@@ -206,6 +206,16 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
     Dorfes zeigen dichte Bebauung mit Wegen und mehreren Nicht-Funktions-
     gebäuden; Bewohner bewegen sich und nutzen Wohnhütten; die Anwendung lädt
     ohne Konsolenfehler.
+16. **Kollision innerorts.** Der Kollisions-Punkt des Abschnitts "**Belebte,
+    dicht bebaute Orte (Ich-Perspektive).**" (`design.md` §2) ist umgesetzt:
+    Spielfigur und Bewohner durchdringen innerorts keine Gebäude und keine
+    soliden Objekte (Hütten, Zäune, Bäume, Felsen, Feuerstelle); Bewegung
+    gleitet an Hindernissen ab; Bewohner bleiben nicht dauerhaft hängen;
+    Zugänge zu den betretbaren Gebäuden und der Ortsausgang bleiben
+    erreichbar. Prüfbar: Ein automatisierter Lauf steuert die Spielfigur
+    gegen ein Gebäude und weist nach, dass sie außerhalb des Kollisionsradius
+    bleibt; Interaktion mit allen Funktionsgebäuden bleibt möglich; die
+    Anwendung läuft ohne Konsolenfehler.
 
 ### 7.2 Selbstverifikation (verpflichtend)
 

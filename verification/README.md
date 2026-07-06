@@ -239,3 +239,35 @@ Dev-Server und Produktions-Preview, 0 Konsolenfehler. Umgesetzt:
 | 49-orte-dorf-masai-kraal.png | Osten: Kuppelhütten-Kraal, Viehpferch |
 | 50-orte-dorf-zulu-steinwaelle.png | Süden: Rondavels mit Trockensteinmauern |
 | 51-orte-produktions-build.png | Produktions-Build (`npm run preview`) |
+
+## Nachtrag: Kollision innerorts (§7.1.16 — design.md §2)
+
+Stand: 7. Juli 2026, achter Lauf (kollision-test.mjs). Headless-Prüfung gegen
+Dev-Server und Produktions-Preview, 0 Konsolenfehler. Umgesetzt:
+
+- **Kreis-Kollisionsmodell** (`src/scenes/place/collision.ts`): jedes solide
+  Objekt wird durch Kreise in der XZ-Ebene approximiert (rechteckige Gebäude
+  als Kreiskette entlang der Längsachse). Die Auflösung schiebt den Beweger
+  entlang der Kontaktnormalen heraus — das ergibt natürliches Abgleiten an
+  Wänden statt hartem Stopp.
+- **Kollidergenerierung** in `buildLayout`: Funktions- und Wohngebäude,
+  Speicher, Zelte, Lagerhaus, Marktstände, Schuppen, Zaunpfosten, Bäume,
+  Felsen sowie Feuerstelle/Webstuhl/Köchin im Dorf.
+- **Spieler** (`PlaceScene`) und **alle Bewohner** (`PlaceLife`: Träger,
+  Kinder, Ziegen, Walker mit Tagesablauf) durchdringen keine Kollider;
+  Walker überspringen einen Wegpunkt, wenn sie länger als 1,4 s blockiert
+  sind (kein dauerhaftes Hängenbleiben).
+
+Verifikation (13 Prüfungen, alle PASS): In beiden Perspektiven wird ein in
+ein Gebäude gesetzter Spieler in einer Frame ausgeworfen (kein Eindringen);
+gegen Wände gerammt bleibt der Mindestabstand ≥ 0; alle Funktionsgebäude
+sind von einem kollisionsfreien Standpunkt aus bedienbar (Prompt erscheint);
+Spawn, Platz und Ortsausgang bleiben frei. Hinweis: Headless-Chromium
+drosselt requestAnimationFrame, daher prüft der Test die Kollision
+frame-unabhängig über Auswurf/Nicht-Durchdringung statt über gehaltenes
+Gehen.
+
+| Datei | Ansicht |
+|---|---|
+| 52-kollision-hafen-wand.png | Hafen: Spieler bündig an der Gebäudewand gestoppt |
+| 53-kollision-dorf-chefhuette.png | Dorf: an der Chefhütte gestoppt, Prompt erreichbar |

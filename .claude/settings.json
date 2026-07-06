@@ -32,7 +32,8 @@
       "Bash(git commit -m 'Atmosphere & immersion: wildlife, climate optics, regional places, ambience, sketches, map *)",
       "Bash(git commit -m 'Spec: real geodata terrain \\(DEM, vector hydrology, PBR splatting\\) *)",
       "Bash(git commit -m 'Real geodata terrain: SRTM DEM, exact 1890 hydrology vectors, PBR splatting, LOD *)",
-      "Bash(git commit -m 'Lively, densely-built places: dwellings, street network, inhabitant routines *)"
+      "Bash(git commit -m 'Lively, densely-built places: dwellings, street network, inhabitant routines *)",
+      "Bash(git commit -m 'In-place collision: player and inhabitants cannot pass through solids *)"
     ],
     "deny": [
       "Read(./.env)",

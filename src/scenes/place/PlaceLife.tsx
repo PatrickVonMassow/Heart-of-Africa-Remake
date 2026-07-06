@@ -8,6 +8,10 @@ import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
 import { buildGoat } from '../../render/fauna'
 import type { RegionPlaceStyle } from './regionStyles'
+import { resolveMove, type Collider } from './collision'
+
+/** Collision radius of inhabitants (matches the player's). */
+const NPC_RADIUS = 0.3
 
 /** Simple primitive human figure; `kneel` folds it down for sitting work. */
 function Figure({
@@ -95,14 +99,15 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
 }
 
 /** Two children chasing each other in a circle. */
-function Kids({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
+function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[]; colliders: Collider[] }) {
   const refs = useRef<Array<THREE.Group | null>>([])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
       if (!g) return
       const a = t * 1.4 + i * Math.PI
-      g.position.set(x + Math.cos(a) * 2.2, Math.abs(Math.sin(t * 6 + i)) * 0.12, z + Math.sin(a) * 2.2)
+      const [px, pz] = resolveMove(colliders, x + Math.cos(a) * 2.2, z + Math.sin(a) * 2.2, NPC_RADIUS)
+      g.position.set(px, Math.abs(Math.sin(t * 6 + i)) * 0.12, pz)
       g.rotation.y = -a
     })
   })
@@ -123,7 +128,7 @@ function Kids({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 }
 
 /** Goats drifting around, grazing — inside the pen when one exists. */
-function Goats({ seed, count, pen }: { seed: number; count: number; pen: PenDef | null }) {
+function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const geo = useMemo(() => buildGoat(), [])
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
@@ -148,7 +153,8 @@ function Goats({ seed, count, pen }: { seed: number; count: number; pen: PenDef 
       const a = anchors[i]
       if (!g || !a) return
       const wob = Math.sin(t * 0.2 + a.phase)
-      g.position.set(a.x + wob * a.amp, 0, a.z + Math.cos(t * 0.17 + a.phase) * a.amp)
+      const [px, pz] = resolveMove(colliders, a.x + wob * a.amp, a.z + Math.cos(t * 0.17 + a.phase) * a.amp, NPC_RADIUS)
+      g.position.set(px, 0, pz)
       g.rotation.y = a.phase + wob * 0.6
     })
   })
@@ -169,7 +175,17 @@ function Goats({ seed, count, pen }: { seed: number; count: number; pen: PenDef 
 }
 
 /** Porters carrying crates between the port buildings and the plaza. */
-function Porters({ seed, stops, cloth }: { seed: number; stops: Array<[number, number]>; cloth: string[] }) {
+function Porters({
+  seed,
+  stops,
+  cloth,
+  colliders,
+}: {
+  seed: number
+  stops: Array<[number, number]>
+  cloth: string[]
+  colliders: Collider[]
+}) {
   const routes = useMemo(() => {
     const rand = mulberry32((seed + 4711) >>> 0)
     const n = Math.min(3, Math.max(1, stops.length))
@@ -195,12 +211,13 @@ function Porters({ seed, stops, cloth }: { seed: number; stops: Array<[number, n
     refs.current.forEach((g, i) => {
       const r = routes[i]
       if (!g || !r) return
-      // Ping-pong along the route.
+      // Ping-pong along the route; solid objects push the porter aside.
       const u = (Math.sin(t * r.speed + r.phase) + 1) / 2
       const x = r.ax + (r.bx - r.ax) * u
       const z = r.az + (r.bz - r.az) * u
       const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
-      g.position.set(x, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, z)
+      const [px, pz] = resolveMove(colliders, x, z, NPC_RADIUS)
+      g.position.set(px, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
   })
@@ -246,6 +263,8 @@ interface WalkerState {
   x: number
   z: number
   yaw: number
+  /** Seconds of blocked movement; skips the waypoint when it grows. */
+  stuck: number
 }
 
 /**
@@ -259,12 +278,14 @@ function Walkers({
   errands,
   cloth,
   count,
+  colliders,
 }: {
   seed: number
   homes: HomeDef[]
   errands: Array<[number, number]>
   cloth: string[]
   count: number
+  colliders: Collider[]
 }) {
   const defs = useMemo(() => {
     const rand = mulberry32((seed + 60601) >>> 0)
@@ -289,6 +310,7 @@ function Walkers({
       x: d.home.door[0],
       z: d.home.door[1],
       yaw: 0,
+      stuck: 0,
     }))
   }
   const refs = useRef<Array<THREE.Group | null>>([])
@@ -339,15 +361,28 @@ function Walkers({
       const dz = target[1] - s.z
       const d = Math.hypot(dx, dz)
       const step = def.speed * dt
-      if (d <= step) {
-        s.x = target[0]
-        s.z = target[1]
+      if (d <= step + 0.35) {
+        // Close enough (the exact point may sit inside a collider).
         s.seg++
+        s.stuck = 0
         if (s.seg === 2) s.pause = 2.5 + Math.random() * 4 // linger at the errand
       } else {
-        s.x += (dx / d) * step
-        s.z += (dz / d) * step
+        // Solid objects block inhabitants too; slide along and skip the
+        // waypoint if blocked for too long (design.md §2 Kollision).
+        const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS)
+        const moved = Math.hypot(nx - s.x, nz - s.z)
+        s.x = nx
+        s.z = nz
         s.yaw = Math.atan2(dx, dz)
+        if (moved < step * 0.3) {
+          s.stuck += dt
+          if (s.stuck > 1.4) {
+            s.seg++
+            s.stuck = 0
+          }
+        } else {
+          s.stuck = 0
+        }
       }
       g.position.set(s.x, Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
       g.rotation.y = s.yaw
@@ -423,6 +458,7 @@ export function PlaceLife({
   homes,
   errands,
   pen,
+  colliders,
 }: {
   kind: 'port' | 'village'
   seed: number
@@ -433,6 +469,7 @@ export function PlaceLife({
   homes: HomeDef[]
   errands: Array<[number, number]>
   pen: PenDef | null
+  colliders: Collider[]
 }) {
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
@@ -441,9 +478,9 @@ export function PlaceLife({
   if (kind === 'port') {
     return (
       <>
-        <Porters seed={localSeed} stops={buildings} cloth={style.cloth} />
+        <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} />
         <Traders seed={localSeed} cloth={style.cloth} />
-        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={6} />
+        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={6} colliders={colliders} />
       </>
     )
   }
@@ -451,9 +488,9 @@ export function PlaceLife({
     <>
       <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
       <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
-      <Kids x={7} z={7.5} cloth={style.cloth} />
-      <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} />
-      <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={5} />
+      <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
+      <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
+      <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={5} colliders={colliders} />
     </>
   )
 }

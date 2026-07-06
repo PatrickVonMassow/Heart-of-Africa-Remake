@@ -32,6 +32,7 @@ Orte wirken nicht als karge Ansammlung weniger Funktionsgebäude, sondern als gl
 - Straßen und Wege erschließen den Ort: Ein erkennbares Wegenetz verbindet Gebäude, Plätze und Ortsrand. Material und Führung passen zur Region (staubige Pisten, gestampfte Lehmwege, belebte Hafengassen). Die Wege ordnen den Ort und lenken die Bewegung von Spieler und Bewohnern.
 - Die Bewohner gehen sichtbar ihren Tätigkeiten nach und bewegen sich glaubhaft durch den Ort: Sie laufen über die Wege, verweilen und arbeiten an Plätzen (§19 Dorf- und Marktleben) und betreten und verlassen die Wohnhütten, in denen sie leben. Sie erscheinen damit nicht als statische Requisiten, sondern als Teil eines lebendigen Alltags — der Ort soll erkennbar „bewohnt" wirken.
 - Die funktionalen, betretbaren Gebäude bleiben trotz der dichteren Bebauung klar erkennbar und heben sich von den nicht betretbaren Bauten ab (§17: Hervorhebung der wichtigen Gebäude).
+- Kollision innerorts: Gebäude und solide Objekte (Hütten, Speicher, Zelte, Zäune, Bäume, Felsen, Feuerstelle u. Ä.) sind physisch undurchdringlich. Weder die Spielfigur noch die Bewohner laufen durch sie hindurch; an Hindernissen gleitet die Bewegung seitlich ab, statt hart zu stoppen. Die Bewohner weichen Hindernissen auf ihren Wegen aus bzw. bleiben nicht dauerhaft an ihnen hängen. Wege, Plätze und die Zugänge zu den betretbaren Gebäuden bleiben stets frei begehbar.
 
 Der Kontrast zwischen der wohlhabenden, geschäftigen Hafenstadt und dem naturnahen Dorf wird durch diese dichtere, belebte Darstellung verstärkt.
 

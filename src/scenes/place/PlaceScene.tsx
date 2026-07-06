@@ -19,9 +19,11 @@ import { createGroundMaterial, createNoisyMaterial } from '../../render/material
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
+import { boxColliders, resolveMove, type Collider } from './collision'
 
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 const INTERACT_RADIUS = 4.5
+const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -75,10 +77,14 @@ interface PlaceLayout {
   fences: FenceDef[]
   paths: PathDef[]
   flora: Array<{ x: number; z: number; h: number }>
+  /** Scattered boulders (solid, part of the collision set). */
+  rocks: Array<[number, number, number]>
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
   errands: Array<[number, number]>
+  /** Solid-object colliders (design.md §2: Kollision innerorts). */
+  colliders: Collider[]
 }
 
 /** Fence posts along a circular arc, skipping given gap angles. */
@@ -325,7 +331,69 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     flora.push({ x, z, h: 3 + rand() * 2 })
   }
 
-  return { interactives, dwellings, fences, paths, flora, pen, errands }
+  const rocks: PlaceLayout['rocks'] = []
+  for (let i = 0; i < 40 && rocks.length < 14; i++) {
+    const a = rand() * Math.PI * 2
+    const r = 6 + rand() * (PLACE_RADIUS + 6)
+    const x = Math.cos(a) * r
+    const z = Math.sin(a) * r
+    if (!isFree(x, z, 2)) continue
+    rocks.push([x, z, 0.3 + rand() * 0.7])
+  }
+
+  // --- Collision set: every solid object becomes one or more circles ------
+  const colliders: Collider[] = []
+  interactives.forEach((it, i) => {
+    if (it.type === 'exit') {
+      colliders.push({ x: it.pos[0] - 1.5, z: it.pos[1], r: 0.24 })
+      colliders.push({ x: it.pos[0] + 1.5, z: it.pos[1], r: 0.24 })
+    } else if (it.type === 'villager') {
+      colliders.push({ x: it.pos[0], z: it.pos[1], r: 0.45 })
+    } else if (place.kind === 'port') {
+      // Must match PortBuilding's variant rotation (variant = interactive index).
+      const rot = ((i * 137) % 40) / 100 - 0.2
+      colliders.push(...boxColliders(it.pos[0], it.pos[1], 2.5, 2.0, rot))
+    } else {
+      colliders.push({ x: it.pos[0], z: it.pos[1], r: 3.35 }) // chief hut
+    }
+  })
+  for (const d of dwellings) {
+    switch (d.kind) {
+      case 'box':
+        colliders.push(...boxColliders(d.x, d.z, d.r, d.r * 0.875, d.rot))
+        break
+      case 'warehouse':
+        colliders.push(...boxColliders(d.x, d.z, d.r, 2.3, d.rot))
+        break
+      case 'granary':
+        colliders.push({ x: d.x, z: d.z, r: 1.2 })
+        break
+      case 'tent':
+        colliders.push({ x: d.x, z: d.z, r: d.r * 1.3 })
+        break
+      case 'stall':
+        colliders.push({ x: d.x, z: d.z, r: 1.35 })
+        break
+      case 'shed':
+        colliders.push({ x: d.x, z: d.z, r: d.r + 0.35 })
+        break
+      default:
+        colliders.push({ x: d.x, z: d.z, r: d.r + 0.3 }) // round hut
+    }
+  }
+  for (const f of fences) {
+    const r = f.kind === 'thorn' ? 0.6 : f.kind === 'stone' ? 0.5 : 0.42
+    for (const [x, z] of f.posts) colliders.push({ x, z, r })
+  }
+  for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
+  for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
+  if (place.kind === 'village') {
+    colliders.push({ x: -3.5, z: 2.5, r: 1.3 }) // fire pit
+    colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
+    colliders.push({ x: -3.5 + 1.2, z: 2.5 + 1.0, r: 0.45 }) // cook
+  }
+
+  return { interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
 }
 
 // --- Shared procedural materials (created once per mount) --------------------
@@ -1021,36 +1089,32 @@ function FirePit({ x, z }: { x: number; z: number }) {
   )
 }
 
-/** Seeded ground scatter: grass tufts and stones (visual only). */
+/** Seeded ground scatter: grass tufts (walkable) plus the layout's solid rocks. */
 function GroundScatter({
   placeId,
   seed,
   isPort,
   grassFactor = 1,
+  rocks,
 }: {
   placeId: string
   seed: number
   isPort: boolean
   grassFactor?: number
+  rocks: Array<[number, number, number]>
 }) {
-  const { tufts, rocks } = useMemo(() => {
+  const tufts = useMemo(() => {
     let hash = 0
     for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
     const rand = mulberry32(((seed ^ hash) + 977) >>> 0)
     const tufts: Array<[number, number, number]> = []
-    const rocks: Array<[number, number, number]> = []
     const tuftCount = Math.round((isPort ? 30 : 70) * grassFactor)
     for (let i = 0; i < tuftCount; i++) {
       const a = rand() * Math.PI * 2
       const r = 4 + rand() * (PLACE_RADIUS + 8)
       tufts.push([Math.cos(a) * r, Math.sin(a) * r, 0.55 + rand() * 0.55])
     }
-    for (let i = 0; i < 16; i++) {
-      const a = rand() * Math.PI * 2
-      const r = 6 + rand() * (PLACE_RADIUS + 6)
-      rocks.push([Math.cos(a) * r, Math.sin(a) * r, 0.3 + rand() * 0.7])
-    }
-    return { tufts, rocks }
+    return tufts
   }, [placeId, seed, isPort, grassFactor])
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
@@ -1086,7 +1150,7 @@ function GroundScatter({
   return (
     <>
       <instancedMesh ref={tuftMesh} args={[tuftGeo, material, 96]} receiveShadow />
-      <instancedMesh ref={rockMesh} args={[rockGeo, material, 16]} castShadow receiveShadow />
+      <instancedMesh ref={rockMesh} args={[rockGeo, material, 20]} castShadow receiveShadow />
     </>
   )
 }
@@ -1134,9 +1198,11 @@ export function PlaceScene() {
     const w = window as unknown as Record<string, unknown>
     w.__placePlayer = player.current
     w.__placeLayout = layout
+    w.__placeColliders = layout?.colliders
     return () => {
       delete w.__placePlayer
       delete w.__placeLayout
+      delete w.__placeColliders
     }
   }, [layout])
 
@@ -1209,8 +1275,11 @@ export function PlaceScene() {
         // Forward is -Z rotated by yaw.
         const dx = ((-sin * forward + cos * strafe) / len) * speed * dt
         const dz = ((-cos * forward - sin * strafe) / len) * speed * dt
-        p.x += dx
-        p.z += dz
+        // Solid objects are impenetrable; the pushout lets the player slide
+        // along walls (design.md §2 Kollision innerorts).
+        const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
+        p.x = rx
+        p.z = rz
         const r = Math.hypot(p.x, p.z)
         if (r > PLACE_RADIUS) {
           useGame.getState().leavePlace()
@@ -1287,7 +1356,7 @@ export function PlaceScene() {
 
       <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
-      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} />
+      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} rocks={layout.rocks} />
 
       <PlaceLife
         kind={isPort ? 'port' : 'village'}
@@ -1301,6 +1370,7 @@ export function PlaceScene() {
           .map((d) => ({ x: d.x, z: d.z, door: d.door }))}
         errands={layout.errands}
         pen={layout.pen}
+        colliders={layout.colliders}
       />
     </>
   )
