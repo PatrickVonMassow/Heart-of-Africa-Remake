@@ -25,6 +25,16 @@ Verlässt man den Ort, wechselt das Spiel zurück in die Vogelperspektive mit de
 **Grafik und Atmosphäre.**
 Dörfer und ihre Bewohner sind typisch für die jeweilige Region gestaltet (Bauweise, Kleidung, Vegetation entsprechend Wüste, Savanne, Dschungel, Hochland, Seen/Rift). Hafenstädte wirken wohlhabender (feste, größere Bauten, geschäftiges Treiben), Dörfer naturnäher (einfache, regionaltypische Behausungen). Die Darstellung erzeugt je Ort und Region eine entsprechende Atmosphäre.
 
+**Belebte, dicht bebaute Orte (Ich-Perspektive).**
+Orte wirken nicht als karge Ansammlung weniger Funktionsgebäude, sondern als glaubhaft bewohnte Siedlungen. Der Aufwand der Darstellung innerorts ist deutlich höher:
+
+- Deutlich mehr Gebäude als die funktionalen (§9): Neben den begehbaren Handels-, Dienstleistungs- und Audienzgebäuden steht eine klare Mehrzahl reiner Wohn- und Nebengebäude — Wohnhütten, Speicher, Ställe, Werkstätten, Zelte, Vorratsbauten —, die der Spieler nicht betreten kann. Dichte, Größenstaffelung und Anordnung sind regionaltypisch (siehe „Grafik und Atmosphäre", §4.5) und je Ort prozedural variiert (§18); Hafenstädte sind dichter und massiver bebaut als Dörfer.
+- Straßen und Wege erschließen den Ort: Ein erkennbares Wegenetz verbindet Gebäude, Plätze und Ortsrand. Material und Führung passen zur Region (staubige Pisten, gestampfte Lehmwege, belebte Hafengassen). Die Wege ordnen den Ort und lenken die Bewegung von Spieler und Bewohnern.
+- Die Bewohner gehen sichtbar ihren Tätigkeiten nach und bewegen sich glaubhaft durch den Ort: Sie laufen über die Wege, verweilen und arbeiten an Plätzen (§19 Dorf- und Marktleben) und betreten und verlassen die Wohnhütten, in denen sie leben. Sie erscheinen damit nicht als statische Requisiten, sondern als Teil eines lebendigen Alltags — der Ort soll erkennbar „bewohnt" wirken.
+- Die funktionalen, betretbaren Gebäude bleiben trotz der dichteren Bebauung klar erkennbar und heben sich von den nicht betretbaren Bauten ab (§17: Hervorhebung der wichtigen Gebäude).
+
+Der Kontrast zwischen der wohlhabenden, geschäftigen Hafenstadt und dem naturnahen Dorf wird durch diese dichtere, belebte Darstellung verstärkt.
+
 **Licht- und Post-Processing-Pipeline.**
 Die Bildqualität stützt sich neben Geometrie- und Materialqualität auf eine vollwertige Beleuchtungs- und Nachbearbeitungskette:
 

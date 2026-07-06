@@ -195,6 +195,17 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
     beider Perspektiven zeigen die aktiven Effekte; Anwendung läuft ohne
     Konsolenfehler auf WebGPU- und WebGL-2-Pfad; Vereinfachungen (z. B. TAA,
     echte Bildraum-Reflexion/Refraktion) sind als offene Punkte benannt.
+15. **Belebte, dicht bebaute Orte.** Der Abschnitt "**Belebte, dicht bebaute
+    Orte (Ich-Perspektive).**" in "## 2. Perspektiven und Kamera" (`design.md`)
+    ist umgesetzt: Die Ich-Perspektive zeigt deutlich mehr Gebäude als nur die
+    funktionalen — zusätzliche, nicht betretbare Wohn- und Nebengebäude in
+    regionaltypischer, prozedural variierter Dichte —, ein erkennbares Straßen-/
+    Wegenetz sowie Bewohner, die sich glaubhaft durch den Ort bewegen und dabei
+    ihre Wohnhütten betreten und verlassen. Die betretbaren Funktionsgebäude
+    bleiben klar hervorgehoben. Prüfbar: Screenshots einer Hafenstadt und eines
+    Dorfes zeigen dichte Bebauung mit Wegen und mehreren Nicht-Funktions-
+    gebäuden; Bewohner bewegen sich und nutzen Wohnhütten; die Anwendung lädt
+    ohne Konsolenfehler.
 
 ### 7.2 Selbstverifikation (verpflichtend)
 
