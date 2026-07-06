@@ -200,3 +200,42 @@ Offene Punkte (im Kriterium benannt): TAA (AA über MSAA des Scene-Pass),
 echte Bildraum-Reflexion/-Refraktion des Wassers (Reflexion kommt aus dem
 IBL-Environment, Refraktion ist über Tiefenabsorption angenähert),
 Tiefenschärfe bewusst weggelassen (Lesbarkeit der Kartenansicht).
+
+## Nachtrag: Belebte, dicht bebaute Orte (§7.1.15 — design.md §2)
+
+Stand: 6. Juli 2026, siebter Lauf (belebt-shots.mjs). Headless-Prüfung gegen
+Dev-Server und Produktions-Preview, 0 Konsolenfehler. Umgesetzt:
+
+- **Dichte Bebauung:** je Ort deutlich mehr nicht betretbare Wohn- und
+  Nebengebäude als Funktionsgebäude — Häfen: Adobe-Häuserreihen (teils
+  zweigeschossig, Dachbalken, Fenster) entlang Haupt- und Querstraße,
+  Lagerhaus, Marktstände, Zelte; Dörfer: 10–13 Wohnbauten plus Speicher,
+  Schuppen, Zäune. Anordnung und Maße je Ort prozedural (§18).
+- **Regionaltypische Siedlungsmuster** (deutlich unterscheidbar): Norden =
+  Adobe-Gassenstadt mit Flachdächern; Westen = Rundhütten-Gehöfte mit
+  Flechtzäunen und Stelzenspeichern; Zentral = Stelzenhäuser mit hohen
+  Kegeldächern auf dunklem Humusboden; Osten = Manyatta-Kraal (Kuppelhütten
+  im Ring, Dornbusch-Umzäunung, zentraler Viehpferch mit Ziegen); Süden =
+  Rondavel-Gehöfte mit Trockensteinmauern.
+- **Wegenetz:** Straßen/Pfade als weiche Canvas-Maske im Bodenmaterial
+  (regionstypische Wegfarbe, ausgefranste Ränder), verbinden Platz,
+  Gebäude, Chefhütte und Ortsausgang; Häfen mit Haupt-/Querstraße und
+  Stichwegen zu den Funktionsgebäuden.
+- **Bewohner-Routinen:** zusätzliche Bewohner treten aus ihren Wohnhütten,
+  laufen über die Wege zu Besorgungspunkten (Platz, Markt, Pferch),
+  verweilen dort und verschwinden wieder in ihren Hütten (Türen der
+  Wohnbauten sind reine Kulisse — nicht betretbar); manche tragen Körbe.
+  Bestehendes Ortsleben (Köchin, Weberin, Kinder, Ziegen, Träger, Händler)
+  bleibt darüber hinaus aktiv.
+- **Hervorhebung:** die betretbaren Funktionsgebäude behalten Beschriftung
+  und Auszeichnung (Markisen/Regalia) und bleiben klar erkennbar.
+
+| Datei | Ansicht |
+|---|---|
+| 45-orte-hafen-kairo.png | Kairo: Straßenzüge, Adobe-Reihen, Marktstand, Bewohner |
+| 46-orte-dorf-nubier-gassen.png | Norden: Adobe-Gassenstadt, helle Piste, Bewohner |
+| 47-orte-dorf-hausa-gehoefte.png | Westen: Rundhütten-Gehöfte, Flechtzäune |
+| 48-orte-dorf-pygmaeen-stelzen.png | Zentral: Stelzenhäuser, Schuppen |
+| 49-orte-dorf-masai-kraal.png | Osten: Kuppelhütten-Kraal, Viehpferch |
+| 50-orte-dorf-zulu-steinwaelle.png | Süden: Rondavels mit Trockensteinmauern |
+| 51-orte-produktions-build.png | Produktions-Build (`npm run preview`) |

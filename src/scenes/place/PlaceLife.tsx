@@ -122,8 +122,8 @@ function Kids({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   )
 }
 
-/** Goats drifting around, grazing. */
-function Goats({ seed, count }: { seed: number; count: number }) {
+/** Goats drifting around, grazing — inside the pen when one exists. */
+function Goats({ seed, count, pen }: { seed: number; count: number; pen: PenDef | null }) {
   const geo = useMemo(() => buildGoat(), [])
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
@@ -133,10 +133,14 @@ function Goats({ seed, count }: { seed: number; count: number }) {
     const rand = mulberry32((seed + 31337) >>> 0)
     return Array.from({ length: count }, () => {
       const a = rand() * Math.PI * 2
+      if (pen) {
+        const r = rand() * (pen.r - 1.6)
+        return { x: pen.x + Math.cos(a) * r, z: pen.z + Math.sin(a) * r, phase: rand() * Math.PI * 2, amp: 0.6 }
+      }
       const r = 9 + rand() * 12
-      return { x: Math.cos(a) * r, z: Math.sin(a) * r, phase: rand() * Math.PI * 2 }
+      return { x: Math.cos(a) * r, z: Math.sin(a) * r, phase: rand() * Math.PI * 2, amp: 1.5 }
     })
-  }, [seed, count])
+  }, [seed, count, pen])
   const refs = useRef<Array<THREE.Group | null>>([])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -144,7 +148,7 @@ function Goats({ seed, count }: { seed: number; count: number }) {
       const a = anchors[i]
       if (!g || !a) return
       const wob = Math.sin(t * 0.2 + a.phase)
-      g.position.set(a.x + wob * 1.5, 0, a.z + Math.cos(t * 0.17 + a.phase) * 1.5)
+      g.position.set(a.x + wob * a.amp, 0, a.z + Math.cos(t * 0.17 + a.phase) * a.amp)
       g.rotation.y = a.phase + wob * 0.6
     })
   })
@@ -221,6 +225,159 @@ function Porters({ seed, stops, cloth }: { seed: number; stops: Array<[number, n
   )
 }
 
+export interface HomeDef {
+  x: number
+  z: number
+  door: [number, number]
+}
+
+export interface PenDef {
+  x: number
+  z: number
+  r: number
+}
+
+interface WalkerState {
+  mode: 'inside' | 'walk'
+  route: Array<[number, number]>
+  seg: number
+  pause: number
+  timer: number
+  x: number
+  z: number
+  yaw: number
+}
+
+/**
+ * Inhabitants with a simple daily routine (design.md §2 belebte Orte): they
+ * step out of their dwelling, walk the paths to an errand point, linger,
+ * walk back and disappear into their home again.
+ */
+function Walkers({
+  seed,
+  homes,
+  errands,
+  cloth,
+  count,
+}: {
+  seed: number
+  homes: HomeDef[]
+  errands: Array<[number, number]>
+  cloth: string[]
+  count: number
+}) {
+  const defs = useMemo(() => {
+    const rand = mulberry32((seed + 60601) >>> 0)
+    const n = Math.min(count, homes.length)
+    return Array.from({ length: n }, (_, i) => ({
+      home: homes[Math.floor(rand() * homes.length)],
+      cloth: cloth[i % cloth.length],
+      speed: 1.05 + rand() * 0.5,
+      startDelay: 1 + rand() * 9,
+      carries: rand() < 0.4,
+    }))
+  }, [seed, homes, cloth, count])
+
+  const states = useRef<WalkerState[]>([])
+  if (states.current.length !== defs.length) {
+    states.current = defs.map((d) => ({
+      mode: 'inside' as const,
+      route: [],
+      seg: 0,
+      pause: 0,
+      timer: d.startDelay,
+      x: d.home.door[0],
+      z: d.home.door[1],
+      yaw: 0,
+    }))
+  }
+  const refs = useRef<Array<THREE.Group | null>>([])
+
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    const t = clock.elapsedTime
+    defs.forEach((def, i) => {
+      const s = states.current[i]
+      const g = refs.current[i]
+      if (!s || !g) return
+
+      if (s.mode === 'inside') {
+        // Invisible while at home; step out through the door when done.
+        g.visible = false
+        s.timer -= dt
+        if (s.timer <= 0) {
+          const e = errands.length > 0 ? errands[Math.floor(Math.random() * errands.length)] : ([0, 2] as [number, number])
+          // Route via a plaza-side midpoint, so walkers follow the lanes.
+          const mid: [number, number] = [e[0] * 0.4 + (Math.random() - 0.5) * 2.5, e[1] * 0.4 + 1 + (Math.random() - 0.5) * 2.5]
+          s.route = [def.home.door, mid, [e[0], e[1]], mid, def.home.door]
+          s.seg = 0
+          s.pause = 0
+          s.x = def.home.door[0]
+          s.z = def.home.door[1]
+          s.mode = 'walk'
+        }
+        return
+      }
+
+      g.visible = true
+      if (s.pause > 0) {
+        // Linger at the errand: slight idle sway, no bob.
+        s.pause -= dt
+        g.position.set(s.x, 0, s.z)
+        g.rotation.y = s.yaw + Math.sin(t * 0.6 + i) * 0.35
+        return
+      }
+
+      const target = s.route[s.seg + 1]
+      if (!target) {
+        // Back home: disappear inside.
+        s.mode = 'inside'
+        s.timer = 7 + Math.random() * 14
+        return
+      }
+      const dx = target[0] - s.x
+      const dz = target[1] - s.z
+      const d = Math.hypot(dx, dz)
+      const step = def.speed * dt
+      if (d <= step) {
+        s.x = target[0]
+        s.z = target[1]
+        s.seg++
+        if (s.seg === 2) s.pause = 2.5 + Math.random() * 4 // linger at the errand
+      } else {
+        s.x += (dx / d) * step
+        s.z += (dz / d) * step
+        s.yaw = Math.atan2(dx, dz)
+      }
+      g.position.set(s.x, Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
+      g.rotation.y = s.yaw
+    })
+  })
+
+  return (
+    <>
+      {defs.map((def, i) => (
+        <group
+          key={i}
+          visible={false}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          <Figure cloth={def.cloth} />
+          {/* Some carry a basket or bundle on the head */}
+          {def.carries && (
+            <mesh position={[0, 1.42, 0]} castShadow>
+              <cylinderGeometry args={[0.22, 0.16, 0.18, 8]} />
+              <meshStandardMaterial color="#a3702e" roughness={0.95} />
+            </mesh>
+          )}
+        </group>
+      ))}
+    </>
+  )
+}
+
 /** Standing traders on the plaza that slowly look around. */
 function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
   const spots = useMemo(() => {
@@ -263,6 +420,9 @@ export function PlaceLife({
   style,
   buildings,
   firePos,
+  homes,
+  errands,
+  pen,
 }: {
   kind: 'port' | 'village'
   seed: number
@@ -270,6 +430,9 @@ export function PlaceLife({
   style: RegionPlaceStyle
   buildings: Array<[number, number]>
   firePos: [number, number]
+  homes: HomeDef[]
+  errands: Array<[number, number]>
+  pen: PenDef | null
 }) {
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
@@ -280,6 +443,7 @@ export function PlaceLife({
       <>
         <Porters seed={localSeed} stops={buildings} cloth={style.cloth} />
         <Traders seed={localSeed} cloth={style.cloth} />
+        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={6} />
       </>
     )
   }
@@ -288,7 +452,8 @@ export function PlaceLife({
       <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
       <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
       <Kids x={7} z={7.5} cloth={style.cloth} />
-      <Goats seed={localSeed} count={3} />
+      <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} />
+      <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={5} />
     </>
   )
 }

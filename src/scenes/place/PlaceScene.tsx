@@ -40,15 +40,74 @@ const BUILDING_LABELS: Record<BuildingType, string> = {
   chief: 'Chefhütte',
 }
 
-interface PlaceLayout {
-  interactives: Interactive[]
-  decoHuts: Array<{ x: number; z: number; r: number; h: number }>
-  palms: Array<{ x: number; z: number; h: number }>
+/** Non-enterable dwellings and outbuildings (design.md §2 belebte Orte). */
+export type DwellingKind = 'hut' | 'box' | 'granary' | 'tent' | 'warehouse' | 'stall' | 'shed'
+
+export interface DwellingDef {
+  x: number
+  z: number
+  /** Yaw; the door faces along local +Z after rotation. */
+  rot: number
+  kind: DwellingKind
+  /** Footprint half-extent. */
+  r: number
+  /** Wall height. */
+  h: number
+  floors: number
+  /** World-space door position (walkers enter/leave here). */
+  door: [number, number]
 }
 
-/** Procedural layout per run+place: positions jittered from a seeded PRNG. */
+interface PathDef {
+  points: Array<[number, number]>
+  width: number
+}
+
+interface FenceDef {
+  kind: 'thorn' | 'woven' | 'stone'
+  /** Sequential post positions; panels orient toward the next post. */
+  posts: Array<[number, number]>
+}
+
+interface PlaceLayout {
+  interactives: Interactive[]
+  dwellings: DwellingDef[]
+  fences: FenceDef[]
+  paths: PathDef[]
+  flora: Array<{ x: number; z: number; h: number }>
+  /** Livestock pen (kraal layouts). */
+  pen: { x: number; z: number; r: number } | null
+  /** Points walkers visit on their errands. */
+  errands: Array<[number, number]>
+}
+
+/** Fence posts along a circular arc, skipping given gap angles. */
+function fenceRing(
+  cx: number,
+  cz: number,
+  radius: number,
+  step: number,
+  gaps: Array<[number, number]>,
+): Array<[number, number]> {
+  const posts: Array<[number, number]> = []
+  const n = Math.max(8, Math.round((Math.PI * 2 * radius) / step))
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2
+    if (gaps.some(([g, half]) => Math.abs(((a - g + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < half)) continue
+    posts.push([cx + Math.cos(a) * radius, cz + Math.sin(a) * radius])
+  }
+  return posts
+}
+
+/**
+ * Procedural layout per run+place (design.md §18): the settlement pattern
+ * follows the region (lanes / compound clusters / kraal ring), with far more
+ * non-enterable dwellings and outbuildings than functional buildings, a
+ * path network and fences (design.md §2 "Belebte, dicht bebaute Orte").
+ */
 function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
+  const style = REGION_PLACE_STYLES[place.region]
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const rand = mulberry32((seed ^ hash) >>> 0)
@@ -73,40 +132,245 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   }
   interactives.push({ type: 'exit', label: 'Ort verlassen', pos: [0, 24] })
 
+  const dwellings: DwellingDef[] = []
+  const fences: FenceDef[] = []
+  const paths: PathDef[] = []
+  const errands: Array<[number, number]> = []
+  let pen: PlaceLayout['pen'] = null
+  const center: [number, number] = [0, 1.5]
+
   // Keep the southern spawn corridor (x≈0, z>6) and interactives clear.
   const isFree = (x: number, z: number, margin: number) => {
-    if (Math.abs(x) < 5 && z > 5) return false
-    if (Math.hypot(x, z - 18) < 7) return false
-    return interactives.every((it) => Math.hypot(x - it.pos[0], z - it.pos[1]) > margin)
+    if (Math.abs(x) < 4.5 && z > 5) return false
+    if (Math.hypot(x, z - 18) < 6) return false
+    if (!interactives.every((it) => Math.hypot(x - it.pos[0], z - it.pos[1]) > margin)) return false
+    return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > margin * 0.55 + d.r)
   }
 
-  const decoHuts: PlaceLayout['decoHuts'] = []
-  const count = place.kind === 'port' ? 7 : 6
-  for (let i = 0; i < count * 4 && decoHuts.length < count; i++) {
-    const angle = rand() * Math.PI * 2
-    const r = 15 + rand() * 8
-    const x = Math.cos(angle) * r
-    const z = Math.sin(angle) * r
-    if (!isFree(x, z, 6)) continue
-    decoHuts.push({ x, z, r: 1.6 + rand() * 0.8, h: 2 + rand() * 0.8 })
+  const addDwelling = (
+    kind: DwellingKind,
+    x: number,
+    z: number,
+    rot: number,
+    r: number,
+    h: number,
+    floors = 1,
+  ): DwellingDef => {
+    const d: DwellingDef = {
+      kind,
+      x,
+      z,
+      rot,
+      r,
+      h,
+      floors,
+      door: [x + Math.sin(rot) * (r + 0.5), z + Math.cos(rot) * (r + 0.5)],
+    }
+    dwellings.push(d)
+    return d
+  }
+  /** Yaw so the door looks from (x,z) toward (tx,tz). */
+  const faceTo = (x: number, z: number, tx: number, tz: number) => Math.atan2(tx - x, tz - z)
+
+  if (place.kind === 'port') {
+    // Street grid: main street south→plaza→north, cross street east–west.
+    paths.push({ points: [[0, 26], [0, 3], [0, -16]], width: 3 })
+    paths.push({ points: [[-20, 3], [20, 3]], width: 2.2 })
+    for (const it of interactives) {
+      if (it.type === 'exit') continue
+      // Spur from each functional building toward the nearest street axis.
+      const toMain: [number, number] = [0, it.pos[1]]
+      const toCross: [number, number] = [it.pos[0], 3]
+      const target = Math.abs(it.pos[0]) < Math.abs(it.pos[1] - 3) ? toMain : toCross
+      paths.push({ points: [it.pos, target], width: 1.4 })
+    }
+
+    // Dense adobe town: rows of houses flanking both streets.
+    for (const sx of [-6.8, 6.8]) {
+      for (let z = -13; z <= 21; z += 4.6) {
+        const x = jitter(sx, 1.6)
+        const zz = jitter(z, 1.6)
+        if (!isFree(x, zz, 4.6)) continue
+        const floors = rand() < 0.3 ? 2 : 1
+        addDwelling('box', x, zz, faceTo(x, zz, 0, zz) + (rand() - 0.5) * 0.15, 1.8 + rand() * 0.5, 2.3 + (floors - 1) * 1.8, floors)
+      }
+    }
+    for (const sz of [-2.8, 9.2]) {
+      for (let x = -19; x <= 19; x += 5.4) {
+        if (Math.abs(x) < 9) continue
+        const xx = jitter(x, 1.8)
+        const zz = jitter(sz, 1.4)
+        if (!isFree(xx, zz, 4.6)) continue
+        const floors = rand() < 0.22 ? 2 : 1
+        addDwelling('box', xx, zz, faceTo(xx, zz, xx, 3) + (rand() - 0.5) * 0.15, 1.7 + rand() * 0.5, 2.2 + (floors - 1) * 1.8, floors)
+      }
+    }
+    // Warehouse at the western end of the cross street.
+    if (isFree(-16.5, 7.5, 4)) addDwelling('warehouse', -16.5, 7.5, Math.PI, 4.2, 3)
+    // Market stalls and tents around the market building.
+    const market = interactives.find((it) => it.type === 'market')
+    if (market) {
+      for (let i = 0; i < 4; i++) {
+        const a = rand() * Math.PI * 2
+        const r = 4.5 + rand() * 2.5
+        const x = market.pos[0] + Math.cos(a) * r
+        const z = market.pos[1] + Math.sin(a) * r
+        if (!isFree(x, z, 3.2)) continue
+        addDwelling(i % 2 ? 'stall' : 'tent', x, z, rand() * Math.PI * 2, 1.3, 1.9)
+      }
+      errands.push([market.pos[0], market.pos[1] + 3.2])
+    }
+    errands.push([0, 3], [jitter(-3, 2), jitter(0, 2)], [jitter(3, 2), jitter(6, 2)])
+  } else {
+    // Common village paths: plaza→exit, plaza→chief, plaza→fire pit.
+    const chief = interactives[0]
+    paths.push({ points: [center, [0, 24]], width: 2.2 })
+    paths.push({ points: [center, [chief.pos[0], chief.pos[1] + 3.4]], width: 1.6 })
+    paths.push({ points: [center, [-3.5, 2.5]], width: 1.1 })
+    errands.push([-2.2, 3.4], [jitter(1.5, 2), jitter(4, 2)], [chief.pos[0], chief.pos[1] + 4])
+
+    const southGap: [number, number] = [Math.PI / 2, 0.55] // spawn corridor
+    const chiefGap: [number, number] = [-Math.PI / 2, 0.5]
+
+    if (style.villageLayout === 'kraal') {
+      // Manyatta: dome huts on a ring inside a thorn fence, cattle pen center.
+      const R = 15.5
+      const n = style.dwellingCount + 4
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + 0.12
+        if (Math.abs(((a - southGap[0] + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.6) continue
+        if (Math.abs(((a - chiefGap[0] + Math.PI * 3) % (Math.PI * 2)) - Math.PI) < 0.55) continue
+        const x = jitter(Math.cos(a) * R, 1.4)
+        const z = jitter(Math.sin(a) * R, 1.4)
+        if (!isFree(x, z, 3.4)) continue
+        const d = addDwelling('hut', x, z, faceTo(x, z, 0, 0), 1.5 + rand() * 0.4, 1.5 + rand() * 0.3)
+        if (dwellings.length % 2 === 0) paths.push({ points: [center, d.door], width: 1.0 })
+      }
+      fences.push({ kind: 'thorn', posts: fenceRing(0, 0.5, R + 4, 1.25, [[southGap[0], 0.3], [chiefGap[0], 0.22]]) })
+      pen = { x: 6.8, z: 2.2, r: 3.4 }
+      fences.push({ kind: 'woven', posts: fenceRing(pen.x, pen.z, pen.r, 0.85, [[Math.PI, 0.35]]) })
+      errands.push([pen.x - pen.r - 0.8, pen.z])
+    } else if (style.villageLayout === 'lanes') {
+      // Desert town: adobe houses along two lanes crossing the main path.
+      paths.push({ points: [[-14, -4.5], [14, -4.5]], width: 1.6 })
+      for (const sx of [-5.2, 5.2]) {
+        for (let z = -10; z <= 15; z += 4.4) {
+          const x = jitter(sx, 1.3)
+          const zz = jitter(z, 1.4)
+          if (!isFree(x, zz, 3.8)) continue
+          const floors = rand() < 0.18 ? 2 : 1
+          addDwelling('box', x, zz, faceTo(x, zz, 0, zz) + (rand() - 0.5) * 0.2, 1.6 + rand() * 0.4, 2.1 + (floors - 1) * 1.7, floors)
+        }
+      }
+      for (const sz of [-8.2, -0.8]) {
+        for (let x = -15; x <= 15; x += 5) {
+          if (Math.abs(x) < 8) continue
+          const xx = jitter(x, 1.6)
+          const zz = jitter(sz, 1.2)
+          if (!isFree(xx, zz, 3.8)) continue
+          addDwelling('box', xx, zz, faceTo(xx, zz, xx, -4.5) + (rand() - 0.5) * 0.2, 1.5 + rand() * 0.4, 2.0)
+        }
+      }
+      errands.push([jitter(-9, 3), -4.5], [jitter(9, 3), -4.5])
+    } else {
+      // Family compounds: hut clusters with fences and granaries.
+      const baseAngles = [0.1, 2.3, 3.35, 4.15, 5.5]
+      const compounds = Math.min(4 + (rand() < 0.5 ? 1 : 0), baseAngles.length)
+      for (let c = 0; c < compounds; c++) {
+        const a = baseAngles[c] + (rand() - 0.5) * 0.3
+        const cr = 13.5 + rand() * 4
+        const cx = Math.cos(a) * cr
+        const cz = Math.sin(a) * cr
+        const huts = 2 + Math.floor(rand() * 2)
+        for (let i = 0; i < huts; i++) {
+          const ha = a + Math.PI + ((i - (huts - 1) / 2) * 1.1 + (rand() - 0.5) * 0.3)
+          const x = cx + Math.cos(ha) * (3.4 + rand() * 1.2)
+          const z = cz + Math.sin(ha) * (3.4 + rand() * 1.2)
+          if (!isFree(x, z, 3.2)) continue
+          addDwelling('hut', x, z, faceTo(x, z, cx, cz), 1.5 + rand() * 0.5, 1.9 + rand() * 0.5)
+        }
+        if (style.granaries && isFree(cx + 2, cz + 2, 2.2)) {
+          addDwelling('granary', cx + 2, cz + 2, faceTo(cx + 2, cz + 2, cx, cz), 0.85, 1.1)
+        }
+        if (style.fence !== 'none') {
+          // Fence around the compound, opening toward the plaza.
+          const openingAngle = Math.atan2(-cz, -cx)
+          fences.push({
+            kind: style.fence === 'stone' ? 'stone' : 'woven',
+            posts: fenceRing(cx, cz, 6.2, style.fence === 'stone' ? 1.0 : 0.9, [[openingAngle, 0.7]]),
+          })
+        }
+        paths.push({ points: [center, [cx, cz]], width: 1.3 })
+        if (c < 2) errands.push([cx, cz])
+      }
+      // A shed and a drying rack scattered between the compounds.
+      for (let i = 0; i < 6 && dwellings.filter((d) => d.kind === 'shed').length < 2; i++) {
+        const a = rand() * Math.PI * 2
+        const r = 9 + rand() * 8
+        const x = Math.cos(a) * r
+        const z = Math.sin(a) * r
+        if (!isFree(x, z, 3)) continue
+        addDwelling('shed', x, z, rand() * Math.PI * 2, 1.1, 1.4)
+      }
+    }
   }
 
-  const palms: PlaceLayout['palms'] = []
-  for (let i = 0; i < 32 && palms.length < 8; i++) {
+  const flora: PlaceLayout['flora'] = []
+  for (let i = 0; i < 48 && flora.length < 9; i++) {
     const angle = rand() * Math.PI * 2
     const r = 8 + rand() * 18
     const x = Math.cos(angle) * r
     const z = Math.sin(angle) * r
-    if (!isFree(x, z, 4)) continue
-    palms.push({ x, z, h: 3 + rand() * 2 })
+    if (!isFree(x, z, 3.5)) continue
+    flora.push({ x, z, h: 3 + rand() * 2 })
   }
 
-  return { interactives, decoHuts, palms }
+  return { interactives, dwellings, fences, paths, flora, pen, errands }
 }
 
 // --- Shared procedural materials (created once per mount) --------------------
 
-function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle) {
+/** Half-extent (world units) the path mask canvas spans around the origin. */
+const PATH_MASK_EXTENT = 44
+
+/** Renders the path polylines into a soft grayscale mask (canvas texture). */
+function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
+  return useMemo(() => {
+    if (!paths || paths.length === 0) return null
+    const size = 512
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, size, size)
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    const toPx = (v: number) => ((v + PATH_MASK_EXTENT) / (PATH_MASK_EXTENT * 2)) * size
+    // Two passes: wide soft verge, narrow trodden core.
+    for (const pass of [
+      { scale: 2.1, alpha: 0.55, blur: 8 },
+      { scale: 1.05, alpha: 1.0, blur: 1 },
+    ]) {
+      ctx.strokeStyle = `rgba(255,255,255,${pass.alpha})`
+      ctx.shadowColor = '#fff'
+      ctx.shadowBlur = pass.blur
+      for (const p of paths) {
+        ctx.lineWidth = ((p.width * pass.scale) / (PATH_MASK_EXTENT * 2)) * size
+        ctx.beginPath()
+        ctx.moveTo(toPx(p.points[0][0]), toPx(p.points[0][1]))
+        for (const [x, z] of p.points.slice(1)) ctx.lineTo(toPx(x), toPx(z))
+        ctx.stroke()
+      }
+    }
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.flipY = false
+    return tex
+  }, [paths])
+}
+
+function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: THREE.Texture | null) {
   return useMemo(() => {
     const plaster = createNoisyMaterial({ base: '#e6d9b4', alt: '#c6b488', scale: 0.6 })
     const plasterDark = createNoisyMaterial({ base: '#d3c294', alt: '#ab9668', scale: 0.7 })
@@ -118,11 +382,15 @@ function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle) {
       octaves: 3,
     })
     const wood = createNoisyMaterial({ base: '#7a5a32', alt: '#573e1f', scale: [1.2, 4, 1.2], roughness: 0.85 })
+    const cloth = createNoisyMaterial({ base: '#d9cdb0', alt: '#b8ab8a', scale: 1.4, roughness: 0.9 })
+    const pathOpts = pathTex
+      ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }
+      : undefined
     const ground = isPort
-      ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b')
-      : createGroundMaterial(...style.ground)
-    return { plaster, plasterDark, mud, thatch, wood, ground }
-  }, [isPort, style])
+      ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
+      : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
+    return { plaster, plasterDark, mud, thatch, wood, cloth, ground }
+  }, [isPort, style, pathTex])
 }
 
 type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
@@ -218,6 +486,7 @@ function VillageHut({
   label,
   mats,
   style,
+  rot,
   chief = false,
 }: {
   x: number
@@ -227,10 +496,11 @@ function VillageHut({
   label?: string
   mats: PlaceMaterials
   style: RegionPlaceStyle
+  /** Yaw of the door; defaults to facing the place center. */
+  rot?: number
   chief?: boolean
 }) {
-  // Door faces the place center.
-  const facing = Math.atan2(x, z) + Math.PI
+  const facing = rot ?? Math.atan2(x, z) + Math.PI
   // Raised floor in the humid Congo basin (design.md §2 region-typical builds).
   const base = style.stilts ? 0.55 : 0
   const wallH = style.roof === 'dome' ? h * 0.55 : h
@@ -393,6 +663,275 @@ function ExitGate({ item, mats }: { item: Interactive; mats: PlaceMaterials }) {
         <div className="map-label">Ort verlassen</div>
       </Html>
     </group>
+  )
+}
+
+// --- Non-enterable dwellings and outbuildings (design.md §2 belebte Orte) ----
+
+/** Rectangular adobe/plaster house with flat roof; door on local +Z. */
+function BoxHouse({ d, mats, variant }: { d: DwellingDef; mats: PlaceMaterials; variant: number }) {
+  const w = d.r * 2
+  const depth = d.r * 1.75
+  const wall = variant % 3 === 0 ? mats.plasterDark : variant % 3 === 1 ? mats.plaster : mats.mud
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      <mesh position={[0, d.h / 2, 0]} castShadow receiveShadow material={wall}>
+        <boxGeometry args={[w, d.h, depth]} />
+      </mesh>
+      {/* Flat roof with parapet */}
+      <mesh position={[0, d.h + 0.07, 0]} castShadow material={mats.wood}>
+        <boxGeometry args={[w + 0.24, 0.14, depth + 0.24]} />
+      </mesh>
+      {[
+        [0, depth / 2, w + 0.24, 0.16],
+        [0, -depth / 2, w + 0.24, 0.16],
+        [-w / 2, 0, 0.16, depth],
+        [w / 2, 0, 0.16, depth],
+      ].map(([px, pz, sw, sd], i) => (
+        <mesh key={i} position={[px, d.h + 0.26, pz]} castShadow material={wall}>
+          <boxGeometry args={[sw, 0.26, sd]} />
+        </mesh>
+      ))}
+      {/* Closed door (not enterable) */}
+      <mesh position={[0, 0.8, depth / 2 + 0.02]}>
+        <boxGeometry args={[0.85, 1.6, 0.07]} />
+        <meshStandardMaterial color="#4a3520" roughness={0.95} />
+      </mesh>
+      {/* Small windows: ground floor beside the door, upper floor if any */}
+      <mesh position={[w * 0.28, 1.35, depth / 2 + 0.02]}>
+        <boxGeometry args={[0.4, 0.45, 0.06]} />
+        <meshStandardMaterial color="#2c2317" roughness={0.8} />
+      </mesh>
+      {d.floors > 1 &&
+        [-w * 0.24, w * 0.24].map((wx) => (
+          <mesh key={wx} position={[wx, d.h - 0.85, depth / 2 + 0.02]}>
+            <boxGeometry args={[0.42, 0.5, 0.06]} />
+            <meshStandardMaterial color="#2c2317" roughness={0.8} />
+          </mesh>
+        ))}
+      {/* Roof beams poking out of the facade (adobe look) */}
+      {[-w * 0.32, 0, w * 0.32].map((wx) => (
+        <mesh key={`b${wx}`} position={[wx, d.h - 0.18, depth / 2 + 0.12]} rotation={[Math.PI / 2, 0, 0]} castShadow material={mats.wood}>
+          <cylinderGeometry args={[0.05, 0.05, 0.3, 5]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Raised granary: mud body on stilt legs with a thatch cap. */
+function Granary({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      {[
+        [-0.5, -0.5],
+        [0.5, -0.5],
+        [-0.5, 0.5],
+        [0.5, 0.5],
+      ].map(([lx, lz], i) => (
+        <mesh key={i} position={[lx, 0.32, lz]} castShadow material={mats.wood}>
+          <cylinderGeometry args={[0.07, 0.09, 0.64, 5]} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.64 + d.h / 2, 0]} castShadow material={mats.mud}>
+        <cylinderGeometry args={[d.r, d.r * 1.1, d.h, 10]} />
+      </mesh>
+      <mesh position={[0, 0.64 + d.h + d.r * 0.42, 0]} castShadow material={mats.thatch}>
+        <coneGeometry args={[d.r * 1.35, d.r * 1.05, 10]} />
+      </mesh>
+      {/* Small filling hatch */}
+      <mesh position={[0, 0.64 + d.h * 0.75, d.r * 0.95]}>
+        <boxGeometry args={[0.35, 0.35, 0.08]} />
+        <meshStandardMaterial color="#3d2c16" roughness={0.95} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Canvas tent (ports: traders passing through). */
+function Tent({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      <mesh position={[0, d.h / 2, 0]} castShadow material={mats.cloth}>
+        <coneGeometry args={[d.r * 1.25, d.h, 8]} />
+      </mesh>
+      <mesh position={[0, d.h + 0.12, 0]} castShadow material={mats.wood}>
+        <cylinderGeometry args={[0.03, 0.03, 0.45, 5]} />
+      </mesh>
+      {/* Dark entrance flap */}
+      <mesh position={[0, 0.55, d.r * 0.82]} rotation={[0.22, 0, 0]}>
+        <boxGeometry args={[0.55, 1.05, 0.06]} />
+        <meshStandardMaterial color="#3a3226" roughness={0.95} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Long harbor warehouse with a wide gate. */
+function Warehouse({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  const w = d.r * 2
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      <mesh position={[0, d.h / 2, 0]} castShadow receiveShadow material={mats.plasterDark}>
+        <boxGeometry args={[w, d.h, 4.6]} />
+      </mesh>
+      <mesh position={[0, d.h + 0.08, 0]} castShadow material={mats.wood}>
+        <boxGeometry args={[w + 0.3, 0.16, 4.9]} />
+      </mesh>
+      {/* Wide gate */}
+      <mesh position={[0, 1.1, 2.32]}>
+        <boxGeometry args={[2.4, 2.2, 0.08]} />
+        <meshStandardMaterial color="#4a3520" roughness={0.95} />
+      </mesh>
+      {[-w * 0.32, w * 0.32].map((wx) => (
+        <mesh key={wx} position={[wx, d.h - 0.7, 2.32]}>
+          <boxGeometry args={[0.5, 0.45, 0.06]} />
+          <meshStandardMaterial color="#2c2317" roughness={0.8} />
+        </mesh>
+      ))}
+      {/* Barrels along the wall */}
+      {[-w * 0.28, -w * 0.12, w * 0.2].map((wx, i) => (
+        <mesh key={`f${i}`} position={[wx, 0.36, 2.75]} castShadow>
+          <cylinderGeometry args={[0.3, 0.34, 0.72, 9]} />
+          <meshStandardMaterial color="#6e4f2a" roughness={0.85} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Market stall: poles, cloth roof, counter with goods. */
+function Stall({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      {[
+        [-1.1, -0.8],
+        [1.1, -0.8],
+        [-1.1, 0.8],
+        [1.1, 0.8],
+      ].map(([px, pz], i) => (
+        <mesh key={i} position={[px, 1.0, pz]} castShadow material={mats.wood}>
+          <cylinderGeometry args={[0.05, 0.06, 2.0, 5]} />
+        </mesh>
+      ))}
+      <mesh position={[0, 2.05, 0]} rotation={[0.14, 0, 0]} castShadow material={mats.cloth}>
+        <boxGeometry args={[2.6, 0.06, 2.0]} />
+      </mesh>
+      {/* Counter with goods */}
+      <mesh position={[0, 0.55, 0.55]} castShadow material={mats.wood}>
+        <boxGeometry args={[2.2, 0.5, 0.7]} />
+      </mesh>
+      <mesh position={[-0.6, 0.95, 0.55]} castShadow>
+        <boxGeometry args={[0.5, 0.3, 0.4]} />
+        <meshStandardMaterial color="#8a6a3a" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.5, 0.95, 0.55]} castShadow>
+        <sphereGeometry args={[0.28, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#a3702e" roughness={0.95} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Small utility shed with a slanted roof and a wood pile. */
+function Shed({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      <mesh position={[0, d.h / 2, 0]} castShadow receiveShadow material={mats.wood}>
+        <boxGeometry args={[d.r * 2, d.h, d.r * 1.6]} />
+      </mesh>
+      <mesh position={[0, d.h + 0.1, 0]} rotation={[0.16, 0, 0]} castShadow material={mats.thatch}>
+        <boxGeometry args={[d.r * 2.3, 0.12, d.r * 2]} />
+      </mesh>
+      {/* Wood pile */}
+      {[0, 1, 2].map((i) => (
+        <mesh
+          key={i}
+          position={[d.r + 0.45, 0.14 + i * 0.17, (i % 2) * 0.1 - 0.05]}
+          rotation={[0, 0.2, Math.PI / 2]}
+          castShadow
+          material={mats.wood}
+        >
+          <cylinderGeometry args={[0.08, 0.09, 1.1, 5]} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Dispatch a dwelling to its regional building component. */
+function Dwelling({ d, mats, style, variant }: { d: DwellingDef; mats: PlaceMaterials; style: RegionPlaceStyle; variant: number }) {
+  switch (d.kind) {
+    case 'hut':
+      return <VillageHut x={d.x} z={d.z} r={d.r} h={d.h} rot={d.rot} mats={mats} style={style} />
+    case 'box':
+      return <BoxHouse d={d} mats={mats} variant={variant} />
+    case 'granary':
+      return <Granary d={d} mats={mats} />
+    case 'tent':
+      return <Tent d={d} mats={mats} />
+    case 'warehouse':
+      return <Warehouse d={d} mats={mats} />
+    case 'stall':
+      return <Stall d={d} mats={mats} />
+    default:
+      return <Shed d={d} mats={mats} />
+  }
+}
+
+/** Instanced fences: thorn-bush kraal rings, woven panels, dry-stone walls. */
+function Fences({ fences, mats }: { fences: FenceDef[]; mats: PlaceMaterials }) {
+  const bushGeo = useMemo(() => buildBush(), [])
+  const panelGeo = useMemo(() => new THREE.BoxGeometry(0.82, 0.95, 0.07), [])
+  const stoneGeo = useMemo(() => new THREE.BoxGeometry(0.9, 0.5, 0.34), [])
+  const thornMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, color: '#a8845a', roughness: 1 }),
+    [],
+  )
+  const stoneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#8d8478', roughness: 1 }), [])
+
+  const { thorn, woven, stone } = useMemo(() => {
+    const out = { thorn: [] as Array<[number, number, number]>, woven: [] as Array<[number, number, number]>, stone: [] as Array<[number, number, number]> }
+    for (const f of fences) {
+      for (let i = 0; i < f.posts.length; i++) {
+        const [x, z] = f.posts[i]
+        const [nx, nz] = f.posts[(i + 1) % f.posts.length]
+        const rot = Math.atan2(nx - x, nz - z) + Math.PI / 2
+        out[f.kind].push([x, z, rot])
+      }
+    }
+    return out
+  }, [fences])
+
+  const thornRef = useRef<THREE.InstancedMesh>(null)
+  const wovenRef = useRef<THREE.InstancedMesh>(null)
+  const stoneRef = useRef<THREE.InstancedMesh>(null)
+
+  useEffect(() => {
+    const mtx = new THREE.Matrix4()
+    const quat = new THREE.Quaternion()
+    const up = new THREE.Vector3(0, 1, 0)
+    const fill = (mesh: THREE.InstancedMesh | null, list: Array<[number, number, number]>, y: number, scale: (i: number) => THREE.Vector3) => {
+      if (!mesh) return
+      list.forEach(([x, z, rot], i) => {
+        quat.setFromAxisAngle(up, rot)
+        mtx.compose(new THREE.Vector3(x, y, z), quat, scale(i))
+        mesh.setMatrixAt(i, mtx)
+      })
+      mesh.count = list.length
+      mesh.instanceMatrix.needsUpdate = true
+    }
+    fill(thornRef.current, thorn, 0, (i) => new THREE.Vector3(1.5, 1.3 + ((i * 37) % 10) / 18, 1.5))
+    fill(wovenRef.current, woven, 0.48, () => new THREE.Vector3(1, 1, 1))
+    fill(stoneRef.current, stone, 0.24, (i) => new THREE.Vector3(1, 0.85 + ((i * 53) % 10) / 25, 1))
+  }, [thorn, woven, stone])
+
+  return (
+    <>
+      <instancedMesh ref={thornRef} args={[bushGeo, thornMat, 220]} castShadow receiveShadow />
+      <instancedMesh ref={wovenRef} args={[panelGeo, mats.thatch, 160]} castShadow receiveShadow />
+      <instancedMesh ref={stoneRef} args={[stoneGeo, stoneMat, 160]} castShadow receiveShadow />
+    </>
   )
 }
 
@@ -569,7 +1108,8 @@ export function PlaceScene() {
   )
   const isPort = place?.kind === 'port'
   const style = REGION_PLACE_STYLES[place?.region ?? 'west']
-  const mats = usePlaceMaterials(!!isPort, style)
+  const pathTex = usePathTexture(layout?.paths ?? null)
+  const mats = usePlaceMaterials(!!isPort, style, pathTex)
   const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
     () => ({ palm: buildPalm(true), acacia: buildAcacia(), jungle: buildJungleTree(), bush: buildBush() }),
     [],
@@ -736,28 +1276,16 @@ export function PlaceScene() {
         )
       })}
 
-      {layout.decoHuts.map((h, i) =>
-        isPort ? (
-          <group key={i} position={[h.x, 0, h.z]} rotation={[0, (i * 73) % 4, 0]}>
-            <mesh position={[0, h.h / 2, 0]} castShadow receiveShadow material={i % 2 ? mats.plaster : mats.plasterDark}>
-              <boxGeometry args={[h.r * 2, h.h, h.r * 1.8]} />
-            </mesh>
-            <mesh position={[0, h.h + 0.08, 0]} castShadow material={mats.wood}>
-              <boxGeometry args={[h.r * 2.2, 0.16, h.r * 2]} />
-            </mesh>
-            <mesh position={[0, h.h * 0.35, h.r * 0.91]}>
-              <boxGeometry args={[0.8, h.h * 0.7, 0.08]} />
-              <meshStandardMaterial color="#3d2c16" roughness={0.9} />
-            </mesh>
-          </group>
-        ) : (
-          <VillageHut key={i} x={h.x} z={h.z} r={h.r} h={h.h} mats={mats} style={style} />
-        ),
-      )}
+      {/* Non-enterable dwellings and outbuildings (design.md §2 belebte Orte) */}
+      {layout.dwellings.map((d, i) => (
+        <Dwelling key={i} d={d} mats={mats} style={style} variant={i} />
+      ))}
+
+      <Fences fences={layout.fences} mats={mats} />
 
       {!isPort && <FirePit x={-3.5} z={2.5} />}
 
-      <PlaceFlora slots={layout.palms} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
+      <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
       <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} />
 
@@ -768,6 +1296,11 @@ export function PlaceScene() {
         style={style}
         buildings={layout.interactives.filter((it) => it.type !== 'exit' && it.type !== 'villager').map((it) => it.pos)}
         firePos={[-3.5, 2.5]}
+        homes={layout.dwellings
+          .filter((d) => d.kind === 'hut' || d.kind === 'box')
+          .map((d) => ({ x: d.x, z: d.z, door: d.door }))}
+        errands={layout.errands}
+        pen={layout.pen}
       />
     </>
   )
