@@ -170,3 +170,33 @@ fehlerfrei. Umgesetzt:
 Anmerkung: Der Suezkanal-Korridor (Bitter-Seen) erscheint als Wasser — er
 existierte 1890 (Eröffnung 1869); die Landverbindung nach Sinai bleibt im
 DEM bestehen (Probe „Suez-Landbrücke": 31 m Land).
+
+## Nachtrag: Licht- und Post-Processing-Pipeline (§7.1.14 — design.md §2)
+
+Stand: 6. Juli 2026, sechster Lauf. Headless-Prüfung gegen Dev-Server und
+Produktions-Preview, 0 Konsolenfehler auf dem WebGL-2-Fallback-Pfad (WebGPU
+nutzt denselben TSL-Code). Die Screenshots 37–44 wurden mit aktiver
+Pipeline neu gerendert und belegen §7.1.13 und §7.1.14 gemeinsam. Umgesetzt:
+
+- **IBL:** prozedurales HDR-Environment (Himmel + Sonnen-Hotspot +
+  Bodenreflex, konsistent zum Sonnenstand) als `scene.environment`
+  (`render/environment.ts`).
+- **Physikalisch begründeter Himmel:** Single-Scatter-Näherung (Rayleigh-
+  Extinktion über Luftmasse, Henyey-Greenstein-Mie um die Sonne) statt
+  Farbverlauf; regionale Stimmungen (§19) als Modulation (`render/sky.tsx`).
+- **Kaskadierte Schatten:** CSMShadowNode (3 Kaskaden, practical, fade) am
+  Reise-Sonnenlicht; die Ich-Perspektive behält ihre hochauflösende
+  Einzel-Shadow-Map (kleine Szene = hohe Dichte nahe der Kamera).
+- **Post-Processing** (`render/Effects.tsx`): Scene-Pass mit MRT-Normalen
+  (4× MSAA) → GTAO → Bloom → Farb-Grading (Sättigung +7 %, warme Höhen) →
+  dezente Vignette; ACES-Tonemapping am Ausgang.
+- **Wasser** (`render/water.ts`): Gerstner-artiges Richtungswellenfeld mit
+  geschärften Kämmen + Noise-Dünung; tiefenabhängige Absorption aus der
+  realen Bathymetrie (DEM-Textur: flach türkis → tief dunkelblau, Flüsse/
+  Seen eigener Ton); Schaum an Uferbändern und Wellenkämmen; niedrige
+  Roughness für IBL-Himmelsreflexionen; distanzabhängig opak.
+
+Offene Punkte (im Kriterium benannt): TAA (AA über MSAA des Scene-Pass),
+echte Bildraum-Reflexion/-Refraktion des Wassers (Reflexion kommt aus dem
+IBL-Environment, Refraktion ist über Tiefenabsorption angenähert),
+Tiefenschärfe bewusst weggelassen (Lesbarkeit der Kartenansicht).

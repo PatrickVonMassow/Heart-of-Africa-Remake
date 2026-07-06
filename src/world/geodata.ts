@@ -51,6 +51,12 @@ export function geodataReady(): boolean {
   return pixels !== null
 }
 
+/** Dataset metadata (bbox/resolution/offset); available after loadGeodata(). */
+export function getDemMeta(): { lonMin: number; lonMax: number; latMin: number; latMax: number; offsetMeters: number } {
+  if (!meta) throw new Error('geodata not loaded')
+  return meta
+}
+
 /** Raw texel access; x/y clamped to the grid. RGBA stride 4. */
 function texel(x: number, y: number): number {
   const m = meta!

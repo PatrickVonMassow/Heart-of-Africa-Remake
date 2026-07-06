@@ -4,6 +4,7 @@ import * as THREE from 'three/webgpu'
 import { useGame } from './state/store'
 import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
+import { Effects } from './render/Effects'
 import { Hud } from './ui/Hud'
 import { AmbienceController } from './ui/AmbienceController'
 
@@ -39,6 +40,7 @@ export default function App() {
       >
         <Suspense fallback={null}>
           {mode === 'travel' ? <TravelScene /> : <PlaceScene />}
+          <Effects />
         </Suspense>
       </Canvas>
       <Hud />

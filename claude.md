@@ -184,6 +184,17 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
     Screenshots von Nildelta, Rift-Kante und einer Küstenlinie zeigen glatte,
     reale Verläufe und texturierten Boden statt Vertexfarben; die Geodaten-
     Vorverarbeitung ist im Repository reproduzierbar dokumentiert.
+14. **Licht- und Post-Processing-Pipeline.** Der Abschnitt "**Licht- und
+    Post-Processing-Pipeline.**" in "## 2. Perspektiven und Kamera"
+    (`design.md`) ist umgesetzt: bildbasierte Umgebungsbeleuchtung (IBL),
+    Himmel aus einem physikalisch begründeten Streuungsmodell konsistent zum
+    Sonnenstand, kaskadierte Schatten in der Vogelperspektive, Bildraum-AO,
+    Bloom, filmisches Tonemapping mit Farb-Grading und dezenter Vignette
+    sowie Wasser mit Wellenfeld, tiefenabhängiger Absorption (reale
+    Bathymetrie) und Schaum an Ufern und Wellenkämmen. Prüfbar: Screenshots
+    beider Perspektiven zeigen die aktiven Effekte; Anwendung läuft ohne
+    Konsolenfehler auf WebGPU- und WebGL-2-Pfad; Vereinfachungen (z. B. TAA,
+    echte Bildraum-Reflexion/Refraktion) sind als offene Punkte benannt.
 
 ### 7.2 Selbstverifikation (verpflichtend)
 

@@ -34,6 +34,7 @@ import { createWaterMaterial } from '../../render/water'
 import { buildAcacia, buildBush, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { Climate } from './Climate'
 import { Wildlife } from './Wildlife'
+import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_RADIUS = 6 // chunks kept around the player in each direction
@@ -309,10 +310,26 @@ function WaterPlane() {
   )
 }
 
-/** Sun light with soft shadows, tracking the player. */
+/**
+ * Sun light tracking the player, with cascaded shadow maps (design.md §2):
+ * high resolution near the camera, softer/coarser further out.
+ */
 function Sun() {
   const lightRef = useRef<THREE.DirectionalLight>(null)
   const targetRef = useRef<THREE.Object3D>(null)
+
+  // Attach the CSM shadow node once the light exists.
+  useEffect(() => {
+    const light = lightRef.current
+    if (!light) return
+    const csm = new CSMShadowNode(light, { cascades: 3, maxFar: 240, mode: 'practical' })
+    csm.fade = true
+    ;(light.shadow as unknown as { shadowNode: unknown }).shadowNode = csm
+    return () => {
+      ;(light.shadow as unknown as { shadowNode: unknown }).shadowNode = null
+    }
+  }, [])
+
   useFrame(() => {
     const pos = useGame.getState().pos
     const l = lightRef.current
@@ -331,10 +348,6 @@ function Sun() {
         color="#fff1da"
         intensity={2.4}
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-95}
-        shadow-camera-right={95}
-        shadow-camera-top={95}
-        shadow-camera-bottom={-95}
         shadow-camera-near={10}
         shadow-camera-far={400}
         shadow-bias={-0.0004}

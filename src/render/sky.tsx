@@ -8,6 +8,7 @@ import {
   clamp,
   color,
   dot,
+  exp,
   float,
   max,
   mix,
@@ -77,18 +78,38 @@ export function SkyDome({
 
     const dir = normalize(positionLocal)
     const y = dir.y
-    const up = clamp(y, 0, 1)
+    const sun = normalize(vec3(...sunDirection))
+    const mu = dot(dir, sun)
 
-    // Vertical gradient above the horizon, muted ground tone below it.
-    const sky = mix(color(preset.horizon), color(preset.zenith), pow(up, float(0.55)))
+    // Single-scatter atmosphere (design.md §2): Rayleigh extinction over a
+    // flat-earth air mass plus Henyey-Greenstein Mie forward scattering.
+    // Compact approximation, consistent with the sun direction.
+    const airMass = float(1).div(max(y, 0.0).add(0.12))
+    const betaR = vec3(0.11, 0.26, 0.56) // stylized Rayleigh coefficients (r<g<b)
+    const transmittance = exp(betaR.mul(airMass).negate())
+    const phaseR = mu.mul(mu).add(1).mul(0.75).mul(0.4).add(0.6)
+    const rayleigh = vec3(1, 1, 1).sub(transmittance).mul(phaseR)
+    const g = 0.78
+    const phaseM = float((1 - g * g) / (4 * Math.PI)).div(
+      float(1 + g * g).sub(mu.mul(2 * g)).max(0.0001).pow(1.5),
+    )
+    const mie = phaseM.mul(airMass.min(6)).mul(0.045)
+    const sky = rayleigh
+      .mul(vec3(0.62, 0.78, 1.05))
+      .add(vec3(1.0, 0.9, 0.72).mul(mie))
+      .mul(1.08)
+
+    // Regional mood tint (§19) stays as a subtle modulation.
+    const tinted = mix(sky, sky.mul(color(preset.zenith).mul(2.4)), 0.14)
+
+    // Muted ground tone below the horizon.
     const below = mix(color(preset.horizon), color(preset.ground), clamp(y.negate().mul(4), 0, 1))
-    let col = mix(below, sky, smoothstep(float(-0.015), float(0.015), y))
+    let col = mix(below, tinted, smoothstep(float(-0.015), float(0.01), y))
 
     // Sun disc plus a wide warm halo.
-    const sun = normalize(vec3(...sunDirection))
-    const s = max(dot(dir, sun), 0)
+    const s = max(mu, 0)
     const disc = pow(s, float(1200)).mul(3.0)
-    const halo = pow(s, float(5)).mul(0.28)
+    const halo = pow(s, float(6)).mul(0.22)
     col = col.add(color(preset.sun).mul(disc.add(halo)))
 
     // Slow drifting cloud bank, faded out toward the horizon.

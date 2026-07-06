@@ -231,8 +231,9 @@ async function main() {
   const pixels = new Uint8Array(W * H * 3)
   for (let i = 0; i < W * H; i++) {
     // Quantize for compression: 4 m steps on land (invisible at game scale),
-    // 50 m steps for bathymetry (color ramps only).
-    const q = ocean[i] ? 50 : 4
+    // 8 m in shallow water (drives the smooth shore-absorption gradient),
+    // 50 m in the deep sea (color ramps only).
+    const q = ocean[i] ? (elev[i] > -240 ? 8 : 50) : 4
     const e = Math.max(0, Math.min(65535, Math.round(elev[i] / q) * q + OFFSET))
     pixels[i * 3] = e >> 8
     pixels[i * 3 + 1] = e & 0xff
