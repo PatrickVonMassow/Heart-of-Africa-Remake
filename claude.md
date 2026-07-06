@@ -150,8 +150,8 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
    Ich-Perspektive (begehbarer Ort) existieren, und der Wechsel zwischen beiden
    funktioniert beim Betreten/Verlassen eines Ortes.
 3. **Weltmodell.** Feste geografische Lage der Landschaftselemente gemäß
-   `design.md`; das konkrete Aussehen darf prozedural und rudimentär sein.
-   Koordinatenanzeige (Breite/Länge in Grad) ist vorhanden.
+   `design.md`; das konkrete Aussehen soll grafisch aufwändig sein, Afrika soll detailliert und authentisch dargestellt werden, der Verlauf der Begrenzungen aller Land- und Kontinent-Regionen soll feingranular sein, inkl. dem Verlauf der Flüsse.
+   Koordinatenanzeige (Breite/Länge in Grad) ist vorhanden. Recherhiere hierzu, wie die genaue Geographie von Afrika zu Ende des 19. Jahrhunderts war. Alle 10 Hafenstädte, 22 Völker, 17 Flüsse und sämtliche Landmarken aus `design.md` sollen umgesetzt sein.
 4. **Bewegung und Zeit.** Die Figur bewegt sich in der Vogelperspektive; Datum
    und Proviant schreiten mit der Reise voran (Kalenderanzeige, Start 1890 gemäß
    `design.md`).
@@ -193,9 +193,6 @@ Nach Fertigstellung und nach jedem größeren System:
 
 - Multiplayer in jeder Form.
 - Onboarding, Tutorials, Absenkung der Einstiegshürde.
-- Vollständige Inhalte: alle 10 Hafenstädte, 22 Völker, 17 Flüsse, sämtliche
-  Landmarken. Für den POC genügt der unter §7.1 geforderte Mindestumfang
-  (mindestens eine Hafenstadt, mindestens ein Dorf, eine Region).
 - Animierte handschriftliche Tagebucheinträge mit Blutspuren (§16 `design.md`).
 - Vollständige Balance, Audio, dynamische Musik, ambiente Tierwelt (§19
   `design.md`), Debug-Menü (§21 `design.md`) über das für die Prüfung Nötige
