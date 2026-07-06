@@ -25,6 +25,15 @@ Verlässt man den Ort, wechselt das Spiel zurück in die Vogelperspektive mit de
 **Grafik und Atmosphäre.**
 Dörfer und ihre Bewohner sind typisch für die jeweilige Region gestaltet (Bauweise, Kleidung, Vegetation entsprechend Wüste, Savanne, Dschungel, Hochland, Seen/Rift). Hafenstädte wirken wohlhabender (feste, größere Bauten, geschäftiges Treiben), Dörfer naturnäher (einfache, regionaltypische Behausungen). Die Darstellung erzeugt je Ort und Region eine entsprechende Atmosphäre.
 
+**Licht- und Post-Processing-Pipeline.**
+Die Bildqualität stützt sich neben Geometrie- und Materialqualität auf eine vollwertige Beleuchtungs- und Nachbearbeitungskette:
+
+- Bildbasierte Beleuchtung: ein HDRI-Himmel dient als Umgebungslichtquelle (IBL) für physikalisch plausible Material-Reflexionen; der sichtbare Himmel folgt einem physikalisch begründeten Atmosphären-/Streuungsmodell statt eines einfachen Farbverlaufs, konsistent mit dem Sonnenstand.
+- Schatten über kaskadierte Shadow Maps (hohe Auflösung nah an der Kamera, weiche Ränder), abgestimmt auf beide Perspektiven.
+- Bildnachbearbeitung: Ambient Occlusion im Bildraum (SSAO/GTAO), Bloom, Temporal Anti-Aliasing, filmisches Tonemapping mit Farb-Grading; dezente Vignette und Tiefenschärfe sind zulässig, dürfen aber die Lesbarkeit der Kartenansicht nicht mindern.
+- Wasser: Bildraum-Reflexionen, Refraktion mit tiefenabhängiger Absorption (Flachwasser heller/grünlicher, Tiefwasser dunkelblau), Wellenfeld (z. B. Gerstner) und Schaum an Ufern und Wellenkämmen.
+- Distanznebel wird durch die Atmosphären-Streuung ersetzt bzw. mit ihr kombiniert; die regionalen Klima-Stimmungen aus §19 bleiben als Modulation darüber bestehen.
+
 ---
 
 ## 3. Weltmodell und Karte

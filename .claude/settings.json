@@ -29,7 +29,9 @@
       "Bash(sed -i \"s|'\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./Users/Patri/Documents/Developing/hoa|'file:///C:/Users/Patri/Documents/Developing/hoa|g\" check-world.mjs)",
       "Bash(cd \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\Documents\\\\\\\\Developing\\\\\\\\hoa\")",
       "Bash(git commit -m 'AAA-style graphics overhaul: TSL sky/water/materials, shadows, vegetation *)",
-      "Bash(git commit -m 'Atmosphere & immersion: wildlife, climate optics, regional places, ambience, sketches, map *)"
+      "Bash(git commit -m 'Atmosphere & immersion: wildlife, climate optics, regional places, ambience, sketches, map *)",
+      "Bash(git commit -m 'Spec: real geodata terrain \\(DEM, vector hydrology, PBR splatting\\) *)",
+      "Bash(git commit -m 'Real geodata terrain: SRTM DEM, exact 1890 hydrology vectors, PBR splatting, LOD *)"
     ],
     "deny": [
       "Read(./.env)",

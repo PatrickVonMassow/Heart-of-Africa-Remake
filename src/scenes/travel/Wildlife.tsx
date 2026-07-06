@@ -75,8 +75,9 @@ function buildHerds(cx: number, cz: number, seed: number): Record<Species, Anima
       const anchor = sampleTerrain(ll.lat, ll.lon, seed)
 
       // Flamingo flocks gather at lake shores regardless of biome roll.
+      // (lakeDistance caps at 0.45°, so the threshold must stay below that.)
       const lakeD = lakeDistance(ll.lat, ll.lon, 1)
-      if (lakeD < 0.6 && roll < 0.7) {
+      if (lakeD < 0.42 && roll < 0.7) {
         placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, true)
         continue
       }

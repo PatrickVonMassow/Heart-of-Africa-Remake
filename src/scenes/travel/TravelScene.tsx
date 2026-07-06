@@ -6,7 +6,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
-import { mx_fractal_noise_float, mx_noise_float, positionWorld, vec3, vertexColor } from 'three/tsl'
+import {
+  attribute,
+  float,
+  mix,
+  mx_fractal_noise_float,
+  normalMap,
+  normalWorldGeometry,
+  positionWorld,
+  smoothstep,
+  texture,
+  vec2,
+  vec3,
+  vec4,
+  vertexColor,
+} from 'three/tsl'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance } from '../../config/balance'
@@ -22,9 +36,14 @@ import { Climate } from './Climate'
 import { Wildlife } from './Wildlife'
 
 const CHUNK_SIZE = 24 // world units
-const CHUNK_SEGMENTS = 32
-const CHUNK_RADIUS = 5 // chunks kept around the player in each direction
+const CHUNK_RADIUS = 6 // chunks kept around the player in each direction
 const CAMERA_OFFSET = { y: 42, z: 24 }
+const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
+
+/** LOD: mesh resolution per chunk by Chebyshev ring distance. */
+function lodSegments(ring: number): number {
+  return ring <= 2 ? 56 : ring <= 4 ? 28 : 20
+}
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.5, 0.62, 0.38]
@@ -36,18 +55,25 @@ function chunkKey(cx: number, cz: number): string {
 /**
  * Build one terrain chunk with smooth, seam-free normals: heights are sampled
  * with a one-vertex margin ring and normals derived by central differences,
- * so neighboring chunks agree exactly at their shared edges.
+ * so neighboring chunks agree exactly at their shared edges. A dropped skirt
+ * around each chunk hides cracks between different LOD levels.
  */
-function buildChunkGeometry(cx: number, cz: number, seed: number): THREE.BufferGeometry {
-  const n = CHUNK_SEGMENTS + 1
-  const step = CHUNK_SIZE / CHUNK_SEGMENTS
+function buildChunkGeometry(cx: number, cz: number, seed: number, segments: number): THREE.BufferGeometry {
+  const n = segments + 1
+  const step = CHUNK_SIZE / segments
   const x0 = cx * CHUNK_SIZE
   const z0 = cz * CHUNK_SIZE
+
+  const skirtCount = 4 * n
+  const total = n * n + skirtCount
+  const positions = new Float32Array(total * 3)
+  const normals = new Float32Array(total * 3)
+  const colors = new Float32Array(total * 3)
+  const splats = new Float32Array(total * 4)
 
   // Height grid including a margin ring for normal computation.
   const m = n + 2
   const heights = new Float32Array(m * m)
-  const colors = new Float32Array(n * n * 3)
   for (let iz = 0; iz < m; iz++) {
     for (let ix = 0; ix < m; ix++) {
       const x = x0 + (ix - 1) * step
@@ -60,12 +86,14 @@ function buildChunkGeometry(cx: number, cz: number, seed: number): THREE.BufferG
         colors[vi * 3] = s.color[0]
         colors[vi * 3 + 1] = s.color[1]
         colors[vi * 3 + 2] = s.color[2]
+        splats[vi * 4] = s.splat[0]
+        splats[vi * 4 + 1] = s.splat[1]
+        splats[vi * 4 + 2] = s.splat[2]
+        splats[vi * 4 + 3] = s.splat[3]
       }
     }
   }
 
-  const positions = new Float32Array(n * n * 3)
-  const normals = new Float32Array(n * n * 3)
   for (let iz = 0; iz < n; iz++) {
     for (let ix = 0; ix < n; ix++) {
       const vi = iz * n + ix
@@ -87,8 +115,8 @@ function buildChunkGeometry(cx: number, cz: number, seed: number): THREE.BufferG
   }
 
   const indices: number[] = []
-  for (let iz = 0; iz < CHUNK_SEGMENTS; iz++) {
-    for (let ix = 0; ix < CHUNK_SEGMENTS; ix++) {
+  for (let iz = 0; iz < segments; iz++) {
+    for (let ix = 0; ix < segments; ix++) {
       const a = iz * n + ix
       const b = a + 1
       const c = a + n
@@ -97,22 +125,109 @@ function buildChunkGeometry(cx: number, cz: number, seed: number): THREE.BufferG
     }
   }
 
+  // Skirt: duplicate the border vertices, dropped by SKIRT_DROP. The terrain
+  // material renders double-sided, so winding does not matter here.
+  const edgeIndex = (e: number, i: number): number => {
+    switch (e) {
+      case 0: return i // north edge (iz = 0)
+      case 1: return (n - 1) * n + i // south edge
+      case 2: return i * n // west edge
+      default: return i * n + (n - 1) // east edge
+    }
+  }
+  let sv = n * n
+  for (let e = 0; e < 4; e++) {
+    const base = sv
+    for (let i = 0; i < n; i++) {
+      const src = edgeIndex(e, i)
+      positions[sv * 3] = positions[src * 3]
+      positions[sv * 3 + 1] = positions[src * 3 + 1] - SKIRT_DROP
+      positions[sv * 3 + 2] = positions[src * 3 + 2]
+      normals[sv * 3] = normals[src * 3]
+      normals[sv * 3 + 1] = normals[src * 3 + 1]
+      normals[sv * 3 + 2] = normals[src * 3 + 2]
+      colors[sv * 3] = colors[src * 3]
+      colors[sv * 3 + 1] = colors[src * 3 + 1]
+      colors[sv * 3 + 2] = colors[src * 3 + 2]
+      for (let k = 0; k < 4; k++) splats[sv * 4 + k] = splats[src * 4 + k]
+      sv++
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const a = edgeIndex(e, i)
+      const b = edgeIndex(e, i + 1)
+      indices.push(a, b, base + i, b, base + i + 1, base + i)
+    }
+  }
+
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
   geo.setIndex(indices)
   return geo
 }
 
-/** Shared terrain material: vertex colors modulated by TSL detail noise. */
+/**
+ * Terrain material (design.md §3): biome vertex tint over splatted tileable
+ * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
+ * normal maps and bi-planar rock on steep slopes.
+ */
 function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
+  const base = import.meta.env.BASE_URL
+  const loader = new THREE.TextureLoader()
+  const load = (name: string, srgb: boolean) => {
+    const t = loader.load(`${base}geodata/tex/${name}.png`)
+    t.wrapS = THREE.RepeatWrapping
+    t.wrapT = THREE.RepeatWrapping
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }
+  const albedos = [load('sand_a', true), load('grass_a', true), load('rock_a', true), load('forest_a', true)]
+  const normalsTex = [load('sand_n', false), load('grass_n', false), load('rock_n', false), load('forest_n', false)]
+
   const mat = new THREE.MeshStandardNodeMaterial()
-  mat.roughness = 0.95
   mat.metalness = 0
-  const detail = mx_fractal_noise_float(vec3(positionWorld.xz.mul(0.3), 1.0), 4)
-  const micro = mx_noise_float(vec3(positionWorld.xz.mul(2.4), 7.0))
-  mat.colorNode = vertexColor().mul(detail.mul(0.28).add(micro.mul(0.12)).add(0.8))
+  mat.side = THREE.DoubleSide // skirts + steep slopes
+  mat.vertexColors = false
+
+  // Cast: the TSL typings do not carry the attribute's vec4 type through.
+  const w = attribute('splat', 'vec4') as unknown as ReturnType<typeof vec4>
+
+  const uvTop = positionWorld.xz.mul(0.5)
+
+  let albedo = texture(albedos[0], uvTop).rgb.mul(w.x)
+  albedo = albedo.add(texture(albedos[1], uvTop).rgb.mul(w.y))
+  albedo = albedo.add(texture(albedos[2], uvTop).rgb.mul(w.z))
+  albedo = albedo.add(texture(albedos[3], uvTop).rgb.mul(w.w))
+
+  // Steep slopes turn rocky; bi-planar side projection avoids stretching.
+  const ny = normalWorldGeometry.y
+  const slopeW = smoothstep(float(0.86), float(0.62), ny)
+  const nx = normalWorldGeometry.x.abs()
+  const nz = normalWorldGeometry.z.abs()
+  const sideBlend = nx.div(nx.add(nz).add(1e-4))
+  const rockZY = texture(albedos[2], positionWorld.zy.mul(0.5)).rgb
+  const rockXY = texture(albedos[2], positionWorld.xy.mul(0.5)).rgb
+  albedo = mix(albedo, mix(rockXY, rockZY, sideBlend), slopeW)
+
+  // Vertex tint carries biome/region hue; boost recenters the mid-gray
+  // detail albedo around 1.0.
+  mat.colorNode = vertexColor().mul(albedo.mul(2.6))
+
+  // Blended detail normal map (top projection).
+  let nrm = texture(normalsTex[0], uvTop).rgb.mul(w.x)
+  nrm = nrm.add(texture(normalsTex[1], uvTop).rgb.mul(w.y))
+  nrm = nrm.add(texture(normalsTex[2], uvTop).rgb.mul(w.z.add(slopeW)))
+  nrm = nrm.add(texture(normalsTex[3], uvTop).rgb.mul(w.w))
+  mat.normalNode = normalMap(vec4(nrm, 1), vec2(0.55, 0.55))
+
+  // Per-material roughness.
+  mat.roughnessNode = w.dot(vec4(0.95, 0.92, 0.85, 0.9))
+
+  // Large-scale brightness variation keeps distant terrain from tiling.
+  const macro = mx_fractal_noise_float(vec3(positionWorld.xz.mul(0.05), 1.0), 3).mul(0.5).add(0.5)
+  mat.colorNode = mat.colorNode.mul(macro.mul(0.3).add(0.85))
   return mat
 }
 
@@ -142,10 +257,22 @@ function TerrainChunks() {
     const keys: string[] = []
     for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
       for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
-        const key = chunkKey(cx + dx, cz + dz)
+        const ring = Math.max(Math.abs(dx), Math.abs(dz))
+        const segments = lodSegments(ring)
+        const key = `${chunkKey(cx + dx, cz + dz)}:${segments}`
         keys.push(key)
         if (!cache.current.has(key)) {
-          cache.current.set(key, buildChunkGeometry(cx + dx, cz + dz, seed))
+          cache.current.set(key, buildChunkGeometry(cx + dx, cz + dz, seed, segments))
+        }
+      }
+    }
+    // Bound the cache: drop non-active geometries once it grows large.
+    if (cache.current.size > 700) {
+      const activeSet = new Set(keys)
+      for (const [key, geo] of cache.current) {
+        if (!activeSet.has(key)) {
+          geo.dispose()
+          cache.current.delete(key)
         }
       }
     }
@@ -176,7 +303,8 @@ function WaterPlane() {
   })
   return (
     <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} material={material}>
-      <planeGeometry args={[CHUNK_SIZE * 10, CHUNK_SIZE * 10, 96, 96]} />
+      {/* Larger than the fog far distance, so its edge is never visible. */}
+      <planeGeometry args={[CHUNK_SIZE * 30, CHUNK_SIZE * 30, 180, 180]} />
     </mesh>
   )
 }

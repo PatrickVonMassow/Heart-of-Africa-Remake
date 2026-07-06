@@ -1,0 +1,12 @@
+{
+  "source": "AWS elevation-tiles-prod (Terrarium, SRTM/GMTED/GEBCO composite), zoom 6",
+  "lonMin": -20,
+  "lonMax": 53,
+  "latMin": -37,
+  "latMax": 38,
+  "res": 0.025,
+  "width": 2920,
+  "height": 3000,
+  "offsetMeters": 12000,
+  "coastDistUnitDeg": 0.02
+}

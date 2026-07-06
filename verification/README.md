@@ -128,3 +128,45 @@ fehlerfrei. Umgesetzt:
 | 34-atmo-tagebuch-skizzen.png | Tagebuch mit Ink-Skizzen (Hafen, Hütten) |
 | 35-atmo-karte.png | Selbstzeichnende Karte nach Nil-Reise (4 % Norden erkundet) |
 | 36-atmo-produktions-build.png | Produktions-Build (`npm run preview`) |
+
+## Nachtrag: Reale Geodaten (§7.1.13 — design.md §3 „Reale Geodaten und Terrain-Darstellung")
+
+Stand: 6. Juli 2026, fünfter Lauf (geo-shots.mjs). Headless-Prüfung gegen
+Dev-Server und Produktions-Preview, 0 Konsolenfehler, `npm run build`
+fehlerfrei. Umgesetzt:
+
+- **Reales Höhenmodell:** SRTM/GMTED/GEBCO-Komposit (Terrarium-Kacheln, AWS
+  Open Data) → äquirektangulares 0,025°-Gitter, als 16-Bit-PNG im Repo
+  (`public/geodata/dem.png`, 5,9 MB). Vorverarbeitung reproduzierbar
+  dokumentiert in `scripts/README.md` (`node scripts/build-geodata.mjs`).
+  Ozean per Flutfüllung (Qattara-/Afar-Senken bleiben Land), Orte auf
+  Subpixel-Inseln werden als Land gestempelt (nur Kapstadt betroffen).
+- **LOD-Streaming:** Chunk-Ringe mit 56/28/20 Segmenten um die Spielfigur,
+  Skirts gegen LOD-Risse, Cache mit Verdrängung.
+- **Glatte Gewässer:** Küstenlinie als 0-Kontur des kontinuierlichen
+  Höhenfelds (bilineare Landmaske + tiefengetriebene Farbe); Flüsse/Seen
+  über exakte Distanzen zu Catmull-Rom-verdichteten ~1890-Vektorläufen
+  (`src/world/hydro.ts`) — keine sichtbaren Rasterstufen mehr.
+- **PBR-Splatting:** vier generierte kachelbare Materialien (Sand, Gras,
+  Fels, Walddach) mit Albedo + Detail-Normalmaps, per Vertex-Gewichten
+  gemischt; steile Hänge bi-planar mit Fels; Biom-Tint aus Vertexfarben.
+- **Weiche Regionsübergänge:** Farb-/Textur-Banding an den Regionsgrenzen
+  durch Smoothstep-Regionsgewichte ersetzt (Gameplay-Typen bleiben diskret).
+- Echte Reliefformen sichtbar: Nildelta, Rift-Berge, Äthiopisches Hochland
+  mit Schluchten, Oranje-Canyon, Namib-Dünenküste; Kilimandscharo 5143 m im
+  Gitter (Schneegrenze ab ~4300 m).
+
+| Datei | Ansicht |
+|---|---|
+| 37-geodaten-nildelta.png | Nildelta: reale Deltaform, mäandernder Nil, Golf von Suez |
+| 38-geodaten-kilimandscharo.png | Rift: reale Bergketten, Viktoriasee, Rudolfsee |
+| 39-geodaten-kueste-lagos.png | Guineaküste: glatte Buchten, Niger-Läufe |
+| 40-geodaten-kongo.png | Kongobecken: mäandernde Flüsse, Walddach-Textur |
+| 41-geodaten-kapstadt.png | Kap: Oranje-Canyon (Augrabies), Namib-Übergang, Dünen |
+| 42-geodaten-aethiopien.png | Äthiopisches Hochland: reale Schluchten des Blauen Nils |
+| 43-geodaten-kairo-ort.png | Ich-Perspektive unverändert funktionsfähig |
+| 44-geodaten-produktions-build.png | Produktions-Build (`npm run preview`) |
+
+Anmerkung: Der Suezkanal-Korridor (Bitter-Seen) erscheint als Wasser — er
+existierte 1890 (Eröffnung 1869); die Landverbindung nach Sinai bleibt im
+DEM bestehen (Probe „Suez-Landbrücke": 31 m Land).

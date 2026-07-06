@@ -1,18 +1,14 @@
-// Terrain sampling: fixed geography (geoIndex.ts over data/*) + procedural
-// per-run appearance via seeded noise (design.md §3/§18). Heights are
-// stylized, not to scale; the *positions* of coasts, rivers, lakes and
-// mountains are authentic ~1890 geography.
+// Terrain sampling on real geodata (design.md §3 "Reale Geodaten und
+// Terrain-Darstellung"): heights come from the SRTM-composite DEM
+// (world/geodata.ts), shorelines from its flood-filled ocean mask, river and
+// lake banks from exact ~1890 vector distances (world/hydro.ts). The seeded
+// noise only adds per-run micro-relief and color variety (design.md §18);
+// the geography itself is identical in every run.
 
 import { regionAt } from './geo'
-import {
-  CELL_LAKE,
-  CELL_OCEAN,
-  cellAt,
-  coastDistance,
-  lakeDistance,
-  riverDistance,
-} from './geoIndex'
-import { MOUNTAINS, RIDGES } from './data/landmarks'
+import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
+import { elevationAt, landFractionAt } from './geodata'
+import { lakeContains } from './hydro'
 import { fbm2 } from './noise'
 
 export type TerrainType =
@@ -24,16 +20,29 @@ export type TerrainType =
   | 'mountain'
   | 'water' // river/lake
 
+/** Splat weights for the ground textures: [sand, grass, rock, forest]. */
+export type SplatWeights = [number, number, number, number]
+
 export interface TerrainSample {
   /** Height in world units (sea level = 0). */
   height: number
+  /** Real elevation in meters (below 0 in the ocean). */
+  elevation: number
   type: TerrainType
-  /** Vertex color as [r, g, b] in 0..1. */
+  /** Vertex color as [r, g, b] in 0..1 (tint over the splatted albedo). */
   color: [number, number, number]
+  splat: SplatWeights
 }
 
 /** River half-width in degrees for terrain carving. */
 export const RIVER_WIDTH_DEG = 0.14
+
+/** Vertical exaggeration: world units per meter (stylized, map scale). */
+const METERS_TO_UNITS = 1.35 / 1000
+
+/** Real elevation thresholds (meters) for mountain terrain and snow. */
+const MOUNTAIN_M = 1600
+const SNOW_M = 4300
 
 // Base palette per terrain type; noise varies brightness per run.
 const PALETTE: Record<TerrainType, [number, number, number]> = {
@@ -65,11 +74,6 @@ function sstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** Blended biome color: primary/alt tone mixed by noise, no hard steps. */
-function biomeColor(type: TerrainType, n: number): [number, number, number] {
-  return mix(PALETTE[type], PALETTE_ALT[type], sstep(0.25, 0.75, n))
-}
-
 function vary(c: [number, number, number], f: number): [number, number, number] {
   return [c[0] * f, c[1] * f, c[2] * f]
 }
@@ -82,120 +86,76 @@ function mix(
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
 }
 
-function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
-  const dx = bx - ax
-  const dy = by - ay
-  const lenSq = dx * dx + dy * dy
-  let t = lenSq === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / lenSq
-  t = Math.max(0, Math.min(1, t))
-  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+/** Blended biome color: primary/alt tone mixed by noise, no hard steps. */
+function biomeColor(type: TerrainType, n: number): [number, number, number] {
+  return mix(PALETTE[type], PALETTE_ALT[type], sstep(0.25, 0.75, n))
 }
 
-/**
- * Stylized elevation of the named mountains and highland ridges
- * (data/landmarks.ts) at the given coordinates, in world units.
- */
-function landmarkElevation(lat: number, lon: number): number {
-  let h = 0
-  for (const m of MOUNTAINS) {
-    const dLon = lon - m.lon
-    const dLat = lat - m.lat
-    const cutoff = m.radiusDeg * 2.5
-    if (Math.abs(dLon) > cutoff || Math.abs(dLat) > cutoff) continue
-    const d = Math.hypot(dLon, dLat) / m.radiusDeg
-    h += (m.elevationM / 1000) * 1.5 * Math.exp(-d * d * 2.2)
-  }
-  for (const r of RIDGES) {
-    let min = Infinity
-    for (let i = 0; i < r.points.length - 1; i++) {
-      const [ax, ay] = r.points[i]
-      const [bx, by] = r.points[i + 1]
-      const d = distToSegment(lon, lat, ax, ay, bx, by)
-      if (d < min) min = d
-    }
-    const t = min / r.widthDeg
-    if (t < 2.5) h += (r.elevationM / 1000) * 1.1 * Math.exp(-t * t * 1.6)
-  }
-  return h
+function normalizeSplat(s: SplatWeights): SplatWeights {
+  const sum = s[0] + s[1] + s[2] + s[3]
+  if (sum <= 0) return [1, 0, 0, 0]
+  return [s[0] / sum, s[1] / sum, s[2] / sum, s[3] / sum]
 }
 
 /**
  * Sample terrain at geographic coordinates. `seed` controls the per-run
- * procedural appearance; geography itself is fixed.
+ * procedural appearance; geography itself is fixed real data.
  */
 export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
-  const cell = cellAt(lat, lon)
-  const coastD = coastDistance(lat, lon)
+  const land = landFractionAt(lat, lon)
+  const elevation = elevationAt(lat, lon)
+  const detail = fbm2(lon * 3, lat * 3, seed + 7, 3)
 
-  if (cell === CELL_OCEAN) {
-    // Shallow shelf toward the shore avoids a hard height step at the
-    // rasterized coast; the water plane at sea level hides the seam.
-    const depth = Math.min(1, coastD / 2.5)
-    const shelf = Math.min(1, coastD / 0.5)
-    return {
-      height: -0.08 - shelf * 0.4 - depth * 2.0,
-      type: 'ocean',
-      color: vary(PALETTE.ocean, 1.25 - depth * 0.65),
-    }
-  }
+  // Continuous shoreline: height and color blend across the smooth
+  // (bilinear) land fraction, so the waterline is the smooth 0-contour of
+  // the height field — no per-vertex land/ocean steps.
+  const shoreT = sstep(0.32, 0.68, land)
+  const hOcean = -0.12 + Math.max(-3.4, elevation * 0.0006)
+  const hLandBase = Math.max(0.06, elevation * METERS_TO_UNITS) + detail * 0.2 * shoreT
 
-  // Lakes: surface below sea level so the global water plane covers them
-  // (stylized — real altitudes are not modeled).
-  if (cell === CELL_LAKE) {
-    return { height: -0.6, type: 'water', color: PALETTE.water }
-  }
-
-  const riverD = riverDistance(lat, lon)
-  if (riverD < RIVER_WIDTH_DEG) {
-    return { height: -0.25, type: 'water', color: PALETTE.water }
+  if (land < 0.5) {
+    const height = Math.min(-0.02, hOcean + (hLandBase - hOcean) * shoreT)
+    // Depth-driven color following the continuous height field. It converges
+    // quickly to one deep tone, so coarse far-LOD triangles show no banding;
+    // the animated water plane above provides the visible ocean surface.
+    const teal: [number, number, number] = [0.28, 0.52, 0.58]
+    const shallow = mix(biomeColor('coast', detail), teal, sstep(0.0, -0.12, height))
+    const color = mix(shallow, PALETTE_ALT.ocean, sstep(-0.08, -0.6, height))
+    return { height, elevation, type: 'ocean', color, splat: [1, 0, 0, 0] }
   }
 
   const region = regionAt(lat, lon)
   const n = fbm2(lon * 0.6, lat * 0.6, seed, 4)
-  const detail = fbm2(lon * 3, lat * 3, seed + 7, 3)
   const shade = 0.85 + detail * 0.3
+  const riverD = riverDistance(lat, lon)
 
+  // Height: real relief with stylized exaggeration plus per-run micro-detail.
+  let height = hOcean + (hLandBase - hOcean) * shoreT
+
+  // Biome type: mountains from real elevation, the rest from region + noise.
+  const mountainT = sstep(MOUNTAIN_M - 350, MOUNTAIN_M + 250, elevation)
   let type: TerrainType
-  let height: number
-  switch (region) {
-    case 'north':
-      // Sahara: low dune fields with subtle relief.
-      type = 'desert'
-      height = 0.5 + n * 1.1 + detail * 0.4
-      break
-    case 'central':
-      // Congo basin rainforest.
-      type = 'jungle'
-      height = 0.4 + n * 0.8
-      break
-    case 'east':
-      // Mountains/rift belt: ridged, higher relief.
-      type = n > 0.45 ? 'mountain' : 'savanna'
-      height = 0.8 + Math.pow(n, 1.5) * 6
-      break
-    case 'south':
-      // High plateau; Namib/Kalahari desert strip toward the west coast.
-      if (lon < 18.5 && lat > -31) {
+  if (elevation > MOUNTAIN_M) {
+    type = 'mountain'
+  } else {
+    switch (region) {
+      case 'north':
         type = 'desert'
-        height = 0.6 + n * 1.2
-      } else {
-        type = n > 0.75 ? 'mountain' : 'savanna'
-        height = 1.8 + n * 2.4
-      }
-      break
-    case 'west':
-    default:
-      // Savanna; rainforest belt along the Guinea coast.
-      type = lat < 8 && lon < 2 && n > 0.35 ? 'jungle' : 'savanna'
-      height = 0.5 + n * 1.4
-      break
-  }
-
-  // Named mountains and highland ridges rise above the regional base.
-  const peaks = landmarkElevation(lat, lon)
-  if (peaks > 0.05) {
-    height += peaks
-    if (peaks > 2.0) type = 'mountain'
+        break
+      case 'central':
+        type = 'jungle'
+        break
+      case 'east':
+        type = n > 0.62 ? 'mountain' : 'savanna'
+        break
+      case 'south':
+        type = lon < 18.5 && lat > -31 ? 'desert' : 'savanna'
+        break
+      case 'west':
+      default:
+        type = lat < 8 && lon < 2 && n > 0.35 ? 'jungle' : 'savanna'
+        break
+    }
   }
 
   // Fertile strip along rivers turns desert green (visual only).
@@ -203,64 +163,110 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     type = 'savanna'
   }
 
-  let color = biomeColor(type, detail)
+  // Soft region weights: the same boundaries as regionAt (geo.ts), but with
+  // smoothstep transitions of ~2-3 degrees, so neither color nor texture
+  // shows hard bands at region borders. The discrete `type` above keeps
+  // driving gameplay and vegetation.
+  const wNorth = Math.max(
+    sstep(15.5, 18.5, lat),
+    Math.min(sstep(13.2, 15.5, lat), sstep(23, 26.5, lon)),
+  )
+  const wSouth = 1 - sstep(-13.5, -10.5, lat)
+  const wEast = Math.min(sstep(30, 33, lon), 1 - wNorth, 1 - wSouth)
+  const wCentral = Math.min(sstep(10.5, 13.5, lon), 1 - sstep(6.2, 8.8, lat), 1 - wEast, 1 - wNorth, 1 - wSouth)
+  const wWest = Math.max(0, 1 - wNorth - wSouth - wEast - wCentral)
 
-  // Cross-blend neighboring biomes so type boundaries have no hard color
-  // steps (the discrete `type` stays as-is for gameplay/vegetation).
-  switch (region) {
-    case 'east':
-      color = mix(biomeColor('savanna', detail), biomeColor('mountain', detail), sstep(0.35, 0.55, n))
-      break
-    case 'south':
-      if (!(lon < 18.5 && lat > -31)) {
-        color = mix(biomeColor('savanna', detail), biomeColor('mountain', detail), sstep(0.62, 0.85, n))
-      }
-      break
-    case 'west':
-      if (lat < 8 && lon < 2) {
-        color = mix(biomeColor('savanna', detail), biomeColor('jungle', detail), sstep(0.28, 0.45, n))
-      }
-      break
-    default:
-      break
+  // Per-region ground colors (before relief/river/coast overlays).
+  const colDesert = biomeColor('desert', detail)
+  const colSavanna = biomeColor('savanna', detail)
+  const colJungle = biomeColor('jungle', detail)
+  const colMountain = biomeColor('mountain', detail)
+  const colWest =
+    lat < 8 && lon < 2 ? mix(colSavanna, colJungle, sstep(0.28, 0.45, n)) : colSavanna
+  const colEast = mix(colSavanna, colMountain, Math.max(mountainT, sstep(0.5, 0.68, n) * 0.6))
+  // Namib/Kalahari strip toward the west coast, softly bounded.
+  const southDesertT = Math.min(1 - sstep(17.5, 19.8, lon), sstep(-32.5, -30, lat))
+  const colSouth = mix(colSavanna, colDesert, southDesertT)
+
+  let color: [number, number, number] = [0, 0, 0]
+  const acc = (c: [number, number, number], w: number) => {
+    color[0] += c[0] * w
+    color[1] += c[1] * w
+    color[2] += c[2] * w
   }
-  if (type === 'mountain' && region !== 'east' && region !== 'south') {
-    color = biomeColor('mountain', detail)
-  }
+  acc(colWest, wWest)
+  acc(colJungle, wCentral)
+  acc(colEast, wEast)
+  acc(colSouth, wSouth)
+  acc(colDesert, wNorth)
+
+  // Real relief drives a rocky tint toward the peaks in every region.
+  color = mix(color, colMountain, mountainT)
+
+  // Splat weights blended with the same soft region weights.
+  const forestW = wCentral + (lat < 8 && lon < 2 ? wWest * sstep(0.28, 0.45, n) : 0)
+  const sandW = wNorth + wSouth * southDesertT
+  const splat: SplatWeights = [
+    sandW + 0.12,
+    Math.max(0, 1 - forestW - sandW),
+    mountainT * 2.5,
+    forestW,
+  ]
 
   // Lush banks along rivers and lakes (visual only).
   const bankT = 1 - Math.min(1, riverD / 0.5)
   if (bankT > 0 && type !== 'mountain') {
-    color = mix(color, LUSH, sstep(0.15, 0.9, bankT) * 0.65)
+    const lush = sstep(0.15, 0.9, bankT) * 0.65
+    color = mix(color, LUSH, lush)
+    splat[1] += lush * 0.8
   }
 
-  // Snow caps on the highest peaks (Kilimandscharo, Kenia, Ruwenzori …).
-  if (type === 'mountain' && height > 6.5) {
-    color = mix(color, SNOW, Math.min(1, (height - 6.5) / 1.5))
+  // Snow caps from real elevation (Kilimandscharo, Kenia, Ruwenzori …).
+  const snowT = sstep(SNOW_M - 400, SNOW_M + 300, elevation)
+  if (snowT > 0) {
+    color = mix(color, SNOW, snowT)
   }
 
-  // Smooth shoreline ramp near the sea coast, blending into beach sand.
+  // Smooth shoreline ramp near the sea coast: a gentle beach plain several
+  // world units wide, so the waterline gradient stays smooth on all LODs.
+  const coastD = coastDistance(lat, lon)
   if (coastD < 0.6) {
     const t = coastD / 0.6
-    height = height * t + 0.15 * (1 - t)
-    color = mix(biomeColor('coast', detail), color, sstep(0.1, 0.55, t))
-    if (coastD < 0.22) {
-      type = 'coast'
+    if (elevation < 400) {
+      height = Math.min(height, 0.04 + coastD * 1.3 + detail * 0.06)
+      color = mix(biomeColor('coast', detail), color, sstep(0.08, 0.5, t))
+      splat[0] += (1 - sstep(0.08, 0.4, t)) * 2
+      if (coastD < 0.15) type = 'coast'
+    } else {
+      height = height * (0.45 + 0.55 * t) // real cliffs, just softened
     }
   }
 
-  // Banks slope down toward lakes and rivers.
+  // Lakes and rivers carve a continuous channel: height follows the signed
+  // distance to the shoreline/centerline, so the waterline is the smooth
+  // 0-contour — no per-vertex steps along banks (design.md §3).
   const lakeD = lakeDistance(lat, lon, 1)
-  if (lakeD < 0.35) {
-    const t = lakeD / 0.35
-    height = Math.min(height, 0.08 + t * Math.max(0.4, height))
+  if (lakeD < 0.3 || lakeContains(lat, lon)) {
+    const sd = lakeContains(lat, lon) ? -lakeD : lakeD // signed: negative inside
+    const hWater = Math.max(-0.6, 0.06 + sd * 2.6)
+    if (hWater < height) height = hWater
+    if (sd < -0.005) type = 'water'
   }
-  if (riverD < RIVER_WIDTH_DEG * 2.5) {
-    const t = (riverD - RIVER_WIDTH_DEG) / (RIVER_WIDTH_DEG * 1.5)
-    height = Math.min(height, 0.1 + Math.max(0, t) * height)
+  const riverS = riverD - RIVER_WIDTH_DEG
+  if (riverS < RIVER_WIDTH_DEG * 1.6) {
+    const hWater = Math.max(-0.32, 0.06 + riverS * 2.2)
+    if (hWater < height) height = hWater
+    if (riverS < -0.005) type = 'water'
+  }
+  if (type === 'water') {
+    // Sandy bank fading into water-blue with depth; the transparent water
+    // plane above adds the actual surface.
+    const depth = sstep(0.02, -0.35, height)
+    color = mix(mix(biomeColor('coast', detail), color, 0.4), PALETTE.water, depth)
+    splat[0] += 1.5
   }
 
-  return { height, type, color: vary(color, shade) }
+  return { height, elevation, type, color: vary(color, shade), splat: normalizeSplat(splat) }
 }
 
 /** Terrain type is ocean → not walkable on foot (design.md §11). */

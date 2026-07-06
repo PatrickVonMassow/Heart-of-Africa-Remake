@@ -32,6 +32,17 @@ body,
   height: 100%;
 }
 
+/* Boot screen while the geodata (DEM) loads. */
+.boot-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 20px;
+  color: var(--hud-accent);
+  letter-spacing: 0.5px;
+}
+
 .game-root canvas {
   display: block;
 }

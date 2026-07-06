@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Downloaded DEM tile cache of scripts/build-geodata.mjs (reproducible)
+scripts/.tile-cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

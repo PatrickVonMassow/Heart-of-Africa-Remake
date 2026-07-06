@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { mx_fractal_noise_float, positionWorld, time, uniform, vec3 } from 'three/tsl'
+import { max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { useGame } from '../../state/store'
 import type { RegionId } from '../../world/geo'
 
@@ -62,8 +62,11 @@ export function Climate() {
     )
       .mul(0.5)
       .add(0.5)
+    // Radial fade toward the quad edges, so the layer border is invisible.
+    const edge = max(uv().x.sub(0.5).abs(), uv().y.sub(0.5).abs())
+    const edgeFade = smoothstep(0.5, 0.3, edge)
     m.colorNode = colorU
-    m.opacityNode = n.mul(n).mul(opacityU)
+    m.opacityNode = n.mul(n).mul(opacityU).mul(edgeFade)
     return { material: m, opacityU, colorU }
   }, [])
 
