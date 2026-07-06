@@ -1,16 +1,40 @@
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { Suspense } from 'react'
+import { Canvas, extend, type ThreeToJSXElements } from '@react-three/fiber'
+import * as THREE from 'three/webgpu'
+import { useGame } from './state/store'
+import { TravelScene } from './scenes/travel/TravelScene'
+import { PlaceScene } from './scenes/place/PlaceScene'
+import { Hud } from './ui/Hud'
+
+declare module '@react-three/fiber' {
+  interface ThreeElements extends ThreeToJSXElements<typeof THREE> {}
+}
+
+// Register the WebGPU build's classes for JSX elements (R3F v9 pattern).
+extend(THREE as unknown as Parameters<typeof extend>[0])
 
 export default function App() {
+  const mode = useGame((s) => s.mode)
   return (
-    <Canvas style={{ height: '100vh' }}>
-      <ambientLight />
-      <pointLight position={[5, 5, 5]} />
-      <mesh rotation={[0.4, 0.6, 0]}>
-        <boxGeometry />
-        <meshStandardMaterial color="orange" />
-      </mesh>
-      <OrbitControls />
-    </Canvas>
+    <div className="game-root">
+      <Canvas
+        camera={{ fov: 50, near: 0.1, far: 2000, position: [0, 40, 20] }}
+        gl={async (props) => {
+          // WebGPU primary; the renderer falls back to WebGL 2 automatically
+          // when WebGPU is unavailable (CLAUDE.md §3).
+          const renderer = new THREE.WebGPURenderer({
+            ...(props as ConstructorParameters<typeof THREE.WebGPURenderer>[0]),
+            antialias: true,
+          })
+          await renderer.init()
+          return renderer
+        }}
+      >
+        <Suspense fallback={null}>
+          {mode === 'travel' ? <TravelScene /> : <PlaceScene />}
+        </Suspense>
+      </Canvas>
+      <Hud />
+    </div>
   )
 }
