@@ -1,0 +1,387 @@
+// Ambient wildlife for the travel view (design.md §19): non-threatening
+// herds as scenery (elephants, giraffes, zebras, antelopes, flamingos at the
+// lakes), a purely decorative lion hunt, and vultures circling the player
+// when the expedition is in poor condition. No gameplay effect.
+
+import { useEffect, useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three/webgpu'
+import { useGame } from '../../state/store'
+import { worldToLatLon } from '../../world/geo'
+import { sampleTerrain } from '../../world/terrain'
+import { lakeDistance } from '../../world/geoIndex'
+import {
+  buildAntelope,
+  buildElephant,
+  buildFlamingo,
+  buildGiraffe,
+  buildLion,
+  buildVulture,
+  buildZebra,
+} from '../../render/fauna'
+
+const CHUNK_SIZE = 24
+const HERD_RADIUS = 4 // chunks around the player checked for herds
+
+type Species = 'elephant' | 'giraffe' | 'zebra' | 'antelope' | 'flamingo'
+const SPECIES: Species[] = ['elephant', 'giraffe', 'zebra', 'antelope', 'flamingo']
+const MAX_INSTANCES: Record<Species, number> = {
+  elephant: 60,
+  giraffe: 60,
+  zebra: 120,
+  antelope: 120,
+  flamingo: 140,
+}
+
+interface Animal {
+  x: number
+  z: number
+  y: number
+  rot: number
+  scale: number
+  /** Per-animal phase for the grazing shuffle. */
+  phase: number
+}
+
+function hash(cx: number, cz: number, i: number, seed: number): number {
+  let h = (seed ^ 0xa51ce5) >>> 0
+  h = Math.imul(h ^ cx, 0x85ebca6b)
+  h = Math.imul(h ^ cz, 0xc2b2ae35)
+  h = Math.imul(h ^ i, 0x27d4eb2f)
+  h ^= h >>> 15
+  h = Math.imul(h, 0x2c1b3c6d)
+  h ^= h >>> 13
+  return (h >>> 0) / 4294967296
+}
+
+/** Deterministic herds around a center chunk. */
+function buildHerds(cx: number, cz: number, seed: number): Record<Species, Animal[]> {
+  const herds: Record<Species, Animal[]> = {
+    elephant: [],
+    giraffe: [],
+    zebra: [],
+    antelope: [],
+    flamingo: [],
+  }
+
+  for (let dz = -HERD_RADIUS; dz <= HERD_RADIUS; dz++) {
+    for (let dx = -HERD_RADIUS; dx <= HERD_RADIUS; dx++) {
+      const ccx = cx + dx
+      const ccz = cz + dz
+      const roll = hash(ccx, ccz, 0, seed)
+      const ax = (ccx + hash(ccx, ccz, 1, seed)) * CHUNK_SIZE
+      const az = (ccz + hash(ccx, ccz, 2, seed)) * CHUNK_SIZE
+      const ll = worldToLatLon(ax, az)
+      const anchor = sampleTerrain(ll.lat, ll.lon, seed)
+
+      // Flamingo flocks gather at lake shores regardless of biome roll.
+      const lakeD = lakeDistance(ll.lat, ll.lon, 1)
+      if (lakeD < 0.6 && roll < 0.7) {
+        placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, true)
+        continue
+      }
+
+      let species: Species | null = null
+      let count = 0
+      if (anchor.type === 'savanna') {
+        if (roll < 0.12) species = 'elephant'
+        else if (roll < 0.2) species = 'giraffe'
+        else if (roll < 0.33) species = 'zebra'
+        else if (roll < 0.46) species = 'antelope'
+        count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : 7
+      } else if (anchor.type === 'jungle') {
+        if (roll < 0.06) {
+          species = 'elephant'
+          count = 3
+        }
+      } else if (anchor.type === 'desert') {
+        if (roll < 0.05) {
+          species = 'antelope'
+          count = 4
+        }
+      }
+      if (!species) continue
+      placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, false)
+    }
+  }
+  return herds
+}
+
+function placeGroup(
+  list: Animal[],
+  ccx: number,
+  ccz: number,
+  ax: number,
+  az: number,
+  count: number,
+  spread: number,
+  seed: number,
+  baseScale: number,
+  shoreline: boolean,
+) {
+  for (let i = 0; i < count; i++) {
+    const r1 = hash(ccx, ccz, 10 + i * 3, seed)
+    const r2 = hash(ccx, ccz, 11 + i * 3, seed)
+    const r3 = hash(ccx, ccz, 12 + i * 3, seed)
+    const x = ax + (r1 - 0.5) * spread * 2
+    const z = az + (r2 - 0.5) * spread * 2
+    const ll = worldToLatLon(x, z)
+    const s = sampleTerrain(ll.lat, ll.lon, seed)
+    if (shoreline) {
+      // Flamingos stand in shallow water or on the bank.
+      if (s.type !== 'water' && s.height > 0.6) continue
+    } else if (s.type === 'ocean' || s.type === 'water' || s.height <= 0.05) {
+      continue
+    }
+    list.push({
+      x,
+      z,
+      y: shoreline ? 0.02 : Math.max(0.02, s.height),
+      rot: r3 * Math.PI * 2,
+      scale: baseScale * (0.85 + r3 * 0.3),
+      phase: r1 * Math.PI * 2,
+    })
+  }
+}
+
+/** Instanced herds, softly shuffling in place. */
+function Herds() {
+  const seed = useGame((s) => s.seed)
+  const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
+  const herdsRef = useRef<Record<Species, Animal[]> | null>(null)
+  const lastCenter = useRef<string | null>(null)
+
+  const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
+    () => ({
+      elephant: buildElephant(),
+      giraffe: buildGiraffe(),
+      zebra: buildZebra(),
+      antelope: buildAntelope(),
+      flamingo: buildFlamingo(),
+    }),
+    [],
+  )
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+    [],
+  )
+
+  useEffect(() => {
+    lastCenter.current = null
+  }, [seed])
+
+  const mtx = useMemo(() => new THREE.Matrix4(), [])
+  const quat = useMemo(() => new THREE.Quaternion(), [])
+  const up = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  const vpos = useMemo(() => new THREE.Vector3(), [])
+  const vscl = useMemo(() => new THREE.Vector3(), [])
+
+  useFrame(({ clock }) => {
+    const pos = useGame.getState().pos
+    const cx = Math.floor(pos.x / CHUNK_SIZE)
+    const cz = Math.floor(pos.z / CHUNK_SIZE)
+    const center = `${cx},${cz}`
+    if (center !== lastCenter.current) {
+      lastCenter.current = center
+      herdsRef.current = buildHerds(cx, cz, seed)
+    }
+    const herds = herdsRef.current
+    if (!herds) return
+
+    // Grazing shuffle: slow per-animal drift and heading sway.
+    const t = clock.elapsedTime
+    for (const sp of SPECIES) {
+      const mesh = meshRefs.current[sp]
+      if (!mesh) continue
+      const list = herds[sp]
+      const n = Math.min(list.length, MAX_INSTANCES[sp])
+      for (let i = 0; i < n; i++) {
+        const a = list[i]
+        const wob = Math.sin(t * 0.25 + a.phase)
+        vpos.set(a.x + wob * 0.8, a.y, a.z + Math.cos(t * 0.2 + a.phase) * 0.8)
+        quat.setFromAxisAngle(up, a.rot + wob * 0.4)
+        vscl.setScalar(a.scale)
+        mtx.compose(vpos, quat, vscl)
+        mesh.setMatrixAt(i, mtx)
+      }
+      mesh.count = n
+      mesh.instanceMatrix.needsUpdate = true
+    }
+  })
+
+  return (
+    <>
+      {SPECIES.map((sp) => (
+        <instancedMesh
+          key={sp}
+          ref={(el) => {
+            meshRefs.current[sp] = el ?? undefined
+          }}
+          args={[geometries[sp], material, MAX_INSTANCES[sp]]}
+          castShadow
+          frustumCulled={false}
+        />
+      ))}
+    </>
+  )
+}
+
+/**
+ * Purely decorative lion hunt (design.md §19): near zebra herds a lion
+ * occasionally chases one zebra; after the catch both rest, then despawn.
+ */
+function LionHunt() {
+  const seed = useGame((s) => s.seed)
+  const lion = useRef<THREE.Group>(null)
+  const prey = useRef<THREE.Group>(null)
+  const state = useRef<{
+    mode: 'idle' | 'chase' | 'feed'
+    lx: number
+    lz: number
+    px: number
+    pz: number
+    timer: number
+  }>({ mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0 })
+
+  const geo = useMemo(() => ({ lion: buildLion(), zebra: buildZebra() }), [])
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+    [],
+  )
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    const s = state.current
+    const pos = useGame.getState().pos
+
+    if (s.mode === 'idle') {
+      s.timer -= dt
+      if (s.timer > 0) return
+      // Try to start a hunt somewhere on savanna within view.
+      const ang = Math.random() * Math.PI * 2
+      const dist = 25 + Math.random() * 20
+      const px = pos.x + Math.cos(ang) * dist
+      const pz = pos.z + Math.sin(ang) * dist
+      const ll = worldToLatLon(px, pz)
+      const t = sampleTerrain(ll.lat, ll.lon, seed)
+      if (t.type !== 'savanna') {
+        s.timer = 4
+        return
+      }
+      s.px = px
+      s.pz = pz
+      s.lx = px + 14
+      s.lz = pz + 6
+      s.mode = 'chase'
+    } else if (s.mode === 'chase') {
+      // Zebra flees, lion closes in slightly faster.
+      const dx = s.px - s.lx
+      const dz = s.pz - s.lz
+      const d = Math.hypot(dx, dz)
+      const fleeX = dx / (d || 1)
+      const fleeZ = dz / (d || 1)
+      s.px += fleeX * 4.6 * dt
+      s.pz += fleeZ * 4.6 * dt
+      s.lx += fleeX * 5.6 * dt
+      s.lz += fleeZ * 5.6 * dt
+      if (d < 0.6) {
+        s.mode = 'feed'
+        s.timer = 20
+      }
+      // Abort when the hunt strays too far from the player.
+      if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > 90) {
+        s.mode = 'idle'
+        s.timer = 10
+      }
+    } else {
+      s.timer -= dt
+      if (s.timer <= 0) {
+        s.mode = 'idle'
+        s.timer = 30 + Math.random() * 30
+      }
+    }
+
+    const active = s.mode !== 'idle'
+    if (lion.current) {
+      lion.current.visible = active
+      if (active) {
+        const ll = worldToLatLon(s.lx, s.lz)
+        lion.current.position.set(s.lx, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height), s.lz)
+        lion.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
+      }
+    }
+    if (prey.current) {
+      prey.current.visible = active
+      if (active) {
+        const ll = worldToLatLon(s.px, s.pz)
+        prey.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height), s.pz)
+        prey.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
+        // Fallen on its side once caught.
+        prey.current.rotation.z = s.mode === 'feed' ? Math.PI / 2.2 : 0
+      }
+    }
+  })
+
+  return (
+    <>
+      <group ref={lion} visible={false}>
+        <mesh geometry={geo.lion} material={material} castShadow />
+      </group>
+      <group ref={prey} visible={false}>
+        <mesh geometry={geo.zebra} material={material} castShadow />
+      </group>
+    </>
+  )
+}
+
+/**
+ * Vultures circling the player as a warning sign of poor condition
+ * (design.md §19). The POC has no full health system (design.md §6), so the
+ * trigger is exhausted provisions.
+ * OPEN: bind to the full health/affliction system once it exists.
+ */
+function Vultures() {
+  const group = useRef<THREE.Group>(null)
+  const geo = useMemo(() => buildVulture(), [])
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+    [],
+  )
+
+  useFrame(({ clock }) => {
+    const s = useGame.getState()
+    if (!group.current) return
+    const starving = s.foodDays <= 0 && s.mode === 'travel'
+    group.current.visible = starving
+    if (!starving) return
+    const t = clock.elapsedTime
+    group.current.position.set(s.pos.x, 0, s.pos.z)
+    group.current.children.forEach((bird, i) => {
+      const phase = (i / group.current!.children.length) * Math.PI * 2
+      const a = t * 0.45 + phase
+      const r = 4.5 + i * 0.9
+      bird.position.set(Math.cos(a) * r, 5.5 + Math.sin(t * 0.8 + phase) * 0.6, Math.sin(a) * r)
+      bird.rotation.y = -a - Math.PI / 2
+      bird.rotation.z = 0.25 // banking into the circle
+      bird.scale.setScalar(1.6)
+    })
+  })
+
+  return (
+    <group ref={group} visible={false}>
+      {[0, 1, 2].map((i) => (
+        <mesh key={i} geometry={geo} material={material} />
+      ))}
+    </group>
+  )
+}
+
+export function Wildlife() {
+  return (
+    <>
+      <Herds />
+      <LionHunt />
+      <Vultures />
+    </>
+  )
+}

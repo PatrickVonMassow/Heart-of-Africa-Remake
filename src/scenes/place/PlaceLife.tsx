@@ -1,0 +1,294 @@
+// Ambient life in places (design.md §19 "Dorf- und Marktleben", §2 bustle):
+// villagers cooking and weaving, playing children and goats in villages;
+// porters and traders in the wealthier ports. Pure animation, no mechanics.
+
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three/webgpu'
+import { mulberry32 } from '../../world/noise'
+import { buildGoat } from '../../render/fauna'
+import type { RegionPlaceStyle } from './regionStyles'
+
+/** Simple primitive human figure; `kneel` folds it down for sitting work. */
+function Figure({
+  cloth,
+  skin = '#5c3317',
+  scale = 1,
+  kneel = false,
+}: {
+  cloth: string
+  skin?: string
+  scale?: number
+  kneel?: boolean
+}) {
+  const bodyH = kneel ? 0.55 : 1.0
+  return (
+    <group scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
+      <mesh position={[0, bodyH * 0.5, 0]} castShadow>
+        <coneGeometry args={[0.32, bodyH, 8]} />
+        <meshStandardMaterial color={cloth} roughness={0.95} />
+      </mesh>
+      <mesh position={[0, bodyH + 0.18, 0]} castShadow>
+        <sphereGeometry args={[0.16, 10, 8]} />
+        <meshStandardMaterial color={skin} roughness={0.85} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Kneeling cook with a three-stick pot beside the village fire. */
+function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  return (
+    <group position={[x, 0, z]} rotation={[0, Math.PI / 3, 0]}>
+      <Figure cloth={cloth} kneel />
+      {/* Tripod with pot over the embers */}
+      <group position={[0.85, 0, -0.4]}>
+        {[0, 1, 2].map((i) => {
+          const a = (i / 3) * Math.PI * 2
+          return (
+            <mesh
+              key={i}
+              position={[Math.cos(a) * 0.22, 0.35, Math.sin(a) * 0.22]}
+              rotation={[Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4]}
+              castShadow
+            >
+              <cylinderGeometry args={[0.02, 0.02, 0.75, 4]} />
+              <meshStandardMaterial color="#4a3018" roughness={0.95} />
+            </mesh>
+          )
+        })}
+        <mesh position={[0, 0.42, 0]} castShadow>
+          <sphereGeometry args={[0.17, 8, 6, 0, Math.PI * 2, 0, Math.PI / 1.6]} />
+          <meshStandardMaterial color="#2c2622" roughness={0.7} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
+
+/** Weaver working at a simple standing loom. */
+function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; weave: string }) {
+  const facing = Math.atan2(-x, -z)
+  return (
+    <group position={[x, 0, z]} rotation={[0, facing, 0]}>
+      {/* Loom frame */}
+      {[-0.55, 0.55].map((px) => (
+        <mesh key={px} position={[px, 0.75, 0]} castShadow>
+          <cylinderGeometry args={[0.035, 0.045, 1.5, 5]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.45, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.03, 0.03, 1.25, 5]} />
+        <meshStandardMaterial color="#5f4526" roughness={0.95} />
+      </mesh>
+      {/* Half-finished cloth */}
+      <mesh position={[0, 1.0, 0]} castShadow>
+        <boxGeometry args={[0.95, 0.85, 0.03]} />
+        <meshStandardMaterial color={weave} roughness={0.95} side={THREE.DoubleSide} />
+      </mesh>
+      <group position={[0, 0, 0.55]}>
+        <Figure cloth={cloth} />
+      </group>
+    </group>
+  )
+}
+
+/** Two children chasing each other in a circle. */
+function Kids({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
+  const refs = useRef<Array<THREE.Group | null>>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    refs.current.forEach((g, i) => {
+      if (!g) return
+      const a = t * 1.4 + i * Math.PI
+      g.position.set(x + Math.cos(a) * 2.2, Math.abs(Math.sin(t * 6 + i)) * 0.12, z + Math.sin(a) * 2.2)
+      g.rotation.y = -a
+    })
+  })
+  return (
+    <>
+      {[0, 1].map((i) => (
+        <group
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          <Figure cloth={cloth[i % cloth.length]} scale={0.55} />
+        </group>
+      ))}
+    </>
+  )
+}
+
+/** Goats drifting around, grazing. */
+function Goats({ seed, count }: { seed: number; count: number }) {
+  const geo = useMemo(() => buildGoat(), [])
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+    [],
+  )
+  const anchors = useMemo(() => {
+    const rand = mulberry32((seed + 31337) >>> 0)
+    return Array.from({ length: count }, () => {
+      const a = rand() * Math.PI * 2
+      const r = 9 + rand() * 12
+      return { x: Math.cos(a) * r, z: Math.sin(a) * r, phase: rand() * Math.PI * 2 }
+    })
+  }, [seed, count])
+  const refs = useRef<Array<THREE.Group | null>>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    refs.current.forEach((g, i) => {
+      const a = anchors[i]
+      if (!g || !a) return
+      const wob = Math.sin(t * 0.2 + a.phase)
+      g.position.set(a.x + wob * 1.5, 0, a.z + Math.cos(t * 0.17 + a.phase) * 1.5)
+      g.rotation.y = a.phase + wob * 0.6
+    })
+  })
+  return (
+    <>
+      {anchors.map((_, i) => (
+        <group
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          <mesh geometry={geo} material={material} castShadow />
+        </group>
+      ))}
+    </>
+  )
+}
+
+/** Porters carrying crates between the port buildings and the plaza. */
+function Porters({ seed, stops, cloth }: { seed: number; stops: Array<[number, number]>; cloth: string[] }) {
+  const routes = useMemo(() => {
+    const rand = mulberry32((seed + 4711) >>> 0)
+    const n = Math.min(3, Math.max(1, stops.length))
+    return Array.from({ length: n }, (_, i) => {
+      const a = stops[i % stops.length]
+      // Routes lead across the central plaza so the bustle stays in view.
+      const px = (rand() - 0.5) * 7
+      const pz = (rand() - 0.5) * 7
+      const toCenter = Math.hypot(a[0], a[1]) || 1
+      return {
+        ax: a[0] * (1 - 3.2 / toCenter),
+        az: a[1] * (1 - 3.2 / toCenter),
+        bx: px,
+        bz: pz,
+        phase: rand() * Math.PI * 2,
+        speed: 0.55 + rand() * 0.2,
+      }
+    })
+  }, [seed, stops])
+  const refs = useRef<Array<THREE.Group | null>>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    refs.current.forEach((g, i) => {
+      const r = routes[i]
+      if (!g || !r) return
+      // Ping-pong along the route.
+      const u = (Math.sin(t * r.speed + r.phase) + 1) / 2
+      const x = r.ax + (r.bx - r.ax) * u
+      const z = r.az + (r.bz - r.az) * u
+      const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
+      g.position.set(x, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, z)
+      g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
+    })
+  })
+  return (
+    <>
+      {routes.map((_, i) => (
+        <group
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          <Figure cloth={cloth[i % cloth.length]} />
+          {/* Carried crate */}
+          <mesh position={[0, 1.05, 0.3]} castShadow>
+            <boxGeometry args={[0.45, 0.35, 0.35]} />
+            <meshStandardMaterial color="#7a5a32" roughness={0.9} />
+          </mesh>
+        </group>
+      ))}
+    </>
+  )
+}
+
+/** Standing traders on the plaza that slowly look around. */
+function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
+  const spots = useMemo(() => {
+    const rand = mulberry32((seed + 913) >>> 0)
+    return [
+      { x: 3 + rand() * 2, z: -4 - rand() * 2, phase: rand() * Math.PI * 2 },
+      { x: -4 - rand() * 2, z: -2 - rand() * 2, phase: rand() * Math.PI * 2 },
+    ]
+  }, [seed])
+  const refs = useRef<Array<THREE.Group | null>>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    refs.current.forEach((g, i) => {
+      const s = spots[i]
+      if (!g || !s) return
+      g.rotation.y = Math.sin(t * 0.4 + s.phase) * 0.8
+    })
+  })
+  return (
+    <>
+      {spots.map((s, i) => (
+        <group
+          key={i}
+          position={[s.x, 0, s.z]}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          <Figure cloth={cloth[(i + 1) % cloth.length]} />
+        </group>
+      ))}
+    </>
+  )
+}
+
+export function PlaceLife({
+  kind,
+  seed,
+  placeId,
+  style,
+  buildings,
+  firePos,
+}: {
+  kind: 'port' | 'village'
+  seed: number
+  placeId: string
+  style: RegionPlaceStyle
+  buildings: Array<[number, number]>
+  firePos: [number, number]
+}) {
+  let hash = 0
+  for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
+  const localSeed = (seed ^ hash) >>> 0
+
+  if (kind === 'port') {
+    return (
+      <>
+        <Porters seed={localSeed} stops={buildings} cloth={style.cloth} />
+        <Traders seed={localSeed} cloth={style.cloth} />
+      </>
+    )
+  }
+  return (
+    <>
+      <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+      <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
+      <Kids x={7} z={7.5} cloth={style.cloth} />
+      <Goats seed={localSeed} count={3} />
+    </>
+  )
+}

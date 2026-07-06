@@ -16,7 +16,9 @@ import { mulberry32 } from '../../world/noise'
 import { isKeyDown, onKeyPress } from '../../systems/input'
 import { PORT_SKY, VILLAGE_SKY, SkyDome } from '../../render/sky'
 import { createGroundMaterial, createNoisyMaterial } from '../../render/materials'
-import { buildGrassTuft, buildPalm, buildRock } from '../../render/flora'
+import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
+import { PlaceLife } from './PlaceLife'
 
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 const INTERACT_RADIUS = 4.5
@@ -104,18 +106,23 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
 
 // --- Shared procedural materials (created once per mount) --------------------
 
-function usePlaceMaterials(isPort: boolean) {
+function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle) {
   return useMemo(() => {
     const plaster = createNoisyMaterial({ base: '#e6d9b4', alt: '#c6b488', scale: 0.6 })
     const plasterDark = createNoisyMaterial({ base: '#d3c294', alt: '#ab9668', scale: 0.7 })
-    const mud = createNoisyMaterial({ base: '#b58343', alt: '#8a6231', scale: 0.9 })
-    const thatch = createNoisyMaterial({ base: '#a5894b', alt: '#6f5a2c', scale: [2.2, 7, 2.2], octaves: 3 })
+    const mud = createNoisyMaterial({ base: style.hutWall.base, alt: style.hutWall.alt, scale: 0.9 })
+    const thatch = createNoisyMaterial({
+      base: style.hutThatch.base,
+      alt: style.hutThatch.alt,
+      scale: [2.2, 7, 2.2],
+      octaves: 3,
+    })
     const wood = createNoisyMaterial({ base: '#7a5a32', alt: '#573e1f', scale: [1.2, 4, 1.2], roughness: 0.85 })
     const ground = isPort
       ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b')
-      : createGroundMaterial('#c9a878', '#a9885c', '#8f7a4e')
+      : createGroundMaterial(...style.ground)
     return { plaster, plasterDark, mud, thatch, wood, ground }
-  }, [isPort])
+  }, [isPort, style])
 }
 
 type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
@@ -210,6 +217,7 @@ function VillageHut({
   h,
   label,
   mats,
+  style,
   chief = false,
 }: {
   x: number
@@ -218,32 +226,73 @@ function VillageHut({
   h: number
   label?: string
   mats: PlaceMaterials
+  style: RegionPlaceStyle
   chief?: boolean
 }) {
   // Door faces the place center.
   const facing = Math.atan2(x, z) + Math.PI
+  // Raised floor in the humid Congo basin (design.md §2 region-typical builds).
+  const base = style.stilts ? 0.55 : 0
+  const wallH = style.roof === 'dome' ? h * 0.55 : h
   return (
     <group position={[x, 0, z]} rotation={[0, facing, 0]}>
-      {/* Mud wall */}
-      <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={mats.mud}>
-        <cylinderGeometry args={[r, r * 1.06, h, 12]} />
+      {style.stilts && (
+        <>
+          {Array.from({ length: 7 }, (_, i) => {
+            const a = (i / 7) * Math.PI * 2
+            return (
+              <mesh key={i} position={[Math.cos(a) * r * 0.85, base / 2, Math.sin(a) * r * 0.85]} castShadow material={mats.wood}>
+                <cylinderGeometry args={[0.09, 0.11, base, 5]} />
+              </mesh>
+            )
+          })}
+          <mesh position={[0, base, 0]} castShadow receiveShadow material={mats.wood}>
+            <cylinderGeometry args={[r * 1.15, r * 1.15, 0.12, 12]} />
+          </mesh>
+          {/* Short log ramp up to the door */}
+          <mesh position={[0, base / 2, r * 1.15]} rotation={[0.55, 0, 0]} castShadow material={mats.wood}>
+            <boxGeometry args={[r * 0.5, 0.08, base * 2.1]} />
+          </mesh>
+        </>
+      )}
+      {/* Wall */}
+      <mesh position={[0, base + wallH / 2, 0]} castShadow receiveShadow material={mats.mud}>
+        <cylinderGeometry args={[r, r * 1.06, wallH, 12]} />
       </mesh>
-      {/* Thatch roof with overhang and top knot */}
-      <mesh position={[0, h + r * 0.5, 0]} castShadow material={mats.thatch}>
-        <coneGeometry args={[r * 1.45, r * 1.25, 12]} />
-      </mesh>
-      <mesh position={[0, h + r * 1.12, 0]} castShadow material={mats.thatch}>
-        <sphereGeometry args={[r * 0.14, 6, 5]} />
-      </mesh>
+      {/* Roof per region style */}
+      {style.roof === 'flat' ? (
+        <>
+          <mesh position={[0, base + wallH + 0.09, 0]} castShadow material={mats.thatch}>
+            <cylinderGeometry args={[r * 1.12, r * 1.12, 0.18, 12]} />
+          </mesh>
+          {/* Parapet ring */}
+          <mesh position={[0, base + wallH + 0.28, 0]} castShadow material={mats.mud}>
+            <cylinderGeometry args={[r * 1.05, r * 1.05, 0.22, 12, 1, true]} />
+          </mesh>
+        </>
+      ) : style.roof === 'dome' ? (
+        <mesh position={[0, base + wallH, 0]} castShadow material={mats.thatch}>
+          <sphereGeometry args={[r * 1.18, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        </mesh>
+      ) : (
+        <>
+          <mesh position={[0, base + wallH + r * (style.roof === 'tallCone' ? 0.8 : 0.5), 0]} castShadow material={mats.thatch}>
+            <coneGeometry args={[r * 1.45, r * (style.roof === 'tallCone' ? 1.95 : 1.25), 12]} />
+          </mesh>
+          <mesh position={[0, base + wallH + r * (style.roof === 'tallCone' ? 1.85 : 1.12), 0]} castShadow material={mats.thatch}>
+            <sphereGeometry args={[r * 0.14, 6, 5]} />
+          </mesh>
+        </>
+      )}
       {/* Door opening */}
-      <mesh position={[0, h * 0.36, r * 0.99]}>
-        <boxGeometry args={[r * 0.55, h * 0.72, 0.12]} />
+      <mesh position={[0, base + wallH * 0.36, r * 0.99]}>
+        <boxGeometry args={[r * 0.55, wallH * 0.72, 0.12]} />
         <meshStandardMaterial color="#332412" roughness={0.95} />
       </mesh>
       {/* Painted band */}
-      <mesh position={[0, h * 0.8, 0]}>
-        <cylinderGeometry args={[r * 1.005, r * 1.005, h * 0.09, 12, 1, true]} />
-        <meshStandardMaterial color={chief ? '#8c2f22' : '#8a6a3c'} roughness={0.9} side={THREE.DoubleSide} />
+      <mesh position={[0, base + wallH * 0.8, 0]}>
+        <cylinderGeometry args={[r * 1.005, r * 1.005, wallH * 0.09, 12, 1, true]} />
+        <meshStandardMaterial color={chief ? '#8c2f22' : style.bandColor} roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
       {chief && (
         <>
@@ -275,18 +324,20 @@ function VillageHut({
   )
 }
 
-function Villager({ item }: { item: Interactive }) {
+function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle }) {
+  const robe = style.cloth[0]
+  const shoulder = style.cloth[1 % style.cloth.length]
   return (
     <group position={[item.pos[0], 0, item.pos[1]]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
         <coneGeometry args={[0.42, 1.25, 10]} />
-        <meshStandardMaterial color="#8a3b2a" roughness={0.95} />
+        <meshStandardMaterial color={robe} roughness={0.95} />
       </mesh>
       {/* Torso and shoulder cloth */}
       <mesh position={[0, 1.28, 0]} castShadow>
         <cylinderGeometry args={[0.22, 0.28, 0.5, 8]} />
-        <meshStandardMaterial color="#a3502f" roughness={0.95} />
+        <meshStandardMaterial color={shoulder} roughness={0.95} />
       </mesh>
       {/* Head with gray hair */}
       <mesh position={[0, 1.68, 0]} castShadow>
@@ -345,18 +396,50 @@ function ExitGate({ item, mats }: { item: Interactive; mats: PlaceMaterials }) {
   )
 }
 
-function Palm({ x, z, h, geometry }: { x: number; z: number; h: number; geometry: THREE.BufferGeometry }) {
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), [])
-  const s = h / 4.4
+type FloraSpecies = 'palm' | 'acacia' | 'jungle' | 'bush'
+
+/** Pick the species for a flora slot from the region's weight mix. */
+function pickFlora(style: RegionPlaceStyle, t: number): FloraSpecies {
+  const { palm, acacia, jungle } = style.flora
+  if (t < palm) return 'palm'
+  if (t < palm + acacia) return 'acacia'
+  if (t < palm + acacia + jungle) return 'jungle'
+  return 'bush'
+}
+
+// First-person plants reuse the travel-scale geometries, scaled up to
+// walkable proportions.
+const FLORA_SCALE: Record<FloraSpecies, number> = { palm: 1, acacia: 2.1, jungle: 1.7, bush: 2.4 }
+
+function PlaceFlora({
+  slots,
+  style,
+  material,
+  geos,
+}: {
+  slots: Array<{ x: number; z: number; h: number }>
+  style: RegionPlaceStyle
+  material: THREE.Material
+  geos: Record<FloraSpecies, THREE.BufferGeometry>
+}) {
   return (
-    <mesh
-      geometry={geometry}
-      material={material}
-      position={[x, 0, z]}
-      rotation={[0, (x * 7 + z * 13) % 6, 0]}
-      scale={[s, s, s]}
-      castShadow
-    />
+    <>
+      {slots.map((t, i) => {
+        const species = pickFlora(style, ((i * 0.37 + t.h * 0.11) % 1 + 1) % 1)
+        const s = (t.h / 4.4) * FLORA_SCALE[species]
+        return (
+          <mesh
+            key={i}
+            geometry={geos[species]}
+            material={material}
+            position={[t.x, 0, t.z]}
+            rotation={[0, (t.x * 7 + t.z * 13) % 6, 0]}
+            scale={[s, s, s]}
+            castShadow
+          />
+        )
+      })}
+    </>
   )
 }
 
@@ -400,14 +483,24 @@ function FirePit({ x, z }: { x: number; z: number }) {
 }
 
 /** Seeded ground scatter: grass tufts and stones (visual only). */
-function GroundScatter({ placeId, seed, isPort }: { placeId: string; seed: number; isPort: boolean }) {
+function GroundScatter({
+  placeId,
+  seed,
+  isPort,
+  grassFactor = 1,
+}: {
+  placeId: string
+  seed: number
+  isPort: boolean
+  grassFactor?: number
+}) {
   const { tufts, rocks } = useMemo(() => {
     let hash = 0
     for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
     const rand = mulberry32(((seed ^ hash) + 977) >>> 0)
     const tufts: Array<[number, number, number]> = []
     const rocks: Array<[number, number, number]> = []
-    const tuftCount = isPort ? 30 : 70
+    const tuftCount = Math.round((isPort ? 30 : 70) * grassFactor)
     for (let i = 0; i < tuftCount; i++) {
       const a = rand() * Math.PI * 2
       const r = 4 + rand() * (PLACE_RADIUS + 8)
@@ -419,7 +512,7 @@ function GroundScatter({ placeId, seed, isPort }: { placeId: string; seed: numbe
       rocks.push([Math.cos(a) * r, Math.sin(a) * r, 0.3 + rand() * 0.7])
     }
     return { tufts, rocks }
-  }, [placeId, seed, isPort])
+  }, [placeId, seed, isPort, grassFactor])
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
   const rockGeo = useMemo(() => buildRock(), [])
@@ -475,8 +568,16 @@ export function PlaceScene() {
     [placeId, seed],
   )
   const isPort = place?.kind === 'port'
-  const mats = usePlaceMaterials(!!isPort)
-  const palmGeo = useMemo(() => buildPalm(true), [])
+  const style = REGION_PLACE_STYLES[place?.region ?? 'west']
+  const mats = usePlaceMaterials(!!isPort, style)
+  const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
+    () => ({ palm: buildPalm(true), acacia: buildAcacia(), jungle: buildJungleTree(), bush: buildBush() }),
+    [],
+  )
+  const floraMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+    [],
+  )
 
   // yaw 0 faces -Z (toward the place center from the southern spawn point).
   const player = useRef({ x: 0, z: 18, yaw: 0 })
@@ -626,11 +727,13 @@ export function PlaceScene() {
       </mesh>
 
       {layout.interactives.map((it, i) => {
-        if (it.type === 'villager') return <Villager key={i} item={it} />
+        if (it.type === 'villager') return <Villager key={i} item={it} style={style} />
         if (it.type === 'exit') return <ExitGate key={i} item={it} mats={mats} />
         if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
         // Chief hut: larger village hut with regalia.
-        return <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={it.label} mats={mats} chief />
+        return (
+          <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={it.label} mats={mats} style={style} chief />
+        )
       })}
 
       {layout.decoHuts.map((h, i) =>
@@ -648,17 +751,24 @@ export function PlaceScene() {
             </mesh>
           </group>
         ) : (
-          <VillageHut key={i} x={h.x} z={h.z} r={h.r} h={h.h} mats={mats} />
+          <VillageHut key={i} x={h.x} z={h.z} r={h.r} h={h.h} mats={mats} style={style} />
         ),
       )}
 
       {!isPort && <FirePit x={-3.5} z={2.5} />}
 
-      {layout.palms.map((t, i) => (
-        <Palm key={i} {...t} geometry={palmGeo} />
-      ))}
+      <PlaceFlora slots={layout.palms} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
-      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} />
+      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} />
+
+      <PlaceLife
+        kind={isPort ? 'port' : 'village'}
+        seed={seed}
+        placeId={place.id}
+        style={style}
+        buildings={layout.interactives.filter((it) => it.type !== 'exit' && it.type !== 'villager').map((it) => it.pos)}
+        firePos={[-3.5, 2.5]}
+      />
     </>
   )
 }

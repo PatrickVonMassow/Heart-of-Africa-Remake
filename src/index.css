@@ -110,6 +110,67 @@ body,
   bottom: 12px;
 }
 
+.map-toggle {
+  position: absolute;
+  right: 128px;
+  bottom: 12px;
+}
+
+/* --- Self-drawing exploration map (design.md §19) ------------------------- */
+
+.map-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-0.4deg);
+  background: var(--paper);
+  color: var(--paper-ink);
+  border: 1px solid #8a6f45;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+  padding: 10px 14px 14px;
+  max-height: 92vh;
+  max-width: 92vw;
+  overflow: auto;
+}
+
+.map-overlay header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #c9b488;
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.map-overlay .map-progress {
+  font-size: 13px;
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.map-overlay button {
+  background: none;
+  border: 1px solid #8a6f45;
+  color: var(--paper-ink);
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.map-overlay canvas {
+  display: block;
+  /* Faint aged-paper texture under the ink. */
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(140, 110, 60, 0.08), transparent 60%),
+    radial-gradient(ellipse at 75% 80%, rgba(140, 110, 60, 0.1), transparent 55%);
+}
+
 /* --- Prompt + toast ------------------------------------------------------ */
 
 .prompt {
@@ -191,6 +252,14 @@ body,
   font-size: 14.5px;
   line-height: 1.5;
   font-style: italic;
+}
+
+/* Hand-sketch illustrations beside entry text (design.md §19). */
+.journal .entry .sketch {
+  float: right;
+  margin: 2px 0 4px 10px;
+  opacity: 0.8;
+  transform: rotate(-2deg);
 }
 
 .journal .entry.hint {

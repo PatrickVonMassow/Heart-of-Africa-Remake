@@ -175,6 +175,7 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
     Triangulation mehrerer Hinweise ist im POC nicht erforderlich — ein
     einzelner dekodierter Hinweis, der zum Fundpunkt führt, genügt.
 11. **Spielgrafik** Die grafische Darstellung soll ansprechend und aufwändig auf AAA-Nivea sein und die bisherige schematische Darstellung des POCs ersetzen. Dazu gehört auch die Glättung der Geometrie, des Kontinents und der Flüsse, denen man bisher starke Stufen ansieht.
+12. **Atmosphäre** Die Elemente zur Atmosphäre aus design.md sind umgesetzt - konkret "## 19. Atmosphäre und Immersion" und Abschnit "**Grafik und Atmosphäre.**" in "## 2. Perspektiven und Kamera".
 
 ### 7.2 Selbstverifikation (verpflichtend)
 

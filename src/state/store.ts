@@ -15,6 +15,7 @@ import {
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { REGION_ENTRY_TEXTS, TEXTS, chiefHintText } from '../journal/texts'
+import type { SketchId } from '../journal/sketches'
 
 export type EquipmentId =
   | 'shovel'
@@ -52,6 +53,8 @@ export interface JournalEntry {
   title: string
   text: string
   kind: 'event' | 'hint' | 'info'
+  /** Optional hand-sketch illustration (design.md §19). */
+  sketch?: SketchId
 }
 
 export type GameMode = 'travel' | 'place'
@@ -77,6 +80,8 @@ export interface GameState {
   visitedRegions: RegionId[]
   visitedPlaces: string[]
   /** Audience state per village. */
+  /** Explored map cells for the self-drawing map (design.md §19). */
+  explored: Record<string, true>
   goodwill: Record<string, number>
   reveredGiftGiven: Record<string, boolean>
   chiefHintGiven: boolean
@@ -100,7 +105,7 @@ export interface GameState {
   giveGift: (material: Material) => void
   talkToVillager: () => void
   dig: () => void
-  addEntry: (title: string, text: string, kind?: JournalEntry['kind']) => void
+  addEntry: (title: string, text: string, kind?: JournalEntry['kind'], sketch?: SketchId) => void
   setJournalOpen: (open: boolean) => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
@@ -114,6 +119,46 @@ export interface GameState {
 }
 
 const CHECKPOINT_KEY = 'hoa-checkpoint-v1'
+
+/** Cell size of the exploration grid for the self-drawing map (design.md §19). */
+export const EXPLORE_CELL_DEG = 0.5
+
+export function exploreCellKey(lat: number, lon: number): string {
+  return `${Math.floor(lon / EXPLORE_CELL_DEG)}|${Math.floor(lat / EXPLORE_CELL_DEG)}`
+}
+
+/**
+ * Mark the 3×3 cells around a position as explored (the traveller's sight
+ * radius). Returns a new map when something changed, else null.
+ */
+function withExplored(
+  explored: Record<string, true>,
+  lat: number,
+  lon: number,
+): Record<string, true> | null {
+  const cx = Math.floor(lon / EXPLORE_CELL_DEG)
+  const cy = Math.floor(lat / EXPLORE_CELL_DEG)
+  let out: Record<string, true> | null = null
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const key = `${cx + dx}|${cy + dy}`
+      if (!explored[key]) {
+        out ??= { ...explored }
+        out[key] = true
+      }
+    }
+  }
+  return out
+}
+
+// Sketch shown with the "new region" journal entry (design.md §19).
+const REGION_SKETCHES: Record<RegionId, SketchId> = {
+  north: 'palm',
+  west: 'acacia',
+  central: 'bird',
+  east: 'mountain',
+  south: 'antelope',
+}
 
 /** Place the grave procedurally per run: desert north of the Nubian village. */
 function generateGrave(seed: number): LatLon {
@@ -146,12 +191,13 @@ function startState(seed: number) {
     equipment: {} as Partial<Record<EquipmentId, number>>,
     handItem: null,
     journal: [
-      { id: 1, day: 0, title: 'Aufbruch', text: TEXTS.gameStart, kind: 'event' as const },
+      { id: 1, day: 0, title: 'Aufbruch', text: TEXTS.gameStart, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
     journalOpen: true,
     region: 'north' as RegionId,
     visitedRegions: ['north' as RegionId],
     visitedPlaces: ['cairo'],
+    explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
     goodwill: {},
     reveredGiftGiven: {},
     chiefHintGiven: false,
@@ -175,9 +221,9 @@ export const useGame = create<GameState>()((set, get) => ({
   ...startState(newSeed()),
   hasCheckpoint: typeof localStorage !== 'undefined' && localStorage.getItem(CHECKPOINT_KEY) !== null,
 
-  addEntry: (title, text, kind = 'event') => {
+  addEntry: (title, text, kind = 'event', sketch) => {
     set((s) => ({
-      journal: [...s.journal, { id: ++nextEntryId, day: Math.floor(s.day), title, text, kind }],
+      journal: [...s.journal, { id: ++nextEntryId, day: Math.floor(s.day), title, text, kind, sketch }],
       journalOpen: true,
     }))
   },
@@ -233,11 +279,13 @@ export const useGame = create<GameState>()((set, get) => ({
 
     const newRegion = regionAt(next.lat, next.lon)
     if (newRegion !== s.region) patch.region = newRegion
+    const ex = withExplored(s.explored, next.lat, next.lon)
+    if (ex) patch.explored = ex
     set(patch)
 
     if (!s.visitedRegions.includes(newRegion)) {
       set((st) => ({ visitedRegions: [...st.visitedRegions, newRegion] }))
-      get().addEntry(`Region: ${REGION_NAMES[newRegion]}`, REGION_ENTRY_TEXTS[newRegion])
+      get().addEntry(`Region: ${REGION_NAMES[newRegion]}`, REGION_ENTRY_TEXTS[newRegion], 'event', REGION_SKETCHES[newRegion])
     }
     if (!s.foodWarned && newFood < 7 && newFood > 0) {
       set({ foodWarned: true })
@@ -258,14 +306,16 @@ export const useGame = create<GameState>()((set, get) => ({
     set({
       mode: 'place',
       placeId: id,
+      // Place membership defines the region shown/used while inside (§4.5).
+      region: place.region,
       visitedPlaces: first ? [...s.visitedPlaces, id] : s.visitedPlaces,
       toast: null,
     })
     if (place.kind === 'port') {
       get().saveCheckpoint()
-      get().addEntry(`Ankunft in ${place.name}`, TEXTS.portCheckpoint(place.name))
+      get().addEntry(`Ankunft in ${place.name}`, TEXTS.portCheckpoint(place.name), 'event', 'harbor')
     } else if (first) {
-      get().addEntry(place.name, TEXTS.villageFirstVisit(place.name))
+      get().addEntry(place.name, TEXTS.villageFirstVisit(place.name), 'event', 'hut')
     }
   },
 
@@ -345,7 +395,7 @@ export const useGame = create<GameState>()((set, get) => ({
       const g = get().graveLatLon
       const fmt = (v: number) => Math.abs(v).toFixed(1).replace('.', ',')
       set({ chiefHintGiven: true })
-      get().addEntry('Der Hinweis des Oberhaupts', chiefHintText(fmt(g.lat), fmt(g.lon)), 'hint')
+      get().addEntry('Der Hinweis des Oberhaupts', chiefHintText(fmt(g.lat), fmt(g.lon)), 'hint', 'compass')
     }
   },
 
@@ -356,7 +406,7 @@ export const useGame = create<GameState>()((set, get) => ({
       return
     }
     set({ languageHintGiven: true })
-    get().addEntry('Die Sprache des Nordens', TEXTS.languageHint, 'hint')
+    get().addEntry('Die Sprache des Nordens', TEXTS.languageHint, 'hint', 'face')
   },
 
   dig: () => {
@@ -370,7 +420,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const d = Math.hypot(s.pos.x - g.x, s.pos.z - g.z)
     if (d <= balance.digRadius) {
       set({ victory: true })
-      get().addEntry('Das Herz von Afrika', TEXTS.victory(formatDate(s.day)), 'event')
+      get().addEntry('Das Herz von Afrika', TEXTS.victory(formatDate(s.day)), 'event', 'grave')
     } else {
       set({ toast: TEXTS.digNothing })
     }
@@ -385,6 +435,7 @@ export const useGame = create<GameState>()((set, get) => ({
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       chiefHintGiven: s.chiefHintGiven, languageHintGiven: s.languageHintGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
+      explored: s.explored,
       nextEntryId,
     }
     try {
@@ -403,6 +454,7 @@ export const useGame = create<GameState>()((set, get) => ({
       nextEntryId = snap.nextEntryId ?? 1000
       set({
         ...snap,
+        explored: snap.explored ?? {},
         mode: 'place',
         victory: false,
         toast: null,
@@ -431,7 +483,8 @@ export const useGame = create<GameState>()((set, get) => ({
 
   debugJumpTo: (lat, lon) => {
     const p = latLonToWorld(lat, lon)
-    set({ mode: 'travel', placeId: null, pos: p, region: regionAt(lat, lon) })
+    const ex = withExplored(get().explored, lat, lon)
+    set({ mode: 'travel', placeId: null, pos: p, region: regionAt(lat, lon), ...(ex ? { explored: ex } : {}) })
   },
 }))
 

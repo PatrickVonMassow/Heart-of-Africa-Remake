@@ -87,3 +87,44 @@ Gebäudedetails, Lagerfeuer, Requisiten, Bodenbewuchs).
 | 24-grafik-chefhuette-nah.png | Chefhütte nah: Stroh-/Lehm-Texturen, Regalia |
 | 25-grafik-tagebuch.png | Geöffnetes Tagebuch über der neuen Grafik |
 | 26-grafik-produktions-build.png | Produktions-Build (`npm run preview`) |
+
+## Nachtrag: Atmosphäre (§7.1.12 — design.md §19 und §2 „Grafik und Atmosphäre")
+
+Stand: 6. Juli 2026, vierter Lauf (atmo-shots.mjs). Headless-Prüfung gegen
+Dev-Server und Produktions-Preview, 0 Konsolenfehler, `npm run build`
+fehlerfrei. Umgesetzt:
+
+- **Geräuschkulisse/Musik (prozedural, WebAudio, ohne Assets):** Wind-,
+  Insekten-, Vogel-/Affen-, Brandungs-, Marktmurmeln- und Trommel-Layer plus
+  sparsame Kalimba-Phrasen (Pentatonik je Region); Überblendung bei Regions-
+  und Perspektivwechsel; Trommeln in Dorfnähe. Start nach erster Eingabe
+  (Autoplay-Richtlinie). Nicht per Screenshot prüfbar; Code: `systems/ambience.ts`.
+- **Tierwelt als Kulisse:** Herden (Elefanten, Giraffen, Zebras, Antilopen)
+  je Biom, Flamingos an Seeufern, ambiente Löwenjagd (rein visuell).
+- **Geier** kreisen über der Figur bei aufgebrauchtem Proviant (POC-Proxy
+  für den schlechten Gesundheitszustand, s. offene Punkte).
+- **Klima-Optik:** Regionsnebel (feuchter Dunst Kongo, warme Staubluft
+  Sahara, klare Hochland-Luft), bodennahe Hitze-/Dunstschichten.
+- **Dorf-/Marktleben:** Köchin am Feuer, Weberin, spielende Kinder, Ziegen;
+  im Hafen Träger mit Kisten und Händler auf dem Platz.
+- **Regionstypische Orte (§2):** Hütten-Stile je Region (Flachdach-Lehmbau,
+  Kegel, Stelzen+hohe Kegel, Kuppel, Rondavel-Band), Bodenpaletten,
+  Vegetationsmix und Kleidungsfarben je Region.
+- **Illustrierte Tagebucheinträge:** Ink-Skizzen (Tier, Landmarke, Gesicht,
+  Hafen, Hütte, Kompass, Grab) neben passenden Einträgen.
+- **Selbstzeichnende Karte (M):** handgezeichnete Erkundungskarte — Küsten,
+  Flüsse, Seen erscheinen nur im bereisten Gebiet; besuchte Orte mit Symbol;
+  Erkundungsgrad der aktuellen Region in Prozent (§17).
+
+| Datei | Ansicht |
+|---|---|
+| 27-atmo-savanne-herden.png | Zebraherde in der Westsavanne |
+| 28-atmo-flamingos-tanganjikasee.png | Flamingos am Tanganjikasee |
+| 29-atmo-dschungel-dunst.png | Kongobecken: dichter Nebel, Bodendunst, Elefant |
+| 30-atmo-wueste-geier.png | Sahara: Hitze-Dunst, kreisende Geier (Proviant 0), Antilopen |
+| 31-atmo-dorf-masai-leben.png | Masai-Dorf (Ost-Stil: Kuppelhütte, rote Kleidung), Köchin/Kind/Ziege |
+| 32-atmo-dorf-pygmaeen-stelzen.png | Pygmäen-Dorf (Zentral-Stil: Stelzen, hohe Kegeldächer) |
+| 33-atmo-hafen-kairo-treiben.png | Kairo: Träger mit Kisten, Händler auf dem Platz |
+| 34-atmo-tagebuch-skizzen.png | Tagebuch mit Ink-Skizzen (Hafen, Hütten) |
+| 35-atmo-karte.png | Selbstzeichnende Karte nach Nil-Reise (4 % Norden erkundet) |
+| 36-atmo-produktions-build.png | Produktions-Build (`npm run preview`) |

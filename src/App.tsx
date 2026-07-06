@@ -5,6 +5,7 @@ import { useGame } from './state/store'
 import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
 import { Hud } from './ui/Hud'
+import { AmbienceController } from './ui/AmbienceController'
 
 declare module '@react-three/fiber' {
   interface ThreeElements extends ThreeToJSXElements<typeof THREE> {}
@@ -41,6 +42,7 @@ export default function App() {
         </Suspense>
       </Canvas>
       <Hud />
+      <AmbienceController />
     </div>
   )
 }

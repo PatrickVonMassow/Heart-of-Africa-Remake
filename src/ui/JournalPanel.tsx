@@ -4,6 +4,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useGame, formatDate } from '../state/store'
+import { Sketch } from '../journal/sketches'
 
 export function JournalPanel() {
   const journal = useGame((s) => s.journal)
@@ -28,6 +29,7 @@ export function JournalPanel() {
           <div key={e.id} className={`entry${e.kind === 'hint' ? ' hint' : ''}`}>
             <div className="date">{formatDate(e.day)}</div>
             <h4>{e.title}</h4>
+            {e.sketch && <Sketch id={e.sketch} />}
             <p>{e.text}</p>
           </div>
         ))}

@@ -18,6 +18,8 @@ import { moveAxes, onKeyPress } from '../../systems/input'
 import { SkyDome, TRAVEL_SKY } from '../../render/sky'
 import { createWaterMaterial } from '../../render/water'
 import { buildAcacia, buildBush, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import { Climate } from './Climate'
+import { Wildlife } from './Wildlife'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_SEGMENTS = 32
@@ -671,14 +673,14 @@ export function TravelScene() {
 
   return (
     <>
-      <color attach="background" args={['#cfe0ea']} />
-      <fog attach="fog" args={['#cfe0ea', 95, 260]} />
       <SkyDome preset={TRAVEL_SKY} sunDirection={SUN_DIR} />
+      <Climate />
       <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
       <Sun />
       <TerrainChunks />
       <WaterPlane />
       <Vegetation />
+      <Wildlife />
       {PLACES.map((p) => (
         <PlaceMarker key={p.id} place={p} />
       ))}

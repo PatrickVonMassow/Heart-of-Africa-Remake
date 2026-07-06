@@ -8,6 +8,7 @@ import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
 import { Dialogs } from './Dialogs'
 import { DebugMenu } from './DebugMenu'
+import { MapOverlay } from './MapOverlay'
 import { onKeyPress } from '../systems/input'
 
 function InventoryBar() {
@@ -110,9 +111,13 @@ export function Hud() {
       const g = useGame.getState()
       g.setJournalOpen(!g.journalOpen)
     })
+    const offM = onKeyPress('KeyM', () => {
+      if (!useUi.getState().dialog) useUi.getState().toggleMap()
+    })
     const offF1 = onKeyPress('F1', () => toggleDebug())
     const offEsc = onKeyPress('Escape', () => {
       if (useUi.getState().dialog) setDialog(null)
+      else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
       else if (useGame.getState().journalOpen) setJournalOpen(false)
     })
     // F1 opens browser help by default — prevent that.
@@ -122,6 +127,7 @@ export function Hud() {
     window.addEventListener('keydown', preventF1)
     return () => {
       offT()
+      offM()
       offF1()
       offEsc()
       window.removeEventListener('keydown', preventF1)
@@ -138,9 +144,13 @@ export function Hud() {
       }}>
         Tagebuch (T)
       </button>
+      <button className="hud-button map-toggle" onClick={() => useUi.getState().toggleMap()}>
+        Karte (M)
+      </button>
       <Prompt />
       <Toast />
       <JournalPanel />
+      <MapOverlay />
       <Dialogs />
       <DebugMenu />
       <StartOverlay />
