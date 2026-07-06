@@ -35,6 +35,14 @@ Dörfer und ihre Bewohner sind typisch für die jeweilige Region gestaltet (Bauw
 - Geländetypen: Ozean, Küste, Wüste, Savanne/offenes Land, Dschungel/Grasland, Gebirge, Wasser (Fluss/See).
 - Koordinatensystem: Standort in Grad, angezeigt als „Breite … Grad Nord/Süd" und „Länge … Grad West/Ost". Dieses System ist zugleich Grundlage der Hinweise (§13).
 
+**Reale Geodaten und Terrain-Darstellung.**
+Die Landschaftsdarstellung basiert auf echten Geodaten statt auf rein synthetischem Rauschen:
+
+- Höhenrelief aus einem realen digitalen Höhenmodell (DEM, z. B. SRTM oder Copernicus GLO-90), vorverarbeitet zu Höhenkacheln und zur Laufzeit mit Detailstufen (LOD) um die Spielfigur gestreamt. Charakteristische Reliefformen (Rift-Steilkanten, Hochplateaus, Dünenfelder, Flusstäler) sind erkennbar.
+- Küsten-, Fluss- und Seeverläufe aus realen Vektordaten (z. B. Natural Earth, HydroSHEDS), angepasst auf den Stand von ~1890 (etwa der große Tschadsee-Umriss, keine modernen Stauseen). Die Verläufe sind glatt und feingranular; sichtbare Rasterstufen an Küsten und Ufern darf es nicht geben.
+- Bodendarstellung über biom-basiertes Textur-Splatting mit PBR-Materialien (Sand, Savannengras, Laterit, Fels, Regenwaldboden) und Detail-Normalmaps (triplanar) statt reiner Vertexfarben.
+- Die prozedurale Pro-Lauf-Variation (§18) bleibt bestehen; sie betrifft Vegetationsverteilung, Dorf-Layouts und bewegliche Ziele — nicht die reale Geographie, die in jedem Durchlauf identisch ist.
+
 ---
 
 ## 4. Orte

@@ -176,6 +176,14 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
     einzelner dekodierter Hinweis, der zum Fundpunkt führt, genügt.
 11. **Spielgrafik** Die grafische Darstellung soll ansprechend und aufwändig auf AAA-Nivea sein und die bisherige schematische Darstellung des POCs ersetzen. Dazu gehört auch die Glättung der Geometrie, des Kontinents und der Flüsse, denen man bisher starke Stufen ansieht.
 12. **Atmosphäre** Die Elemente zur Atmosphäre aus design.md sind umgesetzt - konkret "## 19. Atmosphäre und Immersion" und Abschnit "**Grafik und Atmosphäre.**" in "## 2. Perspektiven und Kamera".
+13. **Reale Geodaten.** Der Abschnitt "**Reale Geodaten und Terrain-Darstellung.**"
+    in "## 3. Weltmodell und Karte" (`design.md`) ist umgesetzt: Höhenrelief aus
+    einem realen DEM (kachelbasiert, LOD-gestreamt), Küsten/Flüsse/Seen aus
+    Vektordaten im Stand von ~1890 ohne sichtbare Rasterstufen, Boden über
+    biom-basiertes PBR-Textur-Splatting mit Detail-Normalmaps. Prüfbar:
+    Screenshots von Nildelta, Rift-Kante und einer Küstenlinie zeigen glatte,
+    reale Verläufe und texturierten Boden statt Vertexfarben; die Geodaten-
+    Vorverarbeitung ist im Repository reproduzierbar dokumentiert.
 
 ### 7.2 Selbstverifikation (verpflichtend)
 
