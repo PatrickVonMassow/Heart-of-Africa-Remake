@@ -371,3 +371,15 @@ body,
   white-space: nowrap;
   transform: translateY(-8px);
 }
+
+/* Natural landmarks (lakes, mountains, waterfalls): subtler atlas-style label. */
+.map-label.landmark {
+  background: rgba(24, 18, 10, 0.45);
+  border-color: transparent;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.map-label.landmark.water-label {
+  color: #bcd9ef;
+}

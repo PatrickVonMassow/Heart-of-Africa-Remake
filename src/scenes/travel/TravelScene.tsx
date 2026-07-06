@@ -10,10 +10,12 @@ import { useUi } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
+import { LAKES } from '../../world/data/lakes'
+import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
 
 const CHUNK_SIZE = 24 // world units
-const CHUNK_SEGMENTS = 24
+const CHUNK_SEGMENTS = 32
 const CHUNK_RADIUS = 5 // chunks kept around the player in each direction
 const CAMERA_OFFSET = { y: 42, z: 24 }
 
@@ -168,6 +170,59 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   )
 }
 
+/** Atlas-style labels for the named landmarks (design.md §4.4). */
+function LandmarkLabels() {
+  const seed = useGame((s) => s.seed)
+  const items = useMemo(() => {
+    const lakes = LAKES.map((l) => ({
+      key: `lake-${l.name}`,
+      name: l.name,
+      lat: l.center[1],
+      lon: l.center[0],
+      y: 0.4,
+      water: true,
+    }))
+    const mountains = MOUNTAINS.map((m) => ({
+      key: `mount-${m.name}`,
+      name: m.name,
+      lat: m.lat,
+      lon: m.lon,
+      y: Math.max(0.5, sampleTerrain(m.lat, m.lon, seed).height) + 1.2,
+      water: false,
+    }))
+    const falls = WATERFALLS.map((w) => ({
+      key: `falls-${w.name}`,
+      name: w.name,
+      lat: w.lat,
+      lon: w.lon,
+      y: 1.0,
+      water: true,
+    }))
+    const g = ELEPHANT_GRAVEYARD
+    const graveyard = {
+      key: 'elephant-graveyard',
+      name: g.name,
+      lat: g.lat,
+      lon: g.lon,
+      y: Math.max(0.5, sampleTerrain(g.lat, g.lon, seed).height) + 0.8,
+      water: false,
+    }
+    return [...lakes, ...mountains, ...falls, graveyard]
+  }, [seed])
+  return (
+    <>
+      {items.map((it) => {
+        const p = latLonToWorld(it.lat, it.lon)
+        return (
+          <Html key={it.key} center position={[p.x, it.y, p.z]} distanceFactor={60}>
+            <div className={`map-label landmark${it.water ? ' water-label' : ''}`}>{it.name}</div>
+          </Html>
+        )
+      })}
+    </>
+  )
+}
+
 /** Debug-only marker for the hidden grave position. */
 function GraveMarker() {
   const grave = useGame((s) => s.graveLatLon)
@@ -293,6 +348,7 @@ export function TravelScene() {
       {PLACES.map((p) => (
         <PlaceMarker key={p.id} place={p} />
       ))}
+      <LandmarkLabels />
       <GraveMarker />
       <Player />
     </>

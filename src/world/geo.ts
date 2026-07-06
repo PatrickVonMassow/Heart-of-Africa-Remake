@@ -1,7 +1,11 @@
 // Fixed geography of the continent (design.md §3/§4): coordinate mapping,
-// approximate coastline, the Nile river system, region lookup and place data.
-// The geographic *positions* are fixed; only the visual appearance of the
-// landscape is procedural per run (design.md §18).
+// region model and the full place roster — all 10 port cities and one village
+// per each of the 22 peoples. Coastline, rivers, lakes and landmarks live in
+// ./data/* and are indexed by ./geoIndex.ts. The geographic *positions* are
+// fixed (authentic ~1890); only the visual appearance of the landscape is
+// procedural per run (design.md §18).
+
+import { RIVERS_DATA, type RiverDef } from './data/rivers'
 
 /** World units per degree of latitude/longitude (flat equirectangular mapping). */
 export const UNITS_PER_DEGREE = 10
@@ -27,50 +31,8 @@ export function formatLatLon(p: LatLon): string {
   return `Breite ${fmt(p.lat)} Grad ${latDir} · Länge ${fmt(p.lon)} Grad ${lonDir}`
 }
 
-// Approximate African coastline as (lon, lat) polygon, clockwise from Tangier.
-// Rudimentary by design (CLAUDE.md §7.1.3) — shape, not survey accuracy.
-export const COASTLINE: Array<[number, number]> = [
-  [-5.9, 35.8], [3.0, 36.9], [10.3, 37.3], [10.0, 33.5], [15.3, 32.4],
-  [20.1, 32.2], [25.0, 31.6], [29.9, 31.2], [32.3, 31.3], [32.6, 29.9],
-  [33.9, 27.0], [35.5, 24.0], [37.2, 21.0], [39.6, 15.5], [42.8, 12.6],
-  [43.4, 11.5], [44.3, 10.4], [51.0, 11.8], [51.4, 10.4], [45.3, 2.0],
-  [41.0, -2.0], [39.7, -4.0], [39.3, -6.8], [40.5, -10.5], [40.6, -14.0],
-  [36.9, -17.8], [34.8, -19.8], [35.4, -23.8], [32.6, -25.9], [31.0, -29.9],
-  [27.9, -33.0], [25.6, -34.0], [20.0, -34.8], [18.4, -34.2], [18.3, -32.0],
-  [16.5, -28.6], [14.5, -22.5], [11.8, -18.0], [13.2, -8.8], [12.3, -6.1],
-  [9.3, 0.4], [9.8, 4.0], [5.3, 5.3], [3.4, 6.4], [-2.0, 4.9],
-  [-7.5, 4.4], [-13.3, 8.5], [-17.4, 14.7], [-16.2, 19.5], [-14.5, 24.0],
-  [-11.5, 28.0], [-9.8, 31.5], [-7.6, 33.6],
-]
-
-// Nile river system as (lon, lat) polylines (design.md §4.3).
-// OPEN: only the Nile system is modeled in the POC; the other 16 rivers,
-// lakes and named landmarks from design.md §4.3/§4.4 are out of POC scope
-// (CLAUDE.md §8 allows the minimum of one region).
-export const RIVERS: Array<{ name: string; points: Array<[number, number]> }> = [
-  {
-    name: 'Nil',
-    points: [
-      [31.0, 31.4], [31.2, 30.0], [31.3, 28.0], [30.8, 26.2], [32.9, 24.1],
-      [33.0, 22.0], [30.5, 19.2], [32.5, 15.6],
-    ],
-  },
-  {
-    name: 'Weißer Nil',
-    points: [
-      [32.5, 15.6], [32.5, 12.0], [31.7, 9.5], [31.6, 7.0], [31.4, 4.0], [31.4, 2.2],
-    ],
-  },
-  {
-    name: 'Blauer Nil',
-    points: [
-      [32.5, 15.6], [34.1, 13.5], [35.6, 12.6], [37.3, 12.0],
-    ],
-  },
-]
-
-/** River half-width in degrees for terrain sampling. */
-export const RIVER_WIDTH_DEG = 0.18
+/** All 17 rivers (design.md §4.3) with named source and mouth. */
+export const RIVERS: RiverDef[] = RIVERS_DATA
 
 export type RegionId = 'north' | 'west' | 'central' | 'east' | 'south'
 
@@ -94,15 +56,18 @@ export const REGION_VALUES: Record<RegionId, { revered: Material[]; rejected: Ma
 }
 
 /**
- * Region lookup from coordinates. Rudimentary banded model of design.md §3:
- * north = Sahara belt, west = savanna west of the Congo basin, central =
- * Congo basin jungle, east = mountains/rift east of it, south = high plateau.
+ * Region lookup from coordinates (design.md §3: five regions). Banded model
+ * refined to the continent's shape: Sahara belt incl. Nubia, the Congo basin,
+ * the eastern mountain/rift belt and the southern plateau. Village/port
+ * region *membership* follows design.md §4.5 via the explicit `region` field
+ * on each place; this function drives landscape, status display and entry
+ * journal texts.
  */
 export function regionAt(lat: number, lon: number): RegionId {
-  if (lat > 16) return 'north'
-  if (lat < -11) return 'south'
-  if (lon > 30) return 'east'
-  if (lon >= 9 && lat < 6) return 'central'
+  if (lat >= 17 || (lat >= 14.5 && lon >= 25)) return 'north'
+  if (lat <= -12) return 'south'
+  if (lon >= 31.5) return 'east'
+  if (lon >= 12 && lat <= 7.5) return 'central'
   return 'west'
 }
 
@@ -119,12 +84,60 @@ export interface PlaceDef {
   region: RegionId
 }
 
-// POC minimum (CLAUDE.md §8): the start port Cairo and one village of the
-// Nubians (north region, design.md §4.5), placed on the Nile.
-export const PLACES: PlaceDef[] = [
-  { id: 'cairo', kind: 'port', name: 'Kairo', lat: 30.0, lon: 31.5, region: 'north' },
-  { id: 'nubian-village', kind: 'village', name: 'Dorf der Nubier', people: 'Nubier', lat: 21.8, lon: 32.6, region: 'north' },
+// All 10 port cities (design.md §4.1) at their real ~1890 positions, nudged
+// slightly inland so each marker sits on walkable land.
+const PORTS: PlaceDef[] = [
+  // River ports sit on the bank beside the channel (east bank at Cairo,
+  // west of the White Nile at Khartoum, north bank at Boma).
+  { id: 'cairo', kind: 'port', name: 'Kairo', lat: 30.05, lon: 31.45, region: 'north' },
+  { id: 'tangier', kind: 'port', name: 'Tanger', lat: 35.6, lon: -5.75, region: 'north' },
+  { id: 'khartoum', kind: 'port', name: 'Khartum', lat: 15.5, lon: 32.15, region: 'north' },
+  { id: 'st-louis', kind: 'port', name: 'St. Louis', lat: 15.9, lon: -16.2, region: 'west' },
+  { id: 'timbuktu', kind: 'port', name: 'Timbuktu', lat: 16.77, lon: -3.0, region: 'west' },
+  { id: 'lagos', kind: 'port', name: 'Lagos', lat: 6.55, lon: 3.4, region: 'west' },
+  { id: 'boma', kind: 'port', name: 'Boma', lat: -5.65, lon: 13.05, region: 'central' },
+  { id: 'berbera', kind: 'port', name: 'Berbera', lat: 10.3, lon: 45.0, region: 'east' },
+  // Zanzibar lies on its island (data/coastline.ts). OPEN: ferries (design.md
+  // §4.1) are not in the POC, so it is not reachable on foot from the mainland.
+  { id: 'zanzibar', kind: 'port', name: 'Sansibar', lat: -6.16, lon: 39.3, region: 'east' },
+  { id: 'capetown', kind: 'port', name: 'Kapstadt', lat: -33.8, lon: 18.5, region: 'south' },
 ]
+
+// One village per each of the 22 peoples (design.md §4.2), region membership
+// per design.md §4.5. Positions are educated guesses at each people's ~1890
+// heartland; where the design region and the historical heartland disagree
+// (Bombara, Bemba, Fang), the position is shifted toward the design region.
+const VILLAGES: PlaceDef[] = [
+  // Norden — Tuareg, Berber, Nubier, Bombara
+  { id: 'tuareg-village', kind: 'village', name: 'Dorf der Tuareg', people: 'Tuareg', lat: 23.2, lon: 5.8, region: 'north' },
+  { id: 'berber-village', kind: 'village', name: 'Dorf der Berber', people: 'Berber', lat: 31.7, lon: -7.2, region: 'north' },
+  { id: 'nubian-village', kind: 'village', name: 'Dorf der Nubier', people: 'Nubier', lat: 21.8, lon: 31.6, region: 'north' },
+  { id: 'bombara-village', kind: 'village', name: 'Dorf der Bombara', people: 'Bombara', lat: 17.2, lon: -3.5, region: 'north' },
+  // Westen — Hausa, Mandingo, Fang
+  { id: 'hausa-village', kind: 'village', name: 'Dorf der Hausa', people: 'Hausa', lat: 12.0, lon: 8.5, region: 'west' },
+  { id: 'mandingo-village', kind: 'village', name: 'Dorf der Mandingo', people: 'Mandingo', lat: 11.5, lon: -9.0, region: 'west' },
+  { id: 'fang-village', kind: 'village', name: 'Dorf der Fang', people: 'Fang', lat: 1.8, lon: 11.5, region: 'west' },
+  // Zentral — Mongo, Pygmäen, Banda, Bambundu, Lunda
+  { id: 'mongo-village', kind: 'village', name: 'Dorf der Mongo', people: 'Mongo', lat: -1.5, lon: 21.0, region: 'central' },
+  { id: 'pygmy-village', kind: 'village', name: 'Dorf der Pygmäen', people: 'Pygmäen', lat: 1.4, lon: 28.6, region: 'central' },
+  { id: 'banda-village', kind: 'village', name: 'Dorf der Banda', people: 'Banda', lat: 6.0, lon: 21.5, region: 'central' },
+  { id: 'bambundu-village', kind: 'village', name: 'Dorf der Bambundu', people: 'Bambundu', lat: -9.3, lon: 15.3, region: 'central' },
+  { id: 'lunda-village', kind: 'village', name: 'Dorf der Lunda', people: 'Lunda', lat: -10.0, lon: 23.4, region: 'central' },
+  // Osten — Masai, Suaheli, Somali, Sidamo, Uganda
+  { id: 'masai-village', kind: 'village', name: 'Dorf der Masai', people: 'Masai', lat: -2.5, lon: 36.8, region: 'east' },
+  { id: 'swahili-village', kind: 'village', name: 'Dorf der Suaheli', people: 'Suaheli', lat: -6.5, lon: 38.7, region: 'east' },
+  { id: 'somali-village', kind: 'village', name: 'Dorf der Somali', people: 'Somali', lat: 5.5, lon: 45.0, region: 'east' },
+  { id: 'sidamo-village', kind: 'village', name: 'Dorf der Sidamo', people: 'Sidamo', lat: 6.7, lon: 38.4, region: 'east' },
+  { id: 'uganda-village', kind: 'village', name: 'Dorf der Uganda', people: 'Uganda', lat: 0.75, lon: 32.55, region: 'east' },
+  // Süden — Batwa, Bemba, Bantu, Zulu, Buschmänner
+  { id: 'batwa-village', kind: 'village', name: 'Dorf der Batwa', people: 'Batwa', lat: -19.0, lon: 22.5, region: 'south' },
+  { id: 'bemba-village', kind: 'village', name: 'Dorf der Bemba', people: 'Bemba', lat: -12.5, lon: 31.0, region: 'south' },
+  { id: 'bantu-village', kind: 'village', name: 'Dorf der Bantu', people: 'Bantu', lat: -24.5, lon: 29.5, region: 'south' },
+  { id: 'zulu-village', kind: 'village', name: 'Dorf der Zulu', people: 'Zulu', lat: -28.4, lon: 31.3, region: 'south' },
+  { id: 'bushmen-village', kind: 'village', name: 'Dorf der Buschmänner', people: 'Buschmänner', lat: -22.5, lon: 21.0, region: 'south' },
+]
+
+export const PLACES: PlaceDef[] = [...PORTS, ...VILLAGES]
 
 export function placeById(id: string): PlaceDef {
   const p = PLACES.find((p) => p.id === id)

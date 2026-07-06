@@ -36,3 +36,29 @@ Laden stellt Spielstand wieder her.
 | 07-sieg.png | Sieg-Zustand nach Bergen des Grabes |
 | 08-debug-menue.png | Debug-Menü (F1) mit Balance-Reglern |
 | 09-produktions-build.png | Produktions-Build (`npm run preview`) |
+
+## Nachtrag: Weltmodell-Vollausbau (§7.1.3, verschärfte Fassung)
+
+Stand: 6. Juli 2026, zweiter Lauf (verify-world.mjs). Headless-Prüfung gegen
+den Dev-Server, alle Prüfungen PASS, keine Konsolenfehler:
+
+- Zählungen: 10 Hafenstädte, 22 Dörfer (eines je Volk, Regionen gemäß
+  design.md §4.5), 17 Flüsse, 8 Seen, 11 Berge, 5 Wasserfälle,
+  Elefantenfriedhof.
+- Jeder Ort liegt auf begehbarem Land; deklarierte Region = Regionsmodell.
+- Jede Flussmündung (ohne Binnen-Zusammenflüsse) liegt < 0,5 Grad von der
+  Küste; jeder Wasserfall < 0,25 Grad von seinem Fluss.
+- Seen-Raster trifft alle 8 Seezentren; Grabungs-Zielgebiet bleibt begehbar
+  (92/100 Stichproben Wüste/Savanne).
+- Performanz: 20 000 Terrain-Samples in ~175 ms (räumlicher Index).
+
+| Datei | Ansicht |
+|---|---|
+| 10-weltmodell-nildelta-kairo.png | Nillauf mit fruchtbaren Ufern, Kairo am Ostufer, Deltaküste |
+| 11-weltmodell-khartum-zusammenfluss.png | Zusammenfluss von Weißem und Blauem Nil bei Khartum |
+| 12-weltmodell-viktoriasee.png | Viktoriasee mit Dorf der Uganda am Nordufer |
+| 13-weltmodell-kilimandscharo.png | Kilimandscharo/Meru mit Schneekappen, Dorf der Masai |
+| 14-weltmodell-kongomuendung-boma.png | Kongomündung mit Boma und Livingstone-Fällen |
+| 15-weltmodell-victoriafaelle.png | Victoria-Fälle am Sambesi |
+| 16-weltmodell-kapstadt.png | Kap-Halbinsel mit Kapstadt |
+| 17-weltmodell-tschadsee.png | Tschadsee (großer Umriss von ~1890) |
