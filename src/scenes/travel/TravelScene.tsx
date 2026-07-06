@@ -1,51 +1,86 @@
 // Bird's-eye travel view (design.md §2): 3D terrain around the player,
-// top-down oriented movement, camera following from above.
+// top-down oriented movement, camera following from above. Visuals: TSL sky
+// dome, sun with soft shadows, animated ocean, instanced biome vegetation.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
+import { mx_fractal_noise_float, mx_noise_float, positionWorld, vec3, vertexColor } from 'three/tsl'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
-import { sampleTerrain } from '../../world/terrain'
+import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
+import { SkyDome, TRAVEL_SKY } from '../../render/sky'
+import { createWaterMaterial } from '../../render/water'
+import { buildAcacia, buildBush, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_SEGMENTS = 32
 const CHUNK_RADIUS = 5 // chunks kept around the player in each direction
 const CAMERA_OFFSET = { y: 42, z: 24 }
 
+/** Sun direction shared by the sky dome disc and the shadow light. */
+const SUN_DIR: [number, number, number] = [0.5, 0.62, 0.38]
+
 function chunkKey(cx: number, cz: number): string {
   return `${cx},${cz}`
 }
 
-/** Build one terrain chunk as absolute-positioned geometry with vertex colors. */
+/**
+ * Build one terrain chunk with smooth, seam-free normals: heights are sampled
+ * with a one-vertex margin ring and normals derived by central differences,
+ * so neighboring chunks agree exactly at their shared edges.
+ */
 function buildChunkGeometry(cx: number, cz: number, seed: number): THREE.BufferGeometry {
   const n = CHUNK_SEGMENTS + 1
   const step = CHUNK_SIZE / CHUNK_SEGMENTS
-  const positions = new Float32Array(n * n * 3)
-  const colors = new Float32Array(n * n * 3)
   const x0 = cx * CHUNK_SIZE
   const z0 = cz * CHUNK_SIZE
 
-  let i = 0
-  for (let iz = 0; iz < n; iz++) {
-    for (let ix = 0; ix < n; ix++) {
-      const x = x0 + ix * step
-      const z = z0 + iz * step
+  // Height grid including a margin ring for normal computation.
+  const m = n + 2
+  const heights = new Float32Array(m * m)
+  const colors = new Float32Array(n * n * 3)
+  for (let iz = 0; iz < m; iz++) {
+    for (let ix = 0; ix < m; ix++) {
+      const x = x0 + (ix - 1) * step
+      const z = z0 + (iz - 1) * step
       const { lat, lon } = worldToLatLon(x, z)
       const s = sampleTerrain(lat, lon, seed)
-      positions[i * 3] = x
-      positions[i * 3 + 1] = s.height
-      positions[i * 3 + 2] = z
-      colors[i * 3] = s.color[0]
-      colors[i * 3 + 1] = s.color[1]
-      colors[i * 3 + 2] = s.color[2]
-      i++
+      heights[iz * m + ix] = s.height
+      if (ix >= 1 && ix <= n && iz >= 1 && iz <= n) {
+        const vi = (iz - 1) * n + (ix - 1)
+        colors[vi * 3] = s.color[0]
+        colors[vi * 3 + 1] = s.color[1]
+        colors[vi * 3 + 2] = s.color[2]
+      }
+    }
+  }
+
+  const positions = new Float32Array(n * n * 3)
+  const normals = new Float32Array(n * n * 3)
+  for (let iz = 0; iz < n; iz++) {
+    for (let ix = 0; ix < n; ix++) {
+      const vi = iz * n + ix
+      positions[vi * 3] = x0 + ix * step
+      positions[vi * 3 + 1] = heights[(iz + 1) * m + (ix + 1)]
+      positions[vi * 3 + 2] = z0 + iz * step
+      const hl = heights[(iz + 1) * m + ix]
+      const hr = heights[(iz + 1) * m + (ix + 2)]
+      const hd = heights[iz * m + (ix + 1)]
+      const hu = heights[(iz + 2) * m + (ix + 1)]
+      const nx = hl - hr
+      const nz = hd - hu
+      const ny = 2 * step
+      const inv = 1 / Math.hypot(nx, ny, nz)
+      normals[vi * 3] = nx * inv
+      normals[vi * 3 + 1] = ny * inv
+      normals[vi * 3 + 2] = nz * inv
     }
   }
 
@@ -62,10 +97,21 @@ function buildChunkGeometry(cx: number, cz: number, seed: number): THREE.BufferG
 
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   geo.setIndex(indices)
-  geo.computeVertexNormals()
   return geo
+}
+
+/** Shared terrain material: vertex colors modulated by TSL detail noise. */
+function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
+  const mat = new THREE.MeshStandardNodeMaterial()
+  mat.roughness = 0.95
+  mat.metalness = 0
+  const detail = mx_fractal_noise_float(vec3(positionWorld.xz.mul(0.3), 1.0), 4)
+  const micro = mx_noise_float(vec3(positionWorld.xz.mul(2.4), 7.0))
+  mat.colorNode = vertexColor().mul(detail.mul(0.28).add(micro.mul(0.12)).add(0.8))
+  return mat
 }
 
 function TerrainChunks() {
@@ -73,6 +119,7 @@ function TerrainChunks() {
   const cache = useRef(new Map<string, THREE.BufferGeometry>())
   const [active, setActive] = useState<string[]>([])
   const lastCenter = useRef<string | null>(null)
+  const material = useMemo(() => createTerrainMaterial(), [])
 
   // Reset the cache when a new run (seed) starts.
   useEffect(() => {
@@ -108,28 +155,271 @@ function TerrainChunks() {
       {active.map((key) => {
         const geo = cache.current.get(key)
         if (!geo) return null
-        return (
-          <mesh key={key} geometry={geo}>
-            <meshStandardMaterial vertexColors flatShading />
-          </mesh>
-        )
+        return <mesh key={key} geometry={geo} material={material} receiveShadow />
       })}
     </>
   )
 }
 
-/** Water surface at sea level, following the player. */
+/** Animated water surface at sea level, following the player. */
 function WaterPlane() {
   const ref = useRef<THREE.Mesh>(null)
+  const { material, offset } = useMemo(() => createWaterMaterial(), [])
   useFrame(() => {
     const pos = useGame.getState().pos
-    if (ref.current) ref.current.position.set(pos.x, 0, pos.z)
+    if (ref.current) {
+      ref.current.position.set(pos.x, 0, pos.z)
+      offset.value.set(pos.x, -pos.z) // plane local Y maps to world -Z
+    }
   })
   return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[CHUNK_SIZE * 10, CHUNK_SIZE * 10]} />
-      <meshStandardMaterial color="#2a6d9c" transparent opacity={0.88} />
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} material={material}>
+      <planeGeometry args={[CHUNK_SIZE * 10, CHUNK_SIZE * 10, 96, 96]} />
     </mesh>
+  )
+}
+
+/** Sun light with soft shadows, tracking the player. */
+function Sun() {
+  const lightRef = useRef<THREE.DirectionalLight>(null)
+  const targetRef = useRef<THREE.Object3D>(null)
+  useFrame(() => {
+    const pos = useGame.getState().pos
+    const l = lightRef.current
+    const t = targetRef.current
+    if (!l || !t) return
+    l.position.set(pos.x + SUN_DIR[0] * 130, SUN_DIR[1] * 130, pos.z + SUN_DIR[2] * 130)
+    t.position.set(pos.x, 0, pos.z)
+    l.target = t
+  })
+  return (
+    <>
+      <object3D ref={targetRef} />
+      <directionalLight
+        ref={lightRef}
+        castShadow
+        color="#fff1da"
+        intensity={2.4}
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-95}
+        shadow-camera-right={95}
+        shadow-camera-top={95}
+        shadow-camera-bottom={-95}
+        shadow-camera-near={10}
+        shadow-camera-far={400}
+        shadow-bias={-0.0004}
+      />
+    </>
+  )
+}
+
+// --- Instanced biome vegetation ---------------------------------------------
+
+type Species = 'acacia' | 'jungle' | 'palm' | 'bush' | 'rock'
+const SPECIES: Species[] = ['acacia', 'jungle', 'palm', 'bush', 'rock']
+const MAX_INSTANCES: Record<Species, number> = {
+  acacia: 1600,
+  jungle: 2600,
+  palm: 700,
+  bush: 1800,
+  rock: 900,
+}
+const CANDIDATES_PER_CHUNK = 16
+
+/** Deterministic hash of chunk coords + index + seed to [0, 1). */
+function hash(cx: number, cz: number, i: number, seed: number): number {
+  let h = seed >>> 0
+  h = Math.imul(h ^ cx, 0x85ebca6b)
+  h = Math.imul(h ^ cz, 0xc2b2ae35)
+  h = Math.imul(h ^ i, 0x27d4eb2f)
+  h ^= h >>> 15
+  h = Math.imul(h, 0x2c1b3c6d)
+  h ^= h >>> 13
+  return (h >>> 0) / 4294967296
+}
+
+/** Species choice per terrain type; roll decides density. */
+function pickSpecies(type: TerrainType, roll: number): Species | null {
+  switch (type) {
+    case 'jungle':
+      return roll < 0.8 ? 'jungle' : roll < 0.9 ? 'bush' : null
+    case 'savanna':
+      return roll < 0.3 ? 'acacia' : roll < 0.62 ? 'bush' : roll < 0.68 ? 'rock' : null
+    case 'desert':
+      return roll < 0.07 ? 'rock' : roll < 0.13 ? 'bush' : null
+    case 'mountain':
+      return roll < 0.34 ? 'rock' : roll < 0.42 ? 'bush' : null
+    case 'coast':
+      return roll < 0.3 ? 'palm' : null
+    default:
+      return null
+  }
+}
+
+function Vegetation() {
+  const seed = useGame((s) => s.seed)
+  const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
+  const lastCenter = useRef<string | null>(null)
+
+  const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
+    () => ({
+      acacia: buildAcacia(),
+      jungle: buildJungleTree(),
+      palm: buildPalm(false),
+      bush: buildBush(),
+      rock: buildRock(),
+    }),
+    [],
+  )
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }),
+    [],
+  )
+
+  useEffect(() => {
+    lastCenter.current = null // force rebuild on new run
+  }, [seed])
+
+  useFrame(() => {
+    const pos = useGame.getState().pos
+    const cx = Math.floor(pos.x / CHUNK_SIZE)
+    const cz = Math.floor(pos.z / CHUNK_SIZE)
+    const center = chunkKey(cx, cz)
+    if (center === lastCenter.current) return
+    lastCenter.current = center
+
+    const counts: Record<Species, number> = { acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0 }
+    const mtx = new THREE.Matrix4()
+    const quat = new THREE.Quaternion()
+    const up = new THREE.Vector3(0, 1, 0)
+    const scl = new THREE.Vector3()
+
+    for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
+      for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
+        const ccx = cx + dx
+        const ccz = cz + dz
+        for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
+          const rx = hash(ccx, ccz, i * 4, seed)
+          const rz = hash(ccx, ccz, i * 4 + 1, seed)
+          const roll = hash(ccx, ccz, i * 4 + 2, seed)
+          const x = (ccx + rx) * CHUNK_SIZE
+          const z = (ccz + rz) * CHUNK_SIZE
+          const ll = worldToLatLon(x, z)
+          const s = sampleTerrain(ll.lat, ll.lon, seed)
+          const species = pickSpecies(s.type, roll)
+          if (!species || s.height <= 0.05) continue
+          if (species === 'rock' && s.type === 'mountain' && s.height > 6.5) continue // snow line
+          // Keep place surroundings clear so markers stay readable.
+          let blockedByPlace = false
+          for (const p of PLACES) {
+            const w = latLonToWorld(p.lat, p.lon)
+            if (Math.hypot(x - w.x, z - w.z) < 4) {
+              blockedByPlace = true
+              break
+            }
+          }
+          if (blockedByPlace) continue
+          const idx = counts[species]
+          if (idx >= MAX_INSTANCES[species]) continue
+          const r4 = hash(ccx, ccz, i * 4 + 3, seed)
+          quat.setFromAxisAngle(up, r4 * Math.PI * 2)
+          const sc = 0.75 + r4 * 0.55
+          scl.set(sc, sc * (0.85 + roll * 0.3), sc)
+          mtx.compose(new THREE.Vector3(x, s.height, z), quat, scl)
+          meshRefs.current[species]?.setMatrixAt(idx, mtx)
+          counts[species] = idx + 1
+        }
+      }
+    }
+
+    for (const sp of SPECIES) {
+      const mesh = meshRefs.current[sp]
+      if (!mesh) continue
+      mesh.count = counts[sp]
+      mesh.instanceMatrix.needsUpdate = true
+    }
+  })
+
+  return (
+    <>
+      {SPECIES.map((sp) => (
+        <instancedMesh
+          key={sp}
+          ref={(el) => {
+            meshRefs.current[sp] = el ?? undefined
+          }}
+          args={[geometries[sp], material, MAX_INSTANCES[sp]]}
+          castShadow
+          receiveShadow
+          frustumCulled={false}
+        />
+      ))}
+    </>
+  )
+}
+
+// --- Places, landmarks, player ----------------------------------------------
+
+function PortMarker() {
+  return (
+    <group>
+      {/* Main trading house with a flat roof */}
+      <mesh position={[0, 0.7, 0]} castShadow>
+        <boxGeometry args={[2.0, 1.4, 1.5]} />
+        <meshStandardMaterial color="#e8dcbc" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 1.48, 0]} castShadow>
+        <boxGeometry args={[2.2, 0.16, 1.7]} />
+        <meshStandardMaterial color="#a8875a" roughness={0.9} />
+      </mesh>
+      {/* Annex */}
+      <mesh position={[1.5, 0.5, 0.4]} castShadow>
+        <boxGeometry args={[1.1, 1.0, 1.0]} />
+        <meshStandardMaterial color="#dccf9f" roughness={0.85} />
+      </mesh>
+      {/* Watch tower with dome */}
+      <mesh position={[-1.35, 1.2, 0.35]} castShadow>
+        <cylinderGeometry args={[0.26, 0.32, 2.4, 8]} />
+        <meshStandardMaterial color="#e0d3ae" roughness={0.85} />
+      </mesh>
+      <mesh position={[-1.35, 2.5, 0.35]} castShadow>
+        <sphereGeometry args={[0.32, 10, 8]} />
+        <meshStandardMaterial color="#b07840" roughness={0.6} metalness={0.2} />
+      </mesh>
+      {/* Flag */}
+      <mesh position={[0.9, 2.1, -0.5]} castShadow>
+        <cylinderGeometry args={[0.03, 0.03, 1.4, 5]} />
+        <meshStandardMaterial color="#6b5230" />
+      </mesh>
+      <mesh position={[1.12, 2.6, -0.5]} castShadow>
+        <boxGeometry args={[0.42, 0.26, 0.02]} />
+        <meshStandardMaterial color="#b03a2e" side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  )
+}
+
+function VillageMarker() {
+  const huts: Array<[number, number, number]> = [
+    [0, -0.2, 0.72],
+    [-0.95, 0.5, 0.5],
+    [0.95, 0.55, 0.52],
+  ]
+  return (
+    <group>
+      {huts.map(([hx, hz, r], i) => (
+        <group key={i} position={[hx, 0, hz]}>
+          <mesh position={[0, r * 0.5, 0]} castShadow>
+            <cylinderGeometry args={[r, r * 1.06, r, 9]} />
+            <meshStandardMaterial color="#b0803f" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, r + r * 0.42, 0]} castShadow>
+            <coneGeometry args={[r * 1.4, r * 1.05, 9]} />
+            <meshStandardMaterial color="#8f7340" roughness={1} />
+          </mesh>
+        </group>
+      ))}
+    </group>
   )
 }
 
@@ -137,33 +427,10 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const seed = useGame((s) => s.seed)
   const p = latLonToWorld(place.lat, place.lon)
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
-  const isPort = place.kind === 'port'
   return (
     <group position={[p.x, y, p.z]}>
-      {isPort ? (
-        <>
-          <mesh position={[0, 0.6, 0]}>
-            <boxGeometry args={[1.8, 1.2, 1.8]} />
-            <meshStandardMaterial color="#d8cba8" />
-          </mesh>
-          <mesh position={[0, 1.5, 0]}>
-            <boxGeometry args={[1.2, 0.6, 1.2]} />
-            <meshStandardMaterial color="#b09a6a" />
-          </mesh>
-        </>
-      ) : (
-        <>
-          <mesh position={[0, 0.4, 0]}>
-            <cylinderGeometry args={[0.8, 0.9, 0.8, 8]} />
-            <meshStandardMaterial color="#a3743c" />
-          </mesh>
-          <mesh position={[0, 1.05, 0]}>
-            <coneGeometry args={[1.05, 0.7, 8]} />
-            <meshStandardMaterial color="#8a6f45" />
-          </mesh>
-        </>
-      )}
-      <Html center position={[0, 2.6, 0]} distanceFactor={60}>
+      {place.kind === 'port' ? <PortMarker /> : <VillageMarker />}
+      <Html center position={[0, 2.9, 0]} distanceFactor={60}>
         <div className="map-label">{place.name}</div>
       </Html>
     </group>
@@ -248,29 +515,94 @@ function GraveMarker() {
   )
 }
 
+/** The expedition leader: khaki outfit, pith helmet, backpack. */
 function Player() {
   const ref = useRef<THREE.Group>(null)
-  useFrame(() => {
+  const inner = useRef<THREE.Group>(null)
+  const heading = useRef(0)
+  const last = useRef<{ x: number; z: number } | null>(null)
+  const walkTime = useRef(0)
+
+  useFrame((_, dt) => {
     const s = useGame.getState()
     if (!ref.current) return
     const ll = worldToLatLon(s.pos.x, s.pos.z)
     const t = sampleTerrain(ll.lat, ll.lon, s.seed)
     ref.current.position.set(s.pos.x, Math.max(0, t.height), s.pos.z)
+
+    // Face the movement direction; bob gently while walking.
+    const prev = last.current
+    if (prev) {
+      const dx = s.pos.x - prev.x
+      const dz = s.pos.z - prev.z
+      const moving = Math.hypot(dx, dz) > 0.001
+      if (moving) {
+        const target = Math.atan2(dx, dz)
+        let diff = target - heading.current
+        while (diff > Math.PI) diff -= Math.PI * 2
+        while (diff < -Math.PI) diff += Math.PI * 2
+        heading.current += diff * Math.min(1, dt * 10)
+        walkTime.current += dt
+      }
+      if (inner.current) {
+        inner.current.rotation.y = heading.current
+        inner.current.position.y = moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0
+      }
+    }
+    last.current = { x: s.pos.x, z: s.pos.z }
   })
+
   return (
     <group ref={ref}>
-      <mesh position={[0, 0.55, 0]}>
-        <capsuleGeometry args={[0.28, 0.6, 4, 10]} />
-        <meshStandardMaterial color="#8d5524" />
-      </mesh>
-      <mesh position={[0, 1.25, 0]}>
-        <sphereGeometry args={[0.24, 12, 10]} />
-        <meshStandardMaterial color="#e8c8a0" />
-      </mesh>
-      <mesh position={[0, 1.45, 0]}>
-        <cylinderGeometry args={[0.4, 0.4, 0.08, 12]} />
-        <meshStandardMaterial color="#d9c9a3" />
-      </mesh>
+      <group ref={inner}>
+        {/* Legs */}
+        <mesh position={[-0.11, 0.22, 0]} castShadow>
+          <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
+          <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
+        </mesh>
+        <mesh position={[0.11, 0.22, 0]} castShadow>
+          <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
+          <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
+        </mesh>
+        {/* Torso (khaki jacket) */}
+        <mesh position={[0, 0.66, 0]} castShadow>
+          <boxGeometry args={[0.44, 0.52, 0.28]} />
+          <meshStandardMaterial color="#c4ac72" roughness={0.9} />
+        </mesh>
+        {/* Belt */}
+        <mesh position={[0, 0.45, 0]} castShadow>
+          <boxGeometry args={[0.46, 0.07, 0.3]} />
+          <meshStandardMaterial color="#4e3a20" roughness={0.8} />
+        </mesh>
+        {/* Arms */}
+        <mesh position={[-0.28, 0.68, 0]} rotation={[0, 0, 0.15]} castShadow>
+          <cylinderGeometry args={[0.06, 0.07, 0.46, 6]} />
+          <meshStandardMaterial color="#c4ac72" roughness={0.9} />
+        </mesh>
+        <mesh position={[0.28, 0.68, 0]} rotation={[0, 0, -0.15]} castShadow>
+          <cylinderGeometry args={[0.06, 0.07, 0.46, 6]} />
+          <meshStandardMaterial color="#c4ac72" roughness={0.9} />
+        </mesh>
+        {/* Head */}
+        <mesh position={[0, 1.06, 0]} castShadow>
+          <sphereGeometry args={[0.17, 12, 10]} />
+          <meshStandardMaterial color="#e8c39a" roughness={0.8} />
+        </mesh>
+        {/* Pith helmet: crown + brim */}
+        <mesh position={[0, 1.19, 0]} castShadow>
+          <sphereGeometry args={[0.19, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#ddd0a8" roughness={0.85} />
+        </mesh>
+        <mesh position={[0, 1.17, 0]} castShadow>
+          <cylinderGeometry args={[0.29, 0.29, 0.035, 14]} />
+          <meshStandardMaterial color="#d0c298" roughness={0.85} />
+        </mesh>
+        {/* Backpack */}
+        <mesh position={[0, 0.72, 0.2]} castShadow>
+          <boxGeometry args={[0.32, 0.38, 0.16]} />
+          <meshStandardMaterial color="#7c5a34" roughness={0.95} />
+        </mesh>
+      </group>
     </group>
   )
 }
@@ -339,12 +671,14 @@ export function TravelScene() {
 
   return (
     <>
-      <color attach="background" args={['#cfe3ee']} />
-      <fog attach="fog" args={['#cfe3ee', 70, 190]} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[60, 90, 30]} intensity={1.1} />
+      <color attach="background" args={['#cfe0ea']} />
+      <fog attach="fog" args={['#cfe0ea', 95, 260]} />
+      <SkyDome preset={TRAVEL_SKY} sunDirection={SUN_DIR} />
+      <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
+      <Sun />
       <TerrainChunks />
       <WaterPlane />
+      <Vegetation />
       {PLACES.map((p) => (
         <PlaceMarker key={p.id} place={p} />
       ))}

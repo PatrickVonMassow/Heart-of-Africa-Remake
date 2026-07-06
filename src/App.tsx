@@ -19,6 +19,7 @@ export default function App() {
     <div className="game-root">
       <Canvas
         camera={{ fov: 50, near: 0.1, far: 2000, position: [0, 40, 20] }}
+        shadows
         gl={async (props) => {
           // WebGPU primary; the renderer falls back to WebGL 2 automatically
           // when WebGPU is unavailable (CLAUDE.md §3).
@@ -27,6 +28,11 @@ export default function App() {
             antialias: true,
           })
           await renderer.init()
+          // Filmic look: soft shadows + ACES tone mapping.
+          renderer.shadowMap.enabled = true
+          renderer.shadowMap.type = THREE.PCFSoftShadowMap
+          renderer.toneMapping = THREE.ACESFilmicToneMapping
+          renderer.toneMappingExposure = 1.05
           return renderer
         }}
       >

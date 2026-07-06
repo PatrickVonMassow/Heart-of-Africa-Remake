@@ -1,20 +1,28 @@
 // First-person place view (design.md §2): walkable port/village with
 // enterable trade buildings, chief hut audience and a villager NPC.
 // Building *positions and looks* are procedural per run (design.md §18);
-// which buildings exist is fixed per place kind.
+// which buildings exist is fixed per place kind. Visuals: TSL sky dome and
+// noise materials, sun shadows, detailed buildings, palms and scatter props.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
+import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
 import { useUi, type BuildingType } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { isKeyDown, onKeyPress } from '../../systems/input'
+import { PORT_SKY, VILLAGE_SKY, SkyDome } from '../../render/sky'
+import { createGroundMaterial, createNoisyMaterial } from '../../render/materials'
+import { buildGrassTuft, buildPalm, buildRock } from '../../render/flora'
 
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 const INTERACT_RADIUS = 4.5
+
+/** Sun direction shared by the sky dome disc and the shadow light. */
+const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
 
 interface Interactive {
   type: BuildingType | 'villager' | 'exit'
@@ -94,21 +102,99 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   return { interactives, decoHuts, palms }
 }
 
-function PortBuilding({ item }: { item: Interactive }) {
+// --- Shared procedural materials (created once per mount) --------------------
+
+function usePlaceMaterials(isPort: boolean) {
+  return useMemo(() => {
+    const plaster = createNoisyMaterial({ base: '#e6d9b4', alt: '#c6b488', scale: 0.6 })
+    const plasterDark = createNoisyMaterial({ base: '#d3c294', alt: '#ab9668', scale: 0.7 })
+    const mud = createNoisyMaterial({ base: '#b58343', alt: '#8a6231', scale: 0.9 })
+    const thatch = createNoisyMaterial({ base: '#a5894b', alt: '#6f5a2c', scale: [2.2, 7, 2.2], octaves: 3 })
+    const wood = createNoisyMaterial({ base: '#7a5a32', alt: '#573e1f', scale: [1.2, 4, 1.2], roughness: 0.85 })
+    const ground = isPort
+      ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b')
+      : createGroundMaterial('#c9a878', '#a9885c', '#8f7a4e')
+    return { plaster, plasterDark, mud, thatch, wood, ground }
+  }, [isPort])
+}
+
+type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
+
+// --- Scenery pieces -----------------------------------------------------------
+
+function PortBuilding({ item, mats, variant }: { item: Interactive; mats: PlaceMaterials; variant: number }) {
+  const rot = ((variant * 137) % 40) / 100 - 0.2
   return (
-    <group position={[item.pos[0], 0, item.pos[1]]}>
-      <mesh position={[0, 1.6, 0]}>
+    <group position={[item.pos[0], 0, item.pos[1]]} rotation={[0, rot, 0]}>
+      {/* Walls */}
+      <mesh position={[0, 1.6, 0]} castShadow receiveShadow material={variant % 2 ? mats.plaster : mats.plasterDark}>
         <boxGeometry args={[5, 3.2, 4]} />
-        <meshStandardMaterial color="#d8cba8" />
       </mesh>
-      <mesh position={[0, 3.4, 0]}>
-        <boxGeometry args={[5.4, 0.4, 4.4]} />
-        <meshStandardMaterial color="#8a6f45" />
+      {/* Corner pilasters */}
+      {[
+        [-2.45, -1.95],
+        [2.45, -1.95],
+        [-2.45, 1.95],
+        [2.45, 1.95],
+      ].map(([px, pz], i) => (
+        <mesh key={i} position={[px, 1.6, pz]} castShadow material={mats.plasterDark}>
+          <boxGeometry args={[0.35, 3.2, 0.35]} />
+        </mesh>
+      ))}
+      {/* Roof slab and parapet */}
+      <mesh position={[0, 3.3, 0]} castShadow material={mats.wood}>
+        <boxGeometry args={[5.4, 0.2, 4.4]} />
       </mesh>
-      {/* Door */}
-      <mesh position={[0, 0.9, 2.01]}>
-        <boxGeometry args={[1.1, 1.8, 0.1]} />
-        <meshStandardMaterial color="#5a4020" />
+      {[
+        [0, -2.1, 5.4, 0.25],
+        [0, 2.1, 5.4, 0.25],
+        [-2.6, 0, 0.25, 3.9],
+        [2.6, 0, 0.25, 3.9],
+      ].map(([px, pz, w, d], i) => (
+        <mesh key={`p${i}`} position={[px, 3.55, pz]} castShadow material={variant % 2 ? mats.plaster : mats.plasterDark}>
+          <boxGeometry args={[w, 0.3, d]} />
+        </mesh>
+      ))}
+      {/* Door with frame and step */}
+      <mesh position={[0, 1.05, 2.02]} material={mats.wood} castShadow>
+        <boxGeometry args={[1.3, 2.1, 0.12]} />
+      </mesh>
+      <mesh position={[0, 1.0, 2.08]}>
+        <boxGeometry args={[1.0, 1.9, 0.06]} />
+        <meshStandardMaterial color="#3d2c16" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 0.08, 2.35]} receiveShadow material={mats.plasterDark}>
+        <boxGeometry args={[1.6, 0.16, 0.7]} />
+      </mesh>
+      {/* Windows */}
+      {[-1.6, 1.6].map((wx) => (
+        <group key={wx} position={[wx, 1.9, 2.01]}>
+          <mesh material={mats.wood}>
+            <boxGeometry args={[0.75, 0.95, 0.08]} />
+          </mesh>
+          <mesh position={[0, 0, 0.03]}>
+            <boxGeometry args={[0.55, 0.75, 0.06]} />
+            <meshStandardMaterial color="#2c2317" roughness={0.7} />
+          </mesh>
+        </group>
+      ))}
+      {/* Awning over the door on two poles */}
+      <mesh position={[0, 2.55, 2.75]} rotation={[0.28, 0, 0]} castShadow>
+        <boxGeometry args={[2.1, 0.06, 1.5]} />
+        <meshStandardMaterial color={variant % 2 ? '#b6552e' : '#8c6b3a'} roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      {[-0.9, 0.9].map((px) => (
+        <mesh key={px} position={[px, 1.15, 3.4]} castShadow material={mats.wood}>
+          <cylinderGeometry args={[0.05, 0.06, 2.3, 6]} />
+        </mesh>
+      ))}
+      {/* Cargo beside the building */}
+      <mesh position={[2.9, 0.35, 1.4]} rotation={[0, 0.4, 0]} castShadow material={mats.wood}>
+        <boxGeometry args={[0.7, 0.7, 0.7]} />
+      </mesh>
+      <mesh position={[3.3, 0.3, 0.5]} castShadow>
+        <cylinderGeometry args={[0.32, 0.36, 0.75, 10]} />
+        <meshStandardMaterial color="#6e4f2a" roughness={0.85} />
       </mesh>
       <Html center position={[0, 4.4, 0]} distanceFactor={18}>
         <div className="map-label">{item.label}</div>
@@ -117,17 +203,69 @@ function PortBuilding({ item }: { item: Interactive }) {
   )
 }
 
-function VillageHut({ x, z, r, h, label }: { x: number; z: number; r: number; h: number; label?: string }) {
+function VillageHut({
+  x,
+  z,
+  r,
+  h,
+  label,
+  mats,
+  chief = false,
+}: {
+  x: number
+  z: number
+  r: number
+  h: number
+  label?: string
+  mats: PlaceMaterials
+  chief?: boolean
+}) {
+  // Door faces the place center.
+  const facing = Math.atan2(x, z) + Math.PI
   return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, h / 2, 0]}>
-        <cylinderGeometry args={[r, r * 1.05, h, 10]} />
-        <meshStandardMaterial color="#b0803f" />
+    <group position={[x, 0, z]} rotation={[0, facing, 0]}>
+      {/* Mud wall */}
+      <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={mats.mud}>
+        <cylinderGeometry args={[r, r * 1.06, h, 12]} />
       </mesh>
-      <mesh position={[0, h + r * 0.45, 0]}>
-        <coneGeometry args={[r * 1.35, r * 1.1, 10]} />
-        <meshStandardMaterial color="#8f7340" />
+      {/* Thatch roof with overhang and top knot */}
+      <mesh position={[0, h + r * 0.5, 0]} castShadow material={mats.thatch}>
+        <coneGeometry args={[r * 1.45, r * 1.25, 12]} />
       </mesh>
+      <mesh position={[0, h + r * 1.12, 0]} castShadow material={mats.thatch}>
+        <sphereGeometry args={[r * 0.14, 6, 5]} />
+      </mesh>
+      {/* Door opening */}
+      <mesh position={[0, h * 0.36, r * 0.99]}>
+        <boxGeometry args={[r * 0.55, h * 0.72, 0.12]} />
+        <meshStandardMaterial color="#332412" roughness={0.95} />
+      </mesh>
+      {/* Painted band */}
+      <mesh position={[0, h * 0.8, 0]}>
+        <cylinderGeometry args={[r * 1.005, r * 1.005, h * 0.09, 12, 1, true]} />
+        <meshStandardMaterial color={chief ? '#8c2f22' : '#8a6a3c'} roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
+      {chief && (
+        <>
+          {/* Entrance poles with horns */}
+          {[-0.7, 0.7].map((px) => (
+            <group key={px} position={[px * r, 0, r * 1.25]}>
+              <mesh position={[0, 1.1, 0]} castShadow material={mats.wood}>
+                <cylinderGeometry args={[0.07, 0.09, 2.2, 6]} />
+              </mesh>
+              <mesh position={[0, 2.25, 0]} rotation={[0, 0, px < 0 ? 0.5 : -0.5]} castShadow>
+                <coneGeometry args={[0.07, 0.5, 5]} />
+                <meshStandardMaterial color="#e8ddc8" roughness={0.6} />
+              </mesh>
+            </group>
+          ))}
+          {/* Shield by the door */}
+          <mesh position={[r * 0.75, 1.0, r * 0.92]} rotation={[0.1, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.45, 0.45, 0.08, 12]} />
+            <meshStandardMaterial color="#a33b28" roughness={0.85} />
+          </mesh>
+        </>
+      )}
       {label && (
         <Html center position={[0, h + r * 1.4 + 0.8, 0]} distanceFactor={18}>
           <div className="map-label">{label}</div>
@@ -140,13 +278,33 @@ function VillageHut({ x, z, r, h, label }: { x: number; z: number; r: number; h:
 function Villager({ item }: { item: Interactive }) {
   return (
     <group position={[item.pos[0], 0, item.pos[1]]}>
-      <mesh position={[0, 0.8, 0]}>
-        <capsuleGeometry args={[0.3, 0.9, 4, 10]} />
-        <meshStandardMaterial color="#7a3b1e" />
+      {/* Robe */}
+      <mesh position={[0, 0.62, 0]} castShadow>
+        <coneGeometry args={[0.42, 1.25, 10]} />
+        <meshStandardMaterial color="#8a3b2a" roughness={0.95} />
       </mesh>
-      <mesh position={[0, 1.65, 0]}>
-        <sphereGeometry args={[0.24, 12, 10]} />
-        <meshStandardMaterial color="#5c3317" />
+      {/* Torso and shoulder cloth */}
+      <mesh position={[0, 1.28, 0]} castShadow>
+        <cylinderGeometry args={[0.22, 0.28, 0.5, 8]} />
+        <meshStandardMaterial color="#a3502f" roughness={0.95} />
+      </mesh>
+      {/* Head with gray hair */}
+      <mesh position={[0, 1.68, 0]} castShadow>
+        <sphereGeometry args={[0.2, 12, 10]} />
+        <meshStandardMaterial color="#5c3317" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 1.8, 0]}>
+        <sphereGeometry args={[0.19, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
+        <meshStandardMaterial color="#cfc8bd" roughness={1} />
+      </mesh>
+      {/* Walking staff */}
+      <mesh position={[0.38, 0.95, 0.05]} rotation={[0, 0, -0.08]} castShadow>
+        <cylinderGeometry args={[0.03, 0.04, 1.9, 6]} />
+        <meshStandardMaterial color="#5f4526" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.4, 1.92, 0.05]}>
+        <sphereGeometry args={[0.06, 6, 5]} />
+        <meshStandardMaterial color="#4a3018" roughness={0.9} />
       </mesh>
       <Html center position={[0, 2.3, 0]} distanceFactor={14}>
         <div className="map-label">Alter Mann</div>
@@ -155,20 +313,153 @@ function Villager({ item }: { item: Interactive }) {
   )
 }
 
-function Palm({ x, z, h }: { x: number; z: number; h: number }) {
+function ExitGate({ item, mats }: { item: Interactive; mats: PlaceMaterials }) {
   return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, h / 2, 0]}>
-        <cylinderGeometry args={[0.12, 0.2, h, 6]} />
-        <meshStandardMaterial color="#7a5c30" />
+    <group position={[item.pos[0], 0, item.pos[1]]}>
+      {[-1.5, 1.5].map((px) => (
+        <group key={px} position={[px, 0, 0]}>
+          <mesh position={[0, 1.3, 0]} castShadow material={mats.wood}>
+            <cylinderGeometry args={[0.14, 0.18, 2.6, 7]} />
+          </mesh>
+          {/* Carved rings */}
+          {[0.8, 1.5, 2.1].map((py) => (
+            <mesh key={py} position={[0, py, 0]} castShadow>
+              <torusGeometry args={[0.17, 0.035, 6, 10]} />
+              <meshStandardMaterial color="#3f2d16" roughness={0.9} />
+            </mesh>
+          ))}
+        </group>
+      ))}
+      <mesh position={[0, 2.65, 0]} castShadow material={mats.wood}>
+        <boxGeometry args={[3.5, 0.22, 0.26]} />
       </mesh>
-      <mesh position={[0, h + 0.2, 0]}>
-        <sphereGeometry args={[1.1, 8, 6]} />
-        <meshStandardMaterial color="#3f6b2a" />
+      {/* Hanging charm */}
+      <mesh position={[0, 2.25, 0]}>
+        <coneGeometry args={[0.09, 0.35, 5]} />
+        <meshStandardMaterial color="#e8ddc8" roughness={0.7} />
       </mesh>
+      <Html center position={[0, 3.2, 0]} distanceFactor={18}>
+        <div className="map-label">Ort verlassen</div>
+      </Html>
     </group>
   )
 }
+
+function Palm({ x, z, h, geometry }: { x: number; z: number; h: number; geometry: THREE.BufferGeometry }) {
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), [])
+  const s = h / 4.4
+  return (
+    <mesh
+      geometry={geometry}
+      material={material}
+      position={[x, 0, z]}
+      rotation={[0, (x * 7 + z * 13) % 6, 0]}
+      scale={[s, s, s]}
+      castShadow
+    />
+  )
+}
+
+/** Village campfire: stone ring, logs, emissive flame, flickering light. */
+function FirePit({ x, z }: { x: number; z: number }) {
+  const light = useRef<THREE.PointLight>(null)
+  useFrame(({ clock }) => {
+    if (light.current) {
+      const t = clock.elapsedTime
+      light.current.intensity = 14 + Math.sin(t * 9) * 2.5 + Math.sin(t * 23.7) * 1.5
+    }
+  })
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.02, 0]} receiveShadow>
+        <cylinderGeometry args={[0.9, 0.9, 0.05, 14]} />
+        <meshStandardMaterial color="#3a3128" roughness={1} />
+      </mesh>
+      {Array.from({ length: 7 }, (_, i) => {
+        const a = (i / 7) * Math.PI * 2
+        return (
+          <mesh key={i} position={[Math.cos(a) * 0.95, 0.12, Math.sin(a) * 0.95]} castShadow>
+            <dodecahedronGeometry args={[0.16, 0]} />
+            <meshStandardMaterial color="#79706a" roughness={1} />
+          </mesh>
+        )
+      })}
+      {[0.5, -0.6].map((ry, i) => (
+        <mesh key={i} position={[0, 0.14, 0]} rotation={[0.08, ry, 0]} castShadow>
+          <cylinderGeometry args={[0.07, 0.08, 1.1, 6]} />
+          <meshStandardMaterial color="#4a3018" roughness={1} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.42, 0]}>
+        <coneGeometry args={[0.3, 0.75, 8]} />
+        <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
+      </mesh>
+      <pointLight ref={light} position={[0, 1.1, 0]} color="#ffab4a" distance={14} decay={2} castShadow={false} />
+    </group>
+  )
+}
+
+/** Seeded ground scatter: grass tufts and stones (visual only). */
+function GroundScatter({ placeId, seed, isPort }: { placeId: string; seed: number; isPort: boolean }) {
+  const { tufts, rocks } = useMemo(() => {
+    let hash = 0
+    for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
+    const rand = mulberry32(((seed ^ hash) + 977) >>> 0)
+    const tufts: Array<[number, number, number]> = []
+    const rocks: Array<[number, number, number]> = []
+    const tuftCount = isPort ? 30 : 70
+    for (let i = 0; i < tuftCount; i++) {
+      const a = rand() * Math.PI * 2
+      const r = 4 + rand() * (PLACE_RADIUS + 8)
+      tufts.push([Math.cos(a) * r, Math.sin(a) * r, 0.55 + rand() * 0.55])
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = rand() * Math.PI * 2
+      const r = 6 + rand() * (PLACE_RADIUS + 6)
+      rocks.push([Math.cos(a) * r, Math.sin(a) * r, 0.3 + rand() * 0.7])
+    }
+    return { tufts, rocks }
+  }, [placeId, seed, isPort])
+
+  const tuftGeo = useMemo(() => buildGrassTuft(), [])
+  const rockGeo = useMemo(() => buildRock(), [])
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), [])
+  const tuftMesh = useRef<THREE.InstancedMesh>(null)
+  const rockMesh = useRef<THREE.InstancedMesh>(null)
+
+  useEffect(() => {
+    const mtx = new THREE.Matrix4()
+    const quat = new THREE.Quaternion()
+    const up = new THREE.Vector3(0, 1, 0)
+    tufts.forEach(([x, z, s], i) => {
+      quat.setFromAxisAngle(up, x * 3 + z)
+      mtx.compose(new THREE.Vector3(x, 0, z), quat, new THREE.Vector3(s, s, s))
+      tuftMesh.current?.setMatrixAt(i, mtx)
+    })
+    rocks.forEach(([x, z, s], i) => {
+      quat.setFromAxisAngle(up, z * 5 + x)
+      mtx.compose(new THREE.Vector3(x, 0, z), quat, new THREE.Vector3(s, s, s))
+      rockMesh.current?.setMatrixAt(i, mtx)
+    })
+    if (tuftMesh.current) {
+      tuftMesh.current.count = tufts.length
+      tuftMesh.current.instanceMatrix.needsUpdate = true
+    }
+    if (rockMesh.current) {
+      rockMesh.current.count = rocks.length
+      rockMesh.current.instanceMatrix.needsUpdate = true
+    }
+  }, [tufts, rocks])
+
+  return (
+    <>
+      <instancedMesh ref={tuftMesh} args={[tuftGeo, material, 96]} receiveShadow />
+      <instancedMesh ref={rockMesh} args={[rockGeo, material, 16]} castShadow receiveShadow />
+    </>
+  )
+}
+
+// --- Scene --------------------------------------------------------------------
 
 export function PlaceScene() {
   const camera = useThree((s) => s.camera)
@@ -183,6 +474,9 @@ export function PlaceScene() {
     () => (placeId ? buildLayout(placeId, seed) : null),
     [placeId, seed],
   )
+  const isPort = place?.kind === 'port'
+  const mats = usePlaceMaterials(!!isPort)
+  const palmGeo = useMemo(() => buildPalm(true), [])
 
   // yaw 0 faces -Z (toward the place center from the southern spawn point).
   const player = useRef({ x: 0, z: 18, yaw: 0 })
@@ -303,67 +597,68 @@ export function PlaceScene() {
   })
 
   if (!place || !layout) return null
-  const isPort = place.kind === 'port'
-  const groundColor = isPort ? '#d9c9a3' : '#c9a878'
-  const skyColor = isPort ? '#bfd9e8' : '#d8e4c8'
+  const sky = isPort ? PORT_SKY : VILLAGE_SKY
 
   return (
     <>
-      <color attach="background" args={[skyColor]} />
-      <fog attach="fog" args={[skyColor, 30, 90]} />
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[30, 50, 20]} intensity={1.8} />
+      <color attach="background" args={[sky.horizon]} />
+      <fog attach="fog" args={[sky.horizon, 38, 110]} />
+      <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
+      <hemisphereLight args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', 0.8]} />
+      <directionalLight
+        position={[SUN_DIR[0] * 60, SUN_DIR[1] * 60, SUN_DIR[2] * 60]}
+        color="#fff1d8"
+        intensity={2.4}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-left={-55}
+        shadow-camera-right={55}
+        shadow-camera-top={55}
+        shadow-camera-bottom={-55}
+        shadow-camera-near={5}
+        shadow-camera-far={160}
+        shadow-bias={-0.0004}
+      />
 
-      {/* Ground disc */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      {/* Ground disc with procedural mottling */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
         <circleGeometry args={[PLACE_RADIUS + 14, 48]} />
-        <meshStandardMaterial color={groundColor} />
       </mesh>
 
       {layout.interactives.map((it, i) => {
         if (it.type === 'villager') return <Villager key={i} item={it} />
-        if (it.type === 'exit') {
-          return (
-            <group key={i} position={[it.pos[0], 0, it.pos[1]]}>
-              <mesh position={[-1.4, 1.2, 0]}>
-                <cylinderGeometry args={[0.15, 0.15, 2.4, 6]} />
-                <meshStandardMaterial color="#7a5c30" />
-              </mesh>
-              <mesh position={[1.4, 1.2, 0]}>
-                <cylinderGeometry args={[0.15, 0.15, 2.4, 6]} />
-                <meshStandardMaterial color="#7a5c30" />
-              </mesh>
-              <mesh position={[0, 2.5, 0]}>
-                <boxGeometry args={[3.2, 0.25, 0.25]} />
-                <meshStandardMaterial color="#7a5c30" />
-              </mesh>
-              <Html center position={[0, 3.2, 0]} distanceFactor={18}>
-                <div className="map-label">Ort verlassen</div>
-              </Html>
-            </group>
-          )
-        }
-        if (isPort) return <PortBuilding key={i} item={it} />
-        // Chief hut: larger village hut.
-        return <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={it.label} />
+        if (it.type === 'exit') return <ExitGate key={i} item={it} mats={mats} />
+        if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
+        // Chief hut: larger village hut with regalia.
+        return <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={it.label} mats={mats} chief />
       })}
 
       {layout.decoHuts.map((h, i) =>
         isPort ? (
-          <group key={i} position={[h.x, 0, h.z]}>
-            <mesh position={[0, h.h / 2, 0]}>
+          <group key={i} position={[h.x, 0, h.z]} rotation={[0, (i * 73) % 4, 0]}>
+            <mesh position={[0, h.h / 2, 0]} castShadow receiveShadow material={i % 2 ? mats.plaster : mats.plasterDark}>
               <boxGeometry args={[h.r * 2, h.h, h.r * 1.8]} />
-              <meshStandardMaterial color="#cbbd97" />
+            </mesh>
+            <mesh position={[0, h.h + 0.08, 0]} castShadow material={mats.wood}>
+              <boxGeometry args={[h.r * 2.2, 0.16, h.r * 2]} />
+            </mesh>
+            <mesh position={[0, h.h * 0.35, h.r * 0.91]}>
+              <boxGeometry args={[0.8, h.h * 0.7, 0.08]} />
+              <meshStandardMaterial color="#3d2c16" roughness={0.9} />
             </mesh>
           </group>
         ) : (
-          <VillageHut key={i} x={h.x} z={h.z} r={h.r} h={h.h} />
+          <VillageHut key={i} x={h.x} z={h.z} r={h.r} h={h.h} mats={mats} />
         ),
       )}
 
+      {!isPort && <FirePit x={-3.5} z={2.5} />}
+
       {layout.palms.map((t, i) => (
-        <Palm key={i} {...t} />
+        <Palm key={i} {...t} geometry={palmGeo} />
       ))}
+
+      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} />
     </>
   )
 }

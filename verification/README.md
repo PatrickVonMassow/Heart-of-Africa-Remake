@@ -62,3 +62,28 @@ den Dev-Server, alle Prüfungen PASS, keine Konsolenfehler:
 | 15-weltmodell-victoriafaelle.png | Victoria-Fälle am Sambesi |
 | 16-weltmodell-kapstadt.png | Kap-Halbinsel mit Kapstadt |
 | 17-weltmodell-tschadsee.png | Tschadsee (großer Umriss von ~1890) |
+
+## Nachtrag: Grafik-Überarbeitung (§7.1.11)
+
+Stand: 6. Juli 2026, dritter Lauf (shots.mjs, preview-shot.mjs). Headless-
+Prüfung gegen Dev-Server und Produktions-Preview, 0 Konsolenfehler, `npm run
+build` fehlerfrei. Umgesetzt: TSL-Himmelskuppel (Gradient, Sonne, ziehende
+Wolken), Sonnenlicht mit weichen Schatten (PCF), ACES-Tone-Mapping,
+animiertes Ozean-/Flusswasser (Wellenhub, Farbrauschen, Glitzern), nahtlos
+geglättete Terrain-Normalen mit Biom-Farbverläufen und Detail-Rauschen,
+instanzierte Vegetation je Biom (Akazien, Dschungelbäume, Palmen, Büsche,
+Felsen), detaillierte Orts-Marker, Spielfigur mit Laufrichtung/-animation
+sowie überarbeitete begehbare Orte (Verputz-/Lehm-/Stroh-Materialien,
+Gebäudedetails, Lagerfeuer, Requisiten, Bodenbewuchs).
+
+| Datei | Ansicht |
+|---|---|
+| 18-grafik-hafenstadt-kairo.png | Kairo (Ich-Perspektive): Gebäude mit Markise/Attika, Palmen, Schatten |
+| 19-grafik-vogelperspektive-nildelta.png | Nildelta: animiertes Meer, fruchtbare Ufer, Kairo-Marker |
+| 20-grafik-savanne-kilimandscharo.png | Ostafrika: Berge, Seen, Akazien-Savanne, Dunst |
+| 21-grafik-dschungel-kongo.png | Kongobecken: dichter Dschungel, Flüsse, Stanley-Fälle |
+| 22-grafik-kueste-lagos.png | Guineaküste bei Lagos: tiefer Ozean mit Glitzern |
+| 23-grafik-dorf-masai.png | Dorf (Ich-Perspektive): Hütten, Lagerfeuer, Alter Mann |
+| 24-grafik-chefhuette-nah.png | Chefhütte nah: Stroh-/Lehm-Texturen, Regalia |
+| 25-grafik-tagebuch.png | Geöffnetes Tagebuch über der neuen Grafik |
+| 26-grafik-produktions-build.png | Produktions-Build (`npm run preview`) |

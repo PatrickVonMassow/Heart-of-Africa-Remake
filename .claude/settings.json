@@ -27,7 +27,8 @@
       "Bash(cat \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\Documents\\\\\\\\Developing\\\\\\\\hoa\\\\\\\\package.json\")",
       "Bash(cd \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-Patri-Documents-Developing-hoa\\\\\\\\d83aaaf1-69c6-4942-8e96-d53b39f1811e\\\\\\\\scratchpad\")",
       "Bash(sed -i \"s|'\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./Users/Patri/Documents/Developing/hoa|'file:///C:/Users/Patri/Documents/Developing/hoa|g\" check-world.mjs)",
-      "Bash(cd \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\Documents\\\\\\\\Developing\\\\\\\\hoa\")"
+      "Bash(cd \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\Documents\\\\\\\\Developing\\\\\\\\hoa\")",
+      "Bash(git commit -m 'AAA-style graphics overhaul: TSL sky/water/materials, shadows, vegetation *)"
     ],
     "deny": [
       "Read(./.env)",

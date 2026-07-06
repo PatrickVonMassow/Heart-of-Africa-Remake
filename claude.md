@@ -174,6 +174,7 @@ gemäß `design.md`; hier steht nur die prüfbare Bedingung.
     Bergen mit Schaufel am Fundpunkt löst den Sieg-Zustand aus. Die vollständige
     Triangulation mehrerer Hinweise ist im POC nicht erforderlich — ein
     einzelner dekodierter Hinweis, der zum Fundpunkt führt, genügt.
+11. **Spielgrafik** Die grafische Darstellung soll ansprechend und aufwändig auf AAA-Nivea sein und die bisherige schematische Darstellung des POCs ersetzen. Dazu gehört auch die Glättung der Geometrie, des Kontinents und der Flüsse, denen man bisher starke Stufen ansieht.
 
 ### 7.2 Selbstverifikation (verpflichtend)
 

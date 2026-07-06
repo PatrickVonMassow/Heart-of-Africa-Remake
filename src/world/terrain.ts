@@ -38,15 +38,37 @@ export const RIVER_WIDTH_DEG = 0.14
 // Base palette per terrain type; noise varies brightness per run.
 const PALETTE: Record<TerrainType, [number, number, number]> = {
   ocean: [0.11, 0.29, 0.5],
-  coast: [0.86, 0.79, 0.56],
-  desert: [0.88, 0.75, 0.46],
-  savanna: [0.63, 0.6, 0.29],
-  jungle: [0.11, 0.36, 0.13],
-  mountain: [0.47, 0.41, 0.35],
+  coast: [0.87, 0.8, 0.58],
+  desert: [0.89, 0.74, 0.44],
+  savanna: [0.64, 0.6, 0.3],
+  jungle: [0.13, 0.38, 0.14],
+  mountain: [0.48, 0.42, 0.35],
+  water: [0.2, 0.42, 0.6],
+}
+
+// Secondary tones blended in by noise for richer, less flat ground colors.
+const PALETTE_ALT: Record<TerrainType, [number, number, number]> = {
+  ocean: [0.08, 0.22, 0.42],
+  coast: [0.8, 0.7, 0.48],
+  desert: [0.78, 0.6, 0.34],
+  savanna: [0.52, 0.47, 0.22],
+  jungle: [0.09, 0.28, 0.11],
+  mountain: [0.38, 0.34, 0.3],
   water: [0.2, 0.42, 0.6],
 }
 
 const SNOW: [number, number, number] = [0.94, 0.95, 0.97]
+const LUSH: [number, number, number] = [0.3, 0.48, 0.18]
+
+function sstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
+}
+
+/** Blended biome color: primary/alt tone mixed by noise, no hard steps. */
+function biomeColor(type: TerrainType, n: number): [number, number, number] {
+  return mix(PALETTE[type], PALETTE_ALT[type], sstep(0.25, 0.75, n))
+}
 
 function vary(c: [number, number, number], f: number): [number, number, number] {
   return [c[0] * f, c[1] * f, c[2] * f]
@@ -181,20 +203,49 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     type = 'savanna'
   }
 
-  let color = PALETTE[type]
+  let color = biomeColor(type, detail)
+
+  // Cross-blend neighboring biomes so type boundaries have no hard color
+  // steps (the discrete `type` stays as-is for gameplay/vegetation).
+  switch (region) {
+    case 'east':
+      color = mix(biomeColor('savanna', detail), biomeColor('mountain', detail), sstep(0.35, 0.55, n))
+      break
+    case 'south':
+      if (!(lon < 18.5 && lat > -31)) {
+        color = mix(biomeColor('savanna', detail), biomeColor('mountain', detail), sstep(0.62, 0.85, n))
+      }
+      break
+    case 'west':
+      if (lat < 8 && lon < 2) {
+        color = mix(biomeColor('savanna', detail), biomeColor('jungle', detail), sstep(0.28, 0.45, n))
+      }
+      break
+    default:
+      break
+  }
+  if (type === 'mountain' && region !== 'east' && region !== 'south') {
+    color = biomeColor('mountain', detail)
+  }
+
+  // Lush banks along rivers and lakes (visual only).
+  const bankT = 1 - Math.min(1, riverD / 0.5)
+  if (bankT > 0 && type !== 'mountain') {
+    color = mix(color, LUSH, sstep(0.15, 0.9, bankT) * 0.65)
+  }
 
   // Snow caps on the highest peaks (Kilimandscharo, Kenia, Ruwenzori …).
   if (type === 'mountain' && height > 6.5) {
     color = mix(color, SNOW, Math.min(1, (height - 6.5) / 1.5))
   }
 
-  // Smooth shoreline ramp near the sea coast.
+  // Smooth shoreline ramp near the sea coast, blending into beach sand.
   if (coastD < 0.6) {
     const t = coastD / 0.6
     height = height * t + 0.15 * (1 - t)
+    color = mix(biomeColor('coast', detail), color, sstep(0.1, 0.55, t))
     if (coastD < 0.22) {
       type = 'coast'
-      color = PALETTE.coast
     }
   }
 
