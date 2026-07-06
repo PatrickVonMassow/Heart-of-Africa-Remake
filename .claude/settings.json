@@ -22,7 +22,12 @@
       "Bash(cp __TRACKED_VAR__/v5-audience.png verification/04-chefhuette-audienz.png)",
       "Bash(cp __TRACKED_VAR__/v6-hint-journal.png verification/05-tagebuch-hinweis.png)",
       "Bash(git add *)",
-      "Bash(git commit -q -m 'Add §7.2 verification evidence: screenshots and check results *)"
+      "Bash(git commit -q -m 'Add §7.2 verification evidence: screenshots and check results *)",
+      "Bash(git -C /c/Users/Patri/Documents/Developing/hoa diff claude.md)",
+      "Bash(cat \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\Documents\\\\\\\\Developing\\\\\\\\hoa\\\\\\\\package.json\")",
+      "Bash(cd \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\c--Users-Patri-Documents-Developing-hoa\\\\\\\\d83aaaf1-69c6-4942-8e96-d53b39f1811e\\\\\\\\scratchpad\")",
+      "Bash(sed -i \"s|'\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./Users/Patri/Documents/Developing/hoa|'file:///C:/Users/Patri/Documents/Developing/hoa|g\" check-world.mjs)",
+      "Bash(cd \"C:\\\\\\\\Users\\\\\\\\Patri\\\\\\\\Documents\\\\\\\\Developing\\\\\\\\hoa\")"
     ],
     "deny": [
       "Read(./.env)",
