@@ -14,7 +14,8 @@ import { moveAxes, onKeyPress } from '../../systems/input'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_SEGMENTS = 24
-const CHUNK_RADIUS = 3 // chunks kept around the player in each direction
+const CHUNK_RADIUS = 5 // chunks kept around the player in each direction
+const CAMERA_OFFSET = { y: 42, z: 24 }
 
 function chunkKey(cx: number, cz: number): string {
   return `${cx},${cz}`
@@ -224,6 +225,14 @@ export function TravelScene() {
   const nearPlaceRef = useRef<PlaceDef | null>(null)
   const setPrompt = useUi((s) => s.setPrompt)
 
+  // Snap the camera to the follow pose on mount (no visible flight from the
+  // previous first-person pose).
+  useEffect(() => {
+    const pos = useGame.getState().pos
+    camera.position.set(pos.x, CAMERA_OFFSET.y, pos.z + CAMERA_OFFSET.z)
+    camera.lookAt(pos.x, 0, pos.z)
+  }, [camera])
+
   // Interaction keys: E enters a nearby place, G digs.
   useEffect(() => {
     const offE = onKeyPress('KeyE', () => {
@@ -252,7 +261,7 @@ export function TravelScene() {
 
     // Camera follows from above with a slight tilt.
     const pos = useGame.getState().pos
-    camera.position.lerp(new THREE.Vector3(pos.x, 42, pos.z + 24), 0.12)
+    camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y, pos.z + CAMERA_OFFSET.z), 0.12)
     camera.lookAt(pos.x, 0, pos.z)
 
     // Proximity prompt for entering places / digging.
@@ -276,9 +285,9 @@ export function TravelScene() {
   return (
     <>
       <color attach="background" args={['#cfe3ee']} />
-      <fog attach="fog" args={['#cfe3ee', 90, 240]} />
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[60, 90, 30]} intensity={2.0} />
+      <fog attach="fog" args={['#cfe3ee', 70, 190]} />
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[60, 90, 30]} intensity={1.1} />
       <TerrainChunks />
       <WaterPlane />
       {PLACES.map((p) => (

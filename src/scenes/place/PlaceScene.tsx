@@ -193,6 +193,18 @@ export function PlaceScene() {
     player.current = { x: 0, z: 18, yaw: 0 }
   }, [placeId])
 
+  // Dev-only hooks for the headless Playwright verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placePlayer = player.current
+    w.__placeLayout = layout
+    return () => {
+      delete w.__placePlayer
+      delete w.__placeLayout
+    }
+  }, [layout])
+
   // Mouse look via pointer lock on canvas click.
   useEffect(() => {
     const el = gl.domElement

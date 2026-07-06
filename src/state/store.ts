@@ -455,6 +455,11 @@ export function priceOfGood(good: EquipmentId | 'food' | Material): number {
   }
 }
 
+// Dev-only hook for the headless Playwright verification (CLAUDE.md §7.2).
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__game = useGame
+}
+
 const GERMAN_MONTHS = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
