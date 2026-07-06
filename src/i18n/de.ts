@@ -132,7 +132,7 @@ export const de: Strings = {
 
   status: {
     date: 'Datum',
-    cash: 'Kasse',
+    cash: 'Geld',
     provisions: 'Proviant',
     provisionsWeeks: (weeks) => `${weeks} Wochen`,
     gifts: 'Gaben',
@@ -169,7 +169,7 @@ export const de: Strings = {
   },
 
   toasts: {
-    oceanBlocked: 'Der Ozean ist unpassierbar — der Kontinent kann nicht verlassen werden.',
+    oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
     inHand: (name) => `${name} in die Hand genommen.`,
@@ -181,7 +181,7 @@ export const de: Strings = {
 
   dialogs: {
     tradeGreeting: '„Willkommen, Reisender! Sieh dich um — beste Ware, ehrliche Preise."',
-    cash: 'Kasse',
+    cash: 'Geld',
     buy: 'Kaufen',
     leave: 'Verlassen (Esc)',
     foodItem: 'Proviant (1 Woche)',
@@ -265,7 +265,7 @@ export const de: Strings = {
     giftNeutral:
       'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. Kein Leuchten in den Augen — es war wohl nicht das, was sein Volk verehrt. Aber ein Anfang ist gemacht.',
     giftRejected: (p: TextParams) =>
-      `Ein schwerer Fehler! Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. Was ich anbot, gilt seinem Volk als Unglücksmetall. Man führte mich wortlos hinaus. Ich muss dieses Misstrauen erst wieder abtragen.`,
+      `Ein schwerer Fehler! Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. Was ich anbot, gilt seinem Volk als Unglücksbringer. Man führte mich wortlos hinaus. Ich muss dieses Misstrauen erst wieder abtragen.`,
     languageHint:
       'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Immer wieder sagte er „Nivera" und wies dorthin, woher nachts der kalte Wind weht — nach Mitternacht. Ich begreife: In der Sprache des Nordens bedeutet „Nivera" Norden!',
     chiefHint: (p: TextParams) =>

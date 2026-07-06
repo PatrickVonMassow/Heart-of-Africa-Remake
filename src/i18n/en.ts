@@ -133,11 +133,11 @@ export const en: Strings = {
 
   status: {
     date: 'Date',
-    cash: 'Cash',
+    cash: 'Funds',
     provisions: 'Provisions',
     provisionsWeeks: (weeks) => `${weeks} weeks`,
     gifts: 'Gifts',
-    hand: 'In Hand',
+    hand: 'Holding',
     handEmpty: '—',
     region: 'Region',
   },
@@ -156,7 +156,7 @@ export const en: Strings = {
 
   labels: {
     talkToElder: 'Talk to the elder',
-    oldMan: 'Old Man',
+    oldMan: 'Elder',
     leavePlace: 'Leave settlement',
     graveDebug: 'Grave (debug)',
   },
@@ -182,7 +182,7 @@ export const en: Strings = {
 
   dialogs: {
     tradeGreeting: '"Welcome, traveler! Have a look around — finest goods, honest prices."',
-    cash: 'Cash',
+    cash: 'Funds',
     buy: 'Buy',
     leave: 'Leave (Esc)',
     foodItem: 'Provisions (1 week)',
@@ -193,8 +193,8 @@ export const en: Strings = {
     moodMid: 'The chief seems well-disposed toward you.',
     moodLow: 'The chief studies you, giving nothing away.',
     chiefDone: '"I have told you all I know. May your path be blessed."',
-    give: 'Present',
-    stock: (n) => `supply: ${n}`,
+    give: 'Offer',
+    stock: (n) => `you have ${n}`,
     endAudience: 'End audience (Esc)',
   },
 
@@ -203,7 +203,7 @@ export const en: Strings = {
     victoryText: (days) =>
       `You have found the tomb of the great king and brought its treasure to light. After ${days} days of travel through desert and wilderness, the expedition is complete. Your name will be spoken in the same breath as the great explorers.`,
     newExpedition: 'New Expedition',
-    checkpointFound: 'A previous game was found (checkpoint from the last port city).',
+    checkpointFound: 'A saved game was found — your checkpoint from the last port city.',
     loadCheckpoint: 'Load checkpoint',
   },
 
@@ -218,7 +218,7 @@ export const en: Strings = {
     goodwillForHint: 'Goodwill required for hint',
     randomEvents: 'Random events (POC: none implemented)',
     showHidden: 'Show hidden objects',
-    cash: 'Cash ($)',
+    cash: 'Funds ($)',
     foodDays: 'Food (days)',
     jumpTo: 'Jump to:',
     grave: 'Grave',
@@ -266,7 +266,7 @@ export const en: Strings = {
     giftNeutral:
       'The chief accepted my gift with a polite nod. No light came into his eyes — it was not, I think, what his people hold dear. But a beginning has been made.',
     giftRejected: (p: TextParams) =>
-      `A grave mistake! No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. What I offered counts among his people as a metal of misfortune. I was led out without a word. It will take time to wear down this mistrust.`,
+      `A grave mistake! No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. What I offered counts among his people as an ill omen. I was led out without a word. It will take time to wear down this mistrust.`,
     languageHint:
       'An old man by the fire spoke with me at length, with hands as much as words. Again and again he said "Nivera" and pointed to where the cold wind comes from at night — toward midnight. Now I understand: in the language of the North, "Nivera" means north!',
     chiefHint: (p: TextParams) =>

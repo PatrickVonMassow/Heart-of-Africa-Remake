@@ -177,7 +177,7 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    and stores hints. The handwritten entry may be simplified in the POC
    (plain text suffices; the animated handwriting is not acceptance-
    relevant).
-9. **Status bar.** Date, cash, provisions, gifts, hand item and current
+9. **Status bar.** Date, funds, provisions, gifts, hand item and current
    region are displayed.
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
