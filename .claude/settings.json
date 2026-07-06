@@ -1,7 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "dontAsk",
-    "additionalDirectories": [],
     "allow": [
       "Read",
       "Edit",
@@ -15,7 +13,16 @@
       "Bash(cp *)",
       "Bash(cd *)",
       "Bash(echo *)",
-      "Bash(touch *)"
+      "Bash(touch *)",
+      "Bash(npm run *)",
+      "Bash(node preview-check.mjs)",
+      "Bash(cp __TRACKED_VAR__/v3-travel.png verification/01-vogelperspektive.png)",
+      "Bash(cp __TRACKED_VAR__/v2-trade-dialog.png verification/02-hafenstadt-kairo-handel.png)",
+      "Bash(cp __TRACKED_VAR__/v4-village.png verification/03-dorf-nubier.png)",
+      "Bash(cp __TRACKED_VAR__/v5-audience.png verification/04-chefhuette-audienz.png)",
+      "Bash(cp __TRACKED_VAR__/v6-hint-journal.png verification/05-tagebuch-hinweis.png)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Add §7.2 verification evidence: screenshots and check results *)"
     ],
     "deny": [
       "Read(./.env)",
@@ -29,6 +36,8 @@
       "Bash(git reset --hard *)",
       "Bash(git clean *)",
       "Bash(git checkout .)"
-    ]
+    ],
+    "defaultMode": "dontAsk",
+    "additionalDirectories": []
   }
 }
