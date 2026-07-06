@@ -1,4 +1,4 @@
-// Ambient life in places (design.md §19 "Dorf- und Marktleben", §2 bustle):
+// Ambient life in places (design.md §19 "village and market life", §2 bustle):
 // villagers cooking and weaving, playing children and goats in villages;
 // porters and traders in the wealthier ports. Pure animation, no mechanics.
 
@@ -268,7 +268,7 @@ interface WalkerState {
 }
 
 /**
- * Inhabitants with a simple daily routine (design.md §2 belebte Orte): they
+ * Inhabitants with a simple daily routine (design.md §2 lively settlements): they
  * step out of their dwelling, walk the paths to an errand point, linger,
  * walk back and disappear into their home again.
  */

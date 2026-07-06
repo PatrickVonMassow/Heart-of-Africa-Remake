@@ -151,7 +151,7 @@ function emitMonkey(dest: GainNode) {
   }
 }
 
-/** One drum bar: low hits with a lighter off-beat (design.md §19 Trommeln). */
+/** One drum bar: low hits with a lighter off-beat (design.md §19 drums). */
 function emitDrums(dest: GainNode) {
   if (!ctx) return
   const t0 = ctx.currentTime

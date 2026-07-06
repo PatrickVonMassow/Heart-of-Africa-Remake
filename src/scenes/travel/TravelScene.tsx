@@ -29,6 +29,7 @@ import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
+import { getStrings, useStrings } from '../../i18n'
 import { SkyDome, TRAVEL_SKY } from '../../render/sky'
 import { createWaterMaterial } from '../../render/water'
 import { buildAcacia, buildBush, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
@@ -567,6 +568,7 @@ function VillageMarker() {
 }
 
 function PlaceMarker({ place }: { place: PlaceDef }) {
+  const t = useStrings()
   const seed = useGame((s) => s.seed)
   const p = latLonToWorld(place.lat, place.lon)
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
@@ -574,7 +576,7 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
     <group position={[p.x, y, p.z]}>
       {place.kind === 'port' ? <PortMarker /> : <VillageMarker />}
       <Html center position={[0, 2.9, 0]} distanceFactor={60}>
-        <div className="map-label">{place.name}</div>
+        <div className="map-label">{t.places[place.id]}</div>
       </Html>
     </group>
   )
@@ -582,27 +584,28 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
 
 /** Atlas-style labels for the named landmarks (design.md §4.4). */
 function LandmarkLabels() {
+  const t = useStrings()
   const seed = useGame((s) => s.seed)
   const items = useMemo(() => {
     const lakes = LAKES.map((l) => ({
-      key: `lake-${l.name}`,
-      name: l.name,
+      key: l.id,
+      name: t.landmarks[l.id],
       lat: l.center[1],
       lon: l.center[0],
       y: 0.4,
       water: true,
     }))
     const mountains = MOUNTAINS.map((m) => ({
-      key: `mount-${m.name}`,
-      name: m.name,
+      key: m.id,
+      name: t.landmarks[m.id],
       lat: m.lat,
       lon: m.lon,
       y: Math.max(0.5, sampleTerrain(m.lat, m.lon, seed).height) + 1.2,
       water: false,
     }))
     const falls = WATERFALLS.map((w) => ({
-      key: `falls-${w.name}`,
-      name: w.name,
+      key: w.id,
+      name: t.landmarks[w.id],
       lat: w.lat,
       lon: w.lon,
       y: 1.0,
@@ -610,15 +613,15 @@ function LandmarkLabels() {
     }))
     const g = ELEPHANT_GRAVEYARD
     const graveyard = {
-      key: 'elephant-graveyard',
-      name: g.name,
+      key: g.id,
+      name: t.landmarks[g.id],
       lat: g.lat,
       lon: g.lon,
       y: Math.max(0.5, sampleTerrain(g.lat, g.lon, seed).height) + 0.8,
       water: false,
     }
     return [...lakes, ...mountains, ...falls, graveyard]
-  }, [seed])
+  }, [seed, t])
   return (
     <>
       {items.map((it) => {
@@ -635,6 +638,7 @@ function LandmarkLabels() {
 
 /** Debug-only marker for the hidden grave position. */
 function GraveMarker() {
+  const t = useStrings()
   const grave = useGame((s) => s.graveLatLon)
   const seed = useGame((s) => s.seed)
   useGame((s) => s.balanceVersion) // re-render when debug toggles change
@@ -652,7 +656,7 @@ function GraveMarker() {
         <meshStandardMaterial color="#c0392b" />
       </mesh>
       <Html center position={[0, 1.6, 0]} distanceFactor={60}>
-        <div className="map-label">Grab (Debug)</div>
+        <div className="map-label">{t.labels.graveDebug}</div>
       </Html>
     </group>
   )
@@ -804,10 +808,11 @@ export function TravelScene() {
       }
     }
     nearPlaceRef.current = near
+    const strings = getStrings()
     const prompt = near
-      ? `E — ${near.name} betreten`
+      ? strings.prompts.enterPlace(strings.places[near.id])
       : s.handItem === 'shovel'
-        ? 'G — Hier graben'
+        ? strings.prompts.digHere
         : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })

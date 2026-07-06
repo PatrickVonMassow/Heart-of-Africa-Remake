@@ -8,11 +8,11 @@ import { loadGeodata } from './world/geodata'
 // the app modules are imported only after the geodata resolves.
 async function boot() {
   const rootEl = document.getElementById('root')!
-  rootEl.innerHTML = '<div class="boot-loading">Karten werden geladen …</div>'
+  rootEl.innerHTML = '<div class="boot-loading">Karten werden geladen … / Loading maps …</div>'
   try {
     await loadGeodata()
   } catch (e) {
-    rootEl.innerHTML = '<div class="boot-loading">Geodaten konnten nicht geladen werden.</div>'
+    rootEl.innerHTML = '<div class="boot-loading">Geodaten konnten nicht geladen werden. / Failed to load geodata.</div>'
     throw e
   }
   const { default: App } = await import('./App')

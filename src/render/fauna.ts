@@ -290,7 +290,7 @@ export function buildVulture(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Goat for village life (design.md §19 Dorfleben), ~0.7 units tall. */
+/** Goat for village life (design.md §19 village life), ~0.7 units tall. */
 export function buildGoat(): THREE.BufferGeometry {
   return merge(
     buildQuadruped({

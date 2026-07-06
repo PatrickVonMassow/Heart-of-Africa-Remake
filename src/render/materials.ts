@@ -38,7 +38,7 @@ export interface GroundPathOptions {
 /**
  * Ground material: large noise patches plus Worley cell mottling, e.g. for
  * trampled sand or dry village earth. An optional path mask blends a street/
- * path network into the ground (design.md §2 belebte Orte).
+ * path network into the ground (design.md §2 lively settlements).
  */
 export function createGroundMaterial(
   base: string,

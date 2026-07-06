@@ -20,6 +20,7 @@ import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, bui
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { boxColliders, resolveMove, type Collider } from './collision'
+import { getStrings, useStrings } from '../../i18n'
 
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 const INTERACT_RADIUS = 4.5
@@ -30,19 +31,17 @@ const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
 
 interface Interactive {
   type: BuildingType | 'villager' | 'exit'
-  label: string
   pos: [number, number]
 }
 
-const BUILDING_LABELS: Record<BuildingType, string> = {
-  shop: 'Laden',
-  weapons: 'Waffenhütte',
-  tools: 'Geräte-Hütte',
-  market: 'Markthütte',
-  chief: 'Chefhütte',
+/** Display label of an interactive in the current language. */
+function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interactive['type']): string {
+  if (type === 'villager') return strings.labels.talkToElder
+  if (type === 'exit') return strings.labels.leavePlace
+  return strings.buildings[type]
 }
 
-/** Non-enterable dwellings and outbuildings (design.md §2 belebte Orte). */
+/** Non-enterable dwellings and outbuildings (design.md §2 lively settlements). */
 export type DwellingKind = 'hut' | 'box' | 'granary' | 'tent' | 'warehouse' | 'stall' | 'shed'
 
 export interface DwellingDef {
@@ -83,7 +82,7 @@ interface PlaceLayout {
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
   errands: Array<[number, number]>
-  /** Solid-object colliders (design.md §2: Kollision innerorts). */
+  /** Solid-object colliders (design.md §2: collision inside settlements). */
   colliders: Collider[]
 }
 
@@ -109,7 +108,7 @@ function fenceRing(
  * Procedural layout per run+place (design.md §18): the settlement pattern
  * follows the region (lanes / compound clusters / kraal ring), with far more
  * non-enterable dwellings and outbuildings than functional buildings, a
- * path network and fences (design.md §2 "Belebte, dicht bebaute Orte").
+ * path network and fences (design.md §2 "Lively, densely built settlements").
  */
 function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
@@ -126,17 +125,13 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       // Diagonal placement keeps the southern spawn corridor free.
       const angle = Math.PI / 4 + (i / types.length) * Math.PI * 2 + (rand() - 0.5) * 0.4
       const r = 11 + rand() * 4
-      interactives.push({
-        type: t,
-        label: BUILDING_LABELS[t],
-        pos: [Math.cos(angle) * r, Math.sin(angle) * r],
-      })
+      interactives.push({ type: t, pos: [Math.cos(angle) * r, Math.sin(angle) * r] })
     })
   } else {
-    interactives.push({ type: 'chief', label: BUILDING_LABELS.chief, pos: [jitter(0, 4), jitter(-13, 3)] })
-    interactives.push({ type: 'villager', label: 'Mit dem Alten sprechen', pos: [jitter(4, 3), jitter(-4, 2)] })
+    interactives.push({ type: 'chief', pos: [jitter(0, 4), jitter(-13, 3)] })
+    interactives.push({ type: 'villager', pos: [jitter(4, 3), jitter(-4, 2)] })
   }
-  interactives.push({ type: 'exit', label: 'Ort verlassen', pos: [0, 24] })
+  interactives.push({ type: 'exit', pos: [0, 24] })
 
   const dwellings: DwellingDef[] = []
   const fences: FenceDef[] = []
@@ -466,6 +461,7 @@ type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
 // --- Scenery pieces -----------------------------------------------------------
 
 function PortBuilding({ item, mats, variant }: { item: Interactive; mats: PlaceMaterials; variant: number }) {
+  const t = useStrings()
   const rot = ((variant * 137) % 40) / 100 - 0.2
   return (
     <group position={[item.pos[0], 0, item.pos[1]]} rotation={[0, rot, 0]}>
@@ -540,7 +536,7 @@ function PortBuilding({ item, mats, variant }: { item: Interactive; mats: PlaceM
         <meshStandardMaterial color="#6e4f2a" roughness={0.85} />
       </mesh>
       <Html center position={[0, 4.4, 0]} distanceFactor={18}>
-        <div className="map-label">{item.label}</div>
+        <div className="map-label">{interactiveLabel(t, item.type)}</div>
       </Html>
     </group>
   )
@@ -663,6 +659,7 @@ function VillageHut({
 }
 
 function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle }) {
+  const t = useStrings()
   const robe = style.cloth[0]
   const shoulder = style.cloth[1 % style.cloth.length]
   return (
@@ -696,13 +693,14 @@ function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle 
         <meshStandardMaterial color="#4a3018" roughness={0.9} />
       </mesh>
       <Html center position={[0, 2.3, 0]} distanceFactor={14}>
-        <div className="map-label">Alter Mann</div>
+        <div className="map-label">{t.labels.oldMan}</div>
       </Html>
     </group>
   )
 }
 
 function ExitGate({ item, mats }: { item: Interactive; mats: PlaceMaterials }) {
+  const t = useStrings()
   return (
     <group position={[item.pos[0], 0, item.pos[1]]}>
       {[-1.5, 1.5].map((px) => (
@@ -728,13 +726,13 @@ function ExitGate({ item, mats }: { item: Interactive; mats: PlaceMaterials }) {
         <meshStandardMaterial color="#e8ddc8" roughness={0.7} />
       </mesh>
       <Html center position={[0, 3.2, 0]} distanceFactor={18}>
-        <div className="map-label">Ort verlassen</div>
+        <div className="map-label">{t.labels.leavePlace}</div>
       </Html>
     </group>
   )
 }
 
-// --- Non-enterable dwellings and outbuildings (design.md §2 belebte Orte) ----
+// --- Non-enterable dwellings and outbuildings (design.md §2 lively settlements) ----
 
 /** Rectangular adobe/plaster house with flat roof; door on local +Z. */
 function BoxHouse({ d, mats, variant }: { d: DwellingDef; mats: PlaceMaterials; variant: number }) {
@@ -1276,7 +1274,7 @@ export function PlaceScene() {
         const dx = ((-sin * forward + cos * strafe) / len) * speed * dt
         const dz = ((-cos * forward - sin * strafe) / len) * speed * dt
         // Solid objects are impenetrable; the pushout lets the player slide
-        // along walls (design.md §2 Kollision innerorts).
+        // along walls (design.md §2 collision inside settlements).
         const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
         p.x = rx
         p.z = rz
@@ -1302,7 +1300,8 @@ export function PlaceScene() {
       }
     }
     nearRef.current = near
-    const prompt = near ? `E — ${near.label}` : null
+    const strings = getStrings()
+    const prompt = near ? strings.prompts.interact(interactiveLabel(strings, near.type)) : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 
@@ -1341,11 +1340,11 @@ export function PlaceScene() {
         if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
         // Chief hut: larger village hut with regalia.
         return (
-          <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={it.label} mats={mats} style={style} chief />
+          <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={interactiveLabel(getStrings(), 'chief')} mats={mats} style={style} chief />
         )
       })}
 
-      {/* Non-enterable dwellings and outbuildings (design.md §2 belebte Orte) */}
+      {/* Non-enterable dwellings and outbuildings (design.md §2 lively settlements) */}
       {layout.dwellings.map((d, i) => (
         <Dwelling key={i} d={d} mats={mats} style={style} variant={i} />
       ))}

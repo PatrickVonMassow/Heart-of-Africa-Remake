@@ -33,7 +33,11 @@
       "Bash(git commit -m 'Spec: real geodata terrain \\(DEM, vector hydrology, PBR splatting\\) *)",
       "Bash(git commit -m 'Real geodata terrain: SRTM DEM, exact 1890 hydrology vectors, PBR splatting, LOD *)",
       "Bash(git commit -m 'Lively, densely-built places: dwellings, street network, inhabitant routines *)",
-      "Bash(git commit -m 'In-place collision: player and inhabitants cannot pass through solids *)"
+      "Bash(git commit -m 'In-place collision: player and inhabitants cannot pass through solids *)",
+      "Bash(grep -v \"^.*//\")",
+      "Bash(grep -vE \"//|/\\\\*| \\\\* \")",
+      "Bash(grep -vE \"^\\\\S+:\\\\s*[0-9]+:\\\\s*//\")",
+      "Bash(BASE_URL=http://localhost:5174/ node \"C:/Users/Patri/AppData/Local/Temp/claude/c--Users-Patri-Documents-Developing-hoa/b4682b4f-397b-4b64-bcc0-91961818b952/scratchpad/i18n-shots.mjs\")"
     ],
     "deny": [
       "Read(./.env)",

@@ -1,4 +1,4 @@
-// Geodata preprocessing (design.md §3 "Reale Geodaten und Terrain-Darstellung").
+// Geodata preprocessing (design.md §3 "Real geodata and terrain rendering").
 //
 // Builds public/geodata/dem.png + dem.json from real elevation data:
 //   1. Downloads Terrarium elevation tiles (zoom 6) for the Africa bounding
@@ -171,7 +171,7 @@ async function main() {
   // Stamp all game places as land (parse positions out of src/world/geo.ts).
   const geoSrc = fs.readFileSync(path.join(ROOT, 'src', 'world', 'geo.ts'), 'utf8')
   const places = [
-    ...geoSrc.matchAll(/name: '([^']+)',(?: people: '[^']+',)? lat: (-?\d+(?:\.\d+)?), lon: (-?\d+(?:\.\d+)?)/g),
+    ...geoSrc.matchAll(/id: '([^']+)', kind: '(?:port|village)',(?: peopleId: '[^']+',)? lat: (-?\d+(?:\.\d+)?), lon: (-?\d+(?:\.\d+)?)/g),
   ].map((m) => ({ name: m[1], lat: Number(m[2]), lon: Number(m[3]) }))
   console.log(`stamping ${places.length} places…`)
   for (const p of places) {
@@ -270,13 +270,13 @@ async function main() {
     const i = y * W + x
     console.log(`  ${name}: elev ${elev[i]} m, ${ocean[i] ? 'OCEAN' : 'land'}`)
   }
-  probe('Kilimandscharo', -3.07, 37.35)
-  probe('Kairo', 30.05, 31.45)
-  probe('Sansibar', -6.16, 39.3)
-  probe('Viktoriasee', -1.0, 33.0)
-  probe('Qattara-Senke', 29.5, 27.5)
-  probe('Suez-Landbrücke', 30.6, 32.35)
-  probe('Atlantik', 0, -10)
+  probe('Kilimanjaro', -3.07, 37.35)
+  probe('Cairo', 30.05, 31.45)
+  probe('Zanzibar', -6.16, 39.3)
+  probe('Lake Victoria', -1.0, 33.0)
+  probe('Qattara Depression', 29.5, 27.5)
+  probe('Suez land bridge', 30.6, 32.35)
+  probe('Atlantic', 0, -10)
 }
 
 main().catch((e) => {

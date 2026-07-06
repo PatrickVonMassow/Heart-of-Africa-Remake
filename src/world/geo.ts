@@ -23,26 +23,10 @@ export function worldToLatLon(x: number, z: number): LatLon {
   return { lat: -z / UNITS_PER_DEGREE, lon: x / UNITS_PER_DEGREE }
 }
 
-/** German coordinate string, e.g. "Breite 30,0 Grad Nord, Länge 31,2 Grad Ost". */
-export function formatLatLon(p: LatLon): string {
-  const latDir = p.lat >= 0 ? 'Nord' : 'Süd'
-  const lonDir = p.lon >= 0 ? 'Ost' : 'West'
-  const fmt = (v: number) => Math.abs(v).toFixed(1).replace('.', ',')
-  return `Breite ${fmt(p.lat)} Grad ${latDir} · Länge ${fmt(p.lon)} Grad ${lonDir}`
-}
-
 /** All 17 rivers (design.md §4.3) with named source and mouth. */
 export const RIVERS: RiverDef[] = RIVERS_DATA
 
 export type RegionId = 'north' | 'west' | 'central' | 'east' | 'south'
-
-export const REGION_NAMES: Record<RegionId, string> = {
-  north: 'Norden',
-  west: 'Westen',
-  central: 'Zentral',
-  east: 'Osten',
-  south: 'Süden',
-}
 
 // Culture/value matrix (design.md §8): revered / rejected materials per region.
 export type Material = 'gold' | 'silver' | 'emerald' | 'copper' | 'ivory'
@@ -74,11 +58,11 @@ export function regionAt(lat: number, lon: number): RegionId {
 export type PlaceKind = 'port' | 'village'
 
 export interface PlaceDef {
+  /** Place id; display names come from the language files (i18n). */
   id: string
   kind: PlaceKind
-  name: string
-  /** People carrying the hints (villages only, design.md §4.2). */
-  people?: string
+  /** People carrying the hints (villages only, design.md §4.2); i18n id. */
+  peopleId?: string
   lat: number
   lon: number
   region: RegionId
@@ -89,18 +73,18 @@ export interface PlaceDef {
 const PORTS: PlaceDef[] = [
   // River ports sit on the bank beside the channel (east bank at Cairo,
   // west of the White Nile at Khartoum, north bank at Boma).
-  { id: 'cairo', kind: 'port', name: 'Kairo', lat: 30.05, lon: 31.45, region: 'north' },
-  { id: 'tangier', kind: 'port', name: 'Tanger', lat: 35.6, lon: -5.75, region: 'north' },
-  { id: 'khartoum', kind: 'port', name: 'Khartum', lat: 15.5, lon: 32.15, region: 'north' },
-  { id: 'st-louis', kind: 'port', name: 'St. Louis', lat: 15.9, lon: -16.2, region: 'west' },
-  { id: 'timbuktu', kind: 'port', name: 'Timbuktu', lat: 16.77, lon: -3.0, region: 'west' },
-  { id: 'lagos', kind: 'port', name: 'Lagos', lat: 6.55, lon: 3.4, region: 'west' },
-  { id: 'boma', kind: 'port', name: 'Boma', lat: -5.65, lon: 13.05, region: 'central' },
-  { id: 'berbera', kind: 'port', name: 'Berbera', lat: 10.3, lon: 45.0, region: 'east' },
+  { id: 'cairo', kind: 'port', lat: 30.05, lon: 31.45, region: 'north' },
+  { id: 'tangier', kind: 'port', lat: 35.6, lon: -5.75, region: 'north' },
+  { id: 'khartoum', kind: 'port', lat: 15.5, lon: 32.15, region: 'north' },
+  { id: 'st-louis', kind: 'port', lat: 15.9, lon: -16.2, region: 'west' },
+  { id: 'timbuktu', kind: 'port', lat: 16.77, lon: -3.0, region: 'west' },
+  { id: 'lagos', kind: 'port', lat: 6.55, lon: 3.4, region: 'west' },
+  { id: 'boma', kind: 'port', lat: -5.65, lon: 13.05, region: 'central' },
+  { id: 'berbera', kind: 'port', lat: 10.3, lon: 45.0, region: 'east' },
   // Zanzibar lies on its island (data/coastline.ts). OPEN: ferries (design.md
   // §4.1) are not in the POC, so it is not reachable on foot from the mainland.
-  { id: 'zanzibar', kind: 'port', name: 'Sansibar', lat: -6.16, lon: 39.3, region: 'east' },
-  { id: 'capetown', kind: 'port', name: 'Kapstadt', lat: -33.8, lon: 18.5, region: 'south' },
+  { id: 'zanzibar', kind: 'port', lat: -6.16, lon: 39.3, region: 'east' },
+  { id: 'capetown', kind: 'port', lat: -33.8, lon: 18.5, region: 'south' },
 ]
 
 // One village per each of the 22 peoples (design.md §4.2), region membership
@@ -108,33 +92,33 @@ const PORTS: PlaceDef[] = [
 // heartland; where the design region and the historical heartland disagree
 // (Bombara, Bemba, Fang), the position is shifted toward the design region.
 const VILLAGES: PlaceDef[] = [
-  // Norden — Tuareg, Berber, Nubier, Bombara
-  { id: 'tuareg-village', kind: 'village', name: 'Dorf der Tuareg', people: 'Tuareg', lat: 23.2, lon: 5.8, region: 'north' },
-  { id: 'berber-village', kind: 'village', name: 'Dorf der Berber', people: 'Berber', lat: 31.7, lon: -7.2, region: 'north' },
-  { id: 'nubian-village', kind: 'village', name: 'Dorf der Nubier', people: 'Nubier', lat: 21.8, lon: 31.6, region: 'north' },
-  { id: 'bombara-village', kind: 'village', name: 'Dorf der Bombara', people: 'Bombara', lat: 17.2, lon: -3.5, region: 'north' },
-  // Westen — Hausa, Mandingo, Fang
-  { id: 'hausa-village', kind: 'village', name: 'Dorf der Hausa', people: 'Hausa', lat: 12.0, lon: 8.5, region: 'west' },
-  { id: 'mandingo-village', kind: 'village', name: 'Dorf der Mandingo', people: 'Mandingo', lat: 11.5, lon: -9.0, region: 'west' },
-  { id: 'fang-village', kind: 'village', name: 'Dorf der Fang', people: 'Fang', lat: 1.8, lon: 11.5, region: 'west' },
-  // Zentral — Mongo, Pygmäen, Banda, Bambundu, Lunda
-  { id: 'mongo-village', kind: 'village', name: 'Dorf der Mongo', people: 'Mongo', lat: -1.5, lon: 21.0, region: 'central' },
-  { id: 'pygmy-village', kind: 'village', name: 'Dorf der Pygmäen', people: 'Pygmäen', lat: 1.4, lon: 28.6, region: 'central' },
-  { id: 'banda-village', kind: 'village', name: 'Dorf der Banda', people: 'Banda', lat: 6.0, lon: 21.5, region: 'central' },
-  { id: 'bambundu-village', kind: 'village', name: 'Dorf der Bambundu', people: 'Bambundu', lat: -9.3, lon: 15.3, region: 'central' },
-  { id: 'lunda-village', kind: 'village', name: 'Dorf der Lunda', people: 'Lunda', lat: -10.0, lon: 23.4, region: 'central' },
-  // Osten — Masai, Suaheli, Somali, Sidamo, Uganda
-  { id: 'masai-village', kind: 'village', name: 'Dorf der Masai', people: 'Masai', lat: -2.5, lon: 36.8, region: 'east' },
-  { id: 'swahili-village', kind: 'village', name: 'Dorf der Suaheli', people: 'Suaheli', lat: -6.5, lon: 38.7, region: 'east' },
-  { id: 'somali-village', kind: 'village', name: 'Dorf der Somali', people: 'Somali', lat: 5.5, lon: 45.0, region: 'east' },
-  { id: 'sidamo-village', kind: 'village', name: 'Dorf der Sidamo', people: 'Sidamo', lat: 6.7, lon: 38.4, region: 'east' },
-  { id: 'uganda-village', kind: 'village', name: 'Dorf der Uganda', people: 'Uganda', lat: 0.75, lon: 32.55, region: 'east' },
-  // Süden — Batwa, Bemba, Bantu, Zulu, Buschmänner
-  { id: 'batwa-village', kind: 'village', name: 'Dorf der Batwa', people: 'Batwa', lat: -19.0, lon: 22.5, region: 'south' },
-  { id: 'bemba-village', kind: 'village', name: 'Dorf der Bemba', people: 'Bemba', lat: -12.5, lon: 31.0, region: 'south' },
-  { id: 'bantu-village', kind: 'village', name: 'Dorf der Bantu', people: 'Bantu', lat: -24.5, lon: 29.5, region: 'south' },
-  { id: 'zulu-village', kind: 'village', name: 'Dorf der Zulu', people: 'Zulu', lat: -28.4, lon: 31.3, region: 'south' },
-  { id: 'bushmen-village', kind: 'village', name: 'Dorf der Buschmänner', people: 'Buschmänner', lat: -22.5, lon: 21.0, region: 'south' },
+  // North — Tuareg, Berbers, Nubians, Bombara
+  { id: 'tuareg-village', kind: 'village', peopleId: 'tuareg', lat: 23.2, lon: 5.8, region: 'north' },
+  { id: 'berber-village', kind: 'village', peopleId: 'berbers', lat: 31.7, lon: -7.2, region: 'north' },
+  { id: 'nubian-village', kind: 'village', peopleId: 'nubians', lat: 21.8, lon: 31.6, region: 'north' },
+  { id: 'bombara-village', kind: 'village', peopleId: 'bombara', lat: 17.2, lon: -3.5, region: 'north' },
+  // West — Hausa, Mandingo, Fang
+  { id: 'hausa-village', kind: 'village', peopleId: 'hausa', lat: 12.0, lon: 8.5, region: 'west' },
+  { id: 'mandingo-village', kind: 'village', peopleId: 'mandingo', lat: 11.5, lon: -9.0, region: 'west' },
+  { id: 'fang-village', kind: 'village', peopleId: 'fang', lat: 1.8, lon: 11.5, region: 'west' },
+  // Central — Mongo, Pygmies, Banda, Bambundu, Lunda
+  { id: 'mongo-village', kind: 'village', peopleId: 'mongo', lat: -1.5, lon: 21.0, region: 'central' },
+  { id: 'pygmy-village', kind: 'village', peopleId: 'pygmies', lat: 1.4, lon: 28.6, region: 'central' },
+  { id: 'banda-village', kind: 'village', peopleId: 'banda', lat: 6.0, lon: 21.5, region: 'central' },
+  { id: 'bambundu-village', kind: 'village', peopleId: 'bambundu', lat: -9.3, lon: 15.3, region: 'central' },
+  { id: 'lunda-village', kind: 'village', peopleId: 'lunda', lat: -10.0, lon: 23.4, region: 'central' },
+  // East — Masai, Swahili, Somali, Sidamo, Uganda
+  { id: 'masai-village', kind: 'village', peopleId: 'masai', lat: -2.5, lon: 36.8, region: 'east' },
+  { id: 'swahili-village', kind: 'village', peopleId: 'swahili', lat: -6.5, lon: 38.7, region: 'east' },
+  { id: 'somali-village', kind: 'village', peopleId: 'somali', lat: 5.5, lon: 45.0, region: 'east' },
+  { id: 'sidamo-village', kind: 'village', peopleId: 'sidamo', lat: 6.7, lon: 38.4, region: 'east' },
+  { id: 'uganda-village', kind: 'village', peopleId: 'uganda', lat: 0.75, lon: 32.55, region: 'east' },
+  // South — Batwa, Bemba, Bantu, Zulu, Bushmen
+  { id: 'batwa-village', kind: 'village', peopleId: 'batwa', lat: -19.0, lon: 22.5, region: 'south' },
+  { id: 'bemba-village', kind: 'village', peopleId: 'bemba', lat: -12.5, lon: 31.0, region: 'south' },
+  { id: 'bantu-village', kind: 'village', peopleId: 'bantu', lat: -24.5, lon: 29.5, region: 'south' },
+  { id: 'zulu-village', kind: 'village', peopleId: 'zulu', lat: -28.4, lon: 31.3, region: 'south' },
+  { id: 'bushmen-village', kind: 'village', peopleId: 'bushmen', lat: -22.5, lon: 21.0, region: 'south' },
 ]
 
 export const PLACES: PlaceDef[] = [...PORTS, ...VILLAGES]

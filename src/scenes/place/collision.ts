@@ -1,5 +1,5 @@
 // Circle-based 2D collision for the first-person places (design.md §2
-// "Belebte, dicht bebaute Orte": buildings and solid props are impenetrable
+// "Lively, densely built settlements": buildings and solid props are impenetrable
 // for the player and the inhabitants). Every solid object is approximated by
 // one or more circles in the XZ plane; rectangular buildings become a row of
 // circles along their long axis (capsule approximation). Resolution pushes

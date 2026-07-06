@@ -3,7 +3,8 @@
 // extent, considerably bigger than the modern lake.
 
 export interface LakeDef {
-  name: string
+  /** Landmark id; display names come from the language files (i18n). */
+  id: string
   points: Array<[number, number]>
   /** Label anchor (lon, lat). */
   center: [number, number]
@@ -11,7 +12,7 @@ export interface LakeDef {
 
 export const LAKES: LakeDef[] = [
   {
-    name: 'Tschadsee',
+    id: 'lake-chad',
     center: [14.1, 13.2],
     points: [
       [13.0, 13.2], [13.5, 13.9], [14.1, 14.0], [14.9, 13.75], [15.3, 13.0],
@@ -19,7 +20,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Tanasee',
+    id: 'lake-tana',
     center: [37.3, 11.95],
     points: [
       [37.0, 12.25], [37.45, 12.3], [37.6, 12.0], [37.5, 11.7], [37.35, 11.6],
@@ -27,7 +28,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Albertsee',
+    id: 'lake-albert',
     center: [30.9, 1.7],
     points: [
       [30.35, 1.0], [30.6, 0.95], [31.45, 2.2], [31.3, 2.45], [30.95, 2.0],
@@ -35,7 +36,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Edwardsee',
+    id: 'lake-edward',
     center: [29.6, -0.38],
     points: [
       [29.35, -0.05], [29.75, -0.1], [29.9, -0.45], [29.7, -0.7], [29.4, -0.6],
@@ -43,7 +44,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Viktoriasee',
+    id: 'lake-victoria',
     center: [32.9, -1.1],
     points: [
       [31.7, 0.3], [32.5, 0.4], [33.3, 0.3], [33.95, 0.0], [34.1, -0.6],
@@ -52,7 +53,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Rudolfsee',
+    id: 'lake-rudolf',
     center: [36.25, 3.5],
     points: [
       [35.85, 4.45], [36.2, 4.6], [36.3, 4.0], [36.6, 3.1], [36.6, 2.45],
@@ -60,7 +61,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Tanganjikasee',
+    id: 'lake-tanganyika',
     center: [29.9, -6.1],
     points: [
       [29.15, -3.4], [29.35, -3.35], [29.55, -4.3], [29.6, -5.3], [30.05, -6.3],
@@ -69,7 +70,7 @@ export const LAKES: LakeDef[] = [
     ],
   },
   {
-    name: 'Nyasasee',
+    id: 'lake-nyasa',
     center: [34.5, -12.0],
     points: [
       [33.9, -9.5], [34.3, -9.5], [34.65, -10.4], [34.7, -11.4], [34.85, -12.3],

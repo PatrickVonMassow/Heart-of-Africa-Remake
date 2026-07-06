@@ -1,8 +1,9 @@
 // HUD composition: status bar, inventory/hand bar, prompt, toast, journal,
-// dialogs, start/victory overlays and the debug menu.
+// dialogs, start/victory overlays and the debug menu. All player-visible
+// text comes from the language files (design.md §17 localization).
 
 import { useEffect, useState } from 'react'
-import { useGame, EQUIPMENT_NAMES, type EquipmentId } from '../state/store'
+import { useGame, type EquipmentId } from '../state/store'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
@@ -10,8 +11,10 @@ import { Dialogs } from './Dialogs'
 import { DebugMenu } from './DebugMenu'
 import { MapOverlay } from './MapOverlay'
 import { onKeyPress } from '../systems/input'
+import { useStrings } from '../i18n'
 
 function InventoryBar() {
+  const t = useStrings()
   const equipment = useGame((s) => s.equipment)
   const handItem = useGame((s) => s.handItem)
   const takeInHand = useGame((s) => s.takeInHand)
@@ -24,9 +27,9 @@ function InventoryBar() {
           key={e}
           className={handItem === e ? 'active' : ''}
           onClick={() => takeInHand(handItem === e ? null : e)}
-          title="In die Hand nehmen / weglegen"
+          title={t.hud.handTooltip}
         >
-          {EQUIPMENT_NAMES[e]}
+          {t.equipment[e]}
         </button>
       ))}
     </div>
@@ -53,21 +56,17 @@ function Prompt() {
 }
 
 function VictoryOverlay() {
+  const t = useStrings()
   const victory = useGame((s) => s.victory)
   const day = useGame((s) => s.day)
   const newGame = useGame((s) => s.newGame)
   if (!victory) return null
   return (
     <div className="overlay">
-      <h1>Das Herz von Afrika</h1>
-      <p>
-        Du hast das Grab des großen Königs gefunden und geborgen. Nach{' '}
-        {Math.floor(day)} Tagen Reise durch Wüste und Wildnis ist die Expedition
-        vollendet. Dein Name wird in einem Atemzug mit den großen Entdeckern
-        genannt werden.
-      </p>
+      <h1>{t.overlays.title}</h1>
+      <p>{t.overlays.victoryText(Math.floor(day))}</p>
       <div className="actions">
-        <button className="hud-button" onClick={newGame}>Neue Expedition</button>
+        <button className="hud-button" onClick={newGame}>{t.overlays.newExpedition}</button>
       </div>
     </div>
   )
@@ -75,14 +74,15 @@ function VictoryOverlay() {
 
 /** Shown once at startup when a checkpoint exists (design.md §18, simplified). */
 function StartOverlay() {
+  const t = useStrings()
   const [decided, setDecided] = useState(false)
   const [hadCheckpoint] = useState(() => useGame.getState().hasCheckpoint)
   const loadCheckpoint = useGame((s) => s.loadCheckpoint)
   if (decided || !hadCheckpoint) return null
   return (
     <div className="overlay">
-      <h1>Das Herz von Afrika</h1>
-      <p>Ein früherer Spielstand (Checkpoint der letzten Hafenstadt) wurde gefunden.</p>
+      <h1>{t.overlays.title}</h1>
+      <p>{t.overlays.checkpointFound}</p>
       <div className="actions">
         <button
           className="hud-button"
@@ -91,10 +91,10 @@ function StartOverlay() {
             setDecided(true)
           }}
         >
-          Checkpoint laden
+          {t.overlays.loadCheckpoint}
         </button>
         <button className="hud-button" onClick={() => setDecided(true)}>
-          Neue Expedition
+          {t.overlays.newExpedition}
         </button>
       </div>
     </div>
@@ -102,6 +102,7 @@ function StartOverlay() {
 }
 
 export function Hud() {
+  const t = useStrings()
   const setJournalOpen = useGame((s) => s.setJournalOpen)
   const toggleDebug = useUi((s) => s.toggleDebug)
   const setDialog = useUi((s) => s.setDialog)
@@ -142,10 +143,10 @@ export function Hud() {
         const g = useGame.getState()
         g.setJournalOpen(!g.journalOpen)
       }}>
-        Tagebuch (T)
+        {t.hud.journalToggle}
       </button>
       <button className="hud-button map-toggle" onClick={() => useUi.getState().toggleMap()}>
-        Karte (M)
+        {t.hud.mapToggle}
       </button>
       <Prompt />
       <Toast />

@@ -1,363 +1,365 @@
-# Das Herz von Afrika — Neuumsetzung: Design
+# The Heart of Africa — Remake: Design
 
-Dieses Dokument beschreibt den Sollzustand einer modernen Indie-Neuumsetzung. Grundlage ist die Spielmechanik des Originals (siehe „Das Herz von Afrika — Vollständige Spielmechanik"); dieses Dokument übernimmt deren Systeme und legt die für die Neuumsetzung entschiedenen Punkte fest.
-
----
-
-## 1. Technische Rahmenarchitektur
-
-- Umsetzung als Web-Anwendung mit Three.js unter React Three Fiber.
-- Zwei Darstellungsmodi (§2): 3D-Vogelperspektive für die Reise durch Afrika, Ich-Perspektive innerhalb von Orten.
+This document describes the target state of a modern indie remake. It is based on the game mechanics of the original (see "The Heart of Africa — Complete Game Mechanics"); this document adopts those systems and fixes the decisions made for the remake.
 
 ---
 
-## 2. Perspektiven und Kamera
+## 1. Technical Framework Architecture
 
-**Vogelperspektive (Reise durch Afrika).**
-Die Navigation über den Kontinent funktioniert wie im Original aus der Vogelperspektive, die Umgebung wird jedoch als 3D-Grafik dargestellt (Gelände, Flüsse, Vegetation, Landmarken). Die Kamera folgt der Spielfigur von oben. Sichtbar ist ein Ausschnitt der Karte — der Sichtbereich der Spielfigur, also die Umgebung rund um die aktuelle Position innerhalb Afrikas.
-
-**Ich-Perspektive (Orte).**
-Beim Betreten eines Dorfes oder einer Hafenstadt wechselt das Spiel in die Ich-Perspektive. Der Ort ist begehbar: man läuft durch den Ort und zu den Gebäuden, kauft und verkauft dort Waren (§9) und hält im Dorf Audienz beim Oberhaupt (§12).
-
-**Wechsel.**
-Verlässt man den Ort, wechselt das Spiel zurück in die Vogelperspektive mit dem Sichtbereich rund um die aktuelle Position.
-
-**Grafik und Atmosphäre.**
-Dörfer und ihre Bewohner sind typisch für die jeweilige Region gestaltet (Bauweise, Kleidung, Vegetation entsprechend Wüste, Savanne, Dschungel, Hochland, Seen/Rift). Hafenstädte wirken wohlhabender (feste, größere Bauten, geschäftiges Treiben), Dörfer naturnäher (einfache, regionaltypische Behausungen). Die Darstellung erzeugt je Ort und Region eine entsprechende Atmosphäre.
-
-**Belebte, dicht bebaute Orte (Ich-Perspektive).**
-Orte wirken nicht als karge Ansammlung weniger Funktionsgebäude, sondern als glaubhaft bewohnte Siedlungen. Der Aufwand der Darstellung innerorts ist deutlich höher:
-
-- Deutlich mehr Gebäude als die funktionalen (§9): Neben den begehbaren Handels-, Dienstleistungs- und Audienzgebäuden steht eine klare Mehrzahl reiner Wohn- und Nebengebäude — Wohnhütten, Speicher, Ställe, Werkstätten, Zelte, Vorratsbauten —, die der Spieler nicht betreten kann. Dichte, Größenstaffelung und Anordnung sind regionaltypisch (siehe „Grafik und Atmosphäre", §4.5) und je Ort prozedural variiert (§18); Hafenstädte sind dichter und massiver bebaut als Dörfer.
-- Straßen und Wege erschließen den Ort: Ein erkennbares Wegenetz verbindet Gebäude, Plätze und Ortsrand. Material und Führung passen zur Region (staubige Pisten, gestampfte Lehmwege, belebte Hafengassen). Die Wege ordnen den Ort und lenken die Bewegung von Spieler und Bewohnern.
-- Die Bewohner gehen sichtbar ihren Tätigkeiten nach und bewegen sich glaubhaft durch den Ort: Sie laufen über die Wege, verweilen und arbeiten an Plätzen (§19 Dorf- und Marktleben) und betreten und verlassen die Wohnhütten, in denen sie leben. Sie erscheinen damit nicht als statische Requisiten, sondern als Teil eines lebendigen Alltags — der Ort soll erkennbar „bewohnt" wirken.
-- Die funktionalen, betretbaren Gebäude bleiben trotz der dichteren Bebauung klar erkennbar und heben sich von den nicht betretbaren Bauten ab (§17: Hervorhebung der wichtigen Gebäude).
-- Kollision innerorts: Gebäude und solide Objekte (Hütten, Speicher, Zelte, Zäune, Bäume, Felsen, Feuerstelle u. Ä.) sind physisch undurchdringlich. Weder die Spielfigur noch die Bewohner laufen durch sie hindurch; an Hindernissen gleitet die Bewegung seitlich ab, statt hart zu stoppen. Die Bewohner weichen Hindernissen auf ihren Wegen aus bzw. bleiben nicht dauerhaft an ihnen hängen. Wege, Plätze und die Zugänge zu den betretbaren Gebäuden bleiben stets frei begehbar.
-
-Der Kontrast zwischen der wohlhabenden, geschäftigen Hafenstadt und dem naturnahen Dorf wird durch diese dichtere, belebte Darstellung verstärkt.
-
-**Licht- und Post-Processing-Pipeline.**
-Die Bildqualität stützt sich neben Geometrie- und Materialqualität auf eine vollwertige Beleuchtungs- und Nachbearbeitungskette:
-
-- Bildbasierte Beleuchtung: ein HDRI-Himmel dient als Umgebungslichtquelle (IBL) für physikalisch plausible Material-Reflexionen; der sichtbare Himmel folgt einem physikalisch begründeten Atmosphären-/Streuungsmodell statt eines einfachen Farbverlaufs, konsistent mit dem Sonnenstand.
-- Schatten über kaskadierte Shadow Maps (hohe Auflösung nah an der Kamera, weiche Ränder), abgestimmt auf beide Perspektiven.
-- Bildnachbearbeitung: Ambient Occlusion im Bildraum (SSAO/GTAO), Bloom, Temporal Anti-Aliasing, filmisches Tonemapping mit Farb-Grading; dezente Vignette und Tiefenschärfe sind zulässig, dürfen aber die Lesbarkeit der Kartenansicht nicht mindern.
-- Wasser: Bildraum-Reflexionen, Refraktion mit tiefenabhängiger Absorption (Flachwasser heller/grünlicher, Tiefwasser dunkelblau), Wellenfeld (z. B. Gerstner) und Schaum an Ufern und Wellenkämmen.
-- Distanznebel wird durch die Atmosphären-Streuung ersetzt bzw. mit ihr kombiniert; die regionalen Klima-Stimmungen aus §19 bleiben als Modulation darüber bestehen.
+- Implemented as a web application with Three.js under React Three Fiber.
+- Two presentation modes (§2): 3D bird's-eye view for the journey through Africa, first-person view inside settlements.
 
 ---
 
-## 3. Weltmodell und Karte
+## 2. Perspectives and Camera
 
-- Fester Kontinent Afrika: Die geografische Lage aller Landschaftselemente (Küsten, Flüsse, Dschungel, Gebirge, Seen, Landmarken, Ortslagen) steht fest. Das konkrete Aussehen der Landschaft sowie das Aussehen der Dörfer samt Verteilung der Hütten werden jedoch in jedem Spieldurchlauf prozedural festgelegt (§18). Zusätzlich werden bewegliche Ziele (Grab, vergrabene Schätze) je Partie neu platziert.
-- Die Welt gibt Afrika geografisch authentisch so wieder, wie es im Jahr 1890 war. Die real existierenden Landmarken aus §4.4 liegen an ihren korrekten geografischen Positionen.
-- Fünf Regionen mit eigener Landschaft, eigenen Völkern und eigenem Wertprofil: Norden (Wüste/Sahara), Westen (Savanne), Zentral (Dschungel/Kongobecken), Osten (Gebirge/Seen/Rift), Süden (Hochplateau).
-- Geländetypen: Ozean, Küste, Wüste, Savanne/offenes Land, Dschungel/Grasland, Gebirge, Wasser (Fluss/See).
-- Koordinatensystem: Standort in Grad, angezeigt als „Breite … Grad Nord/Süd" und „Länge … Grad West/Ost". Dieses System ist zugleich Grundlage der Hinweise (§13).
+**Bird's-eye view (journey through Africa).**
+Navigation across the continent works as in the original from a bird's-eye view, but the surroundings are rendered as 3D graphics (terrain, rivers, vegetation, landmarks). The camera follows the player character from above. Visible is a section of the map — the character's field of view, i.e. the surroundings of the current position within Africa.
 
-**Reale Geodaten und Terrain-Darstellung.**
-Die Landschaftsdarstellung basiert auf echten Geodaten statt auf rein synthetischem Rauschen:
+**First-person view (settlements).**
+On entering a village or a port city, the game switches to the first-person view. The settlement is walkable: you walk through it and to its buildings, buy and sell goods there (§9), and hold an audience with the chief in a village (§12).
 
-- Höhenrelief aus einem realen digitalen Höhenmodell (DEM, z. B. SRTM oder Copernicus GLO-90), vorverarbeitet zu Höhenkacheln und zur Laufzeit mit Detailstufen (LOD) um die Spielfigur gestreamt. Charakteristische Reliefformen (Rift-Steilkanten, Hochplateaus, Dünenfelder, Flusstäler) sind erkennbar.
-- Küsten-, Fluss- und Seeverläufe aus realen Vektordaten (z. B. Natural Earth, HydroSHEDS), angepasst auf den Stand von ~1890 (etwa der große Tschadsee-Umriss, keine modernen Stauseen). Die Verläufe sind glatt und feingranular; sichtbare Rasterstufen an Küsten und Ufern darf es nicht geben.
-- Bodendarstellung über biom-basiertes Textur-Splatting mit PBR-Materialien (Sand, Savannengras, Laterit, Fels, Regenwaldboden) und Detail-Normalmaps (triplanar) statt reiner Vertexfarben.
-- Die prozedurale Pro-Lauf-Variation (§18) bleibt bestehen; sie betrifft Vegetationsverteilung, Dorf-Layouts und bewegliche Ziele — nicht die reale Geographie, die in jedem Durchlauf identisch ist.
+**Switching.**
+When you leave the settlement, the game switches back to the bird's-eye view with the field of view around the current position.
+
+**Graphics and atmosphere.**
+Villages and their inhabitants are styled typically for their region (building style, clothing, vegetation matching desert, savanna, jungle, highlands, lakes/rift). Port cities appear wealthier (solid, larger buildings, busy activity), villages closer to nature (simple, region-typical dwellings). The presentation creates a fitting atmosphere for each settlement and region.
+
+**Lively, densely built settlements (first-person).**
+Settlements do not read as a sparse cluster of a few functional buildings but as believably inhabited communities. The presentation effort inside settlements is considerably higher:
+
+- Considerably more buildings than the functional ones (§9): besides the enterable trade, service and audience buildings there stands a clear majority of purely residential and auxiliary buildings — dwellings, granaries, animal pens, workshops, tents, storage buildings — which the player cannot enter. Density, size gradation and arrangement are region-typical (see "Graphics and atmosphere", §4.5) and procedurally varied per settlement (§18); port cities are built more densely and more massively than villages.
+- Streets and paths open up the settlement: a recognizable path network connects buildings, squares and the settlement edge. Material and routing match the region (dusty tracks, stamped clay paths, busy harbor lanes). The paths structure the settlement and guide the movement of both player and inhabitants.
+- The inhabitants visibly go about their business and move believably through the settlement: they walk along the paths, linger and work at squares (§19 village and market life), and enter and leave the dwellings in which they live. They thus do not appear as static props but as part of a living everyday routine — the settlement must recognizably feel "inhabited".
+- The functional, enterable buildings remain clearly recognizable despite the denser fabric and stand out from the non-enterable buildings (§17: highlighting of the important buildings).
+- Collision inside settlements: buildings and solid objects (huts, granaries, tents, fences, trees, rocks, fire pit and the like) are physically impenetrable. Neither the player character nor the inhabitants walk through them; movement slides sideways along obstacles instead of stopping dead. The inhabitants avoid obstacles on their ways or at least never remain permanently stuck on them. Paths, squares and the accesses to the enterable buildings always remain walkable.
+
+The contrast between the wealthy, busy port city and the nature-bound village is reinforced by this denser, livelier presentation.
+
+**Lighting and post-processing pipeline.**
+Image quality rests not only on geometry and material quality but on a full lighting and post-processing chain:
+
+- Image-based lighting: an HDRI sky serves as the environment light source (IBL) for physically plausible material reflections; the visible sky follows a physically grounded atmosphere/scattering model instead of a simple gradient, consistent with the sun position.
+- Shadows via cascaded shadow maps (high resolution near the camera, soft edges), tuned for both perspectives.
+- Post-processing: screen-space ambient occlusion (SSAO/GTAO), bloom, temporal anti-aliasing, filmic tone mapping with color grading; a subtle vignette and depth of field are permissible but must not reduce the readability of the map view.
+- Water: screen-space reflections, refraction with depth-dependent absorption (shallow water lighter/greener, deep water dark blue), a wave field (e.g. Gerstner) and foam along shores and wave crests.
+- Distance fog is replaced by — or combined with — the atmospheric scattering; the regional climate moods of §19 remain as a modulation on top.
 
 ---
 
-## 4. Orte
+## 3. World Model and Map
 
-### 4.1 Hafenstädte (10)
-Nachschub, Handel, Fähren, Entdeckungsprämien; automatisches Speichern (Checkpoint).
-Kairo (Nordostecke; stets die Startstadt), Tanger (Nordwestküste), Khartum (Nordost-Binnenland), St. Louis (Westküste), Timbuktu (West-Binnenland), Lagos (Golf von Guinea), Boma (Kongomündung), Berbera (Horn von Afrika), Sansibar (Ostküste), Kapstadt (Südspitze).
+- Fixed continent of Africa: the geographic location of all landscape elements (coasts, rivers, jungle, mountains, lakes, landmarks, settlement sites) is fixed. The concrete appearance of the landscape, and the look of the villages including the distribution of their huts, are however determined procedurally in every playthrough (§18). In addition, movable goals (the tomb, buried treasures) are placed anew each game.
+- The world reproduces Africa geographically authentically as it was in the year 1890. The real landmarks of §4.4 lie at their correct geographic positions.
+- Five regions, each with its own landscape, its own peoples and its own value profile: North (desert/Sahara), West (savanna), Central (jungle/Congo basin), East (mountains/lakes/rift), South (high plateau).
+- Terrain types: ocean, coast, desert, savanna/open land, jungle/grassland, mountains, water (river/lake).
+- Coordinate system: position in degrees, displayed as "latitude … degrees north/south" and "longitude … degrees west/east". This system is also the basis of the hints (§13).
 
-### 4.2 Völker (22)
-Träger der Hinweise und des Regionalhandels. Regionszuordnung siehe §4.5.
-Masai, Bantu, Zulu, Buschmänner, Batwa, Lunda, Pygmäen, Suaheli, Somali, Hausa, Mongo, Sidamo, Banda, Nubier, Tuareg, Berber, Bombara, Mandingo, Bemba, Bambundu, Uganda, Fang.
+**Real geodata and terrain rendering.**
+The landscape rendering is based on real geodata rather than purely synthetic noise:
 
-### 4.3 Flüsse (17)
-Grundlage der Richtungs-/Ortshinweise (Mündung/Quelle); mit Kanu befahrbar.
-Blauer Nil, Nil, Weißer Nil, Djuba, Ruvuma, Sambesi, Limpopo, Vaal, Oranje, Sankuru, Kasai, Ubangi, Kongo, Benue, Volta, Niger, Senegal. Jeder Fluss hat je einen benannten Mündungs- und Quellort.
+- Elevation relief from a real digital elevation model (DEM, e.g. SRTM or Copernicus GLO-90), preprocessed into elevation tiles and streamed at runtime with levels of detail (LOD) around the player character. Characteristic relief forms (rift escarpments, high plateaus, dune fields, river valleys) are recognizable.
+- Coast, river and lake courses from real vector data (e.g. Natural Earth, HydroSHEDS), adjusted to their ~1890 state (for instance the large Lake Chad outline, no modern reservoirs). The courses are smooth and fine-grained; visible raster steps on coasts and banks must not occur.
+- Ground rendering via biome-based texture splatting with PBR materials (sand, savanna grass, laterite, rock, rainforest floor) and detail normal maps (triplanar) instead of plain vertex colors.
+- The procedural per-run variation (§18) remains: it affects vegetation distribution, village layouts and movable goals — not the real geography, which is identical in every playthrough.
 
-### 4.4 Landmarken
-Seen (Tschadsee, Tanasee, Albertsee, Edwardsee, Viktoriasee, Rudolfsee, Tanganjikasee, Nyasasee), Berge (Toubkal, Emi Koussi, Kilimandscharo, Kenia, Elgon u. a.), Wasserfälle (Stanley-, Livingstone-, Kabalega-, Victoria-, Augrabies-Fälle). Sonderort: Elefantenfriedhof (wertvolles Elfenbein).
+---
 
-### 4.5 Regionszuordnung
-| Region | Landschaft | Völker |
+## 4. Settlements
+
+### 4.1 Port Cities (10)
+Resupply, trade, ferries, discovery bounties; automatic saving (checkpoint).
+Cairo (northeast corner; always the starting city), Tangier (northwest coast), Khartoum (northeastern interior), St. Louis (west coast), Timbuktu (western interior), Lagos (Gulf of Guinea), Boma (Congo mouth), Berbera (Horn of Africa), Zanzibar (east coast), Cape Town (southern tip).
+
+### 4.2 Peoples (22)
+Carriers of the hints and of regional trade. Region assignment see §4.5.
+Masai, Bantu, Zulu, Bushmen, Batwa, Lunda, Pygmies, Swahili, Somali, Hausa, Mongo, Sidamo, Banda, Nubians, Tuareg, Berbers, Bombara, Mandingo, Bemba, Bambundu, Uganda, Fang.
+
+### 4.3 Rivers (17)
+Basis of the direction/location hints (mouth/source); navigable by canoe.
+Blue Nile, Nile, White Nile, Jubba, Ruvuma, Zambezi, Limpopo, Vaal, Orange, Sankuru, Kasai, Ubangi, Congo, Benue, Volta, Niger, Senegal. Each river has one named source and one named mouth location.
+
+### 4.4 Landmarks
+Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudolf, Lake Tanganyika, Lake Nyasa), mountains (Toubkal, Emi Koussi, Kilimanjaro, Mount Kenya, Mount Elgon and others), waterfalls (Stanley, Livingstone, Kabalega, Victoria, Augrabies Falls). Special site: the Elephant Graveyard (valuable ivory).
+
+### 4.5 Region Assignment
+| Region | Landscape | Peoples |
 |---|---|---|
-| Norden | Wüste/Sahara | Tuareg, Berber, Nubier, Bombara |
-| Westen | Savanne | Hausa, Mandingo, Fang |
-| Zentral | Dschungel/Kongobecken | Mongo, Pygmäen, Banda, Bambundu, Lunda |
-| Osten | Gebirge/Seen/Rift | Masai, Suaheli, Somali, Sidamo, Uganda |
-| Süden | Hochplateau | Batwa, Bemba, Bantu, Zulu, Buschmänner |
+| North | Desert/Sahara | Tuareg, Berbers, Nubians, Bombara |
+| West | Savanna | Hausa, Mandingo, Fang |
+| Central | Jungle/Congo basin | Mongo, Pygmies, Banda, Bambundu, Lunda |
+| East | Mountains/lakes/rift | Masai, Swahili, Somali, Sidamo, Uganda |
+| South | High plateau | Batwa, Bemba, Bantu, Zulu, Bushmen |
 
 ---
 
-## 5. Zeit und Kalender
+## 5. Time and Calendar
 
-- Monate (Anzeige, ausgeschrieben): Januar bis Dezember, mit Jahreszahl (Start 1890).
-- Zeit schreitet durch Reise und Aktionen voran; große Distanzen und schwieriges Gelände kosten mehr Zeit.
-- Mehrjährige Frist, kommuniziert über gestufte Meldungen: Fortschritt/Belohnung bei Entdeckung, erste Warnung, zweite Warnung, Fristablauf (Niederlage).
-
----
-
-## 6. Ressourcen und Zustände
-
-- Währung: \$ (Zahlungsmittel in den Hafenstädten). Startkapital 250 \$. Verwendung: Ausrüstung, Proviant, Fähren, Gaben; Einnahmen durch Verkauf und Entdeckungsprämien.
-- Proviant (Essen): Verbrauch pro Zeitschritt; nachkaufbar.
-- Wasser: die Feldflasche ist stets gefüllt und schützt in der Wüste vor Dehydration.
-- Gaben: Tauschgüter für Oberhäupter; erzeugen Wohlwollen und schalten Hinweise frei. Zugleich Zahlungsmittel in den einheimischen Dörfern (dort gilt kein Geld).
-- „In der Hand" gehaltenes Objekt: zentrale Interaktionsvariable für Geländebeweglichkeit (§11), Verhalten der Einheimischen (§12) und Schatzfund.
-
-Störzustände (verändern Steuerung/Sicht, können tödlich sein): Fieber/Krankheit (v. a. Feuchtgebiete) → zeitweise unkontrollierte Steuerung; Dehydration (Wüste ohne Wasser) → Drift, mit gefüllter Feldflasche vermeidbar; Sonnenblindheit (Wüste) → eingeschränkte Sicht, kann tödlich enden — die Feldflasche hilft dagegen nicht, Erholung nur außerhalb der Wüste; Wunden (Tiere/Überfälle). Fieber und Wunden heilt Medizin. Verlust der Expedition → Nachfolger.
-
-**Lager (Zwischenlager).**
-Inventar-Zwischenlager entlasten das begrenzte Inventar und erlauben es, etwa das Kanu zurückzulassen, wenn man sich von Gewässern entfernt (an Land verursacht es einen Tempo-Malus, §7, §11).
-
-Freies Lager: In der Vogelperspektive lässt sich überall im Freien ein Lager aufschlagen, in dem beliebig viele Inventargegenstände abgelegt werden. Es wird auf der Karte mit einem X markiert. Ein solches Lager kann jedoch geplündert werden; die abgelegten Gegenstände sind dort nicht sicher.
-
-Dorf-Lager: Ist man in einem einheimischen Dorf „Geehrter Freund" (§12), kann man dort jederzeit beliebig viele Inventargegenstände einlagern; sie verschwinden nie. Verscherzt man es sich jedoch in dieser Region durch einen Raubüberfall (§12), sind die dort eingelagerten Gegenstände unwiederbringlich verloren.
+- Months (displayed, written out in the selected game language): January through December, with the year (start 1890).
+- Time advances through travel and actions; long distances and difficult terrain cost more time.
+- A multi-year deadline, communicated through staged messages: progress/reward on discovery, first warning, second warning, deadline expiry (defeat).
 
 ---
 
-## 7. Ausrüstung und Wirkungen
+## 6. Resources and Conditions
 
-| Item | Wirkung |
+- Currency: \$ (means of payment in the port cities). Starting capital \$250. Used for: equipment, provisions, ferries, gifts; income through sales and discovery bounties.
+- Provisions (food): consumed per time step; can be bought.
+- Water: the canteen is always full and protects against dehydration in the desert.
+- Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
+- The object held "in hand": the central interaction variable for terrain mobility (§11), the behavior of the natives (§12) and treasure recovery.
+
+Afflictions (alter controls/vision, can be fatal): fever/illness (mainly in wetlands) → temporarily uncontrolled movement; dehydration (desert without water) → drift, avoidable with a filled canteen; sun blindness (desert) → restricted vision, can end fatally — the canteen does not help against it, recovery only outside the desert; wounds (animals/robberies). Medicine cures fever and wounds. Loss of the expedition → a successor takes over.
+
+**Camps (item caches).**
+Inventory caches relieve the limited inventory and allow, for instance, leaving the canoe behind when moving away from waterways (on land it causes a speed penalty, §7, §11).
+
+Free camp: in the bird's-eye view a camp can be pitched anywhere in the open, holding any number of inventory items. It is marked with an X on the map. Such a camp can however be looted; items stored there are not safe.
+
+Village camp: once you are an "Honored Friend" (§12) in a native village, you may store any number of inventory items there at any time; they never disappear. If however you forfeit that standing in this region through a robbery (§12), the items stored there are irretrievably lost.
+
+---
+
+## 7. Equipment and Effects
+
+| Item | Effect |
 |---|---|
-| Seil | Aufstieg im Gebirge; ohne Seil kein Bergpass |
-| Machete | Durchquerung von Dschungel/dichtem Grasland; bietet auch Schutz vor Tierangriffen, jedoch schwächer als das Gewehr |
-| Schaufel | Ausgraben von Schätzen und Grab an markierten Fundpunkten |
-| Gewehr | Jagd und Verteidigung; bietet den stärksten Schutz bei Tierangriffen an Land — stärker als die Machete (§14). In der Hand getragen lässt es Dorfbewohner fliehen und ermöglicht Raubüberfälle in Hütten — mit dauerhaftem Reputationsverlust im Ort (§12) |
-| Medizin | Heilung von Fieber/Krankheit |
-| Gaben | Tauschgüter für Oberhäupter (Wohlwollen, Hinweise) |
-| Feldflasche | stets voll; schützt in der Wüste vor Dehydration (nicht vor Sonnenblindheit) |
-| Karte | Orientierungshilfe |
-| Kanu | schnelle Reise auf Flüssen/Seen; an Land getragen = Tempo-Malus |
+| Rope | Ascent in the mountains; no mountain pass without a rope |
+| Machete | Crossing jungle/dense grassland; also offers protection against animal attacks, though weaker than the rifle |
+| Shovel | Digging up treasures and the tomb at marked sites |
+| Rifle | Hunting and defense; offers the strongest protection against animal attacks on land — stronger than the machete (§14). Carried in hand it makes villagers flee and enables robberies in huts — with a permanent reputation loss in the settlement (§12) |
+| Medicine | Cures fever/illness |
+| Gifts | Trade goods for chiefs (goodwill, hints) |
+| Canteen | Always full; protects against dehydration in the desert (not against sun blindness) |
+| Map | Orientation aid |
+| Canoe | Fast travel on rivers/lakes; carried on land = speed penalty |
 
-Kernregel: Das gehaltene Objekt entscheidet zugleich über Geländebeweglichkeit, Reaktion der Einheimischen und Schatzfund. Handelt es sich um eine Waffe (Gewehr oder Machete), erhöht das Halten in der Hand zusätzlich den Schutz vor Angriffen wilder Tiere, wobei ein Gewehr stärker schützt als eine Machete (§14).
+Core rule: the held object simultaneously decides terrain mobility, the reaction of the natives and treasure recovery. If it is a weapon (rifle or machete), holding it in hand additionally increases protection against wild-animal attacks, with the rifle protecting more strongly than the machete (§14).
 
 ---
 
-## 8. Wertgegenstände und Kultur-/Wertmatrix
+## 8. Valuables and the Culture/Value Matrix
 
-Schatzfunde/Wertgegenstände: Gold, Elfenbein, Silber, Kupfer, Smaragd, Statue.
+Treasure finds/valuables: gold, ivory, silver, copper, emerald, statue.
 
-Grundprinzip: Der Wert eines Gegenstands ist regions-/kulturabhängig. Was eine Region verehrt, bringt dort viel; was sie ablehnt, wird nicht gekauft oder erzeugt Feindseligkeit. Das erzwingt kontinentweiten Arbitragehandel.
+Core principle: the value of an object depends on region/culture. What a region reveres fetches much there; what it rejects is not bought or provokes hostility. This forces continent-wide arbitrage trading.
 
-| Region | hoher Wert / verehrt | abgelehnt / gefährlich |
+| Region | High value / revered | Rejected / dangerous |
 |---|---|---|
-| Norden | Gold, Smaragde | Silber |
-| Westen | Elfenbein | Smaragd |
-| Zentral | Silber | Gold |
-| Süden | Kupfer, Smaragde | Elfenbein |
-| Osten | Smaragde | Kupfer |
+| North | Gold, emeralds | Silver |
+| West | Ivory | Emerald |
+| Central | Silver | Gold |
+| South | Copper, emeralds | Ivory |
+| East | Emeralds | Copper |
 
-Ein sichtbar getragener Wertgegenstand löst je nach Region eine positive oder negative Reaktion aus.
+A visibly carried valuable triggers a positive or negative reaction depending on the region.
 
 ---
 
-## 9. Gebäudetypen und Funktionen
+## 9. Building Types and Functions
 
-In Dörfern und Hafenstädten gibt es verschiedene Gebäudetypen. In der Ich-Perspektive sind sie begehbar.
+Villages and port cities contain various building types. In the first-person view they are enterable.
 
-| Gebäude | Funktion |
+| Building | Function |
 |---|---|
-| Laden | Verkauf von Medizin, Gaben, Karte |
-| Reisebüro | Fahrkartenverkauf: Reise zu einer anderen Hafenstadt |
-| Basar | An- und Verkauf von Schatzfunden |
-| Waffenhütte | Verkauf von Gewehr, Machete |
-| Geräte-Hütte | Verkauf von Schaufel, Seil, Feldflasche |
-| Markthütte | Verkauf von Kanu, Essen |
-| Chefhütte | nur im Dorf: Audienz mit dem Oberhaupt zur Einholung von Hinweisen |
+| General store | Sells medicine, gifts, map |
+| Travel agency | Ticket sales: passage to another port city |
+| Bazaar | Buying and selling of treasure finds |
+| Weapons hut | Sells rifle, machete |
+| Tool hut | Sells shovel, rope, canteen |
+| Market hut | Sells canoe, food |
+| Chief's hut | Village only: audience with the chief to obtain hints |
 
 ---
 
-## 10. Handel und Ökonomie
+## 10. Trade and Economy
 
-- Orte des Handels: siehe §9.
-- Zahlungsmittel: In Hafenstädten wird mit Geld gehandelt, in einheimischen Dörfern mit Gaben (Tauschgütern).
-- Basar (Schatzfunde): Ware anbieten → Kaufmann nennt ein Gebot → annehmen oder ablehnen. Passt der Gegenstand nicht ins regionale Wertprofil, wird er abgelehnt.
-- Preislogik: Basispreis je Ware; Schatzfunde zusätzlich mit regionalem Faktor und An-/Verkaufsspanne. Der Gewinn entsteht aus regionaler Arbitrage.
-- Fähren (Reisebüro): Reise zwischen Häfen gegen Gebühr; spart Zeit gegenüber der Landreise.
-- Entdeckungsprämie: Für gemeldete Entdeckungen (neue Dörfer, Landmarken) wird Geld überwiesen; Gutschrift beim nächsten Hafenbesuch.
+- Places of trade: see §9.
+- Means of payment: in port cities trade uses money, in native villages gifts (trade goods).
+- Bazaar (treasure finds): offer an item → the merchant names a bid → accept or decline. If the item does not fit the regional value profile, it is rejected.
+- Price logic: a base price per good; treasure finds additionally carry a regional factor and a buy/sell spread. Profit comes from regional arbitrage.
+- Ferries (travel agency): passage between ports for a fee; saves time compared to overland travel.
+- Discovery bounty: money is transferred for reported discoveries (new villages, landmarks); credited on the next port visit.
 
 ---
 
-## 11. Gelände und Bewegung
+## 11. Terrain and Movement
 
-| Gelände | Handobjekt | Ohne / Mit |
+| Terrain | Hand object | Without / with |
 |---|---|---|
-| Wüste | Feldflasche | ohne: Dehydration (Drift), Tempoverlust; mit gefüllter Feldflasche: keine Dehydration. Sonnenblindheit droht unabhängig davon; die Feldflasche hilft dagegen nicht |
-| Dschungel | Machete | ohne: nahezu unpassierbar; mit: durchquerbar |
-| Gebirge | Seil | ohne: kein Aufstieg/Absturzrisiko; mit: begehbar |
-| Fluss/See | Kanu | mit: schnelle Wasserreise; an Land: Tempo-Malus |
-| Savanne/offen | Gewehr (außerhalb Dörfer) | ohne: höheres Überfallrisiko |
-| Grabungspunkt | Schaufel | ohne: kein Fund; mit: ausgraben |
+| Desert | Canteen | without: dehydration (drift), speed loss; with a filled canteen: no dehydration. Sun blindness threatens regardless; the canteen does not help against it |
+| Jungle | Machete | without: nearly impassable; with: traversable |
+| Mountains | Rope | without: no ascent / risk of falling; with: passable |
+| River/lake | Canoe | with: fast water travel; on land: speed penalty |
+| Savanna/open | Rifle (outside villages) | without: higher robbery risk |
+| Dig site | Shovel | without: no find; with: dig it up |
 
-**Bewegungsgrenze.**
-Die Bewegung ist auf den Kontinent und seine Binnengewässer (Flüsse, Seen) beschränkt. Der umgebende Ozean ist nicht befahrbar; der Kontinent kann nicht verlassen werden.
+**Movement boundary.**
+Movement is restricted to the continent and its inland waters (rivers, lakes). The surrounding ocean is not navigable; the continent cannot be left.
 
-**Wasser, Strömung und Wasserfälle.**
-Gewässer weisen eine Strömung auf, die im direkten Umfeld von Wasserfällen (§4.4) besonders stark ist. Mit der Strömung bewegt man sich schneller, gegen die Strömung langsamer. Dort besteht das Risiko, hinuntergerissen zu werden — mit Verletzungen und dem Verlust eines Großteils der Inventargegenstände.
+**Water, current and waterfalls.**
+Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4). Moving with the current is faster, against it slower. There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
 
-Man kann sich auch ohne Kanu im Wasser fortbewegen, ist dann jedoch langsamer und anfälliger für die Strömung. Zusätzlich besteht das Risiko, von einem Krokodil angegriffen und verletzt oder gefressen zu werden. Ohne Kanu wird das Gewehr im Wasser nass und hilft dann nicht; nur eine Machete senkt das Risiko. Im Kanu bleibt das Gewehr trocken und wirkt wie gewohnt.
+You can also move through water without a canoe, but you are slower and more exposed to the current. There is additionally the risk of being attacked by a crocodile and being injured or eaten. Without a canoe the rifle gets wet in the water and is then useless; only a machete reduces the risk. In the canoe the rifle stays dry and works as usual.
 
-Bewegung in der Vogelperspektive; das Gelände wird als 3D dargestellt, die Steuerung bleibt Draufsicht-orientiert.
-
----
-
-## 12. Audienz beim Oberhaupt
-
-Der Zugang zu Hinweisen führt über Oberhäupter, in der Chefhütte eines Dorfes (Ich-Perspektive). Ablauf:
-1. Dorf betreten (nicht mit sichtbarem Gewehr — sonst Flucht/Blockade).
-2. Chefhütte aufsuchen, Audienz.
-3. Kulturell passende Gabe überreichen → Wohlwollen.
-4. Bei ausreichendem Wohlwollen: Hinweis auf Grab/Schatz (in die Chronik, §15).
-5. Falsches Verhalten: Feindseligkeit, Vertreibung.
-
-**Geehrter Freund.**
-Erfüllt man ein Oberhaupt wiederholt korrekt, verleiht es den Status „Geehrter Freund". Dieser gilt für alle Dörfer der jeweiligen Region (Norden, Westen, Zentral, Süden, Osten). Wie jedes Ereignis wird die Verleihung über das Tagebuch mitgeteilt: Es öffnet sich ein neuer Eintrag, in dem das Oberhaupt zusichert, dass seine Einwohner den Reisenden von nun an beschützen. Begeht man einen Raubüberfall, geht dieser Status unwiederbringlich verloren.
-
-Wirkung: In der unmittelbaren Umgebung der einheimischen Dörfer der Region beschützen die Einheimischen den Reisenden vor Angriffen von Tieren und Räubern (§14); er kann dann höchstens leicht verletzt werden. Ist man kurz vorm Sterben, eilen Einwohner mit Nahrung, Wasser oder Medizin herbei. Zudem erhält man in den Dörfern der Region stets kostenlos Nahrung, Wasser und Medizin. Jedes solche Ereignis wird per Tagebucheintrag mitgeteilt. Meist erscheint ein Eintrag wie „Ich wurde von Löwen angegriffen. Eine Gruppe von Einwohnern der … ist mir sofort zu Hilfe geeilt und hat mich vor dem Angriff gerettet. Ich wurde nur leicht verletzt."
-
-**Raubüberfall und Reputation.**
-Nimmt man in einer Hütte das Gewehr in die Hand, lassen sich Waren rauben und in beliebiger Menge mitnehmen. Das verfeindet alle Dörfer der Region dauerhaft: Danach ist keine Hütte der Region mehr betretbar, und es gibt keine Hinweise mehr von den Oberhäuptern. Außerdem geht durch einen Raubüberfall der Status „Geehrter Freund" unwiederbringlich verloren — samt der Schutzwirkung.
+Movement happens in the bird's-eye view; the terrain is rendered in 3D, the controls remain top-down oriented.
 
 ---
 
-## 13. Sprach- und Hinweissystem
+## 12. Audience with the Chief
 
-Kernrätsel des Spiels: Aus Richtungs- und Ortsangaben der Einheimischen die Fundposition bestimmen. Das Verstehen der Sprache ist Teil des Spiels.
+Access to hints leads through the chiefs, in the chief's hut of a village (first-person view). Procedure:
+1. Enter the village (not with a visible rifle — otherwise flight/blockade).
+2. Visit the chief's hut, audience.
+3. Present a culturally fitting gift → goodwill.
+4. With sufficient goodwill: a hint about the tomb/treasure (into the chronicle, §15).
+5. Wrong behavior: hostility, expulsion.
 
-### 13.1 Hinweiskonstruktion
-Hinweise verbinden Landmarke + Richtung + Koordinaten, z. B. „Gebiet um [Ort]", „[Fluss]-Mündung"/„[Fluss]-Quelle", kombiniert mit Nord/Süd/Ost/West und „Breite/Länge … Grad". Als Bezugspunkte dienen nicht nur Flüsse, sondern auch Seen, Berge und Wasserfälle. Landmarken sind Flüsse, Städte, Völker, Seen, Berge und Wasserfälle.
+**Honored Friend.**
+If you satisfy a chief correctly repeatedly, he bestows the status of "Honored Friend". It applies to all villages of the respective region (North, West, Central, South, East). Like every event, the bestowal is communicated through the journal: a new entry opens in which the chief pledges that his people will protect the traveler from now on. Committing a robbery forfeits this status irretrievably.
 
-### 13.2 Regionale Richtungssysteme
-Jede Region drückt Richtungen anders aus; der Spieler muss das jeweilige System erschließen:
-- Norden: Richtung relativ zum Windursprung; „Nivera" = Norden.
-- Westen: „koko" = Nord, „Katula" = Ost, „Phuthswama" = Süd, „Mimbumi" = West.
-- Zentral: Richtungen relativ zu „Utomba".
-- Süden: Jahreszeiten als Richtungen — Sommer = Nord, Winter = Süd, Frühling = Ost, Herbst = West.
-- Osten: relativ zu „Odabi"; „Relolo" = Nord, „Dethamee" = Süd.
+Effect: in the immediate surroundings of the region's native villages, the natives protect the traveler from attacks by animals and robbers (§14); he can then at most be lightly injured. If he is close to death, inhabitants hurry over with food, water or medicine. In addition he always receives food, water and medicine free of charge in the villages of the region. Each such event is communicated via a journal entry. Typically an entry reads like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
 
-Glossar (Landmarken in lokaler Sprache): El Mora Levimara / Mongdamara (Kongo), Lastwana (Sambesi), Gumba lu Untoba (Victoria-Fälle), Unumpara (Kilimandscharo), Galumba / Ut-hu Manbwama (Elefanten), Oz Oz / Oink Oink / Auke Auke (unspezifisches Wissen).
-
-### 13.3 Kaskade und Zeitlimit
-Pro Region verrät typischerweise ein Volk den regionalen Fundort-Hinweis; die übrigen liefern nur unspezifisches Wissen. Mehrere Hinweise werden zur genauen Grabposition trianguliert.
+**Robbery and reputation.**
+Taking the rifle in hand inside a hut lets you rob goods and take any quantity along. This permanently antagonizes all villages of the region: afterwards no hut of the region can be entered anymore, and the chiefs give no more hints. A robbery also irretrievably forfeits the "Honored Friend" status — including its protection.
 
 ---
 
-## 14. Zufallsereignisse
+## 13. Language and Hint System
 
-Verdeckte Auslösung pro Zeitschritt/Region/Zustand:
-- Angriffe wilder Tiere (Löwen, Leoparden und Schlangen): Ein Angriff kann verletzen oder töten. Bei Leoparden ist das Risiko schwerer Verletzungen oder gefressen zu werden geringer als bei Löwen. Das Mitführen eines Gewehrs oder einer Machete senkt das Risiko — ein Gewehr stärker als eine Machete; hält man die Waffe zusätzlich in der Hand, sinkt das Risiko weiter. Die Chronik meldet den Ausgang in Sätzen der Art „Ich wurde von Löwen angegriffen.", „Ich entkam.", „Ich benutzte das Gewehr." oder „Ich wurde leicht verletzt.".
-- Angriffe durch Räuber: können verletzen und Inventargegenstände entwenden. Wie bei Tierangriffen senkt eine Machete das Risiko, ein Gewehr stärker.
-- Schutz durch „Geehrter Freund": In der Umgebung der Dörfer einer Region, in der man diesen Status besitzt, eilen die Einheimischen bei Tier- und Räuberangriffen zu Hilfe; man kann dann höchstens leicht verletzt werden (§12).
-- Krokodilangriffe im Wasser: Bewegt man sich durch Gewässer, kann ein Krokodil angreifen und verletzen oder fressen. Ohne Kanu wird das Gewehr nass und hilft nicht — dann senkt nur eine Machete das Risiko; im Kanu wirkt das Gewehr normal (§11).
-- Strömung an Wasserfällen: In der Nähe von Wasserfällen kann die starke Strömung die Figur hinunterreißen — mit Verletzungen und dem Verlust eines Großteils der Inventargegenstände (§11).
-- Krankheit/Fieber (klima-/regionsabhängig) → Störzustand (§6).
-- Fieberdelirium → zeitweise unkontrollierte Steuerung.
-- Wüstengefahren: Dehydration (mit gefüllter Feldflasche vermeidbar) und Sonnenblindheit (Erholung nur außerhalb der Wüste, §6).
-- Wetter (z. B. Sandsturm mit Sichtverlust).
-- Fund von Verstecken/Lagern/Überresten.
+The game's core puzzle: determine the site from the natives' direction and location statements. Understanding the language is part of the game.
 
-Item-Hilfe: Bei Ereignissen hilft das passende Ausrüstungsstück, insbesondere das in der Hand gehaltene — Gewehr oder Machete senken das Risiko bei Tier- und Räuberangriffen an Land (ein Gewehr stärker als eine Machete; in der Hand stärker als nur mitgeführt); gegen Krokodile im Wasser hilft die Machete stets, ein Gewehr nur im Kanu (ohne Kanu wird es nass und wirkt nicht); Gewehr schreckt Diebe ab; Medizin heilt Wunden und Fieber; die Feldflasche schützt vor Dehydration (nicht vor Sonnenblindheit).
+### 13.1 Hint Construction
+Hints combine landmark + direction + coordinates, e.g. "the area around [place]", "[river] mouth"/"[river] source", combined with north/south/east/west and "latitude/longitude … degrees". Reference points are not only rivers but also lakes, mountains and waterfalls. Landmarks are rivers, cities, peoples, lakes, mountains and waterfalls.
 
-Konkrete Wahrscheinlichkeiten werden für die Balance frei kalibriert.
+### 13.2 Regional Direction Systems
+Every region expresses directions differently; the player must decipher each system:
+- North: direction relative to the origin of the wind; "Nivera" = north.
+- West: "koko" = north, "Katula" = east, "Phuthswama" = south, "Mimbumi" = west.
+- Central: directions relative to "Utomba".
+- South: seasons as directions — summer = north, winter = south, spring = east, autumn = west.
+- East: relative to "Odabi"; "Relolo" = north, "Dethamee" = south.
 
----
+Glossary (landmarks in the local tongue): El Mora Levimara / Mongdamara (Congo), Lastwana (Zambezi), Gumba lu Untoba (Victoria Falls), Unumpara (Kilimanjaro), Galumba / Ut-hu Manbwama (elephants), Oz Oz / Oink Oink / Auke Auke (unspecific knowledge).
 
-## 15. Chronik / Tagebuch
-
-Automatisch mitwachsende, deutschsprachige Erzählchronik der Reise. Funktionen: Stimmungsträger und Speicher der eingeholten Hinweise. Einträge entstehen aus Vorlagen mit eingesetzten Orten/Richtungen und aus Ereignissen.
-
-**Tonalität und Immersion.**
-Das Tagebuch ist das zentrale Mittel zur Erzeugung von Immersion: Viele Ereignisse sieht man nicht, sondern erfährt sie nur als Text — vergleichbar mit dem Lesen eines Romans. Die Einträge sind daher stets mitreißend formuliert und drücken je nach Situation Faszination über Neues, Dramatik, Unverständnis, Bedenken, Hoffnung u. Ä. aus. Bereits die Textbausteine, aus denen die Einträge zusammengesetzt werden, müssen entsprechend mitreißend geschrieben sein.
-
-**Betreten einer neuen Region.**
-Betritt man zum ersten Mal eine neue Region, öffnet sich das Tagebuch, verkündet die Region und zeigt einen Eintrag, der die Faszination des Reisenden über diese Region und ihre Eigenarten beschreibt.
-
-**Tod der Figur.**
-Stirbt die Figur, kann sie keinen Tagebucheintrag mehr verfassen. Statt eines Eintrags erscheint dann ein Bericht, dass die Überreste des Forschers gefunden wurden — ein schauderhafter Anblick, der auf die Todesursache schließen lässt (etwa, dass er von Löwen gefressen wurde).
+### 13.3 Cascade and Time Limit
+Per region, typically one people reveals the regional location hint; the others provide only unspecific knowledge. Several hints are triangulated into the exact position of the tomb.
 
 ---
 
-## 16. Darstellung von Ereignissen
+## 14. Random Events
 
-Ereignisse (Tier- und Räuberangriffe, Hinweise der Oberhäupter, Statusänderungen u. a., §14) werden nicht als eigene Szene explizit dargestellt. Der Spieler erfährt von ihnen dadurch, dass sich das Tagebuch automatisch öffnet und ein neuer Eintrag hinzukommt.
+Hidden triggering per time step/region/condition:
+- Wild-animal attacks (lions, leopards and snakes): an attack can injure or kill. With leopards the risk of severe injury or being eaten is lower than with lions. Carrying a rifle or machete lowers the risk — a rifle more than a machete; holding the weapon in hand lowers it further. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.".
+- Robber attacks: can injure and steal inventory items. As with animal attacks, a machete lowers the risk, a rifle more so.
+- Protection through "Honored Friend": near the villages of a region where you hold this status, the natives rush to help during animal and robber attacks; you can then at most be lightly injured (§12).
+- Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Without a canoe the rifle gets wet and does not help — then only a machete lowers the risk; in the canoe the rifle works normally (§11).
+- Current at waterfalls: near waterfalls the strong current can sweep the character over — with injuries and the loss of a large part of the inventory (§11).
+- Illness/fever (climate/region dependent) → affliction (§6).
+- Fever delirium → temporarily uncontrolled movement.
+- Desert dangers: dehydration (avoidable with a filled canteen) and sun blindness (recovery only outside the desert, §6).
+- Weather (e.g. sandstorm with loss of visibility).
+- Finding caches/camps/remains.
 
-Der Eintrag erscheint nicht als fertiger Text, sondern wird sichtbar von einer Hand in Handschrift hineingeschrieben.
+Item help: the fitting piece of equipment helps during events, especially the one held in hand — rifle or machete lower the risk of animal and robber attacks on land (a rifle more than a machete; in hand more than merely carried); against crocodiles in water the machete always helps, a rifle only in the canoe (without a canoe it gets wet and fails); the rifle deters thieves; medicine cures wounds and fever; the canteen protects against dehydration (not against sun blindness).
 
-Ist die Figur verletzt, sind der schreibenden Hand die Verletzungen anzusehen, und zwar in erkennbarer Schwere: Bei einer schweren Verletzung ist die Hand blutig, bei leichteren Verletzungen entsprechend weniger gezeichnet. Beispiel: Der Eintrag „Ich wurde von Löwen angegriffen und schwer verletzt." wird von einer blutigen Hand geschrieben. Ein von einer blutigen Hand geschriebener Eintrag enthält entsprechend Blutspuren.
-
-Kann die Figur nicht mehr schreiben (Tod), entfällt der handschriftliche Eintrag; stattdessen erscheint der Bericht über die gefundenen Überreste (§15).
+Concrete probabilities are calibrated freely for balance.
 
 ---
 
-## 17. Benutzeroberfläche
+## 15. Chronicle / Journal
 
-- Vogelperspektive: Sichtbereich der Umgebung; Statusleiste mit Datum, Kasse, Proviant, Gaben, Handobjekt; Anzeige der aktuellen Region; Koordinatenanzeige. Zugriff auf Chronik und Objekte (Item in die Hand nehmen, Karte betrachten, Medizin einnehmen). Weitere Funktionen: Standortabfrage, Gesundheitsabfrage, Lager anlegen (§6) sowie eine Erkundungsübersicht, die zeigt, wie weit die aktuelle Region bereits erkundet ist.
-- Ich-Perspektive (Orte): begehbarer Raum, Interaktionsaufforderungen an Gebäuden/Personen, Handels- und Dialogfenster. Eine Gabe an einen Einheimischen liefert zudem eine Orientierung über die Gebäude des Ortes, wobei die wichtigen, betretbaren Gebäude hervorgehoben werden.
-- Bedienung maus-/tastatur- und gamepad-tauglich.
+An automatically growing narrative chronicle of the journey, written in the selected game language (German by default, English available, §17). Functions: mood carrier and store of the collected hints. Entries are produced from templates with places/directions inserted, and from events.
+
+**Tone and immersion.**
+The journal is the central means of creating immersion: many events are never seen, only experienced as text — comparable to reading a novel. The entries are therefore always written vividly and express, depending on the situation, fascination with the new, drama, bewilderment, misgivings, hope and the like. The text building blocks from which entries are assembled must already be written with this vividness — in every supported language.
+
+**Entering a new region.**
+On first entering a new region, the journal opens, announces the region and shows an entry describing the traveler's fascination with this region and its peculiarities.
+
+**Death of the character.**
+A dead character can write no more journal entries. Instead of an entry, a report appears that the explorer's remains have been found — a gruesome sight that hints at the cause of death (for instance, that he was eaten by lions).
 
 ---
 
-## 18. Sieg/Niederlage, prozedurale Platzierung, Speichern
+## 16. Presentation of Events
 
-- Sieg: das prozedural platzierte Grab rechtzeitig finden und bergen.
-- Niederlage: Fristablauf oder Verlust der Expedition (→ Nachfolger).
-- Prozedural je Partie: Position von Grab und Caches, das konkrete Aussehen der Landschaft sowie das Aussehen der Dörfer samt Verteilung der Hütten. Die geografische Lage der Landschaftselemente (Dschungel, Gebirge, Flüsse usw.) bleibt fest. Sonderfundorte: Elefantenfriedhof, Lager/Verstecke.
-- Speichern: automatisch beim Besuch einer Hafenstadt. Die Hafenstädte fungieren als Checkpoints; manuelles Speichern entfällt.
-- Laden: Beim Laden erscheint eine Übersicht aller Hafenstadt-Besuche als Tabelle mit je einer Zeile pro Besuch. Angezeigt werden Hafenstadt, Datum (im Spiel), Geld, Nahrung, Gaben und Gesundheitszustand; daraus wählt der Spieler den Stand, ab dem fortgesetzt wird.
+Events (animal and robber attacks, chiefs' hints, status changes and the like, §14) are not staged as separate scenes. The player learns of them because the journal opens automatically and a new entry appears.
 
-| Hafenstadt | Datum | Geld | Nahrung | Gaben | Gesundheitszustand |
+The entry does not appear as finished text but is visibly written into the book in handwriting by a hand.
+
+If the character is injured, the injuries are visible on the writing hand, at a recognizable severity: with a severe injury the hand is bloody, with lighter injuries correspondingly less marked. Example: the entry "I was attacked by lions and severely wounded." is written by a bloody hand. An entry written by a bloody hand accordingly contains traces of blood.
+
+If the character can no longer write (death), the handwritten entry is omitted; instead the report about the found remains appears (§15).
+
+---
+
+## 17. User Interface
+
+- Bird's-eye view: field of view of the surroundings; status bar with date, cash, provisions, gifts, hand object; display of the current region; coordinate display. Access to the chronicle and to objects (take an item in hand, view the map, take medicine). Further functions: position query, health query, pitch camp (§6), and an exploration overview showing how far the current region has been explored.
+- First-person view (settlements): walkable space, interaction prompts at buildings/persons, trade and dialog windows. A gift to a native additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
+- Controls suitable for mouse/keyboard and gamepad.
+- **Game languages:** German (default) and English. The language can be switched at runtime (POC: via the debug menu, §21). All player-visible text — UI, chronicle, dialogs, names of places and landmarks — is served from language files; adding a further language must require nothing beyond a new language file. Every future addition or change to game text must always be made for both languages; translations are written for their context, not literally. Proper names are localized where established exonyms exist (e.g. "Kairo"/"Cairo", "Kilimandscharo"/"Kilimanjaro").
+
+---
+
+## 18. Victory/Defeat, Procedural Placement, Saving
+
+- Victory: find and recover the procedurally placed tomb in time.
+- Defeat: deadline expiry or loss of the expedition (→ successor).
+- Procedural per game: the position of the tomb and of caches, the concrete appearance of the landscape, and the look of the villages including the distribution of their huts. The geographic location of the landscape elements (jungle, mountains, rivers etc.) remains fixed. Special find sites: the Elephant Graveyard, camps/caches.
+- Saving: automatic on visiting a port city. The port cities act as checkpoints; manual saving is omitted.
+- Loading: on loading, an overview of all port visits appears as a table with one row per visit. Shown are port city, date (in-game), money, food, gifts and health state; from these the player picks the state to continue from.
+
+| Port city | Date | Money | Food | Gifts | Health |
 |---|---|---|---|---|---|
-| Kairo | 3. Jan. 1890 | 250 \$ | 5 Wochen | 2 | gesund |
+| Cairo | Jan 3, 1890 | \$250 | 5 weeks | 2 | healthy |
 
 ---
 
-## 19. Atmosphäre und Immersion
+## 19. Atmosphere and Immersion
 
-Ergänzende Elemente, die das Afrika-Gefühl verstärken, überwiegend ohne neue Mechanik.
+Complementary elements that reinforce the feeling of Africa, mostly without new mechanics.
 
-- Regionale Geräuschkulisse und dynamische Musik: eigene Klanglandschaften je Region (Savannen-Insekten und Weite, Dschungel mit Vögeln und Affen, Wüstenwind, Trommeln in Dorfnähe). Wechselt beim Regionsübergang und beim Perspektivwechsel.
-- Lebende Tierwelt als Kulisse: nicht bedrohliche Tiere im Sichtbereich (Elefanten- und Huftierherden, Giraffen, Zebras, Flamingos an den Seen). Rein visuell, verankert Ort und Region. Die Tiere interagieren auch untereinander (etwa ein Löwe, der ein Zebra reißt) — als ambiente Szenerie ohne Einfluss auf den Spieler.
-- Geier bei schlechtem Gesundheitszustand: Ist die Figur gesundheitlich in schlechtem Zustand (§6), kreisen zeitweise Geier über ihr und folgen ihr — als atmosphärisches Signal ohne eigene Mechanik.
-- Klima und Umgebungsoptik: regionstypische Atmosphäre wie Hitzeflimmern in der Wüste, feuchter Dunst im Dschungel und klare Luft im Hochland. Rein visuell.
-- Dorf- und Marktleben in der Ich-Perspektive: Bewohner bei Alltagstätigkeiten (Kochen, Weben, Vieh, spielende Kinder). Reine Animation; macht Orte lebendig und unterstreicht den Kontrast zwischen wohlhabender Hafenstadt und naturnahem Dorf.
-- Illustrierte Tagebucheinträge: gelegentliche Handskizzen (ein Tier, eine Landmarke, ein Gesicht) neben dem Text, passend zur handschriftlichen Darstellung (§16).
-- Selbstzeichnende Karte: Die Karte füllt sich beim Erkunden als handgezeichnete Skizze statt bloßer Nebelentfernung; passt zur Erkundungsübersicht (§17).
+- Regional soundscape and dynamic music: distinct sound worlds per region (savanna insects and vastness, jungle with birds and monkeys, desert wind, drums near villages). Changes on region transitions and on perspective switches.
+- Living wildlife as scenery: non-threatening animals in the field of view (elephant and ungulate herds, giraffes, zebras, flamingos at the lakes). Purely visual, anchoring place and region. The animals also interact with one another (say, a lion bringing down a zebra) — as ambient scenery without influence on the player.
+- Vultures at poor health: if the character is in poor health (§6), vultures circle above and follow them for a while — an atmospheric signal without its own mechanics.
+- Climate and environmental look: region-typical atmosphere such as heat shimmer in the desert, humid haze in the jungle and clear air in the highlands. Purely visual.
+- Village and market life in the first-person view: inhabitants at everyday activities (cooking, weaving, livestock, playing children). Pure animation; makes settlements feel alive and underlines the contrast between the wealthy port city and the nature-bound village.
+- Illustrated journal entries: occasional hand sketches (an animal, a landmark, a face) beside the text, matching the handwritten presentation (§16).
+- Self-drawing map: the map fills in while exploring as a hand-drawn sketch rather than mere fog removal; fits the exploration overview (§17).
 
-Es gibt keinen Tag-/Nacht-Wechsel: Die Spielzeit läuft im Zeitraffer (rund fünf Jahre Expeditionsdauer über große Distanzen), ein Echtzeit-Tageslauf würde ständige Wechsel erzeugen und die Partie unnötig verlängern.
-
----
-
-## 20. Kern-Spielschleife
-
-1. Hafenstadt (Ich-Perspektive): Ausrüstung, Gaben, Waffen, Feldflasche, Seil, Kanu, Proviant kaufen; ggf. Fähre. Das Betreten der Hafenstadt speichert automatisch (Checkpoint).
-2. Region ansteuern (Vogelperspektive, 3D); passendes Gelände-Item führen.
-3. Dorf betreten (Ich-Perspektive): Chefhütte aufsuchen.
-4. Kulturell korrekte Gabe → Hinweis in die Chronik.
-5. Sprach-/Richtungssystem der Region erschließen, Hinweis dekodieren, Zielposition bestimmen.
-6. Zur Zielposition reisen, Gelände-Items beachten, mit Schaufel graben → Schatz.
-7. Schatzfunde regionsklug am Basar verkaufen.
-8. Gesundheit und Zeit managen.
-9. Entdeckungen an Häfen zu Geld machen.
-10. Mehrere Hinweise triangulieren → Grab finden → Sieg.
+There is no day/night cycle: game time runs in fast-forward (about five years of expedition over great distances); a real-time daily cycle would create constant switches and needlessly prolong a game.
 
 ---
 
-## 21. Debug-Menü
+## 20. Core Gameplay Loop
 
-Ein mit F1 aufrufbares Debug-Menü. Alle Einstellungen wirken sich direkt auf das laufende Spiel aus; kein Neustart nötig.
+1. Port city (first-person): buy equipment, gifts, weapons, canteen, rope, canoe, provisions; possibly take a ferry. Entering the port city saves automatically (checkpoint).
+2. Head for a region (bird's-eye view, 3D); carry the terrain-appropriate item.
+3. Enter a village (first-person): visit the chief's hut.
+4. Culturally correct gift → hint into the chronicle.
+5. Decipher the region's language/direction system, decode the hint, determine the target position.
+6. Travel to the target position, mind the terrain items, dig with the shovel → treasure.
+7. Sell treasure finds region-wisely at the bazaar.
+8. Manage health and time.
+9. Turn discoveries into money at the ports.
+10. Triangulate several hints → find the tomb → victory.
 
-- Laufgeschwindigkeit der Spielfigur innerorts (in Dörfern und Hafenstädten).
-- Laufgeschwindigkeit der Spielfigur außerorts (Reise über den Kontinent).
-- Geschwindigkeit des Nahrungsverbrauchs beim Laufen; bei 0 hält der Nahrungsvorrat ewig.
-- Checkbox: Zufallsereignisse können auftreten (§14), standardmäßig an.
-- Je ein Button pro Art von Zufallsereignis (§14), um es sofort auszulösen.
-- Checkbox: alle versteckten Objekte anzeigen (Position von Schatz/Grab, Caches usw.), standardmäßig aus.
-- Sofortiges Springen zu jeder Hafenstadt.
-- Eingabefelder für Kontostand, Gaben und Nahrung.
-- Eingabefeld für die Inventar-Kapazität.
-- Beliebiges Item dem Inventar hinzufügen; wird das Inventar dadurch überfüllt, erhöht sich die Inventar-Kapazität automatisch entsprechend.
+---
+
+## 21. Debug Menu
+
+A debug menu opened with F1. All settings take effect immediately on the running game; no restart needed.
+
+- Walking speed of the player character inside settlements (villages and port cities).
+- Walking speed of the player character outside settlements (travel across the continent).
+- Speed of food consumption while walking; at 0 the food supply lasts forever.
+- Checkbox: random events can occur (§14), on by default.
+- One button per kind of random event (§14) to trigger it immediately.
+- Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.
+- Instant jump to any port city.
+- Input fields for cash, gifts and food.
+- Input field for the inventory capacity.
+- Add any item to the inventory; if this overfills the inventory, the inventory capacity increases automatically to match.
+- Language selector for the game language (German/English; default German, §17).

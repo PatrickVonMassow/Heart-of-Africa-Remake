@@ -4,18 +4,11 @@
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY } from '../config/balance'
 import type { LatLon, Material, RegionId } from '../world/geo'
-import {
-  REGION_NAMES,
-  REGION_VALUES,
-  latLonToWorld,
-  placeById,
-  regionAt,
-  worldToLatLon,
-} from '../world/geo'
+import { REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
-import { REGION_ENTRY_TEXTS, TEXTS, chiefHintText } from '../journal/texts'
 import type { SketchId } from '../journal/sketches'
+import { getStrings, type TextRef } from '../i18n'
 
 export type EquipmentId =
   | 'shovel'
@@ -27,31 +20,12 @@ export type EquipmentId =
   | 'map'
   | 'canoe'
 
-export const EQUIPMENT_NAMES: Record<EquipmentId, string> = {
-  shovel: 'Schaufel',
-  rope: 'Seil',
-  machete: 'Machete',
-  rifle: 'Gewehr',
-  medicine: 'Medizin',
-  canteen: 'Feldflasche',
-  map: 'Karte',
-  canoe: 'Kanu',
-}
-
-export const GIFT_NAMES: Record<Material, string> = {
-  gold: 'Goldschmuck',
-  silver: 'Silberschmuck',
-  emerald: 'Smaragd',
-  copper: 'Kupferarmband',
-  ivory: 'Elfenbeinschnitzerei',
-}
-
 export interface JournalEntry {
   id: number
   /** In-game day index the entry was written. */
   day: number
-  title: string
-  text: string
+  title: string | TextRef
+  text: string | TextRef
   kind: 'event' | 'hint' | 'info'
   /** Optional hand-sketch illustration (design.md §19). */
   sketch?: SketchId
@@ -105,7 +79,7 @@ export interface GameState {
   giveGift: (material: Material) => void
   talkToVillager: () => void
   dig: () => void
-  addEntry: (title: string, text: string, kind?: JournalEntry['kind'], sketch?: SketchId) => void
+  addEntry: (title: string | TextRef, text: string | TextRef, kind?: JournalEntry['kind'], sketch?: SketchId) => void
   setJournalOpen: (open: boolean) => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
@@ -191,7 +165,7 @@ function startState(seed: number) {
     equipment: {} as Partial<Record<EquipmentId, number>>,
     handItem: null,
     journal: [
-      { id: 1, day: 0, title: 'Aufbruch', text: TEXTS.gameStart, kind: 'event' as const, sketch: 'harbor' as SketchId },
+      { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
     journalOpen: true,
     region: 'north' as RegionId,
@@ -266,7 +240,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const next = worldToLatLon(nx, nz)
     const nextT = sampleTerrain(next.lat, next.lon, s.seed)
     if (isBlocked(nextT.type)) {
-      set({ toast: 'Der Ozean ist unpassierbar — der Kontinent kann nicht verlassen werden.' })
+      set({ toast: getStrings().toasts.oceanBlocked })
       return
     }
 
@@ -285,17 +259,22 @@ export const useGame = create<GameState>()((set, get) => ({
 
     if (!s.visitedRegions.includes(newRegion)) {
       set((st) => ({ visitedRegions: [...st.visitedRegions, newRegion] }))
-      get().addEntry(`Region: ${REGION_NAMES[newRegion]}`, REGION_ENTRY_TEXTS[newRegion], 'event', REGION_SKETCHES[newRegion])
+      get().addEntry(
+        { key: 'journal.titles.region', params: { region: newRegion } },
+        { key: 'journal.regionEntry', params: { region: newRegion } },
+        'event',
+        REGION_SKETCHES[newRegion],
+      )
     }
     if (!s.foodWarned && newFood < 7 && newFood > 0) {
       set({ foodWarned: true })
-      get().addEntry('Proviant knapp', TEXTS.foodLow)
+      get().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
     }
     if (!s.foodOutWarned && newFood === 0) {
       // OPEN: design.md defines no explicit starvation consequence for the POC
       // scope; provisions clamp at 0 and only a journal warning is issued.
       set({ foodOutWarned: true })
-      get().addEntry('Proviant aufgebraucht', TEXTS.foodOut)
+      get().addEntry({ key: 'journal.titles.foodOut' }, { key: 'journal.foodOut' })
     }
   },
 
@@ -313,9 +292,19 @@ export const useGame = create<GameState>()((set, get) => ({
     })
     if (place.kind === 'port') {
       get().saveCheckpoint()
-      get().addEntry(`Ankunft in ${place.name}`, TEXTS.portCheckpoint(place.name), 'event', 'harbor')
+      get().addEntry(
+        { key: 'journal.titles.arrival', params: { place: id } },
+        { key: 'journal.portArrival', params: { place: id } },
+        'event',
+        'harbor',
+      )
     } else if (first) {
-      get().addEntry(place.name, TEXTS.villageFirstVisit(place.name), 'event', 'hut')
+      get().addEntry(
+        { key: 'journal.titles.village', params: { place: id } },
+        { key: 'journal.villageFirstVisit', params: { place: id } },
+        'event',
+        'hut',
+      )
     }
   },
 
@@ -332,24 +321,24 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     const price = priceOfGood(good)
     if (price === undefined || s.money < price) {
-      set({ toast: 'Nicht genug Geld.' })
+      set({ toast: getStrings().toasts.notEnoughMoney })
       return
     }
     if (good === 'food') {
-      set({ money: s.money - price, foodDays: s.foodDays + 7, toast: 'Eine Woche Proviant gekauft.' })
-    } else if (good in GIFT_NAMES) {
+      set({ money: s.money - price, foodDays: s.foodDays + 7, toast: getStrings().toasts.boughtFood })
+    } else if (good === 'gold' || good === 'silver' || good === 'emerald' || good === 'copper' || good === 'ivory') {
       const m = good as Material
       set({
         money: s.money - price,
         gifts: { ...s.gifts, [m]: s.gifts[m] + 1 },
-        toast: `${GIFT_NAMES[m]} gekauft.`,
+        toast: getStrings().toasts.bought(getStrings().gifts[m]),
       })
     } else {
       const e = good as EquipmentId
       set({
         money: s.money - price,
         equipment: { ...s.equipment, [e]: (s.equipment[e] ?? 0) + 1 },
-        toast: `${EQUIPMENT_NAMES[e]} gekauft.`,
+        toast: getStrings().toasts.bought(getStrings().equipment[e]),
       })
     }
   },
@@ -357,7 +346,7 @@ export const useGame = create<GameState>()((set, get) => ({
   takeInHand: (item) => {
     const s = get()
     if (item !== null && !(s.equipment[item] ?? 0)) return
-    set({ handItem: item, toast: item ? `${EQUIPMENT_NAMES[item]} in die Hand genommen.` : 'Hände frei.' })
+    set({ handItem: item, toast: item ? getStrings().toasts.inHand(getStrings().equipment[item]) : getStrings().toasts.handsFree })
   },
 
   giveGift: (material) => {
@@ -373,7 +362,7 @@ export const useGame = create<GameState>()((set, get) => ({
       // OPEN: design.md §12 prescribes hostility/eviction on wrong behavior;
       // the POC simplifies this to a goodwill penalty plus journal entry.
       set({ gifts, goodwill: { ...s.goodwill, [place.id]: Math.max(0, gw - 2) } })
-      get().addEntry('Ein schwerer Fehler', TEXTS.giftRejected(place.people ?? place.name))
+      get().addEntry({ key: 'journal.titles.mistake' }, { key: 'journal.giftRejected', params: { people: place.peopleId ?? place.id } })
       return
     }
 
@@ -384,45 +373,49 @@ export const useGame = create<GameState>()((set, get) => ({
     set({ gifts, goodwill: { ...s.goodwill, [place.id]: newGw }, reveredGiftGiven: reveredGiven })
 
     if (revered) {
-      get().addEntry('Audienz beim Oberhaupt', TEXTS.giftRevered(place.people ?? place.name))
+      get().addEntry({ key: 'journal.titles.audience' }, { key: 'journal.giftRevered', params: { people: place.peopleId ?? place.id } })
     } else {
-      get().addEntry('Audienz beim Oberhaupt', TEXTS.giftNeutral)
+      get().addEntry({ key: 'journal.titles.audience' }, { key: 'journal.giftNeutral' })
     }
 
     // The culturally correct (revered) gift is the hard condition for the hint
     // (CLAUDE.md §7.1.6), plus sufficient goodwill.
     if (!s.chiefHintGiven && reveredGiven[place.id] && newGw >= balance.goodwillForHint) {
       const g = get().graveLatLon
-      const fmt = (v: number) => Math.abs(v).toFixed(1).replace('.', ',')
       set({ chiefHintGiven: true })
-      get().addEntry('Der Hinweis des Oberhaupts', chiefHintText(fmt(g.lat), fmt(g.lon)), 'hint', 'compass')
+      get().addEntry(
+        { key: 'journal.titles.chiefHint' },
+        { key: 'journal.chiefHint', params: { lat: g.lat, lon: g.lon } },
+        'hint',
+        'compass',
+      )
     }
   },
 
   talkToVillager: () => {
     const s = get()
     if (s.languageHintGiven) {
-      set({ toast: 'Der Alte nickt mir freundlich zu.' })
+      set({ toast: getStrings().toasts.villagerNod })
       return
     }
     set({ languageHintGiven: true })
-    get().addEntry('Die Sprache des Nordens', TEXTS.languageHint, 'hint', 'face')
+    get().addEntry({ key: 'journal.titles.language' }, { key: 'journal.languageHint' }, 'hint', 'face')
   },
 
   dig: () => {
     const s = get()
     if (s.mode !== 'travel' || s.victory) return
     if (s.handItem !== 'shovel') {
-      set({ toast: 'Ohne Schaufel in der Hand kann ich nicht graben.' })
+      set({ toast: getStrings().toasts.digNoShovel })
       return
     }
     const g = latLonToWorld(s.graveLatLon.lat, s.graveLatLon.lon)
     const d = Math.hypot(s.pos.x - g.x, s.pos.z - g.z)
     if (d <= balance.digRadius) {
       set({ victory: true })
-      get().addEntry('Das Herz von Afrika', TEXTS.victory(formatDate(s.day)), 'event', 'grave')
+      get().addEntry({ key: 'journal.titles.victory' }, { key: 'journal.victory', params: { day: s.day } }, 'event', 'grave')
     } else {
-      set({ toast: TEXTS.digNothing })
+      set({ toast: getStrings().journal.digNothing })
     }
   },
 
@@ -513,16 +506,6 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__game = useGame
 }
 
-const GERMAN_MONTHS = [
-  'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-]
-
-/** Format a fractional day index as "3. Januar 1890" (start: 1. Januar 1890). */
-export function formatDate(day: number): string {
-  const d = new Date(Date.UTC(1890, 0, 1) + Math.floor(day) * 86400000)
-  return `${d.getUTCDate()}. ${GERMAN_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
-}
 
 /** Total gift count for the status bar. */
 export function totalGifts(gifts: Record<Material, number>): number {

@@ -6,7 +6,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useGame, exploreCellKey, EXPLORE_CELL_DEG } from '../state/store'
 import { useUi } from '../state/ui'
-import { PLACES, REGION_NAMES, regionAt, worldToLatLon, type RegionId } from '../world/geo'
+import { PLACES, regionAt, worldToLatLon, type RegionId } from '../world/geo'
+import { useStrings } from '../i18n'
 import { LAND_POLYGONS } from '../world/data/coastline'
 import { RIVERS_DATA } from '../world/data/rivers'
 import { LAKES } from '../world/data/lakes'
@@ -51,6 +52,7 @@ function getLandTotals(): Record<RegionId, number> {
 }
 
 export function MapOverlay() {
+  const t = useStrings()
   const open = useUi((s) => s.mapOpen)
   const explored = useGame((s) => s.explored)
   const visitedPlaces = useGame((s) => s.visitedPlaces)
@@ -142,7 +144,7 @@ export function MapOverlay() {
         ctx.fill()
       }
       ctx.globalAlpha = 0.85
-      ctx.fillText(place.name, x + 6, y + 3)
+      ctx.fillText(t.places[place.id], x + 6, y + 3)
     }
 
     // Current position: red ink cross.
@@ -176,17 +178,15 @@ export function MapOverlay() {
     ctx.stroke()
     ctx.fillText('N', cx - 4, cy - 20)
     ctx.globalAlpha = 1
-  }, [open, explored, visitedPlaces, pos])
+  }, [open, explored, visitedPlaces, pos, t])
 
   if (!open) return null
   return (
     <div className="map-overlay">
       <header>
-        <span>Karte</span>
-        <span className="map-progress">
-          {REGION_NAMES[region]}: {regionPercent} % erkundet
-        </span>
-        <button onClick={() => useUi.getState().toggleMap()}>Schließen (M)</button>
+        <span>{t.mapOverlay.title}</span>
+        <span className="map-progress">{t.mapOverlay.explored(t.regions[region], regionPercent)}</span>
+        <button onClick={() => useUi.getState().toggleMap()}>{t.mapOverlay.close}</button>
       </header>
       <canvas ref={canvasRef} width={W} height={H} />
     </div>

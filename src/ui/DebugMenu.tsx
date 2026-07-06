@@ -1,10 +1,15 @@
 // Debug menu (design.md §21, F1): runtime tuning of the balance values used
-// by the POC. Implemented only as far as the POC systems require (CLAUDE.md §8).
+// by the POC plus the game-language selector (design.md §17: German default,
+// English). Implemented only as far as the POC systems require (CLAUDE.md §8).
 
 import { balance } from '../config/balance'
-import { useGame, EQUIPMENT_NAMES, GIFT_NAMES, type EquipmentId } from '../state/store'
+import { useGame, type EquipmentId } from '../state/store'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
+import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
+
+const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
+const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
 function NumberField({
   label,
@@ -34,6 +39,9 @@ function NumberField({
 }
 
 export function DebugMenu() {
+  const t = useStrings()
+  const lang = useLocale((s) => s.lang)
+  const setLang = useLocale((s) => s.setLang)
   const open = useUi((s) => s.debugOpen)
   const bump = useGame((s) => s.bumpBalance)
   useGame((s) => s.balanceVersion)
@@ -48,23 +56,34 @@ export function DebugMenu() {
 
   return (
     <div className="debug-menu">
-      <h3>Debug-Menü (F1)</h3>
+      <h3>{t.debug.title}</h3>
 
-      <NumberField label="Tempo außerorts" value={balance.travelSpeed} step={0.5}
+      <label>
+        <span>{t.debug.language}</span>
+        <span>
+          {LANGUAGES.map((l) => (
+            <button key={l} disabled={l === lang} onClick={() => setLang(l)}>
+              {DICTIONARIES[l].languageName}
+            </button>
+          ))}
+        </span>
+      </label>
+
+      <NumberField label={t.debug.travelSpeed} value={balance.travelSpeed} step={0.5}
         onChange={(v) => set('travelSpeed', v)} />
-      <NumberField label="Tempo innerorts" value={balance.placeWalkSpeed} step={0.5}
+      <NumberField label={t.debug.walkSpeed} value={balance.placeWalkSpeed} step={0.5}
         onChange={(v) => set('placeWalkSpeed', v)} />
-      <NumberField label="Nahrungsverbrauch/Tag (0 = ewig)" value={balance.foodPerDay}
+      <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
-      <NumberField label="Tage pro Wegeinheit" value={balance.daysPerUnit} step={0.05}
+      <NumberField label={t.debug.daysPerUnit} value={balance.daysPerUnit} step={0.05}
         onChange={(v) => set('daysPerUnit', Math.max(0, v))} />
-      <NumberField label="Grabe-Radius" value={balance.digRadius} step={0.5}
+      <NumberField label={t.debug.digRadius} value={balance.digRadius} step={0.5}
         onChange={(v) => set('digRadius', v)} />
-      <NumberField label="Wohlwollen für Hinweis" value={balance.goodwillForHint} step={1}
+      <NumberField label={t.debug.goodwillForHint} value={balance.goodwillForHint} step={1}
         onChange={(v) => set('goodwillForHint', v)} />
 
       <label>
-        <span>Zufallsereignisse (POC: keine implementiert)</span>
+        <span>{t.debug.randomEvents}</span>
         <input
           type="checkbox"
           checked={balance.randomEventsEnabled}
@@ -72,7 +91,7 @@ export function DebugMenu() {
         />
       </label>
       <label>
-        <span>Versteckte Objekte anzeigen</span>
+        <span>{t.debug.showHidden}</span>
         <input
           type="checkbox"
           checked={balance.showHiddenObjects}
@@ -81,33 +100,33 @@ export function DebugMenu() {
       </label>
 
       <div className="section">
-        <NumberField label="Kontostand ($)" value={game.money} step={10}
+        <NumberField label={t.debug.cash} value={game.money} step={10}
           onChange={(v) => game.debugSet({ money: v })} />
-        <NumberField label="Nahrung (Tage)" value={game.foodDays} step={7}
+        <NumberField label={t.debug.foodDays} value={game.foodDays} step={7}
           onChange={(v) => game.debugSet({ foodDays: Math.max(0, v) })} />
       </div>
 
       <div className="section">
-        <div>Springe zu:</div>
+        <div>{t.debug.jumpTo}</div>
         {PLACES.map((p) => (
-          <button key={p.id} onClick={() => game.debugJumpTo(p.lat, p.lon)}>{p.name}</button>
+          <button key={p.id} onClick={() => game.debugJumpTo(p.lat, p.lon)}>{t.places[p.id]}</button>
         ))}
         <button onClick={() => game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)}>
-          Grab
+          {t.debug.grave}
         </button>
       </div>
 
       <div className="section">
-        <div>Ausrüstung hinzufügen:</div>
-        {(Object.keys(EQUIPMENT_NAMES) as EquipmentId[]).map((e) => (
-          <button key={e} onClick={() => game.debugAddEquipment(e)}>{EQUIPMENT_NAMES[e]}</button>
+        <div>{t.debug.addEquipment}</div>
+        {EQUIPMENT_IDS.map((e) => (
+          <button key={e} onClick={() => game.debugAddEquipment(e)}>{t.equipment[e]}</button>
         ))}
       </div>
 
       <div className="section">
-        <div>Gabe hinzufügen:</div>
-        {(Object.keys(GIFT_NAMES) as Material[]).map((m) => (
-          <button key={m} onClick={() => game.debugAddGift(m)}>{GIFT_NAMES[m]}</button>
+        <div>{t.debug.addGift}</div>
+        {MATERIALS.map((m) => (
+          <button key={m} onClick={() => game.debugAddGift(m)}>{t.gifts[m]}</button>
         ))}
       </div>
     </div>

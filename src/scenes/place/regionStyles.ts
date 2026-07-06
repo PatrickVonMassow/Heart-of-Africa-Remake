@@ -1,5 +1,5 @@
-// Region-typical place styling (design.md §2 "Grafik und Atmosphäre" and
-// "Belebte, dicht bebaute Orte"): building form, settlement layout, fences,
+// Region-typical place styling (design.md §2 "Graphics and atmosphere" and
+// "Lively, densely built settlements"): building form, settlement layout, fences,
 // ground/path palette, clothing colors and vegetation mix per region — so a
 // desert village reads clearly differently from a jungle or rift one.
 // Values are stylized educated guesses, not ethnographic detail.
@@ -29,7 +29,7 @@ export interface RegionPlaceStyle {
   flora: { palm: number; acacia: number; jungle: number; bush: number }
   /** Grass tuft density factor relative to the default. */
   grass: number
-  /** Settlement pattern of the dwellings (design.md §2 belebte Orte). */
+  /** Settlement pattern of the dwellings (design.md §2 lively settlements). */
   villageLayout: VillageLayout
   /** Compound/kraal fencing style. */
   fence: FenceKind

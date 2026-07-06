@@ -1,5 +1,5 @@
 // Procedural HDR environment for image-based lighting (design.md §2
-// "Licht- und Post-Processing-Pipeline"): a small equirectangular float
+// "Lighting and post-processing pipeline"): a small equirectangular float
 // texture with sky gradient, sun hotspot and ground bounce, consistent with
 // the scene's sun direction. Used as scene.environment (IBL) — the visible
 // sky is the separate scattering dome (render/sky.tsx).

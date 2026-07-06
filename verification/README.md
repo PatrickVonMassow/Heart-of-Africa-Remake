@@ -1,273 +1,305 @@
-# Selbstverifikation (CLAUDE.md §7.2)
+# Self-Verification (CLAUDE.md §7.2)
 
-Stand: 6. Juli 2026. Headless-Prüfung mit Playwright (Chromium) gegen den
-Dev-Server; Produktions-Build zusätzlich über `npm run preview` geprüft.
-Alle Läufe ohne Konsolenfehler.
+As of July 6, 2026. Headless checks with Playwright (Chromium) against the
+dev server; the production build additionally checked via `npm run preview`.
+All runs without console errors.
 
-## Automatisierter End-to-End-Lauf (flow.mjs, 20 Prüfungen — alle PASS)
+## Automated end-to-end run (flow.mjs, 20 checks — all PASS)
 
-1. Start in Kairo (Ich-Perspektive), Tagebuch offen mit „Aufbruch"-Eintrag
-2. Startkapital 250 $, Proviant 5 Wochen, 2 Gaben (design.md §6/§18)
-3. Handel: Schaufel (−20 $) und Goldschmuck-Gabe (−30 $) gekauft
-4. Ort verlassen → Vogelperspektive; erneutes Betreten → Checkpoint in
-   localStorage + Tagebucheintrag
-5. Reise zum Dorf: Datum/Proviant schreiten mit der Bewegung voran
-6. Dorf der Nubier betreten (Ich-Perspektive, Tagebucheintrag)
-7. Alter Mann: Sprach-Hinweis („Nivera" = Norden) als Tagebucheintrag
-8. Chefhütte: kulturell korrekte Gabe (Gold, Region Norden) schaltet den
-   Fundort-Hinweis frei (Nivera + Koordinaten); neutrale/abgelehnte Gaben nicht
-9. Grab liegt prozedural nördlich des Dorfes (Richtungswort stimmt)
-10. Graben ohne Schaufel in der Hand schlägt fehl; mit Schaufel am
-    Fundpunkt → Sieg-Zustand
+1. Start in Cairo (first-person), journal open with the "Departure" entry
+2. Starting money $250, provisions 5 weeks, 2 gifts (design.md §6/§18)
+3. Trade: bought a shovel (−$20) and a gold-jewelry gift (−$30)
+4. Leave the settlement → bird's-eye view; re-entering → checkpoint in
+   localStorage + journal entry
+5. Travel to the village: date/provisions advance with movement
+6. Enter the Nubian Village (first-person, journal entry)
+7. Old man: language hint ("Nivera" = north) as a journal entry
+8. Chief's hut: the culturally correct gift (gold, region North) unlocks
+   the location hint (Nivera + coordinates); neutral/rejected gifts do not
+9. The tomb lies procedurally north of the village (direction word matches)
+10. Digging without the shovel in hand fails; with the shovel at the site
+    → victory state
 
-Zusätzlich (checkpoint.mjs): Seiten-Reload zeigt „Checkpoint laden";
-Laden stellt Spielstand wieder her.
+Additionally (checkpoint.mjs): a page reload shows "Load checkpoint";
+loading restores the game state.
 
-## Screenshots (Kernansichten)
+## Screenshots (core views)
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 01-vogelperspektive.png | Vogelperspektive: Nil, Kairo, Spielfigur, Statusleiste, Koordinaten |
-| 02-hafenstadt-kairo-handel.png | Kairo (Ich-Perspektive) mit Handelsdialog |
-| 03-dorf-nubier.png | Dorf der Nubier mit Chefhütte und Bewohner |
-| 04-chefhuette-audienz.png | Audienz beim Oberhaupt (Gaben-Dialog) |
-| 05-tagebuch-hinweis.png | Geöffnetes Tagebuch mit Sprach- und Fundort-Hinweis |
-| 06-start-tagebuch.png | Spielstart mit Aufbruch-Eintrag |
-| 07-sieg.png | Sieg-Zustand nach Bergen des Grabes |
-| 08-debug-menue.png | Debug-Menü (F1) mit Balance-Reglern |
-| 09-produktions-build.png | Produktions-Build (`npm run preview`) |
+| 01-birdseye-view.png | Bird's-eye view: Nile, Cairo, player character, status bar, coordinates |
+| 02-port-cairo-trade.png | Cairo (first-person) with the trade dialog |
+| 03-village-nubians.png | Nubian Village with chief's hut and villager |
+| 04-chief-hut-audience.png | Audience with the chief (gift dialog) |
+| 05-journal-hint.png | Opened journal with language and location hints |
+| 06-start-journal.png | Game start with the departure entry |
+| 07-victory.png | Victory state after recovering the tomb |
+| 08-debug-menu.png | Debug menu (F1) with balance sliders |
+| 09-production-build.png | Production build (`npm run preview`) |
 
-## Nachtrag: Weltmodell-Vollausbau (§7.1.3, verschärfte Fassung)
+## Addendum: full world model (§7.1.3, tightened wording)
 
-Stand: 6. Juli 2026, zweiter Lauf (verify-world.mjs). Headless-Prüfung gegen
-den Dev-Server, alle Prüfungen PASS, keine Konsolenfehler:
+As of July 6, 2026, second run (verify-world.mjs). Headless checks against
+the dev server, all checks PASS, no console errors:
 
-- Zählungen: 10 Hafenstädte, 22 Dörfer (eines je Volk, Regionen gemäß
-  design.md §4.5), 17 Flüsse, 8 Seen, 11 Berge, 5 Wasserfälle,
-  Elefantenfriedhof.
-- Jeder Ort liegt auf begehbarem Land; deklarierte Region = Regionsmodell.
-- Jede Flussmündung (ohne Binnen-Zusammenflüsse) liegt < 0,5 Grad von der
-  Küste; jeder Wasserfall < 0,25 Grad von seinem Fluss.
-- Seen-Raster trifft alle 8 Seezentren; Grabungs-Zielgebiet bleibt begehbar
-  (92/100 Stichproben Wüste/Savanne).
-- Performanz: 20 000 Terrain-Samples in ~175 ms (räumlicher Index).
+- Counts: 10 port cities, 22 villages (one per people, regions per
+  design.md §4.5), 17 rivers, 8 lakes, 11 mountains, 5 waterfalls,
+  Elephant Graveyard.
+- Every settlement lies on walkable land; declared region = region model.
+- Every river mouth (excluding inland confluences) lies < 0.5° from the
+  coast; every waterfall < 0.25° from its river.
+- The lake raster hits all 8 lake centers; the dig target area stays
+  walkable (92/100 samples desert/savanna).
+- Performance: 20,000 terrain samples in ~175 ms (spatial index).
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 10-weltmodell-nildelta-kairo.png | Nillauf mit fruchtbaren Ufern, Kairo am Ostufer, Deltaküste |
-| 11-weltmodell-khartum-zusammenfluss.png | Zusammenfluss von Weißem und Blauem Nil bei Khartum |
-| 12-weltmodell-viktoriasee.png | Viktoriasee mit Dorf der Uganda am Nordufer |
-| 13-weltmodell-kilimandscharo.png | Kilimandscharo/Meru mit Schneekappen, Dorf der Masai |
-| 14-weltmodell-kongomuendung-boma.png | Kongomündung mit Boma und Livingstone-Fällen |
-| 15-weltmodell-victoriafaelle.png | Victoria-Fälle am Sambesi |
-| 16-weltmodell-kapstadt.png | Kap-Halbinsel mit Kapstadt |
-| 17-weltmodell-tschadsee.png | Tschadsee (großer Umriss von ~1890) |
+| 10-worldmodel-nile-delta-cairo.png | Nile course with fertile banks, Cairo on the east bank, delta coast |
+| 11-worldmodel-khartoum-confluence.png | Confluence of the White and Blue Nile at Khartoum |
+| 12-worldmodel-lake-victoria.png | Lake Victoria with the Uganda Village on the north shore |
+| 13-worldmodel-kilimanjaro.png | Kilimanjaro/Meru with snow caps, Masai Village |
+| 14-worldmodel-congo-mouth-boma.png | Congo mouth with Boma and Livingstone Falls |
+| 15-worldmodel-victoria-falls.png | Victoria Falls on the Zambezi |
+| 16-worldmodel-cape-town.png | Cape peninsula with Cape Town |
+| 17-worldmodel-lake-chad.png | Lake Chad (large ~1890 outline) |
 
-## Nachtrag: Grafik-Überarbeitung (§7.1.11)
+## Addendum: graphics overhaul (§7.1.11)
 
-Stand: 6. Juli 2026, dritter Lauf (shots.mjs, preview-shot.mjs). Headless-
-Prüfung gegen Dev-Server und Produktions-Preview, 0 Konsolenfehler, `npm run
-build` fehlerfrei. Umgesetzt: TSL-Himmelskuppel (Gradient, Sonne, ziehende
-Wolken), Sonnenlicht mit weichen Schatten (PCF), ACES-Tone-Mapping,
-animiertes Ozean-/Flusswasser (Wellenhub, Farbrauschen, Glitzern), nahtlos
-geglättete Terrain-Normalen mit Biom-Farbverläufen und Detail-Rauschen,
-instanzierte Vegetation je Biom (Akazien, Dschungelbäume, Palmen, Büsche,
-Felsen), detaillierte Orts-Marker, Spielfigur mit Laufrichtung/-animation
-sowie überarbeitete begehbare Orte (Verputz-/Lehm-/Stroh-Materialien,
-Gebäudedetails, Lagerfeuer, Requisiten, Bodenbewuchs).
+As of July 6, 2026, third run (shots.mjs, preview-shot.mjs). Headless
+checks against dev server and production preview, 0 console errors,
+`npm run build` clean. Implemented: TSL sky dome (gradient, sun, drifting
+clouds), sunlight with soft shadows (PCF), ACES tone mapping, animated
+ocean/river water (swell, color noise, glints), seam-free smoothed terrain
+normals with biome color blends and detail noise, instanced per-biome
+vegetation (acacias, jungle trees, palms, bushes, rocks), detailed place
+markers, a player figure with heading/walk animation, and reworked walkable
+settlements (plaster/mud/thatch materials, building details, campfire,
+props, ground cover).
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 18-grafik-hafenstadt-kairo.png | Kairo (Ich-Perspektive): Gebäude mit Markise/Attika, Palmen, Schatten |
-| 19-grafik-vogelperspektive-nildelta.png | Nildelta: animiertes Meer, fruchtbare Ufer, Kairo-Marker |
-| 20-grafik-savanne-kilimandscharo.png | Ostafrika: Berge, Seen, Akazien-Savanne, Dunst |
-| 21-grafik-dschungel-kongo.png | Kongobecken: dichter Dschungel, Flüsse, Stanley-Fälle |
-| 22-grafik-kueste-lagos.png | Guineaküste bei Lagos: tiefer Ozean mit Glitzern |
-| 23-grafik-dorf-masai.png | Dorf (Ich-Perspektive): Hütten, Lagerfeuer, Alter Mann |
-| 24-grafik-chefhuette-nah.png | Chefhütte nah: Stroh-/Lehm-Texturen, Regalia |
-| 25-grafik-tagebuch.png | Geöffnetes Tagebuch über der neuen Grafik |
-| 26-grafik-produktions-build.png | Produktions-Build (`npm run preview`) |
+| 18-graphics-port-cairo.png | Cairo (first-person): buildings with awning/parapet, palms, shadows |
+| 19-graphics-birdseye-nile-delta.png | Nile delta: animated sea, fertile banks, Cairo marker |
+| 20-graphics-savanna-kilimanjaro.png | East Africa: mountains, lakes, acacia savanna, haze |
+| 21-graphics-jungle-congo.png | Congo basin: dense jungle, rivers, Stanley Falls |
+| 22-graphics-coast-lagos.png | Guinea coast at Lagos: deep ocean with glints |
+| 23-graphics-village-masai.png | Village (first-person): huts, campfire, old man |
+| 24-graphics-chief-hut-closeup.png | Chief's hut up close: thatch/clay textures, regalia |
+| 25-graphics-journal.png | Opened journal over the new graphics |
+| 26-graphics-production-build.png | Production build (`npm run preview`) |
 
-## Nachtrag: Atmosphäre (§7.1.12 — design.md §19 und §2 „Grafik und Atmosphäre")
+## Addendum: atmosphere (§7.1.12 — design.md §19 and §2 "Graphics and atmosphere")
 
-Stand: 6. Juli 2026, vierter Lauf (atmo-shots.mjs). Headless-Prüfung gegen
-Dev-Server und Produktions-Preview, 0 Konsolenfehler, `npm run build`
-fehlerfrei. Umgesetzt:
+As of July 6, 2026, fourth run (atmo-shots.mjs). Headless checks against
+dev server and production preview, 0 console errors, `npm run build`
+clean. Implemented:
 
-- **Geräuschkulisse/Musik (prozedural, WebAudio, ohne Assets):** Wind-,
-  Insekten-, Vogel-/Affen-, Brandungs-, Marktmurmeln- und Trommel-Layer plus
-  sparsame Kalimba-Phrasen (Pentatonik je Region); Überblendung bei Regions-
-  und Perspektivwechsel; Trommeln in Dorfnähe. Start nach erster Eingabe
-  (Autoplay-Richtlinie). Nicht per Screenshot prüfbar; Code: `systems/ambience.ts`.
-- **Tierwelt als Kulisse:** Herden (Elefanten, Giraffen, Zebras, Antilopen)
-  je Biom, Flamingos an Seeufern, ambiente Löwenjagd (rein visuell).
-- **Geier** kreisen über der Figur bei aufgebrauchtem Proviant (POC-Proxy
-  für den schlechten Gesundheitszustand, s. offene Punkte).
-- **Klima-Optik:** Regionsnebel (feuchter Dunst Kongo, warme Staubluft
-  Sahara, klare Hochland-Luft), bodennahe Hitze-/Dunstschichten.
-- **Dorf-/Marktleben:** Köchin am Feuer, Weberin, spielende Kinder, Ziegen;
-  im Hafen Träger mit Kisten und Händler auf dem Platz.
-- **Regionstypische Orte (§2):** Hütten-Stile je Region (Flachdach-Lehmbau,
-  Kegel, Stelzen+hohe Kegel, Kuppel, Rondavel-Band), Bodenpaletten,
-  Vegetationsmix und Kleidungsfarben je Region.
-- **Illustrierte Tagebucheinträge:** Ink-Skizzen (Tier, Landmarke, Gesicht,
-  Hafen, Hütte, Kompass, Grab) neben passenden Einträgen.
-- **Selbstzeichnende Karte (M):** handgezeichnete Erkundungskarte — Küsten,
-  Flüsse, Seen erscheinen nur im bereisten Gebiet; besuchte Orte mit Symbol;
-  Erkundungsgrad der aktuellen Region in Prozent (§17).
+- **Soundscape/music (procedural, WebAudio, no assets):** wind, insect,
+  bird/monkey, surf, market-murmur and drum layers plus sparse kalimba
+  phrases (pentatonic per region); crossfades on region and perspective
+  switches; drums near villages. Starts after the first input (autoplay
+  policy). Not verifiable via screenshot; code: `systems/ambience.ts`.
+- **Wildlife as scenery:** herds (elephants, giraffes, zebras, antelopes)
+  per biome, flamingos at lake shores, an ambient lion hunt (purely visual).
+- **Vultures** circle above the character when provisions are exhausted
+  (POC proxy for poor health, see open items).
+- **Climate look:** regional fog (humid Congo haze, warm Sahara dust, clear
+  highland air), low ground heat/mist layers.
+- **Village and market life:** cook at the fire, weaver, playing children,
+  goats; in ports, porters with crates and traders on the plaza.
+- **Region-typical settlements (§2):** hut styles per region (flat-roof
+  adobe, cone, stilts + tall cone, dome, banded rondavel), ground palettes,
+  vegetation mix and clothing colors per region.
+- **Illustrated journal entries:** ink sketches (animal, landmark, face,
+  harbor, hut, compass, grave) beside matching entries.
+- **Self-drawing map (M):** hand-drawn exploration map — coasts, rivers,
+  lakes appear only in traveled areas; visited settlements with symbols;
+  exploration percentage of the current region (§17).
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 27-atmo-savanne-herden.png | Zebraherde in der Westsavanne |
-| 28-atmo-flamingos-tanganjikasee.png | Flamingos am Tanganjikasee |
-| 29-atmo-dschungel-dunst.png | Kongobecken: dichter Nebel, Bodendunst, Elefant |
-| 30-atmo-wueste-geier.png | Sahara: Hitze-Dunst, kreisende Geier (Proviant 0), Antilopen |
-| 31-atmo-dorf-masai-leben.png | Masai-Dorf (Ost-Stil: Kuppelhütte, rote Kleidung), Köchin/Kind/Ziege |
-| 32-atmo-dorf-pygmaeen-stelzen.png | Pygmäen-Dorf (Zentral-Stil: Stelzen, hohe Kegeldächer) |
-| 33-atmo-hafen-kairo-treiben.png | Kairo: Träger mit Kisten, Händler auf dem Platz |
-| 34-atmo-tagebuch-skizzen.png | Tagebuch mit Ink-Skizzen (Hafen, Hütten) |
-| 35-atmo-karte.png | Selbstzeichnende Karte nach Nil-Reise (4 % Norden erkundet) |
-| 36-atmo-produktions-build.png | Produktions-Build (`npm run preview`) |
+| 27-atmosphere-savanna-herds.png | Zebra herd in the western savanna |
+| 28-atmosphere-flamingos-lake-tanganyika.png | Flamingos at Lake Tanganyika |
+| 29-atmosphere-jungle-mist.png | Congo basin: dense fog, ground mist, elephant |
+| 30-atmosphere-desert-vultures.png | Sahara: heat haze, circling vultures (provisions 0), antelopes |
+| 31-atmosphere-village-masai-life.png | Masai village (east style: dome hut, red cloth), cook/child/goat |
+| 32-atmosphere-village-pygmies-stilts.png | Pygmy village (central style: stilts, tall cone roofs) |
+| 33-atmosphere-port-cairo-bustle.png | Cairo: porters with crates, traders on the plaza |
+| 34-atmosphere-journal-sketches.png | Journal with ink sketches (harbor, huts) |
+| 35-atmosphere-map.png | Self-drawing map after a Nile journey (4% of North explored) |
+| 36-atmosphere-production-build.png | Production build (`npm run preview`) |
 
-## Nachtrag: Reale Geodaten (§7.1.13 — design.md §3 „Reale Geodaten und Terrain-Darstellung")
+## Addendum: real geodata (§7.1.13 — design.md §3 "Real geodata and terrain rendering")
 
-Stand: 6. Juli 2026, fünfter Lauf (geo-shots.mjs). Headless-Prüfung gegen
-Dev-Server und Produktions-Preview, 0 Konsolenfehler, `npm run build`
-fehlerfrei. Umgesetzt:
+As of July 6, 2026, fifth run (geo-shots.mjs). Headless checks against dev
+server and production preview, 0 console errors, `npm run build` clean.
+Implemented:
 
-- **Reales Höhenmodell:** SRTM/GMTED/GEBCO-Komposit (Terrarium-Kacheln, AWS
-  Open Data) → äquirektangulares 0,025°-Gitter, als 16-Bit-PNG im Repo
-  (`public/geodata/dem.png`, 5,9 MB). Vorverarbeitung reproduzierbar
-  dokumentiert in `scripts/README.md` (`node scripts/build-geodata.mjs`).
-  Ozean per Flutfüllung (Qattara-/Afar-Senken bleiben Land), Orte auf
-  Subpixel-Inseln werden als Land gestempelt (nur Kapstadt betroffen).
-- **LOD-Streaming:** Chunk-Ringe mit 56/28/20 Segmenten um die Spielfigur,
-  Skirts gegen LOD-Risse, Cache mit Verdrängung.
-- **Glatte Gewässer:** Küstenlinie als 0-Kontur des kontinuierlichen
-  Höhenfelds (bilineare Landmaske + tiefengetriebene Farbe); Flüsse/Seen
-  über exakte Distanzen zu Catmull-Rom-verdichteten ~1890-Vektorläufen
-  (`src/world/hydro.ts`) — keine sichtbaren Rasterstufen mehr.
-- **PBR-Splatting:** vier generierte kachelbare Materialien (Sand, Gras,
-  Fels, Walddach) mit Albedo + Detail-Normalmaps, per Vertex-Gewichten
-  gemischt; steile Hänge bi-planar mit Fels; Biom-Tint aus Vertexfarben.
-- **Weiche Regionsübergänge:** Farb-/Textur-Banding an den Regionsgrenzen
-  durch Smoothstep-Regionsgewichte ersetzt (Gameplay-Typen bleiben diskret).
-- Echte Reliefformen sichtbar: Nildelta, Rift-Berge, Äthiopisches Hochland
-  mit Schluchten, Oranje-Canyon, Namib-Dünenküste; Kilimandscharo 5143 m im
-  Gitter (Schneegrenze ab ~4300 m).
+- **Real elevation model:** SRTM/GMTED/GEBCO composite (Terrarium tiles,
+  AWS Open Data) → equirectangular 0.025° grid, stored as a 16-bit PNG in
+  the repo (`public/geodata/dem.png`, 5.9 MB). Preprocessing reproducibly
+  documented in `scripts/README.md` (`node scripts/build-geodata.mjs`).
+  Ocean via flood fill (Qattara/Afar depressions stay land); settlements on
+  sub-pixel islands are stamped as land (only Cape Town affected).
+- **LOD streaming:** chunk rings of 56/28/20 segments around the player,
+  skirts against LOD cracks, cache with eviction.
+- **Smooth waters:** the coastline as the 0-contour of the continuous
+  height field (bilinear land mask + depth-driven color); rivers/lakes via
+  exact distances to Catmull-Rom-densified ~1890 vector courses
+  (`src/world/hydro.ts`) — no more visible raster steps.
+- **PBR splatting:** four generated tileable materials (sand, grass, rock,
+  forest canopy) with albedo + detail normal maps, blended via vertex
+  weights; steep slopes bi-planar with rock; biome tint from vertex colors.
+- **Soft region transitions:** color/texture banding at region borders
+  replaced by smoothstep region weights (gameplay types stay discrete).
+- Real relief forms visible: Nile delta, rift mountains, Ethiopian
+  highlands with gorges, Orange River canyon, Namib dune coast; Kilimanjaro
+  5143 m in the grid (snow line from ~4300 m).
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 37-geodaten-nildelta.png | Nildelta: reale Deltaform, mäandernder Nil, Golf von Suez |
-| 38-geodaten-kilimandscharo.png | Rift: reale Bergketten, Viktoriasee, Rudolfsee |
-| 39-geodaten-kueste-lagos.png | Guineaküste: glatte Buchten, Niger-Läufe |
-| 40-geodaten-kongo.png | Kongobecken: mäandernde Flüsse, Walddach-Textur |
-| 41-geodaten-kapstadt.png | Kap: Oranje-Canyon (Augrabies), Namib-Übergang, Dünen |
-| 42-geodaten-aethiopien.png | Äthiopisches Hochland: reale Schluchten des Blauen Nils |
-| 43-geodaten-kairo-ort.png | Ich-Perspektive unverändert funktionsfähig |
-| 44-geodaten-produktions-build.png | Produktions-Build (`npm run preview`) |
+| 37-geodata-nile-delta.png | Nile delta: real delta shape, meandering Nile, Gulf of Suez |
+| 38-geodata-kilimanjaro.png | Rift: real mountain ranges, Lake Victoria, Lake Rudolf |
+| 39-geodata-coast-lagos.png | Guinea coast: smooth bays, Niger courses |
+| 40-geodata-congo.png | Congo basin: meandering rivers, forest-canopy texture |
+| 41-geodata-cape-town.png | Cape: Orange River canyon (Augrabies), Namib transition, dunes |
+| 42-geodata-ethiopia.png | Ethiopian highlands: real Blue Nile gorges |
+| 43-geodata-cairo-place.png | First-person view unchanged and functional |
+| 44-geodata-production-build.png | Production build (`npm run preview`) |
 
-Anmerkung: Der Suezkanal-Korridor (Bitter-Seen) erscheint als Wasser — er
-existierte 1890 (Eröffnung 1869); die Landverbindung nach Sinai bleibt im
-DEM bestehen (Probe „Suez-Landbrücke": 31 m Land).
+Note: the Suez Canal corridor (Bitter Lakes) appears as water — it existed
+in 1890 (opened 1869); the land bridge to Sinai remains in the DEM (probe
+"Suez land bridge": 31 m, land).
 
-## Nachtrag: Licht- und Post-Processing-Pipeline (§7.1.14 — design.md §2)
+## Addendum: lighting & post-processing pipeline (§7.1.14 — design.md §2)
 
-Stand: 6. Juli 2026, sechster Lauf. Headless-Prüfung gegen Dev-Server und
-Produktions-Preview, 0 Konsolenfehler auf dem WebGL-2-Fallback-Pfad (WebGPU
-nutzt denselben TSL-Code). Die Screenshots 37–44 wurden mit aktiver
-Pipeline neu gerendert und belegen §7.1.13 und §7.1.14 gemeinsam. Umgesetzt:
+As of July 6, 2026, sixth run. Headless checks against dev server and
+production preview, 0 console errors on the WebGL 2 fallback path (WebGPU
+uses the same TSL code). Screenshots 37–44 were re-rendered with the active
+pipeline and evidence §7.1.13 and §7.1.14 together. Implemented:
 
-- **IBL:** prozedurales HDR-Environment (Himmel + Sonnen-Hotspot +
-  Bodenreflex, konsistent zum Sonnenstand) als `scene.environment`
+- **IBL:** procedural HDR environment (sky + sun hotspot + ground bounce,
+  consistent with the sun position) as `scene.environment`
   (`render/environment.ts`).
-- **Physikalisch begründeter Himmel:** Single-Scatter-Näherung (Rayleigh-
-  Extinktion über Luftmasse, Henyey-Greenstein-Mie um die Sonne) statt
-  Farbverlauf; regionale Stimmungen (§19) als Modulation (`render/sky.tsx`).
-- **Kaskadierte Schatten:** CSMShadowNode (3 Kaskaden, practical, fade) am
-  Reise-Sonnenlicht; die Ich-Perspektive behält ihre hochauflösende
-  Einzel-Shadow-Map (kleine Szene = hohe Dichte nahe der Kamera).
-- **Post-Processing** (`render/Effects.tsx`): Scene-Pass mit MRT-Normalen
-  (4× MSAA) → GTAO → Bloom → Farb-Grading (Sättigung +7 %, warme Höhen) →
-  dezente Vignette; ACES-Tonemapping am Ausgang.
-- **Wasser** (`render/water.ts`): Gerstner-artiges Richtungswellenfeld mit
-  geschärften Kämmen + Noise-Dünung; tiefenabhängige Absorption aus der
-  realen Bathymetrie (DEM-Textur: flach türkis → tief dunkelblau, Flüsse/
-  Seen eigener Ton); Schaum an Uferbändern und Wellenkämmen; niedrige
-  Roughness für IBL-Himmelsreflexionen; distanzabhängig opak.
+- **Physically grounded sky:** single-scatter approximation (Rayleigh
+  extinction over air mass, Henyey-Greenstein Mie around the sun) instead
+  of a gradient; regional moods (§19) as modulation (`render/sky.tsx`).
+- **Cascaded shadows:** CSMShadowNode (3 cascades, practical, fade) on the
+  travel sun; the first-person view keeps its high-resolution single shadow
+  map (small scene = high density near the camera).
+- **Post-processing** (`render/Effects.tsx`): scene pass with MRT normals
+  (4× MSAA) → GTAO → bloom → color grading (saturation +7%, warm
+  highlights) → subtle vignette; ACES tone mapping at output.
+- **Water** (`render/water.ts`): Gerstner-style directional wave field with
+  sharpened crests + noise swell; depth-dependent absorption from the real
+  bathymetry (DEM texture: shallow turquoise → deep dark blue, distinct
+  river/lake tone); foam on shore bands and wave crests; low roughness for
+  IBL sky reflections; distance-opaque.
 
-Offene Punkte (im Kriterium benannt): TAA (AA über MSAA des Scene-Pass),
-echte Bildraum-Reflexion/-Refraktion des Wassers (Reflexion kommt aus dem
-IBL-Environment, Refraktion ist über Tiefenabsorption angenähert),
-Tiefenschärfe bewusst weggelassen (Lesbarkeit der Kartenansicht).
+Open items (named in the criterion): TAA (AA via the scene pass's MSAA),
+true screen-space reflection/refraction of the water (reflections come
+from the IBL environment, refraction is approximated via depth
+absorption), depth of field deliberately omitted (map readability).
 
-## Nachtrag: Belebte, dicht bebaute Orte (§7.1.15 — design.md §2)
+## Addendum: lively, densely built settlements (§7.1.15 — design.md §2)
 
-Stand: 6. Juli 2026, siebter Lauf (belebt-shots.mjs). Headless-Prüfung gegen
-Dev-Server und Produktions-Preview, 0 Konsolenfehler. Umgesetzt:
+As of July 6, 2026, seventh run (belebt-shots.mjs). Headless checks against
+dev server and production preview, 0 console errors. Implemented:
 
-- **Dichte Bebauung:** je Ort deutlich mehr nicht betretbare Wohn- und
-  Nebengebäude als Funktionsgebäude — Häfen: Adobe-Häuserreihen (teils
-  zweigeschossig, Dachbalken, Fenster) entlang Haupt- und Querstraße,
-  Lagerhaus, Marktstände, Zelte; Dörfer: 10–13 Wohnbauten plus Speicher,
-  Schuppen, Zäune. Anordnung und Maße je Ort prozedural (§18).
-- **Regionaltypische Siedlungsmuster** (deutlich unterscheidbar): Norden =
-  Adobe-Gassenstadt mit Flachdächern; Westen = Rundhütten-Gehöfte mit
-  Flechtzäunen und Stelzenspeichern; Zentral = Stelzenhäuser mit hohen
-  Kegeldächern auf dunklem Humusboden; Osten = Manyatta-Kraal (Kuppelhütten
-  im Ring, Dornbusch-Umzäunung, zentraler Viehpferch mit Ziegen); Süden =
-  Rondavel-Gehöfte mit Trockensteinmauern.
-- **Wegenetz:** Straßen/Pfade als weiche Canvas-Maske im Bodenmaterial
-  (regionstypische Wegfarbe, ausgefranste Ränder), verbinden Platz,
-  Gebäude, Chefhütte und Ortsausgang; Häfen mit Haupt-/Querstraße und
-  Stichwegen zu den Funktionsgebäuden.
-- **Bewohner-Routinen:** zusätzliche Bewohner treten aus ihren Wohnhütten,
-  laufen über die Wege zu Besorgungspunkten (Platz, Markt, Pferch),
-  verweilen dort und verschwinden wieder in ihren Hütten (Türen der
-  Wohnbauten sind reine Kulisse — nicht betretbar); manche tragen Körbe.
-  Bestehendes Ortsleben (Köchin, Weberin, Kinder, Ziegen, Träger, Händler)
-  bleibt darüber hinaus aktiv.
-- **Hervorhebung:** die betretbaren Funktionsgebäude behalten Beschriftung
-  und Auszeichnung (Markisen/Regalia) und bleiben klar erkennbar.
+- **Dense building fabric:** per settlement far more non-enterable
+  residential and auxiliary buildings than functional ones — ports: adobe
+  house rows (some two-story, roof beams, windows) along a main and a cross
+  street, warehouse, market stalls, tents; villages: 10–13 dwellings plus
+  granaries, sheds, fences. Arrangement and dimensions procedural per
+  settlement (§18).
+- **Region-typical settlement patterns** (clearly distinguishable): North =
+  adobe lane town with flat roofs; West = roundhut compounds with woven
+  fences and stilt granaries; Central = stilt houses with tall cone roofs
+  on dark humus ground; East = manyatta kraal (dome huts in a ring,
+  thorn-bush fence, central livestock pen with goats); South = rondavel
+  compounds with dry-stone walls.
+- **Path network:** streets/paths as a soft canvas mask in the ground
+  material (region-typical path color, ragged edges), connecting plaza,
+  buildings, chief's hut and the settlement exit; ports with main/cross
+  street and spurs to the functional buildings.
+- **Inhabitant routines:** additional inhabitants step out of their
+  dwellings, walk the paths to errand points (plaza, market, pen), linger
+  and disappear into their homes again (dwelling doors are pure scenery —
+  not enterable); some carry head baskets. The existing settlement life
+  (cook, weaver, children, goats, porters, traders) remains active on top.
+- **Highlighting:** the enterable functional buildings keep their labels
+  and distinguishing features (awnings/regalia) and remain clearly
+  recognizable.
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 45-orte-hafen-kairo.png | Kairo: Straßenzüge, Adobe-Reihen, Marktstand, Bewohner |
-| 46-orte-dorf-nubier-gassen.png | Norden: Adobe-Gassenstadt, helle Piste, Bewohner |
-| 47-orte-dorf-hausa-gehoefte.png | Westen: Rundhütten-Gehöfte, Flechtzäune |
-| 48-orte-dorf-pygmaeen-stelzen.png | Zentral: Stelzenhäuser, Schuppen |
-| 49-orte-dorf-masai-kraal.png | Osten: Kuppelhütten-Kraal, Viehpferch |
-| 50-orte-dorf-zulu-steinwaelle.png | Süden: Rondavels mit Trockensteinmauern |
-| 51-orte-produktions-build.png | Produktions-Build (`npm run preview`) |
+| 45-places-port-cairo.png | Cairo: street grid, adobe rows, market stall, inhabitants |
+| 46-places-village-nubians-lanes.png | North: adobe lane town, pale track, inhabitants |
+| 47-places-village-hausa-compounds.png | West: roundhut compounds, woven fences |
+| 48-places-village-pygmies-stilts.png | Central: stilt houses, shed |
+| 49-places-village-masai-kraal.png | East: dome-hut kraal, livestock pen |
+| 50-places-village-zulu-stone-walls.png | South: rondavels with dry-stone walls |
+| 51-places-production-build.png | Production build (`npm run preview`) |
 
-## Nachtrag: Kollision innerorts (§7.1.16 — design.md §2)
+## Addendum: collision inside settlements (§7.1.16 — design.md §2)
 
-Stand: 7. Juli 2026, achter Lauf (kollision-test.mjs). Headless-Prüfung gegen
-Dev-Server und Produktions-Preview, 0 Konsolenfehler. Umgesetzt:
+As of July 7, 2026, eighth run (kollision-test.mjs). Headless checks
+against dev server and production preview, 0 console errors. Implemented:
 
-- **Kreis-Kollisionsmodell** (`src/scenes/place/collision.ts`): jedes solide
-  Objekt wird durch Kreise in der XZ-Ebene approximiert (rechteckige Gebäude
-  als Kreiskette entlang der Längsachse). Die Auflösung schiebt den Beweger
-  entlang der Kontaktnormalen heraus — das ergibt natürliches Abgleiten an
-  Wänden statt hartem Stopp.
-- **Kollidergenerierung** in `buildLayout`: Funktions- und Wohngebäude,
-  Speicher, Zelte, Lagerhaus, Marktstände, Schuppen, Zaunpfosten, Bäume,
-  Felsen sowie Feuerstelle/Webstuhl/Köchin im Dorf.
-- **Spieler** (`PlaceScene`) und **alle Bewohner** (`PlaceLife`: Träger,
-  Kinder, Ziegen, Walker mit Tagesablauf) durchdringen keine Kollider;
-  Walker überspringen einen Wegpunkt, wenn sie länger als 1,4 s blockiert
-  sind (kein dauerhaftes Hängenbleiben).
+- **Circle collision model** (`src/scenes/place/collision.ts`): every
+  solid object is approximated by circles in the XZ plane (rectangular
+  buildings as a circle chain along their long axis). Resolution pushes the
+  mover out along the contact normal — natural sliding along walls instead
+  of a hard stop.
+- **Collider generation** in `buildLayout`: functional and residential
+  buildings, granaries, tents, warehouse, market stalls, sheds, fence
+  posts, trees, rocks, plus fire pit/loom/cook in villages.
+- **Player** (`PlaceScene`) and **all inhabitants** (`PlaceLife`: porters,
+  children, goats, routine walkers) penetrate no colliders; walkers skip a
+  waypoint when blocked for more than 1.4 s (no permanent stuck state).
 
-Verifikation (13 Prüfungen, alle PASS): In beiden Perspektiven wird ein in
-ein Gebäude gesetzter Spieler in einer Frame ausgeworfen (kein Eindringen);
-gegen Wände gerammt bleibt der Mindestabstand ≥ 0; alle Funktionsgebäude
-sind von einem kollisionsfreien Standpunkt aus bedienbar (Prompt erscheint);
-Spawn, Platz und Ortsausgang bleiben frei. Hinweis: Headless-Chromium
-drosselt requestAnimationFrame, daher prüft der Test die Kollision
-frame-unabhängig über Auswurf/Nicht-Durchdringung statt über gehaltenes
-Gehen.
+Verification (13 checks, all PASS): in both perspectives a player placed
+inside a building is ejected within one frame (no penetration); rammed
+against walls the minimum clearance stays ≥ 0; every functional building
+is operable from a collision-free standpoint (prompt appears); spawn,
+plaza and the settlement exit stay clear. Note: headless Chromium
+throttles requestAnimationFrame, so the test proves collision
+frame-independently via ejection/non-penetration rather than sustained
+walking.
 
-| Datei | Ansicht |
+| File | View |
 |---|---|
-| 52-kollision-hafen-wand.png | Hafen: Spieler bündig an der Gebäudewand gestoppt |
-| 53-kollision-dorf-chefhuette.png | Dorf: an der Chefhütte gestoppt, Prompt erreichbar |
+| 52-collision-port-wall.png | Port: player stopped flush against a building wall |
+| 53-collision-village-chief-hut.png | Village: stopped at the chief's hut, prompt reachable |
+
+## Addendum: localization (§7.1.17 — design.md §17)
+
+As of July 7, 2026, ninth run (i18n-shots.mjs). Headless checks against
+dev server and production preview, 0 console errors in both languages.
+Implemented:
+
+- **Language files** `src/i18n/de.ts` and `src/i18n/en.ts` behind a shared
+  `Strings` contract (`src/i18n/types.ts`) — a text added in only one
+  language fails the TypeScript build. German is the default; the language
+  switches at runtime via the debug menu (F1).
+- **Language-neutral journal:** entries are stored as key+params
+  (`TextRef`) and re-render in the selected language; plain-string entries
+  from old checkpoints still display (backward compatible).
+- **Localized proper names:** places ("Kairo"/"Cairo"), peoples
+  ("Buschmänner"/"Bushmen"), landmarks ("Kilimandscharo"/"Kilimanjaro",
+  "Tschadsee"/"Lake Chad"), plus date and coordinate formats per language
+  (German decimal comma, English decimal point).
+- **English texts are contextual**, not literal — diary voice of an 1890
+  explorer.
+- **Technical code fully English:** data files carry English ids
+  (`lake-chad`, `kilimanjaro`, `masai-village` …); display names live only
+  in the language files. The verification screenshots were renamed to
+  English terms accordingly.
+
+| File | View |
+|---|---|
+| 54-i18n-german-default.png | German (default): status bar, journal at start |
+| 55-i18n-english-journal.png | English: journal, status bar after switching |
+| 56-i18n-english-trade.png | English: trade dialog in Cairo |
+| 57-i18n-english-map.png | English: map overlay with region/exploration |
+| 58-i18n-debug-language.png | Debug menu with the language selector |

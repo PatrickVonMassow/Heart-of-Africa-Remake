@@ -31,7 +31,7 @@ export async function loadGeodata(): Promise<void> {
     fetch(`${base}geodata/dem.json`),
     fetch(`${base}geodata/dem.png`),
   ])
-  if (!metaRes.ok || !imgRes.ok) throw new Error('Geodaten konnten nicht geladen werden')
+  if (!metaRes.ok || !imgRes.ok) throw new Error('failed to load geodata')
   meta = (await metaRes.json()) as DemMeta
   const bitmap = await createImageBitmap(await imgRes.blob(), {
     premultiplyAlpha: 'none',
@@ -41,7 +41,7 @@ export async function loadGeodata(): Promise<void> {
   canvas.width = meta.width
   canvas.height = meta.height
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) throw new Error('2D-Kontext nicht verfügbar')
+  if (!ctx) throw new Error('2D context unavailable')
   ctx.drawImage(bitmap, 0, 0)
   pixels = ctx.getImageData(0, 0, meta.width, meta.height).data
   bitmap.close()

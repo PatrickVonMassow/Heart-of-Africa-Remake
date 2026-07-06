@@ -1,5 +1,5 @@
 // Geography query layer. Since the switch to real geodata (design.md §3
-// "Reale Geodaten und Terrain-Darstellung") this delegates to:
+// "Real geodata and terrain rendering") this delegates to:
 //   - geodata.ts: bilinear DEM samplers (elevation, land mask, coast dist)
 //     built from real SRTM-composite tiles by scripts/build-geodata.mjs
 //   - hydro.ts:  exact spline-densified vector distances for the authored
