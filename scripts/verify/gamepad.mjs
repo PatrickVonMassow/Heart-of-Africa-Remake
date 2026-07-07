@@ -100,12 +100,24 @@ const entered = await page.evaluate(() => ({ mode: window.__game.getState().mode
 check('A interacts: the nearby place is entered', entered.mode === 'place' && entered.placeId === 'cairo', '')
 
 // --- Position query (P / Select) in both languages -------------------------------------------
-await pressButton(8) // Select → KeyP
-let toast = await page.evaluate(() => window.__game.getState().toast)
+// Hold the button until the toast appears (like a real press): right after
+// a place entry the scene build can stall frames longer than a short tap,
+// so a fixed 150 ms window may fall between two rAF ticks of the poller.
+const queryToast = async () => {
+  await page.evaluate(() => window.__game.getState().setToast(null))
+  await page.evaluate(() => (window.__pad.buttons[8] = { pressed: true, touched: true, value: 1 }))
+  const toast = await page
+    .waitForFunction(() => window.__game.getState().toast, null, { timeout: 8000 })
+    .then((h) => h.jsonValue())
+    .catch(() => null)
+  await page.evaluate(() => (window.__pad.buttons[8] = { pressed: false, touched: false, value: 0 }))
+  await page.waitForTimeout(150)
+  return toast
+}
+let toast = await queryToast()
 check('position query reports coordinates and region (EN)', !!toast && toast.includes('Latitude') && toast.includes('North'), `"${toast}"`)
 await page.evaluate(() => window.__setLang('de'))
-await pressButton(8)
-toast = await page.evaluate(() => window.__game.getState().toast)
+toast = await queryToast()
 check('position query localized (DE)', !!toast && toast.includes('Breite'), `"${toast}"`)
 await page.evaluate(() => window.__setLang('en'))
 

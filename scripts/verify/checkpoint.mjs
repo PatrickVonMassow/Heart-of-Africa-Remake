@@ -32,6 +32,9 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(3000)
 
+// Close the journal first: the upcoming click is the first user gesture and
+// would otherwise start the deferred initial narration (TTS model download).
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 check('Checkpoint overlay after reload', (await page.getByText('Load checkpoint').count()) > 0)
 await page.getByText('Load checkpoint').click()
 await page.waitForTimeout(500)

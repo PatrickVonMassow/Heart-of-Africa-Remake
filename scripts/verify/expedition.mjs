@@ -36,7 +36,9 @@ const journalKeys = () =>
   page.evaluate(() => window.__game.getState().journal.map((e) => (typeof e.text === 'object' ? e.text.key : e.text)))
 const walk = (n) =>
   page.evaluate((steps) => {
-    for (let i = 0; i < steps; i++) window.__game.getState().moveTravel(0, -1, 0.05)
+    // Walk south (up the Nile): heading north from Cairo runs out of land
+    // at the Mediterranean before the long test walks finish.
+    for (let i = 0; i < steps; i++) window.__game.getState().moveTravel(0, 1, 0.05)
   }, n)
 
 const dl = await page.evaluate(() => window.__balance.deadline)

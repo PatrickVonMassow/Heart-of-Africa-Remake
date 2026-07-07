@@ -76,6 +76,9 @@ export interface BalanceConfig {
     sunblindDrain: number
     woundLightDrain: number
     woundSevereDrain: number
+    /** Days of dry desert travel until dehydration sets in (design.md §6);
+     * fresh water in reach (river/lake) counts as drinking and resets it. */
+    dehydrationOnsetDays: number
     /** Days outside the desert until sun blindness heals. */
     sunblindRecoveryDays: number
     /** Below this the condition counts as "poor" (vultures, §19). */
@@ -185,6 +188,7 @@ export const balance: BalanceConfig = {
     sunblindDrain: 3,
     woundLightDrain: 2,
     woundSevereDrain: 7,
+    dehydrationOnsetDays: 0.5,
     sunblindRecoveryDays: 3,
     poorThreshold: 40,
   },

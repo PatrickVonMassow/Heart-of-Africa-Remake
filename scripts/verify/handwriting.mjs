@@ -80,9 +80,13 @@ check('the entry carries blood traces', bloody.marks >= 3, `${bloody.marks} mark
 await page.screenshot({ path: `${OUT}82-handwriting-blood.png` })
 console.log('shot 82-handwriting-blood.png')
 
-// A click finishes the handwriting immediately.
+// A click finishes the handwriting immediately. DND is raised around the
+// click: it is the page's first user gesture and would otherwise start the
+// deferred initial narration (TTS model download).
+await page.evaluate(() => window.__ui.getState().setJournalDnd(true))
 await page.locator('.journal .entry.writing').click()
 await page.waitForTimeout(200)
+await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
 const clicked = await page.evaluate(() => ({
   writing: document.querySelectorAll('.journal .entry.writing').length,
   marks: [...document.querySelectorAll('.journal .entry')].at(-1)?.querySelectorAll('.blood-marks span').length ?? 0,

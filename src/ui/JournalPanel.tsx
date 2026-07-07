@@ -134,6 +134,33 @@ export function JournalPanel() {
       })
   }
 
+  // Initial narration (design.md §15): the entry already in the book when
+  // the game starts (the departure entry) also counts as newly appearing,
+  // but the browser's autoplay policy blocks audio until the first user
+  // gesture — so its narration is deferred to exactly that gesture.
+  useEffect(() => {
+    if (!speechAvailable(t.lang)) return
+    const onGesture = (ev: Event) => {
+      // Synthetic events (e.g. gamepad button mapping) carry no user
+      // activation and must not consume the one-shot narration.
+      if (!ev.isTrusted) return
+      cleanup()
+      const g = useGame.getState()
+      if (useUi.getState().journalDnd || !g.journalOpen || g.journal.length === 0) return
+      const e = g.journal[g.journal.length - 1]
+      startSpeech(e.id, resolveText(t, e.title), resolveText(t, e.text), true)
+    }
+    const cleanup = () => {
+      window.removeEventListener('pointerdown', onGesture)
+      window.removeEventListener('keydown', onGesture)
+    }
+    window.addEventListener('pointerdown', onGesture)
+    window.addEventListener('keydown', onGesture)
+    return cleanup
+    // Mount-only: the very first user gesture decides once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-narration (design.md §15): a newly appearing entry is read aloud
   // without requiring a click, when the language has a voice and the
   // do-not-disturb option (design.md §16) is off.

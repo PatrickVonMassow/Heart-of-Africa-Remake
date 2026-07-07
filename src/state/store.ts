@@ -8,7 +8,7 @@ import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLo
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
-import { riverDistance } from '../world/geoIndex'
+import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import {
   LANDMARK_POINTS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
@@ -135,6 +135,8 @@ export interface GameState {
   afflictions: Afflictions
   /** Days of desert-free travel left until sun blindness heals. */
   sunblindRecovery: number
+  /** Accumulated days of dry desert travel (dehydration onset, §6). */
+  dryDays: number
   /** Days until the next random event may roll (design.md §14 spam guard). */
   eventCooldown: number
   /** Deadline warning stage already announced (design.md §5): 0, 1 or 2. */
@@ -216,7 +218,7 @@ export interface GameState {
   revealDecoded: (region: RegionId) => void
   dig: () => void
   /** Health per travelled day; exposed for the event engine and tests. */
-  tickHealth: (dayDelta: number, terrain: string) => void
+  tickHealth: (dayDelta: number, terrain: string, lat: number, lon: number) => void
   /** Random events per travelled day (design.md §14). */
   tickEvents: (dayDelta: number, terrain: string, lat: number, lon: number) => void
   /** Debug/testing (design.md §21): fire one event immediately. */
@@ -389,6 +391,7 @@ function startState(seed: number) {
     health: balance.health.max,
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
+    dryDays: 0,
     eventCooldown: 0,
     deadlineWarned: 0,
     defeat: null,
@@ -620,7 +623,7 @@ export const useGame = create<GameState>()((set, get) => ({
       }))
     }
 
-    get().tickHealth(dayDelta, here.type)
+    get().tickHealth(dayDelta, here.type, next.lat, next.lon)
     get().tickEvents(dayDelta, here.type, next.lat, next.lon)
     get().tickDeadline(newDay)
   },
@@ -794,15 +797,25 @@ export const useGame = create<GameState>()((set, get) => ({
    * health, sun blindness heals only outside the desert, and at zero
    * health the expedition is lost (§15).
    */
-  tickHealth: (dayDelta: number, terrain: string) => {
+  tickHealth: (dayDelta: number, terrain: string, lat: number, lon: number) => {
     const s = get()
     if (s.defeat) return
     const hb = balance.health
     const a = { ...s.afflictions }
 
-    // Dehydration (§6): in the desert without a canteen; the canteen is
-    // always full. Leaving the desert or owning a canteen ends it.
-    const dehydrated = terrain === 'desert' && !(s.equipment.canteen && s.equipment.canteen > 0)
+    // Dehydration (§6: "desert without water"): the canteen is always full,
+    // and fresh water in reach — travelling on water or along a river or
+    // lake shore — counts as drinking. Away from both, thirst builds up
+    // over sustained dry travel before the affliction sets in, so terrain
+    // flicker at a river bank never toggles it.
+    const hasCanteen = (s.equipment.canteen ?? 0) > 0
+    const canDrink =
+      terrain === 'water' ||
+      terrain === 'ocean' ||
+      riverDistance(lat, lon, 0.25) < 0.08 ||
+      lakeDistance(lat, lon, 0.25) < 0.08
+    const dryDays = terrain === 'desert' && !hasCanteen && !canDrink ? s.dryDays + dayDelta : 0
+    const dehydrated = dryDays >= hb.dehydrationOnsetDays
     if (dehydrated && !a.dehydration) {
       a.dehydration = true
       get().addEntry({ key: 'journal.titles.dehydration' }, { key: 'journal.dehydrationOn' })
@@ -837,7 +850,7 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     const wasPoor = healthState(s.health) === 'poor'
-    set({ health, afflictions: a, sunblindRecovery })
+    set({ health, afflictions: a, sunblindRecovery, dryDays })
     if (!wasPoor && healthState(health) === 'poor' && health > 0) {
       get().addEntry({ key: 'journal.titles.healthPoor' }, { key: 'journal.healthPoor' })
     }
@@ -1461,7 +1474,7 @@ export const useGame = create<GameState>()((set, get) => ({
       seed: s.seed, placeId: s.placeId, pos: s.pos, day: s.day, money: s.money,
       foodDays: s.foodDays, gifts: s.gifts, equipment: s.equipment, handItem: s.handItem,
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
-      health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
+      health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery, dryDays: s.dryDays,
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
@@ -1510,6 +1523,7 @@ export const useGame = create<GameState>()((set, get) => ({
         giftLoreGiven: snap.giftLoreGiven ?? {},
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
+        dryDays: snap.dryDays ?? 0,
         treasures: snap.treasures ?? { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 },
         treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
         graveyardIvoryLeft: snap.graveyardIvoryLeft ?? balance.economy.graveyardIvory,

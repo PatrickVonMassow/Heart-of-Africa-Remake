@@ -92,6 +92,33 @@ check('English journal: read-aloud button present', speakButtonsEn >= 1, `${spea
 await page.evaluate(() => {
   window.__ttsForceWasm = true
 })
+
+// --- The start entry narrates on the first user gesture (autoplay deferral) --
+// No trusted gesture has happened yet; a neutral key press is the first one.
+await page.keyboard.press('F8')
+let bootSpoke = false
+try {
+  await page.waitForFunction(
+    () => {
+      const btns = document.querySelectorAll('.journal .speak')
+      const t = btns.length > 0 ? btns[btns.length - 1].textContent : ''
+      return t === '…' || t === '■'
+    },
+    null,
+    { timeout: 300000 },
+  )
+  bootSpoke = true
+} catch {
+  bootSpoke = false
+}
+check('the start entry narrates on the first user gesture', bootSpoke, '')
+// Let it reach the speaking state, then stop it for the manual-control check.
+await page
+  .waitForFunction(() => document.querySelector('.journal .speak')?.textContent === '■', null, { timeout: 300000 })
+  .catch(() => {})
+await page.locator('.journal .speak').last().click()
+await page.waitForTimeout(500)
+
 await page.locator('.journal .speak').first().click()
 let speaking = false
 try {

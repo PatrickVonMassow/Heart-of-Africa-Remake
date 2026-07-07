@@ -54,7 +54,12 @@ await g(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1200)
 await g(() => window.__game.getState().debugJumpTo(25.5, 27.0)) // deep Sahara
 await page.waitForTimeout(800)
-await walk(40)
+// Thirst builds up first (design.md §6 onset, a balance value): a short dry
+// stretch must not trigger the affliction yet.
+await walk(4)
+const early = await g(() => window.__game.getState().afflictions.dehydration)
+check('short dry travel does not trigger dehydration yet', early === false, '')
+await walk(36)
 const dehydrated = await g(() => ({
   a: window.__game.getState().afflictions.dehydration,
   health: window.__game.getState().health,
@@ -68,6 +73,26 @@ await walk(10)
 const rehydrated = await g(() => window.__game.getState().afflictions.dehydration)
 check('canteen ends the dehydration', rehydrated === false, '')
 check('journal reports the recovery', (await journalKeys()).includes('journal.dehydrationOver'), '')
+
+// --- Fresh water in reach counts as drinking (design.md §6: "without water") --
+// Walking the Nile bank without a canteen must never toggle thirst/recovery.
+await g(() => {
+  window.__game.setState({ equipment: {} }) // the canteen stays behind
+  window.__game.getState().debugJumpTo(28.6, 31.3) // desert bank of the Nile
+})
+const thirstBefore = (await journalKeys()).filter((k) => k === 'journal.dehydrationOn').length
+await walk(15)
+const nile = await g(() => ({
+  a: window.__game.getState().afflictions.dehydration,
+  dry: window.__game.getState().dryDays,
+}))
+const thirstAfter = (await journalKeys()).filter((k) => k === 'journal.dehydrationOn').length
+check(
+  'the Nile bank never triggers dehydration (fresh water in reach)',
+  nile.a === false && thirstAfter === thirstBefore,
+  `dryDays ${nile.dry.toFixed(2)}`,
+)
+await g(() => window.__game.getState().debugAddEquipment('canteen'))
 
 // --- Regeneration while fed and affliction-free -------------------------------
 await g(() => window.__game.getState().debugSet({ health: 50, foodDays: 30 }))

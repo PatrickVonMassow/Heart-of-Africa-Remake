@@ -53,6 +53,9 @@ check('every port visit stores its own snapshot', (await snapCount()) === 2, `${
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
 await page.waitForTimeout(3500)
+// Close the journal: the click below is the first user gesture and would
+// otherwise start the deferred initial narration (TTS model download).
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.locator('.overlay button', { hasText: 'Load checkpoint' }).click()
 await page.waitForTimeout(400)
 const table = await page.evaluate(() => {
@@ -102,6 +105,7 @@ await page.evaluate(() => {
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
 await page.waitForTimeout(3500)
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.locator('.overlay button', { hasText: 'Load checkpoint' }).click()
 await page.waitForTimeout(400)
 const legacyRows = await page.evaluate(() => document.querySelectorAll('.load-menu tbody tr').length)
