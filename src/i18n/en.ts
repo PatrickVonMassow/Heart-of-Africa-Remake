@@ -305,6 +305,9 @@ export const en: Strings = {
       sandstorm: 'Sandstorm',
       sweptAway: 'Swept Away',
       discovery: 'A Grim Discovery',
+      deadline1: 'A Letter from the Financiers',
+      deadline2: 'The Final Warning',
+      successor: 'A New Hand',
     },
     start:
       'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
@@ -388,5 +391,11 @@ export const en: Strings = {
       '[fear]The current seized me and swept me over the falls![/fear] [weary]I dragged myself to the bank, battered and bleeding —[pause] half of my belongings are gone with the river.[/weary]',
     findRemains: (p: TextParams) =>
       `[somber]I came upon the remains of a traveler who made it no farther.[pause] A grim warning of this land.[/somber] Among the bones lay a purse with ${p.money} dollars — [whisper]may they serve a better fate.[/whisper]`,
+    deadline1:
+      '[somber]A letter reached me from the financiers.[pause] Their patience is thinning: more than half the granted time is spent, and I have no tomb to show.[/somber] [emph]I must press on.[/emph]',
+    deadline2:
+      '[fear]The final warning![/fear] [somber]The financiers write that the expedition will be recalled soon.[pause] If I do not find the tomb now, everything was in vain.[/somber]',
+    successor:
+      "[somber]I take up this journal from the hands of my predecessor, who gave everything for it.[pause] His notes shall guide me.[/somber] [emph]The search continues where he left off.[/emph]",
   },
 }

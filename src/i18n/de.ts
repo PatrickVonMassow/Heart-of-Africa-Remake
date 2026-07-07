@@ -304,6 +304,9 @@ export const de: Strings = {
       sandstorm: 'Sandsturm',
       sweptAway: 'Fortgerissen',
       discovery: 'Ein düsterer Fund',
+      deadline1: 'Ein Brief der Geldgeber',
+      deadline2: 'Die letzte Warnung',
+      successor: 'Eine neue Hand',
     },
     start:
       'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
@@ -387,5 +390,11 @@ export const de: Strings = {
       '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer —[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
     findRemains: (p: TextParams) =>
       `[somber]Ich stieß auf die Überreste eines Reisenden, der nicht weiterkam.[pause] Eine düstere Mahnung dieses Landes.[/somber] Zwischen den Knochen lag eine Börse mit ${p.money} Dollar — [whisper]mögen sie einem besseren Schicksal dienen.[/whisper]`,
+    deadline1:
+      '[somber]Ein Brief der Geldgeber hat mich erreicht.[pause] Ihre Geduld wird dünn: Mehr als die Hälfte der gewährten Zeit ist verstrichen, und ich habe kein Grab vorzuweisen.[/somber] [emph]Ich muss vorankommen.[/emph]',
+    deadline2:
+      '[fear]Die letzte Warnung![/fear] [somber]Die Geldgeber schreiben, die Expedition werde bald zurückgerufen.[pause] Finde ich das Grab jetzt nicht, war alles vergebens.[/somber]',
+    successor:
+      '[somber]Ich übernehme dieses Tagebuch aus den Händen meines Vorgängers, der alles dafür gab.[pause] Seine Aufzeichnungen sollen mich leiten.[/somber] [emph]Die Suche geht weiter, wo er sie ließ.[/emph]',
   },
 }

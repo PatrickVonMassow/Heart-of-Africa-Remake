@@ -120,7 +120,7 @@ function DefeatOverlay() {
   const day = useGame((s) => s.day)
   const newGame = useGame((s) => s.newGame)
   const hasCheckpoint = useGame((s) => s.hasCheckpoint)
-  const loadCheckpoint = useGame((s) => s.loadCheckpoint)
+  const successorTakeOver = useGame((s) => s.successorTakeOver)
   if (!defeat) return null
   return (
     <div className="overlay defeat">
@@ -132,7 +132,7 @@ function DefeatOverlay() {
       </p>
       <div className="actions">
         {defeat === 'death' && hasCheckpoint && (
-          <button className="hud-button" onClick={() => loadCheckpoint()}>
+          <button className="hud-button" onClick={() => successorTakeOver()}>
             {t.overlays.successor}
           </button>
         )}

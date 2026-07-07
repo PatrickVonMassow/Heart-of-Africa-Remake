@@ -54,6 +54,15 @@ export interface BalanceConfig {
     /** Minimum days between two rolled events (spam guard). */
     cooldownDays: number
   }
+  /** Expedition deadline (design.md §5): total days and staged warnings. */
+  deadline: {
+    days: number
+    /** Fractions of the deadline at which the two warnings fire. */
+    warning1: number
+    warning2: number
+    /** Days a successor loses when taking over (design.md §18). */
+    successorDayPenalty: number
+  }
   /** Health & afflictions (design.md §6); drains/regen in points per in-game day. */
   health: {
     max: number
@@ -108,6 +117,12 @@ export const balance: BalanceConfig = {
     waterfallSweep: 0.6,
     findRemains: 0.02,
     cooldownDays: 2,
+  },
+  deadline: {
+    days: 1826, // about five years (design.md §19)
+    warning1: 0.6,
+    warning2: 0.85,
+    successorDayPenalty: 30,
   },
   health: {
     max: 100,

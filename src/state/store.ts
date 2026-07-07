@@ -78,6 +78,8 @@ export interface GameState {
   sunblindRecovery: number
   /** Days until the next random event may roll (design.md §14 spam guard). */
   eventCooldown: number
+  /** Deadline warning stage already announced (design.md §5): 0, 1 or 2. */
+  deadlineWarned: number
   /** Set when the expedition is lost (design.md §15/§18). */
   defeat: 'death' | 'deadline' | null
   deathCause: DeathCause | null
@@ -117,8 +119,12 @@ export interface GameState {
   tickEvents: (dayDelta: number, terrain: string, lat: number, lon: number) => void
   /** Debug/testing (design.md §21): fire one event immediately. */
   debugTriggerEvent: (kind: EventKind) => void
+  /** Deadline check per travelled day (design.md §5). */
+  tickDeadline: (day: number) => void
   applyEventOutcome: (outcome: EventOutcome) => void
   useMedicine: () => void
+  /** A successor continues from the last checkpoint (design.md §18). */
+  successorTakeOver: () => boolean
   /** Debug/testing: set an affliction directly (events trigger them in play). */
   debugSetAffliction: (kind: keyof Afflictions, value: boolean | 0 | 1 | 2) => void
   addEntry: (title: TextRef, text: TextRef, kind?: JournalEntry['kind'], sketch?: SketchId) => void
@@ -216,6 +222,7 @@ function startState(seed: number) {
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
     eventCooldown: 0,
+    deadlineWarned: 0,
     defeat: null,
     deathCause: null as DeathCause | null,
     region: 'north' as RegionId,
@@ -360,6 +367,39 @@ export const useGame = create<GameState>()((set, get) => ({
 
     get().tickHealth(dayDelta, here.type)
     get().tickEvents(dayDelta, here.type, next.lat, next.lon)
+    get().tickDeadline(newDay)
+  },
+
+  /**
+   * Multi-year deadline (design.md §5): staged warnings, defeat on expiry.
+   */
+  tickDeadline: (day: number) => {
+    const s = get()
+    if (s.defeat || s.victory) return
+    const dl = balance.deadline
+    if (day >= dl.days) {
+      set({ defeat: 'deadline', journalOpen: false })
+      return
+    }
+    if (s.deadlineWarned < 2 && day >= dl.days * dl.warning2) {
+      set({ deadlineWarned: 2 })
+      get().addEntry({ key: 'journal.titles.deadline2' }, { key: 'journal.deadline2' })
+    } else if (s.deadlineWarned < 1 && day >= dl.days * dl.warning1) {
+      set({ deadlineWarned: 1 })
+      get().addEntry({ key: 'journal.titles.deadline1' }, { key: 'journal.deadline1' })
+    }
+  },
+
+  successorTakeOver: () => {
+    if (!get().loadCheckpoint()) return false
+    const s = get()
+    const day = s.day + balance.deadline.successorDayPenalty
+    // Warnings already passed at the resumed date stay silent.
+    const dl = balance.deadline
+    const warned = day >= dl.days * dl.warning2 ? 2 : day >= dl.days * dl.warning1 ? 1 : 0
+    set({ day, deadlineWarned: warned })
+    get().addEntry({ key: 'journal.titles.successor' }, { key: 'journal.successor' })
+    return true
   },
 
   tickEvents: (dayDelta, terrain, lat, lon) => {
@@ -720,6 +760,7 @@ export const useGame = create<GameState>()((set, get) => ({
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       chiefHintGiven: s.chiefHintGiven, languageHintGiven: s.languageHintGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
+      deadlineWarned: s.deadlineWarned,
       explored: s.explored,
       nextEntryId,
     }
@@ -741,6 +782,7 @@ export const useGame = create<GameState>()((set, get) => ({
         ...snap,
         explored: snap.explored ?? {},
         health: snap.health ?? balance.health.max,
+        deadlineWarned: snap.deadlineWarned ?? 0,
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         defeat: null,

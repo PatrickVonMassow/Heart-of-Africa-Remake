@@ -398,6 +398,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     asserts the protection ordering (pure functions), deterministic
     outcome mapping, the consequences of each trigger, a fatal attack,
     autonomous firing while travelling and silence when disabled.
+24. **Deadline and successor.** `design.md` §5/§18 is implemented: the
+    expedition runs against a multi-year deadline (balance value, ~5
+    years) with staged messages — a first warning at 60 % and a final
+    warning at 85 % of the granted time, each exactly once, as journal
+    entries in both languages — and is recalled (defeat overlay, journal
+    silent) when the deadline expires; no successor then. When the
+    character dies (pt. 22), a successor takes over instead: he resumes
+    at the last checkpoint, loses a configured number of days, silently
+    inherits the already-passed warning stage and opens his part of the
+    journal with a takeover entry. Verifiable:
+    `scripts/verify/expedition.mjs` asserts the staged warnings (exactly
+    once each), the expiry defeat without successor, and the
+    death-to-successor flow including the day penalty and takeover entry.
 
 ### 7.2 Self-Verification (mandatory)
 

@@ -208,6 +208,9 @@ export interface Strings {
       sandstorm: string
       sweptAway: string
       discovery: string
+      deadline1: string
+      deadline2: string
+      successor: string
     }
     start: string
     regionEntry(p: TextParams): string
@@ -234,5 +237,8 @@ export interface Strings {
     sandstorm: string
     sweptAway: string
     findRemains(p: TextParams): string
+    deadline1: string
+    deadline2: string
+    successor: string
   }
 }
