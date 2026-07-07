@@ -362,6 +362,24 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     Victoria Falls and Lake Victoria (71-73) show the courses. The
     current's *gameplay* effect (drift, being swept over falls) stays
     outside the POC (§8).
+22. **Health and afflictions.** `design.md` §6/§15 is implemented: a
+    health pool is drained by starvation and by the afflictions fever
+    (delirium: temporarily uncontrolled steering), dehydration (sets in
+    automatically in the desert without a canteen: drift and speed loss),
+    sun blindness (view narrowed to a glaring veil; heals only outside
+    the desert) and wounds (light/severe); medicine is taken from the
+    inventory bar and cures fever and wounds; health regenerates while
+    fed and affliction-free. At zero health the expedition is lost: the
+    journal falls silent and a remains report naming the cause of death
+    appears instead (§15), from which a successor can continue at the
+    last checkpoint. The health query (H) reports state and afflictions,
+    vultures circle at poor condition (§19), and health/afflictions are
+    part of the checkpoint. All drains/thresholds are balance values
+    adjustable in the debug menu, which also toggles afflictions for
+    testing. Verifiable: `scripts/verify/health.mjs` asserts defaults,
+    dehydration onset/recovery, regeneration, fever drain and medicine
+    cure, the sun-blindness veil and its recovery, vultures, the H query
+    and the death/successor flow.
 
 ### 7.2 Self-Verification (mandatory)
 

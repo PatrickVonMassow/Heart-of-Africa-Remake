@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { useGame } from '../../state/store'
+import { healthState, useGame } from '../../state/store'
 import { latLonToWorld, worldToLatLon } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
@@ -571,9 +571,7 @@ function LionHunt() {
 
 /**
  * Vultures circling the player as a warning sign of poor condition
- * (design.md §19). The POC has no full health system (design.md §6), so the
- * trigger is exhausted provisions.
- * OPEN: bind to the full health/affliction system once it exists.
+ * (design.md §19), bound to the health system of design.md §6.
  */
 function Vultures() {
   const group = useRef<THREE.Group>(null)
@@ -583,6 +581,16 @@ function Vultures() {
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     [],
   )
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__vultures = { player: group, kill: killGroup }
+    return () => {
+      delete w.__vultures
+    }
+  }, [])
 
   const circle = (g: THREE.Group, t: number, baseR: number, height: number) => {
     g.children.forEach((bird, i) => {
@@ -600,9 +608,9 @@ function Vultures() {
     const s = useGame.getState()
     const t = clock.elapsedTime
     if (group.current) {
-      const starving = s.foodDays <= 0 && s.mode === 'travel'
-      group.current.visible = starving
-      if (starving) {
+      const poor = healthState(s.health) === 'poor' && s.mode === 'travel'
+      group.current.visible = poor
+      if (poor) {
         group.current.position.set(s.pos.x, 0, s.pos.z)
         circle(group.current, t, 4.5, 5.5)
       }

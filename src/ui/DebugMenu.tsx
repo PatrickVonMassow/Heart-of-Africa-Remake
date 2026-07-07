@@ -181,6 +181,23 @@ export function DebugMenu() {
           onChange={(v) => game.debugSet({ money: v })} />
         <NumberField label={t.debug.foodDays} value={game.foodDays} step={7}
           onChange={(v) => game.debugSet({ foodDays: Math.max(0, v) })} />
+        <NumberField label={t.debug.health} value={Math.round(game.health)} step={10}
+          onChange={(v) => game.debugSet({ health: Math.max(0, Math.min(balance.health.max, v)) })} />
+        <label>
+          <span>{t.health.fever}</span>
+          <input type="checkbox" checked={game.afflictions.fever}
+            onChange={(e) => game.debugSetAffliction('fever', e.target.checked)} />
+        </label>
+        <label>
+          <span>{t.health.sunblind}</span>
+          <input type="checkbox" checked={game.afflictions.sunblind}
+            onChange={(e) => game.debugSetAffliction('sunblind', e.target.checked)} />
+        </label>
+        <label>
+          <span>{t.health.woundsSevere}</span>
+          <input type="checkbox" checked={game.afflictions.wounds === 2}
+            onChange={(e) => game.debugSetAffliction('wounds', e.target.checked ? 2 : 0)} />
+        </label>
       </div>
 
       <div className="section">

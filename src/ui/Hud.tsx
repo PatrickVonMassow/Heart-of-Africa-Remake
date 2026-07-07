@@ -3,7 +3,7 @@
 // text comes from the language files (design.md §17 localization).
 
 import { useEffect, useState } from 'react'
-import { useGame, type EquipmentId } from '../state/store'
+import { healthState, useGame, type EquipmentId } from '../state/store'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
@@ -22,16 +22,23 @@ function InventoryBar() {
   if (owned.length === 0) return null
   return (
     <div className="inventory-bar">
-      {owned.map((e) => (
-        <button
-          key={e}
-          className={handItem === e ? 'active' : ''}
-          onClick={() => takeInHand(handItem === e ? null : e)}
-          title={t.hud.handTooltip}
-        >
-          {t.equipment[e]}
-        </button>
-      ))}
+      {owned.map((e) =>
+        e === 'medicine' ? (
+          // Medicine is taken, not held (design.md §17): it cures fever/wounds.
+          <button key={e} onClick={() => useGame.getState().useMedicine()} title={t.hud.medicineTooltip}>
+            {t.equipment[e]} ({equipment.medicine})
+          </button>
+        ) : (
+          <button
+            key={e}
+            className={handItem === e ? 'active' : ''}
+            onClick={() => takeInHand(handItem === e ? null : e)}
+            title={t.hud.handTooltip}
+          >
+            {t.equipment[e]}
+          </button>
+        ),
+      )}
     </div>
   )
 }
@@ -95,6 +102,46 @@ function Prompt() {
   return <div className="prompt">{prompt}</div>
 }
 
+/** Sun blindness (design.md §6): the view narrows to a glaring tunnel. */
+function SunblindVeil() {
+  const sunblind = useGame((s) => s.afflictions.sunblind)
+  if (!sunblind) return null
+  return <div className="sunblind-veil" />
+}
+
+/**
+ * Defeat overlay (design.md §15/§18): on death the journal falls silent and
+ * a report about the explorer's remains appears instead.
+ */
+function DefeatOverlay() {
+  const t = useStrings()
+  const defeat = useGame((s) => s.defeat)
+  const deathCause = useGame((s) => s.deathCause)
+  const day = useGame((s) => s.day)
+  const newGame = useGame((s) => s.newGame)
+  const hasCheckpoint = useGame((s) => s.hasCheckpoint)
+  const loadCheckpoint = useGame((s) => s.loadCheckpoint)
+  if (!defeat) return null
+  return (
+    <div className="overlay defeat">
+      <h1>{t.overlays.title}</h1>
+      <p>
+        {defeat === 'death'
+          ? t.overlays.remainsReport(t.overlays.deathCauses[deathCause ?? 'wounds'], Math.floor(day))
+          : t.overlays.deadlineExpired(Math.floor(day))}
+      </p>
+      <div className="actions">
+        {defeat === 'death' && hasCheckpoint && (
+          <button className="hud-button" onClick={() => loadCheckpoint()}>
+            {t.overlays.successor}
+          </button>
+        )}
+        <button className="hud-button" onClick={newGame}>{t.overlays.newExpedition}</button>
+      </div>
+    </div>
+  )
+}
+
 function VictoryOverlay() {
   const t = useStrings()
   const victory = useGame((s) => s.victory)
@@ -156,6 +203,20 @@ export function Hud() {
       if (!useUi.getState().dialog) useUi.getState().toggleMap()
     })
     const offF1 = onKeyPress('F1', () => toggleDebug())
+    // H: health query (design.md §17) as a toast in the current language.
+    const offH = onKeyPress('KeyH', () => {
+      const g = useGame.getState()
+      const st = getStrings()
+      const state = st.health.states[healthState(g.health)]
+      const list = [
+        g.afflictions.fever ? st.health.fever : null,
+        g.afflictions.dehydration ? st.health.dehydration : null,
+        g.afflictions.sunblind ? st.health.sunblind : null,
+        g.afflictions.wounds === 1 ? st.health.woundsLight : null,
+        g.afflictions.wounds === 2 ? st.health.woundsSevere : null,
+      ].filter((x): x is string => x !== null)
+      g.setToast(st.health.report(state, list))
+    })
     // F2 toggles the journal do-not-disturb option (design.md §16/§21).
     const offF2 = onKeyPress('F2', () => {
       const ui = useUi.getState()
@@ -178,6 +239,7 @@ export function Hud() {
       offM()
       offF1()
       offF2()
+      offH()
       offEsc()
       window.removeEventListener('keydown', preventF1)
     }
@@ -204,9 +266,11 @@ export function Hud() {
       <Dialogs />
       <DebugMenu />
       {/* Above panels and dialogs so it stays clickable; below the modal overlays. */}
+      <SunblindVeil />
       <RendererWarning />
       <StartOverlay />
       <VictoryOverlay />
+      <DefeatOverlay />
     </>
   )
 }

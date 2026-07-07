@@ -131,6 +131,17 @@ export const en: Strings = {
     grave: 'Sketch: grave',
   },
 
+  health: {
+    states: { healthy: 'healthy', weakened: 'weakened', poor: 'in poor condition' },
+    fever: 'fever',
+    dehydration: 'dehydration',
+    sunblind: 'sun blindness',
+    woundsLight: 'light wounds',
+    woundsSevere: 'severe wounds',
+    report: (state, afflictions) =>
+      afflictions.length > 0 ? `I feel ${state} (${afflictions.join(', ')}).` : `I feel ${state}.`,
+  },
+
   status: {
     date: 'Date',
     cash: 'Funds',
@@ -146,6 +157,7 @@ export const en: Strings = {
     journalToggle: 'Journal (T)',
     mapToggle: 'Map (M)',
     handTooltip: 'Take in hand / put away',
+    medicineTooltip: 'Take medicine (cures fever and wounds)',
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
     fps: (fps) => `${fps} FPS`,
@@ -190,6 +202,8 @@ export const en: Strings = {
     villagerNod: 'The old man gives me a friendly nod.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
+    noMedicine: 'I have no medicine left.',
+    medicineNotNeeded: 'I am neither feverish nor wounded — I shall save the medicine.',
   },
 
   dialogs: {
@@ -214,6 +228,18 @@ export const en: Strings = {
     title: 'The Heart of Africa',
     victoryText: (days) =>
       `You have found the tomb of the great king and brought its treasure to light. After ${days} days of travel through desert and wilderness, the expedition is complete. Your name will be spoken in the same breath as the great explorers.`,
+    remainsReport: (cause, days) =>
+      `A caravan has found the remains of the explorer — a gruesome sight. All signs suggest that ${cause}. The journal, ${days} days of hopes and hardships, ends here.`,
+    deathCauses: {
+      starvation: 'hunger wore him down until he could go no farther',
+      fever: 'the fever consumed him far from any help',
+      dehydration: 'he perished of thirst under the desert sun',
+      sunblind: 'sun-blind, he wandered in circles until the desert took him',
+      wounds: 'he succumbed to his wounds',
+    },
+    deadlineExpired: (days) =>
+      `The financiers' patience is exhausted: after ${days} days without the tomb, the expedition is recalled. The Heart of Africa keeps its secret.`,
+    successor: 'A successor takes over',
     newExpedition: 'New Expedition',
     checkpointFound: 'A saved game was found — your checkpoint from the last port city.',
     loadCheckpoint: 'Load checkpoint',
@@ -235,6 +261,7 @@ export const en: Strings = {
     randomEvents: 'Random events (POC: none implemented)',
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
+    health: 'Health',
     wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",
     cash: 'Funds ($)',
@@ -259,6 +286,9 @@ export const en: Strings = {
       victory: 'The Heart of Africa',
       foodLow: 'Provisions Running Low',
       foodOut: 'Provisions Exhausted',
+      dehydration: 'Thirst',
+      recovery: 'Recovery',
+      healthPoor: 'At the End of My Strength',
     },
     start:
       'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
@@ -302,5 +332,15 @@ export const en: Strings = {
       '[somber]My provisions are running low.[/somber] I must reach a town or village soon, [pause]or hunger will become my constant companion.',
     foodOut:
       '[weary]The last of my provisions is gone.[pause] Hunger gnaws at me; every step comes harder than the one before.[/weary] [fear]I must find supplies,[pause] and quickly.[/fear]',
+    dehydrationOn:
+      '[weary]My tongue sticks to the roof of my mouth.[pause] Without a canteen the desert drinks me dry;[/weary] [fear]my steps are beginning to stray.[/fear]',
+    dehydrationOver:
+      '[somber]Water at last.[/somber] My strength returns with every sip, and my stride is steady again.',
+    sunblindOver:
+      '[somber]The white glare has faded from my eyes.[/somber] [excited]I can see clearly again![/excited]',
+    medicineUsed:
+      'I took the medicine. [pause][somber]The fever is breaking and my wounds are closing;[/somber] [excited]I shall be myself again soon.[/excited]',
+    healthPoor:
+      '[weary]I am at the end of my strength.[pause] My hands tremble as I write these lines.[/weary] [fear]If I do not find rest and relief soon, this journal will outlive me.[/fear]',
   },
 }

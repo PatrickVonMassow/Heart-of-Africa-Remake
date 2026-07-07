@@ -39,8 +39,24 @@ export interface BalanceConfig {
   goodwillRevered: number
   /** Goodwill gained per neutral gift. */
   goodwillNeutral: number
-  /** Random events enabled (design.md §14) — POC: no random events implemented. */
+  /** Random events enabled (design.md §14). */
   randomEventsEnabled: boolean
+  /** Health & afflictions (design.md §6); drains/regen in points per in-game day. */
+  health: {
+    max: number
+    /** Regeneration while fed and free of afflictions. */
+    regenPerDay: number
+    starvationDrain: number
+    feverDrain: number
+    dehydrationDrain: number
+    sunblindDrain: number
+    woundLightDrain: number
+    woundSevereDrain: number
+    /** Days outside the desert until sun blindness heals. */
+    sunblindRecoveryDays: number
+    /** Below this the condition counts as "poor" (vultures, §19). */
+    poorThreshold: number
+  }
   /** Show hidden objects (grave position) — debug aid, default off. */
   showHiddenObjects: boolean
 }
@@ -69,6 +85,18 @@ export const balance: BalanceConfig = {
   goodwillRevered: 2,
   goodwillNeutral: 1,
   randomEventsEnabled: true,
+  health: {
+    max: 100,
+    regenPerDay: 4,
+    starvationDrain: 6,
+    feverDrain: 8,
+    dehydrationDrain: 10,
+    sunblindDrain: 3,
+    woundLightDrain: 2,
+    woundSevereDrain: 7,
+    sunblindRecoveryDays: 3,
+    poorThreshold: 40,
+  },
   showHiddenObjects: false,
 }
 

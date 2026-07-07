@@ -3,7 +3,7 @@
 // dictionaries must implement this interface, so adding or changing a text
 // in only one language fails the build.
 
-import type { EquipmentId } from '../state/store'
+import type { DeathCause, EquipmentId } from '../state/store'
 import type { Material, RegionId } from '../world/geo'
 import type { BuildingType } from '../state/ui'
 import type { SketchId } from '../journal/sketches'
@@ -46,10 +46,23 @@ export interface Strings {
     region: string
   }
 
+  /** Health query and affliction names (design.md §6/§17). */
+  health: {
+    states: { healthy: string; weakened: string; poor: string }
+    fever: string
+    dehydration: string
+    sunblind: string
+    woundsLight: string
+    woundsSevere: string
+    /** Toast for the health query (H), e.g. "I feel weakened (fever)." */
+    report(state: string, afflictions: string[]): string
+  }
+
   hud: {
     journalToggle: string
     mapToggle: string
     handTooltip: string
+    medicineTooltip: string
     /** Shown when the renderer fell back from WebGPU to WebGL 2. */
     webglFallback: string
     webglFallbackDismiss: string
@@ -96,6 +109,8 @@ export interface Strings {
     villagerNod: string
     journalDndOn: string
     journalDndOff: string
+    noMedicine: string
+    medicineNotNeeded: string
   }
 
   dialogs: {
@@ -119,6 +134,12 @@ export interface Strings {
   overlays: {
     title: string
     victoryText(days: number): string
+    /** Report about the explorer's remains (design.md §15). */
+    remainsReport(cause: string, days: number): string
+    deathCauses: Record<DeathCause, string>
+    deadlineExpired(days: number): string
+    /** Button: a successor takes over from the last checkpoint (§18). */
+    successor: string
     newExpedition: string
     checkpointFound: string
     loadCheckpoint: string
@@ -141,6 +162,7 @@ export interface Strings {
     randomEvents: string
     showHidden: string
     fpsCounter: string
+    health: string
     wheelZoom: string
     journalDnd: string
     cash: string
@@ -172,6 +194,9 @@ export interface Strings {
       victory: string
       foodLow: string
       foodOut: string
+      dehydration: string
+      recovery: string
+      healthPoor: string
     }
     start: string
     regionEntry(p: TextParams): string
@@ -186,5 +211,10 @@ export interface Strings {
     victory(p: TextParams): string
     foodLow: string
     foodOut: string
+    dehydrationOn: string
+    dehydrationOver: string
+    sunblindOver: string
+    medicineUsed: string
+    healthPoor: string
   }
 }

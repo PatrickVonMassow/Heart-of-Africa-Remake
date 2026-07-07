@@ -130,6 +130,17 @@ export const de: Strings = {
     grave: 'Skizze: Grab',
   },
 
+  health: {
+    states: { healthy: 'gesund', weakened: 'geschwächt', poor: 'in schlechter Verfassung' },
+    fever: 'Fieber',
+    dehydration: 'Dehydrierung',
+    sunblind: 'Sonnenblindheit',
+    woundsLight: 'leichte Wunden',
+    woundsSevere: 'schwere Wunden',
+    report: (state, afflictions) =>
+      afflictions.length > 0 ? `Ich fühle mich ${state} (${afflictions.join(', ')}).` : `Ich fühle mich ${state}.`,
+  },
+
   status: {
     date: 'Datum',
     cash: 'Geld',
@@ -145,6 +156,7 @@ export const de: Strings = {
     journalToggle: 'Tagebuch (T)',
     mapToggle: 'Karte (M)',
     handTooltip: 'In die Hand nehmen / weglegen',
+    medicineTooltip: 'Medizin einnehmen (heilt Fieber und Wunden)',
     webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar — das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
     fps: (fps) => `${fps} FPS`,
@@ -189,6 +201,8 @@ export const de: Strings = {
     villagerNod: 'Der Alte nickt mir freundlich zu.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus — Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an — neue Einträge öffnen das Tagebuch.',
+    noMedicine: 'Ich habe keine Medizin mehr.',
+    medicineNotNeeded: 'Weder Fieber noch Wunden — ich hebe die Medizin auf.',
   },
 
   dialogs: {
@@ -213,6 +227,18 @@ export const de: Strings = {
     title: 'Das Herz von Afrika',
     victoryText: (days) =>
       `Du hast das Grab des großen Königs gefunden und geborgen. Nach ${days} Tagen Reise durch Wüste und Wildnis ist die Expedition vollendet. Dein Name wird in einem Atemzug mit den großen Entdeckern genannt werden.`,
+    remainsReport: (cause, days) =>
+      `Eine Karawane hat die Überreste des Forschers gefunden — ein grausiger Anblick. Alles deutet darauf hin, dass ${cause}. Das Tagebuch, ${days} Tage voller Hoffnungen und Strapazen, endet hier.`,
+    deathCauses: {
+      starvation: 'der Hunger ihn zermürbte, bis er nicht mehr weiterkonnte',
+      fever: 'das Fieber ihn fern jeder Hilfe verzehrte',
+      dehydration: 'er unter der Wüstensonne verdurstete',
+      sunblind: 'er sonnenblind im Kreis irrte, bis die Wüste ihn nahm',
+      wounds: 'er seinen Wunden erlag',
+    },
+    deadlineExpired: (days) =>
+      `Die Geduld der Geldgeber ist erschöpft: Nach ${days} Tagen ohne das Grab wird die Expedition zurückgerufen. Das Herz von Afrika behält sein Geheimnis.`,
+    successor: 'Ein Nachfolger übernimmt',
     newExpedition: 'Neue Expedition',
     checkpointFound: 'Ein früherer Spielstand (Checkpoint der letzten Hafenstadt) wurde gefunden.',
     loadCheckpoint: 'Checkpoint laden',
@@ -234,6 +260,7 @@ export const de: Strings = {
     randomEvents: 'Zufallsereignisse (POC: keine implementiert)',
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
+    health: 'Gesundheit',
     wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',
     cash: 'Kontostand ($)',
@@ -258,6 +285,9 @@ export const de: Strings = {
       victory: 'Das Herz von Afrika',
       foodLow: 'Proviant knapp',
       foodOut: 'Proviant aufgebraucht',
+      dehydration: 'Durst',
+      recovery: 'Genesung',
+      healthPoor: 'Am Ende meiner Kräfte',
     },
     start:
       'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
@@ -301,5 +331,15 @@ export const de: Strings = {
       '[somber]Mein Proviant geht zur Neige.[/somber] Ich muss bald eine Stadt oder ein Dorf erreichen, [pause]sonst wird der Hunger mein ständiger Begleiter.',
     foodOut:
       '[weary]Der letzte Proviant ist aufgezehrt.[pause] Der Hunger nagt an mir; jeder Schritt fällt schwerer.[/weary] [fear]Ich muss dringend Nachschub finden.[/fear]',
+    dehydrationOn:
+      '[weary]Die Zunge klebt mir am Gaumen.[pause] Ohne Feldflasche trinkt die Wüste mich aus;[/weary] [fear]meine Schritte beginnen zu taumeln.[/fear]',
+    dehydrationOver:
+      '[somber]Endlich Wasser.[/somber] Mit jedem Schluck kehren die Kräfte zurück, und mein Schritt ist wieder fest.',
+    sunblindOver:
+      '[somber]Das weiße Gleißen ist aus meinen Augen gewichen.[/somber] [excited]Ich kann wieder klar sehen![/excited]',
+    medicineUsed:
+      'Ich habe die Medizin genommen. [pause][somber]Das Fieber bricht, die Wunden schließen sich;[/somber] [excited]bald bin ich wieder der Alte.[/excited]',
+    healthPoor:
+      '[weary]Ich bin am Ende meiner Kräfte.[pause] Die Hände zittern mir beim Schreiben dieser Zeilen.[/weary] [fear]Finde ich nicht bald Ruhe und Linderung, wird dieses Tagebuch mich überleben.[/fear]',
   },
 }

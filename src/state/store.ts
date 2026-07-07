@@ -35,6 +35,23 @@ export interface JournalEntry {
 
 export type GameMode = 'travel' | 'place'
 
+/** Afflictions (design.md §6): alter controls/vision and drain health. */
+export interface Afflictions {
+  fever: boolean
+  dehydration: boolean
+  sunblind: boolean
+  /** 0 = none, 1 = light, 2 = severe. */
+  wounds: 0 | 1 | 2
+}
+
+export type DeathCause = 'starvation' | 'fever' | 'dehydration' | 'sunblind' | 'wounds'
+
+/** Coarse condition for display and the vulture signal (design.md §6/§19). */
+export function healthState(health: number): 'healthy' | 'weakened' | 'poor' {
+  if (health < balance.health.poorThreshold) return 'poor'
+  return health < 75 ? 'weakened' : 'healthy'
+}
+
 export interface GameState {
   seed: number
   mode: GameMode
@@ -51,6 +68,14 @@ export interface GameState {
   handItem: EquipmentId | null
   journal: JournalEntry[]
   journalOpen: boolean
+  /** Health points (design.md §6); 0 = death of the character. */
+  health: number
+  afflictions: Afflictions
+  /** Days of desert-free travel left until sun blindness heals. */
+  sunblindRecovery: number
+  /** Set when the expedition is lost (design.md §15/§18). */
+  defeat: 'death' | 'deadline' | null
+  deathCause: DeathCause | null
   /** Region the player is currently in (travel mode). */
   region: RegionId
   visitedRegions: RegionId[]
@@ -81,6 +106,11 @@ export interface GameState {
   giveGift: (material: Material) => void
   talkToVillager: () => void
   dig: () => void
+  /** Health per travelled day; exposed for the event engine and tests. */
+  tickHealth: (dayDelta: number, terrain: string) => void
+  useMedicine: () => void
+  /** Debug/testing: set an affliction directly (events trigger them in play). */
+  debugSetAffliction: (kind: keyof Afflictions, value: boolean | 0 | 1 | 2) => void
   addEntry: (title: TextRef, text: TextRef, kind?: JournalEntry['kind'], sketch?: SketchId) => void
   setJournalOpen: (open: boolean) => void
   setToast: (msg: string | null) => void
@@ -88,7 +118,7 @@ export interface GameState {
   loadCheckpoint: () => boolean
   newGame: () => void
   bumpBalance: () => void
-  debugSet: (patch: Partial<Pick<GameState, 'money' | 'foodDays' | 'day'>>) => void
+  debugSet: (patch: Partial<Pick<GameState, 'money' | 'foodDays' | 'day' | 'health'>>) => void
   debugAddGift: (material: Material) => void
   debugAddEquipment: (item: EquipmentId) => void
   debugJumpTo: (lat: number, lon: number) => void
@@ -172,6 +202,11 @@ function startState(seed: number) {
       { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
     journalOpen: true,
+    health: balance.health.max,
+    afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
+    sunblindRecovery: 0,
+    defeat: null,
+    deathCause: null as DeathCause | null,
     region: 'north' as RegionId,
     visitedRegions: ['north' as RegionId],
     visitedPlaces: ['cairo'],
@@ -213,11 +248,26 @@ export const useGame = create<GameState>()((set, get) => ({
 
   moveTravel: (dirX, dirZ, dt) => {
     const s = get()
-    if (s.mode !== 'travel' || s.victory) return
-    const len = Math.hypot(dirX, dirZ)
+    if (s.mode !== 'travel' || s.victory || s.defeat) return
+    let len = Math.hypot(dirX, dirZ)
     if (len === 0) return
     const cur = worldToLatLon(s.pos.x, s.pos.z)
     const here = sampleTerrain(cur.lat, cur.lon, s.seed)
+
+    // Afflicted steering (design.md §6): fever delirium turns movement
+    // temporarily uncontrolled, dehydration makes the traveller drift.
+    if (s.afflictions.fever) {
+      const a = (Math.random() - 0.5) * Math.PI * 1.4
+      const cos = Math.cos(a)
+      const sin = Math.sin(a)
+      ;[dirX, dirZ] = [dirX * cos - dirZ * sin, dirX * sin + dirZ * cos]
+    } else if (s.afflictions.dehydration) {
+      const a = (Math.random() - 0.5) * Math.PI * 0.5
+      const cos = Math.cos(a)
+      const sin = Math.sin(a)
+      ;[dirX, dirZ] = [dirX * cos - dirZ * sin, dirX * sin + dirZ * cos]
+    }
+    len = Math.hypot(dirX, dirZ)
 
     // Terrain time-cost factor depends on terrain and hand item (design.md §11).
     const tc = balance.terrainCost
@@ -241,7 +291,8 @@ export const useGame = create<GameState>()((set, get) => ({
         cost = tc.savanna
     }
 
-    const speed = balance.travelSpeed / Math.max(0.25, cost)
+    let speed = balance.travelSpeed / Math.max(0.25, cost)
+    if (s.afflictions.dehydration) speed *= 0.7 // §11: speed loss in the desert
     const step = speed * dt
     const nx = s.pos.x + (dirX / len) * step
     const nz = s.pos.z + (dirZ / len) * step
@@ -279,11 +330,105 @@ export const useGame = create<GameState>()((set, get) => ({
       get().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
     }
     if (!s.foodOutWarned && newFood === 0) {
-      // OPEN: design.md defines no explicit starvation consequence for the POC
-      // scope; provisions clamp at 0 and only a journal warning is issued.
       set({ foodOutWarned: true })
       get().addEntry({ key: 'journal.titles.foodOut' }, { key: 'journal.foodOut' })
     }
+
+    get().tickHealth(dayDelta, here.type)
+  },
+
+  /**
+   * Health per travelled day (design.md §6): dehydration follows from
+   * desert travel without a canteen, afflictions and starvation drain
+   * health, sun blindness heals only outside the desert, and at zero
+   * health the expedition is lost (§15).
+   */
+  tickHealth: (dayDelta: number, terrain: string) => {
+    const s = get()
+    if (s.defeat) return
+    const hb = balance.health
+    const a = { ...s.afflictions }
+
+    // Dehydration (§6): in the desert without a canteen; the canteen is
+    // always full. Leaving the desert or owning a canteen ends it.
+    const dehydrated = terrain === 'desert' && !(s.equipment.canteen && s.equipment.canteen > 0)
+    if (dehydrated && !a.dehydration) {
+      a.dehydration = true
+      get().addEntry({ key: 'journal.titles.dehydration' }, { key: 'journal.dehydrationOn' })
+    } else if (!dehydrated && a.dehydration) {
+      a.dehydration = false
+      get().addEntry({ key: 'journal.titles.recovery' }, { key: 'journal.dehydrationOver' })
+    }
+
+    // Sun blindness heals only outside the desert (§6).
+    let sunblindRecovery = s.sunblindRecovery
+    if (a.sunblind && terrain !== 'desert') {
+      sunblindRecovery -= dayDelta
+      if (sunblindRecovery <= 0) {
+        a.sunblind = false
+        get().addEntry({ key: 'journal.titles.recovery' }, { key: 'journal.sunblindOver' })
+      }
+    }
+
+    let drain = 0
+    if (s.foodDays <= 0) drain += hb.starvationDrain
+    if (a.fever) drain += hb.feverDrain
+    if (a.dehydration) drain += hb.dehydrationDrain
+    if (a.sunblind) drain += hb.sunblindDrain
+    if (a.wounds === 1) drain += hb.woundLightDrain
+    if (a.wounds === 2) drain += hb.woundSevereDrain
+
+    let health = s.health
+    if (drain > 0) {
+      health = Math.max(0, health - drain * dayDelta)
+    } else if (s.foodDays > 0) {
+      health = Math.min(hb.max, health + hb.regenPerDay * dayDelta)
+    }
+
+    const wasPoor = healthState(s.health) === 'poor'
+    set({ health, afflictions: a, sunblindRecovery })
+    if (!wasPoor && healthState(health) === 'poor' && health > 0) {
+      get().addEntry({ key: 'journal.titles.healthPoor' }, { key: 'journal.healthPoor' })
+    }
+
+    if (health <= 0) {
+      const cause: DeathCause = a.wounds === 2 ? 'wounds'
+        : a.fever ? 'fever'
+        : a.dehydration ? 'dehydration'
+        : a.sunblind ? 'sunblind'
+        : s.foodDays <= 0 ? 'starvation'
+        : 'wounds'
+      // Death (design.md §15): no more entries — the remains report takes
+      // over in the defeat overlay.
+      set({ defeat: 'death', deathCause: cause, journalOpen: false })
+    }
+  },
+
+  useMedicine: () => {
+    const s = get()
+    if (s.defeat || s.victory) return
+    const strings = getStrings()
+    if (!s.equipment.medicine || s.equipment.medicine <= 0) {
+      set({ toast: strings.toasts.noMedicine })
+      return
+    }
+    if (!s.afflictions.fever && s.afflictions.wounds === 0) {
+      set({ toast: strings.toasts.medicineNotNeeded })
+      return
+    }
+    set({
+      equipment: { ...s.equipment, medicine: s.equipment.medicine - 1 },
+      afflictions: { ...s.afflictions, fever: false, wounds: 0 },
+    })
+    get().addEntry({ key: 'journal.titles.recovery' }, { key: 'journal.medicineUsed' })
+  },
+
+  debugSetAffliction: (kind, value) => {
+    const s = get()
+    const a = { ...s.afflictions, [kind]: value } as Afflictions
+    const patch: Partial<GameState> = { afflictions: a }
+    if (kind === 'sunblind' && value === true) patch.sunblindRecovery = balance.health.sunblindRecoveryDays
+    set(patch)
   },
 
   enterPlace: (id) => {
@@ -434,6 +579,7 @@ export const useGame = create<GameState>()((set, get) => ({
       seed: s.seed, placeId: s.placeId, pos: s.pos, day: s.day, money: s.money,
       foodDays: s.foodDays, gifts: s.gifts, equipment: s.equipment, handItem: s.handItem,
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
+      health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       chiefHintGiven: s.chiefHintGiven, languageHintGiven: s.languageHintGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
@@ -457,6 +603,11 @@ export const useGame = create<GameState>()((set, get) => ({
       set({
         ...snap,
         explored: snap.explored ?? {},
+        health: snap.health ?? balance.health.max,
+        afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
+        sunblindRecovery: snap.sunblindRecovery ?? 0,
+        defeat: null,
+        deathCause: null,
         mode: 'place',
         victory: false,
         toast: null,
