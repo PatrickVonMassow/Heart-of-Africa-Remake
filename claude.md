@@ -278,8 +278,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     bathymetry) and foam along shores and wave crests. Verifiable:
     screenshots of both perspectives show the active effects; the
     application runs without console errors on both the WebGPU and WebGL 2
-    paths. TAA, screen-space reflections and true water refraction are
-    covered by pt. 32.
+    paths; simplifications (e.g. TAA, true screen-space reflection/
+    refraction) are named as open items (see pt. 32).
 15. **Lively, densely built settlements.** The passage "**Lively, densely
     built settlements (first-person).**" in "## 2. Perspectives and Camera"
     (`design.md`) is implemented: the first-person view shows far more
@@ -339,13 +339,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     UI never shows a marker; in the English version every journal entry can
     be read aloud via the in-browser Kokoro TTS, with the markup audibly
     shaping the delivery (pauses, pace, loudness, punctuation). A newly
-    appearing entry starts its narration automatically, without a click
-    (silently skipped while the browser's autoplay policy blocks audio).
-    Verifiable: spot check of both language files for markers; journal
-    screenshot free of visible tags; starting narration produces audio
-    without console errors; adding an entry switches its read-aloud control
-    into the speaking state without a click. German read-aloud stays an
-    open item until a German-capable voice exists.
+    appearing entry starts its narration automatically, without a click;
+    while the browser's autoplay policy blocks audio (before the first
+    user gesture), the narration of the newest entry — at game start the
+    departure entry — is deferred to that first gesture instead of being
+    dropped. Verifiable: spot check of both language files for markers;
+    journal screenshot free of visible tags; starting narration produces
+    audio without console errors; adding an entry switches its read-aloud
+    control into the speaking state without a click; the start entry
+    narrates on the first gesture (`scripts/verify/voice.mjs`). German
+    read-aloud stays an open item until a German-capable voice exists.
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
     value), walk speed inside settlements to 10 m/s (raised from 7.5 by
@@ -388,7 +391,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 22. **Health and afflictions.** `design.md` §6/§15 is implemented: a
     health pool is drained by starvation and by the afflictions fever
     (delirium: temporarily uncontrolled steering), dehydration (sets in
-    automatically in the desert without a canteen: drift and speed loss),
+    automatically after sustained dry desert travel without a canteen —
+    a balance value; rivers and lakes in reach count as drinking and
+    reset the thirst, so following a river never triggers it: drift and
+    speed loss),
     sun blindness (view narrowed to a glaring veil; heals only outside
     the desert) and wounds (light/severe); medicine is taken from the
     inventory bar and cures fever and wounds; health regenerates while
@@ -533,13 +539,17 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     first-person view, and the buttons map onto the existing key
     handlers (A interact, B close, X dig, Y journal, LB map, RB camp,
     Select position query, Start debug menu) via synthetic key events —
-    no second input path. The position query (§17) reports the current
-    coordinates and region as a localized toast on P (the status bar
-    keeps showing them permanently). Verifiable:
-    `scripts/verify/gamepad.mjs` injects a virtual gamepad and asserts
-    stick travel movement, right-stick turning in the first-person
-    view, the A-button interaction and Y-button journal toggle, and
-    the position-query toast in both languages.
+    no second input path. Only standard-mapped pads are read, and a
+    connected pad steers only after a deliberate input (button press or
+    full stick push): idle axis drift of wheels, flight sticks or worn
+    pads must never move or turn the game on its own. The position
+    query (§17) reports the current coordinates and region as a
+    localized toast on P (the status bar keeps showing them
+    permanently). Verifiable: `scripts/verify/gamepad.mjs` injects a
+    virtual gamepad and asserts that pre-engagement axis drift moves
+    nothing, stick travel movement, right-stick turning in the
+    first-person view, the A-button interaction and Y-button journal
+    toggle, and the position-query toast in both languages.
 31. **Settlement orientation and panorama wildlife.** Two `design.md`
     §17/§2 polish features hold: after the first accepted gift in a
     settlement the natives provide orientation — the important,
@@ -552,21 +562,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     markers before and markers after the gift plus the toast, their
     persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village.
-32. **Render pipeline upgrades.** The remaining `design.md` §2 pipeline
-    items are implemented for the WebGPU target: temporal anti-aliasing
-    (TRAA from the velocity buffer, replacing the render-pass MSAA) and
-    screen-space reflections masked to the ocean surface via its raised
-    metalness; true water refraction — shallow water samples the scene
-    behind the surface through wave-distorted viewport coordinates,
-    blended into the depth-dependent absorption — is active on both
-    backends. The WebGL 2 escape hatch (§3) keeps MSAA + GTAO + bloom +
-    refraction instead of TRAA/SSR: three r185's SSRNode emits invalid
-    GLSL there (open item, upstream) and TRAA's cost is out of
-    proportion on fallback-grade hardware. Verifiable:
-    `scripts/verify/pipeline.mjs` asserts the pipeline stages matching
-    the active backend, the water refraction/SSR-mask dev hook, and
-    error-free rendering in both perspectives incl. water travel, with
-    coast and settlement screenshots.
+32. **Render pipeline upgrades — open.** TRAA, screen-space reflections
+    and true water refraction (`design.md` §2) remain an OPEN item. A
+    first implementation was reverted: the headless verification runs
+    on the WebGL 2 fallback only (Chromium gets no WebGPU without a
+    display), so the WebGPU-only TRAA/SSR branch went untested and
+    rendered a black scene on real hardware; three r185's SSRNode
+    additionally emits invalid GLSL on WebGL 2 (upstream). The item
+    needs a WebGPU-capable verification path (or a supervised manual
+    test loop) before another attempt; until then AA relies on the
+    render pass' MSAA and reflections on the IBL environment.
 
 ### 7.2 Self-Verification (mandatory)
 
