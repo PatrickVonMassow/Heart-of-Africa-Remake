@@ -4,6 +4,7 @@
       "Read",
       "Edit",
       "Write",
+      "Bash(cd *)",
       "Bash(npm *)",
       "Bash(npm run *)",
       "Bash(npm audit *)",
