@@ -30,15 +30,15 @@ export type Collider = CircleCollider | BoxCollider
  * Oriented-box collider for a rotated rectangle (half extents hx/hz, yaw
  * rot). The margin keeps the camera's near plane out of the wall faces.
  */
-export function boxColliders(
+export function boxCollider(
   cx: number,
   cz: number,
   hx: number,
   hz: number,
   rot: number,
   margin = 0.15,
-): Collider[] {
-  return [{ kind: 'box', x: cx, z: cz, hx: hx + margin, hz: hz + margin, rot }]
+): Collider {
+  return { kind: 'box', x: cx, z: cz, hx: hx + margin, hz: hz + margin, rot }
 }
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v)
@@ -48,7 +48,7 @@ function pushOut(c: Collider, px: number, pz: number, radius: number): [number, 
   if (c.kind === 'box') {
     const sin = Math.sin(c.rot)
     const cos = Math.cos(c.rot)
-    // World → box-local (inverse of the group yaw used in boxColliders).
+    // World → box-local (inverse of the group yaw used in boxCollider).
     const dx = px - c.x
     const dz = pz - c.z
     const lx = cos * dx - sin * dz

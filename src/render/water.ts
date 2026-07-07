@@ -1,5 +1,7 @@
-// Ocean/river water surface (design.md §2 "Licht- und Post-Processing-
-// Pipeline"): Gerstner-style directional wave field plus noise swell,
+// Ocean water surface (design.md §2 "Licht- und Post-Processing-
+// Pipeline"); rivers and lakes have their own calm surfaces
+// (scenes/travel/Rivers.tsx). Gerstner-style directional wave field plus
+// subdued noise swell,
 // depth-dependent absorption sampled from the real bathymetry (the DEM
 // texture), foam along shorelines and on wave crests, and low roughness so
 // the IBL environment provides sky reflections. World-anchored via a uniform

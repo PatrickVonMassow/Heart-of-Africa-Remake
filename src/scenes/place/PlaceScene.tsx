@@ -22,7 +22,7 @@ import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, bui
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxColliders, resolveMove, type Collider } from './collision'
+import { boxCollider, resolveMove, type Collider } from './collision'
 import { getStrings, useStrings } from '../../i18n'
 
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -366,7 +366,7 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     } else if (place.kind === 'port') {
       // Must match PortBuilding's variant rotation (variant = interactive index).
       const rot = ((i * 137) % 40) / 100 - 0.2
-      colliders.push(...boxColliders(it.pos[0], it.pos[1], 2.5, 2.0, rot))
+      colliders.push(boxCollider(it.pos[0], it.pos[1], 2.5, 2.0, rot))
     } else {
       colliders.push({ x: it.pos[0], z: it.pos[1], r: 3.35 }) // chief hut
     }
@@ -374,10 +374,10 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const d of dwellings) {
     switch (d.kind) {
       case 'box':
-        colliders.push(...boxColliders(d.x, d.z, d.r, d.r * 0.875, d.rot))
+        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.875, d.rot))
         break
       case 'warehouse':
-        colliders.push(...boxColliders(d.x, d.z, d.r, 2.3, d.rot))
+        colliders.push(boxCollider(d.x, d.z, d.r, 2.3, d.rot))
         break
       case 'granary':
         colliders.push({ x: d.x, z: d.z, r: 1.2 })

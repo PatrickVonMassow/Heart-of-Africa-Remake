@@ -42,12 +42,8 @@ export interface TextRef {
   params?: Record<string, string | number>
 }
 
-/**
- * Resolve a stored journal text. Plain strings pass through unchanged
- * (backward compatibility with checkpoints from before localization).
- */
-export function resolveText(strings: Strings, ref: string | TextRef): string {
-  if (typeof ref === 'string') return ref
+/** Resolve a stored journal text reference in the given language. */
+export function resolveText(strings: Strings, ref: TextRef): string {
   const node = ref.key
     .split('.')
     .reduce<unknown>((obj, k) => (obj as Record<string, unknown> | undefined)?.[k], strings)

@@ -26,8 +26,8 @@ export interface JournalEntry {
   id: number
   /** In-game day index the entry was written. */
   day: number
-  title: string | TextRef
-  text: string | TextRef
+  title: TextRef
+  text: TextRef
   kind: 'event' | 'hint' | 'info'
   /** Optional hand-sketch illustration (design.md §19). */
   sketch?: SketchId
@@ -81,7 +81,7 @@ export interface GameState {
   giveGift: (material: Material) => void
   talkToVillager: () => void
   dig: () => void
-  addEntry: (title: string | TextRef, text: string | TextRef, kind?: JournalEntry['kind'], sketch?: SketchId) => void
+  addEntry: (title: TextRef, text: TextRef, kind?: JournalEntry['kind'], sketch?: SketchId) => void
   setJournalOpen: (open: boolean) => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
@@ -94,7 +94,9 @@ export interface GameState {
   debugJumpTo: (lat: number, lon: number) => void
 }
 
-const CHECKPOINT_KEY = 'hoa-checkpoint-v1'
+// v2: entries are language-neutral TextRefs only (plain-string journal
+// entries from pre-localization v1 checkpoints are no longer supported).
+const CHECKPOINT_KEY = 'hoa-checkpoint-v2'
 
 /** Cell size of the exploration grid for the self-drawing map (design.md §19). */
 export const EXPLORE_CELL_DEG = 0.5

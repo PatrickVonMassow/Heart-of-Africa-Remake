@@ -124,7 +124,7 @@ for (let i = 0; i < 25 && !entered; i++) {
 }
 await page.waitForTimeout(400)
 s = await state()
-const hasCp = await page.evaluate(() => localStorage.getItem('hoa-checkpoint-v1') !== null)
+const hasCp = await page.evaluate(() => localStorage.getItem('hoa-checkpoint-v2') !== null)
 check('Re-entered Cairo', s.mode === 'place' && s.placeId === 'cairo')
 check('Checkpoint saved (localStorage)', hasCp)
 check('Arrival journal entry', s.journal.some((e) =>
