@@ -12,6 +12,7 @@ import { useGame } from '../../state/store'
 import { useUi, type BuildingType } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { placeById } from '../../world/geo'
+import { sampleTerrain } from '../../world/terrain'
 import { mulberry32 } from '../../world/noise'
 import { isKeyDown, onKeyPress } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
@@ -1208,6 +1209,68 @@ function GroundScatter({
   )
 }
 
+// --- Landscape backdrop --------------------------------------------------------
+
+/**
+ * Panorama of the real surroundings (design.md §2): an annulus heightfield
+ * sampled from the actual travel terrain around the place's map position, so
+ * the first-person view shows the mountains, river courses, lakes and the
+ * coast that lie there in the bird's-eye view. Rendered as distant scenery
+ * in biome colors; heights are exaggerated to read at person scale.
+ */
+const BACKDROP_SCALE = 0.005 // degrees of map per place-unit of distance
+const BACKDROP_HEIGHT = 30 // vertical exaggeration of the map relief
+const BACKDROP_RINGS = 24
+const BACKDROP_SEGS = 96
+
+function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
+  const geometry = useMemo(() => {
+    const r0 = innerRadius
+    const r1 = 340
+    const centerH = sampleTerrain(lat, lon, seed).height
+    const positions: number[] = []
+    const colors: number[] = []
+    const indices: number[] = []
+    for (let ri = 0; ri < BACKDROP_RINGS; ri++) {
+      // Logarithmic ring spacing: more detail near the settlement.
+      const r = r0 * Math.pow(r1 / r0, ri / (BACKDROP_RINGS - 1))
+      // The inner rim tucks below the settlement ground and fades upward.
+      const taper = Math.min(1, ri / 5)
+      for (let si = 0; si < BACKDROP_SEGS; si++) {
+        const a = (si / BACKDROP_SEGS) * Math.PI * 2
+        const x = Math.cos(a) * r
+        const z = Math.sin(a) * r
+        const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
+        const y = Math.max(-6, (smp.height - centerH) * BACKDROP_HEIGHT) * taper - 2
+        positions.push(x, y, z)
+        colors.push(smp.color[0], smp.color[1], smp.color[2])
+      }
+    }
+    for (let ri = 0; ri < BACKDROP_RINGS - 1; ri++) {
+      for (let si = 0; si < BACKDROP_SEGS; si++) {
+        const a = ri * BACKDROP_SEGS + si
+        const b = ri * BACKDROP_SEGS + ((si + 1) % BACKDROP_SEGS)
+        const c = a + BACKDROP_SEGS
+        const d = b + BACKDROP_SEGS
+        indices.push(a, c, b, b, c, d)
+      }
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3))
+    geo.setIndex(indices)
+    geo.computeVertexNormals()
+    return geo
+  }, [lat, lon, seed, innerRadius])
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
+    [],
+  )
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
+  return <mesh geometry={geometry} material={material} receiveShadow />
+}
+
 // --- Scene --------------------------------------------------------------------
 
 export function PlaceScene() {
@@ -1369,7 +1432,7 @@ export function PlaceScene() {
   return (
     <>
       <color attach="background" args={[sky.horizon]} />
-      <fog attach="fog" args={[sky.horizon, 38, 110]} />
+      <fog attach="fog" args={[sky.horizon, 42, 320]} />
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
       <hemisphereLight args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', 0.8]} />
       <directionalLight
@@ -1386,6 +1449,9 @@ export function PlaceScene() {
         shadow-camera-far={160}
         shadow-bias={-0.0004}
       />
+
+      {/* Real-surroundings panorama behind the settlement (design.md §2) */}
+      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
 
       {/* Ground disc with procedural mottling */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
