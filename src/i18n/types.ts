@@ -146,6 +146,8 @@ export interface Strings {
     /** Camps (design.md §6). */
     campPitched: string
     campNeedsFriend: string
+    /** Position query (design.md §17), e.g. via P or the gamepad. */
+    positionReport(coords: string, region: string): string
   }
 
   dialogs: {

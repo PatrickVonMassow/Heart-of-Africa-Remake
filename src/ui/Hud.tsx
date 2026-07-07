@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { healthState, listCheckpoints, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
+import { placeById, worldToLatLon } from '../world/geo'
 import { START_YEAR } from '../config/balance'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
@@ -281,6 +282,17 @@ export function Hud() {
       ].filter((x): x is string => x !== null)
       g.setToast(st.health.report(state, list))
     })
+    // P: position query (design.md §17) — the coordinates as a spoken-style
+    // toast in the current language (the status bar shows them permanently).
+    const offP = onKeyPress('KeyP', () => {
+      const g = useGame.getState()
+      const st = getStrings()
+      const coords =
+        g.mode === 'place' && g.placeId
+          ? { lat: placeById(g.placeId).lat, lon: placeById(g.placeId).lon }
+          : worldToLatLon(g.pos.x, g.pos.z)
+      g.setToast(st.toasts.positionReport(st.formatLatLon(coords.lat, coords.lon), st.regions[g.region]))
+    })
     // C: camps (design.md §6/§17) — pitch/open a free camp while travelling,
     // open the village cache inside villages (Honored Friend privilege).
     const offC = onKeyPress('KeyC', () => {
@@ -312,6 +324,7 @@ export function Hud() {
       offF1()
       offF2()
       offH()
+      offP()
       offC()
       offEsc()
       window.removeEventListener('keydown', preventF1)

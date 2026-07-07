@@ -527,6 +527,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     reveal with the hand element, the wound classes on the hand, the
     persistent blood traces, the click-to-finish, the clean final text
     (no markup, full length) and the silent do-not-disturb path.
+30. **Gamepad and position query.** The `design.md` §17 controls hold
+    for the gamepad too: the left stick moves the character in both
+    perspectives (merged with WASD), the right stick turns the
+    first-person view, and the buttons map onto the existing key
+    handlers (A interact, B close, X dig, Y journal, LB map, RB camp,
+    Select position query, Start debug menu) via synthetic key events —
+    no second input path. The position query (§17) reports the current
+    coordinates and region as a localized toast on P (the status bar
+    keeps showing them permanently). Verifiable:
+    `scripts/verify/gamepad.mjs` injects a virtual gamepad and asserts
+    stick travel movement, right-stick turning in the first-person
+    view, the A-button interaction and Y-button journal toggle, and
+    the position-query toast in both languages.
 
 ### 7.2 Self-Verification (mandatory)
 

@@ -14,7 +14,7 @@ import { balance } from '../../config/balance'
 import { placeById } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { mulberry32 } from '../../world/noise'
-import { isKeyDown, onKeyPress } from '../../systems/input'
+import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial } from '../../render/materials'
@@ -1412,12 +1412,19 @@ export function PlaceScene() {
       // Q/E-free tank controls: WASD + arrows; ←/→ turn, A/D strafe.
       if (isKeyDown('ArrowLeft')) p.yaw += 2.2 * dt
       if (isKeyDown('ArrowRight')) p.yaw -= 2.2 * dt
+      // Gamepad right stick turns the view (design.md §17).
+      const look = gamepadLook()
+      if (look.x !== 0) p.yaw -= look.x * 2.4 * dt
       let forward = 0
       let strafe = 0
       if (isKeyDown('KeyW') || isKeyDown('ArrowUp')) forward += 1
       if (isKeyDown('KeyS') || isKeyDown('ArrowDown')) forward -= 1
       if (isKeyDown('KeyA')) strafe -= 1
       if (isKeyDown('KeyD')) strafe += 1
+      // Gamepad left stick walks/strafes (design.md §17).
+      const stick = gamepadMove()
+      forward += stick.y
+      strafe += stick.x
       const len = Math.hypot(forward, strafe)
       if (len > 0) {
         const speed = balance.placeWalkSpeed

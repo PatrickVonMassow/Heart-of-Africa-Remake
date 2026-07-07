@@ -230,6 +230,7 @@ export const de: Strings = {
     regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet — keine Hütte dieser Region öffnet sich mir mehr.',
     campPitched: 'Lager aufgeschlagen — ein X auf meiner Karte markiert die Stelle.',
     campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
+    positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} — Region ${region}.`,
   },
 
   dialogs: {

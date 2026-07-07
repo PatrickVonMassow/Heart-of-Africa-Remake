@@ -231,6 +231,7 @@ export const en: Strings = {
     regionShunned: 'Word of my robbery has spread — no hut of this region will open to me again.',
     campPitched: 'Camp pitched — an X on my map marks the spot.',
     campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
+    positionReport: (coords, region) => `By my reckoning: ${coords} — the ${region} region.`,
   },
 
   dialogs: {
