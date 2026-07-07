@@ -278,8 +278,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     bathymetry) and foam along shores and wave crests. Verifiable:
     screenshots of both perspectives show the active effects; the
     application runs without console errors on both the WebGPU and WebGL 2
-    paths; simplifications (e.g. TAA, true screen-space reflection/
-    refraction) are named as open items.
+    paths. TAA, screen-space reflections and true water refraction are
+    covered by pt. 32.
 15. **Lively, densely built settlements.** The passage "**Lively, densely
     built settlements (first-person).**" in "## 2. Perspectives and Camera"
     (`design.md`) is implemented: the first-person view shows far more
@@ -552,6 +552,21 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     markers before and markers after the gift plus the toast, their
     persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village.
+32. **Render pipeline upgrades.** The remaining `design.md` §2 pipeline
+    items are implemented for the WebGPU target: temporal anti-aliasing
+    (TRAA from the velocity buffer, replacing the render-pass MSAA) and
+    screen-space reflections masked to the ocean surface via its raised
+    metalness; true water refraction — shallow water samples the scene
+    behind the surface through wave-distorted viewport coordinates,
+    blended into the depth-dependent absorption — is active on both
+    backends. The WebGL 2 escape hatch (§3) keeps MSAA + GTAO + bloom +
+    refraction instead of TRAA/SSR: three r185's SSRNode emits invalid
+    GLSL there (open item, upstream) and TRAA's cost is out of
+    proportion on fallback-grade hardware. Verifiable:
+    `scripts/verify/pipeline.mjs` asserts the pipeline stages matching
+    the active backend, the water refraction/SSR-mask dev hook, and
+    error-free rendering in both perspectives incl. water travel, with
+    coast and settlement screenshots.
 
 ### 7.2 Self-Verification (mandatory)
 
