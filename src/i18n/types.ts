@@ -136,6 +136,7 @@ export interface Strings {
     randomEvents: string
     showHidden: string
     fpsCounter: string
+    wheelZoom: string
     cash: string
     foodDays: string
     jumpTo: string

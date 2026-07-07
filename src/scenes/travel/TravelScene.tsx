@@ -765,9 +765,21 @@ export function TravelScene() {
   // previous first-person pose).
   useEffect(() => {
     const pos = useGame.getState().pos
-    camera.position.set(pos.x, CAMERA_OFFSET.y, pos.z + CAMERA_OFFSET.z)
+    const zoom = useUi.getState().travelZoom
+    camera.position.set(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom)
     camera.lookAt(pos.x, 0, pos.z)
   }, [camera])
+
+  // Mouse-wheel zoom, unlocked via the debug menu (design.md §21).
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      const ui = useUi.getState()
+      if (!ui.wheelZoomEnabled || ui.dialog) return
+      ui.setTravelZoom(ui.travelZoom * Math.exp(e.deltaY * 0.0009))
+    }
+    window.addEventListener('wheel', onWheel, { passive: true })
+    return () => window.removeEventListener('wheel', onWheel)
+  }, [])
 
   // Interaction keys: E enters a nearby place, G digs.
   useEffect(() => {
@@ -795,9 +807,11 @@ export function TravelScene() {
       if (a.x !== 0 || a.y !== 0) s.moveTravel(a.x, -a.y, dt)
     }
 
-    // Camera follows from above with a slight tilt.
+    // Camera follows from above with a slight tilt; the zoom factor scales
+    // the offset while the wheel zoom is unlocked (debug menu).
     const pos = useGame.getState().pos
-    camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y, pos.z + CAMERA_OFFSET.z), 0.12)
+    const zoom = useUi.getState().travelZoom
+    camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom), 0.12)
     camera.lookAt(pos.x, 0, pos.z)
 
     // Proximity prompt for entering places / digging.

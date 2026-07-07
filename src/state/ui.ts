@@ -22,6 +22,10 @@ interface UiState {
   webglWarningDismissed: boolean
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
+  /** Mouse-wheel zoom in the bird's-eye view; unlocked in the debug menu. */
+  wheelZoomEnabled: boolean
+  /** Current bird's-eye zoom factor (1 = default camera distance). */
+  travelZoom: number
   setDialog: (d: Dialog) => void
   setPrompt: (p: string | null) => void
   toggleDebug: () => void
@@ -29,6 +33,8 @@ interface UiState {
   setWebglFallback: (fallback: boolean) => void
   dismissWebglWarning: () => void
   setFpsVisible: (visible: boolean) => void
+  setWheelZoomEnabled: (enabled: boolean) => void
+  setTravelZoom: (zoom: number) => void
 }
 
 export const useUi = create<UiState>()((set) => ({
@@ -39,6 +45,8 @@ export const useUi = create<UiState>()((set) => ({
   webglFallback: false,
   webglWarningDismissed: false,
   fpsVisible: true,
+  wheelZoomEnabled: false,
+  travelZoom: 1,
   setDialog: (dialog) => set({ dialog }),
   setPrompt: (prompt) => set({ prompt }),
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
@@ -46,4 +54,8 @@ export const useUi = create<UiState>()((set) => ({
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
+  // Disabling the unlock also resets the zoom to the default distance.
+  setWheelZoomEnabled: (wheelZoomEnabled) =>
+    set(wheelZoomEnabled ? { wheelZoomEnabled } : { wheelZoomEnabled, travelZoom: 1 }),
+  setTravelZoom: (travelZoom) => set({ travelZoom: Math.min(2.5, Math.max(0.4, travelZoom)) }),
 }))

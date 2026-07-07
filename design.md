@@ -370,6 +370,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - One button per kind of random event (§14) to trigger it immediately.
 - Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
+- Checkbox: unlock mouse-wheel zoom in the bird's-eye view (zoom in/out around the default camera distance), off by default; disabling it resets the zoom.
 - Instant jump to any port city.
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.

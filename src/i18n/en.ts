@@ -231,6 +231,7 @@ export const en: Strings = {
     randomEvents: 'Random events (POC: none implemented)',
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
+    wheelZoom: "Mouse-wheel zoom (bird's-eye view)",
     cash: 'Funds ($)',
     foodDays: 'Food (days)',
     jumpTo: 'Jump to:',

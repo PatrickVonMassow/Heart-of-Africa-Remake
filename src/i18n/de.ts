@@ -230,6 +230,7 @@ export const de: Strings = {
     randomEvents: 'Zufallsereignisse (POC: keine implementiert)',
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
+    wheelZoom: 'Mausrad-Zoom (Vogelperspektive)',
     cash: 'Kontostand ($)',
     foodDays: 'Nahrung (Tage)',
     jumpTo: 'Springe zu:',

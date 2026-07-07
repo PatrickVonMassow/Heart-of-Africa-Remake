@@ -45,6 +45,7 @@ export function DebugMenu() {
   const setLang = useLocale((s) => s.setLang)
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
+  const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const bump = useGame((s) => s.bumpBalance)
   useGame((s) => s.balanceVersion)
   const game = useGame()
@@ -113,6 +114,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={fpsVisible}
           onChange={(e) => useUi.getState().setFpsVisible(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.wheelZoom}</span>
+        <input
+          type="checkbox"
+          checked={wheelZoomEnabled}
+          onChange={(e) => useUi.getState().setWheelZoomEnabled(e.target.checked)}
         />
       </label>
 
