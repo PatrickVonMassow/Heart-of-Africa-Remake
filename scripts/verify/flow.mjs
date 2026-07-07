@@ -73,6 +73,15 @@ await page.waitForTimeout(3500)
 // The flow is asserted against German labels; the default is English (par.17).
 await page.evaluate(() => window.__setLang('de'))
 await page.waitForTimeout(400)
+// Keep the long walks uninterrupted (design.md §16) and hydrated (§6):
+// journal auto-open would stop travel movement, desert walking without a
+// canteen would drift.
+await page.evaluate(() => {
+  window.__ui.getState().setJournalDnd(true)
+  window.__game.getState().debugAddEquipment('canteen')
+  // The core loop is deterministic; random events have their own suite.
+  window.__balance.randomEventsEnabled = false
+})
 
 // --- 1. Start state (criteria 1, 5, 9) ---
 let s = await state()
@@ -83,7 +92,7 @@ check('Starting money $250', s.money === 250)
 check('Provisions 35 days', s.foodDays === 35)
 check('2 starting gifts', Object.values(s.gifts).reduce((a, b) => a + b, 0) === 2)
 await shot('06-start-journal')
-await page.keyboard.press('KeyT')
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(300)
 
 // --- 2. Trade in Cairo (criterion 5) ---
@@ -129,17 +138,18 @@ check('Re-entered Cairo', s.mode === 'place' && s.placeId === 'cairo')
 check('Checkpoint saved (localStorage)', hasCp)
 check('Arrival journal entry', s.journal.some((e) =>
   titleKey(e) === 'journal.titles.arrival' && e.title.params?.place === 'cairo'))
-await page.keyboard.press('KeyT')
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 
 // --- 5. Travel to village (criteria 4, 6) ---
 await pressAt('exit', 1, 'travel')
-// Jump slightly north of the Nubian village, then walk south into it so the
-// journey itself (movement, time) is exercised.
+// Jump slightly north of the North's knowing village (design.md §13.3), then
+// walk south into it so the journey itself (movement, time) is exercised.
 const village = await page.evaluate(async () => {
   const geo = await import('/src/world/geo.ts')
-  const v = geo.PLACES.find((p) => p.id === 'nubian-village')
-  return { lat: v.lat, lon: v.lon }
+  const id = window.__game.getState().knowingVillages.north
+  const v = geo.PLACES.find((p) => p.id === id)
+  return { id, lat: v.lat, lon: v.lon }
 })
 // 0.5° ≈ 5 world units: outside the enter radius (2.5), so real walking
 // (movement, time, provisions) is required to get in.
@@ -150,7 +160,7 @@ const dayBefore = (await state()).day
 await page.keyboard.down('KeyS')
 await page
   .waitForFunction(
-    () => (document.querySelector('.prompt')?.textContent ?? '').includes('Dorf der Nubier betreten'),
+    () => (document.querySelector('.prompt')?.textContent ?? '').includes('betreten'),
     null,
     { timeout: 60000 },
   )
@@ -159,20 +169,20 @@ await page.keyboard.press('KeyE')
 await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
 await page.waitForTimeout(500)
 s = await state()
-check('Entered the village (first-person)', s.mode === 'place' && s.placeId === 'nubian-village')
+check('Entered the village (first-person)', s.mode === 'place' && s.placeId === village.id)
 check('Time advances with the journey', s.day > dayBefore)
 check('Village journal entry', s.journal.some((e) =>
-  titleKey(e) === 'journal.titles.village' && e.title.params?.place === 'nubian-village'))
-await page.keyboard.press('KeyT')
+  titleKey(e) === 'journal.titles.village' && e.title.params?.place === village.id))
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 await shot('03-village-nubians')
 
-// --- 6. Villager: language hint (criterion 7) ---
+// --- 6. Villager: the elder teaches the North's direction system (§13.2) ---
 await pressAt('villager', 2)
 s = await state()
-check('Language hint (Nivera = north) in the journal', s.languageHintGiven &&
+check('Language lesson (Nivera = north) in the journal', s.languagesLearned.north === true &&
   s.journal.some((e) => titleKey(e) === 'journal.titles.language'))
-await page.keyboard.press('KeyT')
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 
 // --- 7. Chief audience: culturally correct gift → hint (criteria 6, 7) ---
@@ -182,17 +192,39 @@ await shot('04-chief-hut-audience')
 await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
 await page.waitForTimeout(400)
 s = await state()
-check('Culturally correct gift → hint unlocked', s.chiefHintGiven)
+check('Culturally correct gift → hint unlocked', s.hintsGiven.north === true)
 const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')
 check('Hint stores grave coordinates (language-neutral)',
   !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
+check('Learned language deciphers the hint (latitude)', s.decodedGiven.north === true &&
+  s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
 await shot('05-journal-hint')
 await closeDialog()
-await page.keyboard.press('KeyT')
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 
-// --- 8. Grave: dig with shovel → victory (criterion 10) ---
+// --- 8. Triangulation: the East's knowing people contributes the longitude ---
 await pressAt('exit', 1, 'travel')
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.enterPlace(g.knowingVillages.east)
+})
+await page.waitForTimeout(1200)
+await page.evaluate(() => {
+  const g = () => window.__game.getState()
+  g().setJournalOpen(false)
+  g().debugAddGift('emerald') // the East reveres emeralds (design.md §8)
+  g().giveGift('emerald')
+  g().talkToVillager()
+})
+await page.waitForTimeout(400)
+s = await state()
+check('Second hint: longitude from the East, deciphered (triangulation)',
+  s.hintsGiven.east === true && s.decodedGiven.east === true)
+await page.evaluate(() => window.__game.getState().leavePlace())
+await page.waitForTimeout(800)
+
+// --- 9. Grave: dig with shovel → victory (criterion 10) ---
 s = await state()
 const grave = s.graveLatLon
 check('Grave lies north of the village (Nivera matches)', grave.lat > 21.8)

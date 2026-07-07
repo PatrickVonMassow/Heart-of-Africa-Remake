@@ -64,6 +64,7 @@ node scripts/verify/enrichments.mjs # §7.1.3/4/12/15/20/21 borders, sea, water,
 node scripts/verify/health.mjs      # §7.1.22 health, afflictions, death/successor
 node scripts/verify/events.mjs      # §7.1.23 random events, protection logic, triggers
 node scripts/verify/expedition.mjs  # §7.1.24 deadline warnings, expiry, successor
+node scripts/verify/hints.mjs       # §7.1.7/10 language systems, hint cascade, triangulation
 
 npm run build && npm run preview    # prerequisite for the production check
 node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean

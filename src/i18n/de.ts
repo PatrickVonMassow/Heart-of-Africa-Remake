@@ -2,6 +2,7 @@
 // visible German text lives here; identifiers and comments stay English.
 
 import type { Strings, TextParams } from './types'
+import { DIRECTION_WORDS, GLOSSARY } from '../world/lore'
 
 const MONTHS = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
@@ -289,8 +290,18 @@ export const de: Strings = {
       village: (p: TextParams) => PLACES[p.place as string],
       audience: 'Audienz beim Oberhaupt',
       mistake: 'Ein schwerer Fehler',
-      chiefHint: 'Der Hinweis des Oberhaupts',
-      language: 'Die Sprache des Nordens',
+      chiefHint: 'Die Worte des Oberhaupts',
+      decoded: 'Entschlüsselt!',
+      unspecific: 'Unbestimmtes Gemurmel',
+      giftLore: 'Was das Volk verehrt',
+      language: (p: TextParams) => {
+        const names: Record<string, string> = {
+          north: 'Die Sprache des Nordens', west: 'Die Sprache des Westens',
+          central: 'Die Sprache des Dschungels', east: 'Die Sprache des Ostens',
+          south: 'Die Sprache des Südens',
+        }
+        return names[p.region as string]
+      },
       victory: 'Das Herz von Afrika',
       foodLow: 'Proviant knapp',
       foodOut: 'Proviant aufgebraucht',
@@ -335,14 +346,58 @@ export const de: Strings = {
       'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. [somber]Kein Leuchten in den Augen —[pause] es war wohl nicht das, was sein Volk verehrt.[/somber] [pause]Aber ein Anfang ist gemacht.',
     giftRejected: (p: TextParams) =>
       `[fear]Ein schwerer Fehler![/fear] Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. [somber]Was ich anbot, gilt seinem Volk als Unglücksbringer.[pause] Man führte mich wortlos hinaus.[/somber] [breath][weary]Ich muss dieses Misstrauen erst wieder abtragen.[/weary]`,
-    languageHint:
-      'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Immer wieder sagte er [emph]„Nivera"[/emph] und wies dorthin, woher nachts der kalte Wind weht — [pause]nach Mitternacht. [breath][excited]Ich begreife:[pause] In der Sprache des Nordens bedeutet [emph]„Nivera" Norden![/emph][/excited]',
-    chiefHint: (p: TextParams) =>
-      'Das Oberhaupt beugte sich vor und sprach mit leiser Stimme: [whisper]„Du suchst das Grab des großen Königs. ' +
-      'Geh von unserem Dorf gen Nivera, immer dem großen Fluss entgegen der Strömung fern. ' +
-      `Wo die Breite ${dec(p.lat as number)} Grad gen Mitternacht zählt und die Länge ${dec(p.lon as number)} Grad gen Sonnenaufgang, ` +
-      '[pause]dort ruht er unter dem Sand. Nimm die Schaufel, und der Sand wird ihn freigeben."[/whisper] — ' +
-      '[breath][somber]Nivera …[pause] ich muss herausfinden, was das bedeutet,[/somber] [excited]dann kenne ich die Richtung.[/excited]',
+    languageLesson: (p: TextParams) => {
+      const texts: Record<string, string> = {
+        north:
+          'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Er nannte die Winde: [emph]„Nivera"[/emph], wo der kalte Nachtwind geboren wird — gen Mitternacht —, „Chamsina" für den heißen Atem des Mittags, „Levantra" für den Morgen, „Gharbia" für den Abend. [breath][excited]Ich begreife:[pause] Der Norden liest seine Richtungen am Ursprung des Windes, und [emph]„Nivera" bedeutet Norden![/emph][/excited]',
+        west:
+          'Ein Ältester zog vier Striche in den Staub und sprach bedächtig: [emph]„koko"[/emph] gen Mitternacht, [emph]„Katula"[/emph] gen Sonnenaufgang, „Phuthswama" gen Mittag, „Mimbumi" gen Sonnenuntergang. [breath][excited]Die Worte des Westens gehören nun mir:[pause] koko ist Norden, Katula ist Osten![/excited]',
+        central:
+          'Am Feuer wies ein Alter immer wieder auf den großen Fluss, den sein Volk [emph]„Utomba"[/emph] nennt — den Mongdamara. Alles liegt „wa-Utomba" oder „ka-Utomba": fort vom Fluss oder zu ihm hin, „lem-Utomba" zur Sonnenaufgangsseite, „mos-Utomba" zum Sonnenuntergang. [breath][excited]Der Wald misst die Welt an seinem Fluss![/excited]',
+        east:
+          'Ein alter Hirte hob den Stab zum leuchtenden Berg, den sein Volk [emph]„Odabi"[/emph] nennt — den Unumpara. Von ihm gehen die Richtungen aus: [emph]„Relolo"[/emph] jenseits von ihm gen Mitternacht, „Dethamee" gen Mittag, „Salewa" gen Sonnenaufgang, „Munjori" gen Sonnenuntergang. [breath][excited]Der Osten misst die Welt am heiligen Berg![/excited]',
+        south:
+          'Eine alte Frau lachte über meinen Kompass und deutete in den Himmel: Ihr Volk nennt die Richtungen nach den Jahreszeiten — [emph]gen Sommer[/emph] heißt gen Mitternacht, gen Winter gen Mittag, Frühling ist der Sonnenaufgang, Herbst der Sonnenuntergang. [breath][excited]Was für eine wunderliche, schöne Art, die Welt zu tragen![/excited]',
+      }
+      return texts[p.region as string]
+    },
+    hintRaw: (p: TextParams) => {
+      const region = p.region as string
+      const w = DIRECTION_WORDS[region as keyof typeof DIRECTION_WORDS]
+      const seasonNorth = 'Sommer'
+      const texts: Record<string, string> = {
+        north:
+          'Das Oberhaupt beugte sich vor und sprach mit leiser Stimme: [whisper]„Du suchst das Grab des großen Königs. ' +
+          `Wo die Breite ${dec(p.lat as number)} Grad gen [emph]${w.north}[/emph] zählt, dort ruht er unter dem Sand."[/whisper] ` +
+          `[breath][somber]${w.north} …[pause] ich muss lernen, was dieses Wort bedeutet;[/somber] [excited]dann weist mir diese Zahl den Weg.[/excited]`,
+        east:
+          'Das Oberhaupt wies mit dem Stab weit über die Ebene: [whisper]„Jenseits der großen Wüste, dorthin, wo Unumpara sich verbirgt — ' +
+          `wo die Länge ${dec(p.lon as number)} Grad gen [emph]${w.east}[/emph] zählt, schläft der alte König."[/whisper] ` +
+          `[breath][somber]${w.east} …[pause] wieder ein Wort, das ich entschlüsseln muss.[/somber]`,
+        west:
+          `Das Oberhaupt sprach von einem Land weit gen [emph]${w.north}[/emph], jenseits des großen Sandes, wo kein Gras mehr wächst: [whisper]„Dort, so heißt es, wurde einst ein König in die Erde gelegt."[/whisper] [somber]Wenn ${w.north} eine Richtung ist, engt das meine Suche ein.[/somber]`,
+        central:
+          `Das Oberhaupt murmelte: [whisper]„Geh [emph]${w.north}[/emph], fort vom ${GLOSSARY.congo}, bis die Bäume enden und der Sand beginnt — unter solchem Sand schlafen die alten Könige."[/whisper] [somber]Die Worte des Waldes verhüllen mir noch die Richtung.[/somber]`,
+        south:
+          `Das Oberhaupt blickte lange zum Horizont: [whisper]„Viele Monde gen [emph]${seasonNorth}[/emph], weiter als ${GLOSSARY.zambezi}, weiter als der große Wald — wo das Land nur noch Sand ist, liegt der große König."[/whisper] [somber]Gen ${seasonNorth} … eine Jahreszeit als Wegweiser?[/somber]`,
+      }
+      return texts[region]
+    },
+    hintDecoded: (p: TextParams) => {
+      const region = p.region as string
+      const texts: Record<string, string> = {
+        north: `[excited]Entschlüsselt![/excited] Die Worte des Oberhaupts bedeuten: [emph]Das Grab liegt auf Breite ${dec(p.lat as number)} Grad Nord.[/emph] [somber]Nun fehlt mir noch seine Länge.[/somber]`,
+        east: `[excited]Entschlüsselt![/excited] „Salewa" ist der Sonnenaufgang: [emph]Das Grab liegt auf Länge ${dec(p.lon as number)} Grad Ost.[/emph] [somber]Zusammen mit der Breite ist der Ort bestimmt.[/somber]`,
+        west: '[excited]Nun verstehe ich das Oberhaupt des Westens:[/excited] Das Grab liegt [emph]im Norden, jenseits des Wüstenrands[/emph] — ein Land ohne Gras.',
+        central: '[excited]Die Worte des Waldes öffnen sich:[/excited] Das Grab liegt [emph]im Norden, fort vom Kongo, wo der Sand beginnt[/emph].',
+        south: '[excited]Die Jahreszeiten sprechen:[/excited] „Gen Sommer" heißt [emph]weit nach Norden[/emph] — jenseits des Sambesi, jenseits der Wälder, im großen Sand.',
+      }
+      return texts[region]
+    },
+    unspecific: (p: TextParams) =>
+      `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß — es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] — [excited]sie sollen mehr wissen.[/excited]`,
+    giftLore: (p: TextParams) =>
+      `Der Alte sprach von den Schätzen seines Landes: Was sein Volk über alles verehrt, ist [emph]${de.gifts[p.gift as keyof typeof de.gifts]}[/emph]. [pause]Ein damit geehrtes Oberhaupt öffnet sein Herz.`,
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
     victory: (p: TextParams) =>
       `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein —[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,

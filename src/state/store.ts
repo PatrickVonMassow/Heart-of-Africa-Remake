@@ -4,12 +4,13 @@
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY } from '../config/balance'
 import type { LatLon, Material, RegionId } from '../world/geo'
-import { REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
+import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
 import { riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
+import { UNSPECIFIC_WORDS } from '../world/lore'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
@@ -92,8 +93,18 @@ export interface GameState {
   explored: Record<string, true>
   goodwill: Record<string, number>
   reveredGiftGiven: Record<string, boolean>
-  chiefHintGiven: boolean
-  languageHintGiven: boolean
+  /** Per region: the village whose people knows the location hint (§13.3). */
+  knowingVillages: Record<RegionId, string>
+  /** Regions whose knowing chief already gave his raw hint. */
+  hintsGiven: Partial<Record<RegionId, boolean>>
+  /** Regions whose raw hint has been deciphered into a decoded entry. */
+  decodedGiven: Partial<Record<RegionId, boolean>>
+  /** Regions whose direction system has been learned from an elder (§13.2). */
+  languagesLearned: Partial<Record<RegionId, boolean>>
+  /** Villages whose chief already shared his unspecific knowledge. */
+  unspecificGiven: Record<string, boolean>
+  /** Regions whose revered gift an elder has revealed (§8). */
+  giftLoreGiven: Partial<Record<RegionId, boolean>>
   graveLatLon: LatLon
   victory: boolean
   /** Short-lived HUD message. */
@@ -112,6 +123,8 @@ export interface GameState {
   takeInHand: (item: EquipmentId | null) => void
   giveGift: (material: Material) => void
   talkToVillager: () => void
+  /** Write the decoded version of a region's hint once language + hint meet. */
+  revealDecoded: (region: RegionId) => void
   dig: () => void
   /** Health per travelled day; exposed for the event engine and tests. */
   tickHealth: (dayDelta: number, terrain: string) => void
@@ -184,6 +197,20 @@ const REGION_SKETCHES: Record<RegionId, SketchId> = {
   south: 'antelope',
 }
 
+/**
+ * Per region, one people knows the location hint (design.md §13.3); the
+ * knowing village is picked per run from the region's villages.
+ */
+function pickKnowingVillages(seed: number): Record<RegionId, string> {
+  const rand = mulberry32((seed ^ 0x517a7e) >>> 0)
+  const out = {} as Record<RegionId, string>
+  for (const region of ['north', 'west', 'central', 'east', 'south'] as RegionId[]) {
+    const villages = PLACES.filter((p) => p.kind === 'village' && p.region === region)
+    out[region] = villages[Math.floor(rand() * villages.length)].id
+  }
+  return out
+}
+
 /** Place the grave procedurally per run: desert north of the Nubian village. */
 function generateGrave(seed: number): LatLon {
   const rand = mulberry32(seed ^ 0x9e3779b9)
@@ -231,8 +258,12 @@ function startState(seed: number) {
     explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
     goodwill: {},
     reveredGiftGiven: {},
-    chiefHintGiven: false,
-    languageHintGiven: false,
+    knowingVillages: pickKnowingVillages(seed),
+    hintsGiven: {} as Partial<Record<RegionId, boolean>>,
+    decodedGiven: {} as Partial<Record<RegionId, boolean>>,
+    languagesLearned: {} as Partial<Record<RegionId, boolean>>,
+    unspecificGiven: {} as Record<string, boolean>,
+    giftLoreGiven: {} as Partial<Record<RegionId, boolean>>,
     graveLatLon: generateGrave(seed),
     victory: false,
     toast: null,
@@ -708,28 +739,76 @@ export const useGame = create<GameState>()((set, get) => ({
       get().addEntry({ key: 'journal.titles.audience' }, { key: 'journal.giftNeutral' })
     }
 
-    // The culturally correct (revered) gift is the hard condition for the hint
-    // (CLAUDE.md §7.1.6), plus sufficient goodwill.
-    if (!s.chiefHintGiven && reveredGiven[place.id] && newGw >= balance.goodwillForHint) {
-      const g = get().graveLatLon
-      set({ chiefHintGiven: true })
-      get().addEntry(
-        { key: 'journal.titles.chiefHint' },
-        { key: 'journal.chiefHint', params: { lat: g.lat, lon: g.lon } },
-        'hint',
-        'compass',
-      )
+    // The culturally correct (revered) gift is the hard condition for the
+    // hint (CLAUDE.md §7.1.6), plus sufficient goodwill. Per region only the
+    // knowing people reveals the location component; the other chiefs offer
+    // unspecific knowledge and point to the knowing people (§13.3).
+    if (reveredGiven[place.id] && newGw >= balance.goodwillForHint) {
+      const region = place.region
+      if (s.knowingVillages[region] === place.id) {
+        if (!s.hintsGiven[region]) {
+          set({ hintsGiven: { ...get().hintsGiven, [region]: true } })
+          const g = get().graveLatLon
+          get().addEntry(
+            { key: 'journal.titles.chiefHint' },
+            { key: 'journal.hintRaw', params: { region, lat: g.lat, lon: g.lon } },
+            'hint',
+            'compass',
+          )
+          get().revealDecoded(region)
+        }
+      } else if (!s.unspecificGiven[place.id]) {
+        set({ unspecificGiven: { ...get().unspecificGiven, [place.id]: true } })
+        const knowing = placeById(get().knowingVillages[region])
+        const word = UNSPECIFIC_WORDS[(place.id.length + region.length) % UNSPECIFIC_WORDS.length]
+        get().addEntry(
+          { key: 'journal.titles.unspecific' },
+          { key: 'journal.unspecific', params: { people: knowing.peopleId ?? knowing.id, word } },
+          'hint',
+        )
+      }
     }
+  },
+
+  revealDecoded: (region) => {
+    const s = get()
+    if (s.decodedGiven[region] || !s.hintsGiven[region] || !s.languagesLearned[region]) return
+    set({ decodedGiven: { ...s.decodedGiven, [region]: true } })
+    const g = s.graveLatLon
+    get().addEntry(
+      { key: 'journal.titles.decoded' },
+      { key: 'journal.hintDecoded', params: { region, lat: g.lat, lon: g.lon } },
+      'hint',
+      'compass',
+    )
   },
 
   talkToVillager: () => {
     const s = get()
-    if (s.languageHintGiven) {
-      set({ toast: getStrings().toasts.villagerNod })
+    if (!s.placeId) return
+    const region = placeById(s.placeId).region
+    // First talk: the elder teaches the region's direction system (§13.2);
+    // a second talk reveals what the region reveres (§8).
+    if (!s.languagesLearned[region]) {
+      set({ languagesLearned: { ...s.languagesLearned, [region]: true } })
+      get().addEntry(
+        { key: 'journal.titles.language', params: { region } },
+        { key: 'journal.languageLesson', params: { region } },
+        'hint',
+        'face',
+      )
+      get().revealDecoded(region)
       return
     }
-    set({ languageHintGiven: true })
-    get().addEntry({ key: 'journal.titles.language' }, { key: 'journal.languageHint' }, 'hint', 'face')
+    if (!s.giftLoreGiven[region]) {
+      set({ giftLoreGiven: { ...s.giftLoreGiven, [region]: true } })
+      get().addEntry(
+        { key: 'journal.titles.giftLore' },
+        { key: 'journal.giftLore', params: { gift: REGION_VALUES[region].revered[0], region } },
+      )
+      return
+    }
+    set({ toast: getStrings().toasts.villagerNod })
   },
 
   dig: () => {
@@ -758,7 +837,8 @@ export const useGame = create<GameState>()((set, get) => ({
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
-      chiefHintGiven: s.chiefHintGiven, languageHintGiven: s.languageHintGiven,
+      knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
+      languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       deadlineWarned: s.deadlineWarned,
       explored: s.explored,
@@ -783,6 +863,12 @@ export const useGame = create<GameState>()((set, get) => ({
         explored: snap.explored ?? {},
         health: snap.health ?? balance.health.max,
         deadlineWarned: snap.deadlineWarned ?? 0,
+        knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
+        hintsGiven: snap.hintsGiven ?? {},
+        decodedGiven: snap.decodedGiven ?? {},
+        languagesLearned: snap.languagesLearned ?? {},
+        unspecificGiven: snap.unspecificGiven ?? {},
+        giftLoreGiven: snap.giftLoreGiven ?? {},
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         defeat: null,

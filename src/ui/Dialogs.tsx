@@ -60,7 +60,8 @@ function AudienceDialog() {
   const gifts = useGame((s) => s.gifts)
   const goodwill = useGame((s) => s.goodwill)
   const giveGift = useGame((s) => s.giveGift)
-  const chiefHintGiven = useGame((s) => s.chiefHintGiven)
+  const hintsGiven = useGame((s) => s.hintsGiven)
+  const unspecificGiven = useGame((s) => s.unspecificGiven)
   const setDialog = useUi((s) => s.setDialog)
   if (!placeId) return null
   const place = placeById(placeId)
@@ -75,7 +76,9 @@ function AudienceDialog() {
       <div className="dialog">
         <h3>{t.dialogs.audienceTitle(peopleName)}</h3>
         <p className="flavor">{t.dialogs.audienceIntro(mood)}</p>
-        {chiefHintGiven && <p className="flavor">{t.dialogs.chiefDone}</p>}
+        {(hintsGiven[place.region] === true || unspecificGiven[place.id] === true) && (
+          <p className="flavor">{t.dialogs.chiefDone}</p>
+        )}
         {MATERIALS.map((m) => (
           <div className="row" key={m}>
             <span>{t.gifts[m]} ({t.dialogs.stock(gifts[m])})</span>
@@ -84,8 +87,8 @@ function AudienceDialog() {
             </button>
           </div>
         ))}
-        {/* OPEN: which gift the region reveres must be discovered by the player
-            (design.md §8); no in-game reveal beyond the chief's reaction. */}
+        {/* Which gift the region reveres is discoverable in play: the village
+            elder reveals it on a second talk (design.md §8, journal.giftLore). */}
         <div className="actions">
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.endAudience}</button>
         </div>

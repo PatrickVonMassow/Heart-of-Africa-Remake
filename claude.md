@@ -203,10 +203,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 6. **Village and cultural contact.** At least one enterable village with a
    chief's hut. A culturally correct gift to the chief unlocks a hint — not
    mere observation: the gift is the condition.
-7. **Language/direction system.** The region's direction/language system
-   (Nivera/koko/Katula per `design.md`) is implemented rudimentarily: at
-   least one hint can be decoded and translated into a target direction/
-   position.
+7. **Language/direction system.** The full system of `design.md` §13 is
+   implemented: every region has its own direction words (§13.2 — the
+   fixed Nivera, koko/Katula/Phuthswama/Mimbumi, Relolo/Dethamee, the
+   Utomba- and season-based systems) and a village elder who teaches
+   them; the §13.2 glossary names (Mongdamara, Lastwana, Unumpara, Gumba
+   lu Untoba …) appear inside the hints; hints combine landmark,
+   direction word and coordinate (§13.1). A chief's raw hint is written
+   in the region's own words and turns into a deciphered journal entry
+   as soon as the region's language has been learned — in either order
+   (lesson before or after the hint). A second elder talk reveals what
+   the region reveres (§8). Verifiable: `scripts/verify/hints.mjs`
+   covers all five regions, the retroactive deciphering, the gift lore
+   and the in-world words in the rendered journal.
 8. **Chronicle/journal.** A journal exists, grows automatically on events
    and stores hints. The handwritten entry may be simplified in the POC
    (plain text suffices; the animated handwriting is not acceptance-
@@ -215,8 +224,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    region are displayed.
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
-    Full triangulation of several hints is not required in the POC — a
-    single decoded hint leading to the site suffices.
+    The site is triangulated from several hints (`design.md` §13.3): per
+    region exactly one (seeded) knowing people reveals its component —
+    the North's chief the latitude, the East's the longitude, the other
+    regions narrowing statements — while every other chief offers only
+    unspecific knowledge (Oz Oz …) that points to the region's knowing
+    people. Verifiable: `scripts/verify/hints.mjs` asserts that the
+    deciphered latitude and longitude equal the actual grave position
+    and that non-knowing chiefs point to the knowing people;
+    `scripts/verify/flow.mjs` plays the full loop (gift → lesson →
+    deciphered latitude, the East leg for the longitude, then the dig).
 11. **Game graphics.** The visual presentation must be appealing and
     elaborate at AAA level and replace the POC's former schematic look.
     This includes smoothing the geometry of the continent and the rivers,

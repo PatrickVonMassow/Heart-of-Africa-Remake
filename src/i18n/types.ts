@@ -194,7 +194,10 @@ export interface Strings {
       audience: string
       mistake: string
       chiefHint: string
-      language: string
+      decoded: string
+      unspecific: string
+      giftLore: string
+      language(p: TextParams): string
       victory: string
       foodLow: string
       foodOut: string
@@ -219,8 +222,16 @@ export interface Strings {
     giftRevered(p: TextParams): string
     giftNeutral: string
     giftRejected(p: TextParams): string
-    languageHint: string
-    chiefHint(p: TextParams): string
+    /** Elder lesson on the region's direction system (design.md §13.2). */
+    languageLesson(p: TextParams): string
+    /** Raw location hint in the region's own words (design.md §13.1/13.3). */
+    hintRaw(p: TextParams): string
+    /** Deciphered version once the language is learned. */
+    hintDecoded(p: TextParams): string
+    /** Unspecific knowledge pointing to the knowing people (§13.3). */
+    unspecific(p: TextParams): string
+    /** What the region reveres (design.md §8), told by an elder. */
+    giftLore(p: TextParams): string
     digNothing: string
     victory(p: TextParams): string
     foodLow: string
