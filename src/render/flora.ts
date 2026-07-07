@@ -140,6 +140,108 @@ export function buildRock(): THREE.BufferGeometry {
   return r
 }
 
+/** Baobab: massive bottle trunk with a sparse, flat branch crown. ~3 units. */
+export function buildBaobab(): THREE.BufferGeometry {
+  const trunk = new THREE.CylinderGeometry(0.42, 0.62, 2.2, 8)
+  trunk.translate(0, 1.1, 0)
+  tint(trunk, '#9a7f5e', 0.08, 91)
+  const parts: THREE.BufferGeometry[] = [trunk]
+  // A ring of stubby branches instead of a leafy canopy (dry-season look).
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2
+    const branch = new THREE.CylinderGeometry(0.05, 0.11, 0.9, 5)
+    branch.translate(0, 0.45, 0)
+    branch.rotateZ(0.9)
+    branch.rotateY(a)
+    branch.translate(Math.cos(a) * 0.2, 2.15, Math.sin(a) * 0.2)
+    tint(branch, '#8f755a', 0.1, 92 + i)
+    parts.push(branch)
+  }
+  const crown = new THREE.SphereGeometry(0.95, 7, 4)
+  crown.scale(1, 0.22, 1)
+  crown.translate(0, 2.65, 0)
+  tint(crown, '#7a7434', 0.2, 98)
+  parts.push(crown)
+  return merge(parts)
+}
+
+/** Termite mound: reddish earthen spires (savanna). ~1.1 units. */
+export function buildTermiteMound(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  const spec = [
+    [0, 0, 0.34, 1.1],
+    [0.28, 0.1, 0.22, 0.65],
+    [-0.24, -0.12, 0.18, 0.5],
+  ] as const
+  spec.forEach(([x, z, r, h], i) => {
+    const spire = new THREE.ConeGeometry(r, h, 6)
+    spire.translate(x, h / 2, z)
+    tint(spire, '#a3603a', 0.1, 101 + i)
+    parts.push(spire)
+  })
+  return merge(parts)
+}
+
+/** Dead, bare tree (droughts, elephant damage). ~2 units. */
+export function buildDeadTree(): THREE.BufferGeometry {
+  const trunk = new THREE.CylinderGeometry(0.06, 0.14, 1.6, 5)
+  trunk.translate(0, 0.8, 0)
+  tint(trunk, '#7d7466', 0.1, 111)
+  const parts: THREE.BufferGeometry[] = [trunk]
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.5
+    const branch = new THREE.CylinderGeometry(0.03, 0.06, 0.9, 4)
+    branch.translate(0, 0.45, 0)
+    branch.rotateZ(0.7 + i * 0.15)
+    branch.rotateY(a)
+    branch.translate(0, 1.45, 0)
+    tint(branch, '#736a5c', 0.1, 112 + i)
+    parts.push(branch)
+  }
+  return merge(parts)
+}
+
+/** Papyrus/reed clump for river banks and lake shores. ~1.3 units. */
+export function buildPapyrus(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2
+    const lean = 0.12 + (i % 3) * 0.06
+    const stem = new THREE.CylinderGeometry(0.02, 0.03, 1.15, 4)
+    stem.translate(0, 0.58, 0)
+    stem.rotateZ(lean)
+    stem.rotateY(a)
+    stem.translate(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08)
+    tint(stem, '#5f7c33', 0.15, 121 + i)
+    parts.push(stem)
+    const head = new THREE.SphereGeometry(0.11, 5, 4)
+    head.scale(1, 0.7, 1)
+    head.translate(Math.cos(a) * (0.08 + Math.sin(lean) * 1.1), 1.18, Math.sin(a) * (0.08 + Math.sin(lean) * 1.1))
+    tint(head, '#88a04a', 0.18, 131 + i)
+    parts.push(head)
+  }
+  return merge(parts)
+}
+
+/** Kopje: stacked granite boulders (savanna/high plateau). ~1.4 units. */
+export function buildKopje(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  const spec = [
+    [0, 0.4, 0, 0.85],
+    [0.55, 0.35, 0.3, 0.55],
+    [-0.5, 0.3, -0.2, 0.5],
+    [0.1, 1.0, 0.1, 0.45],
+  ] as const
+  spec.forEach(([x, y, z, r], i) => {
+    const rock = new THREE.DodecahedronGeometry(r, 0)
+    rock.scale(1, 0.75, 0.9)
+    rock.translate(x, y, z)
+    tint(rock, '#96897c', 0.1, 141 + i)
+    parts.push(rock)
+  })
+  return merge(parts)
+}
+
 /** Tuft of dry grass: crossed, tapered blades. Used as close-up scatter. */
 export function buildGrassTuft(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []

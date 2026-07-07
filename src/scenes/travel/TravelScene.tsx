@@ -26,6 +26,7 @@ import { useUi } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
+import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
@@ -33,7 +34,18 @@ import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { TRAVEL_SKY } from '../../render/skyPresets'
 import { createWaterMaterial } from '../../render/water'
-import { buildAcacia, buildBush, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import {
+  buildAcacia,
+  buildBaobab,
+  buildBush,
+  buildDeadTree,
+  buildJungleTree,
+  buildKopje,
+  buildPalm,
+  buildPapyrus,
+  buildRock,
+  buildTermiteMound,
+} from '../../render/flora'
 import { Climate } from './Climate'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
@@ -361,16 +373,34 @@ function Sun() {
 
 // --- Instanced biome vegetation ---------------------------------------------
 
-type Species = 'acacia' | 'jungle' | 'palm' | 'bush' | 'rock'
-const SPECIES: Species[] = ['acacia', 'jungle', 'palm', 'bush', 'rock']
+type Species =
+  | 'acacia'
+  | 'jungle'
+  | 'palm'
+  | 'bush'
+  | 'rock'
+  | 'baobab'
+  | 'termite'
+  | 'deadtree'
+  | 'papyrus'
+  | 'kopje'
+const SPECIES: Species[] = [
+  'acacia', 'jungle', 'palm', 'bush', 'rock',
+  'baobab', 'termite', 'deadtree', 'papyrus', 'kopje',
+]
 const MAX_INSTANCES: Record<Species, number> = {
   acacia: 1600,
   jungle: 2600,
   palm: 700,
   bush: 1800,
   rock: 900,
+  baobab: 260,
+  termite: 620,
+  deadtree: 380,
+  papyrus: 1100,
+  kopje: 300,
 }
-const CANDIDATES_PER_CHUNK = 16
+const CANDIDATES_PER_CHUNK = 22
 
 /** Deterministic hash of chunk coords + index + seed to [0, 1). */
 function hash(cx: number, cz: number, i: number, seed: number): number {
@@ -384,17 +414,30 @@ function hash(cx: number, cz: number, i: number, seed: number): number {
   return (h >>> 0) / 4294967296
 }
 
-/** Species choice per terrain type; roll decides density. */
-function pickSpecies(type: TerrainType, roll: number): Species | null {
+/**
+ * Species choice per terrain type; roll decides density. Region/period
+ * flavor (design.md §19): baobabs, termite mounds and kopjes in the
+ * savanna, dead trees at the desert edge, papyrus along rivers and lakes.
+ */
+function pickSpecies(type: TerrainType, roll: number, nearWater: boolean): Species | null {
+  // Reed belts follow the water regardless of the biome (Nile, lakes).
+  if (nearWater && type !== 'ocean' && roll < 0.55) return 'papyrus'
   switch (type) {
     case 'jungle':
       return roll < 0.8 ? 'jungle' : roll < 0.9 ? 'bush' : null
     case 'savanna':
-      return roll < 0.3 ? 'acacia' : roll < 0.62 ? 'bush' : roll < 0.68 ? 'rock' : null
+      if (roll < 0.3) return 'acacia'
+      if (roll < 0.62) return 'bush'
+      if (roll < 0.68) return 'rock'
+      if (roll < 0.71) return 'baobab'
+      if (roll < 0.79) return 'termite'
+      if (roll < 0.82) return 'kopje'
+      if (roll < 0.85) return 'deadtree'
+      return null
     case 'desert':
-      return roll < 0.07 ? 'rock' : roll < 0.13 ? 'bush' : null
+      return roll < 0.07 ? 'rock' : roll < 0.13 ? 'bush' : roll < 0.16 ? 'deadtree' : null
     case 'mountain':
-      return roll < 0.34 ? 'rock' : roll < 0.42 ? 'bush' : null
+      return roll < 0.34 ? 'rock' : roll < 0.42 ? 'bush' : roll < 0.46 ? 'kopje' : null
     case 'coast':
       return roll < 0.3 ? 'palm' : null
     default:
@@ -414,6 +457,11 @@ function Vegetation() {
       palm: buildPalm(false),
       bush: buildBush(),
       rock: buildRock(),
+      baobab: buildBaobab(),
+      termite: buildTermiteMound(),
+      deadtree: buildDeadTree(),
+      papyrus: buildPapyrus(),
+      kopje: buildKopje(),
     }),
     [],
   )
@@ -434,7 +482,10 @@ function Vegetation() {
     if (center === lastCenter.current) return
     lastCenter.current = center
 
-    const counts: Record<Species, number> = { acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0 }
+    const counts: Record<Species, number> = {
+      acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0,
+      baobab: 0, termite: 0, deadtree: 0, papyrus: 0, kopje: 0,
+    }
     const mtx = new THREE.Matrix4()
     const quat = new THREE.Quaternion()
     const up = new THREE.Vector3(0, 1, 0)
@@ -452,7 +503,11 @@ function Vegetation() {
           const z = (ccz + rz) * CHUNK_SIZE
           const ll = worldToLatLon(x, z)
           const s = sampleTerrain(ll.lat, ll.lon, seed)
-          const species = pickSpecies(s.type, roll)
+          // Reed belts: within ~0.05° of a river centerline or lake shore.
+          const nearWater =
+            s.height > 0.05 &&
+            (riverDistance(ll.lat, ll.lon, 0.08) < 0.05 || lakeDistance(ll.lat, ll.lon, 0.08) < 0.04)
+          const species = pickSpecies(s.type, roll, nearWater)
           if (!species || s.height <= 0.05) continue
           if (species === 'rock' && s.type === 'mountain' && s.height > 6.5) continue // snow line
           // Keep place surroundings clear so markers stay readable.
