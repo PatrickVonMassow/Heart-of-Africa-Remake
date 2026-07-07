@@ -9,6 +9,7 @@ import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
+import { stripVoiceMarkup } from '../journal/voiceMarkup'
 
 export type EquipmentId =
   | 'shovel'
@@ -415,7 +416,8 @@ export const useGame = create<GameState>()((set, get) => ({
       set({ victory: true })
       get().addEntry({ key: 'journal.titles.victory' }, { key: 'journal.victory', params: { day: s.day } }, 'event', 'grave')
     } else {
-      set({ toast: getStrings().journal.digNothing })
+      // Journal texts carry voice markup; strip it for the plain toast.
+      set({ toast: stripVoiceMarkup(getStrings().journal.digNothing) })
     }
   },
 

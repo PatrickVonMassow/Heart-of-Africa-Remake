@@ -163,7 +163,14 @@ export const de: Strings = {
     graveDebug: 'Grab (Debug)',
   },
 
-  journalPanel: { title: 'Tagebuch', close: 'Schließen (T)' },
+  journalPanel: {
+    title: 'Tagebuch',
+    close: 'Schließen (T)',
+    readAloud: 'Vorlesen',
+    stopReading: 'Vorlesen stoppen',
+    voiceLoading: 'Stimme wird geladen …',
+    voiceError: 'Die Vorlesestimme konnte nicht geladen werden.',
+  },
 
   mapOverlay: {
     title: 'Karte',
@@ -244,46 +251,46 @@ export const de: Strings = {
       foodOut: 'Proviant aufgebraucht',
     },
     start:
-      'Kairo, im Januar 1890. Heute beginnt meine Expedition. Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — das sagenumwobene Grab des großen Königs. Möge das Glück mit mir sein.',
+      'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
     regionEntry: (p: TextParams) => {
       const texts: Record<string, string> = {
         north:
-          'Die Wüste! Ein Meer aus Sand und Licht, so weit das Auge reicht. Die Hitze flimmert über den Dünen, und doch spüre ich eine seltsame Erhabenheit. Man sagt, die Völker des Nordens lesen die Richtung im Ursprung des Windes. Ich muss ihre Worte erst verstehen lernen.',
+          '[awe]Die Wüste![pause] Ein Meer aus Sand und Licht, so weit das Auge reicht.[/awe] Die Hitze flimmert über den Dünen, und doch spüre ich eine seltsame Erhabenheit. [pause]Man sagt, die Völker des Nordens lesen die Richtung im Ursprung des Windes. [somber]Ich muss ihre Worte erst verstehen lernen.[/somber]',
         west:
-          'Endlose Savanne, golden im Abendlicht. Schirmakazien stehen wie Wächter in der Weite, und in der Ferne wandern Herden. Der Westen empfängt mich mit einem Gefühl von Freiheit — und der Ahnung, dass hier andere Worte für die Himmelsrichtungen gelten.',
+          'Endlose Savanne, [awe]golden im Abendlicht.[/awe] Schirmakazien stehen wie Wächter in der Weite, und in der Ferne wandern Herden. [excited]Der Westen empfängt mich mit einem Gefühl von Freiheit[/excited] — und der Ahnung, dass hier andere Worte für die Himmelsrichtungen gelten.',
         central:
-          'Der Dschungel hat mich verschluckt. Grünes Dämmerlicht, das Kreischen der Vögel, feuchte Luft, die sich wie ein nasses Tuch auf die Brust legt. Ohne Machete komme ich hier kaum einen Schritt voran. Alles ist Leben, und alles ist Gefahr.',
+          '[fear]Der Dschungel hat mich verschluckt.[/fear] Grünes Dämmerlicht, das Kreischen der Vögel, feuchte Luft, die sich wie ein nasses Tuch auf die Brust legt. [weary]Ohne Machete komme ich hier kaum einen Schritt voran.[/weary] [breath][somber]Alles ist Leben,[pause] und alles ist Gefahr.[/somber]',
         east:
-          'Berge und Seen, so klar, dass sich der Himmel darin spiegelt. Im Osten ragen schneebedeckte Gipfel über die Wolken — welch ein Anblick mitten in Afrika! Die Völker hier messen die Welt an Orten, die sie „Odabi" nennen.',
+          'Berge und Seen, so klar, dass sich der Himmel darin spiegelt. [awe]Im Osten ragen schneebedeckte Gipfel über die Wolken —[pause] welch ein Anblick mitten in Afrika![/awe] Die Völker hier messen die Welt an Orten, die sie [emph]„Odabi"[/emph] nennen.',
         south:
-          'Das Hochplateau des Südens. Kühle, klare Luft nach all der Hitze, weites Grasland unter einem gewaltigen Himmel. Die Menschen hier, so heißt es, sprechen von Jahreszeiten, wenn sie Richtungen meinen. Was für ein wunderliches Land.',
+          'Das Hochplateau des Südens. [pause]Kühle, klare Luft nach all der Hitze, weites Grasland unter einem gewaltigen Himmel. Die Menschen hier, so heißt es, sprechen von Jahreszeiten, wenn sie Richtungen meinen. [pause][awe]Was für ein wunderliches Land.[/awe]',
       }
       return texts[p.region as string]
     },
     portArrival: (p: TextParams) =>
-      `Ich habe ${PLACES[p.place as string]} erreicht. Der Lärm des Hafens, die Rufe der Händler, der Geruch von Salz und Gewürzen — hier kann ich Vorräte auffrischen und Kräfte sammeln. Meine Aufzeichnungen habe ich in Sicherheit gebracht. (Checkpoint gespeichert)`,
+      `Ich habe ${PLACES[p.place as string]} erreicht. [excited]Der Lärm des Hafens, die Rufe der Händler, der Geruch von Salz und Gewürzen[/excited] — hier kann ich Vorräte auffrischen und Kräfte sammeln. [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`,
     villageFirstVisit: (p: TextParams) =>
-      `Ich habe das ${PLACES[p.place as string]} erreicht. Einfache Hütten aus Lehm und Schilf ducken sich ans Ufer, Kinder laufen mir neugierig entgegen. Das Oberhaupt residiert in der großen Hütte in der Mitte des Dorfes. Wenn ich sein Wohlwollen gewinne, wird es mir vielleicht den Weg weisen.`,
+      `Ich habe das ${PLACES[p.place as string]} erreicht. Einfache Hütten aus Lehm und Schilf ducken sich ans Ufer, Kinder laufen mir neugierig entgegen. [pause]Das Oberhaupt residiert in der großen Hütte in der Mitte des Dorfes. [somber]Wenn ich sein Wohlwollen gewinne,[pause] wird es mir vielleicht den Weg weisen.[/somber]`,
     giftRevered: (p: TextParams) =>
-      `Ich überreichte dem Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe. Seine Augen leuchteten auf — ich habe getroffen, was sein Volk verehrt! Er neigte das Haupt und hieß mich willkommen. Das Wohlwollen wächst.`,
+      `Ich überreichte dem Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe. [excited]Seine Augen leuchteten auf —[pause] ich habe getroffen, was sein Volk verehrt![/excited] Er neigte das Haupt und hieß mich willkommen. [pause][excited]Das Wohlwollen wächst.[/excited]`,
     giftNeutral:
-      'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. Kein Leuchten in den Augen — es war wohl nicht das, was sein Volk verehrt. Aber ein Anfang ist gemacht.',
+      'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. [somber]Kein Leuchten in den Augen —[pause] es war wohl nicht das, was sein Volk verehrt.[/somber] [pause]Aber ein Anfang ist gemacht.',
     giftRejected: (p: TextParams) =>
-      `Ein schwerer Fehler! Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. Was ich anbot, gilt seinem Volk als Unglücksbringer. Man führte mich wortlos hinaus. Ich muss dieses Misstrauen erst wieder abtragen.`,
+      `[fear]Ein schwerer Fehler![/fear] Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. [somber]Was ich anbot, gilt seinem Volk als Unglücksbringer.[pause] Man führte mich wortlos hinaus.[/somber] [breath][weary]Ich muss dieses Misstrauen erst wieder abtragen.[/weary]`,
     languageHint:
-      'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Immer wieder sagte er „Nivera" und wies dorthin, woher nachts der kalte Wind weht — nach Mitternacht. Ich begreife: In der Sprache des Nordens bedeutet „Nivera" Norden!',
+      'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Immer wieder sagte er [emph]„Nivera"[/emph] und wies dorthin, woher nachts der kalte Wind weht — [pause]nach Mitternacht. [breath][excited]Ich begreife:[pause] In der Sprache des Nordens bedeutet [emph]„Nivera" Norden![/emph][/excited]',
     chiefHint: (p: TextParams) =>
-      'Das Oberhaupt beugte sich vor und sprach mit leiser Stimme: „Du suchst das Grab des großen Königs. ' +
+      'Das Oberhaupt beugte sich vor und sprach mit leiser Stimme: [whisper]„Du suchst das Grab des großen Königs. ' +
       'Geh von unserem Dorf gen Nivera, immer dem großen Fluss entgegen der Strömung fern. ' +
       `Wo die Breite ${dec(p.lat as number)} Grad gen Mitternacht zählt und die Länge ${dec(p.lon as number)} Grad gen Sonnenaufgang, ` +
-      'dort ruht er unter dem Sand. Nimm die Schaufel, und der Sand wird ihn freigeben." — ' +
-      'Nivera … ich muss herausfinden, was das bedeutet, dann kenne ich die Richtung.',
-    digNothing: 'Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.',
+      '[pause]dort ruht er unter dem Sand. Nimm die Schaufel, und der Sand wird ihn freigeben."[/whisper] — ' +
+      '[breath][somber]Nivera …[pause] ich muss herausfinden, was das bedeutet,[/somber] [excited]dann kenne ich die Richtung.[/excited]',
+    digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
     victory: (p: TextParams) =>
-      `${de.formatDate(p.day as number, 1890)}. Meine Schaufel stieß auf Stein — behauenen Stein! Mit zitternden Händen legte ich die Grabkammer frei. Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs. Ich habe es gefunden. Das Herz von Afrika. Die Reise war jeden Schritt wert.`,
+      `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein —[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,
     foodLow:
-      'Mein Proviant geht zur Neige. Ich muss bald eine Stadt oder ein Dorf erreichen, sonst wird der Hunger mein ständiger Begleiter.',
+      '[somber]Mein Proviant geht zur Neige.[/somber] Ich muss bald eine Stadt oder ein Dorf erreichen, [pause]sonst wird der Hunger mein ständiger Begleiter.',
     foodOut:
-      'Der letzte Proviant ist aufgezehrt. Der Hunger nagt an mir; jeder Schritt fällt schwerer. Ich muss dringend Nachschub finden.',
+      '[weary]Der letzte Proviant ist aufgezehrt.[pause] Der Hunger nagt an mir; jeder Schritt fällt schwerer.[/weary] [fear]Ich muss dringend Nachschub finden.[/fear]',
   },
 }

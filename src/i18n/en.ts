@@ -164,7 +164,14 @@ export const en: Strings = {
     graveDebug: 'Grave (debug)',
   },
 
-  journalPanel: { title: 'Journal', close: 'Close (T)' },
+  journalPanel: {
+    title: 'Journal',
+    close: 'Close (T)',
+    readAloud: 'Read aloud',
+    stopReading: 'Stop reading',
+    voiceLoading: 'Loading voice …',
+    voiceError: 'The narration voice could not be loaded.',
+  },
 
   mapOverlay: {
     title: 'Map',
@@ -245,46 +252,46 @@ export const en: Strings = {
       foodOut: 'Provisions Exhausted',
     },
     start:
-      'Cairo, January 1890. Today my expedition begins. With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — the fabled tomb of the great king. May fortune walk with me.',
+      'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
     regionEntry: (p: TextParams) => {
       const texts: Record<string, string> = {
         north:
-          'The desert! A sea of sand and light as far as the eye can reach. The heat shimmers above the dunes, and yet I feel a strange exaltation. They say the peoples of the North read direction from the origin of the wind. I shall have to learn their words first.',
+          '[awe]The desert![pause] A sea of sand and light as far as the eye can reach.[/awe] The heat shimmers above the dunes, and yet I feel a strange exaltation. [pause]They say the peoples of the North read direction from the origin of the wind. [somber]I shall have to learn their words first.[/somber]',
         west:
-          'Endless savanna, golden in the evening light. Umbrella acacias stand like sentinels across the vastness, and far off the herds are moving. The West receives me with a feeling of freedom — and a suspicion that different words for the points of the compass hold sway here.',
+          'Endless savanna, [awe]golden in the evening light.[/awe] Umbrella acacias stand like sentinels across the vastness, and far off the herds are moving. [excited]The West receives me with a feeling of freedom[/excited] — and a suspicion that different words for the points of the compass hold sway here.',
         central:
-          'The jungle has swallowed me whole. Green twilight, the shrieking of birds, air so damp it settles on the chest like a wet cloth. Without a machete I can scarcely advance a step. Everything here is life, and everything is danger.',
+          '[fear]The jungle has swallowed me whole.[/fear] Green twilight, the shrieking of birds, air so damp it settles on the chest like a wet cloth. [weary]Without a machete I can scarcely advance a step.[/weary] [breath][somber]Everything here is life,[pause] and everything is danger.[/somber]',
         east:
-          'Mountains and lakes so clear that the sky mirrors itself in them. In the East, snow-capped summits rise above the clouds — what a sight, in the very middle of Africa! The peoples here measure the world from places they call "Odabi".',
+          'Mountains and lakes so clear that the sky mirrors itself in them. [awe]In the East, snow-capped summits rise above the clouds —[pause] what a sight, in the very middle of Africa![/awe] The peoples here measure the world from places they call [emph]"Odabi"[/emph].',
         south:
-          'The high plateau of the South. Cool, clear air after all that heat, wide grassland beneath an immense sky. The people here, so it is said, speak of seasons when they mean directions. What a curious land this is.',
+          'The high plateau of the South. [pause]Cool, clear air after all that heat, wide grassland beneath an immense sky. The people here, so it is said, speak of seasons when they mean directions. [pause][awe]What a curious land this is.[/awe]',
       }
       return texts[p.region as string]
     },
     portArrival: (p: TextParams) =>
-      `I have reached ${PLACES[p.place as string]}. The clamor of the harbor, the cries of the traders, the smell of salt and spices — here I can replenish my stores and gather my strength. My notes are safely put away. (Checkpoint saved)`,
+      `I have reached ${PLACES[p.place as string]}. [excited]The clamor of the harbor, the cries of the traders, the smell of salt and spices[/excited] — here I can replenish my stores and gather my strength. [pause]My notes are safely put away. [mute](Checkpoint saved)[/mute]`,
     villageFirstVisit: (p: TextParams) =>
-      `I have reached the ${PLACES[p.place as string]}. Simple huts of clay and reed huddle close to the water, and children run out to meet me, full of curiosity. The chief resides in the great hut at the center of the village. If I can win his goodwill, perhaps he will show me the way.`,
+      `I have reached the ${PLACES[p.place as string]}. Simple huts of clay and reed huddle close to the water, and children run out to meet me, [pause]full of curiosity. The chief resides in the great hut at the center of the village. [somber]If I can win his goodwill,[pause] perhaps he will show me the way.[/somber]`,
     giftRevered: (p: TextParams) =>
-      `I presented my gift to the chief of the ${PEOPLES[p.people as string]}. His eyes lit up — I have found the very thing his people revere! He bowed his head and bade me welcome. My standing here grows.`,
+      `I presented my gift to the chief of the ${PEOPLES[p.people as string]}. [excited]His eyes lit up —[pause] I have found the very thing his people revere![/excited] He bowed his head and bade me welcome. [pause][excited]My standing here grows.[/excited]`,
     giftNeutral:
-      'The chief accepted my gift with a polite nod. No light came into his eyes — it was not, I think, what his people hold dear. But a beginning has been made.',
+      'The chief accepted my gift with a polite nod. [somber]No light came into his eyes —[pause] it was not, I think, what his people hold dear.[/somber] [pause]But a beginning has been made.',
     giftRejected: (p: TextParams) =>
-      `A grave mistake! No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. What I offered counts among his people as an ill omen. I was led out without a word. It will take time to wear down this mistrust.`,
+      `[fear]A grave mistake![/fear] No sooner had the chief of the ${PEOPLES[p.people as string]} laid eyes on my gift than his face darkened. [somber]What I offered counts among his people as an ill omen.[pause] I was led out without a word.[/somber] [breath][weary]It will take time to wear down this mistrust.[/weary]`,
     languageHint:
-      'An old man by the fire spoke with me at length, with hands as much as words. Again and again he said "Nivera" and pointed to where the cold wind comes from at night — toward midnight. Now I understand: in the language of the North, "Nivera" means north!',
+      'An old man by the fire spoke with me at length, with hands as much as words. Again and again he said [emph]"Nivera"[/emph] and pointed to where the cold wind comes from at night — [pause]toward midnight. [breath][excited]Now I understand:[pause] in the language of the North, [emph]"Nivera" means north![/emph][/excited]',
     chiefHint: (p: TextParams) =>
-      'The chief leaned close and spoke in a low voice: "You seek the tomb of the great king. ' +
+      'The chief leaned close and spoke in a low voice: [whisper]"You seek the tomb of the great king. ' +
       'Go from our village toward Nivera, keeping always clear of the great river against its current. ' +
       `Where the latitude counts ${dec(p.lat as number)} degrees toward midnight and the longitude ${dec(p.lon as number)} degrees toward sunrise, ` +
-      'there he rests beneath the sand. Take your shovel, and the sand will give him up." — ' +
-      'Nivera … I must find out what that word means; then I shall know the direction.',
-    digNothing: 'I dug at this spot, but the sand yielded nothing except stones and old roots.',
+      '[pause]there he rests beneath the sand. Take your shovel, and the sand will give him up."[/whisper] — ' +
+      '[breath][somber]Nivera …[pause] I must find out what that word means;[/somber] [excited]then I shall know the direction.[/excited]',
+    digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',
     victory: (p: TextParams) =>
-      `${en.formatDate(p.day as number, 1890)}. My shovel struck stone — hewn stone! With trembling hands I laid the burial chamber bare. Gold gleams in the torchlight, and upon the sarcophagus rests the mask of the great king. I have found it. The Heart of Africa. The journey was worth every step.`,
+      `${en.formatDate(p.day as number, 1890)}. [excited]My shovel struck stone —[pause] hewn stone![/excited] [breath]With trembling hands I laid the burial chamber bare. [awe]Gold gleams in the torchlight, and upon the sarcophagus rests the mask of the great king.[/awe] [breath][awe]I have found it.[pause] The Heart of Africa.[/awe] [pause][somber]The journey was worth every step.[/somber]`,
     foodLow:
-      'My provisions are running low. I must reach a town or village soon, or hunger will become my constant companion.',
+      '[somber]My provisions are running low.[/somber] I must reach a town or village soon, [pause]or hunger will become my constant companion.',
     foodOut:
-      'The last of my provisions is gone. Hunger gnaws at me; every step comes harder than the one before. I must find supplies, and quickly.',
+      '[weary]The last of my provisions is gone.[pause] Hunger gnaws at me; every step comes harder than the one before.[/weary] [fear]I must find supplies,[pause] and quickly.[/fear]',
   },
 }

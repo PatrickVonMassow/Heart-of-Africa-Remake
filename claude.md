@@ -74,6 +74,16 @@ WebGPU. Requirements:
   back to plain WebGL and record that as an open item instead of blocking
   the run.
 
+**Journal read-aloud: kokoro-js.** The journal's speech output (design.md
+§15) uses the Kokoro TTS model via the `kokoro-js` package, fully
+in-browser (WebGPU when available, WASM fallback). The model weights are
+streamed from the Hugging Face CDN on first use and cached by the browser;
+they are not part of the repository or the bundle. The TTS stack is loaded
+lazily via dynamic import and must never enter the eagerly loaded startup
+chunks. Kokoro has no German voice, so read-aloud is English-only for now
+(open item for German); the voice markup is written for both languages
+regardless.
+
 No additional runtime dependencies without necessity. Every added dependency
 must be justified in its commit.
 
@@ -137,6 +147,15 @@ acceptance (§7).
   directory names), all constant/label values, and all comments are English.
   The only exception is the translated string values inside the language
   files themselves.
+- **Voice markup.** Every journal text — existing and future, in both
+  languages — is written with the emotional voice markup of `design.md`
+  §15 (`[awe]`, `[whisper]`, `[excited]`, `[somber]`, `[weary]`, `[fear]`,
+  `[emph]`, `[mute]`, `[pause]`, `[breath]`). The tags are additive:
+  stripping them must leave well-formed prose. Display always strips the
+  markup; the read-aloud pipeline (parser → TTS text → audio,
+  `src/journal/voiceMarkup.ts` → `src/journal/speech.ts`) turns it into
+  prosody. This rule applies to German too, even while no German TTS voice
+  exists yet.
 - Keep comments brief and factual. Mark placeholder values as such.
 - After each major system, run the self-verification (§7.2) and record the
   result.
@@ -259,6 +278,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     self-verification (§7.2). If a vulnerability has no upstream fix, it
     is recorded as an open item with its advisory ID instead of being
     ignored silently.
+19. **Journal voice markup and read-aloud.** All journal texts in both
+    language files carry the emotional voice markup (`design.md` §15); the
+    UI never shows a marker; in the English version every journal entry can
+    be read aloud via the in-browser Kokoro TTS, with the markup audibly
+    shaping the delivery (pauses, pace, loudness, punctuation). Verifiable:
+    spot check of both language files for markers; journal screenshot free
+    of visible tags; starting narration produces audio without console
+    errors. German read-aloud stays an open item until a German-capable
+    voice exists.
 
 ### 7.2 Self-Verification (mandatory)
 

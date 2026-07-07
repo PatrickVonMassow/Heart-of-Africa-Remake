@@ -359,3 +359,22 @@ only produces frames on demand, so the check pumps rAF before reading.
 | File | View |
 |---|---|
 | 63-fps-counter.png | Frame counter showing 60 FPS in Cairo (first-person) |
+
+## Addendum: journal voice markup and read-aloud (July 7, 2026)
+
+Journal texts in both language files carry the emotional voice markup
+(design.md par.15); the display strips it, the speech pipeline
+(parser -> TTS text -> audio, `src/journal/voiceMarkup.ts` ->
+`src/journal/speech.ts`) turns it into prosody. English entries offer a
+read-aloud control narrated by the in-browser Kokoro TTS (`kokoro-js`);
+German has no Kokoro voice yet, so its journal shows no control (open
+item). `scripts/verify/voice.mjs` proved: balanced markers in both
+language files, no visible marker in either UI, prosody segments with
+varying speed/loudness/pauses, and a real narration reaching the speaking
+state with zero console errors (small WASM model via the `__ttsForceWasm`
+dev hook).
+
+| File | View |
+|---|---|
+| 64-voice-german-journal-clean.png | German journal, markup stripped, no read-aloud control |
+| 65-voice-english-readaloud.png | English journal narrating the Departure entry (stop control active) |

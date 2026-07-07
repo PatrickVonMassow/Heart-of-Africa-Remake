@@ -338,6 +338,27 @@ body,
   cursor: pointer;
 }
 
+/* Read-aloud control per entry (design.md §15, English only for now). */
+.journal .entry .speak {
+  margin-left: 8px;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 1.6;
+  vertical-align: 2px;
+  opacity: 0.75;
+}
+
+.journal .entry .speak:hover {
+  opacity: 1;
+}
+
+.journal .entry .voice-loading {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.65;
+  margin-bottom: 2px;
+}
+
 /* --- Dialogs ------------------------------------------------------------- */
 
 .dialog-backdrop {

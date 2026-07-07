@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
+    "kokoro-js": "^1.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "three": "^0.185.1",

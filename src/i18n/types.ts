@@ -73,6 +73,10 @@ export interface Strings {
   journalPanel: {
     title: string
     close: string
+    readAloud: string
+    stopReading: string
+    voiceLoading: string
+    voiceError: string
   }
 
   mapOverlay: {
@@ -140,7 +144,9 @@ export interface Strings {
 
   /**
    * Journal entry templates, addressed by key from stored TextRefs so that
-   * entries re-render in the currently selected language.
+   * entries re-render in the currently selected language. Bodies carry the
+   * emotional voice markup (src/journal/voiceMarkup.ts, design.md §15) in
+   * every language; it is stripped for display and drives the read-aloud.
    */
   journal: {
     titles: {

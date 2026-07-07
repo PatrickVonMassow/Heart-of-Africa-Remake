@@ -274,6 +274,13 @@ An automatically growing narrative chronicle of the journey, written in the sele
 **Tone and immersion.**
 The journal is the central means of creating immersion: many events are never seen, only experienced as text — comparable to reading a novel. The entries are therefore always written vividly and express, depending on the situation, fascination with the new, drama, bewilderment, misgivings, hope and the like. The text building blocks from which entries are assembled must already be written with this vividness — in every supported language.
 
+**Emotional voice markup and read-aloud.**
+The journal text building blocks are stored in every language file with a lightweight internal markup language that describes the emotional delivery: mood spans (`[awe]…[/awe]`, `[whisper]…[/whisper]`, `[excited]…[/excited]`, `[somber]…[/somber]`, `[weary]…[/weary]`, `[fear]…[/fear]`), word emphasis (`[emph]…[/emph]`), display-only passages (`[mute]…[/mute]`, e.g. meta notes like "(Checkpoint saved)") and beat markers (`[pause]`, `[breath]`). The tags are additive: stripping them must always leave well-formed prose, and the display pipeline shows only the stripped text — markers are never visible to the player.
+
+For speech output the pipeline is parser → TTS text → audio: the parser converts the markup into prosody (real pauses, punctuation shaping such as "…" for hesitation or "!" for excitement, and per-passage speaking speed and loudness) so that "Today… at last. I have found the temple." sounds different from the same words read flatly. Journal entries offer a read-aloud control that narrates the entry with the Kokoro TTS model running in the browser. Kokoro currently provides no German voice, so read-aloud is available in English only; German texts nevertheless carry the exact same markers so a German-capable voice can be plugged in later (open item).
+
+**Every journal text — existing and future, in every language — is written with these emotion markers.**
+
 **Entering a new region.**
 On first entering a new region, the journal opens, announces the region and shows an entry describing the traveler's fascination with this region and its peculiarities.
 
@@ -300,7 +307,7 @@ If the character can no longer write (death), the handwritten entry is omitted; 
 - First-person view (settlements): walkable space, interaction prompts at buildings/persons, trade and dialog windows. A gift to a native additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
 - Controls suitable for mouse/keyboard and gamepad.
 - If the renderer has to fall back from WebGPU to WebGL 2 compatibility mode, a dismissible notice informs the player at startup.
-- **Game languages:** German (default) and English. The language can be switched at runtime (POC: via the debug menu, §21). All player-visible text — UI, chronicle, dialogs, names of places and landmarks — is served from language files; adding a further language must require nothing beyond a new language file. Every future addition or change to game text must always be made for both languages; translations are written for their context, not literally. Proper names are localized where established exonyms exist (e.g. "Kairo"/"Cairo", "Kilimandscharo"/"Kilimanjaro").
+- **Game languages:** German (default) and English. The language can be switched at runtime (POC: via the debug menu, §21). All player-visible text — UI, chronicle, dialogs, names of places and landmarks — is served from language files; adding a further language must require nothing beyond a new language file. Every future addition or change to game text must always be made for both languages; translations are written for their context, not literally. Proper names are localized where established exonyms exist (e.g. "Kairo"/"Cairo", "Kilimandscharo"/"Kilimanjaro"). Journal texts additionally carry the emotional voice markup (§15) in every language; it is stripped before display and never shown to the player.
 
 ---
 
