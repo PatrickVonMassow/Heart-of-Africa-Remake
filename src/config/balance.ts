@@ -85,7 +85,7 @@ export interface BalanceConfig {
 
 export const balance: BalanceConfig = {
   travelSpeed: 8,
-  placeWalkSpeed: 7.5,
+  placeWalkSpeed: 10,
   mouseSensitivity: 0.0011,
   ambienceNoiseVolume: 0.2,
   ambienceGustVolume: 0.2,
@@ -108,15 +108,15 @@ export const balance: BalanceConfig = {
   goodwillNeutral: 1,
   randomEventsEnabled: true,
   events: {
-    animalAttack: 0.1,
-    robberAttack: 0.05,
-    crocodile: 0.3,
-    fever: 0.06,
-    sunblindness: 0.05,
-    sandstorm: 0.06,
-    waterfallSweep: 0.6,
-    findRemains: 0.02,
-    cooldownDays: 2,
+    animalAttack: 0.02,
+    robberAttack: 0.01,
+    crocodile: 0.06,
+    fever: 0.012,
+    sunblindness: 0.01,
+    sandstorm: 0.012,
+    waterfallSweep: 0.12,
+    findRemains: 0.004,
+    cooldownDays: 5,
   },
   deadline: {
     days: 1826, // about five years (design.md §19)
@@ -141,7 +141,7 @@ export const balance: BalanceConfig = {
 
 // Shop prices in $ (ports only; design.md §9/§10). Educated guesses.
 export const prices = {
-  food: 10, // one week of provisions
+  food: 5, // one week of provisions
   medicine: 12,
   map: 10,
   shovel: 20,
