@@ -85,6 +85,22 @@ export interface BalanceConfig {
   showHiddenObjects: boolean
   /** Carryable item count: equipment + gifts + treasures (design.md §6 camps). */
   inventoryCapacity: number
+  /** Standing with the native peoples (design.md §12). */
+  reputation: {
+    /** Goodwill at which a chief bestows "Honored Friend" on his region. */
+    goodwillForFriend: number
+    /** Days a village stays hostile after wrong behavior (expulsion). */
+    hostilityDays: number
+    /** Radius in degrees around a friend region's villages with protection. */
+    friendProtectRadiusDeg: number
+    /** Days between two aid deliveries when close to death (§12). */
+    friendAidCooldownDays: number
+    /** Provisions level a friend village tops the traveler up to. */
+    friendVillageFoodDays: number
+    /** Loot of a hut robbery: gifts and provisions days (§12). */
+    robberyGifts: number
+    robberyFoodDays: number
+  }
   /** Trade economy (design.md §8/§10). */
   economy: {
     /** Base prices of the treasure finds in $ (before regional factors). */
@@ -167,6 +183,15 @@ export const balance: BalanceConfig = {
   },
   showHiddenObjects: false,
   inventoryCapacity: 20,
+  reputation: {
+    goodwillForFriend: 6,
+    hostilityDays: 30,
+    friendProtectRadiusDeg: 1.5,
+    friendAidCooldownDays: 10,
+    friendVillageFoodDays: 21,
+    robberyGifts: 3,
+    robberyFoodDays: 7,
+  },
   economy: {
     treasureBase: { gold: 60, silver: 35, emerald: 70, copper: 20, ivory: 45, statue: 150 },
     reveredFactor: 2.2,

@@ -1370,8 +1370,20 @@ export function PlaceScene() {
       } else if (near.type === 'villager') {
         game.talkToVillager()
       } else if (near.type === 'chief') {
-        setDialog({ kind: 'audience' })
-        if (document.pointerLockElement) document.exitPointerLock()
+        // Standing gates (design.md §12): a visible rifle causes flight and
+        // blockade, a robbed region shuns the traveler, hostility lingers.
+        const strings = getStrings()
+        const place = game.placeId ? placeById(game.placeId) : null
+        if (game.handItem === 'rifle') {
+          game.setToast(strings.toasts.villagersFlee)
+        } else if (place && game.regionRobbed[place.region]) {
+          game.setToast(strings.toasts.regionShunned)
+        } else if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
+          game.setToast(strings.toasts.chiefHostile)
+        } else {
+          setDialog({ kind: 'audience' })
+          if (document.pointerLockElement) document.exitPointerLock()
+        }
       } else if (near.type === 'bazaar' || near.type === 'agency') {
         setDialog({ kind: near.type })
         if (document.pointerLockElement) document.exitPointerLock()

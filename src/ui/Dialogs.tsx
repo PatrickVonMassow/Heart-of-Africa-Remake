@@ -63,6 +63,8 @@ function AudienceDialog() {
   const giveGift = useGame((s) => s.giveGift)
   const hintsGiven = useGame((s) => s.hintsGiven)
   const unspecificGiven = useGame((s) => s.unspecificGiven)
+  const hasRifle = useGame((s) => (s.equipment.rifle ?? 0) > 0)
+  const robVillage = useGame((s) => s.robVillage)
   const setDialog = useUi((s) => s.setDialog)
   if (!placeId) return null
   const place = placeById(placeId)
@@ -91,6 +93,11 @@ function AudienceDialog() {
         {/* Which gift the region reveres is discoverable in play: the village
             elder reveals it on a second talk (design.md §8, journal.giftLore). */}
         <div className="actions">
+          {hasRifle && (
+            // Drawing the rifle inside the hut robs the village — with a
+            // permanent regional reputation loss (design.md §12).
+            <button className="hud-button danger" onClick={robVillage}>{t.dialogs.rob}</button>
+          )}
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.endAudience}</button>
         </div>
       </div>

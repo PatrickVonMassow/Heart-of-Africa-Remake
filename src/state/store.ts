@@ -118,6 +118,16 @@ export interface GameState {
   explored: Record<string, true>
   goodwill: Record<string, number>
   reveredGiftGiven: Record<string, boolean>
+  /** "Honored Friend" standing per region (design.md §12). */
+  honoredFriend: Partial<Record<RegionId, boolean>>
+  /** Regions whose friend status was forfeited by a robbery — for good. */
+  friendForfeited: Partial<Record<RegionId, boolean>>
+  /** Regions antagonized by a hut robbery: no huts, no hints (§12). */
+  regionRobbed: Partial<Record<RegionId, boolean>>
+  /** Per village: in-game day until which it stays hostile (§12 expulsion). */
+  hostileUntil: Record<string, number>
+  /** Day of the last near-death aid delivery (§12), for the cooldown. */
+  lastFriendAidDay: number
   /** Per region: the village whose people knows the location hint (§13.3). */
   knowingVillages: Record<RegionId, string>
   /** Regions whose knowing chief already gave his raw hint. */
@@ -155,6 +165,8 @@ export interface GameState {
   takeInHand: (item: HandId | null) => void
   giveGift: (material: Material) => void
   talkToVillager: () => void
+  /** Rob the hut at rifle point (design.md §12) — permanent regional loss. */
+  robVillage: () => void
   /** Write the decoded version of a region's hint once language + hint meet. */
   revealDecoded: (region: RegionId) => void
   dig: () => void
@@ -299,6 +311,11 @@ function startState(seed: number) {
     explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
     goodwill: {},
     reveredGiftGiven: {},
+    honoredFriend: {} as Partial<Record<RegionId, boolean>>,
+    friendForfeited: {} as Partial<Record<RegionId, boolean>>,
+    regionRobbed: {} as Partial<Record<RegionId, boolean>>,
+    hostileUntil: {} as Record<string, number>,
+    lastFriendAidDay: -9999,
     knowingVillages: pickKnowingVillages(seed),
     hintsGiven: {} as Partial<Record<RegionId, boolean>>,
     decodedGiven: {} as Partial<Record<RegionId, boolean>>,
@@ -314,9 +331,31 @@ function startState(seed: number) {
   }
 }
 
+/**
+ * Nearest village whose region holds "Honored Friend" (design.md §12);
+ * null when none lies within the protection radius.
+ */
+function nearestFriendVillage(
+  lat: number,
+  lon: number,
+  honoredFriend: Partial<Record<RegionId, boolean>>,
+): (typeof PLACES)[number] | null {
+  let best: (typeof PLACES)[number] | null = null
+  let bestDist = balance.reputation.friendProtectRadiusDeg
+  for (const p of PLACES) {
+    if (p.kind !== 'village' || !honoredFriend[p.region]) continue
+    const d = Math.hypot(p.lat - lat, p.lon - lon)
+    if (d <= bestDist) {
+      best = p
+      bestDist = d
+    }
+  }
+  return best
+}
+
 /** Event context from the current situation (design.md §14). */
 function buildEventContext(
-  s: Pick<GameState, 'equipment' | 'handItem'>,
+  s: Pick<GameState, 'equipment' | 'handItem' | 'honoredFriend'>,
   terrain: string,
   lat: number,
   lon: number,
@@ -324,7 +363,8 @@ function buildEventContext(
   const inWater = terrain === 'water' || terrain === 'ocean'
   const nearWaterfall = WATERFALLS.some((w) => Math.hypot(w.lat - lat, w.lon - lon) < 0.35)
   const wetland = terrain === 'jungle' || riverDistance(lat, lon, 0.2) < 0.12
-  return { terrain, inWater, nearWaterfall, wetland, hand: s.handItem, equipment: s.equipment }
+  const protectedByFriends = nearestFriendVillage(lat, lon, s.honoredFriend) !== null
+  return { terrain, inWater, nearWaterfall, wetland, protectedByFriends, hand: s.handItem, equipment: s.equipment }
 }
 
 let nextEntryId = 2
@@ -528,6 +568,16 @@ export const useGame = create<GameState>()((set, get) => ({
         } else if (o.result === 'severe') {
           set({ afflictions: { ...s.afflictions, wounds: 2 } })
         }
+        if (o.rescued) {
+          // Natives of the friend region rushed to help (design.md §12).
+          const cur = worldToLatLon(s.pos.x, s.pos.z)
+          const village = nearestFriendVillage(cur.lat, cur.lon, s.honoredFriend)
+          get().addEntry(
+            { key: 'journal.titles.rescue' },
+            { key: 'journal.friendRescue', params: { animal, people: village?.peopleId ?? '', result: o.result } },
+          )
+          return
+        }
         get().addEntry(
           { key: 'journal.titles.attack' },
           { key: 'journal.animalAttack', params: { animal, result: o.result } },
@@ -540,6 +590,15 @@ export const useGame = create<GameState>()((set, get) => ({
           if (Math.random() < 0.4) {
             set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 } })
           }
+        }
+        if (o.rescued) {
+          const cur = worldToLatLon(s.pos.x, s.pos.z)
+          const village = nearestFriendVillage(cur.lat, cur.lon, s.honoredFriend)
+          get().addEntry(
+            { key: 'journal.titles.rescue' },
+            { key: 'journal.friendRescueRobbers', params: { people: village?.peopleId ?? '' } },
+          )
+          return
         }
         get().addEntry(
           { key: 'journal.titles.robbery' },
@@ -662,6 +721,28 @@ export const useGame = create<GameState>()((set, get) => ({
       get().addEntry({ key: 'journal.titles.healthPoor' }, { key: 'journal.healthPoor' })
     }
 
+    // Close to death near a friend region's villages (design.md §12): the
+    // inhabitants hurry over with food, water and medicine.
+    if (health > 0 && healthState(health) === 'poor') {
+      const rep = balance.reputation
+      if (s.day - s.lastFriendAidDay >= rep.friendAidCooldownDays) {
+        const cur = worldToLatLon(s.pos.x, s.pos.z)
+        const village = nearestFriendVillage(cur.lat, cur.lon, s.honoredFriend)
+        if (village) {
+          set((st) => ({
+            lastFriendAidDay: st.day,
+            foodDays: Math.max(st.foodDays, 7),
+            afflictions: { ...st.afflictions, fever: false, wounds: 0 },
+          }))
+          get().addEntry(
+            { key: 'journal.titles.rescue' },
+            { key: 'journal.friendAid', params: { people: village.peopleId ?? village.id } },
+          )
+          return
+        }
+      }
+    }
+
     if (health <= 0) {
       const cause: DeathCause = a.wounds === 2 ? 'wounds'
         : a.fever ? 'fever'
@@ -748,6 +829,24 @@ export const useGame = create<GameState>()((set, get) => ({
         'event',
         'hut',
       )
+    }
+    // Honored Friend (design.md §12): food, water and medicine free of
+    // charge in every village of the region — granted when needed.
+    if (place.kind === 'village' && s.honoredFriend[place.region]) {
+      const rep = balance.reputation
+      const st = get()
+      const needsFood = st.foodDays < rep.friendVillageFoodDays
+      const needsMedicine = (st.equipment.medicine ?? 0) === 0 && usedInventory(st) < balance.inventoryCapacity
+      if (needsFood || needsMedicine) {
+        set({
+          foodDays: Math.max(st.foodDays, rep.friendVillageFoodDays),
+          equipment: needsMedicine ? { ...st.equipment, medicine: 1 } : st.equipment,
+        })
+        get().addEntry(
+          { key: 'journal.titles.friendSupplies' },
+          { key: 'journal.friendSupplies', params: { people: place.peopleId ?? id } },
+        )
+      }
     }
     // A visibly carried valuable triggers a reaction (design.md §8), once
     // per village: revered material creates goodwill, rejected costs it.
@@ -901,15 +1000,33 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.placeId) return
     const place = placeById(s.placeId)
     if (place.kind !== 'village' || s.gifts[material] <= 0) return
+    // Standing guards (design.md §12): a visible rifle makes the villagers
+    // flee, a robbed region shuns the traveler, hostility must wear off.
+    if (s.handItem === 'rifle') {
+      set({ toast: getStrings().toasts.villagersFlee })
+      return
+    }
+    if (s.regionRobbed[place.region]) {
+      set({ toast: getStrings().toasts.regionShunned })
+      return
+    }
+    if ((s.hostileUntil[place.id] ?? 0) > s.day) {
+      set({ toast: getStrings().toasts.chiefHostile })
+      return
+    }
     const values = REGION_VALUES[place.region]
     const gifts = { ...s.gifts, [material]: s.gifts[material] - 1 }
     const gw = s.goodwill[place.id] ?? 0
 
     if (values.rejected.includes(material)) {
-      // OPEN: design.md §12 prescribes hostility/eviction on wrong behavior;
-      // the POC simplifies this to a goodwill penalty plus journal entry.
-      set({ gifts, goodwill: { ...s.goodwill, [place.id]: Math.max(0, gw - 2) } })
+      // Wrong behavior: hostility and expulsion (design.md §12).
+      set({
+        gifts,
+        goodwill: { ...s.goodwill, [place.id]: 0 },
+        hostileUntil: { ...s.hostileUntil, [place.id]: s.day + balance.reputation.hostilityDays },
+      })
       get().addEntry({ key: 'journal.titles.mistake' }, { key: 'journal.giftRejected', params: { people: place.peopleId ?? place.id } })
+      get().leavePlace()
       return
     }
 
@@ -918,6 +1035,23 @@ export const useGame = create<GameState>()((set, get) => ({
     const newGw = gw + gain
     const reveredGiven = { ...s.reveredGiftGiven, [place.id]: (s.reveredGiftGiven[place.id] ?? false) || revered }
     set({ gifts, goodwill: { ...s.goodwill, [place.id]: newGw }, reveredGiftGiven: reveredGiven })
+
+    // Repeated correct satisfaction bestows "Honored Friend" for the whole
+    // region (design.md §12) — unless it was forfeited by a robbery.
+    if (
+      revered &&
+      newGw >= balance.reputation.goodwillForFriend &&
+      !s.honoredFriend[place.region] &&
+      !s.friendForfeited[place.region]
+    ) {
+      set({ honoredFriend: { ...get().honoredFriend, [place.region]: true } })
+      get().addEntry(
+        { key: 'journal.titles.friend' },
+        { key: 'journal.friendPledge', params: { people: place.peopleId ?? place.id, region: place.region } },
+        'event',
+        'face',
+      )
+    }
 
     if (revered) {
       get().addEntry({ key: 'journal.titles.audience' }, { key: 'journal.giftRevered', params: { people: place.peopleId ?? place.id } })
@@ -973,6 +1107,16 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (!s.placeId) return
     const region = placeById(s.placeId).region
+    // A visible rifle scatters the villagers; a robbed region shuns the
+    // traveler entirely (design.md §12).
+    if (s.handItem === 'rifle') {
+      set({ toast: getStrings().toasts.villagersFlee })
+      return
+    }
+    if (s.regionRobbed[region]) {
+      set({ toast: getStrings().toasts.regionShunned })
+      return
+    }
     // First talk: the elder teaches the region's direction system (§13.2);
     // a second talk reveals what the region reveres (§8).
     if (!s.languagesLearned[region]) {
@@ -995,6 +1139,35 @@ export const useGame = create<GameState>()((set, get) => ({
       return
     }
     set({ toast: getStrings().toasts.villagerNod })
+  },
+
+  robVillage: () => {
+    const s = get()
+    if (!s.placeId || s.defeat || s.victory) return
+    const place = placeById(s.placeId)
+    if (place.kind !== 'village' || (s.equipment.rifle ?? 0) <= 0) return
+    const region = place.region
+    const rep = balance.reputation
+    // Loot at rifle point (design.md §12): goods as far as the pack holds.
+    const space = Math.max(0, balance.inventoryCapacity - usedInventory(s))
+    const lootMaterial = REGION_VALUES[region].revered[0]
+    const loot = Math.min(rep.robberyGifts, space)
+    set({
+      handItem: 'rifle',
+      gifts: { ...s.gifts, [lootMaterial]: s.gifts[lootMaterial] + loot },
+      foodDays: s.foodDays + rep.robberyFoodDays,
+      // The whole region is antagonized for good: no huts, no hints, and
+      // the "Honored Friend" standing is forfeited irretrievably.
+      regionRobbed: { ...s.regionRobbed, [region]: true },
+      honoredFriend: { ...s.honoredFriend, [region]: false },
+      friendForfeited: { ...s.friendForfeited, [region]: true },
+    })
+    useUi.getState().setDialog(null)
+    get().addEntry(
+      { key: 'journal.titles.robberyCommitted' },
+      { key: 'journal.robberyCommitted', params: { people: place.peopleId ?? place.id, region } },
+    )
+    get().leavePlace()
   },
 
   dig: () => {
@@ -1073,6 +1246,8 @@ export const useGame = create<GameState>()((set, get) => ({
       explored: s.explored,
       treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
       pendingBounties: s.pendingBounties, landmarksSeen: s.landmarksSeen, valuableShown: s.valuableShown,
+      honoredFriend: s.honoredFriend, friendForfeited: s.friendForfeited, regionRobbed: s.regionRobbed,
+      hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
       nextEntryId,
     }
     try {
@@ -1108,6 +1283,11 @@ export const useGame = create<GameState>()((set, get) => ({
         pendingBounties: snap.pendingBounties ?? [],
         landmarksSeen: snap.landmarksSeen ?? [],
         valuableShown: snap.valuableShown ?? {},
+        honoredFriend: snap.honoredFriend ?? {},
+        friendForfeited: snap.friendForfeited ?? {},
+        regionRobbed: snap.regionRobbed ?? {},
+        hostileUntil: snap.hostileUntil ?? {},
+        lastFriendAidDay: snap.lastFriendAidDay ?? -9999,
         defeat: null,
         deathCause: null,
         mode: 'place',

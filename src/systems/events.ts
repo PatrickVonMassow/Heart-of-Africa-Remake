@@ -32,6 +32,9 @@ export interface EventContext {
   nearWaterfall: boolean
   /** Jungle or close to a river/lake: fever country (design.md §14). */
   wetland: boolean
+  /** Near a village of a region with "Honored Friend" status (§12): the
+   * natives rush to help — at most a light injury results. */
+  protectedByFriends: boolean
   hand: HandId | null
   equipment: Partial<Record<EquipmentId, number>>
 }
@@ -44,6 +47,8 @@ export interface EventOutcome {
   money?: number
   /** Days lost (sandstorm shelter). */
   daysLost?: number
+  /** Natives of a friend region rushed to the rescue (design.md §12). */
+  rescued?: boolean
 }
 
 /**
@@ -110,6 +115,17 @@ function attackSeverity(
   return 'severe'
 }
 
+/** Resolve an animal attack, honoring the friend protection (§12). */
+function resolveAttack(kind: EventKind, ctx: EventContext, rand: () => number, fatalChance: number): EventOutcome {
+  const severity = attackSeverity(ctx, rand, fatalChance)
+  if (ctx.protectedByFriends) {
+    // Rescue by the natives: at most lightly injured (design.md §12/§14).
+    const capped = severity === 'fatal' || severity === 'severe' || severity === 'light' ? 'light' : 'escaped'
+    return { kind, result: capped, rescued: true }
+  }
+  return { kind, result: severity }
+}
+
 /**
  * Resolve an event of the given kind (used by the per-day roll and by the
  * debug trigger, design.md §21). Pure: state changes happen in the store.
@@ -117,22 +133,26 @@ function attackSeverity(
 export function resolveEvent(kind: EventKind, ctx: EventContext, rand: () => number): EventOutcome {
   switch (kind) {
     case 'lionAttack':
-      return { kind, result: attackSeverity(ctx, rand, 0.08) }
+      return resolveAttack(kind, ctx, rand, 0.08)
     case 'leopardAttack':
       // Lower risk of being eaten than with lions (design.md §14).
-      return { kind, result: attackSeverity(ctx, rand, 0.03) }
+      return resolveAttack(kind, ctx, rand, 0.03)
     case 'snakeBite': {
       const roll = rand()
-      return { kind, result: roll < 0.4 ? 'escaped' : roll < 0.85 ? 'light' : 'severe' }
+      const result = roll < 0.4 ? 'escaped' : roll < 0.85 ? 'light' : 'severe'
+      if (ctx.protectedByFriends && result === 'severe') return { kind, result: 'light', rescued: true }
+      return { kind, result }
     }
     case 'robberAttack': {
+      // Near friend villages the natives drive robbers off (design.md §12).
+      if (ctx.protectedByFriends) return { kind, result: 'deterred', rescued: true }
       // The rifle deters thieves (design.md §14), in hand almost always.
       const deterred = ctx.hand === 'rifle' ? rand() < 0.9 : (ctx.equipment.rifle ?? 0) > 0 && rand() < 0.5
       if (deterred) return { kind, result: 'deterred' }
       return { kind, result: 'robbed', money: 10 + Math.floor(rand() * 41) }
     }
     case 'crocodileAttack':
-      return { kind, result: attackSeverity(ctx, rand, 0.1) }
+      return resolveAttack(kind, ctx, rand, 0.1)
     case 'fever':
       return { kind, result: 'afflicted' }
     case 'sunblindness':

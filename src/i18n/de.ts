@@ -214,6 +214,9 @@ export const de: Strings = {
     sold: (name, amount) => `${name} für ${amount} $ verkauft.`,
     bazaarRejected: (name) => `Der Händler winkt ab — mit ${name} wird hier nicht gehandelt.`,
     graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
+    villagersFlee: 'Beim Anblick meines Gewehrs fliehen die Dorfbewohner — niemand spricht mit mir.',
+    chiefHostile: 'Das Dorf hat meinen Fehltritt nicht vergessen. Das Oberhaupt empfängt mich nicht.',
+    regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet — keine Hütte dieser Region öffnet sich mir mehr.',
   },
 
   dialogs: {
@@ -232,6 +235,7 @@ export const de: Strings = {
     give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
     endAudience: 'Audienz beenden (Esc)',
+    rob: 'Gewehr ziehen und rauben',
     bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab — oder nimm selbst ein Stück mit heim."',
     bazaarSell: 'Einen Fund anbieten:',
     bazaarBuy: 'Zum Verkauf:',
@@ -344,6 +348,10 @@ export const de: Strings = {
       bounty: 'Der Lohn der Entdeckungen',
       ferry: 'Passage übers Meer',
       valuableReaction: 'Der Schatz in meiner Hand',
+      friend: 'Ein Ehrenfreund',
+      rescue: 'Von den Dorfbewohnern gerettet',
+      friendSupplies: 'Gäste der Region',
+      robberyCommitted: 'Eine Tat ohne Vergebung',
     },
     start:
       'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
@@ -489,5 +497,20 @@ export const de: Strings = {
       `Kaum betrat ich das Dorf, richteten sich alle Blicke auf [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand. [excited]Ehrfürchtiges Raunen folgte mir durch die Gassen —[pause] die ${PEOPLES[p.people as string]} verehren, was ich trage.[/excited]`,
     valuableRejected: (p: TextParams) =>
       `[fear]Ein Fehler, es offen zu tragen![/fear] Die ${PEOPLES[p.people as string]} wichen vor [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand zurück wie vor einem bösen Omen. [somber]Türen schlossen sich;[pause] Mütter zogen ihre Kinder ins Haus.[/somber]`,
+    friendPledge: (p: TextParams) =>
+      `[awe]Das Oberhaupt der ${PEOPLES[p.people as string]} erhob sich und legte mir beide Hände auf die Schultern.[/awe] Vor dem versammelten Dorf nannte es mich [emph]Ehrenfreund[/emph] seines Volkes. [excited]„Wo immer unsere Dörfer stehen", gelobte es, „werden unsere Leute über dich wachen."[/excited] [breath][somber]Ich verneigte mich tief.[pause] Ein solches Geschenk wiegt schwerer als Gold.[/somber]`,
+    friendRescue: (p: TextParams) => {
+      const animal = de.animals[p.animal as keyof typeof de.animals]
+      const hurt = p.result === 'light' ? ' [somber]Ich wurde nur leicht verletzt.[/somber]' : ' [excited]Ich blieb unversehrt.[/excited]'
+      return `[fear]Ich wurde von ${animal} angegriffen![/fear] [excited]Eine Gruppe der ${PEOPLES[p.people as string]} eilte mir sofort zu Hilfe und vertrieb das Tier.[/excited]${hurt} [pause][somber]Ich verdanke diesen Menschen mein Leben.[/somber]`
+    },
+    friendRescueRobbers: (p: TextParams) =>
+      `[fear]Räuber verstellten mir den Weg —[/fear] [excited]doch Männer der ${PEOPLES[p.people as string]} traten mit erhobenen Speeren aus dem Busch, und die Banditen stoben auseinander wie aufgescheuchte Vögel.[/excited] [somber]Das Gelöbnis des Oberhaupts wiegt mehr als jedes Gewehr.[/somber]`,
+    friendAid: (p: TextParams) =>
+      `[weary]Ich konnte nicht mehr weiter;[pause] das Land verschwamm vor meinen Augen.[/weary] [somber]Dann hoben mich Hände auf —[/somber] [excited]Leute der ${PEOPLES[p.people as string]} hatten mich gefunden.[/excited] Sie brachten Wasser, Nahrung und bittere Medizin und blieben, bis meine Kräfte zurückkehrten. [pause][awe]Ich lebe, weil ich ihr Freund bin.[/awe]`,
+    friendSupplies: (p: TextParams) =>
+      `Im Dorf der ${PEOPLES[p.people as string]} empfing man mich wie Familie: [excited]Man füllte mein Gepäck mit Proviant und drückte mir Medizin in die Hände,[/excited] von Bezahlung wollte niemand hören. [pause][somber]Die Freundschaft dieser Region ist mein sicherster Besitz.[/somber]`,
+    robberyCommitted: (p: TextParams) =>
+      `[somber]Ich habe etwas getan, das sich nicht ungeschehen machen lässt.[/somber] [fear]Mit erhobenem Gewehr räumte ich die Hütte der ${PEOPLES[p.people as string]} aus und floh aus dem Dorf.[/fear] [breath][weary]Hinter mir: Schreie, und eine Stille, die schlimmer war als die Schreie.[pause] Keine Hütte dieser Region wird sich mir je wieder öffnen.[/weary]`,
   },
 }

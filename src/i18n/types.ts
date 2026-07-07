@@ -124,6 +124,10 @@ export interface Strings {
     /** The bazaar refuses a regionally rejected material (design.md §10). */
     bazaarRejected(name: string): string
     graveyardEmpty: string
+    /** Standing gates (design.md §12). */
+    villagersFlee: string
+    chiefHostile: string
+    regionShunned: string
   }
 
   dialogs: {
@@ -142,6 +146,8 @@ export interface Strings {
     give: string
     stock(n: number): string
     endAudience: string
+    /** Draw the rifle and rob the hut (design.md §12). */
+    rob: string
     /** Bazaar (design.md §10): bid flow on offered treasures. */
     bazaarGreeting: string
     bazaarSell: string
@@ -244,6 +250,10 @@ export interface Strings {
       bounty: string
       ferry: string
       valuableReaction: string
+      friend: string
+      rescue: string
+      friendSupplies: string
+      robberyCommitted: string
     }
     start: string
     regionEntry(p: TextParams): string
@@ -292,5 +302,13 @@ export interface Strings {
     /** Reactions to a visibly carried valuable (design.md §8). */
     valuableRevered(p: TextParams): string
     valuableRejected(p: TextParams): string
+    /** "Honored Friend" (design.md §12): pledge, rescues, aid, supplies. */
+    friendPledge(p: TextParams): string
+    friendRescue(p: TextParams): string
+    friendRescueRobbers(p: TextParams): string
+    friendAid(p: TextParams): string
+    friendSupplies(p: TextParams): string
+    /** A hut robbery at rifle point (design.md §12). */
+    robberyCommitted(p: TextParams): string
   }
 }

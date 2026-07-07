@@ -215,6 +215,9 @@ export const en: Strings = {
     sold: (name, amount) => `${name} sold for ${amount} $.`,
     bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
     graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
+    villagersFlee: 'The villagers flee at the sight of my rifle — no one will speak with me.',
+    chiefHostile: 'The village has not forgotten my offense. The chief refuses to see me.',
+    regionShunned: 'Word of my robbery has spread — no hut of this region will open to me again.',
   },
 
   dialogs: {
@@ -233,6 +236,7 @@ export const en: Strings = {
     give: 'Offer',
     stock: (n) => `you have ${n}`,
     endAudience: 'End audience (Esc)',
+    rob: 'Draw the rifle and rob',
     bazaarGreeting: '"Treasures, effendi! Show me what the wilderness yielded — or take a piece home yourself."',
     bazaarSell: 'Offer a find:',
     bazaarBuy: 'For sale:',
@@ -338,6 +342,10 @@ export const en: Strings = {
       bounty: 'The Bounty of Discovery',
       ferry: 'Passage by Sea',
       valuableReaction: 'The Valuable in My Hand',
+      friend: 'An Honored Friend',
+      rescue: 'Saved by the Villagers',
+      friendSupplies: 'Guests of the Region',
+      robberyCommitted: 'A Deed Beyond Forgiving',
     },
     start:
       'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
@@ -482,5 +490,20 @@ export const en: Strings = {
       `No sooner had I entered the village than eyes turned to the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand. [excited]Murmurs of awe followed me through the lanes —[pause] the ${PEOPLES[p.people as string]} revere what I carry.[/excited]`,
     valuableRejected: (p: TextParams) =>
       `[fear]A mistake to carry it openly![/fear] The ${PEOPLES[p.people as string]} shrank back from the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand as from an ill omen. [somber]Doors closed;[pause] mothers pulled their children inside.[/somber]`,
+    friendPledge: (p: TextParams) =>
+      `[awe]The chief of the ${PEOPLES[p.people as string]} rose and laid both hands upon my shoulders.[/awe] Before the assembled village he named me [emph]Honored Friend[/emph] of his people. [excited]"Wherever our villages stand," he pledged, "our people shall watch over you."[/excited] [breath][somber]I bowed deeply.[pause] Such a gift weighs more than gold.[/somber]`,
+    friendRescue: (p: TextParams) => {
+      const animal = en.animals[p.animal as keyof typeof en.animals]
+      const hurt = p.result === 'light' ? ' [somber]I was only lightly injured.[/somber]' : ' [excited]I escaped unharmed.[/excited]'
+      return `[fear]I was attacked by ${animal}![/fear] [excited]A group of the ${PEOPLES[p.people as string]} rushed to my aid at once and drove the beast away.[/excited]${hurt} [pause][somber]I owe these people my life.[/somber]`
+    },
+    friendRescueRobbers: (p: TextParams) =>
+      `[fear]Robbers blocked my path —[/fear] [excited]but men of the ${PEOPLES[p.people as string]} appeared from the bush with spears raised, and the bandits scattered like startled birds.[/excited] [somber]The chief's pledge is worth more than any rifle.[/somber]`,
+    friendAid: (p: TextParams) =>
+      `[weary]I could go no farther;[pause] the land swam before my eyes.[/weary] [somber]Then hands lifted me —[/somber] [excited]people of the ${PEOPLES[p.people as string]} had found me.[/excited] They brought water, food and bitter medicine, and stayed until my strength returned. [pause][awe]I am alive because I am their friend.[/awe]`,
+    friendSupplies: (p: TextParams) =>
+      `In the village of the ${PEOPLES[p.people as string]} I was received like family: [excited]they filled my packs with provisions and pressed medicine into my hands,[/excited] and no one would hear of payment. [pause][somber]The friendship of this region is my safest possession.[/somber]`,
+    robberyCommitted: (p: TextParams) =>
+      `[somber]I have done a thing that cannot be undone.[/somber] [fear]With the rifle raised I emptied the hut of the ${PEOPLES[p.people as string]} and fled the village.[/fear] [breath][weary]Behind me: screams, and a silence worse than the screams.[pause] No hut of this region will ever open to me again.[/weary]`,
   },
 }

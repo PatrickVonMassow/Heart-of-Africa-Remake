@@ -104,6 +104,12 @@ body,
   cursor: pointer;
 }
 
+/* The robbery action (design.md §12) reads as a dangerous, ruinous step. */
+.hud-button.danger {
+  border-color: #8c2f22;
+  color: #d4715f;
+}
+
 .inventory-bar button.active {
   background: #5a4520;
   border-color: var(--hud-accent);

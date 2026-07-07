@@ -451,6 +451,29 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     Zanzibar (fare, days, checkpoint), the bounty crediting, the
     graveyard ivory depletion, digging a treasure cache and the statue
     site, and both valuable reactions.
+26. **Standing with the natives.** `design.md` §12/§7 is implemented: a
+    rifle carried in hand inside a village makes the inhabitants flee
+    (they vanish indoors) and blocks the audience and the elder talk; a
+    rejected gift means hostility and expulsion — the traveler is thrown
+    out of the village, goodwill resets and the chief refuses audiences
+    for a hostility period (balance value); repeated correct
+    satisfaction of a chief (goodwill threshold via revered gifts)
+    bestows "Honored Friend" for the whole region, announced by a pledge
+    journal entry. The status protects near the region's villages:
+    animal and robber attacks end at most lightly injured with a rescue
+    journal entry naming the people, near-death travelers receive food
+    and medicine from hurrying villagers (cooldown), and the region's
+    villages hand out provisions and medicine free of charge. Drawing
+    the rifle inside a chief's hut robs the village (loot up to the pack
+    limit): the whole region is antagonized permanently — no audiences,
+    no elder talks, no hints — and the "Honored Friend" status is
+    forfeited irretrievably and cannot be re-earned. All new texts exist
+    in both languages with voice markup. Verifiable:
+    `scripts/verify/reputation.mjs` asserts the rifle blockade, the
+    hostility/expulsion and its wear-off, the friend pledge (exactly
+    once), the capped attack outcomes with rescue entries, the
+    near-death aid, the free village supplies, and the permanent
+    robbery consequences including the forfeited friendship.
 
 ### 7.2 Self-Verification (mandatory)
 
