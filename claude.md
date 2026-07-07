@@ -88,7 +88,7 @@ project-root/
 ├── vite.config.ts
 ├── public/
 └── src/
-    ├── App.tsx        (entry; currently the render smoke test)
+    ├── App.tsx        (entry; renderer setup, scene switch, HUD)
     ├── main.tsx
     └── ...            (game code goes here)
 ```
@@ -246,12 +246,22 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     journal, a trade dialog and the map in both languages; no hardcoded
     player-visible strings outside the language files (spot check); the
     application runs without console errors in both languages.
+18. **Lint and dependency hygiene.** The codebase is free of linter
+    findings and known vulnerabilities: `npm run lint` (oxlint) reports
+    zero errors and zero warnings, and `npm audit` reports zero
+    vulnerabilities (CVEs) in the dependency tree. This holds not only at
+    acceptance but after **every** change; both checks are part of the
+    self-verification (§7.2). If a vulnerability has no upstream fix, it
+    is recorded as an open item with its advisory ID instead of being
+    ignored silently.
 
 ### 7.2 Self-Verification (mandatory)
 
 After completion and after every major system:
 
 - Run `npm run build` and confirm it passes without errors.
+- Run `npm run lint` and `npm audit` and confirm both are clean (zero
+  lint errors/warnings, zero vulnerabilities) per §7.1 point 18.
 - Start the dev server and verify via headless screenshot (e.g. Playwright)
   that the affected view renders without console errors.
 - Store screenshots of each core view (bird's-eye view, port city,
@@ -267,8 +277,10 @@ After completion and after every major system:
 - Multiplayer in any form.
 - Onboarding, tutorials, lowering of the entry barrier.
 - Animated handwritten journal entries with blood traces (§16 `design.md`).
-- Full balance, audio, dynamic music, ambient wildlife (§19 `design.md`),
-  debug menu (§21 `design.md`) beyond what verification requires.
+- Full balance calibration; a debug menu (§21 `design.md`) beyond what §2
+  and the verification require. (Audio, dynamic music and ambient wildlife
+  were formerly listed here; they became part of the target via criterion
+  §7.1 pt. 12 and are implemented.)
 - A tabular load menu beyond the simple checkpoint.
 
 These points are not to be started, not even partially, as long as the
