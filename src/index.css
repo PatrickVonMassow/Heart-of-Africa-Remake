@@ -196,6 +196,39 @@ body,
   font-size: 16px;
 }
 
+/* Dismissible notice when the renderer fell back to WebGL 2. */
+.renderer-warning {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--hud-bg);
+  border: 1px solid #a67c2e;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  max-width: 80vw;
+}
+
+.renderer-warning button {
+  background: none;
+  border: 1px solid var(--hud-border);
+  color: var(--hud-text);
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.renderer-warning button:hover {
+  border-color: var(--hud-accent);
+}
+
 .toast {
   position: absolute;
   top: 56px;

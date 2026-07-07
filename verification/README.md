@@ -335,3 +335,17 @@ ground ribbons draped over the terrain in the bird's-eye view.
 |---|---|
 | 59-region-border-birdseye-timbuktu.png | Bird's-eye view at Timbuktu; the lat-17 north border runs as a dashed ground line |
 | 60-region-borders-map.png | Map overlay with all region borders as dashed lines |
+
+## Addendum: WebGL fallback notice (July 7, 2026)
+
+When the WebGPURenderer falls back to WebGL 2 (CLAUDE.md §3), a dismissible,
+localized notice appears above the HUD. Verified both ways: bundled headless
+Chromium (whose WebGPU device request fails for lack of dxil.dll) shows the
+notice and it dismisses cleanly; system Edge headless provides a real WebGPU
+path and shows no notice. Note: this revealed that earlier "WebGPU path"
+checks with the bundled Chromium actually exercised the WebGL fallback.
+
+| File | View |
+|---|---|
+| 61-webgl-fallback-warning.png | WebGL 2 fallback notice with dismiss button (German) |
+| 62-webgpu-no-warning.png | Real WebGPU path (Edge): no notice |

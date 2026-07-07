@@ -64,7 +64,9 @@ WebGPU. Requirements:
 - Import from `three/webgpu`; in R3F v9 create the renderer via the async
   `gl` prop factory and await `renderer.init()`. The WebGPURenderer falls
   back to WebGL 2 automatically when WebGPU is unavailable; this fallback is
-  the defined escape hatch, not a rebuild.
+  the defined escape hatch, not a rebuild. When it happens, a dismissible
+  in-game notice tells the player the game is running in WebGL 2
+  compatibility mode (localized like all player-visible text).
 - Shaders in TSL (Three Shading Language), not raw GLSL or WGSL. TSL
   compiles renderer-agnostically for both backends and avoids a second code
   path.

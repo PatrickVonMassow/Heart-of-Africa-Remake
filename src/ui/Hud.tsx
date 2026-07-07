@@ -48,6 +48,22 @@ function Toast() {
   return <div className="toast">{toast}</div>
 }
 
+/** Dismissible notice when the renderer fell back to WebGL 2 (CLAUDE.md §3). */
+function RendererWarning() {
+  const t = useStrings()
+  const fallback = useUi((s) => s.webglFallback)
+  const dismissed = useUi((s) => s.webglWarningDismissed)
+  if (!fallback || dismissed) return null
+  return (
+    <div className="renderer-warning">
+      <span>{t.hud.webglFallback}</span>
+      <button onClick={() => useUi.getState().dismissWebglWarning()}>
+        {t.hud.webglFallbackDismiss}
+      </button>
+    </div>
+  )
+}
+
 function Prompt() {
   const prompt = useUi((s) => s.prompt)
   const dialog = useUi((s) => s.dialog)
@@ -154,6 +170,8 @@ export function Hud() {
       <MapOverlay />
       <Dialogs />
       <DebugMenu />
+      {/* Above panels and dialogs so it stays clickable; below the modal overlays. */}
+      <RendererWarning />
       <StartOverlay />
       <VictoryOverlay />
     </>

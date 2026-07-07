@@ -146,6 +146,8 @@ export const en: Strings = {
     journalToggle: 'Journal (T)',
     mapToggle: 'Map (M)',
     handTooltip: 'Take in hand / put away',
+    webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
+    webglFallbackDismiss: 'Got it',
   },
 
   prompts: {

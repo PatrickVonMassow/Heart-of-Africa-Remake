@@ -50,6 +50,9 @@ export interface Strings {
     journalToggle: string
     mapToggle: string
     handTooltip: string
+    /** Shown when the renderer fell back from WebGPU to WebGL 2. */
+    webglFallback: string
+    webglFallbackDismiss: string
   }
 
   prompts: {

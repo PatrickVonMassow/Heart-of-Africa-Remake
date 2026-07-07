@@ -145,6 +145,8 @@ export const de: Strings = {
     journalToggle: 'Tagebuch (T)',
     mapToggle: 'Karte (M)',
     handTooltip: 'In die Hand nehmen / weglegen',
+    webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar — das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
+    webglFallbackDismiss: 'Verstanden',
   },
 
   prompts: {

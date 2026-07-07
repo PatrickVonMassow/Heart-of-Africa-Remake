@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Canvas, extend, type ThreeToJSXElements } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { useGame } from './state/store'
+import { useUi } from './state/ui'
 import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
 import { Effects } from './render/Effects'
@@ -30,6 +31,9 @@ export default function App() {
             antialias: true,
           })
           await renderer.init()
+          // Surface the automatic WebGL 2 fallback to the player (CLAUDE.md §3).
+          const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
+          useUi.getState().setWebglFallback(backend?.isWebGPUBackend !== true)
           // Filmic look: soft shadows + ACES tone mapping.
           renderer.shadowMap.enabled = true
           renderer.shadowMap.type = THREE.PCFSoftShadowMap
