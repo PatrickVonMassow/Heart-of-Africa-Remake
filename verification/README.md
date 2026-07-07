@@ -303,3 +303,24 @@ Implemented:
 | 56-i18n-english-trade.png | English: trade dialog in Cairo |
 | 57-i18n-english-map.png | English: map overlay with region/exploration |
 | 58-i18n-debug-language.png | Debug menu with the language selector |
+
+## Addendum: full re-verification (tenth run)
+
+As of July 7, 2026, after the legacy cleanup. The formerly ephemeral
+verification scripts now live in the repository (`scripts/verify/`,
+documented in `scripts/README.md`) and were re-run in full:
+
+- **flow.mjs** — gameplay loop end to end: 20/20 PASS, 0 console errors.
+  Refreshed screenshots 01–07.
+- **checkpoint.mjs** — save/reload/restore: 3/3 PASS.
+- **collision.mjs** — §7.1.16: 12/12 PASS (port + village ejection tests,
+  building reachability, access points). Refreshed screenshots 52–53.
+- **world.mjs** — §7.1.3: all counts (10 ports, 22 villages, 17 rivers,
+  8 lakes, 5 waterfalls) and placement checks PASS. Found and fixed:
+  the reworked Niger course swallowed Timbuktu (stylized river band vs.
+  port site); the local river node now passes south of the city as in
+  reality. Refreshed screenshots 10–17.
+- **i18n.mjs** — §7.1.17: 13/13 PASS. Refreshed screenshots 54–58.
+- **preview.mjs** — production build renders console-clean. Refreshed
+  screenshot 09.
+- `npm run lint` and `npm audit` (§7.1.18): 0 findings, 0 vulnerabilities.

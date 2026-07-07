@@ -44,3 +44,32 @@ weights; steep slopes receive bi-planar projected rock.
 
 Dependency-free PNG codec (decode: 8-bit gray/RGB/RGBA non-interlaced;
 encode: 8-bit RGB), used by both scripts.
+
+# Verification Suite (CLAUDE.md §7.2)
+
+`scripts/verify/` holds the headless acceptance checks (Playwright is a
+devDependency; Chromium via `npx playwright install chromium`). All scripts
+exit non-zero on failure and write screenshot evidence to `verification/`.
+
+```
+npm run dev                          # prerequisite for all dev-server checks
+node scripts/verify/flow.mjs        # gameplay loop end to end (20 checks)
+node scripts/verify/checkpoint.mjs  # checkpoint save/reload/restore
+node scripts/verify/collision.mjs   # §7.1.16 collision + reachability
+node scripts/verify/world.mjs       # §7.1.3 world-model data + screenshots
+node scripts/verify/i18n.mjs        # §7.1.17 localization (de default, en)
+
+npm run build && npm run preview    # prerequisite for the production check
+node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean
+```
+
+Notes:
+
+- The dev-server checks rely on DEV-only hooks (`__game`, `__placePlayer`,
+  `__placeLayout`, `__placeColliders`, `__setLang`); they do not work
+  against the production build.
+- Chromium must run with `--use-angle=d3d11 --enable-gpu` (already set in
+  the scripts). With the SwiftShader fallback, requestAnimationFrame drops
+  to ~1 fps and interaction tests become meaninglessly slow.
+- UI strings are asserted in German (the default language); journal entries
+  are asserted by their language-neutral keys (design.md §17).
