@@ -132,7 +132,8 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
 
   const interactives: Interactive[] = []
   if (place.kind === 'port') {
-    const types: BuildingType[] = ['shop', 'weapons', 'tools', 'market']
+    // Ports carry the full trade roster incl. bazaar and travel agency (§9).
+    const types: BuildingType[] = ['shop', 'weapons', 'tools', 'market', 'bazaar', 'agency']
     types.forEach((t, i) => {
       // Diagonal placement keeps the southern spawn corridor free.
       const angle = Math.PI / 4 + (i / types.length) * Math.PI * 2 + (rand() - 0.5) * 0.4
@@ -1370,6 +1371,9 @@ export function PlaceScene() {
         game.talkToVillager()
       } else if (near.type === 'chief') {
         setDialog({ kind: 'audience' })
+        if (document.pointerLockElement) document.exitPointerLock()
+      } else if (near.type === 'bazaar' || near.type === 'agency') {
+        setDialog({ kind: near.type })
         if (document.pointerLockElement) document.exitPointerLock()
       } else {
         setDialog({ kind: 'trade', building: near.type })

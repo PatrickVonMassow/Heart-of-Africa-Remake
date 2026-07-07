@@ -428,6 +428,29 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     `scripts/verify/expedition.mjs` asserts the staged warnings (exactly
     once each), the expiry defeat without successor, and the
     death-to-successor flow including the day penalty and takeover entry.
+25. **Trade economy.** `design.md` §8/§9/§10 is implemented: treasure
+    finds (gold, silver, emerald, copper, ivory, statue) are inventory
+    items, recovered by shovel from procedurally buried caches (one per
+    region plus a statue site, placed anew each run) and from the limited
+    ivory supply of the elephant graveyard; the inventory has a capacity
+    (balance value) — buying or digging beyond it is refused, the debug
+    menu edits capacity and gift count (§21), and debug item adds raise
+    the capacity automatically when overfilling; ports contain the bazaar
+    and the travel agency (§9); the bazaar trades treasures with the
+    offer → bid → accept/decline mechanic, regional value factors
+    (revered fetches more, rejected materials are refused) and a buy/sell
+    spread — continent-wide arbitrage; the travel agency sells ferry
+    passages between all ports with distance-based fare and duration,
+    which makes Zanzibar reachable; discovery bounties for first-visited
+    villages and sighted landmarks are credited on the next port visit
+    via a journal entry; a valuable carried visibly in hand triggers the
+    positive or negative village reaction of the §8 matrix. All new
+    texts exist in both languages with voice markup. Verifiable:
+    `scripts/verify/economy.mjs` asserts the capacity refusal and
+    auto-raise, the regional bid ordering and rejection, the ferry to
+    Zanzibar (fare, days, checkpoint), the bounty crediting, the
+    graveyard ivory depletion, digging a treasure cache and the statue
+    site, and both valuable reactions.
 
 ### 7.2 Self-Verification (mandatory)
 

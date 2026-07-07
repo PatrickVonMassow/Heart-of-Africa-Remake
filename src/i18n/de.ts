@@ -121,9 +121,13 @@ export const de: Strings = {
     gold: 'Goldschmuck', silver: 'Silberschmuck', emerald: 'Smaragd',
     copper: 'Kupferarmband', ivory: 'Elfenbeinschnitzerei',
   },
+  treasures: {
+    gold: 'Gold', silver: 'Silber', emerald: 'Smaragde',
+    copper: 'Kupfer', ivory: 'Elfenbein', statue: 'Goldene Statue',
+  },
   buildings: {
     shop: 'Laden', weapons: 'Waffenhütte', tools: 'Geräte-Hütte',
-    market: 'Markthütte', chief: 'Chefhütte',
+    market: 'Markthütte', bazaar: 'Basar', agency: 'Reisebüro', chief: 'Chefhütte',
   },
   sketches: {
     palm: 'Skizze: Palme', acacia: 'Skizze: Akazie', bird: 'Skizze: Vogel',
@@ -205,6 +209,11 @@ export const de: Strings = {
     journalDndOff: 'Tagebuch-Unterbrechungen an — neue Einträge öffnen das Tagebuch.',
     noMedicine: 'Ich habe keine Medizin mehr.',
     medicineNotNeeded: 'Weder Fieber noch Wunden — ich hebe die Medizin auf.',
+    inventoryFull: 'Mein Gepäck ist voll — mehr kann ich nicht tragen.',
+    discovered: (name) => `Entdeckt: ${name}. Die Geographische Gesellschaft wird diesen Bericht bezahlen.`,
+    sold: (name, amount) => `${name} für ${amount} $ verkauft.`,
+    bazaarRejected: (name) => `Der Händler winkt ab — mit ${name} wird hier nicht gehandelt.`,
+    graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
   },
 
   dialogs: {
@@ -223,6 +232,16 @@ export const de: Strings = {
     give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
     endAudience: 'Audienz beenden (Esc)',
+    bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab — oder nimm selbst ein Stück mit heim."',
+    bazaarSell: 'Einen Fund anbieten:',
+    bazaarBuy: 'Zum Verkauf:',
+    offer: 'Anbieten',
+    bid: (name, amount) => `Der Händler bietet ${amount} $ für ${name}.`,
+    accept: 'Annehmen',
+    decline: 'Ablehnen',
+    agencyGreeting: '„Passagen in jeden Hafen des Kontinents — schnelle Schiffe, ehrliche Preise."',
+    passage: (dest, days) => `Passage nach ${dest} (~${days} Tage)`,
+    book: 'Buchen',
   },
 
   overlays: {
@@ -280,6 +299,9 @@ export const de: Strings = {
     grave: 'Grab',
     addEquipment: 'Ausrüstung hinzufügen:',
     addGift: 'Gabe hinzufügen:',
+    addTreasure: 'Schatz hinzufügen:',
+    giftsTotal: 'Gaben (Anzahl)',
+    inventoryCapacity: 'Inventar-Kapazität',
   },
 
   journal: {
@@ -318,6 +340,10 @@ export const de: Strings = {
       deadline1: 'Ein Brief der Geldgeber',
       deadline2: 'Die letzte Warnung',
       successor: 'Eine neue Hand',
+      treasure: 'Ein Schatz!',
+      bounty: 'Der Lohn der Entdeckungen',
+      ferry: 'Passage übers Meer',
+      valuableReaction: 'Der Schatz in meiner Hand',
     },
     start:
       'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
@@ -451,5 +477,17 @@ export const de: Strings = {
       '[fear]Die letzte Warnung![/fear] [somber]Die Geldgeber schreiben, die Expedition werde bald zurückgerufen.[pause] Finde ich das Grab jetzt nicht, war alles vergebens.[/somber]',
     successor:
       '[somber]Ich übernehme dieses Tagebuch aus den Händen meines Vorgängers, der alles dafür gab.[pause] Seine Aufzeichnungen sollen mich leiten.[/somber] [emph]Die Suche geht weiter, wo er sie ließ.[/emph]',
+    treasureFound: (p: TextParams) =>
+      `[excited]Meine Schaufel stieß auf etwas Hartes![/excited] [breath]Aus der Erde hob ich ein Versteck voll [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] — vor langer Zeit vergraben und von allen vergessen außer vom Sand. [awe]Das Glück lächelt dem geduldigen Gräber.[/awe]`,
+    ivoryFound:
+      '[awe]Der Elefantenfriedhof.[pause] Gebleichte Knochen ragen um mich auf wie die Rippen gestrandeter Schiffe.[/awe] [somber]Mit stiller Ehrfurcht löste ich einen mächtigen Stoßzahn aus dem Boden —[pause] Elfenbein von einer Reinheit, wie ich sie nie gesehen habe.[/somber]',
+    bounty: (p: TextParams) =>
+      `[excited]Die Geographische Gesellschaft hat meine Berichte gewürdigt![/excited] Für ${p.count} ${Number(p.count) === 1 ? 'dokumentierte Entdeckung' : 'dokumentierte Entdeckungen'} schrieb man mir [emph]${p.amount} Dollar[/emph] gut. [pause]Das Entdecken, so zeigt sich, bezahlt seinen eigenen Proviant.`,
+    ferry: (p: TextParams) =>
+      `Ich habe eine Passage von ${PLACES[p.from as string]} nach ${PLACES[p.to as string]} gebucht. [pause]${p.days} Tage auf See — [somber]die Küste zog vorbei wie ein langsames Panorama,[/somber] [excited]und ich kam ausgeruht an, ausnahmsweise mit trockenen Stiefeln.[/excited]`,
+    valuableRevered: (p: TextParams) =>
+      `Kaum betrat ich das Dorf, richteten sich alle Blicke auf [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand. [excited]Ehrfürchtiges Raunen folgte mir durch die Gassen —[pause] die ${PEOPLES[p.people as string]} verehren, was ich trage.[/excited]`,
+    valuableRejected: (p: TextParams) =>
+      `[fear]Ein Fehler, es offen zu tragen![/fear] Die ${PEOPLES[p.people as string]} wichen vor [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand zurück wie vor einem bösen Omen. [somber]Türen schlossen sich;[pause] Mütter zogen ihre Kinder ins Haus.[/somber]`,
   },
 }

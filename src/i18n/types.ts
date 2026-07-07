@@ -4,6 +4,7 @@
 // in only one language fails the build.
 
 import type { DeathCause, EquipmentId } from '../state/store'
+import type { TreasureId } from '../systems/economy'
 import type { Material, RegionId } from '../world/geo'
 import type { BuildingType } from '../state/ui'
 import type { SketchId } from '../journal/sketches'
@@ -34,6 +35,8 @@ export interface Strings {
   rivers: Record<string, string>
   equipment: Record<EquipmentId, string>
   gifts: Record<Material, string>
+  /** Treasure finds/valuables (design.md §8). */
+  treasures: Record<TreasureId, string>
   buildings: Record<BuildingType, string>
   sketches: Record<SketchId, string>
 
@@ -113,6 +116,14 @@ export interface Strings {
     journalDndOff: string
     noMedicine: string
     medicineNotNeeded: string
+    /** Inventory capacity reached (design.md §6). */
+    inventoryFull: string
+    /** A landmark discovery registered for the bounty (design.md §10). */
+    discovered(name: string): string
+    sold(name: string, amount: number): string
+    /** The bazaar refuses a regionally rejected material (design.md §10). */
+    bazaarRejected(name: string): string
+    graveyardEmpty: string
   }
 
   dialogs: {
@@ -131,6 +142,18 @@ export interface Strings {
     give: string
     stock(n: number): string
     endAudience: string
+    /** Bazaar (design.md §10): bid flow on offered treasures. */
+    bazaarGreeting: string
+    bazaarSell: string
+    bazaarBuy: string
+    offer: string
+    bid(name: string, amount: number): string
+    accept: string
+    decline: string
+    /** Travel agency (design.md §10): ferry passages between ports. */
+    agencyGreeting: string
+    passage(dest: string, days: number): string
+    book: string
   }
 
   overlays: {
@@ -177,6 +200,9 @@ export interface Strings {
     grave: string
     addEquipment: string
     addGift: string
+    addTreasure: string
+    giftsTotal: string
+    inventoryCapacity: string
   }
 
   /**
@@ -214,6 +240,10 @@ export interface Strings {
       deadline1: string
       deadline2: string
       successor: string
+      treasure: string
+      bounty: string
+      ferry: string
+      valuableReaction: string
     }
     start: string
     regionEntry(p: TextParams): string
@@ -251,5 +281,16 @@ export interface Strings {
     deadline1: string
     deadline2: string
     successor: string
+    /** A buried treasure cache dug up (design.md §8/§18). */
+    treasureFound(p: TextParams): string
+    /** Ivory recovered at the elephant graveyard (design.md §4.4). */
+    ivoryFound: string
+    /** Discovery bounties credited at a port (design.md §10). */
+    bounty(p: TextParams): string
+    /** Ferry passage between two ports (design.md §10). */
+    ferry(p: TextParams): string
+    /** Reactions to a visibly carried valuable (design.md §8). */
+    valuableRevered(p: TextParams): string
+    valuableRejected(p: TextParams): string
   }
 }

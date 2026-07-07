@@ -141,8 +141,9 @@ const PORTS: PlaceDef[] = [
   { id: 'lagos', kind: 'port', lat: 6.55, lon: 3.4, region: 'west', size: 2 },
   { id: 'boma', kind: 'port', lat: -5.65, lon: 13.05, region: 'central', size: 1 },
   { id: 'berbera', kind: 'port', lat: 10.3, lon: 45.0, region: 'east', size: 1 },
-  // Zanzibar lies on its island (data/coastline.ts). OPEN: ferries (design.md
-  // §4.1) are not in the POC, so it is not reachable on foot from the mainland.
+  // Zanzibar lies on its island (data/coastline.ts); it is reached by ferry
+  // from any port's travel agency (design.md §10) or by canoe across the
+  // enclosed strait.
   { id: 'zanzibar', kind: 'port', lat: -6.16, lon: 39.3, region: 'east', size: 3 },
   { id: 'capetown', kind: 'port', lat: -33.8, lon: 18.5, region: 'south', size: 3 },
 ]

@@ -4,8 +4,9 @@
 
 import { balance } from '../config/balance'
 import { refreshAmbienceVolume } from '../systems/ambience'
-import { useGame, type EquipmentId } from '../state/store'
+import { totalGifts, useGame, type EquipmentId } from '../state/store'
 import { EVENT_KINDS } from '../systems/events'
+import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
 import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
@@ -182,6 +183,10 @@ export function DebugMenu() {
           onChange={(v) => game.debugSet({ money: v })} />
         <NumberField label={t.debug.foodDays} value={game.foodDays} step={7}
           onChange={(v) => game.debugSet({ foodDays: Math.max(0, v) })} />
+        <NumberField label={t.debug.giftsTotal} value={totalGifts(game.gifts)} step={1}
+          onChange={(v) => game.debugSetGiftTotal(v)} />
+        <NumberField label={t.debug.inventoryCapacity} value={balance.inventoryCapacity} step={1}
+          onChange={(v) => set('inventoryCapacity', Math.max(1, Math.round(v)))} />
         <NumberField label={t.debug.health} value={Math.round(game.health)} step={10}
           onChange={(v) => game.debugSet({ health: Math.max(0, Math.min(balance.health.max, v)) })} />
         <label>
@@ -234,6 +239,12 @@ export function DebugMenu() {
           placeholder={t.debug.choose}
           options={MATERIALS.map((m) => ({ value: m, label: t.gifts[m] }))}
           onPick={(v) => game.debugAddGift(v as Material)}
+        />
+        <ActionSelect
+          label={t.debug.addTreasure}
+          placeholder={t.debug.choose}
+          options={TREASURE_IDS.map((id) => ({ value: id, label: t.treasures[id] }))}
+          onPick={(v) => game.debugAddTreasure(v as TreasureId)}
         />
       </div>
     </div>

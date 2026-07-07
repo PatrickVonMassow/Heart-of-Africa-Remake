@@ -2,8 +2,9 @@
 // text comes from the language files (design.md §17 localization).
 
 import { useGame, priceOfGood, type EquipmentId } from '../state/store'
-import { useUi, type BuildingType } from '../state/ui'
-import { placeById, type Material } from '../world/geo'
+import { useUi, type TradeBuilding } from '../state/ui'
+import { PLACES, placeById, type Material } from '../world/geo'
+import { ferryCost, ferryDays, treasureBuyPrice, TREASURE_IDS } from '../systems/economy'
 import { balance } from '../config/balance'
 import { useStrings } from '../i18n'
 import type { Strings } from '../i18n/types'
@@ -12,7 +13,7 @@ type Good = EquipmentId | 'food' | Material
 
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
-const BUILDING_GOODS: Record<Exclude<BuildingType, 'chief'>, Good[]> = {
+const BUILDING_GOODS: Record<TradeBuilding, Good[]> = {
   shop: ['medicine', 'map', 'gold', 'silver', 'emerald', 'copper', 'ivory'],
   weapons: ['rifle', 'machete'],
   tools: ['shovel', 'rope', 'canteen'],
@@ -25,7 +26,7 @@ function goodName(t: Strings, g: Good): string {
   return t.equipment[g as EquipmentId]
 }
 
-function TradeDialog({ building }: { building: Exclude<BuildingType, 'chief'> }) {
+function TradeDialog({ building }: { building: TradeBuilding }) {
   const t = useStrings()
   const money = useGame((s) => s.money)
   const buy = useGame((s) => s.buy)
@@ -97,9 +98,110 @@ function AudienceDialog() {
   )
 }
 
+/**
+ * Bazaar (design.md §10): offer a treasure, the merchant names a bid to
+ * accept or decline; items rejected by the region's value profile are not
+ * traded. Buying treasures enables the continent-wide arbitrage (§8).
+ */
+function BazaarDialog() {
+  const t = useStrings()
+  const money = useGame((s) => s.money)
+  const treasures = useGame((s) => s.treasures)
+  const placeId = useGame((s) => s.placeId)
+  const offerTreasure = useGame((s) => s.offerTreasure)
+  const acceptBid = useGame((s) => s.acceptBid)
+  const declineBid = useGame((s) => s.declineBid)
+  const buyTreasure = useGame((s) => s.buyTreasure)
+  const bid = useUi((s) => s.bazaarBid)
+  const setDialog = useUi((s) => s.setDialog)
+  if (!placeId) return null
+  const region = placeById(placeId).region
+  const owned = TREASURE_IDS.filter((id) => treasures[id] > 0)
+
+  return (
+    <div className="dialog-backdrop">
+      <div className="dialog">
+        <h3>{t.buildings.bazaar}</h3>
+        <p className="flavor">{t.dialogs.bazaarGreeting}</p>
+        <div className="row"><span>{t.dialogs.cash}</span><span className="price">{Math.floor(money)} $</span></div>
+        {bid && (
+          <div className="row bazaar-bid">
+            <span>{t.dialogs.bid(t.treasures[bid.treasure], bid.amount)}</span>
+            <button className="hud-button" onClick={acceptBid}>{t.dialogs.accept}</button>
+            <button className="hud-button" onClick={declineBid}>{t.dialogs.decline}</button>
+          </div>
+        )}
+        {owned.length > 0 && <p className="flavor">{t.dialogs.bazaarSell}</p>}
+        {owned.map((id) => (
+          <div className="row" key={`sell-${id}`}>
+            <span>{t.treasures[id]} ({t.dialogs.stock(treasures[id])})</span>
+            <button className="hud-button" onClick={() => offerTreasure(id)}>{t.dialogs.offer}</button>
+          </div>
+        ))}
+        <p className="flavor">{t.dialogs.bazaarBuy}</p>
+        {TREASURE_IDS.map((id) => {
+          const price = treasureBuyPrice(id, region)
+          if (price === null) return null // rejected material: not stocked here
+          return (
+            <div className="row" key={`buy-${id}`}>
+              <span>{t.treasures[id]}</span>
+              <span className="price">{price} $</span>
+              <button className="hud-button" onClick={() => buyTreasure(id)} disabled={money < price}>
+                {t.dialogs.buy}
+              </button>
+            </div>
+          )
+        })}
+        <div className="actions">
+          <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Travel agency (design.md §10): passage to another port city for a fee. */
+function AgencyDialog() {
+  const t = useStrings()
+  const money = useGame((s) => s.money)
+  const placeId = useGame((s) => s.placeId)
+  const bookFerry = useGame((s) => s.bookFerry)
+  const setDialog = useUi((s) => s.setDialog)
+  if (!placeId) return null
+  const from = placeById(placeId)
+  const destinations = PLACES.filter((p) => p.kind === 'port' && p.id !== placeId)
+
+  return (
+    <div className="dialog-backdrop">
+      <div className="dialog">
+        <h3>{t.buildings.agency}</h3>
+        <p className="flavor">{t.dialogs.agencyGreeting}</p>
+        <div className="row"><span>{t.dialogs.cash}</span><span className="price">{Math.floor(money)} $</span></div>
+        {destinations.map((dest) => {
+          const cost = ferryCost(from, dest)
+          return (
+            <div className="row" key={dest.id}>
+              <span>{t.dialogs.passage(t.places[dest.id], ferryDays(from, dest))}</span>
+              <span className="price">{cost} $</span>
+              <button className="hud-button" onClick={() => bookFerry(dest.id)} disabled={money < cost}>
+                {t.dialogs.book}
+              </button>
+            </div>
+          )
+        })}
+        <div className="actions">
+          <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Dialogs() {
   const dialog = useUi((s) => s.dialog)
   if (!dialog) return null
   if (dialog.kind === 'audience') return <AudienceDialog />
-  return <TradeDialog building={dialog.building as Exclude<BuildingType, 'chief'>} />
+  if (dialog.kind === 'bazaar') return <BazaarDialog />
+  if (dialog.kind === 'agency') return <AgencyDialog />
+  return <TradeDialog building={dialog.building} />
 }

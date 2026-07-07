@@ -122,9 +122,13 @@ export const en: Strings = {
     gold: 'Gold Jewelry', silver: 'Silver Jewelry', emerald: 'Emerald',
     copper: 'Copper Bangle', ivory: 'Ivory Carving',
   },
+  treasures: {
+    gold: 'Gold', silver: 'Silver', emerald: 'Emeralds',
+    copper: 'Copper', ivory: 'Ivory', statue: 'Golden Statue',
+  },
   buildings: {
     shop: 'General Store', weapons: 'Weapons Hut', tools: 'Tool Hut',
-    market: 'Market Hut', chief: "Chief's Hut",
+    market: 'Market Hut', bazaar: 'Bazaar', agency: 'Travel Agency', chief: "Chief's Hut",
   },
   sketches: {
     palm: 'Sketch: palm tree', acacia: 'Sketch: acacia', bird: 'Sketch: bird',
@@ -206,6 +210,11 @@ export const en: Strings = {
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     noMedicine: 'I have no medicine left.',
     medicineNotNeeded: 'I am neither feverish nor wounded — I shall save the medicine.',
+    inventoryFull: 'My pack is full — I cannot carry any more.',
+    discovered: (name) => `Discovered: ${name}. The geographic society will pay for this report.`,
+    sold: (name, amount) => `${name} sold for ${amount} $.`,
+    bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
+    graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
   },
 
   dialogs: {
@@ -224,6 +233,16 @@ export const en: Strings = {
     give: 'Offer',
     stock: (n) => `you have ${n}`,
     endAudience: 'End audience (Esc)',
+    bazaarGreeting: '"Treasures, effendi! Show me what the wilderness yielded — or take a piece home yourself."',
+    bazaarSell: 'Offer a find:',
+    bazaarBuy: 'For sale:',
+    offer: 'Offer',
+    bid: (name, amount) => `The merchant bids ${amount} $ for the ${name.toLowerCase()}.`,
+    accept: 'Accept',
+    decline: 'Decline',
+    agencyGreeting: '"Passages to every port of the continent — swift ships, honest fares."',
+    passage: (dest, days) => `Passage to ${dest} (~${days} days)`,
+    book: 'Book',
   },
 
   overlays: {
@@ -281,6 +300,9 @@ export const en: Strings = {
     grave: 'Grave',
     addEquipment: 'Add equipment:',
     addGift: 'Add gift:',
+    addTreasure: 'Add treasure:',
+    giftsTotal: 'Gifts (count)',
+    inventoryCapacity: 'Inventory capacity',
   },
 
   journal: {
@@ -312,6 +334,10 @@ export const en: Strings = {
       deadline1: 'A Letter from the Financiers',
       deadline2: 'The Final Warning',
       successor: 'A New Hand',
+      treasure: 'A Treasure!',
+      bounty: 'The Bounty of Discovery',
+      ferry: 'Passage by Sea',
+      valuableReaction: 'The Valuable in My Hand',
     },
     start:
       'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
@@ -444,5 +470,17 @@ export const en: Strings = {
       '[fear]The final warning![/fear] [somber]The financiers write that the expedition will be recalled soon.[pause] If I do not find the tomb now, everything was in vain.[/somber]',
     successor:
       "[somber]I take up this journal from the hands of my predecessor, who gave everything for it.[pause] His notes shall guide me.[/somber] [emph]The search continues where he left off.[/emph]",
+    treasureFound: (p: TextParams) =>
+      `[excited]My shovel struck something hard![/excited] [breath]From the earth I lifted a cache of [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] — buried long ago and forgotten by all but the sand. [awe]Fortune smiles on the patient digger.[/awe]`,
+    ivoryFound:
+      '[awe]The elephant graveyard.[pause] Bleached bones tower about me like the ribs of stranded ships.[/awe] [somber]With quiet reverence I freed a great tusk from the ground —[pause] ivory of a purity I have never seen.[/somber]',
+    bounty: (p: TextParams) =>
+      `[excited]The geographic society has honored my reports![/excited] For ${p.count} documented ${Number(p.count) === 1 ? 'discovery' : 'discoveries'} they credited me [emph]${p.amount} dollars[/emph]. [pause]Exploration, it turns out, can pay for its own provisions.`,
+    ferry: (p: TextParams) =>
+      `I booked passage from ${en.places[p.from as string]} to ${en.places[p.to as string]}. [pause]${p.days} days at sea — [somber]the coast slid past like a slow panorama,[/somber] [excited]and I arrived rested, with dry boots for once.[/excited]`,
+    valuableRevered: (p: TextParams) =>
+      `No sooner had I entered the village than eyes turned to the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand. [excited]Murmurs of awe followed me through the lanes —[pause] the ${PEOPLES[p.people as string]} revere what I carry.[/excited]`,
+    valuableRejected: (p: TextParams) =>
+      `[fear]A mistake to carry it openly![/fear] The ${PEOPLES[p.people as string]} shrank back from the [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] in my hand as from an ill omen. [somber]Doors closed;[pause] mothers pulled their children inside.[/somber]`,
   },
 }

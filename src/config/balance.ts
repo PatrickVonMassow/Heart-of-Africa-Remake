@@ -3,6 +3,8 @@
 // them explicitly (e.g. starting money 250 $, start year 1890). The debug
 // menu (F1) exposes them at runtime for fine-tuning.
 
+import type { Material } from '../world/geo'
+
 export interface BalanceConfig {
   /** Travel speed on the continent map, world units per second (1 unit = 0.1 degree). */
   travelSpeed: number
@@ -81,6 +83,33 @@ export interface BalanceConfig {
   }
   /** Show hidden objects (grave position) — debug aid, default off. */
   showHiddenObjects: boolean
+  /** Carryable item count: equipment + gifts + treasures (design.md §6 camps). */
+  inventoryCapacity: number
+  /** Trade economy (design.md §8/§10). */
+  economy: {
+    /** Base prices of the treasure finds in $ (before regional factors). */
+    treasureBase: Record<Material | 'statue', number>
+    /** Price multiplier where the material is revered (arbitrage margin). */
+    reveredFactor: number
+    /** Buy/sell spread on treasures: bazaar bids stay below asking prices. */
+    sellSpread: number
+    buySpread: number
+    /** Haggling variance on a bazaar bid (± fraction). */
+    bidVariance: number
+    /** Ferry fare: minimum plus per-degree route cost (design.md §10). */
+    ferryMinCost: number
+    ferryCostPerDeg: number
+    /** Passage duration: minimum days plus per-degree days. */
+    ferryMinDays: number
+    ferryDaysPerDeg: number
+    /** Discovery bounties credited on the next port visit (design.md §10). */
+    bountyVillage: number
+    bountyLandmark: number
+    /** Radius in degrees within which a landmark counts as discovered. */
+    discoverRadiusDeg: number
+    /** Ivory pieces recoverable at the elephant graveyard (design.md §4.4). */
+    graveyardIvory: number
+  }
 }
 
 export const balance: BalanceConfig = {
@@ -137,6 +166,22 @@ export const balance: BalanceConfig = {
     poorThreshold: 40,
   },
   showHiddenObjects: false,
+  inventoryCapacity: 20,
+  economy: {
+    treasureBase: { gold: 60, silver: 35, emerald: 70, copper: 20, ivory: 45, statue: 150 },
+    reveredFactor: 2.2,
+    sellSpread: 0.85,
+    buySpread: 1.25,
+    bidVariance: 0.15,
+    ferryMinCost: 15,
+    ferryCostPerDeg: 1.2,
+    ferryMinDays: 2,
+    ferryDaysPerDeg: 0.35,
+    bountyVillage: 15,
+    bountyLandmark: 25,
+    discoverRadiusDeg: 0.5,
+    graveyardIvory: 3,
+  },
 }
 
 // Shop prices in $ (ports only; design.md §9/§10). Educated guesses.

@@ -2,7 +2,7 @@
 // gifts, hand item, current region — plus the coordinate display. All labels
 // come from the language files (design.md §17 localization).
 
-import { useGame, totalGifts } from '../state/store'
+import { useGame, totalGifts, handItemName } from '../state/store'
 import { placeById, worldToLatLon } from '../world/geo'
 import { START_YEAR } from '../config/balance'
 import { useStrings } from '../i18n'
@@ -33,7 +33,7 @@ export function StatusBar() {
       <span className="stat"><b>{t.status.cash}</b> {Math.floor(money)} $</span>
       <span className="stat"><b>{t.status.provisions}</b> {t.status.provisionsWeeks(weeks)}</span>
       <span className="stat"><b>{t.status.gifts}</b> {totalGifts(gifts)}</span>
-      <span className="stat"><b>{t.status.hand}</b> {handItem ? t.equipment[handItem] : t.status.handEmpty}</span>
+      <span className="stat"><b>{t.status.hand}</b> {handItem ? handItemName(handItem) : t.status.handEmpty}</span>
       <span className="stat"><b>{t.status.region}</b> {t.regions[region]}{placeName ? ` · ${placeName}` : ''}</span>
       <span className="spacer" />
       <span className="stat coords">{t.formatLatLon(coords.lat, coords.lon)}</span>

@@ -10,6 +10,11 @@ import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
 import { riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
+import {
+  LANDMARK_POINTS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
+  type TreasureId, type TreasureSite,
+} from '../systems/economy'
+import { ELEPHANT_GRAVEYARD } from '../world/data/landmarks'
 import { UNSPECIFIC_WORDS } from '../world/lore'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
@@ -25,6 +30,15 @@ export type EquipmentId =
   | 'canteen'
   | 'map'
   | 'canoe'
+
+/** Anything holdable in hand: equipment or a visibly carried valuable (§8). */
+export type HandId = EquipmentId | TreasureId
+
+export const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
+
+export function isEquipmentId(id: string): id is EquipmentId {
+  return (EQUIPMENT_IDS as string[]).includes(id)
+}
 
 export interface JournalEntry {
   id: number
@@ -69,7 +83,18 @@ export interface GameState {
   foodDays: number
   gifts: Record<Material, number>
   equipment: Partial<Record<EquipmentId, number>>
-  handItem: EquipmentId | null
+  /** Treasure finds carried along (design.md §8). */
+  treasures: Record<TreasureId, number>
+  /** Buried treasure caches, procedural per run (design.md §18). */
+  treasureSites: TreasureSite[]
+  /** Ivory pieces still recoverable at the elephant graveyard (§4.4). */
+  graveyardIvoryLeft: number
+  /** Discoveries awaiting their bounty at the next port visit (§10). */
+  pendingBounties: Array<{ kind: 'village' | 'landmark'; id: string }>
+  landmarksSeen: string[]
+  /** Villages that already reacted to a visibly carried valuable (§8). */
+  valuableShown: Record<string, boolean>
+  handItem: HandId | null
   journal: JournalEntry[]
   journalOpen: boolean
   /** Health points (design.md §6); 0 = death of the character. */
@@ -120,7 +145,14 @@ export interface GameState {
   enterPlace: (id: string) => void
   leavePlace: () => void
   buy: (good: EquipmentId | 'food' | Material) => void
-  takeInHand: (item: EquipmentId | null) => void
+  /** Bazaar (design.md §10): offer a treasure — the merchant names a bid. */
+  offerTreasure: (treasure: TreasureId) => void
+  acceptBid: () => void
+  declineBid: () => void
+  buyTreasure: (treasure: TreasureId) => void
+  /** Travel agency (design.md §10): passage to another port city. */
+  bookFerry: (destId: string) => void
+  takeInHand: (item: HandId | null) => void
   giveGift: (material: Material) => void
   talkToVillager: () => void
   /** Write the decoded version of a region's hint once language + hint meet. */
@@ -150,6 +182,9 @@ export interface GameState {
   debugSet: (patch: Partial<Pick<GameState, 'money' | 'foodDays' | 'day' | 'health'>>) => void
   debugAddGift: (material: Material) => void
   debugAddEquipment: (item: EquipmentId) => void
+  debugAddTreasure: (treasure: TreasureId) => void
+  /** Debug (design.md §21): set the total gift count directly. */
+  debugSetGiftTotal: (total: number) => void
   debugJumpTo: (lat: number, lon: number) => void
 }
 
@@ -240,7 +275,13 @@ function startState(seed: number) {
     // Start gifts (design.md §18 table: 2) — neutral copper trinkets.
     gifts: { gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 } as Record<Material, number>,
     equipment: {} as Partial<Record<EquipmentId, number>>,
-    handItem: null,
+    treasures: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 } as Record<TreasureId, number>,
+    treasureSites: generateTreasureSites(seed),
+    graveyardIvoryLeft: balance.economy.graveyardIvory,
+    pendingBounties: [] as Array<{ kind: 'village' | 'landmark'; id: string }>,
+    landmarksSeen: [] as string[],
+    valuableShown: {} as Record<string, boolean>,
+    handItem: null as HandId | null,
     journal: [
       { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
@@ -290,6 +331,16 @@ let nextEntryId = 2
 
 function newSeed(): number {
   return Math.floor(Math.random() * 0xffffffff)
+}
+
+/** Carried item count against the inventory capacity (design.md §6). */
+export function usedInventory(
+  s: Pick<GameState, 'equipment' | 'gifts' | 'treasures'>,
+): number {
+  const eq = Object.values(s.equipment).reduce((a, b) => a + (b ?? 0), 0)
+  const gi = Object.values(s.gifts).reduce((a, b) => a + b, 0)
+  const tr = Object.values(s.treasures).reduce((a, b) => a + b, 0)
+  return eq + gi + tr
 }
 
 export const useGame = create<GameState>()((set, get) => ({
@@ -394,6 +445,18 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.foodOutWarned && newFood === 0) {
       set({ foodOutWarned: true })
       get().addEntry({ key: 'journal.titles.foodOut' }, { key: 'journal.foodOut' })
+    }
+
+    // Discovery bounty (design.md §10): sighting a landmark registers the
+    // discovery; the money is credited on the next port visit.
+    for (const lm of LANDMARK_POINTS) {
+      if (Math.hypot(lm.lat - next.lat, lm.lon - next.lon) > balance.economy.discoverRadiusDeg) continue
+      if (get().landmarksSeen.includes(lm.id)) continue
+      set((st) => ({
+        landmarksSeen: [...st.landmarksSeen, lm.id],
+        pendingBounties: [...st.pendingBounties, { kind: 'landmark' as const, id: lm.id }],
+        toast: getStrings().toasts.discovered(getStrings().landmarks[lm.id]),
+      }))
     }
 
     get().tickHealth(dayDelta, here.type)
@@ -649,9 +712,28 @@ export const useGame = create<GameState>()((set, get) => ({
       // Place membership defines the region shown/used while inside (§4.5).
       region: place.region,
       visitedPlaces: first ? [...s.visitedPlaces, id] : s.visitedPlaces,
+      // A first-visited village is itself a bounty-worthy discovery (§10).
+      pendingBounties:
+        first && place.kind === 'village'
+          ? [...s.pendingBounties, { kind: 'village' as const, id }]
+          : s.pendingBounties,
       toast: null,
     })
     if (place.kind === 'port') {
+      // Discovery bounties are paid out on reaching a port (design.md §10).
+      const pending = get().pendingBounties
+      if (pending.length > 0) {
+        const e = balance.economy
+        const amount = pending.reduce(
+          (sum, b) => sum + (b.kind === 'village' ? e.bountyVillage : e.bountyLandmark),
+          0,
+        )
+        set((st) => ({ money: st.money + amount, pendingBounties: [] }))
+        get().addEntry(
+          { key: 'journal.titles.bounty' },
+          { key: 'journal.bounty', params: { amount, count: pending.length } },
+        )
+      }
       get().saveCheckpoint()
       get().addEntry(
         { key: 'journal.titles.arrival', params: { place: id } },
@@ -666,6 +748,27 @@ export const useGame = create<GameState>()((set, get) => ({
         'event',
         'hut',
       )
+    }
+    // A visibly carried valuable triggers a reaction (design.md §8), once
+    // per village: revered material creates goodwill, rejected costs it.
+    if (place.kind === 'village' && s.handItem && !isEquipmentId(s.handItem) && !s.valuableShown[id]) {
+      const treasure = s.handItem as TreasureId
+      const values = REGION_VALUES[place.region]
+      const material = treasure === 'statue' ? null : treasure
+      set((st) => ({ valuableShown: { ...st.valuableShown, [id]: true } }))
+      if (material && values.rejected.includes(material)) {
+        set((st) => ({ goodwill: { ...st.goodwill, [id]: Math.max(0, (st.goodwill[id] ?? 0) - 2) } }))
+        get().addEntry(
+          { key: 'journal.titles.valuableReaction' },
+          { key: 'journal.valuableRejected', params: { people: place.peopleId ?? id, treasure } },
+        )
+      } else if (!material || values.revered.includes(material)) {
+        set((st) => ({ goodwill: { ...st.goodwill, [id]: (st.goodwill[id] ?? 0) + 1 } }))
+        get().addEntry(
+          { key: 'journal.titles.valuableReaction' },
+          { key: 'journal.valuableRevered', params: { people: place.peopleId ?? id, treasure } },
+        )
+      }
     }
   },
 
@@ -683,6 +786,11 @@ export const useGame = create<GameState>()((set, get) => ({
     const price = priceOfGood(good)
     if (price === undefined || s.money < price) {
       set({ toast: getStrings().toasts.notEnoughMoney })
+      return
+    }
+    // Inventory capacity (design.md §6): provisions travel outside the pack.
+    if (good !== 'food' && usedInventory(s) >= balance.inventoryCapacity) {
+      set({ toast: getStrings().toasts.inventoryFull })
       return
     }
     if (good === 'food') {
@@ -706,8 +814,86 @@ export const useGame = create<GameState>()((set, get) => ({
 
   takeInHand: (item) => {
     const s = get()
-    if (item !== null && !(s.equipment[item] ?? 0)) return
-    set({ handItem: item, toast: item ? getStrings().toasts.inHand(getStrings().equipment[item]) : getStrings().toasts.handsFree })
+    if (item !== null) {
+      const owned = isEquipmentId(item) ? (s.equipment[item] ?? 0) : s.treasures[item]
+      if (!owned) return
+    }
+    set({ handItem: item, toast: item ? getStrings().toasts.inHand(handItemName(item)) : getStrings().toasts.handsFree })
+  },
+
+  offerTreasure: (treasure) => {
+    const s = get()
+    if (!s.placeId || s.treasures[treasure] <= 0) return
+    const region = placeById(s.placeId).region
+    const bid = treasureBid(treasure, region, Math.random)
+    if (bid === null) {
+      // Does not fit the regional value profile — refused (design.md §10).
+      useUi.getState().setBazaarBid(null)
+      set({ toast: getStrings().toasts.bazaarRejected(getStrings().treasures[treasure]) })
+      return
+    }
+    useUi.getState().setBazaarBid({ treasure, amount: bid })
+  },
+
+  acceptBid: () => {
+    const s = get()
+    const bid = useUi.getState().bazaarBid
+    if (!bid || s.treasures[bid.treasure] <= 0) return
+    useUi.getState().setBazaarBid(null)
+    set({
+      money: s.money + bid.amount,
+      treasures: { ...s.treasures, [bid.treasure]: s.treasures[bid.treasure] - 1 },
+      handItem: s.handItem === bid.treasure && s.treasures[bid.treasure] === 1 ? null : s.handItem,
+      toast: getStrings().toasts.sold(getStrings().treasures[bid.treasure], bid.amount),
+    })
+  },
+
+  declineBid: () => useUi.getState().setBazaarBid(null),
+
+  buyTreasure: (treasure) => {
+    const s = get()
+    if (!s.placeId) return
+    const price = treasureBuyPrice(treasure, placeById(s.placeId).region)
+    if (price === null) return
+    if (s.money < price) {
+      set({ toast: getStrings().toasts.notEnoughMoney })
+      return
+    }
+    if (usedInventory(s) >= balance.inventoryCapacity) {
+      set({ toast: getStrings().toasts.inventoryFull })
+      return
+    }
+    set({
+      money: s.money - price,
+      treasures: { ...s.treasures, [treasure]: s.treasures[treasure] + 1 },
+      toast: getStrings().toasts.bought(getStrings().treasures[treasure]),
+    })
+  },
+
+  bookFerry: (destId) => {
+    const s = get()
+    if (!s.placeId || s.defeat || s.victory) return
+    const from = placeById(s.placeId)
+    const dest = placeById(destId)
+    if (from.kind !== 'port' || dest.kind !== 'port' || from.id === dest.id) return
+    const cost = ferryCost(from, dest)
+    if (s.money < cost) {
+      set({ toast: getStrings().toasts.notEnoughMoney })
+      return
+    }
+    const days = ferryDays(from, dest)
+    const p = latLonToWorld(dest.lat, dest.lon)
+    // Passage fare includes board; provisions are not consumed (placeholder).
+    set({ money: s.money - cost, day: s.day + days, pos: p })
+    useUi.getState().setDialog(null)
+    get().addEntry(
+      { key: 'journal.titles.ferry' },
+      { key: 'journal.ferry', params: { from: from.id, to: dest.id, days } },
+      'event',
+      'harbor',
+    )
+    get().enterPlace(dest.id)
+    get().tickDeadline(get().day)
   },
 
   giveGift: (material) => {
@@ -823,10 +1009,53 @@ export const useGame = create<GameState>()((set, get) => ({
     if (d <= balance.digRadius) {
       set({ victory: true })
       get().addEntry({ key: 'journal.titles.victory' }, { key: 'journal.victory', params: { day: s.day } }, 'event', 'grave')
-    } else {
-      // Journal texts carry voice markup; strip it for the plain toast.
-      set({ toast: stripVoiceMarkup(getStrings().journal.digNothing) })
+      return
     }
+    const cur = worldToLatLon(s.pos.x, s.pos.z)
+    const digDeg = balance.digRadius / 10 // world units → degrees
+
+    // Ivory at the elephant graveyard (design.md §4.4), a limited supply.
+    if (Math.hypot(cur.lat - ELEPHANT_GRAVEYARD.lat, cur.lon - ELEPHANT_GRAVEYARD.lon) <= digDeg) {
+      if (s.graveyardIvoryLeft <= 0) {
+        set({ toast: getStrings().toasts.graveyardEmpty })
+        return
+      }
+      if (usedInventory(s) >= balance.inventoryCapacity) {
+        set({ toast: getStrings().toasts.inventoryFull })
+        return
+      }
+      set({
+        graveyardIvoryLeft: s.graveyardIvoryLeft - 1,
+        treasures: { ...s.treasures, ivory: s.treasures.ivory + 1 },
+      })
+      get().addEntry({ key: 'journal.titles.treasure' }, { key: 'journal.ivoryFound' }, 'event')
+      return
+    }
+
+    // Buried treasure caches (design.md §8/§18).
+    const siteIndex = s.treasureSites.findIndex(
+      (site) => !site.dug && Math.hypot(cur.lat - site.lat, cur.lon - site.lon) <= digDeg,
+    )
+    if (siteIndex >= 0) {
+      const site = s.treasureSites[siteIndex]
+      if (usedInventory(s) >= balance.inventoryCapacity) {
+        set({ toast: getStrings().toasts.inventoryFull })
+        return
+      }
+      set({
+        treasureSites: s.treasureSites.map((x, i) => (i === siteIndex ? { ...x, dug: true } : x)),
+        treasures: { ...s.treasures, [site.treasure]: s.treasures[site.treasure] + 1 },
+      })
+      get().addEntry(
+        { key: 'journal.titles.treasure' },
+        { key: 'journal.treasureFound', params: { treasure: site.treasure } },
+        'event',
+      )
+      return
+    }
+
+    // Journal texts carry voice markup; strip it for the plain toast.
+    set({ toast: stripVoiceMarkup(getStrings().journal.digNothing) })
   },
 
   saveCheckpoint: () => {
@@ -842,6 +1071,8 @@ export const useGame = create<GameState>()((set, get) => ({
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       deadlineWarned: s.deadlineWarned,
       explored: s.explored,
+      treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
+      pendingBounties: s.pendingBounties, landmarksSeen: s.landmarksSeen, valuableShown: s.valuableShown,
       nextEntryId,
     }
     try {
@@ -871,6 +1102,12 @@ export const useGame = create<GameState>()((set, get) => ({
         giftLoreGiven: snap.giftLoreGiven ?? {},
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
+        treasures: snap.treasures ?? { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 },
+        treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
+        graveyardIvoryLeft: snap.graveyardIvoryLeft ?? balance.economy.graveyardIvory,
+        pendingBounties: snap.pendingBounties ?? [],
+        landmarksSeen: snap.landmarksSeen ?? [],
+        valuableShown: snap.valuableShown ?? {},
         defeat: null,
         deathCause: null,
         mode: 'place',
@@ -893,11 +1130,39 @@ export const useGame = create<GameState>()((set, get) => ({
 
   debugSet: (patch) => set(patch),
 
-  debugAddGift: (material) =>
-    set((s) => ({ gifts: { ...s.gifts, [material]: s.gifts[material] + 1 } })),
+  debugAddGift: (material) => {
+    raiseCapacityIfNeeded(get())
+    set((s) => ({ gifts: { ...s.gifts, [material]: s.gifts[material] + 1 } }))
+  },
 
-  debugAddEquipment: (item) =>
-    set((s) => ({ equipment: { ...s.equipment, [item]: (s.equipment[item] ?? 0) + 1 } })),
+  debugAddEquipment: (item) => {
+    raiseCapacityIfNeeded(get())
+    set((s) => ({ equipment: { ...s.equipment, [item]: (s.equipment[item] ?? 0) + 1 } }))
+  },
+
+  debugAddTreasure: (treasure) => {
+    raiseCapacityIfNeeded(get())
+    set((s) => ({ treasures: { ...s.treasures, [treasure]: s.treasures[treasure] + 1 } }))
+  },
+
+  debugSetGiftTotal: (total) => {
+    const s = get()
+    const target = Math.max(0, Math.round(total))
+    let diff = target - totalGifts(s.gifts)
+    const gifts = { ...s.gifts }
+    // Top up with neutral copper trinkets; drain from any stocked material.
+    if (diff > 0) {
+      gifts.copper += diff
+    } else {
+      for (const m of Object.keys(gifts) as Material[]) {
+        const take = Math.min(gifts[m], -diff)
+        gifts[m] -= take
+        diff += take
+        if (diff >= 0) break
+      }
+    }
+    set({ gifts })
+  },
 
   debugJumpTo: (lat, lon) => {
     const p = latLonToWorld(lat, lon)
@@ -935,4 +1200,22 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 /** Total gift count for the status bar. */
 export function totalGifts(gifts: Record<Material, number>): number {
   return Object.values(gifts).reduce((a, b) => a + b, 0)
+}
+
+/** Localized display name of a hand item (equipment or treasure). */
+export function handItemName(item: HandId): string {
+  const t = getStrings()
+  return isEquipmentId(item) ? t.equipment[item] : t.treasures[item]
+}
+
+/**
+ * Debug adds bypass the capacity; if the pack would overfill, the capacity
+ * grows automatically to match (design.md §21).
+ */
+function raiseCapacityIfNeeded(s: Pick<GameState, 'equipment' | 'gifts' | 'treasures'>): void {
+  const used = usedInventory(s)
+  if (used >= balance.inventoryCapacity) {
+    balance.inventoryCapacity = used + 1
+    useGame.getState().bumpBalance()
+  }
 }

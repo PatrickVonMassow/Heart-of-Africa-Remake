@@ -1,11 +1,17 @@
 // Transient UI state (dialogs, interaction prompt, debug menu visibility).
 
 import { create } from 'zustand'
+import type { TreasureId } from '../systems/economy'
 
-export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'chief'
+export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 'agency' | 'chief'
+
+/** Building types trading with the flat goods list (design.md §9). */
+export type TradeBuilding = 'shop' | 'weapons' | 'tools' | 'market'
 
 export type Dialog =
-  | { kind: 'trade'; building: BuildingType }
+  | { kind: 'trade'; building: TradeBuilding }
+  | { kind: 'bazaar' }
+  | { kind: 'agency' }
   | { kind: 'audience' }
   | null
 
@@ -34,6 +40,9 @@ interface UiState {
   journalDnd: boolean
   /** Current bird's-eye zoom factor (1 = default camera distance). */
   travelZoom: number
+  /** Open bazaar bid awaiting accept/decline (design.md §10). */
+  bazaarBid: { treasure: TreasureId; amount: number } | null
+  setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
   setDialog: (d: Dialog) => void
   setPrompt: (p: string | null) => void
   toggleDebug: () => void
@@ -57,7 +66,10 @@ export const useUi = create<UiState>()((set) => ({
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: 1,
-  setDialog: (dialog) => set({ dialog }),
+  bazaarBid: null,
+  setBazaarBid: (bazaarBid) => set({ bazaarBid }),
+  // Closing or switching a dialog always discards a pending bazaar bid.
+  setDialog: (dialog) => set({ dialog, bazaarBid: null }),
   setPrompt: (prompt) => set({ prompt }),
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
   toggleMap: () => set((s) => ({ mapOpen: !s.mapOpen })),

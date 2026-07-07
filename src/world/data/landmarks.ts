@@ -80,6 +80,6 @@ export const RIDGES: RidgeDef[] = [
 
 // Special site (design.md §4.4): the elephant graveyard. Fictional; placed by
 // educated guess in the remote steppe south-west of Kilimanjaro (calibratable).
-// OPEN: design.md gives the graveyard valuable ivory but no collection
-// mechanic is defined for the POC — it is placed and labeled only.
+// Digging here with the shovel recovers a limited supply of ivory treasures
+// (store.dig, balance.economy.graveyardIvory).
 export const ELEPHANT_GRAVEYARD = { id: 'elephant-graveyard', lon: 36.6, lat: -4.9 }

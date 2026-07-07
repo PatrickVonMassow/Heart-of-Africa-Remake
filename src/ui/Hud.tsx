@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { healthState, useGame, type EquipmentId } from '../state/store'
+import { TREASURE_IDS } from '../systems/economy'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
@@ -16,10 +17,12 @@ import { getStrings, useStrings } from '../i18n'
 function InventoryBar() {
   const t = useStrings()
   const equipment = useGame((s) => s.equipment)
+  const treasures = useGame((s) => s.treasures)
   const handItem = useGame((s) => s.handItem)
   const takeInHand = useGame((s) => s.takeInHand)
   const owned = (Object.keys(equipment) as EquipmentId[]).filter((e) => (equipment[e] ?? 0) > 0)
-  if (owned.length === 0) return null
+  const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0)
+  if (owned.length === 0 && ownedTreasures.length === 0) return null
   return (
     <div className="inventory-bar">
       {owned.map((e) =>
@@ -39,6 +42,17 @@ function InventoryBar() {
           </button>
         ),
       )}
+      {/* Treasures can be carried visibly in hand (design.md §8). */}
+      {ownedTreasures.map((id) => (
+        <button
+          key={id}
+          className={handItem === id ? 'active' : ''}
+          onClick={() => takeInHand(handItem === id ? null : id)}
+          title={t.hud.handTooltip}
+        >
+          {t.treasures[id]} ({treasures[id]})
+        </button>
+      ))}
     </div>
   )
 }

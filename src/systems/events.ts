@@ -7,7 +7,7 @@
 // the canoe (otherwise it is wet), while the machete always helps.
 
 import { balance } from '../config/balance'
-import type { EquipmentId } from '../state/store'
+import type { EquipmentId, HandId } from '../state/store'
 
 export type EventKind =
   | 'lionAttack'
@@ -32,7 +32,7 @@ export interface EventContext {
   nearWaterfall: boolean
   /** Jungle or close to a river/lake: fever country (design.md §14). */
   wetland: boolean
-  hand: EquipmentId | null
+  hand: HandId | null
   equipment: Partial<Record<EquipmentId, number>>
 }
 
