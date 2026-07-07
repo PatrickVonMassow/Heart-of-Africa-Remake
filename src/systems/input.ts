@@ -34,7 +34,7 @@ export function moveAxes(): { x: number; y: number } {
   if (isKeyDown('KeyS') || isKeyDown('ArrowDown')) y -= 1
   if (isKeyDown('KeyA') || isKeyDown('ArrowLeft')) x -= 1
   if (isKeyDown('KeyD') || isKeyDown('ArrowRight')) x += 1
-  const pad = activePad()
+  const pad = engagedPad()
   if (pad) {
     x += deadzoned(pad.axes[0])
     y -= deadzoned(pad.axes[1]) // stick up (negative) = forward
@@ -44,14 +44,34 @@ export function moveAxes(): { x: number; y: number } {
 
 // --- Gamepad (design.md §17: controls suitable for gamepad too) --------------
 
-const GAMEPAD_DEADZONE = 0.18
+const GAMEPAD_DEADZONE = 0.22
+/** Deliberate input threshold that arms the gamepad for steering. */
+const GAMEPAD_ENGAGE = 0.6
+
+// A connected pad steers only after a deliberate input (button press or a
+// full stick push). Idle axis drift of wheels, flight sticks or worn pads
+// must never move the game on its own.
+let gamepadEngaged = false
 
 function activePad(): Gamepad | null {
   if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') return null
   for (const pad of navigator.getGamepads()) {
-    if (pad) return pad
+    // Only standard-mapped pads: other HID devices report arbitrary axes.
+    if (pad && pad.mapping === 'standard') return pad
   }
   return null
+}
+
+function engagedPad(): Gamepad | null {
+  const pad = activePad()
+  if (!pad) return null
+  if (!gamepadEngaged) {
+    const pressed = pad.buttons.some((b) => b.pressed)
+    const pushed = pad.axes.some((a) => Math.abs(a) > GAMEPAD_ENGAGE)
+    if (!pressed && !pushed) return null
+    gamepadEngaged = true
+  }
+  return pad
 }
 
 function deadzoned(v: number | undefined): number {
@@ -61,14 +81,14 @@ function deadzoned(v: number | undefined): number {
 
 /** Right-stick look axes for the first-person view. */
 export function gamepadLook(): { x: number; y: number } {
-  const pad = activePad()
+  const pad = engagedPad()
   if (!pad) return { x: 0, y: 0 }
   return { x: deadzoned(pad.axes[2]), y: deadzoned(pad.axes[3]) }
 }
 
 /** Left-stick movement axes: x = strafe right, y = forward. */
 export function gamepadMove(): { x: number; y: number } {
-  const pad = activePad()
+  const pad = engagedPad()
   if (!pad) return { x: 0, y: 0 }
   return { x: deadzoned(pad.axes[0]), y: -deadzoned(pad.axes[1]) }
 }
@@ -94,6 +114,7 @@ function pollGamepadButtons(): void {
       const i = Number(key)
       const down = pad.buttons[i]?.pressed ?? false
       if (down && !gamepadButtonDown[i]) {
+        gamepadEngaged = true // a button press is always deliberate
         window.dispatchEvent(new KeyboardEvent('keydown', { code: GAMEPAD_BUTTON_KEYS[i] }))
       }
       gamepadButtonDown[i] = down

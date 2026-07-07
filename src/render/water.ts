@@ -1,14 +1,14 @@
-// Ocean water surface (design.md §2 "Lighting and post-processing
-// pipeline"); rivers and lakes have their own calm surfaces
+// Ocean water surface (design.md §2 "Licht- und Post-Processing-
+// Pipeline"); rivers and lakes have their own calm surfaces
 // (scenes/travel/Rivers.tsx). Gerstner-style directional wave field plus
-// subdued noise swell, depth-dependent absorption sampled from the real
-// bathymetry (the DEM texture), foam along shorelines and on wave crests.
-// True refraction: shallow water samples the scene behind the surface via
-// the shared viewport texture with wave-distorted coordinates. Reflections
-// come from the IBL environment plus the screen-space reflection pass in
-// render/Effects.tsx, which keys on the raised metalness of this material.
-// World-anchored via a uniform offset so the plane can follow the player
-// without the pattern swimming.
+// subdued noise swell,
+// depth-dependent absorption sampled from the real bathymetry (the DEM
+// texture), foam along shorelines and on wave crests, and low roughness so
+// the IBL environment provides sky reflections. World-anchored via a uniform
+// offset so the plane can follow the player without the pattern swimming.
+//
+// OPEN: true screen-space reflections/refraction (design.md §2) are beyond
+// the POC pipeline; reflections come from the IBL environment instead.
 
 import * as THREE from 'three/webgpu'
 import {
@@ -28,9 +28,6 @@ import {
   uniform,
   vec2,
   vec3,
-  viewportSafeUV,
-  viewportSharedTexture,
-  viewportUV,
 } from 'three/tsl'
 import { getDemMeta } from '../world/geodata'
 
@@ -47,8 +44,7 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const m = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
   m.roughness = 0.08
-  // Raised metalness marks the surface for the SSR pass (render/Effects.tsx).
-  m.metalness = 0.4
+  m.metalness = 0.02
 
   const offset = uniform(new THREE.Vector2(0, 0))
 
@@ -123,34 +119,19 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const sparkle = pow(smoothstep(float(0.85), float(1.0), w.oneMinus()), float(6)).mul(0.18)
   col = col.add(vec3(sparkle, sparkle, sparkle))
 
-  // --- True refraction (design.md §2): the scene behind the surface is
-  // sampled through wave-distorted viewport coordinates; depth-dependent
-  // absorption fades the refracted ground into the water body color. Far
-  // from the camera the surface turns opaque, so the end of the terrain
-  // chunks underneath is never visible.
+  m.colorNode = col
+  // Shallow water is clearer, deep water opaque; foam always opaque. Far
+  // from the camera the surface turns fully opaque, so the end of the
+  // terrain chunks underneath is never visible.
   const camDist = positionWorld.sub(cameraPosition).length()
-  const distort = vec2(
-    mx_fractal_noise_float(vec3(wp.mul(0.6), time.mul(0.4)), 2),
-    mx_fractal_noise_float(vec3(wp.mul(0.6).add(31.7), time.mul(0.35)), 2),
-  ).mul(0.012)
-  const refracted = viewportSharedTexture(viewportSafeUV(viewportUV.add(distort))).rgb
-  // Absorption: shallow water stays clear, deep water swallows the ground.
-  const absorb = smoothstep(float(0), float(45), depthM)
-    .mul(0.55)
-    .add(0.42)
-    .add(foam.mul(0.4))
+  m.opacityNode = smoothstep(float(0), float(60), depthM)
+    .mul(0.35)
+    .add(0.58)
+    .add(foam.mul(0.3))
     .max(smoothstep(float(110), float(150), camDist))
     .min(1)
-  m.colorNode = mix(refracted.mul(mix(vec3(1, 1, 1), col, 0.45)), col, absorb)
-  m.opacityNode = float(1) // self-composited via the shared viewport texture
-  // Foam is rough and non-reflective; open water glossy (IBL + SSR).
+  // Foam is rough, open water glossy (sky reflections from the IBL).
   m.roughnessNode = foam.mul(0.7).add(0.08)
-  m.metalnessNode = float(0.4).mul(foam.oneMinus())
-
-  // Dev hook for the headless verification (CLAUDE.md §7.2).
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    ;(window as unknown as Record<string, unknown>).__waterFx = { refraction: true, ssrMask: m.metalness }
-  }
 
   return { material: m, offset: offset as unknown as { value: THREE.Vector2 } }
 }

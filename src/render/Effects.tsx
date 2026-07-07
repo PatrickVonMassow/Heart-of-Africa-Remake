@@ -1,20 +1,19 @@
-// Post-processing pipeline (design.md §2 "Lighting and post-processing
-// pipeline"): scene pass with MRT (color, normals, metalness, velocity) →
-// GTAO (screen-space ambient occlusion) → SSR (screen-space reflections,
-// masked to metallic surfaces — the ocean water raises its metalness for
-// this) → TRAA (temporal anti-aliasing from the velocity buffer) → bloom →
-// color grading (warm highlights, gentle saturation) → subtle vignette.
-// Tone mapping (ACES) and output color space are applied by
-// THREE.PostProcessing itself. Also installs the procedural IBL environment.
+// Post-processing pipeline (design.md §2 "Licht- und Post-Processing-
+// Pipeline"): scene pass with MRT normals → GTAO (screen-space ambient
+// occlusion) → bloom → color grading (warm highlights, gentle saturation)
+// → subtle vignette. Tone mapping (ACES) and output color space are applied
+// by THREE.PostProcessing itself. Also installs the procedural IBL
+// environment on the scene.
+//
+// OPEN: TAA and screen-space reflections/refraction (design.md §2) are not
+// in the POC pipeline; AA relies on the render pass' MSAA samples.
 
 import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { convertToTexture, metalness, mix, mrt, normalView, output, pass, roughness, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
+import { mix, mrt, normalView, output, pass, smoothstep, vec3, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
-import { ssr } from 'three/addons/tsl/display/SSRNode.js'
-import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture } from './environment'
 
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
@@ -37,52 +36,18 @@ export function Effects() {
   }, [scene])
 
   const post = useMemo(() => {
-    // TRAA and SSR run on the WebGPU backend (the design target, §3): TRAA
-    // replaces the render-pass MSAA there. The WebGL 2 escape hatch keeps
-    // MSAA + GTAO + bloom + the water refraction — three r185's SSRNode
-    // emits invalid GLSL on that backend (OPEN, upstream), and TRAA's cost
-    // is out of proportion on fallback-grade hardware.
-    const backend = (gl as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
-    const isWebGPU = backend?.isWebGPUBackend === true
-
-    const scenePass = pass(scene, camera, { samples: isWebGPU ? 1 : 4 })
-    const targets: Record<string, unknown> = { output, normal: normalView, metal: metalness, rough: roughness }
-    if (isWebGPU) targets.velocity = velocity
-    scenePass.setMRT(mrt(targets as Parameters<typeof mrt>[0]))
+    const scenePass = pass(scene, camera, { samples: 4 })
+    scenePass.setMRT(mrt({ output, normal: normalView }))
     const color = scenePass.getTextureNode('output')
     const depth = scenePass.getTextureNode('depth')
     const normal = scenePass.getTextureNode('normal')
-    const metal = scenePass.getTextureNode('metal')
-    const rough = scenePass.getTextureNode('rough')
 
     // Screen-space ambient occlusion (single-channel target → use .r).
     const aoPass = ao(depth, normal, camera)
-    // SSRNode samples its color and normal inputs itself, so both must be
-    // texture nodes (the published typing asks for vec3, hence the cast).
-    const composed = isWebGPU
-      ? convertToTexture(color.mul(aoPass.getTextureNode().r))
-      : color.mul(aoPass.getTextureNode().r)
-
-    // Screen-space reflections (design.md §2), masked via metalness: the
-    // ocean surface raises its metalness so shores mirror sky and terrain.
-    const withSsr = isWebGPU
-      ? (() => {
-          const ssrPass = ssr(composed, depth, normal as unknown as never, {
-            metalnessNode: metal.r,
-            roughnessNode: rough.r,
-            camera,
-          })
-          return composed.add(ssrPass.rgb.mul(ssrPass.a).mul(0.6))
-        })()
-      : composed
-
-    // Temporal anti-aliasing from the velocity buffer (design.md §2).
-    const taaPass = isWebGPU
-      ? traa(withSsr, depth, scenePass.getTextureNode('velocity'), camera)
-      : withSsr
+    const composed = color.mul(aoPass.getTextureNode().r)
 
     // Bloom on bright highlights (sun glints, fire, snow).
-    const withBloom = taaPass.add(bloom(taaPass, 0.25, 0.35, 0.88))
+    const withBloom = composed.add(bloom(composed, 0.25, 0.35, 0.88))
 
     // Color grading: gentle saturation lift and warm highlights.
     const luma = withBloom.rgb.dot(vec3(0.2126, 0.7152, 0.0722))
@@ -97,18 +62,6 @@ export function Effects() {
     processing.outputNode = graded.mul(vignette)
     return processing
   }, [gl, scene, camera])
-
-  useEffect(() => {
-    // Dev hook for the headless verification (CLAUDE.md §7.2).
-    if (!import.meta.env.DEV) return
-    const w = window as unknown as Record<string, unknown>
-    const backend = (gl as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
-    const isWebGPU = backend?.isWebGPUBackend === true
-    w.__postFx = { gtao: true, ssr: isWebGPU, traa: isWebGPU, msaa: !isWebGPU, bloom: true }
-    return () => {
-      delete w.__postFx
-    }
-  }, [post, gl])
 
   useEffect(() => {
     return () => {

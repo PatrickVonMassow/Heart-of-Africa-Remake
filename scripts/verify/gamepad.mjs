@@ -45,6 +45,14 @@ const pressButton = async (index) => {
   await page.waitForTimeout(150)
 }
 
+// --- Idle axis drift must not steer (worn pads, wheels, flight sticks) -------------
+// Below the engagement threshold nothing may move before a deliberate input.
+await page.evaluate(() => (window.__pad.axes = [0.35, 0.35, 0.4, 0]))
+await page.waitForTimeout(700)
+const driftYaw = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
+check('idle axis drift steers nothing before engagement', Math.abs(driftYaw) < 0.01, `yaw ${driftYaw.toFixed(3)}`)
+await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+
 // --- Right stick turns the first-person view (in Cairo at start) -------------------
 const yaw0 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
 await page.evaluate(() => (window.__pad.axes = [0, 0, 1, 0]))
