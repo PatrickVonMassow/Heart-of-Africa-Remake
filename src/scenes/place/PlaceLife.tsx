@@ -185,15 +185,17 @@ function Porters({
   stops,
   cloth,
   colliders,
+  count = 3,
 }: {
   seed: number
   stops: Array<[number, number]>
   cloth: string[]
   colliders: Collider[]
+  count?: number
 }) {
   const routes = useMemo(() => {
     const rand = mulberry32((seed + 4711) >>> 0)
-    const n = Math.min(3, Math.max(1, stops.length))
+    const n = Math.min(count, Math.max(1, stops.length))
     return Array.from({ length: n }, (_, i) => {
       const a = stops[i % stops.length]
       // Routes lead across the central plaza so the bustle stays in view.
@@ -209,7 +211,7 @@ function Porters({
         speed: 0.55 + rand() * 0.2,
       }
     })
-  }, [seed, stops])
+  }, [seed, stops, count])
   const refs = useRef<Array<THREE.Group | null>>([])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -750,6 +752,7 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
 
 export function PlaceLife({
   kind,
+  size = 1,
   seed,
   placeId,
   style,
@@ -761,6 +764,8 @@ export function PlaceLife({
   colliders,
 }: {
   kind: 'port' | 'village'
+  /** Settlement size (design.md §4.1): big cities show more bustle. */
+  size?: number
   seed: number
   placeId: string
   style: RegionPlaceStyle
@@ -778,10 +783,10 @@ export function PlaceLife({
   if (kind === 'port') {
     return (
       <>
-        <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} />
+        <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
         <Traders seed={localSeed} cloth={style.cloth} />
         <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
-        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={6} colliders={colliders} />
+        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
       </>
     )
   }

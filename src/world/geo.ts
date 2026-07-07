@@ -119,6 +119,11 @@ export interface PlaceDef {
   lat: number
   lon: number
   region: RegionId
+  /**
+   * Settlement size mirroring real ~1890 importance (design.md §4.1):
+   * 1 = small outpost, 2 = town, 3 = major city. Villages omit it.
+   */
+  size?: 1 | 2 | 3
 }
 
 // All 10 port cities (design.md §4.1) at their real ~1890 positions, nudged
@@ -126,18 +131,20 @@ export interface PlaceDef {
 const PORTS: PlaceDef[] = [
   // River ports sit on the bank beside the channel (east bank at Cairo,
   // west of the White Nile at Khartoum, north bank at Boma).
-  { id: 'cairo', kind: 'port', lat: 30.05, lon: 31.45, region: 'north' },
-  { id: 'tangier', kind: 'port', lat: 35.6, lon: -5.75, region: 'north' },
-  { id: 'khartoum', kind: 'port', lat: 15.5, lon: 32.15, region: 'north' },
-  { id: 'st-louis', kind: 'port', lat: 15.9, lon: -16.2, region: 'west' },
-  { id: 'timbuktu', kind: 'port', lat: 16.77, lon: -3.0, region: 'west' },
-  { id: 'lagos', kind: 'port', lat: 6.55, lon: 3.4, region: 'west' },
-  { id: 'boma', kind: 'port', lat: -5.65, lon: 13.05, region: 'central' },
-  { id: 'berbera', kind: 'port', lat: 10.3, lon: 45.0, region: 'east' },
+  // Sizes reflect real ~1890 importance: Cairo, Zanzibar and Cape Town were
+  // major cities; Boma and Berbera small stations.
+  { id: 'cairo', kind: 'port', lat: 30.05, lon: 31.45, region: 'north', size: 3 },
+  { id: 'tangier', kind: 'port', lat: 35.6, lon: -5.75, region: 'north', size: 2 },
+  { id: 'khartoum', kind: 'port', lat: 15.5, lon: 32.15, region: 'north', size: 2 },
+  { id: 'st-louis', kind: 'port', lat: 15.9, lon: -16.2, region: 'west', size: 2 },
+  { id: 'timbuktu', kind: 'port', lat: 16.77, lon: -3.0, region: 'west', size: 2 },
+  { id: 'lagos', kind: 'port', lat: 6.55, lon: 3.4, region: 'west', size: 2 },
+  { id: 'boma', kind: 'port', lat: -5.65, lon: 13.05, region: 'central', size: 1 },
+  { id: 'berbera', kind: 'port', lat: 10.3, lon: 45.0, region: 'east', size: 1 },
   // Zanzibar lies on its island (data/coastline.ts). OPEN: ferries (design.md
   // §4.1) are not in the POC, so it is not reachable on foot from the mainland.
-  { id: 'zanzibar', kind: 'port', lat: -6.16, lon: 39.3, region: 'east' },
-  { id: 'capetown', kind: 'port', lat: -33.8, lon: 18.5, region: 'south' },
+  { id: 'zanzibar', kind: 'port', lat: -6.16, lon: 39.3, region: 'east', size: 3 },
+  { id: 'capetown', kind: 'port', lat: -33.8, lon: 18.5, region: 'south', size: 3 },
 ]
 
 // One village per each of the 22 peoples (design.md §4.2), region membership

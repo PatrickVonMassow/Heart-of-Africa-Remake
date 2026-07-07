@@ -158,10 +158,13 @@ async function accessPointsFree(sceneLabel) {
   const blocked = await page.evaluate(() => {
     const cs = window.__placeColliders
     const clear = (x, z) => cs.every((c) => window.__clearanceTo(c, x, z) > 0.35)
+    // Spawn and exit scale with the settlement size (design.md par.4.1).
+    const radius = window.__placeLayout.radius
+    const exit = window.__placeLayout.interactives.find((i) => i.type === 'exit')
     return [
-      { n: 'spawn', x: 0, z: 18 },
+      { n: 'spawn', x: 0, z: radius - 10 },
       { n: 'square', x: 0, z: 3 },
-      { n: 'exit', x: 0, z: 23.5 },
+      { n: 'exit', x: exit.pos[0], z: exit.pos[1] - 0.5 },
     ].filter((p) => !clear(p.x, p.z)).map((p) => p.n)
   })
   check(`${sceneLabel}: spawn/square/exit free`, blocked.length === 0,

@@ -72,6 +72,9 @@ The landscape rendering is based on real geodata rather than purely synthetic no
 Resupply, trade, ferries, discovery bounties; automatic saving (checkpoint).
 Cairo (northeast corner; always the starting city), Tangier (northwest coast), Khartoum (northeastern interior), St. Louis (west coast), Timbuktu (western interior), Lagos (Gulf of Guinea), Boma (Congo mouth), Berbera (Horn of Africa), Zanzibar (east coast), Cape Town (southern tip).
 
+**Settlement size and character.**
+The size of a settlement in the game mirrors its real importance at the end of the 19th century: major cities (Cairo, Zanzibar, Cape Town) are markedly larger — a wider walkable area, more building blocks and streets, more warehouses and market stalls, denser crowds, and a landmark tower on the skyline; towns (Tangier, Khartoum, St. Louis, Timbuktu, Lagos) are mid-sized; small stations (Boma, Berbera) stay modest. Port cities and the large interior towns must read clearly differently from villages: stone/adobe blocks, street grids, harbor trade and paid labor versus the villages' organic hut clusters, kinship compounds and subsistence life.
+
 ### 4.2 Peoples (22)
 Carriers of the hints and of regional trade. Region assignment see §4.5.
 Masai, Bantu, Zulu, Bushmen, Batwa, Lunda, Pygmies, Swahili, Somali, Hausa, Mongo, Sidamo, Banda, Nubians, Tuareg, Berbers, Bombara, Mandingo, Bemba, Bambundu, Uganda, Fang.

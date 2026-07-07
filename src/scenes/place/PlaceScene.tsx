@@ -45,7 +45,7 @@ function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interact
 }
 
 /** Non-enterable dwellings and outbuildings (design.md §2 lively settlements). */
-export type DwellingKind = 'hut' | 'box' | 'granary' | 'tent' | 'warehouse' | 'stall' | 'shed'
+export type DwellingKind = 'hut' | 'box' | 'granary' | 'tent' | 'warehouse' | 'stall' | 'shed' | 'tower'
 
 export interface DwellingDef {
   x: number
@@ -74,6 +74,8 @@ interface FenceDef {
 }
 
 interface PlaceLayout {
+  /** Walkable radius; leaving it exits the place (larger for big cities). */
+  radius: number
   interactives: Interactive[]
   dwellings: DwellingDef[]
   fences: FenceDef[]
@@ -121,6 +123,12 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   const rand = mulberry32((seed ^ hash) >>> 0)
   const jitter = (v: number, amount: number) => v + (rand() - 0.5) * amount
 
+  // Settlement size mirrors real ~1890 importance (design.md §4.1): major
+  // cities are markedly larger, with more blocks and a wider walkable area.
+  const size = place.kind === 'port' ? (place.size ?? 2) : 1
+  const ext = place.kind === 'port' ? (size - 1) * 7 : 0
+  const radius = place.kind === 'port' ? 24 + size * 4 : PLACE_RADIUS
+
   const interactives: Interactive[] = []
   if (place.kind === 'port') {
     const types: BuildingType[] = ['shop', 'weapons', 'tools', 'market']
@@ -134,7 +142,7 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     interactives.push({ type: 'chief', pos: [jitter(0, 4), jitter(-13, 3)] })
     interactives.push({ type: 'villager', pos: [jitter(4, 3), jitter(-4, 2)] })
   }
-  interactives.push({ type: 'exit', pos: [0, 24] })
+  interactives.push({ type: 'exit', pos: [0, radius - 4] })
 
   const dwellings: DwellingDef[] = []
   const fences: FenceDef[] = []
@@ -182,8 +190,8 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
 
   if (place.kind === 'port') {
     // Street grid: main street south→plaza→north, cross street east–west.
-    paths.push({ points: [[0, 26], [0, 3], [0, -16]], width: 3 })
-    paths.push({ points: [[-20, 3], [20, 3]], width: 2.2 })
+    paths.push({ points: [[0, radius - 2], [0, 3], [0, -16 - ext]], width: 3 })
+    paths.push({ points: [[-20 - ext, 3], [20 + ext, 3]], width: 2.2 })
     for (const it of interactives) {
       if (it.type === 'exit') continue
       // Spur from each functional building toward the nearest street axis.
@@ -195,7 +203,7 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
 
     // Dense adobe town: rows of houses flanking both streets.
     for (const sx of [-6.8, 6.8]) {
-      for (let z = -13; z <= 21; z += 4.6) {
+      for (let z = -13 - ext; z <= 21 + ext; z += 4.6) {
         const x = jitter(sx, 1.6)
         const zz = jitter(z, 1.6)
         if (!isFree(x, zz, 4.6)) continue
@@ -203,8 +211,8 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
         addDwelling('box', x, zz, faceTo(x, zz, 0, zz) + (rand() - 0.5) * 0.15, 1.8 + rand() * 0.5, 2.3 + (floors - 1) * 1.8, floors)
       }
     }
-    for (const sz of [-2.8, 9.2]) {
-      for (let x = -19; x <= 19; x += 5.4) {
+    for (const sz of size >= 3 ? [-2.8, 9.2, 16.4] : [-2.8, 9.2]) {
+      for (let x = -19 - ext; x <= 19 + ext; x += 5.4) {
         if (Math.abs(x) < 9) continue
         const xx = jitter(x, 1.8)
         const zz = jitter(sz, 1.4)
@@ -213,12 +221,15 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
         addDwelling('box', xx, zz, faceTo(xx, zz, xx, 3) + (rand() - 0.5) * 0.15, 1.7 + rand() * 0.5, 2.2 + (floors - 1) * 1.8, floors)
       }
     }
-    // Warehouse at the western end of the cross street.
+    // Warehouses at the ends of the cross street (two in bigger towns).
     if (isFree(-16.5, 7.5, 4)) addDwelling('warehouse', -16.5, 7.5, Math.PI, 4.2, 3)
+    if (size >= 2 && isFree(16.8, 7.8, 4)) addDwelling('warehouse', 16.8, 7.8, Math.PI, 4.2, 3)
+    // Major cities get a landmark tower on the skyline (design.md §4.1).
+    if (size >= 3 && isFree(-11.5, -8.5, 4)) addDwelling('tower', -11.5, -8.5, 0, 1.1, 7)
     // Market stalls and tents around the market building.
     const market = interactives.find((it) => it.type === 'market')
     if (market) {
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 2 + size * 2; i++) {
         const a = rand() * Math.PI * 2
         const r = 4.5 + rand() * 2.5
         const x = market.pos[0] + Math.cos(a) * r
@@ -336,7 +347,7 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   const rocks: PlaceLayout['rocks'] = []
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
     const a = rand() * Math.PI * 2
-    const r = 6 + rand() * (PLACE_RADIUS + 6)
+    const r = 6 + rand() * (radius + 6)
     const x = Math.cos(a) * r
     const z = Math.sin(a) * r
     if (!isFree(x, z, 2)) continue
@@ -379,6 +390,9 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       case 'shed':
         colliders.push({ x: d.x, z: d.z, r: d.r + 0.35 })
         break
+      case 'tower':
+        colliders.push({ x: d.x, z: d.z, r: d.r + 0.4 })
+        break
       default:
         colliders.push({ x: d.x, z: d.z, r: d.r + 0.3 }) // round hut
     }
@@ -402,7 +416,7 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
 
-  return { interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
+  return { radius, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
 }
 
 // --- Shared procedural materials (created once per mount) --------------------
@@ -913,6 +927,29 @@ function Stall({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
   )
 }
 
+/** Landmark tower of a major city (design.md §4.1): shaft, gallery, dome. */
+function Tower({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      <mesh position={[0, d.h / 2, 0]} castShadow receiveShadow material={mats.plaster}>
+        <cylinderGeometry args={[d.r * 0.75, d.r, d.h, 10]} />
+      </mesh>
+      {/* Gallery ring */}
+      <mesh position={[0, d.h + 0.12, 0]} castShadow material={mats.plasterDark}>
+        <cylinderGeometry args={[d.r * 1.05, d.r * 1.05, 0.3, 10]} />
+      </mesh>
+      {/* Upper stage and dome */}
+      <mesh position={[0, d.h + 0.8, 0]} castShadow material={mats.plaster}>
+        <cylinderGeometry args={[d.r * 0.55, d.r * 0.62, 1.15, 9]} />
+      </mesh>
+      <mesh position={[0, d.h + 1.65, 0]} castShadow>
+        <sphereGeometry args={[d.r * 0.55, 9, 7]} />
+        <meshStandardMaterial color="#8f9573" roughness={0.5} metalness={0.35} />
+      </mesh>
+    </group>
+  )
+}
+
 /** Small utility shed with a slanted roof and a wood pile. */
 function Shed({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
   return (
@@ -954,6 +991,8 @@ function Dwelling({ d, mats, style, variant }: { d: DwellingDef; mats: PlaceMate
       return <Warehouse d={d} mats={mats} />
     case 'stall':
       return <Stall d={d} mats={mats} />
+    case 'tower':
+      return <Tower d={d} mats={mats} />
     default:
       return <Shed d={d} mats={mats} />
   }
@@ -1108,12 +1147,14 @@ function GroundScatter({
   isPort,
   grassFactor = 1,
   rocks,
+  radius,
 }: {
   placeId: string
   seed: number
   isPort: boolean
   grassFactor?: number
   rocks: Array<[number, number, number]>
+  radius: number
 }) {
   const tufts = useMemo(() => {
     let hash = 0
@@ -1123,11 +1164,11 @@ function GroundScatter({
     const tuftCount = Math.round((isPort ? 30 : 70) * grassFactor)
     for (let i = 0; i < tuftCount; i++) {
       const a = rand() * Math.PI * 2
-      const r = 4 + rand() * (PLACE_RADIUS + 8)
+      const r = 4 + rand() * (radius + 8)
       tufts.push([Math.cos(a) * r, Math.sin(a) * r, 0.55 + rand() * 0.55])
     }
     return tufts
-  }, [placeId, seed, isPort, grassFactor])
+  }, [placeId, seed, isPort, grassFactor, radius])
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
   const rockGeo = useMemo(() => buildRock(), [])
@@ -1199,9 +1240,10 @@ export function PlaceScene() {
   const player = useRef({ x: 0, z: 18, yaw: 0 })
   const nearRef = useRef<Interactive | null>(null)
 
-  // Reset position when the place changes.
+  // Reset position when the place changes (just inside the exit gate).
   useEffect(() => {
-    player.current = { x: 0, z: 18, yaw: 0 }
+    player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId])
 
   // Dev-only hooks for the headless Playwright verification (CLAUDE.md §7.2).
@@ -1295,7 +1337,7 @@ export function PlaceScene() {
         p.x = rx
         p.z = rz
         const r = Math.hypot(p.x, p.z)
-        if (r > PLACE_RADIUS) {
+        if (r > layout.radius) {
           useGame.getState().leavePlace()
           return
         }
@@ -1347,7 +1389,7 @@ export function PlaceScene() {
 
       {/* Ground disc with procedural mottling */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
-        <circleGeometry args={[PLACE_RADIUS + 14, 48]} />
+        <circleGeometry args={[layout.radius + 14, 48]} />
       </mesh>
 
       {layout.interactives.map((it, i) => {
@@ -1371,10 +1413,11 @@ export function PlaceScene() {
 
       <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
-      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} rocks={layout.rocks} />
+      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} />
 
       <PlaceLife
         kind={isPort ? 'port' : 'village'}
+        size={place.size ?? 1}
         seed={seed}
         placeId={place.id}
         style={style}
