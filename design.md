@@ -51,7 +51,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 
 - Fixed continent of Africa: the geographic location of all landscape elements (coasts, rivers, jungle, mountains, lakes, landmarks, settlement sites) is fixed. The concrete appearance of the landscape, and the look of the villages including the distribution of their huts, are however determined procedurally in every playthrough (§18). In addition, movable goals (the tomb, buried treasures) are placed anew each game.
 - The world reproduces Africa geographically authentically as it was in the year 1890. The real landmarks of §4.4 lie at their correct geographic positions.
-- Five regions, each with its own landscape, its own peoples and its own value profile: North (desert/Sahara), West (savanna), Central (jungle/Congo basin), East (mountains/lakes/rift), South (high plateau).
+- Five regions, each with its own landscape, its own peoples and its own value profile: North (desert/Sahara), West (savanna), Central (jungle/Congo basin), East (mountains/lakes/rift), South (high plateau). The boundaries between the regions are visible in the game: as subtle dashed ink lines on the exploration map and as dashed ground markings over land in the bird's-eye view.
 - Terrain types: ocean, coast, desert, savanna/open land, jungle/grassland, mountains, water (river/lake).
 - Coordinate system: position in degrees, displayed as "latitude … degrees north/south" and "longitude … degrees west/east". This system is also the basis of the hints (§13).
 

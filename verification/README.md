@@ -324,3 +324,14 @@ documented in `scripts/README.md`) and were re-run in full:
 - **preview.mjs** — production build renders console-clean. Refreshed
   screenshot 09.
 - `npm run lint` and `npm audit` (§7.1.18): 0 findings, 0 vulnerabilities.
+
+## Addendum: region borders (July 7, 2026)
+
+The boundaries between the five regions (design.md §3) are drawn as dashed
+ink lines on the exploration map (always visible, land only) and as dashed
+ground ribbons draped over the terrain in the bird's-eye view.
+
+| File | View |
+|---|---|
+| 59-region-border-birdseye-timbuktu.png | Bird's-eye view at Timbuktu; the lat-17 north border runs as a dashed ground line |
+| 60-region-borders-map.png | Map overlay with all region borders as dashed lines |

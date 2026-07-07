@@ -55,6 +55,22 @@ export function regionAt(lat: number, lon: number): RegionId {
   return 'west'
 }
 
+/**
+ * Region boundary polylines as [lon, lat] points, matching regionAt()'s
+ * thresholds exactly. Used to draw the borders on the exploration map and in
+ * the bird's-eye view (design.md §3); renderers clip them to land themselves.
+ */
+export const REGION_BORDERS: Array<Array<[number, number]>> = [
+  // North vs. the rest: lat 17 west of lon 25, stepping down to lat 14.5 east of it.
+  [[-20, 17], [25, 17], [25, 14.5], [53, 14.5]],
+  // South vs. the rest: lat -12.
+  [[-20, -12], [53, -12]],
+  // East vs. west/central: lon 31.5.
+  [[31.5, 14.5], [31.5, -12]],
+  // Central vs. west: lon 12 up to lat 7.5, then along lat 7.5 to the east border.
+  [[12, -12], [12, 7.5], [31.5, 7.5]],
+]
+
 export type PlaceKind = 'port' | 'village'
 
 export interface PlaceDef {

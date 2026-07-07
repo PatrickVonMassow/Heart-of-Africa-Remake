@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useGame, exploreCellKey, EXPLORE_CELL_DEG } from '../state/store'
 import { useUi } from '../state/ui'
-import { PLACES, regionAt, worldToLatLon, type RegionId } from '../world/geo'
+import { PLACES, REGION_BORDERS, regionAt, worldToLatLon, type RegionId } from '../world/geo'
 import { useStrings } from '../i18n'
 import { LAND_POLYGONS } from '../world/data/coastline'
 import { RIVERS_DATA } from '../world/data/rivers'
@@ -124,6 +124,45 @@ export function MapOverlay() {
     for (const poly of LAND_POLYGONS) drawPolyline(poly.points, true, 1.7, 0.9)
     for (const lake of LAKES) drawPolyline(lake.points, true, 1.3, 0.8)
     for (const river of RIVERS_DATA) drawPolyline(river.points, false, 1.1, 0.7)
+
+    // Region borders: dashed ink lines over land, always visible — they are
+    // conceptual divisions, not geography waiting to be discovered.
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 1
+    ctx.globalAlpha = 0.5
+    ctx.setLineDash([5, 4])
+    for (const line of REGION_BORDERS) {
+      for (let s = 0; s < line.length - 1; s++) {
+        const [lon0, lat0] = line[s]
+        const [lon1, lat1] = line[s + 1]
+        const steps = Math.max(1, Math.round(Math.hypot(lon1 - lon0, lat1 - lat0) / 0.4))
+        let path = false
+        for (let i = 0; i < steps; i++) {
+          const aLon = lon0 + ((lon1 - lon0) * i) / steps
+          const aLat = lat0 + ((lat1 - lat0) * i) / steps
+          const bLon = lon0 + ((lon1 - lon0) * (i + 1)) / steps
+          const bLat = lat0 + ((lat1 - lat0) * (i + 1)) / steps
+          if (cellAt((aLat + bLat) / 2, (aLon + bLon) / 2) === CELL_OCEAN) {
+            if (path) {
+              ctx.stroke()
+              path = false
+            }
+            continue
+          }
+          const [px, py] = project(aLon, aLat)
+          const [qx, qy] = project(bLon, bLat)
+          if (!path) {
+            ctx.beginPath()
+            ctx.moveTo(px, py)
+            path = true
+          }
+          ctx.lineTo(qx, qy)
+        }
+        if (path) ctx.stroke()
+      }
+    }
+    ctx.setLineDash([])
+    ctx.globalAlpha = 1
 
     // Visited places with symbol and name.
     ctx.font = '11px Georgia, serif'

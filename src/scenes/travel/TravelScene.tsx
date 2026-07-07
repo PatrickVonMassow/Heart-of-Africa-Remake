@@ -35,6 +35,7 @@ import { TRAVEL_SKY } from '../../render/skyPresets'
 import { createWaterMaterial } from '../../render/water'
 import { buildAcacia, buildBush, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { Climate } from './Climate'
+import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 
@@ -825,6 +826,7 @@ export function TravelScene() {
       <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
       <Sun />
       <TerrainChunks />
+      <RegionBorders />
       <WaterPlane />
       <Vegetation />
       <Wildlife />
