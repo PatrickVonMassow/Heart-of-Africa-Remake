@@ -399,3 +399,29 @@ entry auto-narrates without a click.
 | 66-voice-auto-narration.png | Newly added entry narrating automatically (stop control active, no click) |
 | 67-settings-debug-menu.png | Debug menu with mouse-sensitivity and ambience-volume controls |
 | 68-lion-feeding.png | Lion feeding on brought-down prey beside Cairo (stain beneath carcass) |
+
+## Addendum: world/settlement/water batch (July 7, 2026)
+
+Sixteen changes landed as separate commits: English default language
+(i18n suite inverted), debug-unlockable wheel zoom, debug dropdowns and
+render-backend display, region names on both sides of the borders,
+swimmable enclosed sea water, a second ambience volume (gust LFOs) at
+20 %, lion feeding that consumes the carcass over a red stain before
+moving on, elephant trampling + lion panic + kill vultures, richer
+region dressing (baobabs, termite mounds, kopjes, dead trees, papyrus),
+drinking/grazing animals, terrain-following rivers with current,
+waterfalls and springs plus lake surfaces, village-life vignettes
+(talkers, fire tender, cooking runs, pounding, drummer, well), size-
+tiered settlements (Cairo/Zanzibar/Cape Town large, with tower), and a
+first-person panorama of the real surrounding landscape.
+
+| File | View |
+|---|---|
+| 69-region-border-labels.png | North/West names on their sides of the lat-17 border |
+| 70-region-labels-map.png | Map overlay with region names along the borders |
+| 71-water-nile-aswan.png | Nile in its bed through the desert (no sea-level canyon) |
+| 72-water-victoria-falls.png | Zambezi with cascade and plunge-pool foam at Victoria Falls |
+| 73-water-lake-victoria.png | Lake Victoria surface at its shore height |
+| 74-water-congo-jungle.png | Congo under jungle with bank foam |
+| 75-place-backdrop-cairo.png | Cairo (size 3) with delta/desert panorama |
+| 76-place-backdrop-masai.png | Masai village with snow-capped rift peaks behind the huts |
