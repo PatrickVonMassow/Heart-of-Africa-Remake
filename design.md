@@ -365,6 +365,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Walking speed of the player character outside settlements (travel across the continent).
 - Mouse-look sensitivity in the first-person view.
 - Volume of the ambience noise beds (wind, surf, crowd murmur; default 0.2 — a fifth of their original loudness).
+- Volume of the gust/swell modulation riding on the noise beds (a separate loudness source; default 0.2).
 - Speed of food consumption while walking; at 0 the food supply lasts forever.
 - Checkbox: random events can occur (§14), on by default.
 - One button per kind of random event (§14) to trigger it immediately.

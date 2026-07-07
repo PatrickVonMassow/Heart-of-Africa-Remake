@@ -75,6 +75,11 @@ function noiseBed(name: string, filterType: BiquadFilterType, freq: number, q = 
   src.start()
 }
 
+// Gust/swell LFOs add gain on top of the layer targets, so they are a
+// loudness source of their own; their depth is scaled by the configurable
+// gust volume (design.md §21) and re-applied on changes.
+const wobbles: Array<{ gain: GainNode; baseDepth: number }> = []
+
 /** Slow amplitude wobble on a layer (wind gusts, crowd swell). */
 function wobble(name: string, rate: number, depth: number) {
   if (!ctx) return
@@ -82,10 +87,11 @@ function wobble(name: string, rate: number, depth: number) {
   const lfo = ctx.createOscillator()
   lfo.frequency.value = rate
   const lfoGain = ctx.createGain()
-  lfoGain.gain.value = depth
+  lfoGain.gain.value = depth * balance.ambienceGustVolume
   lfo.connect(lfoGain)
   lfoGain.connect(l.gain.gain)
   lfo.start()
+  wobbles.push({ gain: lfoGain, baseDepth: depth })
 }
 
 function envOsc(
@@ -257,7 +263,9 @@ export function startAmbience() {
 
 /** Re-apply the gain targets after a volume change in the debug menu. */
 export function refreshAmbienceVolume() {
-  if (ctx) applyScene()
+  if (!ctx) return
+  applyScene()
+  for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceGustVolume
 }
 
 /** Update the ambience to the current game situation. */

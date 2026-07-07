@@ -120,6 +120,11 @@ export function DebugMenu() {
           set('ambienceNoiseVolume', Math.max(0, v))
           refreshAmbienceVolume()
         }} />
+      <NumberField label={t.debug.ambienceGusts} value={balance.ambienceGustVolume} step={0.05}
+        onChange={(v) => {
+          set('ambienceGustVolume', Math.max(0, v))
+          refreshAmbienceVolume()
+        }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.daysPerUnit} value={balance.daysPerUnit} step={0.05}

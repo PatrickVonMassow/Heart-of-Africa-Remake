@@ -12,6 +12,8 @@ export interface BalanceConfig {
   mouseSensitivity: number
   /** Volume multiplier for the ambience noise beds (wind/surf/murmur), 1 = full. */
   ambienceNoiseVolume: number
+  /** Volume multiplier for the gust/swell modulation on the noise beds, 1 = full. */
+  ambienceGustVolume: number
   /** In-game days that pass per world unit traveled on the map. */
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
@@ -48,6 +50,7 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 7.5,
   mouseSensitivity: 0.0011,
   ambienceNoiseVolume: 0.2,
+  ambienceGustVolume: 0.2,
   daysPerUnit: 0.2,
   foodPerDay: 1,
   terrainCost: {
