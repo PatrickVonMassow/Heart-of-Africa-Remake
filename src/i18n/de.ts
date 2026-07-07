@@ -234,6 +234,7 @@ export const de: Strings = {
     cash: 'Kontostand ($)',
     foodDays: 'Nahrung (Tage)',
     jumpTo: 'Springe zu:',
+    choose: 'auswählen …',
     grave: 'Grab',
     addEquipment: 'Ausrüstung hinzufügen:',
     addGift: 'Gabe hinzufügen:',

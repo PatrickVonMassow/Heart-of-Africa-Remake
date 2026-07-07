@@ -371,8 +371,8 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Checkbox: unlock mouse-wheel zoom in the bird's-eye view (zoom in/out around the default camera distance), off by default; disabling it resets the zoom.
-- Instant jump to any port city.
+- Instant jump to any port city or the tomb, via a dropdown selector.
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
-- Add any item to the inventory; if this overfills the inventory, the inventory capacity increases automatically to match.
+- Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.
 - Language selector for the game language (English/German; default English, §17).

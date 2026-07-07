@@ -12,6 +12,36 @@ import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
 const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
+/** Labeled dropdown that fires an action on pick and snaps back to the placeholder. */
+function ActionSelect({
+  label,
+  placeholder,
+  options,
+  onPick,
+}: {
+  label: string
+  placeholder: string
+  options: Array<{ value: string; label: string }>
+  onPick: (value: string) => void
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onPick(e.target.value)
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function NumberField({
   label,
   value,
@@ -133,27 +163,33 @@ export function DebugMenu() {
       </div>
 
       <div className="section">
-        <div>{t.debug.jumpTo}</div>
-        {PLACES.map((p) => (
-          <button key={p.id} onClick={() => game.debugJumpTo(p.lat, p.lon)}>{t.places[p.id]}</button>
-        ))}
-        <button onClick={() => game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)}>
-          {t.debug.grave}
-        </button>
-      </div>
-
-      <div className="section">
-        <div>{t.debug.addEquipment}</div>
-        {EQUIPMENT_IDS.map((e) => (
-          <button key={e} onClick={() => game.debugAddEquipment(e)}>{t.equipment[e]}</button>
-        ))}
-      </div>
-
-      <div className="section">
-        <div>{t.debug.addGift}</div>
-        {MATERIALS.map((m) => (
-          <button key={m} onClick={() => game.debugAddGift(m)}>{t.gifts[m]}</button>
-        ))}
+        <ActionSelect
+          label={t.debug.jumpTo}
+          placeholder={t.debug.choose}
+          options={[
+            ...PLACES.map((p) => ({ value: p.id, label: t.places[p.id] })),
+            { value: '#grave', label: t.debug.grave },
+          ]}
+          onPick={(v) => {
+            if (v === '#grave') game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)
+            else {
+              const p = PLACES.find((pl) => pl.id === v)
+              if (p) game.debugJumpTo(p.lat, p.lon)
+            }
+          }}
+        />
+        <ActionSelect
+          label={t.debug.addEquipment}
+          placeholder={t.debug.choose}
+          options={EQUIPMENT_IDS.map((e) => ({ value: e, label: t.equipment[e] }))}
+          onPick={(v) => game.debugAddEquipment(v as EquipmentId)}
+        />
+        <ActionSelect
+          label={t.debug.addGift}
+          placeholder={t.debug.choose}
+          options={MATERIALS.map((m) => ({ value: m, label: t.gifts[m] }))}
+          onPick={(v) => game.debugAddGift(v as Material)}
+        />
       </div>
     </div>
   )

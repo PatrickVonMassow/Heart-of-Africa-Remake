@@ -140,6 +140,8 @@ export interface Strings {
     cash: string
     foodDays: string
     jumpTo: string
+    /** Placeholder entry of the debug dropdowns. */
+    choose: string
     grave: string
     addEquipment: string
     addGift: string

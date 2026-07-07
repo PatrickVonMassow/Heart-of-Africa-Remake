@@ -235,6 +235,7 @@ export const en: Strings = {
     cash: 'Funds ($)',
     foodDays: 'Food (days)',
     jumpTo: 'Jump to:',
+    choose: 'select …',
     grave: 'Grave',
     addEquipment: 'Add equipment:',
     addGift: 'Add gift:',

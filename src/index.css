@@ -492,6 +492,16 @@ body,
   font: inherit;
 }
 
+.debug-menu select {
+  max-width: 170px;
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  color: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font: inherit;
+}
+
 .debug-menu button {
   background: #2d3748;
   border: 1px solid #4a5568;
