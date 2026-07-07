@@ -8,6 +8,8 @@ export interface BalanceConfig {
   travelSpeed: number
   /** Walking speed inside places (first-person), meters per second. */
   placeWalkSpeed: number
+  /** Mouse-look sensitivity in the first-person view, radians per pixel. */
+  mouseSensitivity: number
   /** In-game days that pass per world unit traveled on the map. */
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
@@ -42,6 +44,7 @@ export interface BalanceConfig {
 export const balance: BalanceConfig = {
   travelSpeed: 8,
   placeWalkSpeed: 5,
+  mouseSensitivity: 0.0011,
   daysPerUnit: 0.2,
   foodPerDay: 1,
   terrainCost: {

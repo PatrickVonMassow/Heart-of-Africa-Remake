@@ -127,6 +127,7 @@ export interface Strings {
     language: string
     travelSpeed: string
     walkSpeed: string
+    mouseSensitivity: string
     foodPerDay: string
     daysPerUnit: string
     digRadius: string

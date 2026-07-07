@@ -362,6 +362,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 
 - Walking speed of the player character inside settlements (villages and port cities).
 - Walking speed of the player character outside settlements (travel across the continent).
+- Mouse-look sensitivity in the first-person view.
 - Speed of food consumption while walking; at 0 the food supply lasts forever.
 - Checkbox: random events can occur (§14), on by default.
 - One button per kind of random event (§14) to trigger it immediately.

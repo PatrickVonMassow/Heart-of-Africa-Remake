@@ -222,6 +222,7 @@ export const en: Strings = {
     language: 'Language',
     travelSpeed: 'Travel speed (overland)',
     walkSpeed: 'Walk speed (in places)',
+    mouseSensitivity: 'Mouse sensitivity (first-person)',
     foodPerDay: 'Food use per day (0 = infinite)',
     daysPerUnit: 'Days per travel unit',
     digRadius: 'Dig radius',

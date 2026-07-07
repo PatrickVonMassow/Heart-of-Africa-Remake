@@ -1215,7 +1215,7 @@ export function PlaceScene() {
     }
     const onMove = (e: MouseEvent) => {
       if (document.pointerLockElement === el) {
-        player.current.yaw -= e.movementX * 0.0022
+        player.current.yaw -= e.movementX * balance.mouseSensitivity
       }
     }
     el.addEventListener('click', onClick)

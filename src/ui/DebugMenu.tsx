@@ -74,6 +74,8 @@ export function DebugMenu() {
         onChange={(v) => set('travelSpeed', v)} />
       <NumberField label={t.debug.walkSpeed} value={balance.placeWalkSpeed} step={0.5}
         onChange={(v) => set('placeWalkSpeed', v)} />
+      <NumberField label={t.debug.mouseSensitivity} value={balance.mouseSensitivity} step={0.0002}
+        onChange={(v) => set('mouseSensitivity', Math.max(0, v))} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.daysPerUnit} value={balance.daysPerUnit} step={0.05}
