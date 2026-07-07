@@ -229,12 +229,15 @@ function Herds() {
 
 /**
  * Purely decorative lion hunt (design.md §19): near zebra herds a lion
- * occasionally chases one zebra; after the catch both rest, then despawn.
+ * occasionally chases one zebra; after the catch the lion visibly feeds on
+ * the carcass — lowered, tearing head movements beside the prey and a dark
+ * stain spreading beneath it (schematic) — then both despawn.
  */
 function LionHunt() {
   const seed = useGame((s) => s.seed)
   const lion = useRef<THREE.Group>(null)
   const prey = useRef<THREE.Group>(null)
+  const stain = useRef<THREE.Mesh>(null)
   const state = useRef<{
     mode: 'idle' | 'chase' | 'feed'
     lx: number
@@ -250,7 +253,19 @@ function LionHunt() {
     [],
   )
 
-  useFrame((_, rawDt) => {
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__lionHunt = { state: state.current, lion, prey, stain }
+    return () => {
+      delete w.__lionHunt
+    }
+  }, [])
+
+  const FEED_DURATION = 20
+
+  useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const s = state.current
     const pos = useGame.getState().pos
@@ -287,7 +302,7 @@ function LionHunt() {
       s.lz += fleeZ * 5.6 * dt
       if (d < 0.6) {
         s.mode = 'feed'
-        s.timer = 20
+        s.timer = FEED_DURATION
       }
       // Abort when the hunt strays too far from the player.
       if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > 90) {
@@ -303,12 +318,24 @@ function LionHunt() {
     }
 
     const active = s.mode !== 'idle'
+    const feeding = s.mode === 'feed'
+    const t = clock.elapsedTime
     if (lion.current) {
       lion.current.visible = active
       if (active) {
         const ll = worldToLatLon(s.lx, s.lz)
-        lion.current.position.set(s.lx, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height), s.lz)
-        lion.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
+        const ground = Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height)
+        if (feeding) {
+          // Feeding (design.md §19): stand at the carcass flank, head down,
+          // rhythmic tearing dips instead of the chase pose.
+          lion.current.position.set(s.px + 0.7, ground, s.pz + 0.25)
+          lion.current.rotation.y = Math.atan2(s.px - (s.px + 0.7), s.pz - (s.pz + 0.25))
+          lion.current.rotation.x = 0.32 + Math.sin(t * 3.2) * 0.16
+        } else {
+          lion.current.position.set(s.lx, ground, s.lz)
+          lion.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
+          lion.current.rotation.x = 0
+        }
       }
     }
     if (prey.current) {
@@ -318,7 +345,17 @@ function LionHunt() {
         prey.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height), s.pz)
         prey.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
         // Fallen on its side once caught.
-        prey.current.rotation.z = s.mode === 'feed' ? Math.PI / 2.2 : 0
+        prey.current.rotation.z = feeding ? Math.PI / 2.2 : 0
+      }
+    }
+    if (stain.current) {
+      stain.current.visible = feeding
+      if (feeding) {
+        const ll = worldToLatLon(s.px, s.pz)
+        stain.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height) + 0.015, s.pz)
+        // The stain spreads while the lion feeds.
+        const spread = Math.min(1, (FEED_DURATION - s.timer) / 6)
+        stain.current.scale.setScalar(0.4 + spread * 0.9)
       }
     }
   })
@@ -331,6 +368,10 @@ function LionHunt() {
       <group ref={prey} visible={false}>
         <mesh geometry={geo.zebra} material={material} castShadow />
       </group>
+      <mesh ref={stain} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.1, 20]} />
+        <meshStandardMaterial color="#5a1410" roughness={1} transparent opacity={0.75} />
+      </mesh>
     </>
   )
 }
