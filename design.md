@@ -26,7 +26,7 @@ When you leave the settlement, the game switches back to the bird's-eye view wit
 Villages and their inhabitants are styled typically for their region (building style, clothing, vegetation matching desert, savanna, jungle, highlands, lakes/rift). Port cities appear wealthier (solid, larger buildings, busy activity), villages closer to nature (simple, region-typical dwellings). The presentation creates a fitting atmosphere for each settlement and region.
 
 **Surroundings panorama (first-person).**
-The background of the first-person view plausibly matches the landscape one would see at this spot in the bird's-eye view: the real map terrain around the settlement's position is rendered as a distant panorama — mountains and ridges, river courses, lakes and the sea appear where they actually lie, in their biome colors, with exaggerated relief so they read at person scale. Distant wildlife in the panorama remains an open item.
+The background of the first-person view plausibly matches the landscape one would see at this spot in the bird's-eye view: the real map terrain around the settlement's position is rendered as a distant panorama — mountains and ridges, river courses, lakes and the sea appear where they actually lie, in their biome colors, with exaggerated relief so they read at person scale. Distant wildlife moves through the panorama: far-off, region-typical animals (elephants, giraffes, zebras in the savanna; antelope near the desert) drift slowly as silhouettes beyond the settlement edge.
 
 **Lively, densely built settlements (first-person).**
 Settlements do not read as a sparse cluster of a few functional buildings but as believably inhabited communities. The presentation effort inside settlements is considerably higher:

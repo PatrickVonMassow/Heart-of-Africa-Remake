@@ -104,6 +104,20 @@ body,
   cursor: pointer;
 }
 
+/* Orientation markers over the enterable buildings (design.md §17). */
+.building-highlight {
+  color: var(--hud-accent);
+  font-size: 22px;
+  text-shadow: 0 0 6px rgba(224, 176, 80, 0.9);
+  animation: highlight-bob 1.1s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes highlight-bob {
+  from { transform: translateY(-4px); }
+  to { transform: translateY(4px); }
+}
+
 /* Tabular load menu (design.md §18): one row per port visit. */
 .load-menu {
   border-collapse: collapse;

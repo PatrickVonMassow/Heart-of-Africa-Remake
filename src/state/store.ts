@@ -125,6 +125,8 @@ export interface GameState {
   landmarksSeen: string[]
   /** Villages that already reacted to a visibly carried valuable (§8). */
   valuableShown: Record<string, boolean>
+  /** Settlements whose buildings are highlighted after a gift (§17). */
+  orientationGiven: Record<string, boolean>
   handItem: HandId | null
   journal: JournalEntry[]
   journalOpen: boolean
@@ -378,6 +380,7 @@ function startState(seed: number) {
     pendingBounties: [] as Array<{ kind: 'village' | 'landmark'; id: string }>,
     landmarksSeen: [] as string[],
     valuableShown: {} as Record<string, boolean>,
+    orientationGiven: {} as Record<string, boolean>,
     handItem: null as HandId | null,
     journal: [
       { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
@@ -1154,6 +1157,15 @@ export const useGame = create<GameState>()((set, get) => ({
     const reveredGiven = { ...s.reveredGiftGiven, [place.id]: (s.reveredGiftGiven[place.id] ?? false) || revered }
     set({ gifts, goodwill: { ...s.goodwill, [place.id]: newGw }, reveredGiftGiven: reveredGiven })
 
+    // A gift to a native provides orientation over the settlement (§17):
+    // from now on the enterable buildings are highlighted here.
+    if (!s.orientationGiven[place.id]) {
+      set({
+        orientationGiven: { ...get().orientationGiven, [place.id]: true },
+        toast: getStrings().toasts.orientationGained,
+      })
+    }
+
     // Repeated correct satisfaction bestows "Honored Friend" for the whole
     // region (design.md §12) — unless it was forfeited by a robbery.
     if (
@@ -1458,6 +1470,7 @@ export const useGame = create<GameState>()((set, get) => ({
       explored: s.explored,
       treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
       pendingBounties: s.pendingBounties, landmarksSeen: s.landmarksSeen, valuableShown: s.valuableShown,
+      orientationGiven: s.orientationGiven,
       honoredFriend: s.honoredFriend, friendForfeited: s.friendForfeited, regionRobbed: s.regionRobbed,
       hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
@@ -1503,6 +1516,7 @@ export const useGame = create<GameState>()((set, get) => ({
         pendingBounties: snap.pendingBounties ?? [],
         landmarksSeen: snap.landmarksSeen ?? [],
         valuableShown: snap.valuableShown ?? {},
+        orientationGiven: snap.orientationGiven ?? {},
         honoredFriend: snap.honoredFriend ?? {},
         friendForfeited: snap.friendForfeited ?? {},
         regionRobbed: snap.regionRobbed ?? {},

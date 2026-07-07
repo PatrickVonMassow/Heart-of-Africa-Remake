@@ -148,6 +148,8 @@ export interface Strings {
     campNeedsFriend: string
     /** Position query (design.md §17), e.g. via P or the gamepad. */
     positionReport(coords: string, region: string): string
+    /** A gift unlocked the settlement orientation (design.md §17). */
+    orientationGained: string
   }
 
   dialogs: {

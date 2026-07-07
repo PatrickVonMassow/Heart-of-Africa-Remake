@@ -11,7 +11,7 @@ import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
 import { useUi, type BuildingType } from '../../state/ui'
 import { balance } from '../../config/balance'
-import { placeById } from '../../world/geo'
+import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { mulberry32 } from '../../world/noise'
 import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/input'
@@ -19,6 +19,7 @@ import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial } from '../../render/materials'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
@@ -1215,6 +1216,88 @@ function GroundScatter({
   )
 }
 
+// --- Distant panorama wildlife (design.md §2) -----------------------------------
+
+/**
+ * Far-off animals drifting through the surroundings panorama: dark, slightly
+ * oversized silhouettes on the backdrop ring so they read at person scale.
+ */
+function PanoramaWildlife({
+  region,
+  placeId,
+  seed,
+  innerRadius,
+}: {
+  region: RegionId
+  placeId: string
+  seed: number
+  innerRadius: number
+}) {
+  const geos = useMemo(() => {
+    // Region-typical species: the desert north shows antelope (oryx), the
+    // rest a savanna mix; giraffes stay out of the deep forest.
+    if (region === 'north') return [buildAntelope()]
+    if (region === 'central') return [buildElephant(), buildAntelope()]
+    return [buildElephant(), buildGiraffe(), buildZebra()]
+  }, [region])
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#4d4639', roughness: 1 }),
+    [],
+  )
+  const items = useMemo(() => {
+    let hash = 0
+    for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
+    const rand = mulberry32(((seed ^ hash) + 0x5eed) >>> 0)
+    return Array.from({ length: 5 }, (_, i) => ({
+      angle: rand() * Math.PI * 2,
+      radius: innerRadius + 14 + rand() * 14,
+      scale: 2.6 + rand() * 1.6,
+      drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
+      geo: geos[i % geos.length],
+      phase: rand() * Math.PI * 2,
+    }))
+  }, [placeId, seed, innerRadius, geos])
+  const refs = useRef<Array<THREE.Group | null>>([])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placePanoramaWildlife = items.length
+    return () => {
+      delete w.__placePanoramaWildlife
+    }
+  }, [items])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    items.forEach((it, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      const a = it.angle + t * it.drift
+      g.position.set(Math.cos(a) * it.radius, 0, Math.sin(a) * it.radius)
+      // Face the drift direction along the ring tangent; gentle walk bob.
+      g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
+      g.position.y = Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12
+    })
+  })
+
+  return (
+    <>
+      {items.map((it, i) => (
+        <group
+          key={i}
+          scale={it.scale}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          <mesh geometry={it.geo} material={material} />
+        </group>
+      ))}
+    </>
+  )
+}
+
 // --- Landscape backdrop --------------------------------------------------------
 
 /**
@@ -1295,6 +1378,7 @@ export function PlaceScene() {
   const gl = useThree((s) => s.gl)
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
+  const orientationGiven = useGame((s) => s.orientationGiven)
   const setPrompt = useUi((s) => s.setPrompt)
   const setDialog = useUi((s) => s.setDialog)
 
@@ -1491,6 +1575,7 @@ export function PlaceScene() {
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
       <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} />
 
       {/* Ground disc with procedural mottling */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
@@ -1506,6 +1591,17 @@ export function PlaceScene() {
           <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={interactiveLabel(getStrings(), 'chief')} mats={mats} style={style} chief />
         )
       })}
+
+      {/* Orientation after a gift (design.md §17): the important, enterable
+          buildings carry a pulsing marker. */}
+      {orientationGiven[place.id] &&
+        layout.interactives
+          .filter((it) => it.type !== 'exit' && it.type !== 'villager')
+          .map((it, i) => (
+            <Html key={`hl-${i}`} center position={[it.pos[0], isPort ? 5.4 : 5.6, it.pos[1]]} distanceFactor={40}>
+              <div className="building-highlight">▼</div>
+            </Html>
+          ))}
 
       {/* Non-enterable dwellings and outbuildings (design.md §2 lively settlements) */}
       {layout.dwellings.map((d, i) => (

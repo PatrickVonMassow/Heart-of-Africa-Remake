@@ -540,6 +540,18 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     stick travel movement, right-stick turning in the first-person
     view, the A-button interaction and Y-button journal toggle, and
     the position-query toast in both languages.
+31. **Settlement orientation and panorama wildlife.** Two `design.md`
+    §17/§2 polish features hold: after the first accepted gift in a
+    settlement the natives provide orientation — the important,
+    enterable buildings carry a pulsing marker from then on (persisted
+    per settlement, announced by a localized toast); and distant
+    wildlife moves through the first-person surroundings panorama —
+    region-typical, slowly drifting silhouettes (elephants, giraffes,
+    zebras in the savanna; antelope near the desert) beyond the
+    settlement edge. Verifiable: `scripts/verify/polish.mjs` asserts no
+    markers before and markers after the gift plus the toast, their
+    persistence across re-entry, and the panorama wildlife count via
+    the dev hook, with a screenshot of the highlighted village.
 
 ### 7.2 Self-Verification (mandatory)
 

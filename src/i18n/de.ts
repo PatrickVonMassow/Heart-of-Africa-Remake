@@ -231,6 +231,7 @@ export const de: Strings = {
     campPitched: 'Lager aufgeschlagen — ein X auf meiner Karte markiert die Stelle.',
     campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
     positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} — Region ${region}.`,
+    orientationGained: 'Zum Dank für die Gabe zeigt man mir die wichtigen Gebäude.',
   },
 
   dialogs: {
