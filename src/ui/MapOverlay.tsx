@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useGame, exploreCellKey, EXPLORE_CELL_DEG } from '../state/store'
 import { useUi } from '../state/ui'
-import { PLACES, REGION_BORDERS, regionAt, worldToLatLon, type RegionId } from '../world/geo'
+import { PLACES, REGION_BORDERS, regionAt, regionBorderLabelAnchors, worldToLatLon, type RegionId } from '../world/geo'
 import { useStrings } from '../i18n'
 import { LAND_POLYGONS } from '../world/data/coastline'
 import { RIVERS_DATA } from '../world/data/rivers'
@@ -162,6 +162,19 @@ export function MapOverlay() {
       }
     }
     ctx.setLineDash([])
+    ctx.globalAlpha = 1
+
+    // Region names on both sides of the borders (design.md §3).
+    ctx.font = 'italic 11px Georgia, serif'
+    ctx.fillStyle = INK
+    ctx.textAlign = 'center'
+    ctx.globalAlpha = 0.55
+    for (const a of regionBorderLabelAnchors(16, 1.7)) {
+      if (cellAt(a.lat, a.lon) === CELL_OCEAN) continue
+      const [x, y] = project(a.lon, a.lat)
+      ctx.fillText(t.regions[a.region].toUpperCase(), x, y + 3)
+    }
+    ctx.textAlign = 'left'
     ctx.globalAlpha = 1
 
     // Visited places with symbol and name.

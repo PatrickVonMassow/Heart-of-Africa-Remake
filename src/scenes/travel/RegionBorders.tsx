@@ -1,11 +1,15 @@
 // Region borders in the bird's-eye view (design.md §3): the boundaries of the
-// five regions rendered as dashed ribbons draped over the terrain, land only.
+// five regions rendered as dashed ribbons draped over the terrain, land only,
+// with the region's name shown on its side of the line.
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
-import { REGION_BORDERS, latLonToWorld } from '../../world/geo'
+import { REGION_BORDERS, latLonToWorld, regionBorderLabelAnchors } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
+import { useStrings } from '../../i18n'
 
 const STEP_DEG = 0.1 // sampling step along a border line (1 world unit)
 const DASH_ON = 4 // samples drawn per dash
@@ -60,6 +64,52 @@ function buildBorderGeometry(seed: number): THREE.BufferGeometry {
   return geo
 }
 
+const LABEL_SPACING_DEG = 4
+const LABEL_OFFSET_DEG = 0.9
+const LABEL_VIEW_RADIUS = 55 // world units around the player
+
+interface BorderLabel {
+  x: number
+  y: number
+  z: number
+  region: 'north' | 'west' | 'central' | 'east' | 'south'
+  key: string
+}
+
+/** Region names on both sides of the borders, only near the player. */
+function BorderLabels({ seed }: { seed: number }) {
+  const t = useStrings()
+  const anchors = useMemo<BorderLabel[]>(
+    () =>
+      regionBorderLabelAnchors(LABEL_SPACING_DEG, LABEL_OFFSET_DEG)
+        .map((a, i) => {
+          const s = sampleTerrain(a.lat, a.lon, seed)
+          if (s.height <= 0.05) return null // land only, like the border ribbons
+          const w = latLonToWorld(a.lat, a.lon)
+          return { x: w.x, y: s.height + 1.2, z: w.z, region: a.region, key: `${i}` }
+        })
+        .filter((a): a is BorderLabel => a !== null),
+    [seed],
+  )
+  const [visible, setVisible] = useState<BorderLabel[]>([])
+  useFrame(() => {
+    const pos = useGame.getState().pos
+    const near = anchors.filter((a) => Math.hypot(a.x - pos.x, a.z - pos.z) < LABEL_VIEW_RADIUS)
+    if (near.length !== visible.length || near.some((a, i) => a.key !== visible[i]?.key)) {
+      setVisible(near)
+    }
+  })
+  return (
+    <>
+      {visible.map((a) => (
+        <Html key={a.key} center position={[a.x, a.y, a.z]} distanceFactor={30} zIndexRange={[3, 0]}>
+          <div className="region-label">{t.regions[a.region]}</div>
+        </Html>
+      ))}
+    </>
+  )
+}
+
 export function RegionBorders() {
   const seed = useGame((s) => s.seed)
   const geometry = useMemo(() => buildBorderGeometry(seed), [seed])
@@ -76,5 +126,10 @@ export function RegionBorders() {
   )
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
-  return <mesh geometry={geometry} material={material} renderOrder={1} />
+  return (
+    <>
+      <mesh geometry={geometry} material={material} renderOrder={1} />
+      <BorderLabels seed={seed} />
+    </>
+  )
 }

@@ -71,6 +71,43 @@ export const REGION_BORDERS: Array<Array<[number, number]>> = [
   [[12, -12], [12, 7.5], [31.5, 7.5]],
 ]
 
+/**
+ * Label anchors on both sides of every region border (design.md §3: the
+ * region's name is shown on its side of the boundary). Anchors are spaced
+ * `spacingDeg` along the border and offset `offsetDeg` perpendicular to it;
+ * renderers clip them to land themselves.
+ */
+export function regionBorderLabelAnchors(
+  spacingDeg: number,
+  offsetDeg: number,
+): Array<{ lat: number; lon: number; region: RegionId }> {
+  const out: Array<{ lat: number; lon: number; region: RegionId }> = []
+  for (const line of REGION_BORDERS) {
+    let ahead = spacingDeg / 2 // distance to the next anchor
+    for (let s = 0; s < line.length - 1; s++) {
+      const [lon0, lat0] = line[s]
+      const [lon1, lat1] = line[s + 1]
+      const segLen = Math.hypot(lon1 - lon0, lat1 - lat0)
+      const pLon = -(lat1 - lat0) / segLen
+      const pLat = (lon1 - lon0) / segLen
+      let d = ahead
+      while (d < segLen) {
+        const t = d / segLen
+        const lon = lon0 + (lon1 - lon0) * t
+        const lat = lat0 + (lat1 - lat0) * t
+        for (const side of [1, -1]) {
+          const oLon = lon + pLon * offsetDeg * side
+          const oLat = lat + pLat * offsetDeg * side
+          out.push({ lat: oLat, lon: oLon, region: regionAt(oLat, oLon) })
+        }
+        d += spacingDeg
+      }
+      ahead = d - segLen
+    }
+  }
+  return out
+}
+
 export type PlaceKind = 'port' | 'village'
 
 export interface PlaceDef {
