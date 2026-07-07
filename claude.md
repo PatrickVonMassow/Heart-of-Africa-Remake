@@ -282,11 +282,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     language files carry the emotional voice markup (`design.md` §15); the
     UI never shows a marker; in the English version every journal entry can
     be read aloud via the in-browser Kokoro TTS, with the markup audibly
-    shaping the delivery (pauses, pace, loudness, punctuation). Verifiable:
-    spot check of both language files for markers; journal screenshot free
-    of visible tags; starting narration produces audio without console
-    errors. German read-aloud stays an open item until a German-capable
-    voice exists.
+    shaping the delivery (pauses, pace, loudness, punctuation). A newly
+    appearing entry starts its narration automatically, without a click
+    (silently skipped while the browser's autoplay policy blocks audio).
+    Verifiable: spot check of both language files for markers; journal
+    screenshot free of visible tags; starting narration produces audio
+    without console errors; adding an entry switches its read-aloud control
+    into the speaking state without a click. German read-aloud stays an
+    open item until a German-capable voice exists.
 
 ### 7.2 Self-Verification (mandatory)
 

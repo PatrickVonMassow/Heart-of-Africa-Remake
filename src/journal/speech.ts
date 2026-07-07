@@ -115,6 +115,9 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   if (run.cancelled) return
   if (!ctx) ctx = new AudioContext()
   if (ctx.state === 'suspended') await ctx.resume()
+  // Still suspended: the browser's autoplay policy blocks audio until the
+  // first user gesture — abort instead of "playing" into a stalled context.
+  if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')
 
   // Lookahead of one: synthesize the next segment while the current plays.
   let playing: Promise<void> = Promise.resolve()

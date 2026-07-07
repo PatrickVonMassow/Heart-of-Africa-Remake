@@ -2,8 +2,9 @@
 // Entries are stored as language-neutral text references and rendered in the
 // currently selected language (design.md §17). Bodies carry the emotional
 // voice markup; it is stripped for display and drives the read-aloud
-// (English only — Kokoro has no German voice yet). POC simplification: plain
-// text; the animated handwriting of design.md §16 is out of POC scope.
+// (English only — Kokoro has no German voice yet). New entries are narrated
+// automatically; the per-entry control replays or stops. POC simplification:
+// plain text; the animated handwriting of design.md §16 is out of POC scope.
 
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../state/store'
@@ -37,14 +38,7 @@ export function JournalPanel() {
     return stopSpeech
   }, [open])
 
-  if (!open) return null
-
-  const speakEntry = (entryId: number, title: string, text: string) => {
-    if (speech?.entryId === entryId) {
-      stopSpeech()
-      setSpeech(null)
-      return
-    }
+  const startSpeech = (entryId: number, title: string, text: string, quiet = false) => {
     setSpeech({ entryId, status: 'loading' })
     const segments = [
       { text: stripVoiceMarkup(title), speed: 1, volume: 1, pauseAfter: 0.6 },
@@ -53,9 +47,35 @@ export function JournalPanel() {
     speakSegments(segments, () => setSpeech({ entryId, status: 'speaking' }))
       .then(() => setSpeech((s) => (s?.entryId === entryId ? null : s)))
       .catch(() => {
-        setToast(t.journalPanel.voiceError)
+        // Quiet mode: auto-narration failures (e.g. autoplay policy before
+        // the first user gesture) must not surface as an error toast.
+        if (!quiet) setToast(t.journalPanel.voiceError)
         setSpeech((s) => (s?.entryId === entryId ? null : s))
       })
+  }
+
+  // Auto-narration (design.md §15): a newly appearing entry is read aloud
+  // without requiring a click, when the language has a voice.
+  const prevCount = useRef(journal.length)
+  useEffect(() => {
+    const prev = prevCount.current
+    prevCount.current = journal.length
+    if (journal.length <= prev || !speechAvailable(t.lang)) return
+    const e = journal[journal.length - 1]
+    startSpeech(e.id, resolveText(t, e.title), resolveText(t, e.text), true)
+    // startSpeech is recreated per render; the entry count is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journal, t])
+
+  if (!open) return null
+
+  const speakEntry = (entryId: number, title: string, text: string) => {
+    if (speech?.entryId === entryId) {
+      stopSpeech()
+      setSpeech(null)
+      return
+    }
+    startSpeech(entryId, title, text)
   }
 
   return (
