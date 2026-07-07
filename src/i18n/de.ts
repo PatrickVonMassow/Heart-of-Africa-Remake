@@ -234,7 +234,7 @@ export const de: Strings = {
     randomEvents: 'Zufallsereignisse (POC: keine implementiert)',
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
-    wheelZoom: 'Mausrad-Zoom (Vogelperspektive)',
+    wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',
     cash: 'Kontostand ($)',
     foodDays: 'Nahrung (Tage)',

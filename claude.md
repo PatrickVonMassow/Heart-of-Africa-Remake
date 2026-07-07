@@ -332,9 +332,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     (wind/surf/murmur) and their gust/swell modulation each play at a 0.2
     volume multiplier. Mouse sensitivity, walk speed and both ambience
     volumes are adjustable at runtime in the debug menu (`design.md` §21)
-    in both languages; the debug menu additionally offers the mouse-wheel
-    zoom unlock for the bird's-eye view, dropdown selectors for jump-to/
-    equipment/gifts, a read-only display of the active render backend, and
+    in both languages; the bird's-eye mouse-wheel zoom is always active
+    (0.25x-4x), with a debug checkbox gating zoom-out beyond the default
+    distance (without it, zoom-out stops at factor 1; disabling clamps a
+    wider view back); the debug menu additionally offers dropdown selectors
+    for jump-to/equipment/gifts, a read-only display of the active render
+    backend, and
     the journal do-not-disturb option (`design.md` §16; also toggled with
     F2) under which new entries neither open the journal nor auto-narrate
     but stay readable on manual open.

@@ -224,22 +224,36 @@ check(
   jumped ? `pos (${jumped.x.toFixed(1)}, ${jumped.z.toFixed(1)})` : 'select not found',
 )
 
-// Wheel zoom: locked without the unlock, active with it.
+// Wheel zoom: zoom-in always works; zoom-out beyond default needs the unlock.
 const zoom = await page.evaluate(async () => {
   const ui = window.__ui
   ui.getState().setWheelZoomEnabled(false)
+  ui.getState().setTravelZoom(1)
   window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 }))
-  await new Promise((r) => setTimeout(r, 100))
-  const locked = ui.getState().travelZoom
+  await new Promise((r) => setTimeout(r, 80))
+  const zoomedIn = ui.getState().travelZoom
+  ui.getState().setTravelZoom(1)
+  window.dispatchEvent(new WheelEvent('wheel', { deltaY: 600 }))
+  await new Promise((r) => setTimeout(r, 80))
+  const gated = ui.getState().travelZoom
   ui.getState().setWheelZoomEnabled(true)
-  window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 }))
-  await new Promise((r) => setTimeout(r, 100))
-  const unlocked = ui.getState().travelZoom
+  window.dispatchEvent(new WheelEvent('wheel', { deltaY: 600 }))
+  await new Promise((r) => setTimeout(r, 80))
+  const wide = ui.getState().travelZoom
+  ui.getState().setTravelZoom(10)
+  const maxOut = ui.getState().travelZoom
+  ui.getState().setTravelZoom(0.01)
+  const maxIn = ui.getState().travelZoom
+  ui.getState().setTravelZoom(3)
   ui.getState().setWheelZoomEnabled(false)
-  return { locked, unlocked }
+  const clamped = ui.getState().travelZoom
+  return { zoomedIn, gated, wide, maxOut, maxIn, clamped }
 })
-check('Wheel zoom: inactive without the debug unlock', zoom.locked === 1, `${zoom.locked}`)
-check('Wheel zoom: zooms once unlocked', zoom.unlocked < 1, `${zoom.unlocked.toFixed(2)}`)
+check('Wheel zoom: zooming in works without the unlock', zoom.zoomedIn < 1, `${zoom.zoomedIn.toFixed(2)}`)
+check('Wheel zoom: zoom-out gated at the default level', zoom.gated === 1, `${zoom.gated}`)
+check('Wheel zoom: zooms out beyond default once unlocked', zoom.wide > 1, `${zoom.wide.toFixed(2)}`)
+check('Wheel zoom: range spans 0.25x-4x', zoom.maxOut === 4 && zoom.maxIn === 0.25, `${zoom.maxIn}-${zoom.maxOut}`)
+check('Wheel zoom: disabling the unlock clamps back to default', zoom.clamped === 1, `${zoom.clamped}`)
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 
 // --- Journal do-not-disturb (§7.1.20 / design.md §16) -------------------------

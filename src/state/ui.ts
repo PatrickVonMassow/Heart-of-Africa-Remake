@@ -22,7 +22,10 @@ interface UiState {
   webglWarningDismissed: boolean
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
-  /** Mouse-wheel zoom in the bird's-eye view; unlocked in the debug menu. */
+  /**
+   * Debug unlock (design.md §21): allow zooming *out* beyond the default
+   * camera distance. Zooming in is always available.
+   */
   wheelZoomEnabled: boolean
   /**
    * Do not disturb (design.md §16/§21, F2): new journal entries neither
@@ -61,10 +64,14 @@ export const useUi = create<UiState>()((set) => ({
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
-  // Disabling the unlock also resets the zoom to the default distance.
+  // Disabling the unlock clamps any zoom-out back to the default distance;
+  // a zoomed-in view is kept.
   setWheelZoomEnabled: (wheelZoomEnabled) =>
-    set(wheelZoomEnabled ? { wheelZoomEnabled } : { wheelZoomEnabled, travelZoom: 1 }),
-  setTravelZoom: (travelZoom) => set({ travelZoom: Math.min(2.5, Math.max(0.4, travelZoom)) }),
+    set((s) => ({ wheelZoomEnabled, travelZoom: wheelZoomEnabled ? s.travelZoom : Math.min(1, s.travelZoom) })),
+  // Zooming in is always available; zooming out beyond the default camera
+  // distance (factor 1) requires the debug unlock (design.md §21).
+  setTravelZoom: (travelZoom) =>
+    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 4 : 1, Math.max(0.25, travelZoom)) })),
   setJournalDnd: (journalDnd) => set({ journalDnd }),
 }))
 

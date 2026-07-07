@@ -235,7 +235,7 @@ export const en: Strings = {
     randomEvents: 'Random events (POC: none implemented)',
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
-    wheelZoom: "Mouse-wheel zoom (bird's-eye view)",
+    wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",
     cash: 'Funds ($)',
     foodDays: 'Food (days)',

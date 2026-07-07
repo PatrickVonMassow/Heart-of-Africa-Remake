@@ -826,11 +826,12 @@ export function TravelScene() {
     camera.lookAt(pos.x, 0, pos.z)
   }, [camera])
 
-  // Mouse-wheel zoom, unlocked via the debug menu (design.md §21).
+  // Mouse-wheel zoom (design.md §21): always available; zooming out beyond
+  // the default distance requires the debug unlock (clamped in setTravelZoom).
   useEffect(() => {
     const onWheel = (e: WheelEvent) => {
       const ui = useUi.getState()
-      if (!ui.wheelZoomEnabled || ui.dialog) return
+      if (ui.dialog) return
       ui.setTravelZoom(ui.travelZoom * Math.exp(e.deltaY * 0.0009))
     }
     window.addEventListener('wheel', onWheel, { passive: true })
