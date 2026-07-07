@@ -694,6 +694,36 @@ function LandmarkLabels() {
   )
 }
 
+/** Free camps (design.md §6): an X of lashed poles marks each pitched camp. */
+function CampMarkers() {
+  const t = useStrings()
+  const camps = useGame((s) => s.freeCamps)
+  const seed = useGame((s) => s.seed)
+  return (
+    <>
+      {camps.map((c) => {
+        const p = latLonToWorld(c.lat, c.lon)
+        const y = Math.max(0.2, sampleTerrain(c.lat, c.lon, seed).height)
+        return (
+          <group key={c.id} position={[p.x, y + 0.4, p.z]}>
+            <mesh rotation={[0, 0, Math.PI / 4]} castShadow>
+              <cylinderGeometry args={[0.09, 0.09, 2.0, 6]} />
+              <meshStandardMaterial color="#7c5a34" roughness={0.95} />
+            </mesh>
+            <mesh rotation={[0, 0, -Math.PI / 4]} castShadow>
+              <cylinderGeometry args={[0.09, 0.09, 2.0, 6]} />
+              <meshStandardMaterial color="#7c5a34" roughness={0.95} />
+            </mesh>
+            <Html center position={[0, 1.5, 0]} distanceFactor={60}>
+              <div className="map-label">{t.labels.camp}</div>
+            </Html>
+          </group>
+        )
+      })}
+    </>
+  )
+}
+
 /** Debug-only marker for the hidden grave position. */
 function GraveMarker() {
   const t = useStrings()
@@ -882,11 +912,17 @@ export function TravelScene() {
     }
     nearPlaceRef.current = near
     const strings = getStrings()
+    const ll = worldToLatLon(pos.x, pos.z)
+    const nearCamp = s.freeCamps.some(
+      (c) => !c.looted && Math.hypot(c.lat - ll.lat, c.lon - ll.lon) <= balance.camps.campRadiusDeg,
+    )
     const prompt = near
       ? strings.prompts.enterPlace(strings.places[near.id])
-      : s.handItem === 'shovel'
-        ? strings.prompts.digHere
-        : null
+      : nearCamp
+        ? strings.prompts.openCamp
+        : s.handItem === 'shovel'
+          ? strings.prompts.digHere
+          : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 
@@ -906,6 +942,7 @@ export function TravelScene() {
         <PlaceMarker key={p.id} place={p} />
       ))}
       <LandmarkLabels />
+      <CampMarkers />
       <GraveMarker />
       <Player />
     </>

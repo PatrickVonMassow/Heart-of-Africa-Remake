@@ -79,6 +79,8 @@ export interface Strings {
     enterPlace(name: string): string
     digHere: string
     interact(label: string): string
+    /** Near a pitched camp (design.md §6). */
+    openCamp: string
   }
 
   labels: {
@@ -86,6 +88,8 @@ export interface Strings {
     oldMan: string
     leavePlace: string
     graveDebug: string
+    /** Marker label of a pitched free camp (design.md §6). */
+    camp: string
   }
 
   journalPanel: {
@@ -128,6 +132,9 @@ export interface Strings {
     villagersFlee: string
     chiefHostile: string
     regionShunned: string
+    /** Camps (design.md §6). */
+    campPitched: string
+    campNeedsFriend: string
   }
 
   dialogs: {
@@ -160,6 +167,16 @@ export interface Strings {
     agencyGreeting: string
     passage(dest: string, days: number): string
     book: string
+    /** Camp caches (design.md §6). */
+    campTitle: string
+    villageCampTitle: string
+    campHint: string
+    villageCampHint: string
+    campPack: string
+    campContents: string
+    campEmpty: string
+    campStore: string
+    campTake: string
   }
 
   overlays: {
@@ -254,6 +271,7 @@ export interface Strings {
       rescue: string
       friendSupplies: string
       robberyCommitted: string
+      campLooted: string
     }
     start: string
     regionEntry(p: TextParams): string
@@ -310,5 +328,7 @@ export interface Strings {
     friendSupplies(p: TextParams): string
     /** A hut robbery at rifle point (design.md §12). */
     robberyCommitted(p: TextParams): string
+    /** A looted free camp, discovered on return (design.md §6). */
+    campLooted: string
   }
 }

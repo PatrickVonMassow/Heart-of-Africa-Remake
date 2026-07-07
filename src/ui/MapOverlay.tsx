@@ -56,6 +56,7 @@ export function MapOverlay() {
   const open = useUi((s) => s.mapOpen)
   const explored = useGame((s) => s.explored)
   const visitedPlaces = useGame((s) => s.visitedPlaces)
+  const freeCamps = useGame((s) => s.freeCamps)
   const pos = useGame((s) => s.pos)
   const region = useGame((s) => s.region)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -199,6 +200,21 @@ export function MapOverlay() {
       ctx.fillText(t.places[place.id], x + 6, y + 3)
     }
 
+    // Free camps (design.md §6): each pitched camp is marked with an X.
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 1.6
+    ctx.globalAlpha = 0.9
+    for (const camp of freeCamps) {
+      const [x, y] = project(camp.lon, camp.lat)
+      ctx.beginPath()
+      ctx.moveTo(x - 4, y - 4)
+      ctx.lineTo(x + 4, y + 4)
+      ctx.moveTo(x + 4, y - 4)
+      ctx.lineTo(x - 4, y + 4)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+
     // Current position: red ink cross.
     const ll = worldToLatLon(pos.x, pos.z)
     const [px, py] = project(ll.lon, ll.lat)
@@ -230,7 +246,7 @@ export function MapOverlay() {
     ctx.stroke()
     ctx.fillText('N', cx - 4, cy - 20)
     ctx.globalAlpha = 1
-  }, [open, explored, visitedPlaces, pos, t])
+  }, [open, explored, visitedPlaces, freeCamps, pos, t])
 
   if (!open) return null
   return (

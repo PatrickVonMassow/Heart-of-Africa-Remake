@@ -40,6 +40,35 @@ export function isEquipmentId(id: string): id is EquipmentId {
   return (EQUIPMENT_IDS as string[]).includes(id)
 }
 
+/** Item kinds movable between the pack and a camp cache (design.md §6). */
+export type ItemKind = 'equipment' | 'gift' | 'treasure'
+
+/** Contents of a camp cache (design.md §6). */
+export interface ItemBag {
+  equipment: Partial<Record<EquipmentId, number>>
+  gifts: Partial<Record<Material, number>>
+  treasures: Partial<Record<TreasureId, number>>
+}
+
+export function emptyBag(): ItemBag {
+  return { equipment: {}, gifts: {}, treasures: {} }
+}
+
+export function bagItemCount(bag: ItemBag): number {
+  const sum = (r: Partial<Record<string, number>>) => Object.values(r).reduce((a, b) => (a ?? 0) + (b ?? 0), 0) ?? 0
+  return sum(bag.equipment) + sum(bag.gifts) + sum(bag.treasures)
+}
+
+/** A free camp pitched in the open (design.md §6): X on the map, lootable. */
+export interface FreeCamp {
+  id: number
+  lat: number
+  lon: number
+  items: ItemBag
+  /** Looted camps reveal their fate when the traveler returns. */
+  looted: boolean
+}
+
 export interface JournalEntry {
   id: number
   /** In-game day index the entry was written. */
@@ -128,6 +157,10 @@ export interface GameState {
   hostileUntil: Record<string, number>
   /** Day of the last near-death aid delivery (§12), for the cooldown. */
   lastFriendAidDay: number
+  /** Free camps pitched in the open (design.md §6): lootable item caches. */
+  freeCamps: FreeCamp[]
+  /** Safe village caches per village id (design.md §6, needs Honored Friend). */
+  villageCamps: Record<string, ItemBag>
   /** Per region: the village whose people knows the location hint (§13.3). */
   knowingVillages: Record<RegionId, string>
   /** Regions whose knowing chief already gave his raw hint. */
@@ -167,6 +200,14 @@ export interface GameState {
   talkToVillager: () => void
   /** Rob the hut at rifle point (design.md §12) — permanent regional loss. */
   robVillage: () => void
+  /** Pitch a camp in the open, or reopen the one nearby (design.md §6). */
+  pitchOrOpenCamp: () => void
+  /** Open the village cache — requires "Honored Friend" (design.md §6). */
+  openVillageCamp: () => void
+  /** Move one item from the pack into the open camp dialog's cache. */
+  campStore: (kind: ItemKind, id: string) => void
+  /** Take one item back out of the cache (capacity permitting). */
+  campTake: (kind: ItemKind, id: string) => void
   /** Write the decoded version of a region's hint once language + hint meet. */
   revealDecoded: (region: RegionId) => void
   dig: () => void
@@ -316,6 +357,8 @@ function startState(seed: number) {
     regionRobbed: {} as Partial<Record<RegionId, boolean>>,
     hostileUntil: {} as Record<string, number>,
     lastFriendAidDay: -9999,
+    freeCamps: [] as FreeCamp[],
+    villageCamps: {} as Record<string, ItemBag>,
     knowingVillages: pickKnowingVillages(seed),
     hintsGiven: {} as Partial<Record<RegionId, boolean>>,
     decodedGiven: {} as Partial<Record<RegionId, boolean>>,
@@ -485,6 +528,29 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.foodOutWarned && newFood === 0) {
       set({ foodOutWarned: true })
       get().addEntry({ key: 'journal.titles.foodOut' }, { key: 'journal.foodOut' })
+    }
+
+    // Free camps (design.md §6): a stocked camp risks being looted while
+    // time passes; returning to a looted camp reveals the loss.
+    if (s.freeCamps.length > 0) {
+      let camps = get().freeCamps
+      let changed = false
+      camps = camps.map((c) => {
+        if (!c.looted && bagItemCount(c.items) > 0 && Math.random() < balance.camps.lootChancePerDay * dayDelta) {
+          changed = true
+          return { ...c, looted: true, items: emptyBag() }
+        }
+        return c
+      })
+      const found = camps.find(
+        (c) => c.looted && Math.hypot(c.lat - next.lat, c.lon - next.lon) <= balance.camps.campRadiusDeg,
+      )
+      if (found) {
+        camps = camps.filter((c) => c.id !== found.id)
+        changed = true
+        get().addEntry({ key: 'journal.titles.campLooted' }, { key: 'journal.campLooted' })
+      }
+      if (changed) set({ freeCamps: camps })
     }
 
     // Discovery bounty (design.md §10): sighting a landmark registers the
@@ -1162,12 +1228,106 @@ export const useGame = create<GameState>()((set, get) => ({
       honoredFriend: { ...s.honoredFriend, [region]: false },
       friendForfeited: { ...s.friendForfeited, [region]: true },
     })
+    // Village caches of the region are irretrievably lost (design.md §6).
+    const villageCamps = { ...s.villageCamps }
+    for (const p of PLACES) {
+      if (p.kind === 'village' && p.region === region) delete villageCamps[p.id]
+    }
+    set({ villageCamps })
     useUi.getState().setDialog(null)
     get().addEntry(
       { key: 'journal.titles.robberyCommitted' },
       { key: 'journal.robberyCommitted', params: { people: place.peopleId ?? place.id, region } },
     )
     get().leavePlace()
+  },
+
+  pitchOrOpenCamp: () => {
+    const s = get()
+    if (s.mode !== 'travel' || s.defeat || s.victory) return
+    const cur = worldToLatLon(s.pos.x, s.pos.z)
+    const near = s.freeCamps.find(
+      (c) => !c.looted && Math.hypot(c.lat - cur.lat, c.lon - cur.lon) <= balance.camps.campRadiusDeg,
+    )
+    if (near) {
+      useUi.getState().setDialog({ kind: 'camp', scope: 'free', campId: near.id })
+      return
+    }
+    const id = s.freeCamps.reduce((m, c) => Math.max(m, c.id), 0) + 1
+    set({
+      freeCamps: [...s.freeCamps, { id, lat: cur.lat, lon: cur.lon, items: emptyBag(), looted: false }],
+      toast: getStrings().toasts.campPitched,
+    })
+    useUi.getState().setDialog({ kind: 'camp', scope: 'free', campId: id })
+  },
+
+  openVillageCamp: () => {
+    const s = get()
+    if (s.mode !== 'place' || !s.placeId) return
+    const place = placeById(s.placeId)
+    if (place.kind !== 'village') return
+    if (s.regionRobbed[place.region]) {
+      set({ toast: getStrings().toasts.regionShunned })
+      return
+    }
+    // The safe village cache is a privilege of the Honored Friend (§6/§12).
+    if (!s.honoredFriend[place.region]) {
+      set({ toast: getStrings().toasts.campNeedsFriend })
+      return
+    }
+    useUi.getState().setDialog({ kind: 'camp', scope: 'village', placeId: place.id })
+  },
+
+  campStore: (kind, id) => {
+    const s = get()
+    const dialog = useUi.getState().dialog
+    if (!dialog || dialog.kind !== 'camp') return
+    const bag = campBagOf(s, dialog)
+    if (!bag) return
+    // Deduct one item from the pack; an emptied hand item is put away.
+    if (kind === 'equipment') {
+      const e = id as EquipmentId
+      if ((s.equipment[e] ?? 0) <= 0) return
+      set({
+        equipment: { ...s.equipment, [e]: (s.equipment[e] ?? 0) - 1 },
+        handItem: s.handItem === e && (s.equipment[e] ?? 0) === 1 ? null : s.handItem,
+      })
+    } else if (kind === 'gift') {
+      const m = id as Material
+      if (s.gifts[m] <= 0) return
+      set({ gifts: { ...s.gifts, [m]: s.gifts[m] - 1 } })
+    } else {
+      const t = id as TreasureId
+      if (s.treasures[t] <= 0) return
+      set({
+        treasures: { ...s.treasures, [t]: s.treasures[t] - 1 },
+        handItem: s.handItem === t && s.treasures[t] === 1 ? null : s.handItem,
+      })
+    }
+    writeCampBag(get, set, dialog, addToBag(bag, kind, id, 1))
+  },
+
+  campTake: (kind, id) => {
+    const s = get()
+    const dialog = useUi.getState().dialog
+    if (!dialog || dialog.kind !== 'camp') return
+    const bag = campBagOf(s, dialog)
+    if (!bag || bagCount(bag, kind, id) <= 0) return
+    if (usedInventory(s) >= balance.inventoryCapacity) {
+      set({ toast: getStrings().toasts.inventoryFull })
+      return
+    }
+    if (kind === 'equipment') {
+      const e = id as EquipmentId
+      set({ equipment: { ...s.equipment, [e]: (s.equipment[e] ?? 0) + 1 } })
+    } else if (kind === 'gift') {
+      const m = id as Material
+      set({ gifts: { ...s.gifts, [m]: s.gifts[m] + 1 } })
+    } else {
+      const t = id as TreasureId
+      set({ treasures: { ...s.treasures, [t]: s.treasures[t] + 1 } })
+    }
+    writeCampBag(get, set, dialog, addToBag(bag, kind, id, -1))
   },
 
   dig: () => {
@@ -1248,6 +1408,7 @@ export const useGame = create<GameState>()((set, get) => ({
       pendingBounties: s.pendingBounties, landmarksSeen: s.landmarksSeen, valuableShown: s.valuableShown,
       honoredFriend: s.honoredFriend, friendForfeited: s.friendForfeited, regionRobbed: s.regionRobbed,
       hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
+      freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       nextEntryId,
     }
     try {
@@ -1288,6 +1449,8 @@ export const useGame = create<GameState>()((set, get) => ({
         regionRobbed: snap.regionRobbed ?? {},
         hostileUntil: snap.hostileUntil ?? {},
         lastFriendAidDay: snap.lastFriendAidDay ?? -9999,
+        freeCamps: snap.freeCamps ?? [],
+        villageCamps: snap.villageCamps ?? {},
         defeat: null,
         deathCause: null,
         mode: 'place',
@@ -1386,6 +1549,54 @@ export function totalGifts(gifts: Record<Material, number>): number {
 export function handItemName(item: HandId): string {
   const t = getStrings()
   return isEquipmentId(item) ? t.equipment[item] : t.treasures[item]
+}
+
+// --- Camp cache helpers (design.md §6) --------------------------------------
+
+type CampDialogRef =
+  | { kind: 'camp'; scope: 'free'; campId: number }
+  | { kind: 'camp'; scope: 'village'; placeId: string }
+
+function campBagOf(
+  s: Pick<GameState, 'freeCamps' | 'villageCamps'>,
+  dialog: CampDialogRef,
+): ItemBag | null {
+  if (dialog.scope === 'free') return s.freeCamps.find((c) => c.id === dialog.campId)?.items ?? null
+  return s.villageCamps[dialog.placeId] ?? emptyBag()
+}
+
+function bagCount(bag: ItemBag, kind: ItemKind, id: string): number {
+  if (kind === 'equipment') return bag.equipment[id as EquipmentId] ?? 0
+  if (kind === 'gift') return bag.gifts[id as Material] ?? 0
+  return bag.treasures[id as TreasureId] ?? 0
+}
+
+function addToBag(bag: ItemBag, kind: ItemKind, id: string, delta: number): ItemBag {
+  const next: ItemBag = { equipment: { ...bag.equipment }, gifts: { ...bag.gifts }, treasures: { ...bag.treasures } }
+  if (kind === 'equipment') {
+    const e = id as EquipmentId
+    next.equipment[e] = Math.max(0, (next.equipment[e] ?? 0) + delta)
+  } else if (kind === 'gift') {
+    const m = id as Material
+    next.gifts[m] = Math.max(0, (next.gifts[m] ?? 0) + delta)
+  } else {
+    const t = id as TreasureId
+    next.treasures[t] = Math.max(0, (next.treasures[t] ?? 0) + delta)
+  }
+  return next
+}
+
+function writeCampBag(
+  get: () => GameState,
+  set: (p: Partial<GameState>) => void,
+  dialog: CampDialogRef,
+  bag: ItemBag,
+): void {
+  if (dialog.scope === 'free') {
+    set({ freeCamps: get().freeCamps.map((c) => (c.id === dialog.campId ? { ...c, items: bag } : c)) })
+  } else {
+    set({ villageCamps: { ...get().villageCamps, [dialog.placeId]: bag } })
+  }
 }
 
 /**

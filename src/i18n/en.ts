@@ -173,6 +173,7 @@ export const en: Strings = {
     enterPlace: (name) => `E — Enter ${name}`,
     digHere: 'G — Dig here',
     interact: (label) => `E — ${label}`,
+    openCamp: 'C — Open camp',
   },
 
   labels: {
@@ -180,6 +181,7 @@ export const en: Strings = {
     oldMan: 'Elder',
     leavePlace: 'Leave settlement',
     graveDebug: 'Grave (debug)',
+    camp: 'Camp',
   },
 
   journalPanel: {
@@ -218,6 +220,8 @@ export const en: Strings = {
     villagersFlee: 'The villagers flee at the sight of my rifle — no one will speak with me.',
     chiefHostile: 'The village has not forgotten my offense. The chief refuses to see me.',
     regionShunned: 'Word of my robbery has spread — no hut of this region will open to me again.',
+    campPitched: 'Camp pitched — an X on my map marks the spot.',
+    campNeedsFriend: 'Only an Honored Friend of this region may leave belongings in the village.',
   },
 
   dialogs: {
@@ -247,6 +251,15 @@ export const en: Strings = {
     agencyGreeting: '"Passages to every port of the continent — swift ships, honest fares."',
     passage: (dest, days) => `Passage to ${dest} (~${days} days)`,
     book: 'Book',
+    campTitle: 'Camp',
+    villageCampTitle: 'Village Cache',
+    campHint: 'Anything left here lightens the pack — but an unguarded camp may be looted.',
+    villageCampHint: 'The villagers guard these belongings as their own. Nothing stored here is ever lost.',
+    campPack: 'In my pack:',
+    campContents: 'Stored here:',
+    campEmpty: 'Nothing is stored here.',
+    campStore: 'Store',
+    campTake: 'Take',
   },
 
   overlays: {
@@ -346,6 +359,7 @@ export const en: Strings = {
       rescue: 'Saved by the Villagers',
       friendSupplies: 'Guests of the Region',
       robberyCommitted: 'A Deed Beyond Forgiving',
+      campLooted: 'The Looted Camp',
     },
     start:
       'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
@@ -505,5 +519,7 @@ export const en: Strings = {
       `In the village of the ${PEOPLES[p.people as string]} I was received like family: [excited]they filled my packs with provisions and pressed medicine into my hands,[/excited] and no one would hear of payment. [pause][somber]The friendship of this region is my safest possession.[/somber]`,
     robberyCommitted: (p: TextParams) =>
       `[somber]I have done a thing that cannot be undone.[/somber] [fear]With the rifle raised I emptied the hut of the ${PEOPLES[p.people as string]} and fled the village.[/fear] [breath][weary]Behind me: screams, and a silence worse than the screams.[pause] No hut of this region will ever open to me again.[/weary]`,
+    campLooted:
+      '[somber]I found my camp torn apart —[pause] the poles thrown down, the ground churned by strange feet.[/somber] [weary]Everything I had left behind is gone.[/weary] [fear]Nothing in this wilderness is safe that is not carried or guarded.[/fear]',
   },
 }

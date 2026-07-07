@@ -231,6 +231,14 @@ export function Hud() {
       ].filter((x): x is string => x !== null)
       g.setToast(st.health.report(state, list))
     })
+    // C: camps (design.md §6/§17) — pitch/open a free camp while travelling,
+    // open the village cache inside villages (Honored Friend privilege).
+    const offC = onKeyPress('KeyC', () => {
+      if (useUi.getState().dialog) return
+      const g = useGame.getState()
+      if (g.mode === 'travel') g.pitchOrOpenCamp()
+      else g.openVillageCamp()
+    })
     // F2 toggles the journal do-not-disturb option (design.md §16/§21).
     const offF2 = onKeyPress('F2', () => {
       const ui = useUi.getState()
@@ -254,6 +262,7 @@ export function Hud() {
       offF1()
       offF2()
       offH()
+      offC()
       offEsc()
       window.removeEventListener('keydown', preventF1)
     }

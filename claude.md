@@ -474,6 +474,25 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     once), the capped attack outcomes with rescue entries, the
     near-death aid, the free village supplies, and the permanent
     robbery consequences including the forfeited friendship.
+27. **Camps (item caches).** `design.md` §6/§17 is implemented: in the
+    bird's-eye view a free camp can be pitched anywhere in the open (C;
+    a nearby existing camp is reopened instead) holding any number of
+    inventory items — equipment, gifts and treasures move between pack
+    and cache (taking back respects the inventory capacity; an emptied
+    hand item is put away, which covers leaving the canoe behind). Each
+    free camp is marked with an X on the exploration map and a pole
+    marker in the bird's-eye view. A stocked free camp risks being
+    looted per travelled day (balance value); the loss is revealed by a
+    journal entry when the traveler returns. In villages of a region
+    with "Honored Friend" standing, C opens the safe village cache
+    whose items never disappear; without the standing the cache is
+    refused, and a robbery in the region irretrievably destroys the
+    region's village caches. All new texts exist in both languages with
+    voice markup. Verifiable: `scripts/verify/camps.mjs` asserts
+    pitching and reopening, storing/taking incl. the capacity refusal
+    and the hand-item put-away, the loot-and-discover flow with its
+    journal entry, the map X, the friend gate on village caches, their
+    persistence, and their destruction by the robbery.
 
 ### 7.2 Self-Verification (mandatory)
 

@@ -1,7 +1,10 @@
 // Trade and audience dialogs (design.md §9/§10/§12). All player-visible
 // text comes from the language files (design.md §17 localization).
 
-import { useGame, priceOfGood, type EquipmentId } from '../state/store'
+import {
+  EQUIPMENT_IDS, bagItemCount, emptyBag, priceOfGood, useGame,
+  type EquipmentId, type ItemBag, type ItemKind,
+} from '../state/store'
 import { useUi, type TradeBuilding } from '../state/ui'
 import { PLACES, placeById, type Material } from '../world/geo'
 import { ferryCost, ferryDays, treasureBuyPrice, TREASURE_IDS } from '../systems/economy'
@@ -204,11 +207,74 @@ function AgencyDialog() {
   )
 }
 
+/**
+ * Camp cache (design.md §6): move items between the pack and a free camp
+ * (lootable) or a village cache (safe, Honored Friend privilege).
+ */
+function CampDialog({ scope, campId, placeId }: { scope: 'free' | 'village'; campId?: number; placeId?: string }) {
+  const t = useStrings()
+  const equipment = useGame((s) => s.equipment)
+  const gifts = useGame((s) => s.gifts)
+  const treasures = useGame((s) => s.treasures)
+  const freeCamps = useGame((s) => s.freeCamps)
+  const villageCamps = useGame((s) => s.villageCamps)
+  const campStore = useGame((s) => s.campStore)
+  const campTake = useGame((s) => s.campTake)
+  const setDialog = useUi((s) => s.setDialog)
+
+  const bag: ItemBag =
+    scope === 'free'
+      ? (freeCamps.find((c) => c.id === campId)?.items ?? emptyBag())
+      : (villageCamps[placeId ?? ''] ?? emptyBag())
+
+  const packRows: Array<{ kind: ItemKind; id: string; name: string; count: number }> = [
+    ...EQUIPMENT_IDS.map((e) => ({ kind: 'equipment' as ItemKind, id: e, name: t.equipment[e], count: equipment[e] ?? 0 })),
+    ...(Object.keys(gifts) as Material[]).map((m) => ({ kind: 'gift' as ItemKind, id: m, name: t.dialogs.gift(t.gifts[m]), count: gifts[m] })),
+    ...TREASURE_IDS.map((id) => ({ kind: 'treasure' as ItemKind, id, name: t.treasures[id], count: treasures[id] })),
+  ].filter((r) => r.count > 0)
+  const bagRows: Array<{ kind: ItemKind; id: string; name: string; count: number }> = [
+    ...EQUIPMENT_IDS.map((e) => ({ kind: 'equipment' as ItemKind, id: e, name: t.equipment[e], count: bag.equipment[e] ?? 0 })),
+    ...(Object.keys(gifts) as Material[]).map((m) => ({ kind: 'gift' as ItemKind, id: m, name: t.dialogs.gift(t.gifts[m]), count: bag.gifts[m] ?? 0 })),
+    ...TREASURE_IDS.map((id) => ({ kind: 'treasure' as ItemKind, id, name: t.treasures[id], count: bag.treasures[id] ?? 0 })),
+  ].filter((r) => r.count > 0)
+
+  return (
+    <div className="dialog-backdrop">
+      <div className="dialog">
+        <h3>{scope === 'free' ? t.dialogs.campTitle : t.dialogs.villageCampTitle}</h3>
+        <p className="flavor">{scope === 'free' ? t.dialogs.campHint : t.dialogs.villageCampHint}</p>
+        <p className="flavor">{t.dialogs.campPack}</p>
+        {packRows.map((r) => (
+          <div className="row" key={`p-${r.kind}-${r.id}`}>
+            <span>{r.name} ({r.count})</span>
+            <button className="hud-button" onClick={() => campStore(r.kind, r.id)}>{t.dialogs.campStore}</button>
+          </div>
+        ))}
+        <p className="flavor">{bagItemCount(bag) > 0 ? t.dialogs.campContents : t.dialogs.campEmpty}</p>
+        {bagRows.map((r) => (
+          <div className="row" key={`c-${r.kind}-${r.id}`}>
+            <span>{r.name} ({r.count})</span>
+            <button className="hud-button" onClick={() => campTake(r.kind, r.id)}>{t.dialogs.campTake}</button>
+          </div>
+        ))}
+        <div className="actions">
+          <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Dialogs() {
   const dialog = useUi((s) => s.dialog)
   if (!dialog) return null
   if (dialog.kind === 'audience') return <AudienceDialog />
   if (dialog.kind === 'bazaar') return <BazaarDialog />
   if (dialog.kind === 'agency') return <AgencyDialog />
+  if (dialog.kind === 'camp') {
+    return dialog.scope === 'free'
+      ? <CampDialog scope="free" campId={dialog.campId} />
+      : <CampDialog scope="village" placeId={dialog.placeId} />
+  }
   return <TradeDialog building={dialog.building} />
 }

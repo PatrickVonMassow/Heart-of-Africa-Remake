@@ -101,6 +101,13 @@ export interface BalanceConfig {
     robberyGifts: number
     robberyFoodDays: number
   }
+  /** Item caches (design.md §6 camps). */
+  camps: {
+    /** Chance per travelled day that a stocked free camp is looted. */
+    lootChancePerDay: number
+    /** Radius in degrees for reopening/discovering a camp. */
+    campRadiusDeg: number
+  }
   /** Trade economy (design.md §8/§10). */
   economy: {
     /** Base prices of the treasure finds in $ (before regional factors). */
@@ -191,6 +198,10 @@ export const balance: BalanceConfig = {
     friendVillageFoodDays: 21,
     robberyGifts: 3,
     robberyFoodDays: 7,
+  },
+  camps: {
+    lootChancePerDay: 0.03,
+    campRadiusDeg: 0.3,
   },
   economy: {
     treasureBase: { gold: 60, silver: 35, emerald: 70, copper: 20, ivory: 45, statue: 150 },

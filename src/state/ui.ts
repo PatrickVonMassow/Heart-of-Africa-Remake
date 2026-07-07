@@ -13,6 +13,9 @@ export type Dialog =
   | { kind: 'bazaar' }
   | { kind: 'agency' }
   | { kind: 'audience' }
+  // Camp caches (design.md §6): a free camp by id, or a village cache.
+  | { kind: 'camp'; scope: 'free'; campId: number }
+  | { kind: 'camp'; scope: 'village'; placeId: string }
   | null
 
 interface UiState {

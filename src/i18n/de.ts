@@ -172,6 +172,7 @@ export const de: Strings = {
     enterPlace: (name) => `E — ${name} betreten`,
     digHere: 'G — Hier graben',
     interact: (label) => `E — ${label}`,
+    openCamp: 'C — Lager öffnen',
   },
 
   labels: {
@@ -179,6 +180,7 @@ export const de: Strings = {
     oldMan: 'Alter Mann',
     leavePlace: 'Ort verlassen',
     graveDebug: 'Grab (Debug)',
+    camp: 'Lager',
   },
 
   journalPanel: {
@@ -217,6 +219,8 @@ export const de: Strings = {
     villagersFlee: 'Beim Anblick meines Gewehrs fliehen die Dorfbewohner — niemand spricht mit mir.',
     chiefHostile: 'Das Dorf hat meinen Fehltritt nicht vergessen. Das Oberhaupt empfängt mich nicht.',
     regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet — keine Hütte dieser Region öffnet sich mir mehr.',
+    campPitched: 'Lager aufgeschlagen — ein X auf meiner Karte markiert die Stelle.',
+    campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
   },
 
   dialogs: {
@@ -246,6 +250,15 @@ export const de: Strings = {
     agencyGreeting: '„Passagen in jeden Hafen des Kontinents — schnelle Schiffe, ehrliche Preise."',
     passage: (dest, days) => `Passage nach ${dest} (~${days} Tage)`,
     book: 'Buchen',
+    campTitle: 'Lager',
+    villageCampTitle: 'Dorflager',
+    campHint: 'Was hier bleibt, macht das Gepäck leichter — doch ein unbewachtes Lager kann geplündert werden.',
+    villageCampHint: 'Die Dorfbewohner hüten diese Habe wie ihre eigene. Was hier lagert, geht nie verloren.',
+    campPack: 'In meinem Gepäck:',
+    campContents: 'Hier gelagert:',
+    campEmpty: 'Hier ist nichts gelagert.',
+    campStore: 'Ablegen',
+    campTake: 'Nehmen',
   },
 
   overlays: {
@@ -352,6 +365,7 @@ export const de: Strings = {
       rescue: 'Von den Dorfbewohnern gerettet',
       friendSupplies: 'Gäste der Region',
       robberyCommitted: 'Eine Tat ohne Vergebung',
+      campLooted: 'Das geplünderte Lager',
     },
     start:
       'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
@@ -512,5 +526,7 @@ export const de: Strings = {
       `Im Dorf der ${PEOPLES[p.people as string]} empfing man mich wie Familie: [excited]Man füllte mein Gepäck mit Proviant und drückte mir Medizin in die Hände,[/excited] von Bezahlung wollte niemand hören. [pause][somber]Die Freundschaft dieser Region ist mein sicherster Besitz.[/somber]`,
     robberyCommitted: (p: TextParams) =>
       `[somber]Ich habe etwas getan, das sich nicht ungeschehen machen lässt.[/somber] [fear]Mit erhobenem Gewehr räumte ich die Hütte der ${PEOPLES[p.people as string]} aus und floh aus dem Dorf.[/fear] [breath][weary]Hinter mir: Schreie, und eine Stille, die schlimmer war als die Schreie.[pause] Keine Hütte dieser Region wird sich mir je wieder öffnen.[/weary]`,
+    campLooted:
+      '[somber]Ich fand mein Lager verwüstet vor —[pause] die Stangen umgerissen, der Boden von fremden Füßen zerwühlt.[/somber] [weary]Alles, was ich zurückgelassen hatte, ist fort.[/weary] [fear]Nichts ist sicher in dieser Wildnis, was nicht getragen oder bewacht wird.[/fear]',
   },
 }
