@@ -356,8 +356,8 @@ export const en: Strings = {
       return texts[p.region as string]
     },
     hintRaw: (p: TextParams) => {
-      const region = p.region as string
-      const w = DIRECTION_WORDS[region as keyof typeof DIRECTION_WORDS]
+      const regionId = p.region as string
+      const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
       const texts: Record<string, string> = {
         north:
           'The chief leaned close and spoke in a low voice: [whisper]"You seek the tomb of the great king. ' +
@@ -374,10 +374,10 @@ export const en: Strings = {
         south:
           `The chief gazed long toward the horizon: [whisper]"Many moons toward [emph]${w.north}[/emph], farther than ${GLOSSARY.zambezi}, farther than the great forest — where the land is nothing but sand, the great king lies."[/whisper] [somber]Toward ${w.north} … a season as a signpost?[/somber]`,
       }
-      return texts[region]
+      return texts[regionId]
     },
     hintDecoded: (p: TextParams) => {
-      const region = p.region as string
+      const regionId = p.region as string
       const texts: Record<string, string> = {
         north: `[excited]Deciphered![/excited] The chief's words mean: [emph]the tomb lies at latitude ${dec(p.lat as number)} degrees north.[/emph] [somber]Now I still need its longitude.[/somber]`,
         east: `[excited]Deciphered![/excited] "Salewa" is the sunrise: [emph]the tomb lies at longitude ${dec(p.lon as number)} degrees east.[/emph] [somber]Together with the latitude, the site is fixed.[/somber]`,
@@ -385,7 +385,7 @@ export const en: Strings = {
         central: '[excited]The forest\u2019s words open up:[/excited] the tomb lies [emph]north, away from the Congo, where the sand begins[/emph].',
         south: '[excited]The seasons speak:[/excited] "toward summer" means [emph]far north[/emph] — beyond the Zambezi, beyond the forests, in the great sand.',
       }
-      return texts[region]
+      return texts[regionId]
     },
     unspecific: (p: TextParams) =>
       `The chief nodded gravely, waved his hands and said again and again only [emph]"${p.word}"[/emph]. [somber]Whatever he knows, he cannot or will not say it in words I grasp.[/somber] [pause]But he pointed insistently toward the villages of the [emph]${PEOPLES[p.people as string]}[/emph] — [excited]they are said to know more.[/excited]`,

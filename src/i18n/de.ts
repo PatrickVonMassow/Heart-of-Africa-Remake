@@ -362,8 +362,8 @@ export const de: Strings = {
       return texts[p.region as string]
     },
     hintRaw: (p: TextParams) => {
-      const region = p.region as string
-      const w = DIRECTION_WORDS[region as keyof typeof DIRECTION_WORDS]
+      const regionId = p.region as string
+      const w = DIRECTION_WORDS[regionId as keyof typeof DIRECTION_WORDS]
       const seasonNorth = 'Sommer'
       const texts: Record<string, string> = {
         north:
@@ -381,10 +381,10 @@ export const de: Strings = {
         south:
           `Das Oberhaupt blickte lange zum Horizont: [whisper]„Viele Monde gen [emph]${seasonNorth}[/emph], weiter als ${GLOSSARY.zambezi}, weiter als der große Wald — wo das Land nur noch Sand ist, liegt der große König."[/whisper] [somber]Gen ${seasonNorth} … eine Jahreszeit als Wegweiser?[/somber]`,
       }
-      return texts[region]
+      return texts[regionId]
     },
     hintDecoded: (p: TextParams) => {
-      const region = p.region as string
+      const regionId = p.region as string
       const texts: Record<string, string> = {
         north: `[excited]Entschlüsselt![/excited] Die Worte des Oberhaupts bedeuten: [emph]Das Grab liegt auf Breite ${dec(p.lat as number)} Grad Nord.[/emph] [somber]Nun fehlt mir noch seine Länge.[/somber]`,
         east: `[excited]Entschlüsselt![/excited] „Salewa" ist der Sonnenaufgang: [emph]Das Grab liegt auf Länge ${dec(p.lon as number)} Grad Ost.[/emph] [somber]Zusammen mit der Breite ist der Ort bestimmt.[/somber]`,
@@ -392,7 +392,7 @@ export const de: Strings = {
         central: '[excited]Die Worte des Waldes öffnen sich:[/excited] Das Grab liegt [emph]im Norden, fort vom Kongo, wo der Sand beginnt[/emph].',
         south: '[excited]Die Jahreszeiten sprechen:[/excited] „Gen Sommer" heißt [emph]weit nach Norden[/emph] — jenseits des Sambesi, jenseits der Wälder, im großen Sand.',
       }
-      return texts[region]
+      return texts[regionId]
     },
     unspecific: (p: TextParams) =>
       `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß — es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] — [excited]sie sollen mehr wissen.[/excited]`,

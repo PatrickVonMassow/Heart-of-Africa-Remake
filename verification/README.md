@@ -425,3 +425,35 @@ first-person panorama of the real surrounding landscape.
 | 74-water-congo-jungle.png | Congo under jungle with bank foam |
 | 75-place-backdrop-cairo.png | Cairo (size 3) with delta/desert panorama |
 | 76-place-backdrop-masai.png | Masai village with snow-capped rift peaks behind the huts |
+
+## Addendum: health, events, deadline, full hint system (July 7, 2026)
+
+Four systems landed as separate commits with their own suites
+(CLAUDE.md par.7.1 pts. 22-24 new; pts. 7 and 10 lose their POC
+simplifications):
+
+- `health.mjs` (20 checks): drains/regen, automatic desert dehydration
+  and canteen recovery, fever + medicine, sun-blindness veil and
+  healing, vultures at poor condition, health query (H), death with
+  remains report and successor takeover.
+- `events.mjs` (18 checks): par.7/par.14 protection ordering (pure
+  functions), wet-rifle/canoe/crocodile rules, deterministic outcome
+  mapping, consequences of every debug trigger, a fatal attack, and
+  autonomous firing/silence with the events toggle.
+- `expedition.mjs` (10 checks): staged deadline warnings exactly once,
+  expiry defeat without successor, death-to-successor flow with day
+  penalty and takeover entry.
+- `hints.mjs` (12 checks): per-region knowing people, raw hints in the
+  five direction systems, retroactive deciphering, unspecific chiefs
+  pointing to the knowing people, gift lore, and the latitude+longitude
+  triangulation matching the grave.
+
+flow.mjs now plays the triangulated loop end to end (gift -> lesson ->
+latitude, East leg -> longitude, dig -> victory) using do-not-disturb
+and a canteen for its long walks. Full regression across all suites
+plus the production preview: green, 0 console errors.
+
+| File | View |
+|---|---|
+| 78-health-remains-report.png | Remains report after death in the field (successor offered) |
+| 79-deadline-expired.png | Deadline expiry: the expedition is recalled |
