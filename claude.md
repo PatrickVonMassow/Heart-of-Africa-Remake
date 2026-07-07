@@ -254,11 +254,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     pass through buildings or solid objects inside settlements (huts,
     fences, trees, rocks, fire pit); movement slides along obstacles;
     inhabitants never get permanently stuck; the accesses to the enterable
-    buildings and the settlement exit remain reachable. Verifiable: an
-    automated run steers the player character against a building and proves
-    it stays outside the collision radius; interaction with all functional
-    buildings remains possible; the application runs without console
-    errors.
+    buildings and the settlement exit remain reachable. Rectangular
+    buildings collide as oriented boxes (exact corners, no gaps), and the
+    clearance keeps the camera's near plane out of every wall — pressing
+    against a building must never show its inside. Inhabitants enter and
+    leave their dwellings through the entrance door (`design.md` §2); the
+    player cannot. Verifiable: an automated run steers the player character
+    against building walls and corners and proves it keeps positive
+    clearance; an observed inhabitant transitions walk → inside at its
+    dwelling and out again; interaction with all functional buildings
+    remains possible; the application runs without console errors.
 17. **Localization.** The game is fully playable in English as well as
     German (`design.md` §17): all player-visible text comes from the
     language files, the debug menu switches the language at runtime

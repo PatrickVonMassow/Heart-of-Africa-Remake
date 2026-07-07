@@ -18,6 +18,25 @@ const check = (name, ok, detail) => {
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Shared helpers for both collider shapes (circle and oriented box).
+await page.addInitScript(() => {
+  window.__clearanceTo = (c, x, z) => {
+    if (c.kind === 'box') {
+      const sin = Math.sin(c.rot)
+      const cos = Math.cos(c.rot)
+      const dx = x - c.x
+      const dz = z - c.z
+      const lx = cos * dx - sin * dz
+      const lz = sin * dx + cos * dz
+      const qx = Math.max(-c.hx, Math.min(c.hx, lx))
+      const qz = Math.max(-c.hz, Math.min(c.hz, lz))
+      if (qx === lx && qz === lz) return -Math.min(c.hx - Math.abs(lx), c.hz - Math.abs(lz))
+      return Math.hypot(lx - qx, lz - qz)
+    }
+    return Math.hypot(x - c.x, z - c.z) - c.r
+  }
+  window.__colliderSize = (c) => (c.kind === 'box' ? Math.max(c.hx, c.hz) : c.r)
+})
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -38,7 +57,7 @@ async function clearance() {
     const p = window.__placePlayer
     let worst = Infinity
     for (const c of window.__placeColliders) {
-      const s = Math.hypot(p.x - c.x, p.z - c.z) - c.r - 0.35
+      const s = window.__clearanceTo(c, p.x, p.z) - 0.35
       if (s < worst) worst = s
     }
     return worst
@@ -65,12 +84,17 @@ async function ejectTest(sceneLabel, pick) {
     // eslint-disable-next-line no-eval
     const idx = eval(pickSrc)(cs)
     const c = cs[idx]
+    if (!c) return null
     const p = window.__placePlayer
     p.x = c.x
     p.z = c.z
     p.yaw = 0
-    return { cx: c.x, cz: c.z, cr: c.r }
+    return { cx: c.x, cz: c.z, cr: window.__colliderSize(c) }
   }, pick)
+  if (!info) {
+    check(`${sceneLabel}: eject target found`, false, `pick matched nothing: ${pick}`)
+    return
+  }
   await pushFrames(14)
   const cl = await clearance()
   const end = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
@@ -105,7 +129,7 @@ async function reachableBuildings(sceneLabel) {
           for (let r = 3.9; r >= 2.6; r -= 0.4) {
             const x = tx + Math.cos(ang) * r
             const z = tz + Math.sin(ang) * r
-            if (cs.every((c) => Math.hypot(x - c.x, z - c.z) > c.r + 0.36)) {
+            if (cs.every((c) => window.__clearanceTo(c, x, z) > 0.36)) {
               const p = window.__placePlayer
               p.x = x
               p.z = z
@@ -133,7 +157,7 @@ async function reachableBuildings(sceneLabel) {
 async function accessPointsFree(sceneLabel) {
   const blocked = await page.evaluate(() => {
     const cs = window.__placeColliders
-    const clear = (x, z) => cs.every((c) => Math.hypot(x - c.x, z - c.z) > c.r + 0.35)
+    const clear = (x, z) => cs.every((c) => window.__clearanceTo(c, x, z) > 0.35)
     return [
       { n: 'spawn', x: 0, z: 18 },
       { n: 'square', x: 0, z: 3 },
@@ -145,9 +169,9 @@ async function accessPointsFree(sceneLabel) {
 }
 
 // === Port (Cairo) ============================================================
-// Eject from: biggest building, and a mid-size collider.
-await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>c.r>a[b].r?i:b,0)')
-await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.r>=0.9&&c.r<=1.6&&(b<0||c.r<a[b].r))?i:b,-1)')
+// Eject from: biggest building (box collider), and a mid-size circle collider.
+await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
+await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&(b<0||c.r>a[b].r))?i:b,-1)') // biggest circle prop
 const funcTypes = await page.evaluate(() =>
   window.__placeLayout.interactives.filter((b) => b.type !== 'exit' && b.type !== 'villager').map((b) => b.type),
 )
@@ -157,11 +181,11 @@ await accessPointsFree('Port')
 
 // Ram screenshot: teleport in front of the biggest wall and nudge into it.
 await page.evaluate(() => {
-  const c = [...window.__placeColliders].sort((a, b) => b.r - a.r)[0]
+  const c = [...window.__placeColliders].sort((a, b) => window.__colliderSize(b) - window.__colliderSize(a))[0]
   const p = window.__placePlayer
   const len = Math.hypot(c.x, c.z) || 1
-  p.x = c.x - (c.x / len) * (c.r + 2)
-  p.z = c.z - (c.z / len) * (c.r + 2)
+  p.x = c.x - (c.x / len) * (window.__colliderSize(c) + 2)
+  p.z = c.z - (c.z / len) * (window.__colliderSize(c) + 2)
   p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
 })
 await pushFrames(16)
@@ -175,9 +199,9 @@ await page.waitForTimeout(2500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>c.r>a[b].r?i:b,0)') // chief hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)') // chief hut
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
 
 // Chief prompt reachable despite collision ("Chefhütte" — German default).
 await page.evaluate(() => {

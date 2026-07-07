@@ -1,19 +1,34 @@
-// Circle-based 2D collision for the first-person places (design.md §2
-// "Lively, densely built settlements": buildings and solid props are impenetrable
-// for the player and the inhabitants). Every solid object is approximated by
-// one or more circles in the XZ plane; rectangular buildings become a row of
-// circles along their long axis (capsule approximation). Resolution pushes
-// the mover out along the contact normal, which yields natural sliding.
+// 2D collision for the first-person places (design.md §2 "Lively, densely
+// built settlements": buildings and solid props are impenetrable for the
+// player and the inhabitants). Round objects are circles in the XZ plane;
+// rectangular buildings are oriented boxes (OBB) so that their corners are
+// covered exactly — the former circle approximation left gaps at the corners
+// through which the camera could clip into the walls. Resolution pushes the
+// mover out along the contact normal, which yields natural sliding.
 
-export interface Collider {
+export interface CircleCollider {
+  kind?: 'circle'
   x: number
   z: number
   r: number
 }
 
+export interface BoxCollider {
+  kind: 'box'
+  x: number
+  z: number
+  /** Half extents in the box's local frame (margin included). */
+  hx: number
+  hz: number
+  /** Yaw, matching the building group's rotation.y. */
+  rot: number
+}
+
+export type Collider = CircleCollider | BoxCollider
+
 /**
- * Approximate a rotated rectangle (half extents hx/hz, yaw rot) with circles
- * spaced along its longer local axis.
+ * Oriented-box collider for a rotated rectangle (half extents hx/hz, yaw
+ * rot). The margin keeps the camera's near plane out of the wall faces.
  */
 export function boxColliders(
   cx: number,
@@ -23,30 +38,69 @@ export function boxColliders(
   rot: number,
   margin = 0.15,
 ): Collider[] {
-  const long = Math.max(hx, hz)
-  const short = Math.min(hx, hz)
-  const r = short + margin
-  const n = Math.max(1, Math.ceil(long / short) )
-  // Circle centers span the long axis so the union covers the box ends.
-  const span = Math.max(0, long - short)
-  const axisIsX = hx >= hz
-  const sin = Math.sin(rot)
-  const cos = Math.cos(rot)
-  const out: Collider[] = []
-  for (let i = 0; i < n; i++) {
-    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1 // -1..1
-    const lx = axisIsX ? t * span : 0
-    const lz = axisIsX ? 0 : t * span
-    // Local → world with the object's yaw (matches group rotation.y).
-    out.push({ x: cx + cos * lx + sin * lz, z: cz - sin * lx + cos * lz, r })
+  return [{ kind: 'box', x: cx, z: cz, hx: hx + margin, hz: hz + margin, rot }]
+}
+
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v)
+
+/** Push a mover circle out of one collider; returns the corrected position. */
+function pushOut(c: Collider, px: number, pz: number, radius: number): [number, number] {
+  if (c.kind === 'box') {
+    const sin = Math.sin(c.rot)
+    const cos = Math.cos(c.rot)
+    // World → box-local (inverse of the group yaw used in boxColliders).
+    const dx = px - c.x
+    const dz = pz - c.z
+    const lx = cos * dx - sin * dz
+    const lz = sin * dx + cos * dz
+    const qx = clamp(lx, -c.hx, c.hx)
+    const qz = clamp(lz, -c.hz, c.hz)
+    let ox = lx
+    let oz = lz
+    if (qx === lx && qz === lz) {
+      // Center inside the box: exit along the smallest penetration axis.
+      const penX = c.hx - Math.abs(lx)
+      const penZ = c.hz - Math.abs(lz)
+      if (penX <= penZ) ox = (lx >= 0 ? 1 : -1) * (c.hx + radius)
+      else oz = (lz >= 0 ? 1 : -1) * (c.hz + radius)
+    } else {
+      const ddx = lx - qx
+      const ddz = lz - qz
+      const d = Math.hypot(ddx, ddz)
+      if (d >= radius) return [px, pz]
+      if (d < 1e-4) {
+        // Exactly on the surface: push along the dominant face normal.
+        if (Math.abs(qx) === c.hx && Math.abs(lx) >= Math.abs(lz)) ox = (lx >= 0 ? 1 : -1) * (c.hx + radius)
+        else oz = (lz >= 0 ? 1 : -1) * (c.hz + radius)
+      } else {
+        ox = qx + (ddx / d) * radius
+        oz = qz + (ddz / d) * radius
+      }
+    }
+    // Box-local → world.
+    return [c.x + cos * ox + sin * oz, c.z - sin * ox + cos * oz]
   }
-  return out
+
+  const dx = px - c.x
+  const dz = pz - c.z
+  const min = c.r + radius
+  const d2 = dx * dx + dz * dz
+  if (d2 >= min * min) return [px, pz]
+  const d = Math.sqrt(d2)
+  if (d < 1e-4) {
+    // Dead center: push toward the place origin to stay deterministic.
+    const ox = px === 0 && pz === 0 ? 1 : px
+    const oz = pz
+    const len = Math.hypot(ox, oz) || 1
+    return [c.x + (ox / len) * min, c.z + (oz / len) * min]
+  }
+  return [c.x + (dx / d) * min, c.z + (dz / d) * min]
 }
 
 /**
- * Move a circle of radius `radius` from its current position to the target,
- * resolving overlaps with the colliders (two iterations handle corners).
- * Returns the resolved position.
+ * Move a circle of radius `radius` to the target position, resolving
+ * overlaps with the colliders (three iterations handle corners between
+ * neighboring objects). Returns the resolved position.
  */
 export function resolveMove(
   colliders: Collider[],
@@ -56,25 +110,9 @@ export function resolveMove(
 ): [number, number] {
   let px = x
   let pz = z
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 3; pass++) {
     for (const c of colliders) {
-      const dx = px - c.x
-      const dz = pz - c.z
-      const min = c.r + radius
-      const d2 = dx * dx + dz * dz
-      if (d2 >= min * min) continue
-      const d = Math.sqrt(d2)
-      if (d < 1e-4) {
-        // Dead center: push toward the place origin to stay deterministic.
-        const ox = px === 0 && pz === 0 ? 1 : px
-        const oz = pz
-        const len = Math.hypot(ox, oz) || 1
-        px = c.x + (ox / len) * min
-        pz = c.z + (oz / len) * min
-      } else {
-        px = c.x + (dx / d) * min
-        pz = c.z + (dz / d) * min
-      }
+      ;[px, pz] = pushOut(c, px, pz, radius)
     }
   }
   return [px, pz]

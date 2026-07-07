@@ -2,7 +2,7 @@
 // villagers cooking and weaving, playing children and goats in villages;
 // porters and traders in the wealthier ports. Pure animation, no mechanics.
 
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
@@ -268,9 +268,12 @@ interface WalkerState {
 }
 
 /**
- * Inhabitants with a simple daily routine (design.md §2 lively settlements): they
- * step out of their dwelling, walk the paths to an errand point, linger,
- * walk back and disappear into their home again.
+ * Inhabitants with a simple daily routine (design.md §2 lively settlements):
+ * they step out of their dwelling through its entrance door, walk the paths
+ * to an errand point, linger, walk back, press against the door and slip
+ * inside, where they stay until the next outing. On the two door segments
+ * (home center ↔ door) collision is skipped — the door is the one deliberate
+ * opening in the otherwise impenetrable building (design.md §2).
  */
 function Walkers({
   seed,
@@ -307,13 +310,23 @@ function Walkers({
       seg: 0,
       pause: 0,
       timer: d.startDelay,
-      x: d.home.door[0],
-      z: d.home.door[1],
+      x: d.home.x,
+      z: d.home.z,
       yaw: 0,
       stuck: 0,
     }))
   }
   const refs = useRef<Array<THREE.Group | null>>([])
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeWalkers = { states: states.current, homes: defs.map((d) => d.home) }
+    return () => {
+      delete w.__placeWalkers
+    }
+  }, [defs])
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -331,11 +344,14 @@ function Walkers({
           const e = errands.length > 0 ? errands[Math.floor(Math.random() * errands.length)] : ([0, 2] as [number, number])
           // Route via a plaza-side midpoint, so walkers follow the lanes.
           const mid: [number, number] = [e[0] * 0.4 + (Math.random() - 0.5) * 2.5, e[1] * 0.4 + 1 + (Math.random() - 0.5) * 2.5]
-          s.route = [def.home.door, mid, [e[0], e[1]], mid, def.home.door]
+          // Start and end inside the dwelling: out through the door, back
+          // in through the door (design.md §2).
+          const inside: [number, number] = [def.home.x, def.home.z]
+          s.route = [inside, def.home.door, mid, [e[0], e[1]], mid, def.home.door, inside]
           s.seg = 0
           s.pause = 0
-          s.x = def.home.door[0]
-          s.z = def.home.door[1]
+          s.x = inside[0]
+          s.z = inside[1]
           s.mode = 'walk'
         }
         return
@@ -352,7 +368,7 @@ function Walkers({
 
       const target = s.route[s.seg + 1]
       if (!target) {
-        // Back home: disappear inside.
+        // Fully inside the dwelling: disappear until the next outing.
         s.mode = 'inside'
         s.timer = 7 + Math.random() * 14
         return
@@ -361,14 +377,21 @@ function Walkers({
       const dz = target[1] - s.z
       const d = Math.hypot(dx, dz)
       const step = def.speed * dt
-      if (d <= step + 0.35) {
+      // Door segments (home center ↔ door) pass through the own dwelling:
+      // no collision there, the walker slips through the entrance door.
+      const throughDoor = s.seg === 0 || s.seg === s.route.length - 2
+      if (d <= step + (throughDoor ? 0.08 : 0.35)) {
         // Close enough (the exact point may sit inside a collider).
         s.seg++
         s.stuck = 0
-        if (s.seg === 2) s.pause = 2.5 + Math.random() * 4 // linger at the errand
+        if (s.seg === 3) s.pause = 2.5 + Math.random() * 4 // linger at the errand
+      } else if (throughDoor) {
+        s.x += (dx / d) * step
+        s.z += (dz / d) * step
+        s.yaw = Math.atan2(dx, dz)
       } else {
         // Solid objects block inhabitants too; slide along and skip the
-        // waypoint if blocked for too long (design.md §2 Kollision).
+        // waypoint if blocked for too long (design.md §2 collision).
         const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS)
         const moved = Math.hypot(nx - s.x, nz - s.z)
         s.x = nx
