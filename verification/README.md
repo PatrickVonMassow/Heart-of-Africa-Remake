@@ -349,3 +349,13 @@ checks with the bundled Chromium actually exercised the WebGL fallback.
 |---|---|
 | 61-webgl-fallback-warning.png | WebGL 2 fallback notice with dismiss button (German) |
 | 62-webgpu-no-warning.png | Real WebGPU path (Edge): no notice |
+
+## Addendum: frame counter (July 7, 2026)
+
+An FPS counter sits below the status bar (top left), on by default and
+toggleable in the debug menu (design.md par.21). Headless note: the compositor
+only produces frames on demand, so the check pumps rAF before reading.
+
+| File | View |
+|---|---|
+| 63-fps-counter.png | Frame counter showing 60 FPS in Cairo (first-person) |

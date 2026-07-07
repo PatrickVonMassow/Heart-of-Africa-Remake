@@ -359,6 +359,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: random events can occur (§14), on by default.
 - One button per kind of random event (§14) to trigger it immediately.
 - Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.
+- Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Instant jump to any port city.
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.

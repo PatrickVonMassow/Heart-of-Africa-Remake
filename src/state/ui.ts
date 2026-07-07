@@ -20,12 +20,15 @@ interface UiState {
   webglFallback: boolean
   /** The fallback notice stays until the player dismisses it. */
   webglWarningDismissed: boolean
+  /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
+  fpsVisible: boolean
   setDialog: (d: Dialog) => void
   setPrompt: (p: string | null) => void
   toggleDebug: () => void
   toggleMap: () => void
   setWebglFallback: (fallback: boolean) => void
   dismissWebglWarning: () => void
+  setFpsVisible: (visible: boolean) => void
 }
 
 export const useUi = create<UiState>()((set) => ({
@@ -35,10 +38,12 @@ export const useUi = create<UiState>()((set) => ({
   mapOpen: false,
   webglFallback: false,
   webglWarningDismissed: false,
+  fpsVisible: true,
   setDialog: (dialog) => set({ dialog }),
   setPrompt: (prompt) => set({ prompt }),
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
   toggleMap: () => set((s) => ({ mapOpen: !s.mapOpen })),
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
+  setFpsVisible: (fpsVisible) => set({ fpsVisible }),
 }))

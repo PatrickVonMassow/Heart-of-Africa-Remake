@@ -53,6 +53,8 @@ export interface Strings {
     /** Shown when the renderer fell back from WebGPU to WebGL 2. */
     webglFallback: string
     webglFallbackDismiss: string
+    /** Frame counter label, e.g. "62 FPS". */
+    fps(fps: number): string
   }
 
   prompts: {
@@ -127,6 +129,7 @@ export interface Strings {
     goodwillForHint: string
     randomEvents: string
     showHidden: string
+    fpsCounter: string
     cash: string
     foodDays: string
     jumpTo: string

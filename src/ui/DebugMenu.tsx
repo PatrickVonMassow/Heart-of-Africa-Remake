@@ -43,6 +43,7 @@ export function DebugMenu() {
   const lang = useLocale((s) => s.lang)
   const setLang = useLocale((s) => s.setLang)
   const open = useUi((s) => s.debugOpen)
+  const fpsVisible = useUi((s) => s.fpsVisible)
   const bump = useGame((s) => s.bumpBalance)
   useGame((s) => s.balanceVersion)
   const game = useGame()
@@ -96,6 +97,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={balance.showHiddenObjects}
           onChange={(e) => set('showHiddenObjects', e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.fpsCounter}</span>
+        <input
+          type="checkbox"
+          checked={fpsVisible}
+          onChange={(e) => useUi.getState().setFpsVisible(e.target.checked)}
         />
       </label>
 

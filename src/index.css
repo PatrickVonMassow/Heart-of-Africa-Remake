@@ -196,6 +196,22 @@ body,
   font-size: 16px;
 }
 
+/* Frame counter, top left below the status bar (the journal panel occupies
+   the right edge). */
+.fps-counter {
+  position: absolute;
+  top: 46px;
+  left: 12px;
+  padding: 2px 8px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 /* Dismissible notice when the renderer fell back to WebGL 2. */
 .renderer-warning {
   position: absolute;

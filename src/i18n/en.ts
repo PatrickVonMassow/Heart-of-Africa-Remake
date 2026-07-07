@@ -148,6 +148,7 @@ export const en: Strings = {
     handTooltip: 'Take in hand / put away',
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
+    fps: (fps) => `${fps} FPS`,
   },
 
   prompts: {
@@ -220,6 +221,7 @@ export const en: Strings = {
     goodwillForHint: 'Goodwill required for hint',
     randomEvents: 'Random events (POC: none implemented)',
     showHidden: 'Show hidden objects',
+    fpsCounter: 'FPS counter',
     cash: 'Funds ($)',
     foodDays: 'Food (days)',
     jumpTo: 'Jump to:',

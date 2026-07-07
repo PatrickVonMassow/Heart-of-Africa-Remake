@@ -48,6 +48,30 @@ function Toast() {
   return <div className="toast">{toast}</div>
 }
 
+/** Frame counter (FPS), top right; toggled in the debug menu (design.md §21). */
+function FpsCounter() {
+  const t = useStrings()
+  const visible = useUi((s) => s.fpsVisible)
+  const [fps, setFps] = useState(0)
+  useEffect(() => {
+    if (!visible) return
+    let frames = 0
+    let last = performance.now()
+    let raf = requestAnimationFrame(function loop(now) {
+      frames++
+      if (now - last >= 500) {
+        setFps(Math.round((frames * 1000) / (now - last)))
+        frames = 0
+        last = now
+      }
+      raf = requestAnimationFrame(loop)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [visible])
+  if (!visible) return null
+  return <div className="fps-counter">{t.hud.fps(fps)}</div>
+}
+
 /** Dismissible notice when the renderer fell back to WebGL 2 (CLAUDE.md §3). */
 function RendererWarning() {
   const t = useStrings()
@@ -154,6 +178,7 @@ export function Hud() {
   return (
     <>
       <StatusBar />
+      <FpsCounter />
       <InventoryBar />
       <button className="hud-button journal-toggle" onClick={() => {
         const g = useGame.getState()
