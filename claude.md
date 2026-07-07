@@ -499,6 +499,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     and the hand-item put-away, the loot-and-discover flow with its
     journal entry, the map X, the friend gate on village caches, their
     persistence, and their destruction by the robbery.
+28. **Full saving and loading.** `design.md` §18 is implemented: every
+    port visit stores its own snapshot (a placeholder cap keeps only the
+    most recent ones); on loading, an overview of all port visits
+    appears as a table with one row per visit — port city, in-game
+    date, money, food, gifts and health state — from which the player
+    picks the state to continue from; manual saving stays omitted. A
+    legacy single-slot checkpoint migrates as one table row. The
+    successor (pt. 24) continues to resume from the latest snapshot.
+    All menu texts exist in both languages. Verifiable:
+    `scripts/verify/saveload.mjs` asserts one snapshot per port visit,
+    the table columns incl. the health state, resuming an older visit
+    restores that state, the successor uses the latest snapshot, and
+    the legacy migration.
 
 ### 7.2 Self-Verification (mandatory)
 
@@ -525,8 +538,8 @@ After completion and after every major system:
 - Full balance calibration; a debug menu (§21 `design.md`) beyond what §2
   and the verification require. (Audio, dynamic music and ambient wildlife
   were formerly listed here; they became part of the target via criterion
-  §7.1 pt. 12 and are implemented.)
-- A tabular load menu beyond the simple checkpoint.
+  §7.1 pt. 12 and are implemented. The tabular load menu, formerly listed
+  here too, became part of the target via criterion §7.1 pt. 28.)
 
 These points are not to be started, not even partially, as long as the
 acceptance criteria of §7.1 are not fully met.

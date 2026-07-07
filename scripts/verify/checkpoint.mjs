@@ -21,8 +21,9 @@ const check = (name, ok) => {
   if (!ok) failures++
 }
 
-// Seed a distinctive state and save a checkpoint.
+// Seed a distinctive state and save a checkpoint (fresh storage).
 await page.evaluate(() => {
+  localStorage.clear()
   const g = window.__game.getState()
   g.debugSet({ money: 123 })
   g.saveCheckpoint()
@@ -33,6 +34,9 @@ await page.waitForTimeout(3000)
 
 check('Checkpoint overlay after reload', (await page.getByText('Load checkpoint').count()) > 0)
 await page.getByText('Load checkpoint').click()
+await page.waitForTimeout(500)
+// The tabular load menu (design.md §18): the newest visit is the top row.
+await page.locator('.load-menu tbody tr').first().locator('button').click()
 await page.waitForTimeout(500)
 const s = await page.evaluate(() => window.__game.getState())
 check('State restored from checkpoint ($123, in Cairo)',

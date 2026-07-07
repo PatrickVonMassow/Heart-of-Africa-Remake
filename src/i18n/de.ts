@@ -198,6 +198,14 @@ export const de: Strings = {
     close: 'Schließen (M)',
   },
 
+  loadMenu: {
+    title: 'Hafenbesuche',
+    port: 'Hafenstadt',
+    health: 'Gesundheit',
+    resume: 'Fortsetzen',
+    back: 'Zurück',
+  },
+
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
     mountainNeedsRope: 'Die Felswand weist mich ab — ohne Seil in der Hand gibt es keinen Aufstieg.',

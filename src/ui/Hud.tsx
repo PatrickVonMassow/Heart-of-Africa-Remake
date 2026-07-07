@@ -3,8 +3,9 @@
 // text comes from the language files (design.md §17 localization).
 
 import { useEffect, useState } from 'react'
-import { healthState, useGame, type EquipmentId } from '../state/store'
+import { healthState, listCheckpoints, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
+import { START_YEAR } from '../config/balance'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
@@ -173,25 +174,74 @@ function VictoryOverlay() {
   )
 }
 
-/** Shown once at startup when a checkpoint exists (design.md §18, simplified). */
+/**
+ * Load menu (design.md §18): an overview of all port visits as a table —
+ * port city, date, money, food, gifts and health state — from which the
+ * player picks the state to continue from.
+ */
+function LoadMenu({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+  const t = useStrings()
+  const loadCheckpoint = useGame((s) => s.loadCheckpoint)
+  const [rows] = useState(() => listCheckpoints())
+  return (
+    <div className="overlay">
+      <h1>{t.loadMenu.title}</h1>
+      <table className="load-menu">
+        <thead>
+          <tr>
+            <th>{t.loadMenu.port}</th>
+            <th>{t.status.date}</th>
+            <th>{t.status.cash}</th>
+            <th>{t.status.provisions}</th>
+            <th>{t.status.gifts}</th>
+            <th>{t.loadMenu.health}</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {[...rows].reverse().map((r) => (
+            <tr key={r.index}>
+              <td>{t.places[r.placeId] ?? r.placeId}</td>
+              <td>{t.formatDate(r.day, START_YEAR)}</td>
+              <td>{Math.floor(r.money)} $</td>
+              <td>{t.status.provisionsWeeks(t.formatDecimal(r.foodDays / 7))}</td>
+              <td>{r.gifts}</td>
+              <td>{t.health.states[healthState(r.health)]}</td>
+              <td>
+                <button
+                  className="hud-button"
+                  onClick={() => {
+                    if (loadCheckpoint(r.index)) onDone()
+                  }}
+                >
+                  {t.loadMenu.resume}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="actions">
+        <button className="hud-button" onClick={onBack}>{t.loadMenu.back}</button>
+      </div>
+    </div>
+  )
+}
+
+/** Shown once at startup when checkpoints exist (design.md §18). */
 function StartOverlay() {
   const t = useStrings()
   const [decided, setDecided] = useState(false)
+  const [showLoad, setShowLoad] = useState(false)
   const [hadCheckpoint] = useState(() => useGame.getState().hasCheckpoint)
-  const loadCheckpoint = useGame((s) => s.loadCheckpoint)
   if (decided || !hadCheckpoint) return null
+  if (showLoad) return <LoadMenu onDone={() => setDecided(true)} onBack={() => setShowLoad(false)} />
   return (
     <div className="overlay">
       <h1>{t.overlays.title}</h1>
       <p>{t.overlays.checkpointFound}</p>
       <div className="actions">
-        <button
-          className="hud-button"
-          onClick={() => {
-            loadCheckpoint()
-            setDecided(true)
-          }}
-        >
+        <button className="hud-button" onClick={() => setShowLoad(true)}>
           {t.overlays.loadCheckpoint}
         </button>
         <button className="hud-button" onClick={() => setDecided(true)}>

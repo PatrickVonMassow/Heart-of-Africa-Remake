@@ -229,7 +229,8 @@ export interface GameState {
   setJournalOpen: (open: boolean) => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
-  loadCheckpoint: () => boolean
+  /** Load a port-visit snapshot; the latest without an index (design.md §18). */
+  loadCheckpoint: (index?: number) => boolean
   newGame: () => void
   bumpBalance: () => void
   debugSet: (patch: Partial<Pick<GameState, 'money' | 'foodDays' | 'day' | 'health'>>) => void
@@ -243,7 +244,48 @@ export interface GameState {
 
 // v2: entries are language-neutral TextRefs only (plain-string journal
 // entries from pre-localization v1 checkpoints are no longer supported).
-const CHECKPOINT_KEY = 'hoa-checkpoint-v2'
+const LEGACY_CHECKPOINT_KEY = 'hoa-checkpoint-v2'
+// Full save system (design.md §18): one snapshot per port visit, listed in
+// the tabular load menu. A single legacy snapshot migrates as one entry.
+const CHECKPOINTS_KEY = 'hoa-checkpoints-v1'
+/** Kept port-visit snapshots (placeholder cap protecting localStorage). */
+const MAX_CHECKPOINTS = 25
+
+/** Snapshot list from storage; migrates the legacy single-slot key. */
+function readCheckpoints(): Array<Record<string, unknown>> {
+  try {
+    const raw = localStorage.getItem(CHECKPOINTS_KEY)
+    if (raw) return JSON.parse(raw)
+    const legacy = localStorage.getItem(LEGACY_CHECKPOINT_KEY)
+    if (legacy) return [JSON.parse(legacy)]
+  } catch {
+    // Unreadable storage counts as no checkpoints.
+  }
+  return []
+}
+
+/** Row data for the load menu (design.md §18 table). */
+export interface CheckpointMeta {
+  index: number
+  placeId: string
+  day: number
+  money: number
+  foodDays: number
+  gifts: number
+  health: number
+}
+
+export function listCheckpoints(): CheckpointMeta[] {
+  return readCheckpoints().map((snap, index) => ({
+    index,
+    placeId: (snap.placeId as string) ?? 'cairo',
+    day: (snap.day as number) ?? 0,
+    money: (snap.money as number) ?? 0,
+    foodDays: (snap.foodDays as number) ?? 0,
+    gifts: totalGifts((snap.gifts as Record<Material, number>) ?? { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0 }),
+    health: (snap.health as number) ?? balance.health.max,
+  }))
+}
 
 /** Cell size of the exploration grid for the self-drawing map (design.md §19). */
 export const EXPLORE_CELL_DEG = 0.5
@@ -428,7 +470,7 @@ export function usedInventory(
 
 export const useGame = create<GameState>()((set, get) => ({
   ...startState(newSeed()),
-  hasCheckpoint: typeof localStorage !== 'undefined' && localStorage.getItem(CHECKPOINT_KEY) !== null,
+  hasCheckpoint: typeof localStorage !== 'undefined' && readCheckpoints().length > 0,
 
   addEntry: (title, text, kind = 'event', sketch) => {
     set((s) => ({
@@ -1418,18 +1460,25 @@ export const useGame = create<GameState>()((set, get) => ({
       nextEntryId,
     }
     try {
-      localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(snapshot))
+      // One snapshot per port visit (design.md §18); the oldest fall away
+      // once the placeholder cap is reached.
+      const snaps = readCheckpoints()
+      snaps.push(snapshot)
+      if (snaps.length > MAX_CHECKPOINTS) snaps.splice(0, snaps.length - MAX_CHECKPOINTS)
+      localStorage.setItem(CHECKPOINTS_KEY, JSON.stringify(snaps))
       set({ hasCheckpoint: true })
     } catch {
       // Storage unavailable (e.g. private mode) — checkpoint silently skipped.
     }
   },
 
-  loadCheckpoint: () => {
+  loadCheckpoint: (index?: number) => {
     try {
-      const raw = localStorage.getItem(CHECKPOINT_KEY)
-      if (!raw) return false
-      const snap = JSON.parse(raw)
+      const snaps = readCheckpoints()
+      if (snaps.length === 0) return false
+      // Without an index the latest snapshot loads (successor, design.md §18).
+      const snap = snaps[index ?? snaps.length - 1] as Partial<GameState> & { nextEntryId?: number }
+      if (!snap) return false
       nextEntryId = snap.nextEntryId ?? 1000
       set({
         ...snap,

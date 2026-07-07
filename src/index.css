@@ -104,6 +104,26 @@ body,
   cursor: pointer;
 }
 
+/* Tabular load menu (design.md §18): one row per port visit. */
+.load-menu {
+  border-collapse: collapse;
+  margin: 12px auto;
+  font-size: 15px;
+}
+
+.load-menu th,
+.load-menu td {
+  padding: 6px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--hud-border);
+}
+
+.load-menu th {
+  color: var(--hud-accent);
+  font-weight: normal;
+  font-style: italic;
+}
+
 /* The robbery action (design.md §12) reads as a dangerous, ruinous step. */
 .hud-button.danger {
   border-color: #8c2f22;

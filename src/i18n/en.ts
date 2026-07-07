@@ -199,6 +199,14 @@ export const en: Strings = {
     close: 'Close (M)',
   },
 
+  loadMenu: {
+    title: 'Port Visits',
+    port: 'Port city',
+    health: 'Health',
+    resume: 'Continue',
+    back: 'Back',
+  },
+
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
     mountainNeedsRope: 'The rock face turns me back — without a rope in hand there is no ascent.',

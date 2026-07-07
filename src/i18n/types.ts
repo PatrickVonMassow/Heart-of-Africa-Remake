@@ -107,6 +107,15 @@ export interface Strings {
     close: string
   }
 
+  /** Tabular load menu of all port visits (design.md §18). */
+  loadMenu: {
+    title: string
+    port: string
+    health: string
+    resume: string
+    back: string
+  }
+
   toasts: {
     oceanBlocked: string
     /** Mountain ascent refused without a rope in hand (design.md §11). */
