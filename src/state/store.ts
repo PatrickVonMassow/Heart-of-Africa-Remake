@@ -228,6 +228,8 @@ export const useGame = create<GameState>()((set, get) => ({
         cost = s.handItem === 'rope' ? tc.mountainWithRope : tc.mountain
         break
       case 'water':
+      // Enclosed sea water (design.md §11) is swum/crossed like inland water.
+      case 'ocean':
         cost = s.handItem === 'canoe' ? tc.waterWithCanoe : tc.water
         break
       default:
@@ -240,7 +242,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const nz = s.pos.z + (dirZ / len) * step
     const next = worldToLatLon(nx, nz)
     const nextT = sampleTerrain(next.lat, next.lon, s.seed)
-    if (isBlocked(nextT.type)) {
+    if (isBlocked(nextT.type, next.lat, next.lon)) {
       set({ toast: getStrings().toasts.oceanBlocked })
       return
     }

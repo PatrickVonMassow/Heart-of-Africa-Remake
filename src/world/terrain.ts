@@ -10,6 +10,7 @@ import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
 import { elevationAt, landFractionAt } from './geodata'
 import { lakeContains } from './hydro'
 import { fbm2 } from './noise'
+import { LAND_POLYGONS } from './data/coastline'
 
 export type TerrainType =
   | 'ocean'
@@ -269,7 +270,51 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   return { height, elevation, type, color: vary(color, shade), splat: normalizeSplat(splat) }
 }
 
-/** Terrain type is ocean → not walkable on foot (design.md §11). */
-export function isBlocked(type: TerrainType): boolean {
-  return type === 'ocean'
+// --- Movement boundary (design.md §11) ---------------------------------------
+// Ocean enclosed by the continent's outline (bays, gulfs, straits cutting
+// into the landmass) counts as inland water and can be swum through; only
+// the open sea outside the outline's convex hull blocks movement.
+
+let hullCache: Array<[number, number]> | null = null
+
+/** Convex hull of the mainland outline (Andrew's monotone chain), lon/lat. */
+function continentHull(): Array<[number, number]> {
+  if (hullCache) return hullCache
+  const pts = [...LAND_POLYGONS[0].points].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+  const lower: Array<[number, number]> = []
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop()
+    lower.push(p)
+  }
+  const upper: Array<[number, number]> = []
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i]
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop()
+    upper.push(p)
+  }
+  hullCache = [...lower.slice(0, -1), ...upper.slice(0, -1)]
+  return hullCache
+}
+
+/** Point-in-convex-polygon test (hull is counterclockwise, lon/lat). */
+function insideContinentOutline(lat: number, lon: number): boolean {
+  const hull = continentHull()
+  for (let i = 0; i < hull.length; i++) {
+    const [ax, ay] = hull[i]
+    const [bx, by] = hull[(i + 1) % hull.length]
+    if ((bx - ax) * (lat - ay) - (by - ay) * (lon - ax) < 0) return false
+  }
+  return true
+}
+
+/**
+ * Ocean blocks movement only outside the continent's outline (design.md
+ * §11); enclosed sea water is swimmable like rivers and lakes.
+ */
+export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolean {
+  if (type !== 'ocean') return false
+  if (lat === undefined || lon === undefined) return true
+  return !insideContinentOutline(lat, lon)
 }

@@ -196,7 +196,7 @@ Villages and port cities contain various building types. In the first-person vie
 | Dig site | Shovel | without: no find; with: dig it up |
 
 **Movement boundary.**
-Movement is restricted to the continent and its inland waters (rivers, lakes). The surrounding ocean is not navigable; the continent cannot be left.
+Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
 
 **Water, current and waterfalls.**
 Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4). Moving with the current is faster, against it slower. There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
