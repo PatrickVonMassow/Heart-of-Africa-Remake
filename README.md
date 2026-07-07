@@ -1,4 +1,6 @@
-# The Heart of Africa — Modern Remake (Proof of Concept)
+<img width="1168" height="784" alt="Grok 1" src="https://github.com/user-attachments/assets/4ee7611d-eb48-458f-8689-38f59a48cd15" />
+
+# The Heart of Africa — Modern Remake
 
 A single-player 3D remake of the 1985 exploration classic *The Heart of Africa*,
 built as a web application. You start in Cairo in 1890 with $250 and a journal,
