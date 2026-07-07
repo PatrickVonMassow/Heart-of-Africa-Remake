@@ -218,6 +218,7 @@ export const de: Strings = {
 
   debug: {
     title: 'Debug-Menü (F1)',
+    renderer: 'Renderer',
     language: 'Sprache',
     travelSpeed: 'Tempo außerorts',
     walkSpeed: 'Tempo innerorts',

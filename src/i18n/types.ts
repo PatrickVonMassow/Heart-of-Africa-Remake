@@ -124,6 +124,8 @@ export interface Strings {
 
   debug: {
     title: string
+    /** Read-only display of the active render backend (WebGPU/WebGL 2). */
+    renderer: string
     language: string
     travelSpeed: string
     walkSpeed: string

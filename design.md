@@ -376,3 +376,4 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Input field for the inventory capacity.
 - Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.
 - Language selector for the game language (English/German; default English, §17).
+- Read-only display of the active render backend (WebGPU, or WebGL 2 after the fallback of §1).

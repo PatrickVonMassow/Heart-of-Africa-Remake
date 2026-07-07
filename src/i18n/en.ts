@@ -219,6 +219,7 @@ export const en: Strings = {
 
   debug: {
     title: 'Debug Menu (F1)',
+    renderer: 'Renderer',
     language: 'Language',
     travelSpeed: 'Travel speed (overland)',
     walkSpeed: 'Walk speed (in places)',

@@ -76,6 +76,7 @@ export function DebugMenu() {
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
+  const webglFallback = useUi((s) => s.webglFallback)
   const bump = useGame((s) => s.bumpBalance)
   useGame((s) => s.balanceVersion)
   const game = useGame()
@@ -90,6 +91,12 @@ export function DebugMenu() {
   return (
     <div className="debug-menu">
       <h3>{t.debug.title}</h3>
+
+      <label>
+        <span>{t.debug.renderer}</span>
+        {/* Proper names, not localized. */}
+        <span>{webglFallback ? 'WebGL 2' : 'WebGPU'}</span>
+      </label>
 
       <label>
         <span>{t.debug.language}</span>
