@@ -512,6 +512,21 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     the table columns incl. the health state, resuming an older visit
     restores that state, the successor uses the latest snapshot, and
     the legacy migration.
+29. **Animated handwriting.** `design.md` §16 is implemented: a newly
+    appearing journal entry does not show as finished text but is
+    visibly written into the book — the text reveals stroke by stroke
+    in a handwritten style behind a moving hand holding the pen (a
+    click finishes the entry immediately). The hand shows the wound
+    level recorded when the entry was written: unhurt skin, a marked
+    hand at light wounds, a bloody hand at severe wounds — and an entry
+    written by a wounded hand permanently carries blood traces on the
+    page, stronger at severe wounds. A dead character writes no entry
+    (the remains report takes over, pt. 22). Entries appearing under
+    do-not-disturb (§16) are written silently without the animation.
+    Verifiable: `scripts/verify/handwriting.mjs` asserts the growing
+    reveal with the hand element, the wound classes on the hand, the
+    persistent blood traces, the click-to-finish, the clean final text
+    (no markup, full length) and the silent do-not-disturb path.
 
 ### 7.2 Self-Verification (mandatory)
 
@@ -534,7 +549,8 @@ After completion and after every major system:
 
 - Multiplayer in any form.
 - Onboarding, tutorials, lowering of the entry barrier.
-- Animated handwritten journal entries with blood traces (§16 `design.md`).
+  (The animated handwriting with blood traces, formerly listed here,
+  became part of the target via criterion §7.1 pt. 29.)
 - Full balance calibration; a debug menu (§21 `design.md`) beyond what §2
   and the verification require. (Audio, dynamic music and ambient wildlife
   were formerly listed here; they became part of the target via criterion

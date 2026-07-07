@@ -319,6 +319,8 @@ body,
 
 .journal .entry {
   margin-bottom: 18px;
+  /* Anchor for the blood traces of design.md §16. */
+  position: relative;
 }
 
 .journal .entry .date {
@@ -335,9 +337,53 @@ body,
 
 .journal .entry p {
   margin: 0;
-  font-size: 14.5px;
-  line-height: 1.5;
-  font-style: italic;
+  font-size: 15.5px;
+  line-height: 1.55;
+  /* Handwritten presentation (design.md §16). */
+  font-family: 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
+}
+
+/* Handwriting animation (design.md §16): the hand writing the entry. */
+.journal .entry.writing {
+  cursor: pointer;
+}
+
+.writing-hand {
+  display: inline-block;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: hand-wiggle 0.35s ease-in-out infinite alternate;
+}
+
+.writing-hand .hand-skin {
+  fill: #d9a86f;
+}
+
+/* Lightly wounded hand: darker, scuffed skin (design.md §16). */
+.writing-hand.marked .hand-skin {
+  fill: #b97f52;
+}
+
+/* Severely wounded: a bloody hand writes the entry (design.md §16). */
+.writing-hand.bloody .hand-skin {
+  fill: #8c2f22;
+}
+
+@keyframes hand-wiggle {
+  from { transform: rotate(-4deg) translateY(0); }
+  to { transform: rotate(3deg) translateY(1px); }
+}
+
+/* Blood traces on entries written by a wounded hand (design.md §16). */
+.blood-marks span {
+  position: absolute;
+  border-radius: 50% 42% 55% 48%;
+  background: radial-gradient(circle at 40% 35%, rgba(122, 27, 16, 0.55), rgba(90, 16, 10, 0.28) 70%, transparent);
+  pointer-events: none;
+}
+
+.blood-marks.severe span {
+  background: radial-gradient(circle at 40% 35%, rgba(122, 27, 16, 0.8), rgba(90, 16, 10, 0.45) 70%, transparent);
 }
 
 /* Hand-sketch illustrations beside entry text (design.md §19). */

@@ -78,6 +78,8 @@ export interface JournalEntry {
   kind: 'event' | 'hint' | 'info'
   /** Optional hand-sketch illustration (design.md §19). */
   sketch?: SketchId
+  /** Wound level of the writing hand at the time (design.md §16). */
+  wounds?: 0 | 1 | 2
 }
 
 export type GameMode = 'travel' | 'place'
@@ -474,7 +476,9 @@ export const useGame = create<GameState>()((set, get) => ({
 
   addEntry: (title, text, kind = 'event', sketch) => {
     set((s) => ({
-      journal: [...s.journal, { id: ++nextEntryId, day: Math.floor(s.day), title, text, kind, sketch }],
+      // The wound level colors the writing hand and leaves blood traces on
+      // the entry (design.md §16).
+      journal: [...s.journal, { id: ++nextEntryId, day: Math.floor(s.day), title, text, kind, sketch, wounds: s.afflictions.wounds }],
       // Do not disturb (design.md §16): entries appear silently; the journal
       // only opens automatically while the option is off.
       journalOpen: useUi.getState().journalDnd ? s.journalOpen : true,
