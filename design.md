@@ -201,6 +201,8 @@ Movement is restricted to the continent and its inland waters (rivers, lakes). S
 **Water, current and waterfalls.**
 Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4). Moving with the current is faster, against it slower. There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
 
+Visually, water follows the height profile of the map: rivers lie in beds carved into the local relief and their surface descends monotonically from source to mouth — never sea-level canyons through the highlands. The surface itself is calm (only slight movement, no ocean-style wave field) with a recognizable downstream current (drifting streaks) that visibly accelerates at rapids and waterfalls. Waterfalls (§4.4) are rendered as white cascades with plunge-pool foam and mist; rivers that rise in open land show a spring at their source. Lakes are flat surfaces at their local shore height. Further realism measures: foam along river banks, depth-tinted beds, glossy sky reflections on open water and a subdued ocean swell.
+
 You can also move through water without a canoe, but you are slower and more exposed to the current. There is additionally the risk of being attacked by a crocodile and being injured or eaten. Without a canoe the rifle gets wet in the water and is then useless; only a machete reduces the risk. In the canoe the rifle stays dry and works as usual.
 
 Movement happens in the bird's-eye view; the terrain is rendered in 3D, the controls remain top-down oriented.

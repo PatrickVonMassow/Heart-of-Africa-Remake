@@ -58,10 +58,12 @@ export function createWaterMaterial(): WaterMaterialHandle {
     const s = phase.sin().mul(0.5).add(0.5)
     return pow(s, float(1.6)).sub(0.5).mul(amp * 2)
   }
-  const w1 = wave(0.8, 0.6, 9.5, 0.1, 0.55)
-  const w2 = wave(-0.55, 0.83, 5.7, 0.06, 0.8)
-  const w3 = wave(0.2, -0.98, 14.5, 0.08, 0.35)
-  const swell = mx_fractal_noise_float(vec3(wp.mul(0.045), time.mul(0.09)), 3).mul(0.18)
+  // Kept subtle (design.md §11: only slight surface movement); rivers and
+  // lakes have their own calm surfaces (scenes/travel/Rivers.tsx).
+  const w1 = wave(0.8, 0.6, 9.5, 0.05, 0.55)
+  const w2 = wave(-0.55, 0.83, 5.7, 0.03, 0.8)
+  const w3 = wave(0.2, -0.98, 14.5, 0.04, 0.35)
+  const swell = mx_fractal_noise_float(vec3(wp.mul(0.045), time.mul(0.09)), 3).mul(0.1)
   const waveH = w1.add(w2).add(w3).add(swell)
   m.positionNode = positionLocal.add(vec3(0, 0, waveH))
 

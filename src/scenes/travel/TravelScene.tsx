@@ -30,6 +30,7 @@ import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
+import { RiversAndLakes } from './Rivers'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { TRAVEL_SKY } from '../../render/skyPresets'
@@ -895,6 +896,7 @@ export function TravelScene() {
       <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
       <Sun />
       <TerrainChunks />
+      <RiversAndLakes />
       <RegionBorders />
       <WaterPlane />
       <Vegetation />

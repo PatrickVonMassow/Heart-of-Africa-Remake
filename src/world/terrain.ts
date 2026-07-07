@@ -247,22 +247,26 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // distance to the shoreline/centerline, so the waterline is the smooth
   // 0-contour — no per-vertex steps along banks (design.md §3).
   const lakeD = lakeDistance(lat, lon, 1)
+  // Rivers and lakes carve their bed *relative to the local relief*, so the
+  // water follows the map's height profile (design.md §2/§11) instead of
+  // cutting sea-level canyons through the highlands. The visible surfaces
+  // are separate meshes laid into these beds (scenes/travel/Rivers.tsx).
+  let carve = 0
   if (lakeD < 0.3 || lakeContains(lat, lon)) {
     const sd = lakeContains(lat, lon) ? -lakeD : lakeD // signed: negative inside
-    const hWater = Math.max(-0.6, 0.06 + sd * 2.6)
-    if (hWater < height) height = hWater
+    carve = Math.max(carve, sstep(0.28, -0.12, sd) * 0.6)
     if (sd < -0.005) type = 'water'
   }
   const riverS = riverD - RIVER_WIDTH_DEG
   if (riverS < RIVER_WIDTH_DEG * 1.6) {
-    const hWater = Math.max(-0.32, 0.06 + riverS * 2.2)
-    if (hWater < height) height = hWater
+    carve = Math.max(carve, sstep(RIVER_WIDTH_DEG * 1.6, -RIVER_WIDTH_DEG * 0.6, riverS) * 0.5)
     if (riverS < -0.005) type = 'water'
   }
+  if (carve > 0) height -= carve
   if (type === 'water') {
-    // Sandy bank fading into water-blue with depth; the transparent water
-    // plane above adds the actual surface.
-    const depth = sstep(0.02, -0.35, height)
+    // Sandy bank fading into water-blue with channel depth; the river/lake
+    // surface meshes above add the actual water.
+    const depth = sstep(0.1, 0.5, carve)
     color = mix(mix(biomeColor('coast', detail), color, 0.4), PALETTE.water, depth)
     splat[0] += 1.5
   }
