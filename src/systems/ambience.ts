@@ -4,6 +4,7 @@
 // The context starts on the first user gesture (browser autoplay policy).
 
 import type { RegionId } from '../world/geo'
+import { balance } from '../config/balance'
 
 export interface AmbienceScene {
   region: RegionId
@@ -228,9 +229,12 @@ function applyScene() {
     east: 0.2,
     south: 0.18,
   }
-  setTarget('wind', inPlace ? 0.1 : windByRegion[region])
-  setTarget('surf', port ? 0.22 : 0)
-  setTarget('murmur', port ? 0.3 : 0)
+  // The broadband noise beds are scaled by the configurable ambience noise
+  // volume (design.md §21; default 0.2 = 20 % of the former loudness).
+  const noise = balance.ambienceNoiseVolume
+  setTarget('wind', (inPlace ? 0.1 : windByRegion[region]) * noise)
+  setTarget('surf', (port ? 0.22 : 0) * noise)
+  setTarget('murmur', (port ? 0.3 : 0) * noise)
   setTarget('insects', !port && (region === 'west' || region === 'south' || region === 'east') ? (inPlace ? 0.12 : 0.2) : 0)
   setTarget('birds', !port && region === 'central' ? (inPlace ? 0.25 : 0.4) : 0)
   setTarget('drums', village ? 0.5 : nearVillage ? 0.18 : 0)
@@ -249,6 +253,11 @@ export function startAmbience() {
   ctx = new Ctor()
   buildGraph()
   applyScene()
+}
+
+/** Re-apply the gain targets after a volume change in the debug menu. */
+export function refreshAmbienceVolume() {
+  if (ctx) applyScene()
 }
 
 /** Update the ambience to the current game situation. */

@@ -3,6 +3,7 @@
 // English). Implemented only as far as the POC systems require (CLAUDE.md §8).
 
 import { balance } from '../config/balance'
+import { refreshAmbienceVolume } from '../systems/ambience'
 import { useGame, type EquipmentId } from '../state/store'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
@@ -76,6 +77,11 @@ export function DebugMenu() {
         onChange={(v) => set('placeWalkSpeed', v)} />
       <NumberField label={t.debug.mouseSensitivity} value={balance.mouseSensitivity} step={0.0002}
         onChange={(v) => set('mouseSensitivity', Math.max(0, v))} />
+      <NumberField label={t.debug.ambienceVolume} value={balance.ambienceNoiseVolume} step={0.05}
+        onChange={(v) => {
+          set('ambienceNoiseVolume', Math.max(0, v))
+          refreshAmbienceVolume()
+        }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.daysPerUnit} value={balance.daysPerUnit} step={0.05}

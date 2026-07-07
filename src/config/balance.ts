@@ -10,6 +10,8 @@ export interface BalanceConfig {
   placeWalkSpeed: number
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
+  /** Volume multiplier for the ambience noise beds (wind/surf/murmur), 1 = full. */
+  ambienceNoiseVolume: number
   /** In-game days that pass per world unit traveled on the map. */
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
@@ -45,6 +47,7 @@ export const balance: BalanceConfig = {
   travelSpeed: 8,
   placeWalkSpeed: 7.5,
   mouseSensitivity: 0.0011,
+  ambienceNoiseVolume: 0.2,
   daysPerUnit: 0.2,
   foodPerDay: 1,
   terrainCost: {

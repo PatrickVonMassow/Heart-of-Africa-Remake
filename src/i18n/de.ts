@@ -222,6 +222,7 @@ export const de: Strings = {
     travelSpeed: 'Tempo außerorts',
     walkSpeed: 'Tempo innerorts',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
+    ambienceVolume: 'Ambiente-Rauschen (Lautstärke)',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',
     daysPerUnit: 'Tage pro Wegeinheit',
     digRadius: 'Grabe-Radius',

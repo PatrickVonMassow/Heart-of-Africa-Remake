@@ -223,6 +223,7 @@ export const en: Strings = {
     travelSpeed: 'Travel speed (overland)',
     walkSpeed: 'Walk speed (in places)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
+    ambienceVolume: 'Ambience noise volume',
     foodPerDay: 'Food use per day (0 = infinite)',
     daysPerUnit: 'Days per travel unit',
     digRadius: 'Dig radius',
