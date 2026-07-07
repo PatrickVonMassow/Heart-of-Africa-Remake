@@ -82,7 +82,7 @@ must be justified in its commit.
 ```
 project-root/
 ├── CLAUDE.md          (this file)
-├── design.md          (target state, do not modify)
+├── design.md          (target state; updated on user change requests)
 ├── package.json
 ├── index.html
 ├── vite.config.ts
@@ -93,8 +93,11 @@ project-root/
     └── ...            (game code goes here)
 ```
 
-`design.md` is not modified. `node_modules/` stays out of version control
-(the Vite `.gitignore` covers this).
+`design.md` is never modified unilaterally. When the user requests a change,
+however, `design.md` and this file are updated along with the code — wherever
+the change touches design content or the build order — so both documents
+always describe the current target state. `node_modules/` stays out of
+version control (the Vite `.gitignore` covers this).
 
 Game code is organized by topic (e.g. `src/world/`, `src/places/`,
 `src/journal/`, `src/systems/`, `src/ui/`). No monolith file.
