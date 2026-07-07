@@ -60,6 +60,7 @@ node scripts/verify/world.mjs       # §7.1.3 world-model data + screenshots
 node scripts/verify/i18n.mjs        # §7.1.17 localization (de default, en)
 node scripts/verify/voice.mjs       # §7.1.19 voice markup + read-aloud + auto-narration (needs HF CDN access)
 node scripts/verify/settings.mjs    # §7.1.20 comfort/audio settings + lion feeding (§7.1.12)
+node scripts/verify/enrichments.mjs # §7.1.3/4/12/15/20/21 borders, sea, water, wildlife, sizes
 
 npm run build && npm run preview    # prerequisite for the production check
 node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean

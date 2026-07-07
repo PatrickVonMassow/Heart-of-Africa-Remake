@@ -238,6 +238,16 @@ function Herds() {
     [],
   )
 
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__wildlife = { herdsRef, stains }
+    return () => {
+      delete w.__wildlife
+    }
+  }, [])
+
   useFrame(({ clock }) => {
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)

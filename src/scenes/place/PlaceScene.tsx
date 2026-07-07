@@ -1268,6 +1268,17 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
   )
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeBackdrop = geometry.attributes.position.count
+    return () => {
+      delete w.__placeBackdrop
+    }
+  }, [geometry])
+
   return <mesh geometry={geometry} material={material} receiveShadow />
 }
 

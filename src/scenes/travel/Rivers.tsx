@@ -6,7 +6,7 @@
 // plunge-pool foam, and rivers rising in open land get a spring marker.
 // Lakes are flat polygon surfaces at their local shore height.
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three/webgpu'
 import {
   attribute,
@@ -293,6 +293,16 @@ export function RiversAndLakes() {
   const lakes = useMemo(() => buildLakeSurfaces(seed), [seed])
   const riverMat = useMemo(() => createRiverMaterial(), [])
   const lakeMat = useMemo(() => createLakeMaterial(), [])
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__rivers = { falls: falls.length, springs: springs.length, lakes: lakes.length }
+    return () => {
+      delete w.__rivers
+    }
+  }, [falls, springs, lakes])
 
   return (
     <>

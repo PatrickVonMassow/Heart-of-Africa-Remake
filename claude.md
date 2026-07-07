@@ -185,10 +185,18 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    courses of the rivers. A coordinate display (latitude/longitude in
    degrees) is present. Research what the exact geography of Africa was at
    the end of the 19th century. All 10 port cities, 22 peoples, 17 rivers
-   and every landmark from `design.md` must be implemented.
+   and every landmark from `design.md` must be implemented. The region
+   borders carry the localized region name on each side of the line, both
+   on the exploration map and in the bird's-eye view (`design.md` §3).
+   Verifiable: near a border, `.region-label` elements name both regions
+   on their sides (`scripts/verify/enrichments.mjs`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890 per
-   `design.md`).
+   `design.md`). Sea water enclosed by the continent's outline (bays,
+   gulfs) is swimmable like inland water; the open ocean beyond the
+   outline blocks movement (`design.md` §11). Verifiable: an automated
+   move on enclosed sea advances the position, a move on open ocean is
+   refused with the blocking notice (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (simplified saving is sufficient).
@@ -218,10 +226,18 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     "**Graphics and atmosphere.**" passage in "## 2. Perspectives and
     Camera". This includes the feed phase of the decorative lion hunt
     (`design.md` §19): after the catch the lion visibly feeds on the
-    carcass (lowered, rhythmically tearing head movements, spreading stain
-    beneath the prey). Verifiable: an automated check forces the feed
-    state and asserts the visible carcass, the lowered animated head and
-    the stain.
+    carcass (lowered, rhythmically tearing head movements, red spreading
+    stain beneath the prey), the carcass shrinks away piece by piece, and
+    once it is consumed the lion moves on. Further animal interactions
+    hold: wandering elephants trample smaller animals (dead on the ground
+    over a red stain), prey scatters from an active lion, vultures circle
+    a kill, shore-near animals periodically walk to the water and drink,
+    grazers dip their heads on open land. The open landscape is dressed
+    with region-typical period elements (baobabs, termite mounds, kopjes,
+    dead trees, papyrus belts along water; `design.md` §19). Verifiable:
+    automated checks force the feed state (carcass, head animation, stain,
+    leave phase) and provoke a trampling via an injected elephant
+    (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes
@@ -251,10 +267,17 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     density — a recognizable street/path network, and inhabitants who move
     believably through the settlement, entering and leaving their homes.
     The enterable functional buildings remain clearly highlighted.
-    Verifiable: screenshots of a port city and a village show dense
-    building fabric with paths and several non-functional buildings;
-    inhabitants move about and use their dwellings; the application loads
-    without console errors.
+    Settlement size mirrors real ~1890 importance (`design.md` §4.1):
+    major cities are markedly larger than small stations. Villages show
+    the life vignettes of `design.md` §19 (conversing pairs, fire tender,
+    cooking runs from the huts, grain pounding, drummer, well with water
+    carrier), and the first-person background is a panorama of the real
+    surrounding map landscape (`design.md` §2). Verifiable: screenshots of
+    a port city and a village show dense building fabric with paths and
+    several non-functional buildings; inhabitants move about and use their
+    dwellings; Cairo's walkable radius and dwelling count exceed Boma's;
+    the backdrop mesh is present; the application loads without console
+    errors (`scripts/verify/enrichments.mjs`).
 16. **Collision inside settlements.** The collision point of the passage
     "**Lively, densely built settlements (first-person).**" (`design.md`
     §2) is implemented: neither the player character nor the inhabitants
@@ -306,15 +329,33 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
     value), walk speed inside settlements to 7.5 m/s (1.5× the former),
     the first-person eye height is 1.5 m, and the ambience noise beds
-    (wind/surf/murmur) play at a 0.2 volume multiplier. Mouse sensitivity,
-    walk speed and ambience noise volume are adjustable at runtime in the
-    debug menu (`design.md` §21) in both languages. Verifiable:
-    `scripts/verify/settings.mjs` asserts the defaults, the eye height,
-    the working debug-menu controls in both languages and the lion-feed
-    depiction (pt. 12); `scripts/verify/collision.mjs` additionally proves
-    corner clearance at box buildings and an inhabitant re-entering its
-    dwelling (pt. 16); `scripts/verify/voice.mjs` proves the automatic
-    narration of a new entry (pt. 19).
+    (wind/surf/murmur) and their gust/swell modulation each play at a 0.2
+    volume multiplier. Mouse sensitivity, walk speed and both ambience
+    volumes are adjustable at runtime in the debug menu (`design.md` §21)
+    in both languages; the debug menu additionally offers the mouse-wheel
+    zoom unlock for the bird's-eye view, dropdown selectors for jump-to/
+    equipment/gifts, and a read-only display of the active render backend.
+    Verifiable: `scripts/verify/settings.mjs` asserts the defaults, the
+    eye height, the working debug-menu controls in both languages and the
+    lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts
+    the zoom gate, the dropdowns and the renderer row;
+    `scripts/verify/collision.mjs` additionally proves corner clearance at
+    box buildings and an inhabitant re-entering its dwelling (pt. 16);
+    `scripts/verify/voice.mjs` proves the automatic narration of a new
+    entry (pt. 19).
+21. **Water realism.** The visual part of the passage "**Water, current
+    and waterfalls.**" in `design.md` §11 is implemented: rivers lie in
+    beds carved relative to the local relief and their surfaces descend
+    monotonically from source to mouth (no sea-level canyons); the surface
+    is calm with a visible downstream current that strengthens at rapids
+    and waterfalls; the five waterfall landmarks show white cascades with
+    plunge-pool foam; rivers rising in open land show a spring; lakes have
+    flat surfaces at their local shore height. Verifiable:
+    `scripts/verify/enrichments.mjs` asserts 5 cascades, at least one
+    spring and 8 lake surfaces via the dev hook; screenshots of the Nile,
+    Victoria Falls and Lake Victoria (71-73) show the courses. The
+    current's *gameplay* effect (drift, being swept over falls) stays
+    outside the POC (§8).
 
 ### 7.2 Self-Verification (mandatory)
 

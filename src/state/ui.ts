@@ -59,3 +59,8 @@ export const useUi = create<UiState>()((set) => ({
     set(wheelZoomEnabled ? { wheelZoomEnabled } : { wheelZoomEnabled, travelZoom: 1 }),
   setTravelZoom: (travelZoom) => set({ travelZoom: Math.min(2.5, Math.max(0.4, travelZoom)) }),
 }))
+
+// Dev hook for the headless verification (CLAUDE.md §7.2).
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__ui = useUi
+}

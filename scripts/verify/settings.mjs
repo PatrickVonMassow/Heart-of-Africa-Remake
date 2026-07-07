@@ -36,10 +36,12 @@ const bal = await page.evaluate(() => ({
   mouse: window.__balance.mouseSensitivity,
   walk: window.__balance.placeWalkSpeed,
   noise: window.__balance.ambienceNoiseVolume,
+  gust: window.__balance.ambienceGustVolume,
 }))
 check('default mouse sensitivity halved (0.0011)', bal.mouse === 0.0011, `${bal.mouse}`)
 check('default walk speed 1.5x (7.5)', bal.walk === 7.5, `${bal.walk}`)
 check('default ambience noise volume 20 % (0.2)', bal.noise === 0.2, `${bal.noise}`)
+check('default ambience gust volume 20 % (0.2)', bal.gust === 0.2, `${bal.gust}`)
 
 // --- First-person eye height -------------------------------------------------
 const eyeY = await page.evaluate(() => window.__placeCamera?.position.y)
