@@ -1,6 +1,10 @@
 // Ambient life in places (design.md §19 "village and market life", §2 bustle):
 // villagers cooking and weaving, playing children and goats in villages;
-// porters and traders in the wealthier ports. Pure animation, no mechanics.
+// porters and traders in the wealthier ports. Inhabitants interact with each
+// other and with the props: pairs stand in conversation, a fire tender stokes
+// the fire, food is fetched from the huts and cooked over it, grain is
+// pounded in a mortar, a drummer plays, and water is carried from the well.
+// Pure animation, no mechanics.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -9,6 +13,7 @@ import { mulberry32 } from '../../world/noise'
 import { buildGoat } from '../../render/fauna'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, type Collider } from './collision'
+import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
 const NPC_RADIUS = 0.3
@@ -238,6 +243,278 @@ function Porters({
           </mesh>
         </group>
       ))}
+    </>
+  )
+}
+
+/** Two inhabitants standing together in conversation, gesturing. */
+function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
+  const a = useRef<THREE.Group>(null)
+  const b = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    // Alternating gestures: slight turns and nods toward each other.
+    if (a.current) {
+      a.current.rotation.y = Math.PI / 2 + Math.sin(t * 1.15) * 0.18
+      a.current.position.y = Math.max(0, Math.sin(t * 2.3)) * 0.03
+    }
+    if (b.current) {
+      b.current.rotation.y = -Math.PI / 2 + Math.sin(t * 1.15 + Math.PI) * 0.18
+      b.current.position.y = Math.max(0, Math.sin(t * 2.3 + Math.PI)) * 0.03
+    }
+  })
+  return (
+    <group position={[x, 0, z]}>
+      <group ref={a} position={[-0.5, 0, 0]}>
+        <Figure cloth={cloth[0]} />
+      </group>
+      <group ref={b} position={[0.5, 0, 0]}>
+        <Figure cloth={cloth[1 % cloth.length]} />
+      </group>
+    </group>
+  )
+}
+
+/** Grain pounding: mortar and a rising, falling pestle (period staple). */
+function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const pestle = useRef<THREE.Mesh>(null)
+  const body = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const stroke = Math.abs(Math.sin(t * 2.4))
+    if (pestle.current) pestle.current.position.y = 1.05 + stroke * 0.38
+    if (body.current) body.current.position.y = -stroke * 0.06
+  })
+  return (
+    <group position={[x, 0, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
+      <group ref={body} position={[0, 0, -0.55]}>
+        <Figure cloth={cloth} />
+      </group>
+      {/* Mortar */}
+      <mesh position={[0, 0.21, 0]} castShadow>
+        <cylinderGeometry args={[0.2, 0.26, 0.42, 8]} />
+        <meshStandardMaterial color="#5f4526" roughness={0.95} />
+      </mesh>
+      {/* Pestle */}
+      <mesh ref={pestle} position={[0, 1.05, 0]} castShadow>
+        <cylinderGeometry args={[0.045, 0.055, 1.05, 5]} />
+        <meshStandardMaterial color="#7a5a32" roughness={0.9} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Drummer beating a hide drum — the audible village drums made visible. */
+function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const hands = useRef<Array<THREE.Mesh | null>>([])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime * 4.2 // matches the drum-bar tempo roughly
+    hands.current.forEach((h, i) => {
+      if (h) h.position.y = 0.78 + Math.max(0, Math.sin(t + i * Math.PI)) * 0.16
+    })
+  })
+  return (
+    <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
+      <Figure cloth={cloth} />
+      {/* Drum */}
+      <mesh position={[0, 0.34, 0.48]} castShadow>
+        <cylinderGeometry args={[0.26, 0.2, 0.66, 9]} />
+        <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+      </mesh>
+      {[-0.14, 0.14].map((hx, i) => (
+        <mesh
+          key={hx}
+          ref={(el) => {
+            hands.current[i] = el
+          }}
+          position={[hx, 0.78, 0.42]}
+          castShadow
+        >
+          <sphereGeometry args={[0.07, 6, 5]} />
+          <meshStandardMaterial color="#5c3317" roughness={0.85} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Fire tender kneeling at the fire pit, stoking the embers with a stick. */
+function FireTender({ x, z, cloth }: { x: number; z: number; cloth: string }) {
+  const stick = useRef<THREE.Mesh>(null)
+  useFrame(({ clock }) => {
+    if (stick.current) stick.current.rotation.x = 0.85 + Math.sin(clock.elapsedTime * 1.6) * 0.12
+  })
+  return (
+    <group position={[x, 0, z]} rotation={[0, Math.atan2(-3.5 - x, 2.5 - z), 0]}>
+      <Figure cloth={cloth} kneel />
+      <mesh ref={stick} position={[0.2, 0.5, 0.35]} castShadow>
+        <cylinderGeometry args={[0.025, 0.03, 1.15, 4]} />
+        <meshStandardMaterial color="#4a3018" roughness={0.95} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Village well: stone ring with a wooden frame and bucket. */
+function Well({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      {Array.from({ length: 9 }, (_, i) => {
+        const a = (i / 9) * Math.PI * 2
+        return (
+          <mesh key={i} position={[Math.cos(a) * 0.55, 0.18, Math.sin(a) * 0.55]} castShadow>
+            <dodecahedronGeometry args={[0.19, 0]} />
+            <meshStandardMaterial color="#8d8478" roughness={1} />
+          </mesh>
+        )
+      })}
+      <mesh position={[0, 0.05, 0]}>
+        <cylinderGeometry args={[0.48, 0.48, 0.08, 12]} />
+        <meshStandardMaterial color="#28516b" roughness={0.3} />
+      </mesh>
+      {[-0.6, 0.6].map((px) => (
+        <mesh key={px} position={[px, 0.75, 0]} castShadow>
+          <cylinderGeometry args={[0.05, 0.06, 1.5, 5]} />
+          <meshStandardMaterial color="#5f4526" roughness={0.95} />
+        </mesh>
+      ))}
+      <mesh position={[0, 1.45, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 1.3, 5]} />
+        <meshStandardMaterial color="#5f4526" roughness={0.95} />
+      </mesh>
+      {/* Bucket on the rope */}
+      <mesh position={[0, 0.95, 0]} castShadow>
+        <cylinderGeometry args={[0.11, 0.09, 0.18, 7]} />
+        <meshStandardMaterial color="#6e4f2a" roughness={0.9} />
+      </mesh>
+    </group>
+  )
+}
+
+/**
+ * Task loop (design.md §19): an inhabitant steps out of its dwelling,
+ * carries something to a fixed target (food bundle to the fire, jar to the
+ * well), kneels there working, and returns home. Door segments skip
+ * collision like the Walkers.
+ */
+function TaskWalker({
+  home,
+  target,
+  cloth,
+  carry,
+  colliders,
+  startDelay,
+}: {
+  home: HomeDef
+  target: [number, number]
+  cloth: string
+  carry: 'bundle' | 'jar'
+  colliders: Collider[]
+  startDelay: number
+}) {
+  const standing = useRef<THREE.Group>(null)
+  const kneeling = useRef<THREE.Group>(null)
+  const state = useRef({
+    mode: 'inside' as 'inside' | 'go' | 'work' | 'back',
+    seg: 0,
+    x: home.x,
+    z: home.z,
+    yaw: 0,
+    timer: startDelay,
+  })
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    const s = state.current
+    const stand = standing.current
+    const kneel = kneeling.current
+    if (!stand || !kneel) return
+
+    const route =
+      s.mode === 'back'
+        ? [target, home.door, [home.x, home.z] as [number, number]]
+        : [[home.x, home.z] as [number, number], home.door, target]
+
+    if (s.mode === 'inside') {
+      stand.visible = false
+      kneel.visible = false
+      s.timer -= dt
+      if (s.timer <= 0) {
+        s.mode = 'go'
+        s.seg = 0
+        s.x = home.x
+        s.z = home.z
+      }
+      return
+    }
+    if (s.mode === 'work') {
+      stand.visible = false
+      kneel.visible = true
+      kneel.position.set(s.x, 0, s.z)
+      kneel.rotation.y = s.yaw
+      s.timer -= dt
+      if (s.timer <= 0) {
+        s.mode = 'back'
+        s.seg = 0
+      }
+      return
+    }
+
+    stand.visible = true
+    kneel.visible = false
+    const tgt = route[s.seg + 1]
+    if (!tgt) {
+      if (s.mode === 'go') {
+        s.mode = 'work'
+        s.timer = 5 + Math.random() * 5
+      } else {
+        s.mode = 'inside'
+        s.timer = 10 + Math.random() * 16
+      }
+      return
+    }
+    const dx = tgt[0] - s.x
+    const dz = tgt[1] - s.z
+    const d = Math.hypot(dx, dz)
+    const step = 1.2 * dt
+    // The home leg (center ↔ door) passes through the own dwelling.
+    const throughDoor = s.mode === 'go' ? s.seg === 0 : s.seg === route.length - 2
+    if (d <= step + (throughDoor ? 0.08 : 0.3)) {
+      s.seg++
+    } else if (throughDoor) {
+      s.x += (dx / d) * step
+      s.z += (dz / d) * step
+      s.yaw = Math.atan2(dx, dz)
+    } else {
+      const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS)
+      if (Math.hypot(nx - s.x, nz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
+      s.x = nx
+      s.z = nz
+      s.yaw = Math.atan2(dx, dz)
+    }
+    stand.position.set(s.x, 0, s.z)
+    stand.rotation.y = s.yaw
+  })
+
+  return (
+    <>
+      <group ref={standing} visible={false}>
+        <Figure cloth={cloth} />
+        {carry === 'bundle' ? (
+          <mesh position={[0, 1.42, 0]} castShadow>
+            <boxGeometry args={[0.38, 0.22, 0.3]} />
+            <meshStandardMaterial color="#a3702e" roughness={0.95} />
+          </mesh>
+        ) : (
+          <mesh position={[0, 1.5, 0]} castShadow>
+            <cylinderGeometry args={[0.12, 0.16, 0.32, 8]} />
+            <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+          </mesh>
+        )}
+      </group>
+      <group ref={kneeling} visible={false}>
+        <Figure cloth={cloth} kneel />
+      </group>
     </>
   )
 }
@@ -503,6 +780,7 @@ export function PlaceLife({
       <>
         <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} />
         <Traders seed={localSeed} cloth={style.cloth} />
+        <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
         <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={6} colliders={colliders} />
       </>
     )
@@ -514,6 +792,32 @@ export function PlaceLife({
       <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
       <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
       <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={5} colliders={colliders} />
+      {/* Inhabitant/prop interactions (design.md §19). */}
+      <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
+      <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
+      <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
+      <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
+      <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />
+      {homes.length > 0 && (
+        <TaskWalker
+          home={homes[0]}
+          target={[firePos[0] + 0.7, firePos[1] + 1.8]}
+          cloth={style.cloth[0]}
+          carry="bundle"
+          colliders={colliders}
+          startDelay={4}
+        />
+      )}
+      {homes.length > 1 && (
+        <TaskWalker
+          home={homes[1]}
+          target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
+          cloth={style.cloth[1 % style.cloth.length]}
+          carry="jar"
+          colliders={colliders}
+          startDelay={9}
+        />
+      )}
     </>
   )
 }

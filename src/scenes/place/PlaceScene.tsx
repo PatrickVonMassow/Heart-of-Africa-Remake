@@ -20,6 +20,7 @@ import { createGroundMaterial, createNoisyMaterial } from '../../render/material
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
+import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 import { boxColliders, resolveMove, type Collider } from './collision'
 import { getStrings, useStrings } from '../../i18n'
 
@@ -142,10 +143,14 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   let pen: PlaceLayout['pen'] = null
   const center: [number, number] = [0, 1.5]
 
-  // Keep the southern spawn corridor (x≈0, z>6) and interactives clear.
+  // Keep the southern spawn corridor (x≈0, z>6), interactives and the
+  // life-prop spots (PlaceLife) clear.
+  const lifeSpots: Array<[number, number]> =
+    place.kind === 'village' ? Object.values(VILLAGE_SPOTS) : [PORT_TALKERS]
   const isFree = (x: number, z: number, margin: number) => {
     if (Math.abs(x) < 4.5 && z > 5) return false
     if (Math.hypot(x, z - 18) < 6) return false
+    if (!lifeSpots.every(([sx, sz]) => Math.hypot(x - sx, z - sz) > margin * 0.6 + 1)) return false
     if (!interactives.every((it) => Math.hypot(x - it.pos[0], z - it.pos[1]) > margin)) return false
     return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > margin * 0.55 + d.r)
   }
@@ -388,6 +393,13 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push({ x: -3.5, z: 2.5, r: 1.3 }) // fire pit
     colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
     colliders.push({ x: -3.5 + 1.2, z: 2.5 + 1.0, r: 0.45 }) // cook
+    // Village-life props (design.md §19; positions from PlaceLife).
+    colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
+    colliders.push({ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 })
+    colliders.push({ x: VILLAGE_SPOTS.drummer[0], z: VILLAGE_SPOTS.drummer[1], r: 0.5 })
+    colliders.push({ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 })
+  } else {
+    colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
 
   return { interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
