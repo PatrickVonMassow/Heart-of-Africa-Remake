@@ -43,7 +43,7 @@ export interface BalanceConfig {
 
 export const balance: BalanceConfig = {
   travelSpeed: 8,
-  placeWalkSpeed: 5,
+  placeWalkSpeed: 7.5,
   mouseSensitivity: 0.0011,
   daysPerUnit: 0.2,
   foodPerDay: 1,
