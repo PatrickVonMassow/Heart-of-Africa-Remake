@@ -1,7 +1,10 @@
 // Ambient wildlife for the travel view (design.md §19): non-threatening
 // herds as scenery (elephants, giraffes, zebras, antelopes, flamingos at the
 // lakes), a purely decorative lion hunt, and vultures circling the player
-// when the expedition is in poor condition. No gameplay effect.
+// when the expedition is in poor condition. The animals interact with one
+// another: wandering elephants trample smaller animals underfoot (dead over
+// a red stain), prey scatters away from an active lion, and vultures gather
+// above a kill. No gameplay effect.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -41,7 +44,32 @@ interface Animal {
   scale: number
   /** Per-animal phase for the grazing shuffle. */
   phase: number
+  /** Trampled by an elephant: lies dead at (x,z) (design.md §19). */
+  dead?: boolean
 }
+
+/**
+ * Shared lion-hunt state (module scope): the herds react to it — prey
+ * animals flee from an active lion, vultures gather over the kill.
+ */
+interface LionHuntState {
+  mode: 'idle' | 'chase' | 'feed' | 'leave'
+  lx: number
+  lz: number
+  px: number
+  pz: number
+  timer: number
+  heading: number
+}
+const LION_STATE: LionHuntState = { mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0 }
+
+/** Species that flee from a hunting or feeding lion. */
+const FLEES_LION: Record<Species, boolean> = {
+  elephant: false, giraffe: true, zebra: true, antelope: true, flamingo: false,
+}
+const TRAMPLE_RADIUS = 1.5
+const FLEE_RADIUS = 14
+const MAX_STAINS = 60
 
 function hash(cx: number, cz: number, i: number, seed: number): number {
   let h = (seed ^ 0xa51ce5) >>> 0
@@ -173,9 +201,17 @@ function Herds() {
 
   const mtx = useMemo(() => new THREE.Matrix4(), [])
   const quat = useMemo(() => new THREE.Quaternion(), [])
+  const euler = useMemo(() => new THREE.Euler(), [])
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), [])
   const vpos = useMemo(() => new THREE.Vector3(), [])
   const vscl = useMemo(() => new THREE.Vector3(), [])
+  const stainMesh = useRef<THREE.InstancedMesh>(null)
+  const stains = useRef<Array<[number, number, number]>>([])
+  const stainGeo = useMemo(() => new THREE.CircleGeometry(0.9, 16), [])
+  const stainMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#a51512', roughness: 1, transparent: true, opacity: 0.8 }),
+    [],
+  )
 
   useFrame(({ clock }) => {
     const pos = useGame.getState().pos
@@ -185,28 +221,109 @@ function Herds() {
     if (center !== lastCenter.current) {
       lastCenter.current = center
       herdsRef.current = buildHerds(cx, cz, seed)
+      stains.current = []
     }
     const herds = herdsRef.current
     if (!herds) return
 
-    // Grazing shuffle: slow per-animal drift and heading sway.
     const t = clock.elapsedTime
+    const lionActive = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
+
+    // Elephants first: slow herd wander — their current positions drive the
+    // trampling of smaller animals underfoot (design.md §19).
+    const elephantPos: Array<[number, number]> = []
+    {
+      const list = herds.elephant
+      const n = Math.min(list.length, MAX_INSTANCES.elephant)
+      for (let i = 0; i < n; i++) {
+        const a = list[i]
+        if (a.dead) continue
+        elephantPos.push([
+          a.x + Math.sin(t * 0.055 + a.phase) * 4.5,
+          a.z + Math.cos(t * 0.04 + a.phase * 1.7) * 4.5,
+        ])
+      }
+    }
+
     for (const sp of SPECIES) {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
       const list = herds[sp]
       const n = Math.min(list.length, MAX_INSTANCES[sp])
+      let eIdx = 0
       for (let i = 0; i < n; i++) {
         const a = list[i]
+        if (a.dead) {
+          // Trampled: lies on its side where it was caught, over a stain.
+          euler.set(0, a.rot, Math.PI / 2.15)
+          quat.setFromEuler(euler)
+          vpos.set(a.x, Math.max(0.02, a.y), a.z)
+          vscl.setScalar(a.scale)
+          mtx.compose(vpos, quat, vscl)
+          mesh.setMatrixAt(i, mtx)
+          continue
+        }
         const wob = Math.sin(t * 0.25 + a.phase)
-        vpos.set(a.x + wob * 0.8, a.y, a.z + Math.cos(t * 0.2 + a.phase) * 0.8)
-        quat.setFromAxisAngle(up, a.rot + wob * 0.4)
+        let px: number
+        let pz: number
+        if (sp === 'elephant') {
+          ;[px, pz] = elephantPos[eIdx++]
+        } else {
+          px = a.x + wob * 0.8
+          pz = a.z + Math.cos(t * 0.2 + a.phase) * 0.8
+        }
+        let yaw = a.rot + wob * 0.4
+        // Prey scatters away from an active lion (design.md §19).
+        if (lionActive && FLEES_LION[sp]) {
+          const dx = px - LION_STATE.lx
+          const dz = pz - LION_STATE.lz
+          const d = Math.hypot(dx, dz)
+          if (d < FLEE_RADIUS && d > 0.01) {
+            const push = ((FLEE_RADIUS - d) / FLEE_RADIUS) * 6
+            px += (dx / d) * push
+            pz += (dz / d) * push
+            yaw = Math.atan2(dx, dz) // face away while fleeing
+          }
+        }
+        // Under an elephant: trampled, stays dead on the ground.
+        if (sp !== 'elephant') {
+          for (const [ex, ez] of elephantPos) {
+            if (Math.hypot(px - ex, pz - ez) < TRAMPLE_RADIUS) {
+              a.dead = true
+              a.x = px
+              a.z = pz
+              if (stains.current.length < MAX_STAINS) stains.current.push([px, a.y, pz])
+              break
+            }
+          }
+          if (a.dead) {
+            i-- // re-render this animal in its dead pose immediately
+            continue
+          }
+        }
+        vpos.set(px, a.y, pz)
+        quat.setFromAxisAngle(up, yaw)
         vscl.setScalar(a.scale)
         mtx.compose(vpos, quat, vscl)
         mesh.setMatrixAt(i, mtx)
       }
       mesh.count = n
       mesh.instanceMatrix.needsUpdate = true
+    }
+
+    // Stains beneath trampled animals.
+    const sm = stainMesh.current
+    if (sm) {
+      stains.current.forEach(([x, y, z], i) => {
+        euler.set(-Math.PI / 2, 0, 0)
+        quat.setFromEuler(euler)
+        vpos.set(x, Math.max(0.02, y) + 0.012, z)
+        vscl.setScalar(1)
+        mtx.compose(vpos, quat, vscl)
+        sm.setMatrixAt(i, mtx)
+      })
+      sm.count = stains.current.length
+      sm.instanceMatrix.needsUpdate = true
     }
   })
 
@@ -223,6 +340,7 @@ function Herds() {
           frustumCulled={false}
         />
       ))}
+      <instancedMesh ref={stainMesh} args={[stainGeo, stainMat, MAX_STAINS]} frustumCulled={false} />
     </>
   )
 }
@@ -239,16 +357,8 @@ function LionHunt() {
   const lion = useRef<THREE.Group>(null)
   const prey = useRef<THREE.Group>(null)
   const stain = useRef<THREE.Mesh>(null)
-  const state = useRef<{
-    mode: 'idle' | 'chase' | 'feed' | 'leave'
-    lx: number
-    lz: number
-    px: number
-    pz: number
-    timer: number
-    /** Walking direction while the lion moves on after feeding. */
-    heading: number
-  }>({ mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0 })
+  // Module-shared state so the herds and vultures can react to the hunt.
+  const state = useRef(LION_STATE)
 
   const geo = useMemo(() => ({ lion: buildLion(), zebra: buildZebra() }), [])
   const material = useMemo(
@@ -406,37 +516,60 @@ function LionHunt() {
  */
 function Vultures() {
   const group = useRef<THREE.Group>(null)
+  const killGroup = useRef<THREE.Group>(null)
   const geo = useMemo(() => buildVulture(), [])
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     [],
   )
 
-  useFrame(({ clock }) => {
-    const s = useGame.getState()
-    if (!group.current) return
-    const starving = s.foodDays <= 0 && s.mode === 'travel'
-    group.current.visible = starving
-    if (!starving) return
-    const t = clock.elapsedTime
-    group.current.position.set(s.pos.x, 0, s.pos.z)
-    group.current.children.forEach((bird, i) => {
-      const phase = (i / group.current!.children.length) * Math.PI * 2
+  const circle = (g: THREE.Group, t: number, baseR: number, height: number) => {
+    g.children.forEach((bird, i) => {
+      const phase = (i / g.children.length) * Math.PI * 2
       const a = t * 0.45 + phase
-      const r = 4.5 + i * 0.9
-      bird.position.set(Math.cos(a) * r, 5.5 + Math.sin(t * 0.8 + phase) * 0.6, Math.sin(a) * r)
+      const r = baseR + i * 0.9
+      bird.position.set(Math.cos(a) * r, height + Math.sin(t * 0.8 + phase) * 0.6, Math.sin(a) * r)
       bird.rotation.y = -a - Math.PI / 2
       bird.rotation.z = 0.25 // banking into the circle
       bird.scale.setScalar(1.6)
     })
+  }
+
+  useFrame(({ clock }) => {
+    const s = useGame.getState()
+    const t = clock.elapsedTime
+    if (group.current) {
+      const starving = s.foodDays <= 0 && s.mode === 'travel'
+      group.current.visible = starving
+      if (starving) {
+        group.current.position.set(s.pos.x, 0, s.pos.z)
+        circle(group.current, t, 4.5, 5.5)
+      }
+    }
+    // Vultures also gather above a lion kill (design.md §19).
+    if (killGroup.current) {
+      const overKill = LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
+      killGroup.current.visible = overKill
+      if (overKill) {
+        killGroup.current.position.set(LION_STATE.px, 0, LION_STATE.pz)
+        circle(killGroup.current, t * 1.15, 3.2, 4.6)
+      }
+    }
   })
 
   return (
-    <group ref={group} visible={false}>
-      {[0, 1, 2].map((i) => (
-        <mesh key={i} geometry={geo} material={material} />
-      ))}
-    </group>
+    <>
+      <group ref={group} visible={false}>
+        {[0, 1, 2].map((i) => (
+          <mesh key={i} geometry={geo} material={material} />
+        ))}
+      </group>
+      <group ref={killGroup} visible={false}>
+        {[0, 1, 2].map((i) => (
+          <mesh key={i} geometry={geo} material={material} />
+        ))}
+      </group>
+    </>
   )
 }
 
