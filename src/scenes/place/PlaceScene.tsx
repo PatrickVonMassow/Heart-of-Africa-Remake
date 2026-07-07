@@ -26,6 +26,7 @@ import { getStrings, useStrings } from '../../i18n'
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 const INTERACT_RADIUS = 4.5
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
+const EYE_HEIGHT = 1.5 // first-person camera height in meters
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -1287,7 +1288,7 @@ export function PlaceScene() {
       }
     }
 
-    camera.position.set(p.x, 1.7, p.z)
+    camera.position.set(p.x, EYE_HEIGHT, p.z)
     camera.rotation.set(0, p.yaw, 0, 'YXZ')
 
     // Interaction proximity.
