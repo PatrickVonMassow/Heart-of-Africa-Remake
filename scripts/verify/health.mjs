@@ -27,7 +27,11 @@ await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
 await page.waitForTimeout(4000)
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+await page.evaluate(() => {
+  window.__game.getState().setJournalOpen(false)
+  // Keep this suite deterministic: random events are covered by events.mjs.
+  window.__balance.randomEventsEnabled = false
+})
 
 const g = (fn) => page.evaluate(fn)
 const journalKeys = () =>
