@@ -10,9 +10,9 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
-import { worldToLatLon } from '../../world/geo'
+import { latLonToWorld, worldToLatLon } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
-import { lakeDistance } from '../../world/geoIndex'
+import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import {
   buildAntelope,
   buildElephant,
@@ -46,6 +46,8 @@ interface Animal {
   phase: number
   /** Trampled by an elephant: lies dead at (x,z) (design.md §19). */
   dead?: boolean
+  /** Shore point this animal periodically walks to and drinks at. */
+  drink?: { tx: number; tz: number }
 }
 
 /**
@@ -162,14 +164,37 @@ function placeGroup(
     } else if (s.type === 'ocean' || s.type === 'water' || s.height <= 0.05) {
       continue
     }
-    list.push({
+    const animal: Animal = {
       x,
       z,
       y: shoreline ? 0.02 : Math.max(0.02, s.height),
       rot: r3 * Math.PI * 2,
       scale: baseScale * (0.85 + r3 * 0.3),
       phase: r1 * Math.PI * 2,
-    })
+    }
+    // Animals near water periodically walk to the shore and drink
+    // (design.md §19); the shore point follows the water-distance gradient.
+    if (!shoreline) {
+      const wd = Math.min(lakeDistance(ll.lat, ll.lon, 0.5), riverDistance(ll.lat, ll.lon, 0.5))
+      if (wd > 0.02 && wd < 0.35) {
+        const e = 0.03
+        const gLat =
+          Math.min(lakeDistance(ll.lat + e, ll.lon, 0.6), riverDistance(ll.lat + e, ll.lon, 0.6)) -
+          Math.min(lakeDistance(ll.lat - e, ll.lon, 0.6), riverDistance(ll.lat - e, ll.lon, 0.6))
+        const gLon =
+          Math.min(lakeDistance(ll.lat, ll.lon + e, 0.6), riverDistance(ll.lat, ll.lon + e, 0.6)) -
+          Math.min(lakeDistance(ll.lat, ll.lon - e, 0.6), riverDistance(ll.lat, ll.lon - e, 0.6))
+        const gl = Math.hypot(gLat, gLon)
+        if (gl > 1e-4) {
+          // Step down the gradient to just short of the waterline.
+          const shoreLat = ll.lat - (gLat / gl) * (wd * 0.85)
+          const shoreLon = ll.lon - (gLon / gl) * (wd * 0.85)
+          const w = latLonToWorld(shoreLat, shoreLon)
+          animal.drink = { tx: w.x, tz: w.z }
+        }
+      }
+    }
+    list.push(animal)
   }
 }
 
@@ -273,6 +298,26 @@ function Herds() {
           pz = a.z + Math.cos(t * 0.2 + a.phase) * 0.8
         }
         let yaw = a.rot + wob * 0.4
+        let pitch = 0
+        // Periodic drinking (design.md §19): walk to the shore point, lower
+        // the head at the water, walk back.
+        if (a.drink && sp !== 'elephant') {
+          const cycle = ((t + a.phase * 40) % 75) / 75
+          if (cycle < 0.5) {
+            const k = cycle < 0.12 ? cycle / 0.12 : cycle < 0.38 ? 1 : (0.5 - cycle) / 0.12
+            const toX = a.drink.tx - px
+            const toZ = a.drink.tz - pz
+            px += toX * k
+            pz += toZ * k
+            if (k > 0.04) yaw = Math.atan2(toX, toZ) + (cycle >= 0.38 ? Math.PI : 0)
+            if (cycle >= 0.12 && cycle < 0.38) pitch = 0.42 + Math.sin(t * 1.4 + a.phase) * 0.08
+          }
+        }
+        // Grazing dips on the open grassland.
+        if (pitch === 0 && (sp === 'zebra' || sp === 'antelope')) {
+          const g = Math.sin(t * 0.35 + a.phase * 3)
+          if (g > 0.65) pitch = (g - 0.65) * 0.9
+        }
         // Prey scatters away from an active lion (design.md §19).
         if (lionActive && FLEES_LION[sp]) {
           const dx = px - LION_STATE.lx
@@ -283,6 +328,7 @@ function Herds() {
             px += (dx / d) * push
             pz += (dz / d) * push
             yaw = Math.atan2(dx, dz) // face away while fleeing
+            pitch = 0
           }
         }
         // Under an elephant: trampled, stays dead on the ground.
@@ -302,7 +348,12 @@ function Herds() {
           }
         }
         vpos.set(px, a.y, pz)
-        quat.setFromAxisAngle(up, yaw)
+        if (pitch > 0) {
+          euler.set(pitch, yaw, 0, 'YXZ')
+          quat.setFromEuler(euler)
+        } else {
+          quat.setFromAxisAngle(up, yaw)
+        }
         vscl.setScalar(a.scale)
         mtx.compose(vpos, quat, vscl)
         mesh.setMatrixAt(i, mtx)
