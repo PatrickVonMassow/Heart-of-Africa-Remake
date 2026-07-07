@@ -41,6 +41,19 @@ export interface BalanceConfig {
   goodwillNeutral: number
   /** Random events enabled (design.md §14). */
   randomEventsEnabled: boolean
+  /** Per-day base probabilities of the random events (design.md §14). */
+  events: {
+    animalAttack: number
+    robberAttack: number
+    crocodile: number
+    fever: number
+    sunblindness: number
+    sandstorm: number
+    waterfallSweep: number
+    findRemains: number
+    /** Minimum days between two rolled events (spam guard). */
+    cooldownDays: number
+  }
   /** Health & afflictions (design.md §6); drains/regen in points per in-game day. */
   health: {
     max: number
@@ -85,6 +98,17 @@ export const balance: BalanceConfig = {
   goodwillRevered: 2,
   goodwillNeutral: 1,
   randomEventsEnabled: true,
+  events: {
+    animalAttack: 0.1,
+    robberAttack: 0.05,
+    crocodile: 0.3,
+    fever: 0.06,
+    sunblindness: 0.05,
+    sandstorm: 0.06,
+    waterfallSweep: 0.6,
+    findRemains: 0.02,
+    cooldownDays: 2,
+  },
   health: {
     max: 100,
     regenPerDay: 4,

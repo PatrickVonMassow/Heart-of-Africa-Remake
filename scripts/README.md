@@ -62,6 +62,7 @@ node scripts/verify/voice.mjs       # §7.1.19 voice markup + read-aloud + auto-
 node scripts/verify/settings.mjs    # §7.1.20 comfort/audio settings + lion feeding (§7.1.12)
 node scripts/verify/enrichments.mjs # §7.1.3/4/12/15/20/21 borders, sea, water, wildlife, sizes
 node scripts/verify/health.mjs      # §7.1.22 health, afflictions, death/successor
+node scripts/verify/events.mjs      # §7.1.23 random events, protection logic, triggers
 
 npm run build && npm run preview    # prerequisite for the production check
 node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean

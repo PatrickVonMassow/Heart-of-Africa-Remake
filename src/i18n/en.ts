@@ -108,6 +108,7 @@ export const en: Strings = {
   formatDecimal: dec,
 
   regions: { north: 'North', west: 'West', central: 'Central', east: 'East', south: 'South' },
+  animals: { lion: 'lions', leopard: 'a leopard', snake: 'a snake', crocodile: 'a crocodile' },
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
@@ -236,6 +237,7 @@ export const en: Strings = {
       dehydration: 'he perished of thirst under the desert sun',
       sunblind: 'sun-blind, he wandered in circles until the desert took him',
       wounds: 'he succumbed to his wounds',
+      eaten: 'wild beasts got the better of him — little was left to bury',
     },
     deadlineExpired: (days) =>
       `The financiers' patience is exhausted: after ${days} days without the tomb, the expedition is recalled. The Heart of Africa keeps its secret.`,
@@ -258,7 +260,14 @@ export const en: Strings = {
     daysPerUnit: 'Days per travel unit',
     digRadius: 'Dig radius',
     goodwillForHint: 'Goodwill required for hint',
-    randomEvents: 'Random events (POC: none implemented)',
+    randomEvents: 'Random events',
+    triggerEvent: 'Trigger event:',
+    eventNames: {
+      lionAttack: 'Lion attack', leopardAttack: 'Leopard attack', snakeBite: 'Snake bite',
+      robberAttack: 'Robbers', crocodileAttack: 'Crocodile', fever: 'Fever',
+      sunblindness: 'Sun blindness', sandstorm: 'Sandstorm', waterfallSweep: 'Swept over falls',
+      findRemains: 'Find remains',
+    },
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
     health: 'Health',
@@ -289,6 +298,13 @@ export const en: Strings = {
       dehydration: 'Thirst',
       recovery: 'Recovery',
       healthPoor: 'At the End of My Strength',
+      attack: 'Attacked!',
+      robbery: 'Robbers',
+      fever: 'Fever',
+      sunblind: 'Blinded by the Sun',
+      sandstorm: 'Sandstorm',
+      sweptAway: 'Swept Away',
+      discovery: 'A Grim Discovery',
     },
     start:
       'Cairo, January 1890. [excited]Today my expedition begins.[/excited] With 250 dollars in my pocket, a bundle of trade gifts, and more hope than sense, I mean to find the Heart of Africa — [awe]the fabled tomb of the great king.[/awe] [breath][somber]May fortune walk with me.[/somber]',
@@ -342,5 +358,35 @@ export const en: Strings = {
       'I took the medicine. [pause][somber]The fever is breaking and my wounds are closing;[/somber] [excited]I shall be myself again soon.[/excited]',
     healthPoor:
       '[weary]I am at the end of my strength.[pause] My hands tremble as I write these lines.[/weary] [fear]If I do not find rest and relief soon, this journal will outlive me.[/fear]',
+    animalAttack: (p: TextParams) => {
+      const animal = en.animals[p.animal as keyof typeof en.animals]
+      const openings: Record<string, string> = {
+        lion: `[fear]I was attacked by ${animal}![/fear]`,
+        leopard: `[fear]Out of nowhere ${animal} was upon me![/fear]`,
+        snake: `[fear]I nearly stepped on ${animal}![/fear]`,
+        crocodile: `[fear]The water erupted —[pause] ${animal}![/fear]`,
+      }
+      const results: Record<string, string> = {
+        escaped: ' [excited]I escaped.[/excited]',
+        defended: ' [excited]I used my weapon and drove the beast off.[/excited]',
+        light: ' [somber]I was lightly injured.[/somber]',
+        severe: ' [weary]I was severely wounded;[pause] every movement hurts.[/weary]',
+      }
+      return openings[p.animal as string] + results[p.result as string]
+    },
+    robbery: (p: TextParams) =>
+      p.result === 'deterred'
+        ? '[fear]Robbers blocked my path —[/fear] [excited]but one look at the rifle and they melted back into the bush.[/excited]'
+        : `[fear]Robbers fell upon me![/fear] [somber]They took ${p.money} dollars before I could flee.[/somber]`,
+    feverOn:
+      '[weary]A fever burns through me.[pause] The land sways before my eyes, and my legs go where they will.[/weary] [fear]I must find medicine, or this wetland will be my grave.[/fear]',
+    sunblindOn:
+      '[fear]The desert light has scorched my eyes![/fear] [weary]The world is a white glare;[pause] I can barely make out my own hand.[/weary] Only far from the desert will they recover.',
+    sandstorm:
+      '[fear]A sandstorm swallowed the horizon![/fear] [weary]I crouched behind my pack for hours while the world turned to howling dust.[/weary] Precious time is lost.',
+    sweptAway:
+      '[fear]The current seized me and swept me over the falls![/fear] [weary]I dragged myself to the bank, battered and bleeding —[pause] half of my belongings are gone with the river.[/weary]',
+    findRemains: (p: TextParams) =>
+      `[somber]I came upon the remains of a traveler who made it no farther.[pause] A grim warning of this land.[/somber] Among the bones lay a purse with ${p.money} dollars — [whisper]may they serve a better fate.[/whisper]`,
   },
 }

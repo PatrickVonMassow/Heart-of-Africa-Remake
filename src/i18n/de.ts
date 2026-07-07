@@ -107,6 +107,7 @@ export const de: Strings = {
   formatDecimal: dec,
 
   regions: { north: 'Norden', west: 'Westen', central: 'Zentral', east: 'Osten', south: 'Süden' },
+  animals: { lion: 'Löwen', leopard: 'ein Leopard', snake: 'eine Schlange', crocodile: 'ein Krokodil' },
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
@@ -235,6 +236,7 @@ export const de: Strings = {
       dehydration: 'er unter der Wüstensonne verdurstete',
       sunblind: 'er sonnenblind im Kreis irrte, bis die Wüste ihn nahm',
       wounds: 'er seinen Wunden erlag',
+      eaten: 'wilde Tiere ihn überwältigten — es blieb wenig zu begraben',
     },
     deadlineExpired: (days) =>
       `Die Geduld der Geldgeber ist erschöpft: Nach ${days} Tagen ohne das Grab wird die Expedition zurückgerufen. Das Herz von Afrika behält sein Geheimnis.`,
@@ -257,7 +259,14 @@ export const de: Strings = {
     daysPerUnit: 'Tage pro Wegeinheit',
     digRadius: 'Grabe-Radius',
     goodwillForHint: 'Wohlwollen für Hinweis',
-    randomEvents: 'Zufallsereignisse (POC: keine implementiert)',
+    randomEvents: 'Zufallsereignisse',
+    triggerEvent: 'Ereignis auslösen:',
+    eventNames: {
+      lionAttack: 'Löwenangriff', leopardAttack: 'Leopardenangriff', snakeBite: 'Schlangenbiss',
+      robberAttack: 'Räuber', crocodileAttack: 'Krokodil', fever: 'Fieber',
+      sunblindness: 'Sonnenblindheit', sandstorm: 'Sandsturm', waterfallSweep: 'Über die Fälle gerissen',
+      findRemains: 'Überreste finden',
+    },
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
     health: 'Gesundheit',
@@ -288,6 +297,13 @@ export const de: Strings = {
       dehydration: 'Durst',
       recovery: 'Genesung',
       healthPoor: 'Am Ende meiner Kräfte',
+      attack: 'Angriff!',
+      robbery: 'Räuber',
+      fever: 'Fieber',
+      sunblind: 'Von der Sonne geblendet',
+      sandstorm: 'Sandsturm',
+      sweptAway: 'Fortgerissen',
+      discovery: 'Ein düsterer Fund',
     },
     start:
       'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
@@ -341,5 +357,35 @@ export const de: Strings = {
       'Ich habe die Medizin genommen. [pause][somber]Das Fieber bricht, die Wunden schließen sich;[/somber] [excited]bald bin ich wieder der Alte.[/excited]',
     healthPoor:
       '[weary]Ich bin am Ende meiner Kräfte.[pause] Die Hände zittern mir beim Schreiben dieser Zeilen.[/weary] [fear]Finde ich nicht bald Ruhe und Linderung, wird dieses Tagebuch mich überleben.[/fear]',
+    animalAttack: (p: TextParams) => {
+      const animal = de.animals[p.animal as keyof typeof de.animals]
+      const openings: Record<string, string> = {
+        lion: `[fear]Ich wurde von ${animal} angegriffen![/fear]`,
+        leopard: `[fear]Aus dem Nichts war ${animal} über mir![/fear]`,
+        snake: `[fear]Beinahe wäre ich auf ${animal} getreten![/fear]`,
+        crocodile: `[fear]Das Wasser brach auf —[pause] ${animal}![/fear]`,
+      }
+      const results: Record<string, string> = {
+        escaped: ' [excited]Ich bin entkommen.[/excited]',
+        defended: ' [excited]Ich setzte meine Waffe ein und schlug das Tier in die Flucht.[/excited]',
+        light: ' [somber]Ich wurde leicht verletzt.[/somber]',
+        severe: ' [weary]Ich wurde schwer verwundet;[pause] jede Bewegung schmerzt.[/weary]',
+      }
+      return openings[p.animal as string] + results[p.result as string]
+    },
+    robbery: (p: TextParams) =>
+      p.result === 'deterred'
+        ? '[fear]Räuber verstellten mir den Weg —[/fear] [excited]doch ein Blick auf das Gewehr, und sie verschwanden im Busch.[/excited]'
+        : `[fear]Räuber fielen über mich her![/fear] [somber]Sie nahmen ${p.money} Dollar, ehe ich fliehen konnte.[/somber]`,
+    feverOn:
+      '[weary]Ein Fieber brennt in mir.[pause] Das Land schwankt vor meinen Augen, und die Beine gehen, wohin sie wollen.[/weary] [fear]Ich muss Medizin finden, sonst wird dieses Sumpfland mein Grab.[/fear]',
+    sunblindOn:
+      '[fear]Das Wüstenlicht hat mir die Augen versengt![/fear] [weary]Die Welt ist ein weißes Gleißen;[pause] kaum erkenne ich die eigene Hand.[/weary] Nur fern der Wüste werden sie sich erholen.',
+    sandstorm:
+      '[fear]Ein Sandsturm verschluckte den Horizont![/fear] [weary]Stundenlang kauerte ich hinter meinem Gepäck, während die Welt zu heulendem Staub wurde.[/weary] Kostbare Zeit ist verloren.',
+    sweptAway:
+      '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer —[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
+    findRemains: (p: TextParams) =>
+      `[somber]Ich stieß auf die Überreste eines Reisenden, der nicht weiterkam.[pause] Eine düstere Mahnung dieses Landes.[/somber] Zwischen den Knochen lag eine Börse mit ${p.money} Dollar — [whisper]mögen sie einem besseren Schicksal dienen.[/whisper]`,
   },
 }

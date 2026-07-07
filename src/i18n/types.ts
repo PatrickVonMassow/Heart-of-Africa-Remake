@@ -26,6 +26,8 @@ export interface Strings {
   formatDecimal(value: number): string
 
   regions: Record<RegionId, string>
+  /** Animal names used in event entries (design.md §14). */
+  animals: { lion: string; leopard: string; snake: string; crocodile: string }
   places: Record<string, string>
   peoples: Record<string, string>
   landmarks: Record<string, string>
@@ -160,6 +162,8 @@ export interface Strings {
     digRadius: string
     goodwillForHint: string
     randomEvents: string
+    triggerEvent: string
+    eventNames: Record<string, string>
     showHidden: string
     fpsCounter: string
     health: string
@@ -197,6 +201,13 @@ export interface Strings {
       dehydration: string
       recovery: string
       healthPoor: string
+      attack: string
+      robbery: string
+      fever: string
+      sunblind: string
+      sandstorm: string
+      sweptAway: string
+      discovery: string
     }
     start: string
     regionEntry(p: TextParams): string
@@ -216,5 +227,12 @@ export interface Strings {
     sunblindOver: string
     medicineUsed: string
     healthPoor: string
+    animalAttack(p: TextParams): string
+    robbery(p: TextParams): string
+    feverOn: string
+    sunblindOn: string
+    sandstorm: string
+    sweptAway: string
+    findRemains(p: TextParams): string
   }
 }

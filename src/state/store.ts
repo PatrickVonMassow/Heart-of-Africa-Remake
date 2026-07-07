@@ -7,6 +7,9 @@ import type { LatLon, Material, RegionId } from '../world/geo'
 import { REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
+import { WATERFALLS } from '../world/data/landmarks'
+import { riverDistance } from '../world/geoIndex'
+import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
@@ -44,7 +47,7 @@ export interface Afflictions {
   wounds: 0 | 1 | 2
 }
 
-export type DeathCause = 'starvation' | 'fever' | 'dehydration' | 'sunblind' | 'wounds'
+export type DeathCause = 'starvation' | 'fever' | 'dehydration' | 'sunblind' | 'wounds' | 'eaten'
 
 /** Coarse condition for display and the vulture signal (design.md §6/§19). */
 export function healthState(health: number): 'healthy' | 'weakened' | 'poor' {
@@ -73,6 +76,8 @@ export interface GameState {
   afflictions: Afflictions
   /** Days of desert-free travel left until sun blindness heals. */
   sunblindRecovery: number
+  /** Days until the next random event may roll (design.md §14 spam guard). */
+  eventCooldown: number
   /** Set when the expedition is lost (design.md §15/§18). */
   defeat: 'death' | 'deadline' | null
   deathCause: DeathCause | null
@@ -108,6 +113,11 @@ export interface GameState {
   dig: () => void
   /** Health per travelled day; exposed for the event engine and tests. */
   tickHealth: (dayDelta: number, terrain: string) => void
+  /** Random events per travelled day (design.md §14). */
+  tickEvents: (dayDelta: number, terrain: string, lat: number, lon: number) => void
+  /** Debug/testing (design.md §21): fire one event immediately. */
+  debugTriggerEvent: (kind: EventKind) => void
+  applyEventOutcome: (outcome: EventOutcome) => void
   useMedicine: () => void
   /** Debug/testing: set an affliction directly (events trigger them in play). */
   debugSetAffliction: (kind: keyof Afflictions, value: boolean | 0 | 1 | 2) => void
@@ -205,6 +215,7 @@ function startState(seed: number) {
     health: balance.health.max,
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
+    eventCooldown: 0,
     defeat: null,
     deathCause: null as DeathCause | null,
     region: 'north' as RegionId,
@@ -222,6 +233,19 @@ function startState(seed: number) {
     foodOutWarned: false,
     balanceVersion: 0,
   }
+}
+
+/** Event context from the current situation (design.md §14). */
+function buildEventContext(
+  s: Pick<GameState, 'equipment' | 'handItem'>,
+  terrain: string,
+  lat: number,
+  lon: number,
+): EventContext {
+  const inWater = terrain === 'water' || terrain === 'ocean'
+  const nearWaterfall = WATERFALLS.some((w) => Math.hypot(w.lat - lat, w.lon - lon) < 0.35)
+  const wetland = terrain === 'jungle' || riverDistance(lat, lon, 0.2) < 0.12
+  return { terrain, inWater, nearWaterfall, wetland, hand: s.handItem, equipment: s.equipment }
 }
 
 let nextEntryId = 2
@@ -335,6 +359,119 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     get().tickHealth(dayDelta, here.type)
+    get().tickEvents(dayDelta, here.type, next.lat, next.lon)
+  },
+
+  tickEvents: (dayDelta, terrain, lat, lon) => {
+    const s = get()
+    if (s.defeat || s.victory || !balance.randomEventsEnabled) return
+    if (s.eventCooldown > 0) {
+      set({ eventCooldown: s.eventCooldown - dayDelta })
+      return
+    }
+    const ctx = buildEventContext(s, terrain, lat, lon)
+    const outcome = rollEvent(ctx, dayDelta, Math.random)
+    if (!outcome) return
+    set({ eventCooldown: balance.events.cooldownDays * (0.75 + Math.random() * 0.5) })
+    get().applyEventOutcome(outcome)
+  },
+
+  /** Apply a resolved event to the state and report it (design.md §16). */
+  applyEventOutcome: (o: EventOutcome) => {
+    const s = get()
+    const animal = o.kind === 'lionAttack' ? 'lion' : o.kind === 'leopardAttack' ? 'leopard' : o.kind === 'snakeBite' ? 'snake' : 'crocodile'
+    switch (o.kind) {
+      case 'lionAttack':
+      case 'leopardAttack':
+      case 'snakeBite':
+      case 'crocodileAttack': {
+        if (o.result === 'fatal') {
+          set({ health: 0, defeat: 'death', deathCause: 'eaten', journalOpen: false })
+          return
+        }
+        if (o.result === 'light') {
+          set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 } })
+        } else if (o.result === 'severe') {
+          set({ afflictions: { ...s.afflictions, wounds: 2 } })
+        }
+        get().addEntry(
+          { key: 'journal.titles.attack' },
+          { key: 'journal.animalAttack', params: { animal, result: o.result } },
+        )
+        return
+      }
+      case 'robberAttack': {
+        if (o.result === 'robbed') {
+          set({ money: Math.max(0, s.money - (o.money ?? 0)) })
+          if (Math.random() < 0.4) {
+            set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 } })
+          }
+        }
+        get().addEntry(
+          { key: 'journal.titles.robbery' },
+          { key: 'journal.robbery', params: { result: o.result, money: o.money ?? 0 } },
+        )
+        return
+      }
+      case 'fever': {
+        if (s.afflictions.fever) return
+        set({ afflictions: { ...s.afflictions, fever: true } })
+        get().addEntry({ key: 'journal.titles.fever' }, { key: 'journal.feverOn' })
+        return
+      }
+      case 'sunblindness': {
+        if (s.afflictions.sunblind) return
+        set({
+          afflictions: { ...s.afflictions, sunblind: true },
+          sunblindRecovery: balance.health.sunblindRecoveryDays,
+        })
+        get().addEntry({ key: 'journal.titles.sunblind' }, { key: 'journal.sunblindOn' })
+        return
+      }
+      case 'sandstorm': {
+        set({ day: s.day + (o.daysLost ?? 0.5) })
+        get().addEntry({ key: 'journal.titles.sandstorm' }, { key: 'journal.sandstorm' })
+        return
+      }
+      case 'waterfallSweep': {
+        // Swept over the falls (design.md §11/§14): injuries and the loss
+        // of a large part of the inventory.
+        const gifts = { ...s.gifts }
+        for (const k of Object.keys(gifts) as (keyof typeof gifts)[]) gifts[k] = Math.floor(gifts[k] / 2)
+        const equipment = { ...s.equipment }
+        const droppable = (Object.keys(equipment) as EquipmentId[]).filter((e) => e !== 'shovel' && (equipment[e] ?? 0) > 0)
+        if (droppable.length > 0) {
+          const drop = droppable[Math.floor(Math.random() * droppable.length)]
+          equipment[drop] = (equipment[drop] ?? 1) - 1
+        }
+        set({
+          gifts,
+          equipment,
+          foodDays: s.foodDays * 0.7,
+          afflictions: { ...s.afflictions, wounds: Math.random() < 0.5 ? 2 : Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 },
+          handItem: s.handItem === 'shovel' ? s.handItem : null,
+        })
+        get().addEntry({ key: 'journal.titles.sweptAway' }, { key: 'journal.sweptAway' })
+        return
+      }
+      case 'findRemains': {
+        set({ money: s.money + (o.money ?? 0) })
+        get().addEntry(
+          { key: 'journal.titles.discovery' },
+          { key: 'journal.findRemains', params: { money: o.money ?? 0 } },
+        )
+        return
+      }
+    }
+  },
+
+  debugTriggerEvent: (kind) => {
+    const s = get()
+    if (s.defeat || s.victory) return
+    const cur = worldToLatLon(s.pos.x, s.pos.z)
+    const here = sampleTerrain(cur.lat, cur.lon, s.seed)
+    const ctx = buildEventContext(s, here.type, cur.lat, cur.lon)
+    get().applyEventOutcome(resolveEvent(kind, ctx, Math.random))
   },
 
   /**

@@ -5,6 +5,7 @@
 import { balance } from '../config/balance'
 import { refreshAmbienceVolume } from '../systems/ambience'
 import { useGame, type EquipmentId } from '../state/store'
+import { EVENT_KINDS } from '../systems/events'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
 import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
@@ -221,6 +222,12 @@ export function DebugMenu() {
           placeholder={t.debug.choose}
           options={EQUIPMENT_IDS.map((e) => ({ value: e, label: t.equipment[e] }))}
           onPick={(v) => game.debugAddEquipment(v as EquipmentId)}
+        />
+        <ActionSelect
+          label={t.debug.triggerEvent}
+          placeholder={t.debug.choose}
+          options={EVENT_KINDS.map((k) => ({ value: k, label: t.debug.eventNames[k] ?? k }))}
+          onPick={(v) => game.debugTriggerEvent(v as (typeof EVENT_KINDS)[number])}
         />
         <ActionSelect
           label={t.debug.addGift}

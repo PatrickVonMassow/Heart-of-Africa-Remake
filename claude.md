@@ -380,6 +380,24 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     dehydration onset/recovery, regeneration, fever drain and medicine
     cure, the sun-blindness veil and its recovery, vultures, the H query
     and the death/successor flow.
+23. **Random events.** `design.md` §14 is implemented as a hidden per-day
+    roll while travelling, modulated by terrain and state: wild-animal
+    attacks (lions, leopards, snakes — lions with the highest risk of a
+    fatal outcome), robber attacks (money theft; a rifle deters, in hand
+    almost always), crocodile attacks in water (the machete always helps,
+    the rifle only from the canoe — otherwise it is wet and useless),
+    fever in wetlands, sun blindness and sandstorms (time loss) in the
+    desert, being swept over a waterfall (wounds + loss of a large part
+    of the inventory) and grim discoveries (remains with a few dollars).
+    Outcomes follow the §7/§14 protection rules (rifle > machete, in hand
+    > carried), wounds/afflictions feed the health system (pt. 22), fatal
+    attacks end in the remains report, and every event is told through a
+    journal entry in both languages with voice markup (§16). Rates are
+    balance values; the debug menu can toggle the events and trigger each
+    kind directly (`design.md` §21). Verifiable: `scripts/verify/events.mjs`
+    asserts the protection ordering (pure functions), deterministic
+    outcome mapping, the consequences of each trigger, a fatal attack,
+    autonomous firing while travelling and silence when disabled.
 
 ### 7.2 Self-Verification (mandatory)
 
