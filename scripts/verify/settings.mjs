@@ -1,6 +1,6 @@
 // Headless verification for CLAUDE.md §7.1.20 (comfort and audio settings)
 // and the lion-feed depiction of §7.1.12: balance defaults (mouse
-// sensitivity halved, walk speed 1.5x, ambience noise at 20 %), the lowered
+// sensitivity halved, walk speed 10 m/s, ambience noise at 20 %), the lowered
 // first-person eye height, the debug-menu controls in both languages, and
 // the schematic feeding animation of the decorative lion hunt.
 // Dev server only (dev hooks).
@@ -39,7 +39,7 @@ const bal = await page.evaluate(() => ({
   gust: window.__balance.ambienceGustVolume,
 }))
 check('default mouse sensitivity halved (0.0011)', bal.mouse === 0.0011, `${bal.mouse}`)
-check('default walk speed 1.5x (7.5)', bal.walk === 7.5, `${bal.walk}`)
+check('default walk speed 10 m/s (user calibration)', bal.walk === 10, `${bal.walk}`)
 check('default ambience noise volume 20 % (0.2)', bal.noise === 0.2, `${bal.noise}`)
 check('default ambience gust volume 20 % (0.2)', bal.gust === 0.2, `${bal.gust}`)
 

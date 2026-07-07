@@ -141,6 +141,9 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       interactives.push({ type: t, pos: [Math.cos(angle) * r, Math.sin(angle) * r] })
     })
   } else {
+    // OPEN: design.md §9/§10 lists trade buildings for villages too (barter
+    // with gifts as the means of payment); the POC gives villages only the
+    // chief's hut and the elder.
     interactives.push({ type: 'chief', pos: [jitter(0, 4), jitter(-13, 3)] })
     interactives.push({ type: 'villager', pos: [jitter(4, 3), jitter(-4, 2)] })
   }
@@ -223,9 +226,11 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
         addDwelling('box', xx, zz, faceTo(xx, zz, xx, 3) + (rand() - 0.5) * 0.15, 1.7 + rand() * 0.5, 2.2 + (floors - 1) * 1.8, floors)
       }
     }
-    // Warehouses at the ends of the cross street (two in bigger towns).
-    if (isFree(-16.5, 7.5, 4)) addDwelling('warehouse', -16.5, 7.5, Math.PI, 4.2, 3)
-    if (size >= 2 && isFree(16.8, 7.8, 4)) addDwelling('warehouse', 16.8, 7.8, Math.PI, 4.2, 3)
+    // Warehouses at the ends of the cross street (two in bigger towns). The
+    // wide margin keeps their long boxes clear of the functional buildings
+    // (overlapping colliders would wedge the player at shared corners).
+    if (isFree(-16.5, 7.5, 8)) addDwelling('warehouse', -16.5, 7.5, Math.PI, 4.2, 3)
+    if (size >= 2 && isFree(16.8, 7.8, 8)) addDwelling('warehouse', 16.8, 7.8, Math.PI, 4.2, 3)
     // Major cities get a landmark tower on the skyline (design.md §4.1).
     if (size >= 3 && isFree(-11.5, -8.5, 4)) addDwelling('tower', -11.5, -8.5, 0, 1.1, 7)
     // Market stalls and tents around the market building.

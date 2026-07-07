@@ -99,8 +99,9 @@ function pushOut(c: Collider, px: number, pz: number, radius: number): [number, 
 
 /**
  * Move a circle of radius `radius` to the target position, resolving
- * overlaps with the colliders (three iterations handle corners between
- * neighboring objects). Returns the resolved position.
+ * overlaps with the colliders. Iterates until no collider pushes anymore
+ * (corners between neighboring or even overlapping objects), capped to
+ * keep the per-frame cost bounded.
  */
 export function resolveMove(
   colliders: Collider[],
@@ -110,10 +111,15 @@ export function resolveMove(
 ): [number, number] {
   let px = x
   let pz = z
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 10; pass++) {
+    let moved = false
     for (const c of colliders) {
-      ;[px, pz] = pushOut(c, px, pz, radius)
+      const [nx, nz] = pushOut(c, px, pz, radius)
+      if (nx !== px || nz !== pz) moved = true
+      px = nx
+      pz = nz
     }
+    if (!moved) break
   }
   return [px, pz]
 }

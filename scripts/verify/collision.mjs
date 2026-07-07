@@ -178,7 +178,9 @@ await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&(b<0||c.r>a
 const funcTypes = await page.evaluate(() =>
   window.__placeLayout.interactives.filter((b) => b.type !== 'exit' && b.type !== 'villager').map((b) => b.type),
 )
-check('Port: all 4 functional buildings present', funcTypes.length === 4, funcTypes.join(','))
+// Since the trade-economy batch, ports carry six functional buildings
+// (design.md §9: incl. bazaar and travel agency).
+check("Port: all 6 functional buildings present", funcTypes.length === 6, funcTypes.join(","))
 await reachableBuildings('Port')
 await accessPointsFree('Port')
 

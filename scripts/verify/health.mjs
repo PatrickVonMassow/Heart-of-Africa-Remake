@@ -97,7 +97,13 @@ check('journal reports the medicine', (await journalKeys()).includes('journal.me
 await g(() => window.__game.getState().debugSetAffliction('sunblind', true))
 await page.waitForTimeout(300)
 check('sun blindness narrows the view (veil)', (await page.locator('.sunblind-veil').count()) === 1, '')
-await g(() => window.__game.getState().debugJumpTo(-1.5, 34.5)) // savanna, outside the desert
+await g(() => {
+  // Savanna, outside the desert; the rope in hand keeps stray hills of the
+  // eastern highlands passable (design.md §11 mountain rule).
+  window.__game.getState().debugAddEquipment('rope')
+  window.__game.getState().takeInHand('rope')
+  window.__game.getState().debugJumpTo(-1.5, 34.5)
+})
 await page.waitForTimeout(600)
 await walk(60)
 const sighted = await g(() => window.__game.getState().afflictions.sunblind)

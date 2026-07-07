@@ -109,6 +109,8 @@ export interface Strings {
 
   toasts: {
     oceanBlocked: string
+    /** Mountain ascent refused without a rope in hand (design.md §11). */
+    mountainNeedsRope: string
     boughtFood: string
     bought(name: string): string
     inHand(name: string): string

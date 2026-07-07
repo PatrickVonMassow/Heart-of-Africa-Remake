@@ -169,6 +169,10 @@ await page.waitForTimeout(800)
 const before = await countEvents()
 await page.evaluate(() => {
   const g = () => window.__game.getState()
+  // The rope in hand keeps stray highland hills on the roundtrip passable
+  // (design.md §11 mountain rule) so travel days actually accrue.
+  g().debugAddEquipment('rope')
+  g().takeInHand('rope')
   for (let i = 0; i < 900; i++) {
     g().moveTravel(i % 200 < 100 ? 0 : 0.3, i % 100 < 50 ? -1 : 1, 0.05)
     g().debugSet({ foodDays: 30, health: 100 })

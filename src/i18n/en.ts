@@ -201,6 +201,7 @@ export const en: Strings = {
 
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
+    mountainNeedsRope: 'The rock face turns me back — without a rope in hand there is no ascent.',
     boughtFood: 'Bought one week of provisions.',
     bought: (name) => `${name} purchased.`,
     inHand: (name) => `Now holding the ${name.toLowerCase()}.`,

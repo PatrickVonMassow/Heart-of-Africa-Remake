@@ -194,9 +194,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    and provisions advance with the journey (calendar display, start 1890 per
    `design.md`). Sea water enclosed by the continent's outline (bays,
    gulfs) is swimmable like inland water; the open ocean beyond the
-   outline blocks movement (`design.md` §11). Verifiable: an automated
-   move on enclosed sea advances the position, a move on open ocean is
-   refused with the blocking notice (`scripts/verify/enrichments.mjs`).
+   outline blocks movement (`design.md` §11). Mountain terrain refuses
+   the ascent without a rope in hand (`design.md` §7/§11); with the rope
+   it is passable, and once on the massif, moving on stays possible.
+   Verifiable: an automated move on enclosed sea advances the position, a
+   move on open ocean is refused with the blocking notice, and a move
+   onto a mountain is refused without and passes with the rope in hand
+   (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (simplified saving is sufficient).
@@ -344,7 +348,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     open item until a German-capable voice exists.
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
-    value), walk speed inside settlements to 7.5 m/s (1.5× the former),
+    value), walk speed inside settlements to 10 m/s (raised from 7.5 by
+    later user calibration),
     the first-person eye height is 1.5 m, and the ambience noise beds
     (wind/surf/murmur) and their gust/swell modulation each play at a 0.2
     volume multiplier. Mouse sensitivity, walk speed and both ambience
@@ -376,9 +381,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     flat surfaces at their local shore height. Verifiable:
     `scripts/verify/enrichments.mjs` asserts 5 cascades, at least one
     spring and 8 lake surfaces via the dev hook; screenshots of the Nile,
-    Victoria Falls and Lake Victoria (71-73) show the courses. The
-    current's *gameplay* effect (drift, being swept over falls) stays
-    outside the POC (§8).
+    Victoria Falls and Lake Victoria (71-73) show the courses. Being swept
+    over falls is gameplay since pt. 23 (waterfall-sweep event); only the
+    current's speed effect on movement (drift with/against the flow)
+    remains an open item.
 22. **Health and afflictions.** `design.md` §6/§15 is implemented: a
     health pool is drained by starvation and by the afflictions fever
     (delirium: temporarily uncontrolled steering), dehydration (sets in

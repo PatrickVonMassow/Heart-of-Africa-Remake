@@ -152,8 +152,14 @@ check('arrival in the port saves the checkpoint', keys.includes('journal.portArr
 // --- Discovery bounties --------------------------------------------------------------
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(600)
-// Sight Kilimanjaro (landmark), then first-visit the Masai village.
-await page.evaluate(() => window.__game.getState().debugJumpTo(-3.35, 37.35))
+// Sight Kilimanjaro (landmark), then first-visit the Masai village. A rope
+// in hand keeps the massif climbable (design.md §11).
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.debugAddEquipment('rope')
+  g.takeInHand('rope')
+  g.debugJumpTo(-3.35, 37.35)
+})
 await page.evaluate(() => {
   for (let i = 0; i < 3; i++) window.__game.getState().moveTravel(0, -1, 0.03)
 })

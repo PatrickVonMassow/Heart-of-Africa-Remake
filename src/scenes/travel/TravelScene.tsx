@@ -724,17 +724,13 @@ function CampMarkers() {
   )
 }
 
-/** Debug-only marker for the hidden grave position. */
-function GraveMarker() {
-  const t = useStrings()
-  const grave = useGame((s) => s.graveLatLon)
+/** Red debug cross with a label, used for the hidden objects (design.md §21). */
+function HiddenCross({ lat, lon, label, scale = 1 }: { lat: number; lon: number; label: string; scale?: number }) {
   const seed = useGame((s) => s.seed)
-  useGame((s) => s.balanceVersion) // re-render when debug toggles change
-  const p = latLonToWorld(grave.lat, grave.lon)
-  const y = Math.max(0.2, sampleTerrain(grave.lat, grave.lon, seed).height)
-  if (!balance.showHiddenObjects) return null
+  const p = latLonToWorld(lat, lon)
+  const y = Math.max(0.2, sampleTerrain(lat, lon, seed).height)
   return (
-    <group position={[p.x, y + 0.5, p.z]}>
+    <group position={[p.x, y + 0.5, p.z]} scale={scale}>
       <mesh rotation={[0, 0, Math.PI / 4]}>
         <boxGeometry args={[2.4, 0.4, 0.4]} />
         <meshStandardMaterial color="#c0392b" />
@@ -744,9 +740,26 @@ function GraveMarker() {
         <meshStandardMaterial color="#c0392b" />
       </mesh>
       <Html center position={[0, 1.6, 0]} distanceFactor={60}>
-        <div className="map-label">{t.labels.graveDebug}</div>
+        <div className="map-label">{label}</div>
       </Html>
     </group>
+  )
+}
+
+/** Debug-only markers for hidden objects: grave and treasure caches (§21). */
+function GraveMarker() {
+  const t = useStrings()
+  const grave = useGame((s) => s.graveLatLon)
+  const sites = useGame((s) => s.treasureSites)
+  useGame((s) => s.balanceVersion) // re-render when debug toggles change
+  if (!balance.showHiddenObjects) return null
+  return (
+    <>
+      <HiddenCross lat={grave.lat} lon={grave.lon} label={t.labels.graveDebug} />
+      {sites.filter((s) => !s.dug).map((s, i) => (
+        <HiddenCross key={i} lat={s.lat} lon={s.lon} label={t.treasures[s.treasure]} scale={0.7} />
+      ))}
+    </>
   )
 }
 

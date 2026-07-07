@@ -127,10 +127,12 @@ await page.evaluate(() => window.__ui.getState().toggleMap())
 
 // --- Village cache: Honored Friend privilege --------------------------------------
 await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
-await page.evaluate(() => window.__game.getState().openVillageCamp())
-ui = await uiState()
-s = await state()
-check('without the friend standing the village cache is refused', ui.dialog === null && !!s.toast, `"${s.toast}"`)
+// Read the toast in the same tick — the HUD clears toasts after a delay.
+const refused = await page.evaluate(() => {
+  window.__game.getState().openVillageCamp()
+  return { toast: window.__game.getState().toast, dialog: window.__ui.getState().dialog }
+})
+check('without the friend standing the village cache is refused', refused.dialog === null && !!refused.toast, `"${refused.toast}"`)
 await page.evaluate(() => {
   window.__game.setState({ honoredFriend: { north: true } })
   window.__game.getState().openVillageCamp()

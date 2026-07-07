@@ -498,6 +498,12 @@ export const useGame = create<GameState>()((set, get) => ({
       set({ toast: getStrings().toasts.oceanBlocked })
       return
     }
+    // No mountain ascent without a rope in hand (design.md §7/§11); once on
+    // the massif, moving on (and back down) stays possible.
+    if (nextT.type === 'mountain' && here.type !== 'mountain' && s.handItem !== 'rope') {
+      set({ toast: getStrings().toasts.mountainNeedsRope })
+      return
+    }
 
     const dayDelta = step * balance.daysPerUnit * cost
     const foodDelta = dayDelta * balance.foodPerDay

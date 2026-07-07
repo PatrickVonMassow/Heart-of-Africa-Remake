@@ -200,6 +200,7 @@ export const de: Strings = {
 
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
+    mountainNeedsRope: 'Die Felswand weist mich ab — ohne Seil in der Hand gibt es keinen Aufstieg.',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
     inHand: (name) => `${name} in die Hand genommen.`,

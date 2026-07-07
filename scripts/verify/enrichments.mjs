@@ -127,6 +127,37 @@ check(
   `moved ${blocked.moved.toFixed(3)}, toast: ${blocked.toast ? 'yes' : 'no'}`,
 )
 
+// --- Mountains need a rope in hand (§7.1.4, design.md §7/§11) ----------------
+// March east into the Emi Koussi massif: refused hands-free, passable with
+// the rope in hand. A canteen prevents desert dehydration drift.
+const climb = await page.evaluate(async () => {
+  const g = window.__game.getState()
+  g.debugAddEquipment('canteen')
+  g.debugSet({ foodDays: 300 })
+  g.takeInHand(null)
+  g.debugJumpTo(19.87, 17.4)
+  g.setToast(null)
+  for (let i = 0; i < 120; i++) window.__game.getState().moveTravel(1, 0, 0.05)
+  const noRope = { lon: window.__game.getState().pos.x / 10, toast: window.__game.getState().toast }
+  const g2 = window.__game.getState()
+  g2.debugAddEquipment('rope')
+  g2.takeInHand('rope')
+  g2.debugJumpTo(19.87, 17.4)
+  g2.setToast(null)
+  for (let i = 0; i < 120; i++) window.__game.getState().moveTravel(1, 0, 0.05)
+  return { noRope, ropeLon: window.__game.getState().pos.x / 10 }
+})
+check(
+  'Mountain ascent is refused without a rope in hand',
+  climb.noRope.lon < 18.55 && typeof climb.noRope.toast === 'string' && climb.noRope.toast.length > 0,
+  `stalled at lon ${climb.noRope.lon.toFixed(2)}, toast: ${climb.noRope.toast ? 'yes' : 'no'}`,
+)
+check(
+  'With the rope in hand the massif is passable',
+  climb.ropeLon > climb.noRope.lon + 0.5,
+  `reached lon ${climb.ropeLon.toFixed(2)}`,
+)
+
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
 await page.evaluate(() => {
   const pos = window.__game.getState().pos
