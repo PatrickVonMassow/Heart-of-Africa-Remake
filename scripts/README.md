@@ -55,10 +55,11 @@ exit non-zero on failure and write screenshot evidence to `verification/`.
 npm run dev                          # prerequisite for all dev-server checks
 node scripts/verify/flow.mjs        # gameplay loop end to end (20 checks)
 node scripts/verify/checkpoint.mjs  # checkpoint save/reload/restore
-node scripts/verify/collision.mjs   # §7.1.16 collision + reachability
+node scripts/verify/collision.mjs   # §7.1.16 collision, corners, hut entry, reachability
 node scripts/verify/world.mjs       # §7.1.3 world-model data + screenshots
 node scripts/verify/i18n.mjs        # §7.1.17 localization (de default, en)
-node scripts/verify/voice.mjs       # §7.1.19 voice markup + read-aloud (needs HF CDN access)
+node scripts/verify/voice.mjs       # §7.1.19 voice markup + read-aloud + auto-narration (needs HF CDN access)
+node scripts/verify/settings.mjs    # §7.1.20 comfort/audio settings + lion feeding (§7.1.12)
 
 npm run build && npm run preview    # prerequisite for the production check
 node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean
@@ -67,8 +68,9 @@ node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean
 Notes:
 
 - The dev-server checks rely on DEV-only hooks (`__game`, `__placePlayer`,
-  `__placeLayout`, `__placeColliders`, `__setLang`, `__voiceMarkup`, `__ttsForceWasm`); they do not work
-  against the production build.
+  `__placeLayout`, `__placeColliders`, `__placeCamera`, `__placeWalkers`,
+  `__balance`, `__lionHunt`, `__setLang`, `__voiceMarkup`, `__ttsForceWasm`);
+  they do not work against the production build.
 - Chromium must run with `--use-angle=d3d11 --enable-gpu` (already set in
   the scripts). With the SwiftShader fallback, requestAnimationFrame drops
   to ~1 fps and interaction tests become meaninglessly slow.

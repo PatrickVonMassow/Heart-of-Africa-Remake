@@ -90,6 +90,11 @@ export const prices = {
   giftIvory: 22,
 }
 
+// Dev hook for the headless verification (CLAUDE.md §7.2).
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__balance = balance
+}
+
 // Fixed by design.md — do not tune.
 export const START_MONEY = 250
 export const START_YEAR = 1890

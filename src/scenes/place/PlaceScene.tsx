@@ -1199,12 +1199,14 @@ export function PlaceScene() {
     w.__placePlayer = player.current
     w.__placeLayout = layout
     w.__placeColliders = layout?.colliders
+    w.__placeCamera = camera
     return () => {
       delete w.__placePlayer
       delete w.__placeLayout
       delete w.__placeColliders
+      delete w.__placeCamera
     }
-  }, [layout])
+  }, [layout, camera])
 
   // Mouse look via pointer lock on canvas click.
   useEffect(() => {

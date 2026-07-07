@@ -108,6 +108,31 @@ console.log('shot 65-voice-english-readaloud.png')
 await page.locator('.journal .speak').first().click()
 await page.waitForTimeout(500)
 
+// --- Auto-narration of a newly appearing entry (no click) --------------------
+await page.evaluate(() =>
+  window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' }),
+)
+let autoSpoke = false
+try {
+  // The model is already loaded, so only synthesis time remains.
+  await page.waitForFunction(
+    () => {
+      const btns = document.querySelectorAll('.journal .speak')
+      return btns.length > 0 && btns[btns.length - 1].textContent === '■'
+    },
+    null,
+    { timeout: 180000 },
+  )
+  autoSpoke = true
+} catch {
+  autoSpoke = false
+}
+check('English: new journal entry auto-narrates without a click', autoSpoke, '')
+await page.screenshot({ path: `${OUT}66-voice-auto-narration.png` })
+console.log('shot 66-voice-auto-narration.png')
+await page.locator('.journal .speak').last().click()
+await page.waitForTimeout(400)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

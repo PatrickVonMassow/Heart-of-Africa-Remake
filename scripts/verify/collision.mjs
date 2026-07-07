@@ -193,6 +193,29 @@ check('Port: no penetration at the wall', (await clearance()) >= -0.03, `clearan
 await page.screenshot({ path: `${OUT}52-collision-port-wall.png` })
 console.log('shot 52-collision-port-wall.png')
 
+// Corner clipping (§7.1.16): drop the player exactly onto each corner of the
+// biggest box building; the resolver must eject it with positive clearance —
+// the former circle approximation left gaps here.
+for (let corner = 0; corner < 4; corner++) {
+  await page.evaluate((k) => {
+    const boxes = window.__placeColliders.filter((c) => c.kind === 'box')
+    const c = boxes.reduce((b, x) => (Math.max(x.hx, x.hz) > Math.max(b.hx, b.hz) ? x : b), boxes[0])
+    const sx = k % 2 ? 1 : -1
+    const sz = k < 2 ? 1 : -1
+    const sin = Math.sin(c.rot)
+    const cos = Math.cos(c.rot)
+    const lx = sx * c.hx
+    const lz = sz * c.hz
+    const p = window.__placePlayer
+    p.x = c.x + cos * lx + sin * lz
+    p.z = c.z - sin * lx + cos * lz
+    p.yaw = 0
+  }, corner)
+  await pushFrames(8)
+  const cl = await clearance()
+  check(`Port: ejected from building corner ${corner + 1}/4`, cl >= -0.03, `clearance ${cl.toFixed(3)}`)
+}
+
 // === Village (Masai) =========================================================
 await page.evaluate(() => window.__game.getState().enterPlace('masai-village'))
 await page.waitForTimeout(2500)
@@ -219,6 +242,39 @@ console.log('shot 53-collision-village-chief-hut.png')
 
 await reachableBuildings('Village')
 await accessPointsFree('Village')
+
+// Inhabitants enter their dwellings (§7.1.16 / design.md §2): observe the
+// walkers until one that has been out walking disappears inside — at that
+// moment it must stand at its home center (it slipped in through the door).
+const walkerResult = await page.evaluate(async () => {
+  const deadline = Date.now() + 150000
+  const wasOut = new Set()
+  return await new Promise((resolve) => {
+    const iv = setInterval(() => {
+      const w = window.__placeWalkers
+      if (!w) return
+      for (let i = 0; i < w.states.length; i++) {
+        const s = w.states[i]
+        if (s.mode === 'walk') wasOut.add(i)
+        else if (wasOut.has(i)) {
+          const h = w.homes[i]
+          clearInterval(iv)
+          resolve({ ok: true, dist: Math.hypot(s.x - h.x, s.z - h.z) })
+          return
+        }
+      }
+      if (Date.now() > deadline) {
+        clearInterval(iv)
+        resolve({ ok: false, dist: -1 })
+      }
+    }, 150)
+  })
+})
+check(
+  'Village: inhabitant walked out and re-entered its dwelling through the door',
+  walkerResult.ok && walkerResult.dist < 0.8,
+  walkerResult.ok ? `entered at ${walkerResult.dist.toFixed(2)} from home center` : 'no walk→inside transition observed',
+)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

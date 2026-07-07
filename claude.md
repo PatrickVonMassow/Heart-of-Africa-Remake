@@ -214,7 +214,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 12. **Atmosphere.** The atmosphere elements from `design.md` are
     implemented — specifically "## 19. Atmosphere and Immersion" and the
     "**Graphics and atmosphere.**" passage in "## 2. Perspectives and
-    Camera".
+    Camera". This includes the feed phase of the decorative lion hunt
+    (`design.md` §19): after the catch the lion visibly feeds on the
+    carcass (lowered, rhythmically tearing head movements, spreading stain
+    beneath the prey). Verifiable: an automated check forces the feed
+    state and asserts the visible carcass, the lowered animated head and
+    the stain.
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes
@@ -295,6 +300,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     without console errors; adding an entry switches its read-aloud control
     into the speaking state without a click. German read-aloud stays an
     open item until a German-capable voice exists.
+20. **Comfort and audio settings.** The control/audio calibration holds:
+    mouse-look sensitivity defaults to 0.0011 rad/px (half the former
+    value), walk speed inside settlements to 7.5 m/s (1.5× the former),
+    the first-person eye height is 1.5 m, and the ambience noise beds
+    (wind/surf/murmur) play at a 0.2 volume multiplier. Mouse sensitivity,
+    walk speed and ambience noise volume are adjustable at runtime in the
+    debug menu (`design.md` §21) in both languages. Verifiable:
+    `scripts/verify/settings.mjs` asserts the defaults, the eye height,
+    the working debug-menu controls in both languages and the lion-feed
+    depiction (pt. 12); `scripts/verify/collision.mjs` additionally proves
+    corner clearance at box buildings and an inhabitant re-entering its
+    dwelling (pt. 16); `scripts/verify/voice.mjs` proves the automatic
+    narration of a new entry (pt. 19).
 
 ### 7.2 Self-Verification (mandatory)
 

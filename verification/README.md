@@ -378,3 +378,24 @@ dev hook).
 |---|---|
 | 64-voice-german-journal-clean.png | German journal, markup stripped, no read-aloud control |
 | 65-voice-english-readaloud.png | English journal narrating the Departure entry (stop control active) |
+
+## Addendum: comfort settings, collision sharpening, hut entry, lion feeding, auto-narration (July 7, 2026)
+
+New acceptance checks (CLAUDE.md par.7.1 pt. 12/16/19/20):
+`scripts/verify/settings.mjs` (18 checks) proves the calibration defaults
+(mouse sensitivity 0.0011 rad/px, walk speed 7.5 m/s, ambience noise beds
+at 0.2, eye height 1.5 m), the runtime effect of the new debug-menu
+controls in both languages, and the lion-feed depiction (lowered tearing
+head, prey on its side, spreading stain). `scripts/verify/collision.mjs`
+additionally ejects the player from all four corners of the biggest box
+building (the former circle approximation left gaps there) and observes
+an inhabitant re-entering its dwelling through the entrance door
+(0.09 m from the home center at the moment it slips inside).
+`scripts/verify/voice.mjs` additionally proves that a newly added journal
+entry auto-narrates without a click.
+
+| File | View |
+|---|---|
+| 66-voice-auto-narration.png | Newly added entry narrating automatically (stop control active, no click) |
+| 67-settings-debug-menu.png | Debug menu with mouse-sensitivity and ambience-volume controls |
+| 68-lion-feeding.png | Lion feeding on brought-down prey beside Cairo (stain beneath carcass) |
