@@ -11,7 +11,7 @@ import { Dialogs } from './Dialogs'
 import { DebugMenu } from './DebugMenu'
 import { MapOverlay } from './MapOverlay'
 import { onKeyPress } from '../systems/input'
-import { useStrings } from '../i18n'
+import { getStrings, useStrings } from '../i18n'
 
 function InventoryBar() {
   const t = useStrings()
@@ -156,6 +156,13 @@ export function Hud() {
       if (!useUi.getState().dialog) useUi.getState().toggleMap()
     })
     const offF1 = onKeyPress('F1', () => toggleDebug())
+    // F2 toggles the journal do-not-disturb option (design.md §16/§21).
+    const offF2 = onKeyPress('F2', () => {
+      const ui = useUi.getState()
+      ui.setJournalDnd(!ui.journalDnd)
+      const s = getStrings()
+      useGame.getState().setToast(ui.journalDnd ? s.toasts.journalDndOff : s.toasts.journalDndOn)
+    })
     const offEsc = onKeyPress('Escape', () => {
       if (useUi.getState().dialog) setDialog(null)
       else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
@@ -170,6 +177,7 @@ export function Hud() {
       offT()
       offM()
       offF1()
+      offF2()
       offEsc()
       window.removeEventListener('keydown', preventF1)
     }

@@ -188,6 +188,8 @@ export const en: Strings = {
     notEnoughMoney: 'Not enough money.',
     digNoShovel: 'I cannot dig without a shovel in hand.',
     villagerNod: 'The old man gives me a friendly nod.',
+    journalDndOn: 'Journal interruptions off — entries appear silently.',
+    journalDndOff: 'Journal interruptions on — new entries open the journal.',
   },
 
   dialogs: {
@@ -234,6 +236,7 @@ export const en: Strings = {
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
     wheelZoom: "Mouse-wheel zoom (bird's-eye view)",
+    journalDnd: "Don't interrupt with journal entries (F2)",
     cash: 'Funds ($)',
     foodDays: 'Food (days)',
     jumpTo: 'Jump to:',

@@ -302,6 +302,9 @@ A dead character can write no more journal entries. Instead of an entry, a repor
 
 Events (animal and robber attacks, chiefs' hints, status changes and the like, §14) are not staged as separate scenes. The player learns of them because the journal opens automatically and a new entry appears.
 
+**Do not disturb.**
+Players who do not want to be interrupted can turn the automatic presentation off (POC: debug-menu checkbox, also toggled with F2): with the option active, new entries neither open the journal nor start their narration — they are written silently and remain fully readable (and narratable) when the journal is opened manually. Turning the option off restores the automatic behavior.
+
 The entry does not appear as finished text but is visibly written into the book in handwriting by a hand.
 
 If the character is injured, the injuries are visible on the writing hand, at a recognizable severity: with a severe injury the hand is bloody, with lighter injuries correspondingly less marked. Example: the entry "I was attacked by lions and severely wounded." is written by a bloody hand. An entry written by a bloody hand accordingly contains traces of blood.
@@ -381,6 +384,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Checkbox: unlock mouse-wheel zoom in the bird's-eye view (zoom in/out around the default camera distance), off by default; disabling it resets the zoom.
+- Checkbox: do not disturb with journal entries (§16), off by default; also toggled with F2. New entries then neither open the journal nor auto-narrate.
 - Instant jump to any port city or the tomb, via a dropdown selector.
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.

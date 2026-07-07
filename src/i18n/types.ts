@@ -94,6 +94,8 @@ export interface Strings {
     notEnoughMoney: string
     digNoShovel: string
     villagerNod: string
+    journalDndOn: string
+    journalDndOff: string
   }
 
   dialogs: {
@@ -140,6 +142,7 @@ export interface Strings {
     showHidden: string
     fpsCounter: string
     wheelZoom: string
+    journalDnd: string
     cash: string
     foodDays: string
     jumpTo: string

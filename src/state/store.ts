@@ -10,6 +10,7 @@ import { mulberry32 } from '../world/noise'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
+import { useUi } from './ui'
 
 export type EquipmentId =
   | 'shovel'
@@ -199,7 +200,9 @@ export const useGame = create<GameState>()((set, get) => ({
   addEntry: (title, text, kind = 'event', sketch) => {
     set((s) => ({
       journal: [...s.journal, { id: ++nextEntryId, day: Math.floor(s.day), title, text, kind, sketch }],
-      journalOpen: true,
+      // Do not disturb (design.md §16): entries appear silently; the journal
+      // only opens automatically while the option is off.
+      journalOpen: useUi.getState().journalDnd ? s.journalOpen : true,
     }))
   },
 

@@ -187,6 +187,8 @@ export const de: Strings = {
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
     villagerNod: 'Der Alte nickt mir freundlich zu.',
+    journalDndOn: 'Tagebuch-Unterbrechungen aus — Einträge erscheinen still.',
+    journalDndOff: 'Tagebuch-Unterbrechungen an — neue Einträge öffnen das Tagebuch.',
   },
 
   dialogs: {
@@ -233,6 +235,7 @@ export const de: Strings = {
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
     wheelZoom: 'Mausrad-Zoom (Vogelperspektive)',
+    journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',
     cash: 'Kontostand ($)',
     foodDays: 'Nahrung (Tage)',
     jumpTo: 'Springe zu:',

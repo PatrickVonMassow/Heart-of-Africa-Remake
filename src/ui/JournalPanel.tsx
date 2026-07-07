@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../state/store'
+import { useUi } from '../state/ui'
 import { START_YEAR } from '../config/balance'
 import { Sketch } from '../journal/sketches'
 import { resolveText, useStrings } from '../i18n'
@@ -55,12 +56,14 @@ export function JournalPanel() {
   }
 
   // Auto-narration (design.md §15): a newly appearing entry is read aloud
-  // without requiring a click, when the language has a voice.
+  // without requiring a click, when the language has a voice and the
+  // do-not-disturb option (design.md §16) is off.
   const prevCount = useRef(journal.length)
   useEffect(() => {
     const prev = prevCount.current
     prevCount.current = journal.length
     if (journal.length <= prev || !speechAvailable(t.lang)) return
+    if (useUi.getState().journalDnd) return
     const e = journal[journal.length - 1]
     startSpeech(e.id, resolveText(t, e.title), resolveText(t, e.text), true)
     // startSpeech is recreated per render; the entry count is the trigger.

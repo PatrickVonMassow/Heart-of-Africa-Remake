@@ -242,6 +242,33 @@ check('Wheel zoom: inactive without the debug unlock', zoom.locked === 1, `${zoo
 check('Wheel zoom: zooms once unlocked', zoom.unlocked < 1, `${zoom.unlocked.toFixed(2)}`)
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 
+// --- Journal do-not-disturb (§7.1.20 / design.md §16) -------------------------
+const dnd = await page.evaluate(() => {
+  const ui = window.__ui.getState()
+  const g = () => window.__game.getState()
+  g().setJournalOpen(false)
+  ui.setJournalDnd(true)
+  const before = g().journal.length
+  g().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
+  const silent = !g().journalOpen
+  const stored = g().journal.length === before + 1
+  window.__ui.getState().setJournalDnd(false)
+  g().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
+  const opens = g().journalOpen
+  g().setJournalOpen(false)
+  return { silent, stored, opens }
+})
+check('DND: new entry stays silent but is stored', dnd.silent && dnd.stored, '')
+check('DND off: new entry opens the journal again', dnd.opens, '')
+const f2 = await page.evaluate(() => {
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F2' }))
+  const on = window.__ui.getState().journalDnd
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F2' }))
+  const off = window.__ui.getState().journalDnd
+  return { on, off }
+})
+check('F2 toggles do-not-disturb', f2.on === true && f2.off === false, '')
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

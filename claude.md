@@ -334,7 +334,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     volumes are adjustable at runtime in the debug menu (`design.md` §21)
     in both languages; the debug menu additionally offers the mouse-wheel
     zoom unlock for the bird's-eye view, dropdown selectors for jump-to/
-    equipment/gifts, and a read-only display of the active render backend.
+    equipment/gifts, a read-only display of the active render backend, and
+    the journal do-not-disturb option (`design.md` §16; also toggled with
+    F2) under which new entries neither open the journal nor auto-narrate
+    but stay readable on manual open.
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults, the
     eye height, the working debug-menu controls in both languages and the
     lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts

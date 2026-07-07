@@ -77,6 +77,7 @@ export function DebugMenu() {
   const fpsVisible = useUi((s) => s.fpsVisible)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
+  const journalDnd = useUi((s) => s.journalDnd)
   const bump = useGame((s) => s.bumpBalance)
   useGame((s) => s.balanceVersion)
   const game = useGame()
@@ -164,6 +165,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={wheelZoomEnabled}
           onChange={(e) => useUi.getState().setWheelZoomEnabled(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.journalDnd}</span>
+        <input
+          type="checkbox"
+          checked={journalDnd}
+          onChange={(e) => useUi.getState().setJournalDnd(e.target.checked)}
         />
       </label>
 
