@@ -135,8 +135,10 @@ acceptance (§7).
 - Work incrementally: small, topically well-scoped commits. Commit after
   each self-contained system. Prerequisite is an initialized git repository
   with an initial commit of the scaffold, `design.md` and `CLAUDE.md`; if
-  none exists, run `git init` first and create that initial commit. No
-  automatic push to a remote.
+  none exists, run `git init` first and create that initial commit.
+  **Every commit is immediately pushed to the remote (`git push`).** If no
+  remote is configured or the push fails, report that instead of skipping
+  it silently.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): German is the default game
   language, English is available, and the structure must make further
