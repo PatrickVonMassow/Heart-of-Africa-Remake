@@ -69,6 +69,9 @@ check(
 )
 
 // --- German: markup stripped, no read-aloud button --------------------------
+// The default language is English (par.17); check German explicitly.
+await page.evaluate(() => window.__setLang('de'))
+await page.waitForTimeout(600)
 let txt = await page.evaluate(() => document.body.innerText)
 check('German journal: no visible markers', !/\[(\/?)[a-z]+\]/.test(txt), '')
 check('German journal: prose intact', txt.includes('Heute beginnt meine Expedition.'), '')

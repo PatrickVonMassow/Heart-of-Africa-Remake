@@ -226,7 +226,7 @@ await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
 
-// Chief prompt reachable despite collision ("Chefhütte" — German default).
+// Chief prompt reachable despite collision ("Chief's Hut" — English default).
 await page.evaluate(() => {
   const it = window.__placeLayout.interactives[0]
   const p = window.__placePlayer
@@ -236,7 +236,7 @@ await page.evaluate(() => {
 })
 await pushFrames(6)
 const prompt = await page.evaluate(() => document.querySelector('.prompt')?.textContent ?? '')
-check('Village: chief-hut prompt reachable despite collision', prompt.includes('Chefhütte'), `prompt: "${prompt}"`)
+check('Village: chief-hut prompt reachable despite collision', prompt.includes("Chief's Hut"), `prompt: "${prompt}"`)
 await page.screenshot({ path: `${OUT}53-collision-village-chief-hut.png` })
 console.log('shot 53-collision-village-chief-hut.png')
 

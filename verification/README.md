@@ -280,7 +280,7 @@ Implemented:
 
 - **Language files** `src/i18n/de.ts` and `src/i18n/en.ts` behind a shared
   `Strings` contract (`src/i18n/types.ts`) — a text added in only one
-  language fails the TypeScript build. German is the default; the language
+  language fails the TypeScript build. English is the default; the language
   switches at runtime via the debug menu (F1).
 - **Language-neutral journal:** entries are stored as key+params
   (`TextRef`) and re-render in the selected language; plain-string entries
@@ -298,10 +298,10 @@ Implemented:
 
 | File | View |
 |---|---|
-| 54-i18n-german-default.png | German (default): status bar, journal at start |
-| 55-i18n-english-journal.png | English: journal, status bar after switching |
-| 56-i18n-english-trade.png | English: trade dialog in Cairo |
-| 57-i18n-english-map.png | English: map overlay with region/exploration |
+| 54-i18n-english-default.png | English (default): status bar, journal at start |
+| 55-i18n-german-journal.png | German: journal, status bar after switching |
+| 56-i18n-german-trade.png | German: trade dialog in Cairo |
+| 57-i18n-german-map.png | German: map overlay with region/exploration |
 | 58-i18n-debug-language.png | Debug menu with the language selector |
 
 ## Addendum: full re-verification (tenth run)

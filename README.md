@@ -60,7 +60,7 @@ npm run lint       # oxlint (zero errors/warnings required)
 npm audit          # zero known vulnerabilities required
 ```
 
-The game starts in German by default; English can be selected at runtime via
+The game starts in English by default; German can be selected at runtime via
 the debug menu (F1). All player-facing text lives in `src/i18n/` — adding a
 language means adding one file.
 

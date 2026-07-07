@@ -1,5 +1,5 @@
-// Contract for the game's language files (design.md §17: German default,
-// English, easily extensible). Every player-visible string lives here; both
+// Contract for the game's language files (design.md §17: English default,
+// German, easily extensible). Every player-visible string lives here; both
 // dictionaries must implement this interface, so adding or changing a text
 // in only one language fails the build.
 

@@ -111,13 +111,14 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   const run: Run = { cancelled: false, source: null }
   currentRun = run
 
-  const tts = await loadEngine()
-  if (run.cancelled) return
+  // Check the autoplay policy BEFORE loading the engine: while audio is
+  // blocked (no user gesture yet), the model download must not start.
   if (!ctx) ctx = new AudioContext()
   if (ctx.state === 'suspended') await ctx.resume()
-  // Still suspended: the browser's autoplay policy blocks audio until the
-  // first user gesture — abort instead of "playing" into a stalled context.
   if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')
+
+  const tts = await loadEngine()
+  if (run.cancelled) return
 
   // Lookahead of one: synthesize the next segment while the current plays.
   let playing: Promise<void> = Promise.resolve()

@@ -1,6 +1,6 @@
 // Verifies the checkpoint load flow (CLAUDE.md §7.1.5): seed a distinctive
 // state, save a checkpoint, reload the page, load the checkpoint via the
-// overlay ("Checkpoint laden" — German default language) and confirm the
+// overlay ("Load checkpoint" — English default language) and confirm the
 // state is restored. Dev server only (dev hooks).
 import { chromium } from 'playwright'
 
@@ -31,8 +31,8 @@ await page.evaluate(() => {
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(3000)
 
-check('Checkpoint overlay after reload', (await page.getByText('Checkpoint laden').count()) > 0)
-await page.getByText('Checkpoint laden').click()
+check('Checkpoint overlay after reload', (await page.getByText('Load checkpoint').count()) > 0)
+await page.getByText('Load checkpoint').click()
 await page.waitForTimeout(500)
 const s = await page.evaluate(() => window.__game.getState())
 check('State restored from checkpoint ($123, in Cairo)',

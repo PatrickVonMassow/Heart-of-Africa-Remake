@@ -140,8 +140,8 @@ acceptance (§7).
   remote is configured or the push fails, report that instead of skipping
   it silently.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
-  from the language files (`design.md` §17): German is the default game
-  language, English is available, and the structure must make further
+  from the language files (`design.md` §17): English is the default game
+  language, German is available, and the structure must make further
   languages easy to add. **Every future addition or change to game text must
   always be made for both languages (German and English).** English texts
   are written for their context, not as literal translations. Code is
@@ -274,7 +274,7 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 17. **Localization.** The game is fully playable in English as well as
     German (`design.md` §17): all player-visible text comes from the
     language files, the debug menu switches the language at runtime
-    (default: German), journal entries are stored language-neutrally and
+    (default: English), journal entries are stored language-neutrally and
     re-render in the selected language, and proper names of places and
     landmarks are localized (e.g. "Kairo"/"Cairo",
     "Kilimandscharo"/"Kilimanjaro"). Adding another language must require

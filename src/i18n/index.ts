@@ -1,5 +1,5 @@
-// Localization runtime (design.md §17): German is the default game language,
-// English is available, and further languages only need a new dictionary
+// Localization runtime (design.md §17): English is the default game language,
+// German is available, and further languages only need a new dictionary
 // implementing the Strings contract. The language is switched at runtime via
 // the debug menu (design.md §21).
 
@@ -19,7 +19,7 @@ interface LocaleState {
 }
 
 export const useLocale = create<LocaleState>()((set) => ({
-  lang: 'de',
+  lang: 'en',
   setLang: (lang) => set({ lang }),
 }))
 

@@ -46,6 +46,9 @@ const eyeY = await page.evaluate(() => window.__placeCamera?.position.y)
 check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${eyeY}`)
 
 // --- Debug menu: new controls, German labels, live effect --------------------
+// The default language is English (par.17); check the German labels explicitly.
+await page.evaluate(() => window.__setLang('de'))
+await page.waitForTimeout(400)
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(600)
 let txt = await page.evaluate(() => document.body.innerText)
@@ -86,7 +89,6 @@ await page.waitForTimeout(600)
 txt = await page.evaluate(() => document.body.innerText)
 check('debug menu (en): mouse sensitivity field', txt.includes('Mouse sensitivity (first-person)'), '')
 check('debug menu (en): ambience volume field', txt.includes('Ambience noise volume'), '')
-await page.evaluate(() => window.__setLang('de'))
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(400)
 

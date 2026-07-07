@@ -70,6 +70,9 @@ await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.evaluate(() => localStorage.clear())
 await page.reload({ waitUntil: 'networkidle' })
 await page.waitForTimeout(3500)
+// The flow is asserted against German labels; the default is English (par.17).
+await page.evaluate(() => window.__setLang('de'))
+await page.waitForTimeout(400)
 
 // --- 1. Start state (criteria 1, 5, 9) ---
 let s = await state()

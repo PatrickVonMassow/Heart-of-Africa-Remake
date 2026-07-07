@@ -270,7 +270,7 @@ Concrete probabilities are calibrated freely for balance.
 
 ## 15. Chronicle / Journal
 
-An automatically growing narrative chronicle of the journey, written in the selected game language (German by default, English available, §17). Functions: mood carrier and store of the collected hints. Entries are produced from templates with places/directions inserted, and from events.
+An automatically growing narrative chronicle of the journey, written in the selected game language (English by default, German available, §17). Functions: mood carrier and store of the collected hints. Entries are produced from templates with places/directions inserted, and from events.
 
 **Tone and immersion.**
 The journal is the central means of creating immersion: many events are never seen, only experienced as text — comparable to reading a novel. The entries are therefore always written vividly and express, depending on the situation, fascination with the new, drama, bewilderment, misgivings, hope and the like. The text building blocks from which entries are assembled must already be written with this vividness — in every supported language.
@@ -308,7 +308,7 @@ If the character can no longer write (death), the handwritten entry is omitted; 
 - First-person view (settlements): walkable space, interaction prompts at buildings/persons, trade and dialog windows. A gift to a native additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
 - Controls suitable for mouse/keyboard and gamepad.
 - If the renderer has to fall back from WebGPU to WebGL 2 compatibility mode, a dismissible notice informs the player at startup.
-- **Game languages:** German (default) and English. The language can be switched at runtime (POC: via the debug menu, §21). All player-visible text — UI, chronicle, dialogs, names of places and landmarks — is served from language files; adding a further language must require nothing beyond a new language file. Every future addition or change to game text must always be made for both languages; translations are written for their context, not literally. Proper names are localized where established exonyms exist (e.g. "Kairo"/"Cairo", "Kilimandscharo"/"Kilimanjaro"). Journal texts additionally carry the emotional voice markup (§15) in every language; it is stripped before display and never shown to the player.
+- **Game languages:** English (default) and German. The language can be switched at runtime (POC: via the debug menu, §21). All player-visible text — UI, chronicle, dialogs, names of places and landmarks — is served from language files; adding a further language must require nothing beyond a new language file. Every future addition or change to game text must always be made for both languages; translations are written for their context, not literally. Proper names are localized where established exonyms exist (e.g. "Kairo"/"Cairo", "Kilimandscharo"/"Kilimanjaro"). Journal texts additionally carry the emotional voice markup (§15) in every language; it is stripped before display and never shown to the player.
 
 ---
 
@@ -374,4 +374,4 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
 - Add any item to the inventory; if this overfills the inventory, the inventory capacity increases automatically to match.
-- Language selector for the game language (German/English; default German, §17).
+- Language selector for the game language (English/German; default English, §17).
