@@ -160,7 +160,7 @@ export const en: Strings = {
   },
 
   hud: {
-    journalToggle: 'Journal (T)',
+    journalToggle: 'Journal (Tab)',
     mapToggle: 'Map (M)',
     handTooltip: 'Take in hand / put away',
     medicineTooltip: 'Take medicine (cures fever and wounds)',
@@ -189,7 +189,7 @@ export const en: Strings = {
 
   journalPanel: {
     title: 'Journal',
-    close: 'Close (T)',
+    close: 'Close (Tab)',
     readAloud: 'Read aloud',
     stopReading: 'Stop reading',
     voiceLoading: 'Loading voice …',

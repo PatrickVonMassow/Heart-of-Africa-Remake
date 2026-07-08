@@ -281,10 +281,19 @@ export function Hud() {
   const setDialog = useUi((s) => s.setDialog)
 
   useEffect(() => {
-    const offT = onKeyPress('KeyT', () => {
+    // Tab toggles the journal (design.md §17). It is handled directly rather
+    // than via onKeyPress so its default focus-cycling can be suppressed —
+    // except inside form controls (debug menu / dialog fields), where Tab
+    // still navigates between them, so it never causes focus problems.
+    const onTab = (e: KeyboardEvent) => {
+      if (e.code !== 'Tab') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      e.preventDefault()
       const g = useGame.getState()
       g.setJournalOpen(!g.journalOpen)
-    })
+    }
+    window.addEventListener('keydown', onTab)
     const offM = onKeyPress('KeyM', () => {
       if (!useUi.getState().dialog) useUi.getState().toggleMap()
     })
@@ -345,7 +354,7 @@ export function Hud() {
     }
     window.addEventListener('keydown', preventFn)
     return () => {
-      offT()
+      window.removeEventListener('keydown', onTab)
       offM()
       offF1()
       offF2()

@@ -237,6 +237,35 @@ const canoe = await page.evaluate(() => {
 check('F4 adds the canoe when missing', canoe.on === 1, `${canoe.on}`)
 check('F4 removes the canoe when present', canoe.off === 0, `${canoe.off}`)
 
+// --- Tab toggles the journal without focus problems (design.md §17) ----------
+await page.evaluate(() => {
+  window.__game.getState().setJournalOpen(false)
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
+})
+await page.waitForTimeout(100)
+await page.keyboard.press('Tab')
+const tabOpen = await page.evaluate(() => ({ open: window.__game.getState().journalOpen, active: document.activeElement?.tagName }))
+await page.keyboard.press('Tab')
+const tabClose = await page.evaluate(() => window.__game.getState().journalOpen)
+check('Tab opens the journal', tabOpen.open === true, '')
+check('Tab does not shift focus onto a control (no focus problem)', tabOpen.active === 'BODY' || tabOpen.active === 'CANVAS' || tabOpen.active == null, `active ${tabOpen.active}`)
+check('Tab toggles the journal closed again', tabClose === false, '')
+// Inside a form control (debug menu), Tab must NOT toggle the journal.
+const tabInField = await page.evaluate(async () => {
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })) // open debug menu
+  await new Promise((r) => setTimeout(r, 300))
+  const input = document.querySelector('.debug-menu input[type="number"]')
+  if (!input) return { ok: false }
+  input.focus()
+  const before = window.__game.getState().journalOpen
+  // A Tab keydown while the field is focused (onTab must bail on INPUT targets).
+  input.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', bubbles: true }))
+  const after = window.__game.getState().journalOpen
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })) // close debug menu
+  return { ok: true, unchanged: before === after }
+})
+check('Tab in a debug field does not toggle the journal (focus-safe)', tabInField.ok && tabInField.unchanged, JSON.stringify(tabInField))
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

@@ -71,7 +71,7 @@ const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
 check('left stick walks the character (first-person)', walked > 1, `moved ${walked.toFixed(1)} m`)
 
 // --- Y opens the journal, B closes it ---------------------------------------------------
-await pressButton(3) // Y → KeyT
+await pressButton(3) // Y → Tab
 let journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
 check('Y toggles the journal', journalOpen === true, '')
 await pressButton(1) // B → Escape

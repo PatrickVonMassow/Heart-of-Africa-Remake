@@ -427,7 +427,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults, the
     eye height, the 80 % strafe/backward factor (exact via the pure
     velocity helper, plus an in-scene smoke check that both directions
-    move), the F3 full loadout, the F4 canoe toggle, the working debug-menu
+    move), the F3 full loadout, the F4 canoe toggle, the Tab journal toggle
+    (opens/closes without shifting focus onto a control, and does not
+    toggle while a debug field is focused; `design.md` §17), the working debug-menu
     controls in both languages and the lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts
     the zoom gate, the dropdowns and the renderer row;
     `scripts/verify/collision.mjs` additionally proves corner clearance at
@@ -623,7 +625,7 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     for the gamepad too: the left stick moves the character in both
     perspectives (merged with WASD), the right stick turns the
     first-person view, and the buttons map onto the existing key
-    handlers (A interact, B close, X dig, Y journal, LB map, RB camp,
+    handlers (A interact, B close, X dig, Y journal (Tab), LB map, RB camp,
     Select position query, Start debug menu) via synthetic key events —
     no second input path. Only standard-mapped pads are read, and a
     connected pad steers only after a deliberate input (button press or

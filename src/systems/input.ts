@@ -99,7 +99,7 @@ const GAMEPAD_BUTTON_KEYS: Record<number, string> = {
   0: 'KeyE', // A: interact / enter
   1: 'Escape', // B: close dialogs/panels
   2: 'KeyG', // X: dig
-  3: 'KeyT', // Y: journal
+  3: 'Tab', // Y: journal
   4: 'KeyM', // LB: map
   5: 'KeyC', // RB: camp
   8: 'KeyP', // Select: position query

@@ -159,7 +159,7 @@ export const de: Strings = {
   },
 
   hud: {
-    journalToggle: 'Tagebuch (T)',
+    journalToggle: 'Tagebuch (Tab)',
     mapToggle: 'Karte (M)',
     handTooltip: 'In die Hand nehmen / weglegen',
     medicineTooltip: 'Medizin einnehmen (heilt Fieber und Wunden)',
@@ -188,7 +188,7 @@ export const de: Strings = {
 
   journalPanel: {
     title: 'Tagebuch',
-    close: 'Schließen (T)',
+    close: 'Schließen (Tab)',
     readAloud: 'Vorlesen',
     stopReading: 'Vorlesen stoppen',
     voiceLoading: 'Stimme wird geladen …',
