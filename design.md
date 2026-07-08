@@ -395,7 +395,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Mouse-wheel zoom in the bird's-eye view is always available (zooming in well below and — when unlocked — well beyond the default camera distance). Checkbox: allow zooming out beyond the default level, off by default; without it, zooming out stops at the default distance, and disabling the checkbox clamps a wider view back to it. Zoomed-in views are never reset.
 - Checkbox: do not disturb with journal entries (§16), off by default; also toggled with F2. New entries then neither open the journal nor auto-narrate.
-- Instant jump to any port city or the tomb, via a dropdown selector.
+- Instant jump to any port city or village, the elephant graveyard, or the tomb, via a dropdown selector.
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
 - Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.

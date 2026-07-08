@@ -343,6 +343,27 @@ check(
   jumped !== null && Math.abs(jumped.x - -30) < 1 && Math.abs(jumped.z - -167.7) < 1,
   jumped ? `pos (${jumped.x.toFixed(1)}, ${jumped.z.toFixed(1)})` : 'select not found',
 )
+// The elephant graveyard is offered too and jumps onto it (lat -4.9, lon 36.6).
+const jumpedGraveyard = await page.evaluate(async () => {
+  const geo = await import('/src/world/geo.ts')
+  const land = await import('/src/world/data/landmarks.ts')
+  const g = land.ELEPHANT_GRAVEYARD
+  const sel = [...document.querySelectorAll('.debug-menu select')].find((s) =>
+    [...s.options].some((o) => o.value === '#graveyard'),
+  )
+  if (!sel) return null
+  const proto = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')
+  proto.set.call(sel, '#graveyard')
+  sel.dispatchEvent(new Event('change', { bubbles: true }))
+  const p = window.__game.getState().pos
+  const target = geo.latLonToWorld(g.lat, g.lon)
+  return { dist: Math.hypot(p.x - target.x, p.z - target.z) }
+})
+check(
+  'Jump-to dropdown offers and reaches the elephant graveyard',
+  jumpedGraveyard !== null && jumpedGraveyard.dist < 1,
+  jumpedGraveyard ? `dist ${jumpedGraveyard.dist.toFixed(2)}` : 'graveyard option not found',
+)
 
 // Wheel zoom (design.md §21): the wheel wiring is proven with one real wheel
 // event (zoom-in), while the zoom-out gate is asserted directly on the store.

@@ -9,6 +9,7 @@ import { EVENT_KINDS } from '../systems/events'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
+import { ELEPHANT_GRAVEYARD } from '../world/data/landmarks'
 import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
 
 const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
@@ -214,10 +215,12 @@ export function DebugMenu() {
           placeholder={t.debug.choose}
           options={[
             ...PLACES.map((p) => ({ value: p.id, label: t.places[p.id] })),
+            { value: '#graveyard', label: t.landmarks['elephant-graveyard'] },
             { value: '#grave', label: t.debug.grave },
           ]}
           onPick={(v) => {
             if (v === '#grave') game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)
+            else if (v === '#graveyard') game.debugJumpTo(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)
             else {
               const p = PLACES.find((pl) => pl.id === v)
               if (p) game.debugJumpTo(p.lat, p.lon)
