@@ -317,6 +317,52 @@ check(
   trample.ok ? `${trample.species}, ${trample.stains} stain(s)` : trample.why,
 )
 
+// Elephants actually roam and reach prey on their own (point 6): plant one
+// elephant ~9 units from a lone prey on an open patch of savanna and let it
+// walk over and trample it.
+const roam = await page.evaluate(async () => {
+  const w = window.__wildlife
+  const herds = w?.herdsRef?.current
+  if (!herds) return { ok: false, why: 'no herds' }
+  const terr = await import('/src/world/terrain.ts')
+  const geo = await import('/src/world/geo.ts')
+  const seed = window.__game.getState().seed
+  const typeAt = (x, z) => {
+    const ll = geo.worldToLatLon(x, z)
+    return terr.sampleTerrain(ll.lat, ll.lon, seed).type
+  }
+  // Find an open savanna patch (all-savanna neighborhood) near the player so
+  // the elephant has clear ground to walk over to the prey.
+  const p = window.__game.getState().pos
+  let spot = null
+  for (let r = 8; r <= 320 && !spot; r += 8) {
+    for (let a = 0; a < 20 && !spot; a++) {
+      const gx = p.x + Math.cos((a / 20) * Math.PI * 2) * r
+      const gz = p.z + Math.sin((a / 20) * Math.PI * 2) * r
+      const open = [[0, 0], [11, 0], [-3, 0], [0, 6], [0, -6], [6, 3], [6, -3]].every(([dx, dz]) => typeAt(gx + dx, gz + dz) === 'savanna')
+      if (open) spot = { x: gx, z: gz }
+    }
+  }
+  if (!spot) return { ok: false, why: 'no open savanna patch found' }
+  herds.elephant.length = 0
+  for (const sp of ['zebra', 'antelope', 'giraffe']) herds[sp].length = 0
+  const eleph = { x: spot.x + 9, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0 }
+  const prey = { x: spot.x, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
+  herds.elephant.push(eleph)
+  herds.zebra.push(prey)
+  const start = { x: eleph.x, z: eleph.z }
+  const deadline = Date.now() + 18000
+  return await new Promise((resolve) => {
+    const iv = setInterval(() => {
+      const moved = Math.hypot(eleph.x - start.x, eleph.z - start.z)
+      if (prey.dead) { clearInterval(iv); resolve({ ok: true, trampled: true, moved }) }
+      else if (Date.now() > deadline) { clearInterval(iv); resolve({ ok: true, trampled: false, moved }) }
+    }, 120)
+  })
+})
+check('elephants roam (their position changes over time)', roam.ok && roam.moved > 3, JSON.stringify(roam))
+check('a roaming elephant reaches and tramples a nearby prey animal', roam.ok && roam.trampled === true, JSON.stringify(roam))
+
 // --- Debug menu: dropdowns, renderer row, wheel-zoom gate (§7.1.20) ----------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(500)

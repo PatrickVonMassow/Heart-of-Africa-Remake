@@ -48,6 +48,8 @@ interface Animal {
   dead?: boolean
   /** Shore point this animal periodically walks to and drinks at. */
   drink?: { tx: number; tz: number }
+  /** Current heading for roaming elephants (radians; set lazily). */
+  heading?: number
 }
 
 /**
@@ -75,6 +77,12 @@ const FLEES_LION: Record<Species, boolean> = {
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
 const MAX_STAINS = 60
+/** Elephant roaming (design.md §19): walk speed, turn rate, prey-notice range.
+ *  The turn rate keeps the turning radius (speed/turn) below the trample radius
+ *  so a pursuing elephant can close in on prey instead of orbiting it. */
+const ELEPHANT_SPEED = 1.8
+const ELEPHANT_TURN = 1.6
+const ELEPHANT_NOTICE = 42
 
 function hash(cx: number, cz: number, i: number, seed: number): number {
   let h = (seed ^ 0xa51ce5) >>> 0
@@ -251,7 +259,8 @@ function Herds() {
     }
   }, [])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
+    const dt = Math.min(delta, 0.1)
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
@@ -267,8 +276,10 @@ function Herds() {
     const t = clock.elapsedTime
     const lionActive = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
 
-    // Elephants first: slow herd wander — their current positions drive the
-    // trampling of smaller animals underfoot (design.md §19).
+    // Elephants roam the savanna (design.md §19): a slow directed walk, gently
+    // biased toward the nearest grazing prey, staying on suitable land. Their
+    // moving positions drive the trampling of smaller animals underfoot.
+    const preyHerds = [herds.zebra, herds.antelope, herds.giraffe]
     const elephantPos: Array<[number, number]> = []
     {
       const list = herds.elephant
@@ -276,10 +287,39 @@ function Herds() {
       for (let i = 0; i < n; i++) {
         const a = list[i]
         if (a.dead) continue
-        elephantPos.push([
-          a.x + Math.sin(t * 0.055 + a.phase) * 4.5,
-          a.z + Math.cos(t * 0.04 + a.phase * 1.7) * 4.5,
-        ])
+        if (a.heading === undefined) a.heading = a.rot
+        // Steer toward the nearest live prey within notice range; otherwise
+        // wander with a slowly curving heading (deterministic per elephant).
+        let target: Animal | null = null
+        let best = ELEPHANT_NOTICE
+        for (const herd of preyHerds) {
+          for (const p of herd) {
+            if (p.dead) continue
+            const d = Math.hypot(p.x - a.x, p.z - a.z)
+            if (d < best) { best = d; target = p }
+          }
+        }
+        const desired = target
+          ? Math.atan2(target.x - a.x, target.z - a.z)
+          : a.heading + Math.sin(t * 0.13 + a.phase * 5) * 0.9
+        let dh = desired - a.heading
+        while (dh > Math.PI) dh -= Math.PI * 2
+        while (dh < -Math.PI) dh += Math.PI * 2
+        a.heading += Math.max(-ELEPHANT_TURN * dt, Math.min(ELEPHANT_TURN * dt, dh))
+        const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * dt
+        const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
+        const ll = worldToLatLon(nx, nz)
+        const ter = sampleTerrain(ll.lat, ll.lon, seed)
+        if (ter.type === 'savanna' || ter.type === 'jungle') {
+          a.x = nx
+          a.z = nz
+          a.y = Math.max(0.02, ter.height)
+        } else {
+          // Turn back from desert, water or the open sea (a firm, steady turn
+          // rather than a per-frame spin) and hold position this step.
+          a.heading += ELEPHANT_TURN * 2.5 * dt
+        }
+        elephantPos.push([a.x, a.z])
       }
     }
 

@@ -282,20 +282,23 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     carcass (lowered, rhythmically tearing head movements, red spreading
     stain beneath the prey), the carcass shrinks away piece by piece, and
     once it is consumed the lion moves on. Further animal interactions
-    hold: wandering elephants trample smaller animals (dead on the ground
-    over a red stain), prey scatters from an active lion, vultures circle
-    a kill, shore-near animals periodically walk to the water and drink,
-    grazers dip their heads on open land. The open landscape is dressed
+    hold: elephants roam the land with a slow directed walk (biased toward
+    nearby grazing herds, staying on savanna/forest) and trample smaller
+    animals they pass over (dead on the ground over a red stain), prey
+    scatters from an active lion, vultures circle a kill, shore-near
+    animals periodically walk to the water and drink, grazers dip their
+    heads on open land. The open landscape is dressed
     with region-typical period elements (baobabs, termite mounds, kopjes,
     dead trees, papyrus belts along water; `design.md` §19). The elephant
     graveyard (`design.md` §4.4) is dressed so it reads at a glance: a
     field of fallen, bleached elephant carcasses with ivory tusks and
     bones strewn over a pale bone-littered patch. Verifiable:
     automated checks force the feed state (carcass, head animation, stain,
-    leave phase), provoke a trampling via an injected elephant, and assert
-    the graveyard's carcass/tusk/bone counts via the dev hook with a
-    screenshot (`scripts/verify/settings.mjs`,
-    `scripts/verify/enrichments.mjs`).
+    leave phase), provoke a trampling via an injected elephant, prove an
+    elephant roams (its position changes over time) and walks over to
+    trample a nearby prey on its own, and assert the graveyard's
+    carcass/tusk/bone counts via the dev hook with a screenshot
+    (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes
