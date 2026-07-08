@@ -207,7 +207,7 @@ export const en: Strings = {
 
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
-    mountainNeedsRope: 'The rock face turns me back — without a rope in hand there is no ascent.',
+    mountainNoRopeWarn: 'Without a rope this climb is dangerous — one slip and I fall. Slowly and carefully!',
     boughtFood: 'Bought one week of provisions.',
     bought: (name) => `${name} purchased.`,
     inHand: (name) => `Now holding the ${name.toLowerCase()}.`,
@@ -356,6 +356,8 @@ export const en: Strings = {
       sunblind: 'Blinded by the Sun',
       sandstorm: 'Sandstorm',
       sweptAway: 'Swept Away',
+      mountainClimb: 'Into the Mountains Without a Rope',
+      mountainFall: 'A Fall',
       discovery: 'A Grim Discovery',
       deadline1: 'A Letter from the Financiers',
       deadline2: 'The Final Warning',
@@ -493,6 +495,12 @@ export const en: Strings = {
       '[fear]A sandstorm swallowed the horizon![/fear] [weary]I crouched behind my pack for hours while the world turned to howling dust.[/weary] Precious time is lost.',
     sweptAway:
       '[fear]The current seized me and swept me over the falls![/fear] [weary]I dragged myself to the bank, battered and bleeding —[pause] half of my belongings are gone with the river.[/weary]',
+    mountainNoRope:
+      '[weary]No rope in hand, and yet there is no way around this range.[/weary] [fear]I climb slowly, hold by hold —[pause] one slip here and the rock will not catch me.[/fear]',
+    mountainFall:
+      '[fear]The rock gave way beneath my foot, and I fell![/fear] [weary]Bruised and dazed I came to rest far below —[pause] without a rope this ascent nearly became my end.[/weary]',
+    mountainFallItem:
+      '[fear]The rock gave way beneath my foot, and I fell![/fear] [weary]Bruised, I dragged myself onward —[pause] and in the fall a piece of my gear tore loose and vanished into the depths.[/weary]',
     findRemains: (p: TextParams) =>
       `[somber]I came upon the remains of a traveler who made it no farther.[pause] A grim warning of this land.[/somber] Among the bones lay a purse with ${p.money} dollars — [whisper]may they serve a better fate.[/whisper]`,
     deadline1:

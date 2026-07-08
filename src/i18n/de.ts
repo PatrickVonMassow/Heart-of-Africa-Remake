@@ -206,7 +206,7 @@ export const de: Strings = {
 
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
-    mountainNeedsRope: 'Die Felswand weist mich ab — ohne Seil in der Hand gibt es keinen Aufstieg.',
+    mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich — ein Fehltritt, und ich stürze. Langsam und vorsichtig!',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
     inHand: (name) => `${name} in die Hand genommen.`,
@@ -362,6 +362,8 @@ export const de: Strings = {
       sunblind: 'Von der Sonne geblendet',
       sandstorm: 'Sandsturm',
       sweptAway: 'Fortgerissen',
+      mountainClimb: 'Ohne Seil ins Gebirge',
+      mountainFall: 'Ein Sturz',
       discovery: 'Ein düsterer Fund',
       deadline1: 'Ein Brief der Geldgeber',
       deadline2: 'Die letzte Warnung',
@@ -500,6 +502,12 @@ export const de: Strings = {
       '[fear]Ein Sandsturm verschluckte den Horizont![/fear] [weary]Stundenlang kauerte ich hinter meinem Gepäck, während die Welt zu heulendem Staub wurde.[/weary] Kostbare Zeit ist verloren.',
     sweptAway:
       '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer —[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
+    mountainNoRope:
+      '[weary]Kein Seil in der Hand, und doch führt kein Weg um dieses Gebirge herum.[/weary] [fear]Ich klettere langsam, Griff um Griff —[pause] ein Fehltritt hier, und der Fels wird mich nicht halten.[/fear]',
+    mountainFall:
+      '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden und benommen kam ich weiter unten zum Liegen —[pause] ohne Seil wäre dieser Aufstieg beinahe mein Ende gewesen.[/weary]',
+    mountainFallItem:
+      '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden schleppte ich mich weiter —[pause] und beim Sturz riss sich ein Stück meiner Ausrüstung los und verschwand in der Tiefe.[/weary]',
     findRemains: (p: TextParams) =>
       `[somber]Ich stieß auf die Überreste eines Reisenden, der nicht weiterkam.[pause] Eine düstere Mahnung dieses Landes.[/somber] Zwischen den Knochen lag eine Börse mit ${p.money} Dollar — [whisper]mögen sie einem besseren Schicksal dienen.[/whisper]`,
     deadline1:

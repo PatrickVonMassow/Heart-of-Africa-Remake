@@ -131,7 +131,7 @@ Village camp: once you are an "Honored Friend" (§12) in a native village, you m
 
 | Item | Effect |
 |---|---|
-| Rope | Ascent in the mountains; no mountain pass without a rope |
+| Rope | Safe, faster ascent in the mountains. Mountains can also be climbed without a rope, but slower and dangerously: after a warning, every stretch on the rock risks a fall that wounds the traveler (light or severe) and can tear a carried item loose |
 | Machete | Crossing jungle/dense grassland; also offers protection against animal attacks, though weaker than the rifle |
 | Shovel | Digging up treasures and the tomb at marked sites |
 | Rifle | Hunting and defense; offers the strongest protection against animal attacks on land — stronger than the machete (§14). Carried in hand it makes villagers flee and enables robberies in huts — with a permanent reputation loss in the settlement (§12) |
@@ -196,7 +196,7 @@ Villages and port cities contain various building types. In the first-person vie
 |---|---|---|
 | Desert | Canteen | without: dehydration (drift), speed loss; with a filled canteen: no dehydration. Sun blindness threatens regardless; the canteen does not help against it |
 | Jungle | Machete | without: nearly impassable; with: traversable |
-| Mountains | Rope | without: no ascent / risk of falling; with: passable |
+| Mountains | Rope | without: passable but slow and dangerous — the traveler is warned, then risks a fall on the rock (a light or severe wound, possibly losing a carried item); with: safe and faster |
 | River/lake | Canoe | with: fast water travel; on land: speed penalty |
 | Savanna/open | Rifle (outside villages) | without: higher robbery risk |
 | Dig site | Shovel | without: no find; with: dig it up |

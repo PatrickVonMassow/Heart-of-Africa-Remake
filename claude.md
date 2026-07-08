@@ -202,12 +202,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    and provisions advance with the journey (calendar display, start 1890 per
    `design.md`). Sea water enclosed by the continent's outline (bays,
    gulfs) is swimmable like inland water; the open ocean beyond the
-   outline blocks movement (`design.md` §11). Mountain terrain refuses
-   the ascent without a rope in hand (`design.md` §7/§11); with the rope
-   it is passable, and once on the massif, moving on stays possible.
-   Verifiable: an automated move on enclosed sea advances the position, a
-   move on open ocean is refused with the blocking notice, and a move
-   onto a mountain is refused without and passes with the rope in hand
+   outline blocks movement (`design.md` §11). Mountain terrain is
+   climbable without a rope (`design.md` §7/§11) but slower and dangerous:
+   the traveler is warned at the ascent, and each stretch on the rock
+   risks a fall that wounds lightly or severely and can cost a carried
+   item; with the rope in hand the climb is safe and faster. Verifiable:
+   an automated move on enclosed sea advances the position, a move on
+   open ocean is refused with the blocking notice, a move onto a mountain
+   without a rope advances (with the warning) while the rope makes it
+   faster, and a forced fall wounds the traveler and can drop an item
    (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
@@ -355,8 +358,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     journal screenshot free of visible tags; starting narration produces
     audio without console errors; adding an entry switches its read-aloud
     control into the speaking state without a click; the start entry
-    narrates on the first gesture (`scripts/verify/voice.mjs`). German
-    read-aloud stays an open item until a German-capable voice exists.
+    narrates on the first gesture (`scripts/verify/voice.mjs`). The open
+    journal never freezes the game (`design.md` §16): the character keeps
+    moving in both perspectives while the journal is open and while an
+    entry narrates; only modal dialogs block movement. Verifiable: with the
+    journal open at game start, driving movement still advances the player
+    position (`scripts/verify/voice.mjs`). German read-aloud stays an open
+    item until a German-capable voice exists.
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
     value), walk speed inside settlements to 10 m/s (raised from 7.5 by
@@ -537,10 +545,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     page, stronger at severe wounds. A dead character writes no entry
     (the remains report takes over, pt. 22). Entries appearing under
     do-not-disturb (§16) are written silently without the animation.
-    Verifiable: `scripts/verify/handwriting.mjs` asserts the growing
-    reveal with the hand element, the wound classes on the hand, the
-    persistent blood traces, the click-to-finish, the clean final text
-    (no markup, full length) and the silent do-not-disturb path.
+    The journal keeps the newest content in view (`design.md` §15): a new
+    entry scrolls the view to the bottom, and while an entry writes in the
+    view follows the growing text down so the appearing strokes stay
+    visible. Verifiable: `scripts/verify/handwriting.mjs` asserts the
+    growing reveal with the hand element, the wound classes on the hand,
+    the persistent blood traces, the click-to-finish, the clean final text
+    (no markup, full length), the silent do-not-disturb path, and that an
+    overflowing journal auto-scrolls down to the still-writing entry.
 30. **Gamepad and position query.** The `design.md` §17 controls hold
     for the gamepad too: the left stick moves the character in both
     perspectives (merged with WASD), the right stick turns the

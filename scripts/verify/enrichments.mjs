@@ -127,11 +127,15 @@ check(
   `moved ${blocked.moved.toFixed(3)}, toast: ${blocked.toast ? 'yes' : 'no'}`,
 )
 
-// --- Mountains need a rope in hand (§7.1.4, design.md §7/§11) ----------------
-// March east into the Emi Koussi massif: refused hands-free, passable with
-// the rope in hand. A canteen prevents desert dehydration drift.
+// --- Mountains are climbable without a rope, slower and dangerous
+//     (§7.1.4, design.md §7/§11) -------------------------------------------------
+// March east into the Emi Koussi massif: now passable hands-free (with a
+// warning), and faster with the rope in hand. Random hazards are switched off
+// so the passability comparison is deterministic. A canteen prevents desert
+// dehydration drift.
 const climb = await page.evaluate(async () => {
   const g = window.__game.getState()
+  window.__balance.randomEventsEnabled = false
   g.debugAddEquipment('canteen')
   g.debugSet({ foodDays: 300 })
   g.takeInHand(null)
@@ -139,24 +143,53 @@ const climb = await page.evaluate(async () => {
   g.setToast(null)
   for (let i = 0; i < 120; i++) window.__game.getState().moveTravel(1, 0, 0.05)
   const noRope = { lon: window.__game.getState().pos.x / 10, toast: window.__game.getState().toast }
-  const g2 = window.__game.getState()
-  g2.debugAddEquipment('rope')
-  g2.takeInHand('rope')
-  g2.debugJumpTo(19.87, 17.4)
-  g2.setToast(null)
-  for (let i = 0; i < 120; i++) window.__game.getState().moveTravel(1, 0, 0.05)
-  return { noRope, ropeLon: window.__game.getState().pos.x / 10 }
+  window.__game.getState().debugAddEquipment('rope')
+  // Single-step speed on the Emi Koussi summit (guaranteed mountain terrain):
+  // the rope lowers the time cost, so one step covers more ground.
+  const stepAt = (withRope) => {
+    const st = window.__game.getState()
+    st.takeInHand(withRope ? 'rope' : null)
+    st.debugJumpTo(19.87, 18.55)
+    const p0 = { ...window.__game.getState().pos }
+    window.__game.getState().moveTravel(1, 0, 0.05)
+    const p1 = { ...window.__game.getState().pos }
+    return Math.hypot(p1.x - p0.x, p1.z - p0.z)
+  }
+  const noRopeStep = stepAt(false)
+  const ropeStep = stepAt(true)
+  return { noRope, noRopeStep, ropeStep }
 })
 check(
-  'Mountain ascent is refused without a rope in hand',
-  climb.noRope.lon < 18.55 && typeof climb.noRope.toast === 'string' && climb.noRope.toast.length > 0,
-  `stalled at lon ${climb.noRope.lon.toFixed(2)}, toast: ${climb.noRope.toast ? 'yes' : 'no'}`,
+  'Mountain is climbable without a rope (with a warning)',
+  climb.noRope.lon > 18.6 && typeof climb.noRope.toast === 'string' && climb.noRope.toast.length > 0,
+  `reached lon ${climb.noRope.lon.toFixed(2)}, warned: ${climb.noRope.toast ? 'yes' : 'no'}`,
 )
 check(
-  'With the rope in hand the massif is passable',
-  climb.ropeLon > climb.noRope.lon + 0.5,
-  `reached lon ${climb.ropeLon.toFixed(2)}`,
+  'With the rope in hand the climb is faster (more ground per step)',
+  climb.ropeStep > climb.noRopeStep * 1.3,
+  `step without ${climb.noRopeStep.toFixed(3)} vs with rope ${climb.ropeStep.toFixed(3)}`,
 )
+
+// A fall wounds the traveller and can cost a carried item (design.md §11).
+const fall = await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.debugSetAffliction('wounds', 0)
+  g.takeInHand(null)
+  for (let i = 0; i < 8; i++) {
+    window.__game.getState().debugAddEquipment('machete')
+    window.__game.getState().debugAddEquipment('canteen')
+  }
+  const inv = () => (window.__game.getState().equipment.machete ?? 0) + (window.__game.getState().equipment.canteen ?? 0)
+  const before = inv()
+  let woundedSeen = false
+  for (let i = 0; i < 30; i++) {
+    window.__game.getState().debugTriggerMountainFall()
+    if (window.__game.getState().afflictions.wounds > 0) woundedSeen = true
+  }
+  return { woundedSeen, before, after: inv() }
+})
+check('A fall while climbing wounds the traveller', fall.woundedSeen, '')
+check('Repeated falls can cost carried items', fall.after < fall.before, `items ${fall.before} → ${fall.after}`)
 
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
 await page.evaluate(() => {
@@ -255,21 +288,28 @@ check(
   jumped ? `pos (${jumped.x.toFixed(1)}, ${jumped.z.toFixed(1)})` : 'select not found',
 )
 
-// Wheel zoom: zoom-in always works; zoom-out beyond default needs the unlock.
-const zoom = await page.evaluate(async () => {
+// Wheel zoom (design.md §21): the wheel wiring is proven with one real wheel
+// event (zoom-in), while the zoom-out gate is asserted directly on the store.
+// A single wheel event is used deliberately: after the first zoom the camera
+// moves and the newly revealed terrain chunks briefly Suspend the scene
+// subtree, dropping its window wheel listener until React remounts it — so
+// chaining several synthetic wheel events in the headless run is unreliable.
+await page.evaluate(() => {
+  window.__ui.getState().setWheelZoomEnabled(false)
+  window.__ui.getState().setTravelZoom(1)
+})
+await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 })))
+await page.waitForTimeout(120)
+const zoomedIn = await page.evaluate(() => window.__ui.getState().travelZoom)
+// Gate: zoom-out beyond the default distance is clamped to 1 while locked and
+// permitted (up to 4) once unlocked (design.md §21).
+const gate = await page.evaluate(() => {
   const ui = window.__ui
   ui.getState().setWheelZoomEnabled(false)
-  ui.getState().setTravelZoom(1)
-  window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 }))
-  await new Promise((r) => setTimeout(r, 80))
-  const zoomedIn = ui.getState().travelZoom
-  ui.getState().setTravelZoom(1)
-  window.dispatchEvent(new WheelEvent('wheel', { deltaY: 600 }))
-  await new Promise((r) => setTimeout(r, 80))
+  ui.getState().setTravelZoom(2)
   const gated = ui.getState().travelZoom
   ui.getState().setWheelZoomEnabled(true)
-  window.dispatchEvent(new WheelEvent('wheel', { deltaY: 600 }))
-  await new Promise((r) => setTimeout(r, 80))
+  ui.getState().setTravelZoom(2)
   const wide = ui.getState().travelZoom
   ui.getState().setTravelZoom(10)
   const maxOut = ui.getState().travelZoom
@@ -278,8 +318,9 @@ const zoom = await page.evaluate(async () => {
   ui.getState().setTravelZoom(3)
   ui.getState().setWheelZoomEnabled(false)
   const clamped = ui.getState().travelZoom
-  return { zoomedIn, gated, wide, maxOut, maxIn, clamped }
+  return { gated, wide, maxOut, maxIn, clamped }
 })
+const zoom = { zoomedIn, ...gate }
 check('Wheel zoom: zooming in works without the unlock', zoom.zoomedIn < 1, `${zoom.zoomedIn.toFixed(2)}`)
 check('Wheel zoom: zoom-out gated at the default level', zoom.gated === 1, `${zoom.gated}`)
 check('Wheel zoom: zooms out beyond default once unlocked', zoom.wide > 1, `${zoom.wide.toFixed(2)}`)

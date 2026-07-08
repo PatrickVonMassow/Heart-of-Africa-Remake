@@ -31,6 +31,15 @@ export interface BalanceConfig {
     water: number
     waterWithCanoe: number
   }
+  /** Climbing a mountain without a rope in hand (design.md §7/§11). */
+  mountainFall: {
+    /** Chance per travelled day of a fall while on a mountain without a rope. */
+    chancePerDay: number
+    /** Share of falls that wound severely (the rest are light). */
+    severeShare: number
+    /** Chance a fall also costs one carried equipment item. */
+    itemLossChance: number
+  }
   /** Radius (world units) around the grave in which digging succeeds. */
   digRadius: number
   /** Radius (world units) around a place marker in which it can be entered. */
@@ -155,6 +164,11 @@ export const balance: BalanceConfig = {
     mountainWithRope: 1.5,
     water: 2.0,
     waterWithCanoe: 0.5,
+  },
+  mountainFall: {
+    chancePerDay: 0.35,
+    severeShare: 0.35,
+    itemLossChance: 0.4,
   },
   digRadius: 3,
   placeEnterRadius: 2.5,

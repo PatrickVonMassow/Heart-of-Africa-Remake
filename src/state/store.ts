@@ -185,6 +185,8 @@ export interface GameState {
   toast: string | null
   foodWarned: boolean
   foodOutWarned: boolean
+  /** Warned once about climbing without a rope; resets when off the mountain. */
+  mountainWarned: boolean
   hasCheckpoint: boolean
   /** Bumped by the debug menu when mutating the balance object. */
   balanceVersion: number
@@ -226,6 +228,9 @@ export interface GameState {
   /** Deadline check per travelled day (design.md §5). */
   tickDeadline: (day: number) => void
   applyEventOutcome: (outcome: EventOutcome) => void
+  /** Resolve a fall while climbing a mountain without a rope (design.md §11). */
+  applyMountainFall: () => void
+  debugTriggerMountainFall: () => void
   useMedicine: () => void
   /** A successor continues from the last checkpoint (design.md §18). */
   successorTakeOver: () => boolean
@@ -420,6 +425,7 @@ function startState(seed: number) {
     toast: null,
     foodWarned: false,
     foodOutWarned: false,
+    mountainWarned: false,
     balanceVersion: 0,
   }
 }
@@ -550,11 +556,12 @@ export const useGame = create<GameState>()((set, get) => ({
       set({ toast: getStrings().toasts.oceanBlocked })
       return
     }
-    // No mountain ascent without a rope in hand (design.md §7/§11); once on
-    // the massif, moving on (and back down) stays possible.
-    if (nextT.type === 'mountain' && here.type !== 'mountain' && s.handItem !== 'rope') {
-      set({ toast: getStrings().toasts.mountainNeedsRope })
-      return
+    // Mountains are climbable without a rope, but slower (terrainCost.mountain
+    // vs. mountainWithRope) and dangerous (design.md §7/§11): warn once at the
+    // start of the ascent, then let the climb proceed.
+    if (nextT.type === 'mountain' && here.type !== 'mountain' && s.handItem !== 'rope' && !s.mountainWarned) {
+      set({ mountainWarned: true, toast: getStrings().toasts.mountainNoRopeWarn })
+      get().addEntry({ key: 'journal.titles.mountainClimb' }, { key: 'journal.mountainNoRope' })
     }
 
     const dayDelta = step * balance.daysPerUnit * cost
@@ -568,7 +575,21 @@ export const useGame = create<GameState>()((set, get) => ({
     if (newRegion !== s.region) patch.region = newRegion
     const ex = withExplored(s.explored, next.lat, next.lon)
     if (ex) patch.explored = ex
+    // Re-arm the climb warning once the traveller is off the mountain again.
+    if (nextT.type !== 'mountain' && s.mountainWarned) patch.mountainWarned = false
     set(patch)
+
+    // Fall risk while climbing a mountain without a rope (design.md §7/§11):
+    // a light or severe wound, and possibly the loss of a carried item. Gated
+    // like the other random hazards so the deterministic suites stay stable.
+    if (
+      balance.randomEventsEnabled &&
+      nextT.type === 'mountain' &&
+      s.handItem !== 'rope' &&
+      Math.random() < balance.mountainFall.chancePerDay * dayDelta
+    ) {
+      get().applyMountainFall()
+    }
 
     if (!s.visitedRegions.includes(newRegion)) {
       set((st) => ({ visitedRegions: [...st.visitedRegions, newRegion] }))
@@ -780,6 +801,37 @@ export const useGame = create<GameState>()((set, get) => ({
         return
       }
     }
+  },
+
+  applyMountainFall: () => {
+    const s = get()
+    const severe = Math.random() < balance.mountainFall.severeShare
+    const wounds = (severe ? 2 : Math.max(s.afflictions.wounds, 1)) as 0 | 1 | 2
+    // A fall may tear a carried item loose (not the shovel — the goal tool).
+    const equipment = { ...s.equipment }
+    let handItem = s.handItem
+    let lostItem = false
+    if (Math.random() < balance.mountainFall.itemLossChance) {
+      const droppable = (Object.keys(equipment) as EquipmentId[]).filter(
+        (e) => e !== 'shovel' && (equipment[e] ?? 0) > 0,
+      )
+      if (droppable.length > 0) {
+        const drop = droppable[Math.floor(Math.random() * droppable.length)]
+        equipment[drop] = (equipment[drop] ?? 1) - 1
+        lostItem = true
+        if (handItem === drop && (equipment[drop] ?? 0) <= 0) handItem = null
+      }
+    }
+    set({ afflictions: { ...s.afflictions, wounds }, equipment, handItem })
+    get().addEntry(
+      { key: 'journal.titles.mountainFall' },
+      { key: lostItem ? 'journal.mountainFallItem' : 'journal.mountainFall' },
+    )
+  },
+
+  debugTriggerMountainFall: () => {
+    if (get().defeat || get().victory) return
+    get().applyMountainFall()
   },
 
   debugTriggerEvent: (kind) => {

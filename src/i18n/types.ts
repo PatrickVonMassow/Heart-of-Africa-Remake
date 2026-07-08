@@ -116,8 +116,8 @@ export interface Strings {
 
   toasts: {
     oceanBlocked: string
-    /** Mountain ascent refused without a rope in hand (design.md §11). */
-    mountainNeedsRope: string
+    /** Warning when starting to climb a mountain without a rope (design.md §11). */
+    mountainNoRopeWarn: string
     boughtFood: string
     bought(name: string): string
     inHand(name: string): string
@@ -272,6 +272,10 @@ export interface Strings {
       sunblind: string
       sandstorm: string
       sweptAway: string
+      /** Warning entry on climbing a mountain without a rope (design.md §11). */
+      mountainClimb: string
+      /** A fall while climbing without a rope (design.md §11). */
+      mountainFall: string
       discovery: string
       deadline1: string
       deadline2: string
@@ -318,6 +322,10 @@ export interface Strings {
     sunblindOn: string
     sandstorm: string
     sweptAway: string
+    /** Climbing a mountain without a rope: warning and the fall (design.md §11). */
+    mountainNoRope: string
+    mountainFall: string
+    mountainFallItem: string
     findRemains(p: TextParams): string
     deadline1: string
     deadline2: string
