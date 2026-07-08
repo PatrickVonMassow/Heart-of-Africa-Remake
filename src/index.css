@@ -24,6 +24,16 @@ body,
   height: 100%;
   overflow: hidden;
   background: #0d0b08;
+  /* The GUI is a game surface, not a document — no text selection anywhere. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Editable controls (e.g. the debug-menu number fields) keep normal selection. */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .game-root {

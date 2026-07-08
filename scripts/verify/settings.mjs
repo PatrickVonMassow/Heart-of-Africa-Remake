@@ -107,6 +107,17 @@ let txt = await page.evaluate(() => document.body.innerText)
 check('debug menu (de): mouse sensitivity field', txt.includes('Maus-Empfindlichkeit (Ego-Sicht)'), '')
 check('debug menu (de): ambience volume field', txt.includes('Ambiente-Lautstärke'), '')
 
+// GUI text is not selectable, but form controls keep normal selection.
+const select = await page.evaluate(() => {
+  const bar = document.querySelector('.status-bar')
+  const label = document.querySelector('.debug-menu label span')
+  const input = document.querySelector('.debug-menu input')
+  const us = (el) => (el ? getComputedStyle(el).userSelect : null)
+  return { bar: us(bar), label: us(label), input: us(input) }
+})
+check('GUI text is not selectable', select.bar === 'none' && select.label === 'none', JSON.stringify(select))
+check('form inputs keep normal text selection', select.input === 'text', JSON.stringify(select))
+
 /** Fill the number input that sits next to the given label text. */
 async function fillField(label, value) {
   return page.evaluate(
