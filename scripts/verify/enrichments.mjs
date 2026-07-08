@@ -235,8 +235,16 @@ if (jungleSpot) {
     const el = document.querySelector('.movement-penalty')
     if (!el) return { text: '' }
     const r = el.getBoundingClientRect()
-    // In the top-right status area: right of center, in the upper region.
-    return { text: el.textContent ?? '', topRight: r.left > window.innerWidth / 2 && r.top < window.innerHeight / 3 }
+    const bar = document.querySelector('.status-bar')?.getBoundingClientRect()
+    // In the status-bar band at the top-right: right of centre and vertically
+    // overlapping the status bar (not stacked below it).
+    const withinBar = !!bar && r.top < bar.bottom && r.right <= window.innerWidth
+    return {
+      text: el.textContent ?? '',
+      topRight: r.left > window.innerWidth / 2 && withinBar,
+      hintTop: Math.round(r.top),
+      barBottom: bar ? Math.round(bar.bottom) : null,
+    }
   })
   await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
   console.log('shot 84-movement-penalty.png')
@@ -248,7 +256,7 @@ if (jungleSpot) {
   await page.waitForTimeout(250)
   const hintMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
   check('Movement penalty hint shows in jungle without a machete', hint.text.toLowerCase().includes('machete'), `"${hint.text}"`)
-  check('Movement penalty hint sits in the top-right status area', hint.topRight === true, '')
+  check('Movement penalty hint sits in the top-right status-bar band', hint.topRight === true, `hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
   check('Movement penalty hint clears with a machete in hand', hintMachete === '', `"${hintMachete}"`)
 
   // Point 7: the penalty is journaled only the first time, then only the
