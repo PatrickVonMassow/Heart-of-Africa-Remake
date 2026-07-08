@@ -341,10 +341,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes
     from vector data in their ~1890 state without visible raster steps,
     ground rendered via biome-based PBR texture splatting with detail
-    normal maps. Verifiable: screenshots of the Nile delta, a rift edge and
-    a coastline show smooth, real courses and textured ground instead of
-    vertex colors; the geodata preprocessing is reproducibly documented in
-    the repository.
+    normal maps. The borders between the landscape types (desert/savanna/
+    jungle) meander rather than following straight region or threshold lines:
+    the coordinates that decide the biome are domain-warped by a
+    low-frequency noise field before classification (raw coordinates still
+    drive elevation, rivers and coasts). Verifiable: screenshots of the Nile
+    delta, a rift edge and a coastline show smooth, real courses and textured
+    ground instead of vertex colors; a pure-threshold biome edge (the south
+    desert) is sampled across latitudes and its longitude varies rather than
+    running straight (`scripts/verify/enrichments.mjs`); the geodata
+    preprocessing is reproducibly documented in the repository.
 14. **Lighting and post-processing pipeline.** The passage "**Lighting and
     post-processing pipeline.**" in "## 2. Perspectives and Camera"
     (`design.md`) is implemented: image-based environment lighting (IBL), a

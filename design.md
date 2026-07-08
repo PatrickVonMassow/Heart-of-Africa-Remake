@@ -68,6 +68,7 @@ The landscape rendering is based on real geodata rather than purely synthetic no
 - Elevation relief from a real digital elevation model (DEM, e.g. SRTM or Copernicus GLO-90), preprocessed into elevation tiles and streamed at runtime with levels of detail (LOD) around the player character. Characteristic relief forms (rift escarpments, high plateaus, dune fields, river valleys) are recognizable.
 - Coast, river and lake courses from real vector data (e.g. Natural Earth, HydroSHEDS), adjusted to their ~1890 state (for instance the large Lake Chad outline, no modern reservoirs). The courses are smooth and fine-grained; visible raster steps on coasts and banks must not occur.
 - Ground rendering via biome-based texture splatting with PBR materials (sand, savanna grass, laterite, rock, rainforest floor) and detail normal maps (triplanar) instead of plain vertex colors.
+- The borders between the landscape types (desert, savanna, jungle) meander naturally rather than following straight region or threshold lines: the coordinates that decide the biome are domain-warped by a low-frequency noise field before classification, so a jungle or desert edge weaves across the map (the raw coordinates still drive elevation, rivers and coasts — the real geography).
 - The procedural per-run variation (§18) remains: it affects vegetation distribution, village layouts and movable goals — not the real geography, which is identical in every playthrough.
 
 ---

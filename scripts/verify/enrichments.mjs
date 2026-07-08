@@ -152,6 +152,25 @@ check(
   JSON.stringify([...new Set(labels)]),
 )
 
+// --- Biome borders meander, not straight lines (design.md §3, point 10) -------
+// The south desert edge is a pure threshold border (no per-tile noise term), so
+// without the domain warp it would be a straight meridian; the warp makes its
+// longitude vary with latitude.
+const biomeEdge = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  const edges = []
+  for (let lat = -28; lat <= -15; lat += 1) {
+    let edge = null
+    for (let lon = 12; lon <= 22; lon += 0.1) if (T(lat, lon, seed) === 'desert') edge = lon
+    if (edge !== null) edges.push(edge)
+  }
+  const m = edges.reduce((a, b) => a + b, 0) / (edges.length || 1)
+  const sd = Math.sqrt(edges.reduce((a, b) => a + (b - m) ** 2, 0) / (edges.length || 1))
+  return { n: edges.length, sd }
+})
+check('biome borders meander instead of running straight', biomeEdge.n >= 6 && biomeEdge.sd > 0.18, JSON.stringify(biomeEdge))
+
 // --- Enclosed sea swimmable, open ocean blocked (§7.1.4) ---------------------
 // Gulf of Sidra: sea inside the continent outline.
 const swim = await page.evaluate(async () => {

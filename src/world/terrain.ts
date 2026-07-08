@@ -43,6 +43,8 @@ const METERS_TO_UNITS = 1.35 / 1000
 
 /** Real elevation thresholds (meters) for mountain terrain and snow. */
 const MOUNTAIN_M = 1600
+/** Degrees of low-frequency meander applied to biome/region borders (design.md §3). */
+const BIOME_WARP = 3.0
 const SNOW_M = 4300
 
 // Base palette per terrain type; noise varies brightness per run.
@@ -125,8 +127,16 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     return { height, elevation, type: 'ocean', color, splat: [1, 0, 0, 0] }
   }
 
-  const region = regionAt(lat, lon)
   const n = fbm2(lon * 0.6, lat * 0.6, seed, 4)
+  // Domain warp (design.md §3): perturb the coordinates that decide the biome
+  // and region-color borders with a low-frequency noise field, so those borders
+  // meander naturally instead of following the straight region/threshold lines
+  // (the raw lat/lon still drive elevation, rivers and coasts — real geodata).
+  const warpU = fbm2(lon * 0.4 + 13, lat * 0.4 - 5, seed + 21, 3) - 0.5
+  const warpV = fbm2(lon * 0.4 - 8, lat * 0.4 + 11, seed + 22, 3) - 0.5
+  const wlon = lon + warpU * BIOME_WARP
+  const wlat = lat + warpV * BIOME_WARP
+  const region = regionAt(wlat, wlon)
   const shade = 0.85 + detail * 0.3
   const riverD = riverDistance(lat, lon)
 
@@ -150,11 +160,11 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
         type = n > 0.62 ? 'mountain' : 'savanna'
         break
       case 'south':
-        type = lon < 18.5 && lat > -31 ? 'desert' : 'savanna'
+        type = wlon < 18.5 && wlat > -31 ? 'desert' : 'savanna'
         break
       case 'west':
       default:
-        type = lat < 8 && lon < 2 && n > 0.35 ? 'jungle' : 'savanna'
+        type = wlat < 8 && wlon < 2 && n > 0.35 ? 'jungle' : 'savanna'
         break
     }
   }
@@ -169,12 +179,12 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // shows hard bands at region borders. The discrete `type` above keeps
   // driving gameplay and vegetation.
   const wNorth = Math.max(
-    sstep(15.5, 18.5, lat),
-    Math.min(sstep(13.2, 15.5, lat), sstep(23, 26.5, lon)),
+    sstep(15.5, 18.5, wlat),
+    Math.min(sstep(13.2, 15.5, wlat), sstep(23, 26.5, wlon)),
   )
-  const wSouth = 1 - sstep(-13.5, -10.5, lat)
-  const wEast = Math.min(sstep(30, 33, lon), 1 - wNorth, 1 - wSouth)
-  const wCentral = Math.min(sstep(10.5, 13.5, lon), 1 - sstep(6.2, 8.8, lat), 1 - wEast, 1 - wNorth, 1 - wSouth)
+  const wSouth = 1 - sstep(-13.5, -10.5, wlat)
+  const wEast = Math.min(sstep(30, 33, wlon), 1 - wNorth, 1 - wSouth)
+  const wCentral = Math.min(sstep(10.5, 13.5, wlon), 1 - sstep(6.2, 8.8, wlat), 1 - wEast, 1 - wNorth, 1 - wSouth)
   const wWest = Math.max(0, 1 - wNorth - wSouth - wEast - wCentral)
 
   // Per-region ground colors (before relief/river/coast overlays).
@@ -183,10 +193,10 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   const colJungle = biomeColor('jungle', detail)
   const colMountain = biomeColor('mountain', detail)
   const colWest =
-    lat < 8 && lon < 2 ? mix(colSavanna, colJungle, sstep(0.28, 0.45, n)) : colSavanna
+    wlat < 8 && wlon < 2 ? mix(colSavanna, colJungle, sstep(0.28, 0.45, n)) : colSavanna
   const colEast = mix(colSavanna, colMountain, Math.max(mountainT, sstep(0.5, 0.68, n) * 0.6))
   // Namib/Kalahari strip toward the west coast, softly bounded.
-  const southDesertT = Math.min(1 - sstep(17.5, 19.8, lon), sstep(-32.5, -30, lat))
+  const southDesertT = Math.min(1 - sstep(17.5, 19.8, wlon), sstep(-32.5, -30, wlat))
   const colSouth = mix(colSavanna, colDesert, southDesertT)
 
   let color: [number, number, number] = [0, 0, 0]
@@ -205,7 +215,7 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   color = mix(color, colMountain, mountainT)
 
   // Splat weights blended with the same soft region weights.
-  const forestW = wCentral + (lat < 8 && lon < 2 ? wWest * sstep(0.28, 0.45, n) : 0)
+  const forestW = wCentral + (wlat < 8 && wlon < 2 ? wWest * sstep(0.28, 0.45, n) : 0)
   const sandW = wNorth + wSouth * southDesertT
   const splat: SplatWeights = [
     sandW + 0.12,
