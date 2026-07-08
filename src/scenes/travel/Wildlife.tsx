@@ -1016,14 +1016,15 @@ function LionHunt() {
     const active = s.mode !== 'idle'
     const feeding = s.mode === 'feed'
 
-    // Touching the lion triggers a lion attack (design.md §14): when the player
-    // walks into the active lion, fire the event (rate-limited by the store).
-    // Only the lion attacks; the other predators are pure scenery.
-    if (active && s.predator === 'lion') {
-      const lionX = feeding ? s.px + 0.7 : s.lx
-      const lionZ = feeding ? s.pz + 0.25 : s.lz
-      if (Math.hypot(lionX - pos.x, lionZ - pos.z) < LION_CONTACT_RADIUS) {
-        useGame.getState().lionContact()
+    // Touching a wandering predator triggers its attack (design.md §14/§19):
+    // when the player walks into the active predator, fire the event
+    // (rate-limited by the store). Every predator attacks on contact now — the
+    // lion remains the apex (highest fatal risk), the others less dangerous.
+    if (active) {
+      const predX = feeding ? s.px + 0.7 : s.lx
+      const predZ = feeding ? s.pz + 0.25 : s.lz
+      if (Math.hypot(predX - pos.x, predZ - pos.z) < LION_CONTACT_RADIUS) {
+        useGame.getState().predatorContact(s.predator)
       }
     }
 

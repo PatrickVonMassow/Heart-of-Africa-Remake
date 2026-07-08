@@ -11,7 +11,9 @@ import type { EquipmentId } from '../state/store'
 
 export type EventKind =
   | 'lionAttack'
+  | 'cheetahAttack'
   | 'leopardAttack'
+  | 'hyenaAttack'
   | 'snakeBite'
   | 'robberAttack'
   | 'crocodileAttack'
@@ -22,7 +24,8 @@ export type EventKind =
   | 'findRemains'
 
 export const EVENT_KINDS: EventKind[] = [
-  'lionAttack', 'leopardAttack', 'snakeBite', 'robberAttack', 'crocodileAttack',
+  'lionAttack', 'cheetahAttack', 'leopardAttack', 'hyenaAttack', 'snakeBite',
+  'robberAttack', 'crocodileAttack',
   'fever', 'sunblindness', 'sandstorm', 'waterfallSweep', 'findRemains',
 ]
 
@@ -71,10 +74,17 @@ export function eventChance(kind: EventKind, ctx: EventContext): number {
   switch (kind) {
     case 'lionAttack':
       return ctx.terrain === 'savanna' && !ctx.inWater ? r.animalAttack * 0.5 * weaponProtection(ctx) : 0
+    case 'cheetahAttack':
+      // Cheetahs of the open plains: timid toward people, so the rarest and
+      // least dangerous of the cats (design.md §14/§19).
+      return ctx.terrain === 'savanna' && !ctx.inWater ? r.animalAttack * 0.15 * weaponProtection(ctx) : 0
     case 'leopardAttack':
       return (ctx.terrain === 'savanna' || ctx.terrain === 'jungle') && !ctx.inWater
         ? r.animalAttack * 0.3 * weaponProtection(ctx)
         : 0
+    case 'hyenaAttack':
+      // Spotted hyenas of the plains: bolder than the cats, a real threat.
+      return ctx.terrain === 'savanna' && !ctx.inWater ? r.animalAttack * 0.35 * weaponProtection(ctx) : 0
     case 'snakeBite':
       return !ctx.inWater && (ctx.terrain === 'savanna' || ctx.terrain === 'jungle' || ctx.terrain === 'desert')
         ? r.animalAttack * 0.2
@@ -137,9 +147,15 @@ export function resolveEvent(kind: EventKind, ctx: EventContext, rand: () => num
   switch (kind) {
     case 'lionAttack':
       return resolveAttack(kind, ctx, rand, 0.08)
+    case 'cheetahAttack':
+      // Cheetahs rarely press an attack home — the lowest fatal risk.
+      return resolveAttack(kind, ctx, rand, 0.01)
     case 'leopardAttack':
       // Lower risk of being eaten than with lions (design.md §14).
       return resolveAttack(kind, ctx, rand, 0.03)
+    case 'hyenaAttack':
+      // More dangerous than the leopard, still below the apex lion.
+      return resolveAttack(kind, ctx, rand, 0.05)
     case 'snakeBite': {
       const roll = rand()
       const result = roll < 0.4 ? 'escaped' : roll < 0.85 ? 'light' : 'severe'

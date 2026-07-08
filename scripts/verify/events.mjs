@@ -91,6 +91,34 @@ check('a rifle in the pack deters robbers', outcomes.deterred === 'deterred', ou
 check('unarmed traveller gets robbed', outcomes.robbed === 'robbed', outcomes.robbed)
 check('weapon turns escape into an active defense', outcomes.defended === 'defended' && outcomes.escapedBare === 'escaped', '')
 
+// Non-lion predators attack too (point 9 / design.md §14/§19): cheetah, leopard
+// and hyena, at realistic rates and injury risk. On the open plains the per-day
+// chance rises cheetah < leopard < hyena < lion; each resolves to a real attack.
+const predators = await page.evaluate(() => {
+  const { eventChance, resolveEvent } = window.__events
+  const ctx = { terrain: 'savanna', inWater: false, nearWaterfall: false, wetland: false, equipment: {} }
+  // fatal only when the roll lands in the fatal band; a mid roll gives light/severe.
+  const res = (k) => resolveEvent(k, ctx, () => 0.9).result // high roll → severe injury band
+  return {
+    cheetah: eventChance('cheetahAttack', ctx),
+    leopard: eventChance('leopardAttack', ctx),
+    hyena: eventChance('hyenaAttack', ctx),
+    lion: eventChance('lionAttack', ctx),
+    cheetahRes: res('cheetahAttack'),
+    hyenaRes: res('hyenaAttack'),
+    // fatal band: a low-ish roll inside the fatal window (0.45..0.45+fatal*p).
+    lionFatal: resolveEvent('lionAttack', ctx, () => 0.46).result,
+    cheetahFatal: resolveEvent('cheetahAttack', ctx, () => 0.46).result,
+  }
+})
+check(
+  'plains predator danger rises cheetah < leopard < hyena < lion',
+  predators.cheetah < predators.leopard && predators.leopard < predators.hyena && predators.hyena < predators.lion,
+  JSON.stringify(predators),
+)
+check('cheetah and hyena resolve to real attacks', ['light', 'severe', 'fatal', 'defended', 'escaped'].includes(predators.cheetahRes) && ['light', 'severe', 'fatal', 'defended', 'escaped'].includes(predators.hyenaRes), `${predators.cheetahRes}/${predators.hyenaRes}`)
+check('the lion is deadlier than the cheetah (wider fatal band)', predators.lionFatal === 'fatal' && predators.cheetahFatal !== 'fatal', `lion ${predators.lionFatal}, cheetah ${predators.cheetahFatal}`)
+
 // === Debug triggers apply real consequences (§21) ==============================
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1200)
@@ -259,6 +287,38 @@ check(
   lionTouch.triggered && lionTouch.cooldown > 0,
   JSON.stringify(lionTouch),
 )
+
+// Point 9: every wandering predator attacks on contact, not only the lion.
+// Pin a hyena on the player and confirm the attack fires (its journal entry).
+const hyenaTouch = await page.evaluate(async () => {
+  const store = window.__game
+  store.setState({ eventCooldown: 0, defeat: null, victory: false })
+  store.getState().debugAddEquipment('rifle')
+  const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
+  const before = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
+  const deadline = Date.now() + 10000
+  return await new Promise((res) => {
+    const iv = setInterval(() => {
+      const g = store.getState()
+      const pos = g.pos
+      const s = window.__lionHunt?.state
+      if (s) {
+        s.predator = 'hyena'
+        s.mode = 'chase'; s.timer = 5
+        s.px = pos.x; s.pz = pos.z; s.lx = pos.x; s.lz = pos.z
+      }
+      const now = g.journal.filter((e) => key(e) === 'journal.titles.attack').length
+      if (now > before || g.defeat === 'death') {
+        clearInterval(iv)
+        res({ triggered: true, cooldown: g.eventCooldown })
+      } else if (Date.now() > deadline) {
+        clearInterval(iv)
+        res({ triggered: false, cooldown: g.eventCooldown })
+      }
+    }, 80)
+  })
+})
+check('touching a hyena triggers a hyena attack (non-lion predator)', hyenaTouch.triggered && hyenaTouch.cooldown > 0, JSON.stringify(hyenaTouch))
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

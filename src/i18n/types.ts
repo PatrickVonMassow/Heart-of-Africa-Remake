@@ -28,7 +28,7 @@ export interface Strings {
 
   regions: Record<RegionId, string>
   /** Animal names used in event entries (design.md §14). */
-  animals: { lion: string; leopard: string; snake: string; crocodile: string }
+  animals: { lion: string; cheetah: string; leopard: string; hyena: string; snake: string; crocodile: string }
   places: Record<string, string>
   peoples: Record<string, string>
   landmarks: Record<string, string>

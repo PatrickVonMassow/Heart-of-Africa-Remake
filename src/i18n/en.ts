@@ -109,7 +109,7 @@ export const en: Strings = {
   formatDecimal: dec,
 
   regions: { north: 'North', west: 'West', central: 'Central', east: 'East', south: 'South' },
-  animals: { lion: 'lions', leopard: 'a leopard', snake: 'a snake', crocodile: 'a crocodile' },
+  animals: { lion: 'lions', cheetah: 'a cheetah', leopard: 'a leopard', hyena: 'hyenas', snake: 'a snake', crocodile: 'a crocodile' },
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
@@ -337,7 +337,8 @@ export const en: Strings = {
     randomEvents: 'Random events',
     triggerEvent: 'Trigger event:',
     eventNames: {
-      lionAttack: 'Lion attack', leopardAttack: 'Leopard attack', snakeBite: 'Snake bite',
+      lionAttack: 'Lion attack', cheetahAttack: 'Cheetah attack', leopardAttack: 'Leopard attack',
+      hyenaAttack: 'Hyena attack', snakeBite: 'Snake bite',
       robberAttack: 'Robbers', crocodileAttack: 'Crocodile', fever: 'Fever',
       sunblindness: 'Sun blindness', sandstorm: 'Sandstorm', waterfallSweep: 'Swept over falls',
       findRemains: 'Find remains',
@@ -506,7 +507,9 @@ export const en: Strings = {
       const animal = en.animals[p.animal as keyof typeof en.animals]
       const openings: Record<string, string> = {
         lion: `[fear]I was attacked by ${animal}![/fear]`,
+        cheetah: `[fear]In a blur of speed, ${animal} broke from the grass at me![/fear]`,
         leopard: `[fear]Out of nowhere ${animal} was upon me![/fear]`,
+        hyena: `[fear]Jaws snapping, ${animal} closed in on me![/fear]`,
         snake: `[fear]I nearly stepped on ${animal}![/fear]`,
         crocodile: `[fear]The water erupted —[pause] ${animal}![/fear]`,
       }

@@ -246,8 +246,9 @@ export interface GameState {
   /** Resolve a fall while climbing a mountain without a rope (design.md §11). */
   applyMountainFall: () => void
   debugTriggerMountainFall: () => void
-  /** Walking into a wandering lion triggers a lion attack (design.md §14). */
-  lionContact: () => void
+  /** Walking into a wandering predator triggers its attack (design.md §14/§19):
+   *  every bird's-eye predator (lion, cheetah, leopard, hyena), not only the lion. */
+  predatorContact: (predator: 'lion' | 'cheetah' | 'leopard' | 'hyena') => void
   useMedicine: () => void
   /** A successor continues from the last checkpoint (design.md §18). */
   successorTakeOver: () => boolean
@@ -822,10 +823,18 @@ export const useGame = create<GameState>()((set, get) => ({
   /** Apply a resolved event to the state and report it (design.md §16). */
   applyEventOutcome: (o: EventOutcome) => {
     const s = get()
-    const animal = o.kind === 'lionAttack' ? 'lion' : o.kind === 'leopardAttack' ? 'leopard' : o.kind === 'snakeBite' ? 'snake' : 'crocodile'
+    const animal =
+      o.kind === 'lionAttack' ? 'lion'
+      : o.kind === 'cheetahAttack' ? 'cheetah'
+      : o.kind === 'leopardAttack' ? 'leopard'
+      : o.kind === 'hyenaAttack' ? 'hyena'
+      : o.kind === 'snakeBite' ? 'snake'
+      : 'crocodile'
     switch (o.kind) {
       case 'lionAttack':
+      case 'cheetahAttack':
       case 'leopardAttack':
+      case 'hyenaAttack':
       case 'snakeBite':
       case 'crocodileAttack': {
         if (o.result === 'fatal') {
@@ -955,16 +964,22 @@ export const useGame = create<GameState>()((set, get) => ({
     get().applyMountainFall()
   },
 
-  lionContact: () => {
+  predatorContact: (predator) => {
     const s = get()
-    // Touching a lion counts as a lion attack (design.md §14), rate-limited by
-    // the shared event cooldown and suppressed with the random-event system.
+    // Touching a wandering predator counts as its attack (design.md §14/§19),
+    // rate-limited by the shared event cooldown and suppressed with the
+    // random-event system. Every predator attacks on contact, not just the lion.
     if (s.defeat || s.victory || !balance.randomEventsEnabled || s.eventCooldown > 0) return
+    const kind: EventKind =
+      predator === 'cheetah' ? 'cheetahAttack'
+      : predator === 'leopard' ? 'leopardAttack'
+      : predator === 'hyena' ? 'hyenaAttack'
+      : 'lionAttack'
     const cur = worldToLatLon(s.pos.x, s.pos.z)
     const here = sampleTerrain(cur.lat, cur.lon, s.seed)
     const ctx = buildEventContext(s, here.type, cur.lat, cur.lon)
     set({ eventCooldown: balance.events.cooldownDays * (0.75 + Math.random() * 0.5) })
-    get().applyEventOutcome(resolveEvent('lionAttack', ctx, Math.random))
+    get().applyEventOutcome(resolveEvent(kind, ctx, Math.random))
   },
 
   debugTriggerEvent: (kind) => {

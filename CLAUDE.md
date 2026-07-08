@@ -581,7 +581,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     and the death/successor flow.
 23. **Random events.** `design.md` §14 is implemented as a hidden per-day
     roll while travelling, modulated by terrain and state: wild-animal
-    attacks (lions, leopards, snakes — lions with the highest risk of a
+    attacks (lions, cheetahs, leopards, hyenas, snakes — danger rises
+    cheetah < leopard < hyena < lion, the lion with the highest risk of a
     fatal outcome), robber attacks (money theft; a rifle in the pack
     deters almost always), crocodile attacks in water (the machete always helps,
     the rifle only from the canoe — otherwise it is wet and useless),
@@ -596,7 +597,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     rates were reduced by a factor of five from the earlier calibration);
     the debug menu can toggle the events and trigger each
     kind directly (`design.md` §21). Beyond the hidden roll, walking into
-    one of the wandering bird's-eye lions directly triggers a lion attack
+    any of the wandering bird's-eye predators (lion, cheetah, leopard,
+    hyena, §19) directly triggers that predator's attack
     (same protection/outcome rules, rate-limited by the event cooldown and
     suppressed with the random-event system). Beyond the reactive events, the
     first time the traveller meets a danger situation the journal warns of it
@@ -609,9 +611,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     (slowdown, not danger). Verifiable:
     `scripts/verify/events.mjs` asserts the reduced rates, the protection
     ordering (pure functions), deterministic outcome mapping, the
+    plains-predator danger order (cheetah < leopard < hyena < lion) with the
+    lion's wider fatal band, the
     consequences of each trigger, a fatal attack, autonomous firing while
-    travelling, silence when disabled, and that pinning the lion on the
-    player triggers a lion attack; `scripts/verify/enrichments.mjs` asserts
+    travelling, silence when disabled, and that pinning a lion — and a hyena —
+    on the player triggers that predator's attack;
+    `scripts/verify/enrichments.mjs` asserts
     each first-time danger warning fires exactly once and marks its flag.
 24. **Deadline and successor.** `design.md` §5/§18 is implemented: the
     expedition runs against a multi-year deadline (balance value, ~5
