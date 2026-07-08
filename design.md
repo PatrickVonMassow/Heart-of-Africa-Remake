@@ -318,9 +318,9 @@ Events (animal and robber attacks, chiefs' hints, status changes and the like, �
 **Do not disturb.**
 Players who do not want to be interrupted can turn the automatic presentation off (POC: debug-menu checkbox, also toggled with F2): with the option active, new entries neither open the journal nor start their narration — they are written silently and remain fully readable (and narratable) when the journal is opened manually. Turning the option off restores the automatic behavior.
 
-The entry does not appear as finished text but is visibly written into the book in handwriting by a hand.
+The entry does not appear as finished text but is visibly written into the book in handwriting by a hand that clearly grips a pen, the nib meeting the line at the growing end of the text.
 
-If the character is injured, the injuries are visible on the writing hand, at a recognizable severity: with a severe injury the hand is bloody, with lighter injuries correspondingly less marked. Example: the entry "I was attacked by lions and severely wounded." is written by a bloody hand. An entry written by a bloody hand accordingly contains traces of blood.
+If the character is injured, the injuries are visible on the writing hand, at a recognizable severity: with a severe injury the hand is bloody, with lighter injuries correspondingly less marked. Example: the entry "I was attacked by lions and severely wounded." is written by a bloody hand. An entry written by a bloody hand accordingly contains traces of blood — rendered as irregular spattered droplets with satellite specks and a run-off drip, so they read as blood rather than tidy dots.
 
 If the character can no longer write (death), the handwritten entry is omitted; instead the report about the found remains appears (§15).
 

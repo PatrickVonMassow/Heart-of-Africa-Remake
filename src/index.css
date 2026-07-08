@@ -387,40 +387,81 @@ body,
 
 .writing-hand {
   display: inline-block;
-  vertical-align: text-bottom;
-  margin-left: 2px;
-  animation: hand-wiggle 0.35s ease-in-out infinite alternate;
+  vertical-align: -0.55em;
+  margin-left: 1px;
+  transform-origin: 15% 90%;
+  animation: hand-wiggle 0.32s ease-in-out infinite alternate;
+  filter: drop-shadow(0 1px 1px rgba(40, 25, 10, 0.35));
 }
 
 .writing-hand .hand-skin {
   fill: #d9a86f;
+  stroke: #a9794a;
+  stroke-width: 0.6;
+}
+.writing-hand .pen-shaft {
+  stroke: #3a2b1a;
+  stroke-width: 2.6;
+}
+.writing-hand .pen-nib {
+  stroke: #14100a;
+  stroke-width: 2.6;
+}
+.writing-hand .pen-ink {
+  fill: #2a1c33;
 }
 
 /* Lightly wounded hand: darker, scuffed skin (design.md §16). */
 .writing-hand.marked .hand-skin {
   fill: #b97f52;
+  stroke: #8a5a30;
 }
 
 /* Severely wounded: a bloody hand writes the entry (design.md §16). */
 .writing-hand.bloody .hand-skin {
-  fill: #8c2f22;
+  fill: #9e4234;
+  stroke: #6f241a;
+}
+.writing-hand.bloody .pen-ink {
+  fill: #6f1710;
 }
 
 @keyframes hand-wiggle {
-  from { transform: rotate(-4deg) translateY(0); }
-  to { transform: rotate(3deg) translateY(1px); }
+  from { transform: rotate(-3deg) translate(-0.5px, 0); }
+  to { transform: rotate(2.5deg) translate(0.5px, 1px); }
 }
 
-/* Blood traces on entries written by a wounded hand (design.md §16). */
-.blood-marks span {
+/* Blood traces on entries written by a wounded hand (design.md §16): irregular
+   spattered droplets with a run-off drip and satellite specks, not tidy dots. */
+.blood-marks .blood-drop {
   position: absolute;
-  border-radius: 50% 42% 55% 48%;
-  background: radial-gradient(circle at 40% 35%, rgba(122, 27, 16, 0.55), rgba(90, 16, 10, 0.28) 70%, transparent);
   pointer-events: none;
+  transform: rotate(var(--rot, 0deg));
+  /* Organic, slightly teardrop outline. */
+  border-radius: 58% 42% 47% 53% / 63% 59% 41% 37%;
+  background: radial-gradient(ellipse at 40% 32%, #7c1c11 0%, #5c1109 55%, #390a05 100%);
+  opacity: 0.82;
+  /* Satellite specks flung from the drop. */
+  box-shadow:
+    0.55em 0.28em 0 -0.34em #5c1109,
+    -0.4em 0.5em 0 -0.4em #6a140b,
+    0.28em 0.62em 0 -0.42em #4a0d06;
+}
+/* A thin run-off drip trailing downward. */
+.blood-marks .blood-drop::after {
+  content: '';
+  position: absolute;
+  left: 44%;
+  top: 62%;
+  width: 20%;
+  height: 130%;
+  border-radius: 40% 40% 55% 55%;
+  background: linear-gradient(to bottom, #5c1109 0%, rgba(70, 15, 8, 0.5) 55%, transparent 100%);
 }
 
-.blood-marks.severe span {
-  background: radial-gradient(circle at 40% 35%, rgba(122, 27, 16, 0.8), rgba(90, 16, 10, 0.45) 70%, transparent);
+.blood-marks.severe .blood-drop {
+  opacity: 0.92;
+  background: radial-gradient(ellipse at 40% 32%, #8f1f12 0%, #6a130a 55%, #430a05 100%);
 }
 
 /* Hand-sketch illustrations beside entry text (design.md §19). */

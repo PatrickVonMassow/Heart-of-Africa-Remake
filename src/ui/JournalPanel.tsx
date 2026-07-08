@@ -9,7 +9,7 @@
 // recorded on the entry — a severely wounded hand is bloody and leaves blood
 // traces on the page.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useGame, type JournalEntry } from '../state/store'
 import { useUi } from '../state/ui'
 import { START_YEAR } from '../config/balance'
@@ -23,42 +23,58 @@ type SpeechUiState = { entryId: number; status: 'loading' | 'speaking' } | null
 /** Reveal speed of the handwriting animation (characters per second). */
 const WRITE_CHARS_PER_SEC = 55
 
-/** The writing hand holding a pen (design.md §16); tinted by wound level. */
+/** The writing hand gripping a pen (design.md §16); tinted by wound level.
+ *  The nib sits at the lower-left so it meets the text baseline as it writes. */
 function WritingHand({ wounds }: { wounds: 0 | 1 | 2 }) {
   const cls = wounds === 2 ? ' bloody' : wounds === 1 ? ' marked' : ''
   return (
     <span className={`writing-hand${cls}`} aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="20" height="20">
-        {/* Pen */}
-        <path d="M4 20 L14 6 L16 8 L6 22 Z" fill="#4a3826" />
-        {/* Hand: palm and two hinted fingers gripping the pen */}
-        <ellipse cx="16" cy="9" rx="5.2" ry="4" className="hand-skin" transform="rotate(38 16 9)" />
-        <ellipse cx="13.2" cy="8.2" rx="1.4" ry="3" className="hand-skin" transform="rotate(48 13.2 8.2)" />
-        <ellipse cx="15" cy="5.8" rx="1.3" ry="2.8" className="hand-skin" transform="rotate(52 15 5.8)" />
+      <svg viewBox="0 0 40 34" width="34" height="29">
+        {/* Pen shaft and dark nib touching the writing line */}
+        <line x1="6" y1="30" x2="31" y2="5" className="pen-shaft" strokeLinecap="round" />
+        <line x1="6" y1="30" x2="10.5" y2="25.5" className="pen-nib" strokeLinecap="round" />
+        {/* Ink dot at the nib */}
+        <circle cx="6" cy="30" r="1.3" className="pen-ink" />
+        {/* Back of the hand / cuff */}
+        <path d="M27 5 Q39 9 39 20 Q39 31 27 30 L19 21 Q22 12 27 5 Z" className="hand-skin" />
+        {/* Three fingers curling over the pen shaft */}
+        <ellipse cx="23" cy="15" rx="5.4" ry="2.6" className="hand-skin" transform="rotate(-45 23 15)" />
+        <ellipse cx="20.3" cy="18.2" rx="4.9" ry="2.4" className="hand-skin" transform="rotate(-45 20.3 18.2)" />
+        <ellipse cx="18" cy="21.2" rx="4.2" ry="2.2" className="hand-skin" transform="rotate(-45 18 21.2)" />
       </svg>
     </span>
   )
 }
 
-/** Deterministic blood traces on entries written by a wounded hand (§16). */
+/** Deterministic blood traces on entries written by a wounded hand (§16):
+ *  irregular droplets with a run-off drip and a few satellite specks, so they
+ *  read as spattered blood rather than tidy dots. */
 function BloodMarks({ entry }: { entry: JournalEntry }) {
   if (!entry.wounds) return null
   const count = entry.wounds === 2 ? 5 : 2
+  const rand = (a: number, b: number) => {
+    const h = Math.sin(entry.id * a + b) * 43758.5453
+    return h - Math.floor(h)
+  }
   const marks = Array.from({ length: count }, (_, i) => {
-    const h = Math.sin(entry.id * 12.9898 + i * 78.233) * 43758.5453
-    const r1 = h - Math.floor(h)
-    const h2 = Math.sin(entry.id * 39.346 + i * 11.135) * 24634.6345
-    const r2 = h2 - Math.floor(h2)
+    const r1 = rand(12.9898 + i * 4.1, 78.233)
+    const r2 = rand(39.346 + i * 2.7, 11.135)
+    const r3 = rand(7.135 + i * 3.3, 21.71)
     return {
-      left: `${8 + r1 * 84}%`,
-      top: `${10 + r2 * 75}%`,
-      size: entry.wounds === 2 ? 5 + r1 * 7 : 3 + r1 * 3,
+      left: `${8 + r1 * 82}%`,
+      top: `${12 + r2 * 70}%`,
+      size: entry.wounds === 2 ? 6 + r1 * 8 : 3.5 + r1 * 3.5,
+      rot: Math.floor(r3 * 360),
     }
   })
   return (
     <div className={`blood-marks${entry.wounds === 2 ? ' severe' : ''}`} aria-hidden="true">
       {marks.map((m, i) => (
-        <span key={i} style={{ left: m.left, top: m.top, width: m.size, height: m.size }} />
+        <span
+          key={i}
+          className="blood-drop"
+          style={{ left: m.left, top: m.top, width: m.size, height: m.size, ['--rot']: `${m.rot}deg` } as CSSProperties}
+        />
       ))}
     </div>
   )
