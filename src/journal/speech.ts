@@ -1,14 +1,14 @@
-// Journal read-aloud (design.md §15): speaks journal entries with the Kokoro
-// TTS model running in the browser (kokoro-js). The model is fetched from the
-// Hugging Face CDN on first use and cached by the browser afterwards. Kokoro
-// runs on a *separate* WebGPU compute path (onnxruntime-web), distinct from the
-// three.js renderer's WebGPU: that compute backend is only reliable on
-// Chromium, so the GPU path is restricted to Chromium and every other browser
-// (Firefox, Safari) uses the universally-working WASM path — otherwise Firefox
-// picks WebGPU (navigator.gpu exists there and drives the renderer fine) and
-// the synthesis fails. Kokoro currently has no German voice, so read-aloud is
-// offered for English only — German texts carry the same voice markup so a
-// German-capable engine can be added later.
+// Journal read-aloud (design.md §15/§16): speaks journal entries with the
+// Kokoro TTS model (kokoro-js), fetched from the Hugging Face CDN on first use
+// and cached by the browser. The model runs in a Web Worker (ttsWorker.ts) so
+// synthesis never blocks the game loop — the main thread only posts text and
+// plays back the returned PCM through the AudioContext. The device is decided
+// here on the main thread: the onnxruntime WebGPU compute path (separate from
+// the three.js renderer's WebGPU) is only reliable on Chromium, so the GPU
+// path is gated to Chromium and every other browser (Firefox, Safari) uses the
+// universally-working WASM path. Kokoro currently has no German voice, so
+// read-aloud is offered for English only — German texts carry the same voice
+// markup so a German-capable engine can be added later.
 // OPEN: German read-aloud once a German-capable TTS voice is available.
 
 import type { SpeechSegment } from './voiceMarkup'
@@ -20,7 +20,6 @@ export function speechAvailable(lang: string): boolean {
   return SPEECH_LANGS.includes(lang)
 }
 
-const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
 // British male voice — fits the Victorian explorer reading his own diary.
 const VOICE = 'bm_george'
 
@@ -28,51 +27,51 @@ interface RawAudioLike {
   audio: Float32Array
   sampling_rate: number
 }
-interface KokoroLike {
-  generate(text: string, opts: { voice: string; speed: number }): Promise<RawAudioLike>
+
+// The Kokoro model runs in a Web Worker so synthesis never blocks the game
+// loop (design.md §16): the main thread only posts text and receives PCM.
+let worker: Worker | null = null
+let reqId = 0
+const pending = new Map<number, { resolve: (r: RawAudioLike) => void; reject: (e: Error) => void }>()
+
+function getWorker(): Worker {
+  if (!worker) {
+    worker = new Worker(new URL('./ttsWorker.ts', import.meta.url), { type: 'module' })
+    worker.onmessage = (e: MessageEvent) => {
+      const { id, ok, audio, samplingRate, error } = e.data
+      const p = pending.get(id)
+      if (!p) return
+      pending.delete(id)
+      if (ok) p.resolve({ audio, sampling_rate: samplingRate })
+      else p.reject(new Error(error))
+    }
+    worker.onerror = () => {
+      // A worker crash fails every outstanding request and resets the worker.
+      for (const p of pending.values()) p.reject(new Error('tts worker error'))
+      pending.clear()
+      worker?.terminate()
+      worker = null
+    }
+  }
+  return worker
 }
 
-let enginePromise: Promise<KokoroLike> | null = null
-
-function loadEngine(): Promise<KokoroLike> {
-  if (!enginePromise) {
-    enginePromise = (async () => {
-      const { KokoroTTS } = await import('kokoro-js')
-      // Dev hook: the headless verification forces the small WASM model to
-      // avoid the large fp32 download (CLAUDE.md §7.2).
-      const forceWasm =
-        import.meta.env.DEV &&
-        typeof window !== 'undefined' &&
-        Boolean((window as unknown as Record<string, unknown>).__ttsForceWasm)
-      // Only Chromium's onnxruntime WebGPU backend is reliable for the TTS.
-      // navigator.userAgentData is Chromium-only, so it gates the GPU path;
-      // Firefox/Safari fall through to WASM instead of a broken WebGPU run.
-      const chromium = typeof navigator !== 'undefined' && 'userAgentData' in navigator
-      const webgpu = !forceWasm && chromium && 'gpu' in navigator
-      // WASM q8 sounds fine and works everywhere; WebGPU needs fp32 (quantized
-      // weights produce audible artifacts on the GPU path).
-      const buildModel = (device: 'webgpu' | 'wasm') =>
-        KokoroTTS.from_pretrained(MODEL_ID, {
-          dtype: device === 'webgpu' ? 'fp32' : 'q8',
-          device,
-        }) as unknown as Promise<KokoroLike>
-      if (webgpu) {
-        try {
-          return await buildModel('webgpu')
-        } catch (err) {
-          // WebGPU present but the compute backend failed to initialise —
-          // fall back to WASM rather than leaving read-aloud broken.
-          console.warn('Kokoro WebGPU unavailable; falling back to WASM.', err)
-        }
-      }
-      return await buildModel('wasm')
-    })()
-    // A failed download (e.g. offline) must not poison later attempts.
-    enginePromise.catch(() => {
-      enginePromise = null
-    })
-  }
-  return enginePromise
+/** Synthesize one segment in the worker; resolves with its raw PCM. */
+function synthesize(text: string, voice: string, speed: number): Promise<RawAudioLike> {
+  // The device is decided here (main thread): the onnxruntime WebGPU backend is
+  // only reliable on Chromium (navigator.userAgentData is Chromium-only), so
+  // Firefox/Safari use WASM. The headless verification forces WASM (dev hook).
+  const forceWasm =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    Boolean((window as unknown as Record<string, unknown>).__ttsForceWasm)
+  const chromium = typeof navigator !== 'undefined' && 'userAgentData' in navigator
+  const preferWebgpu = !forceWasm && chromium && 'gpu' in navigator
+  const id = ++reqId
+  return new Promise<RawAudioLike>((resolve, reject) => {
+    pending.set(id, { resolve, reject })
+    getWorker().postMessage({ id, text, voice, speed, preferWebgpu })
+  })
 }
 
 interface Run {
@@ -136,15 +135,13 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   if (ctx.state === 'suspended') await ctx.resume()
   if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')
 
-  const tts = await loadEngine()
-  if (run.cancelled) return
-
-  // Lookahead of one: synthesize the next segment while the current plays.
+  // Lookahead of one: synthesize the next segment (in the worker) while the
+  // current one plays, so the main thread never blocks on synthesis.
   let playing: Promise<void> = Promise.resolve()
   let started = false
   for (const seg of segments) {
     if (run.cancelled) return
-    const raw = await tts.generate(seg.text, { voice: VOICE, speed: seg.speed })
+    const raw = await synthesize(seg.text, VOICE, seg.speed)
     await playing
     if (run.cancelled) return
     if (!started) {

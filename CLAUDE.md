@@ -76,10 +76,16 @@ WebGPU. Requirements:
 
 **Journal read-aloud: kokoro-js.** The journal's speech output (design.md
 §15) uses the Kokoro TTS model via the `kokoro-js` package, fully
-in-browser (WebGPU when available, WASM fallback). The model weights are
+in-browser. The model runs in a Web Worker (`src/journal/ttsWorker.ts`) so
+synthesis never blocks the game loop — the main thread only posts a text
+segment and plays back the returned PCM. WebGPU is used only on Chromium
+(the onnxruntime WebGPU compute path — distinct from the three.js renderer's
+WebGPU — is unreliable on Firefox/Safari even where `navigator.gpu` exists),
+and every other browser uses the WASM path; the device is decided on the main
+thread and passed to the worker. The model weights are
 streamed from the Hugging Face CDN on first use and cached by the browser;
-they are not part of the repository or the bundle. The TTS stack is loaded
-lazily via dynamic import and must never enter the eagerly loaded startup
+they are not part of the repository or the bundle. The TTS stack (worker
+included) is loaded lazily and must never enter the eagerly loaded startup
 chunks. Kokoro has no German voice, so read-aloud is English-only for now
 (open item for German); the voice markup is written for both languages
 regardless.
@@ -154,8 +160,9 @@ acceptance (§7).
   §15 (`[awe]`, `[whisper]`, `[excited]`, `[somber]`, `[weary]`, `[fear]`,
   `[emph]`, `[mute]`, `[pause]`, `[breath]`). The tags are additive:
   stripping them must leave well-formed prose. Display always strips the
-  markup; the read-aloud pipeline (parser → TTS text → audio,
-  `src/journal/voiceMarkup.ts` → `src/journal/speech.ts`) turns it into
+  markup; the read-aloud pipeline (parser → TTS text → worker synthesis →
+  audio, `src/journal/voiceMarkup.ts` → `src/journal/speech.ts` →
+  `src/journal/ttsWorker.ts`) turns it into
   prosody. This rule applies to German too, even while no German TTS voice
   exists yet.
 - Keep comments brief and factual. Mark placeholder values as such.
