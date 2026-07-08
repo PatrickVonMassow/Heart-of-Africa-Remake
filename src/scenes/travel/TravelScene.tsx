@@ -898,8 +898,10 @@ export function TravelScene() {
     const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
 
-    // Movement: screen up = north (-z).
-    if (!useUi.getState().dialog && !s.journalOpen) {
+    // Movement: screen up = north (-z). The open journal (even while it is
+    // being read aloud) no longer freezes travel (design.md §16); only a modal
+    // dialog blocks movement.
+    if (!useUi.getState().dialog) {
       const a = moveAxes()
       if (a.x !== 0 || a.y !== 0) s.moveTravel(a.x, -a.y, dt)
     }

@@ -1479,7 +1479,9 @@ export function PlaceScene() {
     const dt = Math.min(rawDt, 0.1)
     const p = player.current
 
-    if (!useUi.getState().dialog && !useGame.getState().journalOpen) {
+    // The open journal (even while narrating) no longer freezes walking
+    // (design.md §16); only a modal dialog blocks it.
+    if (!useUi.getState().dialog) {
       // Q/E-free tank controls: WASD + arrows; ←/→ turn, A/D strafe.
       if (isKeyDown('ArrowLeft')) p.yaw += 2.2 * dt
       if (isKeyDown('ArrowRight')) p.yaw -= 2.2 * dt

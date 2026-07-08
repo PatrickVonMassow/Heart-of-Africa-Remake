@@ -47,6 +47,22 @@ await page.reload()
 await page.waitForFunction(() => window.__game && window.__voiceMarkup, null, { timeout: 60000 })
 await page.waitForTimeout(4000)
 
+// --- Movement continues while the journal is open (design.md §16) -----------
+// The game starts in Cairo with the departure entry and the journal open; the
+// character must still walk (the open/narrating journal no longer freezes it).
+{
+  const jOpen = await page.evaluate(() => window.__game.getState().journalOpen)
+  const before = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  for (let i = 0; i < 6; i++) {
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    await page.waitForTimeout(60)
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+  const after = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  const moved = Math.hypot(after.x - before.x, after.z - before.z)
+  check('movement continues while the journal is open', jOpen && moved > 0.5, `journalOpen ${jOpen}, moved ${moved.toFixed(2)} m`)
+}
+
 // --- Parser: strip and prosody segments -------------------------------------
 const parser = await page.evaluate(() => {
   const { stripVoiceMarkup, toSpeechSegments } = window.__voiceMarkup
