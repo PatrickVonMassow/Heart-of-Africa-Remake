@@ -190,8 +190,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    `design.md`; the concrete appearance must be graphically elaborate,
    Africa must be depicted in detail and authentically, and the outlines of
    all land and continent regions must be fine-grained, including the
-   courses of the rivers. A coordinate display (latitude/longitude in
-   degrees) is present. Research what the exact geography of Africa was at
+   courses of the rivers. Coordinates (latitude/longitude in degrees) are
+   not shown permanently; they are read out on demand via the position
+   query (`design.md` §17, pt. 30). Research what the exact geography of Africa was at
    the end of the 19th century. All 10 port cities, 22 peoples, 17 rivers
    and every landmark from `design.md` must be implemented. The region
    borders carry the localized region name on each side of the line, both
@@ -214,10 +215,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    (`scripts/verify/enrichments.mjs`). Any active movement penalty shows
    its reason (`design.md` §11): while a terrain slows the traveler and
    the relieving hand object is not held (jungle→machete, water→canoe,
-   mountain→rope), the bird's-eye view names the cause and the remedy —
-   the slowdown is never silent. Verifiable: the penalty mapping is
-   pure-tested for each terrain, and the HUD hint appears in jungle
-   without a machete and clears once the machete is in hand
+   mountain→rope), the top-right status area names the cause and the
+   remedy — the slowdown is never silent. Verifiable: the penalty mapping
+   is pure-tested for each terrain, and the top-right HUD hint appears in
+   jungle without a machete and clears once the machete is in hand
    (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
@@ -243,7 +244,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    (plain text suffices; the animated handwriting is not acceptance-
    relevant).
 9. **Status bar.** Date, funds, provisions, gifts, hand item and current
-   region are displayed.
+   region are displayed. Coordinates are not shown permanently (removed on
+   user request); the top-right area freed by their removal holds transient
+   status hints (e.g. the movement-penalty reason, pt. 4).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints (`design.md` §13.3): per
@@ -595,8 +598,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     full stick push): idle axis drift of wheels, flight sticks or worn
     pads must never move or turn the game on its own. The position
     query (§17) reports the current coordinates and region as a
-    localized toast on P (the status bar keeps showing them
-    permanently). Verifiable: `scripts/verify/gamepad.mjs` injects a
+    localized toast on P (coordinates are no longer shown permanently, so
+    this query is the way to read them). Verifiable: `scripts/verify/gamepad.mjs` injects a
     virtual gamepad and asserts that pre-engagement axis drift moves
     nothing, stick travel movement, right-stick turning in the
     first-person view, the A-button interaction and Y-button journal

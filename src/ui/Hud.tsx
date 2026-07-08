@@ -366,7 +366,11 @@ export function Hud() {
       <button className="hud-button map-toggle" onClick={() => useUi.getState().toggleMap()}>
         {t.hud.mapToggle}
       </button>
-      <MovementPenalty />
+      {/* Top-right status area (freed by removing the coordinate display,
+          design.md §17): transient status hints appear here. */}
+      <div className="status-hints">
+        <MovementPenalty />
+      </div>
       <Prompt />
       <Toast />
       <JournalPanel />

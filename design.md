@@ -60,7 +60,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 - The world reproduces Africa geographically authentically as it was in the year 1890. The real landmarks of §4.4 lie at their correct geographic positions.
 - Five regions, each with its own landscape, its own peoples and its own value profile: North (desert/Sahara), West (savanna), Central (jungle/Congo basin), East (mountains/lakes/rift), South (high plateau). The boundaries between the regions are visible in the game: as subtle dashed ink lines on the exploration map and as dashed ground markings over land in the bird's-eye view. Along the borders, the name of the region is shown on its respective side of the line (localized), both on the map and in the bird's-eye view.
 - Terrain types: ocean, coast, desert, savanna/open land, jungle/grassland, mountains, water (river/lake).
-- Coordinate system: position in degrees, displayed as "latitude … degrees north/south" and "longitude … degrees west/east". This system is also the basis of the hints (§13).
+- Coordinate system: position in degrees ("latitude … degrees north/south", "longitude … degrees west/east"). This system is the basis of the hints (§13). It is not shown permanently on screen; the current coordinates are read out on demand via the position query (§17).
 
 **Real geodata and terrain rendering.**
 The landscape rendering is based on real geodata rather than purely synthetic noise:
@@ -324,7 +324,7 @@ If the character can no longer write (death), the handwritten entry is omitted; 
 
 ## 17. User Interface
 
-- Bird's-eye view: field of view of the surroundings; status bar with date, funds, provisions, gifts, hand object; display of the current region; coordinate display. Access to the chronicle and to objects (take an item in hand, view the map, take medicine). Further functions: position query, health query, pitch camp (§6), and an exploration overview showing how far the current region has been explored.
+- Bird's-eye view: field of view of the surroundings; status bar with date, funds, provisions, gifts, hand object and the current region. The coordinates are not shown permanently; they are read out on demand via the position query. The area freed at the top right of the status bar is used for transient status displays — hints such as the reason for a movement penalty (§11) appear there instead of over the main view. Access to the chronicle and to objects (take an item in hand, view the map, take medicine). Further functions: position query, health query, pitch camp (§6), and an exploration overview showing how far the current region has been explored.
 - First-person view (settlements): walkable space, interaction prompts at buildings/persons, trade and dialog windows. A gift to a native additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
 - Layering: modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label.
 - Controls suitable for mouse/keyboard and gamepad.

@@ -228,13 +228,20 @@ if (jungleSpot) {
     g.debugJumpTo(s.lat, s.lon)
   }, jungleSpot)
   await page.waitForTimeout(250)
-  const hintNoMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
+  const hint = await page.evaluate(() => {
+    const el = document.querySelector('.movement-penalty')
+    if (!el) return { text: '' }
+    const r = el.getBoundingClientRect()
+    // In the top-right status area: right of center, in the upper region.
+    return { text: el.textContent ?? '', topRight: r.left > window.innerWidth / 2 && r.top < window.innerHeight / 3 }
+  })
   await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
   console.log('shot 84-movement-penalty.png')
   await page.evaluate(() => window.__game.getState().takeInHand('machete'))
   await page.waitForTimeout(250)
   const hintMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
-  check('Movement penalty hint shows in jungle without a machete', hintNoMachete.toLowerCase().includes('machete'), `"${hintNoMachete}"`)
+  check('Movement penalty hint shows in jungle without a machete', hint.text.toLowerCase().includes('machete'), `"${hint.text}"`)
+  check('Movement penalty hint sits in the top-right status area', hint.topRight === true, '')
   check('Movement penalty hint clears with a machete in hand', hintMachete === '', `"${hintMachete}"`)
 } else {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
