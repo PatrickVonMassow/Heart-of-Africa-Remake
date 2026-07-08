@@ -363,6 +363,54 @@ const roam = await page.evaluate(async () => {
 check('elephants roam (their position changes over time)', roam.ok && roam.moved > 3, JSON.stringify(roam))
 check('a roaming elephant reaches and tramples a nearby prey animal', roam.ok && roam.trampled === true, JSON.stringify(roam))
 
+// --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
+// The lion now approaches from a random direction (chase no longer always runs
+// the same way), and the prey weaves left/right to shake it.
+const hunt = await page.evaluate(async () => {
+  const s = window.__lionHunt.state
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const startChase = async (budget) => {
+    // Force a fresh hunt: drop to idle and keep re-arming the spawn until a new
+    // chase begins (the spawn picks a random savanna spot and lion approach).
+    s.mode = 'idle'
+    s.timer = 0
+    const t0 = Date.now()
+    while (s.mode !== 'chase' && Date.now() - t0 < budget) {
+      if (s.mode === 'idle') s.timer = 0
+      await sleep(40)
+    }
+    return s.mode === 'chase'
+  }
+  // Collect the initial chase heading of several hunts.
+  const headings = []
+  const tAll = Date.now()
+  while (headings.length < 8 && Date.now() - tAll < 45000) {
+    if (await startChase(2500)) { headings.push(s.lionHeading); await sleep(60) }
+  }
+  let vx = 0, vz = 0
+  for (const h of headings) { vx += Math.sin(h); vz += Math.cos(h) }
+  const R = headings.length ? Math.hypot(vx, vz) / headings.length : 1
+  // Weave: drive one chase and watch the prey's heading offset from straight-away.
+  const offs = []
+  if (await startChase(4000)) {
+    for (let k = 0; k < 45 && s.mode === 'chase'; k++) {
+      const away = Math.atan2(s.px - s.lx, s.pz - s.lz)
+      let o = s.preyHeading - away
+      while (o > Math.PI) o -= Math.PI * 2
+      while (o < -Math.PI) o += Math.PI * 2
+      offs.push(o)
+      await sleep(100)
+    }
+  }
+  let signChanges = 0
+  for (let i = 1; i < offs.length; i++) if (offs[i] * offs[i - 1] < 0) signChanges++
+  const amp = offs.length ? Math.max(...offs.map(Math.abs)) : 0
+  s.mode = 'idle'; s.timer = 60
+  return { count: headings.length, R: Math.round(R * 100) / 100, weaveSamples: offs.length, signChanges, amp: Math.round(amp * 100) / 100 }
+})
+check('lion hunts run in varied directions (not always the same way)', hunt.count >= 5 && hunt.R < 0.85, JSON.stringify(hunt))
+check('the fleeing prey weaves side to side (zigzag)', hunt.signChanges >= 2 && hunt.amp > 0.4, JSON.stringify(hunt))
+
 // --- Debug menu: dropdowns, renderer row, wheel-zoom gate (§7.1.20) ----------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(500)

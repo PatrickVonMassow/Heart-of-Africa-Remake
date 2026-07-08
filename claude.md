@@ -277,8 +277,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 12. **Atmosphere.** The atmosphere elements from `design.md` are
     implemented — specifically "## 19. Atmosphere and Immersion" and the
     "**Graphics and atmosphere.**" passage in "## 2. Perspectives and
-    Camera". This includes the feed phase of the decorative lion hunt
-    (`design.md` §19): after the catch the lion visibly feeds on the
+    Camera". This includes the decorative lion hunt (`design.md` §19): the
+    lion approaches from a random direction (the chase runs any which way,
+    not always toward the same corner) and the fleeing prey weaves left and
+    right to shake it, while the lion pursues with a limited turn rate but
+    is faster and closes in; after the catch the lion visibly feeds on the
     carcass (lowered, rhythmically tearing head movements, red spreading
     stain beneath the prey), the carcass shrinks away piece by piece, and
     once it is consumed the lion moves on. Further animal interactions
@@ -296,8 +299,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     automated checks force the feed state (carcass, head animation, stain,
     leave phase), provoke a trampling via an injected elephant, prove an
     elephant roams (its position changes over time) and walks over to
-    trample a nearby prey on its own, and assert the graveyard's
-    carcass/tusk/bone counts via the dev hook with a screenshot
+    trample a nearby prey on its own, assert that lion hunts run in varied
+    directions (low mean-resultant length across hunts) with a weaving prey
+    (its heading oscillates around straight-away), and assert the
+    graveyard's carcass/tusk/bone counts via the dev hook with a screenshot
     (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation

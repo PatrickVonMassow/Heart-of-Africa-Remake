@@ -63,12 +63,27 @@ interface LionHuntState {
   px: number
   pz: number
   timer: number
+  /** Per-hunt weave phase (chase) / walk-off direction (leave). */
   heading: number
+  /** Lion's current facing while pursuing (turn-rate limited). */
+  lionHeading: number
+  /** Prey's current flee heading (weaving). */
+  preyHeading: number
 }
-const LION_STATE: LionHuntState = { mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0 }
+const LION_STATE: LionHuntState = {
+  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
+}
 
 /** Distance (world units) at which walking into a lion triggers an attack. */
 const LION_CONTACT_RADIUS = 2
+
+/** Lion hunt (design.md §19): speeds, the prey's evasive weave, lion turn rate. */
+const HUNT_PREY_SPEED = 4.6
+const HUNT_LION_SPEED = 5.6
+const HUNT_LION_TURN = 3.0
+const HUNT_WEAVE_FREQ = 2.2
+const HUNT_WEAVE_AMP = 1.0
+const HUNT_LION_APPROACH = 15
 
 /** Species that flee from a hunting or feeding lion. */
 const FLEES_LION: Record<Species, boolean> = {
@@ -484,6 +499,7 @@ function LionHunt() {
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
+    const t = clock.elapsedTime
     const s = state.current
     const pos = useGame.getState().pos
 
@@ -496,27 +512,39 @@ function LionHunt() {
       const px = pos.x + Math.cos(ang) * dist
       const pz = pos.z + Math.sin(ang) * dist
       const ll = worldToLatLon(px, pz)
-      const t = sampleTerrain(ll.lat, ll.lon, seed)
-      if (t.type !== 'savanna') {
+      const ter = sampleTerrain(ll.lat, ll.lon, seed)
+      if (ter.type !== 'savanna') {
         s.timer = 4
         return
       }
       s.px = px
       s.pz = pz
-      s.lx = px + 14
-      s.lz = pz + 6
+      // The lion closes in from a random direction, so the chase runs any which
+      // way rather than always toward the same corner.
+      const lionAng = Math.random() * Math.PI * 2
+      s.lx = px + Math.cos(lionAng) * HUNT_LION_APPROACH
+      s.lz = pz + Math.sin(lionAng) * HUNT_LION_APPROACH
+      s.heading = Math.random() * Math.PI * 2 // per-hunt weave phase
+      s.lionHeading = Math.atan2(s.px - s.lx, s.pz - s.lz)
+      s.preyHeading = s.lionHeading
       s.mode = 'chase'
     } else if (s.mode === 'chase') {
-      // Zebra flees, lion closes in slightly faster.
-      const dx = s.px - s.lx
-      const dz = s.pz - s.lz
-      const d = Math.hypot(dx, dz)
-      const fleeX = dx / (d || 1)
-      const fleeZ = dz / (d || 1)
-      s.px += fleeX * 4.6 * dt
-      s.pz += fleeZ * 4.6 * dt
-      s.lx += fleeX * 5.6 * dt
-      s.lz += fleeZ * 5.6 * dt
+      // The prey flees away from the lion but weaves left and right to try to
+      // shake it (design.md §19); the lion pursues with a limited turn rate, so
+      // sharp cuts throw it wide, though it is faster and closes in over time.
+      const away = Math.atan2(s.px - s.lx, s.pz - s.lz)
+      s.preyHeading = away + Math.sin(t * HUNT_WEAVE_FREQ + s.heading) * HUNT_WEAVE_AMP
+      s.px += Math.sin(s.preyHeading) * HUNT_PREY_SPEED * dt
+      s.pz += Math.cos(s.preyHeading) * HUNT_PREY_SPEED * dt
+      const toX = s.px - s.lx
+      const toZ = s.pz - s.lz
+      const d = Math.hypot(toX, toZ)
+      let dh = Math.atan2(toX, toZ) - s.lionHeading
+      while (dh > Math.PI) dh -= Math.PI * 2
+      while (dh < -Math.PI) dh += Math.PI * 2
+      s.lionHeading += Math.max(-HUNT_LION_TURN * dt, Math.min(HUNT_LION_TURN * dt, dh))
+      s.lx += Math.sin(s.lionHeading) * HUNT_LION_SPEED * dt
+      s.lz += Math.cos(s.lionHeading) * HUNT_LION_SPEED * dt
       if (d < 0.6) {
         s.mode = 'feed'
         s.timer = FEED_DURATION
@@ -560,7 +588,6 @@ function LionHunt() {
       }
     }
 
-    const t = clock.elapsedTime
     if (lion.current) {
       lion.current.visible = active
       if (active) {
@@ -574,8 +601,8 @@ function LionHunt() {
           lion.current.rotation.x = 0.32 + Math.sin(t * 3.2) * 0.16
         } else {
           lion.current.position.set(s.lx, ground, s.lz)
-          lion.current.rotation.y =
-            s.mode === 'leave' ? s.heading : Math.atan2(s.px - s.lx, s.pz - s.lz)
+          // Face the direction of travel (weaving pursuit / walk-off).
+          lion.current.rotation.y = s.mode === 'leave' ? s.heading : s.lionHeading
           lion.current.rotation.x = 0
         }
       }
@@ -587,7 +614,7 @@ function LionHunt() {
       if (prey.current.visible) {
         const ll = worldToLatLon(s.px, s.pz)
         prey.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height), s.pz)
-        prey.current.rotation.y = Math.atan2(s.px - s.lx, s.pz - s.lz)
+        prey.current.rotation.y = feeding ? Math.atan2(s.px - s.lx, s.pz - s.lz) : s.preyHeading
         // Fallen on its side once caught.
         prey.current.rotation.z = feeding ? Math.PI / 2.2 : 0
         const eaten = feeding ? Math.min(1, (FEED_DURATION - s.timer) / FEED_DURATION) : 0
