@@ -758,6 +758,56 @@ const carcassBound = await page.evaluate(async () => {
 check('off-screen carcasses are culled (bounded growth)', carcassBound.before >= 300 && carcassBound.after < 30, JSON.stringify(carcassBound))
 check('a carcass in view is kept (dissolves on screen, not popped)', carcassBound.nearKept === true, JSON.stringify(carcassBound))
 
+// --- Family life: young that nurse, parents that guard, bathing (§7.1.8) ------
+// design.md §19 richer interactions: grazer/elephant herds raise a calf that
+// keeps close to a parent; a parent moves between an approaching predator and
+// its calf (defends the young); and some shore visitors wade in and bathe.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.waitForTimeout(3500)
+const familyLife = await page.evaluate(() => {
+  const herds = window.__wildlife.herdsRef.current
+  const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']
+  let young = 0, close = 0, bathers = 0, drinkers = 0
+  for (const sp of SP)
+    for (const a of herds[sp] ?? []) {
+      if (a.young && a.parent && !a.parent.dead) {
+        young++
+        if (Math.hypot(a.x - a.parent.x, a.z - a.parent.z) < 5) close++
+      }
+    }
+  for (const sp of Object.keys(herds))
+    for (const a of herds[sp]) { if (a.drink) drinkers++; if (a.bathe) bathers++ }
+  return { young, close, bathers, drinkers }
+})
+check('herds raise young that keep close to a parent (nursing)', familyLife.young > 0 && familyLife.close > 0, JSON.stringify(familyLife))
+check('some shore visitors wade in and bathe', familyLife.bathers > 0 && familyLife.bathers <= familyLife.drinkers, JSON.stringify(familyLife))
+
+// Parent defends its calf: inject a predator at a fixed point near a calf; a
+// guarding parent moves toward that point (to interpose), a fleeing one away.
+// Measuring the parent's distance to the fixed predator point is robust to the
+// calf's own motion (both animals move, so a relative offset would be noisy).
+const guard = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] ?? []) if (a.child && !a.child.dead && !a.dead) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  const L = window.__lionHunt.state
+  const lx = calf.x + 5, lz = calf.z
+  L.mode = 'chase'; L.lx = lx; L.lz = lz; L.px = calf.x; L.pz = calf.z
+  const dist = () => Math.hypot(parent.x - lx, parent.z - lz)
+  const before = dist()
+  // Keep re-pinning the predator so it stays the fixed threat while frames run.
+  const t0 = Date.now()
+  while (Date.now() - t0 < 2800) { L.lx = lx; L.lz = lz; L.mode = 'chase'; await new Promise((r) => setTimeout(r, 60)) }
+  const after = dist()
+  L.mode = 'idle'; L.timer = 60
+  return { found: true, before: +before.toFixed(2), after: +after.toFixed(2) }
+})
+check('a parent moves to guard its calf from a predator', guard.found && guard.after < guard.before - 0.05, JSON.stringify(guard))
+
 // --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
 // The lion now approaches from a random direction (chase no longer always runs
 // the same way), and the prey weaves left/right to shake it.

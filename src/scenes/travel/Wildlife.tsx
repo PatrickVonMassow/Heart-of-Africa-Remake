@@ -66,6 +66,14 @@ interface Animal {
   chunk?: string
   /** Seconds of carcass left once a scavenger has landed; removed at 0 (design.md §19). */
   dissolve?: number
+  /** A juvenile that keeps close to its parent and nurses (design.md §19). */
+  young?: boolean
+  /** The young's parent (object identity survives array sort/filter). */
+  parent?: Animal
+  /** The parent's calf/foal, guarded against predators (design.md §19). */
+  child?: Animal
+  /** Shore animals that also wade in and bathe, not just drink (design.md §19). */
+  bathe?: boolean
 }
 
 /**
@@ -170,6 +178,17 @@ const ELEPHANT_COHESION = 6 // steer back toward the herd beyond this radius
  *  than the elephant, so a head-on herd still tramples them now and then. */
 const PREY_PANIC_RADIUS = 3.2
 const PREY_PANIC_SPEED = 1.35
+/** Family life (design.md §19): a calf keeps within this radius of its parent,
+ *  and a parent moves between an approaching predator and its calf to guard it,
+ *  standing off a short distance in front of the young. */
+const YOUNG_FOLLOW_RADIUS = 1.8
+const YOUNG_FOLLOW_SPEED = 4.5
+const GUARD_RADIUS = 12
+const GUARD_STANDOFF = 2.2
+const GUARD_SPEED = 5.5
+// OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
+// light animal escaping up a kopje/tree) and further new species/birds beyond
+// the current roster and the added calves are not yet implemented.
 
 /** Wildlife streaming (design.md §19): animals are kept alive while they may be
  *  on screen and only despawned well beyond the view. The view radius scales
@@ -301,10 +320,26 @@ function placeGroup(
           const shoreLon = ll.lon - (gLon / gl) * (wd * 0.85)
           const w = latLonToWorld(shoreLat, shoreLon)
           animal.drink = { tx: w.x, tz: w.z }
+          // Some shore visitors also wade in and bathe, not just drink (§19).
+          if (hash(ccx, ccz, 40 + i, seed) < 0.4) animal.bathe = true
         }
       }
     }
     list.push(animal)
+  }
+  // Family life (design.md §19): a herd of at least three raises a juvenile that
+  // keeps close to a parent and nurses; the parent guards it against predators.
+  // Flamingos (shoreline flocks) are excluded.
+  if (!shoreline && count >= 3) {
+    const startIdx = list.length - count
+    const parent = list[startIdx]
+    const calf = list[list.length - 1]
+    if (parent && calf && parent !== calf) {
+      calf.young = true
+      calf.parent = parent
+      calf.scale *= 0.55 // a small juvenile
+      parent.child = calf
+    }
   }
 }
 
@@ -637,18 +672,65 @@ function Herds() {
         }
         let yaw = a.rot + wob * 0.4
         let pitch = 0
+        let bodyY = a.y
         // Periodic drinking (design.md §19): walk to the shore point, lower
-        // the head at the water, walk back.
+        // the head at the water, walk back. Bathers wade further in and dip
+        // their body (a splashing wallow) instead of only lowering the head.
         if (a.drink && sp !== 'elephant') {
           const cycle = ((t + a.phase * 40) % 75) / 75
           if (cycle < 0.5) {
             const k = cycle < 0.12 ? cycle / 0.12 : cycle < 0.38 ? 1 : (0.5 - cycle) / 0.12
-            const toX = a.drink.tx - px
-            const toZ = a.drink.tz - pz
+            const reach = a.bathe ? 1.12 : 1 // bathers step a little into the water
+            const toX = (a.drink.tx - px) * reach
+            const toZ = (a.drink.tz - pz) * reach
             px += toX * k
             pz += toZ * k
             if (k > 0.04) yaw = Math.atan2(toX, toZ) + (cycle >= 0.38 ? Math.PI : 0)
-            if (cycle >= 0.12 && cycle < 0.38) pitch = 0.42 + Math.sin(t * 1.4 + a.phase) * 0.08
+            if (cycle >= 0.12 && cycle < 0.38) {
+              if (a.bathe) bodyY = a.y - 0.35 + Math.sin(t * 3 + a.phase) * 0.05 // wallow/splash
+              else pitch = 0.42 + Math.sin(t * 1.4 + a.phase) * 0.08
+            }
+          }
+        }
+        // Family life (design.md §19): a calf keeps close to its parent and
+        // nurses; a parent stands between an approaching predator and its calf
+        // to defend it instead of fleeing itself. These override the flee below.
+        let familyHeld = false
+        if (sp !== 'elephant') {
+          if (a.young && a.parent && !a.parent.dead) {
+            const toX = a.parent.x - a.x
+            const toZ = a.parent.z - a.z
+            const d = Math.hypot(toX, toZ)
+            if (d > YOUNG_FOLLOW_RADIUS) {
+              a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
+              a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+              px = a.x
+              pz = a.z
+              yaw = Math.atan2(toX, toZ)
+            } else {
+              pitch = -0.22 // nurse: head up toward the parent's flank
+            }
+            familyHeld = true
+          } else if (a.child && !a.child.dead && lionActive) {
+            const cx = a.child.x
+            const cz = a.child.z
+            const pdx = LION_STATE.lx - cx
+            const pdz = LION_STATE.lz - cz
+            const pd = Math.hypot(pdx, pdz)
+            if (pd < GUARD_RADIUS && pd > 0.01) {
+              const gx = cx + (pdx / pd) * GUARD_STANDOFF
+              const gz = cz + (pdz / pd) * GUARD_STANDOFF
+              const toX = gx - a.x
+              const toZ = gz - a.z
+              const gd = Math.hypot(toX, toZ) || 1
+              a.x += (toX / gd) * GUARD_SPEED * dt
+              a.z += (toZ / gd) * GUARD_SPEED * dt
+              px = a.x
+              pz = a.z
+              yaw = Math.atan2(pdx, pdz) // face the predator down
+              pitch = 0
+              familyHeld = true
+            }
           }
         }
         // Grazing dips on the open grassland.
@@ -659,7 +741,7 @@ function Herds() {
         // Prey flees from an active predator (design.md §19): it runs away
         // smoothly, accumulating into its own position, so it never teleports
         // when the hunt begins or snaps back when it ends.
-        if (lionActive && FLEES_LION[sp] && sp !== 'elephant') {
+        if (!familyHeld && lionActive && FLEES_LION[sp] && sp !== 'elephant') {
           const dx = a.x - LION_STATE.lx
           const dz = a.z - LION_STATE.lz
           const d = Math.hypot(dx, dz)
@@ -710,8 +792,8 @@ function Herds() {
             continue
           }
         }
-        vpos.set(px, a.y, pz)
-        if (pitch > 0) {
+        vpos.set(px, bodyY, pz)
+        if (pitch !== 0) {
           euler.set(pitch, yaw, 0, 'YXZ')
           quat.setFromEuler(euler)
         } else {

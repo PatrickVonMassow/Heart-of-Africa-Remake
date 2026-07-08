@@ -348,9 +348,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     kills stay bounded and never stall the frame loop), that more than one
     kind of predator hunts and every predator/prey pairing fits the region
     and the predator's food web, that prey flee a predator smoothly without
-    teleporting (no single-frame jump), and
+    teleporting (no single-frame jump), that herds raise young that keep
+    close to a parent and that a parent moves to interpose between an
+    approaching predator and its calf (defends the young), that some shore
+    visitors bathe (wade in) beyond merely drinking, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
+    OPEN: tree-climbing-to-flee and additional new species/birds beyond the
+    existing roster and the added calves remain to be implemented (§9 open
+    items).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes
