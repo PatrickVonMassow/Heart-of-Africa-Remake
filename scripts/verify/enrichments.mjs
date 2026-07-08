@@ -398,6 +398,113 @@ check('elephants turn only in gentle arcs (no sharp turns)', herdTest.ok && herd
 check('prey does not dodge a distant elephant', herdTest.ok && herdTest.movedWhileFar < 0.5, JSON.stringify(herdTest))
 check('prey darts away from a close elephant (last-moment dodge)', herdTest.ok && herdTest.dNearEnd > herdTest.dNearStart + 0.5, JSON.stringify(herdTest))
 
+// --- Zoom-aware streaming despawn (point 5) ----------------------------------
+// Animals stay alive while they may be on screen and only despawn well beyond
+// the view; the kept radius scales with the bird's-eye zoom. Moves are made in
+// world space (pos is {x,z}) so a fixed distance can be compared against the
+// zoom-scaled despawn radius.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.waitForTimeout(1600)
+const stream = await page.evaluate(async () => {
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const sp5 = ['zebra', 'antelope', 'giraffe', 'elephant', 'flamingo']
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const setPos = (x, z) => window.__game.setState({ pos: { x, z } })
+  const nearest = () => {
+    const p = window.__game.getState().pos
+    let best = null
+    let bd = Infinity
+    for (const sp of sp5) for (const a of herds[sp]) { if (a.dead) continue; const d = Math.hypot(a.x - p.x, a.z - p.z); if (d < bd) { bd = d; best = a } }
+    return best
+  }
+  const hasMark = (k) => sp5.some((sp) => herds[sp].some((a) => a.__mark === k))
+
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(1)
+  const p0 = { ...window.__game.getState().pos }
+  const m1 = nearest()
+  if (!m1) return { ok: false, why: 'no animals spawned' }
+  m1.__mark = 'A'
+  // Cross a chunk boundary (CHUNK_SIZE 24) but stay well within view.
+  setPos(p0.x + 36, p0.z)
+  await sleep(1200)
+  const survivesCross = hasMark('A')
+  // Move far past the zoom-1 despawn radius (~160 world units).
+  setPos(p0.x + 600, p0.z + 600)
+  await sleep(1600)
+  const goneWhenFar = !hasMark('A')
+
+  // At a wider zoom the same distance is still in view and is kept.
+  window.__game.getState().debugJumpTo(-2.2, 34.8)
+  await sleep(1600)
+  window.__ui.getState().setTravelZoom(3)
+  const p3 = { ...window.__game.getState().pos }
+  const m3 = nearest()
+  if (!m3) return { ok: false, why: 'no animals (zoom 3)' }
+  m3.__mark = 'B'
+  window.__ui.getState().setTravelZoom(1)
+  setPos(p3.x + 230, p3.z)
+  await sleep(1600)
+  const goneAtZoom1 = !hasMark('B')
+  // Reset, remark, repeat at zoom 3 (wider despawn radius keeps it).
+  window.__game.getState().debugJumpTo(-2.2, 34.8)
+  await sleep(1600)
+  window.__ui.getState().setTravelZoom(3)
+  const p3b = { ...window.__game.getState().pos }
+  const m3b = nearest()
+  if (!m3b) return { ok: false, why: 'no animals (zoom 3b)' }
+  m3b.__mark = 'C'
+  setPos(p3b.x + 230, p3b.z)
+  await sleep(1600)
+  const keptAtZoom3 = hasMark('C')
+  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
+  return { ok: true, survivesCross, goneWhenFar, goneAtZoom1, keptAtZoom3 }
+})
+check('an animal survives a chunk-boundary crossing while in view', stream.ok && stream.survivesCross, JSON.stringify(stream))
+check('an animal despawns once well outside the view', stream.ok && stream.goneWhenFar, JSON.stringify(stream))
+check('zoom-out keeps animals the default view would despawn', stream.ok && stream.goneAtZoom1 && stream.keptAtZoom3, JSON.stringify(stream))
+
+// --- Scavenging of a non-lion carcass (point 5) ------------------------------
+// A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
+// flies in, lands and consumes it, dissolving it as a lion kill does.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.waitForTimeout(1600)
+const scavenge = await page.evaluate(async () => {
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const sp5 = ['zebra', 'antelope', 'giraffe', 'elephant', 'flamingo']
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  // Clear any leftover carcasses so the scavenger targets ours.
+  for (const sp of sp5) herds[sp] = herds[sp].filter((a) => !a.dead)
+  w.scavenger.current.target = null
+  const p = window.__game.getState().pos
+  const carcass = { x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject' }
+  herds.zebra.push(carcass)
+  let landed = false
+  let dissolveStarted = false
+  const deadline = Date.now() + 15000
+  while (Date.now() < deadline) {
+    const sc = w.scavenger.current
+    if (sc.target === carcass && sc.landed) landed = true
+    if (typeof carcass.dissolve === 'number' && carcass.dissolve < 9) dissolveStarted = true
+    if (landed && dissolveStarted) break
+    await sleep(120)
+  }
+  // Fast-forward the consumption and confirm the carcass is removed.
+  carcass.dissolve = 0.02
+  let removed = false
+  const d2 = Date.now() + 4000
+  while (Date.now() < d2) {
+    if (!herds.zebra.includes(carcass)) { removed = true; break }
+    await sleep(100)
+  }
+  return { landed, dissolveStarted, removed }
+})
+check('a scavenger flies in and lands on a non-lion carcass', scavenge.landed, JSON.stringify(scavenge))
+check('the scavenged carcass dissolves and is removed', scavenge.dissolveStarted && scavenge.removed, JSON.stringify(scavenge))
+
 // --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
 // The lion now approaches from a random direction (chase no longer always runs
 // the same way), and the prey weaves left/right to shake it.

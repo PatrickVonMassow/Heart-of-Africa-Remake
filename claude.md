@@ -305,9 +305,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     it turns only in gentle arcs) and that prey ignore a distant elephant
     but dart away from a close one (last-moment dodge), assert that lion hunts run in varied
     directions (low mean-resultant length across hunts) with a weaving prey
-    (its heading oscillates around straight-away), and assert the
-    graveyard's carcass/tusk/bone counts via the dev hook with a screenshot
-    (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
+    (its heading oscillates around straight-away), prove the zoom-aware
+    streaming despawn (an animal survives a tile-boundary crossing while in
+    view, despawns once well outside it, and a wider zoom keeps animals the
+    default view would have dropped) and that a non-lion (trampled) carcass
+    draws a vulture that lands and consumes it until it is removed, and
+    assert the graveyard's carcass/tusk/bone counts via the dev hook with a
+    screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes

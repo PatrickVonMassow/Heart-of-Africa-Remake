@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
+import { useUi } from '../../state/ui'
 import { latLonToWorld, worldToLatLon } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
@@ -24,7 +25,6 @@ import {
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
-const HERD_RADIUS = 4 // chunks around the player checked for herds
 
 type Species = 'elephant' | 'giraffe' | 'zebra' | 'antelope' | 'flamingo'
 const SPECIES: Species[] = ['elephant', 'giraffe', 'zebra', 'antelope', 'flamingo']
@@ -52,6 +52,10 @@ interface Animal {
   heading?: number
   /** Herd id shared by elephants placed together, so a herd moves as one. */
   herd?: number
+  /** Chunk key that spawned this animal (for streaming despawn). */
+  chunk?: string
+  /** Seconds of carcass left once a scavenger has landed; removed at 0 (design.md §19). */
+  dissolve?: number
 }
 
 /**
@@ -107,6 +111,19 @@ const ELEPHANT_COHESION = 6 // steer back toward the herd beyond this radius
 const PREY_PANIC_RADIUS = 3.2
 const PREY_PANIC_SPEED = 1.35
 
+/** Wildlife streaming (design.md §19): animals are kept alive while they may be
+ *  on screen and only despawned well beyond the view. The view radius scales
+ *  with the bird's-eye zoom; the spawn chunk range is clamped for performance. */
+const VIEW_AT_ZOOM1 = 100
+const SPAWN_MARGIN = 18
+const DESPAWN_MARGIN = 60
+const SPAWN_RANGE_MIN = 4
+const SPAWN_RANGE_MAX = 6
+/** Scavenging (design.md §19): a trampled/other-death carcass draws a vulture
+ *  that flies in, lands and consumes it, dissolving it like a lion kill. */
+const CARCASS_DISSOLVE_SECONDS = 9
+const VULTURE_SCAVENGE_SPEED = 9
+
 function hash(cx: number, cz: number, i: number, seed: number): number {
   let h = (seed ^ 0xa51ce5) >>> 0
   h = Math.imul(h ^ cx, 0x85ebca6b)
@@ -118,61 +135,51 @@ function hash(cx: number, cz: number, i: number, seed: number): number {
   return (h >>> 0) / 4294967296
 }
 
-/** Deterministic herds around a center chunk. */
-function buildHerds(cx: number, cz: number, seed: number): Record<Species, Animal[]> {
-  const herds: Record<Species, Animal[]> = {
-    elephant: [],
-    giraffe: [],
-    zebra: [],
-    antelope: [],
-    flamingo: [],
+function emptyHerds(): Record<Species, Animal[]> {
+  return { elephant: [], giraffe: [], zebra: [], antelope: [], flamingo: [] }
+}
+
+/** Populate one chunk's deterministic herd/flock into the shared herd arrays,
+ *  tagging each animal with its chunk key so it can be streamed out later. */
+function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, seed: number): void {
+  const key = `${ccx},${ccz}`
+  const roll = hash(ccx, ccz, 0, seed)
+  const ax = (ccx + hash(ccx, ccz, 1, seed)) * CHUNK_SIZE
+  const az = (ccz + hash(ccx, ccz, 2, seed)) * CHUNK_SIZE
+  const ll = worldToLatLon(ax, az)
+  const anchor = sampleTerrain(ll.lat, ll.lon, seed)
+
+  // Flamingo flocks gather at lake shores regardless of biome roll.
+  const lakeD = lakeDistance(ll.lat, ll.lon, 1)
+  if (lakeD < 0.42 && roll < 0.7) {
+    placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, true, undefined, key)
+    return
   }
 
-  for (let dz = -HERD_RADIUS; dz <= HERD_RADIUS; dz++) {
-    for (let dx = -HERD_RADIUS; dx <= HERD_RADIUS; dx++) {
-      const ccx = cx + dx
-      const ccz = cz + dz
-      const roll = hash(ccx, ccz, 0, seed)
-      const ax = (ccx + hash(ccx, ccz, 1, seed)) * CHUNK_SIZE
-      const az = (ccz + hash(ccx, ccz, 2, seed)) * CHUNK_SIZE
-      const ll = worldToLatLon(ax, az)
-      const anchor = sampleTerrain(ll.lat, ll.lon, seed)
-
-      // Flamingo flocks gather at lake shores regardless of biome roll.
-      // (lakeDistance caps at 0.45°, so the threshold must stay below that.)
-      const lakeD = lakeDistance(ll.lat, ll.lon, 1)
-      if (lakeD < 0.42 && roll < 0.7) {
-        placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, true)
-        continue
-      }
-
-      let species: Species | null = null
-      let count = 0
-      if (anchor.type === 'savanna') {
-        if (roll < 0.12) species = 'elephant'
-        else if (roll < 0.2) species = 'giraffe'
-        else if (roll < 0.33) species = 'zebra'
-        else if (roll < 0.46) species = 'antelope'
-        count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : 7
-      } else if (anchor.type === 'jungle') {
-        if (roll < 0.06) {
-          species = 'elephant'
-          count = 3
-        }
-      } else if (anchor.type === 'desert') {
-        if (roll < 0.05) {
-          species = 'antelope'
-          count = 4
-        }
-      }
-      if (!species) continue
-      // Elephants placed together share a herd id (stable per chunk) so they
-      // move as one; other species roam/graze individually.
-      const herdId = species === 'elephant' ? ccx * 1000003 + ccz : undefined
-      placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, false, herdId)
+  let species: Species | null = null
+  let count = 0
+  if (anchor.type === 'savanna') {
+    if (roll < 0.12) species = 'elephant'
+    else if (roll < 0.2) species = 'giraffe'
+    else if (roll < 0.33) species = 'zebra'
+    else if (roll < 0.46) species = 'antelope'
+    count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : 7
+  } else if (anchor.type === 'jungle') {
+    if (roll < 0.06) {
+      species = 'elephant'
+      count = 3
+    }
+  } else if (anchor.type === 'desert') {
+    if (roll < 0.05) {
+      species = 'antelope'
+      count = 4
     }
   }
-  return herds
+  if (!species) return
+  // Elephants placed together share a herd id (stable per chunk) so they move
+  // as one; other species roam/graze individually.
+  const herdId = species === 'elephant' ? ccx * 1000003 + ccz : undefined
+  placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, false, herdId, key)
 }
 
 function placeGroup(
@@ -187,6 +194,7 @@ function placeGroup(
   baseScale: number,
   shoreline: boolean,
   herdId?: number,
+  chunkKey?: string,
 ) {
   for (let i = 0; i < count; i++) {
     const r1 = hash(ccx, ccz, 10 + i * 3, seed)
@@ -210,6 +218,7 @@ function placeGroup(
       scale: baseScale * (0.85 + r3 * 0.3),
       phase: r1 * Math.PI * 2,
       ...(herdId !== undefined ? { herd: herdId } : {}),
+      ...(chunkKey !== undefined ? { chunk: chunkKey } : {}),
     }
     // Animals near water periodically walk to the shore and drink
     // (design.md §19); the shore point follows the water-distance gradient.
@@ -242,9 +251,19 @@ function Herds() {
   const seed = useGame((s) => s.seed)
   const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
   const herdsRef = useRef<Record<Species, Animal[]> | null>(null)
-  const lastCenter = useRef<string | null>(null)
+  // Chunks currently populated in herdsRef (streaming key set).
+  const spawnedChunks = useRef(new Set<string>())
   // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
   const herdState = useRef(new Map<number, { heading: number; phase: number }>())
+  // Scavenger vulture that flies to and consumes a non-lion carcass.
+  const scavengeGroup = useRef<THREE.Group>(null)
+  const scavenger = useRef<{ x: number; z: number; y: number; landed: boolean; target: Animal | null }>({
+    x: 0,
+    z: 0,
+    y: 14,
+    landed: false,
+    target: null,
+  })
 
   const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
     () => ({
@@ -260,9 +279,13 @@ function Herds() {
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     [],
   )
+  const vultureGeo = useMemo(() => buildVulture(), [])
 
   useEffect(() => {
-    lastCenter.current = null
+    herdsRef.current = emptyHerds()
+    spawnedChunks.current.clear()
+    herdState.current.clear()
+    scavenger.current.target = null
   }, [seed])
 
   const mtx = useMemo(() => new THREE.Matrix4(), [])
@@ -283,7 +306,7 @@ function Herds() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__wildlife = { herdsRef, stains }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger }
     return () => {
       delete w.__wildlife
     }
@@ -294,15 +317,63 @@ function Herds() {
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
-    const center = `${cx},${cz}`
-    if (center !== lastCenter.current) {
-      lastCenter.current = center
-      herdsRef.current = buildHerds(cx, cz, seed)
-      stains.current = []
-      herdState.current.clear()
-    }
+
+    // Stream wildlife by chunk (design.md §19): keep every animal that may be on
+    // screen alive — the kept radius scales with the bird's-eye zoom — and only
+    // despawn chunks well beyond the view. Dead carcasses dissolve on screen and
+    // are never chunk-despawned.
+    if (herdsRef.current === null) herdsRef.current = emptyHerds()
     const herds = herdsRef.current
-    if (!herds) return
+    const zoom = useUi.getState().travelZoom
+    const viewR = VIEW_AT_ZOOM1 * zoom
+    const spawnR = viewR + SPAWN_MARGIN
+    const despawnR = viewR + DESPAWN_MARGIN
+    const range = Math.max(SPAWN_RANGE_MIN, Math.min(SPAWN_RANGE_MAX, Math.ceil(spawnR / CHUNK_SIZE)))
+    for (let dz = -range; dz <= range; dz++) {
+      for (let dx = -range; dx <= range; dx++) {
+        const ccx = cx + dx
+        const ccz = cz + dz
+        const key = `${ccx},${ccz}`
+        if (spawnedChunks.current.has(key)) continue
+        const chx = (ccx + 0.5) * CHUNK_SIZE
+        const chz = (ccz + 0.5) * CHUNK_SIZE
+        if (Math.hypot(chx - pos.x, chz - pos.z) > spawnR) continue
+        spawnChunk(herds, ccx, ccz, seed)
+        spawnedChunks.current.add(key)
+      }
+    }
+    let despawned = false
+    for (const key of spawnedChunks.current) {
+      const comma = key.indexOf(',')
+      const kx = Number(key.slice(0, comma))
+      const kz = Number(key.slice(comma + 1))
+      const chx = (kx + 0.5) * CHUNK_SIZE
+      const chz = (kz + 0.5) * CHUNK_SIZE
+      if (Math.hypot(chx - pos.x, chz - pos.z) > despawnR) {
+        spawnedChunks.current.delete(key)
+        despawned = true
+      }
+    }
+    if (despawned) {
+      // Keep dead carcasses (they dissolve on screen) and untagged animals
+      // (e.g. injected by the verification) even when their chunk streams out.
+      for (const sp of SPECIES) {
+        herds[sp] = herds[sp].filter((a) => a.dead || a.chunk === undefined || spawnedChunks.current.has(a.chunk))
+      }
+      for (const hid of [...herdState.current.keys()]) {
+        if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
+      }
+      stains.current = stains.current.filter(([x, , z]) => Math.hypot(x - pos.x, z - pos.z) <= despawnR)
+    }
+    // Render nearest-first so the visible cap keeps the animals closest to the
+    // player when a chunk range holds more than an instanced mesh can show.
+    for (const sp of SPECIES) {
+      if (herds[sp].length > MAX_INSTANCES[sp]) {
+        herds[sp].sort(
+          (a, b) => Math.hypot(a.x - pos.x, a.z - pos.z) - Math.hypot(b.x - pos.x, b.z - pos.z),
+        )
+      }
+    }
 
     const t = clock.elapsedTime
     const lionActive = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
@@ -383,6 +454,75 @@ function Herds() {
       }
     }
 
+    // Scavenging (design.md §19): a carcass that was not eaten by the lion
+    // (e.g. trampled) draws a vulture that flies in, lands and consumes it —
+    // the carcass dissolves piece by piece as a lion kill does, then is
+    // removed. One scavenger works the nearest carcass at a time.
+    {
+      const sc = scavenger.current
+      const targetValid = (a: Animal | null): a is Animal =>
+        !!a && !!a.dead && (a.dissolve === undefined || a.dissolve > 0)
+      if (!targetValid(sc.target)) {
+        sc.target = null
+        let bestD = Infinity
+        for (const sp of SPECIES) {
+          for (const a of herds[sp]) {
+            if (!a.dead) continue
+            if (a.dissolve !== undefined && a.dissolve <= 0) continue
+            const d = Math.hypot(a.x - pos.x, a.z - pos.z)
+            if (d < bestD) {
+              bestD = d
+              sc.target = a
+            }
+          }
+        }
+        if (sc.target) {
+          sc.x = sc.target.x + 14
+          sc.z = sc.target.z + 14
+          sc.y = 14
+          sc.landed = false
+        }
+      }
+      const sg = scavengeGroup.current
+      const target = sc.target
+      if (sg && target) {
+        sg.visible = true
+        const dx = target.x - sc.x
+        const dz = target.z - sc.z
+        const d = Math.hypot(dx, dz)
+        if (!sc.landed && d > 0.6) {
+          const step = Math.min(d, VULTURE_SCAVENGE_SPEED * dt)
+          sc.x += (dx / d) * step
+          sc.z += (dz / d) * step
+          sc.y += (target.y + 0.4 - sc.y) * Math.min(1, dt * 2)
+        } else {
+          sc.landed = true
+          sc.x = target.x
+          sc.z = target.z
+          sc.y = target.y + 0.3
+          if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
+          target.dissolve -= dt
+        }
+        sg.position.set(sc.x, sc.y, sc.z)
+        sg.children.forEach((bird, i) => {
+          const ph = (i / sg.children.length) * Math.PI * 2
+          if (sc.landed) {
+            const r = 0.5 + i * 0.35
+            bird.position.set(Math.cos(ph) * r, Math.sin(t * 3 + ph) * 0.12, Math.sin(ph) * r)
+            bird.rotation.set(0.6 + Math.sin(t * 4 + ph) * 0.3, ph, 0) // heads pecking down
+          } else {
+            const a2 = t * 0.6 + ph
+            bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
+            bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
+          }
+          bird.scale.setScalar(1.5)
+        })
+      } else if (sg) {
+        sg.visible = false
+        sc.landed = false
+      }
+    }
+
     for (const sp of SPECIES) {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
@@ -392,11 +532,13 @@ function Herds() {
       for (let i = 0; i < n; i++) {
         const a = list[i]
         if (a.dead) {
-          // Trampled: lies on its side where it was caught, over a stain.
+          // Trampled: lies on its side where it was caught, over a stain; once
+          // a scavenger lands the carcass shrinks away (design.md §19).
+          const df = a.dissolve === undefined ? 1 : Math.max(0, a.dissolve / CARCASS_DISSOLVE_SECONDS)
           euler.set(0, a.rot, Math.PI / 2.15)
           quat.setFromEuler(euler)
           vpos.set(a.x, Math.max(0.02, a.y), a.z)
-          vscl.setScalar(a.scale)
+          vscl.setScalar(a.scale * df)
           mtx.compose(vpos, quat, vscl)
           mesh.setMatrixAt(i, mtx)
           continue
@@ -510,6 +652,15 @@ function Herds() {
       sm.count = stains.current.length
       sm.instanceMatrix.needsUpdate = true
     }
+
+    // Remove carcasses that a scavenger has fully consumed.
+    for (const sp of SPECIES) {
+      const list = herds[sp]
+      for (let i = list.length - 1; i >= 0; i--) {
+        const d = list[i].dissolve
+        if (list[i].dead && d !== undefined && d <= 0) list.splice(i, 1)
+      }
+    }
   })
 
   return (
@@ -526,6 +677,11 @@ function Herds() {
         />
       ))}
       <instancedMesh ref={stainMesh} args={[stainGeo, stainMat, MAX_STAINS]} frustumCulled={false} />
+      <group ref={scavengeGroup} visible={false}>
+        {[0, 1, 2].map((i) => (
+          <mesh key={i} geometry={vultureGeo} material={material} />
+        ))}
+      </group>
     </>
   )
 }
