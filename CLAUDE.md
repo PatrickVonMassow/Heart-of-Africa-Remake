@@ -318,8 +318,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     prove the zoom-aware
     streaming despawn (an animal survives a tile-boundary crossing while in
     view, despawns once well outside it, and a wider zoom keeps animals the
-    default view would have dropped) and that a non-lion (trampled) carcass
-    draws a vulture that lands and consumes it until it is removed, and
+    default view would have dropped), that a non-lion (trampled) carcass
+    draws a vulture that lands and consumes it until it is removed, that
+    carcasses left far off-screen are culled while a visible one is kept (so
+    kills stay bounded and never stall the frame loop), and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"

@@ -698,12 +698,19 @@ function Herds() {
       sm.instanceMatrix.needsUpdate = true
     }
 
-    // Remove carcasses that a scavenger has fully consumed.
+    // Remove carcasses a scavenger has fully consumed, and cull any left far
+    // off-screen: a single scavenger cannot keep up with every kill, so an
+    // unseen carcass is dropped silently rather than lingering forever (this
+    // bounds the herd arrays — otherwise trample kills accumulate without limit
+    // and eventually stall the frame loop).
     for (const sp of SPECIES) {
       const list = herds[sp]
       for (let i = list.length - 1; i >= 0; i--) {
-        const d = list[i].dissolve
-        if (list[i].dead && d !== undefined && d <= 0) list.splice(i, 1)
+        const a = list[i]
+        if (!a.dead) continue
+        const consumed = a.dissolve !== undefined && a.dissolve <= 0
+        const farOffScreen = Math.hypot(a.x - pos.x, a.z - pos.z) > despawnR
+        if (consumed || farOffScreen) list.splice(i, 1)
       }
     }
   })

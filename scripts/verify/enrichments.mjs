@@ -533,6 +533,33 @@ const scavenge = await page.evaluate(async () => {
 check('a scavenger flies in and lands on a non-lion carcass', scavenge.landed, JSON.stringify(scavenge))
 check('the scavenged carcass dissolves and is removed', scavenge.dissolveStarted && scavenge.removed, JSON.stringify(scavenge))
 
+// --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
+// A single scavenger cannot keep up with every kill, so carcasses left far off
+// the screen are culled silently; only near (visible) ones linger. Without this
+// the herd arrays grow without bound and eventually stall the frame loop.
+const carcassBound = await page.evaluate(async () => {
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const sp5 = ['zebra', 'antelope', 'giraffe', 'elephant', 'flamingo']
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  for (const sp of sp5) herds[sp] = herds[sp].filter((a) => !a.dead)
+  w.scavenger.current.target = null
+  const p = window.__game.getState().pos
+  const near = { x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'near' }
+  herds.zebra.push(near)
+  for (let i = 0; i < 300; i++) {
+    herds.zebra.push({ x: p.x + 900 + i, z: p.z + 900, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: `far${i}` })
+  }
+  const before = herds.zebra.filter((a) => a.dead).length
+  // Player stays put; a few frames are enough for the per-frame cull.
+  await sleep(700)
+  const list = w.herdsRef.current.zebra
+  const after = list.filter((a) => a.dead).length
+  return { before, after, nearKept: list.includes(near) }
+})
+check('off-screen carcasses are culled (bounded growth)', carcassBound.before >= 300 && carcassBound.after < 30, JSON.stringify(carcassBound))
+check('a carcass in view is kept (dissolves on screen, not popped)', carcassBound.nearKept === true, JSON.stringify(carcassBound))
+
 // --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
 // The lion now approaches from a random direction (chase no longer always runs
 // the same way), and the prey weaves left/right to shake it.
