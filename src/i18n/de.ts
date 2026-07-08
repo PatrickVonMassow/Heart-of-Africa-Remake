@@ -169,7 +169,6 @@ export const de: Strings = {
   },
 
   prompts: {
-    enterPlace: (name) => `E — ${name} betreten`,
     digHere: 'G — Hier graben',
     interact: (label) => `E — ${label}`,
     openCamp: 'C — Lager öffnen',
@@ -178,7 +177,6 @@ export const de: Strings = {
   labels: {
     talkToElder: 'Mit dem Alten sprechen',
     oldMan: 'Alter Mann',
-    leavePlace: 'Ort verlassen',
     graveDebug: 'Grab (Debug)',
     camp: 'Lager',
   },

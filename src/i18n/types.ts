@@ -76,7 +76,6 @@ export interface Strings {
   }
 
   prompts: {
-    enterPlace(name: string): string
     digHere: string
     interact(label: string): string
     /** Near a pitched camp (design.md §6). */
@@ -86,7 +85,6 @@ export interface Strings {
   labels: {
     talkToElder: string
     oldMan: string
-    leavePlace: string
     graveDebug: string
     /** Marker label of a pitched free camp (design.md §6). */
     camp: string

@@ -26,37 +26,44 @@ const state = () => page.evaluate(() => window.__game.getState())
 const titleKey = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
 const moveTo = (x, z) =>
   page.evaluate(([x, z]) => { const p = window.__placePlayer; p.x = x; p.z = z }, [x, z])
-const findPos = async (type) =>
-  page.evaluate((t) => window.__placeLayout.interactives.find((i) => i.type === t).pos, type)
+const findInteractive = async (type) =>
+  page.evaluate((t) => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === t)
+    return it ? { pos: it.pos, door: it.door ?? null } : null
+  }, type)
 
-// Prompt labels of the interactives in the default language (German).
-const PROMPT_LABEL = {
-  shop: 'Laden',
-  weapons: 'Waffenhütte',
-  tools: 'Geräte-Hütte',
-  market: 'Markthütte',
-  chief: 'Chefhütte',
-  villager: 'Alten',
-  exit: 'Ort verlassen',
+// The elder prompt label in the default language (German). Buildings no longer
+// carry a prompt: they open by walking into their entrance door (design.md §2).
+const ELDER_LABEL = 'Alten'
+
+// Walk against a building's entrance door → it opens its dialog, no key press
+// (design.md §2 "Switching"). Only the elder still takes the E interaction.
+async function enterBuilding(type) {
+  const it = await findInteractive(type)
+  if (type === 'villager') {
+    await moveTo(it.pos[0], it.pos[1] + 2)
+    await page.waitForFunction(
+      (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+      ELDER_LABEL,
+      { timeout: 30000 },
+    )
+    await page.keyboard.press('KeyE')
+  } else {
+    // Step onto the door point; the door trigger fires in the render loop.
+    await moveTo(it.door[0], it.door[1])
+    await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 15000 })
+  }
+  await page.waitForTimeout(400)
 }
 
-// Teleport near the interactive, wait until the proximity prompt names the
-// target (frame-rate and race independent), then press E and wait for the
-// expected effect.
-async function pressAt(type, offset = 3, expect = null) {
-  const pos = await findPos(type)
-  await moveTo(pos[0], pos[1] + offset)
-  await page.waitForFunction(
-    (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
-    PROMPT_LABEL[type],
-    { timeout: 30000 },
-  )
-  await page.keyboard.press('KeyE')
-  if (expect === 'dialog') {
-    await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 15000 })
-  } else if (expect === 'travel') {
-    await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 15000 })
-  }
+// Leaving is walking out (design.md §2): push the player beyond the walkable
+// radius; the render loop switches back to the bird's-eye view.
+async function leaveByWalking() {
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.z = window.__placeLayout.radius + 5
+  })
+  await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 15000 })
   await page.waitForTimeout(400)
 }
 
@@ -95,8 +102,8 @@ await shot('06-start-journal')
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(300)
 
-// --- 2. Trade in Cairo (criterion 5) ---
-await pressAt('tools', 3, 'dialog')
+// --- 2. Trade in Cairo (criterion 5): open a building by walking into its door ---
+await enterBuilding('tools')
 await shot('02-port-cairo-trade')
 await page.locator('.dialog .row', { hasText: 'Schaufel' }).locator('button').click()
 await page.waitForTimeout(300)
@@ -104,32 +111,29 @@ s = await state()
 check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 1 && s.money === 230)
 await closeDialog()
 
-await pressAt('shop', 3, 'dialog')
+await enterBuilding('shop')
 await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
 await page.waitForTimeout(300)
 s = await state()
 check('Gold-jewelry gift bought (−$30)', s.gifts.gold === 1 && s.money === 200)
 await closeDialog()
 
-// --- 3. Leave place → travel mode (criterion 2) ---
-await pressAt('exit', 1, 'travel')
+// --- 3. Leave place by walking out → travel mode (criterion 2) ---
+await leaveByWalking()
 s = await state()
 check('Left the place → bird\'s-eye view', s.mode === 'travel')
 await page.waitForTimeout(600)
 await shot('01-birdseye-view')
 
-// --- 4. Re-enter Cairo → checkpoint (criterion 5) ---
+// --- 4. Re-enter Cairo by walking into it → checkpoint (criterion 5). No key:
+// crossing the enter radius switches to the first-person view (design.md §2). ---
 let entered = false
 for (let i = 0; i < 25 && !entered; i++) {
   await page.keyboard.down('KeyW')
   await page.waitForTimeout(150)
   await page.keyboard.up('KeyW')
   await page.waitForTimeout(120)
-  const prompt = await page.evaluate(() => document.querySelector('.prompt')?.textContent ?? '')
-  if (prompt.includes('Kairo betreten')) {
-    await page.keyboard.press('KeyE')
-    entered = true
-  }
+  entered = await page.evaluate(() => window.__game.getState().mode === 'place')
 }
 await page.waitForTimeout(400)
 s = await state()
@@ -142,7 +146,7 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 
 // --- 5. Travel to village (criteria 4, 6) ---
-await pressAt('exit', 1, 'travel')
+await leaveByWalking()
 // Jump slightly north of the North's knowing village (design.md §13.3), then
 // walk south into it so the journey itself (movement, time) is exercised.
 const village = await page.evaluate(async () => {
@@ -156,17 +160,12 @@ const village = await page.evaluate(async () => {
 await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
 await page.waitForTimeout(400)
 const dayBefore = (await state()).day
-// Walk south toward the village until the enter prompt appears.
+// Walk south into the village: crossing the enter radius switches to the
+// first-person view on its own (no key press, design.md §2).
 await page.keyboard.down('KeyS')
 await page
-  .waitForFunction(
-    () => (document.querySelector('.prompt')?.textContent ?? '').includes('betreten'),
-    null,
-    { timeout: 60000 },
-  )
+  .waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 60000 })
   .finally(() => page.keyboard.up('KeyS'))
-await page.keyboard.press('KeyE')
-await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
 await page.waitForTimeout(500)
 s = await state()
 check('Entered the village (first-person)', s.mode === 'place' && s.placeId === village.id)
@@ -178,7 +177,7 @@ await page.waitForTimeout(200)
 await shot('03-village-nubians')
 
 // --- 6. Villager: the elder teaches the North's direction system (§13.2) ---
-await pressAt('villager', 2)
+await enterBuilding('villager')
 s = await state()
 check('Language lesson (Nivera = north) in the journal', s.languagesLearned.north === true &&
   s.journal.some((e) => titleKey(e) === 'journal.titles.language'))
@@ -186,7 +185,7 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 
 // --- 7. Chief audience: culturally correct gift → hint (criteria 6, 7) ---
-await pressAt('chief', 3, 'dialog')
+await enterBuilding('chief')
 await page.waitForTimeout(300)
 await shot('04-chief-hut-audience')
 await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
@@ -204,7 +203,7 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 
 // --- 8. Triangulation: the East's knowing people contributes the longitude ---
-await pressAt('exit', 1, 'travel')
+await leaveByWalking()
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.enterPlace(g.knowingVillages.east)

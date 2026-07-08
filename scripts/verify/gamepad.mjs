@@ -89,15 +89,23 @@ const tpos1 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
 const travelled = Math.hypot(tpos1.x - tpos0.x, tpos1.z - tpos0.z)
 check("left stick travels in the bird's-eye view", travelled > 0.5, `moved ${travelled.toFixed(2)} units`)
 
-// --- A interacts (E): standing at a place marker enters it ----------------------------------
+// --- A interacts (E): addresses the elder in a village -----------------------------------------
+// Places are entered by walking now (design.md §2), so A no longer "enters":
+// it maps to the E interaction, which addresses the village elder. The
+// northern Nubian village keeps the following position query in the North.
+await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
+await page.waitForTimeout(2000)
 await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.debugJumpTo(30.05, 31.45) // Cairo marker
+  window.__game.getState().setJournalOpen(false)
+  const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')
+  const p = window.__placePlayer
+  p.x = el.pos[0]
+  p.z = el.pos[1] + 2
 })
-await page.waitForTimeout(400)
-await pressButton(0) // A → KeyE
-const entered = await page.evaluate(() => ({ mode: window.__game.getState().mode, placeId: window.__game.getState().placeId }))
-check('A interacts: the nearby place is entered', entered.mode === 'place' && entered.placeId === 'cairo', '')
+await page.waitForTimeout(500)
+await pressButton(0) // A → KeyE → talk to the elder
+const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
+check('A interacts: the elder is addressed (language lesson)', talked === true, '')
 
 // --- Position query (P / Select) in both languages -------------------------------------------
 // Hold the button until the toast appears (like a real press): right after

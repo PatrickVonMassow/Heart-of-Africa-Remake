@@ -107,50 +107,45 @@ async function ejectTest(sceneLabel, pick) {
 }
 
 /**
- * Every functional building must be operable: there is a collision-free
- * standpoint within interaction range from which its prompt appears. This is
- * the gameplay-level access guarantee (§7.1.16).
+ * Every functional building must be operable: walking onto its entrance door
+ * opens the building's dialog, and the door point is collision-free so it can
+ * actually be reached (§7.1.16 / design.md §2 walk-in). This replaces the old
+ * prompt+E access guarantee.
  */
 async function reachableBuildings(sceneLabel) {
   const targets = await page.evaluate(() =>
     window.__placeLayout.interactives
-      .map((it, i) => ({ i, type: it.type, pos: it.pos }))
-      .filter((t) => t.type !== 'exit' && t.type !== 'villager'),
+      .map((it, i) => ({ i, type: it.type, door: it.door ?? null }))
+      .filter((t) => t.type !== 'villager'),
   )
-  const unreachable = []
+  const notOperable = []
   for (const t of targets) {
-    let ok = false
-    for (let a = 0; a < 16 && !ok; a++) {
-      const angle = (a / 16) * Math.PI * 2
-      // Find a collision-free standpoint ~3.6 units out, then read the prompt.
-      const placed = await page.evaluate(
-        ([tx, tz, ang]) => {
-          const cs = window.__placeColliders
-          for (let r = 3.9; r >= 2.6; r -= 0.4) {
-            const x = tx + Math.cos(ang) * r
-            const z = tz + Math.sin(ang) * r
-            if (cs.every((c) => window.__clearanceTo(c, x, z) > 0.36)) {
-              const p = window.__placePlayer
-              p.x = x
-              p.z = z
-              return true
-            }
-          }
-          return false
-        },
-        [t.pos[0], t.pos[1], angle],
-      )
-      if (!placed) continue
-      await pushFrames(4)
-      const pr = await page.evaluate(() => document.querySelector('.prompt')?.textContent ?? '')
-      if (pr.trim().length > 0) ok = true
+    if (!t.door) {
+      notOperable.push(`${t.type}(no door)`)
+      continue
     }
-    if (!ok) unreachable.push(t.type)
+    // The door point must be approachable (collision-free for the player).
+    const clear = await page.evaluate(
+      (d) => window.__placeColliders.every((c) => window.__clearanceTo(c, d[0], d[1]) >= 0.34),
+      t.door,
+    )
+    // Step onto the door; the render loop must open the building's dialog.
+    await page.evaluate((d) => { const p = window.__placePlayer; p.x = d[0]; p.z = d[1] }, t.door)
+    const opened = await page
+      .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
+      .then(() => true)
+      .catch(() => false)
+    if (!clear || !opened) notOperable.push(`${t.type}${clear ? '' : '(blocked door)'}${opened ? '' : '(no open)'}`)
+    // Close and step away so the door latch re-arms for the next building.
+    await page.keyboard.press('Escape')
+    await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
+    await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
+    await page.waitForTimeout(150)
   }
   check(
-    `${sceneLabel}: all functional buildings operable (free standpoint + prompt)`,
-    unreachable.length === 0,
-    unreachable.length ? `unreachable: ${unreachable.join(',')}` : `${targets.length} buildings ok`,
+    `${sceneLabel}: all functional buildings operable (walk into the door opens it)`,
+    notOperable.length === 0,
+    notOperable.length ? `not operable: ${notOperable.join(',')}` : `${targets.length} buildings ok`,
   )
 }
 
@@ -158,16 +153,16 @@ async function accessPointsFree(sceneLabel) {
   const blocked = await page.evaluate(() => {
     const cs = window.__placeColliders
     const clear = (x, z) => cs.every((c) => window.__clearanceTo(c, x, z) > 0.35)
-    // Spawn and exit scale with the settlement size (design.md par.4.1).
+    // Spawn and the southern walk-out corridor scale with settlement size
+    // (design.md par.4.1). Leaving is walking past the edge (no exit gate).
     const radius = window.__placeLayout.radius
-    const exit = window.__placeLayout.interactives.find((i) => i.type === 'exit')
     return [
       { n: 'spawn', x: 0, z: radius - 10 },
       { n: 'square', x: 0, z: 3 },
-      { n: 'exit', x: exit.pos[0], z: exit.pos[1] - 0.5 },
+      { n: 'walk-out', x: 0, z: radius - 0.5 },
     ].filter((p) => !clear(p.x, p.z)).map((p) => p.n)
   })
-  check(`${sceneLabel}: spawn/square/exit free`, blocked.length === 0,
+  check(`${sceneLabel}: spawn/square/walk-out free`, blocked.length === 0,
     blocked.length ? `blocked: ${blocked.join(',')}` : 'free')
 }
 
@@ -176,7 +171,7 @@ async function accessPointsFree(sceneLabel) {
 await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
 await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&(b<0||c.r>a[b].r))?i:b,-1)') // biggest circle prop
 const funcTypes = await page.evaluate(() =>
-  window.__placeLayout.interactives.filter((b) => b.type !== 'exit' && b.type !== 'villager').map((b) => b.type),
+  window.__placeLayout.interactives.filter((b) => b.type !== 'villager').map((b) => b.type),
 )
 // Since the trade-economy batch, ports carry six functional buildings
 // (design.md §9: incl. bazaar and travel agency).
@@ -231,19 +226,26 @@ await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
 
-// Chief prompt reachable despite collision ("Chief's Hut" — English default).
+// Chief hut operable despite collision: walking into its door opens the
+// audience dialog (design.md §2 walk-in).
 await page.evaluate(() => {
-  const it = window.__placeLayout.interactives[0]
+  const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
   const p = window.__placePlayer
-  p.x = it.pos[0]
-  p.z = it.pos[1] + 4.2
+  p.x = it.door[0]
+  p.z = it.door[1]
   p.yaw = 0
 })
-await pushFrames(6)
-const prompt = await page.evaluate(() => document.querySelector('.prompt')?.textContent ?? '')
-check('Village: chief-hut prompt reachable despite collision', prompt.includes("Chief's Hut"), `prompt: "${prompt}"`)
+const audienceOpened = await page
+  .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
+  .then(() => true)
+  .catch(() => false)
+check('Village: chief hut opens by walking into its door', audienceOpened)
 await page.screenshot({ path: `${OUT}53-collision-village-chief-hut.png` })
 console.log('shot 53-collision-village-chief-hut.png')
+await page.keyboard.press('Escape')
+await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
+await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
+await page.waitForTimeout(150)
 
 await reachableBuildings('Village')
 await accessPointsFree('Village')

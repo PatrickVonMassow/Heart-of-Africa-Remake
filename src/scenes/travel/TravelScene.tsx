@@ -857,7 +857,9 @@ function Player() {
 
 export function TravelScene() {
   const camera = useThree((s) => s.camera)
-  const nearPlaceRef = useRef<PlaceDef | null>(null)
+  // Id of the place currently walked into; blocks re-entry until the player
+  // has left its radius again (design.md §2 walk-in entry).
+  const enterLatchRef = useRef<string | null>(null)
   const setPrompt = useUi((s) => s.setPrompt)
 
   // Snap the camera to the follow pose on mount (no visible flight from the
@@ -881,17 +883,12 @@ export function TravelScene() {
     return () => window.removeEventListener('wheel', onWheel)
   }, [])
 
-  // Interaction keys: E enters a nearby place, G digs.
+  // Interaction key: G digs. Places are entered by walking into them (below).
   useEffect(() => {
-    const offE = onKeyPress('KeyE', () => {
-      const p = nearPlaceRef.current
-      if (p && !useUi.getState().dialog) useGame.getState().enterPlace(p.id)
-    })
     const offG = onKeyPress('KeyG', () => {
       if (!useUi.getState().dialog) useGame.getState().dig()
     })
     return () => {
-      offE()
       offG()
       setPrompt(null)
     }
@@ -914,7 +911,9 @@ export function TravelScene() {
     camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom), 0.12)
     camera.lookAt(pos.x, 0, pos.z)
 
-    // Proximity prompt for entering places / digging.
+    // Walking into a place enters it (design.md §2): no key press. The latch
+    // prevents an immediate re-entry after leaving (leavePlace drops the player
+    // just outside the radius); it re-arms once the player is clear again.
     let near: PlaceDef | null = null
     for (const p of PLACES) {
       const w = latLonToWorld(p.lat, p.lon)
@@ -923,19 +922,26 @@ export function TravelScene() {
         break
       }
     }
-    nearPlaceRef.current = near
+    if (near && enterLatchRef.current !== near.id) {
+      enterLatchRef.current = near.id
+      if (!useUi.getState().dialog) {
+        useGame.getState().enterPlace(near.id)
+        return
+      }
+    } else if (!near && enterLatchRef.current) {
+      enterLatchRef.current = null
+    }
+
     const strings = getStrings()
     const ll = worldToLatLon(pos.x, pos.z)
     const nearCamp = s.freeCamps.some(
       (c) => !c.looted && Math.hypot(c.lat - ll.lat, c.lon - ll.lon) <= balance.camps.campRadiusDeg,
     )
-    const prompt = near
-      ? strings.prompts.enterPlace(strings.places[near.id])
-      : nearCamp
-        ? strings.prompts.openCamp
-        : s.handItem === 'shovel'
-          ? strings.prompts.digHere
-          : null
+    const prompt = nearCamp
+      ? strings.prompts.openCamp
+      : s.handItem === 'shovel'
+        ? strings.prompts.digHere
+        : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 

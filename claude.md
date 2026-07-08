@@ -177,7 +177,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    without errors. The application loads without console errors.
 2. **Two perspectives.** Bird's-eye view (3D travel across the continent)
    and first-person view (walkable settlement) exist, and switching between
-   them works when entering/leaving a settlement.
+   them works when entering/leaving a settlement. Entering and leaving
+   happen through movement alone (`design.md` §2 "Switching"): walking onto
+   a settlement's position enters it; walking beyond the settlement's edge
+   leaves it — there is no exit archway and no enter/leave key. The
+   enterable buildings likewise open by walking against their entrance door;
+   only the elder keeps the interaction key. Verifiable: an automated run
+   walks into a place and into a building's door and enters both, and walks
+   past the settlement edge to leave, without any key press
+   (`scripts/verify/flow.mjs`).
 3. **World model.** Fixed geographic locations of the landscape elements per
    `design.md`; the concrete appearance must be graphically elaborate,
    Africa must be depicted in detail and authentically, and the outlines of

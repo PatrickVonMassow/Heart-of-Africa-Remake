@@ -30,19 +30,24 @@ const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 const INTERACT_RADIUS = 4.5
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
+// Walking against a building's entrance door opens it (design.md §2): the
+// trigger sits just in front of the door; it re-arms only after stepping away.
+const DOOR_TRIGGER_RADIUS = 1.2
+const DOOR_RELEASE_RADIUS = 2.0
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
 
 interface Interactive {
-  type: BuildingType | 'villager' | 'exit'
+  type: BuildingType | 'villager'
   pos: [number, number]
+  /** World-space point in front of the entrance door; touching it opens the building. */
+  door?: [number, number]
 }
 
 /** Display label of an interactive in the current language. */
 function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interactive['type']): string {
   if (type === 'villager') return strings.labels.talkToElder
-  if (type === 'exit') return strings.labels.leavePlace
   return strings.buildings[type]
 }
 
@@ -139,16 +144,28 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       // Diagonal placement keeps the southern spawn corridor free.
       const angle = Math.PI / 4 + (i / types.length) * Math.PI * 2 + (rand() - 0.5) * 0.4
       const r = 11 + rand() * 4
-      interactives.push({ type: t, pos: [Math.cos(angle) * r, Math.sin(angle) * r] })
+      const x = Math.cos(angle) * r
+      const z = Math.sin(angle) * r
+      // Must match PortBuilding's variant rotation (variant = interactive index);
+      // the door sits on local +Z just outside the box collider (hz 2.0).
+      const rot = ((i * 137) % 40) / 100 - 0.2
+      interactives.push({ type: t, pos: [x, z], door: [x + Math.sin(rot) * 2.55, z + Math.cos(rot) * 2.55] })
     })
   } else {
     // OPEN: design.md §9/§10 lists trade buildings for villages too (barter
     // with gifts as the means of payment); the POC gives villages only the
     // chief's hut and the elder.
-    interactives.push({ type: 'chief', pos: [jitter(0, 4), jitter(-13, 3)] })
+    const chiefPos: [number, number] = [jitter(0, 4), jitter(-13, 3)]
+    // Must match VillageHut's default facing (door toward the place center);
+    // the door point sits just outside the hut collider (r 3.35).
+    const chiefFacing = Math.atan2(chiefPos[0], chiefPos[1]) + Math.PI
+    interactives.push({
+      type: 'chief',
+      pos: chiefPos,
+      door: [chiefPos[0] + Math.sin(chiefFacing) * 3.9, chiefPos[1] + Math.cos(chiefFacing) * 3.9],
+    })
     interactives.push({ type: 'villager', pos: [jitter(4, 3), jitter(-4, 2)] })
   }
-  interactives.push({ type: 'exit', pos: [0, radius - 4] })
 
   const dwellings: DwellingDef[] = []
   const fences: FenceDef[] = []
@@ -199,7 +216,6 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     paths.push({ points: [[0, radius - 2], [0, 3], [0, -16 - ext]], width: 3 })
     paths.push({ points: [[-20 - ext, 3], [20 + ext, 3]], width: 2.2 })
     for (const it of interactives) {
-      if (it.type === 'exit') continue
       // Spur from each functional building toward the nearest street axis.
       const toMain: [number, number] = [0, it.pos[1]]
       const toCross: [number, number] = [it.pos[0], 3]
@@ -365,10 +381,7 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   // --- Collision set: every solid object becomes one or more circles ------
   const colliders: Collider[] = []
   interactives.forEach((it, i) => {
-    if (it.type === 'exit') {
-      colliders.push({ x: it.pos[0] - 1.5, z: it.pos[1], r: 0.24 })
-      colliders.push({ x: it.pos[0] + 1.5, z: it.pos[1], r: 0.24 })
-    } else if (it.type === 'villager') {
+    if (it.type === 'villager') {
       colliders.push({ x: it.pos[0], z: it.pos[1], r: 0.45 })
     } else if (place.kind === 'port') {
       // Must match PortBuilding's variant rotation (variant = interactive index).
@@ -730,39 +743,6 @@ function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle 
       </mesh>
       <Html center position={[0, 2.3, 0]} distanceFactor={14}>
         <div className="map-label">{t.labels.oldMan}</div>
-      </Html>
-    </group>
-  )
-}
-
-function ExitGate({ item, mats }: { item: Interactive; mats: PlaceMaterials }) {
-  const t = useStrings()
-  return (
-    <group position={[item.pos[0], 0, item.pos[1]]}>
-      {[-1.5, 1.5].map((px) => (
-        <group key={px} position={[px, 0, 0]}>
-          <mesh position={[0, 1.3, 0]} castShadow material={mats.wood}>
-            <cylinderGeometry args={[0.14, 0.18, 2.6, 7]} />
-          </mesh>
-          {/* Carved rings */}
-          {[0.8, 1.5, 2.1].map((py) => (
-            <mesh key={py} position={[0, py, 0]} castShadow>
-              <torusGeometry args={[0.17, 0.035, 6, 10]} />
-              <meshStandardMaterial color="#3f2d16" roughness={0.9} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      <mesh position={[0, 2.65, 0]} castShadow material={mats.wood}>
-        <boxGeometry args={[3.5, 0.22, 0.26]} />
-      </mesh>
-      {/* Hanging charm */}
-      <mesh position={[0, 2.25, 0]}>
-        <coneGeometry args={[0.09, 0.35, 5]} />
-        <meshStandardMaterial color="#e8ddc8" roughness={0.7} />
-      </mesh>
-      <Html center position={[0, 3.2, 0]} distanceFactor={18}>
-        <div className="map-label">{t.labels.leavePlace}</div>
       </Html>
     </group>
   )
@@ -1403,10 +1383,13 @@ export function PlaceScene() {
   // yaw 0 faces -Z (toward the place center from the southern spawn point).
   const player = useRef({ x: 0, z: 18, yaw: 0 })
   const nearRef = useRef<Interactive | null>(null)
+  // Door the player currently stands at; blocks re-triggering until they step away.
+  const doorLatch = useRef<Interactive | null>(null)
 
-  // Reset position when the place changes (just inside the exit gate).
+  // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
     player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
+    doorLatch.current = null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId])
 
@@ -1448,44 +1431,48 @@ export function PlaceScene() {
     }
   }, [gl])
 
-  // Interaction key.
+  // Buildings open by walking against their entrance door (design.md §2);
+  // only the elder keeps the E interaction.
+  const openBuilding = (near: Interactive) => {
+    const game = useGame.getState()
+    // The elder is addressed with the E key, not by a door (has no door point).
+    if (near.type === 'villager') return
+    if (near.type === 'chief') {
+      // Standing gates (design.md §12): a visible rifle causes flight and
+      // blockade, a robbed region shuns the traveler, hostility lingers.
+      const strings = getStrings()
+      const place = game.placeId ? placeById(game.placeId) : null
+      if (game.handItem === 'rifle') {
+        game.setToast(strings.toasts.villagersFlee)
+      } else if (place && game.regionRobbed[place.region]) {
+        game.setToast(strings.toasts.regionShunned)
+      } else if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
+        game.setToast(strings.toasts.chiefHostile)
+      } else {
+        setDialog({ kind: 'audience' })
+        if (document.pointerLockElement) document.exitPointerLock()
+      }
+    } else if (near.type === 'bazaar' || near.type === 'agency') {
+      setDialog({ kind: near.type })
+      if (document.pointerLockElement) document.exitPointerLock()
+    } else {
+      setDialog({ kind: 'trade', building: near.type })
+      if (document.pointerLockElement) document.exitPointerLock()
+    }
+  }
+
+  // Interaction key (elder talk).
   useEffect(() => {
     const offE = onKeyPress('KeyE', () => {
       const near = nearRef.current
-      if (!near || useUi.getState().dialog) return
-      const game = useGame.getState()
-      if (near.type === 'exit') {
-        game.leavePlace()
-      } else if (near.type === 'villager') {
-        game.talkToVillager()
-      } else if (near.type === 'chief') {
-        // Standing gates (design.md §12): a visible rifle causes flight and
-        // blockade, a robbed region shuns the traveler, hostility lingers.
-        const strings = getStrings()
-        const place = game.placeId ? placeById(game.placeId) : null
-        if (game.handItem === 'rifle') {
-          game.setToast(strings.toasts.villagersFlee)
-        } else if (place && game.regionRobbed[place.region]) {
-          game.setToast(strings.toasts.regionShunned)
-        } else if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
-          game.setToast(strings.toasts.chiefHostile)
-        } else {
-          setDialog({ kind: 'audience' })
-          if (document.pointerLockElement) document.exitPointerLock()
-        }
-      } else if (near.type === 'bazaar' || near.type === 'agency') {
-        setDialog({ kind: near.type })
-        if (document.pointerLockElement) document.exitPointerLock()
-      } else {
-        setDialog({ kind: 'trade', building: near.type })
-        if (document.pointerLockElement) document.exitPointerLock()
-      }
+      if (!near || near.type !== 'villager' || useUi.getState().dialog) return
+      useGame.getState().talkToVillager()
     })
     return () => {
       offE()
       setPrompt(null)
     }
-  }, [setDialog, setPrompt])
+  }, [setPrompt])
 
   useFrame((_, rawDt) => {
     if (!layout) return
@@ -1522,21 +1509,41 @@ export function PlaceScene() {
         const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
         p.x = rx
         p.z = rz
-        const r = Math.hypot(p.x, p.z)
-        if (r > layout.radius) {
-          useGame.getState().leavePlace()
-          return
-        }
       }
+    }
+
+    // Walking beyond the settlement's edge leaves it (design.md §2 "Switching"):
+    // no exit key, purely position-based.
+    if (Math.hypot(p.x, p.z) > layout.radius) {
+      useGame.getState().leavePlace()
+      return
     }
 
     camera.position.set(p.x, EYE_HEIGHT, p.z)
     camera.rotation.set(0, p.yaw, 0, 'YXZ')
 
-    // Interaction proximity.
+    // Walking against an entrance door opens the building (design.md §2);
+    // the latch re-arms only after stepping away from the door.
+    const latch = doorLatch.current
+    if (latch?.door && Math.hypot(p.x - latch.door[0], p.z - latch.door[1]) > DOOR_RELEASE_RADIUS) {
+      doorLatch.current = null
+    }
+    if (!useUi.getState().dialog && !useGame.getState().journalOpen) {
+      for (const it of layout.interactives) {
+        if (!it.door || it === doorLatch.current) continue
+        if (Math.hypot(p.x - it.door[0], p.z - it.door[1]) <= DOOR_TRIGGER_RADIUS) {
+          doorLatch.current = it
+          openBuilding(it)
+          break
+        }
+      }
+    }
+
+    // Interaction proximity (elder talk).
     let near: Interactive | null = null
     let best = INTERACT_RADIUS
     for (const it of layout.interactives) {
+      if (it.type !== 'villager') continue
       const d = Math.hypot(p.x - it.pos[0], p.z - it.pos[1])
       if (d < best) {
         best = d
@@ -1584,7 +1591,6 @@ export function PlaceScene() {
 
       {layout.interactives.map((it, i) => {
         if (it.type === 'villager') return <Villager key={i} item={it} style={style} />
-        if (it.type === 'exit') return <ExitGate key={i} item={it} mats={mats} />
         if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
         // Chief hut: larger village hut with regalia.
         return (
@@ -1596,7 +1602,7 @@ export function PlaceScene() {
           buildings carry a pulsing marker. */}
       {orientationGiven[place.id] &&
         layout.interactives
-          .filter((it) => it.type !== 'exit' && it.type !== 'villager')
+          .filter((it) => it.type !== 'villager')
           .map((it, i) => (
             <Html key={`hl-${i}`} center position={[it.pos[0], isPort ? 5.4 : 5.6, it.pos[1]]} distanceFactor={40}>
               <div className="building-highlight">▼</div>
@@ -1622,7 +1628,7 @@ export function PlaceScene() {
         seed={seed}
         placeId={place.id}
         style={style}
-        buildings={layout.interactives.filter((it) => it.type !== 'exit' && it.type !== 'villager').map((it) => it.pos)}
+        buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
         firePos={[-3.5, 2.5]}
         homes={layout.dwellings
           .filter((d) => d.kind === 'hut' || d.kind === 'box')
