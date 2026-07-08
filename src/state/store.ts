@@ -120,6 +120,9 @@ export interface GameState {
   treasureSites: TreasureSite[]
   /** Ivory pieces still recoverable at the elephant graveyard (§4.4). */
   graveyardIvoryLeft: number
+  /** Standing bazaar quotes per treasure at the current port, so re-offering
+   * after a decline shows the same price (design.md §10); cleared on leaving. */
+  bazaarQuotes: Partial<Record<TreasureId, number>>
   /** Discoveries awaiting their bounty at the next port visit (§10). */
   pendingBounties: Array<{ kind: 'village' | 'landmark'; id: string }>
   landmarksSeen: string[]
@@ -384,6 +387,7 @@ function startState(seed: number) {
     treasures: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 } as Record<TreasureId, number>,
     treasureSites: generateTreasureSites(seed),
     graveyardIvoryLeft: balance.economy.graveyardIvory,
+    bazaarQuotes: {},
     pendingBounties: [] as Array<{ kind: 'village' | 'landmark'; id: string }>,
     landmarksSeen: [] as string[],
     valuableShown: {} as Record<string, boolean>,
@@ -984,6 +988,8 @@ export const useGame = create<GameState>()((set, get) => ({
         first && place.kind === 'village'
           ? [...s.pendingBounties, { kind: 'village' as const, id }]
           : s.pendingBounties,
+      // Fresh port, fresh bazaar quotes (design.md §10).
+      bazaarQuotes: {},
       toast: null,
     })
     if (place.kind === 'port') {
@@ -1063,7 +1069,8 @@ export const useGame = create<GameState>()((set, get) => ({
     const place = placeById(s.placeId)
     const p = latLonToWorld(place.lat, place.lon)
     // Re-enter offset south of the marker so the enter prompt does not retrigger.
-    set({ mode: 'travel', placeId: null, pos: { x: p.x, z: p.z + balance.placeEnterRadius + 1.5 } })
+    // Bazaar quotes are per-port, so they expire on leaving (design.md §10).
+    set({ mode: 'travel', placeId: null, pos: { x: p.x, z: p.z + balance.placeEnterRadius + 1.5 }, bazaarQuotes: {} })
   },
 
   buy: (good) => {
@@ -1110,6 +1117,13 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (!s.placeId || s.treasures[treasure] <= 0) return
     const region = placeById(s.placeId).region
+    // Re-offering the same treasure at this port shows the standing quote, not
+    // a freshly rolled one (design.md §10). The quote is cleared on leaving.
+    const cached = s.bazaarQuotes[treasure]
+    if (cached !== undefined) {
+      useUi.getState().setBazaarBid({ treasure, amount: cached })
+      return
+    }
     const bid = treasureBid(treasure, region, Math.random)
     if (bid === null) {
       // Does not fit the regional value profile — refused (design.md §10).
@@ -1117,6 +1131,7 @@ export const useGame = create<GameState>()((set, get) => ({
       set({ toast: getStrings().toasts.bazaarRejected(getStrings().treasures[treasure]) })
       return
     }
+    set({ bazaarQuotes: { ...s.bazaarQuotes, [treasure]: bid } })
     useUi.getState().setBazaarBid({ treasure, amount: bid })
   },
 

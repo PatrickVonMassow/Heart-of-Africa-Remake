@@ -186,7 +186,7 @@ Villages and port cities contain various building types. In the first-person vie
 
 - Places of trade: see §9.
 - Means of payment: in port cities trade uses money, in native villages gifts (trade goods).
-- Bazaar (treasure finds): offer an item → the merchant names a bid → accept or decline. If the item does not fit the regional value profile, it is rejected.
+- Bazaar (treasure finds): offer an item → the merchant names a bid → accept or decline. If the item does not fit the regional value profile, it is rejected. The bid is a standing quote for that port: declining and re-offering the same item shows the identical price, not a freshly haggled one. The quote expires only on leaving the port (a different port haggles anew).
 - Price logic: a base price per good; treasure finds additionally carry a regional factor and a buy/sell spread. Profit comes from regional arbitrage.
 - Ferries (travel agency): passage between ports for a fee; saves time compared to overland travel.
 - Discovery bounty: money is transferred for reported discoveries (new villages, landmarks); credited on the next port visit.

@@ -90,12 +90,46 @@ await page.evaluate(() => {
   g.debugAddTreasure('emerald')
   g.offerTreasure('emerald')
 })
+const firstEmeraldBid = await page.evaluate(() => window.__ui.getState().bazaarBid?.amount)
 await page.evaluate(() => window.__game.getState().declineBid())
 s = await state()
 check(
   'declining keeps the treasure',
   s.treasures.emerald === 1 && (await page.evaluate(() => window.__ui.getState().bazaarBid)) === null,
   '',
+)
+
+// Stable re-offer price (design.md §10): re-offering the same treasure at the
+// same port shows the identical quote instead of a freshly rolled one.
+const reBids = await page.evaluate(() => {
+  const g = window.__game.getState()
+  const amounts = []
+  for (let i = 0; i < 6; i++) {
+    g.offerTreasure('emerald')
+    amounts.push(window.__ui.getState().bazaarBid?.amount)
+    g.declineBid()
+  }
+  return amounts
+})
+check(
+  're-offering the same treasure shows the identical price',
+  firstEmeraldBid > 0 && reBids.every((a) => a === firstEmeraldBid),
+  `first ${firstEmeraldBid}, re-offers ${reBids.join('/')}`,
+)
+// The quote is cached per port and clears on leaving; re-enter to continue.
+const quoteLife = await page.evaluate(() => {
+  const g = window.__game.getState()
+  const cached = g.bazaarQuotes.emerald
+  g.leavePlace()
+  const afterLeave = Object.keys(window.__game.getState().bazaarQuotes).length
+  window.__game.getState().enterPlace('cairo')
+  const afterEnter = Object.keys(window.__game.getState().bazaarQuotes).length
+  return { cached, afterLeave, afterEnter }
+})
+check(
+  'the bazaar quote is cached per port and cleared on leaving',
+  quoteLife.cached === firstEmeraldBid && quoteLife.afterLeave === 0 && quoteLife.afterEnter === 0,
+  JSON.stringify(quoteLife),
 )
 
 // Buying at the bazaar (arbitrage leg).

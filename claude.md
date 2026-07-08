@@ -491,7 +491,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     and the travel agency (§9); the bazaar trades treasures with the
     offer → bid → accept/decline mechanic, regional value factors
     (revered fetches more, rejected materials are refused) and a buy/sell
-    spread — continent-wide arbitrage; the travel agency sells ferry
+    spread — continent-wide arbitrage; a bazaar bid is a standing per-port
+    quote (re-offering the same treasure after a decline shows the
+    identical price; the quote clears on leaving the port); the travel agency sells ferry
     passages between all ports with distance-based fare and duration,
     which makes Zanzibar reachable; discovery bounties for first-visited
     villages and sighted landmarks are credited on the next port visit
@@ -499,10 +501,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     positive or negative village reaction of the §8 matrix. All new
     texts exist in both languages with voice markup. Verifiable:
     `scripts/verify/economy.mjs` asserts the capacity refusal and
-    auto-raise, the regional bid ordering and rejection, the ferry to
-    Zanzibar (fare, days, checkpoint), the bounty crediting, the
-    graveyard ivory depletion, digging a treasure cache and the statue
-    site, and both valuable reactions.
+    auto-raise, the regional bid ordering and rejection, the stable
+    re-offer quote (identical price across re-offers, cleared on leaving
+    the port), the ferry to Zanzibar (fare, days, checkpoint), the bounty
+    crediting, the graveyard ivory depletion, digging a treasure cache and
+    the statue site, and both valuable reactions.
 26. **Standing with the natives.** `design.md` §12/§7 is implemented: a
     rifle carried in hand inside a village makes the inhabitants flee
     (they vanish indoors) and blocks the audience and the elder talk; a
