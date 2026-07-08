@@ -24,6 +24,7 @@ import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 import { boxCollider, resolveMove, type Collider } from './collision'
+import { placeWalkVelocity } from '../../systems/movement'
 import { getStrings, useStrings } from '../../i18n'
 
 const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -1498,14 +1499,15 @@ export function PlaceScene() {
       const stick = gamepadMove()
       forward += stick.y
       strafe += stick.x
-      const len = Math.hypot(forward, strafe)
-      if (len > 0) {
-        const speed = balance.placeWalkSpeed
+      if (forward !== 0 || strafe !== 0) {
         const sin = Math.sin(p.yaw)
         const cos = Math.cos(p.yaw)
-        // Forward is -Z rotated by yaw.
-        const dx = ((-sin * forward + cos * strafe) / len) * speed * dt
-        const dz = ((-cos * forward - sin * strafe) / len) * speed * dt
+        // Strafing and walking backward are slower than walking forward
+        // (design.md §2, placeWalkVelocity).
+        const [vf, vs] = placeWalkVelocity(forward, strafe, balance.placeWalkSpeed, balance.placeStrafeFactor)
+        // Forward is -Z rotated by yaw; strafe is +X rotated by yaw.
+        const dx = (-sin * vf + cos * vs) * dt
+        const dz = (-cos * vf - sin * vs) * dt
         // Solid objects are impenetrable; the pushout lets the player slide
         // along walls (design.md §2 collision inside settlements).
         const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)

@@ -304,6 +304,7 @@ export const en: Strings = {
     language: 'Language',
     travelSpeed: 'Travel speed (overland)',
     walkSpeed: 'Walk speed (in places)',
+    strafeFactor: 'Strafe/backward factor',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     ambienceVolume: 'Ambience noise volume',
     ambienceGusts: 'Ambience gust volume',

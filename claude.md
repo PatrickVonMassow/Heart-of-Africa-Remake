@@ -375,10 +375,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
     value), walk speed inside settlements to 10 m/s (raised from 7.5 by
-    later user calibration),
+    later user calibration), strafing and walking backward inside
+    settlements move at 80 % of the forward speed (a diagonal is never
+    faster than straight; `design.md` §2),
     the first-person eye height is 1.5 m, and the ambience noise beds
     (wind/surf/murmur) and their gust/swell modulation each play at a 0.2
-    volume multiplier. Mouse sensitivity, walk speed and both ambience
+    volume multiplier. Mouse sensitivity, walk speed, the strafe/backward
+    factor and both ambience
     volumes are adjustable at runtime in the debug menu (`design.md` §21)
     in both languages; the bird's-eye mouse-wheel zoom is always active
     (0.25x-4x), with a debug checkbox gating zoom-out beyond the default
@@ -390,8 +393,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     F2) under which new entries neither open the journal nor auto-narrate
     but stay readable on manual open.
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults, the
-    eye height, the working debug-menu controls in both languages and the
-    lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts
+    eye height, the 80 % strafe/backward factor (exact via the pure
+    velocity helper, plus an in-scene smoke check), the working debug-menu
+    controls in both languages and the lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts
     the zoom gate, the dropdowns and the renderer row;
     `scripts/verify/collision.mjs` additionally proves corner clearance at
     box buildings and an inhabitant re-entering its dwelling (pt. 16);

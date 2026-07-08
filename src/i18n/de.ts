@@ -303,6 +303,7 @@ export const de: Strings = {
     language: 'Sprache',
     travelSpeed: 'Tempo außerorts',
     walkSpeed: 'Tempo innerorts',
+    strafeFactor: 'Seitwärts/Rückwärts-Faktor',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     ambienceVolume: 'Ambiente-Rauschen (Lautstärke)',
     ambienceGusts: 'Ambiente-Böen (Lautstärke)',

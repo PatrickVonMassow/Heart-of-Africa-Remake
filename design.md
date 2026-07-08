@@ -19,6 +19,9 @@ Navigation across the continent works as in the original from a bird's-eye view,
 **First-person view (settlements).**
 On entering a village or a port city, the game switches to the first-person view. The settlement is walkable: you walk through it and to its buildings, buy and sell goods there (§9), and hold an audience with the chief in a village (§12).
 
+**Walking speed (first-person).**
+Inside settlements, walking forward is fastest; strafing sideways and walking backward move at a reduced factor of the forward speed (a calibratable value, default 80 %, adjustable in the debug menu §21). A diagonal is never faster than walking straight.
+
 **Switching (walk in, walk out).**
 Entering and leaving a settlement happen purely through movement, without a dedicated key. In the bird's-eye view, walking onto a settlement's position enters it and switches to the first-person view. Inside, walking beyond the settlement's walkable edge leaves it and switches back to the bird's-eye view with the field of view around the current position — there is no exit archway and no "leave" key. Likewise the enterable buildings (trade, service and audience buildings) are opened by walking up against their entrance door, the same deliberate opening the inhabitants use; no key press is required. Only the village elder is addressed with the interaction key.
 

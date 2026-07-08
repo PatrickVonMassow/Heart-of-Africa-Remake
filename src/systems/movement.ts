@@ -21,7 +21,28 @@ export function movementPenalty(terrain: TerrainType, hand: HandId | null): Move
   return null
 }
 
+/**
+ * Local walk velocity inside settlements (design.md §2): strafing and walking
+ * backward move at `strafeFactor` of the forward speed. Input is normalized
+ * first so a diagonal is never faster than a single axis. Returns
+ * `[alongFacing, sideways]` speed components (before rotation by the yaw);
+ * `alongFacing` is positive walking forward (local -Z), `sideways` positive
+ * to the right (local +X).
+ */
+export function placeWalkVelocity(
+  forward: number,
+  strafe: number,
+  speed: number,
+  strafeFactor: number,
+): [number, number] {
+  const len = Math.hypot(forward, strafe)
+  if (len === 0) return [0, 0]
+  const nf = forward / len
+  const ns = strafe / len
+  return [nf * speed * (nf >= 0 ? 1 : strafeFactor), ns * speed * strafeFactor]
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  ;(window as unknown as Record<string, unknown>).__movement = { movementPenalty }
+  ;(window as unknown as Record<string, unknown>).__movement = { movementPenalty, placeWalkVelocity }
 }

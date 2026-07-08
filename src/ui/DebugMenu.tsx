@@ -116,6 +116,8 @@ export function DebugMenu() {
         onChange={(v) => set('travelSpeed', v)} />
       <NumberField label={t.debug.walkSpeed} value={balance.placeWalkSpeed} step={0.5}
         onChange={(v) => set('placeWalkSpeed', v)} />
+      <NumberField label={t.debug.strafeFactor} value={balance.placeStrafeFactor} step={0.05}
+        onChange={(v) => set('placeStrafeFactor', Math.max(0, v))} />
       <NumberField label={t.debug.mouseSensitivity} value={balance.mouseSensitivity} step={0.0002}
         onChange={(v) => set('mouseSensitivity', Math.max(0, v))} />
       <NumberField label={t.debug.ambienceVolume} value={balance.ambienceNoiseVolume} step={0.05}

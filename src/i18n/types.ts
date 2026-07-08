@@ -215,6 +215,7 @@ export interface Strings {
     language: string
     travelSpeed: string
     walkSpeed: string
+    strafeFactor: string
     mouseSensitivity: string
     ambienceVolume: string
     ambienceGusts: string

@@ -10,6 +10,8 @@ export interface BalanceConfig {
   travelSpeed: number
   /** Walking speed inside places (first-person), meters per second. */
   placeWalkSpeed: number
+  /** Speed factor for strafing and walking backward inside places (design.md §2). */
+  placeStrafeFactor: number
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
   /** Volume multiplier for the ambience noise beds (wind/surf/murmur), 1 = full. */
@@ -150,6 +152,7 @@ export interface BalanceConfig {
 export const balance: BalanceConfig = {
   travelSpeed: 8,
   placeWalkSpeed: 10,
+  placeStrafeFactor: 0.8,
   mouseSensitivity: 0.0011,
   ambienceNoiseVolume: 0.2,
   ambienceGustVolume: 0.2,

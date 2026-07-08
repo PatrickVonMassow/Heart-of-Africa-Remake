@@ -35,6 +35,7 @@ await page.waitForTimeout(400)
 const bal = await page.evaluate(() => ({
   mouse: window.__balance.mouseSensitivity,
   walk: window.__balance.placeWalkSpeed,
+  strafe: window.__balance.placeStrafeFactor,
   noise: window.__balance.ambienceNoiseVolume,
   gust: window.__balance.ambienceGustVolume,
 }))
@@ -43,9 +44,50 @@ check('default walk speed 10 m/s (user calibration)', bal.walk === 10, `${bal.wa
 check('default ambience noise volume 20 % (0.2)', bal.noise === 0.2, `${bal.noise}`)
 check('default ambience gust volume 20 % (0.2)', bal.gust === 0.2, `${bal.gust}`)
 
+check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
+
 // --- First-person eye height -------------------------------------------------
 const eyeY = await page.evaluate(() => window.__placeCamera?.position.y)
 check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${eyeY}`)
+
+// --- Strafe/backward speed is 80 % of forward (design.md §2) -----------------
+// Exact ratio via the pure velocity helper (frame-timing independent), plus a
+// loose in-scene smoke check that forward still moves and strafing moves less.
+const vel = await page.evaluate(() => {
+  const v = window.__movement.placeWalkVelocity
+  const mag = ([a, b]) => Math.hypot(a, b)
+  return {
+    forward: mag(v(1, 0, 10, 0.8)),
+    strafe: mag(v(0, 1, 10, 0.8)),
+    back: mag(v(-1, 0, 10, 0.8)),
+    diag: mag(v(1, 1, 10, 0.8)),
+  }
+})
+check('forward walks at full speed', Math.abs(vel.forward - 10) < 1e-6, `${vel.forward}`)
+check('strafing is exactly 80 % of forward', Math.abs(vel.strafe / vel.forward - 0.8) < 1e-6, `${(vel.strafe / vel.forward).toFixed(3)}`)
+check('walking backward is exactly 80 % of forward', Math.abs(vel.back / vel.forward - 0.8) < 1e-6, `${(vel.back / vel.forward).toFixed(3)}`)
+check('a diagonal is not faster than walking straight forward', vel.diag <= vel.forward + 1e-6, `${vel.diag.toFixed(2)}`)
+
+async function measureWalk(code) {
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 16
+    p.yaw = 0
+  })
+  await page.waitForTimeout(80)
+  const p0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  await page.evaluate((c) => window.dispatchEvent(new KeyboardEvent('keydown', { code: c })), code)
+  await page.waitForTimeout(280)
+  await page.evaluate((c) => window.dispatchEvent(new KeyboardEvent('keyup', { code: c })), code)
+  await page.waitForTimeout(40)
+  const p1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
+  return Math.hypot(p1.x - p0.x, p1.z - p0.z)
+}
+const fwd = await measureWalk('KeyW')
+const strafeD = await measureWalk('KeyD')
+check('forward walking actually moves the character', fwd > 0.5, `${fwd.toFixed(2)} m`)
+check('strafing in-scene covers less ground than forward', strafeD < fwd, `strafe ${strafeD.toFixed(2)} < fwd ${fwd.toFixed(2)}`)
 
 // --- Debug menu: new controls, German labels, live effect --------------------
 // The default language is English (par.17); check the German labels explicitly.
@@ -75,13 +117,18 @@ async function fillField(label, value) {
 }
 check('debug menu: mouse sensitivity editable', await fillField('Maus-Empfindlichkeit', 0.002), '')
 check('debug menu: ambience volume editable', await fillField('Ambiente-Rauschen', 0.5), '')
+check('debug menu: strafe factor editable', await fillField('Seitwärts/Rückwärts-Faktor', 0.6), '')
 await page.waitForTimeout(300)
 const adjusted = await page.evaluate(() => ({
   mouse: window.__balance.mouseSensitivity,
   noise: window.__balance.ambienceNoiseVolume,
+  strafe: window.__balance.placeStrafeFactor,
 }))
 check('mouse sensitivity applies at runtime', adjusted.mouse === 0.002, `${adjusted.mouse}`)
 check('ambience volume applies at runtime', adjusted.noise === 0.5, `${adjusted.noise}`)
+check('strafe factor applies at runtime', adjusted.strafe === 0.6, `${adjusted.strafe}`)
+// Restore the default so it does not affect later checks.
+await page.evaluate(() => (window.__balance.placeStrafeFactor = 0.8))
 await page.screenshot({ path: `${OUT}67-settings-debug-menu.png` })
 console.log('shot 67-settings-debug-menu.png')
 
