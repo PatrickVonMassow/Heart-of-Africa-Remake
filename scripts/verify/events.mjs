@@ -215,6 +215,48 @@ await page.evaluate(() => {
   window.__balance.randomEventsEnabled = true
 })
 
+// --- Touching a lion triggers a lion attack (user request / design.md §14) ---
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8)) // savanna
+await page.waitForFunction(() => window.__lionHunt && window.__lionHunt.state, null, { timeout: 20000 }).catch(() => {})
+await page.waitForTimeout(600)
+const lionTouch = await page.evaluate(async () => {
+  const store = window.__game
+  store.setState({ eventCooldown: 0, defeat: null, victory: false })
+  store.getState().takeInHand('rifle') // rifle → rarely fatal
+  const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
+  const attacksBefore = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
+  // Drop the active lion right on top of the player so the frame loop detects
+  // contact; keep it pinned each tick since it moves while chasing.
+  const deadline = Date.now() + 10000
+  return await new Promise((res) => {
+    const iv = setInterval(() => {
+      const g = store.getState()
+      const pos = g.pos
+      const s = window.__lionHunt?.state
+      if (s) {
+        s.mode = 'chase'
+        s.timer = 5
+        s.px = pos.x; s.pz = pos.z
+        s.lx = pos.x; s.lz = pos.z
+      }
+      const attacksNow = g.journal.filter((e) => key(e) === 'journal.titles.attack').length
+      const died = g.defeat === 'death'
+      if (attacksNow > attacksBefore || died) {
+        clearInterval(iv)
+        res({ triggered: true, died, cooldown: g.eventCooldown })
+      } else if (Date.now() > deadline) {
+        clearInterval(iv)
+        res({ triggered: false, died, cooldown: g.eventCooldown })
+      }
+    }, 80)
+  })
+})
+check(
+  'touching a lion triggers a lion attack',
+  lionTouch.triggered && lionTouch.cooldown > 0,
+  JSON.stringify(lionTouch),
+)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

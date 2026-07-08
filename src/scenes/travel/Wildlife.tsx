@@ -65,6 +65,9 @@ interface LionHuntState {
 }
 const LION_STATE: LionHuntState = { mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0 }
 
+/** Distance (world units) at which walking into a lion triggers an attack. */
+const LION_CONTACT_RADIUS = 2
+
 /** Species that flee from a hunting or feeding lion. */
 const FLEES_LION: Record<Species, boolean> = {
   elephant: false, giraffe: true, zebra: true, antelope: true, flamingo: false,
@@ -506,6 +509,17 @@ function LionHunt() {
 
     const active = s.mode !== 'idle'
     const feeding = s.mode === 'feed'
+
+    // Touching a lion triggers a lion attack (design.md §14): when the player
+    // walks into the active lion, fire the event (rate-limited by the store).
+    if (active) {
+      const lionX = feeding ? s.px + 0.7 : s.lx
+      const lionZ = feeding ? s.pz + 0.25 : s.lz
+      if (Math.hypot(lionX - pos.x, lionZ - pos.z) < LION_CONTACT_RADIUS) {
+        useGame.getState().lionContact()
+      }
+    }
+
     const t = clock.elapsedTime
     if (lion.current) {
       lion.current.visible = active

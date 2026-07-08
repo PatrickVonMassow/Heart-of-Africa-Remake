@@ -462,11 +462,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     balance values, calibrated low so events are rare (the per-day base
     rates were reduced by a factor of five from the earlier calibration);
     the debug menu can toggle the events and trigger each
-    kind directly (`design.md` §21). Verifiable: `scripts/verify/events.mjs`
-    asserts the reduced rates, the protection ordering (pure functions),
-    deterministic outcome mapping, the consequences of each trigger, a
-    fatal attack, autonomous firing while travelling and silence when
-    disabled.
+    kind directly (`design.md` §21). Beyond the hidden roll, walking into
+    one of the wandering bird's-eye lions directly triggers a lion attack
+    (same protection/outcome rules, rate-limited by the event cooldown and
+    suppressed with the random-event system). Verifiable:
+    `scripts/verify/events.mjs` asserts the reduced rates, the protection
+    ordering (pure functions), deterministic outcome mapping, the
+    consequences of each trigger, a fatal attack, autonomous firing while
+    travelling, silence when disabled, and that pinning the lion on the
+    player triggers a lion attack.
 24. **Deadline and successor.** `design.md` §5/§18 is implemented: the
     expedition runs against a multi-year deadline (balance value, ~5
     years) with staged messages — a first warning at 60 % and a final

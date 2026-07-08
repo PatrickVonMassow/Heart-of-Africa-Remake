@@ -265,7 +265,7 @@ Per region, typically one people reveals the regional location hint; the others 
 ## 14. Random Events
 
 Hidden triggering per time step/region/condition:
-- Wild-animal attacks (lions, leopards and snakes): an attack can injure or kill. With leopards the risk of severe injury or being eaten is lower than with lions. Carrying a rifle or machete lowers the risk — a rifle more than a machete; holding the weapon in hand lowers it further. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.".
+- Wild-animal attacks (lions, leopards and snakes): an attack can injure or kill. With leopards the risk of severe injury or being eaten is lower than with lions. Carrying a rifle or machete lowers the risk — a rifle more than a machete; holding the weapon in hand lowers it further. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into one of the wandering lions in the bird's-eye view directly triggers a lion attack (same outcome rules and protection).
 - Robber attacks: can injure and steal inventory items. As with animal attacks, a machete lowers the risk, a rifle more so.
 - Protection through "Honored Friend": near the villages of a region where you hold this status, the natives rush to help during animal and robber attacks; you can then at most be lightly injured (§12).
 - Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Without a canoe the rifle gets wet and does not help — then only a machete lowers the risk; in the canoe the rifle works normally (§11).

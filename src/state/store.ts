@@ -234,6 +234,8 @@ export interface GameState {
   /** Resolve a fall while climbing a mountain without a rope (design.md §11). */
   applyMountainFall: () => void
   debugTriggerMountainFall: () => void
+  /** Walking into a wandering lion triggers a lion attack (design.md §14). */
+  lionContact: () => void
   useMedicine: () => void
   /** A successor continues from the last checkpoint (design.md §18). */
   successorTakeOver: () => boolean
@@ -836,6 +838,18 @@ export const useGame = create<GameState>()((set, get) => ({
   debugTriggerMountainFall: () => {
     if (get().defeat || get().victory) return
     get().applyMountainFall()
+  },
+
+  lionContact: () => {
+    const s = get()
+    // Touching a lion counts as a lion attack (design.md §14), rate-limited by
+    // the shared event cooldown and suppressed with the random-event system.
+    if (s.defeat || s.victory || !balance.randomEventsEnabled || s.eventCooldown > 0) return
+    const cur = worldToLatLon(s.pos.x, s.pos.z)
+    const here = sampleTerrain(cur.lat, cur.lon, s.seed)
+    const ctx = buildEventContext(s, here.type, cur.lat, cur.lon)
+    set({ eventCooldown: balance.events.cooldownDays * (0.75 + Math.random() * 0.5) })
+    get().applyEventOutcome(resolveEvent('lionAttack', ctx, Math.random))
   },
 
   debugTriggerEvent: (kind) => {
