@@ -1,10 +1,12 @@
 // Ambient wildlife for the travel view (design.md §19): non-threatening
-// herds as scenery (elephants, giraffes, zebras, antelopes, flamingos at the
-// lakes), a purely decorative lion hunt, and vultures circling the player
-// when the expedition is in poor condition. The animals interact with one
-// another: wandering elephants trample smaller animals underfoot (dead over
-// a red stain), prey scatters away from an active lion, and vultures gather
-// above a kill. No gameplay effect.
+// herds as scenery (elephants, giraffes, zebra, wildebeest, antelope, warthog,
+// flamingos at the lakes), a purely decorative predator hunt (lion, cheetah,
+// leopard or hyena taking prey from its food web), and vultures circling the
+// player when the expedition is in poor condition. The animals interact with
+// one another: wandering elephants trample smaller animals underfoot (dead
+// over a red stain), prey flee an active predator, and vultures gather above a
+// kill. Only walking into the lion attacks the player (§14); otherwise no
+// gameplay effect.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'

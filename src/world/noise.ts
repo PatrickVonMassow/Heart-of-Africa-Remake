@@ -28,8 +28,8 @@ function smoothstep(t: number): number {
   return t * t * (3 - 2 * t)
 }
 
-/** Value noise in [0, 1]. */
-export function valueNoise2(x: number, y: number, seed: number): number {
+/** Value noise in [0, 1] (internal; consumed by fbm2 below). */
+function valueNoise2(x: number, y: number, seed: number): number {
   const ix = Math.floor(x)
   const iy = Math.floor(y)
   const fx = smoothstep(x - ix)

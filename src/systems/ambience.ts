@@ -76,8 +76,8 @@ function noiseBed(name: string, filterType: BiquadFilterType, freq: number, q = 
 }
 
 // Gust/swell LFOs add gain on top of the layer targets, so they are a
-// loudness source of their own; their depth is scaled by the configurable
-// gust volume (design.md §21) and re-applied on changes.
+// loudness source of their own; their depth is scaled by the single
+// configurable ambience volume (design.md §21) and re-applied on changes.
 const wobbles: Array<{ gain: GainNode; baseDepth: number }> = []
 
 /** Slow amplitude wobble on a layer (wind gusts, crowd swell). */

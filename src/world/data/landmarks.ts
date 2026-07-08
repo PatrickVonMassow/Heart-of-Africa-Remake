@@ -46,38 +46,6 @@ export const WATERFALLS: WaterfallDef[] = [
   { id: 'augrabies-falls', lon: 20.34, lat: -28.59, river: 'orange' },
 ]
 
-// Highland ridges as (lon, lat) polylines with a width in degrees — the major
-// mountain belts beyond single peaks (stylized footprints, real locations).
-export interface RidgeDef {
-  /** Landmark id; display names come from the language files (i18n). */
-  id: string
-  points: Array<[number, number]>
-  widthDeg: number
-  /** Peak elevation in meters along the ridge crest. */
-  elevationM: number
-}
-
-export const RIDGES: RidgeDef[] = [
-  {
-    id: 'atlas',
-    points: [[-9.0, 30.5], [-7.0, 31.5], [-4.5, 33.0], [-2.0, 34.5], [0.5, 35.5], [4.0, 36.2]],
-    widthDeg: 1.1,
-    elevationM: 3800,
-  },
-  {
-    id: 'ethiopian-highlands',
-    points: [[36.5, 7.0], [38.0, 9.0], [39.0, 11.0], [38.4, 13.2]],
-    widthDeg: 2.0,
-    elevationM: 3400,
-  },
-  {
-    id: 'drakensberg',
-    points: [[27.0, -31.0], [29.3, -29.3], [30.3, -27.5], [30.5, -25.5]],
-    widthDeg: 0.9,
-    elevationM: 3000,
-  },
-]
-
 // Special site (design.md §4.4): the elephant graveyard. Fictional; placed by
 // educated guess in the remote steppe south-west of Kilimanjaro (calibratable).
 // Digging here with the shovel recovers a limited supply of ivory treasures

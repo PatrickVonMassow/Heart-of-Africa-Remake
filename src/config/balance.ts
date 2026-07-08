@@ -224,7 +224,7 @@ export const balance: BalanceConfig = {
     cooldownDays: 5,
   },
   deadline: {
-    days: 1826, // about five years (design.md §19)
+    days: 1826, // about five years (design.md §5)
     warning1: 0.6,
     warning2: 0.85,
     successorDayPenalty: 30,

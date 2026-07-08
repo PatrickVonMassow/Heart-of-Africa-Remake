@@ -38,17 +38,3 @@ export const GLOSSARY = {
 
 /** Unspecific knowledge (design.md §13.2/§13.3). */
 export const UNSPECIFIC_WORDS = ['Oz Oz', 'Oink Oink', 'Auke Auke'] as const
-
-/**
- * The hint component each region's knowing people contributes (§13.3):
- * the North knows the latitude, the East the longitude; the other regions
- * narrow the area. Triangulating latitude and longitude yields the site.
- */
-export type HintComponent = 'latitude' | 'longitude' | 'area' | 'terrain' | 'distance'
-export const REGION_HINT: Record<RegionId, HintComponent> = {
-  north: 'latitude',
-  east: 'longitude',
-  west: 'area',
-  central: 'terrain',
-  south: 'distance',
-}

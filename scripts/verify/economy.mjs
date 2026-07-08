@@ -362,7 +362,7 @@ check('buying gear in a village works (machete acquired)', vBuy.machete >= 1, `$
 
 const vSell = await page.evaluate(() => {
   const g = () => window.__game.getState()
-  const giftsBefore = window.__store_totalGifts ? 0 : Object.values(g().gifts).reduce((a, b) => a + b, 0)
+  const giftsBefore = Object.values(g().gifts).reduce((a, b) => a + b, 0)
   const machBefore = g().equipment.machete ?? 0
   g().sellItem('machete') // village → paid in gifts
   const giftsAfter = Object.values(g().gifts).reduce((a, b) => a + b, 0)
