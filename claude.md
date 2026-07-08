@@ -449,11 +449,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     > carried), wounds/afflictions feed the health system (pt. 22), fatal
     attacks end in the remains report, and every event is told through a
     journal entry in both languages with voice markup (§16). Rates are
-    balance values; the debug menu can toggle the events and trigger each
+    balance values, calibrated low so events are rare (the per-day base
+    rates were reduced by a factor of five from the earlier calibration);
+    the debug menu can toggle the events and trigger each
     kind directly (`design.md` §21). Verifiable: `scripts/verify/events.mjs`
-    asserts the protection ordering (pure functions), deterministic
-    outcome mapping, the consequences of each trigger, a fatal attack,
-    autonomous firing while travelling and silence when disabled.
+    asserts the reduced rates, the protection ordering (pure functions),
+    deterministic outcome mapping, the consequences of each trigger, a
+    fatal attack, autonomous firing while travelling and silence when
+    disabled.
 24. **Deadline and successor.** `design.md` §5/§18 is implemented: the
     expedition runs against a multi-year deadline (balance value, ~5
     years) with staged messages — a first warning at 60 % and a final

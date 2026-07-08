@@ -278,7 +278,7 @@ Hidden triggering per time step/region/condition:
 
 Item help: the fitting piece of equipment helps during events, especially the one held in hand — rifle or machete lower the risk of animal and robber attacks on land (a rifle more than a machete; in hand more than merely carried); against crocodiles in water the machete always helps, a rifle only in the canoe (without a canoe it gets wet and fails); the rifle deters thieves; medicine cures wounds and fever; the canteen protects against dehydration (not against sun blindness).
 
-Concrete probabilities are calibrated freely for balance.
+Concrete probabilities are calibrated freely for balance. They are tuned to keep events rare, so the journey is only occasionally interrupted (the POC's per-day base rates were lowered by a factor of five from an earlier, too-eventful calibration).
 
 ---
 

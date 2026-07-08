@@ -179,15 +179,17 @@ export const balance: BalanceConfig = {
   goodwillRevered: 2,
   goodwillNeutral: 1,
   randomEventsEnabled: true,
+  // Per-day base probabilities (design.md §14). Reduced by a factor of 5 from
+  // the earlier calibration on user request — events should be markedly rarer.
   events: {
-    animalAttack: 0.02,
-    robberAttack: 0.01,
-    crocodile: 0.06,
-    fever: 0.012,
-    sunblindness: 0.01,
-    sandstorm: 0.012,
-    waterfallSweep: 0.12,
-    findRemains: 0.004,
+    animalAttack: 0.004,
+    robberAttack: 0.002,
+    crocodile: 0.012,
+    fever: 0.0024,
+    sunblindness: 0.002,
+    sandstorm: 0.0024,
+    waterfallSweep: 0.024,
+    findRemains: 0.0008,
     cooldownDays: 5,
   },
   deadline: {

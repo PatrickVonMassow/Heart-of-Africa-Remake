@@ -28,6 +28,17 @@ await page.waitForFunction(() => window.__game && window.__events, null, { timeo
 await page.waitForTimeout(4000)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
+// === Reduced event rates (design.md §14, user calibration ÷5) ================
+const rates = await page.evaluate(() => ({ ...window.__balance.events }))
+check(
+  'event rates reduced by a factor of 5',
+  Math.abs(rates.animalAttack - 0.004) < 1e-9 &&
+    Math.abs(rates.robberAttack - 0.002) < 1e-9 &&
+    Math.abs(rates.waterfallSweep - 0.024) < 1e-9 &&
+    Math.abs(rates.crocodile - 0.012) < 1e-9,
+  `animal ${rates.animalAttack}, robber ${rates.robberAttack}, falls ${rates.waterfallSweep}`,
+)
+
 // === Pure protection logic (design.md §7/§14) =================================
 const prot = await page.evaluate(() => {
   const { weaponProtection, eventChance } = window.__events
@@ -169,6 +180,10 @@ await page.waitForTimeout(800)
 const before = await countEvents()
 await page.evaluate(() => {
   const g = () => window.__game.getState()
+  // Prove the autonomous-firing *mechanism* independent of the (now much
+  // lower, ÷5) calibrated rate: raise the animal-attack rate for this leg so
+  // an event reliably fires over the travelled days.
+  window.__balance.events.animalAttack = 0.3
   // The rope in hand keeps stray highland hills on the roundtrip passable
   // (design.md §11 mountain rule) so travel days actually accrue.
   g().debugAddEquipment('rope')
@@ -177,6 +192,7 @@ await page.evaluate(() => {
     g().moveTravel(i % 200 < 100 ? 0 : 0.3, i % 100 < 50 ? -1 : 1, 0.05)
     g().debugSet({ foodDays: 30, health: 100 })
   }
+  window.__balance.events.animalAttack = 0.004
 })
 const rolled = (await countEvents()) - before
 check('events fire on their own while travelling', rolled >= 1, `${rolled} events over ~70 days`)
