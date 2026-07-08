@@ -118,14 +118,22 @@ const drift = await page.evaluate(async () => {
     const p1 = g().pos
     return Math.hypot(p1.x - p0.x, p1.z - p0.z)
   }
-  // Idle sweep on a calm stretch of the White Nile.
+  // Idle sweep on a calm stretch of the White Nile — and time/provisions must
+  // advance with the drifted distance (design.md §11).
   const calm = findRiver(9, 31)
   let idleMove = 0
+  let dayGain = 0
+  let foodDrop = 0
   if (calm) {
     place(calm)
+    window.__game.setState({ day: 100, foodDays: 300 })
     const p0 = { ...g().pos }
+    const day0 = g().day
+    const food0 = g().foodDays
     for (let i = 0; i < 8; i++) g().driftCurrent(0.1)
     idleMove = Math.hypot(g().pos.x - p0.x, g().pos.z - p0.z)
+    dayGain = g().day - day0
+    foodDrop = food0 - g().foodDays
   }
   // At a waterfall (Victoria Falls, Zambezi): a higher boost sweeps harder.
   const falls = findRiver(-17.93, 25.86)
@@ -137,10 +145,11 @@ const drift = await page.evaluate(async () => {
     window.__balance.currentWaterfallBoost = 4
     boosted = stepDelta(falls)
   }
-  return { calm: !!calm, falls: !!falls, idleMove, base, boosted }
+  return { calm: !!calm, falls: !!falls, idleMove, base, boosted, dayGain, foodDrop }
 })
 check('the river current sweeps an idle traveller downstream', drift.calm && drift.idleMove > 0.3, JSON.stringify(drift))
 check('the current is stronger near a waterfall (varying strength)', drift.falls && drift.boosted > drift.base * 1.5, JSON.stringify(drift))
+check('being swept by the current consumes time and provisions', drift.dayGain > 0 && drift.foodDrop > 0, JSON.stringify(drift))
 
 // --- Region border labels (§7.1.3) -------------------------------------------
 await page.evaluate(() => window.__game.getState().debugJumpTo(17.2, -2))

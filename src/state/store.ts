@@ -719,7 +719,22 @@ export const useGame = create<GameState>()((set, get) => ({
     const nt = sampleTerrain(nlat, nlon, s.seed)
     if (isBlocked(nt.type, nlat, nlon)) return // do not sweep into blocked open ocean
     const nw = latLonToWorld(nlat, nlon)
-    set({ pos: { x: nw.x, z: nw.z } })
+    // Being swept covers ground, so time and provisions advance too (design.md
+    // §11): otherwise the current would move the traveller for free. The cost
+    // matches water travel over the drifted distance.
+    const driftDist = Math.hypot(nw.x - s.pos.x, nw.z - s.pos.z)
+    const cost = s.handItem === 'canoe' ? balance.terrainCost.water / balance.canoeSpeedup : balance.terrainCost.water
+    const dayDelta = driftDist * balance.daysPerUnit * cost
+    const newDay = s.day + dayDelta
+    set({
+      pos: { x: nw.x, z: nw.z },
+      day: newDay,
+      foodDays: Math.max(0, s.foodDays - dayDelta * balance.foodPerDay),
+    })
+    // Passing time still drains/regenerates health and counts toward the
+    // deadline while drifting (thirst resets since the traveller is on water).
+    get().tickHealth(dayDelta, nt.type, nlat, nlon)
+    get().tickDeadline(newDay)
   },
 
   /**

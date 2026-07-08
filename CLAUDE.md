@@ -517,10 +517,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     moving with the current is faster and against it slower), scaled by the
     nearest river segment's downstream direction and a strength that rises
     close to the waterfalls (calibratable balance values: `currentDrift`,
-    `currentWaterfallBoost`, `currentWaterfallRadius`). Verifiable:
+    `currentWaterfallBoost`, `currentWaterfallRadius`). The drift covers real
+    distance, so it advances time and provisions (and ticks health/deadline)
+    exactly as water travel over that distance would — never free movement.
+    Verifiable:
     `scripts/verify/enrichments.mjs` asserts an idle traveller on a river is
-    swept downstream and that the drift near a waterfall exceeds the
-    unboosted drift.
+    swept downstream, that the drift near a waterfall exceeds the
+    unboosted drift, and that being swept consumes time and provisions.
 22. **Health and afflictions.** `design.md` §6/§15 is implemented: a
     health pool is drained by starvation and by the afflictions fever
     (delirium: temporarily uncontrolled steering), dehydration (sets in
