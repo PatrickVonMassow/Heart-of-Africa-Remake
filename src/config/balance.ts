@@ -46,6 +46,10 @@ export interface BalanceConfig {
   digRadius: number
   /** Radius (world units) around a place marker in which it can be entered. */
   placeEnterRadius: number
+  /** Extra clearance (world units) beyond the enter radius the traveller must
+   *  reach after leaving a settlement before it can be re-entered, so walking
+   *  straight back in does not immediately re-enter it (design.md §2). */
+  placeReentryMargin: number
   /** Goodwill points required before the chief reveals the location hint. */
   goodwillForHint: number
   /** Goodwill gained per culturally revered gift. */
@@ -183,6 +187,7 @@ export const balance: BalanceConfig = {
   },
   digRadius: 3,
   placeEnterRadius: 2.5,
+  placeReentryMargin: 6, // calibratable: clearance beyond the edge before re-entry re-arms
   goodwillForHint: 2,
   goodwillRevered: 2,
   goodwillNeutral: 1,

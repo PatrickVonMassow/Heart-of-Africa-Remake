@@ -182,9 +182,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    a settlement's position enters it; walking beyond the settlement's edge
    leaves it — there is no exit archway and no enter/leave key. The
    enterable buildings likewise open by walking against their entrance door;
-   only the elder keeps the interaction key. Verifiable: an automated run
-   walks into a place and into a building's door and enters both, and walks
-   past the settlement edge to leave, without any key press
+   only the elder keeps the interaction key. A settlement just left is briefly
+   closed to re-entry (`design.md` §2): walking straight back does not
+   re-enter it; re-entry re-arms only once the traveller has moved clear of it
+   (a calibratable clearance beyond the enter radius). Verifiable: an automated
+   run walks into a place and into a building's door and enters both, and walks
+   past the settlement edge to leave, without any key press; standing on the
+   just-left marker does not re-enter until the traveller has moved clear
    (`scripts/verify/flow.mjs`).
 3. **World model.** Fixed geographic locations of the landscape elements per
    `design.md`; the concrete appearance must be graphically elaborate,

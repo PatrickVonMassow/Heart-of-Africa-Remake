@@ -132,16 +132,30 @@ check('Left the place → bird\'s-eye view', s.mode === 'travel')
 await page.waitForTimeout(600)
 await shot('01-birdseye-view')
 
-// --- 4. Re-enter Cairo by walking into it → checkpoint (criterion 5). No key:
-// crossing the enter radius switches to the first-person view (design.md §2). ---
-let entered = false
-for (let i = 0; i < 25 && !entered; i++) {
-  await page.keyboard.down('KeyW')
-  await page.waitForTimeout(150)
-  await page.keyboard.up('KeyW')
-  await page.waitForTimeout(120)
-  entered = await page.evaluate(() => window.__game.getState().mode === 'place')
-}
+// --- 4. Re-entry debounce, then re-enter Cairo → checkpoint (criteria 2/5). ---
+// Right after leaving, walking straight back must NOT re-enter (design.md §2):
+// the settlement stays closed until the traveller has moved clear of it.
+const cairoW = await page.evaluate(async () => {
+  const geo = await import('/src/world/geo.ts')
+  const c = geo.PLACES.find((p) => p.id === 'cairo')
+  return geo.latLonToWorld(c.lat, c.lon)
+})
+check('leaving suppresses immediate re-entry',
+  (await state()).reentrySuppressedId === 'cairo', `${(await state()).reentrySuppressedId}`)
+// Stand right on the marker while suppressed: it must stay in the bird's-eye view.
+await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
+await page.waitForTimeout(500)
+check('walking straight back does not re-enter (debounced)', (await state()).mode === 'travel')
+// Move clear of the settlement (south, away from the marker): re-entry re-arms.
+await page.evaluate(async (w) => {
+  window.__game.setState({ pos: { x: w.x, z: w.z + 2 } })
+  for (let i = 0; i < 20; i++) window.__game.getState().moveTravel(0, 1, 0.1)
+}, cairoW)
+await page.waitForTimeout(200)
+check('re-entry re-arms once clear of the settlement', (await state()).reentrySuppressedId === null)
+// Now walking back onto the marker enters again (no key press, design.md §2).
+await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
+await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
 await page.waitForTimeout(400)
 s = await state()
 const hasCp = await page.evaluate(() => localStorage.getItem('hoa-checkpoints-v1') !== null)

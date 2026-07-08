@@ -1019,8 +1019,10 @@ export function TravelScene() {
     camera.lookAt(pos.x, 0, pos.z)
 
     // Walking into a place enters it (design.md §2): no key press. The latch
-    // prevents an immediate re-entry after leaving (leavePlace drops the player
-    // just outside the radius); it re-arms once the player is clear again.
+    // guards against re-entering the same frame; the store's re-entry
+    // suppression (set on leaving) keeps the just-left settlement closed until
+    // the traveller has moved clear of it, so walking straight back in does not
+    // immediately re-enter.
     let near: PlaceDef | null = null
     for (const p of PLACES) {
       const w = latLonToWorld(p.lat, p.lon)
@@ -1029,7 +1031,9 @@ export function TravelScene() {
         break
       }
     }
-    if (near && enterLatchRef.current !== near.id) {
+    if (near && near.id === useGame.getState().reentrySuppressedId) {
+      // Suppressed until the traveller clears this settlement — do not enter.
+    } else if (near && enterLatchRef.current !== near.id) {
       enterLatchRef.current = near.id
       // Do not walk into a settlement once the expedition is over (defeat/
       // victory) — otherwise a dead traveler would still enter and overwrite

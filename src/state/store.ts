@@ -106,6 +106,9 @@ export interface GameState {
   seed: number
   mode: GameMode
   placeId: string | null
+  /** A settlement just left (design.md §2): re-entry is suppressed until the
+   *  traveller clears it, so walking straight back does not re-enter at once. */
+  reentrySuppressedId: string | null
   /** Travel position in world units. */
   pos: { x: number; z: number }
   /** In-game days since 1. Januar 1890 (fractional). */
@@ -389,6 +392,7 @@ function startState(seed: number) {
     seed,
     mode: 'place' as GameMode,
     placeId: 'cairo',
+    reentrySuppressedId: null,
     pos,
     day: 0,
     money: START_MONEY,
@@ -604,6 +608,15 @@ export const useGame = create<GameState>()((set, get) => ({
     const newDay = s.day + dayDelta
 
     const patch: Partial<GameState> = { pos: { x: nx, z: nz }, day: newDay, foodDays: newFood }
+
+    // Re-arm re-entry once the traveller has cleared the settlement just left
+    // (design.md §2): they must move beyond the enter radius plus a margin.
+    if (s.reentrySuppressedId) {
+      const lp = latLonToWorld(placeById(s.reentrySuppressedId).lat, placeById(s.reentrySuppressedId).lon)
+      if (Math.hypot(nx - lp.x, nz - lp.z) > balance.placeEnterRadius + balance.placeReentryMargin) {
+        patch.reentrySuppressedId = null
+      }
+    }
 
     const newRegion = regionAt(next.lat, next.lon)
     if (newRegion !== s.region) patch.region = newRegion
@@ -1110,7 +1123,15 @@ export const useGame = create<GameState>()((set, get) => ({
     const p = latLonToWorld(place.lat, place.lon)
     // Re-enter offset south of the marker so the enter prompt does not retrigger.
     // Bazaar quotes are per-port, so they expire on leaving (design.md §10).
-    set({ mode: 'travel', placeId: null, pos: { x: p.x, z: p.z + balance.placeEnterRadius + 1.5 }, bazaarQuotes: {} })
+    // Suppress re-entry until the traveller clears the settlement, so walking
+    // straight back does not immediately re-enter it (design.md §2).
+    set({
+      mode: 'travel',
+      placeId: null,
+      reentrySuppressedId: s.placeId,
+      pos: { x: p.x, z: p.z + balance.placeEnterRadius + 1.5 },
+      bazaarQuotes: {},
+    })
   },
 
   buy: (good) => {
@@ -1706,6 +1727,7 @@ export const useGame = create<GameState>()((set, get) => ({
         victory: false,
         toast: null,
         journalOpen: false,
+        reentrySuppressedId: null,
       })
       return true
     } catch {
