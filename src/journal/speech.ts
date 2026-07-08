@@ -1,9 +1,14 @@
 // Journal read-aloud (design.md §15): speaks journal entries with the Kokoro
 // TTS model running in the browser (kokoro-js). The model is fetched from the
-// Hugging Face CDN on first use and cached by the browser afterwards; WebGPU
-// is used when available, with a WASM fallback. Kokoro currently has no
-// German voice, so read-aloud is offered for English only — German texts
-// carry the same voice markup so a German-capable engine can be added later.
+// Hugging Face CDN on first use and cached by the browser afterwards. Kokoro
+// runs on a *separate* WebGPU compute path (onnxruntime-web), distinct from the
+// three.js renderer's WebGPU: that compute backend is only reliable on
+// Chromium, so the GPU path is restricted to Chromium and every other browser
+// (Firefox, Safari) uses the universally-working WASM path — otherwise Firefox
+// picks WebGPU (navigator.gpu exists there and drives the renderer fine) and
+// the synthesis fails. Kokoro currently has no German voice, so read-aloud is
+// offered for English only — German texts carry the same voice markup so a
+// German-capable engine can be added later.
 // OPEN: German read-aloud once a German-capable TTS voice is available.
 
 import type { SpeechSegment } from './voiceMarkup'
@@ -39,14 +44,28 @@ function loadEngine(): Promise<KokoroLike> {
         import.meta.env.DEV &&
         typeof window !== 'undefined' &&
         Boolean((window as unknown as Record<string, unknown>).__ttsForceWasm)
-      const webgpu = !forceWasm && typeof navigator !== 'undefined' && 'gpu' in navigator
-      const tts = await KokoroTTS.from_pretrained(MODEL_ID, {
-        // q8 sounds fine on WASM; WebGPU needs fp32 (quantized weights
-        // produce audible artifacts on the GPU path).
-        dtype: webgpu ? 'fp32' : 'q8',
-        device: webgpu ? 'webgpu' : 'wasm',
-      })
-      return tts as unknown as KokoroLike
+      // Only Chromium's onnxruntime WebGPU backend is reliable for the TTS.
+      // navigator.userAgentData is Chromium-only, so it gates the GPU path;
+      // Firefox/Safari fall through to WASM instead of a broken WebGPU run.
+      const chromium = typeof navigator !== 'undefined' && 'userAgentData' in navigator
+      const webgpu = !forceWasm && chromium && 'gpu' in navigator
+      // WASM q8 sounds fine and works everywhere; WebGPU needs fp32 (quantized
+      // weights produce audible artifacts on the GPU path).
+      const buildModel = (device: 'webgpu' | 'wasm') =>
+        KokoroTTS.from_pretrained(MODEL_ID, {
+          dtype: device === 'webgpu' ? 'fp32' : 'q8',
+          device,
+        }) as unknown as Promise<KokoroLike>
+      if (webgpu) {
+        try {
+          return await buildModel('webgpu')
+        } catch (err) {
+          // WebGPU present but the compute backend failed to initialise —
+          // fall back to WASM rather than leaving read-aloud broken.
+          console.warn('Kokoro WebGPU unavailable; falling back to WASM.', err)
+        }
+      }
+      return await buildModel('wasm')
     })()
     // A failed download (e.g. offline) must not poison later attempts.
     enginePromise.catch(() => {
