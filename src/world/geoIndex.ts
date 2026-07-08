@@ -7,7 +7,7 @@
 // The old raster/Chaikin index is gone; the public API is kept.
 
 import { coastDistanceAt, landFractionAt } from './geodata'
-import { lakeContains, lakeShoreDistanceExact, riverDistanceExact } from './hydro'
+import { lakeContains, lakeShoreDistanceExact, riverDistanceExact, riverFlowExact } from './hydro'
 
 export const CELL_OCEAN = 0
 export const CELL_LAND = 1
@@ -33,4 +33,10 @@ export function riverDistance(lat: number, lon: number, maxDist = 4): number {
 /** Exact distance to the nearest lake shoreline in degrees, capped. */
 export function lakeDistance(lat: number, lon: number, maxDist = 4): number {
   return lakeShoreDistanceExact(lat, lon, Math.min(maxDist, 0.45))
+}
+
+/** Downstream river flow at a point (design.md §11): unit direction in (lat,
+ *  lon) and a 0..1 strength that fades away from the centerline (0 off rivers). */
+export function riverFlow(lat: number, lon: number): { dirLat: number; dirLon: number; strength: number } {
+  return riverFlowExact(lat, lon)
 }

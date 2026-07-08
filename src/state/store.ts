@@ -8,7 +8,7 @@ import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLo
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
-import { lakeDistance, riverDistance } from '../world/geoIndex'
+import { lakeDistance, riverDistance, riverFlow } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import { movementPenalty } from '../systems/movement'
 import {
@@ -201,6 +201,8 @@ export interface GameState {
 
   // Actions
   moveTravel: (dirX: number, dirZ: number, dt: number) => void
+  /** Passive river-current drift, applied every travel frame (design.md §11). */
+  driftCurrent: (dt: number) => void
   enterPlace: (id: string) => void
   leavePlace: () => void
   buy: (good: EquipmentId | 'food' | Material) => void
@@ -692,6 +694,32 @@ export const useGame = create<GameState>()((set, get) => ({
     get().tickHealth(dayDelta, here.type, next.lat, next.lon)
     get().tickEvents(dayDelta, here.type, next.lat, next.lon)
     get().tickDeadline(newDay)
+  },
+
+  driftCurrent: (dt) => {
+    const s = get()
+    if (s.mode !== 'travel' || s.victory || s.defeat) return
+    const ll = worldToLatLon(s.pos.x, s.pos.z)
+    const ter = sampleTerrain(ll.lat, ll.lon, s.seed)
+    // The current only sweeps while the traveller is on the water (design.md §11).
+    if (ter.type !== 'water' && ter.type !== 'ocean') return
+    const flow = riverFlow(ll.lat, ll.lon)
+    if (flow.strength <= 0) return
+    // Stronger near the waterfalls (design.md §11/§4.4).
+    let boost = 1
+    for (const wf of WATERFALLS) {
+      const d = Math.hypot(ll.lat - wf.lat, ll.lon - wf.lon)
+      if (d < balance.currentWaterfallRadius) {
+        boost = Math.max(boost, 1 + (balance.currentWaterfallBoost - 1) * (1 - d / balance.currentWaterfallRadius))
+      }
+    }
+    const stepDeg = flow.strength * balance.currentDrift * boost * Math.min(dt, 0.1)
+    const nlat = ll.lat + flow.dirLat * stepDeg
+    const nlon = ll.lon + flow.dirLon * stepDeg
+    const nt = sampleTerrain(nlat, nlon, s.seed)
+    if (isBlocked(nt.type, nlat, nlon)) return // do not sweep into blocked open ocean
+    const nw = latLonToWorld(nlat, nlon)
+    set({ pos: { x: nw.x, z: nw.z } })
   },
 
   /**

@@ -165,6 +165,45 @@ export function lakeShoreDistanceExact(lat: number, lon: number, maxDist = MAX_Q
   return bucketDistance(lon, lat, lakeSegs, lakeBuckets, maxDist)
 }
 
+/**
+ * Downstream flow at a point (design.md §11): the nearest river segment's
+ * direction — the river data runs source → mouth, so the segment orientation
+ * is downstream — and a 0..1 strength that fades with distance from the
+ * centerline. Off the rivers the strength is 0. Direction is a unit vector in
+ * (lat, lon) degrees.
+ */
+export function riverFlowExact(
+  lat: number,
+  lon: number,
+  maxDist = 0.14,
+): { dirLat: number; dirLon: number; strength: number } {
+  const bx = Math.floor(lon / BUCKET)
+  const by = Math.floor(lat / BUCKET)
+  let best = maxDist * maxDist
+  let bestIdx = -1
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const list = riverBuckets.get(bucketKey(bx + dx, by + dy))
+      if (!list) continue
+      for (const idx of list) {
+        const d = segDistSq(lon, lat, riverSegs, idx)
+        if (d < best) {
+          best = d
+          bestIdx = idx
+        }
+      }
+    }
+  }
+  if (bestIdx < 0) return { dirLat: 0, dirLon: 0, strength: 0 }
+  let dLon = riverSegs[bestIdx + 2] - riverSegs[bestIdx]
+  let dLat = riverSegs[bestIdx + 3] - riverSegs[bestIdx + 1]
+  const len = Math.hypot(dLon, dLat) || 1
+  dLon /= len
+  dLat /= len
+  const strength = Math.max(0, 1 - Math.sqrt(best) / maxDist)
+  return { dirLat: dLat, dirLon: dLon, strength }
+}
+
 /** True if the point lies inside one of the ~1890 lake outlines. */
 export function lakeContains(lat: number, lon: number): boolean {
   for (const { ring, minX, minY, maxX, maxY } of lakeRings) {

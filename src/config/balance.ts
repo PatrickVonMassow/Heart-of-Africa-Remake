@@ -39,6 +39,13 @@ export interface BalanceConfig {
   mountainPenalty: number
   /** A canoe makes water travel this much faster than swimming (design.md §11). */
   canoeSpeedup: number
+  /** River current drift in degrees/sec at full strength on the centerline; the
+   *  flow sweeps the traveller downstream (design.md §11). */
+  currentDrift: number
+  /** Multiplier on the current's strength close to a waterfall (design.md §11). */
+  currentWaterfallBoost: number
+  /** Radius (degrees) around a waterfall within which the current is boosted. */
+  currentWaterfallRadius: number
   /** Climbing a mountain without a rope in hand (design.md §7/§11). */
   mountainFall: {
     /** Chance per travelled day of a fall while on a mountain without a rope. */
@@ -188,6 +195,9 @@ export const balance: BalanceConfig = {
   junglePenalty: 2.3, // no machete: 1.3 * 2.3 ≈ 3.0
   mountainPenalty: 1.67, // no rope: 1.5 * 1.67 ≈ 2.5
   canoeSpeedup: 4.0, // with a canoe: 2.0 / 4 = 0.5
+  currentDrift: 0.2, // deg/s at full strength (~2 world units/s, ~35% of walking)
+  currentWaterfallBoost: 4.0,
+  currentWaterfallRadius: 0.5,
   mountainFall: {
     chancePerDay: 0.35,
     severeShare: 0.35,

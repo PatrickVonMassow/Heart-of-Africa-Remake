@@ -82,6 +82,66 @@ check('Rivers: 5 waterfall cascades', rivers?.falls === 5, `${rivers?.falls}`)
 check('Rivers: at least one spring', (rivers?.springs ?? 0) >= 1, `${rivers?.springs}`)
 check('Rivers: 8 lake surfaces', rivers?.lakes === 8, `${rivers?.lakes}`)
 
+// --- River current sweeps the traveller downstream (design.md §11) -----------
+await page.evaluate(() => {
+  window.__balance.randomEventsEnabled = false
+  window.__game.getState().setJournalOpen(false)
+  window.__game.getState().leavePlace()
+})
+const drift = await page.evaluate(async () => {
+  const geo = await import('/src/world/geo.ts')
+  const gi = await import('/src/world/geoIndex.ts')
+  const terr = await import('/src/world/terrain.ts')
+  const g = () => window.__game.getState()
+  const seed = g().seed
+  // Find a river-water point with real flow near a centre coordinate.
+  const findRiver = (clat, clon) => {
+    for (let r = 0; r <= 0.7; r += 0.04) {
+      for (let a = 0; a < 20; a++) {
+        const lat = clat + Math.cos((a / 20) * 6.2832) * r
+        const lon = clon + Math.sin((a / 20) * 6.2832) * r
+        const t = terr.sampleTerrain(lat, lon, seed).type
+        const f = gi.riverFlow(lat, lon)
+        if ((t === 'water' || t === 'ocean') && f.strength > 0.3) return { lat, lon }
+      }
+    }
+    return null
+  }
+  const place = (spot) => {
+    const w = geo.latLonToWorld(spot.lat, spot.lon)
+    window.__game.setState({ pos: { x: w.x, z: w.z } })
+  }
+  const stepDelta = (spot) => {
+    place(spot)
+    const p0 = { ...g().pos }
+    g().driftCurrent(0.1)
+    const p1 = g().pos
+    return Math.hypot(p1.x - p0.x, p1.z - p0.z)
+  }
+  // Idle sweep on a calm stretch of the White Nile.
+  const calm = findRiver(9, 31)
+  let idleMove = 0
+  if (calm) {
+    place(calm)
+    const p0 = { ...g().pos }
+    for (let i = 0; i < 8; i++) g().driftCurrent(0.1)
+    idleMove = Math.hypot(g().pos.x - p0.x, g().pos.z - p0.z)
+  }
+  // At a waterfall (Victoria Falls, Zambezi): a higher boost sweeps harder.
+  const falls = findRiver(-17.93, 25.86)
+  let base = 0
+  let boosted = 0
+  if (falls) {
+    window.__balance.currentWaterfallBoost = 1
+    base = stepDelta(falls)
+    window.__balance.currentWaterfallBoost = 4
+    boosted = stepDelta(falls)
+  }
+  return { calm: !!calm, falls: !!falls, idleMove, base, boosted }
+})
+check('the river current sweeps an idle traveller downstream', drift.calm && drift.idleMove > 0.3, JSON.stringify(drift))
+check('the current is stronger near a waterfall (varying strength)', drift.falls && drift.boosted > drift.base * 1.5, JSON.stringify(drift))
+
 // --- Region border labels (§7.1.3) -------------------------------------------
 await page.evaluate(() => window.__game.getState().debugJumpTo(17.2, -2))
 await page.waitForTimeout(2500)

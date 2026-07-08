@@ -498,9 +498,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     `scripts/verify/enrichments.mjs` asserts 5 cascades, at least one
     spring and 8 lake surfaces via the dev hook; screenshots of the Nile,
     Victoria Falls and Lake Victoria (71-73) show the courses. Being swept
-    over falls is gameplay since pt. 23 (waterfall-sweep event); only the
-    current's speed effect on movement (drift with/against the flow)
-    remains an open item.
+    over falls is gameplay since pt. 23 (waterfall-sweep event). The
+    current's effect on movement is implemented too: while on a river the
+    flow sweeps the traveller downstream every frame (a passive drift, so
+    moving with the current is faster and against it slower), scaled by the
+    nearest river segment's downstream direction and a strength that rises
+    close to the waterfalls (calibratable balance values: `currentDrift`,
+    `currentWaterfallBoost`, `currentWaterfallRadius`). Verifiable:
+    `scripts/verify/enrichments.mjs` asserts an idle traveller on a river is
+    swept downstream and that the drift near a waterfall exceeds the
+    unboosted drift.
 22. **Health and afflictions.** `design.md` §6/§15 is implemented: a
     health pool is drained by starvation and by the afflictions fever
     (delirium: temporarily uncontrolled steering), dehydration (sets in

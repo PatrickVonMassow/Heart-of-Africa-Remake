@@ -1009,6 +1009,9 @@ export function TravelScene() {
     if (!useUi.getState().dialog) {
       const a = moveAxes()
       if (a.x !== 0 || a.y !== 0) s.moveTravel(a.x, -a.y, dt)
+      // The river current sweeps the traveller downstream even while idle
+      // (design.md §11); moving with it is faster, against it slower.
+      s.driftCurrent(dt)
     }
 
     // Camera follows from above with a slight tilt; the zoom factor scales
