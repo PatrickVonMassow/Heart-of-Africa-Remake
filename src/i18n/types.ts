@@ -364,8 +364,8 @@ export interface Strings {
     successor: string
     /** A buried treasure cache dug up (design.md §8/§18). */
     treasureFound(p: TextParams): string
-    /** Ivory recovered at the elephant graveyard (design.md §4.4). */
-    ivoryFound: string
+    /** Ivory recovered at the elephant graveyard, a random haul (design.md §4.4). */
+    ivoryFound(p: TextParams): string
     /** Discovery bounties credited at a port (design.md §10). */
     bounty(p: TextParams): string
     /** Ferry passage between two ports (design.md §10). */

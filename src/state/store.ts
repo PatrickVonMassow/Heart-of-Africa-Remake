@@ -1605,21 +1605,27 @@ export const useGame = create<GameState>()((set, get) => ({
     const cur = worldToLatLon(s.pos.x, s.pos.z)
     const digDeg = balance.digRadius / 10 // world units → degrees
 
-    // Ivory at the elephant graveyard (design.md §4.4), a limited supply.
+    // Ivory at the elephant graveyard (design.md §4.4), a limited supply. Each
+    // dig frees a random haul (uniform min..max, averaging ~5), capped by what
+    // remains in the ground and by the free inventory space.
     if (Math.hypot(cur.lat - ELEPHANT_GRAVEYARD.lat, cur.lon - ELEPHANT_GRAVEYARD.lon) <= digDeg) {
       if (s.graveyardIvoryLeft <= 0) {
         set({ toast: getStrings().toasts.graveyardEmpty })
         return
       }
-      if (usedInventory(s) >= balance.inventoryCapacity) {
+      const space = balance.inventoryCapacity - usedInventory(s)
+      if (space <= 0) {
         set({ toast: getStrings().toasts.inventoryFull })
         return
       }
+      const dig = balance.economy.graveyardIvoryPerDig
+      const rolled = dig.min + Math.floor(Math.random() * (dig.max - dig.min + 1))
+      const count = Math.max(1, Math.min(rolled, s.graveyardIvoryLeft, space))
       set({
-        graveyardIvoryLeft: s.graveyardIvoryLeft - 1,
-        treasures: { ...s.treasures, ivory: s.treasures.ivory + 1 },
+        graveyardIvoryLeft: s.graveyardIvoryLeft - count,
+        treasures: { ...s.treasures, ivory: s.treasures.ivory + count },
       })
-      get().addEntry({ key: 'journal.titles.treasure' }, { key: 'journal.ivoryFound' }, 'event')
+      get().addEntry({ key: 'journal.titles.treasure' }, { key: 'journal.ivoryFound', params: { count } }, 'event')
       return
     }
 

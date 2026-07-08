@@ -564,7 +564,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     finds (gold, silver, emerald, copper, ivory, statue) are inventory
     items, recovered by shovel from procedurally buried caches (one per
     region plus a statue site, placed anew each run) and from the limited
-    ivory supply of the elephant graveyard; the inventory has a capacity
+    ivory supply of the elephant graveyard, where each dig frees a random
+    haul averaging ~5 pieces (capped by the remaining supply and free space);
+    the inventory has a capacity
     (balance value) — buying or digging beyond it is refused, the debug
     menu edits capacity and gift count (§21), and debug item adds raise
     the capacity automatically when overfilling; ports contain the bazaar
@@ -588,7 +590,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     auto-raise, the regional bid ordering and rejection, the stable
     re-offer quote (identical price across re-offers, cleared on leaving
     the port), the ferry to Zanzibar (fare, days, checkpoint), the bounty
-    crediting, the graveyard ivory depletion, digging a treasure cache and
+    crediting, the graveyard's random ivory haul (range 1..9, mean ~5) and
+    its cap by the remaining supply, digging a treasure cache and
     the statue site, both valuable reactions, the baseline goods in every
     settlement, buying food in a village against gifts (money untouched),
     the no-gifts refusal, and selling gear for gifts (village) or money

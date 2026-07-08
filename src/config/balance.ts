@@ -154,8 +154,10 @@ export interface BalanceConfig {
     bountyLandmark: number
     /** Radius in degrees within which a landmark counts as discovered. */
     discoverRadiusDeg: number
-    /** Ivory pieces recoverable at the elephant graveyard (design.md §4.4). */
+    /** Total ivory pieces recoverable at the elephant graveyard (design.md §4.4). */
     graveyardIvory: number
+    /** Random ivory yield per dig at the graveyard (uniform, averages ~5). */
+    graveyardIvoryPerDig: { min: number; max: number }
     /** Fraction of the buy price the traveler gets back when selling gear. */
     equipmentSellFactor: number
   }
@@ -258,7 +260,8 @@ export const balance: BalanceConfig = {
     bountyVillage: 15,
     bountyLandmark: 25,
     discoverRadiusDeg: 0.5,
-    graveyardIvory: 3,
+    graveyardIvory: 24,
+    graveyardIvoryPerDig: { min: 1, max: 9 }, // uniform 1..9 → average 5
     equipmentSellFactor: 0.5,
   },
   village: {

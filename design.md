@@ -90,7 +90,7 @@ Basis of the direction/location hints (mouth/source); navigable by canoe.
 Blue Nile, Nile, White Nile, Jubba, Ruvuma, Zambezi, Limpopo, Vaal, Orange, Sankuru, Kasai, Ubangi, Congo, Benue, Volta, Niger, Senegal. Each river has one named source and one named mouth location.
 
 ### 4.4 Landmarks
-Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudolf, Lake Tanganyika, Lake Nyasa), mountains (Toubkal, Emi Koussi, Kilimanjaro, Mount Kenya, Mount Elgon and others), waterfalls (Stanley, Livingstone, Kabalega, Victoria, Augrabies Falls). Special site: the Elephant Graveyard (valuable ivory) — recognizable at a glance in the bird's-eye view by a field of fallen, bleached elephant carcasses and ivory tusks and bones strewn across a pale, bone-littered patch of ground.
+Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudolf, Lake Tanganyika, Lake Nyasa), mountains (Toubkal, Emi Koussi, Kilimanjaro, Mount Kenya, Mount Elgon and others), waterfalls (Stanley, Livingstone, Kabalega, Victoria, Augrabies Falls). Special site: the Elephant Graveyard (valuable ivory) — recognizable at a glance in the bird's-eye view by a field of fallen, bleached elephant carcasses and ivory tusks and bones strewn across a pale, bone-littered patch of ground. Digging it with the shovel frees a random haul of ivory each time — a rolled amount averaging about five pieces — drawn from the site's limited supply until the bones hold no more.
 
 ### 4.5 Region Assignment
 | Region | Landscape | Peoples |

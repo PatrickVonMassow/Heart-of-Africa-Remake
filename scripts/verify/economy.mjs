@@ -224,7 +224,7 @@ check(
   `+${expectedBounty} $`,
 )
 
-// --- Elephant graveyard ivory ---------------------------------------------------------
+// --- Elephant graveyard ivory: a random haul per dig, averaging ~5 -------------------
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.leavePlace()
@@ -232,19 +232,46 @@ await page.evaluate(() => {
   g.takeInHand('shovel')
 })
 await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6))
-const ivory0 = (await state()).treasures.ivory
-const supply = await page.evaluate(() => window.__game.getState().graveyardIvoryLeft)
-for (let i = 0; i < supply; i++) await page.evaluate(() => window.__game.getState().dig())
-s = await state()
+// Sample many digs with plenty of supply and capacity so nothing caps the roll.
+const dig = await page.evaluate(async () => {
+  window.__balance.inventoryCapacity = 1_000_000
+  window.__game.setState({ graveyardIvoryLeft: 100000 })
+  const yields = []
+  for (let i = 0; i < 150; i++) {
+    const before = window.__game.getState().treasures.ivory
+    window.__game.getState().dig()
+    yields.push(window.__game.getState().treasures.ivory - before)
+  }
+  const sum = yields.reduce((a, b) => a + b, 0)
+  return { n: yields.length, mean: sum / yields.length, min: Math.min(...yields), max: Math.max(...yields) }
+})
 keys = await journalKeys()
-check(
-  'the graveyard yields its limited ivory',
-  s.treasures.ivory === ivory0 + supply && s.graveyardIvoryLeft === 0 && keys.includes('journal.ivoryFound'),
-  `${supply} tusks`,
-)
-await page.evaluate(() => window.__game.getState().dig())
-s = await state()
-check('an exhausted graveyard yields nothing more', s.treasures.ivory === ivory0 + supply && !!s.toast, `"${s.toast}"`)
+check('each graveyard dig yields a random haul in 1..9',
+  dig.min >= 1 && dig.max <= 9 && dig.max > dig.min && keys.includes('journal.ivoryFound'),
+  `min ${dig.min}, max ${dig.max}`)
+check('the graveyard ivory haul averages ~5', dig.mean > 4 && dig.mean < 6, `mean ${dig.mean.toFixed(2)}`)
+
+// Depletion: the haul is capped by what remains, and an empty graveyard gives nothing.
+const deplete = await page.evaluate(async () => {
+  window.__balance.economy.graveyardIvoryPerDig = { min: 9, max: 9 } // force a big roll
+  window.__game.setState({ graveyardIvoryLeft: 2 })
+  const before = window.__game.getState().treasures.ivory
+  window.__game.getState().dig() // rolls 9 but only 2 remain → capped to 2
+  const gained = window.__game.getState().treasures.ivory - before
+  const left = window.__game.getState().graveyardIvoryLeft
+  window.__game.getState().setToast(null)
+  window.__game.getState().dig() // empty now
+  return { gained, left, toast: window.__game.getState().toast }
+})
+check('the haul is capped by the remaining supply', deplete.gained === 2 && deplete.left === 0, JSON.stringify(deplete))
+check('an exhausted graveyard yields nothing more', !!deplete.toast, `"${deplete.toast}"`)
+// Restore the sampled state so later capacity-sensitive checks are unaffected.
+await page.evaluate(() => {
+  window.__balance.inventoryCapacity = 60
+  window.__balance.economy.graveyardIvoryPerDig = { min: 1, max: 9 }
+  const g = window.__game.getState()
+  window.__game.setState({ treasures: { ...g.treasures, ivory: 0 } })
+})
 
 // --- Buried treasure caches -------------------------------------------------------------
 const statueSite = s.treasureSites.find((x) => x.treasure === 'statue')

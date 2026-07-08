@@ -544,8 +544,8 @@ export const de: Strings = {
       '[somber]Ich übernehme dieses Tagebuch aus den Händen meines Vorgängers, der alles dafür gab.[pause] Seine Aufzeichnungen sollen mich leiten.[/somber] [emph]Die Suche geht weiter, wo er sie ließ.[/emph]',
     treasureFound: (p: TextParams) =>
       `[excited]Meine Schaufel stieß auf etwas Hartes![/excited] [breath]Aus der Erde hob ich ein Versteck voll [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] — vor langer Zeit vergraben und von allen vergessen außer vom Sand. [awe]Das Glück lächelt dem geduldigen Gräber.[/awe]`,
-    ivoryFound:
-      '[awe]Der Elefantenfriedhof.[pause] Gebleichte Knochen ragen um mich auf wie die Rippen gestrandeter Schiffe.[/awe] [somber]Mit stiller Ehrfurcht löste ich einen mächtigen Stoßzahn aus dem Boden —[pause] Elfenbein von einer Reinheit, wie ich sie nie gesehen habe.[/somber]',
+    ivoryFound: (p: TextParams) =>
+      `[awe]Der Elefantenfriedhof.[pause] Gebleichte Knochen ragen um mich auf wie die Rippen gestrandeter Schiffe.[/awe] [somber]Mit stiller Ehrfurcht löste ich ${p.count === 1 ? 'einen mächtigen Stoßzahn' : `${p.count} mächtige Stoßzähne`} aus dem Boden —[pause] Elfenbein von einer Reinheit, wie ich sie nie gesehen habe.[/somber]`,
     bounty: (p: TextParams) =>
       `[excited]Die Geographische Gesellschaft hat meine Berichte gewürdigt![/excited] Für ${p.count} ${Number(p.count) === 1 ? 'dokumentierte Entdeckung' : 'dokumentierte Entdeckungen'} schrieb man mir [emph]${p.amount} Dollar[/emph] gut. [pause]Das Entdecken, so zeigt sich, bezahlt seinen eigenen Proviant.`,
     ferry: (p: TextParams) =>
