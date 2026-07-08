@@ -1031,7 +1031,10 @@ export function TravelScene() {
     }
     if (near && enterLatchRef.current !== near.id) {
       enterLatchRef.current = near.id
-      if (!useUi.getState().dialog) {
+      // Do not walk into a settlement once the expedition is over (defeat/
+      // victory) — otherwise a dead traveler would still enter and overwrite
+      // the checkpoint.
+      if (!useUi.getState().dialog && !s.defeat && !s.victory) {
         useGame.getState().enterPlace(near.id)
         return
       }

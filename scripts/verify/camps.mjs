@@ -41,6 +41,9 @@ check('camps balance block present', camps && camps.lootChancePerDay > 0 && camp
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.leavePlace()
+  // Operate in open savanna, away from any settlement marker, so the loot-loop
+  // movement below does not walk the traveler into a place (walk-in entry).
+  g.debugJumpTo(-2.2, 34.8)
   g.debugAddEquipment('canoe')
   g.debugAddGift('gold')
   g.debugAddTreasure('silver')
@@ -122,7 +125,7 @@ await page.evaluate(() => window.__ui.getState().toggleMap())
 await page.waitForTimeout(600)
 const mapVisible = await page.evaluate(() => document.querySelector('.map-overlay canvas') !== null)
 s = await state()
-check('a pitched camp appears while the map view is open', mapVisible && s.freeCamps.length === 1, '')
+check('a pitched camp appears while the map view is open', mapVisible && s.freeCamps.length === 1, `mapVisible ${mapVisible}, camps ${s.freeCamps.length}, mode ${s.mode}`)
 await page.evaluate(() => window.__ui.getState().toggleMap())
 
 // --- Village cache: Honored Friend privilege --------------------------------------
