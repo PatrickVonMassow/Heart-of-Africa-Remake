@@ -272,8 +272,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    relevant).
 9. **Status bar.** Date, funds, provisions, gifts, hand item and current
    region are displayed. Coordinates are not shown permanently (removed on
-   user request); the top-right area freed by their removal holds transient
-   status hints (e.g. the movement-penalty reason, pt. 4).
+   user request); transient status hints (e.g. the movement-penalty reason,
+   pt. 4) render as a right-aligned item inside the status bar itself, not in
+   a separate panel floating over the scene. Verifiable: the hint element is a
+   descendant of `.status-bar` and its box stays within the bar's box
+   (`scripts/verify/enrichments.mjs`).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints (`design.md` §13.3): per

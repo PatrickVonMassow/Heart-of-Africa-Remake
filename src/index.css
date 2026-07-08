@@ -85,22 +85,6 @@ textarea {
   flex: 1;
 }
 
-/* Top-right status area (freed by removing the coordinate display): transient
-   status hints (e.g. the movement penalty) sit at the top-right within the
-   status-bar band, in the space the coordinates used to occupy. */
-.status-hints {
-  position: absolute;
-  top: 5px;
-  right: 12px;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  max-width: 42vw;
-  pointer-events: none;
-}
-
 /* --- Inventory / hand bar ------------------------------------------------ */
 
 .inventory-bar {
@@ -257,16 +241,18 @@ textarea {
   font-size: 16px;
 }
 
-/* Reason for an active movement slowdown (design.md §11), shown in the
-   top-right status area rather than over the main view. */
-.movement-penalty {
-  background: var(--hud-bg);
+/* Reason for an active movement slowdown (design.md §11/§17): a right-aligned
+   item inside the status bar (margin-left:auto pushes it to the bar's right
+   end), not a panel floating over the scene. */
+.status-bar .movement-penalty {
+  margin-left: auto;
+  align-self: center;
   border: 1px solid #a67c2e;
-  border-right: 4px solid #d0912e;
-  padding: 7px 14px;
-  border-radius: 6px;
+  border-left: 4px solid #d0912e;
+  padding: 3px 10px;
+  border-radius: 5px;
   font-size: 14px;
-  text-align: right;
+  color: var(--hud-accent);
 }
 
 /* Frame counter, top left below the status bar (the journal panel occupies

@@ -6,6 +6,30 @@
 import { useGame, totalGifts, handItemName } from '../state/store'
 import { START_YEAR } from '../config/balance'
 import { useStrings } from '../i18n'
+import { useUi } from '../state/ui'
+import { movementPenalty } from '../systems/movement'
+import { worldToLatLon } from '../world/geo'
+import { sampleTerrain } from '../world/terrain'
+
+/**
+ * Movement-penalty hint (design.md §11/§17): while travelling, when the current
+ * terrain slows the traveller and the relieving item is not held, it names the
+ * cause and remedy. Rendered inside the status bar (right-aligned) so it reads
+ * as part of the bar rather than a panel floating over the scene.
+ */
+function MovementPenalty() {
+  const t = useStrings()
+  const mode = useGame((s) => s.mode)
+  const pos = useGame((s) => s.pos)
+  const handItem = useGame((s) => s.handItem)
+  const seed = useGame((s) => s.seed)
+  const dialog = useUi((s) => s.dialog)
+  if (mode !== 'travel' || dialog) return null
+  const ll = worldToLatLon(pos.x, pos.z)
+  const reason = movementPenalty(sampleTerrain(ll.lat, ll.lon, seed).type, handItem)
+  if (!reason) return null
+  return <span className="movement-penalty">{t.hud.movementPenalty[reason]}</span>
+}
 
 export function StatusBar() {
   const t = useStrings()
@@ -29,6 +53,7 @@ export function StatusBar() {
       <span className="stat"><b>{t.status.gifts}</b> {totalGifts(gifts)}</span>
       <span className="stat"><b>{t.status.hand}</b> {handItem ? handItemName(handItem) : t.status.handEmpty}</span>
       <span className="stat"><b>{t.status.region}</b> {t.regions[region]}{placeName ? ` · ${placeName}` : ''}</span>
+      <MovementPenalty />
     </div>
   )
 }
