@@ -129,6 +129,8 @@ export interface Strings {
     villagerNod: string
     journalDndOn: string
     journalDndOff: string
+    /** Debug F3: full loadout granted. */
+    debugLoadout: string
     noMedicine: string
     medicineNotNeeded: string
     /** Inventory capacity reached (design.md §6). */

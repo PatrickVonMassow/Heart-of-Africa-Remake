@@ -386,6 +386,11 @@ There is no day/night cycle: game time runs in fast-forward (about five years of
 
 A debug menu opened with F1. All settings take effect immediately on the running game; no restart needed.
 
+Debug shortcut keys:
+- **F1** opens/closes the debug menu.
+- **F2** toggles the journal do-not-disturb option (§16).
+- **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything.
+
 - Walking speed of the player character inside settlements (villages and port cities).
 - Walking speed of the player character outside settlements (travel across the continent).
 - Mouse-look sensitivity in the first-person view.

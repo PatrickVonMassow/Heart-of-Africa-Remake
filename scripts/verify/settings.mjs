@@ -180,6 +180,47 @@ check('feeding: stain beneath the carcass', feedA.stainVisible === true && feedA
 await page.screenshot({ path: `${OUT}68-lion-feeding.png` })
 console.log('shot 68-lion-feeding.png')
 
+// --- F3: full debug loadout (design.md §21) ----------------------------------
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.debugSet({ money: 5, foodDays: 2, health: 10 })
+  g.debugSetAffliction('fever', true)
+  g.debugSetAffliction('sunblind', true)
+  g.debugSetAffliction('wounds', 2)
+})
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3' })))
+await page.waitForTimeout(200)
+// Read the live store directly — importing the store module inside the page
+// would re-instantiate it and reset window.__game.
+const loadout = await page.evaluate(() => {
+  const equipIds = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
+  const treasureIds = ['gold', 'silver', 'emerald', 'copper', 'ivory', 'statue']
+  const g = window.__game.getState()
+  const sum = (o) => Object.values(o).reduce((a, b) => a + (b ?? 0), 0)
+  return {
+    money: g.money,
+    food: g.foodDays,
+    health: g.health,
+    afflictions: g.afflictions,
+    giftsTotal: sum(g.gifts),
+    allEquip: equipIds.every((e) => (g.equipment[e] ?? 0) >= 1),
+    allTreasure: treasureIds.every((t) => (g.treasures[t] ?? 0) >= 1),
+    used: sum(g.equipment) + sum(g.gifts) + sum(g.treasures),
+    capacity: window.__balance.inventoryCapacity,
+  }
+})
+check('F3: money set to 100000', loadout.money === 100000, `${loadout.money}`)
+check('F3: provisions set to 100000', loadout.food === 100000, `${loadout.food}`)
+check('F3: full health', loadout.health === 100, `${loadout.health}`)
+check(
+  'F3: all afflictions cleared',
+  !loadout.afflictions.fever && !loadout.afflictions.dehydration && !loadout.afflictions.sunblind && loadout.afflictions.wounds === 0,
+  JSON.stringify(loadout.afflictions),
+)
+check('F3: 100000 gifts', loadout.giftsTotal === 100000, `${loadout.giftsTotal}`)
+check('F3: all equipment and treasures present', loadout.allEquip && loadout.allTreasure, `equip ${loadout.allEquip}, treasure ${loadout.allTreasure}`)
+check('F3: inventory capacity raised to fit', loadout.capacity >= loadout.used, `cap ${loadout.capacity} >= used ${loadout.used}`)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

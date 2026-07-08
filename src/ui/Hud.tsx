@@ -329,26 +329,30 @@ export function Hud() {
       const s = getStrings()
       useGame.getState().setToast(ui.journalDnd ? s.toasts.journalDndOff : s.toasts.journalDndOn)
     })
+    // F3 grants the full debug loadout (design.md §21).
+    const offF3 = onKeyPress('F3', () => useGame.getState().debugFullLoadout())
     const offEsc = onKeyPress('Escape', () => {
       if (useUi.getState().dialog) setDialog(null)
       else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
       else if (useGame.getState().journalOpen) setJournalOpen(false)
     })
-    // F1 opens browser help by default — prevent that.
-    const preventF1 = (e: KeyboardEvent) => {
-      if (e.code === 'F1') e.preventDefault()
+    // Function keys trigger browser actions by default (F1 help, F3 find) —
+    // prevent that for the keys the game uses.
+    const preventFn = (e: KeyboardEvent) => {
+      if (e.code === 'F1' || e.code === 'F3') e.preventDefault()
     }
-    window.addEventListener('keydown', preventF1)
+    window.addEventListener('keydown', preventFn)
     return () => {
       offT()
       offM()
       offF1()
       offF2()
+      offF3()
       offH()
       offP()
       offC()
       offEsc()
-      window.removeEventListener('keydown', preventF1)
+      window.removeEventListener('keydown', preventFn)
     }
   }, [setJournalOpen, toggleDebug, setDialog])
 

@@ -221,6 +221,7 @@ export const de: Strings = {
     villagerNod: 'Der Alte nickt mir freundlich zu.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus — Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an — neue Einträge öffnen das Tagebuch.',
+    debugLoadout: 'Debug: Volle Ausstattung — alles im Gepäck, Geld und Proviant randvoll, kerngesund.',
     noMedicine: 'Ich habe keine Medizin mehr.',
     medicineNotNeeded: 'Weder Fieber noch Wunden — ich hebe die Medizin auf.',
     inventoryFull: 'Mein Gepäck ist voll — mehr kann ich nicht tragen.',

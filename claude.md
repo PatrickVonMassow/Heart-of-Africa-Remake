@@ -419,10 +419,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     backend, and
     the journal do-not-disturb option (`design.md` §16; also toggled with
     F2) under which new entries neither open the journal nor auto-narrate
-    but stay readable on manual open.
+    but stay readable on manual open. Debug shortcut keys (`design.md` §21):
+    F1 opens the menu, F2 the do-not-disturb toggle, and F3 grants the full
+    loadout — all gear/treasures, 100000 gifts/dollars/provisions, full
+    health and no afflictions, with the inventory capacity raised to fit.
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults, the
     eye height, the 80 % strafe/backward factor (exact via the pure
-    velocity helper, plus an in-scene smoke check), the working debug-menu
+    velocity helper, plus an in-scene smoke check), the F3 full loadout,
+    the working debug-menu
     controls in both languages and the lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts
     the zoom gate, the dropdowns and the renderer row;
     `scripts/verify/collision.mjs` additionally proves corner clearance at

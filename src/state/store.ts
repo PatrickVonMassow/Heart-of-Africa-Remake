@@ -11,7 +11,7 @@ import { WATERFALLS } from '../world/data/landmarks'
 import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import {
-  LANDMARK_POINTS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
+  LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
   type TreasureId, type TreasureSite,
 } from '../systems/economy'
 import { ELEPHANT_GRAVEYARD } from '../world/data/landmarks'
@@ -258,6 +258,9 @@ export interface GameState {
   debugAddTreasure: (treasure: TreasureId) => void
   /** Debug (design.md §21): set the total gift count directly. */
   debugSetGiftTotal: (total: number) => void
+  /** Debug (design.md §21, F3): full loadout — all gear/gifts/treasures,
+   * money/food maxed, full health, no afflictions; capacity raised to fit. */
+  debugFullLoadout: () => void
   debugJumpTo: (lat: number, lon: number) => void
 }
 
@@ -1715,6 +1718,33 @@ export const useGame = create<GameState>()((set, get) => ({
   debugAddTreasure: (treasure) => {
     raiseCapacityIfNeeded(get())
     set((s) => ({ treasures: { ...s.treasures, [treasure]: s.treasures[treasure] + 1 } }))
+  },
+
+  debugFullLoadout: () => {
+    const s = get()
+    // All equipment and treasures, gifts and provisions to 100000, full
+    // health and no afflictions (design.md §21, F3).
+    const equipment: Partial<Record<EquipmentId, number>> = {}
+    for (const e of EQUIPMENT_IDS) equipment[e] = 1
+    const per = 20000
+    const gifts: Record<Material, number> = { gold: per, silver: per, emerald: per, copper: per, ivory: per }
+    const treasures = { ...s.treasures }
+    for (const tr of TREASURE_IDS) treasures[tr] = Math.max(1, treasures[tr] ?? 0)
+    const used = usedInventory({ equipment, gifts, treasures })
+    if (balance.inventoryCapacity < used) balance.inventoryCapacity = used
+    set({
+      money: 100000,
+      foodDays: 100000,
+      health: balance.health.max,
+      afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 },
+      sunblindRecovery: 0,
+      dryDays: 0,
+      equipment,
+      gifts,
+      treasures,
+      toast: getStrings().toasts.debugLoadout,
+    })
+    get().bumpBalance()
   },
 
   debugSetGiftTotal: (total) => {
