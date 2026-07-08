@@ -10,6 +10,7 @@ import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
 import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
+import { movementPenalty } from '../systems/movement'
 import {
   LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
   type TreasureId, type TreasureSite,
@@ -188,8 +189,9 @@ export interface GameState {
   toast: string | null
   foodWarned: boolean
   foodOutWarned: boolean
-  /** Warned once about climbing without a rope; resets when off the mountain. */
-  mountainWarned: boolean
+  /** Movement-penalty types already announced in the journal (design.md §11):
+   *  each is journaled once, then only the status-bar hint carries it. */
+  penaltyJournaled: { jungle: boolean; water: boolean; mountain: boolean }
   hasCheckpoint: boolean
   /** Bumped by the debug menu when mutating the balance object. */
   balanceVersion: number
@@ -439,7 +441,7 @@ function startState(seed: number) {
     toast: null,
     foodWarned: false,
     foodOutWarned: false,
-    mountainWarned: false,
+    penaltyJournaled: { jungle: false, water: false, mountain: false },
     balanceVersion: 0,
   }
 }
@@ -499,6 +501,13 @@ export function usedInventory(
   const gi = Object.values(s.gifts).reduce((a, b) => a + b, 0)
   const tr = Object.values(s.treasures).reduce((a, b) => a + b, 0)
   return eq + gi + tr
+}
+
+/** Journal title/body/toast keys for each movement-penalty type (design.md §11). */
+const PENALTY_JOURNAL: Record<'jungle' | 'water' | 'mountain', { title: string; body: string; toast: 'penaltyJungle' | 'penaltyWater' | 'mountainNoRopeWarn' }> = {
+  jungle: { title: 'journal.titles.penaltyJungle', body: 'journal.penaltyJungle', toast: 'penaltyJungle' },
+  water: { title: 'journal.titles.penaltyWater', body: 'journal.penaltyWater', toast: 'penaltyWater' },
+  mountain: { title: 'journal.titles.mountainClimb', body: 'journal.mountainNoRope', toast: 'mountainNoRopeWarn' },
 }
 
 export const useGame = create<GameState>()((set, get) => ({
@@ -575,12 +584,18 @@ export const useGame = create<GameState>()((set, get) => ({
       set({ toast: getStrings().toasts.oceanBlocked })
       return
     }
-    // Mountains are climbable without a rope, but slower (terrainCost.mountain
-    // vs. mountainWithRope) and dangerous (design.md §7/§11): warn once at the
-    // start of the ascent, then let the climb proceed.
-    if (nextT.type === 'mountain' && here.type !== 'mountain' && s.handItem !== 'rope' && !s.mountainWarned) {
-      set({ mountainWarned: true, toast: getStrings().toasts.mountainNoRopeWarn })
-      get().addEntry({ key: 'journal.titles.mountainClimb' }, { key: 'journal.mountainNoRope' })
+    // Movement-penalty warning (design.md §11): the first time a missing item
+    // slows the traveller — a machete in the jungle, a canoe in water, a rope
+    // in the mountains — announce it once in the journal (with a toast); after
+    // that the standing status-bar hint carries it silently.
+    const penalty = movementPenalty(nextT.type, s.handItem)
+    if (penalty && !s.penaltyJournaled[penalty]) {
+      const j = PENALTY_JOURNAL[penalty]
+      set({
+        penaltyJournaled: { ...s.penaltyJournaled, [penalty]: true },
+        toast: getStrings().toasts[j.toast],
+      })
+      get().addEntry({ key: j.title }, { key: j.body })
     }
 
     const dayDelta = step * balance.daysPerUnit * cost
@@ -594,8 +609,6 @@ export const useGame = create<GameState>()((set, get) => ({
     if (newRegion !== s.region) patch.region = newRegion
     const ex = withExplored(s.explored, next.lat, next.lon)
     if (ex) patch.explored = ex
-    // Re-arm the climb warning once the traveller is off the mountain again.
-    if (nextT.type !== 'mountain' && s.mountainWarned) patch.mountainWarned = false
     set(patch)
 
     // Fall risk while climbing a mountain without a rope (design.md §7/§11):
@@ -1626,6 +1639,7 @@ export const useGame = create<GameState>()((set, get) => ({
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
+      penaltyJournaled: s.penaltyJournaled,
       deadlineWarned: s.deadlineWarned,
       explored: s.explored,
       treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
@@ -1661,6 +1675,7 @@ export const useGame = create<GameState>()((set, get) => ({
         ...snap,
         explored: snap.explored ?? {},
         health: snap.health ?? balance.health.max,
+        penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false },
         deadlineWarned: snap.deadlineWarned ?? 0,
         knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
         hintsGiven: snap.hintsGiven ?? {},

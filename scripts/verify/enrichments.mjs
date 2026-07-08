@@ -97,6 +97,9 @@ check(
 const swim = await page.evaluate(async () => {
   const g = window.__game.getState()
   g.debugJumpTo(31.8, 18.5)
+  // Mark the water penalty as already announced so its (benign) first-time
+  // toast does not stand in for the ocean-blocked message this test checks.
+  window.__game.setState({ penaltyJournaled: { jungle: true, water: true, mountain: true } })
   window.__game.getState().setToast(null)
   const before = { ...window.__game.getState().pos }
   for (let i = 0; i < 20; i++) window.__game.getState().moveTravel(0, -1, 0.05)
@@ -247,6 +250,29 @@ if (jungleSpot) {
   check('Movement penalty hint shows in jungle without a machete', hint.text.toLowerCase().includes('machete'), `"${hint.text}"`)
   check('Movement penalty hint sits in the top-right status area', hint.topRight === true, '')
   check('Movement penalty hint clears with a machete in hand', hintMachete === '', `"${hintMachete}"`)
+
+  // Point 7: the penalty is journaled only the first time, then only the
+  // status-bar hint carries it (design.md §11).
+  const once = await page.evaluate(async (s) => {
+    const g = () => window.__game.getState()
+    window.__balance.randomEventsEnabled = false
+    window.__game.setState({ penaltyJournaled: { jungle: false, water: false, mountain: false } })
+    g().takeInHand(null)
+    const key = 'journal.titles.penaltyJungle'
+    const countJungle = () => g().journal.filter((e) => e.title?.key === key).length
+    g().debugJumpTo(s.lat, s.lon)
+    const before = countJungle()
+    for (let i = 0; i < 6; i++) { g().moveTravel(1, 0, 0.03); await new Promise((r) => setTimeout(r, 20)) }
+    const afterFirst = countJungle()
+    const flag = g().penaltyJournaled.jungle
+    g().debugJumpTo(s.lat, s.lon)
+    for (let i = 0; i < 6; i++) { g().moveTravel(0, 1, 0.03); await new Promise((r) => setTimeout(r, 20)) }
+    const afterSecond = countJungle()
+    return { before, afterFirst, afterSecond, flag }
+  }, jungleSpot)
+  check('movement penalty is journaled the first time', once.afterFirst === once.before + 1, JSON.stringify(once))
+  check('the penalty type is marked as announced', once.flag === true, JSON.stringify(once))
+  check('a later encounter adds no second journal entry', once.afterSecond === once.afterFirst, JSON.stringify(once))
 } else {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
 }
@@ -415,7 +441,9 @@ const stream = await page.evaluate(async () => {
     const p = window.__game.getState().pos
     let best = null
     let bd = Infinity
-    for (const sp of sp5) for (const a of herds[sp]) { if (a.dead) continue; const d = Math.hypot(a.x - p.x, a.z - p.z); if (d < bd) { bd = d; best = a } }
+    // Only real streamed animals (with a chunk tag) can despawn; skip any
+    // leftover injected animals from earlier tests (no chunk).
+    for (const sp of sp5) for (const a of herds[sp]) { if (a.dead || !a.chunk) continue; const d = Math.hypot(a.x - p.x, a.z - p.z); if (d < bd) { bd = d; best = a } }
     return best
   }
   const hasMark = (k) => sp5.some((sp) => herds[sp].some((a) => a.__mark === k))

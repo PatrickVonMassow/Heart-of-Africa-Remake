@@ -213,6 +213,8 @@ export const en: Strings = {
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
     mountainNoRopeWarn: 'Without a rope this climb is dangerous — one slip and I fall. Slowly and carefully!',
+    penaltyJungle: 'The jungle slows me — a machete in hand would clear the way.',
+    penaltyWater: 'No canoe — I must swim across, slow and soaked.',
     boughtFood: 'Bought one week of provisions.',
     bought: (name) => `${name} purchased.`,
     inHand: (name) => `Now holding the ${name.toLowerCase()}.`,
@@ -372,6 +374,8 @@ export const en: Strings = {
       sandstorm: 'Sandstorm',
       sweptAway: 'Swept Away',
       mountainClimb: 'Into the Mountains Without a Rope',
+      penaltyJungle: 'Fighting Through the Jungle',
+      penaltyWater: 'Into the Water',
       mountainFall: 'A Fall',
       discovery: 'A Grim Discovery',
       deadline1: 'A Letter from the Financiers',
@@ -512,6 +516,10 @@ export const en: Strings = {
       '[fear]The current seized me and swept me over the falls![/fear] [weary]I dragged myself to the bank, battered and bleeding —[pause] half of my belongings are gone with the river.[/weary]',
     mountainNoRope:
       '[weary]No rope in hand, and yet there is no way around this range.[/weary] [fear]I climb slowly, hold by hold —[pause] one slip here and the rock will not catch me.[/fear]',
+    penaltyJungle:
+      '[weary]The jungle closes in, thick with vine and thorn.[/weary] [emph]Without a machete[/emph] I must force every step —[pause] a blade in hand would open the way.',
+    penaltyWater:
+      '[weary]The water bars my path, and I have no canoe.[/weary] I wade and swim across, slow and soaked;[pause] [emph]a canoe in hand[/emph] would carry me over with ease.',
     mountainFall:
       '[fear]The rock gave way beneath my foot, and I fell![/fear] [weary]Bruised and dazed I came to rest far below —[pause] without a rope this ascent nearly became my end.[/weary]',
     mountainFallItem:

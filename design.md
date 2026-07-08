@@ -208,7 +208,7 @@ Every settlement — port city or native village — offers at least the baselin
 | Dig site | Shovel | without: no find; with: dig it up |
 
 **Visible slowdown reason.**
-Whenever the current terrain slows the traveler and the relieving hand object is not held — dense jungle without a machete, water without a canoe, mountain rock without a rope — the bird's-eye view shows a short hint that names the cause and the item that would relieve it. A movement penalty is never silent; the player can always see why progress is slow and what to take in hand.
+Whenever the current terrain slows the traveler and the relieving hand object is not held — dense jungle without a machete, water without a canoe, mountain rock without a rope — the bird's-eye view shows a short hint that names the cause and the item that would relieve it. A movement penalty is never silent; the player can always see why progress is slow and what to take in hand. The very first time each of these three slowdowns is met, it is also announced once in the journal (a short entry naming the terrain and the missing item); every later encounter of that same kind is carried only by the standing status-bar hint, so the chronicle is not filled with repetitions. The "first time" is remembered per penalty type and travels with the checkpoint.
 
 **Movement boundary.**
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.

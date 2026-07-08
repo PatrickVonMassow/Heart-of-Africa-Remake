@@ -120,6 +120,9 @@ export interface Strings {
     oceanBlocked: string
     /** Warning when starting to climb a mountain without a rope (design.md §11). */
     mountainNoRopeWarn: string
+    /** First-time movement-penalty warnings for jungle/water (design.md §11). */
+    penaltyJungle: string
+    penaltyWater: string
     boughtFood: string
     bought(name: string): string
     inHand(name: string): string
@@ -294,6 +297,9 @@ export interface Strings {
       sweptAway: string
       /** Warning entry on climbing a mountain without a rope (design.md §11). */
       mountainClimb: string
+      /** First-time movement-penalty warnings (design.md §11). */
+      penaltyJungle: string
+      penaltyWater: string
       /** A fall while climbing without a rope (design.md §11). */
       mountainFall: string
       discovery: string
@@ -344,6 +350,9 @@ export interface Strings {
     sweptAway: string
     /** Climbing a mountain without a rope: warning and the fall (design.md §11). */
     mountainNoRope: string
+    /** First-time movement-penalty warnings for jungle/water (design.md §11). */
+    penaltyJungle: string
+    penaltyWater: string
     mountainFall: string
     mountainFallItem: string
     findRemains(p: TextParams): string

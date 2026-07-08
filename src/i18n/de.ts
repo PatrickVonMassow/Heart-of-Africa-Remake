@@ -212,6 +212,8 @@ export const de: Strings = {
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
     mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich — ein Fehltritt, und ich stürze. Langsam und vorsichtig!',
+    penaltyJungle: 'Der Dschungel bremst mich — eine Machete in der Hand bahnte den Weg.',
+    penaltyWater: 'Kein Kanu — ich muss hinüberschwimmen, langsam und durchnässt.',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
     inHand: (name) => `${name} in die Hand genommen.`,
@@ -378,6 +380,8 @@ export const de: Strings = {
       sandstorm: 'Sandsturm',
       sweptAway: 'Fortgerissen',
       mountainClimb: 'Ohne Seil ins Gebirge',
+      penaltyJungle: 'Kampf durch den Dschungel',
+      penaltyWater: 'Ins Wasser',
       mountainFall: 'Ein Sturz',
       discovery: 'Ein düsterer Fund',
       deadline1: 'Ein Brief der Geldgeber',
@@ -519,6 +523,10 @@ export const de: Strings = {
       '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer —[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
     mountainNoRope:
       '[weary]Kein Seil in der Hand, und doch führt kein Weg um dieses Gebirge herum.[/weary] [fear]Ich klettere langsam, Griff um Griff —[pause] ein Fehltritt hier, und der Fels wird mich nicht halten.[/fear]',
+    penaltyJungle:
+      '[weary]Der Dschungel schließt sich um mich, dicht von Ranken und Dornen.[/weary] [emph]Ohne Machete[/emph] muss ich jeden Schritt erzwingen —[pause] eine Klinge in der Hand bahnte den Weg.',
+    penaltyWater:
+      '[weary]Das Wasser versperrt mir den Weg, und ich habe kein Kanu.[/weary] Ich wate und schwimme hinüber, langsam und durchnässt;[pause] [emph]ein Kanu in der Hand[/emph] trüge mich mühelos darüber.',
     mountainFall:
       '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden und benommen kam ich weiter unten zum Liegen —[pause] ohne Seil wäre dieser Aufstieg beinahe mein Ende gewesen.[/weary]',
     mountainFallItem:
