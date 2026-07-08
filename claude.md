@@ -216,10 +216,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    its reason (`design.md` §11): while a terrain slows the traveler and
    the relieving hand object is not held (jungle→machete, water→canoe,
    mountain→rope), the top-right status area names the cause and the
-   remedy — the slowdown is never silent. Verifiable: the penalty mapping
-   is pure-tested for each terrain, and the top-right HUD hint appears in
-   jungle without a machete and clears once the machete is in hand
-   (`scripts/verify/enrichments.mjs`).
+   remedy — the slowdown is never silent. The first time each of the three
+   is met it is also announced once in the journal (both languages, voice
+   markup); every later encounter of that kind is carried only by the
+   status-bar hint, and the once-per-type flag travels with the checkpoint.
+   Verifiable: the penalty mapping
+   is pure-tested for each terrain, the top-right HUD hint appears in
+   jungle without a machete and clears once the machete is in hand, and a
+   first jungle entry adds exactly one journal warning while a later entry
+   adds none (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (simplified saving is sufficient). The buy dialog
@@ -279,7 +284,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     "**Graphics and atmosphere.**" passage in "## 2. Perspectives and
     Camera". This includes the decorative lion hunt (`design.md` §19): the
     lion approaches from a random direction (the chase runs any which way,
-    not always toward the same corner) and the fleeing prey weaves left and
+    not always toward the same corner), takes varied, region-appropriate
+    prey (zebra, wildebeest, antelope or warthog per the region's ~1890
+    fauna — wildebeest and warthog are new savanna species that also roam
+    as ambient herds), and the fleeing prey weaves left and
     right to shake it, while the lion pursues with a limited turn rate but
     is faster and closes in; after the catch the lion visibly feeds on the
     carcass (lowered, rhythmically tearing head movements, red spreading
@@ -305,7 +313,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     it turns only in gentle arcs) and that prey ignore a distant elephant
     but dart away from a close one (last-moment dodge), assert that lion hunts run in varied
     directions (low mean-resultant length across hunts) with a weaving prey
-    (its heading oscillates around straight-away), prove the zoom-aware
+    (its heading oscillates around straight-away), that the lion takes more
+    than one kind of prey and every hunted species fits the region's pool,
+    prove the zoom-aware
     streaming despawn (an animal survives a tile-boundary crossing while in
     view, despawns once well outside it, and a wider zoom keeps animals the
     default view would have dropped) and that a non-lion (trampled) carcass
@@ -413,11 +423,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     later user calibration), strafing and walking backward inside
     settlements move at 80 % of the forward speed (a diagonal is never
     faster than straight; `design.md` §2),
-    the first-person eye height is 1.5 m, and the ambience noise beds
-    (wind/surf/murmur) and their gust/swell modulation each play at a 0.2
-    volume multiplier. Mouse sensitivity, walk speed, the strafe/backward
-    factor and both ambience
-    volumes are adjustable at runtime in the debug menu (`design.md` §21)
+    the first-person eye height is 1.5 m, and a single ambience volume
+    (default 0.1) scales the whole soundscape together — the noise beds
+    (wind/surf/murmur), their gust/swell modulation and the proximity
+    animal calls. Nearby wildlife in the bird's-eye view is heard: an
+    animal's own call (elephant trumpet, lion roar, grazer bark, wading
+    flock) rises as the player draws near and fades once it is left behind
+    (`design.md` §19), all under that one volume. Mouse sensitivity, walk
+    speed, the strafe/backward factor and the ambience
+    volume are adjustable at runtime in the debug menu (`design.md` §21)
     in both languages; the bird's-eye mouse-wheel zoom is always active
     (0.25x-4x), with a debug checkbox gating zoom-out beyond the default
     distance (without it, zoom-out stops at factor 1; disabling clamps a
@@ -432,13 +446,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     loadout — all gear/treasures, 100000 gifts/dollars/provisions, full
     health and no afflictions, with the inventory capacity raised to fit —
     and F4 toggles the canoe in and out of the pack.
-    Verifiable: `scripts/verify/settings.mjs` asserts the defaults, the
+    Verifiable: `scripts/verify/settings.mjs` asserts the defaults
+    (including the single ambience volume 0.1), the
     eye height, the 80 % strafe/backward factor (exact via the pure
     velocity helper, plus an in-scene smoke check that both directions
     move), the F3 full loadout, the F4 canoe toggle, the Tab journal toggle
     (opens/closes without shifting focus onto a control, and does not
     toggle while a debug field is focused; `design.md` §17), the working debug-menu
-    controls in both languages and the lion-feed depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts
+    controls in both languages, that a nearby animal raises its proximity
+    call and it fades once the player leaves, and the lion-feed depiction
+    (pt. 12); `scripts/verify/enrichments.mjs` asserts
     the zoom gate, the dropdowns and the renderer row;
     `scripts/verify/collision.mjs` additionally proves corner clearance at
     box buildings and an inhabitant re-entering its dwelling (pt. 16);
