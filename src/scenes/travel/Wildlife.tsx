@@ -152,6 +152,9 @@ const FLEES_LION: Record<Species, boolean> = {
 }
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
+/** Speed (units/sec) at which prey run from an active predator; the flee
+ *  accumulates into the animal's position so it never teleports (design.md §19). */
+const FLEE_SPEED = 5
 const MAX_STAINS = 60
 /** Elephant herd roaming (design.md §19): a slow amble that only ever moves
  *  forward, turning in gentle arcs. Herd-mates keep together (cohesion); they
@@ -651,15 +654,19 @@ function Herds() {
           const g = Math.sin(t * 0.35 + a.phase * 3)
           if (g > 0.65) pitch = (g - 0.65) * 0.9
         }
-        // Prey scatters away from an active lion (design.md §19).
-        if (lionActive && FLEES_LION[sp]) {
-          const dx = px - LION_STATE.lx
-          const dz = pz - LION_STATE.lz
+        // Prey flees from an active predator (design.md §19): it runs away
+        // smoothly, accumulating into its own position, so it never teleports
+        // when the hunt begins or snaps back when it ends.
+        if (lionActive && FLEES_LION[sp] && sp !== 'elephant') {
+          const dx = a.x - LION_STATE.lx
+          const dz = a.z - LION_STATE.lz
           const d = Math.hypot(dx, dz)
           if (d < FLEE_RADIUS && d > 0.01) {
-            const push = ((FLEE_RADIUS - d) / FLEE_RADIUS) * 6
-            px += (dx / d) * push
-            pz += (dz / d) * push
+            const urgency = (FLEE_RADIUS - d) / FLEE_RADIUS
+            a.x += (dx / d) * FLEE_SPEED * urgency * dt
+            a.z += (dz / d) * FLEE_SPEED * urgency * dt
+            px = a.x + wob * 0.3
+            pz = a.z + Math.cos(t * 0.2 + a.phase) * 0.3
             yaw = Math.atan2(dx, dz) // face away while fleeing
             pitch = 0
           }

@@ -332,7 +332,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     carcasses left far off-screen are culled while a visible one is kept (so
     kills stay bounded and never stall the frame loop), that more than one
     kind of predator hunts and every predator/prey pairing fits the region
-    and the predator's food web, and
+    and the predator's food web, that prey flee a predator smoothly without
+    teleporting (no single-frame jump), and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"

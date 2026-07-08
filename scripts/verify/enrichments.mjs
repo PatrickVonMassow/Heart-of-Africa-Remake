@@ -433,6 +433,41 @@ check('elephants turn only in gentle arcs (no sharp turns)', herdTest.ok && herd
 check('prey does not dodge a distant elephant', herdTest.ok && herdTest.movedWhileFar < 0.5, JSON.stringify(herdTest))
 check('prey darts away from a close elephant (last-moment dodge)', herdTest.ok && herdTest.dNearEnd > herdTest.dNearStart + 0.5, JSON.stringify(herdTest))
 
+// --- Prey flees smoothly, never teleporting (point 7) ------------------------
+// When a predator becomes active the prey must run away by accumulating into
+// its position, not snap outward by a fixed offset (the old scatter bug).
+const flee = await page.evaluate(async () => {
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const lh = window.__lionHunt.state
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  lh.mode = 'idle'; lh.timer = 999
+  for (const sp of ['zebra', 'antelope', 'giraffe', 'wildebeest', 'warthog', 'elephant']) herds[sp] = herds[sp].filter(() => false)
+  const p = window.__game.getState().pos
+  const z = { x: p.x + 3, z: p.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
+  herds.zebra.push(z)
+  await sleep(200)
+  const before = { x: z.x, z: z.z }
+  // Activate a predator right next to the prey and pin it there.
+  lh.predator = 'cheetah'; lh.mode = 'chase'; lh.timer = 999
+  lh.lx = p.x; lh.lz = p.z; lh.px = z.x; lh.pz = z.z
+  let prev = { x: z.x, z: z.z }
+  let maxStep = 0
+  let samples = 0
+  for (let i = 0; i < 25; i++) {
+    lh.lx = p.x; lh.lz = p.z // keep the predator pinned
+    await sleep(40)
+    const step = Math.hypot(z.x - prev.x, z.z - prev.z)
+    if (i > 0) { maxStep = Math.max(maxStep, step); samples++ }
+    prev = { x: z.x, z: z.z }
+  }
+  const total = Math.hypot(z.x - before.x, z.z - before.z)
+  lh.mode = 'idle'; lh.timer = 60
+  return { total, maxStep, samples, movedAway: total > 1 }
+})
+check('prey flees the predator (moves away)', flee.movedAway === true, JSON.stringify(flee))
+check('the flee never teleports (no single-frame jump)', flee.maxStep < 2, JSON.stringify(flee))
+
 // --- Zoom-aware streaming despawn (point 5) ----------------------------------
 // Animals stay alive while they may be on screen and only despawn well beyond
 // the view; the kept radius scales with the bird's-eye zoom. Moves are made in
