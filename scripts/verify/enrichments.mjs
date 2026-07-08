@@ -421,6 +421,18 @@ const f2 = await page.evaluate(() => {
 })
 check('F2 toggles do-not-disturb', f2.on === true && f2.off === false, '')
 
+// --- Elephant graveyard: fallen carcasses + strewn ivory (user request) ------
+// The graveyard is a fixed scene decoration; read its layout via the dev hook
+// (mounted in the current bird's-eye scene), then jump onto it for a shot.
+const graveyard = await page.evaluate(() => (window.__graveyard ? { ...window.__graveyard } : null))
+check('elephant graveyard has fallen elephant carcasses', !!graveyard && graveyard.carcasses >= 5, graveyard ? `${graveyard.carcasses} carcasses` : 'no dev hook')
+check('elephant graveyard has strewn ivory tusks', !!graveyard && graveyard.tusks >= 10, graveyard ? `${graveyard.tusks} tusks` : 'no dev hook')
+check('elephant graveyard has scattered bones', !!graveyard && graveyard.bones >= 8, graveyard ? `${graveyard.bones} bones` : 'no dev hook')
+await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6)) // onto the graveyard
+await page.waitForTimeout(2600)
+await page.screenshot({ path: `${OUT}85-elephant-graveyard.png` })
+console.log('shot 85-elephant-graveyard.png')
+
 // --- Modal dialogs render above the in-scene labels (user request) -----------
 // In a settlement the buildings carry floating map-labels (drei <Html>); an
 // opened modal dialog must cover them, not sit behind them.

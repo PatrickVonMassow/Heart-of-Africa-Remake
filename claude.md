@@ -273,10 +273,15 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     a kill, shore-near animals periodically walk to the water and drink,
     grazers dip their heads on open land. The open landscape is dressed
     with region-typical period elements (baobabs, termite mounds, kopjes,
-    dead trees, papyrus belts along water; `design.md` §19). Verifiable:
+    dead trees, papyrus belts along water; `design.md` §19). The elephant
+    graveyard (`design.md` §4.4) is dressed so it reads at a glance: a
+    field of fallen, bleached elephant carcasses with ivory tusks and
+    bones strewn over a pale bone-littered patch. Verifiable:
     automated checks force the feed state (carcass, head animation, stain,
-    leave phase) and provoke a trampling via an injected elephant
-    (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
+    leave phase), provoke a trampling via an injected elephant, and assert
+    the graveyard's carcass/tusk/bone counts via the dev hook with a
+    screenshot (`scripts/verify/settings.mjs`,
+    `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
     in "## 3. World Model and Map" (`design.md`) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes

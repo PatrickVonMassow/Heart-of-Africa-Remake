@@ -47,6 +47,8 @@ import {
   buildRock,
   buildTermiteMound,
 } from '../../render/flora'
+import { buildElephant } from '../../render/fauna'
+import { mulberry32 } from '../../world/noise'
 import { Climate } from './Climate'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
@@ -746,6 +748,103 @@ function HiddenCross({ lat, lon, label, scale = 1 }: { lat: number; lon: number;
   )
 }
 
+/**
+ * Elephant graveyard (design.md §4.4/§19): the site is recognizable from afar
+ * by a field of fallen, bleached elephant carcasses and scattered ivory tusks
+ * and bones over a bone-strewn patch of ground. Layout is seeded per run.
+ */
+function ElephantGraveyard() {
+  const seed = useGame((s) => s.seed)
+  const layout = useMemo(() => {
+    const g = ELEPHANT_GRAVEYARD
+    const center = latLonToWorld(g.lat, g.lon)
+    const groundY = Math.max(0.2, sampleTerrain(g.lat, g.lon, seed).height)
+    const rand = mulberry32((seed ^ 0x51ef4a2d) >>> 0)
+    const carcasses = Array.from({ length: 8 }, () => {
+      const a = rand() * Math.PI * 2
+      const r = 1 + rand() * 4.5
+      return {
+        x: Math.cos(a) * r,
+        z: Math.sin(a) * r,
+        yaw: rand() * Math.PI * 2,
+        roll: (rand() < 0.5 ? 1 : -1) * (Math.PI / 2 + (rand() - 0.5) * 0.35),
+        s: 0.85 + rand() * 0.45,
+      }
+    })
+    const scatter = (n: number) =>
+      Array.from({ length: n }, () => {
+        const a = rand() * Math.PI * 2
+        const r = rand() * 6.5
+        return { x: Math.cos(a) * r, z: Math.sin(a) * r, rot: rand() * Math.PI * 2, tilt: (rand() - 0.5) * 0.5, s: 0.6 + rand() * 0.7 }
+      })
+    return { center, groundY, carcasses, tusks: scatter(22), bones: scatter(16) }
+  }, [seed])
+
+  const elephantGeo = useMemo(() => buildElephant(), [])
+  // Bleached carcass/bone material (flat, ignores the elephant's vertex colors).
+  const boneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c7bda6', roughness: 1, vertexColors: false }), [])
+  const ivoryMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e9dec6', roughness: 0.65 }), [])
+  const tuskGeo = useMemo(() => {
+    const g = new THREE.ConeGeometry(0.1, 1.3, 6)
+    g.rotateZ(Math.PI / 2)
+    return g
+  }, [])
+  const ribGeo = useMemo(() => {
+    const g = new THREE.CylinderGeometry(0.05, 0.06, 1.0, 5)
+    g.rotateZ(Math.PI / 2)
+    return g
+  }, [])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__graveyard = {
+      carcasses: layout.carcasses.length,
+      tusks: layout.tusks.length,
+      bones: layout.bones.length,
+      x: layout.center.x,
+      z: layout.center.z,
+    }
+    return () => {
+      delete w.__graveyard
+    }
+  }, [layout])
+
+  return (
+    <group position={[layout.center.x, layout.groundY, layout.center.z]}>
+      {/* Bone-strewn pale ground patch. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} receiveShadow>
+        <circleGeometry args={[8, 28]} />
+        <meshStandardMaterial color="#b9ad90" roughness={1} />
+      </mesh>
+      {/* Fallen, bleached elephant carcasses lying on their sides. */}
+      {layout.carcasses.map((c, i) => (
+        <group key={`c${i}`} position={[c.x, 0, c.z]} rotation={[0, c.yaw, 0]}>
+          <group position={[0, 0.8 * c.s, 0]} rotation={[0, 0, c.roll]} scale={c.s}>
+            <mesh geometry={elephantGeo} material={boneMat} castShadow />
+          </group>
+        </group>
+      ))}
+      {/* Scattered ivory tusks. */}
+      {layout.tusks.map((t, i) => (
+        <mesh
+          key={`t${i}`}
+          geometry={tuskGeo}
+          material={ivoryMat}
+          position={[t.x, 0.12 * t.s, t.z]}
+          rotation={[t.tilt, t.rot, 0]}
+          scale={t.s}
+          castShadow
+        />
+      ))}
+      {/* Scattered rib bones. */}
+      {layout.bones.map((b, i) => (
+        <mesh key={`b${i}`} geometry={ribGeo} material={boneMat} position={[b.x, 0.08 * b.s, b.z]} rotation={[0, b.rot, 0]} scale={b.s} castShadow />
+      ))}
+    </group>
+  )
+}
+
 /** Debug-only markers for hidden objects: grave and treasure caches (§21). */
 function GraveMarker() {
   const t = useStrings()
@@ -969,6 +1068,7 @@ export function TravelScene() {
         <PlaceMarker key={p.id} place={p} />
       ))}
       <LandmarkLabels />
+      <ElephantGraveyard />
       <CampMarkers />
       <GraveMarker />
       <Player />
