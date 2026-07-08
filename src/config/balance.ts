@@ -23,9 +23,9 @@ export interface BalanceConfig {
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
   foodPerDay: number
   /** Base terrain time-cost multipliers (more days per unit in rough terrain).
-   *  jungle/mountain are the costs with the relieving item in hand; water is the
+   *  jungle/mountain are the costs with the relieving item carried; water is the
    *  cost while swimming (no canoe). The penalty/speed-up factors below modify
-   *  them when the hand object is missing or present. */
+   *  them by whether the relieving item is in the pack (possession-based). */
   terrainCost: {
     desert: number
     savanna: number
@@ -49,7 +49,7 @@ export interface BalanceConfig {
   currentWaterfallBoost: number
   /** Radius (degrees) around a waterfall within which the current is boosted. */
   currentWaterfallRadius: number
-  /** Climbing a mountain without a rope in hand (design.md §7/§11). */
+  /** Climbing a mountain without a rope in the pack (design.md §7/§11). */
   mountainFall: {
     /** Chance per travelled day of a fall while on a mountain without a rope. */
     chancePerDay: number

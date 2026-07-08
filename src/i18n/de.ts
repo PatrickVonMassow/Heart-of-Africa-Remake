@@ -177,7 +177,6 @@ export const de: Strings = {
   },
 
   prompts: {
-    digHere: 'G — Hier graben',
     interact: (label) => `E — ${label}`,
     openCamp: 'C — Lager öffnen',
   },
@@ -221,8 +220,6 @@ export const de: Strings = {
     valuableAlreadyShown: 'Dieses Dorf hat den Schatz bereits gesehen.',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
-    inHand: (name) => `${name} in die Hand genommen.`,
-    handsFree: 'Hände frei.',
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
     villagerNod: 'Der Alte nickt mir freundlich zu.',
@@ -240,7 +237,6 @@ export const de: Strings = {
     notEnoughGifts: 'Nicht genug Gaben — hier zählt kein Geld.',
     bazaarRejected: (name) => `Der Händler winkt ab — mit ${name} wird hier nicht gehandelt.`,
     graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
-    villagersFlee: 'Beim Anblick meines Gewehrs fliehen die Dorfbewohner — niemand spricht mit mir.',
     chiefHostile: 'Das Dorf hat meinen Fehltritt nicht vergessen. Das Oberhaupt empfängt mich nicht.',
     regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet — keine Hütte dieser Region öffnet sich mir mehr.',
     campPitched: 'Lager aufgeschlagen — ein X auf meiner Karte markiert die Stelle.',

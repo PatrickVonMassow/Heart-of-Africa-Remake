@@ -178,7 +178,6 @@ export const en: Strings = {
   },
 
   prompts: {
-    digHere: 'G — Dig here',
     interact: (label) => `E — ${label}`,
     openCamp: 'C — Open camp',
   },
@@ -222,8 +221,6 @@ export const en: Strings = {
     valuableAlreadyShown: 'This village has already seen the treasure.',
     boughtFood: 'Bought one week of provisions.',
     bought: (name) => `${name} purchased.`,
-    inHand: (name) => `Now holding the ${name.toLowerCase()}.`,
-    handsFree: 'Hands free.',
     notEnoughMoney: 'Not enough money.',
     digNoShovel: 'I cannot dig without a shovel in hand.',
     villagerNod: 'The old man gives me a friendly nod.',
@@ -241,7 +238,6 @@ export const en: Strings = {
     notEnoughGifts: 'Not enough gifts — money means nothing here.',
     bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
     graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
-    villagersFlee: 'The villagers flee at the sight of my rifle — no one will speak with me.',
     chiefHostile: 'The village has not forgotten my offense. The chief refuses to see me.',
     regionShunned: 'Word of my robbery has spread — no hut of this region will open to me again.',
     campPitched: 'Camp pitched — an X on my map marks the spot.',

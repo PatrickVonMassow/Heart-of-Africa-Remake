@@ -84,7 +84,6 @@ export interface Strings {
   }
 
   prompts: {
-    digHere: string
     interact(label: string): string
     /** Near a pitched camp (design.md §6). */
     openCamp: string
@@ -134,8 +133,6 @@ export interface Strings {
     valuableAlreadyShown: string
     boughtFood: string
     bought(name: string): string
-    inHand(name: string): string
-    handsFree: string
     notEnoughMoney: string
     digNoShovel: string
     villagerNod: string
@@ -161,7 +158,6 @@ export interface Strings {
     bazaarRejected(name: string): string
     graveyardEmpty: string
     /** Standing gates (design.md §12). */
-    villagersFlee: string
     chiefHostile: string
     regionShunned: string
     /** Camps (design.md §6). */

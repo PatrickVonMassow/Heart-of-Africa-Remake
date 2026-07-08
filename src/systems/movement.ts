@@ -1,7 +1,7 @@
 // Movement penalties (design.md §11): terrain that slows travel unless the
-// matching item is held in hand. Kept pure so the HUD can surface the reason
-// and the verification can assert it. The hint names the terrain and the item
-// that would relieve the slowdown.
+// matching item is carried in the pack. Kept pure so the HUD can surface the
+// reason and the verification can assert it. The hint names the terrain and the
+// item that would relieve the slowdown.
 
 import type { EquipmentId } from '../state/store'
 import type { TerrainType } from '../world/terrain'
@@ -13,8 +13,8 @@ const has = (eq: Inventory, id: EquipmentId) => (eq[id] ?? 0) > 0
 
 /**
  * The active terrain slowdown for the current inventory, or null when nothing
- * slows the traveller here (design.md §11). Effects follow item *possession*,
- * not a held hand item: dense jungle without a machete, open/enclosed water
+ * slows the traveller here (design.md §11). Effects follow item *possession*
+ * (nothing is "held in hand"): dense jungle without a machete, open/enclosed water
  * without a canoe, and steep mountain rock without a rope each slow the
  * traveller; and carrying the canoe slows land travel (its only relevance is
  * possession, so it is a permanent land handicap).
