@@ -592,12 +592,21 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     kind directly (`design.md` §21). Beyond the hidden roll, walking into
     one of the wandering bird's-eye lions directly triggers a lion attack
     (same protection/outcome rules, rate-limited by the event cooldown and
-    suppressed with the random-event system). Verifiable:
+    suppressed with the random-event system). Beyond the reactive events, the
+    first time the traveller meets a danger situation the journal warns of it
+    once and names the protection (`design.md` §14, first-time danger
+    warnings): setting out without a rifle (wild animals → rifle), the first
+    desert (dehydration/sun blindness → canteen), the first water (crocodiles →
+    canoe), and the first fever-jungle (fever → medicine). Each fires once, the
+    flags travel with the checkpoint, and every warning exists in both
+    languages with voice markup — distinct from the §11 movement-penalty hints
+    (slowdown, not danger). Verifiable:
     `scripts/verify/events.mjs` asserts the reduced rates, the protection
     ordering (pure functions), deterministic outcome mapping, the
     consequences of each trigger, a fatal attack, autonomous firing while
     travelling, silence when disabled, and that pinning the lion on the
-    player triggers a lion attack.
+    player triggers a lion attack; `scripts/verify/enrichments.mjs` asserts
+    each first-time danger warning fires exactly once and marks its flag.
 24. **Deadline and successor.** `design.md` §5/§18 is implemented: the
     expedition runs against a multi-year deadline (balance value, ~5
     years) with staged messages — a first warning at 60 % and a final

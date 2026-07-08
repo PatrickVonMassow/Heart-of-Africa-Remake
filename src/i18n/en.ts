@@ -388,6 +388,10 @@ export const en: Strings = {
       penaltyJungle: 'Fighting Through the Jungle',
       penaltyWater: 'Into the Water',
       penaltyCanoeLand: 'The Canoe on Land',
+      dangerUnarmed: 'Wilds Without a Rifle',
+      dangerDesert: 'The Blaze of the Desert',
+      dangerWater: 'Crocodiles Lie in Wait',
+      dangerWetland: 'Fever in the Thicket',
       mountainFall: 'A Fall',
       discovery: 'A Grim Discovery',
       deadline1: 'A Letter from the Financiers',
@@ -534,6 +538,14 @@ export const en: Strings = {
       '[weary]The water bars my path, and I have no canoe.[/weary] I wade and swim across, slow and soaked;[pause] [emph]a canoe[/emph] would carry me over with ease and keep the crocodiles at bay.',
     penaltyCanoeLand:
       '[weary]The canoe on my back is a heavy burden overland.[/weary] It drags at every step —[pause] [emph]for long stretches on foot[/emph] I had better leave it behind in a camp.',
+    dangerUnarmed:
+      '[somber]I set out into the wilds,[pause] and it struck me that I carry no weapon.[/somber] [fear]Lions, leopards and snakes prowl this country.[/fear] [emph]A rifle in the pack[/emph] is the surest protection —[pause] better even than a machete.',
+    dangerDesert:
+      '[weary]The desert blazes without mercy.[/weary] [fear]Without water, thirst and the sun-blindness threaten —[pause] and the blindness can kill.[/fear] [emph]A filled canteen[/emph] holds off the thirst;[pause] against the blindness, only leaving the desert will serve.',
+    dangerWater:
+      '[fear]Crocodiles lie in wait in the water.[/fear] [weary]Without a canoe I am at their mercy, and my rifle turns wet and useless.[/weary] [emph]A canoe[/emph] carries me across safely and keeps the weapon dry;[pause] failing that, only the machete helps.',
+    dangerWetland:
+      '[somber]A damp haze hangs over the thicket.[/somber] [fear]Here the fever breeds, clouding the mind and draining the strength.[/fear] [emph]Medicine in the pack[/emph] cures it —[pause] I should always keep some at hand.',
     mountainFall:
       '[fear]The rock gave way beneath my foot, and I fell![/fear] [weary]Bruised and dazed I came to rest far below —[pause] without a rope this ascent nearly became my end.[/weary]',
     mountainFallItem:

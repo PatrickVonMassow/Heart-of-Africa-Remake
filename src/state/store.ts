@@ -193,6 +193,9 @@ export interface GameState {
   /** Movement-penalty types already announced in the journal (design.md §11):
    *  each is journaled once, then only the status-bar hint carries it. */
   penaltyJournaled: { jungle: boolean; water: boolean; mountain: boolean; canoeOnLand: boolean }
+  /** First-time danger warnings already given (design.md §14): each danger
+   *  situation is announced once with advice on how to protect against it. */
+  dangerWarned: { unarmed: boolean; desert: boolean; water: boolean; wetland: boolean }
   hasCheckpoint: boolean
   /** Bumped by the debug menu when mutating the balance object. */
   balanceVersion: number
@@ -447,6 +450,7 @@ function startState(seed: number) {
     foodWarned: false,
     foodOutWarned: false,
     penaltyJournaled: { jungle: false, water: false, mountain: false, canoeOnLand: false },
+    dangerWarned: { unarmed: false, desert: false, water: false, wetland: false },
     balanceVersion: 0,
   }
 }
@@ -515,6 +519,17 @@ const PENALTY_JOURNAL: Record<'jungle' | 'water' | 'mountain' | 'canoeOnLand', {
   water: { title: 'journal.titles.penaltyWater', body: 'journal.penaltyWater', toast: 'penaltyWater' },
   mountain: { title: 'journal.titles.mountainClimb', body: 'journal.mountainNoRope', toast: 'mountainNoRopeWarn' },
   canoeOnLand: { title: 'journal.titles.penaltyCanoeLand', body: 'journal.penaltyCanoeLand', toast: 'penaltyCanoeLand' },
+}
+
+// First-time danger warnings (design.md §14): the first time the traveller
+// meets a danger situation, the journal warns of it and how to guard against
+// it. Each fires once (dangerWarned travels with the checkpoint).
+type DangerKey = 'unarmed' | 'desert' | 'water' | 'wetland'
+const DANGER_JOURNAL: Record<DangerKey, { title: string; body: string }> = {
+  unarmed: { title: 'journal.titles.dangerUnarmed', body: 'journal.dangerUnarmed' },
+  desert: { title: 'journal.titles.dangerDesert', body: 'journal.dangerDesert' },
+  water: { title: 'journal.titles.dangerWater', body: 'journal.dangerWater' },
+  wetland: { title: 'journal.titles.dangerWetland', body: 'journal.dangerWetland' },
 }
 
 export const useGame = create<GameState>()((set, get) => ({
@@ -606,6 +621,20 @@ export const useGame = create<GameState>()((set, get) => ({
       })
       get().addEntry({ key: j.title }, { key: j.body })
     }
+
+    // First-time danger warnings (design.md §14): the first travel without a
+    // rifle, the first desert, water and fever-prone jungle each warn once and
+    // advise the protecting item. Kept separate from the mobility penalty above
+    // (attack/health danger vs. slowdown).
+    const warn = (key: DangerKey) => {
+      const d = DANGER_JOURNAL[key]
+      set((st) => ({ dangerWarned: { ...st.dangerWarned, [key]: true } }))
+      get().addEntry({ key: d.title }, { key: d.body })
+    }
+    if (!s.dangerWarned.unarmed && (s.equipment.rifle ?? 0) <= 0) warn('unarmed')
+    if (!s.dangerWarned.desert && nextT.type === 'desert') warn('desert')
+    if (!s.dangerWarned.water && (nextT.type === 'water' || nextT.type === 'ocean')) warn('water')
+    if (!s.dangerWarned.wetland && nextT.type === 'jungle') warn('wetland')
 
     const dayDelta = step * balance.daysPerUnit * cost
     const foodDelta = dayDelta * balance.foodPerDay
@@ -1710,6 +1739,7 @@ export const useGame = create<GameState>()((set, get) => ({
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
       penaltyJournaled: s.penaltyJournaled,
+      dangerWarned: s.dangerWarned,
       deadlineWarned: s.deadlineWarned,
       explored: s.explored,
       treasures: s.treasures, treasureSites: s.treasureSites, graveyardIvoryLeft: s.graveyardIvoryLeft,
@@ -1746,6 +1776,7 @@ export const useGame = create<GameState>()((set, get) => ({
         explored: snap.explored ?? {},
         health: snap.health ?? balance.health.max,
         penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false, canoeOnLand: false },
+        dangerWarned: snap.dangerWarned ?? { unarmed: false, desert: false, water: false, wetland: false },
         deadlineWarned: snap.deadlineWarned ?? 0,
         knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
         hintsGiven: snap.hintsGiven ?? {},

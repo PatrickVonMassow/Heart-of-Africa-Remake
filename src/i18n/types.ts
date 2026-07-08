@@ -316,6 +316,11 @@ export interface Strings {
       penaltyJungle: string
       penaltyWater: string
       penaltyCanoeLand: string
+      /** First-time danger warnings with protection advice (design.md §14). */
+      dangerUnarmed: string
+      dangerDesert: string
+      dangerWater: string
+      dangerWetland: string
       /** A fall while climbing without a rope (design.md §11). */
       mountainFall: string
       discovery: string
@@ -370,6 +375,11 @@ export interface Strings {
     penaltyJungle: string
     penaltyWater: string
     penaltyCanoeLand: string
+    /** First-time danger warnings with protection advice (design.md §14). */
+    dangerUnarmed: string
+    dangerDesert: string
+    dangerWater: string
+    dangerWetland: string
     mountainFall: string
     mountainFallItem: string
     findRemains(p: TextParams): string

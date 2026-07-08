@@ -375,6 +375,71 @@ if (jungleSpot) {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
 }
 
+// --- First-time danger warnings with protection advice (§7.1.7 / design.md §14) ---
+// Each danger situation (unarmed travel, desert, water, fever-jungle) warns once
+// in the journal and names the protecting item; a later encounter stays silent.
+const desertSpot = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  for (let lat = 26; lat >= 18; lat -= 0.5)
+    for (let lon = 10; lon <= 30; lon += 0.5)
+      if (window.__terrainType(lat, lon, seed) === 'desert') return { lat, lon }
+  return null
+})
+const waterSpot = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  // Lake Victoria area — open inland water.
+  for (let lat = 0.5; lat >= -2.5; lat -= 0.25)
+    for (let lon = 32; lon <= 34.5; lon += 0.25)
+      if (window.__terrainType(lat, lon, seed) === 'water') return { lat, lon }
+  return null
+})
+const danger = await page.evaluate(async ([desert, water, jungle]) => {
+  const g = () => window.__game.getState()
+  window.__balance.randomEventsEnabled = false
+  window.__game.setState({
+    dangerWarned: { unarmed: false, desert: false, water: false, wetland: false },
+    equipment: {}, // no rifle → unarmed warning; no machete/canoe either
+    afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 },
+  })
+  const count = (k) => g().journal.filter((e) => e.title?.key === k).length
+  const step = async (dx, dz) => {
+    for (let i = 0; i < 4; i++) { g().moveTravel(dx, dz, 0.03); await new Promise((r) => setTimeout(r, 15)) }
+  }
+  const res = {}
+  // Unarmed: the first travel step (from a neutral savanna spot).
+  g().debugJumpTo(-2.2, 34.8)
+  res.uBefore = count('journal.titles.dangerUnarmed'); await step(1, 0); res.uAfter = count('journal.titles.dangerUnarmed')
+  // Desert: first entry warns once, a second stretch stays silent.
+  if (desert) {
+    g().debugJumpTo(desert.lat, desert.lon)
+    res.dBefore = count('journal.titles.dangerDesert'); await step(1, 0); res.dAfter = count('journal.titles.dangerDesert')
+    g().debugJumpTo(desert.lat, desert.lon); await step(0, 1); res.dSecond = count('journal.titles.dangerDesert')
+  }
+  // Water (crocodiles).
+  if (water) {
+    g().debugJumpTo(water.lat, water.lon)
+    res.wBefore = count('journal.titles.dangerWater'); await step(1, 0); res.wAfter = count('journal.titles.dangerWater')
+  }
+  // Fever-prone jungle.
+  g().debugJumpTo(jungle.lat, jungle.lon)
+  res.jBefore = count('journal.titles.dangerWetland'); await step(1, 0); res.jAfter = count('journal.titles.dangerWetland')
+  res.flags = g().dangerWarned
+  return res
+}, [desertSpot, waterSpot, jungleSpot])
+check('unarmed travel warns once (advises a rifle)', danger.uAfter === danger.uBefore + 1, JSON.stringify(danger))
+if (desertSpot) {
+  check('first desert warns once and not again', danger.dAfter === danger.dBefore + 1 && danger.dSecond === danger.dAfter, JSON.stringify(danger))
+} else {
+  check('a desert tile was found for the warning', false, 'no desert tile located')
+}
+if (waterSpot) {
+  check('first water warns of crocodiles once', danger.wAfter === danger.wBefore + 1, JSON.stringify(danger))
+} else {
+  check('a water tile was found for the warning', false, 'no water tile located')
+}
+check('first fever-jungle warns once', danger.jAfter === danger.jBefore + 1, JSON.stringify(danger))
+check('all four danger types are marked warned', danger.flags.unarmed && danger.flags.desert && danger.flags.water && danger.flags.wetland, JSON.stringify(danger.flags))
+
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
 await page.evaluate(() => {
   const pos = window.__game.getState().pos

@@ -394,6 +394,10 @@ export const de: Strings = {
       penaltyJungle: 'Kampf durch den Dschungel',
       penaltyWater: 'Ins Wasser',
       penaltyCanoeLand: 'Das Kanu an Land',
+      dangerUnarmed: 'Wildnis ohne Gewehr',
+      dangerDesert: 'Die Glut der Wüste',
+      dangerWater: 'Lauernde Krokodile',
+      dangerWetland: 'Fieberdunst im Dickicht',
       mountainFall: 'Ein Sturz',
       discovery: 'Ein düsterer Fund',
       deadline1: 'Ein Brief der Geldgeber',
@@ -541,6 +545,14 @@ export const de: Strings = {
       '[weary]Das Wasser versperrt mir den Weg, und ich habe kein Kanu.[/weary] Ich wate und schwimme hinüber, langsam und durchnässt;[pause] [emph]ein Kanu[/emph] trüge mich mühelos und sicher darüber.',
     penaltyCanoeLand:
       '[weary]Das Kanu auf meinem Rücken ist an Land eine schwere Last.[/weary] Es bremst jeden Schritt —[pause] [emph]für lange Wege über Land[/emph] lasse ich es besser in einem Lager zurück.',
+    dangerUnarmed:
+      '[somber]Ich brach in die Wildnis auf,[pause] und mir wurde bewusst, dass ich unbewaffnet bin.[/somber] [fear]Löwen, Leoparden und Schlangen lauern in diesem Land.[/fear] [emph]Ein Gewehr im Gepäck[/emph] ist der beste Schutz —[pause] besser noch als eine Machete.',
+    dangerDesert:
+      '[weary]Die Wüste glüht ohne Gnade.[/weary] [fear]Ohne Wasser drohen Verdursten und die Sonnenblindheit, die tödlich enden kann.[/fear] [emph]Eine gefüllte Trinkflasche[/emph] hält den Durst fern —[pause] doch gegen die Blindheit hilft nur, die Wüste zu verlassen.',
+    dangerWater:
+      '[fear]Im Wasser lauern Krokodile.[/fear] [weary]Ohne Kanu bin ich ihnen ausgeliefert, und mein Gewehr wird nass und nutzlos.[/weary] [emph]Ein Kanu[/emph] trägt mich sicher hinüber und hält die Waffe trocken;[pause] sonst hilft nur die Machete.',
+    dangerWetland:
+      '[somber]Feuchter Dunst hängt über dem Dickicht.[/somber] [fear]Hier brütet das Fieber, das den Verstand trübt und die Kräfte zehrt.[/fear] [emph]Medizin im Gepäck[/emph] heilt es —[pause] ich sollte stets welche bei mir tragen.',
     mountainFall:
       '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden und benommen kam ich weiter unten zum Liegen —[pause] ohne Seil wäre dieser Aufstieg beinahe mein Ende gewesen.[/weary]',
     mountainFallItem:
