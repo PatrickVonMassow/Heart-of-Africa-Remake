@@ -617,21 +617,35 @@ const hunt = await page.evaluate(async () => {
 check('lion hunts run in varied directions (not always the same way)', hunt.count >= 5 && hunt.R < 0.85, JSON.stringify(hunt))
 check('the fleeing prey weaves side to side (zigzag)', hunt.signChanges >= 2 && hunt.amp > 0.4, JSON.stringify(hunt))
 
-// --- Lion prey variety (point 8) ---------------------------------------------
-// The lion takes several kinds of grazer, each fitting the region and period.
+// --- Predator variety, prey variety and the food web (points 6/8) ------------
+// Several predators roam (lion, cheetah, leopard, hyena), each region-fitting,
+// and each takes prey from its own food web (predator → grazer → grassland).
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.waitForTimeout(1000)
 const preyVar = await page.evaluate(async () => {
   const geo = await import('/src/world/geo.ts')
   const s = window.__lionHunt.state
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  // Region prey pools mirror REGION_PREY in Wildlife.tsx (design.md §19).
-  const POOLS = {
+  // Mirror the maps in Wildlife.tsx (design.md §19).
+  const REGION_PREY = {
     east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
     south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
     central: ['antelope', 'warthog', 'zebra'],
     west: ['antelope', 'warthog', 'zebra'],
     north: ['antelope', 'warthog'],
+  }
+  const REGION_PREDATORS = {
+    east: ['lion', 'cheetah', 'hyena', 'leopard'],
+    south: ['lion', 'cheetah', 'hyena', 'leopard'],
+    central: ['lion', 'leopard'],
+    west: ['lion', 'leopard'],
+    north: ['lion', 'cheetah', 'leopard'],
+  }
+  const PREDATOR_PREY = {
+    lion: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    hyena: ['wildebeest', 'zebra', 'warthog'],
+    cheetah: ['antelope', 'warthog'],
+    leopard: ['antelope', 'warthog'],
   }
   const startChase = async (budget) => {
     s.mode = 'idle'; s.timer = 0
@@ -639,23 +653,39 @@ const preyVar = await page.evaluate(async () => {
     while (s.mode !== 'chase' && Date.now() - t0 < budget) { if (s.mode === 'idle') s.timer = 0; await sleep(40) }
     return s.mode === 'chase'
   }
-  const seen = []
-  const mismatches = []
+  const prey = []
+  const predators = []
+  const preyMismatch = []
+  const predMismatch = []
+  const webMismatch = []
   const tAll = Date.now()
-  while (seen.length < 12 && Date.now() - tAll < 60000) {
+  while (prey.length < 16 && Date.now() - tAll < 70000) {
     if (await startChase(2500)) {
       const ll = geo.worldToLatLon(s.px, s.pz)
       const region = geo.regionAt(ll.lat, ll.lon)
-      seen.push(s.prey)
-      if (!POOLS[region]?.includes(s.prey)) mismatches.push({ prey: s.prey, region })
+      prey.push(s.prey)
+      predators.push(s.predator)
+      if (!REGION_PREY[region]?.includes(s.prey)) preyMismatch.push({ prey: s.prey, region })
+      if (!REGION_PREDATORS[region]?.includes(s.predator)) predMismatch.push({ predator: s.predator, region })
+      // Food web: prey must be in the predator's scheme intersected with the region.
+      const web = PREDATOR_PREY[s.predator].filter((p) => REGION_PREY[region].includes(p))
+      if (web.length && !web.includes(s.prey)) webMismatch.push({ predator: s.predator, prey: s.prey, region })
       await sleep(60)
     }
   }
   s.mode = 'idle'; s.timer = 60
-  return { count: seen.length, distinct: [...new Set(seen)], mismatches }
+  return {
+    count: prey.length,
+    distinctPrey: [...new Set(prey)],
+    distinctPredators: [...new Set(predators)],
+    preyMismatch, predMismatch, webMismatch,
+  }
 })
-check('the lion hunts more than one kind of prey', preyVar.distinct.length >= 2, JSON.stringify(preyVar))
-check('every hunted prey fits the region and period', preyVar.count >= 5 && preyVar.mismatches.length === 0, JSON.stringify(preyVar))
+check('several kinds of predator hunt (lion + others)', preyVar.distinctPredators.length >= 2, JSON.stringify(preyVar))
+check('every predator fits the region and period', preyVar.count >= 6 && preyVar.predMismatch.length === 0, JSON.stringify(preyVar))
+check('the predator takes more than one kind of prey', preyVar.distinctPrey.length >= 2, JSON.stringify(preyVar))
+check('every hunted prey fits the region and the predator food web',
+  preyVar.count >= 6 && preyVar.preyMismatch.length === 0 && preyVar.webMismatch.length === 0, JSON.stringify(preyVar))
 
 // --- Debug menu: dropdowns, renderer row, wheel-zoom gate (§7.1.20) ----------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))

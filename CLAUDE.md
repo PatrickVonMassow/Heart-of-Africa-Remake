@@ -286,13 +286,18 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 12. **Atmosphere.** The atmosphere elements from `design.md` are
     implemented — specifically "## 19. Atmosphere and Immersion" and the
     "**Graphics and atmosphere.**" passage in "## 2. Perspectives and
-    Camera". This includes the decorative lion hunt (`design.md` §19): the
-    lion approaches from a random direction (the chase runs any which way,
+    Camera". This includes the decorative predator hunt (`design.md` §19):
+    each hunt a region-appropriate predator appears — lion everywhere,
+    cheetah and hyena on the eastern/southern plains, leopard in the wooded
+    west/centre — and takes prey from its own food web (predator → grazer →
+    grassland: lion/hyena the big grazers, cheetah/leopard the smaller game),
+    with only the lion attacking the player on contact (§14). The predator
+    approaches from a random direction (the chase runs any which way,
     not always toward the same corner), takes varied, region-appropriate
     prey (zebra, wildebeest, antelope or warthog per the region's ~1890
-    fauna — wildebeest and warthog are new savanna species that also roam
+    fauna — wildebeest and warthog are savanna species that also roam
     as ambient herds), and the fleeing prey weaves left and
-    right to shake it, while the lion pursues with a limited turn rate but
+    right to shake it, while the predator pursues with a limited turn rate but
     is faster and closes in; after the catch the lion visibly feeds on the
     carcass (lowered, rhythmically tearing head movements, red spreading
     stain beneath the prey), the carcass shrinks away piece by piece, and
@@ -325,7 +330,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     default view would have dropped), that a non-lion (trampled) carcass
     draws a vulture that lands and consumes it until it is removed, that
     carcasses left far off-screen are culled while a visible one is kept (so
-    kills stay bounded and never stall the frame loop), and
+    kills stay bounded and never stall the frame loop), that more than one
+    kind of predator hunts and every predator/prey pairing fits the region
+    and the predator's food web, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).
 13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"

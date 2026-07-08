@@ -17,9 +17,12 @@ import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import {
   buildAntelope,
+  buildCheetah,
   buildElephant,
   buildFlamingo,
   buildGiraffe,
+  buildHyena,
+  buildLeopard,
   buildLion,
   buildVulture,
   buildWarthog,
@@ -80,20 +83,48 @@ interface LionHuntState {
   lionHeading: number
   /** Prey's current flee heading (weaving). */
   preyHeading: number
-  /** Species the lion is currently hunting (chosen per hunt by region). */
+  /** Predator running this hunt (chosen per hunt by region). */
+  predator: PredatorKind
+  /** Species being hunted (chosen per hunt from the predator's food web). */
   prey: PreyKind
 }
 const LION_STATE: LionHuntState = {
-  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0, prey: 'zebra',
+  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
+  predator: 'lion', prey: 'zebra',
 }
 
-/** Prey the lion hunts (design.md §19): grazers fitting its prey scheme. */
+/** Decorative predators of ~1890 Africa (design.md §19). The lion is the apex
+ *  (and the only one that attacks on contact, §14); the others are scenery. */
+type PredatorKind = 'lion' | 'cheetah' | 'leopard' | 'hyena'
+/** Prey a predator hunts (design.md §19): grazers fitting its prey scheme. */
 type PreyKind = 'zebra' | 'wildebeest' | 'antelope' | 'warthog'
 /** Base render scale per prey species (warthog small, wildebeest sturdy). */
 const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antelope: 0.85, warthog: 0.62 }
-/** Region-appropriate lion prey for ~1890 Africa (design.md §19). The eastern
- *  and southern plains hold the great grazing herds; the wooded west/centre and
- *  the arid north offer a narrower range. */
+
+/** Which predators roam each region (~1890 range). Lions everywhere; cheetahs
+ *  and hyenas favour the open eastern/southern plains; leopards the wooded
+ *  west/centre; the arid north holds lion, cheetah and leopard. */
+const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
+  east: ['lion', 'cheetah', 'hyena', 'leopard'],
+  south: ['lion', 'cheetah', 'hyena', 'leopard'],
+  central: ['lion', 'leopard'],
+  west: ['lion', 'leopard'],
+  north: ['lion', 'cheetah', 'leopard'],
+}
+/** Food web (design.md §19): each predator's prey scheme. The grazers in turn
+ *  feed on the grassland (they graze on open land), so predator → grazer →
+ *  plants forms the chain. Lions and hyenas take the big grazers; the cheetah
+ *  and leopard take smaller, faster game. */
+const PREDATOR_PREY: Record<PredatorKind, PreyKind[]> = {
+  lion: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+  hyena: ['wildebeest', 'zebra', 'warthog'],
+  cheetah: ['antelope', 'warthog'],
+  leopard: ['antelope', 'warthog'],
+}
+/** Region-appropriate grazers for ~1890 Africa (design.md §19). The eastern and
+ *  southern plains hold the great herds; the wooded west/centre and the arid
+ *  north offer a narrower range. A hunt's prey is the predator's scheme
+ *  intersected with what the region holds. */
 const REGION_PREY: Record<RegionId, PreyKind[]> = {
   east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
   south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
@@ -101,6 +132,8 @@ const REGION_PREY: Record<RegionId, PreyKind[]> = {
   west: ['antelope', 'warthog', 'zebra'],
   north: ['antelope', 'warthog'],
 }
+/** Render scale per predator (cheetah/leopard lithe, hyena mid, lion large). */
+const PREDATOR_SCALE: Record<PredatorKind, number> = { lion: 1, cheetah: 0.9, leopard: 0.92, hyena: 0.88 }
 
 /** Distance (world units) at which walking into a lion triggers an attack. */
 const LION_CONTACT_RADIUS = 2
@@ -739,23 +772,35 @@ function Herds() {
 }
 
 /**
- * Purely decorative lion hunt (design.md §19): near zebra herds a lion
- * occasionally chases one zebra; after the catch the lion visibly feeds on
- * the carcass — lowered, tearing head movements while the prey shrinks away
- * piece by piece over a red, spreading stain. Once the carcass is gone the
- * lion moves on and the scene despawns.
+ * Purely decorative predator hunt (design.md §19): near grazing herds a
+ * region-appropriate predator (lion, cheetah, leopard or hyena) occasionally
+ * chases one grazer from its food web; after the catch it visibly feeds on the
+ * carcass — lowered, tearing head movements while the prey shrinks away piece
+ * by piece over a red, spreading stain. Once the carcass is gone the predator
+ * moves on and the scene despawns. The lion is the apex and the only predator
+ * that also attacks the player on contact (§14); the others are pure scenery.
  */
 function LionHunt() {
   const seed = useGame((s) => s.seed)
   const lion = useRef<THREE.Group>(null)
+  const predatorMesh = useRef<THREE.Mesh>(null)
   const prey = useRef<THREE.Group>(null)
   const preyMesh = useRef<THREE.Mesh>(null)
   const stain = useRef<THREE.Mesh>(null)
   // Module-shared state so the herds and vultures can react to the hunt.
   const state = useRef(LION_STATE)
 
-  const geo = useMemo(() => ({ lion: buildLion() }), [])
-  // Prey meshes swapped per hunt so the lion takes varied, region-fitting game.
+  // Predator meshes swapped per hunt so different hunters roam the plains.
+  const predatorGeo = useMemo<Record<PredatorKind, THREE.BufferGeometry>>(
+    () => ({
+      lion: buildLion(),
+      cheetah: buildCheetah(),
+      leopard: buildLeopard(),
+      hyena: buildHyena(),
+    }),
+    [],
+  )
+  // Prey meshes swapped per hunt so the predator takes varied, fitting game.
   const preyGeo = useMemo<Record<PreyKind, THREE.BufferGeometry>>(
     () => ({
       zebra: buildZebra(),
@@ -774,7 +819,7 @@ function LionHunt() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__lionHunt = { state: state.current, lion, prey, stain }
+    w.__lionHunt = { state: state.current, lion, prey, stain, predatorMesh }
     return () => {
       delete w.__lionHunt
     }
@@ -804,17 +849,25 @@ function LionHunt() {
       }
       s.px = px
       s.pz = pz
-      // Pick prey fitting the region and period (design.md §19): the eastern and
-      // southern plains offer wildebeest and zebra, the wooded west/centre and
-      // the arid north a narrower range.
-      const pool = REGION_PREY[regionAt(ll.lat, ll.lon)] ?? REGION_PREY.east
+      // Pick a region-appropriate predator, then prey from its food web that the
+      // region actually holds (design.md §19): predator → grazer → grassland.
+      const region = regionAt(ll.lat, ll.lon)
+      const predPool = REGION_PREDATORS[region] ?? REGION_PREDATORS.east
+      s.predator = predPool[Math.floor(Math.random() * predPool.length)]
+      const regionPrey = REGION_PREY[region] ?? REGION_PREY.east
+      const preyPool = PREDATOR_PREY[s.predator].filter((p) => regionPrey.includes(p))
+      const pool = preyPool.length > 0 ? preyPool : regionPrey
       s.prey = pool[Math.floor(Math.random() * pool.length)]
+      if (predatorMesh.current) {
+        predatorMesh.current.geometry = predatorGeo[s.predator]
+        predatorMesh.current.scale.setScalar(PREDATOR_SCALE[s.predator])
+      }
       if (preyMesh.current) {
         preyMesh.current.geometry = preyGeo[s.prey]
         preyMesh.current.scale.setScalar(PREY_SCALE[s.prey])
       }
-      // The lion closes in from a random direction, so the chase runs any which
-      // way rather than always toward the same corner.
+      // The predator closes in from a random direction, so the chase runs any
+      // which way rather than always toward the same corner.
       const lionAng = Math.random() * Math.PI * 2
       s.lx = px + Math.cos(lionAng) * HUNT_LION_APPROACH
       s.lz = pz + Math.sin(lionAng) * HUNT_LION_APPROACH
@@ -872,9 +925,10 @@ function LionHunt() {
     const active = s.mode !== 'idle'
     const feeding = s.mode === 'feed'
 
-    // Touching a lion triggers a lion attack (design.md §14): when the player
+    // Touching the lion triggers a lion attack (design.md §14): when the player
     // walks into the active lion, fire the event (rate-limited by the store).
-    if (active) {
+    // Only the lion attacks; the other predators are pure scenery.
+    if (active && s.predator === 'lion') {
       const lionX = feeding ? s.px + 0.7 : s.lx
       const lionZ = feeding ? s.pz + 0.25 : s.lz
       if (Math.hypot(lionX - pos.x, lionZ - pos.z) < LION_CONTACT_RADIUS) {
@@ -931,7 +985,7 @@ function LionHunt() {
   return (
     <>
       <group ref={lion} visible={false}>
-        <mesh geometry={geo.lion} material={material} castShadow />
+        <mesh ref={predatorMesh} geometry={predatorGeo.lion} material={material} castShadow />
       </group>
       <group ref={prey} visible={false}>
         <mesh ref={preyMesh} geometry={preyGeo.zebra} material={material} castShadow />

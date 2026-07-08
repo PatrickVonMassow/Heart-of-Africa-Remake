@@ -300,6 +300,63 @@ export function buildLion(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** Slender quadruped predator with a long low tail (cheetah/leopard base). */
+function buildCatPredator(bodyColor: string, headColor: string, scale: number, seed: number): THREE.BufferGeometry {
+  const parts = buildQuadruped({
+    bodyLen: 1.3 * scale,
+    bodyR: 0.34 * scale,
+    legH: 0.62 * scale,
+    legR: 0.07 * scale,
+    neckLen: 0.34 * scale,
+    neckTilt: 0.9,
+    headSize: 0.18 * scale,
+    bodyColor,
+    headColor,
+    seed,
+  })
+  const tail = new THREE.CylinderGeometry(0.025 * scale, 0.04 * scale, 1.0 * scale, 4)
+  tail.rotateX(1.25)
+  tail.translate(0, 0.85 * scale, -0.95 * scale)
+  parts.push(tint(tail, bodyColor, 0.1, seed + 5))
+  return merge(parts)
+}
+
+/** Cheetah: slim, tawny, the open-plains sprinter (~1.1 units tall). */
+export function buildCheetah(): THREE.BufferGeometry {
+  return buildCatPredator('#c9a86a', '#8f7038', 1.0, 191)
+}
+
+/** Leopard: stockier, darker rosetted coat; ambush hunter near cover. */
+export function buildLeopard(): THREE.BufferGeometry {
+  return buildCatPredator('#b7923f', '#6f5722', 1.05, 201)
+}
+
+/** Spotted hyena: sloping back (high shoulders), coarse grey-brown coat. */
+export function buildHyena(): THREE.BufferGeometry {
+  const parts = buildQuadruped({
+    bodyLen: 1.2,
+    bodyR: 0.34,
+    legH: 0.62,
+    legR: 0.07,
+    neckLen: 0.34,
+    neckTilt: 1.1,
+    headSize: 0.2,
+    bodyColor: '#8a7d63',
+    headColor: '#5f5442',
+    seed: 211,
+  })
+  // Higher shoulders than hindquarters: a raised hump over the front legs.
+  const hump = new THREE.SphereGeometry(0.26, 7, 5)
+  hump.scale(0.85, 0.7, 1.0)
+  hump.translate(0, 1.02, 0.5)
+  parts.push(tint(hump, '#7c6f57', 0.12, 212))
+  const tail = new THREE.CylinderGeometry(0.03, 0.04, 0.5, 4)
+  tail.rotateX(0.8)
+  tail.translate(0, 0.85, -0.85)
+  parts.push(tint(tail, '#4c4436', 0.1, 213))
+  return merge(parts)
+}
+
 /** Flamingo, ~1.1 units tall, standing. */
 export function buildFlamingo(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []

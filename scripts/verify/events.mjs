@@ -234,6 +234,7 @@ const lionTouch = await page.evaluate(async () => {
       const pos = g.pos
       const s = window.__lionHunt?.state
       if (s) {
+        s.predator = 'lion' // only the lion attacks on contact (design.md §14)
         s.mode = 'chase'
         s.timer = 5
         s.px = pos.x; s.pz = pos.z
