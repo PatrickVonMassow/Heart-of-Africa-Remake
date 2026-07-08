@@ -290,6 +290,9 @@ For speech output the pipeline is parser → TTS text → audio: the parser conv
 
 **Every journal text — existing and future, in every language — is written with these emotion markers.**
 
+**Following the newest entry.**
+The journal always keeps the newest content in view. When an entry is added the view scrolls to the bottom, and while an entry is being written in stroke by stroke (§16) the view follows the growing text down so the appearing strokes never scroll out of sight.
+
 **Entering a new region.**
 On first entering a new region, the journal opens, announces the region and shows an entry describing the traveler's fascination with this region and its peculiarities.
 

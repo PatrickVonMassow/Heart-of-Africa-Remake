@@ -79,6 +79,13 @@ export function JournalPanel() {
     if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [open, journal.length])
 
+  // While a new entry is written into the book (design.md §16), follow the
+  // growing text down so the appearing content stays in view. `writing` gets a
+  // fresh object each reveal tick, so this re-runs as the text grows.
+  useEffect(() => {
+    if (open && writing) endRef.current?.scrollIntoView({ behavior: 'auto' })
+  }, [open, writing])
+
   // A newly arriving entry is written into the book by a hand (§16); when
   // the journal stays closed (do not disturb) the entry appears silently.
   const writingPrev = useRef(journal.length)

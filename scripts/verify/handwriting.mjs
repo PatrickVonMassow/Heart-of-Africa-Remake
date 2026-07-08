@@ -109,6 +109,42 @@ const dnd = await page.evaluate(() => ({
 check('do-not-disturb writes silently without the animation', dnd.open === false && dnd.writing === 0, '')
 await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
 
+// --- The view follows new content down while it is written (design.md §15/§16) ---
+// Fill the journal so it overflows, reopen it, then add an animated entry: the
+// scroll container must follow the growing text to the bottom so the newly
+// appearing strokes stay visible.
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  window.__ui.getState().setJournalDnd(true) // silent fillers while closed
+  for (let i = 0; i < 24; i++) g.addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
+  window.__ui.getState().setJournalDnd(false)
+  g.setJournalOpen(true)
+})
+await page.waitForTimeout(400)
+await page.evaluate(() =>
+  window.__game.getState().addEntry({ key: 'journal.titles.attack' }, { key: 'journal.healthPoor' }),
+)
+await page.waitForTimeout(500) // mid-animation
+const scroll = await page.evaluate(() => {
+  const el = document.querySelector('.journal .entries')
+  const wp = document.querySelector('.journal .entry.writing p')
+  const cRect = el.getBoundingClientRect()
+  const pRect = wp ? wp.getBoundingClientRect() : null
+  return {
+    overflow: el.scrollHeight - el.clientHeight,
+    bottomGap: el.scrollHeight - el.clientHeight - el.scrollTop,
+    writingVisible: pRect ? pRect.bottom <= cRect.bottom + 6 && pRect.bottom >= cRect.top : false,
+  }
+})
+check('the journal overflows so scrolling is required', scroll.overflow > 40, `overflow ${scroll.overflow.toFixed(0)}px`)
+check(
+  'the view auto-scrolls down to the still-writing entry',
+  scroll.bottomGap < 10 && scroll.writingVisible,
+  `bottomGap ${scroll.bottomGap.toFixed(0)}px, writingVisible ${scroll.writingVisible}`,
+)
+await page.screenshot({ path: `${OUT}83-handwriting-autoscroll.png` })
+console.log('shot 83-handwriting-autoscroll.png')
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
