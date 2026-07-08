@@ -40,23 +40,24 @@ check(
   JSON.stringify(rep),
 )
 
-// --- Rifle blockade (design.md §12) ------------------------------------------------
-// Nubian village (north): with the rifle in hand nobody talks or trades.
+// --- Rifle no longer blocks the village (design.md §12) ----------------------
+// Item effects are possession-based now (no "drawing"): merely owning a rifle
+// does not make the villagers flee — the elder still teaches and the chief
+// still holds audience; the rifle instead enables the robbery action.
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.leavePlace()
   g.debugAddEquipment('rifle')
   g.debugAddGift('gold')
-  g.takeInHand('rifle')
   g.enterPlace('nubian-village')
 })
 await page.evaluate(() => window.__game.getState().talkToVillager())
 let s = await state()
-check('a visible rifle blocks the elder talk', s.languagesLearned.north === undefined && !!s.toast, `"${s.toast}"`)
+check('a rifle in the pack does not block the elder talk', s.languagesLearned.north === true, `"${s.toast}"`)
 await page.evaluate(() => window.__game.getState().giveGift('gold'))
 s = await state()
-check('a visible rifle blocks the audience', (s.goodwill['nubian-village'] ?? 0) === 0 && s.gifts.gold === 1, '')
-await page.evaluate(() => window.__game.getState().takeInHand(null))
+check('a rifle in the pack does not block the audience', (s.goodwill['nubian-village'] ?? 0) > 0, '')
+// Stay in the village for the hostility test below.
 
 // --- Hostility and expulsion --------------------------------------------------------
 // Silver is rejected in the north: the gift gets the traveler thrown out.
@@ -80,15 +81,17 @@ check(
 )
 await page.evaluate(() => {
   const g = window.__game.getState()
+  window.__game.setState({ gifts: { ...g.gifts, gold: 1 } })
   g.enterPlace('nubian-village')
-  g.giveGift('gold')
+  window.__game.getState().giveGift('gold')
 })
 s = await state()
 check('the hostile chief refuses gifts', s.gifts.gold === 1 && (s.goodwill['nubian-village'] ?? 0) === 0, `"${s.toast}"`)
 await page.evaluate(() => {
   const g = window.__game.getState()
+  window.__game.setState({ gifts: { ...g.gifts, gold: 1 } })
   g.debugSet({ day: g.day + window.__balance.reputation.hostilityDays + 1 })
-  g.giveGift('gold')
+  window.__game.getState().giveGift('gold')
 })
 s = await state()
 check('hostility wears off after the period', s.gifts.gold === 0 && (s.goodwill['nubian-village'] ?? 0) > 0, '')

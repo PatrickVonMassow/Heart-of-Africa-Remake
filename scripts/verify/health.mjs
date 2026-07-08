@@ -75,13 +75,18 @@ check('canteen ends the dehydration', rehydrated === false, '')
 check('journal reports the recovery', (await journalKeys()).includes('journal.dehydrationOver'), '')
 
 // --- Fresh water in reach counts as drinking (design.md §6: "without water") --
-// Walking the Nile bank without a canteen must never toggle thirst/recovery.
+// Time passing on the Nile bank without a canteen must never build thirst,
+// because fresh water in reach counts as drinking (resets the thirst).
 await g(() => {
-  window.__game.setState({ equipment: {} }) // the canteen stays behind
+  window.__game.setState({ equipment: {}, dryDays: 0 }) // the canteen stays behind
   window.__game.getState().debugJumpTo(28.6, 31.3) // desert bank of the Nile
 })
 const thirstBefore = (await journalKeys()).filter((k) => k === 'journal.dehydrationOn').length
-await walk(15)
+// Let a long stretch of time pass on fresh water (drinking) — thirst stays 0.
+await g(() => {
+  const c = window.__game.getState()
+  for (let i = 0; i < 40; i++) c.tickHealth(0.1, 'water', 28.6, 31.3)
+})
 const nile = await g(() => ({
   a: window.__game.getState().afflictions.dehydration,
   dry: window.__game.getState().dryDays,
@@ -92,6 +97,33 @@ check(
   nile.a === false && thirstAfter === thirstBefore,
   `dryDays ${nile.dry.toFixed(2)}`,
 )
+await g(() => window.__game.getState().debugAddEquipment('canteen'))
+
+// --- Canteen fill level (design.md §6): drains away from water, empties into
+//     thirst then health loss, refills at fresh water -------------------------
+const canteen = await g(() => {
+  const c = window.__game.getState()
+  window.__game.setState({
+    equipment: { canteen: 1 }, canteenFill: 1, dryDays: 0, health: 100, foodDays: 300,
+    afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 },
+  })
+  for (let i = 0; i < 60; i++) c.tickHealth(0.1, 'desert', 25.5, 27.0) // 6 dry desert days
+  const drained = window.__game.getState().canteenFill
+  // Now start almost empty and let the reserve run out, so thirst builds into
+  // health loss (the drain is deliberately slow — a full canteen lasts months).
+  window.__game.setState({ canteenFill: 0.001, dryDays: 0, health: 100 })
+  for (let i = 0; i < 60; i++) c.tickHealth(0.1, 'desert', 25.5, 27.0)
+  const s1 = window.__game.getState()
+  return { drained, dehydrated: s1.afflictions.dehydration, health: s1.health }
+})
+check('the canteen drains away from fresh water', canteen.drained < 1, `fill ${canteen.drained.toFixed(3)}`)
+check('an empty canteen leads to thirst, then health loss',
+  canteen.dehydrated === true && canteen.health < 100, JSON.stringify(canteen))
+const refill = await g(() => {
+  window.__game.getState().tickHealth(0.1, 'water', 0, 0) // drinking at fresh water
+  return window.__game.getState().canteenFill
+})
+check('fresh water refills the canteen to full', refill === 1, `${refill}`)
 await g(() => window.__game.getState().debugAddEquipment('canteen'))
 
 // --- Regeneration while fed and affliction-free -------------------------------
@@ -123,10 +155,9 @@ await g(() => window.__game.getState().debugSetAffliction('sunblind', true))
 await page.waitForTimeout(300)
 check('sun blindness narrows the view (veil)', (await page.locator('.sunblind-veil').count()) === 1, '')
 await g(() => {
-  // Savanna, outside the desert; the rope in hand keeps stray hills of the
+  // Savanna, outside the desert; a rope in the pack keeps stray hills of the
   // eastern highlands passable (design.md §11 mountain rule).
   window.__game.getState().debugAddEquipment('rope')
-  window.__game.getState().takeInHand('rope')
   window.__game.getState().debugJumpTo(-1.5, 34.5)
 })
 await page.waitForTimeout(600)

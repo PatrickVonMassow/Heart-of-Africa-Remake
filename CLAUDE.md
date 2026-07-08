@@ -218,22 +218,26 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    climbable without a rope (`design.md` §7/§11) but slower and dangerous:
    the traveler is warned at the ascent, and each stretch on the rock
    risks a fall that wounds lightly or severely and can cost a carried
-   item; with the rope in hand the climb is safe and faster. Verifiable:
+   item; with the rope in the pack the climb is safe and faster. Verifiable:
    an automated move on enclosed sea advances the position, a move on
    open ocean is refused with the blocking notice, a move onto a mountain
    without a rope advances (with the warning) while the rope makes it
    faster, and a forced fall wounds the traveler and can drop an item
    (`scripts/verify/enrichments.mjs`). Any active movement penalty shows
    its reason (`design.md` §11): while a terrain slows the traveler and
-   the relieving hand object is not held (jungle→machete, water→canoe,
-   mountain→rope), the top-right status area names the cause and the
-   remedy — the slowdown is never silent. The first time each of the three
-   is met it is also announced once in the journal (both languages, voice
+   the relieving item is not carried (jungle→machete, water→canoe,
+   mountain→rope) or the canoe is carried across open land
+   (savanna/desert→canoeOnLand), the top-right status area names the cause
+   and the remedy — the slowdown is never silent. Item effects are
+   possession-based (`design.md` §6/§7): a piece of equipment acts by being
+   in the inventory, there is no "in hand" state. The first time each
+   penalty type is met it is also announced once in the journal (both languages, voice
    markup); every later encounter of that kind is carried only by the
    status-bar hint, and the once-per-type flag travels with the checkpoint.
    Verifiable: the penalty mapping
-   is pure-tested for each terrain, the top-right HUD hint appears in
-   jungle without a machete and clears once the machete is in hand, and a
+   is pure-tested for each terrain (incl. the canoe-on-land penalty), the
+   top-right HUD hint appears in
+   jungle without a machete and clears once the machete is in the pack, and a
    first jungle entry adds exactly one journal warning while a later entry
    adds none (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
@@ -270,8 +274,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    and stores hints. The handwritten entry may be simplified in the POC
    (plain text suffices; the animated handwriting is not acceptance-
    relevant).
-9. **Status bar.** Date, funds, provisions, gifts, hand item and current
-   region are displayed. Coordinates are not shown permanently (removed on
+9. **Status bar.** Date, funds, provisions, gifts and current
+   region are displayed (no hand-item slot — item effects are
+   possession-based, `design.md` §6/§7). Coordinates are not shown permanently (removed on
    user request); transient status hints (e.g. the movement-penalty reason,
    pt. 4) render as a right-aligned item inside the status bar itself, not in
    a separate panel floating over the scene. Verifiable: the hint element is a
@@ -443,9 +448,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     narrates on the first gesture (`scripts/verify/voice.mjs`). The open
     journal never freezes the game (`design.md` §16): the character keeps
     moving in both perspectives while the journal is open and while an
-    entry narrates; only modal dialogs block movement. Verifiable: with the
+    entry narrates; only modal dialogs block movement. Because the journal is
+    non-modal, walking a hut's entrance door open (pt. 2) works with the
+    journal open too — the door still enters and the book closes as the
+    building's modal appears. Verifiable: with the
     journal open at game start, driving movement still advances the player
-    position (`scripts/verify/voice.mjs`). German read-aloud stays an open
+    position (`scripts/verify/voice.mjs`), and walking into a hut door with
+    the journal forced open still opens the building
+    (`scripts/verify/flow.mjs`). German read-aloud stays an open
     item until a German-capable voice exists.
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
@@ -479,8 +489,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     but stay readable on manual open. Debug shortcut keys (`design.md` §21):
     F1 opens the menu, F2 the do-not-disturb toggle, F3 grants the full
     loadout — all gear/treasures, 100000 gifts/dollars/provisions, full
-    health and no afflictions, with the inventory capacity raised to fit —
-    and F4 toggles the canoe in and out of the pack.
+    health, a full canteen and no afflictions, with the inventory capacity
+    raised to fit — and F4 toggles the canoe in and out of the pack. The
+    canteen's water-consumption rates (land and desert) and its capacity
+    (`design.md` §6/§21) are editable in the debug menu.
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults
     (including the single ambience volume 0.1, the 5.6 travel speed and the
     canoe/jungle/mountain factors), the
@@ -529,11 +541,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     unboosted drift, and that being swept consumes time and provisions.
 22. **Health and afflictions.** `design.md` §6/§15 is implemented: a
     health pool is drained by starvation and by the afflictions fever
-    (delirium: temporarily uncontrolled steering), dehydration (sets in
-    automatically after sustained dry desert travel without a canteen —
-    a balance value; rivers and lakes in reach count as drinking and
-    reset the thirst, so following a river never triggers it: drift and
-    speed loss),
+    (delirium: temporarily uncontrolled steering), dehydration (the canteen
+    holds a fill level that refills to full at fresh water and drains per
+    travelled day on land — faster in the desert, both balance values; once
+    it is empty thirst builds over a balance-value onset and then dehydration
+    sets in; rivers and lakes in reach count as drinking and reset the thirst
+    and refill the canteen, so following a river never triggers it: drift and
+    speed loss). The inventory bar shows the canteen fill and warns as it runs
+    low (glow yellow <20 %, red <5 %, blinking when empty);
     sun blindness (view narrowed to a glaring veil; heals only outside
     the desert) and wounds (light/severe); medicine is taken from the
     inventory bar and cures fever and wounds; health regenerates while
@@ -545,20 +560,22 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     part of the checkpoint. All drains/thresholds are balance values
     adjustable in the debug menu, which also toggles afflictions for
     testing. Verifiable: `scripts/verify/health.mjs` asserts defaults,
-    dehydration onset/recovery, regeneration, fever drain and medicine
+    dehydration onset/recovery, the canteen fill draining away from water,
+    emptying into thirst then health loss, and refilling at fresh water,
+    regeneration, fever drain and medicine
     cure, the sun-blindness veil and its recovery, vultures, the H query
     and the death/successor flow.
 23. **Random events.** `design.md` §14 is implemented as a hidden per-day
     roll while travelling, modulated by terrain and state: wild-animal
     attacks (lions, leopards, snakes — lions with the highest risk of a
-    fatal outcome), robber attacks (money theft; a rifle deters, in hand
-    almost always), crocodile attacks in water (the machete always helps,
+    fatal outcome), robber attacks (money theft; a rifle in the pack
+    deters almost always), crocodile attacks in water (the machete always helps,
     the rifle only from the canoe — otherwise it is wet and useless),
     fever in wetlands, sun blindness and sandstorms (time loss) in the
     desert, being swept over a waterfall (wounds + loss of a large part
     of the inventory) and grim discoveries (remains with a few dollars).
-    Outcomes follow the §7/§14 protection rules (rifle > machete, in hand
-    > carried), wounds/afflictions feed the health system (pt. 22), fatal
+    Outcomes follow the §7/§14 protection rules (rifle > machete, by mere
+    possession in the pack), wounds/afflictions feed the health system (pt. 22), fatal
     attacks end in the remains report, and every event is told through a
     journal entry in both languages with voice markup (§16). Rates are
     balance values, calibrated low so events are rare (the per-day base
@@ -605,7 +622,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     passages between all ports with distance-based fare and duration,
     which makes Zanzibar reachable; discovery bounties for first-visited
     villages and sighted landmarks are credited on the next port visit
-    via a journal entry; a valuable carried visibly in hand triggers the
+    via a journal entry; presenting a carried valuable to a village (the
+    inventory bar) triggers the
     positive or negative village reaction of the §8 matrix. Every
     settlement — port and village — offers at least the baseline goods
     (food, machete, shovel, medicine) and buys gear back; the currency is
@@ -622,10 +640,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     settlement, buying food in a village against gifts (money untouched),
     the no-gifts refusal, and selling gear for gifts (village) or money
     (port).
-26. **Standing with the natives.** `design.md` §12/§7 is implemented: a
-    rifle carried in hand inside a village makes the inhabitants flee
-    (they vanish indoors) and blocks the audience and the elder talk; a
-    rejected gift means hostility and expulsion — the traveler is thrown
+26. **Standing with the natives.** `design.md` §12/§7 is implemented:
+    a rejected gift means hostility and expulsion — the traveler is thrown
     out of the village, goodwill resets and the chief refuses audiences
     for a hostility period (balance value); repeated correct
     satisfaction of a chief (goodwill threshold via revered gifts)
@@ -635,12 +651,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     journal entry naming the people, near-death travelers receive food
     and medicine from hurrying villagers (cooldown), and the region's
     villages hand out provisions and medicine free of charge. Drawing
-    the rifle inside a chief's hut robs the village (loot up to the pack
+    the rifle (a robbery from a chief's hut, enabled by a rifle in the pack)
+    robs the village (loot up to the pack
     limit): the whole region is antagonized permanently — no audiences,
     no elder talks, no hints — and the "Honored Friend" status is
-    forfeited irretrievably and cannot be re-earned. All new texts exist
+    forfeited irretrievably and cannot be re-earned. Item effects are
+    possession-based, so merely carrying a rifle no longer makes villagers
+    flee or blocks the audience. All new texts exist
     in both languages with voice markup. Verifiable:
-    `scripts/verify/reputation.mjs` asserts the rifle blockade, the
+    `scripts/verify/reputation.mjs` asserts a rifle in the pack does not
+    block the elder talk or audience, the
     hostility/expulsion and its wear-off, the friend pledge (exactly
     once), the capped attack outcomes with rescue entries, the
     near-death aid, the free village supplies, and the permanent
@@ -649,8 +669,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     bird's-eye view a free camp can be pitched anywhere in the open (C;
     a nearby existing camp is reopened instead) holding any number of
     inventory items — equipment, gifts and treasures move between pack
-    and cache (taking back respects the inventory capacity; an emptied
-    hand item is put away, which covers leaving the canoe behind). Each
+    and cache (taking back respects the inventory capacity; storing the
+    canoe leaves it behind, dropping its land penalty). Each
     free camp is marked with an X on the exploration map and a pole
     marker in the bird's-eye view. A stocked free camp risks being
     looted per travelled day (balance value); the loss is revealed by a
@@ -661,7 +681,7 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     region's village caches. All new texts exist in both languages with
     voice markup. Verifiable: `scripts/verify/camps.mjs` asserts
     pitching and reopening, storing/taking incl. the capacity refusal
-    and the hand-item put-away, the loot-and-discover flow with its
+    and the canoe put-away, the loot-and-discover flow with its
     journal entry, the map X, the friend gate on village caches, their
     persistence, and their destruction by the robbery.
 28. **Full saving and loading.** `design.md` §18 is implemented: every

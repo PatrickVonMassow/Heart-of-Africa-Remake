@@ -10,7 +10,6 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
-import { useGame } from '../../state/store'
 import { buildGoat } from '../../render/fauna'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, type Collider } from './collision'
@@ -780,13 +779,6 @@ export function PlaceLife({
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
-
-  // A visible rifle makes the villagers flee indoors (design.md §12); only
-  // the livestock stays out. Ports keep their bustle.
-  const rifleDrawn = useGame((s) => s.handItem === 'rifle')
-  if (kind === 'village' && rifleDrawn) {
-    return <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-  }
 
   if (kind === 'port') {
     return (

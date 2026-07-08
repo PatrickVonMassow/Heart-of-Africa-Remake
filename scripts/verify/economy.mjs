@@ -187,11 +187,10 @@ check('arrival in the port saves the checkpoint', keys.includes('journal.portArr
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(600)
 // Sight Kilimanjaro (landmark), then first-visit the Masai village. A rope
-// in hand keeps the massif climbable (design.md §11).
+// in the pack keeps the massif climbable (design.md §11).
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.debugAddEquipment('rope')
-  g.takeInHand('rope')
   g.debugJumpTo(-3.35, 37.35)
 })
 await page.evaluate(() => {
@@ -228,8 +227,7 @@ check(
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.leavePlace()
-  g.debugAddEquipment('shovel')
-  g.takeInHand('shovel')
+  g.debugAddEquipment('shovel') // digging needs the shovel in the pack (clicked)
 })
 await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6))
 // Sample many digs with plenty of supply and capacity so nothing caps the roll.
@@ -289,19 +287,20 @@ check(
   `${statueSite.lat}, ${statueSite.lon}`,
 )
 
-// --- Visible valuable reactions (design.md §8) --------------------------------------------
-// North reveres gold, rejects silver.
+// --- Presented valuable reactions (design.md §8) ------------------------------------------
+// A treasure is presented to the village on demand (click); North reveres gold,
+// rejects silver.
 await page.evaluate(() => {
   const g = window.__game.getState()
   g.debugAddTreasure('gold')
-  g.takeInHand('gold')
   g.enterPlace('nubian-village')
+  g.presentValuable('gold')
 })
 await page.waitForTimeout(200)
 s = await state()
 keys = await journalKeys()
 check(
-  'a revered valuable in hand creates goodwill',
+  'a presented revered valuable creates goodwill',
   keys.includes('journal.valuableRevered') && (s.goodwill['nubian-village'] ?? 0) > 0,
   `goodwill ${s.goodwill['nubian-village']}`,
 )
@@ -309,12 +308,12 @@ await page.evaluate(() => {
   const g = window.__game.getState()
   g.leavePlace()
   g.debugAddTreasure('silver')
-  g.takeInHand('silver')
   g.enterPlace('tuareg-village')
+  g.presentValuable('silver')
 })
 await page.waitForTimeout(200)
 keys = await journalKeys()
-check('a rejected valuable in hand provokes the negative reaction', keys.includes('journal.valuableRejected'), '')
+check('a presented rejected valuable provokes the negative reaction', keys.includes('journal.valuableRejected'), '')
 
 // --- Village trade in gifts (design.md §9/§10, points 4/5) --------------------
 // Every settlement offers the baseline goods; villages pay in gifts, not money.
@@ -329,7 +328,6 @@ check(
 )
 await page.evaluate(() => {
   const g = window.__game.getState()
-  g.takeInHand(null)
   g.leavePlace()
   window.__game.setState({ gifts: { gold: 0, silver: 0, emerald: 0, copper: 6, ivory: 0 }, money: 500 })
   g.enterPlace('nubian-village') // North village → currency is gifts

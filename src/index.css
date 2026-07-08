@@ -166,10 +166,43 @@ textarea {
   bottom: 12px;
 }
 
-.map-toggle {
+.camp-toggle {
   position: absolute;
   right: 128px;
   bottom: 12px;
+}
+
+/* Passive inventory items and the canteen reading are labels, not buttons. */
+.inventory-bar .inv-item {
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-border);
+  color: var(--hud-text);
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+/* Canteen fill colour cue (design.md §6): yellow under 20 %, red under 5 %,
+   blinking red when empty. */
+.inventory-bar .inv-item.canteen.canteen-low {
+  border-color: #d8b13a;
+  color: #e7c752;
+}
+.inventory-bar .inv-item.canteen.canteen-crit {
+  border-color: #c0392b;
+  color: #e0715f;
+}
+.inventory-bar .inv-item.canteen.canteen-empty {
+  border-color: #c0392b;
+  color: #e0715f;
+  animation: canteen-blink 0.7s steps(1, end) infinite;
+}
+
+@keyframes canteen-blink {
+  50% {
+    border-color: var(--hud-border);
+    color: var(--hud-text);
+  }
 }
 
 /* --- Self-drawing exploration map (design.md §19) ------------------------- */

@@ -137,8 +137,8 @@ function AudienceDialog() {
             elder reveals it on a second talk (design.md §8, journal.giftLore). */}
         <div className="actions">
           {hasRifle && (
-            // Drawing the rifle inside the hut robs the village — with a
-            // permanent regional reputation loss (design.md §12).
+            // With a rifle in the pack the audience can be turned into a
+            // robbery — a permanent regional reputation loss (design.md §12).
             <button className="hud-button danger" onClick={robVillage}>{t.dialogs.rob}</button>
           )}
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.endAudience}</button>

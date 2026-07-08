@@ -39,6 +39,9 @@ export interface BalanceConfig {
   mountainPenalty: number
   /** A canoe makes water travel this much faster than swimming (design.md §11). */
   canoeSpeedup: number
+  /** Carrying the canoe slows land travel by this factor (design.md §11): the
+   *  canoe is only relevant by possession, so it is a permanent land handicap. */
+  canoeLandPenalty: number
   /** River current drift in degrees/sec at full strength on the centerline; the
    *  flow sweeps the traveller downstream (design.md §11). */
   currentDrift: number
@@ -104,9 +107,18 @@ export interface BalanceConfig {
     sunblindDrain: number
     woundLightDrain: number
     woundSevereDrain: number
-    /** Days of dry desert travel until dehydration sets in (design.md §6);
-     * fresh water in reach (river/lake) counts as drinking and resets it. */
+    /** Days of an empty canteen (thirst) until dehydration sets in (design.md
+     * §6); fresh water in reach (river/lake) counts as drinking and resets it. */
     dehydrationOnsetDays: number
+    /** Water consumed per travelled day away from fresh water — the base rate
+     * off the desert, and the faster desert rate (design.md §6/§11). The
+     * canteen fill fraction (0..1) drops by this over canteenCapacity, so a full
+     * canteen lasts canteenCapacity / drainPerDay travelled days. */
+    canteenDrainPerDay: number
+    canteenDesertDrainPerDay: number
+    /** Water the canteen holds (units matching the drain rates above). Raising
+     * it makes the supply last proportionally longer (design.md §6/§21). */
+    canteenCapacity: number
     /** Days outside the desert until sun blindness heals. */
     sunblindRecoveryDays: number
     /** Below this the condition counts as "poor" (vultures, §19). */
@@ -195,6 +207,7 @@ export const balance: BalanceConfig = {
   junglePenalty: 2.3, // no machete: 1.3 * 2.3 ≈ 3.0
   mountainPenalty: 1.67, // no rope: 1.5 * 1.67 ≈ 2.5
   canoeSpeedup: 4.0, // with a canoe: 2.0 / 4 = 0.5
+  canoeLandPenalty: 1.6, // carrying the canoe: 1.6x slower on land
   currentDrift: 0.2, // deg/s at full strength (~2 world units/s, ~35% of walking)
   currentWaterfallBoost: 4.0,
   currentWaterfallRadius: 0.5,
@@ -239,6 +252,9 @@ export const balance: BalanceConfig = {
     woundLightDrain: 2,
     woundSevereDrain: 7,
     dehydrationOnsetDays: 0.5,
+    canteenDrainPerDay: 0.9, // consumption raised 200x (user request), offset by the 2000x capacity below
+    canteenDesertDrainPerDay: 3.0, // 200x; desert is faster
+    canteenCapacity: 2000, // raised 2000x; net the supply lasts 10x longer (2000/0.9 ≈ 2222 land days)
     sunblindRecoveryDays: 3,
     poorThreshold: 40,
   },

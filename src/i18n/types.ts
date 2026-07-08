@@ -65,16 +65,22 @@ export interface Strings {
 
   hud: {
     journalToggle: string
-    mapToggle: string
-    handTooltip: string
-    medicineTooltip: string
+    campToggle: string
+    /** Tooltip for a click-to-use item (medicine/map/shovel). */
+    useTooltip: string
+    /** Tooltip for a passive item whose effect follows possession. */
+    passiveTooltip: string
+    /** Tooltip for the canteen fill reading. */
+    canteenTooltip: string
+    /** Tooltip for presenting a valuable to a village. */
+    presentTooltip: string
     /** Shown when the renderer fell back from WebGPU to WebGL 2. */
     webglFallback: string
     webglFallbackDismiss: string
     /** Frame counter label, e.g. "62 FPS". */
     fps(fps: number): string
     /** Reason shown while a terrain slowdown is active (design.md §11). */
-    movementPenalty: { jungle: string; water: string; mountain: string }
+    movementPenalty: { jungle: string; water: string; mountain: string; canoeOnLand: string }
   }
 
   prompts: {
@@ -120,9 +126,12 @@ export interface Strings {
     oceanBlocked: string
     /** Warning when starting to climb a mountain without a rope (design.md §11). */
     mountainNoRopeWarn: string
-    /** First-time movement-penalty warnings for jungle/water (design.md §11). */
+    /** First-time movement-penalty warnings for jungle/water/canoe (design.md §11). */
     penaltyJungle: string
     penaltyWater: string
+    penaltyCanoeLand: string
+    /** A valuable was already presented to this village (design.md §8). */
+    valuableAlreadyShown: string
     boughtFood: string
     bought(name: string): string
     inHand(name: string): string
@@ -240,6 +249,9 @@ export interface Strings {
     mouseSensitivity: string
     ambienceVolume: string
     foodPerDay: string
+    canteenDrain: string
+    canteenDesertDrain: string
+    canteenCapacity: string
     daysPerUnit: string
     canoeSpeedup: string
     junglePenalty: string
@@ -303,6 +315,7 @@ export interface Strings {
       /** First-time movement-penalty warnings (design.md §11). */
       penaltyJungle: string
       penaltyWater: string
+      penaltyCanoeLand: string
       /** A fall while climbing without a rope (design.md §11). */
       mountainFall: string
       discovery: string
@@ -353,9 +366,10 @@ export interface Strings {
     sweptAway: string
     /** Climbing a mountain without a rope: warning and the fall (design.md §11). */
     mountainNoRope: string
-    /** First-time movement-penalty warnings for jungle/water (design.md §11). */
+    /** First-time movement-penalty warnings for jungle/water/canoe (design.md §11). */
     penaltyJungle: string
     penaltyWater: string
+    penaltyCanoeLand: string
     mountainFall: string
     mountainFallItem: string
     findRemains(p: TextParams): string

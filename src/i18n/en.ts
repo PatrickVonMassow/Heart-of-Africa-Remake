@@ -161,16 +161,19 @@ export const en: Strings = {
 
   hud: {
     journalToggle: 'Journal (Tab)',
-    mapToggle: 'Map (M)',
-    handTooltip: 'Take in hand / put away',
-    medicineTooltip: 'Take medicine (cures fever and wounds)',
+    campToggle: 'Camp (C)',
+    useTooltip: 'Click to use it here',
+    passiveTooltip: 'Works automatically while you carry it',
+    canteenTooltip: 'Canteen water level — refills at fresh water',
+    presentTooltip: 'Show it to a village (provokes a reaction)',
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
     fps: (fps) => `${fps} FPS`,
     movementPenalty: {
-      jungle: 'Slowed by dense jungle — a machete in hand would clear the way faster.',
-      water: 'Swimming is slow — a canoe in hand would cross the water faster.',
-      mountain: 'The steep rock slows the climb — a rope in hand makes it safer and faster.',
+      jungle: 'Slowed by dense jungle — a machete in the pack would clear the way faster.',
+      water: 'Swimming is slow and risky — a canoe would cross the water faster and safer.',
+      mountain: 'The steep rock slows the climb — a rope makes it safer and faster.',
+      canoeOnLand: 'The canoe is dead weight on land and slows me — better left in a camp for long overland stretches.',
     },
   },
 
@@ -213,8 +216,10 @@ export const en: Strings = {
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
     mountainNoRopeWarn: 'Without a rope this climb is dangerous — one slip and I fall. Slowly and carefully!',
-    penaltyJungle: 'The jungle slows me — a machete in hand would clear the way.',
+    penaltyJungle: 'The jungle slows me — a machete in the pack would clear the way.',
     penaltyWater: 'No canoe — I must swim across, slow and soaked.',
+    penaltyCanoeLand: 'The canoe slows me on land — better left in a camp for overland travel.',
+    valuableAlreadyShown: 'This village has already seen the treasure.',
     boughtFood: 'Bought one week of provisions.',
     bought: (name) => `${name} purchased.`,
     inHand: (name) => `Now holding the ${name.toLowerCase()}.`,
@@ -320,6 +325,9 @@ export const en: Strings = {
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     ambienceVolume: 'Ambience volume',
     foodPerDay: 'Food use per day (0 = infinite)',
+    canteenDrain: 'Water use per day (land)',
+    canteenDesertDrain: 'Water use per day (desert)',
+    canteenCapacity: 'Canteen capacity',
     daysPerUnit: 'Days per travel unit',
     canoeSpeedup: 'Canoe speed factor (water)',
     junglePenalty: 'Jungle penalty factor (no machete)',
@@ -379,6 +387,7 @@ export const en: Strings = {
       mountainClimb: 'Into the Mountains Without a Rope',
       penaltyJungle: 'Fighting Through the Jungle',
       penaltyWater: 'Into the Water',
+      penaltyCanoeLand: 'The Canoe on Land',
       mountainFall: 'A Fall',
       discovery: 'A Grim Discovery',
       deadline1: 'A Letter from the Financiers',
@@ -522,7 +531,9 @@ export const en: Strings = {
     penaltyJungle:
       '[weary]The jungle closes in, thick with vine and thorn.[/weary] [emph]Without a machete[/emph] I must force every step —[pause] a blade in hand would open the way.',
     penaltyWater:
-      '[weary]The water bars my path, and I have no canoe.[/weary] I wade and swim across, slow and soaked;[pause] [emph]a canoe in hand[/emph] would carry me over with ease.',
+      '[weary]The water bars my path, and I have no canoe.[/weary] I wade and swim across, slow and soaked;[pause] [emph]a canoe[/emph] would carry me over with ease and keep the crocodiles at bay.',
+    penaltyCanoeLand:
+      '[weary]The canoe on my back is a heavy burden overland.[/weary] It drags at every step —[pause] [emph]for long stretches on foot[/emph] I had better leave it behind in a camp.',
     mountainFall:
       '[fear]The rock gave way beneath my foot, and I fell![/fear] [weary]Bruised and dazed I came to rest far below —[pause] without a rope this ascent nearly became my end.[/weary]',
     mountainFallItem:

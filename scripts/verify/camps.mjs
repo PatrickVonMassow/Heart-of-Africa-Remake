@@ -47,7 +47,6 @@ await page.evaluate(() => {
   g.debugAddEquipment('canoe')
   g.debugAddGift('gold')
   g.debugAddTreasure('silver')
-  g.takeInHand('canoe')
   g.pitchOrOpenCamp()
 })
 let s = await state()
@@ -71,7 +70,6 @@ check(
     && s.freeCamps[0].items.treasures.silver === 1,
   '',
 )
-check('storing the held canoe puts the hand away', s.handItem === null, '')
 
 // Take back with a full pack: refused; with space: works.
 await page.evaluate(() => {

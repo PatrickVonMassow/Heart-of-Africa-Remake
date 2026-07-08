@@ -116,9 +116,9 @@ Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudol
 
 - Currency: \$ (means of payment in the port cities). Starting capital \$250. Used for: equipment, provisions, ferries, gifts; income through sales and discovery bounties.
 - Provisions (food): consumed per time step; can be bought.
-- Water: the canteen is always full and protects against dehydration in the desert.
+- Water: the canteen holds a fill level (a percentage). It refills to full at fresh water (river, lake, swimmable sea), drains slowly on land — faster in the desert — and, once empty, thirst builds and then health drops. The inventory bar shows the fill and warns as it runs low (glow yellow below 20 %, red below 5 %, blinking when empty). It protects against dehydration in the desert only while it still holds water.
 - Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
-- The object held "in hand": the central interaction variable for terrain mobility (§11), the behavior of the natives (§12) and treasure recovery.
+- Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the map opens the exploration overview, the shovel digs).
 
 Afflictions (alter controls/vision, can be fatal): fever/illness (mainly in wetlands) → temporarily uncontrolled movement; dehydration (desert without water) → drift, avoidable with a filled canteen; sun blindness (desert) → restricted vision, can end fatally — the canteen does not help against it, recovery only outside the desert; wounds (animals/robberies). Medicine cures fever and wounds. Loss of the expedition → a successor takes over.
 
@@ -138,14 +138,14 @@ Village camp: once you are an "Honored Friend" (§12) in a native village, you m
 | Rope | Safe, faster ascent in the mountains. Mountains can also be climbed without a rope, but slower and dangerously: after a warning, every stretch on the rock risks a fall that wounds the traveler (light or severe) and can tear a carried item loose |
 | Machete | Crossing jungle/dense grassland; also offers protection against animal attacks, though weaker than the rifle |
 | Shovel | Digging up treasures and the tomb at marked sites |
-| Rifle | Hunting and defense; offers the strongest protection against animal attacks on land — stronger than the machete (§14). Carried in hand it makes villagers flee and enables robberies in huts — with a permanent reputation loss in the settlement (§12) |
-| Medicine | Cures fever/illness |
+| Rifle | Hunting and defense; carried in the pack it offers the strongest protection against animal and robber attacks on land — stronger than the machete (§14) — and enables the robbery of a chief's hut (with a permanent reputation loss in the region, §12) |
+| Medicine | Cures fever/illness and wounds; used by clicking it in the inventory bar |
 | Gifts | Trade goods for chiefs (goodwill, hints) |
-| Canteen | Always full; protects against dehydration in the desert (not against sun blindness) |
-| Map | Orientation aid |
-| Canoe | Fast travel on rivers/lakes; carried on land = speed penalty |
+| Canteen | Holds a fill level; refills at fresh water, drains on land (faster in the desert); protects against dehydration in the desert while it holds water (not against sun blindness) |
+| Map | Orientation aid; clicking it in the inventory bar opens the exploration overview |
+| Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles |
 
-Core rule: the held object simultaneously decides terrain mobility, the reaction of the natives and treasure recovery. If it is a weapon (rifle or machete), holding it in hand additionally increases protection against wild-animal attacks, with the rifle protecting more strongly than the machete (§14).
+Core rule: a carried item acts by mere possession — it decides terrain mobility and treasure recovery, and a weapon (rifle or machete) in the pack protects against wild-animal attacks, the rifle more strongly than the machete (§14). There is no "in hand" state.
 
 ---
 
@@ -199,17 +199,17 @@ Every settlement — port city or native village — offers at least the baselin
 
 ## 11. Terrain and Movement
 
-| Terrain | Hand object | Without / with |
+| Terrain | Relieving item | Without / with |
 |---|---|---|
-| Desert | Canteen | without: dehydration (drift), speed loss; with a filled canteen: no dehydration. Sun blindness threatens regardless; the canteen does not help against it |
+| Desert | Canteen (with water) | without water: dehydration (drift), speed loss; with a filled canteen: no dehydration. Sun blindness threatens regardless; the canteen does not help against it |
 | Jungle | Machete | without: nearly impassable; with: traversable |
 | Mountains | Rope | without: passable but slow and dangerous — the traveler is warned, then risks a fall on the rock (a light or severe wound, possibly losing a carried item); with: safe and faster |
-| River/lake | Canoe | with: fast water travel; on land: speed penalty |
-| Savanna/open | Rifle (outside villages) | without: higher robbery risk |
-| Dig site | Shovel | without: no find; with: dig it up |
+| River/lake | Canoe | with: fast, safe water travel; carried on land: marked speed penalty |
+| Savanna/open | Rifle (outside villages) | without: higher robbery risk. Carrying the canoe here slows travel |
+| Dig site | Shovel | without: no find; with (click the shovel): dig it up |
 
 **Visible slowdown reason.**
-Whenever the current terrain slows the traveler and the relieving hand object is not held — dense jungle without a machete, water without a canoe, mountain rock without a rope — the bird's-eye view shows a short hint that names the cause and the item that would relieve it. A movement penalty is never silent; the player can always see why progress is slow and what to take in hand. The very first time each of these three slowdowns is met, it is also announced once in the journal (a short entry naming the terrain and the missing item); every later encounter of that same kind is carried only by the standing status-bar hint, so the chronicle is not filled with repetitions. The "first time" is remembered per penalty type and travels with the checkpoint.
+Whenever the current terrain slows the traveler and the relieving item is not carried — dense jungle without a machete, water without a canoe, mountain rock without a rope, or the canoe carried across open land — the bird's-eye view shows a short hint that names the cause and the item that would relieve it. A movement penalty is never silent; the player can always see why progress is slow and which item to pack. The very first time each of these slowdowns is met, it is also announced once in the journal (a short entry naming the terrain and the missing item); every later encounter of that same kind is carried only by the standing status-bar hint, so the chronicle is not filled with repetitions. The "first time" is remembered per penalty type and travels with the checkpoint.
 
 **Movement boundary.**
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
@@ -228,7 +228,7 @@ Movement happens in the bird's-eye view; the terrain is rendered in 3D, the cont
 ## 12. Audience with the Chief
 
 Access to hints leads through the chiefs, in the chief's hut of a village (first-person view). Procedure:
-1. Enter the village (not with a visible rifle — otherwise flight/blockade).
+1. Enter the village.
 2. Visit the chief's hut, audience.
 3. Present a culturally fitting gift → goodwill.
 4. With sufficient goodwill: a hint about the tomb/treasure (into the chronicle, §15).
@@ -240,7 +240,7 @@ If you satisfy a chief correctly repeatedly, he bestows the status of "Honored F
 Effect: in the immediate surroundings of the region's native villages, the natives protect the traveler from attacks by animals and robbers (§14); he can then at most be lightly injured. If he is close to death, inhabitants hurry over with food, water or medicine. In addition he always receives food, water and medicine free of charge in the villages of the region. Each such event is communicated via a journal entry. Typically an entry reads like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
 
 **Robbery and reputation.**
-Taking the rifle in hand inside a hut lets you rob goods and take any quantity along. This permanently antagonizes all villages of the region: afterwards no hut of the region can be entered anymore, and the chiefs give no more hints. A robbery also irretrievably forfeits the "Honored Friend" status — including its protection.
+With a rifle in the pack, the chief's audience offers to rob the hut — looting goods up to the pack limit. This permanently antagonizes all villages of the region: afterwards no hut of the region can be entered anymore, and the chiefs give no more hints. A robbery also irretrievably forfeits the "Honored Friend" status — including its protection.
 
 ---
 
@@ -269,7 +269,7 @@ Per region, typically one people reveals the regional location hint; the others 
 ## 14. Random Events
 
 Hidden triggering per time step/region/condition:
-- Wild-animal attacks (lions, leopards and snakes): an attack can injure or kill. With leopards the risk of severe injury or being eaten is lower than with lions. Carrying a rifle or machete lowers the risk — a rifle more than a machete; holding the weapon in hand lowers it further. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into one of the wandering lions in the bird's-eye view directly triggers a lion attack (same outcome rules and protection).
+- Wild-animal attacks (lions, leopards and snakes): an attack can injure or kill. With leopards the risk of severe injury or being eaten is lower than with lions. Carrying a rifle or machete in the pack lowers the risk — a rifle more than a machete. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into one of the wandering lions in the bird's-eye view directly triggers a lion attack (same outcome rules and protection).
 - Robber attacks: can injure and steal inventory items. As with animal attacks, a machete lowers the risk, a rifle more so.
 - Protection through "Honored Friend": near the villages of a region where you hold this status, the natives rush to help during animal and robber attacks; you can then at most be lightly injured (§12).
 - Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Without a canoe the rifle gets wet and does not help — then only a machete lowers the risk; in the canoe the rifle works normally (§11).
@@ -280,7 +280,7 @@ Hidden triggering per time step/region/condition:
 - Weather (e.g. sandstorm with loss of visibility).
 - Finding caches/camps/remains.
 
-Item help: the fitting piece of equipment helps during events, especially the one held in hand — rifle or machete lower the risk of animal and robber attacks on land (a rifle more than a machete; in hand more than merely carried); against crocodiles in water the machete always helps, a rifle only in the canoe (without a canoe it gets wet and fails); the rifle deters thieves; medicine cures wounds and fever; the canteen protects against dehydration (not against sun blindness).
+Item help: the fitting piece of equipment in the pack helps during events — rifle or machete lower the risk of animal and robber attacks on land (a rifle more than a machete); against crocodiles in water the machete always helps, a rifle only in the canoe (without a canoe it gets wet and fails); the rifle deters thieves; medicine cures wounds and fever; the canteen protects against dehydration while it holds water (not against sun blindness).
 
 Concrete probabilities are calibrated freely for balance. They are tuned to keep events rare, so the journey is only occasionally interrupted (the POC's per-day base rates were lowered by a factor of five from an earlier, too-eventful calibration).
 
@@ -313,7 +313,7 @@ A dead character can write no more journal entries. Instead of an entry, a repor
 
 ## 16. Presentation of Events
 
-Events (animal and robber attacks, chiefs' hints, status changes and the like, §14) are not staged as separate scenes. The player learns of them because the journal opens automatically and a new entry appears. The opened journal does not freeze the game: the character keeps moving in both perspectives while the journal is open and even while an entry is being read aloud — reading and narration never halt travel. Only the modal dialogs (trade, audience, camp and the like) block movement.
+Events (animal and robber attacks, chiefs' hints, status changes and the like, §14) are not staged as separate scenes. The player learns of them because the journal opens automatically and a new entry appears. The opened journal does not freeze the game: the character keeps moving in both perspectives while the journal is open and even while an entry is being read aloud — reading and narration never halt travel. Only the modal dialogs (trade, audience, camp and the like) block movement. Because the journal is non-modal, walking a building's entrance door open (§2) works with the journal open too — the door still enters and the book closes as the building's modal appears; the auto-opened journal never leaves a hut unenterable.
 
 **Do not disturb.**
 Players who do not want to be interrupted can turn the automatic presentation off (POC: debug-menu checkbox, also toggled with F2): with the option active, new entries neither open the journal nor start their narration — they are written silently and remain fully readable (and narratable) when the journal is opened manually. Turning the option off restores the automatic behavior.
@@ -328,7 +328,7 @@ If the character can no longer write (death), the handwritten entry is omitted; 
 
 ## 17. User Interface
 
-- Bird's-eye view: field of view of the surroundings; status bar with date, funds, provisions, gifts, hand object and the current region. The coordinates are not shown permanently; they are read out on demand via the position query. The area freed at the top right of the status bar holds transient status displays — hints such as the reason for a movement penalty (§11) appear as a right-aligned item within the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene. Access to the chronicle and to objects (take an item in hand, view the map, take medicine). Further functions: position query, health query, pitch camp (§6), and an exploration overview showing how far the current region has been explored.
+- Bird's-eye view: field of view of the surroundings; status bar with date, funds, provisions, gifts and the current region (no hand-object slot — item effects are possession-based, §6/§7). The coordinates are not shown permanently; they are read out on demand via the position query. The area freed at the top right of the status bar holds transient status displays — hints such as the reason for a movement penalty (§11) appear as a right-aligned item within the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene. The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction. Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
 - First-person view (settlements): walkable space, interaction prompts at buildings/persons, trade and dialog windows. A gift to a native additionally provides an orientation over the settlement's buildings, with the important, enterable buildings highlighted.
 - Layering: modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label.
 - Controls suitable for mouse/keyboard and gamepad. The chronicle/journal is opened and closed with the Tab key (gamepad: Y). Tab's default focus cycling is suppressed while playing so it does not shift focus onto UI controls; inside form controls (debug-menu fields, dialog inputs) Tab still navigates between them normally.
@@ -391,7 +391,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 Debug shortcut keys:
 - **F1** opens/closes the debug menu.
 - **F2** toggles the journal do-not-disturb option (§16).
-- **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything.
+- **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health, a full canteen and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything.
 - **F4** toggles the canoe in and out of the pack (for quickly testing water travel and the on-land penalty).
 
 - Walking speed of the player character inside settlements (villages and port cities).
@@ -400,6 +400,7 @@ Debug shortcut keys:
 - Mouse-look sensitivity in the first-person view.
 - Ambience volume (default 0.1): one control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale together.
 - Speed of food consumption while walking; at 0 the food supply lasts forever.
+- Speed of the canteen's water consumption per travelled day, split into the land rate and the (faster) desert rate (§6), and the canteen's capacity — a full canteen lasts capacity ÷ consumption travelled days.
 - Checkbox: random events can occur (§14), on by default.
 - One button per kind of random event (§14) to trigger it immediately.
 - Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.

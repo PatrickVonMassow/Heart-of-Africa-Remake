@@ -40,36 +40,32 @@ check(
 )
 
 // === Pure protection logic (design.md §7/§14) =================================
+// Effects are possession-based: a rifle in the pack cuts risk most, a machete
+// less; in water the rifle only works from a canoe, else it is wet.
 const prot = await page.evaluate(() => {
   const { weaponProtection, eventChance } = window.__events
   const ctx = (over) => ({
     terrain: 'savanna', inWater: false, nearWaterfall: false, wetland: false,
-    hand: null, equipment: {}, ...over,
+    equipment: {}, ...over,
   })
   return {
     none: weaponProtection(ctx({})),
-    macheteCarried: weaponProtection(ctx({ equipment: { machete: 1 } })),
-    macheteHand: weaponProtection(ctx({ equipment: { machete: 1 }, hand: 'machete' })),
-    rifleCarried: weaponProtection(ctx({ equipment: { rifle: 1 } })),
-    rifleHand: weaponProtection(ctx({ equipment: { rifle: 1 }, hand: 'rifle' })),
-    wetRifle: weaponProtection(ctx({ equipment: { rifle: 1 }, hand: 'rifle', inWater: true })),
+    machete: weaponProtection(ctx({ equipment: { machete: 1 } })),
+    rifle: weaponProtection(ctx({ equipment: { rifle: 1 } })),
+    wetRifle: weaponProtection(ctx({ equipment: { rifle: 1 }, inWater: true })),
     wetRifleWithMachete: weaponProtection(ctx({ equipment: { rifle: 1, machete: 1 }, inWater: true })),
-    rifleInCanoe: weaponProtection(ctx({ equipment: { rifle: 1 }, hand: 'canoe', inWater: true })),
+    rifleInCanoe: weaponProtection(ctx({ equipment: { rifle: 1, canoe: 1 }, inWater: true })),
     crocNoHelp: eventChance('crocodileAttack', ctx({ terrain: 'water', inWater: true })),
     crocMachete: eventChance('crocodileAttack', ctx({ terrain: 'water', inWater: true, equipment: { machete: 1 } })),
-    crocCanoeRifle: eventChance('crocodileAttack', ctx({ terrain: 'water', inWater: true, equipment: { rifle: 1 }, hand: 'canoe' })),
+    crocCanoeRifle: eventChance('crocodileAttack', ctx({ terrain: 'water', inWater: true, equipment: { rifle: 1, canoe: 1 } })),
   }
 })
 check(
-  'protection order: none > machete carried > machete in hand',
-  prot.none > prot.macheteCarried && prot.macheteCarried > prot.macheteHand,
-  `${prot.none}/${prot.macheteCarried}/${prot.macheteHand}`,
+  'protection order: none > machete > rifle',
+  prot.none > prot.machete && prot.machete > prot.rifle,
+  `${prot.none}/${prot.machete}/${prot.rifle}`,
 )
-check(
-  'protection order: rifle beats machete, in hand beats carried',
-  prot.rifleCarried < prot.macheteCarried && prot.rifleHand < prot.rifleCarried,
-  `${prot.rifleCarried}/${prot.rifleHand}`,
-)
+check('a rifle in the pack protects best', prot.rifle < prot.machete, `${prot.rifle}`)
 check('wet rifle is useless without the canoe', prot.wetRifle === 1, `${prot.wetRifle}`)
 check('in the water the machete still helps', prot.wetRifleWithMachete < 1, `${prot.wetRifleWithMachete}`)
 check('in the canoe the rifle works normally', prot.rifleInCanoe < prot.wetRifleWithMachete, `${prot.rifleInCanoe}`)
@@ -82,8 +78,8 @@ check(
 // Deterministic outcome mapping via injected rand.
 const outcomes = await page.evaluate(() => {
   const { resolveEvent } = window.__events
-  const ctx = { terrain: 'savanna', inWater: false, nearWaterfall: false, wetland: false, hand: 'rifle', equipment: { rifle: 1 } }
-  const noWeapon = { ...ctx, hand: null, equipment: {} }
+  const ctx = { terrain: 'savanna', inWater: false, nearWaterfall: false, wetland: false, equipment: { rifle: 1 } }
+  const noWeapon = { ...ctx, equipment: {} }
   return {
     deterred: resolveEvent('robberAttack', ctx, () => 0.1).result,
     robbed: resolveEvent('robberAttack', noWeapon, () => 0.6).result,
@@ -91,7 +87,7 @@ const outcomes = await page.evaluate(() => {
     escapedBare: resolveEvent('lionAttack', noWeapon, () => 0.1).result,
   }
 })
-check('rifle in hand deters robbers', outcomes.deterred === 'deterred', outcomes.deterred)
+check('a rifle in the pack deters robbers', outcomes.deterred === 'deterred', outcomes.deterred)
 check('unarmed traveller gets robbed', outcomes.robbed === 'robbed', outcomes.robbed)
 check('weapon turns escape into an active defense', outcomes.defended === 'defended' && outcomes.escapedBare === 'escaped', '')
 
@@ -193,7 +189,6 @@ await page.evaluate(() => {
   // nothing); the rope keeps any highland hill passable (design.md §11).
   g().debugJumpTo(-6, 35)
   g().debugAddEquipment('rope')
-  g().takeInHand('rope')
   for (let i = 0; i < 1300; i++) {
     g().moveTravel(i % 200 < 100 ? -0.4 : 0.4, i % 100 < 50 ? -1 : 1, 0.05)
     g().debugSet({ foodDays: 30, health: 100 })
@@ -229,7 +224,7 @@ await page.waitForTimeout(600)
 const lionTouch = await page.evaluate(async () => {
   const store = window.__game
   store.setState({ eventCooldown: 0, defeat: null, victory: false })
-  store.getState().takeInHand('rifle') // rifle → rarely fatal
+  store.getState().debugAddEquipment('rifle') // rifle in pack → rarely fatal
   const key = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
   const attacksBefore = store.getState().journal.filter((e) => key(e) === 'journal.titles.attack').length
   // Drop the active lion right on top of the player so the frame loop detects

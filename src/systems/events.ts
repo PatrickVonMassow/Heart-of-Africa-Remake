@@ -1,13 +1,13 @@
 // Random events (design.md §14): hidden triggering per travelled time step,
 // modulated by terrain, region and state. This module is pure — the store
 // builds the context, rolls here, and applies the returned outcome to the
-// game state and the journal (§16). Protection follows the hand-item rules
-// of design.md §7/§14: a rifle protects more than a machete, an item held
-// in hand more than one merely carried; in water the rifle only works from
-// the canoe (otherwise it is wet), while the machete always helps.
+// game state and the journal (§16). Protection follows item *possession*
+// (design.md §7/§14): a rifle protects more than a machete; in water the rifle
+// only works from the canoe (otherwise it is wet), while the machete always
+// helps.
 
 import { balance } from '../config/balance'
-import type { EquipmentId, HandId } from '../state/store'
+import type { EquipmentId } from '../state/store'
 
 export type EventKind =
   | 'lionAttack'
@@ -35,7 +35,6 @@ export interface EventContext {
   /** Near a village of a region with "Honored Friend" status (§12): the
    * natives rush to help — at most a light injury results. */
   protectedByFriends: boolean
-  hand: HandId | null
   equipment: Partial<Record<EquipmentId, number>>
 }
 
@@ -52,15 +51,17 @@ export interface EventOutcome {
 }
 
 /**
- * Risk multiplier from the carried/held weapon (design.md §7/§14): 1 = no
- * protection. In water the rifle counts only when travelling by canoe.
+ * Risk multiplier from the carried weapons (design.md §7/§14): 1 = no
+ * protection. A rifle in the pack cuts the risk considerably; in water it only
+ * works from the canoe (otherwise it is wet); a machete is the lesser fallback.
  */
 export function weaponProtection(ctx: EventContext): number {
   const hasRifle = (ctx.equipment.rifle ?? 0) > 0
   const hasMachete = (ctx.equipment.machete ?? 0) > 0
-  const rifleWorks = hasRifle && (!ctx.inWater || ctx.hand === 'canoe')
-  if (rifleWorks) return ctx.hand === 'rifle' ? 0.3 : 0.5
-  if (hasMachete) return ctx.hand === 'machete' ? 0.55 : 0.75
+  const hasCanoe = (ctx.equipment.canoe ?? 0) > 0
+  const rifleWorks = hasRifle && (!ctx.inWater || hasCanoe)
+  if (rifleWorks) return 0.25
+  if (hasMachete) return 0.6
   return 1
 }
 
@@ -82,10 +83,12 @@ export function eventChance(kind: EventKind, ctx: EventContext): number {
       return !ctx.inWater ? r.robberAttack * weaponProtection(ctx) : 0
     case 'crocodileAttack': {
       if (!ctx.inWater) return 0
+      // Crocodiles strike swimmers; a canoe keeps the traveller out of reach.
       // The machete always helps in the water; the rifle only from the canoe.
+      const hasCanoe = (ctx.equipment.canoe ?? 0) > 0
+      if (hasCanoe && (ctx.equipment.rifle ?? 0) > 0) return r.crocodile * 0.2
       const hasMachete = (ctx.equipment.machete ?? 0) > 0
-      const rifleWorks = (ctx.equipment.rifle ?? 0) > 0 && ctx.hand === 'canoe'
-      const factor = rifleWorks ? 0.35 : hasMachete ? 0.6 : 1
+      const factor = hasCanoe ? 0.4 : hasMachete ? 0.6 : 1
       return r.crocodile * factor
     }
     case 'fever':
@@ -146,8 +149,8 @@ export function resolveEvent(kind: EventKind, ctx: EventContext, rand: () => num
     case 'robberAttack': {
       // Near friend villages the natives drive robbers off (design.md §12).
       if (ctx.protectedByFriends) return { kind, result: 'deterred', rescued: true }
-      // The rifle deters thieves (design.md §14), in hand almost always.
-      const deterred = ctx.hand === 'rifle' ? rand() < 0.9 : (ctx.equipment.rifle ?? 0) > 0 && rand() < 0.5
+      // A rifle in the pack deters thieves most of the time (design.md §14).
+      const deterred = (ctx.equipment.rifle ?? 0) > 0 && rand() < 0.85
       if (deterred) return { kind, result: 'deterred' }
       return { kind, result: 'robbed', money: 10 + Math.floor(rand() * 41) }
     }

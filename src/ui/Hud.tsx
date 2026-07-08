@@ -20,38 +20,54 @@ function InventoryBar() {
   const t = useStrings()
   const equipment = useGame((s) => s.equipment)
   const treasures = useGame((s) => s.treasures)
-  const handItem = useGame((s) => s.handItem)
-  const takeInHand = useGame((s) => s.takeInHand)
+  const canteenFill = useGame((s) => s.canteenFill)
   const owned = (Object.keys(equipment) as EquipmentId[]).filter((e) => (equipment[e] ?? 0) > 0)
   const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0)
   if (owned.length === 0 && ownedTreasures.length === 0) return null
+
+  // Medicine, map and shovel are used by clicking them on the spot (design.md
+  // §17); the rest act by mere possession (rifle/rope/machete/canoe) or show a
+  // reading (canteen fill), so they are passive labels, not buttons.
+  const activateItem = (e: EquipmentId) => {
+    const g = useGame.getState()
+    if (e === 'medicine') g.useMedicine()
+    else if (e === 'map') useUi.getState().toggleMap()
+    else if (e === 'shovel') g.dig()
+  }
+  const clickable = (e: EquipmentId) => e === 'medicine' || e === 'map' || e === 'shovel'
+
+  const canteenPct = Math.round(canteenFill * 100)
+  const canteenGlow =
+    canteenFill <= 0 ? ' canteen-empty' : canteenFill < 0.05 ? ' canteen-crit' : canteenFill < 0.2 ? ' canteen-low' : ''
+
   return (
     <div className="inventory-bar">
-      {owned.map((e) =>
-        e === 'medicine' ? (
-          // Medicine is taken, not held (design.md §17): it cures fever/wounds.
-          <button key={e} onClick={() => useGame.getState().useMedicine()} title={t.hud.medicineTooltip}>
-            {t.equipment[e]} ({equipment.medicine})
-          </button>
-        ) : (
-          <button
-            key={e}
-            className={handItem === e ? 'active' : ''}
-            onClick={() => takeInHand(handItem === e ? null : e)}
-            title={t.hud.handTooltip}
-          >
+      {owned.map((e) => {
+        if (e === 'canteen') {
+          return (
+            <span key={e} className={`inv-item canteen${canteenGlow}`} title={t.hud.canteenTooltip}>
+              {t.equipment.canteen} {canteenPct}%
+            </span>
+          )
+        }
+        if (clickable(e)) {
+          const label = e === 'medicine' ? `${t.equipment.medicine} (${equipment.medicine})` : t.equipment[e]
+          return (
+            <button key={e} onClick={() => activateItem(e)} title={t.hud.useTooltip}>
+              {label}
+            </button>
+          )
+        }
+        // Passive gear: its effect follows possession (design.md §11/§14).
+        return (
+          <span key={e} className="inv-item" title={t.hud.passiveTooltip}>
             {t.equipment[e]}
-          </button>
-        ),
-      )}
-      {/* Treasures can be carried visibly in hand (design.md §8). */}
+          </span>
+        )
+      })}
+      {/* Presenting a valuable to a village provokes the §8 reaction. */}
       {ownedTreasures.map((id) => (
-        <button
-          key={id}
-          className={handItem === id ? 'active' : ''}
-          onClick={() => takeInHand(handItem === id ? null : id)}
-          title={t.hud.handTooltip}
-        >
+        <button key={id} onClick={() => useGame.getState().presentValuable(id)} title={t.hud.presentTooltip}>
           {t.treasures[id]} ({treasures[id]})
         </button>
       ))}
@@ -359,8 +375,13 @@ export function Hud() {
       }}>
         {t.hud.journalToggle}
       </button>
-      <button className="hud-button map-toggle" onClick={() => useUi.getState().toggleMap()}>
-        {t.hud.mapToggle}
+      <button className="hud-button camp-toggle" onClick={() => {
+        if (useUi.getState().dialog) return
+        const g = useGame.getState()
+        if (g.mode === 'travel') g.pitchOrOpenCamp()
+        else g.openVillageCamp()
+      }}>
+        {t.hud.campToggle}
       </button>
       <Prompt />
       <Toast />

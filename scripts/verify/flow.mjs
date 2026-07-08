@@ -197,6 +197,28 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
 await shot('03-village-nubians')
 
+// --- 5b. Regression guard (design.md §16): the open, non-modal journal must
+// not block walking into a hut door. A fresh village-discovered entry
+// auto-opens the journal; the door must still enter (and close the book). ---
+await page.evaluate(() => window.__game.getState().setJournalOpen(true))
+const marketDoor = await page.evaluate(() => {
+  const it = window.__placeLayout.interactives.find((i) => i.type === 'market')
+  return it?.door ?? null
+})
+if (marketDoor) {
+  await moveTo(marketDoor[0], marketDoor[1])
+  await page.waitForTimeout(500)
+  check(
+    'a hut door opens even with the journal open (design.md §16)',
+    await page.evaluate(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen),
+  )
+  await page.evaluate(() => window.__ui.getState().setDialog(null))
+  await moveTo(0, 0) // step back to the center to release the door latch
+  await page.waitForTimeout(300)
+} else {
+  check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
+}
+
 // --- 6. Villager: the elder teaches the North's direction system (§13.2) ---
 await enterBuilding('villager')
 s = await state()
@@ -250,18 +272,23 @@ const grave = s.graveLatLon
 check('Grave lies north of the village (Nivera matches)', grave.lat > 21.8)
 await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [grave.lat, grave.lon])
 await page.waitForTimeout(400)
-// Dig without the shovel in hand → must fail politely.
+// Dig with no shovel in the pack → must fail politely (effects are possession-
+// based now, design.md §11/§17).
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  window.__game.setState({ equipment: { ...g.equipment, shovel: 0 } })
+})
 await page.keyboard.press('KeyG')
 await page.waitForTimeout(200)
 s = await state()
-check('Digging without the shovel in hand fails', !s.victory)
-// Take the shovel in hand via the inventory bar, then dig.
+check('Digging without a shovel in the pack fails', !s.victory)
+// Acquire a shovel, then dig by clicking it in the inventory bar (design.md §17).
+await page.evaluate(() => window.__game.getState().debugAddEquipment('shovel'))
+await page.waitForTimeout(150)
 await page.locator('.inventory-bar button', { hasText: 'Schaufel' }).click()
-await page.waitForTimeout(200)
-await page.keyboard.press('KeyG')
 await page.waitForTimeout(400)
 s = await state()
-check('Victory state after digging at the site', s.victory === true)
+check('Victory state after digging at the site (shovel clicked)', s.victory === true)
 await shot('07-victory')
 
 console.log('---')

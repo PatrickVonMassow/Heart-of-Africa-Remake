@@ -160,16 +160,19 @@ export const de: Strings = {
 
   hud: {
     journalToggle: 'Tagebuch (Tab)',
-    mapToggle: 'Karte (M)',
-    handTooltip: 'In die Hand nehmen / weglegen',
-    medicineTooltip: 'Medizin einnehmen (heilt Fieber und Wunden)',
+    campToggle: 'Lager (C)',
+    useTooltip: 'Anklicken, um es hier einzusetzen',
+    passiveTooltip: 'Wirkt automatisch, solange du es dabei hast',
+    canteenTooltip: 'Füllstand der Feldflasche — füllt sich an Süßwasser wieder',
+    presentTooltip: 'Einem Dorf zeigen (löst eine Reaktion aus)',
     webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar — das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
     fps: (fps) => `${fps} FPS`,
     movementPenalty: {
-      jungle: 'Der dichte Dschungel bremst — mit einer Machete in der Hand geht es schneller voran.',
-      water: 'Schwimmen ist langsam — mit einem Kanu in der Hand käme ich schneller übers Wasser.',
-      mountain: 'Der steile Fels bremst den Aufstieg — mit einem Seil in der Hand geht es sicherer und schneller.',
+      jungle: 'Der dichte Dschungel bremst — mit einer Machete im Gepäck geht es schneller voran.',
+      water: 'Schwimmen ist langsam und gefährlich — mit einem Kanu käme ich schneller und sicherer übers Wasser.',
+      mountain: 'Der steile Fels bremst den Aufstieg — mit einem Seil geht es sicherer und schneller.',
+      canoeOnLand: 'Das Kanu ist an Land totes Gewicht und bremst mich — für lange Landwege lasse ich es besser im Lager.',
     },
   },
 
@@ -212,8 +215,10 @@ export const de: Strings = {
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
     mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich — ein Fehltritt, und ich stürze. Langsam und vorsichtig!',
-    penaltyJungle: 'Der Dschungel bremst mich — eine Machete in der Hand bahnte den Weg.',
+    penaltyJungle: 'Der Dschungel bremst mich — eine Machete im Gepäck bahnte den Weg.',
     penaltyWater: 'Kein Kanu — ich muss hinüberschwimmen, langsam und durchnässt.',
+    penaltyCanoeLand: 'Das Kanu bremst mich an Land — für Landwege besser im Lager lassen.',
+    valuableAlreadyShown: 'Dieses Dorf hat den Schatz bereits gesehen.',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
     inHand: (name) => `${name} in die Hand genommen.`,
@@ -319,6 +324,9 @@ export const de: Strings = {
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     ambienceVolume: 'Ambiente-Lautstärke',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',
+    canteenDrain: 'Wasserverbrauch/Tag (Land)',
+    canteenDesertDrain: 'Wasserverbrauch/Tag (Wüste)',
+    canteenCapacity: 'Kapazität der Trinkflasche',
     daysPerUnit: 'Tage pro Wegeinheit',
     canoeSpeedup: 'Kanu-Tempofaktor (Wasser)',
     junglePenalty: 'Malusfaktor Dschungel (ohne Machete)',
@@ -385,6 +393,7 @@ export const de: Strings = {
       mountainClimb: 'Ohne Seil ins Gebirge',
       penaltyJungle: 'Kampf durch den Dschungel',
       penaltyWater: 'Ins Wasser',
+      penaltyCanoeLand: 'Das Kanu an Land',
       mountainFall: 'Ein Sturz',
       discovery: 'Ein düsterer Fund',
       deadline1: 'Ein Brief der Geldgeber',
@@ -529,7 +538,9 @@ export const de: Strings = {
     penaltyJungle:
       '[weary]Der Dschungel schließt sich um mich, dicht von Ranken und Dornen.[/weary] [emph]Ohne Machete[/emph] muss ich jeden Schritt erzwingen —[pause] eine Klinge in der Hand bahnte den Weg.',
     penaltyWater:
-      '[weary]Das Wasser versperrt mir den Weg, und ich habe kein Kanu.[/weary] Ich wate und schwimme hinüber, langsam und durchnässt;[pause] [emph]ein Kanu in der Hand[/emph] trüge mich mühelos darüber.',
+      '[weary]Das Wasser versperrt mir den Weg, und ich habe kein Kanu.[/weary] Ich wate und schwimme hinüber, langsam und durchnässt;[pause] [emph]ein Kanu[/emph] trüge mich mühelos und sicher darüber.',
+    penaltyCanoeLand:
+      '[weary]Das Kanu auf meinem Rücken ist an Land eine schwere Last.[/weary] Es bremst jeden Schritt —[pause] [emph]für lange Wege über Land[/emph] lasse ich es besser in einem Lager zurück.',
     mountainFall:
       '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden und benommen kam ich weiter unten zum Liegen —[pause] ohne Seil wäre dieser Aufstieg beinahe mein Ende gewesen.[/weary]',
     mountainFallItem:

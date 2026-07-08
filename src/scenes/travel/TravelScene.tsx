@@ -988,7 +988,8 @@ export function TravelScene() {
     }
   }, [])
 
-  // Interaction key: G digs. Places are entered by walking into them (below).
+  // Digging is done by clicking the shovel item (design.md §17); the G key
+  // remains as a convenience/gamepad binding for digging on the spot.
   useEffect(() => {
     const offG = onKeyPress('KeyG', () => {
       if (!useUi.getState().dialog) useGame.getState().dig()
@@ -1054,11 +1055,7 @@ export function TravelScene() {
     const nearCamp = s.freeCamps.some(
       (c) => !c.looted && Math.hypot(c.lat - ll.lat, c.lon - ll.lon) <= balance.camps.campRadiusDeg,
     )
-    const prompt = nearCamp
-      ? strings.prompts.openCamp
-      : s.handItem === 'shovel'
-        ? strings.prompts.digHere
-        : null
+    const prompt = nearCamp ? strings.prompts.openCamp : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 

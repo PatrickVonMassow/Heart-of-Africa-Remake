@@ -32,9 +32,6 @@ export type EquipmentId =
   | 'map'
   | 'canoe'
 
-/** Anything holdable in hand: equipment or a visibly carried valuable (§8). */
-export type HandId = EquipmentId | TreasureId
-
 export const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
 
 export function isEquipmentId(id: string): id is EquipmentId {
@@ -134,7 +131,6 @@ export interface GameState {
   valuableShown: Record<string, boolean>
   /** Settlements whose buildings are highlighted after a gift (§17). */
   orientationGiven: Record<string, boolean>
-  handItem: HandId | null
   journal: JournalEntry[]
   journalOpen: boolean
   /** Health points (design.md §6); 0 = death of the character. */
@@ -142,8 +138,10 @@ export interface GameState {
   afflictions: Afflictions
   /** Days of desert-free travel left until sun blindness heals. */
   sunblindRecovery: number
-  /** Accumulated days of dry desert travel (dehydration onset, §6). */
+  /** Accumulated days of thirst (empty canteen) until dehydration (§6). */
   dryDays: number
+  /** Canteen water level 0..1 (design.md §6); only meaningful with a canteen. */
+  canteenFill: number
   /** Days until the next random event may roll (design.md §14 spam guard). */
   eventCooldown: number
   /** Deadline warning stage already announced (design.md §5): 0, 1 or 2. */
@@ -194,7 +192,7 @@ export interface GameState {
   foodOutWarned: boolean
   /** Movement-penalty types already announced in the journal (design.md §11):
    *  each is journaled once, then only the status-bar hint carries it. */
-  penaltyJournaled: { jungle: boolean; water: boolean; mountain: boolean }
+  penaltyJournaled: { jungle: boolean; water: boolean; mountain: boolean; canoeOnLand: boolean }
   hasCheckpoint: boolean
   /** Bumped by the debug menu when mutating the balance object. */
   balanceVersion: number
@@ -216,10 +214,11 @@ export interface GameState {
   buyTreasure: (treasure: TreasureId) => void
   /** Travel agency (design.md §10): passage to another port city. */
   bookFerry: (destId: string) => void
-  takeInHand: (item: HandId | null) => void
   giveGift: (material: Material) => void
   talkToVillager: () => void
-  /** Rob the hut at rifle point (design.md §12) — permanent regional loss. */
+  /** Present a carried valuable to a village — provokes the §8 reaction. */
+  presentValuable: (treasure: TreasureId) => void
+  /** Rob the hut with a rifle (design.md §12) — permanent regional loss. */
   robVillage: () => void
   /** Pitch a camp in the open, or reopen the one nearby (design.md §6). */
   pitchOrOpenCamp: () => void
@@ -410,7 +409,6 @@ function startState(seed: number) {
     landmarksSeen: [] as string[],
     valuableShown: {} as Record<string, boolean>,
     orientationGiven: {} as Record<string, boolean>,
-    handItem: null as HandId | null,
     journal: [
       { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
@@ -419,6 +417,7 @@ function startState(seed: number) {
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
     dryDays: 0,
+    canteenFill: 1,
     eventCooldown: 0,
     deadlineWarned: 0,
     defeat: null,
@@ -447,7 +446,7 @@ function startState(seed: number) {
     toast: null,
     foodWarned: false,
     foodOutWarned: false,
-    penaltyJournaled: { jungle: false, water: false, mountain: false },
+    penaltyJournaled: { jungle: false, water: false, mountain: false, canoeOnLand: false },
     balanceVersion: 0,
   }
 }
@@ -476,7 +475,7 @@ function nearestFriendVillage(
 
 /** Event context from the current situation (design.md §14). */
 function buildEventContext(
-  s: Pick<GameState, 'equipment' | 'handItem' | 'honoredFriend'>,
+  s: Pick<GameState, 'equipment' | 'honoredFriend'>,
   terrain: string,
   lat: number,
   lon: number,
@@ -485,7 +484,7 @@ function buildEventContext(
   const nearWaterfall = WATERFALLS.some((w) => Math.hypot(w.lat - lat, w.lon - lon) < 0.35)
   const wetland = terrain === 'jungle' || riverDistance(lat, lon, 0.2) < 0.12
   const protectedByFriends = nearestFriendVillage(lat, lon, s.honoredFriend) !== null
-  return { terrain, inWater, nearWaterfall, wetland, protectedByFriends, hand: s.handItem, equipment: s.equipment }
+  return { terrain, inWater, nearWaterfall, wetland, protectedByFriends, equipment: s.equipment }
 }
 
 let nextEntryId = 2
@@ -510,10 +509,12 @@ export function usedInventory(
 }
 
 /** Journal title/body/toast keys for each movement-penalty type (design.md §11). */
-const PENALTY_JOURNAL: Record<'jungle' | 'water' | 'mountain', { title: string; body: string; toast: 'penaltyJungle' | 'penaltyWater' | 'mountainNoRopeWarn' }> = {
+type PenaltyToast = 'penaltyJungle' | 'penaltyWater' | 'mountainNoRopeWarn' | 'penaltyCanoeLand'
+const PENALTY_JOURNAL: Record<'jungle' | 'water' | 'mountain' | 'canoeOnLand', { title: string; body: string; toast: PenaltyToast }> = {
   jungle: { title: 'journal.titles.penaltyJungle', body: 'journal.penaltyJungle', toast: 'penaltyJungle' },
   water: { title: 'journal.titles.penaltyWater', body: 'journal.penaltyWater', toast: 'penaltyWater' },
   mountain: { title: 'journal.titles.mountainClimb', body: 'journal.mountainNoRope', toast: 'mountainNoRopeWarn' },
+  canoeOnLand: { title: 'journal.titles.penaltyCanoeLand', body: 'journal.penaltyCanoeLand', toast: 'penaltyCanoeLand' },
 }
 
 export const useGame = create<GameState>()((set, get) => ({
@@ -557,26 +558,28 @@ export const useGame = create<GameState>()((set, get) => ({
     }
     len = Math.hypot(dirX, dirZ)
 
-    // Terrain time-cost factor depends on terrain and hand item (design.md §11).
+    // Terrain time-cost factor depends on terrain and inventory (design.md §11):
+    // the relieving items act by possession, not by being held in hand.
     const tc = balance.terrainCost
+    const hasCanoe = (s.equipment.canoe ?? 0) > 0
     let cost: number
     switch (here.type) {
       case 'desert':
-        cost = tc.desert
+        cost = hasCanoe ? tc.desert * balance.canoeLandPenalty : tc.desert
         break
       case 'jungle':
-        cost = s.handItem === 'machete' ? tc.jungle : tc.jungle * balance.junglePenalty
+        cost = (s.equipment.machete ?? 0) > 0 ? tc.jungle : tc.jungle * balance.junglePenalty
         break
       case 'mountain':
-        cost = s.handItem === 'rope' ? tc.mountain : tc.mountain * balance.mountainPenalty
+        cost = (s.equipment.rope ?? 0) > 0 ? tc.mountain : tc.mountain * balance.mountainPenalty
         break
       case 'water':
       // Enclosed sea water (design.md §11) is swum/crossed like inland water.
       case 'ocean':
-        cost = s.handItem === 'canoe' ? tc.water / balance.canoeSpeedup : tc.water
+        cost = hasCanoe ? tc.water / balance.canoeSpeedup : tc.water
         break
-      default:
-        cost = tc.savanna
+      default: // savanna and the like: the canoe is dead weight on land
+        cost = hasCanoe ? tc.savanna * balance.canoeLandPenalty : tc.savanna
     }
 
     let speed = balance.travelSpeed / Math.max(0.25, cost)
@@ -594,7 +597,7 @@ export const useGame = create<GameState>()((set, get) => ({
     // slows the traveller — a machete in the jungle, a canoe in water, a rope
     // in the mountains — announce it once in the journal (with a toast); after
     // that the standing status-bar hint carries it silently.
-    const penalty = movementPenalty(nextT.type, s.handItem)
+    const penalty = movementPenalty(nextT.type, s.equipment)
     if (penalty && !s.penaltyJournaled[penalty]) {
       const j = PENALTY_JOURNAL[penalty]
       set({
@@ -632,7 +635,7 @@ export const useGame = create<GameState>()((set, get) => ({
     if (
       balance.randomEventsEnabled &&
       nextT.type === 'mountain' &&
-      s.handItem !== 'rope' &&
+      (s.equipment.rope ?? 0) <= 0 &&
       Math.random() < balance.mountainFall.chancePerDay * dayDelta
     ) {
       get().applyMountainFall()
@@ -713,7 +716,11 @@ export const useGame = create<GameState>()((set, get) => ({
         boost = Math.max(boost, 1 + (balance.currentWaterfallBoost - 1) * (1 - d / balance.currentWaterfallRadius))
       }
     }
-    const stepDeg = flow.strength * balance.currentDrift * boost * Math.min(dt, 0.1)
+    // Without a canoe the traveller is far more at the current's mercy; a canoe
+    // rides it under control (design.md §11).
+    const hasCanoe = (s.equipment.canoe ?? 0) > 0
+    const susceptibility = hasCanoe ? 0.5 : 1.6
+    const stepDeg = flow.strength * balance.currentDrift * boost * susceptibility * Math.min(dt, 0.1)
     const nlat = ll.lat + flow.dirLat * stepDeg
     const nlon = ll.lon + flow.dirLon * stepDeg
     const nt = sampleTerrain(nlat, nlon, s.seed)
@@ -723,7 +730,7 @@ export const useGame = create<GameState>()((set, get) => ({
     // §11): otherwise the current would move the traveller for free. The cost
     // matches water travel over the drifted distance.
     const driftDist = Math.hypot(nw.x - s.pos.x, nw.z - s.pos.z)
-    const cost = s.handItem === 'canoe' ? balance.terrainCost.water / balance.canoeSpeedup : balance.terrainCost.water
+    const cost = hasCanoe ? balance.terrainCost.water / balance.canoeSpeedup : balance.terrainCost.water
     const dayDelta = driftDist * balance.daysPerUnit * cost
     const newDay = s.day + dayDelta
     set({
@@ -875,7 +882,6 @@ export const useGame = create<GameState>()((set, get) => ({
           equipment,
           foodDays: s.foodDays * 0.7,
           afflictions: { ...s.afflictions, wounds: Math.random() < 0.5 ? 2 : Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 },
-          handItem: s.handItem === 'shovel' ? s.handItem : null,
         })
         get().addEntry({ key: 'journal.titles.sweptAway' }, { key: 'journal.sweptAway' })
         return
@@ -897,7 +903,6 @@ export const useGame = create<GameState>()((set, get) => ({
     const wounds = (severe ? 2 : Math.max(s.afflictions.wounds, 1)) as 0 | 1 | 2
     // A fall may tear a carried item loose (not the shovel — the goal tool).
     const equipment = { ...s.equipment }
-    let handItem = s.handItem
     let lostItem = false
     if (Math.random() < balance.mountainFall.itemLossChance) {
       const droppable = (Object.keys(equipment) as EquipmentId[]).filter(
@@ -907,10 +912,9 @@ export const useGame = create<GameState>()((set, get) => ({
         const drop = droppable[Math.floor(Math.random() * droppable.length)]
         equipment[drop] = (equipment[drop] ?? 1) - 1
         lostItem = true
-        if (handItem === drop && (equipment[drop] ?? 0) <= 0) handItem = null
       }
     }
-    set({ afflictions: { ...s.afflictions, wounds }, equipment, handItem })
+    set({ afflictions: { ...s.afflictions, wounds }, equipment })
     get().addEntry(
       { key: 'journal.titles.mountainFall' },
       { key: lostItem ? 'journal.mountainFallItem' : 'journal.mountainFall' },
@@ -955,18 +959,33 @@ export const useGame = create<GameState>()((set, get) => ({
     const hb = balance.health
     const a = { ...s.afflictions }
 
-    // Dehydration (§6: "desert without water"): the canteen is always full,
-    // and fresh water in reach — travelling on water or along a river or
-    // lake shore — counts as drinking. Away from both, thirst builds up
-    // over sustained dry travel before the affliction sets in, so terrain
-    // flicker at a river bank never toggles it.
+    // Water (§6/§11): fresh water in reach — travelling on water or along a
+    // river or lake shore — counts as drinking, refilling the canteen and
+    // resetting thirst. Away from it the canteen drains (slowly off the desert,
+    // fast in it); once the reserve is empty, thirst builds up over sustained
+    // travel before the dehydration affliction sets in, so bank flicker never
+    // toggles it. Without a canteen there is no reserve, so thirst builds
+    // whenever fresh water is out of reach.
     const hasCanteen = (s.equipment.canteen ?? 0) > 0
     const canDrink =
       terrain === 'water' ||
       terrain === 'ocean' ||
       riverDistance(lat, lon, 0.25) < 0.08 ||
       lakeDistance(lat, lon, 0.25) < 0.08
-    const dryDays = terrain === 'desert' && !hasCanteen && !canDrink ? s.dryDays + dayDelta : 0
+    let canteenFill = s.canteenFill
+    let dryDays = s.dryDays
+    if (canDrink) {
+      canteenFill = 1
+      dryDays = 0
+    } else {
+      if (hasCanteen) {
+        const perDay = terrain === 'desert' ? hb.canteenDesertDrainPerDay : hb.canteenDrainPerDay
+        const drainRate = perDay / hb.canteenCapacity // fraction of a full canteen per day
+        canteenFill = Math.max(0, canteenFill - drainRate * dayDelta)
+      }
+      const reserve = hasCanteen ? canteenFill : 0
+      dryDays = reserve <= 0 ? s.dryDays + dayDelta : 0
+    }
     const dehydrated = dryDays >= hb.dehydrationOnsetDays
     if (dehydrated && !a.dehydration) {
       a.dehydration = true
@@ -1002,7 +1021,7 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     const wasPoor = healthState(s.health) === 'poor'
-    set({ health, afflictions: a, sunblindRecovery, dryDays })
+    set({ health, afflictions: a, sunblindRecovery, dryDays, canteenFill })
     if (!wasPoor && healthState(health) === 'poor' && health > 0) {
       get().addEntry({ key: 'journal.titles.healthPoor' }, { key: 'journal.healthPoor' })
     }
@@ -1136,26 +1155,35 @@ export const useGame = create<GameState>()((set, get) => ({
         )
       }
     }
-    // A visibly carried valuable triggers a reaction (design.md §8), once
-    // per village: revered material creates goodwill, rejected costs it.
-    if (place.kind === 'village' && s.handItem && !isEquipmentId(s.handItem) && !s.valuableShown[id]) {
-      const treasure = s.handItem as TreasureId
-      const values = REGION_VALUES[place.region]
-      const material = treasure === 'statue' ? null : treasure
-      set((st) => ({ valuableShown: { ...st.valuableShown, [id]: true } }))
-      if (material && values.rejected.includes(material)) {
-        set((st) => ({ goodwill: { ...st.goodwill, [id]: Math.max(0, (st.goodwill[id] ?? 0) - 2) } }))
-        get().addEntry(
-          { key: 'journal.titles.valuableReaction' },
-          { key: 'journal.valuableRejected', params: { people: place.peopleId ?? id, treasure } },
-        )
-      } else if (!material || values.revered.includes(material)) {
-        set((st) => ({ goodwill: { ...st.goodwill, [id]: (st.goodwill[id] ?? 0) + 1 } }))
-        get().addEntry(
-          { key: 'journal.titles.valuableReaction' },
-          { key: 'journal.valuableRevered', params: { people: place.peopleId ?? id, treasure } },
-        )
-      }
+  },
+
+  /** Present a carried valuable to the villagers (design.md §8): once per
+   *  village, a revered material creates goodwill, a rejected one costs it. */
+  presentValuable: (treasure) => {
+    const s = get()
+    const place = s.placeId ? placeById(s.placeId) : null
+    if (!place || place.kind !== 'village') return
+    if ((s.treasures[treasure] ?? 0) <= 0) return
+    const id = place.id
+    if (s.valuableShown[id]) {
+      set({ toast: getStrings().toasts.valuableAlreadyShown })
+      return
+    }
+    const values = REGION_VALUES[place.region]
+    const material = treasure === 'statue' ? null : treasure
+    set((st) => ({ valuableShown: { ...st.valuableShown, [id]: true } }))
+    if (material && values.rejected.includes(material)) {
+      set((st) => ({ goodwill: { ...st.goodwill, [id]: Math.max(0, (st.goodwill[id] ?? 0) - 2) } }))
+      get().addEntry(
+        { key: 'journal.titles.valuableReaction' },
+        { key: 'journal.valuableRejected', params: { people: place.peopleId ?? id, treasure } },
+      )
+    } else if (!material || values.revered.includes(material)) {
+      set((st) => ({ goodwill: { ...st.goodwill, [id]: (st.goodwill[id] ?? 0) + 1 } }))
+      get().addEntry(
+        { key: 'journal.titles.valuableReaction' },
+        { key: 'journal.valuableRevered', params: { people: place.peopleId ?? id, treasure } },
+      )
     }
   },
 
@@ -1239,14 +1267,12 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!place || (s.equipment[id] ?? 0) <= 0) return
     const nextCount = (s.equipment[id] ?? 0) - 1
     const equipment = { ...s.equipment, [id]: nextCount }
-    const handItem = s.handItem === id && nextCount <= 0 ? null : s.handItem
     if (place.kind === 'village') {
       // Villages pay in gifts of the material they value (design.md §9).
       const mat = REGION_VALUES[place.region].revered[0]
       const count = balance.village.sellGifts
       set({
         equipment,
-        handItem,
         gifts: { ...s.gifts, [mat]: s.gifts[mat] + count },
         toast: getStrings().toasts.soldForGifts(getStrings().equipment[id], count),
       })
@@ -1254,20 +1280,10 @@ export const useGame = create<GameState>()((set, get) => ({
       const amount = Math.max(1, Math.floor(priceOfGood(id) * balance.economy.equipmentSellFactor))
       set({
         equipment,
-        handItem,
         money: s.money + amount,
         toast: getStrings().toasts.sold(getStrings().equipment[id], amount),
       })
     }
-  },
-
-  takeInHand: (item) => {
-    const s = get()
-    if (item !== null) {
-      const owned = isEquipmentId(item) ? (s.equipment[item] ?? 0) : s.treasures[item]
-      if (!owned) return
-    }
-    set({ handItem: item, toast: item ? getStrings().toasts.inHand(handItemName(item)) : getStrings().toasts.handsFree })
   },
 
   offerTreasure: (treasure) => {
@@ -1300,7 +1316,6 @@ export const useGame = create<GameState>()((set, get) => ({
     set({
       money: s.money + bid.amount,
       treasures: { ...s.treasures, [bid.treasure]: s.treasures[bid.treasure] - 1 },
-      handItem: s.handItem === bid.treasure && s.treasures[bid.treasure] === 1 ? null : s.handItem,
       toast: getStrings().toasts.sold(getStrings().treasures[bid.treasure], bid.amount),
     })
   },
@@ -1358,12 +1373,8 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.placeId) return
     const place = placeById(s.placeId)
     if (place.kind !== 'village' || s.gifts[material] <= 0) return
-    // Standing guards (design.md §12): a visible rifle makes the villagers
-    // flee, a robbed region shuns the traveler, hostility must wear off.
-    if (s.handItem === 'rifle') {
-      set({ toast: getStrings().toasts.villagersFlee })
-      return
-    }
+    // Standing guards (design.md §12): a robbed region shuns the traveler,
+    // hostility must wear off.
     if (s.regionRobbed[place.region]) {
       set({ toast: getStrings().toasts.regionShunned })
       return
@@ -1474,12 +1485,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (!s.placeId) return
     const region = placeById(s.placeId).region
-    // A visible rifle scatters the villagers; a robbed region shuns the
-    // traveler entirely (design.md §12).
-    if (s.handItem === 'rifle') {
-      set({ toast: getStrings().toasts.villagersFlee })
-      return
-    }
+    // A robbed region shuns the traveler entirely (design.md §12).
     if (s.regionRobbed[region]) {
       set({ toast: getStrings().toasts.regionShunned })
       return
@@ -1520,7 +1526,6 @@ export const useGame = create<GameState>()((set, get) => ({
     const lootMaterial = REGION_VALUES[region].revered[0]
     const loot = Math.min(rep.robberyGifts, space)
     set({
-      handItem: 'rifle',
       gifts: { ...s.gifts, [lootMaterial]: s.gifts[lootMaterial] + loot },
       foodDays: s.foodDays + rep.robberyFoodDays,
       // The whole region is antagonized for good: no huts, no hints, and
@@ -1585,14 +1590,11 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!dialog || dialog.kind !== 'camp') return
     const bag = campBagOf(s, dialog)
     if (!bag) return
-    // Deduct one item from the pack; an emptied hand item is put away.
+    // Deduct one item from the pack into the camp cache.
     if (kind === 'equipment') {
       const e = id as EquipmentId
       if ((s.equipment[e] ?? 0) <= 0) return
-      set({
-        equipment: { ...s.equipment, [e]: (s.equipment[e] ?? 0) - 1 },
-        handItem: s.handItem === e && (s.equipment[e] ?? 0) === 1 ? null : s.handItem,
-      })
+      set({ equipment: { ...s.equipment, [e]: (s.equipment[e] ?? 0) - 1 } })
     } else if (kind === 'gift') {
       const m = id as Material
       if (s.gifts[m] <= 0) return
@@ -1600,10 +1602,7 @@ export const useGame = create<GameState>()((set, get) => ({
     } else {
       const t = id as TreasureId
       if (s.treasures[t] <= 0) return
-      set({
-        treasures: { ...s.treasures, [t]: s.treasures[t] - 1 },
-        handItem: s.handItem === t && s.treasures[t] === 1 ? null : s.handItem,
-      })
+      set({ treasures: { ...s.treasures, [t]: s.treasures[t] - 1 } })
     }
     writeCampBag(get, set, dialog, addToBag(bag, kind, id, 1))
   },
@@ -1634,7 +1633,7 @@ export const useGame = create<GameState>()((set, get) => ({
   dig: () => {
     const s = get()
     if (s.mode !== 'travel' || s.victory) return
-    if (s.handItem !== 'shovel') {
+    if ((s.equipment.shovel ?? 0) <= 0) {
       set({ toast: getStrings().toasts.digNoShovel })
       return
     }
@@ -1702,9 +1701,10 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     const snapshot = {
       seed: s.seed, placeId: s.placeId, pos: s.pos, day: s.day, money: s.money,
-      foodDays: s.foodDays, gifts: s.gifts, equipment: s.equipment, handItem: s.handItem,
+      foodDays: s.foodDays, gifts: s.gifts, equipment: s.equipment,
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
-      health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery, dryDays: s.dryDays,
+      health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
+      dryDays: s.dryDays, canteenFill: s.canteenFill,
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
@@ -1745,7 +1745,7 @@ export const useGame = create<GameState>()((set, get) => ({
         ...snap,
         explored: snap.explored ?? {},
         health: snap.health ?? balance.health.max,
-        penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false },
+        penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false, canoeOnLand: false },
         deadlineWarned: snap.deadlineWarned ?? 0,
         knowingVillages: snap.knowingVillages ?? pickKnowingVillages(snap.seed ?? 0),
         hintsGiven: snap.hintsGiven ?? {},
@@ -1756,6 +1756,7 @@ export const useGame = create<GameState>()((set, get) => ({
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         dryDays: snap.dryDays ?? 0,
+        canteenFill: snap.canteenFill ?? 1,
         treasures: snap.treasures ?? { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 },
         treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
         graveyardIvoryLeft: snap.graveyardIvoryLeft ?? balance.economy.graveyardIvory,
@@ -1827,6 +1828,7 @@ export const useGame = create<GameState>()((set, get) => ({
       afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 },
       sunblindRecovery: 0,
       dryDays: 0,
+      canteenFill: 1, // F3 also tops up the canteen (design.md §21)
       equipment,
       gifts,
       treasures,
@@ -1840,7 +1842,6 @@ export const useGame = create<GameState>()((set, get) => ({
     if ((s.equipment.canoe ?? 0) > 0) {
       set({
         equipment: { ...s.equipment, canoe: 0 },
-        handItem: s.handItem === 'canoe' ? null : s.handItem,
         toast: getStrings().toasts.debugCanoeOff,
       })
     } else {
@@ -1928,12 +1929,6 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 /** Total gift count for the status bar. */
 export function totalGifts(gifts: Record<Material, number>): number {
   return Object.values(gifts).reduce((a, b) => a + b, 0)
-}
-
-/** Localized display name of a hand item (equipment or treasure). */
-export function handItemName(item: HandId): string {
-  const t = getStrings()
-  return isEquipmentId(item) ? t.equipment[item] : t.treasures[item]
 }
 
 // --- Camp cache helpers (design.md §6) --------------------------------------

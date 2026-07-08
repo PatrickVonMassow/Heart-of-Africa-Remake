@@ -1442,14 +1442,15 @@ export function PlaceScene() {
     const game = useGame.getState()
     // The elder is addressed with the E key, not by a door (has no door point).
     if (near.type === 'villager') return
+    // A building's modal opens over the (non-modal) journal — close the book so
+    // the dialog is unobstructed (design.md §16/§17).
+    if (game.journalOpen) game.setJournalOpen(false)
     if (near.type === 'chief') {
-      // Standing gates (design.md §12): a visible rifle causes flight and
-      // blockade, a robbed region shuns the traveler, hostility lingers.
+      // Standing gates (design.md §12): a robbed region shuns the traveler,
+      // hostility lingers. The audience itself offers the (rifle-gated) robbery.
       const strings = getStrings()
       const place = game.placeId ? placeById(game.placeId) : null
-      if (game.handItem === 'rifle') {
-        game.setToast(strings.toasts.villagersFlee)
-      } else if (place && game.regionRobbed[place.region]) {
+      if (place && game.regionRobbed[place.region]) {
         game.setToast(strings.toasts.regionShunned)
       } else if (place && (game.hostileUntil[place.id] ?? 0) > game.day) {
         game.setToast(strings.toasts.chiefHostile)
@@ -1536,7 +1537,11 @@ export function PlaceScene() {
     if (latch?.door && Math.hypot(p.x - latch.door[0], p.z - latch.door[1]) > DOOR_RELEASE_RADIUS) {
       doorLatch.current = null
     }
-    if (!useUi.getState().dialog && !useGame.getState().journalOpen) {
+    // Only a modal dialog blocks door entry; the open journal does not freeze
+    // the game (design.md §16), so walking into a door must still enter even
+    // with the journal open — otherwise huts feel unenterable after a fresh
+    // journal entry auto-opens the book.
+    if (!useUi.getState().dialog) {
       for (const it of layout.interactives) {
         if (!it.door || it === doorLatch.current) continue
         if (Math.hypot(p.x - it.door[0], p.z - it.door[1]) <= DOOR_TRIGGER_RADIUS) {

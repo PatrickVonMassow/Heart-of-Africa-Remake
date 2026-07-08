@@ -229,19 +229,18 @@ const climb = await page.evaluate(async () => {
   window.__balance.randomEventsEnabled = false
   g.debugAddEquipment('canteen')
   g.debugSet({ foodDays: 300 })
-  g.takeInHand(null)
+  const setRope = (n) => window.__game.setState({ equipment: { ...window.__game.getState().equipment, rope: n } })
+  setRope(0) // effects follow possession now, so the bare climb carries no rope
   g.debugJumpTo(19.87, 17.4)
   g.setToast(null)
   // 180 steps (the overland pace was lowered 30%, so more steps cover the reach).
   for (let i = 0; i < 180; i++) window.__game.getState().moveTravel(1, 0, 0.05)
   const noRope = { lon: window.__game.getState().pos.x / 10, toast: window.__game.getState().toast }
-  window.__game.getState().debugAddEquipment('rope')
   // Single-step speed on the Emi Koussi summit (guaranteed mountain terrain):
-  // the rope lowers the time cost, so one step covers more ground.
+  // a rope in the pack lowers the time cost, so one step covers more ground.
   const stepAt = (withRope) => {
-    const st = window.__game.getState()
-    st.takeInHand(withRope ? 'rope' : null)
-    st.debugJumpTo(19.87, 18.55)
+    setRope(withRope ? 1 : 0)
+    window.__game.getState().debugJumpTo(19.87, 18.55)
     const p0 = { ...window.__game.getState().pos }
     window.__game.getState().moveTravel(1, 0, 0.05)
     const p1 = { ...window.__game.getState().pos }
@@ -257,7 +256,7 @@ check(
   `reached lon ${climb.noRope.lon.toFixed(2)}, warned: ${climb.noRope.toast ? 'yes' : 'no'}`,
 )
 check(
-  'With the rope in hand the climb is faster (more ground per step)',
+  'With a rope in the pack the climb is faster (more ground per step)',
   climb.ropeStep > climb.noRopeStep * 1.3,
   `step without ${climb.noRopeStep.toFixed(3)} vs with rope ${climb.ropeStep.toFixed(3)}`,
 )
@@ -266,7 +265,6 @@ check(
 const fall = await page.evaluate(() => {
   const g = window.__game.getState()
   g.debugSetAffliction('wounds', 0)
-  g.takeInHand(null)
   for (let i = 0; i < 8; i++) {
     window.__game.getState().debugAddEquipment('machete')
     window.__game.getState().debugAddEquipment('canteen')
@@ -284,23 +282,25 @@ check('A fall while climbing wounds the traveller', fall.woundedSeen, '')
 check('Repeated falls can cost carried items', fall.after < fall.before, `items ${fall.before} → ${fall.after}`)
 
 // --- Movement-penalty reason is visible (§7.1.4 / design.md §11) --------------
-// Pure mapping: each slowing terrain names its relieving item.
+// Pure mapping: penalties follow inventory possession, not a held hand item.
 const penalties = await page.evaluate(() => {
   const mp = window.__movement.movementPenalty
   return {
-    jungleNone: mp('jungle', null),
-    jungleMachete: mp('jungle', 'machete'),
-    waterNone: mp('water', null),
-    waterCanoe: mp('water', 'canoe'),
-    mountainNone: mp('mountain', null),
-    mountainRope: mp('mountain', 'rope'),
-    savanna: mp('savanna', null),
+    jungleNone: mp('jungle', {}),
+    jungleMachete: mp('jungle', { machete: 1 }),
+    waterNone: mp('water', {}),
+    waterCanoe: mp('water', { canoe: 1 }),
+    mountainNone: mp('mountain', {}),
+    mountainRope: mp('mountain', { rope: 1 }),
+    savanna: mp('savanna', {}),
+    savannaCanoe: mp('savanna', { canoe: 1 }),
   }
 })
 check('Movement penalty: jungle needs a machete', penalties.jungleNone === 'jungle' && penalties.jungleMachete === null)
 check('Movement penalty: water needs a canoe', penalties.waterNone === 'water' && penalties.waterCanoe === null)
 check('Movement penalty: mountain needs a rope', penalties.mountainNone === 'mountain' && penalties.mountainRope === null)
 check('Movement penalty: open savanna has none', penalties.savanna === null)
+check('Movement penalty: the canoe slows land travel', penalties.savannaCanoe === 'canoeOnLand')
 
 // HUD hint: in jungle without a machete the reason is shown, and it clears once
 // the machete is in hand.
@@ -316,7 +316,8 @@ const jungleSpot = await page.evaluate(() => {
 if (jungleSpot) {
   await page.evaluate((s) => {
     const g = window.__game.getState()
-    g.takeInHand(null)
+    // No machete in the pack, so the jungle penalty applies (possession-based).
+    window.__game.setState({ equipment: { ...g.equipment, machete: 0, canoe: 0 } })
     g.debugJumpTo(s.lat, s.lon)
   }, jungleSpot)
   await page.waitForTimeout(250)
@@ -338,24 +339,23 @@ if (jungleSpot) {
   })
   await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
   console.log('shot 84-movement-penalty.png')
-  // Ensure a machete is owned (earlier fall tests may have dropped them all).
-  await page.evaluate(() => {
-    window.__game.getState().debugAddEquipment('machete')
-    window.__game.getState().takeInHand('machete')
-  })
+  // A machete in the pack clears the jungle penalty (possession-based).
+  await page.evaluate(() => window.__game.getState().debugAddEquipment('machete'))
   await page.waitForTimeout(250)
   const hintMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
   check('Movement penalty hint shows in jungle without a machete', hint.text.toLowerCase().includes('machete'), `"${hint.text}"`)
   check('Movement penalty hint sits inside the status bar (right-aligned)', hint.topRight === true, `hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
-  check('Movement penalty hint clears with a machete in hand', hintMachete === '', `"${hintMachete}"`)
+  check('Movement penalty hint clears with a machete in the pack', hintMachete === '', `"${hintMachete}"`)
 
   // Point 7: the penalty is journaled only the first time, then only the
   // status-bar hint carries it (design.md §11).
   const once = await page.evaluate(async (s) => {
     const g = () => window.__game.getState()
     window.__balance.randomEventsEnabled = false
-    window.__game.setState({ penaltyJournaled: { jungle: false, water: false, mountain: false } })
-    g().takeInHand(null)
+    window.__game.setState({
+      penaltyJournaled: { jungle: false, water: false, mountain: false, canoeOnLand: false },
+      equipment: { ...g().equipment, machete: 0, canoe: 0 },
+    })
     const key = 'journal.titles.penaltyJungle'
     const countJungle = () => g().journal.filter((e) => e.title?.key === key).length
     g().debugJumpTo(s.lat, s.lon)
