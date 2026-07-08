@@ -136,6 +136,10 @@ export interface Strings {
     /** A landmark discovery registered for the bounty (design.md §10). */
     discovered(name: string): string
     sold(name: string, amount: number): string
+    /** Sold a piece of gear for gifts in a village (design.md §9). */
+    soldForGifts(name: string, count: number): string
+    /** Not enough gifts to pay in a village (gifts are the local currency). */
+    notEnoughGifts: string
     /** The bazaar refuses a regionally rejected material (design.md §10). */
     bazaarRejected(name: string): string
     graveyardEmpty: string
@@ -154,7 +158,16 @@ export interface Strings {
 
   dialogs: {
     tradeGreeting: string
+    /** Trader greeting in a native village (gifts as currency, design.md §9). */
+    tradeGreetingVillage: string
     cash: string
+    /** Gifts on hand, the currency label in a village trade dialog. */
+    giftsHeld: string
+    /** A price expressed in gifts, e.g. "2 gifts". */
+    priceGifts(n: number): string
+    /** Sell section header and button (design.md §9). */
+    sellHeader: string
+    sell: string
     buy: string
     leave: string
     foodItem: string

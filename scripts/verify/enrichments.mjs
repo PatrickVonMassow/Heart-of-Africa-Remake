@@ -237,7 +237,11 @@ if (jungleSpot) {
   })
   await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
   console.log('shot 84-movement-penalty.png')
-  await page.evaluate(() => window.__game.getState().takeInHand('machete'))
+  // Ensure a machete is owned (earlier fall tests may have dropped them all).
+  await page.evaluate(() => {
+    window.__game.getState().debugAddEquipment('machete')
+    window.__game.getState().takeInHand('machete')
+  })
   await page.waitForTimeout(250)
   const hintMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
   check('Movement penalty hint shows in jungle without a machete', hint.text.toLowerCase().includes('machete'), `"${hint.text}"`)

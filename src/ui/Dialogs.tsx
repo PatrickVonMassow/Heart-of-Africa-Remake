@@ -2,7 +2,8 @@
 // text comes from the language files (design.md §17 localization).
 
 import {
-  EQUIPMENT_IDS, bagItemCount, emptyBag, priceOfGood, useGame,
+  EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, totalGifts,
+  useGame, VILLAGE_TRADE_GOODS,
   type EquipmentId, type ItemBag, type ItemKind,
 } from '../state/store'
 import { useUi, type TradeBuilding } from '../state/ui'
@@ -32,27 +33,63 @@ function goodName(t: Strings, g: Good): string {
 function TradeDialog({ building }: { building: TradeBuilding }) {
   const t = useStrings()
   const money = useGame((s) => s.money)
+  const gifts = useGame((s) => s.gifts)
+  const equipment = useGame((s) => s.equipment)
+  const placeId = useGame((s) => s.placeId)
   const buy = useGame((s) => s.buy)
+  const sellItem = useGame((s) => s.sellItem)
   const setDialog = useUi((s) => s.setDialog)
+
+  // Currency depends on the settlement: money in ports, gifts in native
+  // villages (design.md §9/§10). Villages offer the baseline goods only.
+  const inVillage = placeId ? placeById(placeId).kind === 'village' : false
+  const goods: Good[] = inVillage ? [...VILLAGE_TRADE_GOODS] : BUILDING_GOODS[building]
+  const giftsOnHand = totalGifts(gifts)
+  const priceOf = (g: Good) => (inVillage ? giftPriceOfGood(g as EquipmentId | 'food') : priceOfGood(g))
+  const priceLabel = (g: Good) => (inVillage ? t.dialogs.priceGifts(priceOf(g)) : `${priceOf(g)} $`)
+  const affordable = (g: Good) => (inVillage ? giftsOnHand >= priceOf(g) : money >= priceOf(g))
+  const sellLabel = (id: EquipmentId) =>
+    inVillage
+      ? t.dialogs.priceGifts(balance.village.sellGifts)
+      : `${Math.max(1, Math.floor(priceOfGood(id) * balance.economy.equipmentSellFactor))} $`
+  const ownedGear = EQUIPMENT_IDS.filter((e) => (equipment[e] ?? 0) > 0)
 
   return (
     <div className="dialog-backdrop">
       <div className="dialog">
         <h3>{t.buildings[building]}</h3>
-        <p className="flavor">{t.dialogs.tradeGreeting}</p>
-        <div className="row"><span>{t.dialogs.cash}</span><span className="price">{Math.floor(money)} $</span></div>
+        <p className="flavor">{inVillage ? t.dialogs.tradeGreetingVillage : t.dialogs.tradeGreeting}</p>
+        <div className="row">
+          <span>{inVillage ? t.dialogs.giftsHeld : t.dialogs.cash}</span>
+          <span className="price">{inVillage ? giftsOnHand : `${Math.floor(money)} $`}</span>
+        </div>
         {/* Prices aligned in a table (name / price / action columns). */}
-        <div className="trade-grid">
-          {BUILDING_GOODS[building].map((g) => (
+        <div className="trade-grid buy-grid">
+          {goods.map((g) => (
             <div className="trade-row" key={g}>
               <span className="trade-name">{goodName(t, g)}</span>
-              <span className="price">{priceOfGood(g)} $</span>
-              <button className="hud-button" onClick={() => buy(g)} disabled={money < priceOfGood(g)}>
+              <span className="price">{priceLabel(g)}</span>
+              <button className="hud-button" onClick={() => buy(g)} disabled={!affordable(g)}>
                 {t.dialogs.buy}
               </button>
             </div>
           ))}
         </div>
+        {/* Sell gear for the local currency (design.md §9). */}
+        {ownedGear.length > 0 && (
+          <>
+            <p className="flavor">{t.dialogs.sellHeader}</p>
+            <div className="trade-grid sell-grid">
+              {ownedGear.map((e) => (
+                <div className="trade-row" key={`sell-${e}`}>
+                  <span className="trade-name">{t.equipment[e]} ({t.dialogs.stock(equipment[e] ?? 0)})</span>
+                  <span className="price">{sellLabel(e)}</span>
+                  <button className="hud-button" onClick={() => sellItem(e)}>{t.dialogs.sell}</button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         <div className="actions">
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
         </div>

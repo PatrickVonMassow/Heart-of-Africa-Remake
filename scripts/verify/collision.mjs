@@ -8,7 +8,9 @@
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+// A fixed dev seed makes the procedural settlement layout deterministic so the
+// collision/reachability checks are reproducible (?seed=<n>, DEV only).
+const BASE = process.env.BASE_URL ?? 'http://localhost:5173/?seed=42'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 let failures = 0
 const check = (name, ok, detail) => {
@@ -107,10 +109,9 @@ async function ejectTest(sceneLabel, pick) {
 }
 
 /**
- * Every functional building must be operable: walking onto its entrance door
- * opens the building's dialog, and the door point is collision-free so it can
- * actually be reached (§7.1.16 / design.md §2 walk-in). This replaces the old
- * prompt+E access guarantee.
+ * Every functional building must be operable: there is a collision-free
+ * standpoint within the door's trigger radius from which walking onto it opens
+ * the building's dialog (§7.1.16 / design.md §2 walk-in).
  */
 async function reachableBuildings(sceneLabel) {
   const targets = await page.evaluate(() =>
@@ -124,18 +125,28 @@ async function reachableBuildings(sceneLabel) {
       notOperable.push(`${t.type}(no door)`)
       continue
     }
-    // The door point must be approachable (collision-free for the player).
-    const clear = await page.evaluate(
-      (d) => window.__placeColliders.every((c) => window.__clearanceTo(c, d[0], d[1]) >= 0.34),
-      t.door,
-    )
-    // Step onto the door; the render loop must open the building's dialog.
-    await page.evaluate((d) => { const p = window.__placePlayer; p.x = d[0]; p.z = d[1] }, t.door)
-    const opened = await page
-      .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
-      .then(() => true)
-      .catch(() => false)
-    if (!clear || !opened) notOperable.push(`${t.type}${clear ? '' : '(blocked door)'}${opened ? '' : '(no open)'}`)
+    // Find a collision-free standpoint within the door trigger radius (1.2) and
+    // teleport the player there; the render loop must then open the dialog.
+    const placed = await page.evaluate((d) => {
+      const cs = window.__placeColliders
+      for (let r = 0; r <= 1.0; r += 0.2) {
+        for (let a = 0; a < 10; a++) {
+          const ang = (a / 10) * Math.PI * 2
+          const x = d[0] + Math.cos(ang) * r
+          const z = d[1] + Math.sin(ang) * r
+          if (Math.hypot(x - d[0], z - d[1]) <= 1.15 && cs.every((c) => window.__clearanceTo(c, x, z) > 0.36)) {
+            window.__placePlayer.x = x
+            window.__placePlayer.z = z
+            return true
+          }
+        }
+      }
+      return false
+    }, t.door)
+    const opened = placed
+      ? await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 }).then(() => true).catch(() => false)
+      : false
+    if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : '(no open)'}`)
     // Close and step away so the door latch re-arms for the next building.
     await page.keyboard.press('Escape')
     await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })

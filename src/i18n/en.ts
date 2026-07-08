@@ -227,6 +227,8 @@ export const en: Strings = {
     inventoryFull: 'My pack is full — I cannot carry any more.',
     discovered: (name) => `Discovered: ${name}. The geographic society will pay for this report.`,
     sold: (name, amount) => `${name} sold for ${amount} $.`,
+    soldForGifts: (name, count) => `${name} sold for ${count} ${count === 1 ? 'gift' : 'gifts'}.`,
+    notEnoughGifts: 'Not enough gifts — money means nothing here.',
     bazaarRejected: (name) => `The merchant waves it away — ${name.toLowerCase()} is not traded here.`,
     graveyardEmpty: 'The bleached bones hold no more ivory worth taking.',
     villagersFlee: 'The villagers flee at the sight of my rifle — no one will speak with me.',
@@ -240,7 +242,12 @@ export const en: Strings = {
 
   dialogs: {
     tradeGreeting: '"Welcome, traveler! Have a look around — finest goods, honest prices."',
+    tradeGreetingVillage: '"Be welcome, stranger. Money is nothing to us — offer gifts, and we will trade."',
     cash: 'Funds',
+    giftsHeld: 'Gifts',
+    priceGifts: (n) => `${n} ${n === 1 ? 'gift' : 'gifts'}`,
+    sellHeader: 'Sell your gear:',
+    sell: 'Sell',
     buy: 'Buy',
     leave: 'Leave (Esc)',
     foodItem: 'Provisions (1 week)',

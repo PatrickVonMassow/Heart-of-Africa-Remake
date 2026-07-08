@@ -226,6 +226,8 @@ export const de: Strings = {
     inventoryFull: 'Mein Gepäck ist voll — mehr kann ich nicht tragen.',
     discovered: (name) => `Entdeckt: ${name}. Die Geographische Gesellschaft wird diesen Bericht bezahlen.`,
     sold: (name, amount) => `${name} für ${amount} $ verkauft.`,
+    soldForGifts: (name, count) => `${name} für ${count} ${count === 1 ? 'Gabe' : 'Gaben'} verkauft.`,
+    notEnoughGifts: 'Nicht genug Gaben — hier zählt kein Geld.',
     bazaarRejected: (name) => `Der Händler winkt ab — mit ${name} wird hier nicht gehandelt.`,
     graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
     villagersFlee: 'Beim Anblick meines Gewehrs fliehen die Dorfbewohner — niemand spricht mit mir.',
@@ -239,7 +241,12 @@ export const de: Strings = {
 
   dialogs: {
     tradeGreeting: '„Willkommen, Reisender! Sieh dich um — beste Ware, ehrliche Preise."',
+    tradeGreetingVillage: '„Sei gegrüßt, Fremder. Bei uns zählt kein Geld — biete Gaben, so handeln wir."',
     cash: 'Geld',
+    giftsHeld: 'Gaben',
+    priceGifts: (n) => `${n} ${n === 1 ? 'Gabe' : 'Gaben'}`,
+    sellHeader: 'Ausrüstung verkaufen:',
+    sell: 'Verkaufen',
     buy: 'Kaufen',
     leave: 'Verlassen (Esc)',
     foodItem: 'Proviant (1 Woche)',

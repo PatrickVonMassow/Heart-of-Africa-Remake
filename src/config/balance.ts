@@ -4,6 +4,7 @@
 // menu (F1) exposes them at runtime for fine-tuning.
 
 import type { Material } from '../world/geo'
+import type { EquipmentId } from '../state/store'
 
 export interface BalanceConfig {
   /** Travel speed on the continent map, world units per second (1 unit = 0.1 degree). */
@@ -146,6 +147,15 @@ export interface BalanceConfig {
     discoverRadiusDeg: number
     /** Ivory pieces recoverable at the elephant graveyard (design.md §4.4). */
     graveyardIvory: number
+    /** Fraction of the buy price the traveler gets back when selling gear. */
+    equipmentSellFactor: number
+  }
+  /** Native-village trade (design.md §9/§10): gifts are the local currency. */
+  village: {
+    /** Gift-currency buy prices for the baseline goods sold in every village. */
+    giftPrices: Partial<Record<EquipmentId | 'food', number>>
+    /** Gifts paid to the traveler for one sold piece of gear. */
+    sellGifts: number
   }
 }
 
@@ -240,6 +250,11 @@ export const balance: BalanceConfig = {
     bountyLandmark: 25,
     discoverRadiusDeg: 0.5,
     graveyardIvory: 3,
+    equipmentSellFactor: 0.5,
+  },
+  village: {
+    giftPrices: { food: 1, medicine: 1, machete: 2, shovel: 2, rope: 1, canteen: 1 },
+    sellGifts: 1,
   },
 }
 

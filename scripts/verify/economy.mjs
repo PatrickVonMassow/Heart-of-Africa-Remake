@@ -289,6 +289,87 @@ await page.waitForTimeout(200)
 keys = await journalKeys()
 check('a rejected valuable in hand provokes the negative reaction', keys.includes('journal.valuableRejected'), '')
 
+// --- Village trade in gifts (design.md §9/§10, points 4/5) --------------------
+// Every settlement offers the baseline goods; villages pay in gifts, not money.
+const villageGoods = await page.evaluate(async () => {
+  const store = await import('/src/state/store.ts')
+  return store.VILLAGE_TRADE_GOODS
+})
+check(
+  'every settlement sells food, machete, shovel and medicine',
+  ['food', 'machete', 'shovel', 'medicine'].every((g) => villageGoods.includes(g)),
+  villageGoods.join(','),
+)
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.takeInHand(null)
+  g.leavePlace()
+  window.__game.setState({ gifts: { gold: 0, silver: 0, emerald: 0, copper: 6, ivory: 0 }, money: 500 })
+  g.enterPlace('nubian-village') // North village → currency is gifts
+})
+await page.waitForTimeout(200)
+// The village trading post opens a trade dialog priced in gifts.
+await page.evaluate(() => window.__ui.getState().setDialog({ kind: 'trade', building: 'market' }))
+await page.waitForTimeout(200)
+const villageDialog = await page.evaluate(() => {
+  const txt = document.querySelector('.dialog')?.textContent ?? ''
+  return { txt, hasGifts: /Gaben|gifts/i.test(txt), hasDollar: txt.includes('$') }
+})
+check('the village trade dialog prices goods in gifts, not money', villageDialog.hasGifts && !villageDialog.hasDollar, `"${villageDialog.txt.slice(0, 60)}"`)
+
+const vBuy = await page.evaluate(() => {
+  const g = () => window.__game.getState()
+  const before = { gifts: g().gifts.copper, food: g().foodDays, money: g().money }
+  g().buy('food') // costs 1 gift, +7 food, money unchanged
+  const afterFood = { gifts: g().gifts.copper, food: g().foodDays, money: g().money }
+  g().buy('machete') // costs gifts, gear +1
+  const machete = g().equipment.machete ?? 0
+  return { before, afterFood, machete }
+})
+check(
+  'buying food in a village spends gifts and leaves money untouched',
+  vBuy.afterFood.gifts === vBuy.before.gifts - 1 && vBuy.afterFood.food === vBuy.before.food + 7 && vBuy.afterFood.money === vBuy.before.money,
+  `gifts ${vBuy.before.gifts}→${vBuy.afterFood.gifts}, money ${vBuy.afterFood.money}`,
+)
+check('buying gear in a village works (machete acquired)', vBuy.machete >= 1, `${vBuy.machete}`)
+
+const vSell = await page.evaluate(() => {
+  const g = () => window.__game.getState()
+  const giftsBefore = window.__store_totalGifts ? 0 : Object.values(g().gifts).reduce((a, b) => a + b, 0)
+  const machBefore = g().equipment.machete ?? 0
+  g().sellItem('machete') // village → paid in gifts
+  const giftsAfter = Object.values(g().gifts).reduce((a, b) => a + b, 0)
+  return { giftsBefore, giftsAfter, machBefore, machAfter: g().equipment.machete ?? 0, money: g().money }
+})
+check(
+  'selling gear in a village pays in gifts (not money)',
+  vSell.giftsAfter > vSell.giftsBefore && vSell.machAfter === vSell.machBefore - 1,
+  `gifts ${vSell.giftsBefore}→${vSell.giftsAfter}`,
+)
+
+// Not enough gifts → refused with the gift-currency notice.
+const refusedGifts = await page.evaluate(() => {
+  const g = window.__game.getState()
+  window.__game.setState({ gifts: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0 } })
+  g.setToast(null)
+  window.__game.getState().buy('machete')
+  return { food: window.__game.getState().equipment.machete, toast: window.__game.getState().toast }
+})
+check('a village purchase without gifts is refused', !!refusedGifts.toast && /Gaben|gifts/i.test(refusedGifts.toast), `"${refusedGifts.toast}"`)
+
+// In a port, selling gear pays money.
+const pSell = await page.evaluate(() => {
+  const g = () => window.__game.getState()
+  g().leavePlace()
+  g().enterPlace('cairo')
+  window.__game.setState({ money: 200 })
+  g().debugAddEquipment('machete')
+  const before = g().money
+  g().sellItem('machete')
+  return { before, after: g().money }
+})
+check('selling gear in a port pays money', pSell.after > pSell.before, `money ${pSell.before}→${pSell.after}`)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

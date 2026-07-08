@@ -224,12 +224,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (simplified saving is sufficient). The buy dialog
    lays the goods out as a table — name, a right-justified price column and
-   the buy action — so the prices align down the column (`design.md` §9).
-   Verifiable: `scripts/verify/flow.mjs` asserts the price cells share a
-   column (aligned left edges).
+   the buy action — so the prices align down the column (`design.md` §9);
+   every trade dialog also buys gear back for the local currency (money in
+   a port). Verifiable: `scripts/verify/flow.mjs` asserts the price cells
+   share a column (aligned left edges); `scripts/verify/economy.mjs`
+   asserts selling gear in a port pays money.
 6. **Village and cultural contact.** At least one enterable village with a
    chief's hut. A culturally correct gift to the chief unlocks a hint — not
-   mere observation: the gift is the condition.
+   mere observation: the gift is the condition. Villages also carry a
+   trading post that barters the baseline goods (food, medicine, machete,
+   shovel, rope, canteen) for gifts and buys gear back for gifts — money
+   has no value there (`design.md` §6/§9). Verifiable: `scripts/verify/
+   economy.mjs` buys food in a village against gifts (money untouched),
+   refuses a purchase without gifts, and sells gear for gifts.
 7. **Language/direction system.** The full system of `design.md` §13 is
    implemented: every region has its own direction words (§13.2 — the
    fixed Nivera, koko/Katula/Phuthswama/Mimbumi, Relolo/Dethamee, the
@@ -510,14 +517,21 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     which makes Zanzibar reachable; discovery bounties for first-visited
     villages and sighted landmarks are credited on the next port visit
     via a journal entry; a valuable carried visibly in hand triggers the
-    positive or negative village reaction of the §8 matrix. All new
+    positive or negative village reaction of the §8 matrix. Every
+    settlement — port and village — offers at least the baseline goods
+    (food, machete, shovel, medicine) and buys gear back; the currency is
+    money in ports and gifts in native villages, where a trading post
+    barters the baseline goods for gifts (money is worthless there). All new
     texts exist in both languages with voice markup. Verifiable:
     `scripts/verify/economy.mjs` asserts the capacity refusal and
     auto-raise, the regional bid ordering and rejection, the stable
     re-offer quote (identical price across re-offers, cleared on leaving
     the port), the ferry to Zanzibar (fare, days, checkpoint), the bounty
     crediting, the graveyard ivory depletion, digging a treasure cache and
-    the statue site, and both valuable reactions.
+    the statue site, both valuable reactions, the baseline goods in every
+    settlement, buying food in a village against gifts (money untouched),
+    the no-gifts refusal, and selling gear for gifts (village) or money
+    (port).
 26. **Standing with the natives.** `design.md` §12/§7 is implemented: a
     rifle carried in hand inside a village makes the inhabitants flee
     (they vanish indoors) and blocks the audience and the elder talk; a

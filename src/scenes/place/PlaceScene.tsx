@@ -153,18 +153,18 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       interactives.push({ type: t, pos: [x, z], door: [x + Math.sin(rot) * 2.55, z + Math.cos(rot) * 2.55] })
     })
   } else {
-    // OPEN: design.md §9/§10 lists trade buildings for villages too (barter
-    // with gifts as the means of payment); the POC gives villages only the
-    // chief's hut and the elder.
+    // Villages carry the chief's hut, the elder and a trading post that
+    // barters the baseline goods for gifts (design.md §9/§10).
     const chiefPos: [number, number] = [jitter(0, 4), jitter(-13, 3)]
     // Must match VillageHut's default facing (door toward the place center);
     // the door point sits just outside the hut collider (r 3.35).
-    const chiefFacing = Math.atan2(chiefPos[0], chiefPos[1]) + Math.PI
-    interactives.push({
-      type: 'chief',
-      pos: chiefPos,
-      door: [chiefPos[0] + Math.sin(chiefFacing) * 3.9, chiefPos[1] + Math.cos(chiefFacing) * 3.9],
-    })
+    const hutDoor = (p: [number, number]): [number, number] => {
+      const facing = Math.atan2(p[0], p[1]) + Math.PI
+      return [p[0] + Math.sin(facing) * 3.9, p[1] + Math.cos(facing) * 3.9]
+    }
+    interactives.push({ type: 'chief', pos: chiefPos, door: hutDoor(chiefPos) })
+    const marketPos: [number, number] = [jitter(-6, 2), jitter(-6, 2)]
+    interactives.push({ type: 'market', pos: marketPos, door: hutDoor(marketPos) })
     interactives.push({ type: 'villager', pos: [jitter(4, 3), jitter(-4, 2)] })
   }
 
@@ -184,6 +184,9 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     if (Math.hypot(x, z - 18) < 6) return false
     if (!lifeSpots.every(([sx, sz]) => Math.hypot(x - sx, z - sz) > margin * 0.6 + 1)) return false
     if (!interactives.every((it) => Math.hypot(x - it.pos[0], z - it.pos[1]) > margin)) return false
+    // Keep the entrance-door approach of each functional building clear so it
+    // stays reachable (design.md §2 collision inside settlements).
+    if (!interactives.every((it) => !it.door || Math.hypot(x - it.door[0], z - it.door[1]) > 2.2)) return false
     return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > margin * 0.55 + d.r)
   }
 
@@ -389,7 +392,8 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       const rot = ((i * 137) % 40) / 100 - 0.2
       colliders.push(boxCollider(it.pos[0], it.pos[1], 2.5, 2.0, rot))
     } else {
-      colliders.push({ x: it.pos[0], z: it.pos[1], r: 3.35 }) // chief hut
+      // Chief hut and the smaller trading post (both round village huts).
+      colliders.push({ x: it.pos[0], z: it.pos[1], r: it.type === 'market' ? 2.9 : 3.35 })
     }
   })
   for (const d of dwellings) {
@@ -1596,6 +1600,9 @@ export function PlaceScene() {
       {layout.interactives.map((it, i) => {
         if (it.type === 'villager') return <Villager key={i} item={it} style={style} />
         if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
+        // Village trading post: a plain hut labelled as the market.
+        if (it.type === 'market')
+          return <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={2.6} h={2.8} label={getStrings().buildings.market} mats={mats} style={style} />
         // Chief hut: larger village hut with regalia.
         return (
           <VillageHut key={i} x={it.pos[0]} z={it.pos[1]} r={3} h={3} label={interactiveLabel(getStrings(), 'chief')} mats={mats} style={style} chief />

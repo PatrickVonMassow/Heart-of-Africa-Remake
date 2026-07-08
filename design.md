@@ -168,7 +168,9 @@ A visibly carried valuable triggers a positive or negative reaction depending on
 
 ## 9. Building Types and Functions
 
-Villages and port cities contain various building types. In the first-person view they are enterable. In a buy dialog the goods are laid out as a table: item name, the price aligned in its own right-justified column, and the buy action — so the prices read straight down the column.
+Villages and port cities contain various building types. In the first-person view they are enterable. In a buy dialog the goods are laid out as a table: item name, the price aligned in its own right-justified column, and the buy action — so the prices read straight down the column. Every trade dialog also offers to buy the traveler's gear back, paid in the settlement's currency.
+
+Every settlement — port city or native village — offers at least the baseline goods for purchase: food, a machete, a shovel and medicine. In port cities the currency is money; in native villages it is gifts (money is worthless there, design.md §6), and a village trading post barters these goods for gifts. Selling gear likewise yields money in a port and gifts in a village.
 
 | Building | Function |
 |---|---|
@@ -178,6 +180,7 @@ Villages and port cities contain various building types. In the first-person vie
 | Weapons hut | Sells rifle, machete |
 | Tool hut | Sells shovel, rope, canteen |
 | Market hut | Sells canoe, food |
+| Village trading post | Village only: barters the baseline goods (food, medicine, machete, shovel, rope, canteen) for gifts, and buys gear back for gifts |
 | Chief's hut | Village only: audience with the chief to obtain hints |
 
 ---

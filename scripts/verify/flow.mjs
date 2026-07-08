@@ -108,7 +108,7 @@ await shot('02-port-cairo-trade')
 // Buy prices are laid out as a table: the price cells share a column, so their
 // left edges line up (design.md §9).
 const priceAligned = await page.evaluate(() => {
-  const lefts = [...document.querySelectorAll('.trade-row .price')].map((p) => Math.round(p.getBoundingClientRect().left))
+  const lefts = [...document.querySelectorAll('.buy-grid .price')].map((p) => Math.round(p.getBoundingClientRect().left))
   return lefts.length >= 2 && lefts.every((l) => Math.abs(l - lefts[0]) <= 1)
 })
 check('Buy prices are aligned in a column (table layout)', priceAligned)

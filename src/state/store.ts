@@ -199,6 +199,9 @@ export interface GameState {
   enterPlace: (id: string) => void
   leavePlace: () => void
   buy: (good: EquipmentId | 'food' | Material) => void
+  /** Sell a piece of gear for the settlement's currency (money in a port,
+   * gifts in a village; design.md §9/§10). */
+  sellItem: (id: EquipmentId) => void
   /** Bazaar (design.md §10): offer a treasure — the merchant names a bid. */
   offerTreasure: (treasure: TreasureId) => void
   acceptBid: () => void
@@ -475,6 +478,11 @@ function buildEventContext(
 let nextEntryId = 2
 
 function newSeed(): number {
+  // Dev-only deterministic seed via ?seed=<n> for reproducible layout tests.
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const p = new URLSearchParams(window.location.search).get('seed')
+    if (p !== null && /^\d+$/.test(p)) return Number(p) >>> 0
+  }
   return Math.floor(Math.random() * 0xffffffff)
 }
 
@@ -1089,6 +1097,31 @@ export const useGame = create<GameState>()((set, get) => ({
 
   buy: (good) => {
     const s = get()
+    const place = s.placeId ? placeById(s.placeId) : null
+    // Native villages trade in gifts, ports in money (design.md §9/§10).
+    if (place?.kind === 'village') {
+      const g = good as EquipmentId | 'food'
+      const price = giftPriceOfGood(g)
+      if (totalGifts(s.gifts) < price) {
+        set({ toast: getStrings().toasts.notEnoughGifts })
+        return
+      }
+      if (g !== 'food' && usedInventory(s) >= balance.inventoryCapacity) {
+        set({ toast: getStrings().toasts.inventoryFull })
+        return
+      }
+      const gifts = spendGifts(s.gifts, price)
+      if (g === 'food') {
+        set({ gifts, foodDays: s.foodDays + 7, toast: getStrings().toasts.boughtFood })
+      } else {
+        set({
+          gifts,
+          equipment: { ...s.equipment, [g]: (s.equipment[g] ?? 0) + 1 },
+          toast: getStrings().toasts.bought(getStrings().equipment[g]),
+        })
+      }
+      return
+    }
     const price = priceOfGood(good)
     if (price === undefined || s.money < price) {
       set({ toast: getStrings().toasts.notEnoughMoney })
@@ -1114,6 +1147,34 @@ export const useGame = create<GameState>()((set, get) => ({
         money: s.money - price,
         equipment: { ...s.equipment, [e]: (s.equipment[e] ?? 0) + 1 },
         toast: getStrings().toasts.bought(getStrings().equipment[e]),
+      })
+    }
+  },
+
+  sellItem: (id) => {
+    const s = get()
+    const place = s.placeId ? placeById(s.placeId) : null
+    if (!place || (s.equipment[id] ?? 0) <= 0) return
+    const nextCount = (s.equipment[id] ?? 0) - 1
+    const equipment = { ...s.equipment, [id]: nextCount }
+    const handItem = s.handItem === id && nextCount <= 0 ? null : s.handItem
+    if (place.kind === 'village') {
+      // Villages pay in gifts of the material they value (design.md §9).
+      const mat = REGION_VALUES[place.region].revered[0]
+      const count = balance.village.sellGifts
+      set({
+        equipment,
+        handItem,
+        gifts: { ...s.gifts, [mat]: s.gifts[mat] + count },
+        toast: getStrings().toasts.soldForGifts(getStrings().equipment[id], count),
+      })
+    } else {
+      const amount = Math.max(1, Math.floor(priceOfGood(id) * balance.economy.equipmentSellFactor))
+      set({
+        equipment,
+        handItem,
+        money: s.money + amount,
+        toast: getStrings().toasts.sold(getStrings().equipment[id], amount),
       })
     }
   },
@@ -1683,6 +1744,30 @@ export const useGame = create<GameState>()((set, get) => ({
 }))
 
 /** Price lookup against the central config (config/balance.ts). */
+/** Baseline goods every settlement offers for sale (design.md §9). */
+export const VILLAGE_TRADE_GOODS: Array<EquipmentId | 'food'> = [
+  'food', 'medicine', 'machete', 'shovel', 'rope', 'canteen',
+]
+
+/** Gift-currency price of a good in a native village (design.md §9/§10). */
+export function giftPriceOfGood(good: EquipmentId | 'food'): number {
+  return balance.village.giftPrices[good] ?? 1
+}
+
+/** Spend a number of gifts, cheapest material first, returning the new bag. */
+function spendGifts(gifts: Record<Material, number>, n: number): Record<Material, number> {
+  const order: Material[] = ['copper', 'silver', 'ivory', 'emerald', 'gold']
+  const next = { ...gifts }
+  let left = n
+  for (const m of order) {
+    const take = Math.min(next[m] ?? 0, left)
+    next[m] -= take
+    left -= take
+    if (left <= 0) break
+  }
+  return next
+}
+
 export function priceOfGood(good: EquipmentId | 'food' | Material): number {
   switch (good) {
     case 'food': return prices.food
