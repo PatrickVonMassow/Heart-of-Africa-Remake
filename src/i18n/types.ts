@@ -131,6 +131,9 @@ export interface Strings {
     journalDndOff: string
     /** Debug F3: full loadout granted. */
     debugLoadout: string
+    /** Debug F4: canoe added/removed. */
+    debugCanoeOn: string
+    debugCanoeOff: string
     noMedicine: string
     medicineNotNeeded: string
     /** Inventory capacity reached (design.md §6). */

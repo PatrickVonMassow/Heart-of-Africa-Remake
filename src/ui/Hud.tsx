@@ -331,6 +331,8 @@ export function Hud() {
     })
     // F3 grants the full debug loadout (design.md §21).
     const offF3 = onKeyPress('F3', () => useGame.getState().debugFullLoadout())
+    // F4 toggles the canoe in and out of the pack (design.md §21).
+    const offF4 = onKeyPress('F4', () => useGame.getState().debugToggleCanoe())
     const offEsc = onKeyPress('Escape', () => {
       if (useUi.getState().dialog) setDialog(null)
       else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
@@ -348,6 +350,7 @@ export function Hud() {
       offF1()
       offF2()
       offF3()
+      offF4()
       offH()
       offP()
       offC()

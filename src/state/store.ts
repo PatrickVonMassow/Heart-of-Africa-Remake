@@ -261,6 +261,8 @@ export interface GameState {
   /** Debug (design.md §21, F3): full loadout — all gear/gifts/treasures,
    * money/food maxed, full health, no afflictions; capacity raised to fit. */
   debugFullLoadout: () => void
+  /** Debug (design.md §21, F4): toggle the canoe in and out of the pack. */
+  debugToggleCanoe: () => void
   debugJumpTo: (lat: number, lon: number) => void
 }
 
@@ -1745,6 +1747,20 @@ export const useGame = create<GameState>()((set, get) => ({
       toast: getStrings().toasts.debugLoadout,
     })
     get().bumpBalance()
+  },
+
+  debugToggleCanoe: () => {
+    const s = get()
+    if ((s.equipment.canoe ?? 0) > 0) {
+      set({
+        equipment: { ...s.equipment, canoe: 0 },
+        handItem: s.handItem === 'canoe' ? null : s.handItem,
+        toast: getStrings().toasts.debugCanoeOff,
+      })
+    } else {
+      raiseCapacityIfNeeded(s)
+      set({ equipment: { ...s.equipment, canoe: 1 }, toast: getStrings().toasts.debugCanoeOn })
+    }
   },
 
   debugSetGiftTotal: (total) => {

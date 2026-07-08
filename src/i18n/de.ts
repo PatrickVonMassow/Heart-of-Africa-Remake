@@ -222,6 +222,8 @@ export const de: Strings = {
     journalDndOn: 'Tagebuch-Unterbrechungen aus — Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an — neue Einträge öffnen das Tagebuch.',
     debugLoadout: 'Debug: Volle Ausstattung — alles im Gepäck, Geld und Proviant randvoll, kerngesund.',
+    debugCanoeOn: 'Debug: Kanu ins Gepäck genommen.',
+    debugCanoeOff: 'Debug: Kanu abgelegt.',
     noMedicine: 'Ich habe keine Medizin mehr.',
     medicineNotNeeded: 'Weder Fieber noch Wunden — ich hebe die Medizin auf.',
     inventoryFull: 'Mein Gepäck ist voll — mehr kann ich nicht tragen.',

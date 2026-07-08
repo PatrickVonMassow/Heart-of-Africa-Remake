@@ -390,6 +390,7 @@ Debug shortcut keys:
 - **F1** opens/closes the debug menu.
 - **F2** toggles the journal do-not-disturb option (§16).
 - **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything.
+- **F4** toggles the canoe in and out of the pack (for quickly testing water travel and the on-land penalty).
 
 - Walking speed of the player character inside settlements (villages and port cities).
 - Walking speed of the player character outside settlements (travel across the continent).

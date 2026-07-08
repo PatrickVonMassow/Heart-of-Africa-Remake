@@ -223,6 +223,8 @@ export const en: Strings = {
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     debugLoadout: 'Debug: full loadout — everything in the pack, funds and provisions maxed, in perfect health.',
+    debugCanoeOn: 'Debug: canoe added to the pack.',
+    debugCanoeOff: 'Debug: canoe removed.',
     noMedicine: 'I have no medicine left.',
     medicineNotNeeded: 'I am neither feverish nor wounded — I shall save the medicine.',
     inventoryFull: 'My pack is full — I cannot carry any more.',
