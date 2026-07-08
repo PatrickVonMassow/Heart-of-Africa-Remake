@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // On GitHub Pages the project site is served under /<repo>/, so the CI build
+  // (GITHUB_ACTIONS is set on the runners) needs that base path; locally the
+  // dev server and preview run at the root.
+  base: process.env.GITHUB_ACTIONS ? '/Heart-of-Africa-Remake/' : '/',
   plugins: [react()],
   // The TTS stack resolves its WASM/worker assets at runtime; esbuild
   // pre-bundling breaks those URLs in dev.
