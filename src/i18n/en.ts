@@ -167,6 +167,11 @@ export const en: Strings = {
     webglFallback: 'Graphics notice: WebGPU is unavailable — the game is running in WebGL 2 compatibility mode.',
     webglFallbackDismiss: 'Got it',
     fps: (fps) => `${fps} FPS`,
+    movementPenalty: {
+      jungle: 'Slowed by dense jungle — a machete in hand would clear the way faster.',
+      water: 'Swimming is slow — a canoe in hand would cross the water faster.',
+      mountain: 'The steep rock slows the climb — a rope in hand makes it safer and faster.',
+    },
   },
 
   prompts: {

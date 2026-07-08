@@ -236,6 +236,23 @@ body,
   font-size: 16px;
 }
 
+/* Reason for an active movement slowdown (design.md §11), above the prompt. */
+.movement-penalty {
+  position: absolute;
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--hud-bg);
+  border: 1px solid #a67c2e;
+  border-left: 4px solid #d0912e;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  max-width: 70vw;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* Frame counter, top left below the status bar (the journal panel occupies
    the right edge). */
 .fps-counter {

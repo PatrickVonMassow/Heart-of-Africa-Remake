@@ -166,6 +166,11 @@ export const de: Strings = {
     webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar — das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
     fps: (fps) => `${fps} FPS`,
+    movementPenalty: {
+      jungle: 'Der dichte Dschungel bremst — mit einer Machete in der Hand geht es schneller voran.',
+      water: 'Schwimmen ist langsam — mit einem Kanu in der Hand käme ich schneller übers Wasser.',
+      mountain: 'Der steile Fels bremst den Aufstieg — mit einem Seil in der Hand geht es sicherer und schneller.',
+    },
   },
 
   prompts: {

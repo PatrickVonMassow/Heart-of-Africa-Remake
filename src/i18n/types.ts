@@ -73,6 +73,8 @@ export interface Strings {
     webglFallbackDismiss: string
     /** Frame counter label, e.g. "62 FPS". */
     fps(fps: number): string
+    /** Reason shown while a terrain slowdown is active (design.md §11). */
+    movementPenalty: { jungle: string; water: string; mountain: string }
   }
 
   prompts: {

@@ -322,3 +322,10 @@ export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolea
   if (lat === undefined || lon === undefined) return true
   return !insideContinentOutline(lat, lon)
 }
+
+// Dev hook for the headless verification (CLAUDE.md §7.2): terrain type at a
+// coordinate, so tests can locate a jungle/mountain/water tile.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__terrainType = (lat: number, lon: number, seed: number) =>
+    sampleTerrain(lat, lon, seed).type
+}

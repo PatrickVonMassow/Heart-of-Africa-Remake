@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
 import { healthState, listCheckpoints, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import { placeById, worldToLatLon } from '../world/geo'
+import { sampleTerrain } from '../world/terrain'
+import { movementPenalty } from '../systems/movement'
 import { START_YEAR } from '../config/balance'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
@@ -116,6 +118,25 @@ function Prompt() {
   const dialog = useUi((s) => s.dialog)
   if (!prompt || dialog) return null
   return <div className="prompt">{prompt}</div>
+}
+
+/**
+ * Movement-penalty hint (design.md §11): while travelling, if the current
+ * terrain slows the traveler and the relieving item is not in hand, name the
+ * reason and the remedy so the slowdown is never silent.
+ */
+function MovementPenalty() {
+  const t = useStrings()
+  const mode = useGame((s) => s.mode)
+  const pos = useGame((s) => s.pos)
+  const handItem = useGame((s) => s.handItem)
+  const seed = useGame((s) => s.seed)
+  const dialog = useUi((s) => s.dialog)
+  if (mode !== 'travel' || dialog) return null
+  const ll = worldToLatLon(pos.x, pos.z)
+  const reason = movementPenalty(sampleTerrain(ll.lat, ll.lon, seed).type, handItem)
+  if (!reason) return null
+  return <div className="movement-penalty">{t.hud.movementPenalty[reason]}</div>
 }
 
 /** Sun blindness (design.md §6): the view narrows to a glaring tunnel. */
@@ -345,6 +366,7 @@ export function Hud() {
       <button className="hud-button map-toggle" onClick={() => useUi.getState().toggleMap()}>
         {t.hud.mapToggle}
       </button>
+      <MovementPenalty />
       <Prompt />
       <Toast />
       <JournalPanel />

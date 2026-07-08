@@ -191,6 +191,55 @@ const fall = await page.evaluate(() => {
 check('A fall while climbing wounds the traveller', fall.woundedSeen, '')
 check('Repeated falls can cost carried items', fall.after < fall.before, `items ${fall.before} → ${fall.after}`)
 
+// --- Movement-penalty reason is visible (§7.1.4 / design.md §11) --------------
+// Pure mapping: each slowing terrain names its relieving item.
+const penalties = await page.evaluate(() => {
+  const mp = window.__movement.movementPenalty
+  return {
+    jungleNone: mp('jungle', null),
+    jungleMachete: mp('jungle', 'machete'),
+    waterNone: mp('water', null),
+    waterCanoe: mp('water', 'canoe'),
+    mountainNone: mp('mountain', null),
+    mountainRope: mp('mountain', 'rope'),
+    savanna: mp('savanna', null),
+  }
+})
+check('Movement penalty: jungle needs a machete', penalties.jungleNone === 'jungle' && penalties.jungleMachete === null)
+check('Movement penalty: water needs a canoe', penalties.waterNone === 'water' && penalties.waterCanoe === null)
+check('Movement penalty: mountain needs a rope', penalties.mountainNone === 'mountain' && penalties.mountainRope === null)
+check('Movement penalty: open savanna has none', penalties.savanna === null)
+
+// HUD hint: in jungle without a machete the reason is shown, and it clears once
+// the machete is in hand.
+const jungleSpot = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  for (let lat = 3; lat >= -6; lat -= 0.5) {
+    for (let lon = 14; lon <= 28; lon += 0.5) {
+      if (window.__terrainType(lat, lon, seed) === 'jungle') return { lat, lon }
+    }
+  }
+  return null
+})
+if (jungleSpot) {
+  await page.evaluate((s) => {
+    const g = window.__game.getState()
+    g.takeInHand(null)
+    g.debugJumpTo(s.lat, s.lon)
+  }, jungleSpot)
+  await page.waitForTimeout(250)
+  const hintNoMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
+  await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
+  console.log('shot 84-movement-penalty.png')
+  await page.evaluate(() => window.__game.getState().takeInHand('machete'))
+  await page.waitForTimeout(250)
+  const hintMachete = await page.evaluate(() => document.querySelector('.movement-penalty')?.textContent ?? '')
+  check('Movement penalty hint shows in jungle without a machete', hintNoMachete.toLowerCase().includes('machete'), `"${hintNoMachete}"`)
+  check('Movement penalty hint clears with a machete in hand', hintMachete === '', `"${hintMachete}"`)
+} else {
+  check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
+}
+
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
 await page.evaluate(() => {
   const pos = window.__game.getState().pos
@@ -294,13 +343,17 @@ check(
 // moves and the newly revealed terrain chunks briefly Suspend the scene
 // subtree, dropping its window wheel listener until React remounts it — so
 // chaining several synthetic wheel events in the headless run is unreliable.
-await page.evaluate(() => {
-  window.__ui.getState().setWheelZoomEnabled(false)
-  window.__ui.getState().setTravelZoom(1)
-})
-await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 })))
-await page.waitForTimeout(120)
-const zoomedIn = await page.evaluate(() => window.__ui.getState().travelZoom)
+await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
+// Retry the wheel at page level: a camera move suspends the scene subtree and
+// drops its window wheel listener, so give React time to remount between tries.
+let zoomedIn = 1
+for (let i = 0; i < 12; i++) {
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+  await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 })))
+  await page.waitForTimeout(180)
+  zoomedIn = await page.evaluate(() => window.__ui.getState().travelZoom)
+  if (zoomedIn < 1) break
+}
 // Gate: zoom-out beyond the default distance is clamped to 1 while locked and
 // permitted (up to 4) once unlocked (design.md §21).
 const gate = await page.evaluate(() => {

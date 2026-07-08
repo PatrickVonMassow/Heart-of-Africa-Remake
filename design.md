@@ -201,6 +201,9 @@ Villages and port cities contain various building types. In the first-person vie
 | Savanna/open | Rifle (outside villages) | without: higher robbery risk |
 | Dig site | Shovel | without: no find; with: dig it up |
 
+**Visible slowdown reason.**
+Whenever the current terrain slows the traveler and the relieving hand object is not held — dense jungle without a machete, water without a canoe, mountain rock without a rope — the bird's-eye view shows a short hint that names the cause and the item that would relieve it. A movement penalty is never silent; the player can always see why progress is slow and what to take in hand.
+
 **Movement boundary.**
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
 

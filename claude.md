@@ -211,6 +211,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    open ocean is refused with the blocking notice, a move onto a mountain
    without a rope advances (with the warning) while the rope makes it
    faster, and a forced fall wounds the traveler and can drop an item
+   (`scripts/verify/enrichments.mjs`). Any active movement penalty shows
+   its reason (`design.md` §11): while a terrain slows the traveler and
+   the relieving hand object is not held (jungle→machete, water→canoe,
+   mountain→rope), the bird's-eye view names the cause and the remedy —
+   the slowdown is never silent. Verifiable: the penalty mapping is
+   pure-tested for each terrain, and the HUD hint appears in jungle
+   without a machete and clears once the machete is in hand
    (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
