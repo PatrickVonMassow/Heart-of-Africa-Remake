@@ -105,14 +105,21 @@ await page.waitForTimeout(300)
 // --- 2. Trade in Cairo (criterion 5): open a building by walking into its door ---
 await enterBuilding('tools')
 await shot('02-port-cairo-trade')
-await page.locator('.dialog .row', { hasText: 'Schaufel' }).locator('button').click()
+// Buy prices are laid out as a table: the price cells share a column, so their
+// left edges line up (design.md §9).
+const priceAligned = await page.evaluate(() => {
+  const lefts = [...document.querySelectorAll('.trade-row .price')].map((p) => Math.round(p.getBoundingClientRect().left))
+  return lefts.length >= 2 && lefts.every((l) => Math.abs(l - lefts[0]) <= 1)
+})
+check('Buy prices are aligned in a column (table layout)', priceAligned)
+await page.locator('.trade-row', { hasText: 'Schaufel' }).locator('button').click()
 await page.waitForTimeout(300)
 s = await state()
 check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 1 && s.money === 230)
 await closeDialog()
 
 await enterBuilding('shop')
-await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
+await page.locator('.trade-row', { hasText: 'Goldschmuck' }).locator('button').click()
 await page.waitForTimeout(300)
 s = await state()
 check('Gold-jewelry gift bought (−$30)', s.gifts.gold === 1 && s.money === 200)

@@ -168,7 +168,7 @@ A visibly carried valuable triggers a positive or negative reaction depending on
 
 ## 9. Building Types and Functions
 
-Villages and port cities contain various building types. In the first-person view they are enterable.
+Villages and port cities contain various building types. In the first-person view they are enterable. In a buy dialog the goods are laid out as a table: item name, the price aligned in its own right-justified column, and the buy action — so the prices read straight down the column.
 
 | Building | Function |
 |---|---|

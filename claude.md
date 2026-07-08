@@ -222,7 +222,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    (`scripts/verify/enrichments.mjs`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
-   automatic checkpoint (simplified saving is sufficient).
+   automatic checkpoint (simplified saving is sufficient). The buy dialog
+   lays the goods out as a table — name, a right-justified price column and
+   the buy action — so the prices align down the column (`design.md` §9).
+   Verifiable: `scripts/verify/flow.mjs` asserts the price cells share a
+   column (aligned left edges).
 6. **Village and cultural contact.** At least one enterable village with a
    chief's hut. A culturally correct gift to the chief unlocks a hint — not
    mere observation: the gift is the condition.

@@ -536,6 +536,38 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+/* Buy list laid out as a table: item name / right-aligned price / action.
+   Each .trade-row uses display:contents so its three cells align in the grid
+   columns across all rows while the row element stays addressable. */
+.trade-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 2px 14px;
+}
+
+.trade-row {
+  display: contents;
+}
+
+.trade-row .trade-name {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(212, 180, 120, 0.15);
+  font-size: 15px;
+}
+
+.trade-row .price {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(212, 180, 120, 0.15);
+  text-align: right;
+  color: var(--hud-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-row .hud-button {
+  border-bottom: 1px solid transparent;
+}
+
 .dialog .actions {
   margin-top: 14px;
   display: flex;

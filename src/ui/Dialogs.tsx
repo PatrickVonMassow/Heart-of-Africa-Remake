@@ -41,15 +41,18 @@ function TradeDialog({ building }: { building: TradeBuilding }) {
         <h3>{t.buildings[building]}</h3>
         <p className="flavor">{t.dialogs.tradeGreeting}</p>
         <div className="row"><span>{t.dialogs.cash}</span><span className="price">{Math.floor(money)} $</span></div>
-        {BUILDING_GOODS[building].map((g) => (
-          <div className="row" key={g}>
-            <span>{goodName(t, g)}</span>
-            <span className="price">{priceOfGood(g)} $</span>
-            <button className="hud-button" onClick={() => buy(g)} disabled={money < priceOfGood(g)}>
-              {t.dialogs.buy}
-            </button>
-          </div>
-        ))}
+        {/* Prices aligned in a table (name / price / action columns). */}
+        <div className="trade-grid">
+          {BUILDING_GOODS[building].map((g) => (
+            <div className="trade-row" key={g}>
+              <span className="trade-name">{goodName(t, g)}</span>
+              <span className="price">{priceOfGood(g)} $</span>
+              <button className="hud-button" onClick={() => buy(g)} disabled={money < priceOfGood(g)}>
+                {t.dialogs.buy}
+              </button>
+            </div>
+          ))}
+        </div>
         <div className="actions">
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
         </div>
