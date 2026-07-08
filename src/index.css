@@ -476,6 +476,16 @@ body,
 
 /* --- Dialogs ------------------------------------------------------------- */
 
+/* HUD panels and modals must sit above the in-scene drei <Html> labels, which
+   get a computed z-index up to ~16.7M (drei's default zIndexRange max). Panels
+   sit above the labels; modal dialogs and full-screen overlays sit above the
+   panels. */
+.journal,
+.map-overlay,
+.debug-menu {
+  z-index: 16778000;
+}
+
 .dialog-backdrop {
   position: absolute;
   inset: 0;
@@ -483,6 +493,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 16779000;
 }
 
 .dialog {
@@ -540,6 +551,7 @@ body,
   justify-content: center;
   text-align: center;
   padding: 24px;
+  z-index: 16779000;
 }
 
 .overlay h1 {

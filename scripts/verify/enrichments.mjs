@@ -344,15 +344,28 @@ check(
 // subtree, dropping its window wheel listener until React remounts it — so
 // chaining several synthetic wheel events in the headless run is unreliable.
 await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
-// Retry the wheel at page level: a camera move suspends the scene subtree and
-// drops its window wheel listener, so give React time to remount between tries.
+// The wheel zoom only responds in the bird's-eye view while its scene is
+// mounted. The jump-to dropdown lands on a place marker, which auto-enters the
+// settlement (walk-in entry), so leave it and jump to open terrain, then wait
+// for the scene's readiness flag before dispatching the wheel.
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  if (g.mode === 'place') g.leavePlace()
+  window.__game.getState().debugJumpTo(25, 15) // open Sahara, away from any marker
+})
+await page.waitForFunction(() => window.__travelWheelReady === true, null, { timeout: 20000 }).catch(() => {})
+await page.waitForTimeout(300)
 let zoomedIn = 1
-for (let i = 0; i < 12; i++) {
-  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
-  await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 })))
-  await page.waitForTimeout(180)
-  zoomedIn = await page.evaluate(() => window.__ui.getState().travelZoom)
-  if (zoomedIn < 1) break
+for (let i = 0; i < 10; i++) {
+  const ready = await page.evaluate(() => window.__travelWheelReady === true && window.__game.getState().mode === 'travel')
+  if (ready) {
+    await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+    await page.evaluate(() => window.dispatchEvent(new WheelEvent('wheel', { deltaY: -600 })))
+    await page.waitForTimeout(150)
+    zoomedIn = await page.evaluate(() => window.__ui.getState().travelZoom)
+    if (zoomedIn < 1) break
+  }
+  await page.waitForTimeout(250)
 }
 // Gate: zoom-out beyond the default distance is clamped to 1 while locked and
 // permitted (up to 4) once unlocked (design.md §21).
@@ -407,6 +420,35 @@ const f2 = await page.evaluate(() => {
   return { on, off }
 })
 check('F2 toggles do-not-disturb', f2.on === true && f2.off === false, '')
+
+// --- Modal dialogs render above the in-scene labels (user request) -----------
+// In a settlement the buildings carry floating map-labels (drei <Html>); an
+// opened modal dialog must cover them, not sit behind them.
+await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
+await page.waitForTimeout(2500)
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+await page.waitForTimeout(400)
+const zorder = await page.evaluate(async () => {
+  const label = [...document.querySelectorAll('.map-label')].find((l) => {
+    const r = l.getBoundingClientRect()
+    return r.width > 0 && r.height > 0 && r.top > 80 && r.left > 0 && r.bottom < window.innerHeight - 80
+  })
+  if (!label) return { ok: false, why: 'no visible label' }
+  const r = label.getBoundingClientRect()
+  const cx = Math.round(r.left + r.width / 2)
+  const cy = Math.round(r.top + r.height / 2)
+  const beforeTop = document.elementFromPoint(cx, cy)
+  const labelOnTopBefore = label === beforeTop || label.contains(beforeTop)
+  window.__ui.getState().setDialog({ kind: 'trade', building: 'shop' })
+  await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 80)))
+  const afterTop = document.elementFromPoint(cx, cy)
+  const backdrop = document.querySelector('.dialog-backdrop')
+  const dialogOnTop = !!backdrop && (backdrop === afterTop || backdrop.contains(afterTop))
+  window.__ui.getState().setDialog(null)
+  return { ok: true, labelOnTopBefore, dialogOnTop }
+})
+check('a settlement label is hit-tested on top before a dialog opens', zorder.ok && zorder.labelOnTopBefore, JSON.stringify(zorder))
+check('a modal dialog covers the in-scene labels', zorder.ok && zorder.dialogOnTop, JSON.stringify(zorder))
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

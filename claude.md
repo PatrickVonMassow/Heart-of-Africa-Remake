@@ -400,7 +400,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     `scripts/verify/collision.mjs` additionally proves corner clearance at
     box buildings and an inhabitant re-entering its dwelling (pt. 16);
     `scripts/verify/voice.mjs` proves the automatic narration of a new
-    entry (pt. 19).
+    entry (pt. 19). Modal windows and full-screen overlays always render
+    above the in-scene floating labels (`design.md` §17): the modal layer
+    sits above the drei `<Html>` label z-index range so a dialog is never
+    obscured by a building/place label. Verifiable: with a settlement
+    label hit-tested on top, opening a modal makes the dialog the topmost
+    element at that point (`scripts/verify/enrichments.mjs`).
 21. **Water realism.** The visual part of the passage "**Water, current
     and waterfalls.**" in `design.md` §11 is implemented: rivers lie in
     beds carved relative to the local relief and their surfaces descend

@@ -880,7 +880,13 @@ export function TravelScene() {
       ui.setTravelZoom(ui.travelZoom * Math.exp(e.deltaY * 0.0009))
     }
     window.addEventListener('wheel', onWheel, { passive: true })
-    return () => window.removeEventListener('wheel', onWheel)
+    // Dev-only readiness flag for the headless verification (CLAUDE.md §7.2):
+    // the wheel zoom only responds while this travel scene is mounted.
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__travelWheelReady = true
+    return () => {
+      window.removeEventListener('wheel', onWheel)
+      if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__travelWheelReady = false
+    }
   }, [])
 
   // Interaction key: G digs. Places are entered by walking into them (below).
