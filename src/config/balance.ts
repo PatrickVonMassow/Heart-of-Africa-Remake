@@ -22,17 +22,23 @@ export interface BalanceConfig {
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
   foodPerDay: number
-  /** Terrain time-cost multipliers (more days per unit in rough terrain). */
+  /** Base terrain time-cost multipliers (more days per unit in rough terrain).
+   *  jungle/mountain are the costs with the relieving item in hand; water is the
+   *  cost while swimming (no canoe). The penalty/speed-up factors below modify
+   *  them when the hand object is missing or present. */
   terrainCost: {
     desert: number
     savanna: number
     jungle: number
-    jungleWithMachete: number
     mountain: number
-    mountainWithRope: number
     water: number
-    waterWithCanoe: number
   }
+  /** Jungle without a machete is this much slower than with one (design.md §11). */
+  junglePenalty: number
+  /** Mountain without a rope is this much slower than with one (design.md §11). */
+  mountainPenalty: number
+  /** A canoe makes water travel this much faster than swimming (design.md §11). */
+  canoeSpeedup: number
   /** Climbing a mountain without a rope in hand (design.md §7/§11). */
   mountainFall: {
     /** Chance per travelled day of a fall while on a mountain without a rope. */
@@ -163,7 +169,7 @@ export interface BalanceConfig {
 }
 
 export const balance: BalanceConfig = {
-  travelSpeed: 8,
+  travelSpeed: 5.6, // reduced 30% from 8 for a calmer overland pace
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   mouseSensitivity: 0.0011,
@@ -173,13 +179,13 @@ export const balance: BalanceConfig = {
   terrainCost: {
     desert: 1.2,
     savanna: 1.0,
-    jungle: 3.0,
-    jungleWithMachete: 1.3,
-    mountain: 2.5,
-    mountainWithRope: 1.5,
-    water: 2.0,
-    waterWithCanoe: 0.5,
+    jungle: 1.3, // with a machete (cleared path)
+    mountain: 1.5, // with a rope (safe, fast)
+    water: 2.0, // swimming, without a canoe
   },
+  junglePenalty: 2.3, // no machete: 1.3 * 2.3 ≈ 3.0
+  mountainPenalty: 1.67, // no rope: 1.5 * 1.67 ≈ 2.5
+  canoeSpeedup: 4.0, // with a canoe: 2.0 / 4 = 0.5
   mountainFall: {
     chancePerDay: 0.35,
     severeShare: 0.35,

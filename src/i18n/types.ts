@@ -241,6 +241,9 @@ export interface Strings {
     ambienceVolume: string
     foodPerDay: string
     daysPerUnit: string
+    canoeSpeedup: string
+    junglePenalty: string
+    mountainPenalty: string
     digRadius: string
     goodwillForHint: string
     randomEvents: string

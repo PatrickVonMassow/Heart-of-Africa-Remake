@@ -563,15 +563,15 @@ export const useGame = create<GameState>()((set, get) => ({
         cost = tc.desert
         break
       case 'jungle':
-        cost = s.handItem === 'machete' ? tc.jungleWithMachete : tc.jungle
+        cost = s.handItem === 'machete' ? tc.jungle : tc.jungle * balance.junglePenalty
         break
       case 'mountain':
-        cost = s.handItem === 'rope' ? tc.mountainWithRope : tc.mountain
+        cost = s.handItem === 'rope' ? tc.mountain : tc.mountain * balance.mountainPenalty
         break
       case 'water':
       // Enclosed sea water (design.md §11) is swum/crossed like inland water.
       case 'ocean':
-        cost = s.handItem === 'canoe' ? tc.waterWithCanoe : tc.water
+        cost = s.handItem === 'canoe' ? tc.water / balance.canoeSpeedup : tc.water
         break
       default:
         cost = tc.savanna

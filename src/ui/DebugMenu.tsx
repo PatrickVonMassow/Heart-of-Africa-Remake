@@ -130,6 +130,12 @@ export function DebugMenu() {
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.daysPerUnit} value={balance.daysPerUnit} step={0.05}
         onChange={(v) => set('daysPerUnit', Math.max(0, v))} />
+      <NumberField label={t.debug.canoeSpeedup} value={balance.canoeSpeedup} step={0.25}
+        onChange={(v) => set('canoeSpeedup', Math.max(1, v))} />
+      <NumberField label={t.debug.junglePenalty} value={balance.junglePenalty} step={0.1}
+        onChange={(v) => set('junglePenalty', Math.max(1, v))} />
+      <NumberField label={t.debug.mountainPenalty} value={balance.mountainPenalty} step={0.1}
+        onChange={(v) => set('mountainPenalty', Math.max(1, v))} />
       <NumberField label={t.debug.digRadius} value={balance.digRadius} step={0.5}
         onChange={(v) => set('digRadius', v)} />
       <NumberField label={t.debug.goodwillForHint} value={balance.goodwillForHint} step={1}

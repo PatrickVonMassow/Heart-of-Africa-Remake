@@ -144,7 +144,8 @@ const climb = await page.evaluate(async () => {
   g.takeInHand(null)
   g.debugJumpTo(19.87, 17.4)
   g.setToast(null)
-  for (let i = 0; i < 120; i++) window.__game.getState().moveTravel(1, 0, 0.05)
+  // 180 steps (the overland pace was lowered 30%, so more steps cover the reach).
+  for (let i = 0; i < 180; i++) window.__game.getState().moveTravel(1, 0, 0.05)
   const noRope = { lon: window.__game.getState().pos.x / 10, toast: window.__game.getState().toast }
   window.__game.getState().debugAddEquipment('rope')
   // Single-step speed on the Emi Koussi summit (guaranteed mountain terrain):

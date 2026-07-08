@@ -37,10 +37,17 @@ const bal = await page.evaluate(() => ({
   walk: window.__balance.placeWalkSpeed,
   strafe: window.__balance.placeStrafeFactor,
   ambience: window.__balance.ambienceVolume,
+  travel: window.__balance.travelSpeed,
+  canoe: window.__balance.canoeSpeedup,
+  jungle: window.__balance.junglePenalty,
+  mountain: window.__balance.mountainPenalty,
 }))
 check('default mouse sensitivity halved (0.0011)', bal.mouse === 0.0011, `${bal.mouse}`)
 check('default walk speed 10 m/s (user calibration)', bal.walk === 10, `${bal.walk}`)
 check('single ambience volume default 0.1', bal.ambience === 0.1, `${bal.ambience}`)
+check('overland travel speed reduced 30% (5.6)', bal.travel === 5.6, `${bal.travel}`)
+check('canoe/jungle/mountain factors present', bal.canoe === 4 && bal.jungle === 2.3 && bal.mountain === 1.67,
+  `canoe ${bal.canoe}, jungle ${bal.jungle}, mountain ${bal.mountain}`)
 
 check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
 
@@ -119,15 +126,23 @@ async function fillField(label, value) {
 check('debug menu: mouse sensitivity editable', await fillField('Maus-Empfindlichkeit', 0.002), '')
 check('debug menu: ambience volume editable', await fillField('Ambiente-Lautstärke', 0.5), '')
 check('debug menu: strafe factor editable', await fillField('Seitwärts/Rückwärts-Faktor', 0.6), '')
+check('debug menu: canoe speed factor editable', await fillField('Kanu-Tempofaktor', 5), '')
+check('debug menu: jungle penalty factor editable', await fillField('Malusfaktor Dschungel', 2.5), '')
 await page.waitForTimeout(300)
 const adjusted = await page.evaluate(() => ({
   mouse: window.__balance.mouseSensitivity,
   ambience: window.__balance.ambienceVolume,
   strafe: window.__balance.placeStrafeFactor,
+  canoe: window.__balance.canoeSpeedup,
+  jungle: window.__balance.junglePenalty,
 }))
 check('mouse sensitivity applies at runtime', adjusted.mouse === 0.002, `${adjusted.mouse}`)
 check('ambience volume applies at runtime', adjusted.ambience === 0.5, `${adjusted.ambience}`)
 check('strafe factor applies at runtime', adjusted.strafe === 0.6, `${adjusted.strafe}`)
+check('canoe/jungle factors apply at runtime', adjusted.canoe === 5 && adjusted.jungle === 2.5,
+  `canoe ${adjusted.canoe}, jungle ${adjusted.jungle}`)
+// Restore the changed factors so they do not affect later checks.
+await page.evaluate(() => { window.__balance.canoeSpeedup = 4; window.__balance.junglePenalty = 2.3 })
 // Restore the default so it does not affect later checks.
 await page.evaluate(() => (window.__balance.placeStrafeFactor = 0.8))
 await page.screenshot({ path: `${OUT}67-settings-debug-menu.png` })

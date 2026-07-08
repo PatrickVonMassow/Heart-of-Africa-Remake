@@ -393,7 +393,8 @@ Debug shortcut keys:
 - **F4** toggles the canoe in and out of the pack (for quickly testing water travel and the on-land penalty).
 
 - Walking speed of the player character inside settlements (villages and port cities).
-- Walking speed of the player character outside settlements (travel across the continent).
+- Walking speed of the player character outside settlements (travel across the continent; the default overland pace is calibrated on the calm side).
+- Movement-factor tuning for the terrain relief items (§11): the factor by which a canoe speeds up water travel, and the penalty factors by which the jungle without a machete and the mountains without a rope slow the traveller.
 - Mouse-look sensitivity in the first-person view.
 - Ambience volume (default 0.1): one control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale together.
 - Speed of food consumption while walking; at 0 the food supply lasts forever.

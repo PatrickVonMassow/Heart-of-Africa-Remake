@@ -435,9 +435,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     animal calls. Nearby wildlife in the bird's-eye view is heard: an
     animal's own call (elephant trumpet, lion roar, grazer bark, wading
     flock) rises as the player draws near and fades once it is left behind
-    (`design.md` §19), all under that one volume. Mouse sensitivity, walk
-    speed, the strafe/backward factor and the ambience
-    volume are adjustable at runtime in the debug menu (`design.md` §21)
+    (`design.md` §19), all under that one volume. The overland travel speed
+    default is lowered 30 % (to 5.6) for a calmer pace, and the terrain
+    relief items are tunable as factors (`design.md` §11): a canoe speed-up
+    factor for water and penalty factors for the jungle without a machete
+    and the mountains without a rope. Mouse sensitivity, walk
+    speed, the strafe/backward factor, the ambience volume, the travel speed
+    and these three terrain factors are adjustable at runtime in the debug
+    menu (`design.md` §21)
     in both languages; the bird's-eye mouse-wheel zoom is always active
     (0.25x-4x), with a debug checkbox gating zoom-out beyond the default
     distance (without it, zoom-out stops at factor 1; disabling clamps a
@@ -453,10 +458,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     health and no afflictions, with the inventory capacity raised to fit —
     and F4 toggles the canoe in and out of the pack.
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults
-    (including the single ambience volume 0.1), the
+    (including the single ambience volume 0.1, the 5.6 travel speed and the
+    canoe/jungle/mountain factors), the
     eye height, the 80 % strafe/backward factor (exact via the pure
     velocity helper, plus an in-scene smoke check that both directions
-    move), the F3 full loadout, the F4 canoe toggle, the Tab journal toggle
+    move), the canoe and jungle factor fields edit at runtime, the F3 full
+    loadout, the F4 canoe toggle, the Tab journal toggle
     (opens/closes without shifting focus onto a control, and does not
     toggle while a debug field is focused; `design.md` §17), the working debug-menu
     controls in both languages, that a nearby animal raises its proximity
