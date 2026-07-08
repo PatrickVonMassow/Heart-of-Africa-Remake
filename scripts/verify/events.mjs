@@ -181,18 +181,24 @@ const before = await countEvents()
 await page.evaluate(() => {
   const g = () => window.__game.getState()
   // Prove the autonomous-firing *mechanism* independent of the (now much
-  // lower, ÷5) calibrated rate: raise the animal-attack rate for this leg so
-  // an event reliably fires over the travelled days.
-  window.__balance.events.animalAttack = 0.3
-  // The rope in hand keeps stray highland hills on the roundtrip passable
-  // (design.md §11 mountain rule) so travel days actually accrue.
+  // lower, ÷5) calibrated rate: raise the animal-attack rate high for this leg
+  // so an event reliably fires over the travelled days despite the post-event
+  // cooldown (the calibrated rate is asserted separately above).
+  // Raise the robber rate high: unlike animal attacks (which need savanna/
+  // jungle), a robbery can strike on any non-water land, so this is independent
+  // of the per-run biome under the new seed and fires reliably.
+  window.__balance.events.robberAttack = 0.8
+  // Pin to solid inland East-African land (central Tanzania) so the roundtrip
+  // stays on passable ground and travel days accrue (an ocean step rolls
+  // nothing); the rope keeps any highland hill passable (design.md §11).
+  g().debugJumpTo(-6, 35)
   g().debugAddEquipment('rope')
   g().takeInHand('rope')
-  for (let i = 0; i < 900; i++) {
-    g().moveTravel(i % 200 < 100 ? 0 : 0.3, i % 100 < 50 ? -1 : 1, 0.05)
+  for (let i = 0; i < 1300; i++) {
+    g().moveTravel(i % 200 < 100 ? -0.4 : 0.4, i % 100 < 50 ? -1 : 1, 0.05)
     g().debugSet({ foodDays: 30, health: 100 })
   }
-  window.__balance.events.animalAttack = 0.004
+  window.__balance.events.robberAttack = 0.002
 })
 const rolled = (await countEvents()) - before
 check('events fire on their own while travelling', rolled >= 1, `${rolled} events over ~70 days`)
@@ -204,8 +210,9 @@ await page.evaluate(() => {
 const before2 = await countEvents()
 await page.evaluate(() => {
   const g = () => window.__game.getState()
-  for (let i = 0; i < 900; i++) {
-    g().moveTravel(i % 200 < 100 ? 0 : 0.3, i % 100 < 50 ? -1 : 1, 0.05)
+  g().debugJumpTo(-6, 35) // solid inland land, as above
+  for (let i = 0; i < 1300; i++) {
+    g().moveTravel(i % 200 < 100 ? -0.4 : 0.4, i % 100 < 50 ? -1 : 1, 0.05)
     g().debugSet({ foodDays: 30, health: 100 })
   }
 })
