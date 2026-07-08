@@ -87,7 +87,7 @@ function wobble(name: string, rate: number, depth: number) {
   const lfo = ctx.createOscillator()
   lfo.frequency.value = rate
   const lfoGain = ctx.createGain()
-  lfoGain.gain.value = depth * balance.ambienceGustVolume
+  lfoGain.gain.value = depth * balance.ambienceVolume
   lfo.connect(lfoGain)
   lfoGain.connect(l.gain.gain)
   lfo.start()
@@ -196,6 +196,66 @@ function emitMusic(dest: GainNode) {
   }
 }
 
+/** Elephant trumpet: a rising brassy blare with a short fall. */
+function emitTrumpet(dest: GainNode) {
+  if (!ctx) return
+  const t0 = ctx.currentTime
+  envOsc(dest, 'sawtooth', 150, 430, t0, 0.5, 0.4)
+  envOsc(dest, 'sawtooth', 430, 220, t0 + 0.5, 0.35, 0.3)
+}
+
+/** Lion roar: a low, slowly falling growl with a sub octave. */
+function emitRoar(dest: GainNode) {
+  if (!ctx) return
+  const t0 = ctx.currentTime
+  const n = 2 + Math.floor(Math.random() * 2)
+  let t = t0
+  for (let i = 0; i < n; i++) {
+    envOsc(dest, 'sawtooth', 130, 78, t, 0.7, 0.5)
+    envOsc(dest, 'sine', 65, 42, t, 0.7, 0.35)
+    t += 0.55 + Math.random() * 0.25
+  }
+}
+
+/** Grazer call: short zebra bark / antelope snort, a couple of clipped notes. */
+function emitGrazer(dest: GainNode) {
+  if (!ctx) return
+  const t0 = ctx.currentTime
+  const n = 1 + Math.floor(Math.random() * 3)
+  for (let i = 0; i < n; i++) {
+    envOsc(dest, 'square', 520 + Math.random() * 220, 260, t0 + i * 0.16, 0.12, 0.18)
+  }
+}
+
+/** Wading-flock chatter: soft high honks from a flamingo lagoon. */
+function emitFlock(dest: GainNode) {
+  if (!ctx) return
+  const t0 = ctx.currentTime
+  const n = 3 + Math.floor(Math.random() * 4)
+  for (let i = 0; i < n; i++) {
+    envOsc(dest, 'triangle', 900 + Math.random() * 500, 700, t0 + i * 0.1, 0.09, 0.1)
+  }
+}
+
+// Nearby-animal proximity (0 = none/far, 1 = right beside the player), set each
+// frame by the travel scene; re-applied on a volume change (design.md §19/§21).
+const animalProx: Record<'elephant' | 'lion' | 'grazer' | 'flock', number> = {
+  elephant: 0,
+  lion: 0,
+  grazer: 0,
+  flock: 0,
+}
+
+function applyAnimalTargets() {
+  if (!ctx) return
+  const vol = balance.ambienceVolume
+  const inPlace = scene.mode === 'place'
+  setTarget('aniElephant', inPlace ? 0 : animalProx.elephant * 0.6 * vol)
+  setTarget('aniLion', inPlace ? 0 : animalProx.lion * 0.7 * vol)
+  setTarget('aniGrazer', inPlace ? 0 : animalProx.grazer * 0.5 * vol)
+  setTarget('aniFlock', inPlace ? 0 : animalProx.flock * 0.45 * vol)
+}
+
 function buildGraph() {
   if (!ctx) return
   master = ctx.createGain()
@@ -213,11 +273,19 @@ function buildGraph() {
   layer('birds')
   layer('drums')
   layer('music')
+  layer('aniElephant')
+  layer('aniLion')
+  layer('aniGrazer')
+  layer('aniFlock')
   emitter('insects', 0.4, 1.6, emitInsects)
   emitter('birds', 1.8, 6, emitBird)
   emitter('birds', 7, 18, emitMonkey)
   emitter('drums', 2.2, 2.2, emitDrums) // continuous bars while audible
   emitter('music', 9, 22, emitMusic)
+  emitter('aniElephant', 3, 9, emitTrumpet)
+  emitter('aniLion', 4, 11, emitRoar)
+  emitter('aniGrazer', 1.6, 5, emitGrazer)
+  emitter('aniFlock', 2, 6, emitFlock)
 }
 
 /** Gain targets per scene (region × perspective). */
@@ -235,9 +303,9 @@ function applyScene() {
     east: 0.2,
     south: 0.18,
   }
-  // The broadband noise beds are scaled by the configurable ambience noise
-  // volume (design.md §21; default 0.2 = 20 % of the former loudness).
-  const noise = balance.ambienceNoiseVolume
+  // Every ambience layer is scaled by the single configurable ambience volume
+  // (design.md §21; default 0.1).
+  const noise = balance.ambienceVolume
   setTarget('wind', (inPlace ? 0.1 : windByRegion[region]) * noise)
   setTarget('surf', (port ? 0.22 : 0) * noise)
   setTarget('murmur', (port ? 0.3 : 0) * noise)
@@ -245,6 +313,22 @@ function applyScene() {
   setTarget('birds', !port && region === 'central' ? (inPlace ? 0.25 : 0.4) : 0)
   setTarget('drums', village ? 0.5 : nearVillage ? 0.18 : 0)
   setTarget('music', inPlace ? 0.16 : 0.1)
+  applyAnimalTargets()
+}
+
+/** Report the closest wildlife to the player (design.md §19): each field is a
+ *  0..1 proximity that raises that voice's calls, scaled by the ambience
+ *  volume. Called every frame by the travel scene while animals are near. */
+export function setAmbienceAnimals(next: Record<'elephant' | 'lion' | 'grazer' | 'flock', number>) {
+  let changed = false
+  for (const k of ['elephant', 'lion', 'grazer', 'flock'] as const) {
+    const v = Math.max(0, Math.min(1, next[k]))
+    if (Math.abs(v - animalProx[k]) > 0.02) {
+      animalProx[k] = v
+      changed = true
+    }
+  }
+  if (changed && ctx) applyAnimalTargets()
 }
 
 /** Start the engine on the first user gesture; safe to call repeatedly. */
@@ -265,7 +349,7 @@ export function startAmbience() {
 export function refreshAmbienceVolume() {
   if (!ctx) return
   applyScene()
-  for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceGustVolume
+  for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume
 }
 
 /** Update the ambience to the current game situation. */
@@ -277,4 +361,14 @@ export function setAmbienceScene(next: AmbienceScene) {
     next.nearVillage !== scene.nearVillage
   scene = next
   if (changed && ctx) applyScene()
+}
+
+// Dev hook for the headless verification (CLAUDE.md §7.2).
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).__ambience = {
+    start: () => startAmbience(),
+    started: () => started,
+    layerTarget: (name: string) => layers[name]?.target ?? 0,
+    animalProx: () => ({ ...animalProx }),
+  }
 }

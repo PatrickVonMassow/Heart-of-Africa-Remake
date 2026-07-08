@@ -15,10 +15,9 @@ export interface BalanceConfig {
   placeStrafeFactor: number
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
-  /** Volume multiplier for the ambience noise beds (wind/surf/murmur), 1 = full. */
-  ambienceNoiseVolume: number
-  /** Volume multiplier for the gust/swell modulation on the noise beds, 1 = full. */
-  ambienceGustVolume: number
+  /** Single ambience volume: the noise beds (wind/surf/murmur), their gust/swell
+   *  modulation and the proximity animal calls are all scaled by it (1 = full). */
+  ambienceVolume: number
   /** In-game days that pass per world unit traveled on the map. */
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
@@ -164,8 +163,7 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   mouseSensitivity: 0.0011,
-  ambienceNoiseVolume: 0.2,
-  ambienceGustVolume: 0.2,
+  ambienceVolume: 0.1,
   daysPerUnit: 0.2,
   foodPerDay: 1,
   terrainCost: {

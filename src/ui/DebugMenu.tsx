@@ -121,14 +121,9 @@ export function DebugMenu() {
         onChange={(v) => set('placeStrafeFactor', Math.max(0, v))} />
       <NumberField label={t.debug.mouseSensitivity} value={balance.mouseSensitivity} step={0.0002}
         onChange={(v) => set('mouseSensitivity', Math.max(0, v))} />
-      <NumberField label={t.debug.ambienceVolume} value={balance.ambienceNoiseVolume} step={0.05}
+      <NumberField label={t.debug.ambienceVolume} value={balance.ambienceVolume} step={0.05}
         onChange={(v) => {
-          set('ambienceNoiseVolume', Math.max(0, v))
-          refreshAmbienceVolume()
-        }} />
-      <NumberField label={t.debug.ambienceGusts} value={balance.ambienceGustVolume} step={0.05}
-        onChange={(v) => {
-          set('ambienceGustVolume', Math.max(0, v))
+          set('ambienceVolume', Math.max(0, v))
           refreshAmbienceVolume()
         }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}

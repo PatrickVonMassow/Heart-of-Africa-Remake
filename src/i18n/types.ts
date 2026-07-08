@@ -236,7 +236,6 @@ export interface Strings {
     strafeFactor: string
     mouseSensitivity: string
     ambienceVolume: string
-    ambienceGusts: string
     foodPerDay: string
     daysPerUnit: string
     digRadius: string

@@ -36,13 +36,11 @@ const bal = await page.evaluate(() => ({
   mouse: window.__balance.mouseSensitivity,
   walk: window.__balance.placeWalkSpeed,
   strafe: window.__balance.placeStrafeFactor,
-  noise: window.__balance.ambienceNoiseVolume,
-  gust: window.__balance.ambienceGustVolume,
+  ambience: window.__balance.ambienceVolume,
 }))
 check('default mouse sensitivity halved (0.0011)', bal.mouse === 0.0011, `${bal.mouse}`)
 check('default walk speed 10 m/s (user calibration)', bal.walk === 10, `${bal.walk}`)
-check('default ambience noise volume 20 % (0.2)', bal.noise === 0.2, `${bal.noise}`)
-check('default ambience gust volume 20 % (0.2)', bal.gust === 0.2, `${bal.gust}`)
+check('single ambience volume default 0.1', bal.ambience === 0.1, `${bal.ambience}`)
 
 check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
 
@@ -100,7 +98,7 @@ await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { co
 await page.waitForTimeout(600)
 let txt = await page.evaluate(() => document.body.innerText)
 check('debug menu (de): mouse sensitivity field', txt.includes('Maus-Empfindlichkeit (Ego-Sicht)'), '')
-check('debug menu (de): ambience volume field', txt.includes('Ambiente-Rauschen (Lautstärke)'), '')
+check('debug menu (de): ambience volume field', txt.includes('Ambiente-Lautstärke'), '')
 
 /** Fill the number input that sits next to the given label text. */
 async function fillField(label, value) {
@@ -119,16 +117,16 @@ async function fillField(label, value) {
   )
 }
 check('debug menu: mouse sensitivity editable', await fillField('Maus-Empfindlichkeit', 0.002), '')
-check('debug menu: ambience volume editable', await fillField('Ambiente-Rauschen', 0.5), '')
+check('debug menu: ambience volume editable', await fillField('Ambiente-Lautstärke', 0.5), '')
 check('debug menu: strafe factor editable', await fillField('Seitwärts/Rückwärts-Faktor', 0.6), '')
 await page.waitForTimeout(300)
 const adjusted = await page.evaluate(() => ({
   mouse: window.__balance.mouseSensitivity,
-  noise: window.__balance.ambienceNoiseVolume,
+  ambience: window.__balance.ambienceVolume,
   strafe: window.__balance.placeStrafeFactor,
 }))
 check('mouse sensitivity applies at runtime', adjusted.mouse === 0.002, `${adjusted.mouse}`)
-check('ambience volume applies at runtime', adjusted.noise === 0.5, `${adjusted.noise}`)
+check('ambience volume applies at runtime', adjusted.ambience === 0.5, `${adjusted.ambience}`)
 check('strafe factor applies at runtime', adjusted.strafe === 0.6, `${adjusted.strafe}`)
 // Restore the default so it does not affect later checks.
 await page.evaluate(() => (window.__balance.placeStrafeFactor = 0.8))
@@ -140,7 +138,7 @@ await page.evaluate(() => window.__setLang('en'))
 await page.waitForTimeout(600)
 txt = await page.evaluate(() => document.body.innerText)
 check('debug menu (en): mouse sensitivity field', txt.includes('Mouse sensitivity (first-person)'), '')
-check('debug menu (en): ambience volume field', txt.includes('Ambience noise volume'), '')
+check('debug menu (en): ambience volume field', txt.includes('Ambience volume'), '')
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(400)
 
@@ -265,6 +263,44 @@ const tabInField = await page.evaluate(async () => {
   return { ok: true, unchanged: before === after }
 })
 check('Tab in a debug field does not toggle the journal (focus-safe)', tabInField.ok && tabInField.unchanged, JSON.stringify(tabInField))
+
+// --- Proximity animal calls under the ambience (design.md §19) ---------------
+// A nearby animal raises its own call in the soundscape; the call fades once
+// the player leaves. Measured via the ambience layer target (audio itself is
+// not asserted headless). The engine is started on demand.
+await page.evaluate(() => {
+  window.__game.getState().setJournalOpen(false)
+  window.__balance.ambienceVolume = 0.5 // clear signal for the assertion
+  window.__game.getState().debugJumpTo(-2.2, 34.8) // open savanna with herds
+  window.__ambience.start()
+  window.__lionHunt.state.mode = 'idle'
+  window.__lionHunt.state.timer = 90
+})
+await page.waitForTimeout(1800)
+const aniSound = await page.evaluate(async () => {
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const started = window.__ambience.started()
+  const p = window.__game.getState().pos
+  // Quiet baseline: no elephants near.
+  herds.elephant = herds.elephant.filter(() => false)
+  await sleep(1200)
+  const baseline = window.__ambience.layerTarget('aniElephant')
+  // Inject one right beside the player and let the proximity report settle.
+  herds.elephant.push({ x: p.x + 4, z: p.z + 2, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: 'inject', herd: 999 })
+  await sleep(1600)
+  const near = window.__ambience.layerTarget('aniElephant')
+  const prox = window.__ambience.animalProx().elephant
+  // Remove it again; the call fades back toward silence.
+  herds.elephant = herds.elephant.filter((a) => a.chunk !== 'inject')
+  await sleep(1600)
+  const gone = window.__ambience.animalProx().elephant
+  return { started, baseline, near, prox, gone }
+})
+check('ambience engine starts on demand', aniSound.started === true, '')
+check('a nearby animal raises its proximity call', aniSound.prox > 0.5 && aniSound.near > aniSound.baseline + 0.02, JSON.stringify(aniSound))
+check('the animal call fades once the player moves away', aniSound.gone < 0.1, JSON.stringify(aniSound))
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

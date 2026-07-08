@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
+import { setAmbienceAnimals } from '../../systems/ambience'
 import { latLonToWorld, worldToLatLon } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
@@ -373,6 +374,25 @@ function Herds() {
           (a, b) => Math.hypot(a.x - pos.x, a.z - pos.z) - Math.hypot(b.x - pos.x, b.z - pos.z),
         )
       }
+    }
+
+    // Proximity animal calls for the ambience (design.md §19): report the
+    // nearest live animal of each voice group so their sounds rise as the
+    // player draws near, all under the single ambience volume.
+    {
+      const AUDIBLE = 48
+      const near = { elephant: 0, lion: 0, grazer: 0, flock: 0 }
+      const consider = (dx: number, dz: number, key: keyof typeof near) => {
+        const d = Math.hypot(dx, dz)
+        if (d < AUDIBLE) near[key] = Math.max(near[key], 1 - d / AUDIBLE)
+      }
+      for (const a of herds.elephant) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'elephant')
+      for (const sp of ['zebra', 'antelope', 'giraffe'] as const)
+        for (const a of herds[sp]) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'grazer')
+      for (const a of herds.flamingo) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'flock')
+      if (LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed')
+        consider(LION_STATE.lx - pos.x, LION_STATE.lz - pos.z, 'lion')
+      setAmbienceAnimals(near)
     }
 
     const t = clock.elapsedTime
