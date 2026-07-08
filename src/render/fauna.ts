@@ -213,6 +213,69 @@ export function buildAntelope(): THREE.BufferGeometry {
   )
 }
 
+/** Wildebeest (gnu), the quintessential savanna lion prey (~1.35 units tall). */
+export function buildWildebeest(): THREE.BufferGeometry {
+  const parts = buildQuadruped({
+    bodyLen: 1.5,
+    bodyR: 0.44,
+    legH: 0.8,
+    legR: 0.07,
+    neckLen: 0.5,
+    neckTilt: 1.0,
+    headSize: 0.2,
+    bodyColor: '#5b554f',
+    headColor: '#3d3a36',
+    seed: 171,
+  })
+  // Muscular shoulder hump.
+  const hump = new THREE.SphereGeometry(0.3, 7, 5)
+  hump.scale(0.85, 0.7, 1.0)
+  hump.translate(0, 1.36, 0.5)
+  parts.push(tint(hump, '#4a453f', 0.1, 172))
+  // Short curved horns sweeping out to the sides.
+  for (const hx of [-1, 1]) {
+    const horn = new THREE.ConeGeometry(0.04, 0.3, 4)
+    horn.rotateZ(hx * 1.1)
+    horn.translate(hx * 0.16, 1.55, 0.95)
+    parts.push(tint(horn, '#2b2620', 0.08, 173))
+  }
+  // Beard hanging under the throat.
+  const beard = new THREE.ConeGeometry(0.06, 0.26, 4)
+  beard.rotateX(Math.PI)
+  beard.translate(0, 1.02, 0.92)
+  parts.push(tint(beard, '#2f2b26', 0.1, 174))
+  return merge(parts)
+}
+
+/** Warthog, a small tusked savanna lion prey (~0.65 units tall). */
+export function buildWarthog(): THREE.BufferGeometry {
+  const parts = buildQuadruped({
+    bodyLen: 1.0,
+    bodyR: 0.3,
+    legH: 0.4,
+    legR: 0.05,
+    neckLen: 0.25,
+    neckTilt: 1.2,
+    headSize: 0.2,
+    bodyColor: '#5a4b3c',
+    headColor: '#463a2e',
+    seed: 181,
+  })
+  // Curved tusks from the snout.
+  for (const hx of [-1, 1]) {
+    const tusk = new THREE.ConeGeometry(0.022, 0.18, 4)
+    tusk.rotateX(-0.5)
+    tusk.rotateZ(hx * 0.5)
+    tusk.translate(hx * 0.08, 0.6, 0.72)
+    parts.push(tint(tusk, '#e6dfcd', 0.06, 182))
+  }
+  // Bristly mane along the spine.
+  const mane = new THREE.BoxGeometry(0.05, 0.14, 0.7)
+  mane.translate(0, 0.74, 0.1)
+  parts.push(tint(mane, '#3a2f24', 0.12, 183))
+  return merge(parts)
+}
+
 /** Lion, ~1.3 units tall, with mane. */
 export function buildLion(): THREE.BufferGeometry {
   const parts = buildQuadruped({

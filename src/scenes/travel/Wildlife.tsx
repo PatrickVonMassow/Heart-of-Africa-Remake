@@ -12,7 +12,7 @@ import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
-import { latLonToWorld, worldToLatLon } from '../../world/geo'
+import { latLonToWorld, regionAt, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import {
@@ -22,18 +22,22 @@ import {
   buildGiraffe,
   buildLion,
   buildVulture,
+  buildWarthog,
+  buildWildebeest,
   buildZebra,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
 
-type Species = 'elephant' | 'giraffe' | 'zebra' | 'antelope' | 'flamingo'
-const SPECIES: Species[] = ['elephant', 'giraffe', 'zebra', 'antelope', 'flamingo']
+type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo'
+const SPECIES: Species[] = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo']
 const MAX_INSTANCES: Record<Species, number> = {
   elephant: 60,
   giraffe: 60,
   zebra: 120,
+  wildebeest: 120,
   antelope: 120,
+  warthog: 80,
   flamingo: 140,
 }
 
@@ -76,9 +80,26 @@ interface LionHuntState {
   lionHeading: number
   /** Prey's current flee heading (weaving). */
   preyHeading: number
+  /** Species the lion is currently hunting (chosen per hunt by region). */
+  prey: PreyKind
 }
 const LION_STATE: LionHuntState = {
-  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
+  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0, prey: 'zebra',
+}
+
+/** Prey the lion hunts (design.md §19): grazers fitting its prey scheme. */
+type PreyKind = 'zebra' | 'wildebeest' | 'antelope' | 'warthog'
+/** Base render scale per prey species (warthog small, wildebeest sturdy). */
+const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antelope: 0.85, warthog: 0.62 }
+/** Region-appropriate lion prey for ~1890 Africa (design.md §19). The eastern
+ *  and southern plains hold the great grazing herds; the wooded west/centre and
+ *  the arid north offer a narrower range. */
+const REGION_PREY: Record<RegionId, PreyKind[]> = {
+  east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+  south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+  central: ['antelope', 'warthog', 'zebra'],
+  west: ['antelope', 'warthog', 'zebra'],
+  north: ['antelope', 'warthog'],
 }
 
 /** Distance (world units) at which walking into a lion triggers an attack. */
@@ -94,7 +115,7 @@ const HUNT_LION_APPROACH = 15
 
 /** Species that flee from a hunting or feeding lion. */
 const FLEES_LION: Record<Species, boolean> = {
-  elephant: false, giraffe: true, zebra: true, antelope: true, flamingo: false,
+  elephant: false, giraffe: true, zebra: true, wildebeest: true, antelope: true, warthog: true, flamingo: false,
 }
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
@@ -137,7 +158,7 @@ function hash(cx: number, cz: number, i: number, seed: number): number {
 }
 
 function emptyHerds(): Record<Species, Animal[]> {
-  return { elephant: [], giraffe: [], zebra: [], antelope: [], flamingo: [] }
+  return { elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [] }
 }
 
 /** Populate one chunk's deterministic herd/flock into the shared herd arrays,
@@ -162,9 +183,11 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   if (anchor.type === 'savanna') {
     if (roll < 0.12) species = 'elephant'
     else if (roll < 0.2) species = 'giraffe'
-    else if (roll < 0.33) species = 'zebra'
-    else if (roll < 0.46) species = 'antelope'
-    count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : 7
+    else if (roll < 0.32) species = 'zebra'
+    else if (roll < 0.44) species = 'wildebeest'
+    else if (roll < 0.55) species = 'antelope'
+    else if (roll < 0.62) species = 'warthog'
+    count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : species === 'warthog' ? 4 : 7
   } else if (anchor.type === 'jungle') {
     if (roll < 0.06) {
       species = 'elephant'
@@ -271,7 +294,9 @@ function Herds() {
       elephant: buildElephant(),
       giraffe: buildGiraffe(),
       zebra: buildZebra(),
+      wildebeest: buildWildebeest(),
       antelope: buildAntelope(),
+      warthog: buildWarthog(),
       flamingo: buildFlamingo(),
     }),
     [],
@@ -387,7 +412,7 @@ function Herds() {
         if (d < AUDIBLE) near[key] = Math.max(near[key], 1 - d / AUDIBLE)
       }
       for (const a of herds.elephant) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'elephant')
-      for (const sp of ['zebra', 'antelope', 'giraffe'] as const)
+      for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe'] as const)
         for (const a of herds[sp]) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'grazer')
       for (const a of herds.flamingo) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'flock')
       if (LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed')
@@ -589,7 +614,7 @@ function Herds() {
           }
         }
         // Grazing dips on the open grassland.
-        if (pitch === 0 && (sp === 'zebra' || sp === 'antelope')) {
+        if (pitch === 0 && (sp === 'zebra' || sp === 'antelope' || sp === 'wildebeest' || sp === 'warthog')) {
           const g = Math.sin(t * 0.35 + a.phase * 3)
           if (g > 0.65) pitch = (g - 0.65) * 0.9
         }
@@ -717,11 +742,22 @@ function LionHunt() {
   const seed = useGame((s) => s.seed)
   const lion = useRef<THREE.Group>(null)
   const prey = useRef<THREE.Group>(null)
+  const preyMesh = useRef<THREE.Mesh>(null)
   const stain = useRef<THREE.Mesh>(null)
   // Module-shared state so the herds and vultures can react to the hunt.
   const state = useRef(LION_STATE)
 
-  const geo = useMemo(() => ({ lion: buildLion(), zebra: buildZebra() }), [])
+  const geo = useMemo(() => ({ lion: buildLion() }), [])
+  // Prey meshes swapped per hunt so the lion takes varied, region-fitting game.
+  const preyGeo = useMemo<Record<PreyKind, THREE.BufferGeometry>>(
+    () => ({
+      zebra: buildZebra(),
+      wildebeest: buildWildebeest(),
+      antelope: buildAntelope(),
+      warthog: buildWarthog(),
+    }),
+    [],
+  )
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     [],
@@ -761,6 +797,15 @@ function LionHunt() {
       }
       s.px = px
       s.pz = pz
+      // Pick prey fitting the region and period (design.md §19): the eastern and
+      // southern plains offer wildebeest and zebra, the wooded west/centre and
+      // the arid north a narrower range.
+      const pool = REGION_PREY[regionAt(ll.lat, ll.lon)] ?? REGION_PREY.east
+      s.prey = pool[Math.floor(Math.random() * pool.length)]
+      if (preyMesh.current) {
+        preyMesh.current.geometry = preyGeo[s.prey]
+        preyMesh.current.scale.setScalar(PREY_SCALE[s.prey])
+      }
       // The lion closes in from a random direction, so the chase runs any which
       // way rather than always toward the same corner.
       const lionAng = Math.random() * Math.PI * 2
@@ -882,7 +927,7 @@ function LionHunt() {
         <mesh geometry={geo.lion} material={material} castShadow />
       </group>
       <group ref={prey} visible={false}>
-        <mesh geometry={geo.zebra} material={material} castShadow />
+        <mesh ref={preyMesh} geometry={preyGeo.zebra} material={material} castShadow />
       </group>
       <mesh ref={stain} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.1, 20]} />

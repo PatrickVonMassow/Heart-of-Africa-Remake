@@ -581,6 +581,46 @@ const hunt = await page.evaluate(async () => {
 check('lion hunts run in varied directions (not always the same way)', hunt.count >= 5 && hunt.R < 0.85, JSON.stringify(hunt))
 check('the fleeing prey weaves side to side (zigzag)', hunt.signChanges >= 2 && hunt.amp > 0.4, JSON.stringify(hunt))
 
+// --- Lion prey variety (point 8) ---------------------------------------------
+// The lion takes several kinds of grazer, each fitting the region and period.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.waitForTimeout(1000)
+const preyVar = await page.evaluate(async () => {
+  const geo = await import('/src/world/geo.ts')
+  const s = window.__lionHunt.state
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  // Region prey pools mirror REGION_PREY in Wildlife.tsx (design.md §19).
+  const POOLS = {
+    east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    central: ['antelope', 'warthog', 'zebra'],
+    west: ['antelope', 'warthog', 'zebra'],
+    north: ['antelope', 'warthog'],
+  }
+  const startChase = async (budget) => {
+    s.mode = 'idle'; s.timer = 0
+    const t0 = Date.now()
+    while (s.mode !== 'chase' && Date.now() - t0 < budget) { if (s.mode === 'idle') s.timer = 0; await sleep(40) }
+    return s.mode === 'chase'
+  }
+  const seen = []
+  const mismatches = []
+  const tAll = Date.now()
+  while (seen.length < 12 && Date.now() - tAll < 60000) {
+    if (await startChase(2500)) {
+      const ll = geo.worldToLatLon(s.px, s.pz)
+      const region = geo.regionAt(ll.lat, ll.lon)
+      seen.push(s.prey)
+      if (!POOLS[region]?.includes(s.prey)) mismatches.push({ prey: s.prey, region })
+      await sleep(60)
+    }
+  }
+  s.mode = 'idle'; s.timer = 60
+  return { count: seen.length, distinct: [...new Set(seen)], mismatches }
+})
+check('the lion hunts more than one kind of prey', preyVar.distinct.length >= 2, JSON.stringify(preyVar))
+check('every hunted prey fits the region and period', preyVar.count >= 5 && preyVar.mismatches.length === 0, JSON.stringify(preyVar))
+
 // --- Debug menu: dropdowns, renderer row, wheel-zoom gate (§7.1.20) ----------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(500)
