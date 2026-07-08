@@ -134,8 +134,10 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
   // Settlement size mirrors real ~1890 importance (design.md §4.1): major
   // cities are markedly larger, with more blocks and a wider walkable area.
   const size = place.kind === 'port' ? (place.size ?? 2) : 1
-  const ext = place.kind === 'port' ? (size - 1) * 7 : 0
-  const radius = place.kind === 'port' ? 24 + size * 4 : PLACE_RADIUS
+  // Ports are markedly larger than villages and scale with ~1890 importance
+  // (design.md §4.1, point 6): a wider walkable area and deeper street grid.
+  const ext = place.kind === 'port' ? (size - 1) * 10 : 0
+  const radius = place.kind === 'port' ? 30 + size * 6 : PLACE_RADIUS
 
   const interactives: Interactive[] = []
   if (place.kind === 'port') {
@@ -187,7 +189,37 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Keep the entrance-door approach of each functional building clear so it
     // stays reachable (design.md §2 collision inside settlements).
     if (!interactives.every((it) => !it.door || Math.hypot(x - it.door[0], z - it.door[1]) > 2.2)) return false
+    // Keep every dwelling's entrance-door approach clear too, so a later object
+    // never seals an earlier hut's door (design.md §2, point 6 reachability).
+    if (!dwellings.every((d) => Math.hypot(x - d.door[0], z - d.door[1]) > 1.7)) return false
     return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > margin * 0.55 + d.r)
+  }
+
+  // Door point just outside a dwelling's front face for a given facing.
+  const doorAt = (x: number, z: number, r: number, rot: number): [number, number] => [
+    x + Math.sin(rot) * (r + 0.5),
+    z + Math.cos(rot) * (r + 0.5),
+  ]
+  // A door is reachable when it lands inside the walkable area and clear of the
+  // functional buildings and other dwellings (its inhabitant/player must be able
+  // to stand there — design.md §2, point 6).
+  const doorReachable = (dx: number, dz: number): boolean => {
+    if (Math.hypot(dx, dz) > radius - 0.5) return false
+    if (!interactives.every((it) => Math.hypot(dx - it.pos[0], dz - it.pos[1]) > (it.type === 'villager' ? 0.9 : place.kind === 'port' ? 2.9 : 3.5))) return false
+    return dwellings.every((d) => Math.hypot(dx - d.x, dz - d.z) > d.r + 0.8)
+  }
+  // Orient a dwelling so its door opens onto free space: try the preferred
+  // facing first, then rotate outward in small steps until the door is reachable.
+  const pickDoorRot = (x: number, z: number, r: number, preferred: number): number => {
+    const [px, pz] = doorAt(x, z, r, preferred)
+    if (doorReachable(px, pz)) return preferred
+    for (let k = 1; k <= 7; k++) {
+      for (const rot of [preferred + k * 0.45, preferred - k * 0.45]) {
+        const [dx, dz] = doorAt(x, z, r, rot)
+        if (doorReachable(dx, dz)) return rot
+      }
+    }
+    return preferred // fallback: no clear facing found, keep the intended one
   }
 
   const addDwelling = (
@@ -199,15 +231,16 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
     h: number,
     floors = 1,
   ): DwellingDef => {
+    const facing = pickDoorRot(x, z, r, rot)
     const d: DwellingDef = {
       kind,
       x,
       z,
-      rot,
+      rot: facing,
       r,
       h,
       floors,
-      door: [x + Math.sin(rot) * (r + 0.5), z + Math.cos(rot) * (r + 0.5)],
+      door: doorAt(x, z, r, facing),
     }
     dwellings.push(d)
     return d

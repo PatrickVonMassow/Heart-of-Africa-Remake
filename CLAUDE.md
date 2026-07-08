@@ -387,7 +387,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     believably through the settlement, entering and leaving their homes.
     The enterable functional buildings remain clearly highlighted.
     Settlement size mirrors real ~1890 importance (`design.md` §4.1):
-    major cities are markedly larger than small stations. Villages show
+    major cities are markedly larger than small stations, and the port
+    settlements in particular are enlarged (a wider walkable area and deeper
+    street grid) so they clearly outscale villages. Villages show
     the life vignettes of `design.md` §19 (conversing pairs, fire tender,
     cooking runs from the huts, grain pounding, drummer, well with water
     carrier), and the first-person background is a panorama of the real
@@ -408,11 +410,17 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     clearance keeps the camera's near plane out of every wall — pressing
     against a building must never show its inside. Inhabitants enter and
     leave their dwellings through the entrance door (`design.md` §2); the
-    player cannot. Verifiable: an automated run steers the player character
+    player cannot. Every building — including the inhabitant-only dwellings —
+    is oriented so its entrance door opens onto reachable free ground; the
+    procedural layout rotates a building whose natural facing would seal its
+    door and keeps every door approach clear of later objects (`design.md`
+    §2, point 6). Verifiable: an automated run steers the player character
     against building walls and corners and proves it keeps positive
     clearance; an observed inhabitant transitions walk → inside at its
     dwelling and out again; interaction with all functional buildings
-    remains possible; the application runs without console errors.
+    remains possible; every dwelling door (port and village) has a
+    collision-free standpoint inside the walkable area; the application runs
+    without console errors (`scripts/verify/collision.mjs`).
 17. **Localization.** The game is fully playable in English as well as
     German (`design.md` §17): all player-visible text comes from the
     language files, the debug menu switches the language at runtime

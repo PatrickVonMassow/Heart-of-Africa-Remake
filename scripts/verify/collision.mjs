@@ -160,6 +160,41 @@ async function reachableBuildings(sceneLabel) {
   )
 }
 
+/**
+ * Every dwelling — including the non-functional, inhabitant-only ones — must
+ * have a reachable entrance door (design.md §2, point 6): the door lies inside
+ * the walkable area and a collision-free standpoint exists at it, so a resident
+ * (or the player) can stand there to enter/leave.
+ */
+async function dwellingDoorsReachable(sceneLabel) {
+  const res = await page.evaluate(() => {
+    const cs = window.__placeColliders
+    const radius = window.__placeLayout.radius
+    const bad = []
+    for (const d of window.__placeLayout.dwellings) {
+      const [dx, dz] = d.door
+      if (Math.hypot(dx, dz) > radius) { bad.push(`${d.kind}(outside)`); continue }
+      // A clear standpoint within reach of the door (0.35..0.75) at any angle.
+      let ok = false
+      for (let r = 0.35; r <= 0.75 && !ok; r += 0.2) {
+        for (let a = 0; a < 10 && !ok; a++) {
+          const ang = (a / 10) * Math.PI * 2
+          const x = dx + Math.cos(ang) * r
+          const z = dz + Math.sin(ang) * r
+          if (cs.every((c) => window.__clearanceTo(c, x, z) > 0.36)) ok = true
+        }
+      }
+      if (!ok) bad.push(d.kind)
+    }
+    return { total: window.__placeLayout.dwellings.length, bad }
+  })
+  check(
+    `${sceneLabel}: every dwelling door is reachable (incl. inhabitant-only)`,
+    res.bad.length === 0,
+    res.bad.length ? `blocked: ${res.bad.join(',')}` : `${res.total} dwellings ok`,
+  )
+}
+
 async function accessPointsFree(sceneLabel) {
   const blocked = await page.evaluate(() => {
     const cs = window.__placeColliders
@@ -189,6 +224,7 @@ const funcTypes = await page.evaluate(() =>
 check("Port: all 6 functional buildings present", funcTypes.length === 6, funcTypes.join(","))
 await reachableBuildings('Port')
 await accessPointsFree('Port')
+await dwellingDoorsReachable('Port')
 
 // Ram screenshot: teleport in front of the biggest wall and nudge into it.
 await page.evaluate(() => {
@@ -251,6 +287,9 @@ const audienceOpened = await page
   .then(() => true)
   .catch(() => false)
 check('Village: chief hut opens by walking into its door', audienceOpened)
+await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
+await page.waitForTimeout(200)
+await dwellingDoorsReachable('Village')
 await page.screenshot({ path: `${OUT}53-collision-village-chief-hut.png` })
 console.log('shot 53-collision-village-chief-hut.png')
 await page.keyboard.press('Escape')

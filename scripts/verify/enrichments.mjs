@@ -38,7 +38,7 @@ const cairo = await page.evaluate(() => ({
   dwellings: window.__placeLayout.dwellings.length,
   backdrop: window.__placeBackdrop ?? 0,
 }))
-check('Cairo (size 3): walkable radius 36', cairo.radius === 36, `${cairo.radius}`)
+check('Cairo (size 3): walkable radius 48', cairo.radius === 48, `${cairo.radius}`)
 check('Cairo: landscape backdrop mesh present', cairo.backdrop > 1000, `${cairo.backdrop} vertices`)
 
 await page.evaluate(() => window.__game.getState().leavePlace())
@@ -50,7 +50,7 @@ const boma = await page.evaluate(() => ({
   radius: window.__placeLayout.radius,
   dwellings: window.__placeLayout.dwellings.length,
 }))
-check('Boma (size 1): walkable radius 28', boma.radius === 28, `${boma.radius}`)
+check('Boma (size 1): walkable radius 36', boma.radius === 36, `${boma.radius}`)
 check(
   'Major city clearly bigger than small station',
   cairo.dwellings > boma.dwellings * 1.4,
