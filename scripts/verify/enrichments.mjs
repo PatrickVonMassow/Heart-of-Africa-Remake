@@ -317,10 +317,9 @@ check(
   trample.ok ? `${trample.species}, ${trample.stains} stain(s)` : trample.why,
 )
 
-// Elephants actually roam and reach prey on their own (point 6): plant one
-// elephant ~9 units from a lone prey on an open patch of savanna and let it
-// walk over and trample it.
-const roam = await page.evaluate(async () => {
+// Elephant herds roam together in gentle arcs; prey dodge only at the last
+// moment (point 4). Set up on an open savanna patch near the player.
+const herdTest = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w?.herdsRef?.current
   if (!herds) return { ok: false, why: 'no herds' }
@@ -331,37 +330,73 @@ const roam = await page.evaluate(async () => {
     const ll = geo.worldToLatLon(x, z)
     return terr.sampleTerrain(ll.lat, ll.lon, seed).type
   }
-  // Find an open savanna patch (all-savanna neighborhood) near the player so
-  // the elephant has clear ground to walk over to the prey.
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = window.__game.getState().pos
   let spot = null
   for (let r = 8; r <= 320 && !spot; r += 8) {
     for (let a = 0; a < 20 && !spot; a++) {
       const gx = p.x + Math.cos((a / 20) * Math.PI * 2) * r
       const gz = p.z + Math.sin((a / 20) * Math.PI * 2) * r
-      const open = [[0, 0], [11, 0], [-3, 0], [0, 6], [0, -6], [6, 3], [6, -3]].every(([dx, dz]) => typeAt(gx + dx, gz + dz) === 'savanna')
-      if (open) spot = { x: gx, z: gz }
+      if ([[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12], [9, 9], [-9, -9]].every(([dx, dz]) => typeAt(gx + dx, gz + dz) === 'savanna')) spot = { x: gx, z: gz }
     }
   }
   if (!spot) return { ok: false, why: 'no open savanna patch found' }
-  herds.elephant.length = 0
-  for (const sp of ['zebra', 'antelope', 'giraffe']) herds[sp].length = 0
-  const eleph = { x: spot.x + 9, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0 }
+  const clear = () => {
+    herds.elephant.length = 0
+    for (const sp of ['zebra', 'antelope', 'giraffe']) herds[sp].length = 0
+  }
+  const mean = (arr, k) => arr.reduce((s, m) => s + m[k], 0) / arr.length
+
+  // A herd of 5 sharing a herd id, clustered together.
+  clear()
+  const members = []
+  for (let i = 0; i < 5; i++) {
+    members.push({ x: spot.x + ((i % 3) - 1) * 2.2, z: spot.z + (Math.floor(i / 3) - 0.5) * 2.2, y: 0.2, rot: 0, scale: 1, phase: i * 1.3, herd: 424242 })
+  }
+  herds.elephant.push(...members)
+  const c0 = { x: mean(members, 'x'), z: mean(members, 'z') }
+  const spreads = []
+  const headingSnaps = []
+  for (let k = 0; k < 34; k++) {
+    let maxd = 0
+    for (const a of members) for (const b of members) maxd = Math.max(maxd, Math.hypot(a.x - b.x, a.z - b.z))
+    spreads.push(maxd)
+    headingSnaps.push(members.map((m) => m.heading ?? 0))
+    await sleep(180)
+  }
+  const cF = { x: mean(members, 'x'), z: mean(members, 'z') }
+  const centreMoved = Math.hypot(cF.x - c0.x, cF.z - c0.z)
+  const maxSpread = Math.max(...spreads)
+  let maxTurn = 0
+  for (let s = 1; s < headingSnaps.length; s++) {
+    for (let m = 0; m < members.length; m++) {
+      let dh = headingSnaps[s][m] - headingSnaps[s - 1][m]
+      while (dh > Math.PI) dh -= Math.PI * 2
+      while (dh < -Math.PI) dh += Math.PI * 2
+      maxTurn = Math.max(maxTurn, Math.abs(dh) / 0.18)
+    }
+  }
+
+  // Prey dodges only at the last moment: far elephant → no dodge; near → flee.
+  clear()
   const prey = { x: spot.x, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
-  herds.elephant.push(eleph)
   herds.zebra.push(prey)
-  const start = { x: eleph.x, z: eleph.z }
-  const deadline = Date.now() + 18000
-  return await new Promise((resolve) => {
-    const iv = setInterval(() => {
-      const moved = Math.hypot(eleph.x - start.x, eleph.z - start.z)
-      if (prey.dead) { clearInterval(iv); resolve({ ok: true, trampled: true, moved }) }
-      else if (Date.now() > deadline) { clearInterval(iv); resolve({ ok: true, trampled: false, moved }) }
-    }, 120)
-  })
+  const eleph = { x: spot.x + 7, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
+  herds.elephant.push(eleph)
+  const pf0 = { x: prey.x, z: prey.z }
+  for (let k = 0; k < 10; k++) { eleph.x = spot.x + 7; eleph.z = spot.z; await sleep(120) }
+  const movedWhileFar = Math.hypot(prey.x - pf0.x, prey.z - pf0.z)
+  const dNearStart = Math.hypot(prey.x - (spot.x + 2), prey.z - spot.z)
+  let dNearEnd = dNearStart
+  for (let k = 0; k < 55; k++) { eleph.x = spot.x + 2; eleph.z = spot.z; await sleep(110); dNearEnd = Math.hypot(prey.x - eleph.x, prey.z - eleph.z) }
+
+  return { ok: true, centreMoved, maxSpread, maxTurn, movedWhileFar, dNearStart, dNearEnd }
 })
-check('elephants roam (their position changes over time)', roam.ok && roam.moved > 3, JSON.stringify(roam))
-check('a roaming elephant reaches and tramples a nearby prey animal', roam.ok && roam.trampled === true, JSON.stringify(roam))
+check('an elephant herd roams (its centre moves)', herdTest.ok && herdTest.centreMoved > 1.5, JSON.stringify(herdTest))
+check('the herd stays together (does not disperse)', herdTest.ok && herdTest.maxSpread < 16, JSON.stringify(herdTest))
+check('elephants turn only in gentle arcs (no sharp turns)', herdTest.ok && herdTest.maxTurn < 1.2, JSON.stringify(herdTest))
+check('prey does not dodge a distant elephant', herdTest.ok && herdTest.movedWhileFar < 0.5, JSON.stringify(herdTest))
+check('prey darts away from a close elephant (last-moment dodge)', herdTest.ok && herdTest.dNearEnd > herdTest.dNearStart + 0.5, JSON.stringify(herdTest))
 
 // --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
 // The lion now approaches from a random direction (chase no longer always runs

@@ -50,6 +50,8 @@ interface Animal {
   drink?: { tx: number; tz: number }
   /** Current heading for roaming elephants (radians; set lazily). */
   heading?: number
+  /** Herd id shared by elephants placed together, so a herd moves as one. */
+  herd?: number
 }
 
 /**
@@ -92,12 +94,18 @@ const FLEES_LION: Record<Species, boolean> = {
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
 const MAX_STAINS = 60
-/** Elephant roaming (design.md §19): walk speed, turn rate, prey-notice range.
- *  The turn rate keeps the turning radius (speed/turn) below the trample radius
- *  so a pursuing elephant can close in on prey instead of orbiting it. */
-const ELEPHANT_SPEED = 1.8
-const ELEPHANT_TURN = 1.6
-const ELEPHANT_NOTICE = 42
+/** Elephant herd roaming (design.md §19): a slow amble that only ever moves
+ *  forward, turning in gentle arcs. Herd-mates keep together (cohesion); they
+ *  do not hunt prey — a smaller animal is only trampled if it happens to be in
+ *  the herd's path and dodges too late. */
+const ELEPHANT_SPEED = 1.5
+const ELEPHANT_TURN = 0.55 // gentle steering only (no sharp turns / strafing)
+const ELEPHANT_HERD_ARC = 0.3 // amplitude of the herd heading's slow S-curve
+const ELEPHANT_COHESION = 6 // steer back toward the herd beyond this radius
+/** Prey dodge an elephant only when it comes this close, and a touch slower
+ *  than the elephant, so a head-on herd still tramples them now and then. */
+const PREY_PANIC_RADIUS = 3.2
+const PREY_PANIC_SPEED = 1.35
 
 function hash(cx: number, cz: number, i: number, seed: number): number {
   let h = (seed ^ 0xa51ce5) >>> 0
@@ -158,7 +166,10 @@ function buildHerds(cx: number, cz: number, seed: number): Record<Species, Anima
         }
       }
       if (!species) continue
-      placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, false)
+      // Elephants placed together share a herd id (stable per chunk) so they
+      // move as one; other species roam/graze individually.
+      const herdId = species === 'elephant' ? ccx * 1000003 + ccz : undefined
+      placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, false, herdId)
     }
   }
   return herds
@@ -175,6 +186,7 @@ function placeGroup(
   seed: number,
   baseScale: number,
   shoreline: boolean,
+  herdId?: number,
 ) {
   for (let i = 0; i < count; i++) {
     const r1 = hash(ccx, ccz, 10 + i * 3, seed)
@@ -197,6 +209,7 @@ function placeGroup(
       rot: r3 * Math.PI * 2,
       scale: baseScale * (0.85 + r3 * 0.3),
       phase: r1 * Math.PI * 2,
+      ...(herdId !== undefined ? { herd: herdId } : {}),
     }
     // Animals near water periodically walk to the shore and drink
     // (design.md §19); the shore point follows the water-distance gradient.
@@ -230,6 +243,8 @@ function Herds() {
   const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
   const herdsRef = useRef<Record<Species, Animal[]> | null>(null)
   const lastCenter = useRef<string | null>(null)
+  // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
+  const herdState = useRef(new Map<number, { heading: number; phase: number }>())
 
   const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
     () => ({
@@ -284,6 +299,7 @@ function Herds() {
       lastCenter.current = center
       herdsRef.current = buildHerds(cx, cz, seed)
       stains.current = []
+      herdState.current.clear()
     }
     const herds = herdsRef.current
     if (!herds) return
@@ -291,10 +307,38 @@ function Herds() {
     const t = clock.elapsedTime
     const lionActive = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
 
-    // Elephants roam the savanna (design.md §19): a slow directed walk, gently
-    // biased toward the nearest grazing prey, staying on suitable land. Their
-    // moving positions drive the trampling of smaller animals underfoot.
-    const preyHerds = [herds.zebra, herds.antelope, herds.giraffe]
+    // Elephants roam as herds (design.md §19): each herd shares a heading that
+    // curves in slow arcs; its members keep together (cohesion) and only ever
+    // move forward. They do not hunt — a smaller animal is trampled only if it
+    // is in the herd's path and dodges too late. First aggregate each live
+    // herd's centre and advance its shared heading.
+    const herdCentre = new Map<number, { cx: number; cz: number; heading: number }>()
+    {
+      const sum = new Map<number, { sx: number; sz: number; n: number }>()
+      for (const a of herds.elephant) {
+        if (a.dead || a.herd === undefined) continue
+        const agg = sum.get(a.herd) ?? { sx: 0, sz: 0, n: 0 }
+        agg.sx += a.x
+        agg.sz += a.z
+        agg.n++
+        sum.set(a.herd, agg)
+      }
+      for (const [hid, agg] of sum) {
+        const ccx = agg.sx / agg.n
+        const ccz = agg.sz / agg.n
+        let st = herdState.current.get(hid)
+        if (!st) {
+          st = { heading: hash(hid, 0, 7, seed) * Math.PI * 2, phase: hash(hid, 0, 8, seed) * Math.PI * 2 }
+          herdState.current.set(hid, st)
+        }
+        st.heading += Math.sin(t * 0.08 + st.phase) * ELEPHANT_HERD_ARC * dt
+        // Steer the herd away from ground it cannot cross (ahead of its centre).
+        const fll = worldToLatLon(ccx + Math.sin(st.heading) * 9, ccz + Math.cos(st.heading) * 9)
+        const ft = sampleTerrain(fll.lat, fll.lon, seed).type
+        if (ft !== 'savanna' && ft !== 'jungle') st.heading += ELEPHANT_TURN * 2 * dt
+        herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
+      }
+    }
     const elephantPos: Array<[number, number]> = []
     {
       const list = herds.elephant
@@ -303,23 +347,27 @@ function Herds() {
         const a = list[i]
         if (a.dead) continue
         if (a.heading === undefined) a.heading = a.rot
-        // Steer toward the nearest live prey within notice range; otherwise
-        // wander with a slowly curving heading (deterministic per elephant).
-        let target: Animal | null = null
-        let best = ELEPHANT_NOTICE
-        for (const herd of preyHerds) {
-          for (const p of herd) {
-            if (p.dead) continue
-            const d = Math.hypot(p.x - a.x, p.z - a.z)
-            if (d < best) { best = d; target = p }
-          }
+        const info = a.herd !== undefined ? herdCentre.get(a.herd) : undefined
+        // Follow the herd heading; steer back toward the centre if drifting off.
+        let desired = a.heading
+        if (info) {
+          const toCx = info.cx - a.x
+          const toCz = info.cz - a.z
+          desired = Math.hypot(toCx, toCz) > ELEPHANT_COHESION ? Math.atan2(toCx, toCz) : info.heading
+        } else {
+          desired = a.heading + Math.sin(t * 0.1 + a.phase * 5) * 0.4
         }
-        const desired = target
-          ? Math.atan2(target.x - a.x, target.z - a.z)
-          : a.heading + Math.sin(t * 0.13 + a.phase * 5) * 0.9
+        // If the ground just ahead cannot be crossed, redirect the desired
+        // heading toward the herd (or away) — but still turn only gently.
+        const aheadLL = worldToLatLon(a.x + Math.sin(a.heading) * 6, a.z + Math.cos(a.heading) * 6)
+        const aheadT = sampleTerrain(aheadLL.lat, aheadLL.lon, seed).type
+        if (aheadT !== 'savanna' && aheadT !== 'jungle') {
+          desired = info ? Math.atan2(info.cx - a.x, info.cz - a.z) : a.heading + Math.PI * 0.6
+        }
         let dh = desired - a.heading
         while (dh > Math.PI) dh -= Math.PI * 2
         while (dh < -Math.PI) dh += Math.PI * 2
+        // Gentle arc only — clamp the per-frame turn (never a sharp turn).
         a.heading += Math.max(-ELEPHANT_TURN * dt, Math.min(ELEPHANT_TURN * dt, dh))
         const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * dt
         const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
@@ -329,11 +377,8 @@ function Herds() {
           a.x = nx
           a.z = nz
           a.y = Math.max(0.02, ter.height)
-        } else {
-          // Turn back from desert, water or the open sea (a firm, steady turn
-          // rather than a per-frame spin) and hold position this step.
-          a.heading += ELEPHANT_TURN * 2.5 * dt
         }
+        // Else hold position this frame and keep turning gently next frame.
         elephantPos.push([a.x, a.z])
       }
     }
@@ -396,6 +441,27 @@ function Herds() {
             px += (dx / d) * push
             pz += (dz / d) * push
             yaw = Math.atan2(dx, dz) // face away while fleeing
+            pitch = 0
+          }
+        }
+        // Dodge an approaching elephant, but only at the last moment (design.md
+        // §19): the prey darts away just before it is reached and a touch
+        // slower than the herd, so a head-on elephant still catches some.
+        if (sp !== 'elephant' && FLEES_LION[sp]) {
+          let near: [number, number, number] | null = null
+          for (const [ex, ez] of elephantPos) {
+            const d = Math.hypot(px - ex, pz - ez)
+            if (d < PREY_PANIC_RADIUS && (!near || d < near[2])) near = [ex, ez, d]
+          }
+          if (near) {
+            const dx = a.x - near[0]
+            const dz = a.z - near[1]
+            const d = Math.hypot(dx, dz) || 1
+            a.x += (dx / d) * PREY_PANIC_SPEED * dt
+            a.z += (dz / d) * PREY_PANIC_SPEED * dt
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(dx, dz)
             pitch = 0
           }
         }
