@@ -49,6 +49,8 @@ check('overland travel speed reduced 30% (5.6)', bal.travel === 5.6, `${bal.trav
 check('canoe speed-up factor reduced to 2x (user calibration)', bal.canoe === 2, `canoe ${bal.canoe}`)
 check('jungle/mountain penalty factors present', bal.jungle === 2.3 && bal.mountain === 1.67,
   `jungle ${bal.jungle}, mountain ${bal.mountain}`)
+const canteenCap = await page.evaluate(() => window.__balance.health.canteenCapacity)
+check('canteen capacity reduced to 500 (user calibration)', canteenCap === 500, `${canteenCap}`)
 
 check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
 

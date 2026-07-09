@@ -28,7 +28,7 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 - [x] 3. Kanu-Geschwindigkeitsboost von 4x auf 2x reduzieren.
 - [x] 4. Ein Item, das im Einsatz ist, soll im Inventar aufleuchten.
 - [x] 5. Tagebuch-Bereich nicht bis ganz nach unten: Camp-/Journal-Button nicht verdecken, darüber etwas Abstand.
-- [ ] 6. Canteen Capacity auf 500 reduzieren.
+- [x] 6. Canteen Capacity auf 500 reduzieren.
 - [ ] 7. Überfall mit Gewehr: Sicherheitsabfrage; danach Beute mitteilen; Beute sehr reichhaltig.
 - [ ] 8. Laufgeschwindigkeits-Malus mit Kanu funktioniert nicht / zu schwach — beheben.
 - [ ] 9. Debounce-Radius für versehentliches erneutes Betreten von Siedlungen zu groß — verkleinern.

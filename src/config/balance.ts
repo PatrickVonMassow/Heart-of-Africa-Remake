@@ -254,7 +254,7 @@ export const balance: BalanceConfig = {
     dehydrationOnsetDays: 0.5,
     canteenDrainPerDay: 0.9, // consumption raised 200x (user request), offset by the 2000x capacity below
     canteenDesertDrainPerDay: 3.0, // 200x; desert is faster
-    canteenCapacity: 2000, // raised 2000x; net the supply lasts 10x longer (2000/0.9 ≈ 2222 land days)
+    canteenCapacity: 500, // user calibration: reduced from 2000; a full canteen now lasts 500/0.9 ≈ 555 land days
     sunblindRecoveryDays: 3,
     poorThreshold: 40,
   },

@@ -517,8 +517,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     canteen's water-consumption rates (land and desert) and its capacity
     (`design.md` §6/§21) are editable in the debug menu.
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults
-    (including the single ambience volume 0.1, the 5.6 travel speed and the
-    canoe/jungle/mountain factors), the
+    (including the single ambience volume 0.1, the 5.6 travel speed, the
+    canoe speed-up factor 2, the jungle/mountain factors and the canteen
+    capacity 500), the
     eye height, the 80 % strafe/backward factor (exact via the pure
     velocity helper, plus an in-scene smoke check that both directions
     move), the canoe and jungle factor fields edit at runtime, the F3 full
