@@ -46,8 +46,9 @@ check('default mouse sensitivity halved (0.0011)', bal.mouse === 0.0011, `${bal.
 check('default walk speed 10 m/s (user calibration)', bal.walk === 10, `${bal.walk}`)
 check('single ambience volume default 0.1', bal.ambience === 0.1, `${bal.ambience}`)
 check('overland travel speed reduced 30% (5.6)', bal.travel === 5.6, `${bal.travel}`)
-check('canoe/jungle/mountain factors present', bal.canoe === 4 && bal.jungle === 2.3 && bal.mountain === 1.67,
-  `canoe ${bal.canoe}, jungle ${bal.jungle}, mountain ${bal.mountain}`)
+check('canoe speed-up factor reduced to 2x (user calibration)', bal.canoe === 2, `canoe ${bal.canoe}`)
+check('jungle/mountain penalty factors present', bal.jungle === 2.3 && bal.mountain === 1.67,
+  `jungle ${bal.jungle}, mountain ${bal.mountain}`)
 
 check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
 
@@ -153,7 +154,7 @@ check('strafe factor applies at runtime', adjusted.strafe === 0.6, `${adjusted.s
 check('canoe/jungle factors apply at runtime', adjusted.canoe === 5 && adjusted.jungle === 2.5,
   `canoe ${adjusted.canoe}, jungle ${adjusted.jungle}`)
 // Restore the changed factors so they do not affect later checks.
-await page.evaluate(() => { window.__balance.canoeSpeedup = 4; window.__balance.junglePenalty = 2.3 })
+await page.evaluate(() => { window.__balance.canoeSpeedup = 2; window.__balance.junglePenalty = 2.3 })
 // Restore the default so it does not affect later checks.
 await page.evaluate(() => (window.__balance.placeStrafeFactor = 0.8))
 await page.screenshot({ path: `${OUT}67-settings-debug-menu.png` })
