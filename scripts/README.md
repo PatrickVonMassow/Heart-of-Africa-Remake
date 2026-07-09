@@ -48,35 +48,39 @@ encode: 8-bit RGB), used by both scripts.
 # Verification Suite (CLAUDE.md §7.2)
 
 `scripts/verify/` holds the headless acceptance checks (Playwright is a
-devDependency; Chromium via `npx playwright install chromium`). All scripts
-exit non-zero on failure and write screenshot evidence to `verification/`.
+devDependency; Chromium via `npx playwright install chromium`). Every script
+exits non-zero on failure and writes screenshot evidence to `verification/`.
+
+The whole regression runs with one command:
 
 ```
-npm run dev                          # prerequisite for all dev-server checks
-node scripts/verify/flow.mjs        # gameplay loop end to end (20 checks)
-node scripts/verify/checkpoint.mjs  # checkpoint save/reload/restore
-node scripts/verify/collision.mjs   # §7.1.16 collision, corners, hut entry, reachability
-node scripts/verify/world.mjs       # §7.1.3 world-model data + screenshots
-node scripts/verify/i18n.mjs        # §7.1.17 localization (en default, de)
-node scripts/verify/voice.mjs       # §7.1.19 voice markup + read-aloud + auto-narration (needs HF CDN access)
-node scripts/verify/settings.mjs    # §7.1.20 comfort/audio settings + lion feeding (§7.1.12)
-node scripts/verify/enrichments.mjs # §7.1.3/4/12/15/20/21 borders, sea, water, wildlife, sizes
-node scripts/verify/health.mjs      # §7.1.22 health, afflictions, death/successor
-node scripts/verify/events.mjs      # §7.1.23 random events, protection logic, triggers
-node scripts/verify/expedition.mjs  # §7.1.24 deadline warnings, expiry, successor
-node scripts/verify/hints.mjs       # §7.1.7/10 language systems, hint cascade, triangulation
-
-npm run build && npm run preview    # prerequisite for the production check
-node scripts/verify/preview.mjs     # §7.1.1 production build, console-clean
+npm test              # scripts/verify/run-all.mjs: type-check + build, oxlint,
+                      # then every suite against a managed dev server (:5173),
+                      # then the production-preview smoke test (:4173)
+npm test -- flow      # a single suite (dev server managed for you)
+npm test -- build lint  # just the build + lint preflight
 ```
+
+`npm test` exits non-zero if any suite fails or logs a browser console error.
+The suites are, by topic: `docs` (README/CLAUDE.md consistency), `world`,
+`i18n`, `hints`, `flow`, `health`, `events`, `expedition`, `economy`,
+`reputation`, `camps`, `saveload`, `checkpoint`, `collision`, `handwriting`,
+`polish`, `gamepad`, `voice`, `settings`, `enrichments`, and `preview` (the
+production build). Each maps to the CLAUDE.md §7.1 criteria named in its header
+comment.
+
+A single suite can also be run directly against a running `npm run dev`:
+`node scripts/verify/<name>.mjs` (except `docs`, which needs no server, and
+`preview`, which needs `npm run build && npm run preview` on :4173).
 
 Notes:
 
 - The dev-server checks rely on DEV-only hooks (`__game`, `__ui`,
   `__placePlayer`, `__placeLayout`, `__placeColliders`, `__placeCamera`,
-  `__placeWalkers`, `__placeBackdrop`, `__balance`, `__lionHunt`,
-  `__wildlife`, `__rivers`, `__setLang`, `__voiceMarkup`, `__ttsForceWasm`);
-  they do not work against the production build.
+  `__placeWalkers`, `__placeBackdrop`, `__placeBackdropInfo`, `__balance`,
+  `__movement`, `__events`, `__lionHunt`, `__wildlife`, `__rivers`,
+  `__terrainType`, `__setLang`, `__voiceMarkup`, `__ttsForceWasm`); they do not
+  work against the production build.
 - Chromium must run with `--use-angle=d3d11 --enable-gpu` (already set in
   the scripts). With the SwiftShader fallback, requestAnimationFrame drops
   to ~1 fps and interaction tests become meaninglessly slow.

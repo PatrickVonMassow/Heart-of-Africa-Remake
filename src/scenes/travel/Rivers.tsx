@@ -1,6 +1,8 @@
 // River and lake surfaces for the travel view (design.md §2/§11): the water
 // follows the terrain's height profile. Rivers are ribbon meshes laid into
-// the carved beds with monotonically descending surface heights, a calm
+// the carved beds — the surface sits just above the bed for the whole length,
+// so the ribbon is continuous and never buried, descending overall from source
+// to mouth — with a calm
 // surface (no wave field), edge foam and a visible downstream current that
 // speeds up at rapids; the five waterfall landmarks get white cascades with
 // plunge-pool foam, and rivers rising in open land get a spring marker.
