@@ -66,3 +66,30 @@ describe('read-aloud control (design.md §15, English only)', () => {
     expect(document.querySelectorAll('.journal .speak').length).toBe(0)
   })
 })
+
+describe('entry kinds, ordering and sketches (design.md §15/§16)', () => {
+  it('marks a hint entry with the .hint class', () => {
+    // Entries are added before render, so the handwriting animation never
+    // starts (its baseline is the mounted journal length) — the text is final.
+    g().addEntry({ key: 'journal.titles.chiefHint' }, { key: 'journal.foodLow' }, 'hint')
+    render(<JournalPanel />)
+    expect(document.querySelector('.entry.hint')).toBeInTheDocument()
+  })
+
+  it('renders multiple entries in order with the latest last', () => {
+    g().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' })
+    g().addEntry({ key: 'journal.titles.foodOut' }, { key: 'journal.foodOut' })
+    render(<JournalPanel />)
+    const entries = document.querySelectorAll('.entries .entry')
+    // Departure + the two added entries.
+    expect(entries.length).toBe(3)
+    expect(entries[entries.length - 1].textContent).toContain('The last of my provisions is gone')
+    expect(document.querySelector('.entries')?.textContent).toContain('My provisions are running low')
+  })
+
+  it('renders a hand-drawn sketch (inline SVG) for an entry that carries one', () => {
+    // The departure entry carries the harbor sketch, drawn as three-free SVG.
+    render(<JournalPanel />)
+    expect(document.querySelector('.journal .sketch')).toBeInTheDocument()
+  })
+})

@@ -117,3 +117,71 @@ describe('rollEvent', () => {
     expect(out).not.toBeNull()
   })
 })
+
+describe('weaponProtection exact factors (design.md §7/§14)', () => {
+  it('rifle 0.25, machete 0.6, bare hands 1', () => {
+    expect(weaponProtection(ctx({ equipment: { rifle: 1 } }))).toBe(0.25)
+    expect(weaponProtection(ctx({ equipment: { machete: 1 } }))).toBe(0.6)
+    expect(weaponProtection(ctx({}))).toBe(1)
+  })
+})
+
+describe('resolveEvent snakeBite (design.md §14)', () => {
+  it('rolls escaped < 0.4 ≤ light < 0.85 ≤ severe', () => {
+    expect(resolveEvent('snakeBite', ctx(), () => 0.2).result).toBe('escaped')
+    expect(resolveEvent('snakeBite', ctx(), () => 0.5).result).toBe('light')
+    expect(resolveEvent('snakeBite', ctx(), () => 0.9).result).toBe('severe')
+  })
+
+  it('friend protection caps a severe bite to a light one', () => {
+    const rescued = resolveEvent('snakeBite', ctx({ protectedByFriends: true }), () => 0.9)
+    expect(rescued.result).toBe('light')
+    expect(rescued.rescued).toBe(true)
+  })
+})
+
+describe('resolveEvent findRemains (design.md §14)', () => {
+  it('yields a small purse of 5..25 dollars', () => {
+    const low = resolveEvent('findRemains', ctx(), () => 0)
+    const high = resolveEvent('findRemains', ctx(), () => 0.999999)
+    expect(low.result).toBe('find')
+    expect(low.money).toBe(5)
+    expect(high.money).toBe(25)
+  })
+
+  it('never turns up in the water', () => {
+    expect(eventChance('findRemains', ctx({ inWater: true }))).toBe(0)
+    expect(eventChance('findRemains', ctx())).toBeGreaterThan(0)
+  })
+})
+
+describe('resolveEvent crocodileAttack fatal band (design.md §14)', () => {
+  const water = { terrain: 'water', inWater: true } as const
+
+  it('a mid roll is fatal only when the natives do not rescue', () => {
+    expect(resolveEvent('crocodileAttack', ctx(water), () => 0.46).result).toBe('fatal')
+    const rescued = resolveEvent('crocodileAttack', ctx({ ...water, protectedByFriends: true }), () => 0.46)
+    expect(rescued.result).toBe('light')
+    expect(rescued.rescued).toBe(true)
+  })
+
+  it('the unprotected fatal window is [0.45, 0.55) — fatalChance 0.1', () => {
+    expect(resolveEvent('crocodileAttack', ctx(water), () => 0.54).result).toBe('fatal')
+    expect(resolveEvent('crocodileAttack', ctx(water), () => 0.56).result).toBe('light')
+  })
+})
+
+describe('eventChance terrain gates (design.md §14)', () => {
+  it.each(['savanna', 'jungle', 'desert'])('a snake can strike on %s land', (terrain) => {
+    expect(eventChance('snakeBite', ctx({ terrain }))).toBeGreaterThan(0)
+  })
+
+  it('a snake cannot strike in the water', () => {
+    expect(eventChance('snakeBite', ctx({ terrain: 'water', inWater: true }))).toBe(0)
+  })
+
+  it('the leopard also hunts the jungle, not only the savanna', () => {
+    expect(eventChance('leopardAttack', ctx({ terrain: 'jungle' }))).toBeGreaterThan(0)
+    expect(eventChance('leopardAttack', ctx({ terrain: 'savanna' }))).toBeGreaterThan(0)
+  })
+})

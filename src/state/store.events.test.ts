@@ -7,7 +7,8 @@
 // in src/systems/events.test.ts; the RAF/three lion-pinning stays in Playwright.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
-import { g, freshGame, withWorld, jumpTo, terrainAt, COORD } from '../test/store'
+import { totalGifts } from './store'
+import { g, freshGame, withWorld, jumpTo, terrainAt, COORD, useGame } from '../test/store'
 
 withWorld()
 
@@ -175,5 +176,74 @@ describe('first-time danger warnings (design.md §14)', () => {
     expect(g().dangerWarned.wetland).toBe(true)
     drive(1, 0, 4)
     expect(wetlandWarn()).toBe(1)
+  })
+})
+
+describe('mountain fall resolution (design.md §7/§11)', () => {
+  it('a severe fall with item loss drops a droppable item but spares the shovel', () => {
+    jumpTo(...COORD.mountain)
+    g().debugAddEquipment('machete')
+    g().debugAddEquipment('shovel')
+    // 0.01 lands in the severe band, triggers the item-loss roll and picks
+    // index 0 of the droppable list (the shovel is filtered out of it).
+    vi.spyOn(Math, 'random').mockReturnValue(0.01)
+    g().applyMountainFall()
+    expect(g().afflictions.wounds).toBe(2)
+    expect(g().equipment.machete ?? 0).toBe(0) // torn loose by the fall
+    expect(g().equipment.shovel ?? 0).toBe(1) // the goal tool is protected
+    expect(bodyKeys()).toContain('journal.mountainFallItem')
+  })
+
+  it('a fall that loses no item writes the plain fall entry', () => {
+    jumpTo(...COORD.mountain)
+    g().debugAddEquipment('machete')
+    vi.spyOn(Math, 'random').mockReturnValue(0.9) // light band, above the item-loss roll
+    g().applyMountainFall()
+    expect(g().equipment.machete ?? 0).toBe(1) // nothing dropped
+    expect(bodyKeys()).toContain('journal.mountainFall')
+    expect(bodyKeys()).not.toContain('journal.mountainFallItem')
+  })
+})
+
+describe('predator contact for the other cats (design.md §14/§19)', () => {
+  const attackCount = () => titleKeys().filter((k) => k === 'journal.titles.attack').length
+
+  it('predatorContact("cheetah") logs an attack and arms the cooldown', () => {
+    balance.randomEventsEnabled = true
+    jumpTo(...COORD.savanna)
+    vi.spyOn(Math, 'random').mockReturnValue(0.7) // light (non-fatal) band for every cat
+    const before = attackCount()
+    g().predatorContact('cheetah')
+    expect(attackCount()).toBe(before + 1)
+    expect(g().eventCooldown).toBeGreaterThan(0)
+  })
+
+  it('predatorContact("leopard") logs an attack and arms the cooldown', () => {
+    balance.randomEventsEnabled = true
+    jumpTo(...COORD.savanna)
+    vi.spyOn(Math, 'random').mockReturnValue(0.7)
+    const before = attackCount()
+    g().predatorContact('leopard')
+    expect(attackCount()).toBe(before + 1)
+    expect(g().eventCooldown).toBeGreaterThan(0)
+  })
+
+  it('does nothing while the event cooldown is still running', () => {
+    balance.randomEventsEnabled = true
+    jumpTo(...COORD.savanna)
+    useGame.setState({ eventCooldown: 5 })
+    const before = attackCount()
+    g().predatorContact('leopard')
+    expect(attackCount()).toBe(before) // suppressed by the cooldown
+    expect(g().eventCooldown).toBe(5)
+  })
+})
+
+describe('debug gift total (design.md §21)', () => {
+  it('sets and drains the total gift count', () => {
+    g().debugSetGiftTotal(10)
+    expect(totalGifts(g().gifts)).toBe(10)
+    g().debugSetGiftTotal(0)
+    expect(totalGifts(g().gifts)).toBe(0)
   })
 })

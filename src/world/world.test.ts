@@ -4,9 +4,11 @@
 // proof.
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PLACES, RIVERS, regionAt } from './geo'
-import { sampleTerrain } from './terrain'
-import { cellAt, coastDistance, riverDistance, CELL_LAKE } from './geoIndex'
+import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
+import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
+import { lakeContains } from './hydro'
 import { LAKES } from './data/lakes'
+import { LAND_POLYGONS } from './data/coastline'
 import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD } from './data/landmarks'
 import { setupGeodata } from '../test/geodata'
 
@@ -88,5 +90,96 @@ describe('coordinate mapping (design.md §3)', () => {
     expect(regionAt(30.05, 31.45)).toBe('north') // Cairo
     expect(regionAt(-33.8, 18.5)).toBe('south') // Cape Town
     expect(regionAt(-6.16, 39.3)).toBe('east') // Zanzibar
+  })
+})
+
+describe('movement boundary (design.md §11)', () => {
+  it('blocks open ocean outside the continent hull but not enclosed sea', () => {
+    expect(isBlocked('ocean', 0, -30)).toBe(true) // open Atlantic, outside the hull
+    expect(isBlocked('ocean', 5, 8)).toBe(false) // Gulf of Guinea, inside the hull
+  })
+
+  it('never blocks land terrain', () => {
+    expect(isBlocked('savanna', 5, 8)).toBe(false)
+    expect(isBlocked('desert', 24, 15)).toBe(false)
+  })
+
+  it('blocks ocean with no coordinates given', () => {
+    expect(isBlocked('ocean')).toBe(true)
+  })
+})
+
+describe('terrain sampling on real geodata', () => {
+  it('carves rivers at the fixed half-width', () => {
+    expect(RIVER_WIDTH_DEG).toBe(0.14)
+  })
+
+  // Land points with a stable terrain type under the fixed seed.
+  const landPoints: Array<readonly [number, number]> = [
+    [24, 15], // central Sahara
+    [-2.5, 34.8], // Serengeti savanna
+    [0, 22], // Congo jungle
+  ]
+
+  it.each(landPoints)('has a normalized splat and in-range color at (%s, %s)', (lat, lon) => {
+    const t = sampleTerrain(lat, lon, SEED)
+    const sum = t.splat[0] + t.splat[1] + t.splat[2] + t.splat[3]
+    expect(sum).toBeCloseTo(1, 5)
+    for (const w of t.splat) expect(w).toBeGreaterThanOrEqual(0)
+    for (const c of t.color) {
+      expect(c).toBeGreaterThanOrEqual(0)
+      expect(c).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('cell classification and coast distance', () => {
+  it('classifies open ocean and inland land', () => {
+    expect(cellAt(0, -30)).toBe(CELL_OCEAN) // open Atlantic
+    expect(cellAt(24, 15)).toBe(CELL_LAND) // central Sahara
+  })
+
+  it('reports zero coast distance in open ocean and positive inland', () => {
+    expect(coastDistance(0, -30)).toBeCloseTo(0)
+    expect(coastDistance(24, 15)).toBeGreaterThan(0)
+  })
+
+  it('caps the coast distance at maxDist', () => {
+    expect(coastDistance(24, 15, 0.5)).toBeLessThanOrEqual(0.5)
+  })
+})
+
+describe('world data invariants (design.md §4)', () => {
+  it('anchors every waterfall to an existing river id', () => {
+    const riverIds = new Set(RIVERS.map((r) => r.id))
+    for (const w of WATERFALLS) expect(riverIds.has(w.river), w.id).toBe(true)
+  })
+
+  it('gives each river a unique id and a non-empty course', () => {
+    const ids = RIVERS.map((r) => r.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const r of RIVERS) expect(r.points.length).toBeGreaterThan(0)
+  })
+
+  it('places every lake centre inside its own polygon', () => {
+    for (const l of LAKES) expect(lakeContains(l.center[1], l.center[0]), l.id).toBe(true)
+  })
+
+  it('has six land polygons with the mainland as the largest', () => {
+    expect(LAND_POLYGONS.length).toBe(6)
+    const mainland = LAND_POLYGONS[0]
+    for (const p of LAND_POLYGONS.slice(1)) {
+      expect(mainland.points.length).toBeGreaterThan(p.points.length)
+    }
+  })
+
+  it('keeps place ids and people ids unique and well-formed', () => {
+    const ids = PLACES.map((p) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const v of villages) expect(v.peopleId, v.id).toBeTruthy()
+    for (const p of ports) expect(p.size, p.id).toBeTruthy()
+    const peopleIds = villages.map((v) => v.peopleId)
+    expect(peopleIds.length).toBe(22)
+    expect(new Set(peopleIds).size).toBe(22)
   })
 })

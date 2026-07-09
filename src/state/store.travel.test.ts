@@ -8,6 +8,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
 import { totalGifts } from './store'
 import { g, freshGame, withWorld, jumpTo, terrainAt, COORD } from '../test/store'
+import { regionAt, placeById } from '../world/geo'
+import { WATERFALLS } from '../world/data/landmarks'
+import { riverFlow } from '../world/geoIndex'
 
 withWorld()
 
@@ -165,5 +168,68 @@ describe('river current drift (design.md §11)', () => {
       expect(g().day).toBeGreaterThan(day0)
       expect(g().foodDays).toBeLessThan(food0)
     }
+  })
+
+  it('the current runs stronger near a waterfall (design.md §11/§4.4)', () => {
+    // Stanley Falls sits on the Congo; the fall coordinate itself samples as
+    // river water at full flow, so a single drift step is deterministic there.
+    const wf = WATERFALLS.find((w) => w.id === 'stanley-falls')
+    if (!wf) return
+    if (terrainAt(wf.lat, wf.lon) !== 'water' || riverFlow(wf.lat, wf.lon).strength <= 0) return // guard
+
+    // On the fall (within currentWaterfallRadius) the drift is boosted.
+    jumpTo(wf.lat, wf.lon)
+    const p0 = { ...g().pos }
+    g().driftCurrent(0.1)
+    const boosted = dist(g().pos, p0)
+
+    // Isolate the boost by measuring the SAME cell with the boost radius set to
+    // 0 (no fall in range → boost 1). Comparing against a far river cell would
+    // confound the waterfall boost with that other cell's own flow strength,
+    // making the assertion flaky; the same-cell measurement is exact.
+    const radius = balance.currentWaterfallRadius
+    freshGame()
+    balance.randomEventsEnabled = false
+    balance.currentWaterfallRadius = 0
+    jumpTo(wf.lat, wf.lon)
+    const p1 = { ...g().pos }
+    g().driftCurrent(0.1)
+    const unboosted = dist(g().pos, p1)
+    balance.currentWaterfallRadius = radius // restore the balance mutation
+
+    expect(boosted).toBeGreaterThan(0)
+    expect(unboosted).toBeGreaterThan(0)
+    expect(boosted).toBeGreaterThan(unboosted)
+  })
+})
+
+describe('debugJumpTo (design.md §21)', () => {
+  it('enters travel mode at the coordinate, clears the place and grows exploration', () => {
+    expect(g().mode).toBe('place') // fresh game stands in Cairo
+    const before = Object.keys(g().explored).length
+    const [lat, lon] = COORD.savanna
+    g().debugJumpTo(lat, lon)
+    expect(g().mode).toBe('travel')
+    expect(g().placeId).toBeNull()
+    expect(g().region).toBe(regionAt(lat, lon))
+    // The jump target lies far from Cairo, so new sight cells are recorded.
+    expect(Object.keys(g().explored).length).toBeGreaterThan(before)
+  })
+})
+
+describe('enterPlace region (design.md §4.5)', () => {
+  it("adopts the place's declared region, overriding the current position's", () => {
+    const place = placeById('masai-village') // declared region: east
+    // Enter from a different region (central Sahara → north) to prove the
+    // region comes from the place, not from the position it is entered from.
+    g().debugJumpTo(...COORD.desert)
+    expect(g().region).toBe('north')
+    g().enterPlace(place.id)
+    expect(g().mode).toBe('place')
+    expect(g().region).toBe(place.region)
+    // No village is currently nudged across a region band, so the declared
+    // region also coincides with regionAt here (kept honest by this check);
+    // enterPlace still uses the declared field regardless.
+    expect(place.region).toBe(regionAt(place.lat, place.lon))
   })
 })

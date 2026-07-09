@@ -86,3 +86,53 @@ describe('journal voice markup (design.md §15)', () => {
     }
   })
 })
+
+// Shape of a dictionary node at each leaf path (string/function/array/number).
+function shapePaths(node: unknown, prefix: string, out: Map<string, string>): void {
+  if (Array.isArray(node)) out.set(prefix, 'array')
+  else if (typeof node === 'function') out.set(prefix, 'function')
+  else if (node && typeof node === 'object') {
+    for (const [k, v] of Object.entries(node)) shapePaths(v, prefix ? `${prefix}.${k}` : k, out)
+  } else out.set(prefix, typeof node)
+}
+
+describe('language parity (design.md §17: further languages only need a new file)', () => {
+  it('de and en expose the exact same keys with the same shapes', () => {
+    const dep = new Map<string, string>()
+    const enp = new Map<string, string>()
+    shapePaths(de, '', dep)
+    shapePaths(en, '', enp)
+    const deKeys = [...dep.keys()].sort()
+    const enKeys = [...enp.keys()].sort()
+    expect(deKeys, 'de vs en key set').toEqual(enKeys)
+    for (const k of deKeys) expect(enp.get(k), `shape of ${k}`).toBe(dep.get(k))
+  })
+
+  it('has twelve month names in both languages', () => {
+    expect(de.months).toHaveLength(12)
+    expect(en.months).toHaveLength(12)
+  })
+})
+
+describe('format functions (design.md §17)', () => {
+  it('formatDate names the month and year and advances across the year', () => {
+    const jan = en.formatDate(0, 1890)
+    const dec = en.formatDate(360, 1890)
+    expect(jan).toContain('1890')
+    expect(jan).toContain(en.months[0])
+    expect(dec).toContain(en.months[11])
+    expect(de.formatDate(0, 1890)).toContain(de.months[0])
+  })
+
+  it('formatLatLon and formatDecimal produce localized strings', () => {
+    expect(en.formatLatLon(30.05, 31.45)).toMatch(/30/)
+    expect(en.formatLatLon(-6.16, 39.3)).toMatch(/6/)
+    expect(en.formatDecimal(1.25)).toMatch(/1[.,]\d/)
+    expect(de.formatDecimal(1.25)).toMatch(/1[.,]\d/)
+  })
+
+  it('provisionsWeeks weaves the passed value into both languages', () => {
+    expect(en.status.provisionsWeeks('5')).toContain('5')
+    expect(de.status.provisionsWeeks('5')).toContain('5')
+  })
+})

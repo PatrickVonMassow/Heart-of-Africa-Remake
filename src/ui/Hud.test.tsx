@@ -9,6 +9,7 @@ import { Hud } from './Hud'
 import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
 import { useGame } from '../state/store'
+import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
 
 withWorld()
@@ -16,9 +17,14 @@ withWorld()
 beforeEach(() => {
   freshGame()
   useLocale.getState().setLang('en')
+  // newGame() does not reset hasCheckpoint, and the UI store is a singleton —
+  // clear both so overlays/prompts from a prior test never leak in.
+  useGame.setState({ hasCheckpoint: false })
+  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
+  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false })
 })
 
 const invClass = (eq: string) => document.querySelector(`[data-eq="${eq}"]`)?.className ?? ''
@@ -108,5 +114,92 @@ describe('load menu table (design.md §18)', () => {
     // The health state renders as a localized word (healthy/weakened/poor).
     const states = Object.values(en.health.states)
     expect(states.some((w) => table!.textContent?.includes(w))).toBe(true)
+  })
+})
+
+describe('toast (design.md §17)', () => {
+  it('renders the current toast message', () => {
+    g().setToast('a lion roars nearby')
+    render(<Hud />)
+    const toast = document.querySelector('.toast')
+    expect(toast).toBeInTheDocument()
+    expect(toast?.textContent).toBe('a lion roars nearby')
+  })
+
+  it('renders no toast when there is none', () => {
+    g().setToast(null)
+    render(<Hud />)
+    expect(document.querySelector('.toast')).not.toBeInTheDocument()
+  })
+})
+
+describe('interaction prompt (design.md §17)', () => {
+  it('shows the prompt when set and no dialog is open', () => {
+    useUi.getState().setPrompt(en.prompts.openCamp)
+    render(<Hud />)
+    const prompt = document.querySelector('.prompt')
+    expect(prompt).toBeInTheDocument()
+    expect(prompt?.textContent).toBe(en.prompts.openCamp)
+  })
+
+  it('hides the prompt while a dialog is open', () => {
+    useUi.getState().setPrompt(en.prompts.openCamp)
+    useUi.getState().setDialog({ kind: 'bazaar' })
+    render(<Hud />)
+    expect(document.querySelector('.prompt')).not.toBeInTheDocument()
+  })
+})
+
+describe('renderer warning (CLAUDE.md §3)', () => {
+  it('shows the WebGL 2 fallback notice and hides it once dismissed', () => {
+    useUi.getState().setWebglFallback(true)
+    const { rerender } = render(<Hud />)
+    const warning = document.querySelector('.renderer-warning')
+    expect(warning).toBeInTheDocument()
+    expect(warning?.textContent).toContain(en.hud.webglFallback)
+    const dismiss = [...warning!.querySelectorAll('button')].find((b) => b.textContent === en.hud.webglFallbackDismiss)
+    fireEvent.click(dismiss!)
+    rerender(<Hud />)
+    expect(document.querySelector('.renderer-warning')).not.toBeInTheDocument()
+  })
+})
+
+describe('victory overlay (design.md §15)', () => {
+  it('shows the victory report when the tomb is found', () => {
+    useGame.setState({ victory: true })
+    render(<Hud />)
+    const victory = [...document.querySelectorAll('.overlay')].find((o) =>
+      o.textContent?.includes('found the tomb of the great king'),
+    )
+    expect(victory).toBeTruthy()
+    expect(victory?.classList.contains('defeat')).toBe(false)
+  })
+})
+
+describe('InventoryBar canteen glow (design.md §6)', () => {
+  it('warns as the canteen runs low, then critical, then empty', () => {
+    g().debugAddEquipment('canteen')
+    const { rerender } = render(<Hud />)
+    useGame.setState({ canteenFill: 0.15 })
+    rerender(<Hud />)
+    expect(invClass('canteen')).toContain('canteen-low')
+    useGame.setState({ canteenFill: 0.03 })
+    rerender(<Hud />)
+    expect(invClass('canteen')).toContain('canteen-crit')
+    useGame.setState({ canteenFill: 0 })
+    rerender(<Hud />)
+    expect(invClass('canteen')).toContain('canteen-empty')
+  })
+})
+
+describe('InventoryBar present-valuable button (design.md §8)', () => {
+  it('shows a present button for each owned treasure', () => {
+    g().debugAddTreasure('gold')
+    render(<Hud />)
+    const btn = [...document.querySelectorAll('.inventory-bar button')].find((b) =>
+      b.textContent?.includes(en.treasures.gold),
+    )
+    expect(btn).toBeTruthy()
+    expect(btn?.textContent).toContain('(1)')
   })
 })

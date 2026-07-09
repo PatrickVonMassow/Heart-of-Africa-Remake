@@ -4,10 +4,15 @@
 // and ferry flows live in the store test.
 import { describe, it, expect } from 'vitest'
 import { balance } from '../config/balance'
-import { PLACES, type PlaceDef } from '../world/geo'
+import {
+  PLACES, REGION_VALUES, regionAt,
+  type PlaceDef, type RegionId,
+} from '../world/geo'
+import { isBlocked, sampleTerrain } from '../world/terrain'
+import { withWorld } from '../test/store'
 import {
   regionalFactor, treasureBid, treasureBuyPrice, ferryCost, ferryDays,
-  generateTreasureSites, LANDMARK_POINTS,
+  generateTreasureSites, LANDMARK_POINTS, TREASURE_IDS,
 } from './economy'
 
 const port = (id: string): PlaceDef => {
@@ -87,5 +92,91 @@ describe('LANDMARK_POINTS (discovery bounties)', () => {
     expect(LANDMARK_POINTS.length).toBeGreaterThan(5)
     expect(LANDMARK_POINTS.every((p) => typeof p.lat === 'number' && typeof p.lon === 'number')).toBe(true)
     expect(LANDMARK_POINTS.some((p) => p.id === 'kilimanjaro')).toBe(true)
+  })
+})
+
+describe('bazaar haggling band (design.md §10)', () => {
+  it('the bid stays within ±bidVariance of the rand-0.5 mean', () => {
+    const e = balance.economy
+    // The bid is base × factor × sellSpread × (1 + (rand-0.5)·2·bidVariance),
+    // so rand 0/1 are the extremes of the ±bidVariance haggling band.
+    const raw = e.treasureBase.gold * e.reveredFactor * e.sellSpread
+    const mean = treasureBid('gold', 'north', () => 0.5)!
+    const low = treasureBid('gold', 'north', () => 0)!
+    const high = treasureBid('gold', 'north', () => 1)!
+    expect(mean).toBe(Math.round(raw))
+    expect(low).toBe(Math.max(1, Math.round(raw * (1 - e.bidVariance))))
+    expect(high).toBe(Math.max(1, Math.round(raw * (1 + e.bidVariance))))
+    expect(low).toBeLessThan(mean)
+    expect(high).toBeGreaterThan(mean)
+  })
+
+  it('the buy price still tops the highest bid for a neutral material', () => {
+    // copper is neutral in the north (factor 1): buy is 1.25×base, the best
+    // possible bid only 0.85×1.15×base — the spread holds even without reverence.
+    const buy = treasureBuyPrice('copper', 'north')
+    const topBid = treasureBid('copper', 'north', () => 1)
+    expect(buy).not.toBeNull()
+    expect(topBid).not.toBeNull()
+    expect(buy!).toBeGreaterThan(topBid!)
+  })
+})
+
+describe('ferry symmetry (design.md §10)', () => {
+  it.each([
+    ['cairo', 'zanzibar'],
+    ['capetown', 'lagos'],
+    ['tangier', 'berbera'],
+    ['boma', 'khartoum'],
+  ])('the fare and duration are route-symmetric (%s ↔ %s)', (a, b) => {
+    expect(ferryCost(port(a), port(b))).toBe(ferryCost(port(b), port(a)))
+    expect(ferryDays(port(a), port(b))).toBe(ferryDays(port(b), port(a)))
+  })
+})
+
+describe('regionalFactor matrix (design.md §8)', () => {
+  const REGIONS: RegionId[] = ['north', 'west', 'central', 'east', 'south']
+  const cases = REGIONS.flatMap((region) => TREASURE_IDS.map((treasure) => ({ region, treasure })))
+  it.each(cases)('$treasure in $region follows the value matrix', ({ region, treasure }) => {
+    const f = regionalFactor(treasure, region)
+    if (treasure === 'statue') {
+      // The statue is coveted everywhere, never rejected.
+      expect(f).toBe(balance.economy.reveredFactor)
+      return
+    }
+    const v = REGION_VALUES[region]
+    if (v.rejected.includes(treasure)) expect(f).toBeNull()
+    else if (v.revered.includes(treasure)) expect(f).toBe(balance.economy.reveredFactor)
+    else expect(f).toBe(1)
+  })
+})
+
+describe('generateTreasureSites invariants (design.md §18)', () => {
+  // Needs the real DEM so terrain classification (land/water) is authentic.
+  withWorld()
+  const SEED = 12345
+  const REGIONS: RegionId[] = ['north', 'west', 'central', 'east', 'south']
+  // Rounding to 0.1° happens after the ≥1° clearance check, so a rounded coord
+  // can shift by up to Math.hypot(0.05, 0.05) ≈ 0.0707° in either bound.
+  const ROUND_SLACK = Math.hypot(0.05, 0.05)
+
+  it('the five regional caches sit inside their region on non-water land', () => {
+    const regional = generateTreasureSites(SEED).slice(0, 5) // regions in fixed order; statue is last
+    regional.forEach((s, i) => {
+      expect(regionAt(s.lat, s.lon)).toBe(REGIONS[i])
+      const t = sampleTerrain(s.lat, s.lon, SEED)
+      expect(t.type).not.toBe('water')
+      expect(isBlocked(t.type, s.lat, s.lon)).toBe(false)
+    })
+  })
+
+  it('every site keeps clear of settlements and rounds to 0.1°', () => {
+    for (const s of generateTreasureSites(SEED)) {
+      expect(s.lat).toBe(Math.round(s.lat * 10) / 10)
+      expect(s.lon).toBe(Math.round(s.lon * 10) / 10)
+      for (const p of PLACES) {
+        expect(Math.hypot(p.lat - s.lat, p.lon - s.lon)).toBeGreaterThanOrEqual(1 - ROUND_SLACK)
+      }
+    }
   })
 })
