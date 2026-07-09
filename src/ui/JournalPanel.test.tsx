@@ -40,6 +40,20 @@ describe('JournalPanel display (design.md §15)', () => {
   })
 })
 
+describe('bounty entry rendering (design.md §10)', () => {
+  it('renders the bounty as a telegraphic transfer naming the discoveries', () => {
+    g().addEntry(
+      { key: 'journal.titles.bounty' },
+      { key: 'journal.bounty', params: { amount: 25, count: 1, villages: '', landmarks: 'kilimanjaro' } },
+    )
+    render(<JournalPanel />)
+    const text = document.querySelector('.journal')?.textContent ?? ''
+    expect(text).toMatch(/telegraphic transfer/i)
+    expect(text).toMatch(/Kilimanjaro/i)
+    expect(text).not.toMatch(/\[\/?[a-z]+\]/) // markup stripped
+  })
+})
+
 describe('read-aloud control (design.md §15, English only)', () => {
   it('offers a speak button in English', () => {
     render(<JournalPanel />)
