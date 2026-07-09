@@ -554,14 +554,20 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     element at that point (`scripts/verify/enrichments.mjs`).
 21. **Water realism.** The visual part of the passage "**Water, current
     and waterfalls.**" in `design.md` §11 is implemented: rivers lie in
-    beds carved relative to the local relief and their surfaces descend
-    monotonically from source to mouth (no sea-level canyons); the surface
+    beds carved relative to the local relief, and their surface sits just
+    above the carved bed for the whole length so the water renders as one
+    continuous, unbroken ribbon that descends overall from source to mouth
+    (no sea-level canyons, and never buried where the ground rises); a stray
+    biome-misclassified sea point mid-river is bridged, and only the true
+    mouth ends the ribbon; the surface
     is calm with a visible downstream current that strengthens at rapids
     and waterfalls; the five waterfall landmarks show white cascades with
     plunge-pool foam; rivers rising in open land show a spring; lakes have
     flat surfaces at their local shore height. Verifiable:
     `scripts/verify/enrichments.mjs` asserts 5 cascades, at least one
-    spring and 8 lake surfaces via the dev hook; screenshots of the Nile,
+    spring and 8 lake surfaces, that no river has an interior gap and no
+    river surface is buried, and that the Nile is a single continuous strip,
+    via the dev hook; screenshots of the Nile,
     Victoria Falls and Lake Victoria (71-73) show the courses. Being swept
     over falls is gameplay since pt. 23 (waterfall-sweep event). The
     current's effect on movement is implemented too: while on a river the

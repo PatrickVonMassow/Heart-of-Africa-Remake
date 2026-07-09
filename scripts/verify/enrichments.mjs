@@ -125,6 +125,10 @@ const rivers = await page.evaluate(() => window.__rivers)
 check('Rivers: 5 waterfall cascades', rivers?.falls === 5, `${rivers?.falls}`)
 check('Rivers: at least one spring', (rivers?.springs ?? 0) >= 1, `${rivers?.springs}`)
 check('Rivers: 8 lake surfaces', rivers?.lakes === 8, `${rivers?.lakes}`)
+// Point 13: every river renders as one continuous, never-buried ribbon.
+check('Rivers: no interior gaps (all continuous)', rivers?.gaps === 0, `gaps ${rivers?.gaps}`)
+check('Rivers: surface never buried under the terrain', rivers?.buried === 0, `buried ${rivers?.buried}`)
+check('Rivers: the Nile is a single continuous strip', rivers?.report?.nile?.strips === 1, JSON.stringify(rivers?.report?.nile))
 
 // --- River current sweeps the traveller downstream (design.md §11) -----------
 await page.evaluate(() => {

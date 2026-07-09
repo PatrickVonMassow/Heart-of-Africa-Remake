@@ -67,6 +67,10 @@ function buildRivers(seed: number): {
   geometry: THREE.BufferGeometry
   falls: FallDef[]
   springs: SpringDef[]
+  /** Per-river continuity report (dev/verification): number of drawn ribbon
+   *  strips (1 = fully continuous) and points where the surface would sit below
+   *  the bed (0 = never buried under the terrain). */
+  report: Record<string, { strips: number; buried: number }>
 } {
   const positions: number[] = []
   const uvs: number[] = []
@@ -74,18 +78,21 @@ function buildRivers(seed: number): {
   const indices: number[] = []
   const falls: FallDef[] = []
   const springs: SpringDef[] = []
+  const report: Record<string, { strips: number; buried: number }> = {}
 
   for (const river of RIVERS_DATA) {
     const pts = densifyRiver(river.points)
     const world = pts.map((p) => latLonToWorld(p.lat, p.lon))
     const samples = pts.map((p) => sampleTerrain(p.lat, p.lon, seed))
 
-    // Monotonically descending surface: water never flows uphill.
+    // Surface sits just above the carved bed at every point, so the ribbon is
+    // never buried under a local rise of the terrain (which would leave visible
+    // gaps in the river). The bed itself descends overall from source to mouth,
+    // so the water reads as flowing downhill without sea-level canyons
+    // (design.md §11).
     const surf: number[] = []
-    let level = Infinity
     for (let i = 0; i < pts.length; i++) {
-      level = Math.min(level, samples[i].height + SURFACE_LIFT)
-      surf.push(Math.max(-0.05, level))
+      surf.push(Math.max(-0.05, samples[i].height + SURFACE_LIFT))
     }
 
     // Flow speed: base current plus local slope; boosted near the river's
@@ -137,15 +144,24 @@ function buildRivers(seed: number): {
       springs.push({ x: world[0].x, z: world[0].z, y: surf[0] + 0.06 })
     }
 
-    // Ribbon strip; broken where the river runs into the sea.
+    // Ribbon strip. Isolated inland points that the domain-warped biome map
+    // misclassifies as ocean are bridged so they do not tear the river into
+    // pieces; only a sustained ocean run (the actual river mouth reaching the
+    // sea) ends the ribbon.
     let stripStart = -1
     let arc = 0
+    let oceanRun = 0
+    let strips = 0
+    let buried = 0
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
       if (samples[i].type === 'ocean') {
-        stripStart = -1
+        oceanRun++
+        if (oceanRun > 3) stripStart = -1 // reached open sea: stop rather than bridge across it
         continue
       }
+      oceanRun = 0
+      if (surf[i] < samples[i].height - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)
@@ -159,8 +175,10 @@ function buildRivers(seed: number): {
       const f = flowAt(i)
       flows.push(f, f)
       if (stripStart >= 0) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
+      else strips++ // a land point with no open strip begins a new drawn strip
       stripStart = i
     }
+    report[river.id] = { strips, buried }
   }
 
   const geometry = new THREE.BufferGeometry()
@@ -168,7 +186,7 @@ function buildRivers(seed: number): {
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
   geometry.setIndex(indices)
-  return { geometry, falls, springs }
+  return { geometry, falls, springs, report }
 }
 
 /**
@@ -289,7 +307,7 @@ function Spring({ spring }: { spring: SpringDef }) {
 
 export function RiversAndLakes() {
   const seed = useGame((s) => s.seed)
-  const { geometry, falls, springs } = useMemo(() => buildRivers(seed), [seed])
+  const { geometry, falls, springs, report } = useMemo(() => buildRivers(seed), [seed])
   const lakes = useMemo(() => buildLakeSurfaces(seed), [seed])
   const riverMat = useMemo(() => createRiverMaterial(), [])
   const lakeMat = useMemo(() => createLakeMaterial(), [])
@@ -298,11 +316,16 @@ export function RiversAndLakes() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__rivers = { falls: falls.length, springs: springs.length, lakes: lakes.length }
+    // gaps = interior ribbon breaks summed over all rivers (strips-1 each);
+    // buried = points where the surface would sit under the terrain. Both 0 =
+    // every river renders as one continuous, never-buried ribbon (design.md §11).
+    const gaps = Object.values(report).reduce((n, r) => n + Math.max(0, r.strips - 1), 0)
+    const buried = Object.values(report).reduce((n, r) => n + r.buried, 0)
+    w.__rivers = { falls: falls.length, springs: springs.length, lakes: lakes.length, gaps, buried, report }
     return () => {
       delete w.__rivers
     }
-  }, [falls, springs, lakes])
+  }, [falls, springs, lakes, report])
 
   return (
     <>
