@@ -18,7 +18,7 @@ import { latLonToWorld, regionAt, UNITS_PER_DEGREE, worldToLatLon, type RegionId
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
-import { escortHeading, fleeHeading, gambolState, turnToward } from './wildlifeBehavior'
+import { escortHeading, fleeHeading, gambolState, separationPush, turnToward } from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
 import {
   buildAntelope,
@@ -240,10 +240,11 @@ const CALF_CATCH_DIST = 0.9 // the predator catches the chased calf within this
 /** The hunted calf bolts instead of standing at its parent, but slower than its
  *  hunter, so it is visibly run down in the open (design.md §19). */
 const CALF_FLEE_SPEED = 3.8
-/** A bolting parent never abandons its hunted calf beyond this distance: it
- *  holds there and turns back, so it stands clear — but near — when the calf
- *  is seized and its rescue charge is a visible run (design.md §19). */
-const ESCORT_MAX_DIST = 8
+/** A bolting parent keeps station this far beyond its hunted calf (away from
+ *  the hunter): running with the flight without abandoning the young, it
+ *  stands clear — but near — when the calf is seized, so its rescue charge is
+ *  a visible run (design.md §19). */
+const ESCORT_OFFSET = 6
 /** Inside this radius the predator pounces straight at the calf, bypassing its
  *  turn-rate limit: with speed 5.6 and turn 3 the minimum turning circle is
  *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
@@ -293,6 +294,23 @@ const VULTURE_SCAVENGE_SPEED = 9
 const FALLS_DRIFT_BOOST = 4
 const FALLS_DRIFT_RADIUS_DEG = 0.5
 
+/** Body radius per species (world units, at scale 1): animals spawn with — and
+ *  keep — at least the sum of two bodies' radii between their centres, so they
+ *  neither spawn inside one another nor walk through each other (design.md
+ *  §19). The elephant×smaller-prey pair is exempt at runtime: trampling is a
+ *  designed interaction (the herd walks OVER a too-slow animal). */
+const BODY_RADIUS: Record<Species, number> = {
+  elephant: 1.3,
+  giraffe: 0.9,
+  zebra: 0.7,
+  wildebeest: 0.75,
+  antelope: 0.6,
+  warthog: 0.45,
+  flamingo: 0.25,
+}
+/** Grid cell size for the runtime separation pass (≥ 2·max body radius). */
+const SEPARATION_CELL = 4
+
 // Wildlife placement salts the seed so it decorrelates from the terrain
 // scatter that shares hashChunk (design.md §19).
 const hash = (cx: number, cz: number, i: number, seed: number): number => hashChunk(cx, cz, i, seed ^ 0xa51ce5)
@@ -340,7 +358,7 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   // Flamingo flocks gather at lake shores regardless of biome roll.
   const lakeD = lakeDistance(ll.lat, ll.lon, 1)
   if (lakeD < 0.42 && roll < 0.7) {
-    placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, true, undefined, key)
+    placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, BODY_RADIUS.flamingo, true, undefined, key)
     return
   }
 
@@ -369,7 +387,7 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   // Elephants placed together share a herd id (stable per chunk) so they move
   // as one; other species roam/graze individually.
   const herdId = species === 'elephant' ? ccx * 1000003 + ccz : undefined
-  placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, false, herdId, key)
+  placeGroup(herds[species], ccx, ccz, ax, az, count, 7, seed, species === 'elephant' ? 1 : 0.9, BODY_RADIUS[species], false, herdId, key)
 }
 
 function placeGroup(
@@ -382,6 +400,7 @@ function placeGroup(
   spread: number,
   seed: number,
   baseScale: number,
+  bodyRadius: number,
   shoreline: boolean,
   herdId?: number,
   chunkKey?: string,
@@ -391,8 +410,23 @@ function placeGroup(
     const r1 = hash(ccx, ccz, 10 + i * 3, seed)
     const r2 = hash(ccx, ccz, 11 + i * 3, seed)
     const r3 = hash(ccx, ccz, 12 + i * 3, seed)
-    const x = ax + (r1 - 0.5) * spread * 2
-    const z = az + (r2 - 0.5) * spread * 2
+    let x = ax + (r1 - 0.5) * spread * 2
+    let z = az + (r2 - 0.5) * spread * 2
+    const sc = baseScale * (0.85 + r3 * 0.3)
+    // Spawn spacing (design.md §19): part the newcomer from already-placed
+    // herd-mates before the terrain check, so no two animals spawn inside one
+    // another. Deterministic — only hash-derived positions feed in.
+    for (let iter = 0; iter < 4; iter++) {
+      const neighbors: Array<[number, number, number]> = []
+      for (let j = placedStart; j < list.length; j++) {
+        const b = list[j]
+        neighbors.push([b.x, b.z, bodyRadius * (sc + b.scale)])
+      }
+      const [dx, dz] = separationPush(x, z, neighbors)
+      if (dx === 0 && dz === 0) break
+      x += dx * 2 // only the newcomer moves, so take the full correction
+      z += dz * 2
+    }
     const ll = worldToLatLon(x, z)
     const s = sampleTerrain(ll.lat, ll.lon, seed)
     if (shoreline) {
@@ -406,7 +440,7 @@ function placeGroup(
       z,
       y: shoreline ? 0.02 : Math.max(0.02, s.height),
       rot: r3 * Math.PI * 2,
-      scale: baseScale * (0.85 + r3 * 0.3),
+      scale: sc,
       phase: r1 * Math.PI * 2,
       ...(herdId !== undefined ? { herd: herdId } : {}),
       ...(chunkKey !== undefined ? { chunk: chunkKey } : {}),
@@ -776,6 +810,63 @@ function Herds() {
       }
     }
 
+    // Animal-animal collision (design.md §19): live animals never stand in or
+    // walk through one another — each frame every overlapping pair parts, each
+    // member resolving its own half of the overlap (a spatial grid keeps the
+    // pass O(n·k)). Exempt are the scripted dramas that need contact (a caught
+    // or in-water calf, a charging/plunging parent) and the elephant×smaller-
+    // prey pair, where walking over a too-slow animal IS the designed trample.
+    {
+      const inDrama = (b: Animal): boolean =>
+        b.dead ||
+        b.caught !== undefined ||
+        b.inWater !== undefined ||
+        b.rescued !== undefined ||
+        b.plungeTo !== undefined ||
+        (b.child !== undefined && !b.child.dead && b.child.caught !== undefined)
+      const grid = new Map<string, Array<{ a: Animal; sp: Species }>>()
+      for (const sp of SPECIES) {
+        for (const a of herds[sp]) {
+          if (inDrama(a)) continue
+          const key = `${Math.floor(a.x / SEPARATION_CELL)},${Math.floor(a.z / SEPARATION_CELL)}`
+          let cellList = grid.get(key)
+          if (!cellList) {
+            cellList = []
+            grid.set(key, cellList)
+          }
+          cellList.push({ a, sp })
+        }
+      }
+      const neighbors: Array<[number, number, number]> = []
+      for (const sp of SPECIES) {
+        for (const a of herds[sp]) {
+          if (inDrama(a)) continue
+          const ra = BODY_RADIUS[sp] * a.scale
+          const gx = Math.floor(a.x / SEPARATION_CELL)
+          const gz = Math.floor(a.z / SEPARATION_CELL)
+          neighbors.length = 0
+          for (let dz2 = -1; dz2 <= 1; dz2++) {
+            for (let dx2 = -1; dx2 <= 1; dx2++) {
+              const cellList = grid.get(`${gx + dx2},${gz + dz2}`)
+              if (!cellList) continue
+              for (const n of cellList) {
+                if (n.a === a) continue
+                // Trample pairs stay unseparated (design.md §19).
+                if ((sp === 'elephant') !== (n.sp === 'elephant')) continue
+                neighbors.push([n.a.x, n.a.z, ra + BODY_RADIUS[n.sp] * n.a.scale])
+              }
+            }
+          }
+          if (neighbors.length === 0) continue
+          const [dx, dz] = separationPush(a.x, a.z, neighbors)
+          if (dx !== 0 || dz !== 0) {
+            a.x += dx
+            a.z += dz
+          }
+        }
+      }
+    }
+
     // Proximity animal calls for the ambience (design.md §19): report the
     // nearest live animal of each voice group so their sounds rise as the
     // player draws near, all under the single ambience volume.
@@ -1065,17 +1156,16 @@ function Herds() {
             pitch = 0
             familyHeld = true
           } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase' && LION_STATE.victim === a.child) {
-            // Our calf is being run down: bolt alongside, but never abandon it —
-            // beyond the escort range hold and turn back to the calf, so at the
-            // catch the parent stands clear and the rescue charge that follows
-            // is a visible run (design.md §19).
-            const h = escortHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, ESCORT_MAX_DIST)
+            // Our calf is being run down: run with the flight, keeping station
+            // just beyond the calf on the side away from the hunter — never
+            // abandoning it, never sitting on its escape line (design.md §19).
+            const h = escortHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, ESCORT_OFFSET)
             if (h !== null) {
               a.x += Math.sin(h) * FLEE_SPEED * dt
               a.z += Math.cos(h) * FLEE_SPEED * dt
               yaw = h
             } else {
-              yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z) // hold and watch the calf
+              yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z) // on station: face the calf
             }
             px = a.x
             pz = a.z

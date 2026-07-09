@@ -135,12 +135,18 @@ const feedA = await page.evaluate(() => {
     stainScale: h.stain.current?.scale.x,
   }
 })
-await page.waitForTimeout(600)
-const feedB = await page.evaluate(() => ({ headPitch: window.__lionHunt.lion.current?.rotation.x }))
+// The head bobs on a ~2 s sine, so two samples can land symmetric around a
+// peak and tie — sample a short series and assert the swing instead.
+const pitches = [feedA.headPitch]
+for (let i = 0; i < 5; i++) {
+  await page.waitForTimeout(300)
+  pitches.push(await page.evaluate(() => window.__lionHunt.lion.current?.rotation.x))
+}
+const pitchSwing = Math.max(...pitches) - Math.min(...pitches)
 check('feeding: lion and carcass visible', feedA.lionVisible === true && feedA.preyVisible === true, '')
 check('feeding: lion head lowered', feedA.headPitch > 0.1, `${feedA.headPitch?.toFixed(3)}`)
-check('feeding: tearing movement animates', Math.abs(feedB.headPitch - feedA.headPitch) > 0.005,
-  `${feedA.headPitch?.toFixed(3)} -> ${feedB.headPitch?.toFixed(3)}`)
+check('feeding: tearing movement animates', pitchSwing > 0.005,
+  pitches.map((p) => p?.toFixed(3)).join(' -> '))
 check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
 check('feeding: stain beneath the carcass', feedA.stainVisible === true && feedA.stainScale > 0.3,
   `scale ${feedA.stainScale?.toFixed(2)}`)

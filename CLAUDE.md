@@ -398,7 +398,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     struggle and its parent wades in, pulls it out and both return to the bank
     alive, in the water inside a waterfall's reach a calf is swept over and
     dies with its parent plunging after it, and a rescuing parent wading into
-    the falls' reach is swept over itself while its calf survives; that some shore
+    the falls' reach is swept over itself while its calf survives; assert the
+    animal body separation of design.md §19 — streamed animals keep their
+    body spacing after spawn (no two inside one another) and an animal placed
+    onto another parts from it within moments, while the elephant trample
+    remains possible; that some shore
     visitors bathe (wade in) beyond merely drinking, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).

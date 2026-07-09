@@ -53,13 +53,14 @@ export function fleeHeading(
 
 /**
  * Escort heading for a parent whose calf is being run down by a predator
- * (design.md §19): the parent bolts away from the hunter like the rest of the
- * herd, but it never abandons its young — once it is `keepNear` or farther
- * from the calf it holds its ground (returns `null`) and turns back to watch.
- * Holding short of the hunter is what leaves the parent standing clear when
- * the calf is seized, so the rescue charge that follows is a visible run.
- * Also holds (`null`) in the degenerate case of standing on the predator —
- * the charge/sacrifice resolution handles contact, not the escort.
+ * (design.md §19): the parent keeps station at a point `offset` beyond the
+ * calf on the side away from the hunter — running with the flight without
+ * ever abandoning the young or sitting on its escape line. Returns the
+ * heading toward that station, or `null` when already on it (the caller
+ * holds and faces the calf). Station-keeping converges, so at the catch the
+ * parent stands clear of — but near — the calf, and the rescue charge that
+ * follows is a visible run. Also `null` in the degenerate case of the
+ * predator standing on the calf — the catch resolution owns that contact.
  */
 export function escortHeading(
   x: number,
@@ -68,12 +69,22 @@ export function escortHeading(
   calfZ: number,
   predX: number,
   predZ: number,
-  keepNear: number,
+  offset: number,
+  lateral = 1.5,
 ): number | null {
-  if (Math.hypot(x - calfX, z - calfZ) >= keepNear) return null
-  const dx = x - predX
-  const dz = z - predZ
-  if (Math.hypot(dx, dz) < 1e-4) return null
+  const adx = calfX - predX
+  const adz = calfZ - predZ
+  const ad = Math.hypot(adx, adz)
+  if (ad < 1e-4) return null
+  const ax = adx / ad
+  const az = adz / ad
+  // The station sits `lateral` beside the flight line, on the parent's own
+  // side: the overtaking path then passes clear of the calf's body, so the
+  // animal separation cannot deadlock the parent right behind its calf.
+  const side = ax * (z - calfZ) - az * (x - calfX) >= 0 ? 1 : -1
+  const dx = calfX + ax * offset - az * lateral * side - x
+  const dz = calfZ + az * offset + ax * lateral * side - z
+  if (Math.hypot(dx, dz) < 0.3) return null
   return Math.atan2(dx, dz)
 }
 
@@ -97,6 +108,36 @@ export function gambolState(
   const heading = phase * Math.PI * 2 + Math.sin((t + phase * 40) * 0.9) * 1.2
   const hop = Math.abs(Math.sin(t * 7 + phase * 3))
   return { heading, hop }
+}
+
+/**
+ * Body-separation push (design.md §19): given neighbours as `[x, z, minDist]`,
+ * returns the `[dx, dz]` that moves the subject half-way out of every overlap
+ * (each of an overlapping pair resolves its own half, so the pair parts
+ * symmetrically). Coincident points get a small fixed +x nudge so two animals
+ * on the same spot still part instead of dividing by zero.
+ */
+export function separationPush(
+  x: number,
+  z: number,
+  neighbors: ReadonlyArray<readonly [number, number, number]>,
+): [number, number] {
+  let px = 0
+  let pz = 0
+  for (const [nx, nz, minD] of neighbors) {
+    const dx = x - nx
+    const dz = z - nz
+    const d = Math.hypot(dx, dz)
+    if (d >= minD) continue
+    if (d < 1e-5) {
+      px += minD * 0.5
+      continue
+    }
+    const need = (minD - d) * 0.5
+    px += (dx / d) * need
+    pz += (dz / d) * need
+  }
+  return [px, pz]
 }
 
 /** Turn `current` toward `target` (both radians) by at most `maxStep`, taking the

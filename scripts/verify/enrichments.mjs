@@ -1290,6 +1290,67 @@ check('a rescuing parent wading into the falls\' reach is swept over (calf survi
   sweptRescuer.found && !sweptRescuer.noWater && sweptRescuer.calfFellIn && sweptRescuer.parentSwept && sweptRescuer.calfAlive,
   JSON.stringify(sweptRescuer))
 
+// --- Point 4: spawn spacing and animal-animal collision -----------------------
+// design.md §19: animals spawn with natural spacing (no two inside one another)
+// and never walk through each other — overlapping animals part at once. The
+// elephant×smaller-prey pair stays exempt (trampling is designed; its own test
+// above still passes). Body radii mirror Wildlife.tsx BODY_RADIUS.
+await pinFamily(-2.9, 34.2)
+const spacing = await page.evaluate(async () => {
+  const RAD = { elephant: 1.3, giraffe: 0.9, zebra: 0.7, wildebeest: 0.75, antelope: 0.6, warthog: 0.45, flamingo: 0.25 }
+  const herds = window.__wildlife.herdsRef.current
+  const all = []
+  for (const sp of Object.keys(RAD)) {
+    for (const a of herds[sp] ?? []) {
+      if (a.dead || a.caught !== undefined || a.inWater !== undefined || a.rescued !== undefined) continue
+      if (a.chunk === undefined) continue // only real streamed animals
+      all.push({ x: a.x, z: a.z, r: RAD[sp] * a.scale, sp })
+    }
+  }
+  let worst = Infinity
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const A = all[i], B = all[j]
+      if ((A.sp === 'elephant') !== (B.sp === 'elephant')) continue // trample pair exempt
+      const minD = A.r + B.r
+      const d = Math.hypot(A.x - B.x, A.z - B.z)
+      worst = Math.min(worst, d / minD)
+    }
+  }
+  return { animals: all.length, worst: +worst.toFixed(3) }
+})
+check('spawned animals keep body spacing (no two inside one another)',
+  spacing.animals > 5 && spacing.worst >= 0.7, JSON.stringify(spacing))
+
+const parting = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  // Two live grazers of the same species, neither in a scripted drama.
+  let a = null, b = null, sp = null
+  for (const s of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    const live = (herds[s] ?? []).filter(
+      (x) => !x.dead && x.caught === undefined && x.inWater === undefined && !x.rescued && !x.plungeTo,
+    )
+    if (live.length >= 2) { a = live[0]; b = live[1]; sp = s; break }
+  }
+  if (!a) return { found: false }
+  const RAD = { zebra: 0.7, wildebeest: 0.75, antelope: 0.6, warthog: 0.45 }
+  const minD = RAD[sp] * (a.scale + b.scale)
+  // Drop B onto A: they must part instead of standing inside one another.
+  b.x = a.x
+  b.z = a.z
+  const t0 = Date.now()
+  let d = 0
+  while (Date.now() - t0 < 8000) {
+    d = Math.hypot(a.x - b.x, a.z - b.z)
+    if (d >= minD * 0.9) break
+    await sleep(80)
+  }
+  return { found: true, sp, minD: +minD.toFixed(2), d: +d.toFixed(2), parted: d >= minD * 0.9 }
+})
+check('an animal placed onto another parts from it (no walking through)',
+  parting.found && parting.parted, JSON.stringify(parting))
+
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);
 // what stays needs the live store: selecting a place actually teleports there.

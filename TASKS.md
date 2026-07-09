@@ -58,8 +58,10 @@ the map).
   wade in and pull them out. In the attempt a calf or a parent can be swept over
   a waterfall and die; if a calf goes over a waterfall, the parents plunge after
   it and die.
-- [ ] 4. Spawn animals with enough spacing that they do not overlap; add
+- [x] 4. Spawn animals with enough spacing that they do not overlap; add
   collision detection so they do not walk through one another.
+  (The elephant trample remains the designed exception: it must still be able
+  to walk over a too-slow smaller animal.)
 - [ ] 5. Vultures: spawn outside the visible area and fly in (not appearing out
   of nowhere); after feeding they fly off and only despawn well outside the
   visible area. Account for the zoom level.
