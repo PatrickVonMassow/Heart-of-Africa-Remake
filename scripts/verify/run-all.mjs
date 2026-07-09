@@ -14,9 +14,10 @@ import { dirname, join } from 'node:path'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const isWin = process.platform === 'win32'
 
-// Suites that run against the dev server (:5173), in a stable order.
+// Suites that run against the dev server (:5173), in a stable order. `docs` is
+// a pure Node check (no browser) but runs in the same pass for a single report.
 const DEV_SUITES = [
-  'world', 'i18n', 'hints', 'flow', 'health', 'events', 'expedition', 'economy',
+  'docs', 'world', 'i18n', 'hints', 'flow', 'health', 'events', 'expedition', 'economy',
   'reputation', 'camps', 'saveload', 'checkpoint', 'collision', 'handwriting',
   'polish', 'gamepad', 'voice', 'settings', 'enrichments',
 ]

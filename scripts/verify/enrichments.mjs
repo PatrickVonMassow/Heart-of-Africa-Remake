@@ -16,6 +16,26 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
+// Wildlife spawns in the render loop, which headless Chromium throttles — under
+// full-suite CPU load a fixed sleep after a jump is not enough for herds to
+// stream in. Poll until live animals exist so the wildlife checks are reliable
+// (this only waits for the spawn, it does not relax any assertion).
+const waitForHerds = (min = 6, timeout = 30000) =>
+  page
+    .waitForFunction(
+      (m) => {
+        const h = window.__wildlife?.herdsRef?.current
+        if (!h) return false
+        let n = 0
+        for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead).length
+        return n >= m
+      },
+      min,
+      { timeout },
+    )
+    .then(() => true)
+    .catch(() => false)
+
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
@@ -628,7 +648,7 @@ check('the flee never teleports (no single-frame jump)', flee.maxStep < 2, JSON.
 // world space (pos is {x,z}) so a fixed distance can be compared against the
 // zoom-scaled despawn radius.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-await page.waitForTimeout(1600)
+await waitForHerds()
 const stream = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w.herdsRef.current
@@ -763,11 +783,14 @@ check('a carcass in view is kept (dissolves on screen, not popped)', carcassBoun
 // keeps close to a parent; a parent moves between an approaching predator and
 // its calf (defends the young); and some shore visitors wade in and bathe.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-await page.waitForTimeout(3500)
+await waitForHerds()
+// A calf keeps close to its parent only after a few spawn+follow frames; give
+// the family behaviours a moment to settle once the herds are present.
+await page.waitForTimeout(2000)
 const familyLife = await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']
-  let young = 0, close = 0, bathers = 0, drinkers = 0
+  let young = 0, close = 0
   for (const sp of SP)
     for (const a of herds[sp] ?? []) {
       if (a.young && a.parent && !a.parent.dead) {
@@ -775,12 +798,47 @@ const familyLife = await page.evaluate(() => {
         if (Math.hypot(a.x - a.parent.x, a.z - a.parent.z) < 5) close++
       }
     }
-  for (const sp of Object.keys(herds))
-    for (const a of herds[sp]) { if (a.drink) drinkers++; if (a.bathe) bathers++ }
-  return { young, close, bathers, drinkers }
+  return { young, close }
 })
 check('herds raise young that keep close to a parent (nursing)', familyLife.young > 0 && familyLife.close > 0, JSON.stringify(familyLife))
-check('some shore visitors wade in and bathe', familyLife.bathers > 0 && familyLife.bathers <= familyLife.drinkers, JSON.stringify(familyLife))
+
+// Bathing needs shore visitors, which only spawn where a herd sits within reach
+// of water. Move along a few lake/river shores in the savanna and wait until
+// animals with a drink target have streamed in, then confirm some also bathe.
+const shoreSpots = [[-1.0, 34.2], [-1.6, 33.1], [0.45, 33.15], [7.6, 33.2], [-2.2, 34.8]]
+let bathe = { drinkers: 0, bathers: 0 }
+for (const spot of shoreSpots) {
+  await page.evaluate((s) => window.__game.getState().debugJumpTo(s[0], s[1]), spot)
+  const gotDrinkers = await page
+    .waitForFunction(
+      () => {
+        const h = window.__wildlife?.herdsRef?.current
+        if (!h) return false
+        let d = 0
+        for (const sp of Object.keys(h)) d += h[sp].filter((a) => a.drink && !a.dead).length
+        return d >= 2
+      },
+      null,
+      { timeout: 12000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  if (gotDrinkers) {
+    bathe = await page.evaluate(() => {
+      const h = window.__wildlife.herdsRef.current
+      let drinkers = 0, bathers = 0
+      for (const sp of Object.keys(h)) for (const a of h[sp]) { if (a.drink) drinkers++; if (a.bathe) bathers++ }
+      return { drinkers, bathers }
+    })
+    break
+  }
+}
+check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, JSON.stringify(bathe))
+
+// Return to the herd-dense plains for the predator-guard check below.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await waitForHerds()
+await page.waitForTimeout(1500)
 
 // Parent defends its calf: inject a predator at a fixed point near a calf; a
 // guarding parent moves toward that point (to interpose), a fleeing one away.
