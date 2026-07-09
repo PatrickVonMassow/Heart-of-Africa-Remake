@@ -50,6 +50,32 @@ the map).
   wade in and pull them out. In the attempt a calf or a parent can be swept over
   a waterfall and die; if a calf goes over a waterfall, the parents plunge after
   it and die.
+- [ ] 4. Spawn animals with enough spacing that they do not overlap; add
+  collision detection so they do not walk through one another.
+- [ ] 5. Vultures: spawn outside the visible area and fly in (not appearing out
+  of nowhere); after feeding they fly off and only despawn well outside the
+  visible area. Account for the zoom level.
+- [ ] 6. Predators must not despawn within the visible area. In general: animals
+  only despawn well outside the visible area (account for the zoom level).
+- [ ] 7. When a predator leaves, it leaves behind a small remnant of prey that is
+  then eaten by vultures.
+- [ ] 8. In the debug-menu-extended zoom mode one should be able to zoom out far
+  enough to see the whole continent. So far this is prevented both by not being
+  able to zoom out far enough and by haze obscuring the view. In the zoom range
+  reachable only via the debug extension, no haze should be shown.
+- [ ] 9. When paddling through water in the canoe and the crocodile random event
+  fires, a hint still appears suggesting one should better travel by canoe —
+  although one already is.
+- [ ] 10. When something is discovered — such as a waterfall — it should be
+  announced via the journal.
+- [ ] 11. The water in some lakes looks oddly blotchy and the blotches flicker
+  while walking — e.g. in Lake Victoria.
+- [ ] 12. The blood stain of dying animals has gaps and looks more like a
+  Pac-Man.
+- [ ] 13. More variety in the journal entries for the different villages. These
+  should reflect locally/historically accurate peculiarities of each.
+- [ ] 14. One should be able to recover even without medicine. Currently one dies
+  even from a light wound.
 
 ## Closing (only after all points)
 
