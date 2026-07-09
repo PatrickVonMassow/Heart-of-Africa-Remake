@@ -96,6 +96,30 @@ await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
+// --- Point 12: map points show "?" until discovered --------------------------
+// Every place/landmark label is rendered; an undiscovered one shows a muted "?",
+// a visited place (Cairo) shows its real name, and sighting a landmark reveals it.
+const labelsBefore = await page.evaluate(() => {
+  const labels = [...document.querySelectorAll('.map-label')]
+  return {
+    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && l.textContent.trim() === '?').length,
+    cairoNamed: labels.some((l) => !l.classList.contains('undiscovered') && /Kair|Cairo/.test(l.textContent)),
+    kiliHidden: !labels.some((l) => /Kilim/.test(l.textContent)),
+    seen: window.__game.getState().landmarksSeen.includes('kilimanjaro'),
+  }
+})
+check('undiscovered map points show a "?" label', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('a visited place (Cairo) shows its real name', labelsBefore.cairoNamed, JSON.stringify(labelsBefore))
+check('an unsighted landmark (Kilimanjaro) is hidden behind "?"', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
+await page.evaluate(() =>
+  window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'kilimanjaro'] }),
+)
+await page.waitForTimeout(400)
+const kiliRevealed = await page.evaluate(() =>
+  [...document.querySelectorAll('.map-label')].some((l) => /Kilim/.test(l.textContent)),
+)
+check('a sighted landmark reveals its real name', kiliRevealed, '')
+
 // --- Rivers: cascades, springs, lake surfaces (§7.1.21) ----------------------
 const rivers = await page.evaluate(() => window.__rivers)
 check('Rivers: 5 waterfall cascades', rivers?.falls === 5, `${rivers?.falls}`)

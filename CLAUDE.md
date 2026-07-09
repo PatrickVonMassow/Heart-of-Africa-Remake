@@ -214,7 +214,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    borders carry the localized region name on each side of the line, both
    on the exploration map and in the bird's-eye view (`design.md` §3).
    Verifiable: near a border, `.region-label` elements name both regions
-   on their sides (`scripts/verify/enrichments.mjs`).
+   on their sides (`scripts/verify/enrichments.mjs`). Map-point labels are
+   discovery-gated (`design.md` §17): a settlement's or landmark's floating name
+   shows only once discovered (a place when visited, a landmark when sighted);
+   until then the point shows a muted "?". Verifiable: undiscovered `.map-label`
+   elements read "?", a visited place (Cairo) shows its name, and sighting a
+   landmark reveals its name (`scripts/verify/enrichments.mjs`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890 per
    `design.md`). Sea water enclosed by the continent's outline (bays,

@@ -630,13 +630,16 @@ function VillageMarker() {
 function PlaceMarker({ place }: { place: PlaceDef }) {
   const t = useStrings()
   const seed = useGame((s) => s.seed)
+  // A place's name is revealed only once it has been visited (design.md §17);
+  // until then it shows a question mark.
+  const discovered = useGame((s) => s.visitedPlaces.includes(place.id))
   const p = latLonToWorld(place.lat, place.lon)
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
   return (
     <group position={[p.x, y, p.z]}>
       {place.kind === 'port' ? <PortMarker /> : <VillageMarker />}
       <Html center position={[0, 2.9, 0]} distanceFactor={60}>
-        <div className="map-label">{t.places[place.id]}</div>
+        <div className={`map-label${discovered ? '' : ' undiscovered'}`}>{discovered ? t.places[place.id] : '?'}</div>
       </Html>
     </group>
   )
@@ -646,6 +649,9 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
 function LandmarkLabels() {
   const t = useStrings()
   const seed = useGame((s) => s.seed)
+  // A landmark's name is revealed only once it has been sighted (design.md §17,
+  // the same "seen" set that earns its discovery bounty); until then: "?".
+  const seen = useGame((s) => s.landmarksSeen)
   const items = useMemo(() => {
     const lakes = LAKES.map((l) => ({
       key: l.id,
@@ -686,9 +692,12 @@ function LandmarkLabels() {
     <>
       {items.map((it) => {
         const p = latLonToWorld(it.lat, it.lon)
+        const discovered = seen.includes(it.key)
         return (
           <Html key={it.key} center position={[p.x, it.y, p.z]} distanceFactor={60}>
-            <div className={`map-label landmark${it.water ? ' water-label' : ''}`}>{it.name}</div>
+            <div className={`map-label landmark${it.water ? ' water-label' : ''}${discovered ? '' : ' undiscovered'}`}>
+              {discovered ? it.name : '?'}
+            </div>
           </Html>
         )
       })}

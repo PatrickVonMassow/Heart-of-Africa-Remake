@@ -807,3 +807,11 @@ textarea {
 .map-label.landmark.water-label {
   color: #bcd9ef;
 }
+
+/* Undiscovered points show a muted "?" until the traveller reaches/sights them
+   (design.md §17). */
+.map-label.undiscovered {
+  color: #8a7f6c;
+  font-weight: 700;
+  opacity: 0.75;
+}
