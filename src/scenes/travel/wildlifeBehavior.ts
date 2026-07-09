@@ -77,6 +77,28 @@ export function escortHeading(
   return Math.atan2(dx, dz)
 }
 
+/**
+ * Playful gambolling of a herd calf (design.md §19): on a per-calf cycle the
+ * calf breaks into a short bout of scampering hops around its parent. Returns
+ * the bout's current heading and hop height (0..1), or `null` outside a bout.
+ * Deterministic in (t, phase), so a calf's bouts are steady and phase-shifted
+ * against its herd-mates'.
+ */
+export function gambolState(
+  t: number,
+  phase: number,
+  period = 16,
+  activeShare = 0.25,
+): { heading: number; hop: number } | null {
+  const cycle = (((t + phase * 40) % period) + period) % period / period
+  if (cycle >= activeShare) return null
+  // A curving scamper: the base direction is per-calf, bent side to side over
+  // the bout, with quick bouncy hops on top.
+  const heading = phase * Math.PI * 2 + Math.sin((t + phase * 40) * 0.9) * 1.2
+  const hop = Math.abs(Math.sin(t * 7 + phase * 3))
+  return { heading, hop }
+}
+
 /** Turn `current` toward `target` (both radians) by at most `maxStep`, taking the
  *  shorter way around. Used to cap per-frame turns so a facing never snaps. */
 export function turnToward(current: number, target: number, maxStep: number): number {

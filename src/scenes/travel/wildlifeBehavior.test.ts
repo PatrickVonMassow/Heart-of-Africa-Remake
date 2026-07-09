@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { escortHeading, fleeHeading, turnToward } from './wildlifeBehavior'
+import { escortHeading, fleeHeading, gambolState, turnToward } from './wildlifeBehavior'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -134,6 +134,33 @@ describe('escortHeading (design.md §19 — parent escorts its hunted calf)', ()
     const dParentCalf = Math.hypot(parent.x - calf.x, parent.z - calf.z)
     expect(dParentCalf).toBeGreaterThan(2) // clear of the pin — the charge is a run
     expect(dParentCalf).toBeLessThan(keepNear + 1) // but never abandoned
+  })
+})
+
+describe('gambolState (design.md §19 — playful calf hop-bouts)', () => {
+  it('is idle outside the bout window and active inside it', () => {
+    // phase 0: the bout is the first quarter of the 16 s cycle.
+    expect(gambolState(8, 0)).toBeNull() // cycle 0.5 — idle
+    expect(gambolState(15, 0)).toBeNull() // cycle ~0.94 — idle
+    const bout = gambolState(1, 0) // cycle ~0.06 — playing
+    expect(bout).not.toBeNull()
+    expect(bout!.hop).toBeGreaterThanOrEqual(0)
+    expect(bout!.hop).toBeLessThanOrEqual(1)
+  })
+
+  it('phase-shifts the bouts so herd-mates do not all play at once', () => {
+    expect(gambolState(8, 0)).toBeNull()
+    expect(gambolState(8, 0.2)).not.toBeNull() // 8 + 0.2*40 = 16 → cycle 0
+  })
+
+  it('is deterministic and curves over the bout (heading varies)', () => {
+    const a1 = gambolState(0.2, 0)
+    const a2 = gambolState(0.2, 0)
+    expect(a1).toEqual(a2)
+    const b = gambolState(1.75, 0) // near the bend's peak of the same bout
+    expect(a1).not.toBeNull()
+    expect(b).not.toBeNull()
+    expect(Math.abs(a1!.heading - b!.heading)).toBeGreaterThan(0.3)
   })
 })
 

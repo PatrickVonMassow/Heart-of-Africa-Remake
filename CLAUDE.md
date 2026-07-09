@@ -393,7 +393,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     catches it — with the hunted calf visibly fleeing the chase (slower than
     its hunter) instead of standing at its parent, and the escorting parent
     standing clear of, but near, the calf at the catch so the rescue charge is
-    a visible run over real time; that some shore
+    a visible run over real time; assert the calf water drama of design.md §19
+    — calves gambol in visible hop-bouts, a calf on open water starts a
+    struggle and its parent wades in, pulls it out and both return to the bank
+    alive, in the water inside a waterfall's reach a calf is swept over and
+    dies with its parent plunging after it, and a rescuing parent wading into
+    the falls' reach is swept over itself while its calf survives; that some shore
     visitors bathe (wade in) beyond merely drinking, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).

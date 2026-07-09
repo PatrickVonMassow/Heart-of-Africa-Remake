@@ -14,11 +14,12 @@ import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
-import { latLonToWorld, regionAt, worldToLatLon, type RegionId } from '../../world/geo'
+import { latLonToWorld, regionAt, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
-import { lakeDistance, riverDistance } from '../../world/geoIndex'
+import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
-import { escortHeading, fleeHeading, turnToward } from './wildlifeBehavior'
+import { escortHeading, fleeHeading, gambolState, turnToward } from './wildlifeBehavior'
+import { WATERFALLS } from '../../world/data/landmarks'
 import {
   buildAntelope,
   buildCheetah,
@@ -84,8 +85,22 @@ interface Animal {
    *  a parent may still save it. */
   caught?: number
   /** This carcass is being consumed by the on-scene predator (the lion hunt),
-   *  not the ground scavenger — keeps the vulture from double-feeding on it. */
+   *  not the ground scavenger — keeps the vulture from double-feeding on it.
+   *  Waterfall victims set it too: the river takes them, no scavenger lands. */
   lionFed?: boolean
+  /** Seconds this calf has been struggling in open water (design.md §19). */
+  inWater?: number
+  /** Land point to walk back to after a water rescue (where the calf fell in). */
+  rescueEntry?: { x: number; z: number }
+  /** The parent reached its calf in the water: both walk back to the
+   *  rescueEntry until they stand on land again (design.md §19). */
+  rescued?: boolean
+  /** Where this parent's calf went over a waterfall: the parent plunges after
+   *  it and dies there (design.md §19). */
+  plungeTo?: { x: number; z: number }
+  /** Current playful-hop height (0..1) while a calf gambols (design.md §19);
+   *  kept as state so the verification can observe the play. */
+  hop?: number
 }
 
 /**
@@ -239,6 +254,23 @@ const PARENT_SACRIFICE_DIST = 1.3 // parent reaches the predator → sacrifices 
 const PARENT_TOO_LATE_DIST = 3.2 // parent only this close when the window ends → both eaten
 /** Species whose calves a predator hunt can target (design.md §19). */
 const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog'] as const
+/** Calf play and water accidents (design.md §19): calves gambol on a per-calf
+ *  cycle; a calf that ends up on open water struggles there, its parent wades
+ *  in and pulls it back to land, and near a waterfall the current takes any of
+ *  them over the falls — a calf that goes over is followed by its plunging
+ *  parent, which dies with it. */
+const GAMBOL_PERIOD = 16 // s between play bouts (bout = first quarter)
+const GAMBOL_ACTIVE = 0.25
+const GAMBOL_SPEED = 2.2
+const GAMBOL_RANGE = 4 // calves only play while this close to the parent
+const CALF_DRIFT_DEG = 0.06 // deg/s downstream drift of a struggling calf
+const WADE_SPEED = 4.2 // parent wading to its calf
+const RESCUE_REACH = 1.2 // parent this close pulls the calf out
+const RETURN_SPEED = 3 // walking back to the rescue entry
+const FALLS_DEATH_RADIUS_DEG = 0.2 // in water this close to a fall = swept over
+const PLUNGE_SPEED = 5.5 // a parent rushing after its swept-over calf
+const PLUNGE_REACH = 1
+const STRUGGLE_SELF_RESCUE = 25 // s after which an unaided calf clambers out
 // OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
 // light animal escaping up a kopje/tree) and further new species/birds beyond
 // the current roster and the added calves are not yet implemented.
@@ -256,9 +288,40 @@ const SPAWN_RANGE_MAX = 6
 const CARCASS_DISSOLVE_SECONDS = 9
 const VULTURE_SCAVENGE_SPEED = 9
 
+/** Drift boost of the current close to a fall (mirrors the traveller's drift
+ *  §11 but with local, decorative constants). */
+const FALLS_DRIFT_BOOST = 4
+const FALLS_DRIFT_RADIUS_DEG = 0.5
+
 // Wildlife placement salts the seed so it decorrelates from the terrain
 // scatter that shares hashChunk (design.md §19).
 const hash = (cx: number, cz: number, i: number, seed: number): number => hashChunk(cx, cz, i, seed ^ 0xa51ce5)
+
+/** Distance (degrees) to the nearest waterfall (design.md §4.4/§19). */
+function fallsDistanceDeg(lat: number, lon: number): number {
+  let best = Infinity
+  for (const wf of WATERFALLS) {
+    const d = Math.hypot(lat - wf.lat, lon - wf.lon)
+    if (d < best) best = d
+  }
+  return best
+}
+
+/** Nearest land spot around a water point (probing rings outward): the walk-
+ *  back target of a rescue when the fall-in point was never seen on land. */
+function findLandNear(x: number, z: number, seed: number): { x: number; z: number } {
+  for (let r = 1; r <= 10; r += 1.5) {
+    for (let k = 0; k < 8; k++) {
+      const ang = (k / 8) * Math.PI * 2
+      const nx = x + Math.cos(ang) * r
+      const nz = z + Math.sin(ang) * r
+      const ll = worldToLatLon(nx, nz)
+      const t = sampleTerrain(ll.lat, ll.lon, seed)
+      if (t.type !== 'water' && t.type !== 'ocean' && t.height > 0.05) return { x: nx, z: nz }
+    }
+  }
+  return { x, z } // mid-lake with no bank in reach — hold position
+}
 
 function emptyHerds(): Record<Species, Animal[]> {
   return { elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [] }
@@ -578,6 +641,141 @@ function Herds() {
       }
     }
 
+    // Calf water drama (design.md §19), over the FULL lists like the predation
+    // above: a calf that ends up on open water (usually mid-gambol at a shore)
+    // struggles there and drifts with the current; its parent wades in, pulls
+    // it out and both walk back to the bank. In water close to a waterfall any
+    // of them is swept over and dies — and a calf that goes over is followed
+    // by its plunging parent, which dies with it.
+    for (const sp of CALF_HUNT_SPECIES) {
+      for (const a of herds[sp]) {
+        if (a.dead) {
+          // A waterfall/water victim sinks away on its own — no scavenger
+          // lands on open water.
+          if (a.inWater !== undefined && a.dissolve !== undefined && a.dissolve > 0) a.dissolve -= dt
+          continue
+        }
+        if (a.young) {
+          const isChaseVictim = LION_STATE.mode === 'chase' && LION_STATE.victim === a
+          if (a.inWater === undefined && !a.rescued && a.caught === undefined && !isChaseVictim) {
+            const ll = worldToLatLon(a.x, a.z)
+            const ter = sampleTerrain(ll.lat, ll.lon, seed)
+            if (ter.type === 'water') {
+              // Fell in: start to struggle. A play bout recorded the entry
+              // point; otherwise probe for the nearest bank.
+              a.inWater = 0
+              a.hop = undefined
+              a.y = Math.max(0.02, ter.height)
+              if (!a.rescueEntry) a.rescueEntry = findLandNear(a.x, a.z, seed)
+            }
+          }
+          if (a.inWater !== undefined && !a.rescued) {
+            a.inWater += dt
+            const ll = worldToLatLon(a.x, a.z)
+            const fd = fallsDistanceDeg(ll.lat, ll.lon)
+            if (fd < FALLS_DEATH_RADIUS_DEG) {
+              // Swept over the fall: the calf dies, its parent plunges after it.
+              a.dead = true
+              a.lionFed = true // the river takes it — it sinks, nothing scavenges
+              a.dissolve = CARCASS_DISSOLVE_SECONDS
+              const par = a.parent
+              a.parent = undefined
+              if (par && !par.dead) {
+                par.plungeTo = { x: a.x, z: a.z }
+                par.child = undefined
+              }
+              continue
+            }
+            // Drift downstream, harder near a fall (§11-style current).
+            const flow = riverFlow(ll.lat, ll.lon)
+            if (flow.strength > 0) {
+              const boost =
+                fd < FALLS_DRIFT_RADIUS_DEG ? 1 + (FALLS_DRIFT_BOOST - 1) * (1 - fd / FALLS_DRIFT_RADIUS_DEG) : 1
+              const stepDeg = flow.strength * CALF_DRIFT_DEG * boost * dt
+              a.x += flow.dirLon * stepDeg * UNITS_PER_DEGREE
+              a.z -= flow.dirLat * stepDeg * UNITS_PER_DEGREE
+              const nll = worldToLatLon(a.x, a.z)
+              a.y = Math.max(0.02, sampleTerrain(nll.lat, nll.lon, seed).height)
+            }
+            // An unaided calf eventually clambers out exhausted on its own.
+            if (a.inWater > STRUGGLE_SELF_RESCUE) a.rescued = true
+          }
+          if (a.rescued) {
+            // Pulled out (or clambering out): walk back to the entry bank.
+            const entry = a.rescueEntry ?? (a.rescueEntry = findLandNear(a.x, a.z, seed))
+            const dx = entry.x - a.x
+            const dz = entry.z - a.z
+            const d = Math.hypot(dx, dz)
+            if (d > 0.3) {
+              a.x += (dx / d) * RETURN_SPEED * dt
+              a.z += (dz / d) * RETURN_SPEED * dt
+            }
+            const ll = worldToLatLon(a.x, a.z)
+            const ter = sampleTerrain(ll.lat, ll.lon, seed)
+            if (ter.type !== 'water' || d <= 0.3) {
+              // Back on the bank: shake off and rejoin the herd.
+              a.inWater = undefined
+              a.rescued = undefined
+              a.rescueEntry = undefined
+              a.y = Math.max(0.02, ter.height)
+            }
+          }
+        } else if (a.plungeTo) {
+          // Our calf went over the fall: plunge after it (design.md §19).
+          const dx = a.plungeTo.x - a.x
+          const dz = a.plungeTo.z - a.z
+          const d = Math.hypot(dx, dz) || 1
+          a.x += (dx / d) * PLUNGE_SPEED * dt
+          a.z += (dz / d) * PLUNGE_SPEED * dt
+          if (d < PLUNGE_REACH) {
+            a.dead = true
+            a.lionFed = true
+            a.inWater = 0 // sinks in the plunge pool like its calf
+            a.dissolve = CARCASS_DISSOLVE_SECONDS
+          }
+        } else if (a.child && !a.child.dead && a.child.inWater !== undefined) {
+          const calf = a.child
+          if (!calf.rescued) {
+            // Wade in toward the struggling calf and pull it out on reach.
+            const dx = calf.x - a.x
+            const dz = calf.z - a.z
+            const d = Math.hypot(dx, dz)
+            if (d > RESCUE_REACH) {
+              a.x += (dx / d) * WADE_SPEED * dt
+              a.z += (dz / d) * WADE_SPEED * dt
+            } else {
+              calf.rescued = true
+              if (!calf.rescueEntry) calf.rescueEntry = findLandNear(calf.x, calf.z, seed)
+            }
+            // The rescuer is at the river's mercy too: wading close to a fall
+            // it is swept over and dies, and the calf struggles on alone.
+            const ll = worldToLatLon(a.x, a.z)
+            const ter = sampleTerrain(ll.lat, ll.lon, seed)
+            if (ter.type === 'water') {
+              a.y = Math.max(0.02, ter.height)
+              if (fallsDistanceDeg(ll.lat, ll.lon) < FALLS_DEATH_RADIUS_DEG) {
+                a.dead = true
+                a.lionFed = true
+                a.inWater = 0
+                a.dissolve = CARCASS_DISSOLVE_SECONDS
+                calf.parent = undefined
+                a.child = undefined
+              }
+            }
+          } else if (calf.rescueEntry) {
+            // Escort the pulled-out calf back to the bank.
+            const dx = calf.rescueEntry.x - a.x
+            const dz = calf.rescueEntry.z - a.z
+            const d = Math.hypot(dx, dz)
+            if (d > 1) {
+              a.x += (dx / d) * RETURN_SPEED * dt
+              a.z += (dz / d) * RETURN_SPEED * dt
+            }
+          }
+        }
+      }
+    }
+
     // Proximity animal calls for the ambience (design.md §19): report the
     // nearest live animal of each voice group so their sounds rise as the
     // player draws near, all under the single ambience volume.
@@ -820,6 +1018,40 @@ function Herds() {
             yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
             pitch = 0
             familyHeld = true
+          } else if (a.young && a.inWater !== undefined && !a.rescued) {
+            // Struggling in open water (design.md §19): low in the water,
+            // thrashing — movement (drift) happens in the water pre-pass.
+            px = a.x + Math.sin(t * 9 + a.phase) * 0.12
+            pz = a.z + Math.cos(t * 8 + a.phase) * 0.12
+            yaw = a.rot + Math.sin(t * 10 + a.phase) * 0.6
+            bodyY = a.y - 0.3 + Math.sin(t * 5 + a.phase) * 0.06
+            pitch = 0.25
+            familyHeld = true
+          } else if (a.young && a.rescued) {
+            // Pulled out: walking back to the bank beside the parent.
+            px = a.x
+            pz = a.z
+            if (a.rescueEntry) yaw = Math.atan2(a.rescueEntry.x - a.x, a.rescueEntry.z - a.z)
+            pitch = 0
+            familyHeld = true
+          } else if (a.plungeTo) {
+            // Rushing after its swept-over calf (movement in the pre-pass).
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(a.plungeTo.x - a.x, a.plungeTo.z - a.z)
+            pitch = 0
+            familyHeld = true
+          } else if (a.child && !a.child.dead && a.child.inWater !== undefined) {
+            // Wading to (or escorting) the calf in the water (pre-pass moves).
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
+            {
+              const llw = worldToLatLon(a.x, a.z)
+              if (sampleTerrain(llw.lat, llw.lon, seed).type === 'water') bodyY = a.y - 0.25
+            }
+            pitch = 0.15
+            familyHeld = true
           } else if (a.young && LION_STATE.mode === 'chase' && LION_STATE.victim === a) {
             // This calf is the one being run down (design.md §19): it bolts
             // instead of standing at its parent, but slower than its hunter, so
@@ -853,13 +1085,42 @@ function Herds() {
             const toX = a.parent.x - a.x
             const toZ = a.parent.z - a.z
             const d = Math.hypot(toX, toZ)
-            if (d > YOUNG_FOLLOW_RADIUS) {
+            const canPlay = !lionActive && d <= GAMBOL_RANGE && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
+            const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
+            if (bout) {
+              // Playful gambolling (design.md §19): scampering hops around the
+              // parent. The step is real, so a bout at the shore can carry the
+              // calf into the water — the accident the rescue drama hangs on.
+              const beforeX = a.x
+              const beforeZ = a.z
+              a.x += Math.sin(bout.heading) * GAMBOL_SPEED * dt
+              a.z += Math.cos(bout.heading) * GAMBOL_SPEED * dt
+              const llp = worldToLatLon(a.x, a.z)
+              const terp = sampleTerrain(llp.lat, llp.lon, seed)
+              if (terp.type === 'water') {
+                // Hopped off the bank: remember the entry for the rescue.
+                a.rescueEntry = { x: beforeX, z: beforeZ }
+              } else if (terp.type === 'ocean' || terp.height <= 0.02) {
+                a.x = beforeX
+                a.z = beforeZ // never gambol into the open sea
+              } else {
+                a.y = Math.max(0.02, terp.height)
+              }
+              a.hop = bout.hop
+              px = a.x
+              pz = a.z
+              bodyY = a.y + bout.hop * 0.35
+              yaw = bout.heading
+              pitch = 0
+            } else if (d > YOUNG_FOLLOW_RADIUS) {
+              a.hop = undefined
               a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
               a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
               px = a.x
               pz = a.z
               yaw = Math.atan2(toX, toZ)
             } else {
+              a.hop = undefined
               pitch = -0.22 // nurse: head up toward the parent's flank
             }
             familyHeld = true
@@ -1098,7 +1359,8 @@ function LionHunt() {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {
-            if (!c.young || c.dead || c.caught !== undefined || !c.parent || c.parent.dead) continue
+            if (!c.young || c.dead || c.caught !== undefined || c.inWater !== undefined || !c.parent || c.parent.dead)
+              continue
             const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
             if (cd < bd) {
               bd = cd

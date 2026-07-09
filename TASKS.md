@@ -54,7 +54,7 @@ the map).
   catch, making the rescue charge a visible run (~1 s). The calf-hunt chance
   was raised (0.45 → 0.6), and a spawn bug was fixed where skipped (water)
   placements mislinked a family across chunk groups.
-- [ ] 3. Calves hop about playfully and sometimes fall into the water. Parents
+- [x] 3. Calves hop about playfully and sometimes fall into the water. Parents
   wade in and pull them out. In the attempt a calf or a parent can be swept over
   a waterfall and die; if a calf goes over a waterfall, the parents plunge after
   it and die.
@@ -84,6 +84,8 @@ the map).
   should reflect locally/historically accurate peculiarities of each.
 - [ ] 14. One should be able to recover even without medicine. Currently one dies
   even from a light wound.
+- [ ] 15. Animals must not walk into the impassable open ocean (the water beyond
+  the continent outline that blocks the traveller too).
 
 ## Closing (only after all points)
 

@@ -34,10 +34,37 @@ const waitForHerds = (min = 6, timeout = 30000) =>
         const h = window.__wildlife?.herdsRef?.current
         if (!h) return false
         let n = 0
-        for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead).length
+        // Count only real streamed animals (chunk-tagged): animals injected or
+        // relocated by earlier tests have no chunk and would otherwise satisfy
+        // the wait long before the local herds actually streamed in.
+        for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead && a.chunk !== undefined).length
         return n >= m
       },
       min,
+      { timeout },
+    )
+    .then(() => true)
+    .catch(() => false)
+
+// The family scenarios additionally need a live parent+calf pair among the
+// grazer herds; under full-suite load the herds can take a while to stream in
+// after a jump, so poll for the family instead of scanning once (this only
+// waits for the spawn, it does not relax any assertion).
+const waitForFamily = (timeout = 30000) =>
+  page
+    .waitForFunction(
+      () => {
+        const h = window.__wildlife?.herdsRef?.current
+        if (!h) return false
+        for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+          for (const a of h[sp] ?? []) {
+            if (a.child && !a.child.dead && !a.dead && a.child.caught === undefined && a.child.inWater === undefined)
+              return true
+          }
+        }
+        return false
+      },
+      null,
       { timeout },
     )
     .then(() => true)
@@ -650,8 +677,8 @@ const shoreSpots = await page.evaluate(() => {
   }
   const spots = []
   // East African lakes/rivers belt — plenty of savanna shoreline.
-  for (let lat = 3; lat >= -7 && spots.length < 10; lat -= 0.4)
-    for (let lon = 29; lon <= 37 && spots.length < 10; lon += 0.4)
+  for (let lat = 3; lat >= -7 && spots.length < 16; lat -= 0.4)
+    for (let lon = 29; lon <= 37 && spots.length < 16; lon += 0.4)
       if (T(lat, lon, seed) === 'savanna' && nearWater(lat, lon)) spots.push([lat, lon])
   return spots
 })
@@ -852,6 +879,7 @@ check('every hunted prey fits the region and the predator food web',
 const pinFamily = async (lat, lon) => {
   await page.evaluate((c) => window.__game.getState().debugJumpTo(c[0], c[1]), [lat, lon])
   await waitForHerds()
+  await waitForFamily()
   await page.waitForTimeout(2200) // let calves settle beside their parents
   await page.evaluate(() => {
     const s = window.__lionHunt.state
@@ -1076,6 +1104,191 @@ check('the rescue charge is a visible run that ends in the sacrifice',
   choreo.found && choreo.chargeMs !== null && choreo.chargeMs >= 400 &&
   choreo.parentDead && choreo.calfDead === false && choreo.calfFreed,
   JSON.stringify(choreo))
+
+// --- Point 3: playful calves, water accidents, waterfall deaths ---------------
+// design.md §19: calves gambol in hop-bouts around the parent; a calf on open
+// water struggles and drifts, its parent wades in and pulls it back to the
+// bank; in water near a waterfall calf or parent is swept over and dies, and a
+// calf that goes over is followed by its plunging parent. The water states are
+// forced by relocating live families (the drama itself is live behaviour).
+
+// (1) Gambol: some calf breaks into a hop-bout (hop state + real movement).
+await pinFamily(-2.2, 34.8)
+const play = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const calves = []
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) if (a.young && !a.dead && a.parent && !a.parent.dead) calves.push(a)
+  }
+  if (!calves.length) return { found: false }
+  const start = calves.map((c) => ({ x: c.x, z: c.z }))
+  let hopped = 0
+  let movedWhileHopping = 0
+  const t0 = Date.now()
+  while (Date.now() - t0 < 25000) {
+    calves.forEach((c, i) => {
+      if (c.hop !== undefined && c.hop > 0.3) {
+        hopped++
+        if (Math.hypot(c.x - start[i].x, c.z - start[i].z) > 0.4) movedWhileHopping++
+      }
+    })
+    if (hopped > 3 && movedWhileHopping > 0) break
+    await sleep(120)
+  }
+  return { found: true, calves: calves.length, hopped, movedWhileHopping }
+})
+check('calves gambol in playful hop-bouts (hop state + movement)',
+  play.found && play.hopped > 3 && play.movedWhileHopping > 0, JSON.stringify(play))
+
+// (2) Fall-in and rescue at Lake Victoria's west shore: the calf placed on the
+// water starts to struggle, the parent wades in from farther inland, pulls it
+// out and both walk back to land alive.
+await waitForFamily()
+const rescue = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || [])
+      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  // Land→water transition on the lake's west shore (scan rows eastward).
+  let waterLL = null, landLL = null
+  outer: for (let lat = -1.2; lat <= -0.2; lat += 0.05) {
+    for (let lon = 30.8; lon <= 33.4; lon += 0.04) {
+      const here = T(lat, lon, seed)
+      if (here !== 'water' && here !== 'ocean' && T(lat, lon + 0.04, seed) === 'water') {
+        landLL = [lat, lon - 0.02]
+        waterLL = [lat, lon + 0.1]
+        if (T(waterLL[0], waterLL[1], seed) !== 'water') waterLL = [lat, lon + 0.04]
+        break outer
+      }
+    }
+  }
+  if (!waterLL) return { found: true, noWater: true }
+  // No player jump: the water drama resolves in the full-list pre-pass, so the
+  // family can be relocated to the far shore while the player (and with it the
+  // family's spawn chunk) stays put — a jump would despawn the family's chunk
+  // and orphan the relocated objects out of the herd arrays.
+  const U = 10
+  calf.x = waterLL[1] * U; calf.z = -waterLL[0] * U
+  // Parent farther inland, so the wade-in approach is measurable.
+  parent.x = landLL[1] * U - 5; parent.z = -landLL[0] * U
+  const out = { found: true, fellIn: false, parentApproached: false, rescued: false, backOnLand: false, bothAlive: false }
+  let d0 = null
+  const t0 = Date.now()
+  while (Date.now() - t0 < 45000) {
+    if (calf.inWater !== undefined) out.fellIn = true
+    const d = Math.hypot(parent.x - calf.x, parent.z - calf.z)
+    if (d0 === null) d0 = d
+    if (out.fellIn && d < d0 - 2) out.parentApproached = true
+    if (calf.rescued) out.rescued = true
+    if (out.rescued && calf.inWater === undefined && !calf.dead) {
+      out.backOnLand = true
+      out.bothAlive = !calf.dead && !parent.dead
+      break
+    }
+    await sleep(100)
+  }
+  out.state = { inWater: calf.inWater, rescued: !!calf.rescued, calfDead: !!calf.dead, parentDead: !!parent.dead }
+  return out
+})
+check('a calf on open water starts to struggle and its parent wades in',
+  rescue.found && !rescue.noWater && rescue.fellIn && rescue.parentApproached, JSON.stringify(rescue))
+check('the parent pulls the calf out and both return to the bank alive',
+  rescue.found && rescue.rescued && rescue.backOnLand && rescue.bothAlive, JSON.stringify(rescue))
+
+// (3) Waterfall: a calf in the water inside Victoria Falls' reach is swept over
+// and dies; its parent plunges after it and dies too. The player stays on the
+// plains — the drama resolves in the full-list pre-pass wherever it happens.
+await waitForFamily()
+const plunge = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || [])
+      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  const WF = { lat: -17.93, lon: 25.86 }
+  let waterLL = null
+  outer: for (let dl = 0; dl <= 0.18; dl += 0.03) {
+    for (const [dlat, dlon] of [[dl, 0], [-dl, 0], [0, dl], [0, -dl], [dl, dl], [-dl, -dl]]) {
+      if (T(WF.lat + dlat, WF.lon + dlon, seed) === 'water') { waterLL = [WF.lat + dlat, WF.lon + dlon]; break outer }
+    }
+  }
+  if (!waterLL) return { found: true, noWater: true }
+  const U = 10
+  calf.x = waterLL[1] * U; calf.z = -waterLL[0] * U
+  parent.x = calf.x + 6; parent.z = calf.z + 2
+  const out = { found: true, calfSwept: false, parentGotPlunge: false, parentPlunged: false }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 25000) {
+    if (calf.dead) out.calfSwept = true
+    if (parent.plungeTo) out.parentGotPlunge = true
+    if (parent.dead) { out.parentPlunged = true; break }
+    await sleep(80)
+  }
+  return out
+})
+check('a calf in the water at a waterfall is swept over and dies',
+  plunge.found && !plunge.noWater && plunge.calfSwept, JSON.stringify(plunge))
+check('the parent plunges after its swept-over calf and dies with it',
+  plunge.found && plunge.parentGotPlunge && plunge.parentPlunged, JSON.stringify(plunge))
+
+// (4) A rescuing parent wading inside the falls' reach is swept over itself;
+// the calf (outside the reach) survives and struggles on.
+await waitForFamily()
+const sweptRescuer = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || [])
+      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  const WF = { lat: -17.93, lon: 25.86 }
+  let calfLL = null, parentLL = null
+  for (let dl = 0.24; dl <= 0.45; dl += 0.03) {
+    for (const [dlat, dlon] of [[dl, 0], [-dl, 0], [0, dl], [0, -dl]]) {
+      if (!calfLL && T(WF.lat + dlat, WF.lon + dlon, seed) === 'water') calfLL = [WF.lat + dlat, WF.lon + dlon]
+    }
+  }
+  for (let dl = 0; dl <= 0.18; dl += 0.03) {
+    for (const [dlat, dlon] of [[dl, 0], [-dl, 0], [0, dl], [0, -dl]]) {
+      if (!parentLL && T(WF.lat + dlat, WF.lon + dlon, seed) === 'water') parentLL = [WF.lat + dlat, WF.lon + dlon]
+    }
+  }
+  if (!calfLL || !parentLL) return { found: true, noWater: true }
+  const U = 10
+  calf.x = calfLL[1] * U; calf.z = -calfLL[0] * U
+  parent.x = parentLL[1] * U; parent.z = -parentLL[0] * U
+  const out = { found: true, calfFellIn: false, parentSwept: false, calfAlive: false }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 20000) {
+    if (calf.inWater !== undefined) out.calfFellIn = true
+    if (parent.dead) { out.parentSwept = true; break }
+    await sleep(80)
+  }
+  out.calfAlive = !calf.dead
+  return out
+})
+check('a rescuing parent wading into the falls\' reach is swept over (calf survives)',
+  sweptRescuer.found && !sweptRescuer.noWater && sweptRescuer.calfFellIn && sweptRescuer.parentSwept && sweptRescuer.calfAlive,
+  JSON.stringify(sweptRescuer))
 
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);
