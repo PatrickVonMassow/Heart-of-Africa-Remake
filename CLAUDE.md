@@ -384,7 +384,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     and the predator's food web, that prey flee a predator smoothly without
     teleporting (no single-frame jump), that herds raise young that keep
     close to a parent and that a parent moves to interpose between an
-    approaching predator and its calf (defends the young), that some shore
+    approaching predator and its calf (defends the young); assert the calf
+    predation of design.md §19 — a predator catching a calf holds it in a
+    struggle (alive, no stain or shrink) for a few seconds before the kill, a
+    parent charges the predator and, reaching it, is eaten in the calf's place
+    while the calf escapes, a parent that only got close by the window's end is
+    eaten alongside the calf, and the full LionHunt path runs a calf down and
+    catches it; that some shore
     visitors bathe (wade in) beyond merely drinking, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).

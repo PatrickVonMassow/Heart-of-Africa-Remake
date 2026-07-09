@@ -79,6 +79,13 @@ interface Animal {
   /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
    *  the facing never snaps between flanking threats (design.md §19). */
   dodgeHeading?: number
+  /** Seconds of struggle left while a predator eats this calf (design.md §19):
+   *  during the window the calf is alive and wriggling (no stain/shrink yet), and
+   *  a parent may still save it. */
+  caught?: number
+  /** This carcass is being consumed by the on-scene predator (the lion hunt),
+   *  not the ground scavenger — keeps the vulture from double-feeding on it. */
+  lionFed?: boolean
 }
 
 /**
@@ -102,11 +109,23 @@ interface LionHuntState {
   predator: PredatorKind
   /** Species being hunted (chosen per hunt from the predator's food web). */
   prey: PreyKind
+  /** A hunted/eaten herd calf (then its sacrificed parent) when the hunt targets
+   *  a family (design.md §19); null for a generic scripted-prey hunt. When set,
+   *  this real herd animal is the visible victim and the scripted prey mesh hides. */
+  victim: Animal | null
+  /** True for the whole lifetime of a calf hunt (chase→feed→leave), so the
+   *  scripted prey/stain meshes stay hidden — the herds draw the victim instead. */
+  victimHunt: boolean
 }
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
-  predator: 'lion', prey: 'zebra',
+  predator: 'lion', prey: 'zebra', victim: null, victimHunt: false,
 }
+
+/** Pointer to the herds of the mounted <Herds>, so <LionHunt> can pick a nearby
+ *  calf to hunt (both live in this module). Set each frame by <Herds>, cleared on
+ *  unmount. */
+let ACTIVE_HERDS: Record<Species, Animal[]> | null = null
 
 /** Decorative predators of ~1890 Africa (design.md §19). The lion is the apex
  *  (and the only one that attacks on contact, §14); the others are scenery. */
@@ -194,6 +213,25 @@ const YOUNG_FOLLOW_SPEED = 4.5
 const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
 const GUARD_SPEED = 5.5
+/** Calf predation (design.md §19): when a predator catches a calf it does not die
+ *  at once — it struggles for CAUGHT_DURATION seconds first (no stain/shrink yet).
+ *  In that window the parent charges the predator; reaching it (SACRIFICE_DIST)
+ *  the parent is taken instead and the calf escapes, while a parent that only got
+ *  close (TOO_LATE_DIST) by the time the window ends is eaten alongside the calf. */
+const CAUGHT_DURATION = 5
+const CALF_HUNT_CHANCE = 0.45 // chance a hunt targets a calf near the player over a generic grazer
+const CALF_HUNT_SEEK = 45 // radius around the player within which a huntable calf is picked
+const CALF_CATCH_DIST = 0.9 // the predator catches the chased calf within this
+/** Inside this radius the predator pounces straight at the calf, bypassing its
+ *  turn-rate limit: with speed 5.6 and turn 3 the minimum turning circle is
+ *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
+ *  could otherwise be orbited forever and never caught. */
+const CALF_POUNCE_RADIUS = 3
+const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator faster than it guards
+const PARENT_SACRIFICE_DIST = 1.3 // parent reaches the predator → sacrifices itself
+const PARENT_TOO_LATE_DIST = 3.2 // parent only this close when the window ends → both eaten
+/** Species whose calves a predator hunt can target (design.md §19). */
+const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog'] as const
 // OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
 // light animal escaping up a kopje/tree) and further new species/birds beyond
 // the current roster and the added calves are not yet implemented.
@@ -412,6 +450,10 @@ function Herds() {
     }
   }, [])
 
+  // Drop the shared herd pointer when this scene unmounts so a stale reference
+  // never outlives it (design.md §19).
+  useEffect(() => () => { ACTIVE_HERDS = null }, [])
+
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.1)
     const pos = useGame.getState().pos
@@ -424,6 +466,7 @@ function Herds() {
     // are never chunk-despawned.
     if (herdsRef.current === null) herdsRef.current = emptyHerds()
     const herds = herdsRef.current
+    ACTIVE_HERDS = herds // let <LionHunt> pick a calf to hunt from these herds
     const zoom = useUi.getState().travelZoom
     const viewR = VIEW_AT_ZOOM1 * zoom
     const spawnR = viewR + SPAWN_MARGIN
@@ -472,6 +515,57 @@ function Herds() {
         herds[sp].sort(
           (a, b) => Math.hypot(a.x - pos.x, a.z - pos.z) - Math.hypot(b.x - pos.x, b.z - pos.z),
         )
+      }
+    }
+
+    // Calf predation resolution (design.md §19), over the FULL herd lists — not
+    // just the rendered slice — so a caught calf's struggle countdown and its
+    // parent's rescue charge always resolve, even when a herd exceeds the
+    // instance cap and the family straddles the rendered boundary. The render
+    // loop below only poses these animals; the state transitions happen here.
+    for (const sp of CALF_HUNT_SPECIES) {
+      for (const a of herds[sp]) {
+        if (a.dead) continue
+        if (a.caught !== undefined && a.caught > 0) {
+          // Caught calf: count down the struggle. Unrescued, the kill completes —
+          // and a parent that charged in but only got close (too late) is taken
+          // alongside it: both are eaten (§19).
+          a.caught -= dt
+          if (a.caught <= 0) {
+            a.caught = undefined
+            a.dead = true
+            a.lionFed = true
+            a.dissolve = CARCASS_DISSOLVE_SECONDS
+            if (stains.current.length < MAX_STAINS) stains.current.push([a.x, a.y, a.z])
+            const par = a.parent
+            if (par && !par.dead && Math.hypot(par.x - a.x, par.z - a.z) < PARENT_TOO_LATE_DIST) {
+              par.dead = true
+              par.lionFed = true
+              par.dissolve = CARCASS_DISSOLVE_SECONDS
+              if (stains.current.length < MAX_STAINS) stains.current.push([par.x, par.y, par.z])
+              par.child = undefined
+            }
+          }
+        } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
+          // A calf of ours is being eaten: charge the predator (at the calf) and
+          // sacrifice ourselves on contact so the calf gets up and escapes (§19).
+          const calf = a.child
+          const toX = calf.x - a.x
+          const toZ = calf.z - a.z
+          const d = Math.hypot(toX, toZ) || 1
+          a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
+          a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
+          if (d < PARENT_SACRIFICE_DIST) {
+            calf.caught = undefined // freed — it rises and flees on its own
+            calf.parent = undefined
+            a.child = undefined
+            a.dead = true
+            a.lionFed = true
+            a.dissolve = CARCASS_DISSOLVE_SECONDS
+            if (stains.current.length < MAX_STAINS) stains.current.push([a.x, a.y, a.z])
+            if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
+          }
+        }
       }
     }
 
@@ -580,13 +674,13 @@ function Herds() {
     {
       const sc = scavenger.current
       const targetValid = (a: Animal | null): a is Animal =>
-        !!a && !!a.dead && (a.dissolve === undefined || a.dissolve > 0)
+        !!a && !!a.dead && !a.lionFed && (a.dissolve === undefined || a.dissolve > 0)
       if (!targetValid(sc.target)) {
         sc.target = null
         let bestD = Infinity
         for (const sp of SPECIES) {
           for (const a of herds[sp]) {
-            if (!a.dead) continue
+            if (!a.dead || a.lionFed) continue // the on-scene predator eats its own kill
             if (a.dissolve !== undefined && a.dissolve <= 0) continue
             const d = Math.hypot(a.x - pos.x, a.z - pos.z)
             if (d < bestD) {
@@ -694,11 +788,30 @@ function Herds() {
           }
         }
         // Family life (design.md §19): a calf keeps close to its parent and
-        // nurses; a parent stands between an approaching predator and its calf
-        // to defend it instead of fleeing itself. These override the flee below.
+        // nurses; when a predator eats a calf it struggles for a few seconds
+        // first, during which a parent charges in and can sacrifice itself to save
+        // it; otherwise a parent stands between an approaching predator and its
+        // calf to defend it. These override the flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
-          if (a.young && a.parent && !a.parent.dead) {
+          if (a.young && a.caught !== undefined && a.caught > 0) {
+            // Caught by a predator (resolved in the full-list pre-pass above):
+            // thrash in place — no stain or shrink yet — while a parent may
+            // still reach the predator and save it (§19).
+            px = a.x + Math.sin(t * 13 + a.phase) * 0.14
+            pz = a.z + Math.cos(t * 11 + a.phase) * 0.14
+            yaw = a.rot + Math.sin(t * 16 + a.phase) * 0.7
+            pitch = Math.PI / 2.3 // thrown on its side, thrashing
+            familyHeld = true
+          } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
+            // Charging the predator eating our calf (movement in the pre-pass):
+            // face the calf while rushing in.
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
+            pitch = 0
+            familyHeld = true
+          } else if (a.young && a.parent && !a.parent.dead) {
             const toX = a.parent.x - a.x
             const toZ = a.parent.z - a.z
             const d = Math.hypot(toX, toZ)
@@ -762,7 +875,7 @@ function Herds() {
         // the summed repulsion of ALL nearby elephants (not just the nearest)
         // and turn toward it at a bounded rate, so the facing never flip-flops
         // ~90° between two flanking herd-mates (no oscillation, design.md §19).
-        if (sp !== 'elephant' && FLEES_LION[sp]) {
+        if (!familyHeld && sp !== 'elephant' && FLEES_LION[sp]) {
           const target = fleeHeading(a.x, a.z, elephantPos, PREY_PANIC_RADIUS)
           if (target !== null) {
             a.dodgeHeading =
@@ -777,15 +890,18 @@ function Herds() {
             a.dodgeHeading = undefined
           }
         }
-        // Under an elephant: trampled, stays dead on the ground.
+        // Under an elephant: trampled, stays dead on the ground. (A calf killed
+        // by a predator above is already dead; skip the scan and just re-render.)
         if (sp !== 'elephant') {
-          for (const [ex, ez] of elephantPos) {
-            if (Math.hypot(px - ex, pz - ez) < TRAMPLE_RADIUS) {
-              a.dead = true
-              a.x = px
-              a.z = pz
-              if (stains.current.length < MAX_STAINS) stains.current.push([px, a.y, pz])
-              break
+          if (!a.dead) {
+            for (const [ex, ez] of elephantPos) {
+              if (Math.hypot(px - ex, pz - ez) < TRAMPLE_RADIUS) {
+                a.dead = true
+                a.x = px
+                a.z = pz
+                if (stains.current.length < MAX_STAINS) stains.current.push([px, a.y, pz])
+                break
+              }
             }
           }
           if (a.dead) {
@@ -926,18 +1042,50 @@ function LionHunt() {
     const pos = useGame.getState().pos
 
     if (s.mode === 'idle') {
+      // Idle clears any stale calf-hunt bookkeeping so a re-armed hunt starts clean.
+      s.victim = null
+      s.victimHunt = false
       s.timer -= dt
       if (s.timer > 0) return
-      // Try to start a hunt somewhere on savanna within view.
-      const ang = Math.random() * Math.PI * 2
-      const dist = 25 + Math.random() * 20
-      const px = pos.x + Math.cos(ang) * dist
-      const pz = pos.z + Math.sin(ang) * dist
-      const ll = worldToLatLon(px, pz)
-      const ter = sampleTerrain(ll.lat, ll.lon, seed)
-      if (ter.type !== 'savanna') {
-        s.timer = 4
-        return
+      // Sometimes the hunt targets a calf near the PLAYER instead of a generic
+      // grazer, so the family drama (struggle → parent charge → sacrifice) plays
+      // out on screen rather than far off (design.md §19). Searching around the
+      // player — not a random far spawn spot — is what keeps it visible.
+      let px: number
+      let pz: number
+      let ll: { lat: number; lon: number }
+      const herds = ACTIVE_HERDS
+      let calf: Animal | null = null
+      if (herds && Math.random() < CALF_HUNT_CHANCE) {
+        let bd = CALF_HUNT_SEEK
+        for (const csp of CALF_HUNT_SPECIES) {
+          for (const c of herds[csp]) {
+            if (!c.young || c.dead || c.caught !== undefined || !c.parent || c.parent.dead) continue
+            const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
+            if (cd < bd) {
+              bd = cd
+              calf = c
+            }
+          }
+        }
+      }
+      if (calf) {
+        px = calf.x
+        pz = calf.z
+        ll = worldToLatLon(px, pz)
+        s.victim = calf
+        s.victimHunt = true
+      } else {
+        // Generic hunt: a random savanna spot within view.
+        const ang = Math.random() * Math.PI * 2
+        const dist = 25 + Math.random() * 20
+        px = pos.x + Math.cos(ang) * dist
+        pz = pos.z + Math.sin(ang) * dist
+        ll = worldToLatLon(px, pz)
+        if (sampleTerrain(ll.lat, ll.lon, seed).type !== 'savanna') {
+          s.timer = 4
+          return
+        }
       }
       s.px = px
       s.pz = pz
@@ -968,40 +1116,89 @@ function LionHunt() {
       s.preyHeading = s.lionHeading
       s.mode = 'chase'
     } else if (s.mode === 'chase') {
-      // The prey flees away from the lion but weaves left and right to try to
-      // shake it (design.md §19); the lion pursues with a limited turn rate, so
-      // sharp cuts throw it wide, though it is faster and closes in over time.
-      const away = Math.atan2(s.px - s.lx, s.pz - s.lz)
-      s.preyHeading = away + Math.sin(t * HUNT_WEAVE_FREQ + s.heading) * HUNT_WEAVE_AMP
-      s.px += Math.sin(s.preyHeading) * HUNT_PREY_SPEED * dt
-      s.pz += Math.cos(s.preyHeading) * HUNT_PREY_SPEED * dt
-      const toX = s.px - s.lx
-      const toZ = s.pz - s.lz
-      const d = Math.hypot(toX, toZ)
-      let dh = Math.atan2(toX, toZ) - s.lionHeading
-      while (dh > Math.PI) dh -= Math.PI * 2
-      while (dh < -Math.PI) dh += Math.PI * 2
-      s.lionHeading += Math.max(-HUNT_LION_TURN * dt, Math.min(HUNT_LION_TURN * dt, dh))
-      s.lx += Math.sin(s.lionHeading) * HUNT_LION_SPEED * dt
-      s.lz += Math.cos(s.lionHeading) * HUNT_LION_SPEED * dt
-      if (d < 0.6) {
-        s.mode = 'feed'
-        s.timer = FEED_DURATION
+      const v = s.victim
+      if (v) {
+        // Calf hunt: chase the actual fleeing calf (drawn by the herds). If it
+        // died some other way before we reached it, just close out into feed.
+        if (v.dead || v.caught !== undefined) {
+          s.mode = 'feed'
+          s.timer = 30
+        } else {
+          s.px = v.x
+          s.pz = v.z
+        }
+      } else {
+        // Generic hunt: the prey flees the lion but weaves left and right to try
+        // to shake it (design.md §19); the lion pursues with a limited turn rate,
+        // so sharp cuts throw it wide, though it is faster and closes in.
+        const away = Math.atan2(s.px - s.lx, s.pz - s.lz)
+        s.preyHeading = away + Math.sin(t * HUNT_WEAVE_FREQ + s.heading) * HUNT_WEAVE_AMP
+        s.px += Math.sin(s.preyHeading) * HUNT_PREY_SPEED * dt
+        s.pz += Math.cos(s.preyHeading) * HUNT_PREY_SPEED * dt
       }
-      // Abort when the hunt strays too far from the player.
-      if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > 90) {
-        s.mode = 'idle'
-        s.timer = 10
+      if (s.mode === 'chase') {
+        const toX = s.px - s.lx
+        const toZ = s.pz - s.lz
+        const d = Math.hypot(toX, toZ)
+        if (v && d < CALF_POUNCE_RADIUS) {
+          // Pounce: lunge straight at the calf. The turn-rate limit's minimum
+          // circle (~1.9) is wider than the catch distance, so a slow calf could
+          // otherwise be orbited forever and never caught.
+          s.lionHeading = Math.atan2(toX, toZ)
+        } else {
+          let dh = Math.atan2(toX, toZ) - s.lionHeading
+          while (dh > Math.PI) dh -= Math.PI * 2
+          while (dh < -Math.PI) dh += Math.PI * 2
+          s.lionHeading += Math.max(-HUNT_LION_TURN * dt, Math.min(HUNT_LION_TURN * dt, dh))
+        }
+        s.lx += Math.sin(s.lionHeading) * HUNT_LION_SPEED * dt
+        s.lz += Math.cos(s.lionHeading) * HUNT_LION_SPEED * dt
+        if (d < (v ? CALF_CATCH_DIST : 0.6)) {
+          // Caught: a calf begins its struggle (the herds run the outcome); a
+          // generic grazer is felled at once.
+          if (v && v.caught === undefined && !v.dead) v.caught = CAUGHT_DURATION
+          s.mode = 'feed'
+          s.timer = v ? 30 : FEED_DURATION
+        }
+        // Abort when the hunt strays too far from the player.
+        if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > 90) {
+          s.mode = 'idle'
+          s.timer = 10
+        }
       }
     } else if (s.mode === 'feed') {
-      s.timer -= dt
-      if (s.timer <= 0) {
-        // Carcass fully consumed: the lion moves on (design.md §19).
-        s.mode = 'leave'
-        s.timer = 9
-        s.heading = Math.random() * Math.PI * 2
-        s.lx = s.px + 0.7
-        s.lz = s.pz + 0.25
+      const v = s.victim
+      if (v) {
+        // Feeding on a caught calf (or the parent that sacrificed itself): the
+        // herds run the 5s struggle and its resolution, then shrink the carcass
+        // via its dissolve timer; keep the predator on the victim and move on once
+        // it is consumed (design.md §19).
+        s.timer -= dt
+        s.px = v.x
+        s.pz = v.z
+        if (v.dead) {
+          if (v.dissolve === undefined) v.dissolve = CARCASS_DISSOLVE_SECONDS
+          v.dissolve -= dt
+        }
+        const consumed = v.dead && (v.dissolve ?? 0) <= 0
+        if (consumed || s.timer <= 0) {
+          s.mode = 'leave'
+          s.timer = 9
+          s.heading = Math.random() * Math.PI * 2
+          s.victim = null
+          s.lx = s.px + 0.7
+          s.lz = s.pz + 0.25
+        }
+      } else {
+        s.timer -= dt
+        if (s.timer <= 0) {
+          // Carcass fully consumed: the lion moves on (design.md §19).
+          s.mode = 'leave'
+          s.timer = 9
+          s.heading = Math.random() * Math.PI * 2
+          s.lx = s.px + 0.7
+          s.lz = s.pz + 0.25
+        }
       }
     } else {
       // Moving on: walk straight away from the kill site, then despawn.
@@ -1050,8 +1247,9 @@ function LionHunt() {
     }
     if (prey.current) {
       // The carcass disappears piece by piece while the lion feeds; once it
-      // is gone (leave phase) nothing of it remains.
-      prey.current.visible = s.mode === 'chase' || feeding
+      // is gone (leave phase) nothing of it remains. In a calf hunt the victim is
+      // a real herd animal drawn by <Herds>, so the scripted mesh stays hidden.
+      prey.current.visible = (s.mode === 'chase' || feeding) && !s.victimHunt
       if (prey.current.visible) {
         const ll = worldToLatLon(s.px, s.pz)
         prey.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height), s.pz)
@@ -1063,8 +1261,9 @@ function LionHunt() {
       }
     }
     if (stain.current) {
-      // The red stain stays behind while the lion walks off.
-      stain.current.visible = feeding || s.mode === 'leave'
+      // The red stain stays behind while the lion walks off. A calf kill's stain
+      // is drawn by <Herds> at the victim, so the scripted stain stays hidden.
+      stain.current.visible = (feeding || s.mode === 'leave') && !s.victimHunt
       if (stain.current.visible) {
         const ll = worldToLatLon(s.px, s.pz)
         stain.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height) + 0.015, s.pz)

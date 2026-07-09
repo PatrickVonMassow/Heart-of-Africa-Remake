@@ -111,6 +111,11 @@ await page.waitForFunction(() => window.__lionHunt, null, { timeout: 20000 })
 await page.evaluate(() => {
   const pos = window.__game.getState().pos
   const s = window.__lionHunt.state
+  // Force a generic grazer feed: a naturally started calf hunt (victimHunt)
+  // would keep the scripted prey/stain meshes hidden (the herds draw a calf
+  // victim instead), so clear it before forcing the feed state.
+  s.victim = null
+  s.victimHunt = false
   s.px = pos.x + 5
   s.pz = pos.z - 3
   s.lx = s.px + 0.7

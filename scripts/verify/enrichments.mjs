@@ -240,6 +240,8 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.evaluate(() => {
   const pos = window.__game.getState().pos
   const s = window.__lionHunt.state
+  s.victim = null // a generic grazer feed (not a calf hunt)
+  s.victimHunt = false
   s.px = pos.x + 5
   s.pz = pos.z - 3
   s.lx = s.px + 0.7
@@ -419,11 +421,13 @@ const oscillate = await page.evaluate(async () => {
     while (d < -Math.PI) d += Math.PI * 2
     return d
   }
-  // No single-step ~90° snap …
+  // Per-frame turn stays rate-limited (the heading can never snap): the cap is
+  // PREY_DODGE_TURN·dt = 8·0.1 = 0.8 rad on a throttled frame, so a step well
+  // under that proves no snap (the old bug jumped ~1.57 rad / 90°).
   let maxDelta = 0
   for (let i = 1; i < samples.length; i++) maxDelta = Math.max(maxDelta, Math.abs(wrap(samples[i] - samples[i - 1])))
-  // … and the whole flee stays in one steady direction: the heading never wanders
-  // far from where it settled (the old bug swung ~90° between the two flankers).
+  // The whole flee stays in one steady direction: the heading never wanders far
+  // from where it settled (the old bug swung ~90° between the two flankers).
   const base = samples[Math.min(3, samples.length - 1)] ?? 0
   let spread = 0
   for (let i = 3; i < samples.length; i++) spread = Math.max(spread, Math.abs(wrap(samples[i] - base)))
@@ -433,7 +437,7 @@ const oscillate = await page.evaluate(async () => {
   return { n: samples.length, maxDelta: +maxDelta.toFixed(3), spread: +spread.toFixed(3), moved: +moved.toFixed(2) }
 })
 check('a fleeing prey dodges without oscillating (stable heading)',
-  oscillate.n >= 8 && oscillate.maxDelta < 0.5 && oscillate.spread < 0.6 && oscillate.moved > 0.5,
+  oscillate.n >= 8 && oscillate.maxDelta < 0.85 && oscillate.spread < 0.6 && oscillate.moved > 0.5,
   JSON.stringify(oscillate))
 
 // --- Prey flees smoothly, never teleporting (point 7) ------------------------
@@ -739,10 +743,17 @@ const hunt = await page.evaluate(async () => {
   let vx = 0, vz = 0
   for (const h of headings) { vx += Math.sin(h); vz += Math.cos(h) }
   const R = headings.length ? Math.hypot(vx, vz) / headings.length : 1
-  // Weave: drive one chase and watch the prey's heading offset from straight-away.
+  // Weave: drive one GENERIC chase (a calf hunt has no weaving scripted prey, so
+  // retry until s.victim is null) and watch the prey's heading offset from
+  // straight-away.
   const offs = []
-  if (await startChase(4000)) {
-    for (let k = 0; k < 45 && s.mode === 'chase'; k++) {
+  let generic = false
+  const tw = Date.now()
+  while (!generic && Date.now() - tw < 25000) {
+    if (await startChase(4000) && s.victim === null) generic = true
+  }
+  if (generic) {
+    for (let k = 0; k < 45 && s.mode === 'chase' && s.victim === null; k++) {
       const away = Math.atan2(s.px - s.lx, s.pz - s.lz)
       let o = s.preyHeading - away
       while (o > Math.PI) o -= Math.PI * 2
@@ -829,6 +840,176 @@ check('every predator fits the region and period', preyVar.count >= 6 && preyVar
 check('the predator takes more than one kind of prey', preyVar.distinctPrey.length >= 2, JSON.stringify(preyVar))
 check('every hunted prey fits the region and the predator food web',
   preyVar.count >= 6 && preyVar.preyMismatch.length === 0 && preyVar.webMismatch.length === 0, JSON.stringify(preyVar))
+
+// --- Point 2: a predator eating a calf — struggle, parent sacrifice -----------
+// design.md §19: a caught calf struggles for a few seconds before the kill
+// completes (no stain/shrink yet); in that window a parent charges the predator
+// and, reaching it, is eaten instead so the calf escapes; a parent that only got
+// close by the time the window ends is eaten alongside the calf. The predation is
+// resolved by the herds off the calf's `caught` timer, so it can be forced by
+// hand (the live LionHunt is pinned idle first). Each scenario re-finds a live
+// family (the inline finder skips animals a prior scenario killed).
+const pinFamily = async (lat, lon) => {
+  await page.evaluate((c) => window.__game.getState().debugJumpTo(c[0], c[1]), [lat, lon])
+  await waitForHerds()
+  await page.waitForTimeout(2200) // let calves settle beside their parents
+  await page.evaluate(() => {
+    const s = window.__lionHunt.state
+    s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
+    // Remove elephants so a stray trampling can't pre-empt the predation path.
+    window.__wildlife.herdsRef.current.elephant.length = 0
+  })
+}
+
+// (1) The caught calf struggles unharmed for the first seconds, then is killed.
+await pinFamily(-2.2, 34.8)
+const struggle = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) if (a.child && !a.child.dead && !a.dead && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  parent.child = undefined // isolate the calf so we see the plain struggle→death
+  calf.parent = undefined
+  const stains = window.__wildlife.stains
+  const stains0 = stains.current.length
+  calf.caught = 5
+  await sleep(700)
+  const during = { dead: !!calf.dead, caught: calf.caught, stainsSame: stains.current.length === stains0 }
+  calf.caught = 0.05 // fast-forward the end of the window
+  await sleep(500)
+  const after = { dead: !!calf.dead, lionFed: !!calf.lionFed, dissolve: typeof calf.dissolve === 'number', stainsUp: stains.current.length > stains0 }
+  return { found: true, during, after }
+})
+check('a caught calf struggles unharmed for the first seconds (no stain/shrink yet)',
+  struggle.found && struggle.during.dead === false && struggle.during.caught > 0 && struggle.during.caught < 5 && struggle.during.stainsSame,
+  JSON.stringify(struggle))
+check('after the struggle window the calf is killed (stain + carcass)',
+  struggle.found && struggle.after.dead && struggle.after.lionFed && struggle.after.dissolve && struggle.after.stainsUp,
+  JSON.stringify(struggle))
+
+// (2) A parent charges the predator at the caught calf and sacrifices itself, so
+// the calf is freed and escapes.
+await pinFamily(-2.6, 35.1)
+const sacrifice = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) if (a.child && !a.child.dead && !a.dead && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  calf.caught = 5
+  calf.x = parent.x + 5; calf.z = parent.z // pinned 5 units off; the parent must run to it
+  const d0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
+  await sleep(400)
+  const dCharged = Math.hypot(parent.x - calf.x, parent.z - calf.z)
+  await sleep(1800) // let the charge reach the predator
+  return {
+    found: true, d0: +d0.toFixed(2), dCharged: +dCharged.toFixed(2),
+    parentDead: !!parent.dead, parentLionFed: !!parent.lionFed,
+    calfDead: !!calf.dead, calfFreed: calf.caught === undefined && calf.parent === undefined,
+  }
+})
+check('a parent charges the predator as soon as its calf is eaten',
+  sacrifice.found && sacrifice.dCharged < sacrifice.d0 - 1, JSON.stringify(sacrifice))
+check('the parent sacrifices itself and the calf gets up and escapes',
+  sacrifice.found && sacrifice.parentDead && sacrifice.parentLionFed && sacrifice.calfDead === false && sacrifice.calfFreed,
+  JSON.stringify(sacrifice))
+
+// (3) A parent that only got close by the time the window ends is eaten too.
+await pinFamily(-3.0, 34.5)
+const bothDie = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) if (a.child && !a.child.dead && !a.dead && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  calf.x = parent.x + 2.8; calf.z = parent.z // close, but the window shuts before the parent reaches
+  calf.caught = 0.03
+  await sleep(500)
+  return { found: true, calfDead: !!calf.dead, parentDead: !!parent.dead, bothLionFed: !!calf.lionFed && !!parent.lionFed }
+})
+check('a parent that arrives too late is eaten alongside the calf (both die)',
+  bothDie.found && bothDie.calfDead && bothDie.parentDead && bothDie.bothLionFed, JSON.stringify(bothDie))
+
+// (4) A calf caught with no parent in reach dies alone; the parent survives.
+await pinFamily(-2.0, 35.4)
+const onlyCalf = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) if (a.child && !a.child.dead && !a.dead && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  calf.x = parent.x + 20; calf.z = parent.z // parent far off — cannot reach in time
+  calf.caught = 0.03
+  await sleep(500)
+  return { found: true, calfDead: !!calf.dead, parentDead: !!parent.dead }
+})
+check('a calf caught with no parent near dies alone (parent survives)',
+  onlyCalf.found && onlyCalf.calfDead && onlyCalf.parentDead === false, JSON.stringify(onlyCalf))
+
+// (5) End-to-end: a real LionHunt runs a calf down (parent NOT detached), the
+// calf is caught and struggles, the parent charges in and sacrifices itself, and
+// the calf escapes. This drives the whole chase→catch→struggle→sacrifice→escape
+// chain (the isolated scenarios above force `caught` by hand). The predator
+// starts close so the catch is reliable even under headless RAF throttling.
+await pinFamily(-2.8, 35.3)
+const e2e = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  // Pick the family nearest the player: the herd arrays accumulate far-off
+  // animals across the earlier scenarios, and a chase farther than 90 units
+  // from the player aborts to idle before it can ever catch.
+  const p = window.__game.getState().pos
+  let parent = null, calf = null, bd = 80
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) {
+      if (!a.child || a.child.dead || a.dead || a.child.caught !== undefined) continue
+      const d = Math.hypot(a.child.x - p.x, a.child.z - p.z)
+      if (d < bd) { bd = d; parent = a; calf = a.child }
+    }
+  }
+  if (!parent) return { found: false }
+  const s = window.__lionHunt.state
+  s.predator = 'lion'
+  s.victim = calf; s.victimHunt = true
+  s.lx = calf.x + 1.5; s.lz = calf.z
+  s.px = calf.x; s.pz = calf.z
+  s.lionHeading = Math.atan2(calf.x - s.lx, calf.z - s.lz)
+  s.mode = 'chase'
+  let caughtSeen = false
+  const t0 = Date.now()
+  while (Date.now() - t0 < 12000) {
+    if (calf.caught !== undefined) caughtSeen = true
+    if (parent.dead || calf.dead) break
+    await sleep(50)
+  }
+  s.mode = 'idle'; s.timer = 60; s.victim = null; s.victimHunt = false
+  const calfEscaped = !calf.dead && calf.caught === undefined && calf.parent === undefined
+  // The struggle window can resolve within 1-2 frames when the parent nurses
+  // right beside the calf, so 50ms polling may miss `caught` — but the
+  // sacrifice outcome itself is proof of the catch: it only ever fires while
+  // the calf's caught timer is running.
+  const catchEvidenced = caughtSeen || (!!parent.dead && calfEscaped)
+  return {
+    found: true, caughtSeen, catchEvidenced,
+    parentDead: !!parent.dead, calfDead: !!calf.dead, calfEscaped,
+  }
+})
+check('a real hunt catches a calf, the parent sacrifices itself and the calf escapes',
+  e2e.found && e2e.catchEvidenced && e2e.parentDead && e2e.calfDead === false && e2e.calfEscaped,
+  JSON.stringify(e2e))
 
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);

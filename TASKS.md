@@ -40,7 +40,7 @@ the map).
 - [x] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
   fleeing from elephants) — stabilise the direction choice so the facing no
   longer flip-flops.
-- [ ] 2. A predator eating a calf: the red stain and the calf shrinking start
+- [x] 2. A predator eating a calf: the red stain and the calf shrinking start
   only after 5 s; during that window the calf still struggles. If a parent
   touches the predator within that window it sacrifices itself and is eaten
   instead of the calf, and the calf gets up and escapes; if the parent arrives
