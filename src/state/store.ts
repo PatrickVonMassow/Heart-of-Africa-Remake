@@ -1565,13 +1565,18 @@ export const useGame = create<GameState>()((set, get) => ({
     if (place.kind !== 'village' || (s.equipment.rifle ?? 0) <= 0) return
     const region = place.region
     const rep = balance.reputation
-    // Loot at rifle point (design.md §12): goods as far as the pack holds.
+    // Loot at rifle point (design.md §12): a rich haul — cash, gifts as far as
+    // the pack holds, and provisions — so the robbery can pay off despite the
+    // permanent regional fallout.
     const space = Math.max(0, balance.inventoryCapacity - usedInventory(s))
     const lootMaterial = REGION_VALUES[region].revered[0]
-    const loot = Math.min(rep.robberyGifts, space)
+    const lootGifts = Math.min(rep.robberyGifts, space)
+    const lootMoney = rep.robberyMoney
+    const lootFood = rep.robberyFoodDays
     set({
-      gifts: { ...s.gifts, [lootMaterial]: s.gifts[lootMaterial] + loot },
-      foodDays: s.foodDays + rep.robberyFoodDays,
+      money: s.money + lootMoney,
+      gifts: { ...s.gifts, [lootMaterial]: s.gifts[lootMaterial] + lootGifts },
+      foodDays: s.foodDays + lootFood,
       // The whole region is antagonized for good: no huts, no hints, and
       // the "Honored Friend" standing is forfeited irretrievably.
       regionRobbed: { ...s.regionRobbed, [region]: true },
@@ -1585,9 +1590,13 @@ export const useGame = create<GameState>()((set, get) => ({
     }
     set({ villageCamps })
     useUi.getState().setDialog(null)
+    // Report the haul so the player learns what the robbery yielded (design.md §12).
     get().addEntry(
       { key: 'journal.titles.robberyCommitted' },
-      { key: 'journal.robberyCommitted', params: { people: place.peopleId ?? place.id, region } },
+      {
+        key: 'journal.robberyCommitted',
+        params: { people: place.peopleId ?? place.id, region, money: lootMoney, gifts: lootGifts, food: Math.round(lootFood) },
+      },
     )
     get().leavePlace()
   },

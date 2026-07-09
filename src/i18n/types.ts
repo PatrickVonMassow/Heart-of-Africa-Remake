@@ -196,6 +196,10 @@ export interface Strings {
     endAudience: string
     /** Draw the rifle and rob the hut (design.md §12). */
     rob: string
+    /** Safety confirmation before the robbery, and its yes/cancel labels. */
+    robConfirm: string
+    robConfirmYes: string
+    robCancel: string
     /** Bazaar (design.md §10): bid flow on offered treasures. */
     bazaarGreeting: string
     bazaarSell: string

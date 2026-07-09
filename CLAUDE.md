@@ -690,8 +690,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     and medicine from hurrying villagers (cooldown), and the region's
     villages hand out provisions and medicine free of charge. Drawing
     the rifle (a robbery from a chief's hut, enabled by a rifle in the pack)
-    robs the village (loot up to the pack
-    limit): the whole region is antagonized permanently — no audiences,
+    robs the village after a deliberate safety confirmation (the deed is
+    irreversible), for a deliberately rich haul — a large sum of money, trade
+    goods up to the pack limit and provisions (balance values) — reported in
+    the chronicle so the player learns what was taken: the whole region is
+    antagonized permanently — no audiences,
     no elder talks, no hints — and the "Honored Friend" status is
     forfeited irretrievably and cannot be re-earned. Item effects are
     possession-based, so merely carrying a rifle no longer makes villagers
@@ -701,7 +704,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     block the elder talk or audience, the
     hostility/expulsion and its wear-off, the friend pledge (exactly
     once), the capped attack outcomes with rescue entries, the
-    near-death aid, the free village supplies, and the permanent
+    near-death aid, the free village supplies, the confirmation gate on the
+    Rob button and the rich money/gifts/provisions haul, and the permanent
     robbery consequences including the forfeited friendship.
 27. **Camps (item caches).** `design.md` §6/§17 is implemented: in the
     bird's-eye view a free camp can be pitched anywhere in the open (C;

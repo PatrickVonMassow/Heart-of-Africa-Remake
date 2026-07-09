@@ -29,7 +29,7 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 - [x] 4. Ein Item, das im Einsatz ist, soll im Inventar aufleuchten.
 - [x] 5. Tagebuch-Bereich nicht bis ganz nach unten: Camp-/Journal-Button nicht verdecken, darüber etwas Abstand.
 - [x] 6. Canteen Capacity auf 500 reduzieren.
-- [ ] 7. Überfall mit Gewehr: Sicherheitsabfrage; danach Beute mitteilen; Beute sehr reichhaltig.
+- [x] 7. Überfall mit Gewehr: Sicherheitsabfrage; danach Beute mitteilen; Beute sehr reichhaltig.
 - [ ] 8. Laufgeschwindigkeits-Malus mit Kanu funktioniert nicht / zu schwach — beheben.
 - [ ] 9. Debounce-Radius für versehentliches erneutes Betreten von Siedlungen zu groß — verkleinern.
 - [ ] 10. Hafenankunft: mitteilen, wie viel Geld für Entdeckungen und welche; Geld als „telegrafische Überweisung".
@@ -44,3 +44,6 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 2. Thorough dead-code / stale-doc / stale-comment cleanup — as separate commits,
    not mixed with feature commits.
 3. Full regression again.
+4. **Den Nutzer daran erinnern, VS Code neu zu starten**, damit die neuen
+   Berechtigungen (angesammelte `Bash(...)`-Allow-Einträge in
+   `.claude/settings.local.json`) greifen.

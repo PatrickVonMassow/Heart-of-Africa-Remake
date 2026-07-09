@@ -160,20 +160,45 @@ check(
   `food ${s.foodDays.toFixed(0)}, medicine ${s.equipment.medicine}`,
 )
 
-// --- Robbery: permanent regional loss ------------------------------------------------------
-const giftsBefore = await page.evaluate(() => {
+// --- Robbery: confirmation gate + rich haul + permanent regional loss --------
+const rep2 = await page.evaluate(() => window.__balance.reputation)
+await page.evaluate(() => {
   const g = window.__game.getState()
-  return Object.values(g.gifts).reduce((a, b) => a + b, 0)
+  g.enterPlace('tuareg-village') // north region, not yet robbed
+  window.__ui.getState().setDialog({ kind: 'audience' })
 })
-await page.evaluate(() => window.__game.getState().robVillage())
-await page.waitForTimeout(200)
+await page.waitForTimeout(250)
+const before = await page.evaluate(() => {
+  const g = window.__game.getState()
+  return { money: g.money, gifts: Object.values(g.gifts).reduce((a, b) => a + b, 0), food: g.foodDays }
+})
+// Click the Rob button (the sole danger button in the audience actions).
+await page.evaluate(() => document.querySelector('.dialog .actions .hud-button.danger')?.click())
+await page.waitForTimeout(150)
+const midway = await page.evaluate(() => ({
+  confirmShown: !!document.querySelector('.rob-confirm'),
+  robbed: window.__game.getState().regionRobbed.north === true,
+}))
+check(
+  'the Rob button asks for confirmation first (no robbery yet)',
+  midway.confirmShown && !midway.robbed,
+  JSON.stringify(midway),
+)
+// Confirm the robbery.
+await page.evaluate(() => document.querySelector('.rob-confirm .hud-button.danger')?.click())
+await page.waitForTimeout(250)
 s = await state()
 keys = await journalKeys()
-const giftsAfter = Object.values(s.gifts).reduce((a, b) => a + b, 0)
+const after = { money: s.money, gifts: Object.values(s.gifts).reduce((a, b) => a + b, 0), food: s.foodDays }
 check(
-  'the robbery loots goods and expels the robber',
-  s.mode === 'travel' && giftsAfter > giftsBefore && keys.includes('journal.robberyCommitted'),
-  `gifts ${giftsBefore} → ${giftsAfter}`,
+  'the confirmed robbery yields a rich haul (money + gifts + provisions)',
+  after.money >= before.money + rep2.robberyMoney && after.gifts > before.gifts && after.food > before.food + 1,
+  JSON.stringify({ before, after, robberyMoney: rep2.robberyMoney }),
+)
+check(
+  'the robbery is reported in the journal and expels the robber',
+  s.mode === 'travel' && keys.includes('journal.robberyCommitted'),
+  '',
 )
 check(
   'the region is antagonized and the friendship forfeited',

@@ -140,7 +140,10 @@ export interface BalanceConfig {
     friendAidCooldownDays: number
     /** Provisions level a friend village tops the traveler up to. */
     friendVillageFoodDays: number
-    /** Loot of a hut robbery: gifts and provisions days (§12). */
+    /** Loot of a hut robbery (§12): the haul is deliberately rich so a robbery
+     *  can pay off despite the permanent regional fallout — money, gifts (capped
+     *  by pack space) and provisions days. */
+    robberyMoney: number
     robberyGifts: number
     robberyFoodDays: number
   }
@@ -266,8 +269,9 @@ export const balance: BalanceConfig = {
     friendProtectRadiusDeg: 1.5,
     friendAidCooldownDays: 10,
     friendVillageFoodDays: 21,
-    robberyGifts: 3,
-    robberyFoodDays: 7,
+    robberyMoney: 600, // rich cash haul (design.md §12): a robbery must be able to pay off
+    robberyGifts: 24, // capped by free pack space
+    robberyFoodDays: 40,
   },
   camps: {
     lootChancePerDay: 0.03,

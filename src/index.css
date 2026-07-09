@@ -149,6 +149,16 @@ textarea {
   color: #d4715f;
 }
 
+/* Robbery safety confirmation (design.md §12). */
+.rob-confirm {
+  margin-top: 8px;
+  border-top: 1px solid var(--hud-border);
+  padding-top: 8px;
+}
+.rob-confirm .danger-text {
+  color: #e0715f;
+}
+
 .inventory-bar button.active {
   background: #5a4520;
   border-color: var(--hud-accent);

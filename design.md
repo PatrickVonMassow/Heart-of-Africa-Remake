@@ -241,7 +241,7 @@ If you satisfy a chief correctly repeatedly, he bestows the status of "Honored F
 Effect: in the immediate surroundings of the region's native villages, the natives protect the traveler from attacks by animals and robbers (§14); he can then at most be lightly injured. If he is close to death, inhabitants hurry over with food, water or medicine. In addition he always receives food, water and medicine free of charge in the villages of the region. Each such event is communicated via a journal entry. Typically an entry reads like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
 
 **Robbery and reputation.**
-With a rifle in the pack, the chief's audience offers to rob the hut — looting goods up to the pack limit. This permanently antagonizes all villages of the region: afterwards no hut of the region can be entered anymore, and the chiefs give no more hints. A robbery also irretrievably forfeits the "Honored Friend" status — including its protection.
+With a rifle in the pack, the chief's audience offers to rob the hut. Because the deed is irreversible, it takes a deliberate safety confirmation first (a warning naming the consequences, with a confirm/cancel choice). The haul is deliberately rich — a large sum of money, trade goods up to the pack limit, and provisions — so that a robbery can genuinely pay off despite its heavy cost; the chronicle reports exactly what was taken. This permanently antagonizes all villages of the region: afterwards no hut of the region can be entered anymore, and the chiefs give no more hints. A robbery also irretrievably forfeits the "Honored Friend" status — including its protection.
 
 ---
 
