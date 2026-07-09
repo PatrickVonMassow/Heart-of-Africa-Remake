@@ -27,7 +27,7 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 - [x] 2. Prüfen: ist alles committet oder gibt es noch lokale modified Dateien? → Nur die von `npm test` neu erzeugten `verification/*.png` (Screenshot-Evidenz) waren modifiziert; kein Quellcode offen. Evidenz frisch committet → Baum sauber. (Reine Repo-Hygiene, kein Code-Change; kein stabiler Suite-Test möglich, da die Suite die Screenshots selbst neu erzeugt.)
 - [x] 3. Kanu-Geschwindigkeitsboost von 4x auf 2x reduzieren.
 - [x] 4. Ein Item, das im Einsatz ist, soll im Inventar aufleuchten.
-- [ ] 5. Tagebuch-Bereich nicht bis ganz nach unten: Camp-/Journal-Button nicht verdecken, darüber etwas Abstand.
+- [x] 5. Tagebuch-Bereich nicht bis ganz nach unten: Camp-/Journal-Button nicht verdecken, darüber etwas Abstand.
 - [ ] 6. Canteen Capacity auf 500 reduzieren.
 - [ ] 7. Überfall mit Gewehr: Sicherheitsabfrage; danach Beute mitteilen; Beute sehr reichhaltig.
 - [ ] 8. Laufgeschwindigkeits-Malus mit Kanu funktioniert nicht / zu schwach — beheben.

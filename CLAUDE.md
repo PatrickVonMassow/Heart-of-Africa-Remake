@@ -474,8 +474,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     journal open at game start, driving movement still advances the player
     position (`scripts/verify/voice.mjs`), and walking into a hut door with
     the journal forced open still opens the building
-    (`scripts/verify/flow.mjs`). German read-aloud stays an open
-    item until a German-capable voice exists.
+    (`scripts/verify/flow.mjs`). The open journal panel does not reach the
+    bottom of the screen: it ends above the camp/journal toggle buttons with a
+    small gap so it never covers them. Verifiable: with the journal open, the
+    `.journal` panel's bottom edge sits above the `.camp-toggle` and
+    `.journal-toggle` button tops (`scripts/verify/enrichments.mjs`). German
+    read-aloud stays an open item until a German-capable voice exists.
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px (half the former
     value), walk speed inside settlements to 10 m/s (raised from 7.5 by

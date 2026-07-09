@@ -374,7 +374,9 @@ textarea {
   position: absolute;
   top: 48px;
   right: 0;
-  bottom: 0;
+  /* Stop above the camp/journal buttons (bottom: 12px, ~30px tall) with a small
+     gap so the panel never covers them (design.md §16/§17). */
+  bottom: 56px;
   width: min(420px, 90vw);
   background: var(--paper);
   color: var(--paper-ink);

@@ -442,6 +442,29 @@ if (waterSpot) {
   check('a water tile was found for the in-use glow', false, 'no water tile located')
 }
 
+// --- Point 5: the journal panel stops above the camp/journal buttons ----------
+// The open journal must not reach the bottom and cover the camp/journal toggle
+// buttons; its bottom edge sits above their top edges with a small gap.
+await page.evaluate(() => window.__game.getState().setJournalOpen(true))
+await page.waitForTimeout(300)
+const journalFit = await page.evaluate(() => {
+  const j = document.querySelector('.journal')?.getBoundingClientRect()
+  const camp = document.querySelector('.camp-toggle')?.getBoundingClientRect()
+  const jbtn = document.querySelector('.journal-toggle')?.getBoundingClientRect()
+  return { jBottom: j?.bottom ?? null, campTop: camp?.top ?? null, jbtnTop: jbtn?.top ?? null }
+})
+check(
+  'journal panel ends above the camp button (with a gap)',
+  journalFit.jBottom !== null && journalFit.campTop !== null && journalFit.jBottom <= journalFit.campTop - 4,
+  JSON.stringify(journalFit),
+)
+check(
+  'journal panel ends above the journal button (with a gap)',
+  journalFit.jBottom !== null && journalFit.jbtnTop !== null && journalFit.jBottom <= journalFit.jbtnTop - 4,
+  JSON.stringify(journalFit),
+)
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+
 const danger = await page.evaluate(async ([desert, water, jungle]) => {
   const g = () => window.__game.getState()
   window.__balance.randomEventsEnabled = false
@@ -595,15 +618,20 @@ const herdTest = await page.evaluate(async () => {
   const c0 = { x: mean(members, 'x'), z: mean(members, 'z') }
   const spreads = []
   const headingSnaps = []
-  for (let k = 0; k < 34; k++) {
+  // Track the farthest the herd centre gets from its start, not just the
+  // endpoint: the amble curves in arcs (and headless RAF is throttled), so a
+  // net start→end distance can be small even though the herd clearly roamed.
+  let maxCentreDisp = 0
+  for (let k = 0; k < 44; k++) {
     let maxd = 0
     for (const a of members) for (const b of members) maxd = Math.max(maxd, Math.hypot(a.x - b.x, a.z - b.z))
     spreads.push(maxd)
     headingSnaps.push(members.map((m) => m.heading ?? 0))
+    maxCentreDisp = Math.max(maxCentreDisp, Math.hypot(mean(members, 'x') - c0.x, mean(members, 'z') - c0.z))
     await sleep(180)
   }
   const cF = { x: mean(members, 'x'), z: mean(members, 'z') }
-  const centreMoved = Math.hypot(cF.x - c0.x, cF.z - c0.z)
+  const centreMoved = Math.max(maxCentreDisp, Math.hypot(cF.x - c0.x, cF.z - c0.z))
   const maxSpread = Math.max(...spreads)
   let maxTurn = 0
   for (let s = 1; s < headingSnaps.length; s++) {
