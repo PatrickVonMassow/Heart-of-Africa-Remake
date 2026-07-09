@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fleeHeading, turnToward } from './wildlifeBehavior'
+import { escortHeading, fleeHeading, turnToward } from './wildlifeBehavior'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -80,6 +80,60 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
     }
     expect(maxDelta).toBeLessThan(0.35) // no ~90° snap
     expect(reversals).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('escortHeading (design.md §19 — parent escorts its hunted calf)', () => {
+  it('bolts away from the predator while near the calf', () => {
+    // Parent at origin, calf beside it, predator at +x: flee toward -x.
+    const h = escortHeading(0, 0, 1, 0, 5, 0, 8)
+    expect(h).not.toBeNull()
+    const [sx, sz] = dir(h as number)
+    expect(sx).toBeCloseTo(-1, 5)
+    expect(sz).toBeCloseTo(0, 5)
+  })
+
+  it('holds once the calf is keepNear or farther away (never abandons it)', () => {
+    expect(escortHeading(0, 0, 9, 0, 12, 0, 8)).toBeNull()
+    expect(escortHeading(0, 0, 8, 0, 12, 0, 8)).toBeNull() // boundary: >= holds
+  })
+
+  it('holds in the degenerate case of standing on the predator', () => {
+    expect(escortHeading(3, 3, 4, 3, 3, 3, 8)).toBeNull()
+  })
+
+  it('leaves the parent clear of — but near — the calf when the hunter closes in', () => {
+    // Mini-simulation of the chase contract (design.md §19): the predator runs
+    // the fleeing calf down while the parent escorts. At the catch the parent
+    // must stand clear of the pin (so the rescue charge is a visible run) yet
+    // never beyond the escort range of its calf.
+    const keepNear = 8
+    const calf = { x: 0, z: 0 }
+    const parent = { x: 1.8, z: 0 }
+    const pred = { x: -12, z: 0 }
+    const dt = 1 / 60
+    let caught = false
+    for (let i = 0; i < 60 * 20 && !caught; i++) {
+      const toCalf = Math.atan2(calf.x - pred.x, calf.z - pred.z)
+      pred.x += Math.sin(toCalf) * 5.6 * dt
+      pred.z += Math.cos(toCalf) * 5.6 * dt
+      if (Math.hypot(pred.x - calf.x, pred.z - calf.z) < 0.9) {
+        caught = true
+        break
+      }
+      const away = Math.atan2(calf.x - pred.x, calf.z - pred.z)
+      calf.x += Math.sin(away) * 3.8 * dt
+      calf.z += Math.cos(away) * 3.8 * dt
+      const h = escortHeading(parent.x, parent.z, calf.x, calf.z, pred.x, pred.z, keepNear)
+      if (h !== null) {
+        parent.x += Math.sin(h) * 5 * dt
+        parent.z += Math.cos(h) * 5 * dt
+      }
+    }
+    expect(caught).toBe(true) // the slower calf is run down
+    const dParentCalf = Math.hypot(parent.x - calf.x, parent.z - calf.z)
+    expect(dParentCalf).toBeGreaterThan(2) // clear of the pin — the charge is a run
+    expect(dParentCalf).toBeLessThan(keepNear + 1) // but never abandoned
   })
 })
 

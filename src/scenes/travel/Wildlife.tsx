@@ -18,7 +18,7 @@ import { latLonToWorld, regionAt, worldToLatLon, type RegionId } from '../../wor
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
-import { fleeHeading, turnToward } from './wildlifeBehavior'
+import { escortHeading, fleeHeading, turnToward } from './wildlifeBehavior'
 import {
   buildAntelope,
   buildCheetah,
@@ -219,9 +219,16 @@ const GUARD_SPEED = 5.5
  *  the parent is taken instead and the calf escapes, while a parent that only got
  *  close (TOO_LATE_DIST) by the time the window ends is eaten alongside the calf. */
 const CAUGHT_DURATION = 5
-const CALF_HUNT_CHANCE = 0.45 // chance a hunt targets a calf near the player over a generic grazer
+const CALF_HUNT_CHANCE = 0.6 // chance a hunt targets a calf near the player over a generic grazer
 const CALF_HUNT_SEEK = 45 // radius around the player within which a huntable calf is picked
 const CALF_CATCH_DIST = 0.9 // the predator catches the chased calf within this
+/** The hunted calf bolts instead of standing at its parent, but slower than its
+ *  hunter, so it is visibly run down in the open (design.md §19). */
+const CALF_FLEE_SPEED = 3.8
+/** A bolting parent never abandons its hunted calf beyond this distance: it
+ *  holds there and turns back, so it stands clear — but near — when the calf
+ *  is seized and its rescue charge is a visible run (design.md §19). */
+const ESCORT_MAX_DIST = 8
 /** Inside this radius the predator pounces straight at the calf, bypassing its
  *  turn-rate limit: with speed 5.6 and turn 3 the minimum turning circle is
  *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
@@ -316,6 +323,7 @@ function placeGroup(
   herdId?: number,
   chunkKey?: string,
 ) {
+  const placedStart = list.length
   for (let i = 0; i < count; i++) {
     const r1 = hash(ccx, ccz, 10 + i * 3, seed)
     const r2 = hash(ccx, ccz, 11 + i * 3, seed)
@@ -368,10 +376,11 @@ function placeGroup(
   }
   // Family life (design.md §19): a herd of at least three raises a juvenile that
   // keeps close to a parent and nurses; the parent guards it against predators.
-  // Flamingos (shoreline flocks) are excluded.
-  if (!shoreline && count >= 3) {
-    const startIdx = list.length - count
-    const parent = list[startIdx]
+  // Flamingos (shoreline flocks) are excluded. Counted over the animals actually
+  // placed (spots on water are skipped above), so the parent/calf link can never
+  // reach back into an earlier group's animals.
+  if (!shoreline && list.length - placedStart >= 3) {
+    const parent = list[placedStart]
     const calf = list[list.length - 1]
     if (parent && calf && parent !== calf) {
       calf.young = true
@@ -809,6 +818,35 @@ function Herds() {
             px = a.x
             pz = a.z
             yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
+            pitch = 0
+            familyHeld = true
+          } else if (a.young && LION_STATE.mode === 'chase' && LION_STATE.victim === a) {
+            // This calf is the one being run down (design.md §19): it bolts
+            // instead of standing at its parent, but slower than its hunter, so
+            // the chase is visible in the open before the catch.
+            const h = Math.atan2(a.x - LION_STATE.lx, a.z - LION_STATE.lz)
+            a.x += Math.sin(h) * CALF_FLEE_SPEED * dt
+            a.z += Math.cos(h) * CALF_FLEE_SPEED * dt
+            px = a.x
+            pz = a.z
+            yaw = h
+            pitch = 0
+            familyHeld = true
+          } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase' && LION_STATE.victim === a.child) {
+            // Our calf is being run down: bolt alongside, but never abandon it —
+            // beyond the escort range hold and turn back to the calf, so at the
+            // catch the parent stands clear and the rescue charge that follows
+            // is a visible run (design.md §19).
+            const h = escortHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, ESCORT_MAX_DIST)
+            if (h !== null) {
+              a.x += Math.sin(h) * FLEE_SPEED * dt
+              a.z += Math.cos(h) * FLEE_SPEED * dt
+              yaw = h
+            } else {
+              yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z) // hold and watch the calf
+            }
+            px = a.x
+            pz = a.z
             pitch = 0
             familyHeld = true
           } else if (a.young && a.parent && !a.parent.dead) {

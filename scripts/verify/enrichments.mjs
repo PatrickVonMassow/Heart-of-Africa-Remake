@@ -1011,6 +1011,72 @@ check('a real hunt catches a calf, the parent sacrifices itself and the calf esc
   e2e.found && e2e.catchEvidenced && e2e.parentDead && e2e.calfDead === false && e2e.calfEscaped,
   JSON.stringify(e2e))
 
+// (6) Visible choreography (design.md §19 rework): from a real chase distance
+// the hunted calf flees (it no longer stands nursing while run down), the
+// escorting parent stands clear — but near — at the catch, and the rescue
+// charge afterwards is a visible run over real time, ending in the sacrifice.
+await pinFamily(-2.4, 34.6)
+const choreo = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const p = window.__game.getState().pos
+  let parent = null, calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || []) if (a.child && !a.child.dead && !a.dead && a.child.caught === undefined) { parent = a; calf = a.child; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  // Relocate the family beside the player so the chase stays well inside the
+  // 90-unit hunt-abort radius regardless of where this seed spawned it. The
+  // choreography itself (flee, escort, charge) is live behaviour from here on.
+  calf.x = p.x + 14; calf.z = p.z
+  parent.x = p.x + 15.8; parent.z = p.z
+  await sleep(300) // settle: the calf nurses beside its parent
+  const s = window.__lionHunt.state
+  s.predator = 'lion'
+  s.victim = calf; s.victimHunt = true
+  s.lx = calf.x + 12; s.lz = calf.z
+  s.px = calf.x; s.pz = calf.z
+  s.lionHeading = Math.atan2(calf.x - s.lx, calf.z - s.lz)
+  s.mode = 'chase'
+  const calf0 = { x: calf.x, z: calf.z }
+  let calfMoved = 0
+  let dParentAtCatch = null
+  let tCatch = 0
+  let tParentDead = 0
+  const t0 = Date.now()
+  while (Date.now() - t0 < 45000) {
+    calfMoved = Math.max(calfMoved, Math.hypot(calf.x - calf0.x, calf.z - calf0.z))
+    if (calf.caught !== undefined && dParentAtCatch === null) {
+      dParentAtCatch = +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2)
+      tCatch = Date.now()
+    }
+    if (parent.dead) { tParentDead = Date.now(); break }
+    if (calf.dead || s.mode === 'idle') break
+    await sleep(50)
+  }
+  const out = {
+    found: true,
+    calfMoved: +calfMoved.toFixed(2),
+    dParentAtCatch,
+    chargeMs: tParentDead && tCatch ? tParentDead - tCatch : null,
+    parentDead: !!parent.dead,
+    calfDead: !!calf.dead,
+    calfFreed: calf.caught === undefined && calf.parent === undefined && !calf.dead,
+  }
+  s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
+  return out
+})
+check('the hunted calf flees the chase instead of standing at its parent',
+  choreo.found && choreo.calfMoved > 2, JSON.stringify(choreo))
+check('the escorting parent stands clear — but near — of its calf at the catch',
+  choreo.found && choreo.dParentAtCatch !== null && choreo.dParentAtCatch > 2.5 && choreo.dParentAtCatch < 12,
+  JSON.stringify(choreo))
+check('the rescue charge is a visible run that ends in the sacrifice',
+  choreo.found && choreo.chargeMs !== null && choreo.chargeMs >= 400 &&
+  choreo.parentDead && choreo.calfDead === false && choreo.calfFreed,
+  JSON.stringify(choreo))
+
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);
 // what stays needs the live store: selecting a place actually teleports there.

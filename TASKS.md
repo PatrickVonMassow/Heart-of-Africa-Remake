@@ -46,6 +46,14 @@ the map).
   instead of the calf, and the calf gets up and escapes; if the parent arrives
   too late, both are eaten. In addition, parents charge the predator as soon as a
   calf is being eaten.
+  Reworked after review (the sacrifice fired but was invisible — the guarding
+  parent stood ~2 units from the calf, so the charge resolved within a couple
+  of frames and read as an ordinary kill): the hunted calf now flees the chase
+  (slower than the predator, so it is visibly run down), the parent escorts it
+  without ever abandoning it beyond a short range and stands clear at the
+  catch, making the rescue charge a visible run (~1 s). The calf-hunt chance
+  was raised (0.45 → 0.6), and a spawn bug was fixed where skipped (water)
+  placements mislinked a family across chunk groups.
 - [ ] 3. Calves hop about playfully and sometimes fall into the water. Parents
   wade in and pull them out. In the attempt a calf or a parent can be swept over
   a waterfall and die; if a calf goes over a waterfall, the parents plunge after

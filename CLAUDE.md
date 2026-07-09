@@ -390,7 +390,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     parent charges the predator and, reaching it, is eaten in the calf's place
     while the calf escapes, a parent that only got close by the window's end is
     eaten alongside the calf, and the full LionHunt path runs a calf down and
-    catches it; that some shore
+    catches it — with the hunted calf visibly fleeing the chase (slower than
+    its hunter) instead of standing at its parent, and the escorting parent
+    standing clear of, but near, the calf at the catch so the rescue charge is
+    a visible run over real time; that some shore
     visitors bathe (wade in) beyond merely drinking, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).

@@ -51,6 +51,32 @@ export function fleeHeading(
   return Math.atan2(rx, rz)
 }
 
+/**
+ * Escort heading for a parent whose calf is being run down by a predator
+ * (design.md §19): the parent bolts away from the hunter like the rest of the
+ * herd, but it never abandons its young — once it is `keepNear` or farther
+ * from the calf it holds its ground (returns `null`) and turns back to watch.
+ * Holding short of the hunter is what leaves the parent standing clear when
+ * the calf is seized, so the rescue charge that follows is a visible run.
+ * Also holds (`null`) in the degenerate case of standing on the predator —
+ * the charge/sacrifice resolution handles contact, not the escort.
+ */
+export function escortHeading(
+  x: number,
+  z: number,
+  calfX: number,
+  calfZ: number,
+  predX: number,
+  predZ: number,
+  keepNear: number,
+): number | null {
+  if (Math.hypot(x - calfX, z - calfZ) >= keepNear) return null
+  const dx = x - predX
+  const dz = z - predZ
+  if (Math.hypot(dx, dz) < 1e-4) return null
+  return Math.atan2(dx, dz)
+}
+
 /** Turn `current` toward `target` (both radians) by at most `maxStep`, taking the
  *  shorter way around. Used to cap per-frame turns so a facing never snaps. */
 export function turnToward(current: number, target: number, maxStep: number): number {
