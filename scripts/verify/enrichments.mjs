@@ -590,7 +590,9 @@ const scavenge = await page.evaluate(async () => {
   herds.zebra.push(carcass)
   let landed = false
   let dissolveStarted = false
-  const deadline = Date.now() + 15000
+  // The scavenger now flies in from beyond the view ring (design.md §19), so
+  // the approach itself takes several seconds before it can land.
+  const deadline = Date.now() + 30000
   while (Date.now() < deadline) {
     const sc = w.scavenger.current
     if (sc.target === carcass && sc.landed) landed = true
@@ -1350,6 +1352,133 @@ const parting = await page.evaluate(async () => {
 })
 check('an animal placed onto another parts from it (no walking through)',
   parting.found && parting.parted, JSON.stringify(parting))
+
+// --- Point 5: vultures fly in and off beyond the view (zoom-aware) ------------
+// design.md §19: no vulture pops into or out of the picture. The scavenger
+// spawns beyond the zoom-aware view ring, flies in and lands; after the meal it
+// flies off and despawns only well outside the view. The kill flock flies the
+// same pattern.
+const vulFlight = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const p = () => window.__game.getState().pos
+  window.__ui.getState().setTravelZoom(1)
+  for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+  const sc = w.scavenger.current
+  sc.target = null
+  sc.mode = 'idle'
+  await sleep(150)
+  const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5' }
+  herds.zebra.push(carcass)
+  const out = { spawnDist: null, landed: false, outSeen: false, hideDist: null }
+  let t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (sc.target === carcass && sc.mode === 'in') {
+      out.spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
+      break
+    }
+    await sleep(40)
+  }
+  t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (sc.landed) { out.landed = true; break }
+    await sleep(100)
+  }
+  carcass.dissolve = 0.02 // fast-forward the meal; the carcass is removed
+  t0 = Date.now()
+  let lastOut = null
+  while (Date.now() - t0 < 30000) {
+    if (sc.mode === 'out') {
+      out.outSeen = true
+      lastOut = Math.hypot(sc.x - p().x, sc.z - p().z)
+    }
+    if (out.outSeen && sc.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); break }
+    await sleep(60)
+  }
+  return out
+})
+check('the scavenger spawns beyond the view ring and flies in (no popping in)',
+  vulFlight.spawnDist !== null && vulFlight.spawnDist > 100 && vulFlight.landed, JSON.stringify(vulFlight))
+check('after the meal the scavenger flies off and despawns only well outside the view',
+  vulFlight.outSeen && vulFlight.hideDist !== null && vulFlight.hideDist > 130, JSON.stringify(vulFlight))
+
+// Zoom-aware ring: at a wider zoom the flight spawns proportionally farther out.
+const vulZoom = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const p = () => window.__game.getState().pos
+  window.__ui.getState().setWheelZoomEnabled(true) // zoom-out past 1 is gated
+  window.__ui.getState().setTravelZoom(2)
+  for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+  const sc = w.scavenger.current
+  sc.target = null
+  sc.mode = 'idle'
+  await sleep(150)
+  const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5z' }
+  herds.zebra.push(carcass)
+  let spawnDist = null
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (sc.target === carcass && sc.mode === 'in') {
+      spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
+      break
+    }
+    await sleep(40)
+  }
+  // Clean up: consume the carcass and reset the zoom.
+  carcass.dissolve = 0.01
+  await sleep(200)
+  sc.target = null
+  sc.mode = 'idle'
+  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
+  return { spawnDist }
+})
+check('a wider zoom pushes the vulture spawn ring proportionally out',
+  vulZoom.spawnDist !== null && vulZoom.spawnDist > 200, JSON.stringify(vulZoom))
+
+// The kill-circling flock flies in and off the same way (no popping).
+const killFlock = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p = () => window.__game.getState().pos
+  const L = window.__lionHunt.state
+  const f = window.__vultures.killFlight.current
+  f.mode = 'idle'
+  L.victim = null
+  L.victimHunt = false
+  L.px = p().x + 8
+  L.pz = p().z
+  L.lx = L.px + 0.7
+  L.lz = L.pz + 0.25
+  L.mode = 'feed'
+  L.timer = 90
+  const out = { spawnDist: null, arrived: false, outSeen: false, hideDist: null }
+  let t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (f.mode === 'in' && out.spawnDist === null) out.spawnDist = +Math.hypot(f.x - p().x, f.z - p().z).toFixed(1)
+    if (f.mode === 'active') { out.arrived = true; break }
+    await sleep(50)
+  }
+  L.mode = 'idle'
+  L.timer = 99999
+  t0 = Date.now()
+  let lastOut = null
+  while (Date.now() - t0 < 30000) {
+    if (f.mode === 'out') {
+      out.outSeen = true
+      lastOut = Math.hypot(f.x - p().x, f.z - p().z)
+    }
+    if (out.outSeen && f.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); break }
+    await sleep(60)
+  }
+  return out
+})
+check('the kill flock flies in from beyond the view ring and settles over the kill',
+  killFlock.spawnDist !== null && killFlock.spawnDist > 100 && killFlock.arrived, JSON.stringify(killFlock))
+check('when the kill scene ends the flock flies off and despawns well outside the view',
+  killFlock.outSeen && killFlock.hideDist !== null && killFlock.hideDist > 130, JSON.stringify(killFlock))
 
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);

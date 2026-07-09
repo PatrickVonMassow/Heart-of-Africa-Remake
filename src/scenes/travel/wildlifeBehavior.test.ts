@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { escortHeading, fleeHeading, gambolState, separationPush, turnToward } from './wildlifeBehavior'
+import {
+  escortHeading,
+  fleeHeading,
+  FLIGHT_DESPAWN_OUT,
+  FLIGHT_SPAWN_OUT,
+  flightStep,
+  gambolState,
+  separationPush,
+  turnToward,
+  type FlightState,
+} from './wildlifeBehavior'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -217,6 +227,54 @@ describe('separationPush (design.md §19 — animal body separation)', () => {
       if (Math.abs(bx - ax) >= 1.4) break
     }
     expect(Math.abs(bx - ax)).toBeGreaterThanOrEqual(1.4 - 1e-6)
+  })
+})
+
+describe('flightStep (design.md §19 — vultures fly in and off, never pop)', () => {
+  const mk = (): FlightState => ({ mode: 'idle', x: 0, z: 0 })
+
+  it('spawns beyond the view ring on the far side of the target', () => {
+    const s = mk()
+    flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)
+    expect(s.mode).toBe('in')
+    expect(s.x).toBeCloseTo(100 + FLIGHT_SPAWN_OUT, 6)
+    expect(s.z).toBeCloseTo(0, 6)
+  })
+
+  it('spawns at a fixed ring point when the target sits on the player', () => {
+    const s = mk()
+    flightStep(s, true, 0, 0, 0, 0, 100, 16, 1 / 60)
+    expect(s.mode).toBe('in')
+    expect(Math.hypot(s.x, s.z)).toBeCloseTo(100 + FLIGHT_SPAWN_OUT, 6)
+  })
+
+  it('flies in, arrives (active), and stays while wanted', () => {
+    const s = mk()
+    flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)
+    const d0 = Math.hypot(s.x - 10, s.z)
+    for (let i = 0; i < 60 * 20 && s.mode === 'in'; i++) flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)
+    expect(s.mode).toBe('active')
+    expect(Math.hypot(s.x - 10, s.z)).toBeLessThan(d0)
+    flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)
+    expect(s.mode).toBe('active')
+  })
+
+  it('flies off when no longer wanted and despawns only well outside the view', () => {
+    const s: FlightState = { mode: 'active', x: 10, z: 0 }
+    let lastOutDist = 0
+    for (let i = 0; i < 60 * 30 && s.mode !== 'idle'; i++) {
+      flightStep(s, false, 10, 0, 0, 0, 100, 16, 1 / 60)
+      if (s.mode === 'out') lastOutDist = Math.hypot(s.x, s.z)
+    }
+    expect(s.mode).toBe('idle')
+    expect(lastOutDist).toBeGreaterThan(100 + FLIGHT_DESPAWN_OUT - 1)
+  })
+
+  it('retargets while still airborne instead of respawning', () => {
+    const s: FlightState = { mode: 'out', x: 50, z: 0 }
+    flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)
+    expect(s.mode).toBe('in')
+    expect(Math.hypot(s.x - 50, s.z)).toBeLessThan(1) // kept its position
   })
 })
 

@@ -18,7 +18,15 @@ import { latLonToWorld, regionAt, UNITS_PER_DEGREE, worldToLatLon, type RegionId
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
-import { escortHeading, fleeHeading, gambolState, separationPush, turnToward } from './wildlifeBehavior'
+import {
+  escortHeading,
+  fleeHeading,
+  flightStep,
+  gambolState,
+  separationPush,
+  turnToward,
+  type FlightState,
+} from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
 import {
   buildAntelope,
@@ -287,7 +295,10 @@ const SPAWN_RANGE_MAX = 6
 /** Scavenging (design.md §19): a trampled/other-death carcass draws a vulture
  *  that flies in, lands and consumes it, dissolving it like a lion kill. */
 const CARCASS_DISSOLVE_SECONDS = 9
-const VULTURE_SCAVENGE_SPEED = 9
+/** Fast glide: the flights start beyond the view ring (design.md §19), so the
+ *  birds must cover real distance to arrive while their reason still holds. */
+const VULTURE_SCAVENGE_SPEED = 16
+const VULTURE_FLY_SPEED = 16
 
 /** Drift boost of the current close to a fall (mirrors the traveller's drift
  *  §11 but with local, decorative constants). */
@@ -497,9 +508,12 @@ function Herds() {
   const spawnedChunks = useRef(new Set<string>())
   // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
   const herdState = useRef(new Map<number, { heading: number; phase: number }>())
-  // Scavenger vulture that flies to and consumes a non-lion carcass.
+  // Scavenger vulture that flies to and consumes a non-lion carcass. Its x/z
+  // and mode live in a FlightState so it flies in from — and departs to —
+  // beyond the zoom-aware view ring instead of popping (design.md §19).
   const scavengeGroup = useRef<THREE.Group>(null)
-  const scavenger = useRef<{ x: number; z: number; y: number; landed: boolean; target: Animal | null }>({
+  const scavenger = useRef<FlightState & { y: number; landed: boolean; target: Animal | null }>({
+    mode: 'idle',
     x: 0,
     z: 0,
     y: 14,
@@ -968,7 +982,10 @@ function Herds() {
     // Scavenging (design.md §19): a carcass that was not eaten by the lion
     // (e.g. trampled) draws a vulture that flies in, lands and consumes it —
     // the carcass dissolves piece by piece as a lion kill does, then is
-    // removed. One scavenger works the nearest carcass at a time.
+    // removed. One scavenger works the nearest carcass at a time. The bird
+    // never pops in or out of the picture: it spawns beyond the zoom-aware
+    // view ring, flies in, and after the meal flies off and despawns only
+    // well outside the view again (design.md §19).
     {
       const sc = scavenger.current
       const targetValid = (a: Animal | null): a is Animal =>
@@ -987,50 +1004,54 @@ function Herds() {
             }
           }
         }
-        if (sc.target) {
-          sc.x = sc.target.x + 14
-          sc.z = sc.target.z + 14
-          sc.y = 14
-          sc.landed = false
-        }
       }
       const sg = scavengeGroup.current
       const target = sc.target
-      if (sg && target) {
-        sg.visible = true
-        const dx = target.x - sc.x
-        const dz = target.z - sc.z
-        const d = Math.hypot(dx, dz)
-        if (!sc.landed && d > 0.6) {
-          const step = Math.min(d, VULTURE_SCAVENGE_SPEED * dt)
-          sc.x += (dx / d) * step
-          sc.z += (dz / d) * step
-          sc.y += (target.y + 0.4 - sc.y) * Math.min(1, dt * 2)
-        } else {
-          sc.landed = true
-          sc.x = target.x
-          sc.z = target.z
-          sc.y = target.y + 0.3
-          if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
-          target.dissolve -= dt
-        }
-        sg.position.set(sc.x, sc.y, sc.z)
-        sg.children.forEach((bird, i) => {
-          const ph = (i / sg.children.length) * Math.PI * 2
-          if (sc.landed) {
-            const r = 0.5 + i * 0.35
-            bird.position.set(Math.cos(ph) * r, Math.sin(t * 3 + ph) * 0.12, Math.sin(ph) * r)
-            bird.rotation.set(0.6 + Math.sin(t * 4 + ph) * 0.3, ph, 0) // heads pecking down
+      flightStep(
+        sc,
+        target !== null,
+        target ? target.x : sc.x,
+        target ? target.z : sc.z,
+        pos.x,
+        pos.z,
+        viewR,
+        VULTURE_SCAVENGE_SPEED,
+        dt,
+      )
+      sc.landed = sc.mode === 'active' && target !== null
+      if (sg) {
+        sg.visible = sc.mode !== 'idle'
+        if (sc.mode !== 'idle') {
+          if (sc.landed && target) {
+            sc.x = target.x
+            sc.z = target.z
+            sc.y = target.y + 0.3
+            if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
+            target.dissolve -= dt
+          } else if (target && sc.mode === 'in') {
+            // Glide down toward the carcass as the approach closes.
+            const d = Math.hypot(target.x - sc.x, target.z - sc.z)
+            sc.y = target.y + 0.4 + Math.min(1, d / 40) * 13
           } else {
-            const a2 = t * 0.6 + ph
-            bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
-            bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
+            sc.y = Math.min(14, sc.y + 6 * dt) // climbing away
           }
-          bird.scale.setScalar(1.5)
-        })
-      } else if (sg) {
-        sg.visible = false
-        sc.landed = false
+          sg.position.set(sc.x, sc.y, sc.z)
+          sg.children.forEach((bird, i) => {
+            const ph = (i / sg.children.length) * Math.PI * 2
+            if (sc.landed) {
+              const r = 0.5 + i * 0.35
+              bird.position.set(Math.cos(ph) * r, Math.sin(t * 3 + ph) * 0.12, Math.sin(ph) * r)
+              bird.rotation.set(0.6 + Math.sin(t * 4 + ph) * 0.3, ph, 0) // heads pecking down
+            } else {
+              const a2 = t * 0.6 + ph
+              bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
+              bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
+            }
+            bird.scale.setScalar(1.5)
+          })
+        } else {
+          sc.landed = false
+        }
       }
     }
 
@@ -1687,6 +1708,11 @@ function LionHunt() {
 function Vultures() {
   const group = useRef<THREE.Group>(null)
   const killGroup = useRef<THREE.Group>(null)
+  // Flight states so neither flock ever pops in or out of the picture: they
+  // spawn beyond the zoom-aware view ring, fly in, and when their reason
+  // passes fly off and despawn only well outside the view (design.md §19).
+  const playerFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
+  const killFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
   const geo = useMemo(() => buildVulture(), [])
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
@@ -1697,7 +1723,7 @@ function Vultures() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__vultures = { player: group, kill: killGroup }
+    w.__vultures = { player: group, kill: killGroup, playerFlight, killFlight }
     return () => {
       delete w.__vultures
     }
@@ -1715,23 +1741,34 @@ function Vultures() {
     })
   }
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
     const t = clock.elapsedTime
+    const viewR = VIEW_AT_ZOOM1 * useUi.getState().travelZoom
     if (group.current) {
       const poor = healthState(s.health) === 'poor' && s.mode === 'travel'
-      group.current.visible = poor
-      if (poor) {
-        group.current.position.set(s.pos.x, 0, s.pos.z)
+      const f = playerFlight.current
+      flightStep(f, poor, s.pos.x, s.pos.z, s.pos.x, s.pos.z, viewR, VULTURE_FLY_SPEED, dt, 2)
+      if (f.mode === 'active') {
+        // Track the traveller while circling overhead.
+        f.x += (s.pos.x - f.x) * Math.min(1, dt * 2)
+        f.z += (s.pos.z - f.z) * Math.min(1, dt * 2)
+      }
+      group.current.visible = f.mode !== 'idle'
+      if (f.mode !== 'idle') {
+        group.current.position.set(f.x, 0, f.z)
         circle(group.current, t, 4.5, 5.5)
       }
     }
     // Vultures also gather above a lion kill (design.md §19).
     if (killGroup.current) {
       const overKill = LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
-      killGroup.current.visible = overKill
-      if (overKill) {
-        killGroup.current.position.set(LION_STATE.px, 0, LION_STATE.pz)
+      const f = killFlight.current
+      flightStep(f, overKill, LION_STATE.px, LION_STATE.pz, s.pos.x, s.pos.z, viewR, VULTURE_FLY_SPEED, dt, 2)
+      killGroup.current.visible = f.mode !== 'idle'
+      if (f.mode !== 'idle') {
+        killGroup.current.position.set(f.x, 0, f.z)
         circle(killGroup.current, t * 1.15, 3.2, 4.6)
       }
     }

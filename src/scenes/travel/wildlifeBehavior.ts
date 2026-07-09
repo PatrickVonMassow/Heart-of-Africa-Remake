@@ -140,6 +140,92 @@ export function separationPush(
   return [px, pz]
 }
 
+/** Vulture flight (design.md §19): where a flight spawns beyond the view ring
+ *  and how far out it must be before it may despawn ("well outside" the view). */
+export const FLIGHT_SPAWN_OUT = 20
+export const FLIGHT_DESPAWN_OUT = 40
+
+export interface FlightState {
+  /** idle = despawned (hidden); in = flying in; active = arrived (circling or
+   *  landed — the caller poses it); out = flying off to despawn. */
+  mode: 'idle' | 'in' | 'active' | 'out'
+  x: number
+  z: number
+}
+
+/**
+ * Advance a vulture flight one step (design.md §19): vultures never pop in or
+ * out of the picture — they spawn beyond the view ring (zoom-aware `viewR`),
+ * fly in to their target, and when done fly off and only despawn well outside
+ * the view again.
+ * - idle + want → spawn at the ring on the target's far side, turn inbound
+ * - in → fly toward the target; on reach → active (want dropped → out)
+ * - active + want → hold (the caller circles/lands it); want dropped → out
+ * - out → fly straight away from the player; past the ring + margin → idle;
+ *   a new want while still out turns it back inbound (retarget, no respawn)
+ * Mutates and returns `s`.
+ */
+export function flightStep(
+  s: FlightState,
+  want: boolean,
+  tx: number,
+  tz: number,
+  px: number,
+  pz: number,
+  viewR: number,
+  speed: number,
+  dt: number,
+  reach = 0.6,
+): FlightState {
+  if (s.mode === 'idle') {
+    if (!want) return s
+    let dx = tx - px
+    let dz = tz - pz
+    const d = Math.hypot(dx, dz)
+    if (d < 1e-3) {
+      dx = 1
+      dz = 0
+    } else {
+      dx /= d
+      dz /= d
+    }
+    s.x = px + dx * (viewR + FLIGHT_SPAWN_OUT)
+    s.z = pz + dz * (viewR + FLIGHT_SPAWN_OUT)
+    s.mode = 'in'
+    return s
+  }
+  if (!want && s.mode !== 'out') s.mode = 'out'
+  if (want && s.mode === 'out') s.mode = 'in' // retarget while still airborne
+  if (s.mode === 'in') {
+    const dx = tx - s.x
+    const dz = tz - s.z
+    const d = Math.hypot(dx, dz)
+    if (d <= Math.max(reach, speed * dt)) {
+      s.x = tx
+      s.z = tz
+      s.mode = 'active'
+    } else {
+      s.x += (dx / d) * speed * dt
+      s.z += (dz / d) * speed * dt
+    }
+  } else if (s.mode === 'out') {
+    let dx = s.x - px
+    let dz = s.z - pz
+    const d = Math.hypot(dx, dz)
+    if (d < 1e-3) {
+      dx = 1
+      dz = 0
+    } else {
+      dx /= d
+      dz /= d
+    }
+    s.x += dx * speed * dt
+    s.z += dz * speed * dt
+    if (d > viewR + FLIGHT_DESPAWN_OUT) s.mode = 'idle'
+  }
+  return s
+}
+
 /** Turn `current` toward `target` (both radians) by at most `maxStep`, taking the
  *  shorter way around. Used to cap per-frame turns so a facing never snaps. */
 export function turnToward(current: number, target: number, maxStep: number): number {

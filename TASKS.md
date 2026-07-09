@@ -62,7 +62,7 @@ the map).
   collision detection so they do not walk through one another.
   (The elephant trample remains the designed exception: it must still be able
   to walk over a too-slow smaller animal.)
-- [ ] 5. Vultures: spawn outside the visible area and fly in (not appearing out
+- [x] 5. Vultures: spawn outside the visible area and fly in (not appearing out
   of nowhere); after feeding they fly off and only despawn well outside the
   visible area. Account for the zoom level.
 - [ ] 6. Predators must not despawn within the visible area. In general: animals

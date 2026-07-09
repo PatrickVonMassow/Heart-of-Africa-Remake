@@ -377,7 +377,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     streaming despawn (an animal survives a tile-boundary crossing while in
     view, despawns once well outside it, and a wider zoom keeps animals the
     default view would have dropped), that a non-lion (trampled) carcass
-    draws a vulture that lands and consumes it until it is removed, that
+    draws a vulture that lands and consumes it until it is removed — with the
+    vulture spawning beyond the zoom-aware view ring and flying in (no popping
+    in), flying off after the meal and despawning only well outside the view,
+    and the kill-circling flock flying the same in/out pattern — that
     carcasses left far off-screen are culled while a visible one is kept (so
     kills stay bounded and never stall the frame loop), that more than one
     kind of predator hunts and every predator/prey pairing fits the region
