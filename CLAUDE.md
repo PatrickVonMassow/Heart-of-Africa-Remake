@@ -417,12 +417,16 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     the life vignettes of `design.md` §19 (conversing pairs, fire tender,
     cooking runs from the huts, grain pounding, drummer, well with water
     carrier), and the first-person background is a panorama of the real
-    surrounding map landscape (`design.md` §2). Verifiable: screenshots of
+    surrounding map landscape (`design.md` §2), whose relief is capped and
+    drawn double-sided so even a mountainous setting (the Atlas behind Berber
+    Village) reads as a distant horizon range rather than looming over the
+    camera as a dark overhanging ceiling. Verifiable: screenshots of
     a port city and a village show dense building fabric with paths and
     several non-functional buildings; inhabitants move about and use their
     dwellings; Cairo's walkable radius and dwelling count exceed Boma's;
-    the backdrop mesh is present; the application loads without console
-    errors (`scripts/verify/enrichments.mjs`).
+    the backdrop mesh is present and Berber Village's backdrop stays a low
+    horizon range (max elevation angle bounded); the application loads
+    without console errors (`scripts/verify/enrichments.mjs`).
 16. **Collision inside settlements.** The collision point of the passage
     "**Lively, densely built settlements (first-person).**" (`design.md`
     §2) is implemented: neither the player character nor the inhabitants

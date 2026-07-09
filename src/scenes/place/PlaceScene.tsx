@@ -1327,6 +1327,10 @@ function PanoramaWildlife({
  */
 const BACKDROP_SCALE = 0.005 // degrees of map per place-unit of distance
 const BACKDROP_HEIGHT = 30 // vertical exaggeration of the map relief
+// Max backdrop rise as a fraction of the ring's distance (~tan of the elevation
+// angle): keeps mountains as a distant horizon range, never looming over the
+// camera. atan(0.32) ≈ 18°.
+const BACKDROP_MAX_SLOPE = 0.32
 const BACKDROP_RINGS = 24
 const BACKDROP_SEGS = 96
 
@@ -1348,7 +1352,13 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
         const x = Math.cos(a) * r
         const z = Math.sin(a) * r
         const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
-        const y = Math.max(-6, (smp.height - centerH) * BACKDROP_HEIGHT) * taper - 2
+        const relief = (smp.height - centerH) * BACKDROP_HEIGHT
+        // Cap the height to a fraction of the ring's distance so even mountainous
+        // surroundings (e.g. the Atlas behind Berber Village) read as a distant
+        // range on the horizon instead of looming up and arcing over the camera
+        // (which showed as a dark overhanging "ceiling" with gaps).
+        const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
+        const y = capped * taper - 2
         positions.push(x, y, z)
         colors.push(smp.color[0], smp.color[1], smp.color[2])
       }
@@ -1370,19 +1380,34 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     return geo
   }, [lat, lon, seed, innerRadius])
   const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
+    // Double-sided so steep far slopes never show as black backface overhangs.
+    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }),
     [],
   )
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 
-  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  // Dev hook for the headless verification (CLAUDE.md §7.2). Reports the vertex
+  // count and the steepest elevation angle any backdrop vertex subtends from the
+  // eye-height camera at the centre — bounded so mountains never loom overhead.
   useEffect(() => {
     if (!import.meta.env.DEV) return
+    const pos = geometry.attributes.position
+    let maxElevationDeg = 0
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      const z = pos.getZ(i)
+      const horiz = Math.hypot(x, z) || 1
+      const deg = (Math.atan2(y - EYE_HEIGHT, horiz) * 180) / Math.PI
+      if (deg > maxElevationDeg) maxElevationDeg = deg
+    }
     const w = window as unknown as Record<string, unknown>
-    w.__placeBackdrop = geometry.attributes.position.count
+    w.__placeBackdrop = pos.count
+    w.__placeBackdropInfo = { count: pos.count, maxElevationDeg }
     return () => {
       delete w.__placeBackdrop
+      delete w.__placeBackdropInfo
     }
   }, [geometry])
 

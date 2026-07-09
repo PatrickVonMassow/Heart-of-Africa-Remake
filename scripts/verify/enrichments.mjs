@@ -91,6 +91,24 @@ check('Village: landscape backdrop mesh present', village.backdrop > 1000, `${vi
 await page.screenshot({ path: `${OUT}77-enrich-village-life.png` })
 console.log('shot 77-enrich-village-life.png')
 
+// Point 14: the backdrop of a mountainous settlement (Berber Village, at the
+// Atlas) must read as a distant range on the horizon, not loom over the camera
+// and arc overhead (the former clipping error). The steepest backdrop vertex
+// stays at a low elevation angle from the eye-height camera.
+await page.evaluate(() => window.__game.getState().leavePlace())
+await page.waitForTimeout(800)
+await page.evaluate(() => window.__game.getState().enterPlace('berber-village'))
+await page.waitForFunction(() => window.__placeBackdropInfo, null, { timeout: 30000 })
+await page.waitForTimeout(1200)
+const berber = await page.evaluate(() => window.__placeBackdropInfo)
+check(
+  'Berber Village: mountainous backdrop stays a distant range (no looming/clipping)',
+  berber.maxElevationDeg < 25,
+  `max elevation ${berber.maxElevationDeg?.toFixed(1)}°`,
+)
+await page.screenshot({ path: `${OUT}86-berber-backdrop.png` })
+console.log('shot 86-berber-backdrop.png')
+
 // === Travel view =============================================================
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1500)
