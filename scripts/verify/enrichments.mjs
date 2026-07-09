@@ -388,6 +388,54 @@ check('elephants turn only in gentle arcs (no sharp turns)', herdTest.ok && herd
 check('prey does not dodge a distant elephant', herdTest.ok && herdTest.movedWhileFar < 0.5, JSON.stringify(herdTest))
 check('prey darts away from a close elephant (last-moment dodge)', herdTest.ok && herdTest.dNearEnd > herdTest.dNearStart + 0.5, JSON.stringify(herdTest))
 
+// --- Point 1: the dodge heading stays stable (no ~90° oscillation) -----------
+// A prey straddled by two elephants ~90° apart must flee a single, steady
+// direction — the old nearest-threat pick flip-flopped its facing between the
+// two flankers. Keep the elephants flanking the fleeing prey and watch its
+// persisted dodgeHeading: it must barely change and never reverse.
+const oscillate = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  herds.elephant.length = 0
+  for (const sp of ['zebra', 'antelope', 'giraffe', 'wildebeest', 'warthog']) herds[sp].length = 0
+  const p = window.__game.getState().pos
+  const prey = { x: p.x, z: p.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
+  herds.zebra.push(prey)
+  // Two elephants flanking the prey ~90° apart (slightly asymmetric), pinned
+  // relative to the prey each frame so they keep pace and it stays in range.
+  const a = { x: prey.x + 2.2, z: prey.z + 2.2, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
+  const b = { x: prey.x + 2.6, z: prey.z - 1.6, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
+  herds.elephant.push(a, b)
+  const start = { x: prey.x, z: prey.z }
+  const samples = []
+  for (let k = 0; k < 34; k++) {
+    a.x = prey.x + 2.2; a.z = prey.z + 2.2
+    b.x = prey.x + 2.6; b.z = prey.z - 1.6
+    await sleep(70)
+    if (typeof prey.dodgeHeading === 'number') samples.push(prey.dodgeHeading)
+  }
+  const wrap = (d) => {
+    while (d > Math.PI) d -= Math.PI * 2
+    while (d < -Math.PI) d += Math.PI * 2
+    return d
+  }
+  // No single-step ~90° snap …
+  let maxDelta = 0
+  for (let i = 1; i < samples.length; i++) maxDelta = Math.max(maxDelta, Math.abs(wrap(samples[i] - samples[i - 1])))
+  // … and the whole flee stays in one steady direction: the heading never wanders
+  // far from where it settled (the old bug swung ~90° between the two flankers).
+  const base = samples[Math.min(3, samples.length - 1)] ?? 0
+  let spread = 0
+  for (let i = 3; i < samples.length; i++) spread = Math.max(spread, Math.abs(wrap(samples[i] - base)))
+  const moved = Math.hypot(prey.x - start.x, prey.z - start.z)
+  herds.elephant.length = 0
+  herds.zebra.length = 0
+  return { n: samples.length, maxDelta: +maxDelta.toFixed(3), spread: +spread.toFixed(3), moved: +moved.toFixed(2) }
+})
+check('a fleeing prey dodges without oscillating (stable heading)',
+  oscillate.n >= 8 && oscillate.maxDelta < 0.5 && oscillate.spread < 0.6 && oscillate.moved > 0.5,
+  JSON.stringify(oscillate))
+
 // --- Prey flees smoothly, never teleporting (point 7) ------------------------
 // When a predator becomes active the prey must run away by accumulating into
 // its position, not snap outward by a fixed offset (the old scatter bug).

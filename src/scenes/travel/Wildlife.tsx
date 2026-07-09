@@ -18,6 +18,7 @@ import { latLonToWorld, regionAt, worldToLatLon, type RegionId } from '../../wor
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
+import { fleeHeading, turnToward } from './wildlifeBehavior'
 import {
   buildAntelope,
   buildCheetah,
@@ -75,6 +76,9 @@ interface Animal {
   child?: Animal
   /** Shore animals that also wade in and bathe, not just drink (design.md §19). */
   bathe?: boolean
+  /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
+   *  the facing never snaps between flanking threats (design.md §19). */
+  dodgeHeading?: number
 }
 
 /**
@@ -179,6 +183,9 @@ const ELEPHANT_COHESION = 6 // steer back toward the herd beyond this radius
  *  than the elephant, so a head-on herd still tramples them now and then. */
 const PREY_PANIC_RADIUS = 3.2
 const PREY_PANIC_SPEED = 1.35
+/** Max turn rate (rad/s) for a prey's dodge/flee facing: responsive enough to
+ *  dart aside, capped so the heading can never snap between two threats. */
+const PREY_DODGE_TURN = 8
 /** Family life (design.md §19): a calf keeps within this radius of its parent,
  *  and a parent moves between an approaching predator and its calf to guard it,
  *  standing off a short distance in front of the young. */
@@ -751,23 +758,23 @@ function Herds() {
         }
         // Dodge an approaching elephant, but only at the last moment (design.md
         // §19): the prey darts away just before it is reached and a touch
-        // slower than the herd, so a head-on elephant still catches some.
+        // slower than the herd, so a head-on elephant still catches some. Flee
+        // the summed repulsion of ALL nearby elephants (not just the nearest)
+        // and turn toward it at a bounded rate, so the facing never flip-flops
+        // ~90° between two flanking herd-mates (no oscillation, design.md §19).
         if (sp !== 'elephant' && FLEES_LION[sp]) {
-          let near: [number, number, number] | null = null
-          for (const [ex, ez] of elephantPos) {
-            const d = Math.hypot(px - ex, pz - ez)
-            if (d < PREY_PANIC_RADIUS && (!near || d < near[2])) near = [ex, ez, d]
-          }
-          if (near) {
-            const dx = a.x - near[0]
-            const dz = a.z - near[1]
-            const d = Math.hypot(dx, dz) || 1
-            a.x += (dx / d) * PREY_PANIC_SPEED * dt
-            a.z += (dz / d) * PREY_PANIC_SPEED * dt
+          const target = fleeHeading(a.x, a.z, elephantPos, PREY_PANIC_RADIUS)
+          if (target !== null) {
+            a.dodgeHeading =
+              a.dodgeHeading === undefined ? target : turnToward(a.dodgeHeading, target, PREY_DODGE_TURN * dt)
+            a.x += Math.sin(a.dodgeHeading) * PREY_PANIC_SPEED * dt
+            a.z += Math.cos(a.dodgeHeading) * PREY_PANIC_SPEED * dt
             px = a.x
             pz = a.z
-            yaw = Math.atan2(dx, dz)
+            yaw = a.dodgeHeading
             pitch = 0
+          } else {
+            a.dodgeHeading = undefined
           }
         }
         // Under an elephant: trampled, stays dead on the ground.

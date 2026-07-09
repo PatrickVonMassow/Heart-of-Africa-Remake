@@ -37,7 +37,7 @@ the map).
 
 ## Checklist
 
-- [ ] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
+- [x] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
   fleeing from elephants) — stabilise the direction choice so the facing no
   longer flip-flops.
 - [ ] 2. A predator eating a calf: the red stain and the calf shrinking start
