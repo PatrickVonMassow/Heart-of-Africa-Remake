@@ -581,7 +581,7 @@ export const useGame = create<GameState>()((set, get) => ({
     let cost: number
     switch (here.type) {
       case 'desert':
-        cost = hasCanoe ? tc.desert * balance.canoeLandPenalty : tc.desert
+        cost = tc.desert
         break
       case 'jungle':
         cost = (s.equipment.machete ?? 0) > 0 ? tc.jungle : tc.jungle * balance.junglePenalty
@@ -594,9 +594,13 @@ export const useGame = create<GameState>()((set, get) => ({
       case 'ocean':
         cost = hasCanoe ? tc.water / balance.canoeSpeedup : tc.water
         break
-      default: // savanna and the like: the canoe is dead weight on land
-        cost = hasCanoe ? tc.savanna * balance.canoeLandPenalty : tc.savanna
+      default: // savanna and the like
+        cost = tc.savanna
     }
+    // Carrying the canoe is dead weight on ANY land (design.md §11): a
+    // multiplicative penalty on top of the terrain cost — desert, savanna,
+    // jungle and mountain alike. Water is exempt (there the canoe speeds up).
+    if (hasCanoe && here.type !== 'water' && here.type !== 'ocean') cost *= balance.canoeLandPenalty
 
     let speed = balance.travelSpeed / Math.max(0.25, cost)
     if (s.afflictions.dehydration) speed *= 0.7 // §11: speed loss in the desert

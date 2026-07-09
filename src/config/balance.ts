@@ -210,7 +210,7 @@ export const balance: BalanceConfig = {
   junglePenalty: 2.3, // no machete: 1.3 * 2.3 ≈ 3.0
   mountainPenalty: 1.67, // no rope: 1.5 * 1.67 ≈ 2.5
   canoeSpeedup: 2.0, // with a canoe water travel is 2x faster (user calibration): 2.0 / 2 = 1.0
-  canoeLandPenalty: 1.6, // carrying the canoe: 1.6x slower on land
+  canoeLandPenalty: 2.5, // carrying the canoe: 2.5x slower on ANY land (user calibration: was 1.6, too weak)
   currentDrift: 0.2, // deg/s at full strength (~2 world units/s, ~35% of walking)
   currentWaterfallBoost: 4.0,
   currentWaterfallRadius: 0.5,

@@ -226,8 +226,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    (`scripts/verify/enrichments.mjs`). Any active movement penalty shows
    its reason (`design.md` §11): while a terrain slows the traveler and
    the relieving item is not carried (jungle→machete, water→canoe,
-   mountain→rope) or the canoe is carried across open land
-   (savanna/desert→canoeOnLand), the top-right status area names the cause
+   mountain→rope) or the canoe is carried across any land
+   (desert/savanna/jungle/mountain→canoeOnLand, a multiplicative penalty on
+   top of the terrain cost), the top-right status area names the cause
    and the remedy — the slowdown is never silent. Item effects are
    possession-based (`design.md` §6/§7): a piece of equipment acts by being
    in the inventory, there is no "in hand" state. The first time each
@@ -235,7 +236,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    markup); every later encounter of that kind is carried only by the
    status-bar hint, and the once-per-type flag travels with the checkpoint.
    Verifiable: the penalty mapping
-   is pure-tested for each terrain (incl. the canoe-on-land penalty), the
+   is pure-tested for each terrain (incl. the canoe-on-land penalty on every
+   land type), a canoe run on savanna covers clearly less ground than without
+   it (the land malus is real, not just a hint), the
    top-right HUD hint appears in
    jungle without a machete and clears once the machete is in the pack, and a
    first jungle entry adds exactly one journal warning while a later entry

@@ -30,7 +30,7 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 - [x] 5. Tagebuch-Bereich nicht bis ganz nach unten: Camp-/Journal-Button nicht verdecken, darüber etwas Abstand.
 - [x] 6. Canteen Capacity auf 500 reduzieren.
 - [x] 7. Überfall mit Gewehr: Sicherheitsabfrage; danach Beute mitteilen; Beute sehr reichhaltig.
-- [ ] 8. Laufgeschwindigkeits-Malus mit Kanu funktioniert nicht / zu schwach — beheben.
+- [x] 8. Laufgeschwindigkeits-Malus mit Kanu funktioniert nicht / zu schwach — beheben.
 - [ ] 9. Debounce-Radius für versehentliches erneutes Betreten von Siedlungen zu groß — verkleinern.
 - [ ] 10. Hafenankunft: mitteilen, wie viel Geld für Entdeckungen und welche; Geld als „telegrafische Überweisung".
 - [ ] 11. Beim Betreten einer Siedlung Fokus automatisch auf die Steuerung (kein Extra-Klick).

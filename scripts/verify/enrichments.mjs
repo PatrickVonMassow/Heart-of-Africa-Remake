@@ -314,6 +314,9 @@ const penalties = await page.evaluate(() => {
     mountainRope: mp('mountain', { rope: 1 }),
     savanna: mp('savanna', {}),
     savannaCanoe: mp('savanna', { canoe: 1 }),
+    desertCanoe: mp('desert', { canoe: 1 }),
+    jungleCanoe: mp('jungle', { machete: 1, canoe: 1 }),
+    mountainCanoe: mp('mountain', { rope: 1, canoe: 1 }),
   }
 })
 check('Movement penalty: jungle needs a machete', penalties.jungleNone === 'jungle' && penalties.jungleMachete === null)
@@ -321,6 +324,47 @@ check('Movement penalty: water needs a canoe', penalties.waterNone === 'water' &
 check('Movement penalty: mountain needs a rope', penalties.mountainNone === 'mountain' && penalties.mountainRope === null)
 check('Movement penalty: open savanna has none', penalties.savanna === null)
 check('Movement penalty: the canoe slows land travel', penalties.savannaCanoe === 'canoeOnLand')
+check(
+  'Movement penalty: the canoe drags on every land type (desert/jungle/mountain)',
+  penalties.desertCanoe === 'canoeOnLand' && penalties.jungleCanoe === 'canoeOnLand' && penalties.mountainCanoe === 'canoeOnLand',
+  JSON.stringify(penalties),
+)
+
+// Behavioural: carrying the canoe visibly slows land travel (design.md §11).
+// Move a fixed number of steps on the same savanna spot with and without the
+// canoe; the canoe run must cover clearly less ground (higher terrain cost).
+const savSpot = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  for (let lat = -1; lat >= -4; lat -= 0.3)
+    for (let lon = 33; lon <= 37; lon += 0.3)
+      if (T(lat, lon, seed) === 'savanna' && T(lat - 0.05, lon, seed) === 'savanna') return { lat, lon }
+  return null
+})
+if (savSpot) {
+  const canoeLand = await page.evaluate((spot) => {
+    const g = () => window.__game.getState()
+    window.__balance.randomEventsEnabled = false
+    const runN = (equip) => {
+      window.__game.setState({ equipment: equip })
+      g().debugJumpTo(spot.lat, spot.lon)
+      const p0 = { ...g().pos }
+      for (let i = 0; i < 10; i++) g().moveTravel(0, -1, 0.05)
+      const p1 = g().pos
+      return Math.hypot(p1.x - p0.x, p1.z - p0.z)
+    }
+    const noCanoe = runN({})
+    const withCanoe = runN({ canoe: 1 })
+    return { noCanoe: +noCanoe.toFixed(3), withCanoe: +withCanoe.toFixed(3) }
+  }, savSpot)
+  check(
+    'carrying the canoe slows land travel (covers clearly less ground)',
+    canoeLand.withCanoe < canoeLand.noCanoe * 0.55,
+    JSON.stringify(canoeLand),
+  )
+} else {
+  check('a savanna spot was found for the canoe-land test', false, 'no savanna spot located')
+}
 
 // HUD hint: in jungle without a machete the reason is shown, and it clears once
 // the machete is in hand.

@@ -23,8 +23,9 @@ export function movementPenalty(terrain: TerrainType, equipment: Inventory): Mov
   if (terrain === 'jungle' && !has(equipment, 'machete')) return 'jungle'
   if ((terrain === 'water' || terrain === 'ocean') && !has(equipment, 'canoe')) return 'water'
   if (terrain === 'mountain' && !has(equipment, 'rope')) return 'mountain'
-  // On land the canoe is dead weight and slows the traveller.
-  if ((terrain === 'savanna' || terrain === 'desert') && has(equipment, 'canoe')) return 'canoeOnLand'
+  // On ANY land the canoe is dead weight and slows the traveller (design.md §11);
+  // shown after the more urgent missing-relief-item hints above.
+  if (terrain !== 'water' && terrain !== 'ocean' && has(equipment, 'canoe')) return 'canoeOnLand'
   return null
 }
 
