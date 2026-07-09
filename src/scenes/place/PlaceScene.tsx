@@ -1447,12 +1447,22 @@ export function PlaceScene() {
     }
   }, [layout, camera])
 
-  // Mouse look via pointer lock on canvas click.
+  // Focus + mouse-look. On entering a settlement any lingering HUD button is
+  // blurred so keyboard input goes straight to the game without an extra click
+  // (design.md §2/§17). Mouse-look still engages on a deliberate canvas click:
+  // auto-grabbing the pointer would capture the cursor and make the non-modal
+  // journal and dialogs unclickable, so the lock stays an explicit choice.
   useEffect(() => {
     const el = gl.domElement
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
     const onClick = () => {
       if (!useUi.getState().dialog && document.pointerLockElement !== el) {
-        el.requestPointerLock()
+        try {
+          const r = el.requestPointerLock() as unknown as Promise<void> | undefined
+          if (r && typeof r.catch === 'function') r.catch(() => {})
+        } catch {
+          /* pointer lock unavailable — the game stays playable via keyboard */
+        }
       }
     }
     const onMove = (e: MouseEvent) => {

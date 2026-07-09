@@ -190,6 +190,14 @@ await page
 await page.waitForTimeout(500)
 s = await state()
 check('Entered the village (first-person)', s.mode === 'place' && s.placeId === village.id)
+// Point 11: entering a settlement puts the focus on the controls — no lingering
+// HUD button keeps focus, so keyboard works without an extra click (and the
+// canvas is not made a focus/click target, so it never blocks HUD clicks).
+check(
+  'entering leaves no HUD control focused (controls ready, no extra click)',
+  await page.evaluate(() => !['BUTTON', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName ?? '')),
+  await page.evaluate(() => document.activeElement?.tagName ?? 'none'),
+)
 check('Time advances with the journey', s.day > dayBefore)
 check('Village journal entry', s.journal.some((e) =>
   titleKey(e) === 'journal.titles.village' && e.title.params?.place === village.id))

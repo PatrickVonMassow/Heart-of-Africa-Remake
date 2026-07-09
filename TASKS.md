@@ -33,7 +33,7 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 - [x] 8. Laufgeschwindigkeits-Malus mit Kanu funktioniert nicht / zu schwach — beheben.
 - [x] 9. Debounce-Radius für versehentliches erneutes Betreten von Siedlungen zu groß — verkleinern.
 - [x] 10. Hafenankunft: mitteilen, wie viel Geld für Entdeckungen und welche; Geld als „telegrafische Überweisung".
-- [ ] 11. Beim Betreten einer Siedlung Fokus automatisch auf die Steuerung (kein Extra-Klick).
+- [x] 11. Beim Betreten einer Siedlung Fokus automatisch auf die Steuerung (kein Extra-Klick).
 - [ ] 12. Karten-Labels (Wasserfall, Dorf …) erst nach Entdeckung anzeigen; bis dahin „?".
 - [ ] 13. Flusswasser durchgängig (mind. der Nil hat Unterbrechungen).
 - [ ] 14. Hintergrund-Landschaft von Siedlungen hat Clipping-Fehler (Berge hinter „Berber Village").

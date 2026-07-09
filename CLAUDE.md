@@ -196,6 +196,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    run walks into a place and into a building's door and enters both, and walks
    past the settlement edge to leave, without any key press; standing on the
    just-left marker does not re-enter until the traveller has moved clear
+   (`scripts/verify/flow.mjs`). Entering a settlement puts focus on the
+   controls without an extra click: any lingering HUD button is blurred so the
+   keyboard controls the character at once (mouse-look/pointer lock stays a
+   deliberate click, so the cursor is not captured and HUD clicks keep working);
+   verifiable: on entering, no HUD control (button/input) retains focus
    (`scripts/verify/flow.mjs`).
 3. **World model.** Fixed geographic locations of the landscape elements per
    `design.md`; the concrete appearance must be graphically elaborate,
