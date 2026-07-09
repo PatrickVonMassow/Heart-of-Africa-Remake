@@ -1480,6 +1480,102 @@ check('the kill flock flies in from beyond the view ring and settles over the ki
 check('when the kill scene ends the flock flies off and despawns well outside the view',
   killFlock.outSeen && killFlock.hideDist !== null && killFlock.hideDist > 130, JSON.stringify(killFlock))
 
+// --- Point 6: the predator never despawns in view (zoom-aware) ----------------
+// design.md §19: after the meal the predator trots off and leaves the stage
+// only well beyond the visible surroundings; a chase that strays aborts past
+// the same ring — nothing vanishes in sight.
+const leaveOffstage = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p = () => window.__game.getState().pos
+  const L = window.__lionHunt.state
+  window.__ui.getState().setTravelZoom(1)
+  L.victim = null
+  L.victimHunt = false
+  L.px = p().x + 80
+  L.pz = p().z
+  L.lx = L.px + 0.7
+  L.lz = L.pz + 0.25
+  L.mode = 'feed'
+  L.timer = 0.1 // carcass done at once → leave
+  const out = { sawLeave: false, hideDist: null }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 45000) {
+    if (L.mode === 'leave') out.sawLeave = true
+    if (out.sawLeave && L.mode === 'idle') {
+      out.hideDist = +Math.hypot(L.lx - p().x, L.lz - p().z).toFixed(1)
+      break
+    }
+    await sleep(80)
+  }
+  L.mode = 'idle'
+  L.timer = 99999
+  return out
+})
+check('after the meal the predator walks off and despawns only outside the view',
+  leaveOffstage.sawLeave && leaveOffstage.hideDist !== null && leaveOffstage.hideDist > 100,
+  JSON.stringify(leaveOffstage))
+
+const chaseAbort = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p = () => window.__game.getState().pos
+  const L = window.__lionHunt.state
+  L.victim = null
+  L.victimHunt = false
+  L.mode = 'chase'
+  L.lx = p().x + 90
+  L.lz = p().z
+  L.px = p().x + 400 // prey far beyond the ring: the chase strays outward
+  L.pz = p().z
+  L.lionHeading = Math.atan2(L.px - L.lx, L.pz - L.lz)
+  L.preyHeading = L.lionHeading
+  let abortDist = null
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (L.mode !== 'chase') {
+      abortDist = +Math.hypot(L.lx - p().x, L.lz - p().z).toFixed(1)
+      break
+    }
+    await sleep(60)
+  }
+  L.mode = 'idle'
+  L.timer = 99999
+  return { abortDist }
+})
+check('a strayed chase aborts only beyond the view ring (not in sight)',
+  chaseAbort.abortDist !== null && chaseAbort.abortDist > 100, JSON.stringify(chaseAbort))
+
+// Zoom-aware ring: at a narrower zoom the stage edge sits closer in.
+const leaveZoom = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p = () => window.__game.getState().pos
+  const L = window.__lionHunt.state
+  window.__ui.getState().setTravelZoom(0.5) // view ring 50 → offstage past 80
+  L.victim = null
+  L.victimHunt = false
+  L.px = p().x + 60
+  L.pz = p().z
+  L.lx = L.px + 0.7
+  L.lz = L.pz + 0.25
+  L.mode = 'feed'
+  L.timer = 0.1
+  let hideDist = null
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (L.mode === 'idle') {
+      hideDist = +Math.hypot(L.lx - p().x, L.lz - p().z).toFixed(1)
+      break
+    }
+    await sleep(60)
+  }
+  L.mode = 'idle'
+  L.timer = 99999
+  window.__ui.getState().setTravelZoom(1)
+  return { hideDist }
+})
+check('the predator despawn ring scales with the zoom (narrow zoom hides sooner)',
+  leaveZoom.hideDist !== null && leaveZoom.hideDist >= 80 && leaveZoom.hideDist < 100,
+  JSON.stringify(leaveZoom))
+
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);
 // what stays needs the live store: selecting a place actually teleports there.

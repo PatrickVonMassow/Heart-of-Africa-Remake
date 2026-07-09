@@ -202,6 +202,11 @@ const HUNT_LION_TURN = 3.0
 const HUNT_WEAVE_FREQ = 2.2
 const HUNT_WEAVE_AMP = 1.0
 const HUNT_LION_APPROACH = 15
+/** After the meal the predator trots off and leaves the stage only well beyond
+ *  the zoom-aware view ring — it never despawns in sight (design.md §19); a
+ *  chase that strays ends past the same ring. */
+const HUNT_LEAVE_SPEED = 4.5
+const HUNT_OFFSTAGE_MARGIN = 30
 
 /** Species that flee from a hunting or feeding lion. */
 const FLEES_LION: Record<Species, boolean> = {
@@ -350,6 +355,15 @@ function findLandNear(x: number, z: number, seed: number): { x: number; z: numbe
     }
   }
   return { x, z } // mid-lake with no bank in reach — hold position
+}
+
+/** Walk-off direction after a kill: straight away from the traveller, so the
+ *  leave never crosses the view; random when standing on the traveller. */
+function leaveHeading(x: number, z: number, px: number, pz: number): number {
+  const dx = x - px
+  const dz = z - pz
+  if (Math.hypot(dx, dz) < 1e-3) return Math.random() * Math.PI * 2
+  return Math.atan2(dx, dz)
 }
 
 function emptyHerds(): Record<Species, Animal[]> {
@@ -1450,6 +1464,9 @@ function LionHunt() {
     const t = clock.elapsedTime
     const s = state.current
     const pos = useGame.getState().pos
+    // The predator leaves the stage — and a strayed chase ends — only well
+    // beyond the visible surroundings, however far the zoom reaches (§19).
+    const offstageR = VIEW_AT_ZOOM1 * useUi.getState().travelZoom + HUNT_OFFSTAGE_MARGIN
 
     if (s.mode === 'idle') {
       // Idle clears any stale calf-hunt bookkeeping so a re-armed hunt starts clean.
@@ -1571,8 +1588,9 @@ function LionHunt() {
           s.mode = 'feed'
           s.timer = v ? 30 : FEED_DURATION
         }
-        // Abort when the hunt strays too far from the player.
-        if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > 90) {
+        // Abort when the hunt strays beyond the visible surroundings — never
+        // inside the view, so the animals do not vanish in sight (§19).
+        if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR) {
           s.mode = 'idle'
           s.timer = 10
         }
@@ -1594,8 +1612,7 @@ function LionHunt() {
         const consumed = v.dead && (v.dissolve ?? 0) <= 0
         if (consumed || s.timer <= 0) {
           s.mode = 'leave'
-          s.timer = 9
-          s.heading = Math.random() * Math.PI * 2
+          s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.victim = null
           s.lx = s.px + 0.7
           s.lz = s.pz + 0.25
@@ -1605,18 +1622,18 @@ function LionHunt() {
         if (s.timer <= 0) {
           // Carcass fully consumed: the lion moves on (design.md §19).
           s.mode = 'leave'
-          s.timer = 9
-          s.heading = Math.random() * Math.PI * 2
+          s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.lx = s.px + 0.7
           s.lz = s.pz + 0.25
         }
       }
     } else {
-      // Moving on: walk straight away from the kill site, then despawn.
-      s.lx += Math.sin(s.heading) * 2.0 * dt
-      s.lz += Math.cos(s.heading) * 2.0 * dt
-      s.timer -= dt
-      if (s.timer <= 0) {
+      // Moving on: trot straight away from the traveller and leave the stage
+      // only well beyond the visible surroundings (zoom-aware) — the predator
+      // never despawns in sight (design.md §19).
+      s.lx += Math.sin(s.heading) * HUNT_LEAVE_SPEED * dt
+      s.lz += Math.cos(s.heading) * HUNT_LEAVE_SPEED * dt
+      if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR) {
         s.mode = 'idle'
         s.timer = 30 + Math.random() * 30
       }

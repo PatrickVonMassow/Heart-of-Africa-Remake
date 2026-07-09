@@ -376,7 +376,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     prove the zoom-aware
     streaming despawn (an animal survives a tile-boundary crossing while in
     view, despawns once well outside it, and a wider zoom keeps animals the
-    default view would have dropped), that a non-lion (trampled) carcass
+    default view would have dropped) — with the scripted predator obeying the
+    same ring: after feeding it walks off and is removed only beyond it, and a
+    strayed chase aborts the same way — that a non-lion (trampled) carcass
     draws a vulture that lands and consumes it until it is removed — with the
     vulture spawning beyond the zoom-aware view ring and flying in (no popping
     in), flying off after the meal and despawning only well outside the view,

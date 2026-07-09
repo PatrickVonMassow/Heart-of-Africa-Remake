@@ -65,8 +65,11 @@ the map).
 - [x] 5. Vultures: spawn outside the visible area and fly in (not appearing out
   of nowhere); after feeding they fly off and only despawn well outside the
   visible area. Account for the zoom level.
-- [ ] 6. Predators must not despawn within the visible area. In general: animals
+- [x] 6. Predators must not despawn within the visible area. In general: animals
   only despawn well outside the visible area (account for the zoom level).
+  (Herd streaming already despawned beyond the zoom-aware ring; the offender
+  was the scripted hunt predator, which left by timer and aborted at a fixed
+  90 units — both now resolve only past the zoom-aware view ring.)
 - [ ] 7. When a predator leaves, it leaves behind a small remnant of prey that is
   then eaten by vultures.
 - [ ] 8. In the debug-menu-extended zoom mode one should be able to zoom out far
