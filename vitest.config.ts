@@ -1,13 +1,17 @@
 import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
 
 // Fast, deterministic unit/component layer (CLAUDE.md §7.2): pure logic, store
 // transitions and the HTML HUD components run in jsdom with no browser or dev
 // server, so the bulk of the regression finishes in seconds and never flickers
 // on RAF/browser timing. The remaining browser-only checks stay in Playwright
 // (scripts/verify/*.mjs).
+//
+// JSX is transformed by esbuild with the automatic React runtime (no
+// @vitejs/plugin-react — its vite-8/rolldown build does not load under
+// Vitest's bundled vite, so its JSX transform would silently fall back to the
+// classic runtime and break component tests).
 export default defineConfig({
-  plugins: [react()],
+  esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
