@@ -4,6 +4,7 @@
 
 import type { Strings, TextParams } from './types'
 import { DIRECTION_WORDS, GLOSSARY } from '../world/lore'
+import { namesFromCsv } from './names'
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -565,8 +566,10 @@ export const en: Strings = {
       `[excited]My shovel struck something hard![/excited] [breath]From the earth I lifted a cache of [emph]${en.treasures[p.treasure as keyof typeof en.treasures].toLowerCase()}[/emph] — buried long ago and forgotten by all but the sand. [awe]Fortune smiles on the patient digger.[/awe]`,
     ivoryFound: (p: TextParams) =>
       `[awe]The elephant graveyard.[pause] Bleached bones tower about me like the ribs of stranded ships.[/awe] [somber]With quiet reverence I freed ${p.count === 1 ? 'a great tusk' : `${p.count} great tusks`} from the ground —[pause] ivory of a purity I have never seen.[/somber]`,
-    bounty: (p: TextParams) =>
-      `[excited]The geographic society has honored my reports![/excited] For ${p.count} documented ${Number(p.count) === 1 ? 'discovery' : 'discoveries'} they credited me [emph]${p.amount} dollars[/emph]. [pause]Exploration, it turns out, can pay for its own provisions.`,
+    bounty: (p: TextParams) => {
+      const names = [namesFromCsv(p.villages, en.places), namesFromCsv(p.landmarks, LANDMARKS)].filter(Boolean).join(', ')
+      return `[excited]The geographic society has honored my reports![/excited] For ${p.count} documented ${Number(p.count) === 1 ? 'discovery' : 'discoveries'} — [emph]${names}[/emph] — they sent word ahead: a [emph]telegraphic transfer[/emph] of [emph]${p.amount} dollars[/emph] awaited me at the port. [pause]Exploration, it turns out, can pay for its own provisions.`
+    },
     ferry: (p: TextParams) =>
       `I booked passage from ${en.places[p.from as string]} to ${en.places[p.to as string]}. [pause]${p.days} days at sea — [somber]the coast slid past like a slow panorama,[/somber] [excited]and I arrived rested, with dry boots for once.[/excited]`,
     valuableRevered: (p: TextParams) =>

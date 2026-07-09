@@ -222,6 +222,31 @@ check(
   s.money === moneyPreBounty + expectedBounty && s.pendingBounties.length === 0 && keys.includes('journal.bounty'),
   `+${expectedBounty} $`,
 )
+// The report names which discoveries earned the money (design.md §10, point 10).
+const bountyParams = await page.evaluate(() => {
+  const e = [...window.__game.getState().journal]
+    .reverse()
+    .find((x) => (typeof x.text === 'object' ? x.text.key : x.text) === 'journal.bounty')
+  return e && typeof e.text === 'object' ? e.text.params : null
+})
+check(
+  'the bounty entry records which discoveries earned it',
+  !!bountyParams && String(bountyParams.landmarks || '').includes('kilimanjaro') && String(bountyParams.villages || '').includes('masai-village'),
+  JSON.stringify(bountyParams),
+)
+// The rendered entry calls it a telegraphic transfer and names the discoveries.
+await page.evaluate(() => window.__game.getState().setJournalOpen(true))
+await page.waitForTimeout(500)
+const bountyRendered = await page.evaluate(() => {
+  const e = [...document.querySelectorAll('.journal .entry')].find((el) => /telegra|Überweisung|transfer/i.test(el.textContent))
+  return e ? e.textContent : ''
+})
+check(
+  'the bounty is reported as a telegraphic transfer naming the discoveries',
+  /telegra|Überweisung|transfer/i.test(bountyRendered) && /Kilim/i.test(bountyRendered),
+  bountyRendered.slice(0, 180),
+)
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
 // --- Elephant graveyard ivory: a random haul per dig, averaging ~5 -------------------
 await page.evaluate(() => {

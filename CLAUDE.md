@@ -662,8 +662,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     identical price; the quote clears on leaving the port); the travel agency sells ferry
     passages between all ports with distance-based fare and duration,
     which makes Zanzibar reachable; discovery bounties for first-visited
-    villages and sighted landmarks are credited on the next port visit
-    via a journal entry; presenting a carried valuable to a village (the
+    villages and sighted landmarks are credited on the next port visit as a
+    telegraphic transfer, the journal entry naming exactly which discoveries
+    earned it and the amount; presenting a carried valuable to a village (the
     inventory bar) triggers the
     positive or negative village reaction of the §8 matrix. Every
     settlement — port and village — offers at least the baseline goods
@@ -675,7 +676,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     auto-raise, the regional bid ordering and rejection, the stable
     re-offer quote (identical price across re-offers, cleared on leaving
     the port), the ferry to Zanzibar (fare, days, checkpoint), the bounty
-    crediting, the graveyard's random ivory haul (range 1..9, mean ~5) and
+    crediting and its telegraphic-transfer report naming the discoveries,
+    the graveyard's random ivory haul (range 1..9, mean ~5) and
     its cap by the remaining supply, digging a treasure cache and
     the statue site, both valuable reactions, the baseline goods in every
     settlement, buying food in a village against gifts (money untouched),

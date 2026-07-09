@@ -1164,10 +1164,14 @@ export const useGame = create<GameState>()((set, get) => ({
           (sum, b) => sum + (b.kind === 'village' ? e.bountyVillage : e.bountyLandmark),
           0,
         )
+        // Pass the discovered ids (comma-joined, by kind) so the journal can
+        // name exactly which discoveries earned the transfer (design.md §10).
+        const villages = pending.filter((b) => b.kind === 'village').map((b) => b.id).join(',')
+        const landmarks = pending.filter((b) => b.kind === 'landmark').map((b) => b.id).join(',')
         set((st) => ({ money: st.money + amount, pendingBounties: [] }))
         get().addEntry(
           { key: 'journal.titles.bounty' },
-          { key: 'journal.bounty', params: { amount, count: pending.length } },
+          { key: 'journal.bounty', params: { amount, count: pending.length, villages, landmarks } },
         )
       }
       get().saveCheckpoint()
