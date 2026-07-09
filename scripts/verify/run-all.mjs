@@ -73,7 +73,11 @@ if (!filter.length || filter.includes('build')) {
   const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const buildOk = build.status === 0
   console.log(`${buildOk ? 'PASS' : 'FAIL'}  build        (tsc -b + vite build, exit ${build.status})`)
-  if (!buildOk) console.log((build.stdout ?? '') + (build.stderr ?? ''))
+  if (!buildOk) {
+    console.log((build.stdout ?? '') + (build.stderr ?? ''))
+    console.log('\n1 SUITE(S) FAILED — build failed, skipping the rest')
+    process.exit(1) // fail fast: no point running suites against a broken build
+  }
   results.push(buildOk)
 }
 if (!filter.length || filter.includes('lint')) {

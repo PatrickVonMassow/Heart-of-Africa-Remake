@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { healthState, listCheckpoints, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import { placeById, worldToLatLon } from '../world/geo'
+import { sampleTerrain } from '../world/terrain'
 import { START_YEAR } from '../config/balance'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
@@ -21,6 +22,10 @@ function InventoryBar() {
   const equipment = useGame((s) => s.equipment)
   const treasures = useGame((s) => s.treasures)
   const canteenFill = useGame((s) => s.canteenFill)
+  const mode = useGame((s) => s.mode)
+  const pos = useGame((s) => s.pos)
+  const seed = useGame((s) => s.seed)
+  const afflictions = useGame((s) => s.afflictions)
   const owned = (Object.keys(equipment) as EquipmentId[]).filter((e) => (equipment[e] ?? 0) > 0)
   const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0)
   if (owned.length === 0 && ownedTreasures.length === 0) return null
@@ -36,6 +41,19 @@ function InventoryBar() {
   }
   const clickable = (e: EquipmentId) => e === 'medicine' || e === 'map' || e === 'shovel'
 
+  // An item "in use" glows in the inventory: a carried relief item currently
+  // countering the terrain (canoe on water, machete in jungle, rope on a
+  // mountain), and medicine while there is a curable affliction (fever/wounds).
+  const active = new Set<EquipmentId>()
+  if (mode === 'travel') {
+    const ll = worldToLatLon(pos.x, pos.z)
+    const terrain = sampleTerrain(ll.lat, ll.lon, seed).type
+    if ((terrain === 'water' || terrain === 'ocean') && (equipment.canoe ?? 0) > 0) active.add('canoe')
+    if (terrain === 'jungle' && (equipment.machete ?? 0) > 0) active.add('machete')
+    if (terrain === 'mountain' && (equipment.rope ?? 0) > 0) active.add('rope')
+  }
+  if ((equipment.medicine ?? 0) > 0 && (afflictions.fever || afflictions.wounds > 0)) active.add('medicine')
+
   const canteenPct = Math.round(canteenFill * 100)
   const canteenGlow =
     canteenFill <= 0 ? ' canteen-empty' : canteenFill < 0.05 ? ' canteen-crit' : canteenFill < 0.2 ? ' canteen-low' : ''
@@ -43,9 +61,10 @@ function InventoryBar() {
   return (
     <div className="inventory-bar">
       {owned.map((e) => {
+        const activeCls = active.has(e) ? ' inv-active' : ''
         if (e === 'canteen') {
           return (
-            <span key={e} className={`inv-item canteen${canteenGlow}`} title={t.hud.canteenTooltip}>
+            <span key={e} data-eq={e} className={`inv-item canteen${canteenGlow}`} title={t.hud.canteenTooltip}>
               {t.equipment.canteen} {canteenPct}%
             </span>
           )
@@ -53,14 +72,14 @@ function InventoryBar() {
         if (clickable(e)) {
           const label = e === 'medicine' ? `${t.equipment.medicine} (${equipment.medicine})` : t.equipment[e]
           return (
-            <button key={e} onClick={() => activateItem(e)} title={t.hud.useTooltip}>
+            <button key={e} data-eq={e} className={activeCls.trim()} onClick={() => activateItem(e)} title={t.hud.useTooltip}>
               {label}
             </button>
           )
         }
         // Passive gear: its effect follows possession (design.md §11/§14).
         return (
-          <span key={e} className="inv-item" title={t.hud.passiveTooltip}>
+          <span key={e} data-eq={e} className={`inv-item${activeCls}`} title={t.hud.passiveTooltip}>
             {t.equipment[e]}
           </span>
         )

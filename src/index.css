@@ -205,6 +205,23 @@ textarea {
   }
 }
 
+/* Item "in use" glow: a carried item currently taking effect (canoe on water,
+   machete in jungle, rope on a mountain, medicine while afflicted) lights up in
+   the inventory bar (both passive labels and clickable buttons). */
+.inventory-bar .inv-item.inv-active,
+.inventory-bar button.inv-active {
+  border-color: #6fc36a;
+  color: #b6efb0;
+  box-shadow: 0 0 8px rgba(111, 195, 106, 0.7);
+  animation: inv-active-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes inv-active-pulse {
+  50% {
+    box-shadow: 0 0 3px rgba(111, 195, 106, 0.35);
+  }
+}
+
 /* --- Self-drawing exploration map (design.md §19) ------------------------- */
 
 .map-overlay {

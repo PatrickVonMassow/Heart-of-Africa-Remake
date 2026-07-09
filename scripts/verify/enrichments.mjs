@@ -413,6 +413,35 @@ const waterSpot = await page.evaluate(() => {
       if (window.__terrainType(lat, lon, seed) === 'water') return { lat, lon }
   return null
 })
+
+// --- Point 4: an in-use item glows in the inventory (.inv-active) -------------
+// A carried relief item countering the present terrain (canoe on water) and
+// medicine while afflicted gain .inv-active; idle items (rifle) do not.
+if (waterSpot) {
+  await page.evaluate((w) => {
+    const g = window.__game.getState()
+    g.debugFullLoadout() // all gear incl. canoe/rifle/medicine; afflictions cleared
+    g.debugJumpTo(w.lat, w.lon) // stand on water
+  }, waterSpot)
+  await page.waitForTimeout(400)
+  const onWater = await page.evaluate(() => {
+    const cls = (eq) => document.querySelector(`.inventory-bar [data-eq="${eq}"]`)?.className ?? ''
+    return { canoe: cls('canoe'), rifle: cls('rifle'), medicine: cls('medicine') }
+  })
+  check('the canoe glows (.inv-active) while on water', /inv-active/.test(onWater.canoe), onWater.canoe)
+  check('an idle item (rifle) does not glow on water', !/inv-active/.test(onWater.rifle), onWater.rifle)
+  check('medicine does not glow while healthy', !/inv-active/.test(onWater.medicine), onWater.medicine)
+  await page.evaluate(() => window.__game.getState().debugSetAffliction('fever', true))
+  await page.waitForTimeout(200)
+  const afflicted = await page.evaluate(
+    () => document.querySelector('.inventory-bar [data-eq="medicine"]')?.className ?? '',
+  )
+  check('medicine glows (.inv-active) while afflicted', /inv-active/.test(afflicted), afflicted)
+  await page.evaluate(() => window.__game.getState().debugSetAffliction('fever', false))
+} else {
+  check('a water tile was found for the in-use glow', false, 'no water tile located')
+}
+
 const danger = await page.evaluate(async ([desert, water, jungle]) => {
   const g = () => window.__game.getState()
   window.__balance.randomEventsEnabled = false

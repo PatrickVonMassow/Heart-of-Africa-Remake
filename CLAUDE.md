@@ -279,9 +279,14 @@ The POC counts as fulfilled when all points verifiably hold. Details per
    possession-based, `design.md` §6/§7). Coordinates are not shown permanently (removed on
    user request); transient status hints (e.g. the movement-penalty reason,
    pt. 4) render as a right-aligned item inside the status bar itself, not in
-   a separate panel floating over the scene. Verifiable: the hint element is a
-   descendant of `.status-bar` and its box stays within the bar's box
-   (`scripts/verify/enrichments.mjs`).
+   a separate panel floating over the scene. An inventory item currently in use
+   lights up (glows) in the inventory bar (`design.md` §17): the relief item
+   countering the present terrain (canoe on water, machete in jungle, rope on a
+   mountain) and medicine while a curable affliction is active carry an
+   `.inv-active` glow. Verifiable: the hint element is a
+   descendant of `.status-bar` and its box stays within the bar's box, and a
+   canoe on water / medicine while afflicted gains `.inv-active` while an
+   idle item does not (`scripts/verify/enrichments.mjs`).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints (`design.md` §13.3): per
