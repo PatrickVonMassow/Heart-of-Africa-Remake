@@ -51,6 +51,8 @@ check('jungle/mountain penalty factors present', bal.jungle === 2.3 && bal.mount
   `jungle ${bal.jungle}, mountain ${bal.mountain}`)
 const canteenCap = await page.evaluate(() => window.__balance.health.canteenCapacity)
 check('canteen capacity reduced to 500 (user calibration)', canteenCap === 500, `${canteenCap}`)
+const reentry = await page.evaluate(() => window.__balance.placeReentryMargin)
+check('settlement re-entry debounce margin reduced to a small clearance (2)', reentry === 2, `${reentry}`)
 
 check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
 

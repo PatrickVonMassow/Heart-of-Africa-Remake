@@ -221,7 +221,7 @@ export const balance: BalanceConfig = {
   },
   digRadius: 3,
   placeEnterRadius: 2.5,
-  placeReentryMargin: 6, // calibratable: clearance beyond the edge before re-entry re-arms
+  placeReentryMargin: 2, // small clearance beyond the enter radius before re-entry re-arms (user: was 6, too large)
   goodwillForHint: 2,
   goodwillRevered: 2,
   goodwillNeutral: 1,
