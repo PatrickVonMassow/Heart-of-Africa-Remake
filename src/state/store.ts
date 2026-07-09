@@ -34,10 +34,6 @@ export type EquipmentId =
 
 export const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
 
-export function isEquipmentId(id: string): id is EquipmentId {
-  return (EQUIPMENT_IDS as string[]).includes(id)
-}
-
 /** Item kinds movable between the pack and a camp cache (design.md §6). */
 export type ItemKind = 'equipment' | 'gift' | 'treasure'
 
@@ -1144,6 +1140,8 @@ export const useGame = create<GameState>()((set, get) => ({
       mode: 'place',
       placeId: id,
       // Place membership defines the region shown/used while inside (§4.5).
+      // Every current place already sits in its declared region (place.region
+      // === regionAt); this stays authoritative if a future place is off-band.
       region: place.region,
       visitedPlaces: first ? [...s.visitedPlaces, id] : s.visitedPlaces,
       // A first-visited village is itself a bounty-worthy discovery (§10).

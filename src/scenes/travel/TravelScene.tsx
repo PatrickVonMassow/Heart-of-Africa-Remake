@@ -48,7 +48,7 @@ import {
   buildTermiteMound,
 } from '../../render/flora'
 import { buildElephant } from '../../render/fauna'
-import { mulberry32 } from '../../world/noise'
+import { mulberry32, hashChunk } from '../../world/noise'
 import { Climate } from './Climate'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
@@ -405,18 +405,6 @@ const MAX_INSTANCES: Record<Species, number> = {
 }
 const CANDIDATES_PER_CHUNK = 22
 
-/** Deterministic hash of chunk coords + index + seed to [0, 1). */
-function hash(cx: number, cz: number, i: number, seed: number): number {
-  let h = seed >>> 0
-  h = Math.imul(h ^ cx, 0x85ebca6b)
-  h = Math.imul(h ^ cz, 0xc2b2ae35)
-  h = Math.imul(h ^ i, 0x27d4eb2f)
-  h ^= h >>> 15
-  h = Math.imul(h, 0x2c1b3c6d)
-  h ^= h >>> 13
-  return (h >>> 0) / 4294967296
-}
-
 /**
  * Species choice per terrain type; roll decides density. Region/period
  * flavor (design.md §19): baobabs, termite mounds and kopjes in the
@@ -499,9 +487,9 @@ function Vegetation() {
         const ccx = cx + dx
         const ccz = cz + dz
         for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-          const rx = hash(ccx, ccz, i * 4, seed)
-          const rz = hash(ccx, ccz, i * 4 + 1, seed)
-          const roll = hash(ccx, ccz, i * 4 + 2, seed)
+          const rx = hashChunk(ccx, ccz, i * 4, seed)
+          const rz = hashChunk(ccx, ccz, i * 4 + 1, seed)
+          const roll = hashChunk(ccx, ccz, i * 4 + 2, seed)
           const x = (ccx + rx) * CHUNK_SIZE
           const z = (ccz + rz) * CHUNK_SIZE
           const ll = worldToLatLon(x, z)
@@ -525,7 +513,7 @@ function Vegetation() {
           if (blockedByPlace) continue
           const idx = counts[species]
           if (idx >= MAX_INSTANCES[species]) continue
-          const r4 = hash(ccx, ccz, i * 4 + 3, seed)
+          const r4 = hashChunk(ccx, ccz, i * 4 + 3, seed)
           quat.setFromAxisAngle(up, r4 * Math.PI * 2)
           const sc = 0.75 + r4 * 0.55
           scl.set(sc, sc * (0.85 + roll * 0.3), sc)

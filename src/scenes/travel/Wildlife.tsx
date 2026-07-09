@@ -17,6 +17,7 @@ import { setAmbienceAnimals } from '../../systems/ambience'
 import { latLonToWorld, regionAt, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
+import { hashChunk } from '../../world/noise'
 import {
   buildAntelope,
   buildCheetah,
@@ -203,16 +204,9 @@ const SPAWN_RANGE_MAX = 6
 const CARCASS_DISSOLVE_SECONDS = 9
 const VULTURE_SCAVENGE_SPEED = 9
 
-function hash(cx: number, cz: number, i: number, seed: number): number {
-  let h = (seed ^ 0xa51ce5) >>> 0
-  h = Math.imul(h ^ cx, 0x85ebca6b)
-  h = Math.imul(h ^ cz, 0xc2b2ae35)
-  h = Math.imul(h ^ i, 0x27d4eb2f)
-  h ^= h >>> 15
-  h = Math.imul(h, 0x2c1b3c6d)
-  h ^= h >>> 13
-  return (h >>> 0) / 4294967296
-}
+// Wildlife placement salts the seed so it decorrelates from the terrain
+// scatter that shares hashChunk (design.md §19).
+const hash = (cx: number, cz: number, i: number, seed: number): number => hashChunk(cx, cz, i, seed ^ 0xa51ce5)
 
 function emptyHerds(): Record<Species, Animal[]> {
   return { elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [] }

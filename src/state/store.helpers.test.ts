@@ -3,7 +3,7 @@
 // id guard and the exploration grid key. No browser, no store instance.
 import { describe, it, expect } from 'vitest'
 import {
-  healthState, bagItemCount, emptyBag, totalGifts, isEquipmentId,
+  healthState, bagItemCount, emptyBag, totalGifts,
   exploreCellKey, EXPLORE_CELL_DEG, EQUIPMENT_IDS, type ItemBag,
   usedInventory, priceOfGood, giftPriceOfGood, VILLAGE_TRADE_GOODS, type GameState,
 } from './store'
@@ -38,15 +38,9 @@ describe('inventory bag (design.md §6 camps)', () => {
   })
 })
 
-describe('gift + equipment helpers', () => {
+describe('gift totals', () => {
   it('totalGifts sums the gift record', () => {
     expect(totalGifts({ gold: 1, silver: 2, emerald: 0, copper: 3, ivory: 0 })).toBe(6)
-  })
-
-  it('isEquipmentId recognizes exactly the equipment ids', () => {
-    for (const id of EQUIPMENT_IDS) expect(isEquipmentId(id)).toBe(true)
-    expect(isEquipmentId('gold')).toBe(false)
-    expect(isEquipmentId('nonsense')).toBe(false)
   })
 })
 

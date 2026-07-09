@@ -99,12 +99,12 @@ verification/        acceptance-criteria screenshot evidence
 src/
 ├── config/          central balance values (runtime-tunable via debug menu)
 ├── i18n/            language files (de, en) and localization runtime
-├── journal/         journal sketches
+├── journal/         journal sketches, voice markup, in-browser TTS read-aloud
 ├── render/          sky, water, materials, flora/fauna, post effects
 ├── scenes/travel/   bird's-eye view: terrain, climate, wildlife
 ├── scenes/place/    first-person view: settlements, inhabitants, collision
 ├── state/           game and UI state (zustand)
-├── systems/         input, ambience
+├── systems/         input, movement, events, economy, ambience
 ├── ui/              HUD, status bar, journal panel, map, dialogs, debug menu
 └── world/           geography, geodata sampling, hydrology, terrain model
 ```

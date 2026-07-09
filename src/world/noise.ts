@@ -41,6 +41,22 @@ function valueNoise2(x: number, y: number, seed: number): number {
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy
 }
 
+/**
+ * Deterministic hash of chunk coordinates + an index + seed to [0, 1). Used to
+ * scatter procedural scenery and wildlife per streaming chunk (design.md
+ * §18/§19); callers salt the seed to decorrelate independent layers.
+ */
+export function hashChunk(cx: number, cz: number, i: number, seed: number): number {
+  let h = seed >>> 0
+  h = Math.imul(h ^ cx, 0x85ebca6b)
+  h = Math.imul(h ^ cz, 0xc2b2ae35)
+  h = Math.imul(h ^ i, 0x27d4eb2f)
+  h ^= h >>> 15
+  h = Math.imul(h, 0x2c1b3c6d)
+  h ^= h >>> 13
+  return (h >>> 0) / 4294967296
+}
+
 /** Fractal Brownian motion in [0, 1]. */
 export function fbm2(x: number, y: number, seed: number, octaves = 4, lacunarity = 2, gain = 0.5): number {
   let sum = 0
