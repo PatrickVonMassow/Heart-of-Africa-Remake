@@ -1,8 +1,15 @@
-// Headless verification for CLAUDE.md §7.1.20 (comfort and audio settings)
-// and the lion-feed depiction of §7.1.12: balance defaults (mouse
-// sensitivity halved, walk speed 10 m/s, ambience noise at 20 %), the lowered
-// first-person eye height, the debug-menu controls in both languages, and
-// the schematic feeding animation of the decorative lion hunt.
+// Headless verification for CLAUDE.md §7.1.20 (comfort/audio settings) and the
+// lion-feed depiction of §7.1.12: the browser-only remainder. The balance
+// defaults (mouse/walk/ambience/travel/canoe/jungle/mountain/canteen/reentry/
+// strafe) moved to src/config/balance.test.ts, the pure placeWalkVelocity ratio
+// to src/systems/movement.test.ts, the F3/F4/Tab-toggle store asserts to
+// src/state/store.debug.test.ts, and the DebugMenu label/field/dropdown/
+// renderer render asserts to src/ui/DebugMenu.test.tsx. What stays here needs a
+// real browser: the first-person eye height (window.__placeCamera), the
+// in-scene walk measurement, the user-select computed style, the RAF-driven
+// lion-feed depiction (window.__lionHunt), the ambience engine + proximity
+// animal call rise/fade (AudioContext/window.__wildlife), the Tab-no-focus-shift
+// behaviour (activeElement/canvas), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
@@ -31,53 +38,15 @@ await page.waitForTimeout(4000)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
-// --- Balance defaults --------------------------------------------------------
-const bal = await page.evaluate(() => ({
-  mouse: window.__balance.mouseSensitivity,
-  walk: window.__balance.placeWalkSpeed,
-  strafe: window.__balance.placeStrafeFactor,
-  ambience: window.__balance.ambienceVolume,
-  travel: window.__balance.travelSpeed,
-  canoe: window.__balance.canoeSpeedup,
-  jungle: window.__balance.junglePenalty,
-  mountain: window.__balance.mountainPenalty,
-}))
-check('default mouse sensitivity halved (0.0011)', bal.mouse === 0.0011, `${bal.mouse}`)
-check('default walk speed 10 m/s (user calibration)', bal.walk === 10, `${bal.walk}`)
-check('single ambience volume default 0.1', bal.ambience === 0.1, `${bal.ambience}`)
-check('overland travel speed reduced 30% (5.6)', bal.travel === 5.6, `${bal.travel}`)
-check('canoe speed-up factor reduced to 2x (user calibration)', bal.canoe === 2, `canoe ${bal.canoe}`)
-check('jungle/mountain penalty factors present', bal.jungle === 2.3 && bal.mountain === 1.67,
-  `jungle ${bal.jungle}, mountain ${bal.mountain}`)
-const canteenCap = await page.evaluate(() => window.__balance.health.canteenCapacity)
-check('canteen capacity reduced to 500 (user calibration)', canteenCap === 500, `${canteenCap}`)
-const reentry = await page.evaluate(() => window.__balance.placeReentryMargin)
-check('settlement re-entry debounce margin reduced to a small clearance (2)', reentry === 2, `${reentry}`)
-
-check('default strafe/backward factor 0.8', bal.strafe === 0.8, `${bal.strafe}`)
-
 // --- First-person eye height -------------------------------------------------
 const eyeY = await page.evaluate(() => window.__placeCamera?.position.y)
 check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${eyeY}`)
 
-// --- Strafe/backward speed is 80 % of forward (design.md §2) -----------------
-// Exact ratio via the pure velocity helper (frame-timing independent), plus a
-// loose in-scene smoke check that forward still moves and strafing moves less.
-const vel = await page.evaluate(() => {
-  const v = window.__movement.placeWalkVelocity
-  const mag = ([a, b]) => Math.hypot(a, b)
-  return {
-    forward: mag(v(1, 0, 10, 0.8)),
-    strafe: mag(v(0, 1, 10, 0.8)),
-    back: mag(v(-1, 0, 10, 0.8)),
-    diag: mag(v(1, 1, 10, 0.8)),
-  }
-})
-check('forward walks at full speed', Math.abs(vel.forward - 10) < 1e-6, `${vel.forward}`)
-check('strafing is exactly 80 % of forward', Math.abs(vel.strafe / vel.forward - 0.8) < 1e-6, `${(vel.strafe / vel.forward).toFixed(3)}`)
-check('walking backward is exactly 80 % of forward', Math.abs(vel.back / vel.forward - 0.8) < 1e-6, `${(vel.back / vel.forward).toFixed(3)}`)
-check('a diagonal is not faster than walking straight forward', vel.diag <= vel.forward + 1e-6, `${vel.diag.toFixed(2)}`)
-
+// --- Strafe/backward move in the scene (design.md §2) ------------------------
+// The exact 80 % ratio is proven by the pure velocity helper in Vitest
+// (src/systems/movement.test.ts); here we only confirm both directions move a
+// real character in the live scene (frame-count-dependent distance, so the two
+// are not directly comparable).
 async function measureWalk(code) {
   await page.evaluate(() => {
     const p = window.__placePlayer
@@ -104,22 +73,17 @@ async function measureWalk(code) {
 }
 const fwd = await measureWalk('KeyW')
 const strafeD = await measureWalk('KeyD')
-// The exact 80 % ratio is proven above via the pure helper; here just confirm
-// both directions actually move in the scene (the wall-clock hold gets a
-// frame-count-dependent distance, so the two are not directly comparable).
 check('forward walking actually moves the character', fwd > 0.5, `${fwd.toFixed(2)} m`)
 check('strafing actually moves the character', strafeD > 0.5, `${strafeD.toFixed(2)} m`)
 
-// --- Debug menu: new controls, German labels, live effect --------------------
-// The default language is English (par.17); check the German labels explicitly.
+// --- Debug menu open: user-select computed style + screenshot ----------------
+// The German label/field/dropdown asserts moved to Vitest (DebugMenu.test.tsx);
+// the debug menu is opened here for the real-CSS user-select check and the
+// acceptance screenshot. Switch to German first (matches the shot's evidence).
 await page.evaluate(() => window.__setLang('de'))
 await page.waitForTimeout(400)
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(600)
-let txt = await page.evaluate(() => document.body.innerText)
-check('debug menu (de): mouse sensitivity field', txt.includes('Maus-Empfindlichkeit (Ego-Sicht)'), '')
-check('debug menu (de): ambience volume field', txt.includes('Ambiente-Lautstärke'), '')
-
 // GUI text is not selectable, but form controls keep normal selection.
 const select = await page.evaluate(() => {
   const bar = document.querySelector('.status-bar')
@@ -130,54 +94,12 @@ const select = await page.evaluate(() => {
 })
 check('GUI text is not selectable', select.bar === 'none' && select.label === 'none', JSON.stringify(select))
 check('form inputs keep normal text selection', select.input === 'text', JSON.stringify(select))
-
-/** Fill the number input that sits next to the given label text. */
-async function fillField(label, value) {
-  return page.evaluate(
-    ([lbl, v]) => {
-      const rows = [...document.querySelectorAll('.debug-menu label')]
-      const row = rows.find((r) => r.textContent.includes(lbl))
-      const input = row?.querySelector('input[type="number"]')
-      if (!input) return false
-      const proto = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')
-      proto.set.call(input, String(v))
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-      return true
-    },
-    [label, value],
-  )
-}
-check('debug menu: mouse sensitivity editable', await fillField('Maus-Empfindlichkeit', 0.002), '')
-check('debug menu: ambience volume editable', await fillField('Ambiente-Lautstärke', 0.5), '')
-check('debug menu: strafe factor editable', await fillField('Seitwärts/Rückwärts-Faktor', 0.6), '')
-check('debug menu: canoe speed factor editable', await fillField('Kanu-Tempofaktor', 5), '')
-check('debug menu: jungle penalty factor editable', await fillField('Malusfaktor Dschungel', 2.5), '')
-await page.waitForTimeout(300)
-const adjusted = await page.evaluate(() => ({
-  mouse: window.__balance.mouseSensitivity,
-  ambience: window.__balance.ambienceVolume,
-  strafe: window.__balance.placeStrafeFactor,
-  canoe: window.__balance.canoeSpeedup,
-  jungle: window.__balance.junglePenalty,
-}))
-check('mouse sensitivity applies at runtime', adjusted.mouse === 0.002, `${adjusted.mouse}`)
-check('ambience volume applies at runtime', adjusted.ambience === 0.5, `${adjusted.ambience}`)
-check('strafe factor applies at runtime', adjusted.strafe === 0.6, `${adjusted.strafe}`)
-check('canoe/jungle factors apply at runtime', adjusted.canoe === 5 && adjusted.jungle === 2.5,
-  `canoe ${adjusted.canoe}, jungle ${adjusted.jungle}`)
-// Restore the changed factors so they do not affect later checks.
-await page.evaluate(() => { window.__balance.canoeSpeedup = 2; window.__balance.junglePenalty = 2.3 })
-// Restore the default so it does not affect later checks.
-await page.evaluate(() => (window.__balance.placeStrafeFactor = 0.8))
 await page.screenshot({ path: `${OUT}67-settings-debug-menu.png` })
 console.log('shot 67-settings-debug-menu.png')
 
-// --- English labels ----------------------------------------------------------
+// Close the debug menu and restore English before the scene checks.
 await page.evaluate(() => window.__setLang('en'))
-await page.waitForTimeout(600)
-txt = await page.evaluate(() => document.body.innerText)
-check('debug menu (en): mouse sensitivity field', txt.includes('Mouse sensitivity (first-person)'), '')
-check('debug menu (en): ambience volume field', txt.includes('Ambience volume'), '')
+await page.waitForTimeout(400)
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(400)
 
@@ -220,88 +142,23 @@ check('feeding: stain beneath the carcass', feedA.stainVisible === true && feedA
 await page.screenshot({ path: `${OUT}68-lion-feeding.png` })
 console.log('shot 68-lion-feeding.png')
 
-// --- F3: full debug loadout (design.md §21) ----------------------------------
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.debugSet({ money: 5, foodDays: 2, health: 10 })
-  g.debugSetAffliction('fever', true)
-  g.debugSetAffliction('sunblind', true)
-  g.debugSetAffliction('wounds', 2)
-})
-await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3' })))
-await page.waitForTimeout(200)
-// Read the live store directly — importing the store module inside the page
-// would re-instantiate it and reset window.__game.
-const loadout = await page.evaluate(() => {
-  const equipIds = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
-  const treasureIds = ['gold', 'silver', 'emerald', 'copper', 'ivory', 'statue']
-  const g = window.__game.getState()
-  const sum = (o) => Object.values(o).reduce((a, b) => a + (b ?? 0), 0)
-  return {
-    money: g.money,
-    food: g.foodDays,
-    health: g.health,
-    afflictions: g.afflictions,
-    giftsTotal: sum(g.gifts),
-    allEquip: equipIds.every((e) => (g.equipment[e] ?? 0) >= 1),
-    allTreasure: treasureIds.every((t) => (g.treasures[t] ?? 0) >= 1),
-    used: sum(g.equipment) + sum(g.gifts) + sum(g.treasures),
-    capacity: window.__balance.inventoryCapacity,
-  }
-})
-check('F3: money set to 100000', loadout.money === 100000, `${loadout.money}`)
-check('F3: provisions set to 100000', loadout.food === 100000, `${loadout.food}`)
-check('F3: full health', loadout.health === 100, `${loadout.health}`)
-check(
-  'F3: all afflictions cleared',
-  !loadout.afflictions.fever && !loadout.afflictions.dehydration && !loadout.afflictions.sunblind && loadout.afflictions.wounds === 0,
-  JSON.stringify(loadout.afflictions),
-)
-check('F3: 100000 gifts', loadout.giftsTotal === 100000, `${loadout.giftsTotal}`)
-check('F3: all equipment and treasures present', loadout.allEquip && loadout.allTreasure, `equip ${loadout.allEquip}, treasure ${loadout.allTreasure}`)
-check('F3: inventory capacity raised to fit', loadout.capacity >= loadout.used, `cap ${loadout.capacity} >= used ${loadout.used}`)
-
-// --- F4: toggle the canoe in and out of the pack (design.md §21) -------------
-const canoe = await page.evaluate(() => {
-  const g = () => window.__game.getState()
-  window.__game.setState({ equipment: { ...g().equipment, canoe: 0 } })
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F4' }))
-  const on = g().equipment.canoe ?? 0
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F4' }))
-  const off = g().equipment.canoe ?? 0
-  return { on, off }
-})
-check('F4 adds the canoe when missing', canoe.on === 1, `${canoe.on}`)
-check('F4 removes the canoe when present', canoe.off === 0, `${canoe.off}`)
-
 // --- Tab toggles the journal without focus problems (design.md §17) ----------
+// The journalOpen toggle itself is asserted in Vitest (store.debug.test.ts);
+// here we only prove the real-browser focus behaviour: Tab must not park focus
+// on a control, so the keyboard keeps steering the character.
 await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
 })
 await page.waitForTimeout(100)
 await page.keyboard.press('Tab')
-const tabOpen = await page.evaluate(() => ({ open: window.__game.getState().journalOpen, active: document.activeElement?.tagName }))
-await page.keyboard.press('Tab')
-const tabClose = await page.evaluate(() => window.__game.getState().journalOpen)
-check('Tab opens the journal', tabOpen.open === true, '')
-check('Tab does not shift focus onto a control (no focus problem)', tabOpen.active === 'BODY' || tabOpen.active === 'CANVAS' || tabOpen.active == null, `active ${tabOpen.active}`)
-check('Tab toggles the journal closed again', tabClose === false, '')
-// Inside a form control (debug menu), Tab must NOT toggle the journal.
-const tabInField = await page.evaluate(async () => {
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })) // open debug menu
-  await new Promise((r) => setTimeout(r, 300))
-  const input = document.querySelector('.debug-menu input[type="number"]')
-  if (!input) return { ok: false }
-  input.focus()
-  const before = window.__game.getState().journalOpen
-  // A Tab keydown while the field is focused (onTab must bail on INPUT targets).
-  input.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', bubbles: true }))
-  const after = window.__game.getState().journalOpen
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })) // close debug menu
-  return { ok: true, unchanged: before === after }
-})
-check('Tab in a debug field does not toggle the journal (focus-safe)', tabInField.ok && tabInField.unchanged, JSON.stringify(tabInField))
+const tabActive = await page.evaluate(() => document.activeElement?.tagName)
+check(
+  'Tab does not shift focus onto a control (no focus problem)',
+  tabActive === 'BODY' || tabActive === 'CANVAS' || tabActive == null,
+  `active ${tabActive}`,
+)
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
 // --- Proximity animal calls under the ambience (design.md §19) ---------------
 // A nearby animal raises its own call in the soundscape; the call fades once

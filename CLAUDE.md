@@ -129,10 +129,24 @@ npm install            # dependencies
 npm run dev            # dev server (usually http://localhost:5173)
 npm run build          # production build (must pass without errors)
 npm run preview        # check the production build locally
+npm run test:unit      # fast Vitest layer (jsdom): logic, store, HUD components
+npm test               # full regression: build + lint + vitest, then browser suites
 ```
 
 The TypeScript build must pass without errors. `npm run build` is part of
 acceptance (§7).
+
+**Test architecture (hybrid).** The regression is split so the bulk runs in
+seconds and cannot flicker on browser timing: a fast, deterministic **Vitest**
+layer (jsdom, no browser) in `src/**/*.test.ts[x]` covers all pure logic, store
+transitions and HTML-HUD component classes/text; the **Playwright** scripts in
+`scripts/verify/*.mjs` keep only what genuinely needs a real browser (the
+three.js scene + RAF wildlife, real layout geometry, canvas/WebGL init,
+pointer-lock, TTS audio, the §7.2 acceptance screenshots and one end-to-end core
+flow). **Every future feature must add a test on the appropriate layer(s)** —
+prefer Vitest for anything assertable without a browser; use Playwright only for
+the scene/geometry/CSS/audio/screenshot cases. The full strategy and the
+old→new coverage map live in `scripts/verify/README.md`.
 
 ---
 
@@ -830,8 +844,11 @@ After completion and after every major system:
 - Run `npm run build` and confirm it passes without errors.
 - Run `npm run lint` and `npm audit` and confirm both are clean (zero
   lint errors/warnings, zero vulnerabilities) per §7.1 point 18.
+- Run `npm run test:unit` (the fast Vitest layer) and confirm it is green;
+  add or extend a test there for the changed logic/store/HUD when applicable.
 - Start the dev server and verify via headless screenshot (e.g. Playwright)
-  that the affected view renders without console errors.
+  that the affected view renders without console errors. `npm test` chains all
+  of the above (build → lint → vitest → the browser suites → preview).
 - Store screenshots of each core view (bird's-eye view, port city,
   village/chief's hut, opened journal) and check them against the criteria
   of §7.1.

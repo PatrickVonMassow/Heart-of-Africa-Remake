@@ -1,8 +1,12 @@
-// Headless verification for CLAUDE.md §7.1.22 (health & afflictions,
-// design.md §6/§15): drains and regeneration, automatic dehydration in the
-// desert without a canteen, sun-blindness veil and recovery, medicine cure,
-// death with remains report and successor, vultures at poor condition, and
-// the health query (H). Dev server only (dev hooks).
+// Headless verification for CLAUDE.md §7.1.22 (health & afflictions): the
+// browser-only remainder. The store-driven asserts (defaults, canteen/
+// dehydration onset & recovery, regeneration, fever drain & medicine cure,
+// death/successor flow) moved to src/state/store.health.test.ts, and the
+// HTML-overlay asserts (.sunblind-veil, the .overlay.defeat remains text, the
+// successor button) to src/ui/Hud.test.tsx. What stays here needs a real
+// browser: the RAF-driven vultures that circle at poor condition
+// (window.__vultures), the remains-report screenshot (§7.2 evidence) and the
+// console-error gate. Dev server only (dev hooks).
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
@@ -34,8 +38,6 @@ await page.evaluate(() => {
 })
 
 const g = (fn) => page.evaluate(fn)
-const journalKeys = () =>
-  page.evaluate(() => window.__game.getState().journal.map((e) => (typeof e.text === 'object' ? e.text.key : e.text)))
 const walk = async (n, dx = 0, dz = -1) => {
   await page.evaluate(
     ([steps, x, z]) => {
@@ -45,126 +47,9 @@ const walk = async (n, dx = 0, dz = -1) => {
   )
 }
 
-// --- Defaults -----------------------------------------------------------------
-const init = await g(() => ({ health: window.__game.getState().health, a: window.__game.getState().afflictions }))
-check('start: full health, no afflictions', init.health === 100 && !init.a.fever && !init.a.dehydration, `${init.health}`)
-
-// --- Dehydration in the desert without a canteen (auto onset/recovery) --------
+// Leave the starting place into the bird's-eye view (where the vultures mount).
 await g(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1200)
-await g(() => window.__game.getState().debugJumpTo(25.5, 27.0)) // deep Sahara
-await page.waitForTimeout(800)
-// Thirst builds up first (design.md §6 onset, a balance value): a short dry
-// stretch must not trigger the affliction yet.
-await walk(4)
-const early = await g(() => window.__game.getState().afflictions.dehydration)
-check('short dry travel does not trigger dehydration yet', early === false, '')
-await walk(36)
-const dehydrated = await g(() => ({
-  a: window.__game.getState().afflictions.dehydration,
-  health: window.__game.getState().health,
-}))
-check('desert without canteen: dehydration sets in', dehydrated.a === true, '')
-check('dehydration drains health', dehydrated.health < 100, `${dehydrated.health.toFixed(1)}`)
-check('journal reports the thirst', (await journalKeys()).includes('journal.dehydrationOn'), '')
-
-await g(() => window.__game.getState().debugAddEquipment('canteen'))
-await walk(10)
-const rehydrated = await g(() => window.__game.getState().afflictions.dehydration)
-check('canteen ends the dehydration', rehydrated === false, '')
-check('journal reports the recovery', (await journalKeys()).includes('journal.dehydrationOver'), '')
-
-// --- Fresh water in reach counts as drinking (design.md §6: "without water") --
-// Time passing on the Nile bank without a canteen must never build thirst,
-// because fresh water in reach counts as drinking (resets the thirst).
-await g(() => {
-  window.__game.setState({ equipment: {}, dryDays: 0 }) // the canteen stays behind
-  window.__game.getState().debugJumpTo(28.6, 31.3) // desert bank of the Nile
-})
-const thirstBefore = (await journalKeys()).filter((k) => k === 'journal.dehydrationOn').length
-// Let a long stretch of time pass on fresh water (drinking) — thirst stays 0.
-await g(() => {
-  const c = window.__game.getState()
-  for (let i = 0; i < 40; i++) c.tickHealth(0.1, 'water', 28.6, 31.3)
-})
-const nile = await g(() => ({
-  a: window.__game.getState().afflictions.dehydration,
-  dry: window.__game.getState().dryDays,
-}))
-const thirstAfter = (await journalKeys()).filter((k) => k === 'journal.dehydrationOn').length
-check(
-  'the Nile bank never triggers dehydration (fresh water in reach)',
-  nile.a === false && thirstAfter === thirstBefore,
-  `dryDays ${nile.dry.toFixed(2)}`,
-)
-await g(() => window.__game.getState().debugAddEquipment('canteen'))
-
-// --- Canteen fill level (design.md §6): drains away from water, empties into
-//     thirst then health loss, refills at fresh water -------------------------
-const canteen = await g(() => {
-  const c = window.__game.getState()
-  window.__game.setState({
-    equipment: { canteen: 1 }, canteenFill: 1, dryDays: 0, health: 100, foodDays: 300,
-    afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 },
-  })
-  for (let i = 0; i < 60; i++) c.tickHealth(0.1, 'desert', 25.5, 27.0) // 6 dry desert days
-  const drained = window.__game.getState().canteenFill
-  // Now start almost empty and let the reserve run out, so thirst builds into
-  // health loss (the drain is deliberately slow — a full canteen lasts months).
-  window.__game.setState({ canteenFill: 0.001, dryDays: 0, health: 100 })
-  for (let i = 0; i < 60; i++) c.tickHealth(0.1, 'desert', 25.5, 27.0)
-  const s1 = window.__game.getState()
-  return { drained, dehydrated: s1.afflictions.dehydration, health: s1.health }
-})
-check('the canteen drains away from fresh water', canteen.drained < 1, `fill ${canteen.drained.toFixed(3)}`)
-check('an empty canteen leads to thirst, then health loss',
-  canteen.dehydrated === true && canteen.health < 100, JSON.stringify(canteen))
-const refill = await g(() => {
-  window.__game.getState().tickHealth(0.1, 'water', 0, 0) // drinking at fresh water
-  return window.__game.getState().canteenFill
-})
-check('fresh water refills the canteen to full', refill === 1, `${refill}`)
-await g(() => window.__game.getState().debugAddEquipment('canteen'))
-
-// --- Regeneration while fed and affliction-free -------------------------------
-await g(() => window.__game.getState().debugSet({ health: 50, foodDays: 30 }))
-await walk(20)
-const regen = await g(() => window.__game.getState().health)
-check('health regenerates while fed and affliction-free', regen > 50, `${regen.toFixed(1)}`)
-
-// --- Fever: heavy drain, cured by medicine ------------------------------------
-await g(() => {
-  window.__game.getState().debugSet({ health: 80 })
-  window.__game.getState().debugSetAffliction('fever', true)
-})
-await walk(20)
-const fevered = await g(() => window.__game.getState().health)
-check('fever drains health', fevered < 80, `${fevered.toFixed(1)}`)
-await g(() => window.__game.getState().debugAddEquipment('medicine'))
-const medBefore = await g(() => window.__game.getState().equipment.medicine)
-await g(() => window.__game.getState().useMedicine())
-const cured = await g(() => ({
-  fever: window.__game.getState().afflictions.fever,
-  med: window.__game.getState().equipment.medicine,
-}))
-check('medicine cures the fever and is consumed', cured.fever === false && cured.med === medBefore - 1, '')
-check('journal reports the medicine', (await journalKeys()).includes('journal.medicineUsed'), '')
-
-// --- Sun blindness: veil + recovery outside the desert -------------------------
-await g(() => window.__game.getState().debugSetAffliction('sunblind', true))
-await page.waitForTimeout(300)
-check('sun blindness narrows the view (veil)', (await page.locator('.sunblind-veil').count()) === 1, '')
-await g(() => {
-  // Savanna, outside the desert; a rope in the pack keeps stray hills of the
-  // eastern highlands passable (design.md §11 mountain rule).
-  window.__game.getState().debugAddEquipment('rope')
-  window.__game.getState().debugJumpTo(-1.5, 34.5)
-})
-await page.waitForTimeout(600)
-await walk(60)
-const sighted = await g(() => window.__game.getState().afflictions.sunblind)
-check('sun blindness heals outside the desert', sighted === false, '')
-check('veil is gone after recovery', (await page.locator('.sunblind-veil').count()) === 0, '')
 
 // --- Vultures at poor condition (design.md §19) --------------------------------
 await g(() => window.__game.getState().debugSet({ health: 20 }))
@@ -173,61 +58,22 @@ const vultures = await g(() => window.__vultures?.player.current?.visible)
 check('vultures circle at poor condition', vultures === true, '')
 await g(() => window.__game.getState().debugSet({ health: 90 }))
 
-// --- Health query (H) -----------------------------------------------------------
-await g(() => {
-  window.__game.getState().debugSetAffliction('wounds', 1)
-  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }))
-})
-await page.waitForTimeout(300)
-const toast = await g(() => window.__game.getState().toast)
-check('health query reports state and afflictions', typeof toast === 'string' && toast.includes('I feel'), toast ?? '')
-await g(() => window.__game.getState().debugSetAffliction('wounds', 0))
-
-// --- Death: remains report, journal silent, successor --------------------------
-// Create a checkpoint first (re-enter Cairo), then die in the field.
+// --- Death: remains-report screenshot (§7.2 evidence) --------------------------
+// Drive the character to death to render the remains overlay for the shot; the
+// store/overlay asserts themselves moved to Vitest (store.health.test.ts,
+// Hud.test.tsx). Create a checkpoint first (re-enter Cairo), then die afield.
 await g(() => window.__game.getState().enterPlace('cairo'))
 await page.waitForTimeout(1500)
 await g(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1000)
-const entriesBeforeDeath = await g(() => window.__game.getState().journal.length)
 await g(() => {
   window.__game.getState().debugSet({ health: 3 })
   window.__game.getState().debugSetAffliction('wounds', 2)
 })
 await walk(30)
-const dead = await g(() => ({
-  defeat: window.__game.getState().defeat,
-  cause: window.__game.getState().deathCause,
-  open: window.__game.getState().journalOpen,
-  entries: window.__game.getState().journal.length,
-}))
-check('zero health loses the expedition', dead.defeat === 'death', `cause: ${dead.cause}`)
-check('the journal falls silent on death', dead.open === false && dead.entries <= entriesBeforeDeath + 1, '')
 await page.waitForTimeout(400)
-const overlayText = await page.evaluate(() => document.querySelector('.overlay.defeat')?.textContent ?? '')
-check('remains report names the cause', overlayText.includes('remains') && overlayText.includes('wounds'), '')
 await page.screenshot({ path: `${OUT}78-health-remains-report.png` })
 console.log('shot 78-health-remains-report.png')
-
-const successorVisible = await page.evaluate(() =>
-  [...document.querySelectorAll('.overlay.defeat button')].some((b) => b.textContent?.includes('successor')),
-)
-check('successor can take over from the checkpoint', successorVisible, '')
-await page.evaluate(() => {
-  const btn = [...document.querySelectorAll('.overlay.defeat button')].find((b) => b.textContent?.includes('successor'))
-  btn?.click()
-})
-await page.waitForTimeout(800)
-const revived = await g(() => ({
-  defeat: window.__game.getState().defeat,
-  health: window.__game.getState().health,
-  place: window.__game.getState().placeId,
-}))
-check(
-  'successor continues in Cairo with the checkpoint health',
-  revived.defeat === null && revived.health >= 40 && revived.place === 'cairo',
-  `health ${revived.health}`,
-)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

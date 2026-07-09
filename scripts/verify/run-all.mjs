@@ -14,11 +14,17 @@ import { dirname, join } from 'node:path'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const isWin = process.platform === 'win32'
 
-// Suites that run against the dev server (:5173), in a stable order. `docs` is
-// a pure Node check (no browser) but runs in the same pass for a single report.
+// Hybrid test architecture: the fast, deterministic Vitest layer (jsdom, no
+// browser) runs first (`unit` stage below) and covers all pure logic, store
+// transitions and HTML-HUD component classes/text. Only the checks that
+// genuinely need a real browser remain here as Playwright suites against the
+// dev server (:5173): the R3F/three scene + RAF wildlife, real layout geometry,
+// canvas/WebGL init, pointer-lock, TTS audio, the §7.2 acceptance screenshots
+// and one end-to-end core flow. `docs` is a pure Node check that runs in the
+// same pass for a single report. See scripts/verify/README.md for the full
+// old→new mapping table.
 const DEV_SUITES = [
-  'docs', 'world', 'i18n', 'hints', 'flow', 'health', 'events', 'expedition', 'economy',
-  'reputation', 'camps', 'saveload', 'checkpoint', 'collision', 'handwriting',
+  'docs', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
   'polish', 'gamepad', 'voice', 'settings', 'enrichments',
 ]
 
@@ -88,6 +94,38 @@ if (!filter.length || filter.includes('lint')) {
   console.log(`${lintOk ? 'PASS' : 'FAIL'}  lint         (oxlint, exit ${lint.status})`)
   if (!lintOk) console.log(out)
   results.push(lintOk)
+}
+
+// Vitest layer (jsdom): the fast, deterministic unit + component tests that
+// carry the bulk of the coverage. Type-checked first (esbuild strips types at
+// runtime, so tsc guards the test files), then run. Fail fast — no point
+// driving the slow browser suites if the deterministic layer is red.
+if (!filter.length || filter.includes('unit')) {
+  console.log('# unit + component tests (vitest, jsdom)…')
+  const root = join(HERE, '..', '..')
+  const tc = spawnSync('npx tsc -p tsconfig.vitest.json --noEmit', { cwd: root, shell: true, encoding: 'utf8' })
+  if (tc.status !== 0) {
+    console.log('FAIL  test-types   (tsc -p tsconfig.vitest.json)')
+    console.log((tc.stdout ?? '') + (tc.stderr ?? ''))
+    console.log('\n1 SUITE(S) FAILED — test type-check failed, skipping the rest')
+    process.exit(1)
+  }
+  console.log('PASS  test-types   (tsc -p tsconfig.vitest.json)')
+  // NO_COLOR keeps the summary free of ANSI escapes so the count parses cleanly.
+  const unit = spawnSync('npx vitest run', {
+    cwd: root, shell: true, encoding: 'utf8',
+    env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
+  })
+  const out = (unit.stdout ?? '') + (unit.stderr ?? '')
+  const unitOk = unit.status === 0
+  const m = out.match(/Tests\s+(\d+) passed/)
+  console.log(`${unitOk ? 'PASS' : 'FAIL'}  unit         (vitest jsdom, ${m ? m[1] : '?'} tests, exit ${unit.status})`)
+  if (!unitOk) {
+    console.log(out)
+    console.log('\n1 SUITE(S) FAILED — vitest failed, skipping the browser suites')
+    process.exit(1) // fail fast
+  }
+  results.push(unitOk)
 }
 
 let dev
