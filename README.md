@@ -25,10 +25,20 @@ end, not the complete game. `design.md` is the authoritative design document;
   cities; a culturally correct gift to a village chief unlocks a hint.
 - **Language and direction system.** Hints are given in the regional
   Nivera/koko/Katula system and must be decoded into bearings and positions.
+- **Survival.** Provisions, a canteen with a draining water level, and a health
+  pool worn down by starvation, fever, dehydration, sun blindness and wounds;
+  medicine cures, fresh water and rest restore.
+- **Hazards.** Hidden per-day events while travelling — animal and robber
+  attacks, crocodiles, fever, sandstorms, waterfall sweeps — and wandering
+  predators (lion, cheetah, leopard, hyena) that attack on contact. Equipment
+  protects by mere possession; a multi-year deadline and a successor on death
+  keep the expedition finite.
 - **Journal.** A chronicle that grows automatically with events and stores
-  decoded hints, language-neutrally, re-rendered in the selected language.
-- **The goal.** A procedurally placed tomb; digging at the right spot with the
-  shovel wins the game.
+  decoded hints, language-neutrally, re-rendered in the selected language. Every
+  English entry can be read aloud in-browser via the Kokoro TTS model, with
+  emotional voice markup shaping the delivery.
+- **The goal.** A procedurally placed tomb triangulated from regional hints;
+  digging at the right spot with the shovel wins the game.
 
 ## Tech stack
 
@@ -60,6 +70,7 @@ npm run build      # type-check + production build (must pass clean)
 npm run preview    # serve the production build locally
 npm run lint       # oxlint (zero errors/warnings required)
 npm audit          # zero known vulnerabilities required
+npm test           # full headless regression (boots dev + preview servers)
 ```
 
 The game starts in English by default; German can be selected at runtime via
@@ -100,6 +111,8 @@ src/
 
 ## Status
 
-All 18 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
+All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
 evidence lives in `verification/`. Known simplifications (e.g. no TAA, no true
-screen-space reflections) are recorded as open items in the code (`// OPEN:`).
+screen-space reflections, English-only journal read-aloud) are recorded as open
+items in the code (`// OPEN:`). The full headless regression runs with
+`npm test`.

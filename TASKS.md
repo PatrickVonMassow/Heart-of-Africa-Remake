@@ -23,7 +23,7 @@ CLAUDE.md §7.1 — sufficient to guard the changes below.
 
 ## Checklist
 
-- [ ] 1. README veraltet: „All 18 acceptance criteria" vs. CLAUDE.md §7.1 = 32; Zahl nachziehen und README insgesamt überprüfen/überarbeiten.
+- [x] 1. README veraltet: „All 18 acceptance criteria" vs. CLAUDE.md §7.1 = 32; Zahl nachziehen und README insgesamt überprüfen/überarbeiten.
 - [ ] 2. Prüfen: ist alles committet oder gibt es noch lokale modified Dateien?
 - [ ] 3. Kanu-Geschwindigkeitsboost von 4x auf 2x reduzieren.
 - [ ] 4. Ein Item, das im Einsatz ist, soll im Inventar aufleuchten.
