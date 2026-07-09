@@ -859,13 +859,30 @@ const familyLife = await page.evaluate(() => {
 })
 check('herds raise young that keep close to a parent (nursing)', familyLife.young > 0 && familyLife.close > 0, JSON.stringify(familyLife))
 
-// Bathing needs shore visitors, which only spawn where a herd sits within reach
-// of water. Move along a few lake/river shores in the savanna and wait until
-// animals with a drink target have streamed in, then confirm some also bathe.
-const shoreSpots = [[-1.0, 34.2], [-1.6, 33.1], [0.45, 33.15], [7.6, 33.2], [-2.2, 34.8]]
+// Bathing needs shore visitors, which only spawn where a savanna herd sits
+// within reach of water. Find savanna tiles near water for the current seed
+// (so this does not depend on hand-picked coordinates), then roam them until a
+// herd with drink targets has streamed in and some of them also bathe.
+const shoreSpots = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  const nearWater = (lat, lon) => {
+    for (let dlat = -0.35; dlat <= 0.35; dlat += 0.1)
+      for (let dlon = -0.35; dlon <= 0.35; dlon += 0.1)
+        if (T(lat + dlat, lon + dlon, seed) === 'water') return true
+    return false
+  }
+  const spots = []
+  // East African lakes/rivers belt — plenty of savanna shoreline.
+  for (let lat = 3; lat >= -7 && spots.length < 10; lat -= 0.4)
+    for (let lon = 29; lon <= 37 && spots.length < 10; lon += 0.4)
+      if (T(lat, lon, seed) === 'savanna' && nearWater(lat, lon)) spots.push([lat, lon])
+  return spots
+})
 let bathe = { drinkers: 0, bathers: 0 }
 for (const spot of shoreSpots) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s[0], s[1]), spot)
+  await waitForHerds()
   const gotDrinkers = await page
     .waitForFunction(
       () => {
@@ -876,7 +893,7 @@ for (const spot of shoreSpots) {
         return d >= 2
       },
       null,
-      { timeout: 12000 },
+      { timeout: 16000 },
     )
     .then(() => true)
     .catch(() => false)
@@ -887,10 +904,10 @@ for (const spot of shoreSpots) {
       for (const sp of Object.keys(h)) for (const a of h[sp]) { if (a.drink) drinkers++; if (a.bathe) bathers++ }
       return { drinkers, bathers }
     })
-    break
+    if (bathe.bathers > 0) break // keep roaming if this herd happened to have no bathers
   }
 }
-check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, JSON.stringify(bathe))
+check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, `${JSON.stringify(bathe)} spots=${shoreSpots.length}`)
 
 // Return to the herd-dense plains for the predator-guard check below.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))

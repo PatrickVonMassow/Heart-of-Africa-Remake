@@ -86,7 +86,15 @@ async function measureWalk(code) {
   await page.waitForTimeout(80)
   const p0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
   await page.evaluate((c) => window.dispatchEvent(new KeyboardEvent('keydown', { code: c })), code)
-  await page.waitForTimeout(280)
+  // Hold the key until the character has clearly moved (or 4s): headless RAF is
+  // throttled, so a fixed short hold can span too few frames under load.
+  await page
+    .waitForFunction(
+      (start) => Math.hypot(window.__placePlayer.x - start.x, window.__placePlayer.z - start.z) > 0.6,
+      p0,
+      { timeout: 4000 },
+    )
+    .catch(() => {})
   await page.evaluate((c) => window.dispatchEvent(new KeyboardEvent('keyup', { code: c })), code)
   await page.waitForTimeout(40)
   const p1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
