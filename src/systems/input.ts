@@ -2,10 +2,19 @@
 
 const pressed = new Set<string>()
 
+/**
+ * True while the event targets a form control (debug menu fields), so game keys
+ * don't fire and Tab still navigates between fields — matching the journal
+ * toggle guard in the HUD (design.md §17/§21).
+ */
+function isTypingTarget(e: Event): boolean {
+  const tag = (e.target as HTMLElement | null)?.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
-    // Ignore keys while typing into inputs (debug menu fields).
-    if ((e.target as HTMLElement)?.tagName === 'INPUT') return
+    if (isTypingTarget(e)) return
     pressed.add(e.code)
   })
   window.addEventListener('keyup', (e) => pressed.delete(e.code))
@@ -19,7 +28,7 @@ export function isKeyDown(code: string): boolean {
 /** Register a keydown handler for a specific code; returns unsubscribe. */
 export function onKeyPress(code: string, cb: () => void): () => void {
   const handler = (e: KeyboardEvent) => {
-    if ((e.target as HTMLElement)?.tagName === 'INPUT') return
+    if (isTypingTarget(e)) return
     if (e.code === code) cb()
   }
   window.addEventListener('keydown', handler)

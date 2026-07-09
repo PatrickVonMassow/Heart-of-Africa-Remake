@@ -156,9 +156,6 @@ describe('generateTreasureSites invariants (design.md §18)', () => {
   withWorld()
   const SEED = 12345
   const REGIONS: RegionId[] = ['north', 'west', 'central', 'east', 'south']
-  // Rounding to 0.1° happens after the ≥1° clearance check, so a rounded coord
-  // can shift by up to Math.hypot(0.05, 0.05) ≈ 0.0707° in either bound.
-  const ROUND_SLACK = Math.hypot(0.05, 0.05)
 
   it('the five regional caches sit inside their region on non-water land', () => {
     const regional = generateTreasureSites(SEED).slice(0, 5) // regions in fixed order; statue is last
@@ -175,7 +172,9 @@ describe('generateTreasureSites invariants (design.md §18)', () => {
       expect(s.lat).toBe(Math.round(s.lat * 10) / 10)
       expect(s.lon).toBe(Math.round(s.lon * 10) / 10)
       for (const p of PLACES) {
-        expect(Math.hypot(p.lat - s.lat, p.lon - s.lon)).toBeGreaterThanOrEqual(1 - ROUND_SLACK)
+        // The ≥1° margin now holds exactly, since the check runs on the
+        // already-rounded coordinate (economy.ts generateTreasureSites).
+        expect(Math.hypot(p.lat - s.lat, p.lon - s.lon)).toBeGreaterThanOrEqual(1)
       }
     }
   })

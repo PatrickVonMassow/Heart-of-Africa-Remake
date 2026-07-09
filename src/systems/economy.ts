@@ -91,14 +91,17 @@ export function generateTreasureSites(seed: number): TreasureSite[] {
   ]
   for (const w of wanted) {
     for (let i = 0; i < 400; i++) {
-      const lat = -34 + rand() * 68
-      const lon = -17 + rand() * 68
+      // Round to 0.1° first (like the grave) so every check below — region,
+      // terrain and the settlement margin — holds for the final coordinate,
+      // not a pre-rounding candidate that could drift across a threshold.
+      const lat = Math.round((-34 + rand() * 68) * 10) / 10
+      const lon = Math.round((-17 + rand() * 68) * 10) / 10
       if (w.region && regionAt(lat, lon) !== w.region) continue
       const t = sampleTerrain(lat, lon, seed)
       if (t.type === 'water' || isBlocked(t.type, lat, lon)) continue
       // Keep a clear margin to settlements so sites are found by hints, not luck.
       if (PLACES.some((p) => Math.hypot(p.lat - lat, p.lon - lon) < 1)) continue
-      sites.push({ lat: Math.round(lat * 10) / 10, lon: Math.round(lon * 10) / 10, treasure: w.treasure, dug: false })
+      sites.push({ lat, lon, treasure: w.treasure, dug: false })
       break
     }
   }
