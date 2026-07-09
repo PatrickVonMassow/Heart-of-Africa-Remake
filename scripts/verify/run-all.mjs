@@ -64,6 +64,28 @@ function runSuite(name) {
 }
 
 const results = []
+
+// Preflight: type-check + production build and lint must be clean before the
+// suites run (CLAUDE.md §7.2). Folding these into `npm test` means a feature's
+// whole verification is one already-allowed command.
+if (!filter.length || filter.includes('build')) {
+  console.log('# type-check + production build…')
+  const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
+  const buildOk = build.status === 0
+  console.log(`${buildOk ? 'PASS' : 'FAIL'}  build        (tsc -b + vite build, exit ${build.status})`)
+  if (!buildOk) console.log((build.stdout ?? '') + (build.stderr ?? ''))
+  results.push(buildOk)
+}
+if (!filter.length || filter.includes('lint')) {
+  console.log('# lint (oxlint)…')
+  const lint = spawnSync('npx oxlint', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
+  const out = (lint.stdout ?? '') + (lint.stderr ?? '')
+  const lintOk = lint.status === 0 && !/warning|error/i.test(out)
+  console.log(`${lintOk ? 'PASS' : 'FAIL'}  lint         (oxlint, exit ${lint.status})`)
+  if (!lintOk) console.log(out)
+  results.push(lintOk)
+}
+
 let dev
 try {
   const runDev = pick(DEV_SUITES).length > 0
