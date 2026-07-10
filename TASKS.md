@@ -110,6 +110,21 @@ the map).
   turn rate; exit-ring hysteresis on the dodge; a finished flight leaves the
   animal facing where it ran; elephants face their line of travel.
 
+- [x] 18. The walkable continent ends at the Red Sea. Everything northeast of
+  the African Red Sea coast (the Red Sea itself, Sinai, the Arabian peninsula)
+  is open, impassable ocean — the same as the sea around the rest of the
+  continent. No special treatment of the Red Sea as inland water.
+  (Boundary polyline slightly seaward of the ~1890 coast, Mediterranean →
+  Suez → Bab-el-Mandeb → Gulf of Aden past the Horn, in src/world/redSea.ts;
+  isBlocked() always blocks northeast of it, and loadGeodata() stamps those
+  DEM texels to ocean so Sinai/the Levant/Arabia no longer render as land —
+  the water bathymetry texture now reads the stamped pixels instead of
+  dem.png. Two baseline probes contradicted the task's assumptions and were
+  kept as-is per "unchanged as before": the Mozambique channel was already
+  BLOCKED (outside the mainland hull), and the Mediterranean off the Gulf of
+  Sidra at 15°E/34°N was already SWIMMABLE (a bay inside the hull) — the
+  tests pin the true unchanged behavior.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

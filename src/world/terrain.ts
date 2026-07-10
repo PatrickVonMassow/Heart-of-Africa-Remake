@@ -10,6 +10,7 @@ import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
 import { elevationAt, landFractionAt } from './geodata'
 import { lakeContains } from './hydro'
 import { fbm2 } from './noise'
+import { isNortheastOfBoundary } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
 
 export type TerrainType =
@@ -284,10 +285,12 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   return { height, elevation, type, color: vary(color, shade), splat: normalizeSplat(splat) }
 }
 
-// --- Movement boundary (design.md §11) ---------------------------------------
+// --- Movement boundary (design.md §11.2) --------------------------------------
 // Ocean enclosed by the continent's outline (bays, gulfs, straits cutting
 // into the landmass) counts as inland water and can be swum through; only
-// the open sea outside the outline's convex hull blocks movement.
+// the open sea outside the outline's convex hull blocks movement. Exception:
+// everything northeast of the Red Sea boundary (redSea.ts) is always open,
+// impassable ocean — the Red Sea is never inland water.
 
 let hullCache: Array<[number, number]> | null = null
 
@@ -325,11 +328,13 @@ function insideContinentOutline(lat: number, lon: number): boolean {
 
 /**
  * Ocean blocks movement only outside the continent's outline (design.md
- * §11); enclosed sea water is swimmable like rivers and lakes.
+ * §11.2); enclosed sea water is swimmable like rivers and lakes. Northeast
+ * of the Red Sea boundary the ocean always blocks, hull or not.
  */
 export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolean {
   if (type !== 'ocean') return false
   if (lat === undefined || lon === undefined) return true
+  if (isNortheastOfBoundary(lat, lon)) return true
   return !insideContinentOutline(lat, lon)
 }
 

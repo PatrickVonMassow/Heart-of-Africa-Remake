@@ -29,7 +29,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl'
-import { getDemMeta } from '../world/geodata'
+import { getDemMeta, getDemPixels } from '../world/geodata'
 
 export interface WaterMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
@@ -76,8 +76,17 @@ export function createWaterMaterial(): WaterMaterialHandle {
   m.positionNode = positionLocal.add(vec3(0, 0, waveH))
 
   // --- Real bathymetry: depth in meters from the DEM texture -------------
+  // Built from the loaded (northeast-trimmed) pixels rather than dem.png, so
+  // the water sees the same world cut as the terrain (world/redSea.ts).
   const meta = getDemMeta()
-  const demTex = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}geodata/dem.png`)
+  const dem = getDemPixels()
+  const demTex = new THREE.DataTexture(
+    new Uint8Array(dem.data.buffer, dem.data.byteOffset, dem.data.length),
+    dem.width,
+    dem.height,
+    THREE.RGBAFormat,
+  )
+  demTex.needsUpdate = true
   demTex.flipY = false
   demTex.colorSpace = THREE.NoColorSpace
   demTex.minFilter = THREE.LinearFilter

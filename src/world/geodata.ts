@@ -9,6 +9,13 @@
 //
 // loadGeodata() must resolve before any terrain sampling happens; main.tsx
 // gates the app start on it.
+//
+// The decoded pixels are trimmed to the game world before use: every land
+// texel northeast of the Red Sea boundary (Sinai, the Levant, Arabia) is
+// stamped to ocean (redSea.ts), so the world ends at the African Red Sea
+// coast (design.md §3.1/§11.2). dem.png itself stays untouched.
+
+import { stampNortheastOcean } from './redSea'
 
 interface DemMeta {
   lonMin: number
@@ -45,6 +52,17 @@ export async function loadGeodata(): Promise<void> {
   ctx.drawImage(bitmap, 0, 0)
   pixels = ctx.getImageData(0, 0, meta.width, meta.height).data
   bitmap.close()
+  stampNortheastOcean(pixels, meta)
+}
+
+/**
+ * The decoded (and northeast-trimmed) DEM pixel grid, RGBA stride 4; for
+ * consumers that need the raw texels (the water bathymetry texture) so they
+ * see the same trimmed world as the samplers. Available after loadGeodata().
+ */
+export function getDemPixels(): { data: Uint8ClampedArray; width: number; height: number } {
+  if (!pixels || !meta) throw new Error('geodata not loaded')
+  return { data: pixels, width: meta.width, height: meta.height }
 }
 
 /** Dataset metadata (bbox/resolution/offset); available after loadGeodata(). */

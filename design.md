@@ -78,6 +78,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 
 - Fixed continent of Africa: the geographic location of all landscape elements (coasts, rivers, jungle, mountains, lakes, landmarks, settlement sites) is fixed. The concrete appearance of the landscape, and the look of the villages including the distribution of their huts, are however determined procedurally in every playthrough (§18). In addition, movable goals (the tomb, buried treasures) are placed anew each game.
 - The world reproduces Africa geographically authentically as it was in the year 1890. The real landmarks of §4.4 lie at their correct geographic positions.
+- The world ends at the African Red Sea coast: the Red Sea, Sinai and the Arabian peninsula are not part of the map. Northeast of a boundary running slightly seaward of that coast — from the Mediterranean across the Suez isthmus, down the Red Sea to Bab-el-Mandeb and out along the Gulf of Aden past the Horn — there is only open, impassable ocean (§11.2), rendered as sea like the rest of the water around the continent.
 
 ### 3.2 Regions, terrain types and coordinates
 
@@ -254,6 +255,8 @@ The very first time each of these slowdowns is met, it is also announced once in
 ### 11.2 Movement boundary
 
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
+
+The Red Sea is never inland water: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — is open, impassable ocean, the same as the sea around the rest of the continent. The other bays keep their outline treatment unchanged.
 
 ### 11.3 Water, current and waterfalls
 
