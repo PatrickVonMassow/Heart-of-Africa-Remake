@@ -300,7 +300,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 8. **Chronicle/journal.** A journal exists, grows automatically on events
    and stores hints. The handwritten entry may be simplified in the POC
    (plain text suffices; the animated handwriting is not acceptance-
-   relevant).
+   relevant). The first visit to a village is journaled through that
+   people's own ~1890 way of life (`design.md` §16): every village carries
+   its own historically grounded vignette in both languages — never a
+   shared boilerplate. Verifiable: `src/i18n/villages.test.ts` asserts one
+   distinct, markup-clean text per village in both languages, and
+   `src/state/store.travel.test.ts` that the entry carries its people.
 9. **Status bar.** Date, funds, provisions, gifts and current
    region are displayed (no hand-item slot — item effects are
    possession-based, `design.md` §6/§7). Coordinates are not shown permanently (removed on

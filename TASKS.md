@@ -88,7 +88,7 @@ the map).
   while walking — e.g. in Lake Victoria.
 - [x] 12. The blood stain of dying animals has gaps and looks more like a
   Pac-Man.
-- [ ] 13. More variety in the journal entries for the different villages. These
+- [x] 13. More variety in the journal entries for the different villages. These
   should reflect locally/historically accurate peculiarities of each.
 - [ ] 14. One should be able to recover even without medicine. Currently one dies
   even from a light wound.

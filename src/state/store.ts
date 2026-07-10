@@ -1194,9 +1194,11 @@ export const useGame = create<GameState>()((set, get) => ({
         'harbor',
       )
     } else if (first) {
+      // The first visit reads like the place (design.md §16): the entry is
+      // people-specific, drawn from the village's ~1890 way of life.
       get().addEntry(
         { key: 'journal.titles.village', params: { place: id } },
-        { key: 'journal.villageFirstVisit', params: { place: id } },
+        { key: 'journal.villageFirstVisit', params: { place: id, people: place.peopleId ?? '' } },
         'event',
         'hut',
       )

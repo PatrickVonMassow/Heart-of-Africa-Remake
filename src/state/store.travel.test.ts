@@ -177,6 +177,17 @@ describe('landmark discovery bounty (design.md §10)', () => {
   })
 })
 
+describe('village first visit (design.md §16)', () => {
+  it('journals the people-specific vignette with the people param', () => {
+    g().enterPlace('masai-village')
+    const entry = g().journal.find(
+      (e) => typeof e.text === 'object' && e.text.key === 'journal.villageFirstVisit',
+    )
+    expect(entry).toBeTruthy()
+    expect(entry && typeof entry.text === 'object' && entry.text.params?.people).toBe('masai')
+  })
+})
+
 describe('river current drift (design.md §11)', () => {
   it('sweeps an idle traveller downstream and spends time + provisions', () => {
     // A river cell with flow: the White Nile below Lake Victoria.
