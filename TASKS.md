@@ -166,10 +166,26 @@ the map).
   load-time world trim, and the status section links the hybrid test
   strategy. The criteria count stays 32 (docs.mjs green). Full regression:
   one known start-timing flake (flow journal auto-open), green standalone.)
-- [ ] 22. Fully zoomed out in the debug mode, the ocean still renders
+- [x] 22. Fully zoomed out in the debug mode, the ocean still renders
   incorrectly — especially in the northeast.
-- [ ] 23. In the west-southwest a large, unreachable land mass is still shown;
+  (Three layers fixed: the water shader clamp-repeated the bathymetry
+  texture's edge texels into endless streaks beyond the DEM bbox — it now
+  blends to plain deep ocean out there; the trim stamp depth rose from
+  -1000 m to -3000 m so trimmed land reads as the same deep ocean as the
+  bbox mask; and ghost shallows are removed — the shelf ring around every
+  trimmed island (Crete, Cyprus, the Canaries) is deepened via a box
+  dilation of the stamp mask, and all shallow sea northeast of the boundary
+  (Persian Gulf, Dahlak banks, Caspian corner) reads as deep open ocean.
+  The African coast keeps its real shelf bathymetry.)
+- [x] 23. In the west-southwest a large, unreachable land mass is still shown;
   it must be removed from the map as well.
+  (Not reproducible as literal land: cap-zoom sweeps from central, Cairo,
+  south-west and Cape positions show no land outside the game's land masses
+  — landFraction samples confirm it. The likeliest culprit is the point-22
+  family of artifacts (clamped edge bands and bright ghost shallows read as
+  sand-colored land masses and lay in arbitrary screen directions depending
+  on the player position); all of those are gone now. If a land mass still
+  shows after this build, a position/screenshot would pin it down.)
 - [ ] 24. F3 (full loadout) should also unlock the extended zoom mode.
 
 ## Closing (only after all points)

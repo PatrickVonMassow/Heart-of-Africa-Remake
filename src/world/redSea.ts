@@ -139,14 +139,71 @@ export function trimToGameWorld(
     if (idx >= width) tryVisit(idx - width)
     if (idx < total - width) tryVisit(idx + width)
   }
-  const stampedElevation = meta.offsetMeters - 1000 // -1000 m: plausible open sea
+  // Deep open sea: matches the water shader's fully-deep tone (and its
+  // outside-the-bbox mask), so trimmed areas read as plain open ocean with
+  // no brighter rectangle against the surrounding sea.
+  const stampedElevation = meta.offsetMeters - 3000
   const hi = (stampedElevation >> 8) & 0xff
   const lo = stampedElevation & 0xff
+  const stamped = new Uint8Array(total)
   for (let idx = 0; idx < total; idx++) {
     if (visited[idx] || !isLand(idx)) continue
+    stamped[idx] = 1
     const i = idx * 4
     pixels[i] = hi
     pixels[i + 1] = lo
     pixels[i + 2] = 0
+  }
+  // The northeast side of the boundary reads as plain open ocean in full:
+  // shallow sea there — the Persian Gulf's banks, the Dahlak shelf, the
+  // Levant shore — would otherwise stay behind as bright ghost shallows
+  // beside the trimmed land. The African side keeps its real bathymetry.
+  const shallowCap = meta.offsetMeters - 150 // above = shallower than 150 m
+  for (let y = 0; y < meta.height; y++) {
+    const lat = meta.latMax - (y + 0.5) * meta.res
+    if (lat < BOX_LAT_MIN) break
+    for (let x = Math.max(0, Math.floor((BOX_LON_MIN - meta.lonMin) / meta.res)); x < meta.width; x++) {
+      const i = (y * meta.width + x) * 4
+      if (pixels[i + 2] > 0) continue // land (kept)
+      if (pixels[i] * 256 + pixels[i + 1] <= shallowCap) continue // already deep
+      const lon = meta.lonMin + (x + 0.5) * meta.res
+      if (!isNortheastOfBoundary(lat, lon)) continue
+      pixels[i] = hi
+      pixels[i + 1] = lo
+    }
+  }
+  // Ghost shelves: a trimmed island would leave its shallow shelf behind as
+  // a bright outline of the removed land. Deepen shallow sea near trimmed
+  // texels (separable box dilation of the stamp mask), so trimmed land
+  // leaves no trace; deep sea and shores of kept land stay untouched.
+  const radius = Math.max(1, Math.round(0.3 / meta.res))
+  const shallowLimit = meta.offsetMeters - 150 // above = shallower than 150 m
+  const maskH = new Uint8Array(total)
+  for (let y = 0; y < meta.height; y++) {
+    const row = y * meta.width
+    let count = 0
+    for (let x = 0; x < meta.width + radius; x++) {
+      if (x < meta.width && stamped[row + x]) count++
+      const drop = x - 2 * radius - 1
+      if (drop >= 0 && stamped[row + drop]) count--
+      const cx = x - radius
+      if (cx >= 0 && cx < meta.width && count > 0) maskH[row + cx] = 1
+    }
+  }
+  for (let x = 0; x < meta.width; x++) {
+    let count = 0
+    for (let y = 0; y < meta.height + radius; y++) {
+      if (y < meta.height && maskH[y * meta.width + x]) count++
+      const drop = y - 2 * radius - 1
+      if (drop >= 0 && maskH[drop * meta.width + x]) count--
+      const cy = y - radius
+      if (cy < 0 || cy >= meta.height || count === 0) continue
+      const idx = cy * meta.width + x
+      const i = idx * 4
+      if (pixels[i + 2] > 0) continue // land (kept): untouched
+      if (pixels[i] * 256 + pixels[i + 1] <= shallowLimit) continue // already deep
+      pixels[i] = hi
+      pixels[i + 1] = lo
+    }
   }
 }

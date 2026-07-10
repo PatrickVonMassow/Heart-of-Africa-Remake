@@ -106,7 +106,17 @@ export function createWaterMaterial(): WaterMaterialHandle {
   )
   const demSample = texture(demTex, demUv)
   const elevation = demSample.r.mul(255 * 256).add(demSample.g.mul(255)).sub(meta.offsetMeters)
-  const depthM = max(elevation.negate(), 0) // meters of water below sea level
+  const depthSampled = max(elevation.negate(), 0) // meters of water below sea level
+  // Outside the DEM bbox the texture would clamp-repeat its edge texels into
+  // endless streaks across the far sea (visible at the continent zoom,
+  // especially northeast). Blend to plain deep ocean beyond the bbox instead.
+  const inLon = smoothstep(float(meta.lonMin - 1), float(meta.lonMin), lon).mul(
+    smoothstep(float(meta.lonMax), float(meta.lonMax + 1), lon).oneMinus(),
+  )
+  const inLat = smoothstep(float(meta.latMin - 1), float(meta.latMin), lat).mul(
+    smoothstep(float(meta.latMax), float(meta.latMax + 1), lat).oneMinus(),
+  )
+  const depthM = mix(float(3500), depthSampled, inLon.mul(inLat))
 
   // --- Depth-dependent absorption (design.md §2) --------------------------
   const riverTone = color('#2c6285') // over land pixels (rivers, lakes)

@@ -40,11 +40,13 @@ describe('isNortheastOfBoundary', () => {
 })
 
 describe('trimToGameWorld', () => {
-  // Synthetic 23x24 grid at 1°/texel covering lon 30..53, lat 8..32: land
-  // everywhere (B = 5, elevation 500 m at offset 12000 → value 12500) except
-  // a full-height sea column at lon 37..40 that splits a west land mass
+  // Synthetic 23x24 grid at 1°/texel covering lon 0..23, lat 8..32 — west of
+  // the Red Sea boundary box, so only the flood/stamp mechanics act (the
+  // real-boundary passes are covered by the DEM tests below). Land everywhere
+  // (B = 5, elevation 500 m at offset 12000 → value 12500) except a
+  // full-height sea column at lon 7..10 that splits a west land mass
   // (seeded) from an east one (unconnected).
-  const meta = { width: 23, height: 24, lonMin: 30, latMax: 32, res: 1, offsetMeters: 12000 }
+  const meta = { width: 23, height: 24, lonMin: 0, latMax: 32, res: 1, offsetMeters: 12000 }
   const texel = (lon: number, lat: number) => {
     const x = Math.floor(lon - meta.lonMin)
     const y = Math.floor(meta.latMax - lat)
@@ -69,15 +71,15 @@ describe('trimToGameWorld', () => {
     return px
   }
   const elev = (px: Uint8ClampedArray, i: number) => px[i] * 256 + px[i + 1] - meta.offsetMeters
-  const seeds: Array<[number, number]> = [[31.5, 20.5]]
+  const seeds: Array<[number, number]> = [[1.5, 20.5]]
 
   it('keeps land connected to a seed and trims the unconnected mass', () => {
     const px = fill()
     trimToGameWorld(px, meta, seeds)
-    const west = texel(33.5, 20.5)
+    const west = texel(3.5, 20.5)
     expect(px[west + 2]).toBe(5)
     expect(elev(px, west)).toBe(500)
-    const east = texel(45.5, 20.5)
+    const east = texel(15.5, 20.5)
     expect(px[east + 2]).toBe(0)
     expect(elev(px, east)).toBeLessThan(0)
   })
@@ -85,9 +87,24 @@ describe('trimToGameWorld', () => {
   it('keeps the real bathymetry of sea texels', () => {
     const px = fill()
     trimToGameWorld(px, meta, seeds)
-    const sea = texel(38.5, 20.5)
+    const sea = texel(8.5, 20.5)
     expect(elev(px, sea)).toBe(-200)
     expect(px[sea + 2]).toBe(0)
+  })
+
+  it('deepens the shallow shelf around trimmed land, not shallows near kept land', () => {
+    const px = fill()
+    const shelfEast = texel(9.5, 21.5) // shallow sea texel bordering the trimmed east mass
+    px[shelfEast] = (12000 - 50) >> 8
+    px[shelfEast + 1] = (12000 - 50) & 0xff
+    px[shelfEast + 2] = 0
+    const shelfWest = texel(7.5, 21.5) // shallow sea texel bordering the kept west mass
+    px[shelfWest] = (12000 - 50) >> 8
+    px[shelfWest + 1] = (12000 - 50) & 0xff
+    px[shelfWest + 2] = 0
+    trimToGameWorld(px, meta, seeds)
+    expect(elev(px, shelfEast)).toBeLessThan(-1000) // ghost shelf removed
+    expect(elev(px, shelfWest)).toBe(-50) // kept-land shore untouched
   })
 
   it('never trims land adjacent to kept land outside the Suez isthmus gate (no bites)', async () => {
@@ -152,6 +169,11 @@ describe('world trim on the real DEM', () => {
     const t = sampleTerrain(12, 45, seed)
     expect(t.type).toBe('ocean')
     expect(isBlocked(t.type, 12, 45)).toBe(true)
+  })
+
+  it('shallow sea northeast of the boundary reads as deep open ocean (Persian Gulf)', () => {
+    expect(elevationAt(27, 51)).toBeLessThan(-500)
+    expect(elevationAt(16, 40.2)).toBeLessThan(-500) // Dahlak shelf
   })
 
   it('land masses outside the walkable continent are trimmed to ocean', () => {

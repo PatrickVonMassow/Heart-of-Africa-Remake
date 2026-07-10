@@ -250,7 +250,8 @@ verify suite that proves it.
    world trim are pure-tested at the acceptance coordinates — mid Red
    Sea, Sinai, the Arabian peninsula and the Gulf of Aden are blocked
    ocean (Sinai/Arabia trimmed in the DEM, so no land route rounds the
-   Red Sea), foreign land (southern Spain, Sicily, Crete, the Canaries,
+   Red Sea; shallow sea northeast of the boundary reads as deep open
+   ocean), foreign land (southern Spain, Sicily, Crete, the Canaries,
    the Comoros …) samples as ocean while the game's islands stay land,
    no trimmed texel borders kept land outside the Suez isthmus gate (no
    ocean scrap juts into the coast), the Nile delta and the African Red
