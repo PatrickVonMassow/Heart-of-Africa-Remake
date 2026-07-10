@@ -199,7 +199,7 @@ The POC counts as fulfilled when all points verifiably hold. Details per
 2. **Two perspectives.** Bird's-eye view (3D travel across the continent)
    and first-person view (walkable settlement) exist, and switching between
    them works when entering/leaving a settlement. Entering and leaving
-   happen through movement alone (`design.md` §2 "Switching"): walking onto
+   happen through movement alone (`design.md` §2.3 "Switching"): walking onto
    a settlement's position enters it; walking beyond the settlement's edge
    leaves it — there is no exit archway and no enter/leave key. The
    enterable buildings likewise open by walking against their entrance door;
@@ -337,8 +337,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     which previously showed visible steps.
 12. **Atmosphere.** The atmosphere elements from `design.md` are
     implemented — specifically "## 19. Atmosphere and Immersion" and the
-    "**Graphics and atmosphere.**" passage in "## 2. Perspectives and
-    Camera". This includes the decorative predator hunt (`design.md` §19):
+    "Graphics and atmosphere" section (`design.md` §2.4). This includes
+    the decorative predator hunt (`design.md` §19):
     each hunt a region-appropriate predator appears — lion everywhere,
     cheetah and hyena on the eastern/southern plains, leopard in the wooded
     west/centre — and takes prey from its own food web (predator → grazer →
@@ -430,8 +430,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     OPEN: tree-climbing-to-flee and additional new species/birds beyond the
     existing roster and the added calves remain to be implemented (§9 open
     items).
-13. **Real geodata.** The passage "**Real geodata and terrain rendering.**"
-    in "## 3. World Model and Map" (`design.md`) is implemented: elevation
+13. **Real geodata.** The section "Real geodata and terrain rendering"
+    (`design.md` §3.3) is implemented: elevation
     relief from a real DEM (tile-based, LOD-streamed), coasts/rivers/lakes
     from vector data in their ~1890 state without visible raster steps,
     ground rendered via biome-based PBR texture splatting with detail
@@ -445,9 +445,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     desert) is sampled across latitudes and its longitude varies rather than
     running straight (`scripts/verify/enrichments.mjs`); the geodata
     preprocessing is reproducibly documented in the repository.
-14. **Lighting and post-processing pipeline.** The passage "**Lighting and
-    post-processing pipeline.**" in "## 2. Perspectives and Camera"
-    (`design.md`) is implemented: image-based environment lighting (IBL), a
+14. **Lighting and post-processing pipeline.** The section "Lighting and
+    post-processing pipeline" (`design.md` §2.7) is implemented: image-based environment lighting (IBL), a
     sky from a physically grounded scattering model consistent with the sun
     position, cascaded shadows in the bird's-eye view, screen-space AO,
     bloom, filmic tone mapping with color grading and a subtle vignette,
@@ -457,9 +456,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     application runs without console errors on both the WebGPU and WebGL 2
     paths; simplifications (e.g. TAA, true screen-space reflection/
     refraction) are named as open items (see pt. 32).
-15. **Lively, densely built settlements.** The passage "**Lively, densely
-    built settlements (first-person).**" in "## 2. Perspectives and Camera"
-    (`design.md`) is implemented: the first-person view shows far more
+15. **Lively, densely built settlements.** The section "Lively, densely
+    built settlements (first-person)" (`design.md` §2.6) is implemented: the first-person view shows far more
     buildings than just the functional ones — additional non-enterable
     dwellings and outbuildings in region-typical, procedurally varied
     density — a recognizable street/path network, and inhabitants who move
@@ -482,9 +480,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     the backdrop mesh is present and Berber Village's backdrop stays a low
     horizon range (max elevation angle bounded); the application loads
     without console errors (`scripts/verify/enrichments.mjs`).
-16. **Collision inside settlements.** The collision point of the passage
-    "**Lively, densely built settlements (first-person).**" (`design.md`
-    §2) is implemented: neither the player character nor the inhabitants
+16. **Collision inside settlements.** The collision point of the section
+    "Lively, densely built settlements (first-person)" (`design.md` §2.6)
+    is implemented: neither the player character nor the inhabitants
     pass through buildings or solid objects inside settlements (huts,
     fences, trees, rocks, fire pit); movement slides along obstacles;
     inhabitants never get permanently stuck; the accesses to the enterable
@@ -623,8 +621,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     obscured by a building/place label. Verifiable: with a settlement
     label hit-tested on top, opening a modal makes the dialog the topmost
     element at that point (`scripts/verify/enrichments.mjs`).
-21. **Water realism.** The visual part of the passage "**Water, current
-    and waterfalls.**" in `design.md` §11 is implemented: rivers lie in
+21. **Water realism.** The visual part of the section "Water, current
+    and waterfalls" (`design.md` §11.3) is implemented: rivers lie in
     beds carved relative to the local relief, and their surface sits just
     above the carved bed for the whole length so the water renders as one
     continuous, unbroken ribbon that descends overall from source to mouth
