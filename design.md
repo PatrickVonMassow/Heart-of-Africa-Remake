@@ -588,7 +588,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 
 - **F1** opens/closes the debug menu.
 - **F2** toggles the journal do-not-disturb option (§16).
-- **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health, a full canteen and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything.
+- **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health, a full canteen and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything, and the extended zoom of §21.4 is unlocked along with it.
 - **F4** toggles the canoe in and out of the pack (for quickly testing water travel and the on-land penalty).
 
 ### 21.2 Tunable values

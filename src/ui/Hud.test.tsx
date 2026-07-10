@@ -203,3 +203,13 @@ describe('InventoryBar present-valuable button (design.md §8)', () => {
     expect(btn?.textContent).toContain('(1)')
   })
 })
+
+describe('F3 unlocks the extended zoom alongside the loadout (design.md §21.1)', () => {
+  it('sets wheelZoomEnabled and grants the loadout on one press', () => {
+    useUi.setState({ wheelZoomEnabled: false })
+    render(<Hud />)
+    fireEvent.keyDown(window, { code: 'F3' })
+    expect(useUi.getState().wheelZoomEnabled).toBe(true)
+    expect(g().money).toBe(100000)
+  })
+})

@@ -186,7 +186,9 @@ the map).
   sand-colored land masses and lay in arbitrary screen directions depending
   on the player position); all of those are gone now. If a land mass still
   shows after this build, a position/screenshot would pin it down.)
-- [ ] 24. F3 (full loadout) should also unlock the extended zoom mode.
+- [x] 24. F3 (full loadout) should also unlock the extended zoom mode.
+  (The F3 handler now enables the wheel-zoom unlock alongside the loadout;
+  asserted in src/ui/Hud.test.tsx via a window keydown.)
 
 ## Closing (only after all points)
 

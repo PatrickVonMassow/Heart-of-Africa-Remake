@@ -353,8 +353,12 @@ export function Hud() {
       const s = getStrings()
       useGame.getState().setToast(ui.journalDnd ? s.toasts.journalDndOff : s.toasts.journalDndOn)
     })
-    // F3 grants the full debug loadout (design.md §21).
-    const offF3 = onKeyPress('F3', () => useGame.getState().debugFullLoadout())
+    // F3 grants the full debug loadout and unlocks the extended zoom
+    // (design.md §21.1).
+    const offF3 = onKeyPress('F3', () => {
+      useGame.getState().debugFullLoadout()
+      useUi.getState().setWheelZoomEnabled(true)
+    })
     // F4 toggles the canoe in and out of the pack (design.md §21).
     const offF4 = onKeyPress('F4', () => useGame.getState().debugToggleCanoe())
     const offEsc = onKeyPress('Escape', () => {

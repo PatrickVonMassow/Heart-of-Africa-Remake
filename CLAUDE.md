@@ -489,7 +489,8 @@ verify suite that proves it.
     do-not-disturb option (§16.2; also F2); the §21.1 shortcuts hold (F1
     menu, F2 do-not-disturb, F3 full loadout — all gear/treasures, 100000
     gifts/dollars/provisions, full health, full canteen, no afflictions,
-    capacity raised to fit — F4 canoe toggle); the canteen's consumption
+    capacity raised to fit, and the extended zoom unlocked — F4 canoe
+    toggle); the canteen's consumption
     rates and capacity are editable (§21.2). Modal windows and full-screen
     overlays always render above the in-scene floating labels (§17.4).
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults
@@ -510,7 +511,8 @@ verify suite that proves it.
     (no sea/land drift) and the chunk-bound dressing hidden, the
     reversion at zoom 1 (haze, far sheet and dressing), the far sheet's
     chunk-matched ground tone (`src/scenes/travel/farColor.test.ts`,
-    pure), the dropdowns, the renderer row, and that with a
+    pure), the F3 zoom unlock (`src/ui/Hud.test.tsx`), the dropdowns, the
+    renderer row, and that with a
     settlement label hit-tested on top, opening a modal makes the dialog
     the topmost element at that point; `scripts/verify/collision.mjs`
     additionally proves corner clearance at box buildings and an
