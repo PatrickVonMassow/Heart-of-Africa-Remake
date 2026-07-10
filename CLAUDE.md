@@ -382,7 +382,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     draws a vulture that lands and consumes it until it is removed — with the
     vulture spawning beyond the zoom-aware view ring and flying in (no popping
     in), flying off after the meal and despawning only well outside the view,
-    and the kill-circling flock flying the same in/out pattern — that
+    and the kill-circling flock flying the same in/out pattern — that a
+    finished hunt leaves a small prey remnant at the kill site which the
+    scavenger then finds and finishes (and a feed that ends without a kill
+    leaves none), that
     carcasses left far off-screen are culled while a visible one is kept (so
     kills stay bounded and never stall the frame loop), that more than one
     kind of predator hunts and every predator/prey pairing fits the region

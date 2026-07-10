@@ -151,8 +151,8 @@ describe('escortHeading (design.md §19 — parent escorts its hunted calf)', ()
       calf.z += Math.cos(away) * 3.8 * dt
       const h = escortHeading(parent.x, parent.z, calf.x, calf.z, pred.x, pred.z, offset)
       if (h !== null) {
-        parent.x += Math.sin(h) * 5 * dt
-        parent.z += Math.cos(h) * 5 * dt
+        parent.x += Math.sin(h) * 6 * dt
+        parent.z += Math.cos(h) * 6 * dt
       }
     }
     expect(caught).toBe(true) // the slower calf is run down

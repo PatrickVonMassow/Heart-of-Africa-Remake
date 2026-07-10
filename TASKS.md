@@ -70,7 +70,7 @@ the map).
   (Herd streaming already despawned beyond the zoom-aware ring; the offender
   was the scripted hunt predator, which left by timer and aborted at a fixed
   90 units — both now resolve only past the zoom-aware view ring.)
-- [ ] 7. When a predator leaves, it leaves behind a small remnant of prey that is
+- [x] 7. When a predator leaves, it leaves behind a small remnant of prey that is
   then eaten by vultures.
 - [ ] 8. In the debug-menu-extended zoom mode one should be able to zoom out far
   enough to see the whole continent. So far this is prevented both by not being

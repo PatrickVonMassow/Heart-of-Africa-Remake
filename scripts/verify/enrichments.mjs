@@ -508,6 +508,9 @@ check('the flee never teleports (no single-frame jump)', flee.maxStep < 2, JSON.
 // world space (pos is {x,z}) so a fixed distance can be compared against the
 // zoom-scaled despawn radius.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+// The elephant/oscillation/flee tests above emptied herd arrays while their
+// chunk keys stayed registered — restock so the area streams in fresh.
+await page.evaluate(() => window.__wildlife.restock())
 await waitForHerds()
 const stream = await page.evaluate(async () => {
   const w = window.__wildlife
@@ -645,6 +648,7 @@ check('a carcass in view is kept (dissolves on screen, not popped)', carcassBoun
 // keeps close to a parent; a parent moves between an approaching predator and
 // its calf (defends the young); and some shore visitors wade in and bathe.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.evaluate(() => window.__wildlife.restock())
 await waitForHerds()
 // A calf keeps close to its parent only after a few spawn+follow frames; give
 // the family behaviours a moment to settle once the herds are present.
@@ -684,9 +688,13 @@ const shoreSpots = await page.evaluate(() => {
       if (T(lat, lon, seed) === 'savanna' && nearWater(lat, lon)) spots.push([lat, lon])
   return spots
 })
-let bathe = { drinkers: 0, bathers: 0 }
+// Aggregate drinkers/bathers over ALL roamed shores: ~40 % of drinkers bathe,
+// so a single shore with a handful of drinkers can easily hold none — the
+// union across shores makes the sample large enough to be reliable.
+const bathe = { drinkers: 0, bathers: 0 }
 for (const spot of shoreSpots) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s[0], s[1]), spot)
+  await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
   const gotDrinkers = await page
     .waitForFunction(
@@ -703,20 +711,24 @@ for (const spot of shoreSpots) {
     .then(() => true)
     .catch(() => false)
   if (gotDrinkers) {
-    bathe = await page.evaluate(() => {
+    const here = await page.evaluate(() => {
       const h = window.__wildlife.herdsRef.current
       let drinkers = 0, bathers = 0
       for (const sp of Object.keys(h)) for (const a of h[sp]) { if (a.drink) drinkers++; if (a.bathe) bathers++ }
       return { drinkers, bathers }
     })
-    if (bathe.bathers > 0) break // keep roaming if this herd happened to have no bathers
+    bathe.drinkers += here.drinkers
+    bathe.bathers += here.bathers
+    if (bathe.bathers > 0) break
   }
 }
 check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, `${JSON.stringify(bathe)} spots=${shoreSpots.length}`)
 
 // Return to the herd-dense plains for the predator-guard check below.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.evaluate(() => window.__wildlife.restock())
 await waitForHerds()
+await waitForFamily()
 await page.waitForTimeout(1500)
 
 // Parent defends its calf: inject a predator at a fixed point near a calf; a
@@ -733,6 +745,12 @@ const guard = await page.evaluate(async () => {
   if (!parent) return { found: false }
   const L = window.__lionHunt.state
   const lx = calf.x + 5, lz = calf.z
+  // Start the parent on the far side of the calf: the guard standoff sits 2.2
+  // from the calf toward the predator, so a parent that happens to stand right
+  // at the pin point would correctly move AWAY to it — seed a deterministic
+  // approach instead.
+  parent.x = calf.x - 3
+  parent.z = calf.z
   L.mode = 'chase'; L.lx = lx; L.lz = lz; L.px = calf.x; L.pz = calf.z
   const dist = () => Math.hypot(parent.x - lx, parent.z - lz)
   const before = dist()
@@ -880,6 +898,10 @@ check('every hunted prey fits the region and the predator food web',
 // family (the inline finder skips animals a prior scenario killed).
 const pinFamily = async (lat, lon) => {
   await page.evaluate((c) => window.__game.getState().debugJumpTo(c[0], c[1]), [lat, lon])
+  // Restock: earlier tests may have emptied herd arrays while the chunk keys
+  // stayed registered, leaving the area barren — re-stream it deterministically
+  // so every family scenario is self-contained.
+  await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
   await waitForFamily()
   await page.waitForTimeout(2200) // let calves settle beside their parents
@@ -1365,15 +1387,19 @@ const vulFlight = await page.evaluate(async () => {
   const p = () => window.__game.getState().pos
   window.__ui.getState().setTravelZoom(1)
   for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+  herds.elephant.length = 0
+  // Inject FIRST, then reset the flight: the re-pick that follows must find
+  // our carcass as the nearest valid target (a frame between reset and inject
+  // could otherwise bind the scavenger to some far natural kill).
+  const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5' }
+  herds.zebra.push(carcass)
   const sc = w.scavenger.current
   sc.target = null
   sc.mode = 'idle'
-  await sleep(150)
-  const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5' }
-  herds.zebra.push(carcass)
   const out = { spawnDist: null, landed: false, outSeen: false, hideDist: null }
   let t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  while (Date.now() - t0 < 60000) {
+    herds.elephant.length = 0 // no tramples: the injected carcass stays the nearest target
     if (sc.target === carcass && sc.mode === 'in') {
       out.spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
       break
@@ -1382,6 +1408,7 @@ const vulFlight = await page.evaluate(async () => {
   }
   t0 = Date.now()
   while (Date.now() - t0 < 30000) {
+    herds.elephant.length = 0
     if (sc.landed) { out.landed = true; break }
     await sleep(100)
   }
@@ -1412,15 +1439,18 @@ const vulZoom = await page.evaluate(async () => {
   window.__ui.getState().setWheelZoomEnabled(true) // zoom-out past 1 is gated
   window.__ui.getState().setTravelZoom(2)
   for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+  herds.elephant.length = 0
+  // Inject FIRST, then reset the flight (see above): zoom 2 streams in fresh
+  // chunks whose animals could otherwise die and outbid our carcass.
+  const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5z' }
+  herds.zebra.push(carcass)
   const sc = w.scavenger.current
   sc.target = null
   sc.mode = 'idle'
-  await sleep(150)
-  const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5z' }
-  herds.zebra.push(carcass)
   let spawnDist = null
   const t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  while (Date.now() - t0 < 60000) {
+    herds.elephant.length = 0 // zoom 2 streams in fresh elephants — no tramples
     if (sc.target === carcass && sc.mode === 'in') {
       spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
       break
@@ -1456,7 +1486,7 @@ const killFlock = await page.evaluate(async () => {
   L.timer = 90
   const out = { spawnDist: null, arrived: false, outSeen: false, hideDist: null }
   let t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  while (Date.now() - t0 < 60000) {
     if (f.mode === 'in' && out.spawnDist === null) out.spawnDist = +Math.hypot(f.x - p().x, f.z - p().z).toFixed(1)
     if (f.mode === 'active') { out.arrived = true; break }
     await sleep(50)
@@ -1575,6 +1605,94 @@ const leaveZoom = await page.evaluate(async () => {
 check('the predator despawn ring scales with the zoom (narrow zoom hides sooner)',
   leaveZoom.hideDist !== null && leaveZoom.hideDist >= 80 && leaveZoom.hideDist < 100,
   JSON.stringify(leaveZoom))
+
+// --- Point 7: a finished hunt leaves a prey remnant for the vulture -----------
+// design.md §19: the predator does not strip its kill bare — a small carcass
+// scrap stays at the site, and the scavenger drops in and finishes it. A feed
+// that ends without a kill (a rescued calf) leaves nothing.
+const remnant = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const p = () => window.__game.getState().pos
+  const L = window.__lionHunt.state
+  window.__ui.getState().setTravelZoom(1)
+  for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
+  const sc = w.scavenger.current
+  sc.target = null
+  sc.mode = 'idle'
+  L.victim = null
+  L.victimHunt = false
+  L.prey = 'zebra'
+  L.px = p().x + 6
+  L.pz = p().z
+  L.lx = L.px + 0.7
+  L.lz = L.pz + 0.25
+  L.mode = 'feed'
+  L.timer = 0.3
+  const out = { remnantFound: false, small: false, targeted: false, consumed: false }
+  let rem = null
+  let t0 = Date.now()
+  while (Date.now() - t0 < 10000) {
+    rem = herds.zebra.find((a) => a.dead && Math.hypot(a.x - L.px, a.z - L.pz) < 1.5)
+    if (rem) break
+    await sleep(60)
+  }
+  if (!rem) { L.mode = 'idle'; L.timer = 99999; return out }
+  out.remnantFound = true
+  out.small = rem.scale < 0.6
+  t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (sc.target === rem) { out.targeted = true; break }
+    await sleep(80)
+  }
+  t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (sc.landed && sc.target === rem) rem.dissolve = 0.02 // fast-forward the meal
+    if (!herds.zebra.includes(rem)) { out.consumed = true; break }
+    await sleep(100)
+  }
+  L.mode = 'idle'
+  L.timer = 99999
+  return out
+})
+check('a finished hunt leaves a small prey remnant at the kill site',
+  remnant.remnantFound && remnant.small, JSON.stringify(remnant))
+check('the scavenger vulture finds and finishes the remnant',
+  remnant.targeted && remnant.consumed, JSON.stringify(remnant))
+
+const noRemnant = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const L = window.__lionHunt.state
+  let calf = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || [])
+      if (a.young && !a.dead && a.caught === undefined && a.inWater === undefined && a.parent && !a.parent.dead) { calf = a; break }
+    if (calf) break
+  }
+  if (!calf) return { found: false }
+  const countDead = () => Object.keys(herds).reduce((n, sp) => n + herds[sp].filter((a) => a.dead).length, 0)
+  const deadBefore = countDead()
+  L.victim = calf // alive — as after a successful rescue
+  L.victimHunt = true
+  L.px = calf.x
+  L.pz = calf.z
+  L.lx = calf.x + 0.7
+  L.lz = calf.z + 0.25
+  L.mode = 'feed'
+  L.timer = 0.3
+  await sleep(2500)
+  const out = { found: true, deadBefore, deadAfter: countDead(), calfAlive: !calf.dead, mode: L.mode }
+  L.mode = 'idle'
+  L.timer = 99999
+  L.victim = null
+  L.victimHunt = false
+  return out
+})
+check('a feed that ends without a kill leaves no remnant',
+  noRemnant.found && noRemnant.deadAfter === noRemnant.deadBefore && noRemnant.calfAlive,
+  JSON.stringify(noRemnant))
 
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);

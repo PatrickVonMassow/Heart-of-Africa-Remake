@@ -109,6 +109,10 @@ interface Animal {
   /** Current playful-hop height (0..1) while a calf gambols (design.md §19);
    *  kept as state so the verification can observe the play. */
   hop?: number
+  /** Removed from the herd arrays (culled/consumed): releases any scavenger
+   *  flight still bound to this carcass — a ghost target would otherwise stay
+   *  "valid" forever and pin the vulture to an empty spot. */
+  gone?: boolean
 }
 
 /**
@@ -256,8 +260,10 @@ const CALF_FLEE_SPEED = 3.8
 /** A bolting parent keeps station this far beyond its hunted calf (away from
  *  the hunter): running with the flight without abandoning the young, it
  *  stands clear — but near — when the calf is seized, so its rescue charge is
- *  a visible run (design.md §19). */
+ *  a visible run (design.md §19). The sprint is a notch faster than a plain
+ *  flee so the parent completes its overtake well before the catch. */
 const ESCORT_OFFSET = 6
+const ESCORT_SPEED = 6
 /** Inside this radius the predator pounces straight at the calf, bypassing its
  *  turn-rate limit: with speed 5.6 and turn 3 the minimum turning circle is
  *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
@@ -364,6 +370,25 @@ function leaveHeading(x: number, z: number, px: number, pz: number): number {
   const dz = z - pz
   if (Math.hypot(dx, dz) < 1e-3) return Math.random() * Math.PI * 2
   return Math.atan2(dx, dz)
+}
+
+/** A predator does not strip its kill bare (design.md §19): when it walks off,
+ *  a small remnant of the prey stays behind at the site — a carcass scrap the
+ *  scavenger vulture later drops in on and finishes. */
+const REMNANT_SCALE = 0.35
+function spawnRemnant(s: LionHuntState, seed: number): void {
+  const herds = ACTIVE_HERDS
+  if (!herds) return
+  const ll = worldToLatLon(s.px, s.pz)
+  herds[s.prey].push({
+    x: s.px,
+    z: s.pz,
+    y: Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height),
+    rot: Math.random() * Math.PI * 2,
+    scale: PREY_SCALE[s.prey] * REMNANT_SCALE,
+    phase: 0,
+    dead: true,
+  })
 }
 
 function emptyHerds(): Record<Species, Animal[]> {
@@ -574,11 +599,22 @@ function Herds() {
     [],
   )
 
-  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  // Dev hook for the headless verification (CLAUDE.md §7.2). `restock` empties
+  // every herd in place AND forgets the spawned chunks, so the next frame
+  // re-streams the area deterministically — the harness needs it after a test
+  // has emptied herd arrays (a bare array clear leaves the chunk keys behind
+  // and the area would stay barren until the player travelled far away).
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger }
+    const restock = () => {
+      const h = herdsRef.current
+      if (h) for (const sp of SPECIES) h[sp].length = 0
+      spawnedChunks.current.clear()
+      herdState.current.clear()
+      scavenger.current.target = null
+    }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock }
     return () => {
       delete w.__wildlife
     }
@@ -1003,7 +1039,7 @@ function Herds() {
     {
       const sc = scavenger.current
       const targetValid = (a: Animal | null): a is Animal =>
-        !!a && !!a.dead && !a.lionFed && (a.dissolve === undefined || a.dissolve > 0)
+        !!a && !!a.dead && !a.lionFed && !a.gone && (a.dissolve === undefined || a.dissolve > 0)
       if (!targetValid(sc.target)) {
         sc.target = null
         let bestD = Infinity
@@ -1196,8 +1232,8 @@ function Herds() {
             // abandoning it, never sitting on its escape line (design.md §19).
             const h = escortHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, ESCORT_OFFSET)
             if (h !== null) {
-              a.x += Math.sin(h) * FLEE_SPEED * dt
-              a.z += Math.cos(h) * FLEE_SPEED * dt
+              a.x += Math.sin(h) * ESCORT_SPEED * dt
+              a.z += Math.cos(h) * ESCORT_SPEED * dt
               yaw = h
             } else {
               yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z) // on station: face the calf
@@ -1375,7 +1411,10 @@ function Herds() {
         if (!a.dead) continue
         const consumed = a.dissolve !== undefined && a.dissolve <= 0
         const farOffScreen = Math.hypot(a.x - pos.x, a.z - pos.z) > despawnR
-        if (consumed || farOffScreen) list.splice(i, 1)
+        if (consumed || farOffScreen) {
+          a.gone = true // releases a scavenger flight bound to this carcass
+          list.splice(i, 1)
+        }
       }
     }
   })
@@ -1611,6 +1650,9 @@ function LionHunt() {
         }
         const consumed = v.dead && (v.dissolve ?? 0) <= 0
         if (consumed || s.timer <= 0) {
+          // A remnant stays behind only when a kill was actually eaten — a
+          // feed that timed out over a rescued calf leaves nothing (§19).
+          if (v.dead) spawnRemnant(s, seed)
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.victim = null
@@ -1620,7 +1662,8 @@ function LionHunt() {
       } else {
         s.timer -= dt
         if (s.timer <= 0) {
-          // Carcass fully consumed: the lion moves on (design.md §19).
+          // Carcass consumed: the lion moves on, leaving a scrap (§19).
+          spawnRemnant(s, seed)
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.lx = s.px + 0.7
