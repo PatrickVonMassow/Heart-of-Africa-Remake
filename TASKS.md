@@ -72,7 +72,7 @@ the map).
   90 units — both now resolve only past the zoom-aware view ring.)
 - [x] 7. When a predator leaves, it leaves behind a small remnant of prey that is
   then eaten by vultures.
-- [ ] 8. In the debug-menu-extended zoom mode one should be able to zoom out far
+- [x] 8. In the debug-menu-extended zoom mode one should be able to zoom out far
   enough to see the whole continent. So far this is prevented both by not being
   able to zoom out far enough and by haze obscuring the view. In the zoom range
   reachable only via the debug extension, no haze should be shown.

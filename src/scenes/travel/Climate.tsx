@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { useGame } from '../../state/store'
+import { useUi } from '../../state/ui'
 import type { RegionId } from '../../world/geo'
 
 interface FogPreset {
@@ -73,18 +74,41 @@ export function Climate() {
   const targetColor = useMemo(() => new THREE.Color(), [])
   const hazeTarget = useMemo(() => new THREE.Color(), [])
 
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__climate = {
+      fog: () => {
+        const f = scene.fog as THREE.Fog | null
+        return f ? { near: f.near, far: f.far } : null
+      },
+      hazeOpacity: () => haze.opacityU.value as number,
+    }
+    return () => {
+      delete w.__climate
+    }
+  }, [scene, haze])
+
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const k = Math.min(1, dt * 0.8) // slow blend across region borders
     const s = useGame.getState()
     const preset = FOG_PRESETS[s.region]
+    // No haze in the debug-only zoom range (design.md §21): beyond the default
+    // camera distance the fog recedes to the horizon and the ground haze fades
+    // out, so a zoomed-out view — up to the whole continent — stays clear.
+    const zoom = useUi.getState().travelZoom
+    const clearView = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
 
     const fog = scene.fog as THREE.Fog | null
     if (fog) {
       targetColor.set(preset.color)
       fog.color.lerp(targetColor, k)
-      fog.near += (preset.near - fog.near) * k
-      fog.far += (preset.far - fog.far) * k
+      const nearT = preset.near + (6000 - preset.near) * clearView
+      const farT = preset.far + (12000 - preset.far) * clearView
+      fog.near += (nearT - fog.near) * k
+      fog.far += (farT - fog.far) * k
       if (scene.background instanceof THREE.Color) scene.background.lerp(targetColor, k)
     }
 
@@ -93,7 +117,7 @@ export function Climate() {
     if (g) {
       hazeTarget.set(preset.hazeColor)
       haze.colorU.value.lerp(hazeTarget, k)
-      haze.opacityU.value += (preset.haze - haze.opacityU.value) * k
+      haze.opacityU.value += (preset.haze * (1 - clearView) - haze.opacityU.value) * k
       g.visible = haze.opacityU.value > 0.01
       if (g.visible) {
         const t = clock.elapsedTime

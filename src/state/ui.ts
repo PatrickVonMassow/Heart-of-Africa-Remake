@@ -84,9 +84,10 @@ export const useUi = create<UiState>()((set) => ({
   setWheelZoomEnabled: (wheelZoomEnabled) =>
     set((s) => ({ wheelZoomEnabled, travelZoom: wheelZoomEnabled ? s.travelZoom : Math.min(1, s.travelZoom) })),
   // Zooming in is always available; zooming out beyond the default camera
-  // distance (factor 1) requires the debug unlock (design.md §21).
+  // distance (factor 1) requires the debug unlock (design.md §21). The
+  // unlocked range reaches far enough to take in the whole continent.
   setTravelZoom: (travelZoom) =>
-    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 4 : 1, Math.max(0.25, travelZoom)) })),
+    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : 1, Math.max(0.25, travelZoom)) })),
   setJournalDnd: (journalDnd) => set({ journalDnd }),
 }))
 

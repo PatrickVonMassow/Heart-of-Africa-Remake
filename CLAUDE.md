@@ -560,9 +560,19 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     and these three terrain factors are adjustable at runtime in the debug
     menu (`design.md` §21)
     in both languages; the bird's-eye mouse-wheel zoom is always active
-    (0.25x-4x), with a debug checkbox gating zoom-out beyond the default
+    (0.25x-16x), with a debug checkbox gating zoom-out beyond the default
     distance (without it, zoom-out stops at factor 1; disabling clamps a
-    wider view back); the debug menu additionally offers dropdown selectors
+    wider view back). The unlocked range reaches a view of the whole
+    continent: a coarse far-terrain sheet streams in beyond the detailed
+    chunks, the sea calms to glass (crests/foam/glints would alias into
+    speckle noise at that distance), the camera near plane moves out to keep
+    coastal depth precision, and in the debug-only zoom range (beyond factor
+    1) no haze is shown — the fog recedes to the horizon and the ground haze
+    fades, returning as the zoom drops back. Verifiable: at the zoom cap the
+    far sheet is built and visible, the fog far plane exceeds 2000 and the
+    haze opacity is ~0, with a screenshot (87), and back at zoom 1 the fog
+    and the sheet revert (`scripts/verify/enrichments.mjs`); the debug menu
+    additionally offers dropdown selectors
     for jump-to (ports/villages, the elephant graveyard and the
     tomb)/equipment/gifts, a read-only display of the active render
     backend, and

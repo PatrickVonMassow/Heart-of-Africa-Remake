@@ -24,12 +24,12 @@ describe('travel zoom (design.md §21)', () => {
     expect(u().travelZoom).toBe(0.25) // hard minimum
   })
 
-  it('the debug unlock allows zoom-out up to 4x', () => {
+  it('the debug unlock allows zoom-out far enough to take in the continent', () => {
     u().setWheelZoomEnabled(true)
     u().setTravelZoom(3)
     expect(u().travelZoom).toBe(3)
-    u().setTravelZoom(10)
-    expect(u().travelZoom).toBe(4) // hard maximum
+    u().setTravelZoom(99)
+    expect(u().travelZoom).toBe(16) // hard maximum — whole-continent view
   })
 
   it('disabling the unlock clamps a wide view back but keeps a zoomed-in one', () => {

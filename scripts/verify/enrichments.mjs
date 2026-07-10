@@ -1694,6 +1694,56 @@ check('a feed that ends without a kill leaves no remnant',
   noRemnant.found && noRemnant.deadAfter === noRemnant.deadBefore && noRemnant.calfAlive,
   JSON.stringify(noRemnant))
 
+// --- Point 8: whole-continent debug zoom without haze -------------------------
+// design.md §21: the debug-unlocked zoom reaches a view of the whole continent
+// (a coarse far-terrain sheet streams in), and in that debug-only range no
+// haze is shown — the fog recedes to the horizon and the ground haze fades.
+const continentZoom = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(99)
+  const zoom = window.__ui.getState().travelZoom
+  let ok = false
+  const t0 = Date.now()
+  while (Date.now() - t0 < 60000) {
+    const fog = window.__climate?.fog()
+    if (
+      window.__farTerrain?.built() &&
+      window.__farTerrain?.visible() &&
+      fog && fog.far > 2000 &&
+      window.__climate.hazeOpacity() < 0.05
+    ) { ok = true; break }
+    await sleep(300)
+  }
+  return {
+    zoom,
+    ok,
+    farVerts: window.__farTerrain?.vertices() ?? 0,
+    fogFar: window.__climate?.fog()?.far,
+    haze: window.__climate?.hazeOpacity(),
+  }
+})
+check('the debug zoom reaches a whole-continent view (cap 16, far sheet streamed in)',
+  continentZoom.zoom === 16 && continentZoom.ok && continentZoom.farVerts > 50000, JSON.stringify(continentZoom))
+await page.waitForTimeout(1200)
+await page.screenshot({ path: `${OUT}87-continent-zoom.png` })
+console.log('shot 87-continent-zoom.png')
+const zoomBack = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
+  let ok = false
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    const fog = window.__climate?.fog()
+    if (fog && fog.far < 500 && !window.__farTerrain?.visible()) { ok = true; break }
+    await sleep(300)
+  }
+  return { ok, fog: window.__climate?.fog() }
+})
+check('back at the default zoom the haze returns and the far sheet hides',
+  zoomBack.ok, JSON.stringify(zoomBack))
+
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);
 // what stays needs the live store: selecting a place actually teleports there.

@@ -35,6 +35,10 @@ export interface WaterMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
   /** World-space XZ position of the plane center; update when the plane moves. */
   offset: { value: THREE.Vector2 }
+  /** 0 = normal sea; 1 = glassy calm (debug continent zoom, design.md §21):
+   *  waves, crest foam and sparkle fade out — at that distance they alias
+   *  into speckle noise across the whole view. */
+  calm: { value: number }
 }
 
 /** World units per degree (must match world/geo.ts). */
@@ -47,6 +51,8 @@ export function createWaterMaterial(): WaterMaterialHandle {
   m.metalness = 0.02
 
   const offset = uniform(new THREE.Vector2(0, 0))
+  const calm = uniform(0)
+  const lively = float(1).sub(calm)
 
   // Plane geometry lies in local XY (rotated flat): local X + offset.x is
   // world X, local Y + offset.y is world -Z (see the plane rotation).
@@ -66,7 +72,7 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const w2 = wave(-0.55, 0.83, 5.7, 0.03, 0.8)
   const w3 = wave(0.2, -0.98, 14.5, 0.04, 0.35)
   const swell = mx_fractal_noise_float(vec3(wp.mul(0.045), time.mul(0.09)), 3).mul(0.1)
-  const waveH = w1.add(w2).add(w3).add(swell)
+  const waveH = w1.add(w2).add(w3).add(swell).mul(lively)
   m.positionNode = positionLocal.add(vec3(0, 0, waveH))
 
   // --- Real bathymetry: depth in meters from the DEM texture -------------
@@ -111,12 +117,12 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const crestFoam = smoothstep(float(0.16), float(0.3), waveH).mul(
     smoothstep(float(0.45), float(0.8), foamNoise),
   )
-  const foam = max(shoreFoam, crestFoam).mul(0.85)
+  const foam = max(shoreFoam, crestFoam).mul(0.85).mul(lively)
   col = mix(col, color('#eaf4f6'), foam)
 
   // Sparse moving glints from a tight Worley cell pattern.
   const w = mx_worley_noise_float(vec3(wp.mul(1.7), time.mul(0.3)))
-  const sparkle = pow(smoothstep(float(0.85), float(1.0), w.oneMinus()), float(6)).mul(0.18)
+  const sparkle = pow(smoothstep(float(0.85), float(1.0), w.oneMinus()), float(6)).mul(0.18).mul(lively)
   col = col.add(vec3(sparkle, sparkle, sparkle))
 
   m.colorNode = col
@@ -133,5 +139,9 @@ export function createWaterMaterial(): WaterMaterialHandle {
   // Foam is rough, open water glossy (sky reflections from the IBL).
   m.roughnessNode = foam.mul(0.7).add(0.08)
 
-  return { material: m, offset: offset as unknown as { value: THREE.Vector2 } }
+  return {
+    material: m,
+    offset: offset as unknown as { value: THREE.Vector2 },
+    calm: calm as unknown as { value: number },
+  }
 }

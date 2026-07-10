@@ -312,11 +312,18 @@ function TerrainChunks() {
 /** Animated water surface at sea level, following the player. */
 function WaterPlane() {
   const ref = useRef<THREE.Mesh>(null)
-  const { material, offset } = useMemo(() => createWaterMaterial(), [])
+  const { material, offset, calm } = useMemo(() => createWaterMaterial(), [])
   useFrame(() => {
     const pos = useGame.getState().pos
+    const zoom = useUi.getState().travelZoom
     if (ref.current) {
       ref.current.position.set(pos.x, 0, pos.z)
+      // In the debug zoom range the plane grows with the view so the sea
+      // reaches the horizon at the whole-continent zoom; the wave field calms
+      // to glass out there — crests, foam and glints alias into speckle noise
+      // at that distance (design.md §21).
+      ref.current.scale.setScalar(Math.max(1, zoom / 2))
+      calm.value = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
       offset.value.set(pos.x, -pos.z) // plane local Y maps to world -Z
     }
   })
@@ -326,6 +333,101 @@ function WaterPlane() {
       <planeGeometry args={[CHUNK_SIZE * 30, CHUNK_SIZE * 30, 180, 180]} />
     </mesh>
   )
+}
+
+/**
+ * Whole-continent far terrain for the debug zoom range (design.md §21): a
+ * single coarse vertex-colored sheet over Africa's bounding box, built lazily
+ * the first time the view zooms past the default distance and shown only
+ * there. It sits slightly below the detailed chunks, which keep drawing on
+ * top around the traveller; at that camera height the coarse relief and the
+ * biome colors read as a map of the whole continent.
+ */
+const FAR_TERRAIN = { x0: -220, x1: 560, z0: -400, z1: 390, step: 2.5 }
+
+function buildFarTerrainGeometry(seed: number): THREE.BufferGeometry {
+  const nx = Math.round((FAR_TERRAIN.x1 - FAR_TERRAIN.x0) / FAR_TERRAIN.step) + 1
+  const nz = Math.round((FAR_TERRAIN.z1 - FAR_TERRAIN.z0) / FAR_TERRAIN.step) + 1
+  const positions = new Float32Array(nx * nz * 3)
+  const colors = new Float32Array(nx * nz * 3)
+  for (let iz = 0; iz < nz; iz++) {
+    for (let ix = 0; ix < nx; ix++) {
+      const vi = iz * nx + ix
+      const x = FAR_TERRAIN.x0 + ix * FAR_TERRAIN.step
+      const z = FAR_TERRAIN.z0 + iz * FAR_TERRAIN.step
+      const { lat, lon } = worldToLatLon(x, z)
+      const s = sampleTerrain(lat, lon, seed)
+      positions[vi * 3] = x
+      // Land is clamped to clear the sea-level water plane even after the
+      // sheet's -0.4 sink — with margin, or the grazing view angle tears the
+      // coast into depth-precision stripes; water cells keep their carved
+      // height (inland rivers stay visible, the sea sinks under the plane).
+      positions[vi * 3 + 1] =
+        s.type === 'ocean' || s.type === 'water' ? s.height : Math.max(s.height, 1.2)
+      positions[vi * 3 + 2] = z
+      colors[vi * 3] = s.color[0]
+      colors[vi * 3 + 1] = s.color[1]
+      colors[vi * 3 + 2] = s.color[2]
+    }
+  }
+  const indices: number[] = []
+  for (let iz = 0; iz < nz - 1; iz++) {
+    for (let ix = 0; ix < nx - 1; ix++) {
+      const a = iz * nx + ix
+      const b = a + 1
+      const c = a + nx
+      const d = c + 1
+      indices.push(a, c, b, b, c, d)
+    }
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+
+function FarTerrain() {
+  const seed = useGame((s) => s.seed)
+  const zoom = useUi((s) => s.travelZoom)
+  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null)
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+
+  // Reset on a new game (the biome warp is seeded).
+  useEffect(() => {
+    setGeo(null)
+  }, [seed])
+  useEffect(() => {
+    if (zoom <= 1 || geo) return
+    // Build once, lazily: only the debug zoom range ever shows the sheet.
+    setGeo(buildFarTerrainGeometry(seed))
+  }, [zoom, geo, seed])
+  useEffect(() => {
+    return () => {
+      geo?.dispose()
+    }
+  }, [geo])
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__farTerrain = {
+      built: () => geo !== null,
+      vertices: () => (geo ? (geo.getAttribute('position')?.count ?? 0) : 0),
+      visible: () => geo !== null && useUi.getState().travelZoom > 1,
+    }
+    return () => {
+      delete w.__farTerrain
+    }
+  }, [geo])
+
+  if (!geo || zoom <= 1) return null
+  // Sunk a little below the detailed chunks so they stay on top around the
+  // traveller without z-fighting; at continent distance the offset (and the
+  // slightly fattened coastline it causes) is imperceptible.
+  return <mesh geometry={geo} material={material} position={[0, -0.4, 0]} frustumCulled={false} />
 }
 
 /**
@@ -1018,6 +1120,15 @@ export function TravelScene() {
     const zoom = useUi.getState().travelZoom
     camera.position.lerp(new THREE.Vector3(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom), 0.12)
     camera.lookAt(pos.x, 0, pos.z)
+    // In the debug zoom range nothing is closer than the zoomed-out camera
+    // offset, so the near plane can move out — with near 0.1 the depth buffer
+    // resolves only ~1 unit at continental distances and the far sheet's
+    // coasts would tear into stripes against the sea plane (design.md §21).
+    const nearPlane = zoom > 1 ? 4 : 0.1
+    if (camera.near !== nearPlane) {
+      camera.near = nearPlane
+      camera.updateProjectionMatrix()
+    }
 
     // Walking into a place enters it (design.md §2): no key press. The latch
     // guards against re-entering the same frame; the store's re-entry
@@ -1063,6 +1174,7 @@ export function TravelScene() {
       <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
       <Sun />
       <TerrainChunks />
+      <FarTerrain />
       <RiversAndLakes />
       <RegionBorders />
       <WaterPlane />
