@@ -328,6 +328,8 @@ export const de: Strings = {
     canteenDrain: 'Wasserverbrauch/Tag (Land)',
     canteenDesertDrain: 'Wasserverbrauch/Tag (Wüste)',
     canteenCapacity: 'Kapazität der Trinkflasche',
+    woundHealLight: 'Leichte Wunde heilt (Tage)',
+    woundHealSevere: 'Schwere Wunde bessert sich (Tage)',
     daysPerUnit: 'Tage pro Wegeinheit',
     canoeSpeedup: 'Kanu-Tempofaktor (Wasser)',
     junglePenalty: 'Malusfaktor Dschungel (ohne Machete)',
@@ -538,6 +540,10 @@ export const de: Strings = {
       '[somber]Endlich Wasser.[/somber] Mit jedem Schluck kehren die Kräfte zurück, und mein Schritt ist wieder fest.',
     sunblindOver:
       '[somber]Das weiße Gleißen ist aus meinen Augen gewichen.[/somber] [excited]Ich kann wieder klar sehen![/excited]',
+    woundHealed:
+      '[somber]Heute wechselte ich den Verband und fand die Wunde endlich geschlossen.[/somber] [excited]Mein Körper hat sich selbst geheilt —[pause] ich bin wieder ganz.[/excited]',
+    woundEased:
+      '[somber]Die tiefe Wunde schließt sich.[/somber] [weary]Noch zieht sie bei jedem Schritt, doch das Schlimmste ist vorüber —[pause] mit Ruhe und Proviant heilt sie von allein.[/weary]',
     medicineUsed:
       'Ich habe die Medizin genommen. [pause][somber]Das Fieber bricht, die Wunden schließen sich;[/somber] [excited]bald bin ich wieder der Alte.[/excited]',
     healthPoor:

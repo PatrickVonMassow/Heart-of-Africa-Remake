@@ -149,6 +149,41 @@ describe('afflictions, drains and regeneration (design.md §6/§15)', () => {
     expect(g().health).toBeGreaterThan(50)
   })
 
+  it('a light wound heals on its own while fed (no medicine needed)', () => {
+    g().debugAddEquipment('canteen')
+    useGame.setState({ canteenFill: 1, dryDays: 0, health: 100, foodDays: 300 })
+    g().debugSetAffliction('wounds', 1)
+    // Past woundHealLightDays (6) of fed travel the wound closes by itself.
+    tick('savanna', ...COORD.savanna, 7)
+    expect(g().afflictions.wounds).toBe(0)
+    expect(journalKeys()).toContain('journal.woundHealed')
+    expect(g().health).toBeGreaterThan(0) // the light drain never came close to killing
+    // And with the wound gone, health regenerates again.
+    const h = g().health
+    tick('savanna', ...COORD.savanna, 2)
+    expect(g().health).toBeGreaterThan(h)
+  })
+
+  it('a severe wound eases to a light one, then closes (staged healing)', () => {
+    g().debugAddEquipment('canteen')
+    useGame.setState({ canteenFill: 1, dryDays: 0, health: 100, foodDays: 300 })
+    g().debugSetAffliction('wounds', 2)
+    tick('savanna', ...COORD.savanna, 11) // past woundHealSevereDays (10)
+    expect(g().afflictions.wounds).toBe(1)
+    expect(journalKeys()).toContain('journal.woundEased')
+    tick('savanna', ...COORD.savanna, 7) // past woundHealLightDays (6)
+    expect(g().afflictions.wounds).toBe(0)
+    expect(journalKeys()).toContain('journal.woundHealed')
+  })
+
+  it('wounds do not heal while starving', () => {
+    g().debugAddEquipment('canteen')
+    useGame.setState({ canteenFill: 1, dryDays: 0, health: 100, foodDays: 0 })
+    g().debugSetAffliction('wounds', 1)
+    tick('savanna', ...COORD.savanna, 8)
+    expect(g().afflictions.wounds).toBe(1) // no rations, no mending
+  })
+
   it('sun blindness heals only outside the desert', () => {
     g().debugAddEquipment('canteen')
     useGame.setState({ canteenFill: 1, dryDays: 0, health: 100, foodDays: 300 })

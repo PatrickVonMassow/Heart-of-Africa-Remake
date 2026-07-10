@@ -134,6 +134,10 @@ export function DebugMenu() {
         onChange={(v) => { balance.health.canteenDesertDrainPerDay = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.canteenCapacity} value={balance.health.canteenCapacity} step={100}
         onChange={(v) => { balance.health.canteenCapacity = Math.max(1, v); bump() }} />
+      <NumberField label={t.debug.woundHealLight} value={balance.health.woundHealLightDays} step={1}
+        onChange={(v) => { balance.health.woundHealLightDays = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.woundHealSevere} value={balance.health.woundHealSevereDays} step={1}
+        onChange={(v) => { balance.health.woundHealSevereDays = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.daysPerUnit} value={balance.daysPerUnit} step={0.05}
         onChange={(v) => set('daysPerUnit', Math.max(0, v))} />
       <NumberField label={t.debug.canoeSpeedup} value={balance.canoeSpeedup} step={0.25}

@@ -329,6 +329,8 @@ export const en: Strings = {
     canteenDrain: 'Water use per day (land)',
     canteenDesertDrain: 'Water use per day (desert)',
     canteenCapacity: 'Canteen capacity',
+    woundHealLight: 'Light wound heals (days)',
+    woundHealSevere: 'Severe wound eases (days)',
     daysPerUnit: 'Days per travel unit',
     canoeSpeedup: 'Canoe speed factor (water)',
     junglePenalty: 'Jungle penalty factor (no machete)',
@@ -531,6 +533,10 @@ export const en: Strings = {
       '[somber]Water at last.[/somber] My strength returns with every sip, and my stride is steady again.',
     sunblindOver:
       '[somber]The white glare has faded from my eyes.[/somber] [excited]I can see clearly again![/excited]',
+    woundHealed:
+      '[somber]I changed the dressing today and found the wound closed at last.[/somber] [excited]My body has mended itself —[pause] I am whole again.[/excited]',
+    woundEased:
+      '[somber]The deep wound is knitting.[/somber] [weary]It still pulls at every step, but the worst is past —[pause] with rest and rations it will close on its own.[/weary]',
     medicineUsed:
       'I took the medicine. [pause][somber]The fever is breaking and my wounds are closing;[/somber] [excited]I shall be myself again soon.[/excited]',
     healthPoor:

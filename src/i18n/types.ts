@@ -252,6 +252,9 @@ export interface Strings {
     canteenDrain: string
     canteenDesertDrain: string
     canteenCapacity: string
+    /** Natural wound-healing durations (design.md §6/§21). */
+    woundHealLight: string
+    woundHealSevere: string
     daysPerUnit: string
     canoeSpeedup: string
     junglePenalty: string
@@ -363,6 +366,9 @@ export interface Strings {
     dehydrationOn: string
     dehydrationOver: string
     sunblindOver: string
+    /** Natural wound healing without medicine (design.md §6). */
+    woundHealed: string
+    woundEased: string
     medicineUsed: string
     healthPoor: string
     animalAttack(p: TextParams): string

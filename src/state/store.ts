@@ -136,6 +136,10 @@ export interface GameState {
   sunblindRecovery: number
   /** Accumulated days of thirst (empty canteen) until dehydration (§6). */
   dryDays: number
+  /** Days accumulated toward the current wound stage healing on its own
+   *  (design.md §6): while fed, a severe wound subsides to a light one and a
+   *  light wound closes — medicine stays the instant cure. */
+  woundHealDays: number
   /** Canteen water level 0..1 (design.md §6); only meaningful with a canteen. */
   canteenFill: number
   /** Days until the next random event may roll (design.md §14 spam guard). */
@@ -417,6 +421,7 @@ function startState(seed: number) {
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
     dryDays: 0,
+    woundHealDays: 0,
     canteenFill: 1,
     eventCooldown: 0,
     deadlineWarned: 0,
@@ -856,9 +861,10 @@ export const useGame = create<GameState>()((set, get) => ({
           return
         }
         if (o.result === 'light') {
-          set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 } })
+          // A fresh wound restarts the natural-healing clock (design.md §6).
+          set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 }, woundHealDays: 0 })
         } else if (o.result === 'severe') {
-          set({ afflictions: { ...s.afflictions, wounds: 2 } })
+          set({ afflictions: { ...s.afflictions, wounds: 2 }, woundHealDays: 0 })
         }
         if (o.rescued) {
           // Natives of the friend region rushed to help (design.md §12).
@@ -880,7 +886,7 @@ export const useGame = create<GameState>()((set, get) => ({
         if (o.result === 'robbed') {
           set({ money: Math.max(0, s.money - (o.money ?? 0)) })
           if (Math.random() < 0.4) {
-            set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 } })
+            set({ afflictions: { ...s.afflictions, wounds: Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 }, woundHealDays: 0 })
           }
         }
         if (o.rescued) {
@@ -934,6 +940,7 @@ export const useGame = create<GameState>()((set, get) => ({
           equipment,
           foodDays: s.foodDays * 0.7,
           afflictions: { ...s.afflictions, wounds: Math.random() < 0.5 ? 2 : Math.max(s.afflictions.wounds, 1) as 0 | 1 | 2 },
+          woundHealDays: 0,
         })
         get().addEntry({ key: 'journal.titles.sweptAway' }, { key: 'journal.sweptAway' })
         return
@@ -966,7 +973,7 @@ export const useGame = create<GameState>()((set, get) => ({
         lostItem = true
       }
     }
-    set({ afflictions: { ...s.afflictions, wounds }, equipment })
+    set({ afflictions: { ...s.afflictions, wounds }, equipment, woundHealDays: 0 })
     get().addEntry(
       { key: 'journal.titles.mountainFall' },
       { key: lostItem ? 'journal.mountainFallItem' : 'journal.mountainFall' },
@@ -1063,6 +1070,25 @@ export const useGame = create<GameState>()((set, get) => ({
       }
     }
 
+    // Natural wound healing (design.md §6): while fed, a severe wound
+    // subsides to a light one and a light wound closes on its own — recovery
+    // without medicine is possible, medicine stays the instant cure.
+    let woundHealDays = s.woundHealDays
+    if (a.wounds > 0 && s.foodDays > 0) {
+      woundHealDays += dayDelta
+      const stageDays = a.wounds === 2 ? hb.woundHealSevereDays : hb.woundHealLightDays
+      if (woundHealDays >= stageDays) {
+        woundHealDays = 0
+        a.wounds = (a.wounds - 1) as 0 | 1 | 2
+        get().addEntry(
+          { key: 'journal.titles.recovery' },
+          { key: a.wounds === 0 ? 'journal.woundHealed' : 'journal.woundEased' },
+        )
+      }
+    } else if (a.wounds === 0) {
+      woundHealDays = 0
+    }
+
     let drain = 0
     if (s.foodDays <= 0) drain += hb.starvationDrain
     if (a.fever) drain += hb.feverDrain
@@ -1079,7 +1105,7 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     const wasPoor = healthState(s.health) === 'poor'
-    set({ health, afflictions: a, sunblindRecovery, dryDays, canteenFill })
+    set({ health, afflictions: a, sunblindRecovery, dryDays, canteenFill, woundHealDays })
     if (!wasPoor && healthState(health) === 'poor' && health > 0) {
       get().addEntry({ key: 'journal.titles.healthPoor' }, { key: 'journal.healthPoor' })
     }
@@ -1779,7 +1805,7 @@ export const useGame = create<GameState>()((set, get) => ({
       foodDays: s.foodDays, gifts: s.gifts, equipment: s.equipment,
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
-      dryDays: s.dryDays, canteenFill: s.canteenFill,
+      dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
       visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
@@ -1833,6 +1859,7 @@ export const useGame = create<GameState>()((set, get) => ({
         afflictions: snap.afflictions ?? { fever: false, dehydration: false, sunblind: false, wounds: 0 },
         sunblindRecovery: snap.sunblindRecovery ?? 0,
         dryDays: snap.dryDays ?? 0,
+        woundHealDays: (snap as { woundHealDays?: number }).woundHealDays ?? 0,
         canteenFill: snap.canteenFill ?? 1,
         treasures: snap.treasures ?? { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 },
         treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
@@ -1905,6 +1932,7 @@ export const useGame = create<GameState>()((set, get) => ({
       afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 },
       sunblindRecovery: 0,
       dryDays: 0,
+      woundHealDays: 0,
       canteenFill: 1, // F3 also tops up the canteen (design.md §21)
       equipment,
       gifts,

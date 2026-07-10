@@ -660,8 +660,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     low (glow yellow <20 %, red <5 %, blinking when empty);
     sun blindness (view narrowed to a glaring veil; heals only outside
     the desert) and wounds (light/severe); medicine is taken from the
-    inventory bar and cures fever and wounds; health regenerates while
-    fed and affliction-free. At zero health the expedition is lost: the
+    inventory bar and cures fever and wounds; wounds also mend naturally
+    while fed — a severe wound subsides to a light one and a light wound
+    closes over calibratable day counts (debug-menu editable), so a wound
+    alone is never an unavoidable death without medicine; health regenerates
+    while fed and affliction-free. At zero health the expedition is lost: the
     journal falls silent and a remains report naming the cause of death
     appears instead (§15), from which a successor can continue at the
     last checkpoint. The health query (H) reports state and afflictions,
@@ -672,7 +675,8 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     dehydration onset/recovery, the canteen fill draining away from water,
     emptying into thirst then health loss, and refilling at fresh water,
     regeneration, fever drain and medicine
-    cure, the sun-blindness veil and its recovery, vultures, the H query
+    cure (and `src/state/store.health.test.ts` the staged natural wound
+    healing: light heals fed, severe eases to light, starving blocks it), the sun-blindness veil and its recovery, vultures, the H query
     and the death/successor flow.
 23. **Random events.** `design.md` §14 is implemented as a hidden per-day
     roll while travelling, modulated by terrain and state: wild-animal

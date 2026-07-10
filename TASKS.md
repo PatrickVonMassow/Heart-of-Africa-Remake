@@ -90,7 +90,7 @@ the map).
   Pac-Man.
 - [x] 13. More variety in the journal entries for the different villages. These
   should reflect locally/historically accurate peculiarities of each.
-- [ ] 14. One should be able to recover even without medicine. Currently one dies
+- [x] 14. One should be able to recover even without medicine. Currently one dies
   even from a light wound.
 - [ ] 15. Animals must not walk into the impassable open ocean (the water beyond
   the continent outline that blocks the traveller too).

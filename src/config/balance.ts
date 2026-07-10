@@ -107,6 +107,11 @@ export interface BalanceConfig {
     sunblindDrain: number
     woundLightDrain: number
     woundSevereDrain: number
+    /** Natural wound healing while fed (design.md §6): days until a light
+     * wound closes on its own, and days until a severe wound subsides to a
+     * light one. Medicine remains the instant cure. */
+    woundHealLightDays: number
+    woundHealSevereDays: number
     /** Days of an empty canteen (thirst) until dehydration sets in (design.md
      * §6); fresh water in reach (river/lake) counts as drinking and resets it. */
     dehydrationOnsetDays: number
@@ -254,6 +259,8 @@ export const balance: BalanceConfig = {
     sunblindDrain: 3,
     woundLightDrain: 2,
     woundSevereDrain: 7,
+    woundHealLightDays: 6, // a light wound closes on its own in about a week (fed)
+    woundHealSevereDays: 10, // a severe wound subsides to a light one (fed)
     dehydrationOnsetDays: 0.5,
     canteenDrainPerDay: 0.9, // consumption raised 200x (user request), offset by the 2000x capacity below
     canteenDesertDrainPerDay: 3.0, // 200x; desert is faster
