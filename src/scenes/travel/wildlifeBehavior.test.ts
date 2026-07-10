@@ -6,6 +6,7 @@ import {
   FLIGHT_SPAWN_OUT,
   flightStep,
   gambolState,
+  groundNormal,
   separationPush,
   turnToward,
   type FlightState,
@@ -275,6 +276,35 @@ describe('flightStep (design.md §19 — vultures fly in and off, never pop)', (
     flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)
     expect(s.mode).toBe('in')
     expect(Math.hypot(s.x - 50, s.z)).toBeLessThan(1) // kept its position
+  })
+})
+
+describe('groundNormal (design.md §19 — slope-conforming decals)', () => {
+  it('returns straight up on flat ground', () => {
+    const [nx, ny, nz] = groundNormal(0, 0, () => 1)
+    expect(nx).toBeCloseTo(0, 6)
+    expect(ny).toBeCloseTo(1, 6)
+    expect(nz).toBeCloseTo(0, 6)
+  })
+
+  it('tilts against a slope rising toward +x', () => {
+    // height = x → surface normal leans toward -x; unit length; ny > 0.
+    const [nx, ny, nz] = groundNormal(0, 0, (x) => x)
+    expect(nx).toBeLessThan(0)
+    expect(nz).toBeCloseTo(0, 6)
+    expect(ny).toBeGreaterThan(0)
+    expect(Math.hypot(nx, ny, nz)).toBeCloseTo(1, 6)
+    // Exact: slope 1 → normal (-1, 1, 0)/√2.
+    expect(nx).toBeCloseTo(-Math.SQRT1_2, 6)
+    expect(ny).toBeCloseTo(Math.SQRT1_2, 6)
+  })
+
+  it('tilts against a slope rising toward -z', () => {
+    const [nx, ny, nz] = groundNormal(0, 0, (_x, z) => -z)
+    expect(nx).toBeCloseTo(0, 6)
+    expect(nz).toBeGreaterThan(0)
+    expect(ny).toBeGreaterThan(0)
+    expect(Math.hypot(nx, ny, nz)).toBeCloseTo(1, 6)
   })
 })
 

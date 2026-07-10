@@ -337,6 +337,20 @@ check(
   trample.ok === true && trample.stains >= 1,
   trample.ok ? `${trample.species}, ${trample.stains} stain(s)` : trample.why,
 )
+// TASKS pt. 12: every stain lies in the local slope plane (position + unit
+// ground normal) — a horizontal disc on a hillside read as a Pac-Man.
+const stainNormals = await page.evaluate(() => {
+  const list = window.__wildlife.stains.current
+  return list.map((st) => ({
+    unit: +Math.hypot(st.nx, st.ny, st.nz).toFixed(3),
+    nyPositive: st.ny > 0,
+  }))
+})
+check(
+  'blood stains carry a unit ground normal (slope-conforming decal)',
+  stainNormals.length >= 1 && stainNormals.every((n) => Math.abs(n.unit - 1) < 0.01 && n.nyPositive),
+  JSON.stringify(stainNormals.slice(0, 4)),
+)
 
 // Elephant herds roam together in gentle arcs; prey dodge only at the last
 // moment (point 4). Set up on an open savanna patch near the player.

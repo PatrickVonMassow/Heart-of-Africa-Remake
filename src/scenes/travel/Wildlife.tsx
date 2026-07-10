@@ -23,6 +23,7 @@ import {
   fleeHeading,
   flightStep,
   gambolState,
+  groundNormal,
   separationPush,
   turnToward,
   type FlightState,
@@ -587,12 +588,26 @@ function Herds() {
 
   const mtx = useMemo(() => new THREE.Matrix4(), [])
   const quat = useMemo(() => new THREE.Quaternion(), [])
+  const quat2 = useMemo(() => new THREE.Quaternion(), [])
   const euler = useMemo(() => new THREE.Euler(), [])
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  const nrm = useMemo(() => new THREE.Vector3(), [])
   const vpos = useMemo(() => new THREE.Vector3(), [])
   const vscl = useMemo(() => new THREE.Vector3(), [])
   const stainMesh = useRef<THREE.InstancedMesh>(null)
-  const stains = useRef<Array<[number, number, number]>>([])
+  // Each stain lies in the local slope plane (position + ground normal): a
+  // horizontal disc on a hillside got wedges swallowed by the ground and read
+  // as a Pac-Man (design.md §19).
+  const stains = useRef<Array<{ x: number; y: number; z: number; nx: number; ny: number; nz: number }>>([])
+  const pushStain = (x: number, z: number) => {
+    if (stains.current.length >= MAX_STAINS) return
+    const heightAt = (px: number, pz: number) => {
+      const ll = worldToLatLon(px, pz)
+      return sampleTerrain(ll.lat, ll.lon, seed).height
+    }
+    const [nx, ny, nz] = groundNormal(x, z, heightAt)
+    stains.current.push({ x, y: Math.max(0.02, heightAt(x, z)), z, nx, ny, nz })
+  }
   const stainGeo = useMemo(() => new THREE.CircleGeometry(0.9, 16), [])
   const stainMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#a51512', roughness: 1, transparent: true, opacity: 0.8 }),
@@ -676,7 +691,7 @@ function Herds() {
       for (const hid of [...herdState.current.keys()]) {
         if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
       }
-      stains.current = stains.current.filter(([x, , z]) => Math.hypot(x - pos.x, z - pos.z) <= despawnR)
+      stains.current = stains.current.filter((st) => Math.hypot(st.x - pos.x, st.z - pos.z) <= despawnR)
     }
     // Render nearest-first so the visible cap keeps the animals closest to the
     // player when a chunk range holds more than an instanced mesh can show.
@@ -706,13 +721,13 @@ function Herds() {
             a.dead = true
             a.lionFed = true
             a.dissolve = CARCASS_DISSOLVE_SECONDS
-            if (stains.current.length < MAX_STAINS) stains.current.push([a.x, a.y, a.z])
+            pushStain(a.x, a.z)
             const par = a.parent
             if (par && !par.dead && Math.hypot(par.x - a.x, par.z - a.z) < PARENT_TOO_LATE_DIST) {
               par.dead = true
               par.lionFed = true
               par.dissolve = CARCASS_DISSOLVE_SECONDS
-              if (stains.current.length < MAX_STAINS) stains.current.push([par.x, par.y, par.z])
+              pushStain(par.x, par.z)
               par.child = undefined
             }
           }
@@ -732,7 +747,7 @@ function Herds() {
             a.dead = true
             a.lionFed = true
             a.dissolve = CARCASS_DISSOLVE_SECONDS
-            if (stains.current.length < MAX_STAINS) stains.current.push([a.x, a.y, a.z])
+            pushStain(a.x, a.z)
             if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
           }
         }
@@ -1359,7 +1374,7 @@ function Herds() {
                 a.dead = true
                 a.x = px
                 a.z = pz
-                if (stains.current.length < MAX_STAINS) stains.current.push([px, a.y, pz])
+                pushStain(px, pz)
                 break
               }
             }
@@ -1384,13 +1399,16 @@ function Herds() {
       mesh.instanceMatrix.needsUpdate = true
     }
 
-    // Stains beneath trampled animals.
+    // Stains beneath trampled animals, laid into the local slope plane so no
+    // wedge is swallowed by rising ground (design.md §19).
     const sm = stainMesh.current
     if (sm) {
-      stains.current.forEach(([x, y, z], i) => {
+      stains.current.forEach((st, i) => {
         euler.set(-Math.PI / 2, 0, 0)
-        quat.setFromEuler(euler)
-        vpos.set(x, Math.max(0.02, y) + 0.012, z)
+        quat2.setFromEuler(euler)
+        nrm.set(st.nx, st.ny, st.nz)
+        quat.setFromUnitVectors(up, nrm).multiply(quat2)
+        vpos.set(st.x + st.nx * 0.08, st.y + st.ny * 0.08, st.z + st.nz * 0.08)
         vscl.setScalar(1)
         mtx.compose(vpos, quat, vscl)
         sm.setMatrixAt(i, mtx)
@@ -1485,6 +1503,10 @@ function LionHunt() {
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     [],
   )
+  const stainUp = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+  const stainNrm = useMemo(() => new THREE.Vector3(), [])
+  const stainFlat = useMemo(() => new THREE.Quaternion(), [])
+  const stainEuler = useMemo(() => new THREE.Euler(), [])
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
@@ -1736,8 +1758,17 @@ function LionHunt() {
       // is drawn by <Herds> at the victim, so the scripted stain stays hidden.
       stain.current.visible = (feeding || s.mode === 'leave') && !s.victimHunt
       if (stain.current.visible) {
-        const ll = worldToLatLon(s.px, s.pz)
-        stain.current.position.set(s.px, Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height) + 0.015, s.pz)
+        const heightAt = (px: number, pz: number) => {
+          const l = worldToLatLon(px, pz)
+          return sampleTerrain(l.lat, l.lon, seed).height
+        }
+        // Laid into the local slope plane — a horizontal disc on a hillside
+        // got wedges swallowed by the ground (design.md §19).
+        const [nx, ny, nz] = groundNormal(s.px, s.pz, heightAt)
+        const y = Math.max(0.02, heightAt(s.px, s.pz))
+        stain.current.position.set(s.px + nx * 0.08, y + ny * 0.08, s.pz + nz * 0.08)
+        stainFlat.setFromEuler(stainEuler.set(-Math.PI / 2, 0, 0))
+        stain.current.quaternion.setFromUnitVectors(stainUp, stainNrm.set(nx, ny, nz)).multiply(stainFlat)
         // The stain spreads while the lion feeds.
         const spread = feeding ? Math.min(1, (FEED_DURATION - s.timer) / 6) : 1
         stain.current.scale.setScalar(0.4 + spread * 0.9)

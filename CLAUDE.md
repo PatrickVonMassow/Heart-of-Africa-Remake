@@ -347,7 +347,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     right to shake it, while the predator pursues with a limited turn rate but
     is faster and closes in; after the catch the lion visibly feeds on the
     carcass (lowered, rhythmically tearing head movements, red spreading
-    stain beneath the prey), the carcass shrinks away piece by piece, and
+    stain beneath the prey — the stain decal laid into the local ground
+    slope, so rising terrain never slices it into a Pac-Man shape), the
+    carcass shrinks away piece by piece, and
     once it is consumed the lion moves on. Further animal interactions
     hold: elephants move as herds — members keep together and roam as a
     group (rarely alone), only ever forward and turning in gentle arcs

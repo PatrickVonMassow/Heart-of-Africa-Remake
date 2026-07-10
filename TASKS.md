@@ -84,9 +84,9 @@ the map).
   instead.)
 - [x] 10. When something is discovered — such as a waterfall — it should be
   announced via the journal.
-- [ ] 11. The water in some lakes looks oddly blotchy and the blotches flicker
+- [x] 11. The water in some lakes looks oddly blotchy and the blotches flicker
   while walking — e.g. in Lake Victoria.
-- [ ] 12. The blood stain of dying animals has gaps and looks more like a
+- [x] 12. The blood stain of dying animals has gaps and looks more like a
   Pac-Man.
 - [ ] 13. More variety in the journal entries for the different villages. These
   should reflect locally/historically accurate peculiarities of each.
@@ -94,6 +94,9 @@ the map).
   even from a light wound.
 - [ ] 15. Animals must not walk into the impassable open ocean (the water beyond
   the continent outline that blocks the traveller too).
+- [ ] 16. After using the new extended zoom-out and then entering a village,
+  massive clipping errors appear when walking close to a hut (likely the raised
+  debug-zoom camera near plane carrying over into the first-person scene).
 
 ## Closing (only after all points)
 
