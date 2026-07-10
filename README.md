@@ -18,11 +18,22 @@ end, not the complete game. `design.md` is the authoritative design document;
   continent, and a first-person view inside walkable settlements; the game
   switches between them when entering or leaving a settlement.
 - **Living world.** Ten port cities, 22 peoples, 17 rivers and real landmarks
-  at their correct 1890 positions. Settlements are densely built and inhabited:
-  procedurally varied dwellings, street networks, and villagers who go about
-  their routines, with full player/NPC collision.
+  at their correct 1890 positions; the map is trimmed to the walkable continent
+  (the world ends at the African Red Sea coast). Settlements are densely built
+  and inhabited: procedurally varied dwellings, street networks, and villagers
+  who go about their routines, with full player/NPC collision. Ambient wildlife
+  streams with the journey — grazing herds that raise calves, predator hunts
+  with regional food webs, elephant herds, vultures and shore life.
 - **Trade and cultural contact.** Buy equipment, provisions and gifts in port
-  cities; a culturally correct gift to a village chief unlocks a hint.
+  cities; a culturally correct gift to a village chief unlocks a hint. Bazaars
+  pay regional prices for treasure finds (continent-wide arbitrage), travel
+  agencies sell ferry passages, and discovery bounties arrive at the next port
+  as telegraphic transfers.
+- **Standing with the natives.** A rejected gift means hostility and expulsion;
+  repeatedly satisfying a chief earns "Honored Friend" — rescue from attacks,
+  near-death aid and free village supplies — while a rifle-backed robbery pays
+  richly but antagonizes the region for good. Village caches and free camps
+  relieve the limited inventory.
 - **Language and direction system.** Hints are given in the regional
   Nivera/koko/Katula system and must be decoded into bearings and positions.
 - **Survival.** Provisions, a canteen with a draining water level, and a health
@@ -34,9 +45,13 @@ end, not the complete game. `design.md` is the authoritative design document;
   protects by mere possession; a multi-year deadline and a successor on death
   keep the expedition finite.
 - **Journal.** A chronicle that grows automatically with events and stores
-  decoded hints, language-neutrally, re-rendered in the selected language. Every
-  English entry can be read aloud in-browser via the Kokoro TTS model, with
-  emotional voice markup shaping the delivery.
+  decoded hints, language-neutrally, re-rendered in the selected language.
+  Entries are written into the book stroke by stroke by an animated hand that
+  shows the writer's wounds. Every English entry can be read aloud in-browser
+  via the Kokoro TTS model, with emotional voice markup shaping the delivery.
+- **Saving and controls.** Automatic checkpoints on every port visit with a
+  tabular load overview; a successor resumes from the latest snapshot after
+  death. Mouse/keyboard and standard gamepads share one input path.
 - **The goal.** A procedurally placed tomb triangulated from regional hints;
   digging at the right spot with the shovel wins the game.
 
@@ -47,6 +62,8 @@ end, not the complete game. `design.md` is the authoritative design document;
 - **WebGPU renderer with automatic WebGL 2 fallback** — shaders are written in
   TSL (Three Shading Language) so one code path serves both backends
 - [zustand](https://github.com/pmndrs/zustand) for game state
+- [kokoro-js](https://github.com/hexgrad/kokoro) for the in-browser journal
+  read-aloud (lazy-loaded, synthesized in a Web Worker)
 - [oxlint](https://oxc.rs/) for linting
 
 Rendering features include real-DEM terrain with biome-based PBR texture
@@ -70,6 +87,7 @@ npm run build      # type-check + production build (must pass clean)
 npm run preview    # serve the production build locally
 npm run lint       # oxlint (zero errors/warnings required)
 npm audit          # zero known vulnerabilities required
+npm run test:unit  # fast Vitest layer (jsdom): logic, store, HUD components
 npm test           # full headless regression (boots dev + preview servers)
 ```
 
@@ -88,12 +106,17 @@ node scripts/build-geodata.mjs              # DEM from public Terrarium tiles
 node scripts/generate-terrain-textures.mjs  # tileable ground textures
 ```
 
+At load time the DEM is trimmed to the game world: only land connected to the
+game's own land masses is kept, so Sinai, Arabia, southern Europe and foreign
+islands render as open sea (`src/world/redSea.ts`); `dem.png` itself stays
+untouched.
+
 ## Project structure
 
 ```
 design.md            authoritative design document (do not modify)
 CLAUDE.md            POC scope, acceptance criteria, build rules
-scripts/             reproducible geodata preprocessing
+scripts/             geodata preprocessing + headless verification (scripts/verify/)
 public/geodata/      generated DEM + terrain textures
 verification/        acceptance-criteria screenshot evidence
 src/
@@ -115,4 +138,6 @@ All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
 evidence lives in `verification/`. Known simplifications (e.g. no TAA, no true
 screen-space reflections, English-only journal read-aloud) are recorded as open
 items in the code (`// OPEN:`). The full headless regression runs with
-`npm test`.
+`npm test` — a fast Vitest (jsdom) layer plus 13 Playwright browser suites;
+the test strategy and coverage map live in
+[`scripts/verify/README.md`](scripts/verify/README.md).

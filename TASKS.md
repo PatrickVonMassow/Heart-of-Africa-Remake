@@ -154,9 +154,23 @@ the map).
   island. Verified per screenshot repro at zoom 5/10 and new enrichments
   checks; the full regression needed one flake rerun each for the known
   RAF-timing checks — calf sacrifice, walk smoke — both green standalone.)
-- [ ] 21. After the recent wave of design.md changes (restructure into numbered
+- [x] 21. After the recent wave of design.md changes (restructure into numbered
   subsections, §7.1 slimming, the Red Sea/world-trim work), review README.md
   and bring it in step where it has drifted.
+  (No §-references needed fixing — the README cites none. Drift closed:
+  gameplay list caught up with the built systems (ambient wildlife, bazaar
+  arbitrage/ferries/bounties, reputation incl. robbery, camps, animated
+  handwriting, port-snapshot saving/successor, gamepad), kokoro-js added to
+  the stack list, `npm run test:unit` added to the scripts, the scripts/ tree
+  line now names the verify suites, the geodata section documents the
+  load-time world trim, and the status section links the hybrid test
+  strategy. The criteria count stays 32 (docs.mjs green). Full regression:
+  one known start-timing flake (flow journal auto-open), green standalone.)
+- [ ] 22. Fully zoomed out in the debug mode, the ocean still renders
+  incorrectly — especially in the northeast.
+- [ ] 23. In the west-southwest a large, unreachable land mass is still shown;
+  it must be removed from the map as well.
+- [ ] 24. F3 (full loadout) should also unlock the extended zoom mode.
 
 ## Closing (only after all points)
 
