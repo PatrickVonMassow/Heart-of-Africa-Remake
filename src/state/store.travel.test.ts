@@ -144,12 +144,36 @@ describe('once-only penalty and danger journal (design.md §11/§14)', () => {
 })
 
 describe('landmark discovery bounty (design.md §10)', () => {
-  it('sighting a landmark registers it and queues a pending bounty', () => {
+  const discoveryEntries = () =>
+    g().journal.filter((e) => typeof e.text === 'object' && e.text.key === 'journal.landmarkDiscovered')
+
+  it('sighting a landmark registers it, queues a bounty and journals the discovery', () => {
     jumpTo(-3.05, 37.3) // Kilimanjaro
     g().debugAddEquipment('rope')
     drive(0, -1, 3)
     expect(g().landmarksSeen).toContain('kilimanjaro')
     expect(g().pendingBounties.some((b) => b.kind === 'landmark' && b.id === 'kilimanjaro')).toBe(true)
+    // The journal announces the discovery (design.md §16), flavored by kind.
+    const entries = discoveryEntries().filter(
+      (e) => typeof e.text === 'object' && e.text.params?.landmark === 'kilimanjaro',
+    )
+    expect(entries.length).toBe(1)
+    expect(typeof entries[0].text === 'object' && entries[0].text.params?.kind).toBe('mountain')
+    // Sighted once: further travel nearby adds no second announcement.
+    drive(0, -1, 2)
+    expect(
+      discoveryEntries().filter((e) => typeof e.text === 'object' && e.text.params?.landmark === 'kilimanjaro').length,
+    ).toBe(1)
+  })
+
+  it('sighting a waterfall journals the falls-flavored discovery', () => {
+    jumpTo(-17.9, 25.5) // just west of Victoria Falls
+    drive(1, 0, 6)
+    const entries = discoveryEntries().filter(
+      (e) => typeof e.text === 'object' && e.text.params?.landmark === 'victoria-falls',
+    )
+    expect(entries.length).toBe(1)
+    expect(typeof entries[0].text === 'object' && entries[0].text.params?.kind).toBe('falls')
   })
 })
 

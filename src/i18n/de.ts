@@ -401,6 +401,7 @@ export const de: Strings = {
       dangerWater: 'Lauernde Krokodile',
       dangerWetland: 'Fieberdunst im Dickicht',
       mountainFall: 'Ein Sturz',
+      landmarkDiscovered: 'Eine Entdeckung',
       discovery: 'Ein düsterer Fund',
       deadline1: 'Ein Brief der Geldgeber',
       deadline2: 'Die letzte Warnung',
@@ -541,6 +542,16 @@ export const de: Strings = {
       '[fear]Ein Sandsturm verschluckte den Horizont![/fear] [weary]Stundenlang kauerte ich hinter meinem Gepäck, während die Welt zu heulendem Staub wurde.[/weary] Kostbare Zeit ist verloren.',
     sweptAway:
       '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer —[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
+    landmarkDiscovered: (p: TextParams) => {
+      const name = de.landmarks[p.landmark as keyof typeof de.landmarks]
+      const flavors: Record<string, string> = {
+        mountain: `[awe]Da erhob er sich endlich vor mir —[pause] ${name}, seine Flanken gewaltig gegen den Himmel.[/awe] [excited]Ich habe ihn mit eigenen Augen gesehen, und mein Tagebuch soll es bezeugen.[/excited]`,
+        falls: `[awe]Ein fernes Donnern rollte über das Land, lange bevor ich es sah:[pause] ${name}![/awe] [excited]Der Fluss stürzt sich in weißen Wänden in die Tiefe —[pause] ein Anblick, den ich nie vergessen werde.[/excited]`,
+        lake: `[awe]Ein großes Wasser öffnete sich vor mir —[pause] ${name}, bis zum Horizont gedehnt wie ein Meer.[/awe] [somber]Ich habe sein Ufer auf meiner Karte vermerkt.[/somber]`,
+        grave: `[whisper]Ich gehe zwischen gebleichten Knochen und mächtigen Stoßzähnen —[pause] der Friedhof der Elefanten.[/whisper] [awe]Die alten Geschichten haben also die Wahrheit gesagt.[/awe]`,
+      }
+      return flavors[p.kind as string] ?? flavors.mountain
+    },
     mountainNoRope:
       '[weary]Kein Seil in der Hand, und doch führt kein Weg um dieses Gebirge herum.[/weary] [fear]Ich klettere langsam, Griff um Griff —[pause] ein Fehltritt hier, und der Fels wird mich nicht halten.[/fear]',
     penaltyJungle:

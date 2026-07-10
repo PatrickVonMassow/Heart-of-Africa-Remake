@@ -110,14 +110,17 @@ export function generateTreasureSites(seed: number): TreasureSite[] {
 
 export interface LandmarkPoint extends LatLon {
   id: string
+  /** What kind of landmark this is — the discovery journal entry (design.md
+   *  §16) flavors its text by it. */
+  kind: 'mountain' | 'falls' | 'lake' | 'grave'
 }
 
 /** All bounty-relevant landmark positions (design.md §10 discovery bounty). */
 export const LANDMARK_POINTS: LandmarkPoint[] = [
-  ...MOUNTAINS.map((m) => ({ id: m.id, lat: m.lat, lon: m.lon })),
-  ...WATERFALLS.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon })),
-  ...LAKES.map((l) => ({ id: l.id, lat: l.center[1], lon: l.center[0] })),
-  { id: ELEPHANT_GRAVEYARD.id, lat: ELEPHANT_GRAVEYARD.lat, lon: ELEPHANT_GRAVEYARD.lon },
+  ...MOUNTAINS.map((m) => ({ id: m.id, lat: m.lat, lon: m.lon, kind: 'mountain' as const })),
+  ...WATERFALLS.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon, kind: 'falls' as const })),
+  ...LAKES.map((l) => ({ id: l.id, lat: l.center[1], lon: l.center[0], kind: 'lake' as const })),
+  { id: ELEPHANT_GRAVEYARD.id, lat: ELEPHANT_GRAVEYARD.lat, lon: ELEPHANT_GRAVEYARD.lon, kind: 'grave' as const },
 ]
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

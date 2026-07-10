@@ -323,6 +323,8 @@ export interface Strings {
       dangerWetland: string
       /** A fall while climbing without a rope (design.md §11). */
       mountainFall: string
+      /** Sighting a landmark for the first time (design.md §10/§16). */
+      landmarkDiscovered: string
       discovery: string
       deadline1: string
       deadline2: string
@@ -385,6 +387,9 @@ export interface Strings {
     dangerWetland: string
     mountainFall: string
     mountainFallItem: string
+    /** First sighting of a landmark (design.md §10/§16): the journal announces
+     *  the discovery, flavored by its kind (mountain/falls/lake/grave). */
+    landmarkDiscovered(p: TextParams): string
     findRemains(p: TextParams): string
     deadline1: string
     deadline2: string

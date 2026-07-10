@@ -740,7 +740,12 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     which makes Zanzibar reachable; discovery bounties for first-visited
     villages and sighted landmarks are credited on the next port visit as a
     telegraphic transfer, the journal entry naming exactly which discoveries
-    earned it and the amount; presenting a carried valuable to a village (the
+    earned it and the amount, and the first sighting of a landmark is itself
+    announced by a journal entry flavored by its kind (mountain, waterfall,
+    lake, the graveyard — once per landmark, both languages, voice markup;
+    verifiable: `src/state/store.travel.test.ts` asserts the entry with its
+    kind for a mountain and a waterfall and that it fires only once);
+    presenting a carried valuable to a village (the
     inventory bar) triggers the
     positive or negative village reaction of the §8 matrix. Every
     settlement — port and village — offers at least the baseline goods

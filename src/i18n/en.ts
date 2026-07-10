@@ -395,6 +395,7 @@ export const en: Strings = {
       dangerWater: 'Crocodiles Lie in Wait',
       dangerWetland: 'Fever in the Thicket',
       mountainFall: 'A Fall',
+      landmarkDiscovered: 'A Discovery',
       discovery: 'A Grim Discovery',
       deadline1: 'A Letter from the Financiers',
       deadline2: 'The Final Warning',
@@ -534,6 +535,16 @@ export const en: Strings = {
       '[fear]A sandstorm swallowed the horizon![/fear] [weary]I crouched behind my pack for hours while the world turned to howling dust.[/weary] Precious time is lost.',
     sweptAway:
       '[fear]The current seized me and swept me over the falls![/fear] [weary]I dragged myself to the bank, battered and bleeding —[pause] half of my belongings are gone with the river.[/weary]',
+    landmarkDiscovered: (p: TextParams) => {
+      const name = en.landmarks[p.landmark as keyof typeof en.landmarks]
+      const flavors: Record<string, string> = {
+        mountain: `[awe]There it rose before me at last —[pause] ${name}, its flanks vast against the sky.[/awe] [excited]I have laid eyes on it, and my journal shall bear witness.[/excited]`,
+        falls: `[awe]A distant thunder rolled over the land long before I saw it:[pause] ${name}![/awe] [excited]The river hurls itself into the deep in walls of white water —[pause] a sight I shall never forget.[/excited]`,
+        lake: `[awe]A great water opened before me —[pause] ${name}, stretching away to the horizon like a sea.[/awe] [somber]I marked its shore upon my map.[/somber]`,
+        grave: `[whisper]I walk among bleached bones and mighty tusks —[pause] the graveyard of the elephants.[/whisper] [awe]So the old tales told the truth after all.[/awe]`,
+      }
+      return flavors[p.kind as string] ?? flavors.mountain
+    },
     mountainNoRope:
       '[weary]No rope in hand, and yet there is no way around this range.[/weary] [fear]I climb slowly, hold by hold —[pause] one slip here and the rock will not catch me.[/fear]',
     penaltyJungle:

@@ -82,7 +82,7 @@ the map).
   (The culprit was the first-time water danger warning, which always advised
   the canoe; with a canoe in the pack it now acknowledges its protection
   instead.)
-- [ ] 10. When something is discovered — such as a waterfall — it should be
+- [x] 10. When something is discovered — such as a waterfall — it should be
   announced via the journal.
 - [ ] 11. The water in some lakes looks oddly blotchy and the blotches flicker
   while walking — e.g. in Lake Victoria.

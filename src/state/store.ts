@@ -722,7 +722,8 @@ export const useGame = create<GameState>()((set, get) => ({
     }
 
     // Discovery bounty (design.md §10): sighting a landmark registers the
-    // discovery; the money is credited on the next port visit.
+    // discovery; the money is credited on the next port visit. The journal
+    // announces every discovery (design.md §16), flavored by its kind.
     for (const lm of LANDMARK_POINTS) {
       if (Math.hypot(lm.lat - next.lat, lm.lon - next.lon) > balance.economy.discoverRadiusDeg) continue
       if (get().landmarksSeen.includes(lm.id)) continue
@@ -731,6 +732,10 @@ export const useGame = create<GameState>()((set, get) => ({
         pendingBounties: [...st.pendingBounties, { kind: 'landmark' as const, id: lm.id }],
         toast: getStrings().toasts.discovered(getStrings().landmarks[lm.id]),
       }))
+      get().addEntry(
+        { key: 'journal.titles.landmarkDiscovered' },
+        { key: 'journal.landmarkDiscovered', params: { landmark: lm.id, kind: lm.kind } },
+      )
     }
 
     get().tickHealth(dayDelta, here.type, next.lat, next.lon)
