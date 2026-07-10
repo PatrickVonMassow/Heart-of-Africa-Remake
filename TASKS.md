@@ -94,7 +94,7 @@ the map).
   even from a light wound.
 - [x] 15. Animals must not walk into the impassable open ocean (the water beyond
   the continent outline that blocks the traveller too).
-- [ ] 16. After using the new extended zoom-out and then entering a village,
+- [x] 16. After using the new extended zoom-out and then entering a village,
   massive clipping errors appear when walking close to a hut (likely the raised
   debug-zoom camera near plane carrying over into the first-person scene).
 

@@ -575,8 +575,10 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     continent: a coarse far-terrain sheet streams in beyond the detailed
     chunks, the sea calms to glass (crests/foam/glints would alias into
     speckle noise at that distance), the camera near plane moves out to keep
-    coastal depth precision, and in the debug-only zoom range (beyond factor
-    1) no haze is shown — the fog recedes to the horizon and the ground haze
+    coastal depth precision (and snaps back to the first-person default the
+    moment another scene takes the shared camera — entering a settlement
+    straight out of the debug zoom must never clip hut walls), and in the
+    debug-only zoom range (beyond factor 1) no haze is shown — the fog recedes to the horizon and the ground haze
     fades, returning as the zoom drops back. Verifiable: at the zoom cap the
     far sheet is built and visible, the fog far plane exceeds 2000 and the
     haze opacity is ~0, with a screenshot (87), and back at zoom 1 the fog

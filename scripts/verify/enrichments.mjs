@@ -1824,6 +1824,37 @@ const zoomBack = await page.evaluate(async () => {
 check('back at the default zoom the haze returns and the far sheet hides',
   zoomBack.ok, JSON.stringify(zoomBack))
 
+// --- Point 16: no first-person clipping after the extended zoom-out ----------
+// The travel view widens the shared camera's near plane in the debug zoom
+// range; a place scene entered right out of that zoom must own it back to the
+// first-person default, or every hut wall clips at close range.
+const nearAfterZoom = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(12)
+  await sleep(600) // let the travel frame apply the widened near plane
+  window.__game.getState().enterPlace('masai-village')
+  const t0 = Date.now()
+  while (Date.now() - t0 < 15000) {
+    const cam = window.__placeCamera
+    if (cam) {
+      await sleep(300) // a couple of place-scene frames
+      const near = window.__placeCamera.near
+      window.__game.getState().leavePlace()
+      window.__ui.getState().setTravelZoom(1)
+      window.__ui.getState().setWheelZoomEnabled(false)
+      return { near }
+    }
+    await sleep(100)
+  }
+  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
+  return { near: null }
+})
+check('entering a settlement out of the debug zoom restores the near plane (no clipping)',
+  nearAfterZoom.near !== null && nearAfterZoom.near <= 0.1,
+  JSON.stringify(nearAfterZoom))
+
 // --- Debug menu: jump-to dropdown teleports (§7.1.20) ------------------------
 // The dropdown/renderer-row PRESENCE asserts moved to Vitest (DebugMenu.test);
 // what stays needs the live store: selecting a place actually teleports there.

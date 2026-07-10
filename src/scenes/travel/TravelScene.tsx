@@ -1061,12 +1061,18 @@ export function TravelScene() {
   const setPrompt = useUi((s) => s.setPrompt)
 
   // Snap the camera to the follow pose on mount (no visible flight from the
-  // previous first-person pose).
+  // previous first-person pose). On unmount the near plane returns to the
+  // first-person default — the debug zoom range widens it (depth precision),
+  // and the shared camera must never carry that into another scene.
   useEffect(() => {
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
     camera.position.set(pos.x, CAMERA_OFFSET.y * zoom, pos.z + CAMERA_OFFSET.z * zoom)
     camera.lookAt(pos.x, 0, pos.z)
+    return () => {
+      camera.near = 0.1
+      camera.updateProjectionMatrix()
+    }
   }, [camera])
 
   // Mouse-wheel zoom (design.md §21): always available; zooming out beyond

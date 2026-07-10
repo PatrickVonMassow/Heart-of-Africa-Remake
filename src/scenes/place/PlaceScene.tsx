@@ -1425,6 +1425,17 @@ export function PlaceScene() {
   const setPrompt = useUi((s) => s.setPrompt)
   const setDialog = useUi((s) => s.setDialog)
 
+  // The camera is shared across scenes: the travel view widens its near plane
+  // in the debug zoom range (depth precision at continental distances), and a
+  // first-person scene inheriting near=4 clips every wall the player
+  // approaches. Own the near plane here.
+  useEffect(() => {
+    if (camera.near !== 0.1) {
+      camera.near = 0.1
+      camera.updateProjectionMatrix()
+    }
+  }, [camera])
+
   const place = placeId ? placeById(placeId) : null
   const layout = useMemo(
     () => (placeId ? buildLayout(placeId, seed) : null),
