@@ -715,6 +715,16 @@ const shoreSpots = await page.evaluate(() => {
 const bathe = { drinkers: 0, bathers: 0, animalsSeen: 0 }
 for (const spot of shoreSpots) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s[0], s[1]), spot)
+  // A shore spot can fall into a settlement's enter radius — the place scene
+  // then unmounts the wildlife. Step back out and skip such a spot.
+  const inTravel = await page.evaluate(() => {
+    if (window.__game.getState().mode !== 'travel') {
+      window.__game.getState().leavePlace()
+      return false
+    }
+    return true
+  })
+  if (!inTravel) continue
   await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
   const gotDrinkers = await page
@@ -733,9 +743,9 @@ for (const spot of shoreSpots) {
     .catch(() => false)
   if (gotDrinkers) {
     const here = await page.evaluate(() => {
-      const h = window.__wildlife.herdsRef.current
+      const h = window.__wildlife?.herdsRef?.current
       let drinkers = 0, bathers = 0, animals = 0
-      for (const sp of Object.keys(h)) for (const a of h[sp]) { animals++; if (a.drink) drinkers++; if (a.bathe) bathers++ }
+      if (h) for (const sp of Object.keys(h)) for (const a of h[sp]) { animals++; if (a.drink) drinkers++; if (a.bathe) bathers++ }
       return { drinkers, bathers, animals }
     })
     bathe.drinkers += here.drinkers
@@ -746,9 +756,9 @@ for (const spot of shoreSpots) {
     // Even a shore whose drinker gate timed out tells us whether animals
     // spawned at all (environment stall vs. assignment issue).
     bathe.animalsSeen += await page.evaluate(() => {
-      const h = window.__wildlife.herdsRef.current
+      const h = window.__wildlife?.herdsRef?.current
       let n = 0
-      for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead).length
+      if (h) for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead).length
       return n
     })
   }
@@ -1724,6 +1734,45 @@ const noRemnant = await page.evaluate(async () => {
 check('a feed that ends without a kill leaves no remnant',
   noRemnant.found && noRemnant.deadAfter === noRemnant.deadBefore && noRemnant.calfAlive,
   JSON.stringify(noRemnant))
+
+// --- Point 15: animals never stand in the impassable open ocean --------------
+// Jump to the west coast (clear of any settlement's enter radius) so genuine
+// open-ocean cells are in probing reach; the travel scene must stay mounted.
+await page.evaluate(() => window.__game.getState().debugJumpTo(4.9, 6.1))
+await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
+await page.waitForTimeout(600)
+const oceanBackstop = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const T = window.__terrainType
+  const p = window.__game.getState().pos
+  // Probe outward from the player for a genuine open-ocean cell.
+  let sea = null
+  outer: for (let r = 3; r <= 60 && !sea; r += 1.5) {
+    for (let k = 0; k < 16; k++) {
+      const lat = -p.z / 10 + (Math.cos((k / 16) * Math.PI * 2) * r) / 10
+      const lon = p.x / 10 + (Math.sin((k / 16) * Math.PI * 2) * r) / 10
+      if (T(lat, lon, seed) === 'ocean') { sea = [lat, lon]; break outer }
+    }
+  }
+  if (!sea) return { found: false }
+  const zebra = { x: sea[1] * 10, z: -sea[0] * 10, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: 'inject-p15' }
+  herds.zebra.push(zebra)
+  let rescuedToLand = false
+  const t0 = Date.now()
+  while (Date.now() - t0 < 15000) {
+    const ll = { lat: -zebra.z / 10, lon: zebra.x / 10 }
+    if (T(ll.lat, ll.lon, seed) !== 'ocean') { rescuedToLand = true; break }
+    await sleep(120)
+  }
+  const endType = T(-zebra.z / 10, zebra.x / 10, seed)
+  herds.zebra = herds.zebra.filter((a) => a !== zebra)
+  return { found: true, rescuedToLand, endType }
+})
+check('an animal on an open-ocean cell is set back to the nearest land',
+  oceanBackstop.found && oceanBackstop.rescuedToLand && oceanBackstop.endType !== 'ocean',
+  JSON.stringify(oceanBackstop))
 
 // --- Point 8: whole-continent debug zoom without haze -------------------------
 // design.md §21: the debug-unlocked zoom reaches a view of the whole continent

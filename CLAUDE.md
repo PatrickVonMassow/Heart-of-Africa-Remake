@@ -417,7 +417,9 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     animal body separation of design.md §19 — streamed animals keep their
     body spacing after spawn (no two inside one another) and an animal placed
     onto another parts from it within moments, while the elephant trample
-    remains possible; that some shore
+    remains possible; assert that an animal on an open-ocean cell is set back
+    to the nearest land (no animal strays into the impassable sea, and the
+    scripted hunt's prey balks at the waterline); that some shore
     visitors bathe (wade in) beyond merely drinking, and
     assert the graveyard's carcass/tusk/bone counts via the dev hook with a
     screenshot (`scripts/verify/settings.mjs`, `scripts/verify/enrichments.mjs`).

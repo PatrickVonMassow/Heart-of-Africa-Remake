@@ -92,7 +92,7 @@ the map).
   should reflect locally/historically accurate peculiarities of each.
 - [x] 14. One should be able to recover even without medicine. Currently one dies
   even from a light wound.
-- [ ] 15. Animals must not walk into the impassable open ocean (the water beyond
+- [x] 15. Animals must not walk into the impassable open ocean (the water beyond
   the continent outline that blocks the traveller too).
 - [ ] 16. After using the new extended zoom-out and then entering a village,
   massive clipping errors appear when walking close to a hut (likely the raised

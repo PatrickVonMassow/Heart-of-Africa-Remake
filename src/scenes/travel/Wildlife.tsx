@@ -548,6 +548,8 @@ function Herds() {
   const spawnedChunks = useRef(new Set<string>())
   // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
   const herdState = useRef(new Map<number, { heading: number; phase: number }>())
+  // Rotating index of the open-ocean backstop sweep (design.md §19).
+  const oceanSweep = useRef(0)
   // Scavenger vulture that flies to and consumes a non-lion carcass. Its x/z
   // and mode live in a FlightState so it flies in from — and departs to —
   // beyond the zoom-aware view ring instead of popping (design.md §19).
@@ -941,6 +943,31 @@ function Herds() {
           if (dx !== 0 || dz !== 0) {
             a.x += dx
             a.z += dz
+          }
+        }
+      }
+    }
+
+    // Animals never walk into the impassable open ocean (design.md §19): a
+    // rotating slice of the herds is checked each frame (full coverage every
+    // few frames), and anyone standing on an ocean cell is set back to the
+    // nearest land. This backstops every mover — flee, dodge, follow, escort
+    // and the separation pushes — without sampling every animal every frame.
+    {
+      const phase = oceanSweep.current++ % 7
+      for (const sp of SPECIES) {
+        const list = herds[sp]
+        for (let i = phase; i < list.length; i += 7) {
+          const a = list[i]
+          if (a.dead || a.inWater !== undefined) continue // water drama owns its own
+          const ll = worldToLatLon(a.x, a.z)
+          if (sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean') {
+            const back = findLandNear(a.x, a.z, seed)
+            a.x = back.x
+            a.z = back.z
+            const l2 = worldToLatLon(a.x, a.z)
+            a.y = Math.max(0.02, sampleTerrain(l2.lat, l2.lon, seed).height)
+            a.dodgeHeading = undefined
           }
         }
       }
@@ -1622,8 +1649,15 @@ function LionHunt() {
         // so sharp cuts throw it wide, though it is faster and closes in.
         const away = Math.atan2(s.px - s.lx, s.pz - s.lz)
         s.preyHeading = away + Math.sin(t * HUNT_WEAVE_FREQ + s.heading) * HUNT_WEAVE_AMP
-        s.px += Math.sin(s.preyHeading) * HUNT_PREY_SPEED * dt
-        s.pz += Math.cos(s.preyHeading) * HUNT_PREY_SPEED * dt
+        const nx = s.px + Math.sin(s.preyHeading) * HUNT_PREY_SPEED * dt
+        const nz = s.pz + Math.cos(s.preyHeading) * HUNT_PREY_SPEED * dt
+        // The prey balks at the open sea instead of fleeing into it (design.md
+        // §19) — the hunter then takes it at the waterline.
+        const nll = worldToLatLon(nx, nz)
+        if (sampleTerrain(nll.lat, nll.lon, seed).type !== 'ocean') {
+          s.px = nx
+          s.pz = nz
+        }
       }
       if (s.mode === 'chase') {
         const toX = s.px - s.lx
