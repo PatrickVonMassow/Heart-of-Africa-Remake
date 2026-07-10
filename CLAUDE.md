@@ -375,7 +375,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     elephant herd roams together (its centre moves, it stays clustered, and
     it turns only in gentle arcs) and that prey ignore a distant elephant
     but dart away from a close one (last-moment dodge) while holding one steady
-    escape direction rather than oscillating ~90° between two flanking herd-mates,
+    escape direction rather than oscillating ~90° between two flanking
+    herd-mates — with the RENDERED facing itself sampled under the universal
+    turn cap through engage and disengage (no snap when a flight ends), a
+    tailing elephant unable to flap the dodge at its ring (exit hysteresis),
+    and an elephant's facing tracking its roam heading,
     assert that lion hunts run in varied
     directions (low mean-resultant length across hunts) with a weaving prey
     (its heading oscillates around straight-away), that the lion takes more

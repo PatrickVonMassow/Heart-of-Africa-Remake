@@ -117,6 +117,11 @@ interface Animal {
    *  flight still bound to this carcass — a ghost target would otherwise stay
    *  "valid" forever and pin the vulture to an empty spot. */
   gone?: boolean
+  /** Persistent rendered facing (radians), steered toward each frame's desired
+   *  heading at a capped turn rate: the visible orientation can never snap —
+   *  not between two flanking threats, not when a flight starts or ends, not
+   *  on any behavior change (design.md §19). */
+  face?: number
 }
 
 /**
@@ -241,6 +246,13 @@ const PREY_PANIC_SPEED = 1.35
 /** Max turn rate (rad/s) for a prey's dodge/flee facing: responsive enough to
  *  dart aside, capped so the heading can never snap between two threats. */
 const PREY_DODGE_TURN = 8
+/** Universal cap (rad/s) on every animal's rendered facing (design.md §19):
+ *  each frame's desired heading only steers the persistent facing, so no
+ *  behavior boundary can flip the body around within a frame. */
+const FACE_TURN = 7
+/** A dodge disengages only well past its trigger ring (hysteresis), so an
+ *  elephant tailing its prey cannot flap the dodge on and off at the ring. */
+const PREY_PANIC_EXIT = 1.5
 /** Family life (design.md §19): a calf keeps within this radius of its parent,
  *  and a parent moves between an approaching predator and its calf to guard it,
  *  standing off a short distance in front of the young. */
@@ -1179,7 +1191,11 @@ function Herds() {
           px = a.x + wob * 0.8
           pz = a.z + Math.cos(t * 0.2 + a.phase) * 0.8
         }
-        let yaw = a.rot + wob * 0.4
+        // Desired heading this frame; the branches below overwrite it. An
+        // elephant faces its line of travel (it walks its own heading), all
+        // others idle at their resting orientation with a slow shuffle.
+        const idleYaw = sp === 'elephant' ? (a.heading ?? a.rot) : a.rot + wob * 0.4
+        let yaw = idleYaw
         let pitch = 0
         let bodyY = a.y
         // Periodic drinking (design.md §19): walk to the shore point, lower
@@ -1381,7 +1397,10 @@ function Herds() {
         // and turn toward it at a bounded rate, so the facing never flip-flops
         // ~90° between two flanking herd-mates (no oscillation, design.md §19).
         if (!familyHeld && sp !== 'elephant' && FLEES_LION[sp]) {
-          const target = fleeHeading(a.x, a.z, elephantPos, PREY_PANIC_RADIUS)
+          // Hysteresis: once dodging, only disengage well past the trigger
+          // ring — a tailing elephant cannot flap the dodge on and off.
+          const ring = a.dodgeHeading === undefined ? PREY_PANIC_RADIUS : PREY_PANIC_RADIUS * PREY_PANIC_EXIT
+          const target = fleeHeading(a.x, a.z, elephantPos, ring)
           if (target !== null) {
             a.dodgeHeading =
               a.dodgeHeading === undefined ? target : turnToward(a.dodgeHeading, target, PREY_DODGE_TURN * dt)
@@ -1391,7 +1410,10 @@ function Herds() {
             pz = a.z
             yaw = a.dodgeHeading
             pitch = 0
-          } else {
+          } else if (a.dodgeHeading !== undefined) {
+            // Disengaged: keep facing where the dart ended instead of turning
+            // back to the pre-flight orientation (design.md §19).
+            a.rot = a.dodgeHeading
             a.dodgeHeading = undefined
           }
         }
@@ -1414,12 +1436,23 @@ function Herds() {
             continue
           }
         }
+        // Steer the persistent facing toward this frame's desired heading —
+        // no behavior change can snap the body around (design.md §19). The
+        // deliberate fast wiggles (a caught calf's thrash, the in-water
+        // struggle) pass through unfiltered, and any directional behavior
+        // updates the resting orientation so ending it never yanks the animal
+        // back toward its spawn-time facing.
+        const thrashing =
+          (a.caught !== undefined && a.caught > 0) || (a.inWater !== undefined && !a.rescued)
+        const face = thrashing ? yaw : turnToward(a.face ?? yaw, yaw, FACE_TURN * dt)
+        a.face = face
+        if (sp !== 'elephant' && !thrashing && yaw !== idleYaw) a.rot = face
         vpos.set(px, bodyY, pz)
         if (pitch !== 0) {
-          euler.set(pitch, yaw, 0, 'YXZ')
+          euler.set(pitch, face, 0, 'YXZ')
           quat.setFromEuler(euler)
         } else {
-          quat.setFromAxisAngle(up, yaw)
+          quat.setFromAxisAngle(up, face)
         }
         vscl.setScalar(a.scale)
         mtx.compose(vpos, quat, vscl)

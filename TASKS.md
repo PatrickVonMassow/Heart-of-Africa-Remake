@@ -98,6 +98,18 @@ the map).
   massive clipping errors appear when walking close to a hut (likely the raised
   debug-zoom camera near plane carrying over into the first-person scene).
 
+- [x] 17. The movement oscillation persisted after point 1. Root cause found:
+  the summed threat field had smoothed the heading only WITHIN the dodge,
+  while the rendered facing was recomputed per behavior branch and snapped at
+  every boundary (dodge engage/disengage at the panic ring, flight end,
+  nurse↔follow, the drink turn-around) — and elephants never rendered their
+  travel heading at all. The suggested return to a discrete nearest-threat
+  choice was evaluated and rejected: it would reintroduce the ~90° flip
+  between two flankers and fix none of the boundary snaps. Fixed sustainably:
+  one persistent facing per animal, steered by every behavior at a capped
+  turn rate; exit-ring hysteresis on the dodge; a finished flight leaves the
+  animal facing where it ran; elephants face their line of travel.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

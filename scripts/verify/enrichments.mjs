@@ -458,11 +458,21 @@ const oscillate = await page.evaluate(async () => {
   herds.elephant.push(a, b)
   const start = { x: prey.x, z: prey.z }
   const samples = []
+  const faces = []
   for (let k = 0; k < 34; k++) {
     a.x = prey.x + 2.2; a.z = prey.z + 2.2
     b.x = prey.x + 2.6; b.z = prey.z - 1.6
     await sleep(70)
     if (typeof prey.dodgeHeading === 'number') samples.push(prey.dodgeHeading)
+    if (typeof prey.face === 'number') faces.push(prey.face)
+  }
+  // Disengage: remove the threats and keep sampling the RENDERED facing — the
+  // end of a flight must not snap the body back to some resting orientation
+  // (the old bug: yaw fell back to the spawn rot within one frame).
+  herds.elephant.length = 0
+  for (let k = 0; k < 12; k++) {
+    await sleep(70)
+    if (typeof prey.face === 'number') faces.push(prey.face)
   }
   const wrap = (d) => {
     while (d > Math.PI) d -= Math.PI * 2
@@ -474,19 +484,82 @@ const oscillate = await page.evaluate(async () => {
   // under that proves no snap (the old bug jumped ~1.57 rad / 90°).
   let maxDelta = 0
   for (let i = 1; i < samples.length; i++) maxDelta = Math.max(maxDelta, Math.abs(wrap(samples[i] - samples[i - 1])))
+  // The RENDERED facing obeys the same cap across the whole episode,
+  // including the moment the flight disengages (FACE_TURN·dt ≤ 0.7 throttled).
+  let maxFaceDelta = 0
+  for (let i = 1; i < faces.length; i++) maxFaceDelta = Math.max(maxFaceDelta, Math.abs(wrap(faces[i] - faces[i - 1])))
   // The whole flee stays in one steady direction: the heading never wanders far
   // from where it settled (the old bug swung ~90° between the two flankers).
   const base = samples[Math.min(3, samples.length - 1)] ?? 0
   let spread = 0
   for (let i = 3; i < samples.length; i++) spread = Math.max(spread, Math.abs(wrap(samples[i] - base)))
   const moved = Math.hypot(prey.x - start.x, prey.z - start.z)
-  herds.elephant.length = 0
   herds.zebra.length = 0
-  return { n: samples.length, maxDelta: +maxDelta.toFixed(3), spread: +spread.toFixed(3), moved: +moved.toFixed(2) }
+  return { n: samples.length, nFace: faces.length, maxDelta: +maxDelta.toFixed(3), maxFaceDelta: +maxFaceDelta.toFixed(3), spread: +spread.toFixed(3), moved: +moved.toFixed(2) }
 })
 check('a fleeing prey dodges without oscillating (stable heading)',
   oscillate.n >= 8 && oscillate.maxDelta < 0.85 && oscillate.spread < 0.6 && oscillate.moved > 0.5,
   JSON.stringify(oscillate))
+check('the rendered facing never snaps — not even when the flight disengages',
+  oscillate.nFace >= 12 && oscillate.maxFaceDelta < 0.9,
+  JSON.stringify(oscillate))
+
+// A tailing elephant at the trigger ring must not flap the dodge on and off
+// (hysteresis + adopted resting orientation): the rendered facing stays under
+// the turn cap through repeated engage/disengage cycles.
+const ringFlap = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  herds.elephant.length = 0
+  for (const sp of ['zebra', 'antelope', 'giraffe', 'wildebeest', 'warthog']) herds[sp].length = 0
+  const p = window.__game.getState().pos
+  const prey = { x: p.x, z: p.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
+  herds.zebra.push(prey)
+  const eleph = { x: prey.x + 3.0, z: prey.z, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
+  herds.elephant.push(eleph)
+  const faces = []
+  for (let k = 0; k < 40; k++) {
+    // Re-pin the elephant right at the trigger ring of the prey's CURRENT
+    // spot every few polls — engage, escape past the ring, engage again.
+    if (k % 4 === 0) { eleph.x = prey.x + 3.0; eleph.z = prey.z }
+    await sleep(70)
+    if (typeof prey.face === 'number') faces.push(prey.face)
+  }
+  const wrap = (d) => {
+    while (d > Math.PI) d -= Math.PI * 2
+    while (d < -Math.PI) d += Math.PI * 2
+    return d
+  }
+  let maxFaceDelta = 0
+  for (let i = 1; i < faces.length; i++) maxFaceDelta = Math.max(maxFaceDelta, Math.abs(wrap(faces[i] - faces[i - 1])))
+  herds.elephant.length = 0
+  herds.zebra.length = 0
+  return { n: faces.length, maxFaceDelta: +maxFaceDelta.toFixed(3) }
+})
+check('a tailing elephant at the ring cannot flip the facing (hysteresis holds)',
+  ringFlap.n >= 20 && ringFlap.maxFaceDelta < 0.9, JSON.stringify(ringFlap))
+
+// Elephants face their line of travel (they used to render their random
+// spawn orientation while walking a different heading).
+const elephantFacing = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  herds.elephant.length = 0
+  const p = window.__game.getState().pos
+  const e = { x: p.x + 6, z: p.z, y: 0.2, rot: 2.4, scale: 1, phase: 0, heading: 0.7, herd: 771177 }
+  herds.elephant.push(e)
+  await sleep(2500) // roam a little; the facing settles onto the heading
+  const wrap = (d) => {
+    while (d > Math.PI) d -= Math.PI * 2
+    while (d < -Math.PI) d += Math.PI * 2
+    return d
+  }
+  const off = typeof e.face === 'number' && typeof e.heading === 'number' ? Math.abs(wrap(e.face - e.heading)) : null
+  herds.elephant.length = 0
+  return { off: off === null ? null : +off.toFixed(3), heading: +(+e.heading).toFixed(3) }
+})
+check('an elephant faces its line of travel (facing tracks the roam heading)',
+  elephantFacing.off !== null && elephantFacing.off < 0.6, JSON.stringify(elephantFacing))
 
 // --- Prey flees smoothly, never teleporting (point 7) ------------------------
 // When a predator becomes active the prey must run away by accumulating into
@@ -703,16 +776,24 @@ const shoreSpots = await page.evaluate(() => {
     return false
   }
   const spots = []
-  // East African lakes/rivers belt — plenty of savanna shoreline.
-  for (let lat = 3; lat >= -9 && spots.length < 24; lat -= 0.4)
-    for (let lon = 29; lon <= 37 && spots.length < 24; lon += 0.4)
-      if (T(lat, lon, seed) === 'savanna' && nearWater(lat, lon)) spots.push([lat, lon])
+  // East/central African lakes-and-rivers belt — plenty of savanna shoreline.
+  // Keep the spots spread out: neighbouring scan cells respawn the very same
+  // deterministic herds, which would only re-count the same drinkers.
+  for (let lat = 3; lat >= -12 && spots.length < 32; lat -= 0.4)
+    for (let lon = 29; lon <= 37 && spots.length < 32; lon += 0.4)
+      if (
+        T(lat, lon, seed) === 'savanna' &&
+        nearWater(lat, lon) &&
+        spots.every(([sl, sn]) => Math.hypot(sl - lat, sn - lon) > 1.2)
+      )
+        spots.push([lat, lon])
   return spots
 })
 // Aggregate drinkers/bathers over ALL roamed shores: ~40 % of drinkers bathe,
 // so a single shore with a handful of drinkers can easily hold none — the
 // union across shores makes the sample large enough to be reliable.
 const bathe = { drinkers: 0, bathers: 0, animalsSeen: 0 }
+const drinkerKeys = new Set() // unique drinkers only — respawns must not re-count
 for (const spot of shoreSpots) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s[0], s[1]), spot)
   // A shore spot can fall into a settlement's enter radius — the place scene
@@ -744,11 +825,19 @@ for (const spot of shoreSpots) {
   if (gotDrinkers) {
     const here = await page.evaluate(() => {
       const h = window.__wildlife?.herdsRef?.current
-      let drinkers = 0, bathers = 0, animals = 0
-      if (h) for (const sp of Object.keys(h)) for (const a of h[sp]) { animals++; if (a.drink) drinkers++; if (a.bathe) bathers++ }
+      const drinkers = []
+      let bathers = 0, animals = 0
+      if (h)
+        for (const sp of Object.keys(h))
+          for (const a of h[sp]) {
+            animals++
+            if (a.drink) drinkers.push(`${sp}:${a.drink.tx.toFixed(2)},${a.drink.tz.toFixed(2)}`)
+            if (a.bathe) bathers++
+          }
       return { drinkers, bathers, animals }
     })
-    bathe.drinkers += here.drinkers
+    for (const k of here.drinkers) if (!drinkerKeys.has(k)) drinkerKeys.add(k)
+    bathe.drinkers = drinkerKeys.size
     bathe.bathers += here.bathers
     bathe.animalsSeen += here.animals
     if (bathe.bathers > 0) break
