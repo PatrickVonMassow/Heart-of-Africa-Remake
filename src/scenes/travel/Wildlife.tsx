@@ -5,8 +5,11 @@
 // player when the expedition is in poor condition. The animals interact with
 // one another: wandering elephants trample smaller animals underfoot (dead
 // over a red stain), prey flee an active predator, and vultures gather above a
-// kill. Only walking into the lion attacks the player (§14); otherwise no
-// gameplay effect.
+// kill. Herds raise young: calves gambol, get hunted (with the parent's rescue
+// sacrifice) and fall into water (with the parent's rescue and the waterfalls'
+// toll); kills leave remnants for the scavenger, animals keep body spacing and
+// never stray into the open ocean. Only walking into the lion attacks the
+// player (§14); otherwise no gameplay effect.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -1426,7 +1429,7 @@ function Herds() {
       mesh.instanceMatrix.needsUpdate = true
     }
 
-    // Stains beneath trampled animals, laid into the local slope plane so no
+    // Blood stains under kills of every kind, laid into the local slope so no
     // wedge is swallowed by rising ground (design.md §19).
     const sm = stainMesh.current
     if (sm) {
@@ -1493,7 +1496,9 @@ function Herds() {
  * chases one grazer from its food web; after the catch it visibly feeds on the
  * carcass — lowered, tearing head movements while the prey shrinks away piece
  * by piece over a red, spreading stain. Once the carcass is gone the predator
- * moves on and the scene despawns. The lion is the apex and the only predator
+ * leaves a small prey remnant for the scavenger, trots off away from the
+ * traveller and despawns only beyond the zoom-aware view ring. The lion is
+ * the apex and the only predator
  * that also attacks the player on contact (§14); the others are pure scenery.
  */
 function LionHunt() {
