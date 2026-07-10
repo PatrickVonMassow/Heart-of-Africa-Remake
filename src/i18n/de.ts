@@ -334,6 +334,7 @@ export const de: Strings = {
     canoeSpeedup: 'Kanu-Tempofaktor (Wasser)',
     junglePenalty: 'Malusfaktor Dschungel (ohne Machete)',
     mountainPenalty: 'Malusfaktor Gebirge (ohne Seil)',
+    foodUnitDays: 'Proviant pro Nahrungseinheit (Tage)',
     oceanSwimMargin: 'Schwimmbares Küstenband (°)',
     digRadius: 'Grabe-Radius',
     goodwillForHint: 'Wohlwollen für Hinweis',

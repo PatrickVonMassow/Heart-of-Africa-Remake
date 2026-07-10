@@ -203,6 +203,23 @@ the map).
   part of the game world; CLAUDE.md pt. 4, README and the redSea tests
   follow.)
 
+- [x] 26. One purchased food unit should last four weeks instead of one.
+  (New balance value foodUnitDays 28, used by both buy paths — port money
+  and village gifts — debug-menu editable in both languages; economy store
+  test asserts against the balance value.)
+- [x] 27. The journal panel should keep a small gap to the right screen edge.
+  (.journal right: 0 → 12px; enrichments asserts the panel's right edge
+  keeps a gap to the viewport edge.)
+- [x] 28. Raise the canoe speed factor to 3x.
+  (balance.canoeSpeedup 2 → 3; balance default test and the CLAUDE.md pt. 20
+  checked number follow.)
+- [x] 29. Shrink the re-entry debounce radius against accidentally re-entering
+  a settlement.
+  (placeReentryMargin 2 → 1; the leavePlace exit offset shrinks with it,
+  from enterRadius+1.5 to enterRadius+0.5, so the exit point stays inside
+  the clearance and the debounce still arms — points 26-29 land as one
+  calibration commit since they share balance.ts/store.ts hunks.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

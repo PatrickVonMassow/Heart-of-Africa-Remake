@@ -1284,15 +1284,17 @@ export const useGame = create<GameState>()((set, get) => ({
     if (!s.placeId) return
     const place = placeById(s.placeId)
     const p = latLonToWorld(place.lat, place.lon)
-    // Re-enter offset south of the marker so the enter prompt does not retrigger.
-    // Bazaar quotes are per-port, so they expire on leaving (design.md §10).
-    // Suppress re-entry until the traveller clears the settlement, so walking
-    // straight back does not immediately re-enter it (design.md §2).
+    // Exit just past the enter radius so the enter prompt does not retrigger;
+    // the exit point must stay inside the re-entry clearance
+    // (placeEnterRadius + placeReentryMargin), or the debounce would re-arm
+    // immediately. Bazaar quotes are per-port, so they expire on leaving
+    // (design.md §10). Suppress re-entry until the traveller clears the
+    // settlement, so walking straight back does not re-enter it (design.md §2).
     set({
       mode: 'travel',
       placeId: null,
       reentrySuppressedId: s.placeId,
-      pos: { x: p.x, z: p.z + balance.placeEnterRadius + 1.5 },
+      pos: { x: p.x, z: p.z + balance.placeEnterRadius + 0.5 },
       bazaarQuotes: {},
     })
   },
@@ -1314,7 +1316,7 @@ export const useGame = create<GameState>()((set, get) => ({
       }
       const gifts = spendGifts(s.gifts, price)
       if (g === 'food') {
-        set({ gifts, foodDays: s.foodDays + 7, toast: getStrings().toasts.boughtFood })
+        set({ gifts, foodDays: s.foodDays + balance.foodUnitDays, toast: getStrings().toasts.boughtFood })
       } else {
         set({
           gifts,
@@ -1335,7 +1337,7 @@ export const useGame = create<GameState>()((set, get) => ({
       return
     }
     if (good === 'food') {
-      set({ money: s.money - price, foodDays: s.foodDays + 7, toast: getStrings().toasts.boughtFood })
+      set({ money: s.money - price, foodDays: s.foodDays + balance.foodUnitDays, toast: getStrings().toasts.boughtFood })
     } else if (good === 'gold' || good === 'silver' || good === 'emerald' || good === 'copper' || good === 'ivory') {
       const m = good as Material
       set({

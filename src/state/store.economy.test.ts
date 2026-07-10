@@ -257,13 +257,14 @@ describe('settlement currency split (design.md §9/§10)', () => {
     useGame.setState({ gifts: { gold: 0, silver: 0, emerald: 0, copper: 6, ivory: 0 }, money: 500 })
     g().enterPlace('nubian-village') // North village → currency is gifts
 
-    // Buying food spends 1 gift, adds 7 provision days, leaves money untouched.
+    // Buying food spends 1 gift, adds one food unit's provision days (a
+    // balance value, four weeks by default), leaves money untouched.
     const gifts0 = totalGifts(g().gifts)
     const food0 = g().foodDays
     const money0 = g().money
     g().buy('food')
     expect(totalGifts(g().gifts)).toBe(gifts0 - 1)
-    expect(g().foodDays).toBe(food0 + 7)
+    expect(g().foodDays).toBe(food0 + balance.foodUnitDays)
     expect(g().money).toBe(money0)
 
     // Buying gear works.

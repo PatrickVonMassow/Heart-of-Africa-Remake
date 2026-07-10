@@ -17,7 +17,7 @@ describe('comfort & control defaults (user calibration)', () => {
 
 describe('terrain relief factors (design.md §11)', () => {
   it('canoe speed-up and the jungle/mountain/canoe-land penalties', () => {
-    expect(balance.canoeSpeedup).toBe(2)
+    expect(balance.canoeSpeedup).toBe(3)
     expect(balance.junglePenalty).toBeCloseTo(2.3, 5)
     expect(balance.mountainPenalty).toBeCloseTo(1.67, 5)
     expect(balance.canoeLandPenalty).toBe(2.5)
@@ -27,7 +27,13 @@ describe('terrain relief factors (design.md §11)', () => {
 describe('canteen and re-entry (design.md §6/§2)', () => {
   it('canteen capacity and the re-entry clearance margin', () => {
     expect(balance.health.canteenCapacity).toBe(500)
-    expect(balance.placeReentryMargin).toBe(2)
+    expect(balance.placeReentryMargin).toBe(1)
+  })
+})
+
+describe('provisions (design.md §9)', () => {
+  it('one purchased food unit lasts four weeks', () => {
+    expect(balance.foodUnitDays).toBe(28)
   })
 })
 

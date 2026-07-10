@@ -383,7 +383,8 @@ textarea {
 .journal {
   position: absolute;
   top: 48px;
-  right: 0;
+  /* Small gap to the right screen edge (design.md §17.4). */
+  right: 12px;
   /* Stop above the camp/journal buttons (bottom: 12px, ~30px tall) with a small
      gap so the panel never covers them (design.md §16/§17). */
   bottom: 56px;

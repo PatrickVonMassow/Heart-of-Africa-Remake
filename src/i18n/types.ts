@@ -259,6 +259,7 @@ export interface Strings {
     canoeSpeedup: string
     junglePenalty: string
     mountainPenalty: string
+    foodUnitDays: string
     oceanSwimMargin: string
     digRadius: string
     goodwillForHint: string

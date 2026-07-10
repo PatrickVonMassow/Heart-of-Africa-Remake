@@ -450,7 +450,7 @@ First-person view (settlements): walkable space, interaction prompts at building
 
 ### 17.4 Layering
 
-Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) does not extend to the bottom of the screen: it ends above the camp and journal buttons in the bottom corner, leaving a small gap, so those buttons are never covered.
+Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and does not extend to the bottom of the screen: it ends above the camp and journal buttons in the bottom corner, leaving a small gap, so those buttons are never covered.
 
 ### 17.5 Controls and focus
 
@@ -600,6 +600,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Mouse-look sensitivity in the first-person view.
 - Ambience volume (default 0.1): one control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale together.
 - Speed of food consumption while walking; at 0 the food supply lasts forever.
+- Days of provisions one purchased food unit grants (§9; four weeks by default).
 - Speed of the canteen's water consumption per travelled day, split into the land rate and the (faster) desert rate (§6), and the canteen's capacity — a full canteen lasts capacity ÷ consumption travelled days.
 - Natural wound-healing durations (§6): the days until a light wound closes on its own and until a severe wound eases to a light one.
 - Input fields for cash, gifts and food.

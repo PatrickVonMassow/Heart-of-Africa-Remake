@@ -335,6 +335,7 @@ export const en: Strings = {
     canoeSpeedup: 'Canoe speed factor (water)',
     junglePenalty: 'Jungle penalty factor (no machete)',
     mountainPenalty: 'Mountain penalty factor (no rope)',
+    foodUnitDays: 'Provisions per food unit (days)',
     oceanSwimMargin: 'Swimmable coastal band (°)',
     digRadius: 'Dig radius',
     goodwillForHint: 'Goodwill required for hint',

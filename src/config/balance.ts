@@ -22,6 +22,8 @@ export interface BalanceConfig {
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
   foodPerDay: number
+  /** Days of provisions one purchased food unit grants (design.md §9). */
+  foodUnitDays: number
   /** Base terrain time-cost multipliers (more days per unit in rough terrain).
    *  jungle/mountain are the costs with the relieving item carried; water is the
    *  cost while swimming (no canoe). The penalty/speed-up factors below modify
@@ -208,6 +210,7 @@ export const balance: BalanceConfig = {
   ambienceVolume: 0.1,
   daysPerUnit: 0.2,
   foodPerDay: 1,
+  foodUnitDays: 28, // one purchased food unit lasts four weeks (user calibration)
   terrainCost: {
     desert: 1.2,
     savanna: 1.0,
@@ -217,7 +220,7 @@ export const balance: BalanceConfig = {
   },
   junglePenalty: 2.3, // no machete: 1.3 * 2.3 ≈ 3.0
   mountainPenalty: 1.67, // no rope: 1.5 * 1.67 ≈ 2.5
-  canoeSpeedup: 2.0, // with a canoe water travel is 2x faster (user calibration): 2.0 / 2 = 1.0
+  canoeSpeedup: 3.0, // with a canoe water travel is 3x faster (user calibration)
   canoeLandPenalty: 2.5, // carrying the canoe: 2.5x slower on ANY land (user calibration: was 1.6, too weak)
   currentDrift: 0.2, // deg/s at full strength (~2 world units/s, ~35% of walking)
   currentWaterfallBoost: 4.0,
@@ -230,7 +233,7 @@ export const balance: BalanceConfig = {
   digRadius: 3,
   placeEnterRadius: 2.5,
   oceanSwimMarginDeg: 1.2, // calibratable: swimmable coastal band width in degrees
-  placeReentryMargin: 2, // small clearance beyond the enter radius before re-entry re-arms (user: was 6, too large)
+  placeReentryMargin: 1, // small clearance beyond the enter radius before re-entry re-arms (user: shrunk from 2)
   goodwillForHint: 2,
   goodwillRevered: 2,
   goodwillNeutral: 1,
@@ -313,7 +316,7 @@ export const balance: BalanceConfig = {
 
 // Shop prices in $ (ports only; design.md §9/§10). Educated guesses.
 export const prices = {
-  food: 5, // one week of provisions
+  food: 5, // one food unit (foodUnitDays of provisions, four weeks by default)
   medicine: 12,
   map: 10,
   shovel: 20,

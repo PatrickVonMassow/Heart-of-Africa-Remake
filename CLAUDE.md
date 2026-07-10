@@ -464,8 +464,8 @@ verify suite that proves it.
     (`scripts/verify/voice.mjs`); walking into a hut door with the journal
     forced open still opens the building (`scripts/verify/flow.mjs`); with
     the journal open, the `.journal` panel's bottom edge sits above the
-    `.camp-toggle` and `.journal-toggle` button tops
-    (`scripts/verify/enrichments.mjs`).
+    `.camp-toggle` and `.journal-toggle` button tops and its right edge
+    keeps a gap to the screen edge (`scripts/verify/enrichments.mjs`).
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px, walk speed inside
     settlements to 10 m/s, strafing and walking backward to 80 % of the
@@ -496,7 +496,7 @@ verify suite that proves it.
     overlays always render above the in-scene floating labels (§17.4).
     Verifiable: `scripts/verify/settings.mjs` asserts the defaults
     (including the single ambience volume 0.1, the 5.6 travel speed, the
-    canoe speed-up factor 2, the jungle/mountain factors and the canteen
+    canoe speed-up factor 3, the jungle/mountain factors and the canteen
     capacity 500), the eye height, the 80 % strafe/backward factor (exact
     via the pure velocity helper, plus an in-scene smoke check that both
     directions move), the canoe and jungle factor fields edit at runtime,

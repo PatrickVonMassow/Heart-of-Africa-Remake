@@ -256,7 +256,7 @@ const journalFit = await page.evaluate(() => {
   const j = document.querySelector('.journal')?.getBoundingClientRect()
   const camp = document.querySelector('.camp-toggle')?.getBoundingClientRect()
   const jbtn = document.querySelector('.journal-toggle')?.getBoundingClientRect()
-  return { jBottom: j?.bottom ?? null, campTop: camp?.top ?? null, jbtnTop: jbtn?.top ?? null }
+  return { jBottom: j?.bottom ?? null, campTop: camp?.top ?? null, jbtnTop: jbtn?.top ?? null, jRight: j?.right ?? null, vw: window.innerWidth }
 })
 check(
   'journal panel ends above the camp button (with a gap)',
@@ -266,6 +266,11 @@ check(
 check(
   'journal panel ends above the journal button (with a gap)',
   journalFit.jBottom !== null && journalFit.jbtnTop !== null && journalFit.jBottom <= journalFit.jbtnTop - 4,
+  JSON.stringify(journalFit),
+)
+check(
+  'journal panel keeps a small gap to the right screen edge',
+  journalFit.jRight !== null && journalFit.jRight <= journalFit.vw - 8,
   JSON.stringify(journalFit),
 )
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
