@@ -39,6 +39,11 @@ export interface WaterMaterialHandle {
    *  waves, crest foam and sparkle fade out — at that distance they alias
    *  into speckle noise across the whole view. */
   calm: { value: number }
+  /** Uniform mesh scale of the plane; MUST match the mesh's scale so the
+   *  shader's world reconstruction (local * scale + offset) stays aligned
+   *  with the land — otherwise bathymetry and pattern drift against the
+   *  coast while the player walks in the debug zoom. */
+  planeScale: { value: number }
 }
 
 /** World units per degree (must match world/geo.ts). */
@@ -52,11 +57,13 @@ export function createWaterMaterial(): WaterMaterialHandle {
 
   const offset = uniform(new THREE.Vector2(0, 0))
   const calm = uniform(0)
+  const planeScale = uniform(1)
   const lively = float(1).sub(calm)
 
-  // Plane geometry lies in local XY (rotated flat): local X + offset.x is
-  // world X, local Y + offset.y is world -Z (see the plane rotation).
-  const wp = positionLocal.xy.add(offset)
+  // Plane geometry lies in local XY (rotated flat): local X * scale +
+  // offset.x is world X, local Y * scale + offset.y is world -Z (see the
+  // plane rotation; the mesh is scaled up in the debug zoom range).
+  const wp = positionLocal.xy.mul(planeScale).add(offset)
 
   // --- Gerstner-style wave field: three directional components + swell ----
   const wave = (dirX: number, dirY: number, len: number, amp: number, speed: number) => {
@@ -152,5 +159,6 @@ export function createWaterMaterial(): WaterMaterialHandle {
     material: m,
     offset: offset as unknown as { value: THREE.Vector2 },
     calm: calm as unknown as { value: number },
+    planeScale: planeScale as unknown as { value: number },
   }
 }

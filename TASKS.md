@@ -140,9 +140,20 @@ the map).
   African-connected land regardless, the Gulf-of-Suez segment now hugs the
   African west shore, and a raw-DEM scan test asserts trimmed land borders
   kept land only at the Suez isthmus gate.)
-- [ ] 20. In the debug zoom-out, walking produces oddities: the ocean moves
+- [x] 20. In the debug zoom-out, walking produces oddities: the ocean moves
   offset against the land mass, and the landscape is only rendered in a
   rectangular area that covers a fraction of the visible range.
+  (Two causes: the water plane is scaled up in the zoom range but its shader
+  reconstructed world XZ from the unscaled local position, so bathymetry and
+  pattern drifted against the land while walking — a planeScale uniform now
+  tracks the mesh scale. And the "rectangle" was the detailed chunk area
+  standing out against the far-terrain sheet: the sheet now bakes the chunks'
+  mean ground-texture response into its vertex colors (farColor.ts, pure
+  Vitest-tested), and the chunk-bound dressing (trees, rocks) hides beyond
+  zoom 3 — it only ever covers the chunk rectangle and read as a dark dressed
+  island. Verified per screenshot repro at zoom 5/10 and new enrichments
+  checks; the full regression needed one flake rerun each for the known
+  RAF-timing checks — calf sacrifice, walk smoke — both green standalone.)
 - [ ] 21. After the recent wave of design.md changes (restructure into numbered
   subsections, §7.1 slimming, the Red Sea/world-trim work), review README.md
   and bring it in step where it has drifted.

@@ -31,6 +31,7 @@ import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
 import { RiversAndLakes } from './Rivers'
+import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { TRAVEL_SKY } from '../../render/skyPresets'
@@ -56,6 +57,10 @@ import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_RADIUS = 6 // chunks kept around the player in each direction
+// Beyond this debug-zoom factor the chunk-bound dressing (trees, rocks …)
+// hides: it only ever covers the chunk rectangle, which would read as a
+// dark dressed island on the far-terrain sheet (design.md §21.4).
+const VEGETATION_HIDE_ZOOM = 3
 const CAMERA_OFFSET = { y: 42, z: 24 }
 const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 
@@ -312,7 +317,7 @@ function TerrainChunks() {
 /** Animated water surface at sea level, following the player. */
 function WaterPlane() {
   const ref = useRef<THREE.Mesh>(null)
-  const { material, offset, calm } = useMemo(() => createWaterMaterial(), [])
+  const { material, offset, calm, planeScale } = useMemo(() => createWaterMaterial(), [])
   useFrame(() => {
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
@@ -322,11 +327,29 @@ function WaterPlane() {
       // reaches the horizon at the whole-continent zoom; the wave field calms
       // to glass out there — crests, foam and glints alias into speckle noise
       // at that distance (design.md §21).
-      ref.current.scale.setScalar(Math.max(1, zoom / 2))
+      const s = Math.max(1, zoom / 2)
+      ref.current.scale.setScalar(s)
+      // The shader reconstructs world XZ as local * scale + offset; feed it
+      // the same scale, or the bathymetry drifts against the land while the
+      // player walks in the zoomed view.
+      planeScale.value = s
       calm.value = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
       offset.value.set(pos.x, -pos.z) // plane local Y maps to world -Z
     }
   })
+  // Dev hook for the headless verification (CLAUDE.md §7.2): the shader's
+  // scale uniform must track the mesh scale.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__water = {
+      planeScale: () => planeScale.value,
+      meshScale: () => ref.current?.scale.x ?? 0,
+    }
+    return () => {
+      delete w.__water
+    }
+  }, [planeScale])
   return (
     <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} material={material}>
       {/* Larger than the fog far distance, so its edge is never visible. */}
@@ -365,9 +388,13 @@ function buildFarTerrainGeometry(seed: number): THREE.BufferGeometry {
       positions[vi * 3 + 1] =
         s.type === 'ocean' || s.type === 'water' ? s.height : Math.max(s.height, 1.2)
       positions[vi * 3 + 2] = z
-      colors[vi * 3] = s.color[0]
-      colors[vi * 3 + 1] = s.color[1]
-      colors[vi * 3 + 2] = s.color[2]
+      // Bake the chunks' mean ground-texture response into the vertex color
+      // (farColor.ts), so the sheet does not read as a pale frame around the
+      // detailed chunk rectangle in the mid-zoom range.
+      const c = farTerrainColor(s.color, s.splat)
+      colors[vi * 3] = c[0]
+      colors[vi * 3 + 1] = c[1]
+      colors[vi * 3 + 2] = c[2]
     }
   }
   const indices: number[] = []
@@ -542,6 +569,7 @@ function Vegetation() {
   const seed = useGame((s) => s.seed)
   const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
   const lastCenter = useRef<string | null>(null)
+  const hiddenRef = useRef(false)
 
   const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
     () => ({
@@ -567,7 +595,28 @@ function Vegetation() {
     lastCenter.current = null // force rebuild on new run
   }, [seed])
 
+  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__vegetation = { visible: () => !hiddenRef.current }
+    return () => {
+      delete w.__vegetation
+    }
+  }, [])
+
   useFrame(() => {
+    // In the far debug zoom the dressing hides (it exists only inside the
+    // chunk rectangle); the far-terrain sheet carries the look out there.
+    const hide = useUi.getState().travelZoom > VEGETATION_HIDE_ZOOM
+    if (hide !== hiddenRef.current) {
+      hiddenRef.current = hide
+      for (const sp of SPECIES) {
+        const mesh = meshRefs.current[sp]
+        if (mesh) mesh.visible = !hide
+      }
+    }
+    if (hide) return
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)

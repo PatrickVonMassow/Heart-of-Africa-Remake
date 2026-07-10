@@ -1894,6 +1894,23 @@ const continentZoom = await page.evaluate(async () => {
 })
 check('the debug zoom reaches a whole-continent view (cap 16, far sheet streamed in)',
   continentZoom.zoom === 16 && continentZoom.ok && continentZoom.farVerts > 50000, JSON.stringify(continentZoom))
+// Walking while zoomed out must not desync the scene: the water shader's
+// world reconstruction tracks the scaled plane (or the sea drifts against
+// the land), and the chunk-bound dressing hides (it only covers the chunk
+// rectangle, which would read as a dark dressed island on the far sheet).
+const zoomedWalk = await page.evaluate(() => {
+  const g = window.__game.getState()
+  for (let i = 0; i < 10; i++) g.moveTravel(1, 0, 0.05)
+  return {
+    planeScale: window.__water?.planeScale(),
+    meshScale: window.__water?.meshScale(),
+    vegVisible: window.__vegetation?.visible(),
+  }
+})
+check('zoomed out, the water plane scale uniform tracks the mesh scale (no sea/land drift)',
+  zoomedWalk.planeScale === zoomedWalk.meshScale && zoomedWalk.planeScale > 1, JSON.stringify(zoomedWalk))
+check('zoomed out, the chunk-bound dressing hides (no dressed chunk rectangle)',
+  zoomedWalk.vegVisible === false, JSON.stringify(zoomedWalk))
 await page.waitForTimeout(1200)
 await page.screenshot({ path: `${OUT}87-continent-zoom.png` })
 console.log('shot 87-continent-zoom.png')
@@ -1908,10 +1925,11 @@ const zoomBack = await page.evaluate(async () => {
     if (fog && fog.far < 500 && !window.__farTerrain?.visible()) { ok = true; break }
     await sleep(300)
   }
-  return { ok, fog: window.__climate?.fog() }
+  return { ok, fog: window.__climate?.fog(), veg: window.__vegetation?.visible() }
 })
 check('back at the default zoom the haze returns and the far sheet hides',
   zoomBack.ok, JSON.stringify(zoomBack))
+check('back at the default zoom the dressing returns', zoomBack.veg === true, JSON.stringify(zoomBack))
 
 // --- Point 16: no first-person clipping after the extended zoom-out ----------
 // The travel view widens the shared camera's near plane in the debug zoom

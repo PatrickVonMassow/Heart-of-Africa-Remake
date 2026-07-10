@@ -504,8 +504,12 @@ verify suite that proves it.
     proximity call and it fades once the player leaves, and the lion-feed
     depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts the zoom
     gate, at the zoom cap the built and visible far sheet, a fog far plane
-    beyond 2000 and haze opacity ~0 with a screenshot (87) and the
-    reversion at zoom 1, the dropdowns, the renderer row, and that with a
+    beyond 2000 and haze opacity ~0 with a screenshot (87), during a
+    zoomed walk the water plane's scale uniform tracking its mesh scale
+    (no sea/land drift) and the chunk-bound dressing hidden, the
+    reversion at zoom 1 (haze, far sheet and dressing), the far sheet's
+    chunk-matched ground tone (`src/scenes/travel/farColor.test.ts`,
+    pure), the dropdowns, the renderer row, and that with a
     settlement label hit-tested on top, opening a modal makes the dialog
     the topmost element at that point; `scripts/verify/collision.mjs`
     additionally proves corner clearance at box buildings and an
