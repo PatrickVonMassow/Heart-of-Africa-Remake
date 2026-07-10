@@ -107,9 +107,9 @@ node scripts/generate-terrain-textures.mjs  # tileable ground textures
 ```
 
 At load time the DEM is trimmed to the game world: only land connected to the
-game's own land masses is kept, so Sinai, Arabia, southern Europe and foreign
-islands render as open sea (`src/world/redSea.ts`); `dem.png` itself stays
-untouched.
+game's own land masses is kept, so Sinai, Arabia, southern Europe, foreign
+islands and the unreachable Madagascar render as open sea
+(`src/world/redSea.ts`); `dem.png` itself stays untouched.
 
 ## Project structure
 

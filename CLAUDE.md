@@ -252,7 +252,8 @@ verify suite that proves it.
    ocean (Sinai/Arabia trimmed in the DEM, so no land route rounds the
    Red Sea; shallow sea northeast of the boundary reads as deep open
    ocean), foreign land (southern Spain, Sicily, Crete, the Canaries,
-   the Comoros …) samples as ocean while the game's islands stay land,
+   the Comoros … and the unreachable Madagascar) samples as ocean while
+   the game's reachable islands stay land,
    no trimmed texel borders kept land outside the Suez isthmus gate (no
    ocean scrap juts into the coast), the Nile delta and the African Red
    Sea coast stay walkable land, nearshore sea swims while far-offshore

@@ -75,7 +75,6 @@ export interface StampMeta {
  *  seed is trimmed from the map. */
 export const GAME_LAND_SEEDS: Array<[number, number]> = [
   [15, 24], // mainland (central Sahara)
-  [46.8, -19.5], // Madagascar
   [39.3, -6.1], // Zanzibar
   [39.72, -5.15], // Pemba
   [8.65, 3.5], // Bioko
@@ -158,16 +157,35 @@ export function trimToGameWorld(
   // shallow sea there — the Persian Gulf's banks, the Dahlak shelf, the
   // Levant shore — would otherwise stay behind as bright ghost shallows
   // beside the trimmed land. The African side keeps its real bathymetry.
-  const shallowCap = meta.offsetMeters - 150 // above = shallower than 150 m
+  // 800 m in the trimmed regions (deep enough that even the steep old
+  // coast slopes leave no pale outline); the global shelf dilation further
+  // down uses 150 m instead, since it acts next to kept shores.
+  const regionCap = meta.offsetMeters - 800
   for (let y = 0; y < meta.height; y++) {
     const lat = meta.latMax - (y + 0.5) * meta.res
     if (lat < BOX_LAT_MIN) break
     for (let x = Math.max(0, Math.floor((BOX_LON_MIN - meta.lonMin) / meta.res)); x < meta.width; x++) {
       const i = (y * meta.width + x) * 4
       if (pixels[i + 2] > 0) continue // land (kept)
-      if (pixels[i] * 256 + pixels[i + 1] <= shallowCap) continue // already deep
+      if (pixels[i] * 256 + pixels[i + 1] <= regionCap) continue // already deep
       const lon = meta.lonMin + (x + 0.5) * meta.res
       if (!isNortheastOfBoundary(lat, lon)) continue
+      pixels[i] = hi
+      pixels[i + 1] = lo
+    }
+  }
+  // The Madagascar box likewise: the island is unreachable and removed on
+  // user request (design.md §3.1), and its shelf banks reach further out
+  // than the ghost-shelf dilation below — after the trim the box holds no
+  // kept land, so all shallow sea there reads as deep open ocean.
+  const MG = { lonMin: 42, latMin: -27, latMax: -11 }
+  for (let y = Math.max(0, Math.floor((meta.latMax - MG.latMax) / meta.res)); y < meta.height; y++) {
+    const lat = meta.latMax - (y + 0.5) * meta.res
+    if (lat < MG.latMin) break
+    for (let x = Math.max(0, Math.floor((MG.lonMin - meta.lonMin) / meta.res)); x < meta.width; x++) {
+      const i = (y * meta.width + x) * 4
+      if (pixels[i + 2] > 0) continue
+      if (pixels[i] * 256 + pixels[i + 1] <= regionCap) continue
       pixels[i] = hi
       pixels[i + 1] = lo
     }

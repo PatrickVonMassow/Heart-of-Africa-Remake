@@ -90,13 +90,9 @@ const MAINLAND: Array<[number, number]> = [
   [33.2, 28.2], [33.1, 28.35], [32.65, 29.6],
 ]
 
-const MADAGASCAR: Array<[number, number]> = [
-  [49.3, -12.0], [50.2, -14.9], [49.85, -16.9], [49.4, -18.2], [48.8, -20.2],
-  [47.9, -22.4], [47.1, -24.0], [46.6, -25.17], [45.2, -25.6], [44.3, -24.6],
-  [43.7, -23.4], [43.25, -22.05], [44.25, -20.3], [44.45, -19.4], [44.24, -17.75],
-  [43.93, -16.2], [45.25, -15.9], [46.3, -15.7], [47.2, -14.7], [47.5, -13.4],
-  [48.7, -13.2],
-]
+// Madagascar is deliberately absent: it is unreachable in the game and
+// therefore not part of the map material (design.md §3.1) — the world trim
+// (redSea.ts) renders its area as open sea.
 
 // Zanzibar carries the port of the same name (design.md §4.1).
 const ZANZIBAR: Array<[number, number]> = [
@@ -118,7 +114,6 @@ const SOCOTRA: Array<[number, number]> = [
 
 export const LAND_POLYGONS: LandPolygon[] = [
   { name: 'Afrika', points: MAINLAND },
-  { name: 'Madagaskar', points: MADAGASCAR },
   { name: 'Sansibar', points: ZANZIBAR },
   { name: 'Pemba', points: PEMBA },
   { name: 'Bioko', points: BIOKO },

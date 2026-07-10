@@ -189,6 +189,19 @@ the map).
 - [x] 24. F3 (full loadout) should also unlock the extended zoom mode.
   (The F3 handler now enables the wheel-zoom unlock alongside the loadout;
   asserted in src/ui/Hud.test.tsx via a window keydown.)
+- [x] 25. The unreachable land mass of point 23 is identified (user
+  screenshot): it is Madagascar. It cannot be reached in the game and must
+  therefore be removed from the map material — the rendered world and the
+  exploration map alike.
+  (Removed as a game land mass: its trim seed and coastline polygon are
+  gone, so the world trim stamps it to deep ocean and the exploration map
+  no longer sketches it. Its wide western shelf banks and steep old coast
+  slope left ghost outlines in the water, so shallow sea in the trimmed
+  Madagascar box — and in the trimmed northeast — is deepened up to 800 m,
+  and the water's deep tone now saturates by ~1600 m so trimmed stamps
+  match the surrounding basins. design.md §3.1 records Madagascar as not
+  part of the game world; CLAUDE.md pt. 4, README and the redSea tests
+  follow.)
 
 ## Closing (only after all points)
 

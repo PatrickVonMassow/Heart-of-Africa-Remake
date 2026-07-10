@@ -176,6 +176,12 @@ describe('world trim on the real DEM', () => {
     expect(elevationAt(16, 40.2)).toBeLessThan(-500) // Dahlak shelf
   })
 
+  it('Madagascar leaves no land and no ghost shelf (unreachable, removed)', () => {
+    expect(landFractionAt(-19.5, 46.8)).toBe(0)
+    expect(elevationAt(-17.5, 43.5)).toBeLessThan(-500) // its wide western bank
+    expect(isBlocked('ocean', -19.5, 46.8)).toBe(true)
+  })
+
   it('land masses outside the walkable continent are trimmed to ocean', () => {
     for (const [lat, lon] of [
       [37, -5], // southern Spain
@@ -186,6 +192,7 @@ describe('world trim on the real DEM', () => {
       [28.3, -16.5], // Canary Islands
       [-11.7, 43.35], // Comoros
       [0.25, 6.6], // São Tomé
+      [-19.5, 46.8], // Madagascar (unreachable, removed on user request)
     ] as const) {
       expect(landFractionAt(lat, lon), `land at ${lat},${lon}`).toBe(0)
       expect(sampleTerrain(lat, lon, seed).type).toBe('ocean')
@@ -197,7 +204,6 @@ describe('world trim on the real DEM', () => {
       [-6.1, 39.3], // Zanzibar
       [-5.15, 39.72], // Pemba
       [3.5, 8.65], // Bioko
-      [-19.5, 46.8], // Madagascar
     ] as const) {
       expect(landFractionAt(lat, lon), `land at ${lat},${lon}`).toBeGreaterThan(0.5)
     }

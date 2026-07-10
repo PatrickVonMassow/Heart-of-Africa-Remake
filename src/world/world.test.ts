@@ -165,8 +165,8 @@ describe('world data invariants (design.md §4)', () => {
     for (const l of LAKES) expect(lakeContains(l.center[1], l.center[0]), l.id).toBe(true)
   })
 
-  it('has six land polygons with the mainland as the largest', () => {
-    expect(LAND_POLYGONS.length).toBe(6)
+  it('has five land polygons with the mainland as the largest', () => {
+    expect(LAND_POLYGONS.length).toBe(5)
     const mainland = LAND_POLYGONS[0]
     for (const p of LAND_POLYGONS.slice(1)) {
       expect(mainland.points.length).toBeGreaterThan(p.points.length)
