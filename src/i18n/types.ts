@@ -379,6 +379,9 @@ export interface Strings {
     dangerUnarmed: string
     dangerDesert: string
     dangerWater: string
+    /** Water-warning variant when a canoe is already in the pack: it
+     *  acknowledges the protection instead of advising it (design.md §14). */
+    dangerWaterCanoe: string
     dangerWetland: string
     mountainFall: string
     mountainFallItem: string

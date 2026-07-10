@@ -634,7 +634,16 @@ export const useGame = create<GameState>()((set, get) => ({
     }
     if (!s.dangerWarned.unarmed && (s.equipment.rifle ?? 0) <= 0) warn('unarmed')
     if (!s.dangerWarned.desert && nextT.type === 'desert') warn('desert')
-    if (!s.dangerWarned.water && (nextT.type === 'water' || nextT.type === 'ocean')) warn('water')
+    if (!s.dangerWarned.water && (nextT.type === 'water' || nextT.type === 'ocean')) {
+      // The crocodile warning acknowledges a canoe already in the pack instead
+      // of advising the traveller to use what they are already using (§14).
+      if ((s.equipment.canoe ?? 0) > 0) {
+        set((st) => ({ dangerWarned: { ...st.dangerWarned, water: true } }))
+        get().addEntry({ key: DANGER_JOURNAL.water.title }, { key: 'journal.dangerWaterCanoe' })
+      } else {
+        warn('water')
+      }
+    }
     if (!s.dangerWarned.wetland && nextT.type === 'jungle') warn('wetland')
 
     const dayDelta = step * balance.daysPerUnit * cost

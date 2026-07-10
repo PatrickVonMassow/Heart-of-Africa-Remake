@@ -693,7 +693,11 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     canoe), and the first fever-jungle (fever → medicine). Each fires once, the
     flags travel with the checkpoint, and every warning exists in both
     languages with voice markup — distinct from the §11 movement-penalty hints
-    (slowdown, not danger). Verifiable:
+    (slowdown, not danger). A warning never advises the traveller to use what
+    they are already using: with a canoe in the pack the water warning
+    acknowledges its protection instead of recommending one (verifiable:
+    `src/state/store.events.test.ts` asserts the canoe-aware variant fires —
+    once — and the advising text does not). Verifiable:
     `scripts/verify/events.mjs` asserts the reduced rates, the protection
     ordering (pure functions), deterministic outcome mapping, the
     plains-predator danger order (cheetah < leopard < hyena < lion) with the

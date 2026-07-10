@@ -167,6 +167,19 @@ describe('first-time danger warnings (design.md §14)', () => {
     expect(waterWarn()).toBe(1)
   })
 
+  it('with a canoe in the pack the water warning acknowledges it instead of advising it', () => {
+    jumpTo(...COORD.water)
+    g().debugAddEquipment('canoe')
+    drive(0, 1, 1)
+    // The crocodile warning still fires once, but in its canoe-aware variant —
+    // it never advises the traveller to use what they are already using (§14).
+    expect(bodyKeys().filter((k) => k === 'journal.dangerWaterCanoe').length).toBe(1)
+    expect(bodyKeys()).not.toContain('journal.dangerWater')
+    expect(g().dangerWarned.water).toBe(true)
+    drive(0, 1, 4)
+    expect(bodyKeys().filter((k) => k === 'journal.dangerWaterCanoe').length).toBe(1)
+  })
+
   it('the first fever-prone jungle warns once', () => {
     jumpTo(...COORD.jungle)
     expect(terrainAt(...COORD.jungle)).toBe('jungle')

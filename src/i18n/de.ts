@@ -555,6 +555,8 @@ export const de: Strings = {
       '[weary]Die Wüste glüht ohne Gnade.[/weary] [fear]Ohne Wasser drohen Verdursten und die Sonnenblindheit, die tödlich enden kann.[/fear] [emph]Eine gefüllte Trinkflasche[/emph] hält den Durst fern —[pause] doch gegen die Blindheit hilft nur, die Wüste zu verlassen.',
     dangerWater:
       '[fear]Im Wasser lauern Krokodile.[/fear] [weary]Ohne Kanu bin ich ihnen ausgeliefert, und mein Gewehr wird nass und nutzlos.[/weary] [emph]Ein Kanu[/emph] trägt mich sicher hinüber und hält die Waffe trocken;[pause] sonst hilft nur die Machete.',
+    dangerWaterCanoe:
+      '[fear]Im Wasser lauern Krokodile —[pause] ihre Augen stehen über der Oberfläche.[/fear] [somber]Gut, dass das Kanu mich trägt:[/somber] [emph]außerhalb ihrer Reichweite,[/emph] und das Gewehr bleibt an Bord trocken.',
     dangerWetland:
       '[somber]Feuchter Dunst hängt über dem Dickicht.[/somber] [fear]Hier brütet das Fieber, das den Verstand trübt und die Kräfte zehrt.[/fear] [emph]Medizin im Gepäck[/emph] heilt es —[pause] ich sollte stets welche bei mir tragen.',
     mountainFall:

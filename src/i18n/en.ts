@@ -548,6 +548,8 @@ export const en: Strings = {
       '[weary]The desert blazes without mercy.[/weary] [fear]Without water, thirst and the sun-blindness threaten —[pause] and the blindness can kill.[/fear] [emph]A filled canteen[/emph] holds off the thirst;[pause] against the blindness, only leaving the desert will serve.',
     dangerWater:
       '[fear]Crocodiles lie in wait in the water.[/fear] [weary]Without a canoe I am at their mercy, and my rifle turns wet and useless.[/weary] [emph]A canoe[/emph] carries me across safely and keeps the weapon dry;[pause] failing that, only the machete helps.',
+    dangerWaterCanoe:
+      '[fear]Crocodiles lie in wait in the water —[pause] I see their eyes above the surface.[/fear] [somber]Good that the canoe carries me:[/somber] [emph]out of their reach,[/emph] and the rifle stays dry aboard.',
     dangerWetland:
       '[somber]A damp haze hangs over the thicket.[/somber] [fear]Here the fever breeds, clouding the mind and draining the strength.[/fear] [emph]Medicine in the pack[/emph] cures it —[pause] I should always keep some at hand.',
     mountainFall:

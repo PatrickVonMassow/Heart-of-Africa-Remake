@@ -76,9 +76,12 @@ the map).
   enough to see the whole continent. So far this is prevented both by not being
   able to zoom out far enough and by haze obscuring the view. In the zoom range
   reachable only via the debug extension, no haze should be shown.
-- [ ] 9. When paddling through water in the canoe and the crocodile random event
+- [x] 9. When paddling through water in the canoe and the crocodile random event
   fires, a hint still appears suggesting one should better travel by canoe —
   although one already is.
+  (The culprit was the first-time water danger warning, which always advised
+  the canoe; with a canoe in the pack it now acknowledges its protection
+  instead.)
 - [ ] 10. When something is discovered — such as a waterfall — it should be
   announced via the journal.
 - [ ] 11. The water in some lakes looks oddly blotchy and the blotches flicker
