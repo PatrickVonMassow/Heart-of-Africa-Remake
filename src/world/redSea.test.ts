@@ -1,12 +1,17 @@
-// Northeast world cut (design.md §3.1/§11.2): the walkable continent ends at
-// the African Red Sea coast — the Red Sea, Sinai, the Levant and the Arabian
-// peninsula are open, impassable ocean, with no change to the hull behavior
-// of the remaining bays. Covers the pure boundary side test, the pure DEM
-// stamping pass and the real-DEM acceptance coordinates.
+// World trim and movement boundary (design.md §3.1/§11.2): the walkable
+// continent ends at the African Red Sea coast, no land outside the game's
+// own land masses is rendered, swimmable sea reaches only a calibratable
+// band off the coast, and the hull treatment of the remaining bays is
+// unchanged. Covers the pure boundary side test, the pure trimming pass on
+// synthetic and raw real data, and the real-DEM acceptance coordinates.
 import { describe, it, expect, beforeAll } from 'vitest'
-import { isNortheastOfBoundary, stampNortheastOcean } from './redSea'
+import sharp from 'sharp'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { isNortheastOfBoundary, trimToGameWorld } from './redSea'
 import { sampleTerrain, isBlocked } from './terrain'
 import { elevationAt, landFractionAt } from './geodata'
+import { balance } from '../config/balance'
 import { setupGeodata } from '../test/geodata'
 
 beforeAll(async () => {
@@ -34,9 +39,11 @@ describe('isNortheastOfBoundary', () => {
   })
 })
 
-describe('stampNortheastOcean', () => {
-  // Synthetic 23x24 grid at 1°/texel covering lon 30..53, lat 8..32, all land
-  // (B = 5, elevation 500 m at offset 12000 → value 12500).
+describe('trimToGameWorld', () => {
+  // Synthetic 23x24 grid at 1°/texel covering lon 30..53, lat 8..32: land
+  // everywhere (B = 5, elevation 500 m at offset 12000 → value 12500) except
+  // a full-height sea column at lon 37..40 that splits a west land mass
+  // (seeded) from an east one (unconnected).
   const meta = { width: 23, height: 24, lonMin: 30, latMax: 32, res: 1, offsetMeters: 12000 }
   const texel = (lon: number, lat: number) => {
     const x = Math.floor(lon - meta.lonMin)
@@ -51,43 +58,69 @@ describe('stampNortheastOcean', () => {
       px[i + 2] = 5
       px[i + 3] = 255
     }
+    for (let y = 0; y < meta.height; y++) {
+      for (let x = 7; x <= 9; x++) {
+        const i = (y * meta.width + x) * 4
+        px[i] = 11800 >> 8 // -200 m: existing sea depth
+        px[i + 1] = 11800 & 0xff
+        px[i + 2] = 0
+      }
+    }
     return px
   }
   const elev = (px: Uint8ClampedArray, i: number) => px[i] * 256 + px[i + 1] - meta.offsetMeters
+  const seeds: Array<[number, number]> = [[31.5, 20.5]]
 
-  it('stamps land northeast of the boundary to below-sea ocean', () => {
+  it('keeps land connected to a seed and trims the unconnected mass', () => {
     const px = fill()
-    stampNortheastOcean(px, meta)
-    const arabia = texel(45.5, 24.5)
-    expect(px[arabia + 2]).toBe(0)
-    expect(elev(px, arabia)).toBeLessThan(0)
-    const sinai = texel(33.5, 29.5)
-    expect(px[sinai + 2]).toBe(0)
+    trimToGameWorld(px, meta, seeds)
+    const west = texel(33.5, 20.5)
+    expect(px[west + 2]).toBe(5)
+    expect(elev(px, west)).toBe(500)
+    const east = texel(45.5, 20.5)
+    expect(px[east + 2]).toBe(0)
+    expect(elev(px, east)).toBeLessThan(0)
   })
 
-  it('leaves the African side untouched', () => {
+  it('keeps the real bathymetry of sea texels', () => {
     const px = fill()
-    stampNortheastOcean(px, meta)
-    const delta = texel(30.5, 30.5)
-    expect(px[delta + 2]).toBe(5)
-    expect(elev(px, delta)).toBe(500)
-    const sudanCoast = texel(36.5, 19.5)
-    expect(px[sudanCoast + 2]).toBe(5)
+    trimToGameWorld(px, meta, seeds)
+    const sea = texel(38.5, 20.5)
+    expect(elev(px, sea)).toBe(-200)
+    expect(px[sea + 2]).toBe(0)
   })
 
-  it('keeps the real bathymetry of texels that already are ocean', () => {
-    const px = fill()
-    const redSea = texel(38.5, 20.5)
-    px[redSea] = 11800 >> 8 // -200 m: existing sea depth
-    px[redSea + 1] = 11800 & 0xff
-    px[redSea + 2] = 0
-    stampNortheastOcean(px, meta)
-    expect(elev(px, redSea)).toBe(-200)
-    expect(px[redSea + 2]).toBe(0)
-  })
+  it('never trims land adjacent to kept land outside the Suez isthmus gate (no bites)', async () => {
+    // Run the pure pass on the raw dataset and verify the trim boundary only
+    // touches kept land at the isthmus gate — everywhere else trimmed and
+    // kept land never share an edge, so no ocean scrap juts into the coast.
+    const root = process.cwd()
+    const pngBuf = readFileSync(resolve(root, 'public/geodata/dem.png'))
+    const demMeta = JSON.parse(readFileSync(resolve(root, 'public/geodata/dem.json'), 'utf8'))
+    const { data, info } = await sharp(pngBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    const px = new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength)
+    const { width, height } = info
+    const landBefore = new Uint8Array(width * height)
+    for (let idx = 0; idx < width * height; idx++) landBefore[idx] = px[idx * 4 + 2] > 0 ? 1 : 0
+    trimToGameWorld(px, demMeta)
+    const keptLand = (idx: number) => px[idx * 4 + 2] > 0
+    const offenders: string[] = []
+    for (let y = 1; y < height - 1 && offenders.length < 10; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x
+        if (!landBefore[idx] || keptLand(idx)) continue // only trimmed ex-land
+        if (!(keptLand(idx - 1) || keptLand(idx + 1) || keptLand(idx - width) || keptLand(idx + width))) continue
+        const lon = demMeta.lonMin + (x + 0.5) * demMeta.res
+        const lat = demMeta.latMax - (y + 0.5) * demMeta.res
+        const inGate = lon >= 31.9 && lon <= 34.7 && lat >= 29.0
+        if (!inGate) offenders.push(`${lat.toFixed(2)},${lon.toFixed(2)}`)
+      }
+    }
+    expect(offenders).toEqual([])
+  }, 60000)
 })
 
-describe('world cut on the real DEM', () => {
+describe('world trim on the real DEM', () => {
   const seed = 1
 
   it('mid Red Sea is ocean and blocked', () => {
@@ -96,7 +129,7 @@ describe('world cut on the real DEM', () => {
     expect(isBlocked(t.type, 20, 38)).toBe(true)
   })
 
-  it('the Arabian peninsula is ocean and blocked (stamped, formerly land)', () => {
+  it('the Arabian peninsula is ocean and blocked (trimmed, formerly land)', () => {
     const t = sampleTerrain(24, 45, seed)
     expect(t.type).toBe('ocean')
     expect(landFractionAt(24, 45)).toBe(0)
@@ -121,6 +154,33 @@ describe('world cut on the real DEM', () => {
     expect(isBlocked(t.type, 12, 45)).toBe(true)
   })
 
+  it('land masses outside the walkable continent are trimmed to ocean', () => {
+    for (const [lat, lon] of [
+      [37, -5], // southern Spain
+      [37.2, 14.5], // Sicily
+      [35.2, 24.8], // Crete
+      [36.9, 22.3], // Peloponnese
+      [36.8, 29.5], // southwestern Anatolia
+      [28.3, -16.5], // Canary Islands
+      [-11.7, 43.35], // Comoros
+      [0.25, 6.6], // São Tomé
+    ] as const) {
+      expect(landFractionAt(lat, lon), `land at ${lat},${lon}`).toBe(0)
+      expect(sampleTerrain(lat, lon, seed).type).toBe('ocean')
+    }
+  })
+
+  it('the game’s own islands stay land', () => {
+    for (const [lat, lon] of [
+      [-6.1, 39.3], // Zanzibar
+      [-5.15, 39.72], // Pemba
+      [3.5, 8.65], // Bioko
+      [-19.5, 46.8], // Madagascar
+    ] as const) {
+      expect(landFractionAt(lat, lon), `land at ${lat},${lon}`).toBeGreaterThan(0.5)
+    }
+  })
+
   it('the Nile delta and Cairo surroundings stay walkable land', () => {
     for (const [lat, lon] of [
       [30.5, 31.0],
@@ -138,23 +198,47 @@ describe('world cut on the real DEM', () => {
     expect(landFractionAt(19, 37)).toBeGreaterThan(0.9)
     expect(isBlocked(t.type, 19, 37)).toBe(false)
   })
+})
 
-  it('the other bays and seas behave as before', () => {
-    // Gulf of Guinea: enclosed bay inside the hull, swimmable.
+describe('swim margin (design.md §11.2)', () => {
+  const seed = 1
+
+  it('nearshore sea is swimmable, far offshore blocks even inside the hull', () => {
+    // Gulf of Guinea nearshore (~0.9° off the coast): swimmable.
     const guinea = sampleTerrain(5.5, 3, seed)
     expect(guinea.type).toBe('ocean')
     expect(isBlocked(guinea.type, 5.5, 3)).toBe(false)
-    // Mozambique channel: outside the mainland hull, blocked (as before).
+    // Center of the Gulf of Guinea bight (several degrees offshore): blocked
+    // despite lying inside the hull — no swimming far out into the open sea.
+    const bight = sampleTerrain(2, 0, seed)
+    expect(bight.type).toBe('ocean')
+    expect(isBlocked(bight.type, 2, 0)).toBe(true)
+    // Mediterranean off the Gulf of Sidra (~1.7° offshore, inside the hull):
+    // blocked by the margin since the world-trim work; formerly swimmable.
+    const sidra = sampleTerrain(34, 15, seed)
+    expect(sidra.type).toBe('ocean')
+    expect(isBlocked(sidra.type, 34, 15)).toBe(true)
+  })
+
+  it('the margin is a runtime-editable balance value', () => {
+    const prev = balance.oceanSwimMarginDeg
+    try {
+      balance.oceanSwimMarginDeg = 3
+      expect(isBlocked('ocean', 34, 15)).toBe(false)
+      balance.oceanSwimMarginDeg = 0.2
+      expect(isBlocked('ocean', 5.5, 3)).toBe(true)
+    } finally {
+      balance.oceanSwimMarginDeg = prev
+    }
+  })
+
+  it('the hull rules stay: open Atlantic and the Mozambique channel block, the strait off Tunisia too', () => {
+    expect(isBlocked('ocean', 0, -30)).toBe(true) // open Atlantic
     const mozambique = sampleTerrain(-18, 41, seed)
     expect(mozambique.type).toBe('ocean')
     expect(isBlocked(mozambique.type, -18, 41)).toBe(true)
-    // Mediterranean off the Gulf of Sidra: inside the hull, swimmable bay
-    // (as before); the open Mediterranean further out stays blocked.
-    const sidra = sampleTerrain(34, 15, seed)
-    expect(sidra.type).toBe('ocean')
-    expect(isBlocked(sidra.type, 34, 15)).toBe(false)
     const openMed = sampleTerrain(37.5, 11.5, seed)
     expect(openMed.type).toBe('ocean')
-    expect(isBlocked(openMed.type, 37.5, 11.5)).toBe(true)
+    expect(isBlocked(openMed.type, 37.5, 11.5)).toBe(true) // outside the hull
   })
 })

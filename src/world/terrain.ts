@@ -12,6 +12,7 @@ import { lakeContains } from './hydro'
 import { fbm2 } from './noise'
 import { isNortheastOfBoundary } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
+import { balance } from '../config/balance'
 
 export type TerrainType =
   | 'ocean'
@@ -287,10 +288,12 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
 
 // --- Movement boundary (design.md §11.2) --------------------------------------
 // Ocean enclosed by the continent's outline (bays, gulfs, straits cutting
-// into the landmass) counts as inland water and can be swum through; only
-// the open sea outside the outline's convex hull blocks movement. Exception:
-// everything northeast of the Red Sea boundary (redSea.ts) is always open,
-// impassable ocean — the Red Sea is never inland water.
+// into the landmass) counts as inland water and can be swum through — but
+// only within a calibratable band off the coast (balance.oceanSwimMarginDeg);
+// further out, and everywhere outside the outline's convex hull, the open
+// sea blocks movement. Exception: everything northeast of the Red Sea
+// boundary (redSea.ts) is always open, impassable ocean — the Red Sea is
+// never inland water.
 
 let hullCache: Array<[number, number]> | null = null
 
@@ -326,16 +329,51 @@ function insideContinentOutline(lat: number, lon: number): boolean {
   return true
 }
 
+let coastSegments: Float64Array | null = null
+
+/** Distance (degrees) to the nearest coastline segment of any land polygon. */
+function coastlineDistanceDeg(lat: number, lon: number): number {
+  if (!coastSegments) {
+    const segs: number[] = []
+    for (const poly of LAND_POLYGONS) {
+      const pts = poly.points
+      for (let i = 0; i < pts.length; i++) {
+        const [ax, ay] = pts[i]
+        const [bx, by] = pts[(i + 1) % pts.length]
+        segs.push(ax, ay, bx - ax, by - ay)
+      }
+    }
+    coastSegments = new Float64Array(segs)
+  }
+  let best = Infinity
+  const s = coastSegments
+  for (let i = 0; i < s.length; i += 4) {
+    const ax = s[i]
+    const ay = s[i + 1]
+    const dx = s[i + 2]
+    const dy = s[i + 3]
+    const t = Math.max(0, Math.min(1, ((lon - ax) * dx + (lat - ay) * dy) / (dx * dx + dy * dy)))
+    const px = lon - (ax + dx * t)
+    const py = lat - (ay + dy * t)
+    const d = px * px + py * py
+    if (d < best) best = d
+  }
+  return Math.sqrt(best)
+}
+
 /**
  * Ocean blocks movement only outside the continent's outline (design.md
- * §11.2); enclosed sea water is swimmable like rivers and lakes. Northeast
- * of the Red Sea boundary the ocean always blocks, hull or not.
+ * §11.2); enclosed sea water is swimmable like rivers and lakes, but only
+ * within the calibratable swim margin off the coast — no swimming far out
+ * into the open sea. Northeast of the Red Sea boundary the ocean always
+ * blocks, hull or not.
  */
 export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolean {
   if (type !== 'ocean') return false
   if (lat === undefined || lon === undefined) return true
   if (isNortheastOfBoundary(lat, lon)) return true
-  return !insideContinentOutline(lat, lon)
+  if (!insideContinentOutline(lat, lon)) return true
+  return coastlineDistanceDeg(lat, lon) > balance.oceanSwimMarginDeg
 }
 
 // Dev hook for the headless verification (CLAUDE.md §7.2): terrain type at a

@@ -79,6 +79,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 - Fixed continent of Africa: the geographic location of all landscape elements (coasts, rivers, jungle, mountains, lakes, landmarks, settlement sites) is fixed. The concrete appearance of the landscape, and the look of the villages including the distribution of their huts, are however determined procedurally in every playthrough (§18). In addition, movable goals (the tomb, buried treasures) are placed anew each game.
 - The world reproduces Africa geographically authentically as it was in the year 1890. The real landmarks of §4.4 lie at their correct geographic positions.
 - The world ends at the African Red Sea coast: the Red Sea, Sinai and the Arabian peninsula are not part of the map. Northeast of a boundary running slightly seaward of that coast — from the Mediterranean across the Suez isthmus, down the Red Sea to Bab-el-Mandeb and out along the Gulf of Aden past the Horn — there is only open, impassable ocean (§11.2), rendered as sea like the rest of the water around the continent.
+- More generally, only the game's own land masses are rendered: the continent and its ~1890 islands (Madagascar, Zanzibar, Pemba, Bioko). Real-data land outside them — southern Europe, Anatolia, foreign islands — is trimmed from the map material to open sea; no land is visible outside the walkable continent.
 
 ### 3.2 Regions, terrain types and coordinates
 
@@ -257,6 +258,8 @@ The very first time each of these slowdowns is met, it is also announced once in
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
 
 The Red Sea is never inland water: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — is open, impassable ocean, the same as the sea around the rest of the continent. The other bays keep their outline treatment unchanged.
+
+Swimmable sea reaches only a short band off the coast (a calibratable balance value, adjustable in the debug menu §21): further out, the open ocean blocks movement even where the continent's outline still encloses it — there is no swimming far out to sea.
 
 ### 11.3 Water, current and waterfalls
 
@@ -593,6 +596,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Walking speed of the player character inside settlements (villages and port cities).
 - Walking speed of the player character outside settlements (travel across the continent; the default overland pace is calibrated on the calm side).
 - Movement-factor tuning for the terrain relief items (§11): the factor by which a canoe speeds up water travel, and the penalty factors by which the jungle without a machete and the mountains without a rope slow the traveller.
+- The swimmable coastal band width (§11.2): how far off the coast the sea can be swum before the open ocean blocks.
 - Mouse-look sensitivity in the first-person view.
 - Ambience volume (default 0.1): one control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale together.
 - Speed of food consumption while walking; at 0 the food supply lasts forever.

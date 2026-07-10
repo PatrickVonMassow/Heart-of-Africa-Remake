@@ -62,6 +62,9 @@ export interface BalanceConfig {
   digRadius: number
   /** Radius (world units) around a place marker in which it can be entered. */
   placeEnterRadius: number
+  /** How far (degrees) off the coast the sea stays swimmable (design.md
+   *  §11.2); beyond it the open ocean blocks movement even inside bays. */
+  oceanSwimMarginDeg: number
   /** Extra clearance (world units) beyond the enter radius the traveller must
    *  reach after leaving a settlement before it can be re-entered, so walking
    *  straight back in does not immediately re-enter it (design.md §2). */
@@ -226,6 +229,7 @@ export const balance: BalanceConfig = {
   },
   digRadius: 3,
   placeEnterRadius: 2.5,
+  oceanSwimMarginDeg: 1.2, // calibratable: swimmable coastal band width in degrees
   placeReentryMargin: 2, // small clearance beyond the enter radius before re-entry re-arms (user: was 6, too large)
   goodwillForHint: 2,
   goodwillRevered: 2,

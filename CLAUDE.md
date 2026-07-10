@@ -227,9 +227,11 @@ verify suite that proves it.
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890).
    The movement boundary of `design.md` §11.2 holds (enclosed sea
-   swimmable, open ocean blocks, and the Red Sea cut of §3.1/§11.2:
-   everything northeast of the African Red Sea coast is blocked ocean,
-   never inland water), as do the ropeless mountain climb with
+   swimmable only within the calibratable coastal band, open ocean
+   blocks, the Red Sea cut of §3.1/§11.2: everything northeast of the
+   African Red Sea coast is blocked ocean, never inland water, and the
+   §3.1 world trim: no land renders outside the game's land masses), as
+   do the ropeless mountain climb with
    its warning and fall risk (§7/§11), the visible movement-penalty reason
    incl. the canoe-on-land penalty and its once-per-type journal
    announcement (§11.1, both languages, voice markup, flag in the
@@ -244,13 +246,18 @@ verify suite that proves it.
    real, not just a hint), the top-right HUD hint appears in jungle
    without a machete and clears once the machete is in the pack, and a
    first jungle entry adds exactly one journal warning while a later entry
-   adds none (`scripts/verify/enrichments.mjs`); the Red Sea cut is
-   pure-tested at the acceptance coordinates — mid Red Sea, Sinai, the
-   Arabian peninsula and the Gulf of Aden are blocked ocean (Sinai/Arabia
-   stamped in the DEM, so no land route rounds the Red Sea), the Nile
-   delta and the African Red Sea coast stay walkable land, and the other
-   bays (Gulf of Guinea, Gulf of Sidra, Mozambique channel) keep their
-   previous behavior (`src/world/redSea.test.ts`).
+   adds none (`scripts/verify/enrichments.mjs`); the Red Sea cut and
+   world trim are pure-tested at the acceptance coordinates — mid Red
+   Sea, Sinai, the Arabian peninsula and the Gulf of Aden are blocked
+   ocean (Sinai/Arabia trimmed in the DEM, so no land route rounds the
+   Red Sea), foreign land (southern Spain, Sicily, Crete, the Canaries,
+   the Comoros …) samples as ocean while the game's islands stay land,
+   no trimmed texel borders kept land outside the Suez isthmus gate (no
+   ocean scrap juts into the coast), the Nile delta and the African Red
+   Sea coast stay walkable land, nearshore sea swims while far-offshore
+   sea blocks even inside the hull (the margin edits at runtime), and
+   the hull rules for the open Atlantic and the Mozambique channel are
+   unchanged (`src/world/redSea.test.ts`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (`design.md` §18; simplified saving is

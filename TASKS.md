@@ -125,6 +125,28 @@ the map).
   Sidra at 15°E/34°N was already SWIMMABLE (a bay inside the hull) — the
   tests pin the true unchanged behavior.)
 
+- [x] 19. At the continent's edges one can swim a long way out into the open
+  ocean — that must not be possible. Land masses outside the walkable
+  continent are still visible on the map material and must be removed. And a
+  scrap of the Red Sea still juts into the land.
+  (Swimmable sea is now capped at a calibratable coastal band —
+  balance.oceanSwimMarginDeg 1.2°, debug-editable — on top of the unchanged
+  hull rules. The per-texel northeast stamp became a keep-flood trim in
+  trimToGameWorld(): only land connected to the game's land-mass seeds
+  survives, so southern Europe, Anatolia, the Canaries, Comoros, São Tomé
+  and all Red Sea islands are trimmed to ocean along with Sinai/Levant/
+  Arabia. The Red Sea scrap came from boundary vertices biting into the
+  real coast (Gulf of Suez, Sudan, Eritrea); the flood keeps
+  African-connected land regardless, the Gulf-of-Suez segment now hugs the
+  African west shore, and a raw-DEM scan test asserts trimmed land borders
+  kept land only at the Suez isthmus gate.)
+- [ ] 20. In the debug zoom-out, walking produces oddities: the ocean moves
+  offset against the land mass, and the landscape is only rendered in a
+  rectangular area that covers a fraction of the visible range.
+- [ ] 21. After the recent wave of design.md changes (restructure into numbered
+  subsections, §7.1 slimming, the Red Sea/world-trim work), review README.md
+  and bring it in step where it has drifted.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

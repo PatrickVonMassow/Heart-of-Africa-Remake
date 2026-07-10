@@ -7,15 +7,20 @@
 // north to Suez" / "Gulf of Aden"): from the eastern Mediterranean across
 // the Suez isthmus, down the Red Sea to Bab-el-Mandeb and out along the
 // Gulf of Aden past the Horn. Used by the movement boundary (terrain.ts)
-// and by the geodata load, which stamps the DEM's northeast texels to ocean
-// (geodata.ts) so Sinai/Arabia are not rendered as land.
+// and by the geodata load (geodata.ts), whose trimming pass keeps only the
+// land connected to the game's own land masses — the boundary acts as the
+// gate at the Suez isthmus, and all other real-data land (Sinai, the
+// Levant, Arabia, southern Europe, foreign islands) is stamped to ocean.
 
 /** Boundary polyline as [lon, lat], northwest (Mediterranean) → southeast. */
 export const NORTHEAST_BOUNDARY: Array<[number, number]> = [
   // Eastern Mediterranean down to the Suez isthmus (east of the Nile delta).
-  [30.6, 39.0], [31.9, 34.2], [32.42, 31.45], [32.62, 30.4], [32.9, 29.7],
-  // Seaward of the African Red Sea coast down to Bab-el-Mandeb.
-  [33.4, 28.55], [33.9, 27.45], [34.65, 26.3], [35.4, 25.2], [36.15, 24.05],
+  [30.6, 39.0], [31.9, 34.2], [32.42, 31.45], [32.62, 30.4], [32.7, 29.75],
+  // Down the Gulf of Suez, hugging its African west shore (the Sinai side
+  // stays northeast), then seaward of the African Red Sea coast to
+  // Bab-el-Mandeb.
+  [32.78, 29.2], [32.9, 28.7], [33.25, 28.25], [33.6, 27.75], [33.95, 27.3],
+  [34.65, 26.3], [35.4, 25.2], [36.15, 24.05],
   [36.2, 22.6], [36.9, 21.15], [37.6, 19.8], [37.7, 19.3], [38.4, 18.2],
   [38.9, 17.1], [39.8, 15.85], [40.5, 15.45], [41.45, 15.15], [42.1, 14.25],
   [43.0, 13.25], [43.5, 12.4],
@@ -55,7 +60,7 @@ export function isNortheastOfBoundary(lat: number, lon: number): boolean {
   return bestCross >= 0
 }
 
-/** Subset of the DEM metadata the stamping pass needs (see geodata.ts). */
+/** Subset of the DEM metadata the trimming pass needs (see geodata.ts). */
 export interface StampMeta {
   width: number
   height: number
@@ -65,30 +70,83 @@ export interface StampMeta {
   offsetMeters: number
 }
 
+/** Seed points [lon, lat] on the game's own land masses (design.md §3.1):
+ *  the mainland and its ~1890 islands. Everything not land-connected to a
+ *  seed is trimmed from the map. */
+export const GAME_LAND_SEEDS: Array<[number, number]> = [
+  [15, 24], // mainland (central Sahara)
+  [46.8, -19.5], // Madagascar
+  [39.3, -6.1], // Zanzibar
+  [39.72, -5.15], // Pemba
+  [8.65, 3.5], // Bioko
+  [52.95, 12.5], // Socotra (mostly beyond the dataset edge; kept if present)
+]
+
+// The Suez isthmus — the only land bridge between Africa and Asia inside the
+// dataset. The keep-flood may not cross the boundary here; everywhere else
+// the boundary runs over sea, which the flood cannot cross anyway.
+const GATE = { lonMin: 31.9, lonMax: 34.7, latMin: 29.0 }
+
 /**
- * Stamp every land texel northeast of the boundary to ocean, in place:
- * B channel 0 (ocean in the dataset's land/coast-distance encoding) and the
- * R/G elevation set below sea level. Texels that already are ocean keep
- * their real bathymetry, so the Red Sea blends seamlessly into the
- * Mediterranean and the Gulf of Aden. Pure over the RGBA pixel array —
+ * Trim the DEM to the game world, in place: a flood fill from the game's
+ * land seeds marks every texel land-connected to the walkable continent —
+ * blocked from crossing the boundary at the Suez isthmus gate — and every
+ * other land texel (Sinai, the Levant, Arabia, southern Europe, foreign
+ * islands) is stamped to ocean: B channel 0 (ocean in the dataset's
+ * land/coast-distance encoding) and the R/G elevation set below sea level.
+ * Sea texels keep their real bathymetry, so the trimmed areas blend
+ * seamlessly into the surrounding ocean. Pure over the RGBA pixel array —
  * no browser dependency (unit-tested in redSea.test.ts).
  */
-export function stampNortheastOcean(pixels: Uint8ClampedArray, meta: StampMeta): void {
+export function trimToGameWorld(
+  pixels: Uint8ClampedArray,
+  meta: StampMeta,
+  seeds: Array<[number, number]> = GAME_LAND_SEEDS,
+): void {
+  const { width, height } = meta
+  const total = width * height
+  const isLand = (idx: number) => pixels[idx * 4 + 2] > 0
+  const gateBlocked = (idx: number): boolean => {
+    const lon = meta.lonMin + ((idx % width) + 0.5) * meta.res
+    if (lon < GATE.lonMin || lon > GATE.lonMax) return false
+    const lat = meta.latMax - (((idx / width) | 0) + 0.5) * meta.res
+    if (lat < GATE.latMin) return false
+    return isNortheastOfBoundary(lat, lon)
+  }
+  const visited = new Uint8Array(total)
+  const queue = new Int32Array(total)
+  let head = 0
+  let tail = 0
+  for (const [lon, lat] of seeds) {
+    const x = Math.round((lon - meta.lonMin) / meta.res - 0.5)
+    const y = Math.round((meta.latMax - lat) / meta.res - 0.5)
+    if (x < 0 || y < 0 || x >= width || y >= height) continue
+    const idx = y * width + x
+    if (!isLand(idx) || visited[idx]) continue
+    visited[idx] = 1
+    queue[tail++] = idx
+  }
+  const tryVisit = (idx: number) => {
+    if (visited[idx] || !isLand(idx) || gateBlocked(idx)) return
+    visited[idx] = 1
+    queue[tail++] = idx
+  }
+  while (head < tail) {
+    const idx = queue[head++]
+    const x = idx % width
+    if (x > 0) tryVisit(idx - 1)
+    if (x < width - 1) tryVisit(idx + 1)
+    if (idx >= width) tryVisit(idx - width)
+    if (idx < total - width) tryVisit(idx + width)
+  }
   const stampedElevation = meta.offsetMeters - 1000 // -1000 m: plausible open sea
   const hi = (stampedElevation >> 8) & 0xff
   const lo = stampedElevation & 0xff
-  const xStart = Math.max(0, Math.floor((BOX_LON_MIN - meta.lonMin) / meta.res))
-  const yEnd = Math.min(meta.height, Math.ceil((meta.latMax - BOX_LAT_MIN) / meta.res))
-  for (let y = 0; y < yEnd; y++) {
-    const lat = meta.latMax - (y + 0.5) * meta.res
-    for (let x = xStart; x < meta.width; x++) {
-      const i = (y * meta.width + x) * 4
-      if (pixels[i + 2] === 0) continue // already ocean: keep real bathymetry
-      const lon = meta.lonMin + (x + 0.5) * meta.res
-      if (!isNortheastOfBoundary(lat, lon)) continue
-      pixels[i] = hi
-      pixels[i + 1] = lo
-      pixels[i + 2] = 0
-    }
+  for (let idx = 0; idx < total; idx++) {
+    if (visited[idx] || !isLand(idx)) continue
+    const i = idx * 4
+    pixels[i] = hi
+    pixels[i + 1] = lo
+    pixels[i + 2] = 0
   }
 }
