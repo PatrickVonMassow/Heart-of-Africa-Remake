@@ -249,21 +249,45 @@ function createLakeMaterial(): THREE.MeshStandardNodeMaterial {
 }
 
 /** Flat lake polygon at its local shore height (design.md §2 water). */
-function buildLakeSurfaces(seed: number): Array<{ geometry: THREE.BufferGeometry; y: number }> {
+function buildLakeSurfaces(
+  seed: number,
+): Array<{ geometry: THREE.BufferGeometry; y: number; bedMax: number }> {
   return LAKES.map((lake) => {
     const shape = new THREE.Shape()
+    let minLon = Infinity
+    let maxLon = -Infinity
+    let minLat = Infinity
+    let maxLat = -Infinity
     lake.points.forEach(([lon, lat], i) => {
       const w = latLonToWorld(lat, lon)
       if (i === 0) shape.moveTo(w.x, -w.z)
       else shape.lineTo(w.x, -w.z)
+      minLon = Math.min(minLon, lon)
+      maxLon = Math.max(maxLon, lon)
+      minLat = Math.min(minLat, lat)
+      maxLat = Math.max(maxLat, lat)
     })
-    let y = Infinity
-    for (const [lon, lat] of lake.points) {
-      y = Math.min(y, sampleTerrain(lat, lon, seed).height)
+    // The surface sits just above the highest interior bed sample. The old
+    // min-over-the-shore-points height let a single low outlier (an outlet
+    // gorge) pull the sheet under the carved bed, which then showed through
+    // in flickering blotches across the lake (TASKS pt. 11).
+    let bedMax = -Infinity
+    const N = 9
+    for (let i = 1; i < N; i++) {
+      for (let j = 1; j < N; j++) {
+        const lon = minLon + ((maxLon - minLon) * i) / N
+        const lat = minLat + ((maxLat - minLat) * j) / N
+        if (!lakeContains(lat, lon)) continue
+        bedMax = Math.max(bedMax, sampleTerrain(lat, lon, seed).height)
+      }
+    }
+    if (bedMax === -Infinity) {
+      // A sliver of a lake between grid points: fall back to its centre.
+      bedMax = sampleTerrain(lake.center[1], lake.center[0], seed).height
     }
     const geometry = new THREE.ShapeGeometry(shape)
     geometry.rotateX(-Math.PI / 2)
-    return { geometry, y: Math.max(-0.05, y - 0.1) }
+    return { geometry, y: Math.max(-0.05, bedMax + 0.12), bedMax }
   })
 }
 
@@ -323,7 +347,10 @@ export function RiversAndLakes() {
     // every river renders as one continuous, never-buried ribbon (design.md §11).
     const gaps = Object.values(report).reduce((n, r) => n + Math.max(0, r.strips - 1), 0)
     const buried = Object.values(report).reduce((n, r) => n + r.buried, 0)
-    w.__rivers = { falls: falls.length, springs: springs.length, lakes: lakes.length, gaps, buried, report }
+    // lakeInfo: each surface's height vs. its highest interior bed sample —
+    // y > bedMax for every lake proves no lake surface is buried (TASKS pt. 11).
+    const lakeInfo = lakes.map((l) => ({ y: l.y, bedMax: l.bedMax }))
+    w.__rivers = { falls: falls.length, springs: springs.length, lakes: lakes.length, gaps, buried, report, lakeInfo }
     return () => {
       delete w.__rivers
     }

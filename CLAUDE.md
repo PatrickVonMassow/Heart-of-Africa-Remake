@@ -619,10 +619,13 @@ The POC counts as fulfilled when all points verifiably hold. Details per
     is calm with a visible downstream current that strengthens at rapids
     and waterfalls; the five waterfall landmarks show white cascades with
     plunge-pool foam; rivers rising in open land show a spring; lakes have
-    flat surfaces at their local shore height. Verifiable:
+    flat surfaces at their local shore height, laid just above the highest
+    point of their carved bed so the bed never shows through the sheet in
+    flickering blotches. Verifiable:
     `scripts/verify/enrichments.mjs` asserts 5 cascades, at least one
     spring and 8 lake surfaces, that no river has an interior gap and no
-    river surface is buried, and that the Nile is a single continuous strip,
+    river surface is buried, that every lake surface clears its interior
+    bed, and that the Nile is a single continuous strip,
     via the dev hook; screenshots of the Nile,
     Victoria Falls and Lake Victoria (71-73) show the courses. Being swept
     over falls is gameplay since pt. 23 (waterfall-sweep event). The

@@ -185,6 +185,13 @@ check('Rivers: 8 lake surfaces', rivers?.lakes === 8, `${rivers?.lakes}`)
 check('Rivers: no interior gaps (all continuous)', rivers?.gaps === 0, `gaps ${rivers?.gaps}`)
 check('Rivers: surface never buried under the terrain', rivers?.buried === 0, `buried ${rivers?.buried}`)
 check('Rivers: the Nile is a single continuous strip', rivers?.report?.nile?.strips === 1, JSON.stringify(rivers?.report?.nile))
+// TASKS pt. 11: every lake surface clears its highest interior bed sample —
+// a buried sheet showed through in flickering blotches (Lake Victoria).
+check(
+  'Lakes: every surface sits above its interior bed (no blotchy show-through)',
+  Array.isArray(rivers?.lakeInfo) && rivers.lakeInfo.length === 8 && rivers.lakeInfo.every((l) => l.y > l.bedMax),
+  JSON.stringify(rivers?.lakeInfo),
+)
 
 // --- Region border labels (§7.1.3) -------------------------------------------
 await page.evaluate(() => window.__game.getState().debugJumpTo(17.2, -2))
@@ -683,15 +690,15 @@ const shoreSpots = await page.evaluate(() => {
   }
   const spots = []
   // East African lakes/rivers belt — plenty of savanna shoreline.
-  for (let lat = 3; lat >= -7 && spots.length < 16; lat -= 0.4)
-    for (let lon = 29; lon <= 37 && spots.length < 16; lon += 0.4)
+  for (let lat = 3; lat >= -9 && spots.length < 24; lat -= 0.4)
+    for (let lon = 29; lon <= 37 && spots.length < 24; lon += 0.4)
       if (T(lat, lon, seed) === 'savanna' && nearWater(lat, lon)) spots.push([lat, lon])
   return spots
 })
 // Aggregate drinkers/bathers over ALL roamed shores: ~40 % of drinkers bathe,
 // so a single shore with a handful of drinkers can easily hold none — the
 // union across shores makes the sample large enough to be reliable.
-const bathe = { drinkers: 0, bathers: 0 }
+const bathe = { drinkers: 0, bathers: 0, animalsSeen: 0 }
 for (const spot of shoreSpots) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s[0], s[1]), spot)
   await page.evaluate(() => window.__wildlife.restock())
@@ -703,23 +710,33 @@ for (const spot of shoreSpots) {
         if (!h) return false
         let d = 0
         for (const sp of Object.keys(h)) d += h[sp].filter((a) => a.drink && !a.dead).length
-        return d >= 2
+        return d >= 1 // any drinker lets this shore contribute to the aggregate
       },
       null,
-      { timeout: 16000 },
+      { timeout: 8000 },
     )
     .then(() => true)
     .catch(() => false)
   if (gotDrinkers) {
     const here = await page.evaluate(() => {
       const h = window.__wildlife.herdsRef.current
-      let drinkers = 0, bathers = 0
-      for (const sp of Object.keys(h)) for (const a of h[sp]) { if (a.drink) drinkers++; if (a.bathe) bathers++ }
-      return { drinkers, bathers }
+      let drinkers = 0, bathers = 0, animals = 0
+      for (const sp of Object.keys(h)) for (const a of h[sp]) { animals++; if (a.drink) drinkers++; if (a.bathe) bathers++ }
+      return { drinkers, bathers, animals }
     })
     bathe.drinkers += here.drinkers
     bathe.bathers += here.bathers
+    bathe.animalsSeen += here.animals
     if (bathe.bathers > 0) break
+  } else {
+    // Even a shore whose drinker gate timed out tells us whether animals
+    // spawned at all (environment stall vs. assignment issue).
+    bathe.animalsSeen += await page.evaluate(() => {
+      const h = window.__wildlife.herdsRef.current
+      let n = 0
+      for (const sp of Object.keys(h)) n += h[sp].filter((a) => !a.dead).length
+      return n
+    })
   }
 }
 check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, `${JSON.stringify(bathe)} spots=${shoreSpots.length}`)
