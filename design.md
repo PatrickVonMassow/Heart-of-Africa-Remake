@@ -161,7 +161,7 @@ Afflictions alter controls/vision and can be fatal:
 
 Inventory caches relieve the limited inventory and allow, for instance, leaving the canoe behind when moving away from waterways (on land it causes a speed penalty, §7, §11).
 
-- Free camp: in the bird's-eye view a camp can be pitched anywhere in the open, holding any number of inventory items. It is marked with an X on the map. Such a camp can however be looted; items stored there are not safe.
+- Free camp: in the bird's-eye view a camp can be pitched anywhere in the open (near an existing camp, that camp is reopened instead of pitching a second), holding any number of inventory items. It is marked with an X on the exploration map and a pole marker in the bird's-eye view. Such a camp can however be looted while the traveler is away; the loss is revealed by a journal entry when he returns — items stored there are not safe.
 - Village camp: once you are an "Honored Friend" (§12) in a native village, you may store any number of inventory items there at any time; they never disappear. If however you forfeit that standing in this region through a robbery (§12), the items stored there are irretrievably lost.
 
 ---
@@ -284,6 +284,9 @@ Access to hints leads through the chiefs, in the chief's hut of a village (first
 4. With sufficient goodwill: a hint about the tomb/treasure (into the chronicle, §15).
 5. Wrong behavior: hostility, expulsion.
 
+**Hostility.**
+A rejected gift means hostility and expulsion: the traveler is thrown out of the village, accumulated goodwill resets, and the chief refuses further audiences for a hostility period (a calibratable balance value) before relations can be rebuilt.
+
 **Honored Friend.**
 If you satisfy a chief correctly repeatedly, he bestows the status of "Honored Friend". It applies to all villages of the respective region (North, West, Central, South, East). Like every event, the bestowal is communicated through the journal: a new entry opens in which the chief pledges that his people will protect the traveler from now on. Committing a robbery forfeits this status irretrievably.
 
@@ -311,8 +314,10 @@ Every region expresses directions differently; the player must decipher each sys
 
 Glossary (landmarks in the local tongue): El Mora Levimara / Mongdamara (Congo), Lastwana (Zambezi), Gumba lu Untoba (Victoria Falls), Unumpara (Kilimanjaro), Galumba / Ut-hu Manbwama (elephants), Oz Oz / Oink Oink / Auke Auke (unspecific knowledge).
 
+A village elder teaches the region's direction words; a second talk with the elder reveals what the region reveres (§8). A chief's raw hint is recorded in the journal in the region's own words and turns into a deciphered entry as soon as the region's language has been learned — in either order (lesson before or after the hint), so an undeciphered hint is decoded retroactively.
+
 ### 13.3 Cascade and Time Limit
-Per region, typically one people reveals the regional location hint; the others provide only unspecific knowledge. Several hints are triangulated into the exact position of the tomb.
+Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. Every other chief offers only unspecific knowledge (Oz Oz …) that points toward the region's knowing people. Several hints are triangulated into the exact position of the tomb.
 
 ---
 
@@ -344,7 +349,7 @@ The fitting piece of equipment in the pack helps during events:
 
 ### 14.3 Calibration
 
-Concrete probabilities are calibrated freely for balance. They are tuned to keep events rare, so the journey is only occasionally interrupted (the POC's per-day base rates were lowered by a factor of five from an earlier, too-eventful calibration).
+Concrete probabilities are calibrated freely for balance. They are tuned to keep events rare, so the journey is only occasionally interrupted.
 
 ### 14.4 First-time danger warnings
 
@@ -444,6 +449,7 @@ Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full
 ### 17.5 Controls and focus
 
 - Controls suitable for mouse/keyboard and gamepad. The chronicle/journal is opened and closed with the Tab key (gamepad: Y). Tab's default focus cycling is suppressed while playing so it does not shift focus onto UI controls; inside form controls (debug-menu fields, dialog inputs) Tab still navigates between them normally.
+- Gamepad: the left stick moves the character in both perspectives (merged with WASD), the right stick turns the first-person view, and the buttons map onto the existing key handlers (A interact, B close, X dig, Y journal, LB map, RB camp, Select position query, Start debug menu) — a single input path, no second one. Only standard-mapped pads are read, and a connected pad steers only after a deliberate input (a button press or a full stick push): idle axis drift of wheels, flight sticks or worn pads must never move or turn the game on its own.
 - Entering a settlement puts the focus straight on the controls: any lingering HUD button is blurred so the keyboard controls the character at once, without an extra click. Mouse-look (pointer lock) still engages on a deliberate click on the view — auto-capturing the cursor would make the non-modal journal and dialogs unclickable, so the lock stays an explicit choice.
 - The GUI is a game surface, not a document: text in the interface cannot be selected/highlighted. Only editable form controls (debug-menu fields, dialog inputs) keep normal text selection.
 
@@ -460,7 +466,8 @@ English (default) and German. The language can be switched at runtime (POC: via 
 ## 18. Victory/Defeat, Procedural Placement, Saving
 
 - Victory: find and recover the procedurally placed tomb in time.
-- Defeat: deadline expiry or loss of the expedition (→ successor).
+- Defeat: deadline expiry or loss of the expedition (→ successor). On deadline expiry the expedition is recalled (defeat overlay, the journal falls silent); there is no successor then.
+- Successor: when the character dies, a successor takes over instead. He resumes at the most recent checkpoint, loses a configured number of days (balance value), silently inherits the already-passed deadline warning stage, and opens his part of the journal with a takeover entry.
 - Procedural per game: the position of the tomb and of caches, the concrete appearance of the landscape, and the look of the villages including the distribution of their huts. The geographic location of the landscape elements (jungle, mountains, rivers etc.) remains fixed. Special find sites: the Elephant Graveyard, camps/caches.
 - Saving: automatic on visiting a port city. The port cities act as checkpoints; manual saving is omitted.
 - Loading: on loading, an overview of all port visits appears as a table with one row per visit. Shown are port city, date (in-game), money, food, gifts and health state; from these the player picks the state to continue from.
