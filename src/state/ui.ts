@@ -38,6 +38,13 @@ interface UiState {
    */
   traaEnabled: boolean
   /**
+   * Screen-space reflections (design.md §2.7). Default off while the
+   * manual WebGPU check loop of CLAUDE.md §7.1 pt. 32 runs. WebGPU only:
+   * three r185's SSRNode emits invalid GLSL on the WebGL 2 fallback, so
+   * the flag is inert there and reflections stay with the IBL.
+   */
+  ssrEnabled: boolean
+  /**
    * Debug unlock (design.md §21): allow zooming *out* beyond the default
    * camera distance. Zooming in is always available.
    */
@@ -60,6 +67,7 @@ interface UiState {
   dismissWebglWarning: () => void
   setFpsVisible: (visible: boolean) => void
   setTraaEnabled: (enabled: boolean) => void
+  setSsrEnabled: (enabled: boolean) => void
   setWheelZoomEnabled: (enabled: boolean) => void
   setTravelZoom: (zoom: number) => void
   setJournalDnd: (dnd: boolean) => void
@@ -74,6 +82,7 @@ export const useUi = create<UiState>()((set) => ({
   webglWarningDismissed: false,
   fpsVisible: true,
   traaEnabled: true,
+  ssrEnabled: false,
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: 1,
@@ -88,6 +97,7 @@ export const useUi = create<UiState>()((set) => ({
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),
+  setSsrEnabled: (ssrEnabled) => set({ ssrEnabled }),
   // Disabling the unlock clamps any zoom-out back to the default distance;
   // a zoomed-in view is kept.
   setWheelZoomEnabled: (wheelZoomEnabled) =>

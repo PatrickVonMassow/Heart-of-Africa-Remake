@@ -79,6 +79,7 @@ export function DebugMenu() {
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
   const traaEnabled = useUi((s) => s.traaEnabled)
+  const ssrEnabled = useUi((s) => s.ssrEnabled)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -186,6 +187,17 @@ export function DebugMenu() {
           type="checkbox"
           checked={traaEnabled}
           onChange={(e) => useUi.getState().setTraaEnabled(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.ssr}</span>
+        {/* SSRNode emits invalid GLSL on WebGL 2 (upstream), so the toggle
+            is disabled on the fallback backend. */}
+        <input
+          type="checkbox"
+          checked={ssrEnabled}
+          disabled={webglFallback}
+          onChange={(e) => useUi.getState().setSsrEnabled(e.target.checked)}
         />
       </label>
       <label>

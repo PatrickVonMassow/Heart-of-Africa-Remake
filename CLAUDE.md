@@ -712,15 +712,22 @@ verify suite that proves it.
     off), passed its manual WebGPU check (stable across repeated toggles
     after the pipeline-rebuild disposal fix, visually on par with 4×
     MSAA) and is on by default; the debug checkbox (`design.md` §21.3)
-    switches back to the render pass' MSAA. SSR and refraction remain
-    OPEN — three r185's SSRNode emits invalid GLSL on WebGL 2 (upstream)
-    — so reflections still rely on the IBL environment. Verifiable:
+    switches back to the render pass' MSAA. Step 2 is delivered for its
+    manual check: SSR (upstream `SSRNode`, metalness/roughness MRT,
+    dielectrics included so the water reflects, additive composite
+    before the temporal resolve) sits behind a default-off debug
+    checkbox and runs on the WebGPU backend only — three r185's SSRNode
+    emits invalid GLSL on WebGL 2 (upstream), so on the fallback the
+    checkbox is disabled, the flag is inert and reflections stay with
+    the IBL. True water refraction remains OPEN. Verifiable:
     `scripts/verify/settings.mjs` toggles TRAA at runtime, asserts a
     non-black frame without console errors on the WebGL 2 path (with
-    screenshot 69) and gates the rebuild leak on a flat renderer texture
-    count across repeated toggle cycles; `src/ui/DebugMenu.test.tsx`
-    asserts the localized checkbox (default on) writing through to the
-    UI store.
+    screenshot 69), gates the rebuild leak on a flat renderer texture
+    count across repeated toggle cycles, and asserts the SSR flag stays
+    inert on the WebGL 2 fallback (no shader errors, frame intact);
+    `src/ui/DebugMenu.test.tsx` asserts both localized checkboxes (TRAA
+    default on, SSR default off and disabled on the fallback) writing
+    through to the UI store.
 
 ### 7.2 Self-Verification (mandatory)
 

@@ -351,6 +351,7 @@ export const en: Strings = {
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
     traa: 'TRAA (temporal anti-aliasing)',
+    ssr: 'SSR (screen-space reflections, WebGPU only)',
     health: 'Health',
     wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",

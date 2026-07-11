@@ -268,8 +268,10 @@ export interface Strings {
     eventNames: Record<string, string>
     showHidden: string
     fpsCounter: string
-    /** TRAA toggle (design.md §2.7/§21); default off pending the manual WebGPU check. */
+    /** TRAA toggle (design.md §2.7/§21), default on. */
     traa: string
+    /** SSR toggle (design.md §2.7/§21), WebGPU only; default off pending the manual check. */
+    ssr: string
     health: string
     wheelZoom: string
     journalDnd: string

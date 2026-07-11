@@ -67,6 +67,8 @@ afterEach(() => {
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
+  useUi.getState().setSsrEnabled(false)
+  useUi.getState().setWebglFallback(false)
   if (useUi.getState().debugOpen) useUi.getState().toggleDebug()
 })
 
@@ -155,6 +157,40 @@ describe('DebugMenu TRAA toggle (design.md §2.7/§21)', () => {
     useLocale.getState().setLang('de')
     render(<DebugMenu />)
     expect(screen.getByText(de.debug.traa)).toBeInTheDocument()
+  })
+})
+
+describe('DebugMenu SSR toggle (design.md §2.7/§21, WebGPU only)', () => {
+  const ssrBox = () => {
+    const row = screen.getByText(en.debug.ssr).closest('label')
+    return row?.querySelector('input[type="checkbox"]') as HTMLInputElement
+  }
+
+  it('renders the localized SSR checkbox, default off', () => {
+    render(<DebugMenu />)
+    expect(ssrBox().checked).toBe(false)
+    expect(useUi.getState().ssrEnabled).toBe(false)
+  })
+
+  it('carries a German label after the language switch', () => {
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    expect(screen.getByText(de.debug.ssr)).toBeInTheDocument()
+  })
+
+  it('toggling the checkbox writes through to the UI store', () => {
+    render(<DebugMenu />)
+    fireEvent.click(ssrBox())
+    expect(useUi.getState().ssrEnabled).toBe(true)
+    fireEvent.click(ssrBox())
+    expect(useUi.getState().ssrEnabled).toBe(false)
+  })
+
+  it('is disabled on the WebGL 2 fallback (SSRNode emits invalid GLSL there)', () => {
+    useUi.getState().setWebglFallback(true)
+    render(<DebugMenu />)
+    expect(ssrBox().disabled).toBe(true)
+    useUi.getState().setWebglFallback(false)
   })
 })
 

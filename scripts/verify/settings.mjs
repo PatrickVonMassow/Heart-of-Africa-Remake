@@ -261,6 +261,20 @@ check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean
 check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
   errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
+// --- SSR backend gate (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------
+// SSRNode emits invalid GLSL on WebGL 2 (upstream), so on the fallback —
+// which is what headless Chromium runs — the flag must be inert: no shader
+// errors, frame intact. The WebGPU visual result stays a manual check.
+const errsBeforeSsr = errors.length
+const onFallback = await page.evaluate(() => window.__ui.getState().webglFallback)
+await page.evaluate(() => window.__ui.getState().setSsrEnabled(true))
+await page.waitForTimeout(1500)
+const ssrMean = await meanLuma(await page.screenshot())
+check('SSR flag stays inert on the WebGL 2 fallback (non-black, no shader errors)',
+  onFallback === true && ssrMean > 8 && errors.length === errsBeforeSsr,
+  `fallback ${onFallback}, mean ${ssrMean.toFixed(1)}, new errs ${errors.length - errsBeforeSsr}`)
+await page.evaluate(() => window.__ui.getState().setSsrEnabled(false))
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

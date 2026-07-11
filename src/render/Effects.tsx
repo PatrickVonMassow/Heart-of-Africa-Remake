@@ -10,16 +10,21 @@
 // pass' MSAA samples. TRAA requires MSAA off and a velocity MRT target, so
 // the scene pass is built per mode.
 //
-// OPEN: screen-space reflections/refraction (design.md §2) are not in the
-// POC pipeline (three r185's SSRNode emits invalid GLSL on WebGL 2).
+// Screen-space reflections (design.md §2.7) sit behind a default-off debug
+// toggle and run on the WebGPU backend only — three r185's SSRNode emits
+// invalid GLSL on WebGL 2 (upstream), so on the fallback the toggle is inert
+// and reflections stay with the IBL environment.
+//
+// OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
 import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { mix, mrt, normalView, output, pass, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
+import { metalness, mix, mrt, normalView, output, pass, roughness, smoothstep, vec2, vec3, vec4, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
+import { ssr } from 'three/addons/tsl/display/SSRNode.js'
 import { createEnvironmentTexture } from './environment'
 import { useUi } from '../state/ui'
 
@@ -43,6 +48,11 @@ export function Effects() {
   }, [scene])
 
   const traaEnabled = useUi((s) => s.traaEnabled)
+  const ssrEnabled = useUi((s) => s.ssrEnabled)
+  const webglFallback = useUi((s) => s.webglFallback)
+  // Hard backend gate: SSRNode compiles to invalid GLSL on WebGL 2 (upstream,
+  // three r185), so the toggle is inert on the fallback.
+  const ssrActive = ssrEnabled && !webglFallback
 
   const post = useMemo(() => {
     // The toggle rebuilds the whole pipeline, and three's PostProcessing
@@ -53,13 +63,18 @@ export function Effects() {
     const disposables: Array<{ dispose: () => void }> = []
 
     // TRAA jitters the camera and resolves temporally, so MSAA must be off
-    // and the pass must write per-pixel velocities.
+    // and the pass must write per-pixel velocities. SSR additionally needs
+    // per-pixel metalness/roughness targets.
     const scenePass = traaEnabled ? pass(scene, camera) : pass(scene, camera, { samples: 4 })
     disposables.push(scenePass)
     scenePass.setMRT(
-      traaEnabled
-        ? mrt({ output, normal: normalView, velocity })
-        : mrt({ output, normal: normalView }),
+      mrt({
+        output,
+        normal: normalView,
+        ...(traaEnabled ? { velocity } : {}),
+        // Combined attachment as in the upstream SSR example.
+        ...(ssrActive ? { metalrough: vec2(metalness, roughness) } : {}),
+      }),
     )
     const color = scenePass.getTextureNode('output')
     const depth = scenePass.getTextureNode('depth')
@@ -72,7 +87,38 @@ export function Effects() {
     const aoNoise = (aoPass as unknown as { _noiseNode?: { value?: { dispose: () => void } } })
       ._noiseNode?.value
     disposables.push({ dispose: () => aoNoise?.dispose() })
-    const aoComposed = color.mul(aoPass.getTextureNode().r)
+    let aoComposed = color.mul(aoPass.getTextureNode().r)
+
+    // Screen-space reflections (WebGPU only, design.md §2.7): mirror trace
+    // with roughness-driven blur, dielectrics included so the water (a
+    // non-metal) picks up shore and terrain reflections on top of its IBL
+    // sky. Added before the temporal resolve so TRAA settles the SSR noise.
+    if (ssrActive) {
+      const metalRough = scenePass.getTextureNode('metalrough')
+      // The upstream declaration types the inputs as plain value nodes, but
+      // the implementation samples them at arbitrary UVs — the pass texture
+      // nodes are exactly what it needs (as in the upstream example).
+      const ssrNode = ssr(
+        color,
+        depth as unknown as THREE.Node<'float'>,
+        normal as unknown as THREE.Node<'vec3'>,
+        {
+          metalnessNode: metalRough.r,
+          roughnessNode: metalRough.g,
+          reflectNonMetals: true,
+          camera,
+        },
+      )
+      disposables.push(ssrNode)
+      // Placeholder tuning for the game's world scale (10 units/degree,
+      // bird's-eye camera ~40 units up); calibrated in the manual check loop.
+      ssrNode.maxDistance.value = 40
+      ssrNode.thickness.value = 0.5
+      ssrNode.resolutionScale = 0.5
+      // Additive reflection contribution (alpha untouched); the SSR alpha
+      // channel carries the ray distance, not opacity.
+      aoComposed = aoComposed.add(vec4(ssrNode.rgb, 0))
+    }
 
     // Temporal resolve over the AO-composed image, so the accumulation also
     // settles the (jittered) AO term instead of re-aliasing it afterwards.
@@ -141,7 +187,7 @@ export function Effects() {
       }
     }
     return { processing, dispose }
-  }, [gl, scene, camera, traaEnabled])
+  }, [gl, scene, camera, traaEnabled, ssrActive])
 
   useEffect(() => {
     return () => {
