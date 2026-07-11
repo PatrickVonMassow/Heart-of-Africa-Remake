@@ -32,9 +32,9 @@ interface UiState {
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
   /**
-   * Temporal anti-aliasing (design.md §2.7). Default off while the manual
-   * WebGPU check loop of CLAUDE.md §7.1 pt. 32 is running; when off, AA
-   * falls back to the render pass' MSAA.
+   * Temporal anti-aliasing (design.md §2.7), default on since the manual
+   * WebGPU check (CLAUDE.md §7.1 pt. 32) passed; when off, AA falls back
+   * to the render pass' MSAA.
    */
   traaEnabled: boolean
   /**
@@ -73,7 +73,7 @@ export const useUi = create<UiState>()((set) => ({
   webglFallback: false,
   webglWarningDismissed: false,
   fpsVisible: true,
-  traaEnabled: false,
+  traaEnabled: true,
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: 1,

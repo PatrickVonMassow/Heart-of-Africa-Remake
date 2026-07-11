@@ -5,10 +5,10 @@
 // mapping (ACES) and output color space are applied by THREE.PostProcessing
 // itself. Also installs the procedural IBL environment on the scene.
 //
-// TRAA sits behind a default-off debug toggle while the manual WebGPU check
-// loop runs (CLAUDE.md §7.1 pt. 32); with the toggle off, AA relies on the
-// render pass' MSAA samples. TRAA requires MSAA off and a velocity MRT
-// target, so the scene pass is built per mode.
+// TRAA is the default since its manual WebGPU check passed (CLAUDE.md §7.1
+// pt. 32); the debug toggle (design.md §21.3) can switch back to the render
+// pass' MSAA samples. TRAA requires MSAA off and a velocity MRT target, so
+// the scene pass is built per mode.
 //
 // OPEN: screen-space reflections/refraction (design.md §2) are not in the
 // POC pipeline (three r185's SSRNode emits invalid GLSL on WebGL 2).

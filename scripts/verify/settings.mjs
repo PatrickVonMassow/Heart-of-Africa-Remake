@@ -211,11 +211,11 @@ check('ambience engine starts on demand', aniSound.started === true, '')
 check('a nearby animal raises its proximity call', aniSound.prox > 0.5 && aniSound.near > aniSound.baseline + 0.02, JSON.stringify(aniSound))
 check('the animal call fades once the player moves away', aniSound.gone < 0.1, JSON.stringify(aniSound))
 
-// --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32 check loop) ----------
-// Enabling the temporal AA rebuilds the post pipeline (velocity MRT, MSAA off).
-// Headless this exercises the WebGL 2 fallback only — the WebGPU path stays a
-// supervised manual check. Assert the scene keeps rendering a non-black frame
-// without new console errors, and that disabling restores the MSAA path.
+// --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------------
+// TRAA is the default; toggling rebuilds the post pipeline (velocity MRT,
+// MSAA off ↔ MSAA on). Headless this exercises the WebGL 2 fallback only —
+// the WebGPU path passed its supervised manual check. Assert the scene keeps
+// rendering a non-black frame without new console errors on both paths.
 const meanLuma = async (png) => {
   const stats = await sharp(png).stats()
   return stats.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / 3

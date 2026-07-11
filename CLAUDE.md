@@ -707,18 +707,20 @@ verify suite that proves it.
     (Chromium gets no WebGPU without a display), so after each step the
     user confirms the WebGPU path on real hardware — the lesson from the
     reverted first attempt, whose WebGPU-only TRAA/SSR branch went
-    untested and rendered a black scene. Step 1 is done: TRAA runs
-    backend-neutrally (upstream `TRAANode`, velocity MRT, MSAA off)
-    behind a default-off debug checkbox (`design.md` §21.3) and turns on
-    by default only once the manual WebGPU check has passed. SSR and
-    refraction remain OPEN — three r185's SSRNode emits invalid GLSL on
-    WebGL 2 (upstream) — so reflections still rely on the IBL
-    environment; with the checkbox off, AA relies on the render pass'
-    MSAA. Verifiable: `scripts/verify/settings.mjs` toggles TRAA at
-    runtime and asserts a non-black frame without console errors on the
-    WebGL 2 path (with screenshot 69), and back off again;
-    `src/ui/DebugMenu.test.tsx` asserts the localized checkbox writing
-    through to the UI store.
+    untested and rendered a black scene. Step 1 is done and accepted:
+    TRAA runs backend-neutrally (upstream `TRAANode`, velocity MRT, MSAA
+    off), passed its manual WebGPU check (stable across repeated toggles
+    after the pipeline-rebuild disposal fix, visually on par with 4×
+    MSAA) and is on by default; the debug checkbox (`design.md` §21.3)
+    switches back to the render pass' MSAA. SSR and refraction remain
+    OPEN — three r185's SSRNode emits invalid GLSL on WebGL 2 (upstream)
+    — so reflections still rely on the IBL environment. Verifiable:
+    `scripts/verify/settings.mjs` toggles TRAA at runtime, asserts a
+    non-black frame without console errors on the WebGL 2 path (with
+    screenshot 69) and gates the rebuild leak on a flat renderer texture
+    count across repeated toggle cycles; `src/ui/DebugMenu.test.tsx`
+    asserts the localized checkbox (default on) writing through to the
+    UI store.
 
 ### 7.2 Self-Verification (mandatory)
 
