@@ -9,10 +9,12 @@
 // in-scene walk measurement, the user-select computed style, the RAF-driven
 // lion-feed depiction (window.__lionHunt), the ambience engine + proximity
 // animal call rise/fade (AudioContext/window.__wildlife), the Tab-no-focus-shift
-// behaviour (activeElement/canvas), the screenshots and the console-error gate.
+// behaviour (activeElement/canvas), the TRAA pipeline toggle (real pipeline
+// rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
+import sharp from 'sharp'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -208,6 +210,31 @@ const aniSound = await page.evaluate(async () => {
 check('ambience engine starts on demand', aniSound.started === true, '')
 check('a nearby animal raises its proximity call', aniSound.prox > 0.5 && aniSound.near > aniSound.baseline + 0.02, JSON.stringify(aniSound))
 check('the animal call fades once the player moves away', aniSound.gone < 0.1, JSON.stringify(aniSound))
+
+// --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32 check loop) ----------
+// Enabling the temporal AA rebuilds the post pipeline (velocity MRT, MSAA off).
+// Headless this exercises the WebGL 2 fallback only — the WebGPU path stays a
+// supervised manual check. Assert the scene keeps rendering a non-black frame
+// without new console errors, and that disabling restores the MSAA path.
+const meanLuma = async (png) => {
+  const stats = await sharp(png).stats()
+  return stats.channels.slice(0, 3).reduce((a, c) => a + c.mean, 0) / 3
+}
+const errsBeforeTraa = errors.length
+await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
+await page.waitForTimeout(2500)
+const traaShot = await page.screenshot({ path: `${OUT}69-traa-on.png` })
+console.log('shot 69-traa-on.png')
+const traaMean = await meanLuma(traaShot)
+check('TRAA on: scene renders non-black', traaMean > 8, `mean ${traaMean.toFixed(1)}`)
+check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
+  errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
+await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
+await page.waitForTimeout(1500)
+const msaaMean = await meanLuma(await page.screenshot())
+check('TRAA off again: MSAA path renders non-black', msaaMean > 8, `mean ${msaaMean.toFixed(1)}`)
+check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
+  errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

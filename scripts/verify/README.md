@@ -67,7 +67,7 @@ ported asserts now live in Vitest:
 | `i18n.mjs` | 5 localization screenshots + console gate | `src/i18n/i18n.test.ts`, `src/ui/{StatusBar,JournalPanel,Dialogs,DebugMenu}.test.tsx` |
 | `health.mjs` | vultures at poor condition (RAF) + console gate | `src/state/store.health.test.ts`, `src/ui/Hud.test.tsx` (veil, defeat) |
 | `events.mjs` | touch-a-lion / touch-a-hyena contact (RAF scene) | `src/systems/events.test.ts`, `src/state/store.events.test.ts` |
-| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, Tab focus | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` |
+| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, Tab focus, TRAA pipeline toggle (rebuild + non-black frame, WebGL 2 path) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
 | `enrichments.mjs` | all wildlife/RAF, drei map/region labels, river/graveyard scene, layout geometry, real WheelEvent, screenshots | `src/systems/movement.test.ts`, `src/state/store.*.test.ts`, `src/ui/{StatusBar,Hud,DebugMenu}.test.tsx` |
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud, screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx` |
 

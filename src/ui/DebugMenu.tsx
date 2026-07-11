@@ -78,6 +78,7 @@ export function DebugMenu() {
   const setLang = useLocale((s) => s.setLang)
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
+  const traaEnabled = useUi((s) => s.traaEnabled)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -177,6 +178,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={fpsVisible}
           onChange={(e) => useUi.getState().setFpsVisible(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.traa}</span>
+        <input
+          type="checkbox"
+          checked={traaEnabled}
+          onChange={(e) => useUi.getState().setTraaEnabled(e.target.checked)}
         />
       </label>
       <label>

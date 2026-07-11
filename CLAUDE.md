@@ -700,16 +700,25 @@ verify suite that proves it.
     markers before and markers after the gift plus the toast, their
     persistence across re-entry, and the panorama wildlife count via the
     dev hook, with a screenshot of the highlighted village.
-32. **Render pipeline upgrades — open.** TRAA, screen-space reflections
-    and true water refraction (`design.md` §2.7) remain an OPEN item. A
-    first implementation was reverted: the headless verification runs on
-    the WebGL 2 fallback only (Chromium gets no WebGPU without a display),
-    so the WebGPU-only TRAA/SSR branch went untested and rendered a black
-    scene on real hardware; three r185's SSRNode additionally emits
-    invalid GLSL on WebGL 2 (upstream). The item needs a WebGPU-capable
-    verification path (or a supervised manual test loop) before another
-    attempt; until then AA relies on the render pass' MSAA and reflections
-    on the IBL environment.
+32. **Render pipeline upgrades — in progress.** TRAA, screen-space
+    reflections and true water refraction (`design.md` §2.7) are being
+    rebuilt in small backend-neutral steps with a supervised manual test
+    loop: the headless verification runs on the WebGL 2 fallback only
+    (Chromium gets no WebGPU without a display), so after each step the
+    user confirms the WebGPU path on real hardware — the lesson from the
+    reverted first attempt, whose WebGPU-only TRAA/SSR branch went
+    untested and rendered a black scene. Step 1 is done: TRAA runs
+    backend-neutrally (upstream `TRAANode`, velocity MRT, MSAA off)
+    behind a default-off debug checkbox (`design.md` §21.3) and turns on
+    by default only once the manual WebGPU check has passed. SSR and
+    refraction remain OPEN — three r185's SSRNode emits invalid GLSL on
+    WebGL 2 (upstream) — so reflections still rely on the IBL
+    environment; with the checkbox off, AA relies on the render pass'
+    MSAA. Verifiable: `scripts/verify/settings.mjs` toggles TRAA at
+    runtime and asserts a non-black frame without console errors on the
+    WebGL 2 path (with screenshot 69), and back off again;
+    `src/ui/DebugMenu.test.tsx` asserts the localized checkbox writing
+    through to the UI store.
 
 ### 7.2 Self-Verification (mandatory)
 

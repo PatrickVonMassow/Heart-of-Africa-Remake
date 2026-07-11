@@ -32,6 +32,12 @@ interface UiState {
   /** Frame counter (FPS) in the screen corner; toggled in the debug menu. */
   fpsVisible: boolean
   /**
+   * Temporal anti-aliasing (design.md §2.7). Default off while the manual
+   * WebGPU check loop of CLAUDE.md §7.1 pt. 32 is running; when off, AA
+   * falls back to the render pass' MSAA.
+   */
+  traaEnabled: boolean
+  /**
    * Debug unlock (design.md §21): allow zooming *out* beyond the default
    * camera distance. Zooming in is always available.
    */
@@ -53,6 +59,7 @@ interface UiState {
   setWebglFallback: (fallback: boolean) => void
   dismissWebglWarning: () => void
   setFpsVisible: (visible: boolean) => void
+  setTraaEnabled: (enabled: boolean) => void
   setWheelZoomEnabled: (enabled: boolean) => void
   setTravelZoom: (zoom: number) => void
   setJournalDnd: (dnd: boolean) => void
@@ -66,6 +73,7 @@ export const useUi = create<UiState>()((set) => ({
   webglFallback: false,
   webglWarningDismissed: false,
   fpsVisible: true,
+  traaEnabled: false,
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: 1,
@@ -79,6 +87,7 @@ export const useUi = create<UiState>()((set) => ({
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
+  setTraaEnabled: (traaEnabled) => set({ traaEnabled }),
   // Disabling the unlock clamps any zoom-out back to the default distance;
   // a zoomed-in view is kept.
   setWheelZoomEnabled: (wheelZoomEnabled) =>

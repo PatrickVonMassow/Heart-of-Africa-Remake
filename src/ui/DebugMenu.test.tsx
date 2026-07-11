@@ -66,6 +66,7 @@ afterEach(() => {
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   useLocale.getState().setLang('en')
+  useUi.getState().setTraaEnabled(false)
   if (useUi.getState().debugOpen) useUi.getState().toggleDebug()
 })
 
@@ -127,6 +128,33 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     const input = numberField(label)
     fireEvent.change(input, { target: { value: String(value) } })
     expect(read()).toBe(value)
+  })
+})
+
+describe('DebugMenu TRAA toggle (design.md §2.7/§21)', () => {
+  it('renders the localized TRAA checkbox, default off', () => {
+    render(<DebugMenu />)
+    const row = screen.getByText(en.debug.traa).closest('label')
+    const box = row?.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+    expect(box).not.toBeNull()
+    expect(box?.checked).toBe(false)
+    expect(useUi.getState().traaEnabled).toBe(false)
+  })
+
+  it('toggling the checkbox writes through to the UI store and back', () => {
+    render(<DebugMenu />)
+    const row = screen.getByText(en.debug.traa).closest('label')
+    const box = row?.querySelector('input[type="checkbox"]') as HTMLInputElement
+    fireEvent.click(box)
+    expect(useUi.getState().traaEnabled).toBe(true)
+    fireEvent.click(box)
+    expect(useUi.getState().traaEnabled).toBe(false)
+  })
+
+  it('carries a German label after the language switch', () => {
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    expect(screen.getByText(de.debug.traa)).toBeInTheDocument()
   })
 })
 
