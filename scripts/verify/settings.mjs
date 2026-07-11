@@ -261,6 +261,19 @@ check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean
 check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
   errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
+// The TRAA scene pass must be single-sampled: an omitted samples option
+// inherits the renderer's MSAA (4, antialias: true), whose multisampled
+// depth breaks TRAA's history copy with per-frame WebGPU validation errors
+// (invisible on the WebGL 2 fallback, so asserted structurally here).
+await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
+await page.waitForTimeout(800)
+const traaSamples = await page.evaluate(() => window.__scenePass.renderTarget.samples)
+await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
+await page.waitForTimeout(800)
+const msaaSamples = await page.evaluate(() => window.__scenePass.renderTarget.samples)
+check('TRAA scene pass renders single-sampled (MSAA pass keeps 4)',
+  traaSamples === 0 && msaaSamples === 4, `traa ${traaSamples}, msaa ${msaaSamples}`)
+
 // --- SSR backend gate (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------
 // SSRNode emits invalid GLSL on WebGL 2 (upstream), so on the fallback —
 // which is what headless Chromium runs — the flag must be inert: no shader

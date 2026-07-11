@@ -64,9 +64,16 @@ export function Effects() {
 
     // TRAA jitters the camera and resolves temporally, so MSAA must be off
     // and the pass must write per-pixel velocities. SSR additionally needs
-    // per-pixel metalness/roughness targets.
-    const scenePass = traaEnabled ? pass(scene, camera) : pass(scene, camera, { samples: 4 })
+    // per-pixel metalness/roughness targets. The samples MUST be set
+    // explicitly: an omitted option inherits renderer.samples (4, from
+    // antialias: true), and a multisampled depth breaks TRAA's history copy
+    // with per-frame WebGPU validation errors.
+    const scenePass = pass(scene, camera, { samples: traaEnabled ? 0 : 4 })
     disposables.push(scenePass)
+    // Dev hook for the headless verification (CLAUDE.md §7.2).
+    if (import.meta.env.DEV) {
+      ;(window as unknown as Record<string, unknown>).__scenePass = scenePass
+    }
     scenePass.setMRT(
       mrt({
         output,
