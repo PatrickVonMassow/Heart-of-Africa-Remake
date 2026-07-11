@@ -92,6 +92,9 @@ describe('trimToGameWorld', () => {
     expect(px[sea + 2]).toBe(0)
   })
 
+  // The trimmed east mass sits well beyond the near-shore band (0.6°), so it
+  // takes the deep open-sea stamp and its shelf ring is hidden; a trimmed
+  // spit at a kept shore is covered by the delta assertions below.
   it('deepens the shallow shelf around trimmed land, not shallows near kept land', () => {
     const px = fill()
     const shelfEast = texel(9.5, 21.5) // shallow sea texel bordering the trimmed east mass
@@ -218,6 +221,17 @@ describe('world trim on the real DEM', () => {
       expect(landFractionAt(lat, lon)).toBeGreaterThan(0.5)
       expect(isBlocked(t.type, lat, lon)).toBe(false)
     }
+  })
+
+  it('trimmed coastal spits inherit the local shelf depth, open-sea land stays deep', () => {
+    // The dataset's lagoon bars off the Nile delta are trimmed (disconnected
+    // land), but must read as the surrounding shallow shelf — the former
+    // uniform deep stamp punched dark angular holes into the coastal water.
+    expect(elevationAt(31.6, 30.75)).toBeGreaterThan(-100)
+    expect(elevationAt(31.6, 31.25)).toBeGreaterThan(-100)
+    // Removed open-sea land keeps the plain deep tone (design.md §21.4).
+    expect(elevationAt(35.2, 24.8)).toBeLessThan(-500) // Crete
+    expect(elevationAt(28.3, -16.5)).toBeLessThan(-500) // Canary Islands
   })
 
   it('the African Red Sea coast stays walkable land', () => {

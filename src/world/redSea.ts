@@ -138,9 +138,14 @@ export function trimToGameWorld(
     if (idx >= width) tryVisit(idx - width)
     if (idx < total - width) tryVisit(idx + width)
   }
-  // Deep open sea: matches the water shader's fully-deep tone (and its
-  // outside-the-bbox mask), so trimmed areas read as plain open ocean with
-  // no brighter rectangle against the surrounding sea.
+  // Two kinds of trimmed land (design.md §3.1/§21.4): removed OPEN-SEA land
+  // (Crete, Sicily, the Canaries …) must read as plain deep ocean, while a
+  // removed coastal spit or lagoon bar RIGHT AT a kept shore (the Nile
+  // delta's bars) must read as the same shallow shelf as the sea around it —
+  // a uniform deep stamp there punched dark angular holes into bright
+  // coastal water (the blotchy sea off the delta). Near-shore stamps
+  // therefore inherit the depth of the nearest kept sea (multi-source BFS);
+  // everything else gets the uniform deep stamp.
   const stampedElevation = meta.offsetMeters - 3000
   const hi = (stampedElevation >> 8) & 0xff
   const lo = stampedElevation & 0xff
@@ -148,10 +153,80 @@ export function trimToGameWorld(
   for (let idx = 0; idx < total; idx++) {
     if (visited[idx] || !isLand(idx)) continue
     stamped[idx] = 1
-    const i = idx * 4
-    pixels[i] = hi
-    pixels[i + 1] = lo
-    pixels[i + 2] = 0
+    pixels[idx * 4 + 2] = 0
+  }
+  const encAt = (idx: number) => pixels[idx * 4] * 256 + pixels[idx * 4 + 1]
+  const writeEnc = (idx: number, val: number) => {
+    pixels[idx * 4] = (val >> 8) & 0xff
+    pixels[idx * 4 + 1] = val & 0xff
+  }
+  const neighbors = (idx: number): [number, number, number, number] => {
+    const x = idx % width
+    return [
+      x > 0 ? idx - 1 : -1,
+      x < width - 1 ? idx + 1 : -1,
+      idx >= width ? idx - width : -1,
+      idx < total - width ? idx + width : -1,
+    ]
+  }
+  // Near-shore mask: separable box dilation of the KEPT land by ~0.6°.
+  const shoreRadius = Math.max(1, Math.round(0.6 / meta.res))
+  const nearShore = new Uint8Array(total)
+  {
+    const maskH = new Uint8Array(total)
+    for (let y = 0; y < height; y++) {
+      const row = y * width
+      let count = 0
+      for (let x = 0; x < width + shoreRadius; x++) {
+        if (x < width && isLand(row + x)) count++
+        const drop = x - 2 * shoreRadius - 1
+        if (drop >= 0 && isLand(row + drop)) count--
+        const cx = x - shoreRadius
+        if (cx >= 0 && cx < width && count > 0) maskH[row + cx] = 1
+      }
+    }
+    for (let x = 0; x < width; x++) {
+      let count = 0
+      for (let y = 0; y < height + shoreRadius; y++) {
+        if (y < height && maskH[y * width + x]) count++
+        const drop = y - 2 * shoreRadius - 1
+        if (drop >= 0 && maskH[drop * width + x]) count--
+        const cy = y - shoreRadius
+        if (cy >= 0 && cy < height && count > 0) nearShore[cy * width + x] = 1
+      }
+    }
+  }
+  {
+    // Near-shore stamps inherit the nearest kept sea depth.
+    const assigned = new Int32Array(total).fill(-1)
+    const bfs = new Int32Array(total)
+    let bfsHead = 0
+    let bfsTail = 0
+    for (let idx = 0; idx < total; idx++) {
+      if (!stamped[idx] || !nearShore[idx] || assigned[idx] >= 0) continue
+      for (const nb of neighbors(idx)) {
+        if (nb < 0 || stamped[nb] || isLand(nb)) continue
+        assigned[idx] = encAt(nb)
+        bfs[bfsTail++] = idx
+        break
+      }
+    }
+    while (bfsHead < bfsTail) {
+      const idx = bfs[bfsHead++]
+      const val = assigned[idx]
+      for (const nb of neighbors(idx)) {
+        if (nb < 0 || !stamped[nb] || !nearShore[nb] || assigned[nb] >= 0) continue
+        assigned[nb] = val
+        bfs[bfsTail++] = nb
+      }
+    }
+    for (let idx = 0; idx < total; idx++) {
+      if (!stamped[idx]) continue
+      // Off-shore stamps and enclosed remainders without sea contact stay
+      // plain deep.
+      const val = nearShore[idx] && assigned[idx] >= 0 ? assigned[idx] : stampedElevation
+      writeEnc(idx, val)
+    }
   }
   // The northeast side of the boundary reads as plain open ocean in full:
   // shallow sea there — the Persian Gulf's banks, the Dahlak shelf, the
@@ -191,19 +266,26 @@ export function trimToGameWorld(
     }
   }
   // Ghost shelves: a trimmed island would leave its shallow shelf behind as
-  // a bright outline of the removed land. Deepen shallow sea near trimmed
-  // texels (separable box dilation of the stamp mask), so trimmed land
-  // leaves no trace; deep sea and shores of kept land stay untouched.
+  // a bright outline of the removed land. Deepen shallow sea near DEEP
+  // stamps (separable box dilation of that mask), so removed open-sea land
+  // leaves no trace; deep sea and shores of kept land stay untouched. The
+  // shallow near-shore stamps are excluded — around them the dilation would
+  // re-punch the dark holes the nearest-sea inheritance just closed.
   const radius = Math.max(1, Math.round(0.3 / meta.res))
   const shallowLimit = meta.offsetMeters - 150 // above = shallower than 150 m
+  const deepLimit = meta.offsetMeters - 500
+  const stampedDeep = new Uint8Array(total)
+  for (let idx = 0; idx < total; idx++) {
+    if (stamped[idx] && encAt(idx) <= deepLimit) stampedDeep[idx] = 1
+  }
   const maskH = new Uint8Array(total)
   for (let y = 0; y < meta.height; y++) {
     const row = y * meta.width
     let count = 0
     for (let x = 0; x < meta.width + radius; x++) {
-      if (x < meta.width && stamped[row + x]) count++
+      if (x < meta.width && stampedDeep[row + x]) count++
       const drop = x - 2 * radius - 1
-      if (drop >= 0 && stamped[row + drop]) count--
+      if (drop >= 0 && stampedDeep[row + drop]) count--
       const cx = x - radius
       if (cx >= 0 && cx < meta.width && count > 0) maskH[row + cx] = 1
     }

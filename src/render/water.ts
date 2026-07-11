@@ -138,9 +138,10 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const deep = color('#0b2f4e')
   let col = mix(riverTone, shallow, smoothstep(float(0), float(25), depthM))
   col = mix(col, mid, smoothstep(float(30), float(400), depthM))
-  // Fully deep by ~1600 m: abyssal plains, trimmed-land stamps (-3000 m,
-  // world/redSea.ts) and the outside-bbox mask all share one deep tone, so
-  // no trimmed silhouette stands out against a shallower ocean basin.
+  // Fully deep by ~1600 m: abyssal plains, removed open-sea land (-3000 m
+  // stamps, world/redSea.ts) and the outside-bbox mask all share one deep
+  // tone, so no trimmed silhouette stands out against a shallower basin;
+  // removed shore spits instead inherit their local shelf depth there.
   col = mix(col, deep, smoothstep(float(500), float(1600), depthM))
   // Gentle ripple modulation keeps large surfaces alive.
   const ripple = mx_fractal_noise_float(
