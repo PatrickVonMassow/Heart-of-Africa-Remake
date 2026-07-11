@@ -236,6 +236,31 @@ check('TRAA off again: MSAA path renders non-black', msaaMean > 8, `mean ${msaaM
 check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
   errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 
+// Repeated toggling must not leak the pipeline: every rebuild disposes the
+// full node chain (scene MRT, GTAO, bloom, TRAA history/RTT). The regression
+// was a GPU-memory leak per toggle that blacked out the device after a few
+// switches on real hardware. Gate on the renderer's live texture count —
+// it must stay flat across cycles, not grow per toggle.
+const texCount = () => page.evaluate(() => window.__renderer.info.memory.textures)
+const toggleTraa = async (on) => {
+  await page.evaluate((v) => window.__ui.getState().setTraaEnabled(v), on)
+  await page.waitForTimeout(600)
+}
+await toggleTraa(true)
+await toggleTraa(false)
+const texAfterFirstCycle = await texCount()
+for (let i = 0; i < 5; i++) {
+  await toggleTraa(true)
+  await toggleTraa(false)
+}
+const texAfterStress = await texCount()
+check('TRAA toggle stress: no render-target leak across rebuilds',
+  texAfterStress <= texAfterFirstCycle + 2, `${texAfterFirstCycle} -> ${texAfterStress}`)
+const stressMean = await meanLuma(await page.screenshot())
+check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean ${stressMean.toFixed(1)}`)
+check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
+  errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

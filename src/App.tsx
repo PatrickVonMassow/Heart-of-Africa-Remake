@@ -34,6 +34,11 @@ export default function App() {
           // Surface the automatic WebGL 2 fallback to the player (CLAUDE.md §3).
           const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
           useUi.getState().setWebglFallback(backend?.isWebGPUBackend !== true)
+          // Dev hook for the headless verification (CLAUDE.md §7.2): the
+          // pipeline-rebuild leak gate reads renderer.info.memory.
+          if (import.meta.env.DEV) {
+            ;(window as unknown as Record<string, unknown>).__renderer = renderer
+          }
           // Filmic look: soft shadows + ACES tone mapping.
           renderer.shadowMap.enabled = true
           renderer.shadowMap.type = THREE.PCFSoftShadowMap

@@ -45,9 +45,17 @@ export function Effects() {
   const traaEnabled = useUi((s) => s.traaEnabled)
 
   const post = useMemo(() => {
+    // The toggle rebuilds the whole pipeline, and three's PostProcessing
+    // disposes only its own quad material — every pass created here must be
+    // collected and disposed with it, or each rebuild leaks its render
+    // targets until the GPU device is lost (black screen after a few
+    // toggles on real hardware).
+    const disposables: Array<{ dispose: () => void }> = []
+
     // TRAA jitters the camera and resolves temporally, so MSAA must be off
     // and the pass must write per-pixel velocities.
     const scenePass = traaEnabled ? pass(scene, camera) : pass(scene, camera, { samples: 4 })
+    disposables.push(scenePass)
     scenePass.setMRT(
       traaEnabled
         ? mrt({ output, normal: normalView, velocity })
@@ -59,22 +67,55 @@ export function Effects() {
 
     // Screen-space ambient occlusion (single-channel target → use .r).
     const aoPass = ao(depth, normal, camera)
+    disposables.push(aoPass)
+    // GTAO's dispose() misses its internal noise DataTexture.
+    const aoNoise = (aoPass as unknown as { _noiseNode?: { value?: { dispose: () => void } } })
+      ._noiseNode?.value
+    disposables.push({ dispose: () => aoNoise?.dispose() })
     const aoComposed = color.mul(aoPass.getTextureNode().r)
 
     // Temporal resolve over the AO-composed image, so the accumulation also
     // settles the (jittered) AO term instead of re-aliasing it afterwards.
-    // Consumed via its pass texture node (like GTAO/bloom); the cast covers
-    // getTextureNode() missing from the upstream declaration file.
-    const composed = traaEnabled
-      ? (
-          traa(aoComposed, depth, scenePass.getTextureNode('velocity'), camera) as unknown as {
-            getTextureNode: () => typeof aoComposed
-          }
-        ).getTextureNode()
-      : aoComposed
+    // Consumed via its pass texture node (like GTAO/bloom); the casts cover
+    // getTextureNode() and the RTT internals missing from the upstream
+    // declaration file.
+    let composed = aoComposed
+    if (traaEnabled) {
+      const traaNode = traa(aoComposed, depth, scenePass.getTextureNode('velocity'), camera)
+      disposables.push(traaNode)
+      // traa() wraps the composed input in an RTT node, which owns a
+      // full-resolution render target of its own and has no dispose().
+      const rtt = traaNode.beautyNode as unknown as {
+        renderTarget?: { dispose: () => void }
+        _quadMesh?: { material: { dispose: () => void } }
+      }
+      disposables.push({
+        dispose: () => {
+          rtt.renderTarget?.dispose()
+          rtt._quadMesh?.material.dispose()
+        },
+      })
+      // TRAA's dispose() misses its previous-depth texture; the initial
+      // placeholder is swapped out after the first frame, so free both.
+      const prevDepthNode = (
+        traaNode as unknown as { _previousDepthNode?: { value?: { dispose: () => void } } }
+      )._previousDepthNode
+      const initialPrevDepth = prevDepthNode?.value
+      disposables.push({
+        dispose: () => {
+          initialPrevDepth?.dispose()
+          if (prevDepthNode?.value !== initialPrevDepth) prevDepthNode?.value?.dispose()
+        },
+      })
+      composed = (
+        traaNode as unknown as { getTextureNode: () => typeof aoComposed }
+      ).getTextureNode()
+    }
 
     // Bloom on bright highlights (sun glints, fire, snow).
-    const withBloom = composed.add(bloom(composed, 0.25, 0.35, 0.88))
+    const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
+    disposables.push(bloomNode)
+    const withBloom = composed.add(bloomNode)
 
     // Color grading: gentle saturation lift and warm highlights.
     const luma = withBloom.rgb.dot(vec3(0.2126, 0.7152, 0.0722))
@@ -87,7 +128,19 @@ export function Effects() {
 
     const processing = new THREE.PostProcessing(gl)
     processing.outputNode = graded.mul(vignette)
-    return processing
+
+    const dispose = () => {
+      processing.dispose()
+      for (const d of disposables) d.dispose()
+      // A teardown can land between the TRAA jitter set and its per-frame
+      // clear: never leave the shared camera or the module-level velocity
+      // node with a stale jitter/projection.
+      if (traaEnabled) {
+        ;(camera as THREE.PerspectiveCamera).clearViewOffset()
+        velocity.setProjectionMatrix(null)
+      }
+    }
+    return { processing, dispose }
   }, [gl, scene, camera, traaEnabled])
 
   useEffect(() => {
@@ -98,7 +151,7 @@ export function Effects() {
 
   // Priority render: replaces R3F's default render with the post pipeline.
   useFrame(() => {
-    post.render()
+    post.processing.render()
   }, 1)
 
   return null
