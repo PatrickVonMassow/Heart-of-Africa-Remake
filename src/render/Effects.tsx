@@ -122,9 +122,14 @@ export function Effects() {
       ssrNode.maxDistance.value = 40
       ssrNode.thickness.value = 0.5
       ssrNode.resolutionScale = 0.5
-      // Additive reflection contribution (alpha untouched); the SSR alpha
-      // channel carries the ray distance, not opacity.
-      aoComposed = aoComposed.add(vec4(ssrNode.rgb, 0))
+      // Additive reflection contribution (alpha untouched; the SSR alpha
+      // channel carries the ray distance, not opacity) — masked to SMOOTH
+      // surfaces. reflectNonMetals traces every dielectric, and the blurred
+      // reflections of rough ground (sand/rock, roughness ~0.9) smear huge
+      // gray clouds over the whole frame; only the near-mirror water and
+      // glossy surfaces are meant to reflect.
+      const smoothMask = smoothstep(0.15, 0.45, metalRough.g).oneMinus()
+      aoComposed = aoComposed.add(vec4(ssrNode.rgb.mul(smoothMask), 0))
     }
 
     // Temporal resolve over the AO-composed image, so the accumulation also
