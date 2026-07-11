@@ -2,7 +2,7 @@
 // Pipeline"): scene pass with MRT normals → GTAO (screen-space ambient
 // occlusion) → optional TRAA (temporal anti-aliasing) → bloom → color
 // grading (warm highlights, gentle saturation) → subtle vignette. Tone
-// mapping (ACES) and output color space are applied by THREE.PostProcessing
+// mapping (ACES) and output color space are applied by THREE.RenderPipeline
 // itself. Also installs the procedural IBL environment on the scene.
 //
 // TRAA is the default since its manual WebGPU check passed (CLAUDE.md §7.1
@@ -55,7 +55,7 @@ export function Effects() {
   const ssrActive = ssrEnabled && !webglFallback
 
   const post = useMemo(() => {
-    // The toggle rebuilds the whole pipeline, and three's PostProcessing
+    // The toggle rebuilds the whole pipeline, and three's RenderPipeline
     // disposes only its own quad material — every pass created here must be
     // collected and disposed with it, or each rebuild leaks its render
     // targets until the GPU device is lost (black screen after a few
@@ -179,7 +179,9 @@ export function Effects() {
     const d = viewportUV.sub(0.5).length()
     const vignette = smoothstep(0.95, 0.45, d).mul(0.18).add(0.82)
 
-    const processing = new THREE.PostProcessing(gl)
+    // RenderPipeline is r185's name for the former PostProcessing (which now
+    // only lives on as a deprecation alias that warns on construction).
+    const processing = new THREE.RenderPipeline(gl)
     processing.outputNode = graded.mul(vignette)
 
     const dispose = () => {

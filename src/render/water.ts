@@ -151,16 +151,23 @@ export function createWaterMaterial(): WaterMaterialHandle {
   const foam = max(shoreFoam, crestFoam).mul(0.85).mul(lively)
   col = mix(col, color('#eaf4f6'), foam)
 
-  // Sparse moving glints from a tight Worley cell pattern.
+  // Sparse moving glints from a tight Worley cell pattern. The cells are
+  // world-sized, so a close camera would read them as dense confetti
+  // scattered over the sea — fade them out below the default view height
+  // and keep them sparse and subtle beyond it.
+  const camDist = positionWorld.sub(cameraPosition).length()
   const w = mx_worley_noise_float(vec3(wp.mul(1.7), time.mul(0.3)))
-  const sparkle = pow(smoothstep(float(0.85), float(1.0), w.oneMinus()), float(6)).mul(0.18).mul(lively)
+  const glintVis = smoothstep(float(16), float(32), camDist)
+  const sparkle = pow(smoothstep(float(0.9), float(1.0), w.oneMinus()), float(6))
+    .mul(0.12)
+    .mul(lively)
+    .mul(glintVis)
   col = col.add(vec3(sparkle, sparkle, sparkle))
 
   m.colorNode = col
   // Shallow water is clearer, deep water opaque; foam always opaque. Far
   // from the camera the surface turns fully opaque, so the end of the
   // terrain chunks underneath is never visible.
-  const camDist = positionWorld.sub(cameraPosition).length()
   m.opacityNode = smoothstep(float(0), float(60), depthM)
     .mul(0.35)
     .add(0.58)

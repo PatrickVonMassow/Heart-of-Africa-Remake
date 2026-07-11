@@ -94,6 +94,10 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
   const normals = new Float32Array(total * 3)
   const colors = new Float32Array(total * 3)
   const splats = new Float32Array(total * 4)
+  // Planar uv matching the material's top projection (world xz * 0.5): the
+  // normal-map TBN derives from uv screen derivatives, so without a real uv
+  // attribute the tangent basis degenerates (and every material build warns).
+  const uvs = new Float32Array(total * 2)
 
   // Height grid including a margin ring for normal computation.
   const m = n + 2
@@ -124,6 +128,8 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
       positions[vi * 3] = x0 + ix * step
       positions[vi * 3 + 1] = heights[(iz + 1) * m + (ix + 1)]
       positions[vi * 3 + 2] = z0 + iz * step
+      uvs[vi * 2] = (x0 + ix * step) * 0.5
+      uvs[vi * 2 + 1] = (z0 + iz * step) * 0.5
       const hl = heights[(iz + 1) * m + ix]
       const hr = heights[(iz + 1) * m + (ix + 2)]
       const hd = heights[iz * m + (ix + 1)]
@@ -174,6 +180,8 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
       colors[sv * 3 + 1] = colors[src * 3 + 1]
       colors[sv * 3 + 2] = colors[src * 3 + 2]
       for (let k = 0; k < 4; k++) splats[sv * 4 + k] = splats[src * 4 + k]
+      uvs[sv * 2] = uvs[src * 2]
+      uvs[sv * 2 + 1] = uvs[src * 2 + 1]
       sv++
     }
     for (let i = 0; i < n - 1; i++) {
@@ -188,6 +196,7 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
   geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
   geo.setIndex(indices)
   return geo
 }
