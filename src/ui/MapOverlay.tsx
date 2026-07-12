@@ -78,9 +78,36 @@ export function MapOverlay() {
 
   useEffect(() => {
     if (!open) return
-    const ctx = canvasRef.current?.getContext('2d')
-    if (!ctx) return
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!ctx || !canvas) return
     ctx.clearRect(0, 0, W, H)
+
+    // --- Aged-parchment base: warm gradient, deterministic mottling, vignette.
+    const bg = ctx.createLinearGradient(0, 0, W, H)
+    bg.addColorStop(0, '#efe6cd')
+    bg.addColorStop(1, '#e3d4af')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+    for (let i = 0; i < 300; i++) {
+      const h1 = Math.sin(i * 12.9898) * 43758.5453
+      const h2 = Math.sin(i * 78.233) * 24634.6345
+      const h3 = Math.sin(i * 5.137) * 1234.567
+      const rx = (h1 - Math.floor(h1)) * W
+      const ry = (h2 - Math.floor(h2)) * H
+      const rr = 5 + (h3 - Math.floor(h3)) * 26
+      ctx.globalAlpha = 0.035
+      ctx.fillStyle = i % 2 ? '#b6984f' : '#c8b483'
+      ctx.beginPath()
+      ctx.arc(rx, ry, rr, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.globalAlpha = 1
+    const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.32, W / 2, H / 2, Math.max(W, H) * 0.62)
+    vg.addColorStop(0, 'rgba(0,0,0,0)')
+    vg.addColorStop(1, 'rgba(90,58,20,0.2)')
+    ctx.fillStyle = vg
+    ctx.fillRect(0, 0, W, H)
 
     const isExplored = (lon: number, lat: number) => explored[exploreCellKey(lat, lon)] === true
 
@@ -126,6 +153,50 @@ export function MapOverlay() {
     for (const lake of LAKES) drawPolyline(lake.points, true, 1.3, 0.8)
     for (const river of RIVERS_DATA) drawPolyline(river.points, false, 1.1, 0.7)
 
+    // --- Fog of war (design.md §19): the unexplored map lies under a cloudy
+    // veil; each explored grid cell clears a soft window through it, so the ink
+    // beneath shows only where the traveller has been. Built on an offscreen
+    // canvas (destination-out clears the fog, not the parchment) then composited.
+    const fog = document.createElement('canvas')
+    fog.width = W
+    fog.height = H
+    const fctx = fog.getContext('2d')
+    if (fctx) {
+      fctx.fillStyle = 'rgba(126, 108, 78, 0.9)'
+      fctx.fillRect(0, 0, W, H)
+      // Faint cloud texture so the veil is not a flat wash.
+      for (let i = 0; i < 44; i++) {
+        const h1 = Math.sin(i * 33.71) * 9871.2
+        const h2 = Math.sin(i * 71.13) * 4412.9
+        const h3 = Math.sin(i * 17.9) * 2233.1
+        const bx = (h1 - Math.floor(h1)) * W
+        const by = (h2 - Math.floor(h2)) * H
+        const br = 30 + (h3 - Math.floor(h3)) * 90
+        const cl = fctx.createRadialGradient(bx, by, 0, bx, by, br)
+        cl.addColorStop(0, i % 2 ? 'rgba(150,132,96,0.5)' : 'rgba(96,80,54,0.5)')
+        cl.addColorStop(1, 'rgba(0,0,0,0)')
+        fctx.fillStyle = cl
+        fctx.fillRect(bx - br, by - br, br * 2, br * 2)
+      }
+      fctx.globalCompositeOperation = 'destination-out'
+      const cellPx = (EXPLORE_CELL_DEG / (LON_MAX - LON_MIN)) * W
+      const r = Math.max(6, cellPx * 2.2)
+      for (const key of Object.keys(explored)) {
+        const [ix, iy] = key.split('|').map(Number)
+        const cLat = (iy + 0.5) * EXPLORE_CELL_DEG
+        const cLon = (ix + 0.5) * EXPLORE_CELL_DEG
+        const [x, y] = project(cLon, cLat)
+        const grd = fctx.createRadialGradient(x, y, 0, x, y, r)
+        grd.addColorStop(0, 'rgba(0,0,0,1)')
+        grd.addColorStop(0.55, 'rgba(0,0,0,0.92)')
+        grd.addColorStop(1, 'rgba(0,0,0,0)')
+        fctx.fillStyle = grd
+        fctx.fillRect(x - r, y - r, r * 2, r * 2)
+      }
+      fctx.globalCompositeOperation = 'source-over'
+      ctx.drawImage(fog, 0, 0)
+    }
+
     // Region borders: dashed ink lines over land, always visible — they are
     // conceptual divisions, not geography waiting to be discovered.
     ctx.strokeStyle = INK
@@ -165,11 +236,12 @@ export function MapOverlay() {
     ctx.setLineDash([])
     ctx.globalAlpha = 1
 
-    // Region names on both sides of the borders (design.md §3).
-    ctx.font = 'italic 11px Georgia, serif'
-    ctx.fillStyle = INK
+    // Region names on both sides of the borders (design.md §3) — a faded
+    // sepia-red, conceptual and drawn over the fog like the borders.
+    ctx.font = 'small-caps bold 13px Georgia, serif'
+    ctx.fillStyle = '#8c3a26'
     ctx.textAlign = 'center'
-    ctx.globalAlpha = 0.55
+    ctx.globalAlpha = 0.7
     for (const a of regionBorderLabelAnchors(16, 1.7)) {
       if (cellAt(a.lat, a.lon) === CELL_OCEAN) continue
       const [x, y] = project(a.lon, a.lat)
@@ -228,10 +300,11 @@ export function MapOverlay() {
     ctx.lineTo(px - 5, py + 5)
     ctx.stroke()
 
-    // Small compass rose, bottom left.
-    const cx = 40
-    const cy = H - 48
+    // Small compass rose, top right (clear of the title cartouche).
+    const cx = W - 46
+    const cy = 46
     ctx.strokeStyle = INK
+    ctx.fillStyle = INK
     ctx.lineWidth = 1.2
     ctx.globalAlpha = 0.75
     ctx.beginPath()
@@ -244,8 +317,66 @@ export function MapOverlay() {
     ctx.lineTo(cx, cy - 12)
     ctx.lineTo(cx + 4, cy - 6)
     ctx.stroke()
-    ctx.fillText('N', cx - 4, cy - 20)
+    ctx.textAlign = 'center'
+    ctx.font = '10px Georgia, serif'
+    ctx.fillText('N', cx, cy - 19)
+    ctx.textAlign = 'left'
     ctx.globalAlpha = 1
+
+    // --- Decorative border frame: a double ink rule with a diamond chain, like
+    // an engraved map border.
+    const diamond = (dx: number, dy: number, s: number) => {
+      ctx.beginPath()
+      ctx.moveTo(dx, dy - s)
+      ctx.lineTo(dx + s, dy)
+      ctx.lineTo(dx, dy + s)
+      ctx.lineTo(dx - s, dy)
+      ctx.closePath()
+      ctx.fill()
+    }
+    const m = 7
+    ctx.strokeStyle = INK
+    ctx.fillStyle = INK
+    ctx.globalAlpha = 0.92
+    ctx.lineWidth = 2.4
+    ctx.strokeRect(m, m, W - 2 * m, H - 2 * m)
+    const inner = m + 7
+    ctx.lineWidth = 1
+    ctx.strokeRect(inner, inner, W - 2 * inner, H - 2 * inner)
+    const mid = m + 3.5
+    for (let x = inner; x <= W - inner; x += 13) {
+      diamond(x, mid, 3)
+      diamond(x, H - mid, 3)
+    }
+    for (let y = inner; y <= H - inner; y += 13) {
+      diamond(mid, y, 3)
+      diamond(W - mid, y, 3)
+    }
+    ctx.globalAlpha = 1
+
+    // --- Title cartouche (bottom left): the continent name on a small scroll.
+    const bw = 156
+    const bh = 46
+    const bx = 26
+    const by = H - 68
+    ctx.fillStyle = 'rgba(233, 221, 190, 0.94)'
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.roundRect(bx, by, bw, bh, 5)
+    ctx.fill()
+    ctx.stroke()
+    // Rolled scroll ends.
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(bx, by + bh / 2, 5, 0, Math.PI * 2)
+    ctx.arc(bx + bw, by + bh / 2, 5, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = INK
+    ctx.font = 'bold 27px Georgia, serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(t.mapOverlay.continent.toUpperCase(), bx + bw / 2, by + bh / 2 + 9)
+    ctx.textAlign = 'left'
   }, [open, explored, visitedPlaces, freeCamps, pos, t])
 
   if (!open) return null

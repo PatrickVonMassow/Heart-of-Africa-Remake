@@ -341,10 +341,18 @@ the map).
   and forth. The body-separation pass parts a calf from its own parent every
   frame while play/follow pulls it back; exclude the parent-calf pair.
   (The separation neighbour scan skips an animal's own child/parent.)
-- [ ] 54. Make the exploration map look like a real hand-drawn map (parchment,
+- [x] 54. Make the exploration map look like a real hand-drawn map (parchment,
   decorative border, a title cartouche, ink coastlines/rivers, region names
   North/West/Central/East/South) as in the reference image, keeping the
   discovery gating: unexplored areas are hidden under fog of war.
+  (The MapOverlay canvas now paints an aged-parchment base (gradient + mottling
+  + vignette), a diamond-chain engraved border, an AFRICA/AFRIKA title
+  cartouche, a top-right compass and sepia-red region names over the existing
+  ink coasts/rivers/lakes. Fog of war: an offscreen fog layer covers the whole
+  chart and destination-out clears a soft window at every explored grid cell,
+  so the inked geography shows only where the traveller has been. i18n
+  continent name (de + en); enrichments reads back that the explored area is
+  lighter than the fogged area, with screenshot 92.)
 - [x] 55. The default bird's-eye zoom should start more zoomed in. Default 0.5,
   and without the debug unlock the wheel cannot zoom out past that default.
   (ui DEFAULT_TRAVEL_ZOOM = 0.5 is both the start and the no-unlock zoom-out

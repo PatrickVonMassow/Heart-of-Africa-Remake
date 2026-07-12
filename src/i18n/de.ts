@@ -205,6 +205,7 @@ export const de: Strings = {
 
   mapOverlay: {
     title: 'Karte',
+    continent: 'Afrika',
     explored: (region, percent) => `${region}: ${percent} % erkundet`,
     close: 'Schließen (M)',
   },

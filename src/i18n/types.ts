@@ -110,6 +110,8 @@ export interface Strings {
 
   mapOverlay: {
     title: string
+    /** Continent name shown in the map's title cartouche. */
+    continent: string
     explored(region: string, percent: number): string
     close: string
   }

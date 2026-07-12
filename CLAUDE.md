@@ -221,10 +221,15 @@ verify suite that proves it.
    courses. Region borders carry the localized region name on each side of
    the line in both views (§3.2); map-point labels are discovery-gated
    (§17.2); coordinates are read out on demand via the position query
-   (§3.2, pt. 30), never shown permanently. Verifiable: near a border,
-   `.region-label` elements name both regions on their sides; undiscovered
-   `.map-label` elements read "?", a visited place (Cairo) shows its name,
-   and sighting a landmark reveals its name
+   (§3.2, pt. 30), never shown permanently. The exploration map (§19.11)
+   reads as a real hand-drawn parchment chart (engraved border, title
+   cartouche, ink coasts/rivers/lakes, region names, compass) under a fog
+   of war that each explored area clears a window through. Verifiable: near
+   a border, `.region-label` elements name both regions on their sides;
+   undiscovered `.map-label` elements read "?", a visited place (Cairo)
+   shows its name, and sighting a landmark reveals its name; the opened
+   exploration map's explored area reads lighter (cleared) than the
+   unexplored area (under fog) with a screenshot (92)
    (`scripts/verify/enrichments.mjs`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890).

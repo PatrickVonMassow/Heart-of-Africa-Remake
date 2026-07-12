@@ -557,7 +557,7 @@ Inhabitants at everyday activities (cooking, weaving, livestock, playing childre
 ### 19.11 Journal illustrations and self-drawing map
 
 - Illustrated journal entries: occasional hand sketches (an animal, a landmark, a face) beside the text, matching the handwritten presentation (§16).
-- Self-drawing map: the map fills in while exploring as a hand-drawn sketch rather than mere fog removal; fits the exploration overview (§17).
+- Exploration map: the map reads as a real hand-drawn chart of Africa — an aged-parchment sheet inside a decorative engraved border, with a title cartouche, ink coastlines, rivers and lakes, the region names, a compass rose and the visited-place markers. It is discovery-gated: the whole chart lies under a cloudy fog of war and each explored area clears a soft window through it, so the inked geography shows only where the traveller has been. Fits the exploration overview (§17).
 
 ### 19.12 No day/night cycle
 

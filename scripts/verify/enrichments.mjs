@@ -214,6 +214,35 @@ check('the Meroë pyramids reveal their name once sighted', meroeRevealed, '')
 await page.screenshot({ path: `${OUT}91-cultural-landmark-meroe.png` })
 console.log('shot 91-cultural-landmark-meroe.png')
 
+// --- Exploration map: parchment look + fog of war (§7.1.3, design.md §19) -----
+// Explore a swath of the north, open the map and confirm the explored area is a
+// cleared (lighter) window through the fog while the unexplored south stays
+// darker under the veil — plus the parchment/frame render (non-blank canvas).
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  for (let lat = 30; lat >= 10; lat -= 1.5) for (let lon = 8; lon <= 38; lon += 1.5) g.debugJumpTo(lat, lon)
+  window.__ui.getState().toggleMap()
+})
+await page.waitForTimeout(500)
+const mapPix = await page.evaluate(() => {
+  const c = document.querySelector('.map-overlay canvas')
+  if (!c) return null
+  const ctx = c.getContext('2d')
+  const lum = (x, y) => {
+    const d = ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data
+    return 0.299 * d[0] + 0.587 * d[1] + 0.587 * d[2]
+  }
+  return { explored: lum(c.width * 0.5, c.height * 0.28), fogged: lum(c.width * 0.5, c.height * 0.9) }
+})
+check(
+  'exploration map: explored area is cleared while the unexplored is under fog',
+  mapPix !== null && mapPix.explored > mapPix.fogged + 25,
+  JSON.stringify(mapPix),
+)
+await page.locator('.map-overlay').screenshot({ path: `${OUT}92-map-fog-of-war.png` })
+console.log('shot 92-map-fog-of-war.png')
+await page.evaluate(() => window.__ui.getState().toggleMap())
+
 // --- Rivers: cascades, springs, lake surfaces (§7.1.21) ----------------------
 const rivers = await page.evaluate(() => window.__rivers)
 check('Rivers: 5 waterfall cascades', rivers?.falls === 5, `${rivers?.falls}`)
