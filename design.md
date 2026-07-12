@@ -257,7 +257,7 @@ The very first time each of these slowdowns is met, it is also announced once in
 
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
 
-The Red Sea is never inland water: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — is open, impassable ocean, the same as the sea around the rest of the continent. The other bays keep their outline treatment unchanged.
+The Red Sea is never inland water: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — is open, impassable ocean, the same as the sea around the rest of the continent. The Mediterranean likewise: the sea off the entire northern coast (Alexandria, the Nile delta, the Gulf of Sidra …) is open ocean and never swimmable, coastal band or not. The other bays keep their outline treatment unchanged.
 
 Swimmable sea reaches only a short band off the coast (a calibratable balance value, adjustable in the debug menu §21): further out, the open ocean blocks movement even where the continent's outline still encloses it — there is no swimming far out to sea.
 

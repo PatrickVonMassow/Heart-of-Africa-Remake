@@ -361,17 +361,27 @@ function coastlineDistanceDeg(lat: number, lon: number): number {
   return Math.sqrt(best)
 }
 
+/** The Mediterranean is open sea, never a swimmable bight (design.md §11.2):
+ *  the convex hull spanning the northern coast would otherwise class the
+ *  water off Alexandria or in the Gulf of Sidra as continent-enclosed and
+ *  open its coastal band to swimming. Ocean north of this latitude and east
+ *  of Gibraltar always blocks; the African north coast itself lies south of
+ *  the latitude only as land, so no legitimate swim water is caught. */
+const MEDITERRANEAN_LAT_MIN = 30.2
+const MEDITERRANEAN_LON_MIN = -6.5
+
 /**
  * Ocean blocks movement only outside the continent's outline (design.md
  * §11.2); enclosed sea water is swimmable like rivers and lakes, but only
  * within the calibratable swim margin off the coast — no swimming far out
- * into the open sea. Northeast of the Red Sea boundary the ocean always
- * blocks, hull or not.
+ * into the open sea. Northeast of the Red Sea boundary and throughout the
+ * Mediterranean the ocean always blocks, hull or not.
  */
 export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolean {
   if (type !== 'ocean') return false
   if (lat === undefined || lon === undefined) return true
   if (isNortheastOfBoundary(lat, lon)) return true
+  if (lat > MEDITERRANEAN_LAT_MIN && lon > MEDITERRANEAN_LON_MIN) return true
   if (!insideContinentOutline(lat, lon)) return true
   return coastlineDistanceDeg(lat, lon) > balance.oceanSwimMarginDeg
 }

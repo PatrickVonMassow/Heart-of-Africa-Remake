@@ -229,7 +229,9 @@ verify suite that proves it.
    The movement boundary of `design.md` §11.2 holds (enclosed sea
    swimmable only within the calibratable coastal band, open ocean
    blocks, the Red Sea cut of §3.1/§11.2: everything northeast of the
-   African Red Sea coast is blocked ocean, never inland water, and the
+   African Red Sea coast is blocked ocean, never inland water, the
+   Mediterranean always-blocked rule of §11.2: the sea off the northern
+   coast is open ocean with no swimmable band, and the
    §3.1 world trim: no land renders outside the game's land masses), as
    do the ropeless mountain climb with
    its warning and fall risk (§7/§11), the visible movement-penalty reason
@@ -257,9 +259,11 @@ verify suite that proves it.
    no trimmed texel borders kept land outside the Suez isthmus gate (no
    ocean scrap juts into the coast), the Nile delta and the African Red
    Sea coast stay walkable land, nearshore sea swims while far-offshore
-   sea blocks even inside the hull (the margin edits at runtime), and
-   the hull rules for the open Atlantic and the Mozambique channel are
-   unchanged (`src/world/redSea.test.ts`).
+   sea blocks even inside the hull (the margin edits at runtime), the
+   Mediterranean blocks everywhere — off the delta, off Alexandria, in
+   the Sidra bight — regardless of the swim margin, and the hull rules
+   for the open Atlantic and the Mozambique channel are unchanged
+   (`src/world/redSea.test.ts`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (`design.md` §18; simplified saving is

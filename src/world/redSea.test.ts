@@ -255,18 +255,43 @@ describe('swim margin (design.md §11.2)', () => {
     const bight = sampleTerrain(2, 0, seed)
     expect(bight.type).toBe('ocean')
     expect(isBlocked(bight.type, 2, 0)).toBe(true)
-    // Mediterranean off the Gulf of Sidra (~1.7° offshore, inside the hull):
-    // blocked by the margin since the world-trim work; formerly swimmable.
+    // Mediterranean off the Gulf of Sidra: open sea, always blocked.
     const sidra = sampleTerrain(34, 15, seed)
     expect(sidra.type).toBe('ocean')
     expect(isBlocked(sidra.type, 34, 15)).toBe(true)
   })
 
+  it('the Mediterranean is never swimmable, even inside the coastal band', () => {
+    // The convex hull spans the northern coast, so without the explicit
+    // Mediterranean rule the sea off Alexandria would read as an enclosed
+    // bight with a swimmable band (reported walkable ocean north of Cairo).
+    const prev = balance.oceanSwimMarginDeg
+    try {
+      for (const [lat, lon] of [
+        [31.6, 31.0], // off the Nile delta, well inside the old band
+        [31.4, 30.0], // off Alexandria
+        [33.5, 13.0], // Gulf of Sidra bight
+      ] as const) {
+        const t = sampleTerrain(lat, lon, seed)
+        expect(t.type, `type at ${lat},${lon}`).toBe('ocean')
+        expect(isBlocked(t.type, lat, lon), `blocked at ${lat},${lon}`).toBe(true)
+      }
+      // Not even a widened band opens it — the rule is margin-independent.
+      balance.oceanSwimMarginDeg = 3
+      expect(isBlocked('ocean', 31.6, 31.0)).toBe(true)
+    } finally {
+      balance.oceanSwimMarginDeg = prev
+    }
+  })
+
   it('the margin is a runtime-editable balance value', () => {
     const prev = balance.oceanSwimMarginDeg
     try {
+      // Gulf of Guinea, ~1.8° offshore: blocked by the default band, opened
+      // by a widened one.
+      expect(isBlocked('ocean', 4.4, 3)).toBe(true)
       balance.oceanSwimMarginDeg = 3
-      expect(isBlocked('ocean', 34, 15)).toBe(false)
+      expect(isBlocked('ocean', 4.4, 3)).toBe(false)
       balance.oceanSwimMarginDeg = 0.2
       expect(isBlocked('ocean', 5.5, 3)).toBe(true)
     } finally {
