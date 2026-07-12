@@ -345,9 +345,11 @@ verify suite that proves it.
     zoom-aware view ring and flying in (no popping in), flying off after
     the meal and despawning only well outside the view, and the
     kill-circling flock flying the same in/out pattern; that a finished
-    hunt leaves a small prey remnant at the kill site which the scavenger
-    then finds and finishes (and a feed that ends without a kill leaves
-    none); that carcasses left far off-screen are culled while a visible
+    hunt leaves a small prey remnant at the kill site which the ALREADY
+    CIRCLING kill flock then descends on and finishes — the ground
+    scavenger never takes a flocked kill's scrap (and a feed that ends
+    without a kill leaves none); that carcasses left far off-screen are
+    culled while a visible
     one is kept (so kills stay bounded and never stall the frame loop);
     that more than one kind of predator hunts and every predator/prey
     pairing fits the region and the predator's food web; that prey flee a

@@ -7,9 +7,11 @@
 // over a red stain), prey flee an active predator, and vultures gather above a
 // kill. Herds raise young: calves gambol, get hunted (with the parent's rescue
 // sacrifice) and fall into water (with the parent's rescue and the waterfalls'
-// toll); kills leave remnants for the scavenger, animals keep body spacing and
-// never stray into the open ocean. Only walking into the lion attacks the
-// player (§14); otherwise no gameplay effect.
+// toll); kills leave remnants that the circling flock descends on and
+// finishes (the ground scavenger serves only carcasses without a flock,
+// e.g. trampled ones), animals keep body spacing and never stray into the
+// open ocean. Only walking into the lion attacks the player (§14);
+// otherwise no gameplay effect.
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
@@ -117,6 +119,11 @@ interface Animal {
    *  flight still bound to this carcass — a ghost target would otherwise stay
    *  "valid" forever and pin the vulture to an empty spot. */
   gone?: boolean
+  /** Prey scrap a finished hunt left behind (design.md §19.6): consumed by
+   *  the kill-circling flock already overhead, never by the ground
+   *  scavenger — the user-visible rule is that no NEW vulture flies in for
+   *  a kill the flock has been circling all along. */
+  remnant?: boolean
   /** Persistent rendered facing (radians), steered toward each frame's desired
    *  heading at a capped turn rate: the visible orientation can never snap —
    *  not between two flanking threats, not when a flight starts or ends, not
@@ -390,7 +397,7 @@ function leaveHeading(x: number, z: number, px: number, pz: number): number {
 
 /** A predator does not strip its kill bare (design.md §19): when it walks off,
  *  a small remnant of the prey stays behind at the site — a carcass scrap the
- *  scavenger vulture later drops in on and finishes. */
+ *  kill-circling flock then descends on and finishes. */
 const REMNANT_SCALE = 0.35
 function spawnRemnant(s: LionHuntState, seed: number): void {
   const herds = ACTIVE_HERDS
@@ -404,6 +411,7 @@ function spawnRemnant(s: LionHuntState, seed: number): void {
     scale: PREY_SCALE[s.prey] * REMNANT_SCALE,
     phase: 0,
     dead: true,
+    remnant: true,
   })
 }
 
@@ -1096,13 +1104,14 @@ function Herds() {
     {
       const sc = scavenger.current
       const targetValid = (a: Animal | null): a is Animal =>
-        !!a && !!a.dead && !a.lionFed && !a.gone && (a.dissolve === undefined || a.dissolve > 0)
+        !!a && !!a.dead && !a.lionFed && !a.remnant && !a.gone && (a.dissolve === undefined || a.dissolve > 0)
       if (!targetValid(sc.target)) {
         sc.target = null
         let bestD = Infinity
         for (const sp of SPECIES) {
           for (const a of herds[sp]) {
             if (!a.dead || a.lionFed) continue // the on-scene predator eats its own kill
+            if (a.remnant) continue // hunt scraps belong to the circling kill flock
             if (a.dissolve !== undefined && a.dissolve <= 0) continue
             const d = Math.hypot(a.x - pos.x, a.z - pos.z)
             if (d < bestD) {
@@ -1876,6 +1885,8 @@ function Vultures() {
   // passes fly off and despawn only well outside the view (design.md §19).
   const playerFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
   const killFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
+  /** 0 = circling overhead, 1 = landed on the remnant and feeding. */
+  const killDescend = useRef(0)
   const geo = useMemo(() => buildVulture(), [])
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
@@ -1886,7 +1897,7 @@ function Vultures() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__vultures = { player: group, kill: killGroup, playerFlight, killFlight }
+    w.__vultures = { player: group, kill: killGroup, playerFlight, killFlight, killDescend }
     return () => {
       delete w.__vultures
     }
@@ -1924,15 +1935,85 @@ function Vultures() {
         circle(group.current, t, 4.5, 5.5)
       }
     }
-    // Vultures also gather above a lion kill (design.md §19).
+    // Vultures also gather above a lion kill (design.md §19) — and once the
+    // predator has moved on, the SAME flock descends onto the remnant and
+    // finishes it: the birds that circled the kill take the scrap, no new
+    // scavenger flies in for it.
     if (killGroup.current) {
-      const overKill = LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
+      const feeding = LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
+      let remnant: Animal | null = null
+      if (ACTIVE_HERDS) {
+        outer: for (const sp of SPECIES) {
+          for (const a of ACTIVE_HERDS[sp]) {
+            if (a.remnant && a.dead && !a.gone && (a.dissolve === undefined || a.dissolve > 0)) {
+              remnant = a
+              break outer
+            }
+          }
+        }
+      }
+      const toRemnant = !feeding && remnant !== null
       const f = killFlight.current
-      flightStep(f, overKill, LION_STATE.px, LION_STATE.pz, s.pos.x, s.pos.z, viewR, VULTURE_FLY_SPEED, dt, 2)
+      flightStep(
+        f,
+        feeding || remnant !== null,
+        toRemnant && remnant ? remnant.x : LION_STATE.px,
+        toRemnant && remnant ? remnant.z : LION_STATE.pz,
+        s.pos.x,
+        s.pos.z,
+        viewR,
+        VULTURE_FLY_SPEED,
+        dt,
+        2,
+      )
+      const consuming =
+        toRemnant &&
+        remnant !== null &&
+        f.mode === 'active' &&
+        Math.hypot(f.x - remnant.x, f.z - remnant.z) < 2.2
+      if (consuming && remnant) {
+        f.x += (remnant.x - f.x) * Math.min(1, dt * 3)
+        f.z += (remnant.z - f.z) * Math.min(1, dt * 3)
+        // Only landed birds eat; the scrap dissolves like a scavenged carcass.
+        if (killDescend.current > 0.7) {
+          if (remnant.dissolve === undefined) remnant.dissolve = CARCASS_DISSOLVE_SECONDS
+          remnant.dissolve -= dt
+        }
+      }
+      killDescend.current = Math.max(
+        0,
+        Math.min(1, killDescend.current + (consuming ? dt / 1.4 : -dt / 1.4)),
+      )
       killGroup.current.visible = f.mode !== 'idle'
       if (f.mode !== 'idle') {
         killGroup.current.position.set(f.x, 0, f.z)
-        circle(killGroup.current, t * 1.15, 3.2, 4.6)
+        const dsc = killDescend.current
+        if (dsc <= 0) {
+          circle(killGroup.current, t * 1.15, 3.2, 4.6)
+        } else {
+          // Blend the circling pose down into the scavenger-style meal
+          // cluster: the flock spirals in, lands and pecks.
+          const g = killGroup.current
+          g.children.forEach((bird, i) => {
+            const phase = (i / g.children.length) * Math.PI * 2
+            const a = t * 1.15 * 0.45 + phase
+            const r = 3.2 + i * 0.9
+            const cx = Math.cos(a) * r
+            const cy = 4.6 + Math.sin(t * 1.15 * 0.8 + phase) * 0.6
+            const cz = Math.sin(a) * r
+            const lr = 0.5 + i * 0.35
+            const lx = Math.cos(phase) * lr
+            const ly = 0.25 + Math.sin(t * 3 + phase) * 0.12
+            const lz = Math.sin(phase) * lr
+            bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
+            if (dsc > 0.6) {
+              bird.rotation.set(0.6 + Math.sin(t * 4 + phase) * 0.3, phase, 0) // pecking down
+            } else {
+              bird.rotation.set(0, -a - Math.PI / 2, 0.25) // still banking
+            }
+            bird.scale.setScalar(1.6)
+          })
+        }
       }
     }
   })

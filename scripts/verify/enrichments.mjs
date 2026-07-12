@@ -1610,6 +1610,11 @@ const killFlock = await page.evaluate(async () => {
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   const f = window.__vultures.killFlight.current
+  // Purge carcasses from earlier checks: a leftover hunt remnant would now
+  // legitimately hold the flock on site (it consumes the scrap) and mask
+  // the fly-off this check asserts.
+  const herds = window.__wildlife.herdsRef.current
+  for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
   f.mode = 'idle'
   L.victim = null
   L.victimHunt = false
@@ -1741,9 +1746,10 @@ check('the predator despawn ring scales with the zoom (narrow zoom hides sooner)
   leaveZoom.hideDist !== null && leaveZoom.hideDist >= 80 && leaveZoom.hideDist < 100,
   JSON.stringify(leaveZoom))
 
-// --- Point 7: a finished hunt leaves a prey remnant for the vulture -----------
+// --- Point 7: a finished hunt leaves a prey remnant for the kill flock --------
 // design.md §19: the predator does not strip its kill bare — a small carcass
-// scrap stays at the site, and the scavenger drops in and finishes it. A feed
+// scrap stays at the site, and the vultures ALREADY CIRCLING the kill descend
+// onto it and finish it; no new scavenger flies in for a flocked kill. A feed
 // that ends without a kill (a rescued calf) leaves nothing.
 const remnant = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -1765,7 +1771,13 @@ const remnant = await page.evaluate(async () => {
   L.lz = L.pz + 0.25
   L.mode = 'feed'
   L.timer = 0.3
-  const out = { remnantFound: false, small: false, targeted: false, consumed: false }
+  const out = {
+    remnantFound: false,
+    small: false,
+    flockLanded: false,
+    consumed: false,
+    scavengerUninvolved: true,
+  }
   let rem = null
   let t0 = Date.now()
   while (Date.now() - t0 < 10000) {
@@ -1776,14 +1788,25 @@ const remnant = await page.evaluate(async () => {
   if (!rem) { L.mode = 'idle'; L.timer = 99999; return out }
   out.remnantFound = true
   out.small = rem.scale < 0.6
+  // The circling flock descends and lands on the scrap (flight active at the
+  // site, descend blend at the ground) — while the ground scavenger never
+  // takes it as a target.
+  const kf = () => window.__vultures.killFlight.current
   t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
-    if (sc.target === rem) { out.targeted = true; break }
-    await sleep(80)
+  while (Date.now() - t0 < 45000) {
+    if (sc.target === rem) out.scavengerUninvolved = false
+    const f = kf()
+    if (
+      f.mode === 'active' &&
+      Math.hypot(f.x - rem.x, f.z - rem.z) < 2.5 &&
+      window.__vultures.killDescend.current > 0.7
+    ) { out.flockLanded = true; break }
+    await sleep(100)
   }
   t0 = Date.now()
   while (Date.now() - t0 < 30000) {
-    if (sc.landed && sc.target === rem) rem.dissolve = 0.02 // fast-forward the meal
+    if (sc.target === rem) out.scavengerUninvolved = false
+    if (out.flockLanded && rem.dissolve !== undefined) rem.dissolve = Math.min(rem.dissolve, 0.02) // fast-forward the meal
     if (!herds.zebra.includes(rem)) { out.consumed = true; break }
     await sleep(100)
   }
@@ -1793,8 +1816,8 @@ const remnant = await page.evaluate(async () => {
 })
 check('a finished hunt leaves a small prey remnant at the kill site',
   remnant.remnantFound && remnant.small, JSON.stringify(remnant))
-check('the scavenger vulture finds and finishes the remnant',
-  remnant.targeted && remnant.consumed, JSON.stringify(remnant))
+check('the circling kill flock descends on the remnant and finishes it (scavenger uninvolved)',
+  remnant.flockLanded && remnant.consumed && remnant.scavengerUninvolved, JSON.stringify(remnant))
 
 const noRemnant = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
