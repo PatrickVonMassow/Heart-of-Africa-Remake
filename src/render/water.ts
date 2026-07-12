@@ -116,14 +116,17 @@ export function createWaterMaterial(): WaterMaterialHandle {
   // tone, so no trimmed silhouette stands out against a shallower basin;
   // removed shore spits instead inherit their local shelf depth there.
   col = mix(col, deep, smoothstep(float(500), float(1600), depthM))
-  // Gentle ripple modulation keeps large surfaces alive.
+  // Gentle ripple modulation keeps large surfaces alive. Multiplicative
+  // (±5 % brightness), NOT additive: a flat additive lift is invisible on
+  // bright shallows but bleaches the dark deep-ocean tone into pale cloudy
+  // blotches.
   const ripple = mx_fractal_noise_float(
     vec3(wp.x.mul(0.22).add(time.mul(0.12)), wp.y.mul(0.22), time.mul(0.07)),
     3,
   )
     .mul(0.5)
     .add(0.5)
-  col = col.add(ripple.mul(0.05))
+  col = col.mul(ripple.mul(0.1).add(0.95))
 
   // --- Foam: shoreline band + wave crests + sparse glints -----------------
   const foamNoise = mx_fractal_noise_float(vec3(wp.mul(0.9), time.mul(0.35)), 3).mul(0.5).add(0.5)

@@ -6,14 +6,17 @@
 
 /// <reference lib="webworker" />
 import { KokoroTTS } from 'kokoro-js'
-// kokoro-js' own dependency (same hoisted instance): only imported to reach
-// the onnxruntime env. On the WebGPU execution provider, session setup logs
-// two red warning blocks ("Some nodes were not assigned ...") to the console
-// on every load; raising the log threshold to errors silences that noise.
-import { env as transformersEnv } from '@huggingface/transformers'
 
-const onnxEnv = (transformersEnv as { backends?: { onnx?: { logLevel?: string } } }).backends?.onnx
-if (onnxEnv) onnxEnv.logLevel = 'error'
+// onnxruntime's WASM runtime prints two session-setup warning blocks
+// ("[W:onnxruntime:...] Some nodes were not assigned ...") straight to
+// stderr → console.error on every model load, and kokoro-js offers no
+// session-options passthrough to lower that severity. Filter the known
+// noise here — this worker's console is otherwise ours alone.
+const rawConsoleError = console.error.bind(console)
+console.error = (...args: unknown[]) => {
+  if (String(args[0] ?? '').includes('[W:onnxruntime:')) return
+  rawConsoleError(...args)
+}
 
 const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
 
