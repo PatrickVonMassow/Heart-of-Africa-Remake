@@ -245,9 +245,33 @@ the map).
   ever redder toward 0 %.
   (A HealthBar HUD element in the bottom-left corner; the fill width tracks
   health / balance.health.max and its colour sweeps hue 120→0 (green→red) as
-  health drops. The inventory bar moved up 24px to sit above it. Localized
-  label (Health/Gesundheit); Hud.test.tsx asserts full-width-green at full
-  health and shrink-reddens toward zero.)
+  health drops. Localized label (Health/Gesundheit); Hud.test.tsx asserts
+  full-width-green at full health and shrink-reddens toward zero. (Moved to
+  the bottom-right row in point 37.)
+- [x] 37. Move the health bar to the bottom right, with the camp/journal
+  buttons to its left in the same row.
+  (The two buttons and the health bar now share a right-anchored flex row
+  (.hud-bottom-right): Camp, Journal, then the health bar at the far right;
+  the buttons lost their individual absolute positions and the inventory bar
+  returned to the bottom-left corner. The journal-panel clearance check still
+  holds against the buttons' tops.)
+- [x] 38. The ridden canoe looked filled with water — the world water plane
+  showed up through the open hull. Lift the hull clear of the surface so the
+  wooden interior reads instead of water.
+  (First pass raised the whole hull above the sea plane (y≈0); completed in
+  point 40 for elevated rivers.)
+- [x] 39. Swap the health bar and the right buttons: the health bar goes to the
+  left of the row, the camp/journal buttons to the far right.
+  (Reordered the .hud-bottom-right flex children to HealthBar, Camp, Journal
+  — the journal toggle returns to the bottom-right corner.)
+- [x] 40. The canoe is still sometimes flooded — visible driving along the Nile.
+  (Root cause: the river/lake surface is drawn SURFACE_LIFT (0.3) above the
+  carved bed, but the player group sits at the bed height, so on an elevated
+  river — bed height ≫ 0, like the Nile — the hull sat 0.3 below the visible
+  surface and flooded. SURFACE_LIFT is now exported from Rivers.tsx and the
+  Player lifts the canoe by it on a 'water' cell (river/lake); the sea plane
+  keeps its own level. CANOE_HULL_CLEARANCE 0.27 keeps the hull's lowest
+  point just above whichever surface applies.)
 
 ## Closing (only after all points)
 

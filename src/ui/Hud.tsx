@@ -411,22 +411,26 @@ export function Hud() {
     <>
       <StatusBar />
       <FpsCounter />
-      <HealthBar />
       <InventoryBar />
-      <button className="hud-button journal-toggle" onClick={() => {
-        const g = useGame.getState()
-        g.setJournalOpen(!g.journalOpen)
-      }}>
-        {t.hud.journalToggle}
-      </button>
-      <button className="hud-button camp-toggle" onClick={() => {
-        if (useUi.getState().dialog) return
-        const g = useGame.getState()
-        if (g.mode === 'travel') g.pitchOrOpenCamp()
-        else g.openVillageCamp()
-      }}>
-        {t.hud.campToggle}
-      </button>
+      {/* Bottom-right row: the health bar on the left, then the camp/journal
+          buttons at the far right (design.md §17.1/§17.4). */}
+      <div className="hud-bottom-right">
+        <HealthBar />
+        <button className="hud-button camp-toggle" onClick={() => {
+          if (useUi.getState().dialog) return
+          const g = useGame.getState()
+          if (g.mode === 'travel') g.pitchOrOpenCamp()
+          else g.openVillageCamp()
+        }}>
+          {t.hud.campToggle}
+        </button>
+        <button className="hud-button journal-toggle" onClick={() => {
+          const g = useGame.getState()
+          g.setJournalOpen(!g.journalOpen)
+        }}>
+          {t.hud.journalToggle}
+        </button>
+      </div>
       <Prompt />
       <Toast />
       <JournalPanel />

@@ -30,7 +30,7 @@ import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
-import { RiversAndLakes } from './Rivers'
+import { RiversAndLakes, SURFACE_LIFT } from './Rivers'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -1023,9 +1023,10 @@ function GraveMarker() {
 // The explorer sits this much lower when seated in the canoe, so torso and
 // head clear the gunwale while the (hidden) legs would fold into the hull.
 const CANOE_SEAT_DROP = 0.28
-// Lift the riding canoe + rider so the hull rides on the surface with only a
-// shallow draft, instead of sitting half-submerged (design.md §7).
-const CANOE_WATERLINE = 0.18
+// Clearance that keeps the hull's lowest point just above the water surface, so
+// the surface never shows up through the open hull and floods the canoe
+// (design.md §7). The hull's own draft below its centre is ~0.25.
+const CANOE_HULL_CLEARANCE = 0.27
 
 /** The dugout hull + gunwale rim, reused by the ridden and the dragged canoe. */
 function CanoeHull() {
@@ -1102,18 +1103,25 @@ function Player() {
       }
     }
 
+    // The player group sits at the carved bed height (max(0, terrain)); a river
+    // or lake surface is drawn SURFACE_LIFT above that bed, while the sea plane
+    // sits at ~0. Lift the canoe onto that surface so it never floods on an
+    // elevated river (e.g. the Nile) where bed height ≫ 0.
+    const surfaceLift = t.type === 'water' ? SURFACE_LIFT : 0
+    const boatBaseY = CANOE_HULL_CLEARANCE + surfaceLift
+
     if (inner.current) {
       inner.current.rotation.y = heading.current
       if (canoeing) {
-        // Sit into the hull, lifted to the waterline; a slow rock replaces the bob.
-        inner.current.position.y = CANOE_WATERLINE - CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
+        // Sit into the hull, lifted to the water surface; a slow rock replaces the bob.
+        inner.current.position.y = boatBaseY - CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
       } else {
         inner.current.position.y = moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0
       }
     }
     if (boat.current) {
       boat.current.rotation.y = heading.current
-      boat.current.position.y = CANOE_WATERLINE + Math.sin(bobTime.current * 1.7) * 0.03
+      boat.current.position.y = boatBaseY + Math.sin(bobTime.current * 1.7) * 0.03
     }
     // A gentle, one-sided paddle stroke while riding.
     if (paddle.current) paddle.current.rotation.x = 0.35 + Math.sin(bobTime.current * 3.2) * 0.4

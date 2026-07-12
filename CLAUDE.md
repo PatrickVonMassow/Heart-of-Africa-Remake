@@ -306,8 +306,9 @@ verify suite that proves it.
    coordinates (removed on user request); transient status hints (e.g.
    the movement-penalty reason, pt. 4) render as a right-aligned item
    inside the status bar itself, not in a separate floating panel; the
-   inventory item currently in use glows (§17.1); a bottom-left health bar
-   is green at full health and reddens toward zero (§17.1). Verifiable: the
+   inventory item currently in use glows (§17.1); a health bar at the left
+   of the bottom-right camp/journal button row is green at full health and
+   reddens toward zero (§17.1). Verifiable: the
    hint element is a descendant of `.status-bar` and its box stays within
    the bar's box, and a canoe on water / medicine while afflicted gains
    `.inv-active` while an idle item does not

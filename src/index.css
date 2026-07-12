@@ -87,11 +87,17 @@ textarea {
 
 /* --- Inventory / hand bar ------------------------------------------------ */
 
-/* Health bar in the very bottom-left corner; the inventory sits just above it. */
-.health-bar {
+/* Bottom-right row: camp/journal buttons with the health bar at the far right. */
+.hud-bottom-right {
   position: absolute;
-  left: 12px;
+  right: 12px;
   bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-bar {
   width: 180px;
   height: 16px;
   background: rgba(0, 0, 0, 0.45);
@@ -108,7 +114,7 @@ textarea {
 .inventory-bar {
   position: absolute;
   left: 12px;
-  bottom: 36px;
+  bottom: 12px;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
@@ -188,17 +194,7 @@ textarea {
   border-color: var(--hud-accent);
 }
 
-.journal-toggle {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-}
-
-.camp-toggle {
-  position: absolute;
-  right: 128px;
-  bottom: 12px;
-}
+/* The camp/journal toggles are laid out by their flex row (.hud-bottom-right). */
 
 /* Passive inventory items and the canteen reading are labels, not buttons. */
 .inventory-bar .inv-item {

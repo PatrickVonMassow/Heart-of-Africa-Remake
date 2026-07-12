@@ -435,7 +435,7 @@ Players who do not want to be interrupted can turn the automatic presentation of
 - Transient status hints — e.g. the reason for a movement penalty (§11) — appear as a right-aligned item inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
 - The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
 - An item that is currently in use lights up (glows) in the inventory bar: the relief item countering the present terrain (the canoe on water, the machete in the jungle, the rope on a mountain) and medicine while a curable affliction (fever or a wound) is active — so the player sees at a glance which piece of equipment is doing its work right now.
-- A health bar sits in the bottom-left corner: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. The detailed state and afflictions stay on the health query (H).
+- A health bar sits in the bottom-right area, at the left of the row that holds the camp and journal buttons: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. The detailed state and afflictions stay on the health query (H).
 - Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
 
 ### 17.2 Discovery-gated labels
