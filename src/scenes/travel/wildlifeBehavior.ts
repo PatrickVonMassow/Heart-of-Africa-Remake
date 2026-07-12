@@ -52,43 +52,6 @@ export function fleeHeading(
 }
 
 /**
- * Escort heading for a parent whose calf is being run down by a predator
- * (design.md §19): the parent keeps station at a point `offset` beyond the
- * calf on the side away from the hunter — running with the flight without
- * ever abandoning the young or sitting on its escape line. Returns the
- * heading toward that station, or `null` when already on it (the caller
- * holds and faces the calf). Station-keeping converges, so at the catch the
- * parent stands clear of — but near — the calf, and the rescue charge that
- * follows is a visible run. Also `null` in the degenerate case of the
- * predator standing on the calf — the catch resolution owns that contact.
- */
-export function escortHeading(
-  x: number,
-  z: number,
-  calfX: number,
-  calfZ: number,
-  predX: number,
-  predZ: number,
-  offset: number,
-  lateral = 1.5,
-): number | null {
-  const adx = calfX - predX
-  const adz = calfZ - predZ
-  const ad = Math.hypot(adx, adz)
-  if (ad < 1e-4) return null
-  const ax = adx / ad
-  const az = adz / ad
-  // The station sits `lateral` beside the flight line, on the parent's own
-  // side: the overtaking path then passes clear of the calf's body, so the
-  // animal separation cannot deadlock the parent right behind its calf.
-  const side = ax * (z - calfZ) - az * (x - calfX) >= 0 ? 1 : -1
-  const dx = calfX + ax * offset - az * lateral * side - x
-  const dz = calfZ + az * offset + ax * lateral * side - z
-  if (Math.hypot(dx, dz) < 0.3) return null
-  return Math.atan2(dx, dz)
-}
-
-/**
  * Playful gambolling of a herd calf (design.md §19): on a per-calf cycle the
  * calf breaks into a short bout of scampering hops around its parent. Returns
  * the bout's current heading and hop height (0..1), or `null` outside a bout.

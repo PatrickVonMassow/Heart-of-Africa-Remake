@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  escortHeading,
   fleeHeading,
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
@@ -94,52 +93,20 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
   })
 })
 
-describe('escortHeading (design.md §19 — parent escorts its hunted calf)', () => {
-  it('heads for the station beyond the calf, away from the predator', () => {
-    // Parent at origin, calf at (1,0), predator at (5,0): the station lies at
-    // (1,0) + 6·(-1,0) plus the 1.5 lateral seat = (-5,-1.5) — the parent runs
-    // dominantly toward -x, never toward the predator.
-    const h = escortHeading(0, 0, 1, 0, 5, 0, 6)
-    expect(h).not.toBeNull()
-    const [sx, sz] = dir(h as number)
-    expect(sx).toBeLessThan(-0.9)
-    expect(Math.abs(sz)).toBeLessThan(0.45)
-  })
-
-  it('keeps the station beside the flight line (clear of the calf body)', () => {
-    // A parent exactly on the flight line is sent to a laterally offset seat,
-    // so its overtaking path passes beside the calf, not through it.
-    const h = escortHeading(1.8, 0, 0, 0, -12, 0, 6) as number
-    // Calf flees +x (predator at -x): station ≈ (6, ±1.5) — off the line.
-    const [sx, sz] = dir(h)
-    expect(sx).toBeGreaterThan(0.5)
-    expect(Math.abs(sz)).toBeGreaterThan(0.05)
-  })
-
-  it('holds (null) once on station', () => {
-    // Station for calf (9,0), predator (12,0), offset 6 sits at (3,-1.5) for a
-    // parent approaching on that side.
-    expect(escortHeading(3, -1.5, 9, 0, 12, 0, 6)).toBeNull()
-    expect(escortHeading(3.2, -1.5, 9, 0, 12, 0, 6)).toBeNull() // within the eps
-    expect(escortHeading(0, 0, 9, 0, 12, 0, 6)).not.toBeNull() // behind station
-  })
-
-  it('holds in the degenerate case of the predator on the calf', () => {
-    expect(escortHeading(3, 3, 4, 3, 4, 3, 6)).toBeNull()
-  })
-
-  it('leaves the parent clear of — but near — the calf when the hunter closes in', () => {
-    // Mini-simulation of the chase contract (design.md §19): the predator runs
-    // the fleeing calf down while the parent keeps station beyond it. At the
-    // catch the parent must stand clear of the pin (so the rescue charge is a
-    // visible run) yet never far beyond its station offset.
-    const offset = 6
+describe('parent charge intercept (design.md §19 — the parent turns on the hunter)', () => {
+  it('a parent beside its calf intercepts the hunter before the catch', () => {
+    // Mini-simulation of the chase contract; the numbers mirror Wildlife.tsx
+    // (HUNT_LION_SPEED 5.6, CALF_FLEE_SPEED 3.8, PARENT_CHARGE_SPEED 6.5,
+    // PARENT_SACRIFICE_DIST 1.3, CALF_CATCH_DIST 0.9). The parent charging the
+    // predator head-on must reach it (sacrifice contact) before the hunter
+    // reaches the calf (catch).
     const calf = { x: 0, z: 0 }
     const parent = { x: 1.8, z: 0 }
-    const pred = { x: -12, z: 0 }
+    const pred = { x: 12, z: 0 }
     const dt = 1 / 60
+    let intercepted = false
     let caught = false
-    for (let i = 0; i < 60 * 20 && !caught; i++) {
+    for (let i = 0; i < 60 * 20 && !intercepted && !caught; i++) {
       const toCalf = Math.atan2(calf.x - pred.x, calf.z - pred.z)
       pred.x += Math.sin(toCalf) * 5.6 * dt
       pred.z += Math.cos(toCalf) * 5.6 * dt
@@ -150,16 +117,13 @@ describe('escortHeading (design.md §19 — parent escorts its hunted calf)', ()
       const away = Math.atan2(calf.x - pred.x, calf.z - pred.z)
       calf.x += Math.sin(away) * 3.8 * dt
       calf.z += Math.cos(away) * 3.8 * dt
-      const h = escortHeading(parent.x, parent.z, calf.x, calf.z, pred.x, pred.z, offset)
-      if (h !== null) {
-        parent.x += Math.sin(h) * 6 * dt
-        parent.z += Math.cos(h) * 6 * dt
-      }
+      const toPred = Math.atan2(pred.x - parent.x, pred.z - parent.z)
+      parent.x += Math.sin(toPred) * 6.5 * dt
+      parent.z += Math.cos(toPred) * 6.5 * dt
+      if (Math.hypot(pred.x - parent.x, pred.z - parent.z) < 1.3) intercepted = true
     }
-    expect(caught).toBe(true) // the slower calf is run down
-    const dParentCalf = Math.hypot(parent.x - calf.x, parent.z - calf.z)
-    expect(dParentCalf).toBeGreaterThan(2) // clear of the pin — the charge is a run
-    expect(dParentCalf).toBeLessThan(offset + 2) // but never abandoned
+    expect(intercepted).toBe(true) // the charge connects mid-chase
+    expect(caught).toBe(false) // …before the calf is ever caught
   })
 })
 

@@ -24,7 +24,6 @@ import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
 import {
-  escortHeading,
   fleeHeading,
   flightStep,
   gambolState,
@@ -268,11 +267,14 @@ const YOUNG_FOLLOW_SPEED = 4.5
 const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
 const GUARD_SPEED = 5.5
-/** Calf predation (design.md §19): when a predator catches a calf it does not die
- *  at once — it struggles for CAUGHT_DURATION seconds first (no stain/shrink yet).
- *  In that window the parent charges the predator; reaching it (SACRIFICE_DIST)
- *  the parent is taken instead and the calf escapes, while a parent that only got
- *  close (TOO_LATE_DIST) by the time the window ends is eaten alongside the calf. */
+/** Calf predation (design.md §19): while the hunt runs, the parent does not
+ *  flee — it charges the predator itself; reaching it (SACRIFICE_DIST) mid-chase
+ *  it is taken in the calf's place and the calf escapes uncaught. If the parent
+ *  cannot intercept in time and the calf is caught, it does not die at once — it
+ *  struggles for CAUGHT_DURATION seconds first (no stain/shrink yet). In that
+ *  window the charge continues; reaching the predator the parent is taken
+ *  instead and the calf escapes, while a parent that only got close
+ *  (TOO_LATE_DIST) by the time the window ends is eaten alongside the calf. */
 const CAUGHT_DURATION = 5
 const CALF_HUNT_CHANCE = 0.6 // chance a hunt targets a calf near the player over a generic grazer
 const CALF_HUNT_SEEK = 45 // radius around the player within which a huntable calf is picked
@@ -280,19 +282,12 @@ const CALF_CATCH_DIST = 0.9 // the predator catches the chased calf within this
 /** The hunted calf bolts instead of standing at its parent, but slower than its
  *  hunter, so it is visibly run down in the open (design.md §19). */
 const CALF_FLEE_SPEED = 3.8
-/** A bolting parent keeps station this far beyond its hunted calf (away from
- *  the hunter): running with the flight without abandoning the young, it
- *  stands clear — but near — when the calf is seized, so its rescue charge is
- *  a visible run (design.md §19). The sprint is a notch faster than a plain
- *  flee so the parent completes its overtake well before the catch. */
-const ESCORT_OFFSET = 6
-const ESCORT_SPEED = 6
 /** Inside this radius the predator pounces straight at the calf, bypassing its
  *  turn-rate limit: with speed 5.6 and turn 3 the minimum turning circle is
  *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
  *  could otherwise be orbited forever and never caught. */
 const CALF_POUNCE_RADIUS = 3
-const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator faster than it guards
+const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator (mid-chase and post-catch) faster than it guards
 const PARENT_SACRIFICE_DIST = 1.3 // parent reaches the predator → sacrifices itself
 const PARENT_TOO_LATE_DIST = 3.2 // parent only this close when the window ends → both eaten
 /** Species whose calves a predator hunt can target (design.md §19). */
@@ -775,6 +770,30 @@ function Herds() {
             pushStain(a.x, a.z)
             if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
           }
+        } else if (
+          a.child &&
+          !a.child.dead &&
+          a.child.caught === undefined &&
+          LION_STATE.mode === 'chase' &&
+          LION_STATE.victim === a.child
+        ) {
+          // Our calf is being run down (design.md §19): the parent does not flee
+          // with it — it charges the hunter itself, and on contact it is taken
+          // in the calf's place, so the calf escapes before any catch.
+          const toX = LION_STATE.lx - a.x
+          const toZ = LION_STATE.lz - a.z
+          const d = Math.hypot(toX, toZ) || 1
+          a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
+          a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
+          if (d < PARENT_SACRIFICE_DIST) {
+            a.child.parent = undefined // freed — it keeps fleeing on its own
+            a.child = undefined
+            a.dead = true
+            a.lionFed = true
+            a.dissolve = CARCASS_DISSOLVE_SECONDS
+            pushStain(a.x, a.z)
+            LION_STATE.victim = a // the hunt closes out feeding on the parent
+          }
         }
       }
     }
@@ -1227,10 +1246,11 @@ function Herds() {
           }
         }
         // Family life (design.md §19): a calf keeps close to its parent and
-        // nurses; when a predator eats a calf it struggles for a few seconds
-        // first, during which a parent charges in and can sacrifice itself to save
-        // it; otherwise a parent stands between an approaching predator and its
-        // calf to defend it. These override the flee/dodge below.
+        // nurses; when a hunt runs a calf down the parent charges the hunter to
+        // be taken in its place, and a caught calf struggles for a few seconds
+        // during which that charge can still save it; otherwise a parent stands
+        // between an approaching predator and its calf to defend it. These
+        // override the flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
           if (a.young && a.caught !== undefined && a.caught > 0) {
@@ -1297,19 +1317,11 @@ function Herds() {
             pitch = 0
             familyHeld = true
           } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase' && LION_STATE.victim === a.child) {
-            // Our calf is being run down: run with the flight, keeping station
-            // just beyond the calf on the side away from the hunter — never
-            // abandoning it, never sitting on its escape line (design.md §19).
-            const h = escortHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, ESCORT_OFFSET)
-            if (h !== null) {
-              a.x += Math.sin(h) * ESCORT_SPEED * dt
-              a.z += Math.cos(h) * ESCORT_SPEED * dt
-              yaw = h
-            } else {
-              yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z) // on station: face the calf
-            }
+            // Our calf is being run down: the parent charges the hunter itself
+            // (movement in the pre-pass) to be taken in the calf's place (§19).
             px = a.x
             pz = a.z
+            yaw = Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z)
             pitch = 0
             familyHeld = true
           } else if (a.young && a.parent && !a.parent.dead) {

@@ -1150,7 +1150,9 @@ check('a calf caught with no parent near dies alone (parent survives)',
 // calf is caught and struggles, the parent charges in and sacrifices itself, and
 // the calf escapes. This drives the whole chase→catch→struggle→sacrifice→escape
 // chain (the isolated scenarios above force `caught` by hand). The predator
-// starts close so the catch is reliable even under headless RAF throttling.
+// starts close so the catch is reliable even under headless RAF throttling, and
+// the parent is parked out of intercept reach so its mid-chase charge (§19)
+// cannot take the hunter before the catch — the struggle window still saves it.
 await pinFamily(-2.8, 35.3)
 const e2e = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -1168,6 +1170,10 @@ const e2e = await page.evaluate(async () => {
     }
   }
   if (!parent) return { found: false }
+  // Park the parent 22 units off: too far to intercept the hunter mid-chase
+  // (the lion pounces from 1.5 within a beat), close enough that its charge
+  // crosses the distance well inside the 5 s struggle window.
+  parent.x = calf.x - 22; parent.z = calf.z
   const s = window.__lionHunt.state
   s.predator = 'lion'
   s.victim = calf; s.victimHunt = true
@@ -1198,10 +1204,10 @@ check('a real hunt catches a calf, the parent sacrifices itself and the calf esc
   e2e.found && e2e.catchEvidenced && e2e.parentDead && e2e.calfDead === false && e2e.calfEscaped,
   JSON.stringify(e2e))
 
-// (6) Visible choreography (design.md §19 rework): from a real chase distance
-// the hunted calf flees (it no longer stands nursing while run down), the
-// escorting parent stands clear — but near — at the catch, and the rescue
-// charge afterwards is a visible run over real time, ending in the sacrifice.
+// (6) Visible choreography (design.md §19): from a real chase distance the
+// hunted calf flees (it no longer stands nursing while run down) while its
+// parent does NOT flee with it — it charges the hunter head-on over visible
+// real time and is taken in the calf's place mid-chase, before any catch.
 await pinFamily(-2.4, 34.6)
 const choreo = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -1215,7 +1221,7 @@ const choreo = await page.evaluate(async () => {
   if (!parent) return { found: false }
   // Relocate the family beside the player so the chase stays well inside the
   // 90-unit hunt-abort radius regardless of where this seed spawned it. The
-  // choreography itself (flee, escort, charge) is live behaviour from here on.
+  // choreography itself (flee, charge, sacrifice) is live behaviour from here on.
   calf.x = p.x + 14; calf.z = p.z
   parent.x = p.x + 15.8; parent.z = p.z
   await sleep(300) // settle: the calf nurses beside its parent
@@ -1227,17 +1233,16 @@ const choreo = await page.evaluate(async () => {
   s.lionHeading = Math.atan2(calf.x - s.lx, calf.z - s.lz)
   s.mode = 'chase'
   const calf0 = { x: calf.x, z: calf.z }
+  const dPL0 = +Math.hypot(parent.x - s.lx, parent.z - s.lz).toFixed(2)
+  let dPLmin = dPL0
   let calfMoved = 0
-  let dParentAtCatch = null
-  let tCatch = 0
+  let caughtSeen = false
   let tParentDead = 0
   const t0 = Date.now()
   while (Date.now() - t0 < 45000) {
     calfMoved = Math.max(calfMoved, Math.hypot(calf.x - calf0.x, calf.z - calf0.z))
-    if (calf.caught !== undefined && dParentAtCatch === null) {
-      dParentAtCatch = +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2)
-      tCatch = Date.now()
-    }
+    dPLmin = Math.min(dPLmin, +Math.hypot(parent.x - s.lx, parent.z - s.lz).toFixed(2))
+    if (calf.caught !== undefined) caughtSeen = true
     if (parent.dead) { tParentDead = Date.now(); break }
     if (calf.dead || s.mode === 'idle') break
     await sleep(50)
@@ -1245,8 +1250,10 @@ const choreo = await page.evaluate(async () => {
   const out = {
     found: true,
     calfMoved: +calfMoved.toFixed(2),
-    dParentAtCatch,
-    chargeMs: tParentDead && tCatch ? tParentDead - tCatch : null,
+    dPL0,
+    dPLmin,
+    caughtSeen,
+    chargeMs: tParentDead ? tParentDead - t0 : null,
     parentDead: !!parent.dead,
     calfDead: !!calf.dead,
     calfFreed: calf.caught === undefined && calf.parent === undefined && !calf.dead,
@@ -1256,12 +1263,11 @@ const choreo = await page.evaluate(async () => {
 })
 check('the hunted calf flees the chase instead of standing at its parent',
   choreo.found && choreo.calfMoved > 2, JSON.stringify(choreo))
-check('the escorting parent stands clear — but near — of its calf at the catch',
-  choreo.found && choreo.dParentAtCatch !== null && choreo.dParentAtCatch > 2.5 && choreo.dParentAtCatch < 12,
-  JSON.stringify(choreo))
-check('the rescue charge is a visible run that ends in the sacrifice',
+check('the parent charges the hunter during the chase instead of fleeing with the calf',
+  choreo.found && choreo.dPLmin < choreo.dPL0 - 3, JSON.stringify(choreo))
+check('the charging parent is taken in the calf\'s place before any catch (visible run)',
   choreo.found && choreo.chargeMs !== null && choreo.chargeMs >= 400 &&
-  choreo.parentDead && choreo.calfDead === false && choreo.calfFreed,
+  choreo.parentDead && choreo.caughtSeen === false && choreo.calfDead === false && choreo.calfFreed,
   JSON.stringify(choreo))
 
 // --- Point 3: playful calves, water accidents, waterfall deaths ---------------

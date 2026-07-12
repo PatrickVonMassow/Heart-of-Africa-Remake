@@ -364,11 +364,12 @@ verify suite that proves it.
     shrink) for a few seconds before the kill, a parent that reaches the
     predator is eaten in the calf's place while the calf escapes, a parent
     that only got close by the window's end is eaten alongside the calf,
-    and the full LionHunt path runs a calf down and catches it — with the
-    hunted calf visibly fleeing the chase (slower than its hunter) instead
-    of standing at its parent, and the escorting parent standing clear of,
-    but near, the calf at the catch so the rescue charge is a visible run
-    over real time; assert the calf water drama of §19.8 — calves gambol
+    and the full LionHunt path runs a calf down and catches it (the parent
+    held out of intercept reach) — with the hunted calf visibly fleeing
+    the chase (slower than its hunter) instead of standing at its parent,
+    and a parent in reach charging the hunter itself over visible real
+    time during the chase and being taken in the calf's place before any
+    catch; assert the calf water drama of §19.8 — calves gambol
     in visible hop-bouts, a calf on open water starts a struggle and its
     parent wades in, pulls it out and both return to the bank alive, in
     the water inside a waterfall's reach a calf is swept over and dies
