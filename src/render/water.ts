@@ -25,13 +25,12 @@ import {
   positionWorld,
   pow,
   smoothstep,
-  texture,
   time,
   uniform,
-  vec2,
   vec3,
 } from 'three/tsl'
-import { getDemMeta, getDemPixels } from '../world/geodata'
+import { getDemMeta } from '../world/geodata'
+import { demElevation } from './demElevation'
 
 export interface WaterMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
@@ -86,39 +85,13 @@ export function createWaterMaterial(): WaterMaterialHandle {
 
   // --- Real bathymetry: depth in meters from the DEM texture -------------
   // Built from the loaded (northeast-trimmed) pixels rather than dem.png, so
-  // the water sees the same world cut as the terrain (world/redSea.ts).
-  // The elevation is DECODED on the CPU into a single half-float channel:
-  // the raw two-byte encoding must never be linearly filtered — the GPU
-  // interpolates high and low byte independently, which invents wild
-  // phantom elevations at texel edges and stained the sea with hard,
-  // angular depth blotches.
+  // the water sees the same world cut as the terrain (world/redSea.ts). The
+  // shared module decodes the two-byte elevation into a filterable
+  // half-float texture (render/demElevation.ts).
   const meta = getDemMeta()
-  const dem = getDemPixels()
-  const texelCount = dem.width * dem.height
-  const elevHalf = new Uint16Array(texelCount)
-  for (let i = 0; i < texelCount; i++) {
-    const metersUp = dem.data[i * 4] * 256 + dem.data[i * 4 + 1] - meta.offsetMeters
-    elevHalf[i] = THREE.DataUtils.toHalfFloat(metersUp)
-  }
-  const demTex = new THREE.DataTexture(
-    elevHalf,
-    dem.width,
-    dem.height,
-    THREE.RedFormat,
-    THREE.HalfFloatType,
-  )
-  demTex.needsUpdate = true
-  demTex.flipY = false
-  demTex.colorSpace = THREE.NoColorSpace
-  demTex.minFilter = THREE.LinearFilter
-  demTex.magFilter = THREE.LinearFilter
   const lon = wp.x.div(UNITS_PER_DEGREE)
   const lat = wp.y.div(UNITS_PER_DEGREE) // wp.y is stable world -Z → +lat
-  const demUv = vec2(
-    lon.sub(meta.lonMin).div(meta.lonMax - meta.lonMin),
-    float(meta.latMax).sub(lat).div(meta.latMax - meta.latMin),
-  )
-  const elevation = texture(demTex, demUv).r // meters above sea level, pre-decoded
+  const elevation = demElevation(lon, lat) // meters above sea level
   const depthSampled = max(elevation.negate(), 0) // meters of water below sea level
   // Outside the DEM bbox the texture would clamp-repeat its edge texels into
   // endless streaks across the far sea (visible at the continent zoom,

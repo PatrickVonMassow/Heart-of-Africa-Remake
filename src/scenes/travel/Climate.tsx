@@ -6,7 +6,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
+import { float, max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
+import { demElevation } from '../../render/demElevation'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import type { RegionId } from '../../world/geo'
@@ -24,10 +25,12 @@ interface FogPreset {
 // Stylized climate per region (design.md §3/§19). The east/south presets keep
 // long sight lines ("klare Luft im Hochland"), the Congo basin sits in damp
 // mist, the Sahara in warm dust.
+// Haze opacities kept low: the layers read as fine drifting dust — at higher
+// values their large noise features read as gray cloud blobs over the map.
 const FOG_PRESETS: Record<RegionId, FogPreset> = {
-  north: { color: '#e2d6ba', near: 70, far: 200, haze: 0.15, hazeColor: '#f4e2b6', hazeHeight: 1.1 },
-  west: { color: '#d5dfe2', near: 90, far: 250, haze: 0.05, hazeColor: '#eee6c8', hazeHeight: 1.3 },
-  central: { color: '#d1e0d2', near: 55, far: 165, haze: 0.2, hazeColor: '#e2efdc', hazeHeight: 2.2 },
+  north: { color: '#e2d6ba', near: 70, far: 200, haze: 0.09, hazeColor: '#f4e2b6', hazeHeight: 1.1 },
+  west: { color: '#d5dfe2', near: 90, far: 250, haze: 0.04, hazeColor: '#eee6c8', hazeHeight: 1.3 },
+  central: { color: '#d1e0d2', near: 55, far: 165, haze: 0.12, hazeColor: '#e2efdc', hazeHeight: 2.2 },
   east: { color: '#d2e2ee', near: 130, far: 330, haze: 0, hazeColor: '#ffffff', hazeHeight: 1.5 },
   south: { color: '#d5dde4', near: 105, far: 280, haze: 0, hazeColor: '#ffffff', hazeHeight: 1.5 },
 }
@@ -57,17 +60,26 @@ export function Climate() {
     m.depthWrite = false
     m.side = THREE.DoubleSide
     m.fog = false
+    // Fine-grained dust streaks: a lower frequency turns the noise features
+    // into ~20-unit patches that read as gray cloud blobs over the terrain.
     const n = mx_fractal_noise_float(
-      vec3(positionWorld.xz.mul(0.05).add(time.mul(0.025)), time.mul(0.05)),
+      vec3(positionWorld.xz.mul(0.13).add(time.mul(0.03)), time.mul(0.05)),
       3,
     )
       .mul(0.5)
       .add(0.5)
-    // Radial fade toward the quad edges, so the layer border is invisible.
+    // Radial fade toward the quad edges, wide enough that no rotated-square
+    // silhouette of the layer quad ever shows.
     const edge = max(uv().x.sub(0.5).abs(), uv().y.sub(0.5).abs())
-    const edgeFade = smoothstep(0.5, 0.3, edge)
+    const edgeFade = smoothstep(0.48, 0.2, edge)
+    // Ground dust belongs over the ground: over open water the pale veils
+    // read as gray cloud blobs on the dark sea, so the haze fades out across
+    // the shoreline (elevation from the shared decoded DEM texture).
+    const lon = positionWorld.x.div(10)
+    const lat = positionWorld.z.negate().div(10)
+    const overLand = smoothstep(float(-6), float(6), demElevation(lon, lat))
     m.colorNode = colorU
-    m.opacityNode = n.mul(n).mul(opacityU).mul(edgeFade)
+    m.opacityNode = n.mul(n).mul(opacityU).mul(edgeFade).mul(overLand)
     return { material: m, opacityU, colorU }
   }, [])
 
@@ -98,8 +110,11 @@ export function Climate() {
     // No haze in the debug-only zoom range (design.md §21): beyond the default
     // camera distance the fog recedes to the horizon and the ground haze fades
     // out, so a zoomed-out view — up to the whole continent — stays clear.
+    // The haze ramp is tight (gone by ~1.25x): already slightly widened views
+    // read the dust veils as floating gray clouds over the map.
     const zoom = useUi.getState().travelZoom
     const clearView = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
+    const hazeClear = Math.min(1, Math.max(0, (zoom - 1) / 0.25))
 
     const fog = scene.fog as THREE.Fog | null
     if (fog) {
@@ -117,7 +132,7 @@ export function Climate() {
     if (g) {
       hazeTarget.set(preset.hazeColor)
       haze.colorU.value.lerp(hazeTarget, k)
-      haze.opacityU.value += (preset.haze * (1 - clearView) - haze.opacityU.value) * k
+      haze.opacityU.value += (preset.haze * (1 - hazeClear) - haze.opacityU.value) * k
       g.visible = haze.opacityU.value > 0.01
       if (g.visible) {
         const t = clock.elapsedTime
