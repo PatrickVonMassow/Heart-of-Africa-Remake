@@ -231,6 +231,24 @@ the map).
   carrying, enrichments asserts ride-on-water / drag-on-land / neither, and
   screenshot 89 shows the drag.)
 
+- [x] 35. Make the explorer's injury visible on the bird's-eye figure: when he
+  carries a wound (light/severe), it shows on the character, scaling with the
+  wound level.
+  (Wound marks toggle on the Player by afflictions.wounds. Placed on the
+  crown and shoulders — the surfaces that read from the steep top-down angle,
+  where torso/chest marks were occluded by the helmet: light = an off-white
+  bandage strap over the helmet with a blood spot, severe = the strap runs
+  red and blood soaks both shoulders. __player.wounds drives the toggle;
+  enrichments asserts the severe-shows / healed-clears path with screenshot
+  90.)
+- [x] 36. Add a health bar at the bottom left: green at 100 % health, shading
+  ever redder toward 0 %.
+  (A HealthBar HUD element in the bottom-left corner; the fill width tracks
+  health / balance.health.max and its colour sweeps hue 120→0 (green→red) as
+  health drops. The inventory bar moved up 24px to sit above it. Localized
+  label (Health/Gesundheit); Hud.test.tsx asserts full-width-green at full
+  health and shrink-reddens toward zero.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

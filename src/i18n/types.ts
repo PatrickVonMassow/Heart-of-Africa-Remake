@@ -79,6 +79,8 @@ export interface Strings {
     webglFallbackDismiss: string
     /** Frame counter label, e.g. "62 FPS". */
     fps(fps: number): string
+    /** Label/tooltip for the bottom-left health bar (design.md §17.1). */
+    healthBar: string
     /** Reason shown while a terrain slowdown is active (design.md §11). */
     movementPenalty: { jungle: string; water: string; mountain: string; canoeOnLand: string }
   }

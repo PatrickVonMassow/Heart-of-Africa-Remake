@@ -1052,12 +1052,15 @@ function Player() {
   const carry = useRef<THREE.Group>(null)
   const legs = useRef<THREE.Group>(null)
   const paddle = useRef<THREE.Group>(null)
+  const woundLight = useRef<THREE.Group>(null)
+  const woundSevere = useRef<THREE.Group>(null)
   const heading = useRef(0)
   const last = useRef<{ x: number; z: number } | null>(null)
   const walkTime = useRef(0)
   const bobTime = useRef(0)
   const wasCanoeing = useRef<boolean | null>(null)
   const wasCarrying = useRef<boolean | null>(null)
+  const wasWounds = useRef<number | null>(null)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1115,14 +1118,19 @@ function Player() {
     // A gentle, one-sided paddle stroke while riding.
     if (paddle.current) paddle.current.rotation.x = 0.35 + Math.sin(bobTime.current * 3.2) * 0.4
 
-    if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying) {
+    // Wounds show on the figure, scaling with severity (design.md §6/§16).
+    const wounds = s.afflictions.wounds
+    if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying || wasWounds.current !== wounds) {
       wasCanoeing.current = canoeing
       wasCarrying.current = carrying
+      wasWounds.current = wounds
       if (boat.current) boat.current.visible = canoeing
       if (carry.current) carry.current.visible = carrying
       if (legs.current) legs.current.visible = !canoeing
+      if (woundLight.current) woundLight.current.visible = wounds >= 1
+      if (woundSevere.current) woundSevere.current.visible = wounds >= 2
       if (import.meta.env.DEV) {
-        ;(window as unknown as Record<string, unknown>).__player = { canoeing, carrying }
+        ;(window as unknown as Record<string, unknown>).__player = { canoeing, carrying, wounds }
       }
     }
     last.current = { x: s.pos.x, z: s.pos.z }
@@ -1200,6 +1208,38 @@ function Player() {
           <boxGeometry args={[0.32, 0.38, 0.16]} />
           <meshStandardMaterial color="#7c5a34" roughness={0.95} />
         </mesh>
+        {/* Wounds show on the figure (design.md §6), toggled in useFrame. From
+            the steep bird's-eye the crown and shoulders are what read, so the
+            marks sit there. Light: a bandage strap over the helmet with a blood
+            spot. Severe: the strap runs red and blood soaks both shoulders. */}
+        <group ref={woundLight} visible={false}>
+          {/* Bandage strap over the crown of the helmet (visible from above). */}
+          <mesh position={[0, 1.26, 0]} castShadow>
+            <boxGeometry args={[0.13, 0.05, 0.46]} />
+            <meshStandardMaterial color="#ece6d6" roughness={1} />
+          </mesh>
+          {/* Blood soaking through the strap. */}
+          <mesh position={[0, 1.30, 0.1]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.06, 12]} />
+            <meshStandardMaterial color="#a01c1c" roughness={0.8} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+        <group ref={woundSevere} visible={false}>
+          {/* The head strap runs red when the wound is severe. */}
+          <mesh position={[0, 1.27, 0]}>
+            <boxGeometry args={[0.14, 0.055, 0.48]} />
+            <meshStandardMaterial color="#8a1717" roughness={0.85} />
+          </mesh>
+          {/* Blood soaking both shoulders (top-facing, reads from above). */}
+          <mesh position={[-0.2, 0.9, 0.02]}>
+            <sphereGeometry args={[0.13, 12, 8]} />
+            <meshStandardMaterial color="#8a1717" roughness={0.85} />
+          </mesh>
+          <mesh position={[0.2, 0.9, 0.02]}>
+            <sphereGeometry args={[0.11, 12, 8]} />
+            <meshStandardMaterial color="#7a1414" roughness={0.85} />
+          </mesh>
+        </group>
       </group>
     </group>
   )

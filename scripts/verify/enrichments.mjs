@@ -310,6 +310,27 @@ if (waterSpot && landSpot) {
   await page.waitForTimeout(300)
   const none = await page.evaluate(() => window.__player)
   check('Canoe: no canoe in the pack, neither ridden nor dragged', none?.canoeing === false && none?.carrying === false, JSON.stringify(none))
+
+  // --- Injured figure: a wound shows on the explorer, scaling with severity ----
+  // (§7.1.35, design.md §6). __player.wounds mirrors the toggled wound meshes.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__game.setState({ afflictions: { ...g.afflictions, wounds: 2 } })
+    window.__ui.getState().setTravelZoom(0.3)
+  })
+  await page.waitForTimeout(500)
+  const hurt = await page.evaluate(() => window.__player)
+  check('Injured figure: a severe wound shows on the explorer', hurt?.wounds === 2, JSON.stringify(hurt))
+  await page.screenshot({ path: `${OUT}90-wounded-explorer.png` })
+  console.log('shot 90-wounded-explorer.png')
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 } })
+    window.__ui.getState().setTravelZoom(1)
+  })
+  await page.waitForTimeout(300)
+  const healed = await page.evaluate(() => window.__player)
+  check('Injured figure: healed explorer shows no wound', healed?.wounds === 0, JSON.stringify(healed))
 } else {
   check('Canoe: a water tile and a land tile were found', false, `water=${JSON.stringify(waterSpot)} land=${JSON.stringify(landSpot)}`)
 }

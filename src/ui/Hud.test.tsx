@@ -11,6 +11,7 @@ import { useLocale } from '../i18n'
 import { useGame } from '../state/store'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
+import { balance } from '../config/balance'
 
 withWorld()
 
@@ -201,6 +202,28 @@ describe('InventoryBar present-valuable button (design.md §8)', () => {
     )
     expect(btn).toBeTruthy()
     expect(btn?.textContent).toContain('(1)')
+  })
+})
+
+describe('HealthBar (design.md §17.1)', () => {
+  const fill = () => document.querySelector('.health-bar-fill') as HTMLElement | null
+  const hueOf = (el: HTMLElement) => Number(el.getAttribute('data-hue'))
+
+  it('is full-width and green at full health', () => {
+    useGame.setState({ health: balance.health.max })
+    render(<Hud />)
+    const f = fill()
+    expect(f).toBeTruthy()
+    expect(f!.style.width).toBe('100%')
+    expect(hueOf(f!)).toBe(120) // green
+  })
+
+  it('shrinks and reddens toward zero health', () => {
+    useGame.setState({ health: balance.health.max * 0.1 })
+    render(<Hud />)
+    const f = fill()!
+    expect(parseFloat(f.style.width)).toBeCloseTo(10, 5)
+    expect(hueOf(f)).toBeLessThan(20) // red-ish, not green
   })
 })
 

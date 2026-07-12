@@ -153,7 +153,7 @@ Afflictions alter controls/vision and can be fatal:
 - Fever/illness (mainly in wetlands) → temporarily uncontrolled movement.
 - Dehydration (desert without water) → drift; avoidable with a filled canteen.
 - Sun blindness (desert) → restricted vision, can end fatally — the canteen does not help against it; recovery only outside the desert.
-- Wounds (animals/robberies) — wounds also mend on their own while the traveler is fed: a severe wound subsides to a light one and a light wound closes over days (calibratable), so recovery without medicine is possible; medicine remains the instant cure.
+- Wounds (animals/robberies) — wounds also mend on their own while the traveler is fed: a severe wound subsides to a light one and a light wound closes over days (calibratable), so recovery without medicine is possible; medicine remains the instant cure. A wound also shows on the traveler's bird's-eye figure, scaling with severity — a bandaged head for a light wound, a bloodied head and shoulders for a severe one — just as it shows on the writing hand (§16.3).
 - Medicine cures fever and wounds.
 - Loss of the expedition → a successor takes over.
 
@@ -435,6 +435,7 @@ Players who do not want to be interrupted can turn the automatic presentation of
 - Transient status hints — e.g. the reason for a movement penalty (§11) — appear as a right-aligned item inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
 - The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
 - An item that is currently in use lights up (glows) in the inventory bar: the relief item countering the present terrain (the canoe on water, the machete in the jungle, the rope on a mountain) and medicine while a curable affliction (fever or a wound) is active — so the player sees at a glance which piece of equipment is doing its work right now.
+- A health bar sits in the bottom-left corner: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. The detailed state and afflictions stay on the health query (H).
 - Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
 
 ### 17.2 Discovery-gated labels

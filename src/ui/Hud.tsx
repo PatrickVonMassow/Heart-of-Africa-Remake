@@ -7,7 +7,7 @@ import { healthState, listCheckpoints, useGame, type EquipmentId } from '../stat
 import { TREASURE_IDS } from '../systems/economy'
 import { placeById, worldToLatLon } from '../world/geo'
 import { sampleTerrain } from '../world/terrain'
-import { START_YEAR } from '../config/balance'
+import { START_YEAR, balance } from '../config/balance'
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
@@ -128,6 +128,26 @@ function FpsCounter() {
   }, [visible])
   if (!visible) return null
   return <div className="fps-counter">{t.hud.fps(fps)}</div>
+}
+
+/** Health bar, bottom-left (design.md §17.1): a filled bar that is green at
+ *  full health and shades ever redder toward zero. */
+function HealthBar() {
+  const t = useStrings()
+  const health = useGame((s) => s.health)
+  const frac = Math.max(0, Math.min(1, health / balance.health.max))
+  // Hue sweeps green (120°) → red (0°) as health drops, so the colour reads
+  // the condition at a glance without needing the H query.
+  const hue = Math.round(120 * frac)
+  return (
+    <div className="health-bar" title={t.hud.healthBar} aria-label={t.hud.healthBar}>
+      <div
+        className="health-bar-fill"
+        data-hue={hue}
+        style={{ width: `${frac * 100}%`, background: `hsl(${hue}, 68%, 44%)` }}
+      />
+    </div>
+  )
 }
 
 /** Dismissible notice when the renderer fell back to WebGL 2 (CLAUDE.md §3). */
@@ -391,6 +411,7 @@ export function Hud() {
     <>
       <StatusBar />
       <FpsCounter />
+      <HealthBar />
       <InventoryBar />
       <button className="hud-button journal-toggle" onClick={() => {
         const g = useGame.getState()

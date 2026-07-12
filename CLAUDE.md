@@ -306,11 +306,14 @@ verify suite that proves it.
    coordinates (removed on user request); transient status hints (e.g.
    the movement-penalty reason, pt. 4) render as a right-aligned item
    inside the status bar itself, not in a separate floating panel; the
-   inventory item currently in use glows (§17.1). Verifiable: the hint
-   element is a descendant of `.status-bar` and its box stays within the
-   bar's box, and a canoe on water / medicine while afflicted gains
+   inventory item currently in use glows (§17.1); a bottom-left health bar
+   is green at full health and reddens toward zero (§17.1). Verifiable: the
+   hint element is a descendant of `.status-bar` and its box stays within
+   the bar's box, and a canoe on water / medicine while afflicted gains
    `.inv-active` while an idle item does not
-   (`scripts/verify/enrichments.mjs`).
+   (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is full-width
+   green at full health and shrinks/reddens toward zero
+   (`src/ui/Hud.test.tsx`).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints via the knowing-people
@@ -577,10 +580,11 @@ verify suite that proves it.
     natural wound healing of §6.2 (calibratable, debug-editable day
     counts — a wound alone is never an unavoidable death), regeneration
     while fed and affliction-free, the remains report and successor on
-    death (§15.6), the health query (H), and vultures circling at poor
-    condition (§19.6); health/afflictions travel with the checkpoint; all
-    drains/thresholds are balance values adjustable in the debug menu,
-    which also toggles afflictions for testing. Verifiable:
+    death (§15.6), the health query (H), the wound shown on the traveler's
+    bird's-eye figure scaling with severity (§6.2), and vultures circling
+    at poor condition (§19.6); health/afflictions travel with the
+    checkpoint; all drains/thresholds are balance values adjustable in the
+    debug menu, which also toggles afflictions for testing. Verifiable:
     `src/state/store.health.test.ts` asserts defaults, dehydration
     onset/recovery, the canteen fill draining away from water, emptying
     into thirst then health loss, and refilling at fresh water,
@@ -588,7 +592,10 @@ verify suite that proves it.
     healing (light heals fed, severe eases to light, starving blocks it)
     and the death/successor flow; `src/ui/Hud.test.tsx` the sun-blindness
     veil and its recovery and the remains/defeat overlay;
-    `scripts/verify/health.mjs` the vultures circling at poor condition.
+    `scripts/verify/health.mjs` the vultures circling at poor condition;
+    `scripts/verify/enrichments.mjs` that a severe wound shows on the
+    bird's-eye figure (`__player.wounds`) and clears when healed
+    (screenshot 90).
 23. **Random events.** `design.md` §14 is implemented as a hidden per-day
     roll while travelling, modulated by terrain and state: the event kinds
     of §14.1 (with the predator danger order cheetah < leopard < hyena <
