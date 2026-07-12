@@ -1023,11 +1023,33 @@ function GraveMarker() {
 // The explorer sits this much lower when seated in the canoe, so torso and
 // head clear the gunwale while the (hidden) legs would fold into the hull.
 const CANOE_SEAT_DROP = 0.28
+// Lift the riding canoe + rider so the hull rides on the surface with only a
+// shallow draft, instead of sitting half-submerged (design.md §7).
+const CANOE_WATERLINE = 0.18
+
+/** The dugout hull + gunwale rim, reused by the ridden and the dragged canoe. */
+function CanoeHull() {
+  return (
+    <>
+      {/* Hull: an elongated open bowl. */}
+      <mesh position={[0, -0.02, 0]} scale={[0.72, 0.46, 2.15]} castShadow receiveShadow>
+        <sphereGeometry args={[0.5, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+        <meshStandardMaterial color="#5a3f28" roughness={0.85} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Gunwale rim — the boat's outline reads clearly from the bird's eye. */}
+      <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.74, 2.18, 1]} castShadow>
+        <torusGeometry args={[0.5, 0.045, 8, 24]} />
+        <meshStandardMaterial color="#7a5836" roughness={0.8} />
+      </mesh>
+    </>
+  )
+}
 
 function Player() {
   const ref = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
   const boat = useRef<THREE.Group>(null)
+  const carry = useRef<THREE.Group>(null)
   const legs = useRef<THREE.Group>(null)
   const paddle = useRef<THREE.Group>(null)
   const heading = useRef(0)
@@ -1035,6 +1057,7 @@ function Player() {
   const walkTime = useRef(0)
   const bobTime = useRef(0)
   const wasCanoeing = useRef<boolean | null>(null)
+  const wasCarrying = useRef<boolean | null>(null)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1050,9 +1073,13 @@ function Player() {
     const t = sampleTerrain(ll.lat, ll.lon, s.seed)
     ref.current.position.set(s.pos.x, Math.max(0, t.height), s.pos.z)
 
-    // Travelling water with a canoe in the pack: the explorer rides it (design.md
-    // §7/§11) — same possession-based rule the HUD canoe glow uses.
-    const canoeing = (t.type === 'water' || t.type === 'ocean') && (s.equipment.canoe ?? 0) > 0
+    // With a canoe in the pack (possession-based, like the HUD canoe glow):
+    // on water the explorer rides it, on land he drags it along behind him
+    // (design.md §7/§11).
+    const hasCanoe = (s.equipment.canoe ?? 0) > 0
+    const onWater = t.type === 'water' || t.type === 'ocean'
+    const canoeing = hasCanoe && onWater
+    const carrying = hasCanoe && !onWater
     bobTime.current += dt
 
     // Face the movement direction; bob gently while walking.
@@ -1075,26 +1102,27 @@ function Player() {
     if (inner.current) {
       inner.current.rotation.y = heading.current
       if (canoeing) {
-        // Sit into the hull; a slow water rock replaces the walk bob.
-        inner.current.position.y = -CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
+        // Sit into the hull, lifted to the waterline; a slow rock replaces the bob.
+        inner.current.position.y = CANOE_WATERLINE - CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
       } else {
         inner.current.position.y = moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0
       }
     }
     if (boat.current) {
       boat.current.rotation.y = heading.current
-      boat.current.position.y = Math.sin(bobTime.current * 1.7) * 0.03
+      boat.current.position.y = CANOE_WATERLINE + Math.sin(bobTime.current * 1.7) * 0.03
     }
     // A gentle, one-sided paddle stroke while riding.
     if (paddle.current) paddle.current.rotation.x = 0.35 + Math.sin(bobTime.current * 3.2) * 0.4
 
-    if (wasCanoeing.current !== canoeing) {
+    if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying) {
       wasCanoeing.current = canoeing
+      wasCarrying.current = carrying
       if (boat.current) boat.current.visible = canoeing
+      if (carry.current) carry.current.visible = carrying
       if (legs.current) legs.current.visible = !canoeing
       if (import.meta.env.DEV) {
-        const w = window as unknown as Record<string, unknown>
-        w.__player = { ...(w.__player as object), canoeing }
+        ;(window as unknown as Record<string, unknown>).__player = { canoeing, carrying }
       }
     }
     last.current = { x: s.pos.x, z: s.pos.z }
@@ -1102,18 +1130,9 @@ function Player() {
 
   return (
     <group ref={ref}>
-      {/* Dugout canoe, shown only while riding water (toggled in useFrame). */}
+      {/* Ridden dugout, shown only while travelling water (toggled in useFrame). */}
       <group ref={boat} visible={false}>
-        {/* Hull: an elongated open bowl, partly submerged below the waterline. */}
-        <mesh position={[0, -0.02, 0]} scale={[0.72, 0.46, 2.15]} castShadow receiveShadow>
-          <sphereGeometry args={[0.5, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-          <meshStandardMaterial color="#5a3f28" roughness={0.85} side={THREE.DoubleSide} />
-        </mesh>
-        {/* Gunwale rim — the boat's outline reads clearly from the bird's eye. */}
-        <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.74, 2.18, 1]} castShadow>
-          <torusGeometry args={[0.5, 0.045, 8, 24]} />
-          <meshStandardMaterial color="#7a5836" roughness={0.8} />
-        </mesh>
+        <CanoeHull />
         {/* Paddle held to the right, dipping with the stroke. */}
         <group ref={paddle} position={[0.34, 0.16, 0.05]}>
           <mesh position={[0, 0, 0.34]} rotation={[0.32, 0, 0]} castShadow>
@@ -1127,6 +1146,11 @@ function Player() {
         </group>
       </group>
       <group ref={inner}>
+        {/* Dragged canoe on land: trails behind the walking figure, near end
+            lifted to the grip, far end resting on the ground (toggled in frame). */}
+        <group ref={carry} visible={false} position={[0, 0.26, -1.2]} rotation={[-0.2, 0, 0]}>
+          <CanoeHull />
+        </group>
         {/* Legs (hidden inside the hull while canoeing). */}
         <group ref={legs}>
           <mesh position={[-0.11, 0.22, 0]} castShadow>

@@ -259,44 +259,59 @@ if (jungleSpot) {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
 }
 
-// --- Canoe ride: the explorer sits in a canoe on water (§7.1.4, design.md §7) -
-// With a canoe in the pack, travelling a water tile rides it; on land the canoe
-// is stowed and the explorer walks. The Player component exposes __player.canoeing.
-const waterSpot = await page.evaluate(() => {
-  const seed = window.__game.getState().seed
-  for (let lat = 2; lat >= -6; lat -= 0.4) {
-    for (let lon = 12; lon <= 34; lon += 0.4) {
-      if (window.__terrainType(lat, lon, seed) === 'water') return { lat, lon }
-    }
-  }
-  return null
-})
-if (waterSpot) {
+// --- Canoe depiction: ridden on water, dragged on land (§7.1.4, design.md §7) --
+// With a canoe in the pack, travelling a water tile rides it (seated in the
+// hull); on land the explorer drags it behind him; with no canoe he just walks.
+// The Player component exposes __player.{canoeing,carrying}.
+const findTile = (ty, lat0, lat1, lon0, lon1) =>
+  page.evaluate(
+    ({ ty, lat0, lat1, lon0, lon1 }) => {
+      const seed = window.__game.getState().seed
+      for (let lat = lat0; lat >= lat1; lat -= 0.3)
+        for (let lon = lon0; lon <= lon1; lon += 0.3)
+          if (window.__terrainType(lat, lon, seed) === ty) return { lat, lon }
+      return null
+    },
+    { ty, lat0, lat1, lon0, lon1 },
+  )
+const waterSpot = await findTile('water', 2, -6, 12, 34)
+const landSpot = await findTile('desert', 24, 14, -6, 26)
+if (waterSpot && landSpot) {
   await page.evaluate((s) => {
     const g = window.__game.getState()
     window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
     g.debugJumpTo(s.lat, s.lon)
   }, waterSpot)
   await page.waitForTimeout(400)
-  const onWater = await page.evaluate(() => window.__player?.canoeing)
-  check('Canoe ride: the explorer rides the canoe on water', onWater === true, `canoeing=${onWater}`)
-  // Zoom in for legible evidence (zoom-in below 1 is always allowed), then restore.
+  const ride = await page.evaluate(() => window.__player)
+  check('Canoe: the explorer rides the canoe on water', ride?.canoeing === true && ride?.carrying === false, JSON.stringify(ride))
+  // Zoom in for legible evidence (zoom-in below 1 is always allowed).
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
   await page.waitForTimeout(500)
   await page.screenshot({ path: `${OUT}88-canoe-ride.png` })
   console.log('shot 88-canoe-ride.png')
+
+  // On land with the canoe still in the pack: it is dragged behind, not ridden.
+  await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), landSpot)
+  await page.waitForTimeout(300)
+  await page.evaluate(() => { const p = window.__game.getState().pos; window.__game.setState({ pos: { x: p.x, z: p.z - 2 } }) })
+  await page.waitForTimeout(500)
+  const drag = await page.evaluate(() => window.__player)
+  check('Canoe: on land the explorer drags the canoe (not ridden)', drag?.carrying === true && drag?.canoeing === false, JSON.stringify(drag))
+  await page.screenshot({ path: `${OUT}89-canoe-carry.png` })
+  console.log('shot 89-canoe-carry.png')
   await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
 
-  // Stow the canoe (remove it): on the same water tile the explorer no longer rides.
+  // Stow the canoe (remove it): neither ridden nor dragged.
   await page.evaluate(() => {
     const g = window.__game.getState()
     window.__game.setState({ equipment: { ...g.equipment, canoe: 0 } })
   })
   await page.waitForTimeout(300)
-  const noCanoe = await page.evaluate(() => window.__player?.canoeing)
-  check('Canoe ride: no canoe in the pack, no ride', noCanoe === false, `canoeing=${noCanoe}`)
+  const none = await page.evaluate(() => window.__player)
+  check('Canoe: no canoe in the pack, neither ridden nor dragged', none?.canoeing === false && none?.carrying === false, JSON.stringify(none))
 } else {
-  check('Canoe ride: a water tile was found', false, 'no water tile located')
+  check('Canoe: a water tile and a land tile were found', false, `water=${JSON.stringify(waterSpot)} land=${JSON.stringify(landSpot)}`)
 }
 
 // --- Point 5: the journal panel stops above the camp/journal buttons ----------

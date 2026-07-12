@@ -214,6 +214,22 @@ the map).
   topic bullets; README/scripts READMEs caught up (TRAA on by default,
   current suite list); the long TASKS notes compacted to root cause +
   outcome.)
+- [x] 33. Travelling water with a canoe now shows the explorer seated in it,
+  but the hull sits partly under the water surface and reads poorly. Raise
+  the canoe so it rides on the surface with only a shallow draft.
+  (A CANOE_WATERLINE lift (0.18) raises the ridden hull and the seated rider
+  together, so the hull rides on the surface with a shallow draft and the
+  gunwale rim reads clearly; verified per zoomed screenshot 88.)
+- [x] 34. On land, make it recognizable that the explorer is transporting the
+  canoe (carrying or dragging it — whichever reads better in the bird's-eye
+  view).
+  (Dragging reads best at the steep-oblique bird's-eye angle (an overhead
+  portage would occlude the figure): a second canoe instance trails behind
+  the walking explorer along his heading, near end lifted to the grip, far
+  end resting on the ground. The hull geometry is shared by the ridden and
+  the dragged canoe via a CanoeHull component; __player exposes canoeing +
+  carrying, enrichments asserts ride-on-water / drag-on-land / neither, and
+  screenshot 89 shows the drag.)
 
 ## Closing (only after all points)
 
