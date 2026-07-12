@@ -81,7 +81,7 @@ Notes:
 - The dev-server checks rely on DEV-only hooks (`__game`, `__ui`,
   `__placePlayer`, `__placeLayout`, `__placeColliders`, `__placeCamera`,
   `__placeWalkers`, `__placeBackdrop`, `__placeBackdropInfo`, `__balance`,
-  `__movement`, `__events`, `__lionHunt`, `__wildlife`, `__rivers`,
+  `__movement`, `__events`, `__lionHunt`, `__wildlife`, `__player`, `__rivers`,
   `__terrainType`, `__setLang`, `__voiceMarkup`, `__ttsForceWasm`); they do not
   work against the production build.
 - Chromium must run with `--use-angle=d3d11 --enable-gpu` (already set in

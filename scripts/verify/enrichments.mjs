@@ -195,7 +195,19 @@ check(
 
 // --- Region border labels (§7.1.3) -------------------------------------------
 await page.evaluate(() => window.__game.getState().debugJumpTo(17.2, -2))
-await page.waitForTimeout(2500)
+// The drei <Html> labels mount a frame or two after the jump; on a cold first
+// border visit that can exceed a fixed sleep. Poll until both are present (this
+// only waits for the mount, it does not relax the assertion below).
+await page
+  .waitForFunction(
+    () => {
+      const l = [...document.querySelectorAll('.region-label')].map((e) => e.textContent)
+      return l.includes('North') && l.includes('West')
+    },
+    null,
+    { timeout: 10000 },
+  )
+  .catch(() => {})
 const labels = await page.evaluate(() => [...document.querySelectorAll('.region-label')].map((e) => e.textContent))
 check(
   'Border labels: both regions named on their sides',
@@ -245,6 +257,46 @@ if (jungleSpot) {
   check('Movement penalty hint sits inside the status bar (right-aligned)', hint.topRight === true, `hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
 } else {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
+}
+
+// --- Canoe ride: the explorer sits in a canoe on water (§7.1.4, design.md §7) -
+// With a canoe in the pack, travelling a water tile rides it; on land the canoe
+// is stowed and the explorer walks. The Player component exposes __player.canoeing.
+const waterSpot = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  for (let lat = 2; lat >= -6; lat -= 0.4) {
+    for (let lon = 12; lon <= 34; lon += 0.4) {
+      if (window.__terrainType(lat, lon, seed) === 'water') return { lat, lon }
+    }
+  }
+  return null
+})
+if (waterSpot) {
+  await page.evaluate((s) => {
+    const g = window.__game.getState()
+    window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
+    g.debugJumpTo(s.lat, s.lon)
+  }, waterSpot)
+  await page.waitForTimeout(400)
+  const onWater = await page.evaluate(() => window.__player?.canoeing)
+  check('Canoe ride: the explorer rides the canoe on water', onWater === true, `canoeing=${onWater}`)
+  // Zoom in for legible evidence (zoom-in below 1 is always allowed), then restore.
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: `${OUT}88-canoe-ride.png` })
+  console.log('shot 88-canoe-ride.png')
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
+
+  // Stow the canoe (remove it): on the same water tile the explorer no longer rides.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__game.setState({ equipment: { ...g.equipment, canoe: 0 } })
+  })
+  await page.waitForTimeout(300)
+  const noCanoe = await page.evaluate(() => window.__player?.canoeing)
+  check('Canoe ride: no canoe in the pack, no ride', noCanoe === false, `canoeing=${noCanoe}`)
+} else {
+  check('Canoe ride: a water tile was found', false, 'no water tile located')
 }
 
 // --- Point 5: the journal panel stops above the camp/journal buttons ----------

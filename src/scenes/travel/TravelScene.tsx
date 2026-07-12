@@ -1020,12 +1020,28 @@ function GraveMarker() {
 }
 
 /** The expedition leader: khaki outfit, pith helmet, backpack. */
+// The explorer sits this much lower when seated in the canoe, so torso and
+// head clear the gunwale while the (hidden) legs would fold into the hull.
+const CANOE_SEAT_DROP = 0.28
+
 function Player() {
   const ref = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
+  const boat = useRef<THREE.Group>(null)
+  const legs = useRef<THREE.Group>(null)
+  const paddle = useRef<THREE.Group>(null)
   const heading = useRef(0)
   const last = useRef<{ x: number; z: number } | null>(null)
   const walkTime = useRef(0)
+  const bobTime = useRef(0)
+  const wasCanoeing = useRef<boolean | null>(null)
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__player
+    }
+  }, [])
 
   useFrame((_, dt) => {
     const s = useGame.getState()
@@ -1034,12 +1050,18 @@ function Player() {
     const t = sampleTerrain(ll.lat, ll.lon, s.seed)
     ref.current.position.set(s.pos.x, Math.max(0, t.height), s.pos.z)
 
+    // Travelling water with a canoe in the pack: the explorer rides it (design.md
+    // §7/§11) — same possession-based rule the HUD canoe glow uses.
+    const canoeing = (t.type === 'water' || t.type === 'ocean') && (s.equipment.canoe ?? 0) > 0
+    bobTime.current += dt
+
     // Face the movement direction; bob gently while walking.
     const prev = last.current
+    let moving = false
     if (prev) {
       const dx = s.pos.x - prev.x
       const dz = s.pos.z - prev.z
-      const moving = Math.hypot(dx, dz) > 0.001
+      moving = Math.hypot(dx, dz) > 0.001
       if (moving) {
         const target = Math.atan2(dx, dz)
         let diff = target - heading.current
@@ -1048,9 +1070,31 @@ function Player() {
         heading.current += diff * Math.min(1, dt * 10)
         walkTime.current += dt
       }
-      if (inner.current) {
-        inner.current.rotation.y = heading.current
+    }
+
+    if (inner.current) {
+      inner.current.rotation.y = heading.current
+      if (canoeing) {
+        // Sit into the hull; a slow water rock replaces the walk bob.
+        inner.current.position.y = -CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
+      } else {
         inner.current.position.y = moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0
+      }
+    }
+    if (boat.current) {
+      boat.current.rotation.y = heading.current
+      boat.current.position.y = Math.sin(bobTime.current * 1.7) * 0.03
+    }
+    // A gentle, one-sided paddle stroke while riding.
+    if (paddle.current) paddle.current.rotation.x = 0.35 + Math.sin(bobTime.current * 3.2) * 0.4
+
+    if (wasCanoeing.current !== canoeing) {
+      wasCanoeing.current = canoeing
+      if (boat.current) boat.current.visible = canoeing
+      if (legs.current) legs.current.visible = !canoeing
+      if (import.meta.env.DEV) {
+        const w = window as unknown as Record<string, unknown>
+        w.__player = { ...(w.__player as object), canoeing }
       }
     }
     last.current = { x: s.pos.x, z: s.pos.z }
@@ -1058,16 +1102,42 @@ function Player() {
 
   return (
     <group ref={ref}>
+      {/* Dugout canoe, shown only while riding water (toggled in useFrame). */}
+      <group ref={boat} visible={false}>
+        {/* Hull: an elongated open bowl, partly submerged below the waterline. */}
+        <mesh position={[0, -0.02, 0]} scale={[0.72, 0.46, 2.15]} castShadow receiveShadow>
+          <sphereGeometry args={[0.5, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+          <meshStandardMaterial color="#5a3f28" roughness={0.85} side={THREE.DoubleSide} />
+        </mesh>
+        {/* Gunwale rim — the boat's outline reads clearly from the bird's eye. */}
+        <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.74, 2.18, 1]} castShadow>
+          <torusGeometry args={[0.5, 0.045, 8, 24]} />
+          <meshStandardMaterial color="#7a5836" roughness={0.8} />
+        </mesh>
+        {/* Paddle held to the right, dipping with the stroke. */}
+        <group ref={paddle} position={[0.34, 0.16, 0.05]}>
+          <mesh position={[0, 0, 0.34]} rotation={[0.32, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.028, 0.028, 0.7, 6]} />
+            <meshStandardMaterial color="#8a6a3e" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, -0.16, 0.62]} rotation={[0.32, 0, 0]} castShadow>
+            <boxGeometry args={[0.12, 0.02, 0.3]} />
+            <meshStandardMaterial color="#8a6a3e" roughness={0.9} />
+          </mesh>
+        </group>
+      </group>
       <group ref={inner}>
-        {/* Legs */}
-        <mesh position={[-0.11, 0.22, 0]} castShadow>
-          <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
-          <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
-        </mesh>
-        <mesh position={[0.11, 0.22, 0]} castShadow>
-          <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
-          <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
-        </mesh>
+        {/* Legs (hidden inside the hull while canoeing). */}
+        <group ref={legs}>
+          <mesh position={[-0.11, 0.22, 0]} castShadow>
+            <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
+            <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
+          </mesh>
+          <mesh position={[0.11, 0.22, 0]} castShadow>
+            <cylinderGeometry args={[0.08, 0.09, 0.44, 6]} />
+            <meshStandardMaterial color="#6e5a3a" roughness={0.9} />
+          </mesh>
+        </group>
         {/* Torso (khaki jacket) */}
         <mesh position={[0, 0.66, 0]} castShadow>
           <boxGeometry args={[0.44, 0.52, 0.28]} />

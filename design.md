@@ -178,7 +178,7 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 | Gifts | Trade goods for chiefs (goodwill, hints) |
 | Canteen | Holds a fill level; refills at fresh water, drains on land (faster in the desert); protects against dehydration in the desert while it holds water (not against sun blindness) |
 | Map | Orientation aid; clicking it in the inventory bar opens the exploration overview |
-| Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles |
+| Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles. While travelling water with a canoe in the pack, the explorer is visibly shown seated in the canoe in the bird's-eye view, paddling; on land the canoe is stowed and he walks |
 
 Core rule: a carried item acts by mere possession — it decides terrain mobility and treasure recovery, and a weapon (rifle or machete) in the pack protects against wild-animal attacks, the rifle more strongly than the machete (§14). There is no "in hand" state.
 

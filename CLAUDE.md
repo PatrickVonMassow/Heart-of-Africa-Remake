@@ -238,7 +238,8 @@ verify suite that proves it.
    incl. the canoe-on-land penalty and its once-per-type journal
    announcement (§11.1, both languages, voice markup, flag in the
    checkpoint), and possession-based item effects (§6.1/§7 — no "in hand"
-   state). Verifiable: an automated move on enclosed sea advances the
+   state), incl. the explorer shown seated in the canoe while travelling
+   water with one in the pack (§7). Verifiable: an automated move on enclosed sea advances the
    position, a move on open ocean is refused with the blocking notice, a
    move onto a mountain without a rope advances (with the warning) while
    the rope makes it faster, and a forced fall wounds the traveler and can
@@ -246,9 +247,11 @@ verify suite that proves it.
    (incl. the canoe-on-land penalty on every land type), a canoe run on
    savanna covers clearly less ground than without it (the land malus is
    real, not just a hint), the top-right HUD hint appears in jungle
-   without a machete and clears once the machete is in the pack, and a
+   without a machete and clears once the machete is in the pack, a
    first jungle entry adds exactly one journal warning while a later entry
-   adds none (`scripts/verify/enrichments.mjs`); the Red Sea cut and
+   adds none, and travelling a water tile with a canoe in the pack shows
+   the explorer riding it (`__player.canoeing`) while removing the canoe
+   stows it (`scripts/verify/enrichments.mjs`); the Red Sea cut and
    world trim are pure-tested at the acceptance coordinates — mid Red
    Sea, Sinai, the Arabian peninsula and the Gulf of Aden are blocked
    ocean (Sinai/Arabia trimmed in the DEM, so no land route rounds the
