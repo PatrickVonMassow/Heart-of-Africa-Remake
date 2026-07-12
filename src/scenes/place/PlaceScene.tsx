@@ -1245,12 +1245,17 @@ function PanoramaWildlife({
   placeId,
   seed,
   innerRadius,
+  lat,
+  lon,
 }: {
   region: RegionId
   placeId: string
   seed: number
   innerRadius: number
+  lat: number
+  lon: number
 }) {
+  const centerH = useMemo(() => sampleTerrain(lat, lon, seed).height, [lat, lon, seed])
   const geos = useMemo(() => {
     // Region-typical species: the desert north shows antelope (oryx), the
     // rest a savanna mix; giraffes stay out of the deep forest.
@@ -1292,10 +1297,14 @@ function PanoramaWildlife({
       const g = refs.current[i]
       if (!g) return
       const a = it.angle + t * it.drift
-      g.position.set(Math.cos(a) * it.radius, 0, Math.sin(a) * it.radius)
-      // Face the drift direction along the ring tangent; gentle walk bob.
+      const x = Math.cos(a) * it.radius
+      const z = Math.sin(a) * it.radius
+      // Sit on the backdrop relief (not a flat y=0) so the silhouette neither
+      // floats above a dip nor sinks into a dune/ridge; a gentle walk bob on top.
+      const groundY = backdropHeightAt(x, z, lat, lon, seed, centerH, innerRadius)
+      g.position.set(x, groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12, z)
+      // Face the drift direction along the ring tangent.
       g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
-      g.position.y = Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12
     })
   })
 
@@ -1333,11 +1342,27 @@ const BACKDROP_HEIGHT = 30 // vertical exaggeration of the map relief
 const BACKDROP_MAX_SLOPE = 0.32
 const BACKDROP_RINGS = 24
 const BACKDROP_SEGS = 96
+const BACKDROP_OUTER = 340 // outermost ring radius
+
+/**
+ * Height of the backdrop surface at a point (x, z) around the place centre —
+ * the same formula the backdrop mesh is built from, so panorama wildlife can
+ * sit on the relief instead of floating above it or sinking into it (§2.5).
+ */
+function backdropHeightAt(x: number, z: number, lat: number, lon: number, seed: number, centerH: number, r0: number): number {
+  const r = Math.hypot(x, z)
+  const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
+  const relief = (smp.height - centerH) * BACKDROP_HEIGHT
+  const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
+  const ri = ((BACKDROP_RINGS - 1) * Math.log(Math.max(r, r0) / r0)) / Math.log(BACKDROP_OUTER / r0)
+  const taper = Math.min(1, ri / 5)
+  return capped * taper - 2
+}
 
 function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
   const geometry = useMemo(() => {
     const r0 = innerRadius
-    const r1 = 340
+    const r1 = BACKDROP_OUTER
     const centerH = sampleTerrain(lat, lon, seed).height
     const positions: number[] = []
     const colors: number[] = []
@@ -1485,13 +1510,15 @@ export function PlaceScene() {
 
   // Focus + mouse-look. On entering a settlement any lingering HUD button is
   // blurred so keyboard input goes straight to the game without an extra click
-  // (design.md §2/§17). Mouse-look still engages on a deliberate canvas click:
-  // auto-grabbing the pointer would capture the cursor and make the non-modal
-  // journal and dialogs unclickable, so the lock stays an explicit choice.
+  // (design.md §2/§17.5), and mouse-look is engaged straight away: the walk-in
+  // keypress carries the user activation pointer lock needs, so it is requested
+  // on entry. A dialog releases the lock (so its buttons stay clickable) and
+  // Escape releases it too; where a browser refuses the un-clicked request, a
+  // deliberate canvas click remains as the fallback.
   useEffect(() => {
     const el = gl.domElement
     ;(document.activeElement as HTMLElement | null)?.blur?.()
-    const onClick = () => {
+    const grab = () => {
       if (!useUi.getState().dialog && document.pointerLockElement !== el) {
         try {
           const r = el.requestPointerLock() as unknown as Promise<void> | undefined
@@ -1501,6 +1528,8 @@ export function PlaceScene() {
         }
       }
     }
+    grab() // engage immediately on entry (activation from the walk-in keypress)
+    const onClick = () => grab()
     const onMove = (e: MouseEvent) => {
       if (document.pointerLockElement === el) {
         player.current.yaw -= e.movementX * balance.mouseSensitivity
@@ -1674,7 +1703,7 @@ export function PlaceScene() {
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
       <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
-      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} />
 
       {/* Ground disc with procedural mottling */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>

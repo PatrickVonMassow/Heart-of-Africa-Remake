@@ -97,6 +97,30 @@ textarea {
   gap: 8px;
 }
 
+/* Health status top-right, below the status bar, at the FPS-counter height:
+   the affliction badges sit to the left of the health bar. */
+.health-status {
+  position: absolute;
+  top: 46px;
+  right: 12px;
+  height: 22px; /* fixed, so adding taller affliction badges never nudges the bar */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.affliction-badge {
+  padding: 2px 8px;
+  background: var(--hud-bg);
+  border: 1px solid #a3502e;
+  border-left: 4px solid #d0562e;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #f0b48a;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
 .health-bar {
   width: 180px;
   height: 16px;

@@ -273,9 +273,97 @@ the map).
   keeps its own level. CANOE_HULL_CLEARANCE 0.27 keeps the hull's lowest
   point just above whichever surface applies.)
 
+- [x] 41. The canoe still floods at some Nile spots. Near the mouth/where the
+  biome map misclassifies a river cell as ocean, the terrain type is 'ocean'
+  so the river surface lift is not applied and the hull sits below the ribbon.
+  Detect "on a river" by river proximity, not terrain type.
+  (The Player now floats the canoe on the actual water surface: on a river/lake
+  — detected via riverDistance, not the terrain type — the surface is
+  max(-0.05, bed + SURFACE_LIFT); the sea keeps its own level. So a
+  misclassified 'ocean' river cell no longer drops the lift.)
+- [x] 42. Move the health bar to the top right, below the status bar, at the
+  same height as the FPS counter.
+  (.health-status row absolute at top:46px right:12px; the camp/journal buttons
+  returned to the bottom-right.)
+- [x] 43. On land the ground shows through the dragged canoe (the open hull).
+  Give the hull a solid floor so nothing shows through. Test in very hilly
+  mountains too, where the ground slope could still reveal a gap.
+  (A solid opaque floor disc inside CanoeHull occludes the ground/water through
+  the open bowl; verified on a river and on steep northern mountains.)
+- [x] 44. When the canoe is dragged on land, the paddle should be visibly
+  lying inside it.
+  (A shared CanoePaddle is stowed lengthwise in the dragged hull.)
+- [x] 45. Rivers read too narrow — the Nile especially — making it easy to
+  stray briefly onto land while canoeing. Widen the navigable channel (the
+  ~1890 courses stay authentic; the width is a playability calibration).
+  (RIVER_WIDTH_DEG 0.14 → 0.17 and HALF_WIDTH 1.35 → 1.7 — the max widening that
+  keeps every settlement off the water; Timbuktu, at river distance 0.172, is
+  the tightest. world.test pins the new value.)
+- [x] 46. In settlements the background panorama wildlife (§2.5) sometimes
+  clips into the backdrop relief or floats in the air (seen in Cairo). Place
+  the silhouettes on the backdrop surface so they neither sink nor float.
+  (A shared backdropHeightAt() — the same formula the backdrop mesh is built
+  from — grounds the drifting silhouettes on the relief.)
+- [x] 47. The children playing tag in villages keep catching briefly and then
+  their position jumps forward. Smooth the movement so it no longer stutters.
+  (Each kid eases toward the circling target and resolves the collision on the
+  eased step, so it slides along obstacles instead of clamping at the absolute
+  circle point and then jumping when the point clears.)
+- [x] 48. Villages sit so close to water that they reach into it, so canoeing a
+  river can drift the traveller into the village by accident. Do not auto-enter
+  a settlement while the traveller is on a water cell (enter it by stepping
+  onto land), so a river passage never pulls him in.
+  (The bird's-eye enter check skips entry when the player's cell is 'water'.)
+- [x] 49. Entering a settlement does not put the focus on the controls as §17.5
+  intends: a mouse cursor shows and the player must click before keyboard/
+  mouse-look work. Make entering focus the game controls (mouse-look engaging
+  without a separate click where the browser allows it).
+  (Pointer lock is now requested on entry — the walk-in keypress carries the
+  activation the browser needs — with the canvas click kept as fallback and a
+  dialog/Escape releasing it. §17.5 updated; needs a manual real-hardware check
+  since headless has no user activation.)
+- [x] 50. Feeding vultures clip down into the ground. Keep the vulture on the
+  surface while it feeds.
+  (The landed scavenger group rises to target.y+0.5, the body hop is
+  positive-only and the peck rotation is gentler, so the pecking head no longer
+  swings under the terrain.)
+- [x] 51. A parent acting as a living shield for its calf faces the predator
+  while running away, so it moves backwards. Its facing should follow its run
+  direction instead.
+  (While running to hold the station the parent snaps its facing to the run
+  heading (blockHeading); only on station does it keep that facing and face the
+  hunter down — no more lagging turn-cap that read as running backwards.)
+- [x] 52. Show the other health impairments (fever, sun blindness, wounds) as
+  indicators to the left of the health bar.
+  (.affliction-badge items render left of the bar in the .health-status row,
+  one per active affliction; Hud.test asserts them.)
+- [x] 53. The gambolling juveniles in the bird's-eye view sometimes shiver back
+  and forth. The body-separation pass parts a calf from its own parent every
+  frame while play/follow pulls it back; exclude the parent-calf pair.
+  (The separation neighbour scan skips an animal's own child/parent.)
+- [x] 55. The default bird's-eye zoom should start more zoomed in.
+  (ui travelZoom default 1 → 0.7; the player can still zoom out to 1, or wider
+  with the debug unlock.)
+- [ ] 56. The player should collide with animals and large plants (trees) in
+  the bird's-eye view instead of walking through them.
+- [x] 57. Styling: when affliction badges show (e.g. "Fever") the health bar
+  slips slightly downward. Keep the bar fixed regardless of the badges.
+  (.health-status has a fixed 22px height, so taller badges never nudge the
+  centred bar.)
+- [ ] 54. Make the exploration map look like a real hand-drawn map (parchment,
+  decorative border, a title cartouche, ink coastlines/rivers, region names
+  North/West/Central/East/South) as in the reference image, keeping the
+  discovery gating: unexplored areas are hidden under fog of war.
+- [ ] 58. Add the pyramids near Cairo as a landmark in the bird's-eye view (and
+  the Cairo surroundings), for period atmosphere.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
 2. Thorough dead-code / stale-doc / stale-comment cleanup — as separate commits,
    not mixed with feature commits.
 3. Full regression again.
+4. Analyse every .md file for cruft that accreted through the iterative
+   additions: compact or restructure sections that have grown rambling or
+   redundant, improving structure where it helps. The referenced section
+   numbers must be preserved.

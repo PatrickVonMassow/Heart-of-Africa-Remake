@@ -38,7 +38,7 @@ export interface TerrainSample {
 }
 
 /** River half-width in degrees for terrain carving. */
-export const RIVER_WIDTH_DEG = 0.14
+export const RIVER_WIDTH_DEG = 0.17
 
 /** Vertical exaggeration: world units per meter (stylized, map scale). */
 const METERS_TO_UNITS = 1.35 / 1000

@@ -33,7 +33,7 @@ import { LAKES } from '../../world/data/lakes'
 import { WATERFALLS } from '../../world/data/landmarks'
 
 const STEP_DEG = 0.08 // sampling step along a river (0.8 world units)
-const HALF_WIDTH = 1.35 // ribbon half width in world units
+const HALF_WIDTH = 1.7 // ribbon half width in world units (matches RIVER_WIDTH_DEG)
 // Water surface above the carved bed centerline. Exported so the travel Player
 // can float the canoe on the river surface rather than on the bed height.
 export const SURFACE_LIFT = 0.3

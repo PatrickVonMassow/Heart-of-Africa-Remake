@@ -110,8 +110,8 @@ describe('movement boundary (design.md §11)', () => {
 })
 
 describe('terrain sampling on real geodata', () => {
-  it('carves rivers at the fixed half-width', () => {
-    expect(RIVER_WIDTH_DEG).toBe(0.14)
+  it('carves rivers at the fixed half-width (widened for navigability, still clear of settlements)', () => {
+    expect(RIVER_WIDTH_DEG).toBe(0.17)
   })
 
   // Land points with a stable terrain type under the fixed seed.

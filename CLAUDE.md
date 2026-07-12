@@ -202,15 +202,17 @@ verify suite that proves it.
    and first-person view (walkable settlement) exist; switching between
    them happens through movement alone per `design.md` §2.3 (walk in /
    walk out, buildings open by walking against their door, only the elder
-   keeps the interaction key, and a just-left settlement stays closed to
+   keeps the interaction key, a just-left settlement stays closed to
    re-entry until the traveller has moved clear — a calibratable clearance
-   beyond the enter radius). Entering focuses the controls without an
-   extra click per `design.md` §17.5 (HUD buttons blurred; pointer lock
-   stays a deliberate click). Verifiable: an automated run walks into a
-   place and into a building's door and enters both, and walks past the
-   settlement edge to leave, without any key press; standing on the
-   just-left marker does not re-enter until the traveller has moved clear;
-   on entering, no HUD control (button/input) retains focus
+   beyond the enter radius — and a settlement is not auto-entered while the
+   traveller is on a water cell, so a river passage never pulls him in).
+   Entering focuses the controls without an extra click per `design.md`
+   §17.5 (HUD buttons blurred; mouse-look engages on entry from the walk-in
+   keypress, with the click as fallback). Verifiable: an automated run
+   walks into a place and into a building's door and enters both, and walks
+   past the settlement edge to leave, without any key press; standing on
+   the just-left marker does not re-enter until the traveller has moved
+   clear; on entering, no HUD control (button/input) retains focus
    (`scripts/verify/flow.mjs`).
 3. **World model.** The fixed, authentic ~1890 geography of `design.md`
    §3.1/§3.2 — researched against the real end-of-19th-century state —
@@ -306,14 +308,15 @@ verify suite that proves it.
    coordinates (removed on user request); transient status hints (e.g.
    the movement-penalty reason, pt. 4) render as a right-aligned item
    inside the status bar itself, not in a separate floating panel; the
-   inventory item currently in use glows (§17.1); a health bar at the left
-   of the bottom-right camp/journal button row is green at full health and
-   reddens toward zero (§17.1). Verifiable: the
-   hint element is a descendant of `.status-bar` and its box stays within
-   the bar's box, and a canoe on water / medicine while afflicted gains
-   `.inv-active` while an idle item does not
-   (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is full-width
-   green at full health and shrinks/reddens toward zero
+   inventory item currently in use glows (§17.1); a top-right health bar
+   (below the status bar, at the FPS-counter height) is green at full
+   health and reddens toward zero, with the active afflictions shown as
+   badges to its left (§17.1). Verifiable: the hint element is a descendant
+   of `.status-bar` and its box stays within the bar's box, and a canoe on
+   water / medicine while afflicted gains `.inv-active` while an idle item
+   does not (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is
+   full-width green at full health and shrinks/reddens toward zero, and an
+   `.affliction-badge` renders left of the bar for each active affliction
    (`src/ui/Hud.test.tsx`).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.

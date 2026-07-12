@@ -225,6 +225,23 @@ describe('HealthBar (design.md §17.1)', () => {
     expect(parseFloat(f.style.width)).toBeCloseTo(10, 5)
     expect(hueOf(f)).toBeLessThan(20) // red-ish, not green
   })
+
+  it('shows an affliction badge to the left of the bar for each active affliction', () => {
+    useGame.setState({ afflictions: { fever: true, dehydration: false, sunblind: true, wounds: 2 } })
+    render(<Hud />)
+    const badges = [...document.querySelectorAll('.affliction-badge')].map((e) => e.textContent)
+    expect(badges).toEqual([en.health.fever, en.health.sunblind, en.health.woundsSevere])
+    // Each badge precedes the health bar in the same status row (rendered left of it).
+    const row = document.querySelector('.health-status')!
+    const kids = [...row.children]
+    expect(kids.findIndex((c) => c.classList.contains('health-bar'))).toBe(badges.length)
+  })
+
+  it('shows no affliction badge when healthy', () => {
+    useGame.setState({ afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 } })
+    render(<Hud />)
+    expect(document.querySelectorAll('.affliction-badge').length).toBe(0)
+  })
 })
 
 describe('F3 unlocks the extended zoom alongside the loadout (design.md §21.1)', () => {

@@ -106,14 +106,30 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
 /** Two children chasing each other in a circle. */
 function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[]; colliders: Collider[] }) {
   const refs = useRef<Array<THREE.Group | null>>([])
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
+  // Each kid's current position, eased toward the circling target so it slides
+  // smoothly along any obstacle instead of sticking at the absolute circle point
+  // and then jumping once the point clears the obstacle.
+  const pos = useRef<Array<{ x: number; z: number } | null>>([null, null])
+  useFrame((state, dt) => {
+    const t = state.clock.elapsedTime
     refs.current.forEach((g, i) => {
       if (!g) return
       const a = t * 1.4 + i * Math.PI
-      const [px, pz] = resolveMove(colliders, x + Math.cos(a) * 2.2, z + Math.sin(a) * 2.2, NPC_RADIUS)
+      const tx = x + Math.cos(a) * 2.2
+      const tz = z + Math.sin(a) * 2.2
+      let p = pos.current[i]
+      if (!p) {
+        p = { x: tx, z: tz }
+        pos.current[i] = p
+      }
+      const k = Math.min(1, dt * 3.5)
+      const [px, pz] = resolveMove(colliders, p.x + (tx - p.x) * k, p.z + (tz - p.z) * k, NPC_RADIUS)
+      const dx = px - p.x
+      const dz = pz - p.z
+      p.x = px
+      p.z = pz
       g.position.set(px, Math.abs(Math.sin(t * 6 + i)) * 0.12, pz)
-      g.rotation.y = -a
+      if (Math.hypot(dx, dz) > 1e-4) g.rotation.y = Math.atan2(dx, dz)
     })
   })
   return (

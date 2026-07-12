@@ -32,6 +32,7 @@ Entering and leaving a settlement happen purely through movement, without a dedi
 - In the bird's-eye view, walking onto a settlement's position enters it and switches to the first-person view.
 - Inside, walking beyond the settlement's walkable edge leaves it and switches back to the bird's-eye view with the field of view around the current position — there is no exit archway and no "leave" key.
 - A settlement just left stays closed to re-entry until the traveller has moved clear of it (a calibratable clearance beyond the enter radius), so leaving never bounces straight back in.
+- A settlement is not auto-entered while the traveller is on a water cell: riverside villages reach close to the channel, so canoeing a river would otherwise drift him in by accident. He enters by stepping onto land.
 - Enterable buildings (trade, service and audience buildings) open by walking against their entrance door — the same deliberate opening the inhabitants use, no key press. Only the village elder is addressed with the interaction key.
 
 ### 2.4 Graphics and atmosphere
@@ -44,7 +45,7 @@ The background of the first-person view plausibly matches the landscape one woul
 
 - The real map terrain around the settlement's position is rendered as a distant panorama — mountains and ridges, river courses, lakes and the sea appear where they actually lie, in their biome colors, with exaggerated relief so they read at person scale.
 - The relief is capped so that even a mountainous surrounding (e.g. the Atlas behind Berber Village) reads as a distant range on the horizon rather than looming up and arcing over the camera; the panorama surface is drawn double-sided so steep far slopes never show as dark overhanging gaps.
-- Distant wildlife moves through the panorama: far-off, region-typical animals (elephants, giraffes, zebras in the savanna; antelope near the desert) drift slowly as silhouettes beyond the settlement edge.
+- Distant wildlife moves through the panorama: far-off, region-typical animals (elephants, giraffes, zebras in the savanna; antelope near the desert) drift slowly as silhouettes beyond the settlement edge, sitting on the backdrop relief (never floating above a dip or sinking into a ridge).
 
 ### 2.6 Lively, densely built settlements (first-person)
 
@@ -435,7 +436,7 @@ Players who do not want to be interrupted can turn the automatic presentation of
 - Transient status hints — e.g. the reason for a movement penalty (§11) — appear as a right-aligned item inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
 - The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
 - An item that is currently in use lights up (glows) in the inventory bar: the relief item countering the present terrain (the canoe on water, the machete in the jungle, the rope on a mountain) and medicine while a curable affliction (fever or a wound) is active — so the player sees at a glance which piece of equipment is doing its work right now.
-- A health bar sits in the bottom-right area, at the left of the row that holds the camp and journal buttons: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. The detailed state and afflictions stay on the health query (H).
+- A health bar sits at the top right, below the status bar at the FPS-counter height: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. To its left, the currently active afflictions (fever, dehydration, sun blindness, wounds) show as small badges. The detailed state stays on the health query (H).
 - Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
 
 ### 17.2 Discovery-gated labels
@@ -454,7 +455,7 @@ Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full
 
 - Controls suitable for mouse/keyboard and gamepad. The chronicle/journal is opened and closed with the Tab key (gamepad: Y). Tab's default focus cycling is suppressed while playing so it does not shift focus onto UI controls; inside form controls (debug-menu fields, dialog inputs) Tab still navigates between them normally.
 - Gamepad: the left stick moves the character in both perspectives (merged with WASD), the right stick turns the first-person view, and the buttons map onto the existing key handlers (A interact, B close, X dig, Y journal, LB map, RB camp, Select position query, Start debug menu) — a single input path, no second one. Only standard-mapped pads are read, and a connected pad steers only after a deliberate input (a button press or a full stick push): idle axis drift of wheels, flight sticks or worn pads must never move or turn the game on its own.
-- Entering a settlement puts the focus straight on the controls: any lingering HUD button is blurred so the keyboard controls the character at once, without an extra click. Mouse-look (pointer lock) still engages on a deliberate click on the view — auto-capturing the cursor would make the non-modal journal and dialogs unclickable, so the lock stays an explicit choice.
+- Entering a settlement puts the focus straight on the controls: any lingering HUD button is blurred so the keyboard controls the character at once, and mouse-look (pointer lock) engages straight away — the walk-in keypress carries the user activation the browser requires. A modal dialog releases the lock so its buttons stay clickable (Escape releases it too); where a browser refuses the un-clicked request, a deliberate click on the view remains as the fallback.
 - The GUI is a game surface, not a document: text in the interface cannot be selected/highlighted. Only editable form controls (debug-menu fields, dialog inputs) keep normal text selection.
 
 ### 17.6 Renderer notice

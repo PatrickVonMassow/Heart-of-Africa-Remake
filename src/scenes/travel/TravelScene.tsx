@@ -25,7 +25,7 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
-import { sampleTerrain, type TerrainType } from '../../world/terrain'
+import { sampleTerrain, RIVER_WIDTH_DEG, type TerrainType } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
@@ -1023,10 +1023,10 @@ function GraveMarker() {
 // The explorer sits this much lower when seated in the canoe, so torso and
 // head clear the gunwale while the (hidden) legs would fold into the hull.
 const CANOE_SEAT_DROP = 0.28
-// Clearance that keeps the hull's lowest point just above the water surface, so
-// the surface never shows up through the open hull and floods the canoe
-// (design.md §7). The hull's own draft below its centre is ~0.25.
-const CANOE_HULL_CLEARANCE = 0.27
+// The hull's lowest point sits below the boat origin by ~0.25 (its draft); this
+// constant places that point just above the water surface, so the surface never
+// shows up through the open hull and floods the canoe (design.md §7).
+const CANOE_HULL_CLEARANCE = 0.29
 
 /** The dugout hull + gunwale rim, reused by the ridden and the dragged canoe. */
 function CanoeHull() {
@@ -1037,10 +1037,34 @@ function CanoeHull() {
         <sphereGeometry args={[0.5, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
         <meshStandardMaterial color="#5a3f28" roughness={0.85} side={THREE.DoubleSide} />
       </mesh>
+      {/* Solid floor across the hull interior: reads as the canoe's bottom and
+          keeps the ground (on land) or the water plane (on rivers) from showing
+          up through the open hull. */}
+      <mesh position={[0, -0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[0.68, 2.0, 1]} receiveShadow>
+        <circleGeometry args={[0.5, 24]} />
+        <meshStandardMaterial color="#4a3420" roughness={0.9} side={THREE.DoubleSide} />
+      </mesh>
       {/* Gunwale rim — the boat's outline reads clearly from the bird's eye. */}
       <mesh position={[0, 0.05, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.74, 2.18, 1]} castShadow>
         <torusGeometry args={[0.5, 0.045, 8, 24]} />
         <meshStandardMaterial color="#7a5836" roughness={0.8} />
+      </mesh>
+    </>
+  )
+}
+
+/** A canoe paddle: a shaft with a flat blade, reused by the ridden and the
+ *  stowed (dragged) canoe. */
+function CanoePaddle() {
+  return (
+    <>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.028, 0.028, 0.7, 6]} />
+        <meshStandardMaterial color="#8a6a3e" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, -0.44, 0]} castShadow>
+        <boxGeometry args={[0.12, 0.3, 0.02]} />
+        <meshStandardMaterial color="#8a6a3e" roughness={0.9} />
       </mesh>
     </>
   )
@@ -1103,12 +1127,15 @@ function Player() {
       }
     }
 
-    // The player group sits at the carved bed height (max(0, terrain)); a river
-    // or lake surface is drawn SURFACE_LIFT above that bed, while the sea plane
-    // sits at ~0. Lift the canoe onto that surface so it never floods on an
-    // elevated river (e.g. the Nile) where bed height ≫ 0.
-    const surfaceLift = t.type === 'water' ? SURFACE_LIFT : 0
-    const boatBaseY = CANOE_HULL_CLEARANCE + surfaceLift
+    // Float the canoe on the actual water surface. A river/lake ribbon sits
+    // SURFACE_LIFT above the carved bed; the sea plane sits at ~0. "On a river"
+    // is detected by river proximity, not terrain type — near the mouth the
+    // biome map can misclassify a river cell as ocean, which would otherwise
+    // drop the lift and flood the hull on an elevated river (design.md §7/§11).
+    const refY = Math.max(0, t.height)
+    const onRiver = t.type === 'water' || riverDistance(ll.lat, ll.lon) < RIVER_WIDTH_DEG * 1.4
+    const surfaceY = onRiver ? Math.max(-0.05, t.height + SURFACE_LIFT) : 0
+    const boatBaseY = surfaceY - refY + CANOE_HULL_CLEARANCE
 
     if (inner.current) {
       inner.current.rotation.y = heading.current
@@ -1166,6 +1193,10 @@ function Player() {
             lifted to the grip, far end resting on the ground (toggled in frame). */}
         <group ref={carry} visible={false} position={[0, 0.26, -1.2]} rotation={[-0.2, 0, 0]}>
           <CanoeHull />
+          {/* Paddle stowed lengthwise inside the hull. */}
+          <group position={[0.09, 0.0, 0.1]} rotation={[Math.PI / 2, 0, 0.05]}>
+            <CanoePaddle />
+          </group>
         </group>
         {/* Legs (hidden inside the hull while canoeing). */}
         <group ref={legs}>
@@ -1348,6 +1379,13 @@ export function TravelScene() {
         near = p
         break
       }
+    }
+    // Do not auto-enter a settlement while travelling water: a riverside village
+    // reaches near the channel, and a canoe passage would otherwise drift the
+    // traveller in by accident (design.md §2.3). Stepping onto land enters it.
+    if (near) {
+      const ell = worldToLatLon(pos.x, pos.z)
+      if (sampleTerrain(ell.lat, ell.lon, s.seed).type === 'water') near = null
     }
     if (near && near.id === useGame.getState().reentrySuppressedId) {
       // Suppressed until the traveller clears this settlement — do not enter.

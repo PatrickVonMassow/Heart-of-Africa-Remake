@@ -1010,6 +1010,9 @@ function Herds() {
               if (!cellList) continue
               for (const n of cellList) {
                 if (n.a === a) continue
+                // A calf plays and nurses right beside its parent — never part
+                // the pair, or they jitter as separation fights play/follow.
+                if (a.child === n.a || a.parent === n.a) continue
                 // Trample pairs stay unseparated (design.md §19).
                 if ((sp === 'elephant') !== (n.sp === 'elephant')) continue
                 neighbors.push([n.a.x, n.a.z, ra + BODY_RADIUS[n.sp] * n.a.scale])
@@ -1196,7 +1199,10 @@ function Herds() {
           if (sc.landed && target) {
             sc.x = target.x
             sc.z = target.z
-            sc.y = target.y + 0.3
+            // Stand clear of the ground: the pecking head tilts well below the
+            // group origin, so keep the group high enough that it never clips
+            // into the terrain (design.md §19).
+            sc.y = target.y + 0.5
             if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
             target.dissolve -= dt
           } else if (target && sc.mode === 'in') {
@@ -1211,8 +1217,11 @@ function Herds() {
             const ph = (i / sg.children.length) * Math.PI * 2
             if (sc.landed) {
               const r = 0.5 + i * 0.35
-              bird.position.set(Math.cos(ph) * r, Math.sin(t * 3 + ph) * 0.12, Math.sin(ph) * r)
-              bird.rotation.set(0.6 + Math.sin(t * 4 + ph) * 0.3, ph, 0) // heads pecking down
+              // Positive-only hop so the body never dips below the group, and a
+              // gentler peck so the head tilts down to the carcass without
+              // swinging under the ground.
+              bird.position.set(Math.cos(ph) * r, 0.05 + Math.abs(Math.sin(t * 3 + ph)) * 0.1, Math.sin(ph) * r)
+              bird.rotation.set(0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3, ph, 0) // heads pecking down
             } else {
               const a2 = t * 0.6 + ph
               bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
@@ -1368,12 +1377,19 @@ function Herds() {
           } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase' && LION_STATE.victim === a.child) {
             // Our calf is being run down: the parent holds itself between the
             // hunter and its young (movement in the pre-pass) so the hunter
-            // takes it in the calf's place (§19). Running, it faces its path;
-            // on station it faces the hunter down.
+            // takes it in the calf's place (§19).
             px = a.x
             pz = a.z
             const h = blockHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
-            yaw = h ?? Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z)
+            if (h !== null) {
+              // Running to hold the station: face the run direction (snap, so the
+              // body never lags behind and appears to run backwards).
+              yaw = h
+              a.face = h
+            } else {
+              // On station: face the hunter down, keeping the arrival facing.
+              yaw = a.face ?? Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z)
+            }
             pitch = 0
             familyHeld = true
           } else if (a.young && a.parent && !a.parent.dead) {

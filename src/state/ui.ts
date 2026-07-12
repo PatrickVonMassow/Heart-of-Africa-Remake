@@ -85,7 +85,9 @@ export const useUi = create<UiState>()((set) => ({
   ssrEnabled: false,
   wheelZoomEnabled: false,
   journalDnd: false,
-  travelZoom: 1,
+  // Start more zoomed in than the default camera distance; the player can still
+  // zoom out to factor 1 (or wider with the debug unlock, §21.4).
+  travelZoom: 0.7,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
