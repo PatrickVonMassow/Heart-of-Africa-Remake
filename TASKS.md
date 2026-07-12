@@ -219,6 +219,26 @@ the map).
   from enterRadius+1.5 to enterRadius+0.5, so the exit point stays inside
   the clearance and the debounce still arms — points 26-29 land as one
   calibration commit since they share balance.ts/store.ts hunks.)
+- [x] 30. During a calf hunt the parent must not flee with the calf — it
+  protects it: while the chase runs it holds itself between hunter and young
+  (a living shield, taken in the calf's place if the hunter reaches it), and
+  only once a calf is caught does it charge the predator to sacrifice itself.
+  (Replaces the former escort run — an intermediate head-on-charge variant
+  landed as its own commit and was revised on request; blockHeading
+  station-keeping is pure-tested, the enrichments choreography asserts the
+  held shield line, the mid-chase take without any catch, and the preserved
+  catch→struggle→charge fallback.)
+- [x] 31. Juveniles must read as young beyond their smaller body: baby schema
+  within the schematic animal style.
+  (Per-species calf geometries — proportionally larger head on a shorter
+  neck, shorter rounder body, leggy stance, no horns/tusks/beard/mane, the
+  elephant calf with stubby trunk and smaller ears — rendered through own
+  instanced calf meshes; fauna.test.ts asserts the proportions, enrichments
+  the live calf-mesh instancing. Points 30-31 land as one commit since they
+  share Wildlife.tsx/design.md/CLAUDE.md/enrichments hunks; it also hardens
+  the kill-flock remnant check, which under suite order/load inherited a
+  mid-fly-off flock from the zoom tests and timed out — the test now resets
+  the kill flight to idle up front, like it already reset the scavenger.)
 
 ## Closing (only after all points)
 

@@ -358,18 +358,22 @@ verify suite that proves it.
     that more than one kind of predator hunts and every predator/prey
     pairing fits the region and the predator's food web; that prey flee a
     predator smoothly without teleporting (no single-frame jump); that
-    herds raise young that keep close to a parent and that a parent moves
+    herds raise young that keep close to a parent — rendered through their
+    own baby-schema build (proportionally larger head, shorter neck/body,
+    leggy stance, no adult ornaments; pure-tested in
+    `src/render/fauna.test.ts`, live-checked via the calf meshes) — and
+    that a parent moves
     to interpose between an approaching predator and its calf; assert the
     calf predation of §19.8 — a caught calf struggles alive (no stain or
     shrink) for a few seconds before the kill, a parent that reaches the
     predator is eaten in the calf's place while the calf escapes, a parent
     that only got close by the window's end is eaten alongside the calf,
     and the full LionHunt path runs a calf down and catches it (the parent
-    held out of intercept reach) — with the hunted calf visibly fleeing
+    held out of shielding reach) — with the hunted calf visibly fleeing
     the chase (slower than its hunter) instead of standing at its parent,
-    and a parent in reach charging the hunter itself over visible real
-    time during the chase and being taken in the calf's place before any
-    catch; assert the calf water drama of §19.8 — calves gambol
+    and a parent in reach holding itself between hunter and calf (living
+    shield) over visible real time until the hunter takes it in the
+    calf's place before any catch; assert the calf water drama of §19.8 — calves gambol
     in visible hop-bouts, a calf on open water starts a struggle and its
     parent wades in, pulls it out and both return to the bank alive, in
     the water inside a waterfall's reach a calf is swept over and dies

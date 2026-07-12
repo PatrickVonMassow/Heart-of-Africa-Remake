@@ -28,7 +28,7 @@ function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return merged
 }
 
-interface QuadrupedSpec {
+export interface QuadrupedSpec {
   bodyLen: number
   bodyR: number
   legH: number
@@ -40,6 +40,25 @@ interface QuadrupedSpec {
   headColor?: string
   horns?: boolean
   seed: number
+}
+
+/**
+ * Baby-schema proportions for a juvenile (design.md §19): within the schematic
+ * animal style a calf reads as young beyond its mere size — a proportionally
+ * larger head on a shorter neck, a shorter, rounder body on relatively long,
+ * thin legs, and none of the adult ornaments (horns). Built at adult scale;
+ * the per-animal spawn scale shrinks the whole calf.
+ */
+export function calfProportions(s: QuadrupedSpec): QuadrupedSpec {
+  return {
+    ...s,
+    bodyLen: s.bodyLen * 0.68,
+    bodyR: s.bodyR * 0.88,
+    legR: s.legR * 0.75, // legH stays: a leggy, stilt-like juvenile stance
+    neckLen: s.neckLen * 0.7,
+    headSize: s.headSize * 1.45,
+    horns: false,
+  }
 }
 
 /** Shared quadruped body plan (zebra, antelope, goat, lion base). */
@@ -88,11 +107,14 @@ function buildQuadruped(s: QuadrupedSpec): THREE.BufferGeometry[] {
   return parts
 }
 
-/** Savanna elephant, ~2.6 units tall. */
-export function buildElephant(): THREE.BufferGeometry {
+/** Savanna elephant, ~2.6 units tall. With `calf`, baby-schema proportions
+ *  (design.md §19): a rounder, shorter body, a proportionally bigger head with
+ *  smaller ears, a stubby trunk and no tusks yet — built at adult scale, the
+ *  spawn scale shrinks it. */
+export function buildElephant(calf = false): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   const body = new THREE.SphereGeometry(1.05, 9, 7)
-  body.scale(0.95, 0.95, 1.4)
+  body.scale(0.95, 0.95, calf ? 1.15 : 1.4)
   body.translate(0, 1.75, 0)
   parts.push(tint(body, '#8d8680', 0.06, 101))
 
@@ -103,26 +125,26 @@ export function buildElephant(): THREE.BufferGeometry {
     [0.5, -0.85],
   ]) {
     const leg = new THREE.CylinderGeometry(0.26, 0.3, 1.3, 6)
-    leg.translate(lx, 0.65, lz)
+    leg.translate(lx, 0.65, lz * (calf ? 0.85 : 1))
     parts.push(tint(leg, '#847d77', 0.06, 102))
   }
 
-  const head = new THREE.SphereGeometry(0.62, 8, 6)
-  head.translate(0, 2.15, 1.45)
+  const head = new THREE.SphereGeometry(calf ? 0.85 : 0.62, 8, 6)
+  head.translate(0, 2.15, calf ? 1.25 : 1.45)
   parts.push(tint(head, '#8d8680', 0.06, 103))
 
-  for (const ex of [-0.72, 0.72]) {
-    const ear = new THREE.BoxGeometry(0.1, 0.75, 0.62)
+  for (const ex of calf ? [-0.88, 0.88] : [-0.72, 0.72]) {
+    const ear = new THREE.BoxGeometry(0.1, calf ? 0.6 : 0.75, calf ? 0.5 : 0.62)
     ear.rotateY(ex < 0 ? 0.35 : -0.35)
-    ear.translate(ex, 2.2, 1.3)
+    ear.translate(ex, 2.2, calf ? 1.1 : 1.3)
     parts.push(tint(ear, '#7d766f', 0.06, 104))
   }
 
-  // Trunk: three tapering segments curving down.
+  // Trunk: tapering segments curving down (the calf's is short and stubby).
   let ty = 1.85
-  let tz = 2.0
-  for (let i = 0; i < 3; i++) {
-    const seg = new THREE.CylinderGeometry(0.14 - i * 0.03, 0.18 - i * 0.03, 0.55, 6)
+  let tz = calf ? 1.95 : 2.0
+  for (let i = 0; i < (calf ? 2 : 3); i++) {
+    const seg = new THREE.CylinderGeometry(0.14 - i * 0.03, 0.18 - i * 0.03, calf ? 0.45 : 0.55, 6)
     seg.rotateX(0.5 + i * 0.45)
     seg.translate(0, ty, tz)
     parts.push(tint(seg, '#847d77', 0.06, 105 + i))
@@ -130,20 +152,25 @@ export function buildElephant(): THREE.BufferGeometry {
     tz += 0.16
   }
 
-  for (const tx of [-0.3, 0.3]) {
-    const tusk = new THREE.ConeGeometry(0.07, 0.6, 5)
-    tusk.rotateX(1.9)
-    tusk.translate(tx, 1.75, 2.0)
-    parts.push(tint(tusk, '#e8ddc4', 0.05, 108))
+  if (!calf) {
+    for (const tx of [-0.3, 0.3]) {
+      const tusk = new THREE.ConeGeometry(0.07, 0.6, 5)
+      tusk.rotateX(1.9)
+      tusk.translate(tx, 1.75, 2.0)
+      parts.push(tint(tusk, '#e8ddc4', 0.05, 108))
+    }
   }
   return merge(parts)
 }
 
-/** Giraffe, ~3.6 units tall. */
-export function buildGiraffe(): THREE.BufferGeometry {
+/** Giraffe, ~3.6 units tall. With `calf`, baby-schema proportions (design.md
+ *  §19): a much shorter neck carrying a proportionally bigger head over the
+ *  same leggy stance, and short ossicone nubs — built at adult scale, the
+ *  spawn scale shrinks it. */
+export function buildGiraffe(calf = false): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   const body = new THREE.SphereGeometry(0.62, 8, 6)
-  body.scale(0.85, 0.85, 1.35)
+  body.scale(0.85, 0.85, calf ? 1.1 : 1.35)
   body.rotateX(-0.18)
   body.translate(0, 1.9, 0)
   parts.push(tint(body, '#c89a55', 0.14, 111))
@@ -155,78 +182,90 @@ export function buildGiraffe(): THREE.BufferGeometry {
     [0.3, -0.5],
   ]) {
     const leg = new THREE.CylinderGeometry(0.09, 0.07, 1.65, 5)
-    leg.translate(lx, 0.82, lz)
+    leg.translate(lx, 0.82, lz * (calf ? 0.85 : 1))
     parts.push(tint(leg, '#bf9150', 0.14, 112))
   }
 
-  const neck = new THREE.CylinderGeometry(0.13, 0.2, 1.6, 6)
+  const neck = new THREE.CylinderGeometry(0.13, 0.2, calf ? 1.0 : 1.6, 6)
   neck.rotateX(-0.35)
-  neck.translate(0, 2.85, 0.85)
+  neck.translate(0, calf ? 2.55 : 2.85, calf ? 0.73 : 0.85)
   parts.push(tint(neck, '#c89a55', 0.14, 113))
 
-  const head = new THREE.SphereGeometry(0.2, 7, 5)
+  const head = new THREE.SphereGeometry(calf ? 0.29 : 0.2, 7, 5)
   head.scale(0.8, 0.8, 1.4)
-  head.translate(0, 3.55, 1.25)
+  head.translate(0, calf ? 3.08 : 3.55, calf ? 1.0 : 1.25)
   parts.push(tint(head, '#c89a55', 0.12, 114))
 
   for (const ox of [-0.08, 0.08]) {
-    const ossicone = new THREE.CylinderGeometry(0.025, 0.025, 0.18, 4)
-    ossicone.translate(ox, 3.72, 1.15)
+    const ossicone = new THREE.CylinderGeometry(0.025, 0.025, calf ? 0.1 : 0.18, 4)
+    ossicone.translate(ox, calf ? 3.3 : 3.72, calf ? 0.92 : 1.15)
     parts.push(tint(ossicone, '#8a6a38', 0.1, 115))
   }
   return merge(parts)
 }
 
+const ZEBRA_SPEC: QuadrupedSpec = {
+  bodyLen: 1.5,
+  bodyR: 0.42,
+  legH: 0.75,
+  legR: 0.07,
+  neckLen: 0.65,
+  neckTilt: 0.6,
+  headSize: 0.2,
+  bodyColor: '#d8d4cc',
+  headColor: '#9a958c',
+  seed: 121,
+}
+
 /** Zebra, ~1.5 units tall. */
 export function buildZebra(): THREE.BufferGeometry {
-  return merge(
-    buildQuadruped({
-      bodyLen: 1.5,
-      bodyR: 0.42,
-      legH: 0.75,
-      legR: 0.07,
-      neckLen: 0.65,
-      neckTilt: 0.6,
-      headSize: 0.2,
-      bodyColor: '#d8d4cc',
-      headColor: '#9a958c',
-      seed: 121,
-    }),
-  )
+  return merge(buildQuadruped(ZEBRA_SPEC))
+}
+
+/** Zebra foal with baby-schema proportions (design.md §19). */
+export function buildZebraCalf(): THREE.BufferGeometry {
+  return merge(buildQuadruped(calfProportions(ZEBRA_SPEC)))
+}
+
+const ANTELOPE_SPEC: QuadrupedSpec = {
+  bodyLen: 1.1,
+  bodyR: 0.32,
+  legH: 0.65,
+  legR: 0.05,
+  neckLen: 0.55,
+  neckTilt: 0.5,
+  headSize: 0.15,
+  bodyColor: '#b08a55',
+  horns: true,
+  seed: 131,
 }
 
 /** Antelope/gazelle, ~1.2 units tall. */
 export function buildAntelope(): THREE.BufferGeometry {
-  return merge(
-    buildQuadruped({
-      bodyLen: 1.1,
-      bodyR: 0.32,
-      legH: 0.65,
-      legR: 0.05,
-      neckLen: 0.55,
-      neckTilt: 0.5,
-      headSize: 0.15,
-      bodyColor: '#b08a55',
-      horns: true,
-      seed: 131,
-    }),
-  )
+  return merge(buildQuadruped(ANTELOPE_SPEC))
+}
+
+/** Antelope calf: baby schema, hornless (design.md §19). */
+export function buildAntelopeCalf(): THREE.BufferGeometry {
+  return merge(buildQuadruped(calfProportions(ANTELOPE_SPEC)))
+}
+
+const WILDEBEEST_SPEC: QuadrupedSpec = {
+  bodyLen: 1.5,
+  bodyR: 0.44,
+  legH: 0.8,
+  legR: 0.07,
+  neckLen: 0.5,
+  neckTilt: 1.0,
+  headSize: 0.2,
+  bodyColor: '#5b554f',
+  headColor: '#3d3a36',
+  seed: 171,
 }
 
 /** Wildebeest (gnu), the quintessential savanna lion prey (~1.35 units tall). */
 export function buildWildebeest(): THREE.BufferGeometry {
-  const parts = buildQuadruped({
-    bodyLen: 1.5,
-    bodyR: 0.44,
-    legH: 0.8,
-    legR: 0.07,
-    neckLen: 0.5,
-    neckTilt: 1.0,
-    headSize: 0.2,
-    bodyColor: '#5b554f',
-    headColor: '#3d3a36',
-    seed: 171,
-  })
+  const parts = buildQuadruped(WILDEBEEST_SPEC)
   // Muscular shoulder hump.
   const hump = new THREE.SphereGeometry(0.3, 7, 5)
   hump.scale(0.85, 0.7, 1.0)
@@ -247,20 +286,27 @@ export function buildWildebeest(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** Wildebeest calf: baby schema, none of the adult hump/horns/beard (§19). */
+export function buildWildebeestCalf(): THREE.BufferGeometry {
+  return merge(buildQuadruped(calfProportions(WILDEBEEST_SPEC)))
+}
+
+const WARTHOG_SPEC: QuadrupedSpec = {
+  bodyLen: 1.0,
+  bodyR: 0.3,
+  legH: 0.4,
+  legR: 0.05,
+  neckLen: 0.25,
+  neckTilt: 1.2,
+  headSize: 0.2,
+  bodyColor: '#5a4b3c',
+  headColor: '#463a2e',
+  seed: 181,
+}
+
 /** Warthog, a small tusked savanna lion prey (~0.65 units tall). */
 export function buildWarthog(): THREE.BufferGeometry {
-  const parts = buildQuadruped({
-    bodyLen: 1.0,
-    bodyR: 0.3,
-    legH: 0.4,
-    legR: 0.05,
-    neckLen: 0.25,
-    neckTilt: 1.2,
-    headSize: 0.2,
-    bodyColor: '#5a4b3c',
-    headColor: '#463a2e',
-    seed: 181,
-  })
+  const parts = buildQuadruped(WARTHOG_SPEC)
   // Curved tusks from the snout.
   for (const hx of [-1, 1]) {
     const tusk = new THREE.ConeGeometry(0.022, 0.18, 4)
@@ -274,6 +320,11 @@ export function buildWarthog(): THREE.BufferGeometry {
   mane.translate(0, 0.74, 0.1)
   parts.push(tint(mane, '#3a2f24', 0.12, 183))
   return merge(parts)
+}
+
+/** Warthog piglet: baby schema, no tusks or bristly mane yet (§19). */
+export function buildWarthogCalf(): THREE.BufferGeometry {
+  return merge(buildQuadruped(calfProportions(WARTHOG_SPEC)))
 }
 
 /** Lion, ~1.3 units tall, with mane. */

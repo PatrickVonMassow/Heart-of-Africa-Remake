@@ -52,6 +52,35 @@ export function fleeHeading(
 }
 
 /**
+ * Blocking station for a parent whose calf is being run down by a predator
+ * (design.md §19): the parent keeps itself between the hunter and its young,
+ * at a point `offset` from the calf toward the predator — a living shield on
+ * the escape line, so a closing hunter reaches the parent first and takes it
+ * in the calf's place. Returns the heading toward that station, or `null`
+ * when already on it (the caller holds and faces the hunter down). Also
+ * `null` in the degenerate case of the predator standing on the calf — the
+ * catch resolution owns that contact.
+ */
+export function blockHeading(
+  x: number,
+  z: number,
+  calfX: number,
+  calfZ: number,
+  predX: number,
+  predZ: number,
+  offset: number,
+): number | null {
+  const adx = predX - calfX
+  const adz = predZ - calfZ
+  const ad = Math.hypot(adx, adz)
+  if (ad < 1e-4) return null
+  const dx = calfX + (adx / ad) * offset - x
+  const dz = calfZ + (adz / ad) * offset - z
+  if (Math.hypot(dx, dz) < 0.3) return null
+  return Math.atan2(dx, dz)
+}
+
+/**
  * Playful gambolling of a herd calf (design.md §19): on a per-calf cycle the
  * calf breaks into a short bout of scampering hops around its parent. Returns
  * the bout's current heading and hop height (0..1), or `null` outside a bout.

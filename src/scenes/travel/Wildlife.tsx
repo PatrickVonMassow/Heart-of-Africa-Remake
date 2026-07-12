@@ -24,6 +24,7 @@ import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
 import {
+  blockHeading,
   fleeHeading,
   flightStep,
   gambolState,
@@ -35,6 +36,7 @@ import {
 import { WATERFALLS } from '../../world/data/landmarks'
 import {
   buildAntelope,
+  buildAntelopeCalf,
   buildCheetah,
   buildElephant,
   buildFlamingo,
@@ -44,8 +46,11 @@ import {
   buildLion,
   buildVulture,
   buildWarthog,
+  buildWarthogCalf,
   buildWildebeest,
+  buildWildebeestCalf,
   buildZebra,
+  buildZebraCalf,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
@@ -61,6 +66,11 @@ const MAX_INSTANCES: Record<Species, number> = {
   warthog: 80,
   flamingo: 140,
 }
+/** Juveniles render through their own baby-schema geometry (design.md §19) in
+ *  a separate instanced mesh per species; one calf per herd group keeps the
+ *  counts small. Flamingos raise no young. */
+const CALF_SPECIES: Exclude<Species, 'flamingo'>[] = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog']
+const MAX_CALF_INSTANCES = 24
 
 interface Animal {
   x: number
@@ -268,13 +278,15 @@ const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
 const GUARD_SPEED = 5.5
 /** Calf predation (design.md §19): while the hunt runs, the parent does not
- *  flee — it charges the predator itself; reaching it (SACRIFICE_DIST) mid-chase
- *  it is taken in the calf's place and the calf escapes uncaught. If the parent
- *  cannot intercept in time and the calf is caught, it does not die at once — it
- *  struggles for CAUGHT_DURATION seconds first (no stain/shrink yet). In that
- *  window the charge continues; reaching the predator the parent is taken
- *  instead and the calf escapes, while a parent that only got close
- *  (TOO_LATE_DIST) by the time the window ends is eaten alongside the calf. */
+ *  flee — it holds itself between hunter and calf (BLOCK_*), a living shield
+ *  on the escape line; a hunter that reaches the blocking parent (TAKE_DIST)
+ *  takes it in the calf's place and the calf escapes uncaught. If the parent
+ *  cannot reach its station in time and the calf is caught, it does not die at
+ *  once — it struggles for CAUGHT_DURATION seconds first (no stain/shrink
+ *  yet). Only then does the parent charge the predator; reaching it
+ *  (SACRIFICE_DIST) it is taken instead and the calf escapes, while a parent
+ *  that only got close (TOO_LATE_DIST) by the time the window ends is eaten
+ *  alongside the calf. */
 const CAUGHT_DURATION = 5
 const CALF_HUNT_CHANCE = 0.6 // chance a hunt targets a calf near the player over a generic grazer
 const CALF_HUNT_SEEK = 45 // radius around the player within which a huntable calf is picked
@@ -287,9 +299,17 @@ const CALF_FLEE_SPEED = 3.8
  *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
  *  could otherwise be orbited forever and never caught. */
 const CALF_POUNCE_RADIUS = 3
-const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator (mid-chase and post-catch) faster than it guards
+const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator eating its calf faster than it guards
 const PARENT_SACRIFICE_DIST = 1.3 // parent reaches the predator → sacrifices itself
 const PARENT_TOO_LATE_DIST = 3.2 // parent only this close when the window ends → both eaten
+/** The blocking station sits this far from the hunted calf toward the hunter —
+ *  beyond the catch reach (CALF_CATCH_DIST), so a closing hunter meets the
+ *  shield first. The shield sprints a notch faster than the calf's flee so it
+ *  can hold the moving station, and the hunter takes a blocking parent within
+ *  PARENT_TAKE_DIST. */
+const PARENT_BLOCK_OFFSET = 1.8
+const PARENT_BLOCK_SPEED = 6
+const PARENT_TAKE_DIST = 1.0
 /** Species whose calves a predator hunt can target (design.md §19). */
 const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog'] as const
 /** Calf play and water accidents (design.md §19): calves gambol on a per-calf
@@ -593,6 +613,20 @@ function Herds() {
     }),
     [],
   )
+  // Juveniles get their own baby-schema build (design.md §19): a bigger head
+  // on a shorter neck, a rounder body on leggy limbs, no adult ornaments.
+  const calfGeometries = useMemo<Record<(typeof CALF_SPECIES)[number], THREE.BufferGeometry>>(
+    () => ({
+      elephant: buildElephant(true),
+      giraffe: buildGiraffe(true),
+      zebra: buildZebraCalf(),
+      wildebeest: buildWildebeestCalf(),
+      antelope: buildAntelopeCalf(),
+      warthog: buildWarthogCalf(),
+    }),
+    [],
+  )
+  const calfMeshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     [],
@@ -649,7 +683,7 @@ function Herds() {
       herdState.current.clear()
       scavenger.current.target = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs }
     return () => {
       delete w.__wildlife
     }
@@ -778,15 +812,17 @@ function Herds() {
           LION_STATE.victim === a.child
         ) {
           // Our calf is being run down (design.md §19): the parent does not flee
-          // with it — it charges the hunter itself, and on contact it is taken
-          // in the calf's place, so the calf escapes before any catch.
-          const toX = LION_STATE.lx - a.x
-          const toZ = LION_STATE.lz - a.z
-          const d = Math.hypot(toX, toZ) || 1
-          a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
-          a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
-          if (d < PARENT_SACRIFICE_DIST) {
-            a.child.parent = undefined // freed — it keeps fleeing on its own
+          // with it — it holds itself between the hunter and its young, a living
+          // shield on the escape line. A hunter that reaches the blocking parent
+          // takes it in the calf's place, and the calf escapes uncaught.
+          const calf = a.child
+          const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
+          if (h !== null) {
+            a.x += Math.sin(h) * PARENT_BLOCK_SPEED * dt
+            a.z += Math.cos(h) * PARENT_BLOCK_SPEED * dt
+          }
+          if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
+            calf.parent = undefined // freed — it keeps fleeing on its own
             a.child = undefined
             a.dead = true
             a.lionFed = true
@@ -1195,6 +1231,18 @@ function Herds() {
       if (!mesh) continue
       const list = herds[sp]
       const n = Math.min(list.length, MAX_INSTANCES[sp])
+      // Juveniles divert into their own baby-schema instanced mesh (design.md
+      // §19); adults and calves keep separate instance counters.
+      const calfMesh = calfMeshRefs.current[sp]
+      let aIdx = 0
+      let cIdx = 0
+      const write = (a: Animal) => {
+        if (a.young && calfMesh) {
+          if (cIdx < MAX_CALF_INSTANCES) calfMesh.setMatrixAt(cIdx++, mtx)
+        } else {
+          mesh.setMatrixAt(aIdx++, mtx)
+        }
+      }
       let eIdx = 0
       for (let i = 0; i < n; i++) {
         const a = list[i]
@@ -1207,7 +1255,7 @@ function Herds() {
           vpos.set(a.x, Math.max(0.02, a.y), a.z)
           vscl.setScalar(a.scale * df)
           mtx.compose(vpos, quat, vscl)
-          mesh.setMatrixAt(i, mtx)
+          write(a)
           continue
         }
         const wob = Math.sin(t * 0.25 + a.phase)
@@ -1246,11 +1294,12 @@ function Herds() {
           }
         }
         // Family life (design.md §19): a calf keeps close to its parent and
-        // nurses; when a hunt runs a calf down the parent charges the hunter to
-        // be taken in its place, and a caught calf struggles for a few seconds
-        // during which that charge can still save it; otherwise a parent stands
-        // between an approaching predator and its calf to defend it. These
-        // override the flee/dodge below.
+        // nurses; when a hunt runs a calf down the parent shields it — holding
+        // itself between hunter and young to be taken in its place — and a
+        // caught calf struggles for a few seconds during which the parent's
+        // charge can still save it; otherwise a parent stands between an
+        // approaching predator and its calf to defend it. These override the
+        // flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
           if (a.young && a.caught !== undefined && a.caught > 0) {
@@ -1317,11 +1366,14 @@ function Herds() {
             pitch = 0
             familyHeld = true
           } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase' && LION_STATE.victim === a.child) {
-            // Our calf is being run down: the parent charges the hunter itself
-            // (movement in the pre-pass) to be taken in the calf's place (§19).
+            // Our calf is being run down: the parent holds itself between the
+            // hunter and its young (movement in the pre-pass) so the hunter
+            // takes it in the calf's place (§19). Running, it faces its path;
+            // on station it faces the hunter down.
             px = a.x
             pz = a.z
-            yaw = Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z)
+            const h = blockHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
+            yaw = h ?? Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z)
             pitch = 0
             familyHeld = true
           } else if (a.young && a.parent && !a.parent.dead) {
@@ -1477,10 +1529,14 @@ function Herds() {
         }
         vscl.setScalar(a.scale)
         mtx.compose(vpos, quat, vscl)
-        mesh.setMatrixAt(i, mtx)
+        write(a)
       }
-      mesh.count = n
+      mesh.count = aIdx
       mesh.instanceMatrix.needsUpdate = true
+      if (calfMesh) {
+        calfMesh.count = cIdx
+        calfMesh.instanceMatrix.needsUpdate = true
+      }
     }
 
     // Blood stains under kills of every kind, laid into the local slope so no
@@ -1530,6 +1586,17 @@ function Herds() {
             meshRefs.current[sp] = el ?? undefined
           }}
           args={[geometries[sp], material, MAX_INSTANCES[sp]]}
+          castShadow
+          frustumCulled={false}
+        />
+      ))}
+      {CALF_SPECIES.map((sp) => (
+        <instancedMesh
+          key={`${sp}-calf`}
+          ref={(el) => {
+            calfMeshRefs.current[sp] = el ?? undefined
+          }}
+          args={[calfGeometries[sp], material, MAX_CALF_INSTANCES]}
           castShadow
           frustumCulled={false}
         />

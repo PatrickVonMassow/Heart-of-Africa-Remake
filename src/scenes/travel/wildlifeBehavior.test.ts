@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  blockHeading,
   fleeHeading,
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
@@ -93,20 +94,43 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
   })
 })
 
-describe('parent charge intercept (design.md §19 — the parent turns on the hunter)', () => {
-  it('a parent beside its calf intercepts the hunter before the catch', () => {
+describe('blockHeading (design.md §19 — the parent shields its hunted calf)', () => {
+  it('heads for the station between the calf and the predator', () => {
+    // Parent at origin, calf at (-4,0), predator at (5,0): the station lies at
+    // calf + 1.8·(1,0) = (-2.2, 0) — between the two, on the escape line.
+    const h = blockHeading(0, 0, -4, 0, 5, 0, 1.8)
+    expect(h).not.toBeNull()
+    const [sx, sz] = dir(h as number)
+    expect(sx).toBeLessThan(-0.9) // toward -x: back to the station
+    expect(Math.abs(sz)).toBeLessThan(0.1)
+  })
+
+  it('holds (null) once on station', () => {
+    // Station for calf (0,0), predator (6,0), offset 1.8 sits at (1.8, 0).
+    expect(blockHeading(1.8, 0, 0, 0, 6, 0, 1.8)).toBeNull()
+    expect(blockHeading(1.9, 0.1, 0, 0, 6, 0, 1.8)).toBeNull() // within the eps
+    expect(blockHeading(4, 0, 0, 0, 6, 0, 1.8)).not.toBeNull() // off station
+  })
+
+  it('holds in the degenerate case of the predator on the calf', () => {
+    expect(blockHeading(3, 3, 4, 3, 4, 3, 1.8)).toBeNull()
+  })
+
+  it('the shield stays between hunter and calf, and the hunter takes it first', () => {
     // Mini-simulation of the chase contract; the numbers mirror Wildlife.tsx
-    // (HUNT_LION_SPEED 5.6, CALF_FLEE_SPEED 3.8, PARENT_CHARGE_SPEED 6.5,
-    // PARENT_SACRIFICE_DIST 1.3, CALF_CATCH_DIST 0.9). The parent charging the
-    // predator head-on must reach it (sacrifice contact) before the hunter
-    // reaches the calf (catch).
+    // (HUNT_LION_SPEED 5.6, CALF_FLEE_SPEED 3.8, PARENT_BLOCK_SPEED 6,
+    // PARENT_BLOCK_OFFSET 1.8, PARENT_TAKE_DIST 1.0, CALF_CATCH_DIST 0.9).
+    // The parent holding its blocking station must be reached by the hunter
+    // (taken in the calf's place) before the hunter ever reaches the calf.
     const calf = { x: 0, z: 0 }
     const parent = { x: 1.8, z: 0 }
     const pred = { x: 12, z: 0 }
     const dt = 1 / 60
-    let intercepted = false
+    let taken = false
     let caught = false
-    for (let i = 0; i < 60 * 20 && !intercepted && !caught; i++) {
+    let betweenSamples = 0
+    let samples = 0
+    for (let i = 0; i < 60 * 30 && !taken && !caught; i++) {
       const toCalf = Math.atan2(calf.x - pred.x, calf.z - pred.z)
       pred.x += Math.sin(toCalf) * 5.6 * dt
       pred.z += Math.cos(toCalf) * 5.6 * dt
@@ -117,13 +141,20 @@ describe('parent charge intercept (design.md §19 — the parent turns on the hu
       const away = Math.atan2(calf.x - pred.x, calf.z - pred.z)
       calf.x += Math.sin(away) * 3.8 * dt
       calf.z += Math.cos(away) * 3.8 * dt
-      const toPred = Math.atan2(pred.x - parent.x, pred.z - parent.z)
-      parent.x += Math.sin(toPred) * 6.5 * dt
-      parent.z += Math.cos(toPred) * 6.5 * dt
-      if (Math.hypot(pred.x - parent.x, pred.z - parent.z) < 1.3) intercepted = true
+      const h = blockHeading(parent.x, parent.z, calf.x, calf.z, pred.x, pred.z, 1.8)
+      if (h !== null) {
+        parent.x += Math.sin(h) * 6 * dt
+        parent.z += Math.cos(h) * 6 * dt
+      }
+      samples++
+      const dPredParent = Math.hypot(pred.x - parent.x, pred.z - parent.z)
+      const dPredCalf = Math.hypot(pred.x - calf.x, pred.z - calf.z)
+      if (dPredParent < dPredCalf && Math.hypot(parent.x - calf.x, parent.z - calf.z) < 4) betweenSamples++
+      if (dPredParent < 1.0) taken = true
     }
-    expect(intercepted).toBe(true) // the charge connects mid-chase
-    expect(caught).toBe(false) // …before the calf is ever caught
+    expect(taken).toBe(true) // the hunter meets the shield…
+    expect(caught).toBe(false) // …never the calf
+    expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
   })
 })
 

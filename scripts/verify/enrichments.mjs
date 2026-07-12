@@ -1151,8 +1151,8 @@ check('a calf caught with no parent near dies alone (parent survives)',
 // the calf escapes. This drives the whole chase→catch→struggle→sacrifice→escape
 // chain (the isolated scenarios above force `caught` by hand). The predator
 // starts close so the catch is reliable even under headless RAF throttling, and
-// the parent is parked out of intercept reach so its mid-chase charge (§19)
-// cannot take the hunter before the catch — the struggle window still saves it.
+// the parent is parked out of reach so its living shield (§19) cannot make its
+// station before the catch — the struggle window still saves the calf.
 await pinFamily(-2.8, 35.3)
 const e2e = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -1170,7 +1170,7 @@ const e2e = await page.evaluate(async () => {
     }
   }
   if (!parent) return { found: false }
-  // Park the parent 22 units off: too far to intercept the hunter mid-chase
+  // Park the parent 22 units off: too far to shield the calf mid-chase
   // (the lion pounces from 1.5 within a beat), close enough that its charge
   // crosses the distance well inside the 5 s struggle window.
   parent.x = calf.x - 22; parent.z = calf.z
@@ -1206,8 +1206,9 @@ check('a real hunt catches a calf, the parent sacrifices itself and the calf esc
 
 // (6) Visible choreography (design.md §19): from a real chase distance the
 // hunted calf flees (it no longer stands nursing while run down) while its
-// parent does NOT flee with it — it charges the hunter head-on over visible
-// real time and is taken in the calf's place mid-chase, before any catch.
+// parent does NOT flee with it — it holds itself between the hunter and the
+// calf (living shield) over visible real time, and the hunter takes the
+// blocking parent in the calf's place, before any catch.
 await pinFamily(-2.4, 34.6)
 const choreo = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -1233,27 +1234,32 @@ const choreo = await page.evaluate(async () => {
   s.lionHeading = Math.atan2(calf.x - s.lx, calf.z - s.lz)
   s.mode = 'chase'
   const calf0 = { x: calf.x, z: calf.z }
-  const dPL0 = +Math.hypot(parent.x - s.lx, parent.z - s.lz).toFixed(2)
-  let dPLmin = dPL0
   let calfMoved = 0
   let caughtSeen = false
+  let betweenSamples = 0
+  let samples = 0
   let tParentDead = 0
   const t0 = Date.now()
   while (Date.now() - t0 < 45000) {
     calfMoved = Math.max(calfMoved, Math.hypot(calf.x - calf0.x, calf.z - calf0.z))
-    dPLmin = Math.min(dPLmin, +Math.hypot(parent.x - s.lx, parent.z - s.lz).toFixed(2))
     if (calf.caught !== undefined) caughtSeen = true
     if (parent.dead) { tParentDead = Date.now(); break }
     if (calf.dead || s.mode === 'idle') break
+    // The shield holds its line: the parent sits closer to the hunter than the
+    // calf does, and stays near the calf.
+    samples++
+    const dLP = Math.hypot(s.lx - parent.x, s.lz - parent.z)
+    const dLC = Math.hypot(s.lx - calf.x, s.lz - calf.z)
+    if (dLP < dLC && Math.hypot(parent.x - calf.x, parent.z - calf.z) < 5) betweenSamples++
     await sleep(50)
   }
   const out = {
     found: true,
     calfMoved: +calfMoved.toFixed(2),
-    dPL0,
-    dPLmin,
+    samples,
+    betweenShare: samples ? +(betweenSamples / samples).toFixed(2) : 0,
     caughtSeen,
-    chargeMs: tParentDead ? tParentDead - t0 : null,
+    shieldMs: tParentDead ? tParentDead - t0 : null,
     parentDead: !!parent.dead,
     calfDead: !!calf.dead,
     calfFreed: calf.caught === undefined && calf.parent === undefined && !calf.dead,
@@ -1263,10 +1269,10 @@ const choreo = await page.evaluate(async () => {
 })
 check('the hunted calf flees the chase instead of standing at its parent',
   choreo.found && choreo.calfMoved > 2, JSON.stringify(choreo))
-check('the parent charges the hunter during the chase instead of fleeing with the calf',
-  choreo.found && choreo.dPLmin < choreo.dPL0 - 3, JSON.stringify(choreo))
-check('the charging parent is taken in the calf\'s place before any catch (visible run)',
-  choreo.found && choreo.chargeMs !== null && choreo.chargeMs >= 400 &&
+check('the parent holds itself between the hunter and the fleeing calf (living shield)',
+  choreo.found && choreo.samples >= 5 && choreo.betweenShare > 0.8, JSON.stringify(choreo))
+check('the hunter takes the blocking parent in the calf\'s place before any catch',
+  choreo.found && choreo.shieldMs !== null && choreo.shieldMs >= 400 &&
   choreo.parentDead && choreo.caughtSeen === false && choreo.calfDead === false && choreo.calfFreed,
   JSON.stringify(choreo))
 
@@ -1305,6 +1311,19 @@ const play = await page.evaluate(async () => {
 })
 check('calves gambol in playful hop-bouts (hop state + movement)',
   play.found && play.hopped > 3 && play.movedWhileHopping > 0, JSON.stringify(play))
+
+// Juveniles render through their own baby-schema geometry (design.md §19): a
+// proportionally bigger head on a shorter neck, a shorter body, leggy stance,
+// no adult ornaments. With live families present, the per-species calf
+// instanced meshes carry the young while the adults render separately.
+const calfRender = await page.evaluate(() => {
+  const refs = window.__wildlife.calfMeshRefs.current
+  let calves = 0
+  for (const sp of Object.keys(refs)) calves += refs[sp] ? refs[sp].count : 0
+  return { calves }
+})
+check('juveniles render through their own baby-schema calf meshes',
+  calfRender.calves >= 1, JSON.stringify(calfRender))
 
 // (2) Fall-in and rescue at Lake Victoria's west shore: the calf placed on the
 // water starts to struggle, the parent wades in from farther inland, pulls it
@@ -1768,6 +1787,12 @@ const remnant = await page.evaluate(async () => {
   const sc = w.scavenger.current
   sc.target = null
   sc.mode = 'idle'
+  // Reset the kill flight too: the zoom tests above leave it mid fly-off, and
+  // under full-suite RAF throttling finishing that cycle plus the fresh fly-in
+  // can exceed the landing window — from idle it spawns at the view ring like
+  // any real kill's flock (setup only; the descent itself stays live).
+  window.__vultures.killFlight.current.mode = 'idle'
+  window.__vultures.killDescend.current = 0
   L.victim = null
   L.victimHunt = false
   L.prey = 'zebra'
