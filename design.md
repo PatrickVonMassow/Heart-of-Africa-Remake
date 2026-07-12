@@ -31,8 +31,8 @@ Entering and leaving a settlement happen purely through movement, without a dedi
 
 - In the bird's-eye view, walking onto a settlement's position enters it and switches to the first-person view.
 - Inside, walking beyond the settlement's walkable edge leaves it and switches back to the bird's-eye view with the field of view around the current position — there is no exit archway and no "leave" key.
-- To avoid an accidental bounce straight back in, a settlement just left is briefly closed to re-entry: walking directly back toward it does not re-enter it. Re-entry re-arms only once the traveller has moved clear of the settlement (a short clearance beyond the enter radius, a calibratable balance value); after that, walking back onto its position enters it again as usual.
-- Likewise the enterable buildings (trade, service and audience buildings) are opened by walking up against their entrance door, the same deliberate opening the inhabitants use; no key press is required. Only the village elder is addressed with the interaction key.
+- A settlement just left stays closed to re-entry until the traveller has moved clear of it (a calibratable clearance beyond the enter radius), so leaving never bounces straight back in.
+- Enterable buildings (trade, service and audience buildings) open by walking against their entrance door — the same deliberate opening the inhabitants use, no key press. Only the village elder is addressed with the interaction key.
 
 ### 2.4 Graphics and atmosphere
 
@@ -50,15 +50,13 @@ The background of the first-person view plausibly matches the landscape one woul
 
 Settlements do not read as a sparse cluster of a few functional buildings but as believably inhabited communities. The presentation effort inside settlements is considerably higher:
 
-- Considerably more buildings than the functional ones (§9): besides the enterable trade, service and audience buildings there stands a clear majority of purely residential and auxiliary buildings — dwellings, granaries, animal pens, workshops, tents, storage buildings — which the player cannot enter. Density, size gradation and arrangement are region-typical (see §2.4, §4.5) and procedurally varied per settlement (§18); port cities are built more densely and more massively than villages.
-- Streets and paths open up the settlement: a recognizable path network connects buildings, squares and the settlement edge. Material and routing match the region (dusty tracks, stamped clay paths, busy harbor lanes). The paths structure the settlement and guide the movement of both player and inhabitants.
-- The inhabitants visibly go about their business and move believably through the settlement: they walk along the paths, linger and work at squares (§19.10 village and market life), and enter and leave the dwellings in which they live. They thus do not appear as static props but as part of a living everyday routine — the settlement must recognizably feel "inhabited".
-- The functional, enterable buildings remain clearly recognizable despite the denser fabric and stand out from the non-enterable buildings (§17: highlighting of the important buildings).
-- Collision inside settlements: buildings and solid objects (huts, granaries, tents, fences, trees, rocks, fire pit and the like) are physically impenetrable. Neither the player character nor the inhabitants walk through them; movement slides sideways along obstacles instead of stopping dead. The collision clearance is large enough that the camera never clips into a building even when pressing against walls or corners — the player must never see the inside of a building from outside. The inhabitants avoid obstacles on their ways or at least never remain permanently stuck on them. Paths, squares and the accesses to the enterable buildings always remain walkable.
-- Inhabitants enter their dwellings: the entrance door is the one deliberate opening in the otherwise impenetrable buildings — an inhabitant returning home visibly walks up against the entrance door, slips through it and disappears inside the dwelling, and later steps out through the same door again. The player cannot use the dwellings' doors; the non-functional buildings stay non-enterable for the player. The functional, enterable buildings, by contrast, are opened by the player the same way: walking against their entrance door opens the trade or audience window (see §2.3).
-- Every building is oriented so that its entrance door is reachable — the door opens onto free ground (a path, square or open lane), not against a neighbouring wall, a fence without a gap, or the settlement edge. This holds for the inhabitant-only dwellings as much as for the functional buildings: each resident must be able to stand at its own door to enter and leave. The procedural layout rotates a building when its natural facing would seal the door, and keeps every door's approach clear of later-placed objects.
-
-The contrast between the wealthy, busy port city and the nature-bound village is reinforced by this denser, livelier presentation.
+- A clear majority of the buildings is non-functional: dwellings, granaries, animal pens, workshops, tents and storage buildings the player cannot enter, beside the enterable trade, service and audience buildings (§9). Density, size gradation and arrangement are region-typical (§2.4, §4.5) and procedurally varied per settlement (§18); port cities build denser and more massively than villages.
+- A recognizable path network connects buildings, squares and the settlement edge, in region-typical material and routing (dusty tracks, stamped clay paths, busy harbor lanes); it structures the settlement and guides player and inhabitants.
+- The inhabitants visibly go about their business: they walk the paths, linger and work at squares (§19.10), and enter and leave the dwellings they live in — not static props but a living everyday routine. The settlement must recognizably feel "inhabited".
+- The functional, enterable buildings stay clearly recognizable within the denser fabric (§17: highlighting of the important buildings).
+- Collision: buildings and solid objects (huts, granaries, tents, fences, trees, rocks, the fire pit) are impenetrable to player and inhabitants alike; movement slides along obstacles instead of stopping dead. The clearance keeps the camera out of every wall — pressing against a building never shows its inside. Inhabitants avoid obstacles or at least never remain permanently stuck; paths, squares and the accesses to the enterable buildings always stay walkable.
+- The entrance door is the one deliberate opening in the otherwise impenetrable buildings: an inhabitant returning home visibly walks up against its door, slips through, and later steps out the same way. The player opens the functional buildings exactly like that (§2.3) but cannot use the dwellings' doors — non-functional buildings stay closed to him.
+- Every door opens onto reachable free ground (a path, square or open lane) — never against a neighbouring wall, a gapless fence or the settlement edge — so each resident can stand at its own door. The procedural layout rotates a building whose natural facing would seal its door and keeps every door's approach clear of later-placed objects.
 
 ### 2.7 Lighting and post-processing pipeline
 
@@ -117,7 +115,7 @@ Basis of the direction/location hints (mouth/source); navigable by canoe.
 Blue Nile, Nile, White Nile, Jubba, Ruvuma, Zambezi, Limpopo, Vaal, Orange, Sankuru, Kasai, Ubangi, Congo, Benue, Volta, Niger, Senegal. Each river has one named source and one named mouth location.
 
 ### 4.4 Landmarks
-Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudolf, Lake Tanganyika, Lake Nyasa), mountains (Toubkal, Emi Koussi, Kilimanjaro, Mount Kenya, Mount Elgon and others), waterfalls (Stanley, Livingstone, Kabalega, Victoria, Augrabies Falls). Special site: the Elephant Graveyard (valuable ivory) — recognizable at a glance in the bird's-eye view by a field of fallen, bleached elephant carcasses and ivory tusks and bones strewn across a pale, bone-littered patch of ground. Digging it with the shovel frees a random haul of ivory each time — a rolled amount averaging about five pieces — drawn from the site's limited supply until the bones hold no more.
+Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudolf, Lake Tanganyika, Lake Nyasa), mountains (Toubkal, Emi Koussi, Kilimanjaro, Mount Kenya, Mount Elgon and others), waterfalls (Stanley, Livingstone, Kabalega, Victoria, Augrabies Falls). Special site: the Elephant Graveyard (valuable ivory) — recognizable at a glance in the bird's-eye view by fallen, bleached elephant carcasses and ivory tusks and bones strewn across a pale patch of ground. Each dig with the shovel frees a random ivory haul (averaging about five pieces) from the site's limited supply, until the bones hold no more.
 
 ### 4.5 Region Assignment
 | Region | Landscape | Peoples |
@@ -230,7 +228,7 @@ Every settlement — port city or native village — offers at least the baselin
 - Bazaar (treasure finds): offer an item → the merchant names a bid → accept or decline. If the item does not fit the regional value profile, it is rejected. The bid is a standing quote for that port: declining and re-offering the same item shows the identical price, not a freshly haggled one. The quote expires only on leaving the port (a different port haggles anew).
 - Price logic: a base price per good; treasure finds additionally carry a regional factor and a buy/sell spread. Profit comes from regional arbitrage.
 - Ferries (travel agency): passage between ports for a fee; saves time compared to overland travel.
-- Discovery bounty: money is paid for reported discoveries (new villages, landmarks). It is credited on the next port visit as a telegraphic transfer waiting at the port, and the chronicle entry names exactly which discoveries earned it and the amount. The discovery itself is a journal moment too: the first sighting of a landmark is announced with its own entry, flavored by what was found — a mountain rising against the sky, a thundering waterfall, a sea-like lake, the elephant graveyard.
+- Discovery bounty: money for reported discoveries (new villages, landmarks), credited on the next port visit as a telegraphic transfer; the chronicle entry names the discoveries and the amount. The first sighting of a landmark is itself a journal moment, with its own entry flavored by what was found — a mountain rising against the sky, a thundering waterfall, a sea-like lake, the elephant graveyard.
 
 ---
 
@@ -249,30 +247,30 @@ Movement happens in the bird's-eye view; the terrain is rendered in 3D, the cont
 
 ### 11.1 Visible slowdown reason
 
-Whenever the current terrain slows the traveler and the relieving item is not carried — dense jungle without a machete, water without a canoe, mountain rock without a rope, or the canoe carried across any land (it is dead weight on land — desert, savanna, jungle and mountain alike) — the bird's-eye view shows a short hint that names the cause and the item that would relieve it. A movement penalty is never silent; the player can always see why progress is slow and which item to pack.
+Whenever the current terrain slows the traveler and the relieving item is not carried — dense jungle without a machete, water without a canoe, mountain rock without a rope, or the canoe carried across any land (dead weight on desert, savanna, jungle and mountain alike) — the bird's-eye view shows a short hint naming the cause and the relieving item. A movement penalty is never silent.
 
-The very first time each of these slowdowns is met, it is also announced once in the journal (a short entry naming the terrain and the missing item); every later encounter of that same kind is carried only by the standing status-bar hint, so the chronicle is not filled with repetitions. The "first time" is remembered per penalty type and travels with the checkpoint.
+The first encounter of each penalty type is additionally announced once in the journal (a short entry naming the terrain and the missing item); every later encounter of that kind is carried by the status-bar hint alone. The per-type "already announced" flag travels with the checkpoint.
 
 ### 11.2 Movement boundary
 
-Movement is restricted to the continent and its inland waters (rivers, lakes). Sea water that lies within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum through (or crossed by canoe) like a river or lake. The open ocean beyond the continent's outline is not navigable; the continent cannot be left.
+Movement is restricted to the continent and its inland waters (rivers, lakes). Sea within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum or crossed by canoe like a river or lake; the open ocean beyond is not navigable, so the continent cannot be left.
 
-The Red Sea is never inland water: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — is open, impassable ocean, the same as the sea around the rest of the continent. The Mediterranean likewise: the sea off the entire northern coast (Alexandria, the Nile delta, the Gulf of Sidra …) is open ocean and never swimmable, coastal band or not. The other bays keep their outline treatment unchanged.
+Two seas are never inland water regardless of the outline: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — and the Mediterranean off the entire northern coast (Alexandria, the Nile delta, the Gulf of Sidra …) are open, impassable ocean, with no swimmable band. The other bays keep their outline treatment unchanged.
 
-Swimmable sea reaches only a short band off the coast (a calibratable balance value, adjustable in the debug menu §21): further out, the open ocean blocks movement even where the continent's outline still encloses it — there is no swimming far out to sea.
+Even inside the outline, swimmable sea reaches only a short band off the coast (a calibratable balance value, debug menu §21); further out the open ocean blocks — there is no swimming far out to sea.
 
 ### 11.3 Water, current and waterfalls
 
 Current and gameplay:
 
 - Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4).
-- Moving with the current is faster, against it slower, and even an idle traveller on a river is carried downstream. Because the drift covers real distance, it consumes time and provisions exactly as travelling that stretch of water would — the current never moves the traveller for free.
+- Moving with the current is faster, against it slower; even an idle traveller on a river is carried downstream. The drift covers real distance and therefore consumes time and provisions like any water travel — the current never moves the traveller for free.
 - There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
-- You can also move through water without a canoe, but you are slower and more exposed to the current. There is additionally the risk of being attacked by a crocodile and being injured or eaten. Without a canoe the rifle gets wet in the water and is then useless; only a machete reduces the risk. In the canoe the rifle stays dry and works as usual.
+- Water can also be crossed without a canoe, but slower, more exposed to the current, and at risk of a crocodile attack (injury or death). Out of the canoe the rifle gets wet and is useless — only a machete reduces the risk; in the canoe it stays dry and works as usual.
 
 Visual water realism:
 
-- Water follows the height profile of the map: rivers lie in beds carved into the local relief, and their surface sits just above that carved bed for the whole length of the river, so the water reads as one continuous, unbroken ribbon that descends overall from source to mouth (never sea-level canyons through the highlands, and never buried where the ground rises).
+- Water follows the map's height profile: rivers lie in beds carved into the local relief, their surface just above the bed along the whole course, reading as one continuous, unbroken ribbon that descends from source to mouth — never sea-level canyons through the highlands, never buried where the ground rises.
 - A stray point that the biome map misclassifies as sea mid-river is bridged rather than tearing the ribbon; only the true mouth, where the river reaches the sea, ends it.
 - The surface itself is calm (only slight movement, no ocean-style wave field) with a recognizable downstream current (drifting streaks) that visibly accelerates at rapids and waterfalls.
 - Waterfalls (§4.4) are rendered as white cascades with plunge-pool foam and mist; rivers that rise in open land show a spring at their source.
@@ -294,12 +292,12 @@ Access to hints leads through the chiefs, in the chief's hut of a village (first
 A rejected gift means hostility and expulsion: the traveler is thrown out of the village, accumulated goodwill resets, and the chief refuses further audiences for a hostility period (a calibratable balance value) before relations can be rebuilt.
 
 **Honored Friend.**
-If you satisfy a chief correctly repeatedly, he bestows the status of "Honored Friend". It applies to all villages of the respective region (North, West, Central, South, East). Like every event, the bestowal is communicated through the journal: a new entry opens in which the chief pledges that his people will protect the traveler from now on. Committing a robbery forfeits this status irretrievably.
+Satisfying a chief correctly repeatedly bestows the status of "Honored Friend" for all villages of his region. The bestowal is journaled: an entry in which the chief pledges his people's protection. A robbery forfeits the status irretrievably.
 
-Effect: in the immediate surroundings of the region's native villages, the natives protect the traveler from attacks by animals and robbers (§14); he can then at most be lightly injured. If he is close to death, inhabitants hurry over with food, water or medicine. In addition he always receives food, water and medicine free of charge in the villages of the region. Each such event is communicated via a journal entry. Typically an entry reads like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
+Effect: near the region's native villages the natives protect the traveler from animal and robber attacks (§14) — he is at most lightly injured; close to death, inhabitants hurry over with food, water or medicine; and in the region's villages he always receives food, water and medicine free of charge. Each such event is journaled, typically like "I was attacked by lions. A group of the … people rushed to my aid at once and saved me from the attack. I was only lightly injured."
 
 **Robbery and reputation.**
-With a rifle in the pack, the chief's audience offers to rob the hut. Because the deed is irreversible, it takes a deliberate safety confirmation first (a warning naming the consequences, with a confirm/cancel choice). The haul is deliberately rich — a large sum of money, trade goods up to the pack limit, and provisions — so that a robbery can genuinely pay off despite its heavy cost; the chronicle reports exactly what was taken. This permanently antagonizes all villages of the region: afterwards no hut of the region can be entered anymore, and the chiefs give no more hints. A robbery also irretrievably forfeits the "Honored Friend" status — including its protection.
+With a rifle in the pack, the chief's audience offers to rob the hut — behind a deliberate safety confirmation (a warning naming the consequences, confirm/cancel), because the deed is irreversible. The haul is deliberately rich — a large sum of money, trade goods up to the pack limit, and provisions — so a robbery can genuinely pay off despite its cost; the chronicle reports exactly what was taken. It permanently antagonizes all villages of the region (no hut enterable, no more hints) and irretrievably forfeits the "Honored Friend" status including its protection.
 
 ---
 
@@ -333,7 +331,7 @@ Hidden triggering per time step/region/condition.
 
 ### 14.1 Event kinds
 
-- Wild-animal attacks (lions, cheetahs, leopards, hyenas and snakes): an attack can injure or kill. The predators differ in danger — the lion is the most likely to kill, then the hyena, then the leopard, and the cheetah is the least dangerous (it rarely presses an attack home). Carrying a rifle or machete in the pack lowers the risk — a rifle more than a machete. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into any of the wandering predators in the bird's-eye view (§19) directly triggers that predator's attack (same outcome rules and protection).
+- Wild-animal attacks (lions, cheetahs, leopards, hyenas and snakes): an attack can injure or kill. Danger order: lion (most likely to kill) > hyena > leopard > cheetah (rarely presses an attack home). A rifle or machete in the pack lowers the risk, the rifle more. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into a wandering predator in the bird's-eye view (§19) directly triggers that predator's attack (same outcome rules and protection).
 - Robber attacks: can injure and steal inventory items. As with animal attacks, a machete lowers the risk, a rifle more so.
 - Protection through "Honored Friend": near the villages of a region where you hold this status, the natives rush to help during animal and robber attacks; you can then at most be lightly injured (§12).
 - Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Without a canoe the rifle gets wet and does not help — then only a machete lowers the risk; in the canoe the rifle works normally (§11).
@@ -359,12 +357,11 @@ Concrete probabilities are calibrated freely for balance. They are tuned to keep
 
 ### 14.4 First-time danger warnings
 
-The first time the traveller meets a danger situation, the journal warns of it once and names how to guard against it — a foresightful hint, not a reaction to an event that already struck.
+The first time the traveller meets a danger situation, the journal warns of it once and names how to guard against it — a foresightful hint, not a reaction to an event that already struck (distinct from the movement-penalty hints of §11, which concern slowdown, not danger).
 
-- A warning never advises the traveller to use what they are already using: whoever crosses the first water with a canoe in the pack is told the crocodiles lurk but that the canoe keeps them out of reach, not to get one.
-- Each warning fires only on its first occurrence (the "already warned" flags travel with the checkpoint, like the movement-penalty announcements of §11) and is written in both languages with voice markup (§15).
-- The situations covered: setting out into the wilds without a rifle (wild-animal attacks — a rifle in the pack is the strongest protection, better than a machete); the first desert stretch (dehydration and sun blindness — a filled canteen holds off the thirst, and only leaving the desert cures the blindness); the first passage through water (crocodiles — a canoe carries the traveller across safely and keeps the rifle dry, otherwise only the machete helps); and the first fever-prone jungle (fever — medicine in the pack cures it).
-- These proactive warnings are distinct from the movement-penalty hints of §11 (which concern slowdown, not attack or health danger).
+- A warning never advises what is already in use: whoever crosses the first water with a canoe in the pack is told the crocodiles lurk but that the canoe keeps them out of reach — not to get one.
+- Each warning fires only on its first occurrence (the "already warned" flags travel with the checkpoint, like the §11 announcements) and is written in both languages with voice markup (§15).
+- The situations covered: setting out into the wilds without a rifle (wild-animal attacks — the rifle is the strongest protection, better than a machete); the first desert stretch (dehydration and sun blindness — a filled canteen holds off the thirst, only leaving the desert cures the blindness); the first passage through water (crocodiles — a canoe carries safely and keeps the rifle dry, otherwise only the machete helps); the first fever-prone jungle (fever — medicine cures it).
 
 ---
 
@@ -386,7 +383,7 @@ The journal text building blocks are stored in every language file with a lightw
 
 - For speech output the pipeline is parser → TTS text → audio: the parser converts the markup into prosody (real pauses, punctuation shaping such as "…" for hesitation or "!" for excitement, and per-passage speaking speed and loudness) so that "Today… at last. I have found the temple." sounds different from the same words read flatly.
 - Journal entries are narrated with the Kokoro TTS model running in the browser — the synthesis runs off the main thread (in a Web Worker) so it never stalls the game while a voice is being generated, especially the heavier first-time model load.
-- A newly appearing entry is read aloud automatically (no click required). While the browser's autoplay policy still blocks audio — before the first user gesture — the narration is not dropped but deferred: the newest entry (at game start, the departure entry) starts narrating with that first gesture.
+- A new entry is read aloud automatically (no click required). While the browser's autoplay policy still blocks audio, the narration is deferred, not dropped: the newest entry (at game start, the departure entry) starts narrating with the first user gesture.
 - Every entry additionally offers a read-aloud control to replay or stop the narration.
 - Kokoro currently provides no German voice, so narration is available in English only; German texts nevertheless carry the exact same markers so a German-capable voice can be plugged in later (open item).
 
@@ -414,7 +411,7 @@ The entries read like the moment they record: the first visit to a village is to
 
 - The opened journal does not freeze the game: the character keeps moving in both perspectives while the journal is open and even while an entry is being read aloud — reading and narration never halt travel.
 - Only the modal dialogs (trade, audience, camp and the like) block movement.
-- Because the journal is non-modal, walking a building's entrance door open (§2) works with the journal open too — the door still enters and the book closes as the building's modal appears; the auto-opened journal never leaves a hut unenterable.
+- Walking a building's entrance door open (§2) therefore works with the journal open too — the book closes as the building's modal appears; an auto-opened journal never leaves a hut unenterable.
 
 ### 16.2 Do not disturb
 
@@ -435,7 +432,7 @@ Players who do not want to be interrupted can turn the automatic presentation of
 
 - Field of view of the surroundings; status bar with date, funds, provisions, gifts and the current region (no hand-object slot — item effects are possession-based, §6/§7).
 - The coordinates are not shown permanently; they are read out on demand via the position query.
-- The area freed at the top right of the status bar holds transient status displays — hints such as the reason for a movement penalty (§11) appear as a right-aligned item within the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
+- Transient status hints — e.g. the reason for a movement penalty (§11) — appear as a right-aligned item inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
 - The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
 - An item that is currently in use lights up (glows) in the inventory bar: the relief item countering the present terrain (the canoe on water, the machete in the jungle, the rope on a mountain) and medicine while a curable affliction (fever or a wound) is active — so the player sees at a glance which piece of equipment is doing its work right now.
 - Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
@@ -495,55 +492,54 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 
 ### 19.2 Living wildlife and streaming
 
-- Living wildlife as scenery: non-threatening animals in the field of view (elephant herds, giraffes, and grazing herds of zebra, wildebeest, antelope and warthog on the savanna, flamingos at the lakes). Purely visual, anchoring place and region. The animals also interact with one another (say, a lion bringing down a grazer) — as ambient scenery.
-- The scenery streams in and out with the journey: an animal is only removed once it is clearly outside the field of view, and how far that reaches is tied to the bird's-eye zoom (zooming out keeps animals alive that the default view would have dropped); an animal that merely passes across a tile boundary while still on screen is never culled.
-- The hunting predator obeys the same rule: when its hunt is over it trots off away from the traveller and leaves the stage only well beyond the visible surroundings, and a hunt that strays likewise ends only past the view's edge — no animal vanishes in sight.
-- The one exception is a dead animal, which — so its removal is not seen to pop away — dissolves on screen (eaten by lion or vulture) rather than vanishing; a carcass left far off the screen, which the single scavenger cannot reach in time, is instead culled silently, so kills never pile up without bound and choke the frame loop.
+- Living wildlife as scenery: non-threatening animals in the field of view (elephant herds, giraffes, grazing herds of zebra, wildebeest, antelope and warthog on the savanna, flamingos at the lakes). Purely visual, anchoring place and region; the animals also interact with one another (say, a lion bringing down a grazer).
+- The scenery streams with the journey: an animal is removed only once it is clearly outside the field of view — how far that reaches follows the bird's-eye zoom (zooming out keeps animals the default view would have dropped) — and an animal merely crossing a tile boundary while on screen is never culled.
+- The hunting predator obeys the same rule: a finished hunt trots off away from the traveller and leaves the stage only well beyond the visible surroundings, and a strayed hunt ends the same way — no animal vanishes in sight.
+- The one exception is a dead animal, which dissolves on screen (eaten by lion or vulture) rather than popping away; a carcass left far off screen, out of the single scavenger's reach, is instead culled silently, so kills never pile up without bound and choke the frame loop.
 
 ### 19.3 The predator hunt
 
-- The lion is not the only hunter: each hunt a region-appropriate predator of ~1890 Africa appears — the lion everywhere, the cheetah and the spotted hyena on the open eastern and southern plains, the leopard in the wooded west and centre — and it takes prey from its own food web, so the whole forms a chain of predator → grazer → grassland.
-- The big predators (lion, hyena) bring down the large grazers (wildebeest, zebra); the lighter cats (cheetah, leopard) take the smaller, faster game (antelope, warthog); and those grazers in turn feed on the grass they graze on the open land. Which prey a hunt takes is its predator's scheme intersected with what the region actually holds — wildebeest and zebra on the great eastern and southern plains, antelope and warthog more widely, with the arid north and the wooded west/centre offering a narrower range.
-- Every one of these wandering predators attacks the player on contact (§14): walking into the active predator triggers its attack, rate-limited by the event cooldown. They differ in danger — the lion is the apex with the highest risk of a fatal outcome, then the hyena, then the leopard, and the cheetah is the least dangerous (timid toward people); the protection rules (§7/§14) apply to all of them. Away from a contact the predators remain scenery.
-- The predator closes in on the prey from a random direction, so a hunt runs any which way across the plain rather than always toward the same corner; the fleeing prey does not run in a straight line but weaves left and right to try to shake the hunter, which pursues with a limited turning rate (sharp cuts throw it wide) yet is faster and closes in over time.
-- When the predator has brought down prey, it visibly feeds on it (schematic: it stands over the fallen carcass with lowered, rhythmically tearing head movements, a red stain spreading beneath); the carcass shrinks away piece by piece while it eats.
-- Yet the predator does not strip its kill bare: when it walks off, a small remnant of the prey stays behind at the site beside the stain — and the vultures that have been circling the kill all along descend onto the scrap and finish it themselves. No new scavenger flies in for a flocked kill; the lone ground scavenger serves only carcasses that drew no circling flock (e.g. trampled animals).
+- The lion is not the only hunter: each hunt fields a region-appropriate predator of ~1890 Africa — the lion everywhere, cheetah and spotted hyena on the open eastern and southern plains, the leopard in the wooded west and centre — taking prey from its own food web: predator → grazer → grassland.
+- The big predators (lion, hyena) bring down the large grazers (wildebeest, zebra); the lighter cats (cheetah, leopard) take the smaller, faster game (antelope, warthog). A hunt's prey is the predator's scheme intersected with what the region actually holds.
+- Every wandering predator attacks the player on contact (§14), rate-limited by the event cooldown, with the §14 danger order (lion > hyena > leopard > cheetah, which is timid toward people) and protection rules (§7/§14). Away from a contact the predators remain scenery.
+- The predator closes in from a random direction, so hunts run any which way across the plain. The fleeing prey weaves left and right to shake the hunter, which pursues with a limited turning rate (sharp cuts throw it wide) yet is faster and closes in over time.
+- Brought-down prey is visibly fed on (schematic: the predator stands over the carcass with lowered, rhythmically tearing head movements, a red stain spreading beneath) while the carcass shrinks away piece by piece.
+- The kill is not stripped bare: a small remnant stays beside the stain when the predator walks off, and the vultures that circled the kill all along descend and finish it themselves. No new scavenger flies in for a flocked kill; the lone ground scavenger serves only carcasses without a circling flock (e.g. trampled animals).
 
 ### 19.4 Elephants and trampling
 
-- Elephants move as herds — the members keep together and roam as a group (they are rarely seen alone), on a slow amble that only ever moves forward and changes direction in gentle arcs (no sharp turns, no strafing or backing up), staying on suitable ground (savanna and forest, where elephants occurred at the end of the 19th century, not the open desert).
-- They do not hunt; a smaller animal is trampled only if it happens to be in the herd's path. A trampled animal stays dead on the ground over a red stain like a lion kill.
-- Other animals try to get out of an elephant's way, but only at the last moment — they dart aside just before the herd reaches them and a touch slower than an elephant, so a head-on herd still tramples one now and then.
-- A fleeing animal picks one steady escape direction — the combined push of every nearby elephant — rather than jittering back and forth between two of them.
+- Elephants roam as herds (rarely seen alone) on suitable ground — savanna and forest, where elephants occurred at the end of the 19th century, not the open desert — on a slow amble that only ever moves forward and turns in gentle arcs (no sharp turns, strafing or backing up).
+- They do not hunt; a smaller animal is trampled only if it is in the herd's path, and stays dead over a red stain like a lion kill.
+- Other animals dodge an elephant only at the last moment and a touch slower than it, so a head-on herd still tramples one now and then. A fleeing animal holds one steady escape direction — the combined push of every nearby elephant — rather than jittering between two of them.
 
 ### 19.5 Bodies and movement discipline
 
-- Every animal carries one persistent visible facing that all its behaviors merely steer at a capped turn rate: the body never whips around when a behavior starts, ends or changes — the dodge disengages only well past its trigger ring, a finished flight leaves the animal facing where it ran, and an elephant always faces its line of travel.
-- The animals have bodies: herd members spawn with natural spacing between them, and no animal stands in or walks through another — overlapping animals part at once. The one exception is the elephant trample itself, which by design walks straight over a too-slow smaller animal.
-- Prey animals (zebras, wildebeest, antelopes, warthogs, giraffes) run away from a hunting or feeding predator — a smooth flight that accumulates into their movement, never a sudden jump to a new spot.
-- Every blood stain is laid into the local slope of the ground (never as a horizontal disc that rising terrain slices into a half-moon).
-- No animal ever strays into the impassable open ocean (§11): scripted prey balks at the waterline instead of fleeing into the sea, and any animal that ends up on open-ocean ground — pushed, fleeing or dodging — is set back to the nearest land at once.
+- Every animal carries one persistent visible facing that all behaviors merely steer at a capped turn rate — the body never whips around when a behavior starts, ends or changes: the dodge disengages only well past its trigger ring, a finished flight leaves the animal facing where it ran, an elephant always faces its line of travel.
+- The animals have bodies: herd members spawn with natural spacing, no animal stands in or walks through another, and overlapping animals part at once. The one designed exception is the elephant trample itself.
+- Prey animals (zebras, wildebeest, antelopes, warthogs, giraffes) flee a hunting or feeding predator smoothly — accumulated movement, never a sudden jump to a new spot.
+- Every blood stain is laid into the local slope of the ground (never a horizontal disc that rising terrain slices into a half-moon).
+- No animal ever strays into the impassable open ocean (§11): scripted prey balks at the waterline, and any animal that ends up on open-ocean ground — pushed, fleeing or dodging — is set back to the nearest land at once.
 
 ### 19.6 Vultures and carcasses
 
 - Vultures gather and circle above a lion kill.
-- A carcass that was not eaten by the lion — a trampled animal, or any death other than being eaten — is not left lying forever: a vulture flies in, lands on it and feeds, and the carcass shrinks away piece by piece and is gone the same way a lion kill dissolves.
-- No vulture ever pops into or out of the picture: every flight — the lone scavenger and the flocks over a kill or over an ailing traveller alike — appears beyond the visible surroundings (however far the current zoom reaches), flies in, and once its reason has passed flies off and vanishes only well outside the view again.
-- Vultures at poor health: if the character is in poor health (§6), vultures circle above and follow them for a while — an atmospheric signal without its own mechanics.
+- A carcass the predator did not eat — a trampled animal, any other death — is not left lying forever: a vulture flies in, lands and feeds, and the carcass shrinks away the same way a lion kill dissolves.
+- No vulture ever pops into or out of the picture: every flight — lone scavenger and flocks alike — appears beyond the visible surroundings (however far the current zoom reaches), flies in, and once its reason has passed flies off and vanishes only well outside the view again.
+- If the character is in poor health (§6), vultures circle above and follow them for a while — an atmospheric signal without its own mechanics.
 
 ### 19.7 Shore and grazing life
 
-- Animals living near a river or lake periodically walk to the shore, lower their heads and drink before returning to the herd; grazing species dip their heads into the grass on open land; flamingos wade in the shallows.
-- Beyond drinking, some shore visitors wade a little further into the shallow water and bathe — a low, splashing wallow rather than only lowering the head.
+- Animals living near a river or lake periodically walk to the shore, drink and return to the herd; grazing species dip their heads into the grass on open land; flamingos wade in the shallows.
+- Some shore visitors go beyond drinking and bathe — a low, splashing wallow a little further into the shallow water.
 
 ### 19.8 Family life in the herds
 
-- A herd of several animals raises a juvenile (a small calf or foal) that keeps close to a parent and nurses beside it. The young reads as young beyond its mere size: within the schematic animal style it carries a baby schema — a proportionally larger head on a shorter neck, a shorter, rounder body on relatively long, thin legs, and none of the adult ornaments (no horns, tusks, beard or mane; the elephant calf has a stubby trunk and smaller ears, the giraffe calf a much shorter neck).
-- When a predator closes on the young, its parent does not simply flee — it moves between the hunter and its calf to shield it, standing off just in front of the young and facing the danger down.
-- When a hunt singles out the calf itself, the family does not stand frozen: the calf bolts and — slower than its hunter — is visibly run down in the open, while its parent does not flee with it. Fleeing is no protection: the parent runs with the flight holding itself between the hunter and its young, a living shield on the escape line — a hunter that closes in reaches the blocking parent first and takes it in the calf's place, so the calf escapes without ever being caught.
-- If the shield cannot make its station in time and a predator does catch a calf, the calf is not killed at once: it struggles for a few seconds first — no wound or bloodstain yet — and only now does the parent rush the predator. A parent that reaches it throws itself in and is taken in the calf's place, so the calf gets up and escapes; a parent that only gets close by the time the struggle ends is dragged down alongside the calf, and both are eaten.
-- The calves are playful besides: on their own rhythm they break into short gambolling hop-bouts around the parent — and at a shore such a bout can carry a calf into the open water, where it struggles and drifts with the current. Its parent wades in after it, pulls it out on reach, and the two walk back to the bank together.
-- The rivers keep their menace (§11) for the animals too: in the water close to one of the waterfalls, calf or parent is seized by the racing current and swept over the falls to its death — and a calf that goes over is followed by its parent, which plunges after it and dies with it.
+- A herd raises a juvenile (a small calf or foal) that keeps close to a parent and nurses beside it. The young reads as young beyond mere size — a baby schema within the schematic style: a proportionally larger head on a shorter neck, a shorter, rounder body on relatively long, thin legs, none of the adult ornaments (no horns, tusks, beard or mane; the elephant calf with stubby trunk and smaller ears, the giraffe calf with a much shorter neck).
+- A predator closing on the young finds the parent moving between them: it stands off just in front of the calf, facing the danger down, instead of fleeing.
+- When a hunt targets the calf itself, the calf bolts and — slower than its hunter — is visibly run down in the open. The parent runs as a living shield on the escape line, holding itself between hunter and young: a hunter that closes in reaches the parent first and takes it in the calf's place, and the calf escapes uncaught.
+- If the shield is out of position and the calf is caught, it is not killed at once: it struggles alive for a few seconds (no wound or bloodstain yet) while the parent rushes the predator. Reaching it within that window, the parent is taken in the calf's place and the calf gets up and escapes; arriving merely close by the struggle's end, it is dragged down and eaten alongside the calf.
+- Calves are playful: on their own rhythm they break into short gambolling hop-bouts around the parent. At a shore a bout can carry a calf into open water, where it struggles and drifts with the current; the parent wades in, pulls it out on reach, and the two walk back to the bank.
+- Near a waterfall the current keeps its menace (§11) for the animals too: calf or parent in its reach is swept over the falls to its death — and a parent follows a swept calf, plunging after it and dying with it.
 
 ### 19.9 Climate and landscape dressing
 
@@ -624,7 +620,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 
 - Mouse-wheel zoom in the bird's-eye view is always available (zooming in well below and — when unlocked — well beyond the default camera distance, far enough to take in the whole continent).
 - Checkbox: allow zooming out beyond the default level, off by default; without it, zooming out stops at the default distance, and disabling the checkbox clamps a wider view back to it. Zoomed-in views are never reset.
-- In the zoom range that only the unlock reaches (beyond the default distance) no haze is shown: the fog recedes to the horizon and the ground haze fades out, and both return as the zoom drops back; out there a coarse far-terrain sheet depicts the land beyond the detailed surroundings, and the sea lies glassy calm.
-- Walking while zoomed out keeps the picture consistent: the sea surface stays aligned with the land, the far-terrain sheet matches the detailed ground's tone (it bakes in the ground textures' mean response), and beyond a zoom threshold the chunk-bound dressing (trees, rocks …) hides — the detailed dressing only ever surrounds the traveller and would otherwise read as a dressed rectangle on the sheet; it returns as the zoom drops back.
-- The sea reads as plain ocean out to the horizon of the widest view: beyond the elevation dataset's edge the water renders as uniform deep ocean (never clamped edge streaks or false shallow blocks), and open-sea land trimmed from the map (§3.1) lies under the same deep tone as the sea around the continent. Trimmed scraps right at a kept shore (coastal spits, lagoon bars) instead blend into the local shelf depth — the depth tint along kept coasts stays a smooth shallow-to-deep gradient with no dark holes where the dataset's spits were removed.
+- In the zoom range only the unlock reaches, no haze is shown: the fog recedes to the horizon and the ground haze fades out (both return as the zoom drops back); out there a coarse far-terrain sheet depicts the land beyond the detailed surroundings, and the sea lies glassy calm.
+- Walking while zoomed out keeps the picture consistent: the sea surface stays aligned with the land, the far sheet matches the detailed ground's tone (it bakes in the ground textures' mean response), and beyond a zoom threshold the chunk-bound dressing (trees, rocks …) hides — it only ever surrounds the traveller and would otherwise read as a dressed rectangle on the sheet; it returns as the zoom drops back.
+- The sea reads as plain ocean out to the widest view's horizon: beyond the elevation dataset's edge the water renders as uniform deep ocean (never clamped edge streaks or false shallow blocks), and open-sea land trimmed from the map (§3.1) lies under the same deep tone. Trimmed scraps right at a kept shore (coastal spits, lagoon bars) instead blend into the local shelf depth — the coastal depth tint stays a smooth shallow-to-deep gradient with no dark holes where the dataset's spits were removed.
 - Leaving the zoomed view for a settlement never harms the first-person picture: walls and objects render correctly at close range.

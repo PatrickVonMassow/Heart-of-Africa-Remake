@@ -7,7 +7,7 @@ need a real browser stay in Playwright.
 | Layer | Where | Runner | What it covers |
 |---|---|---|---|
 | **Vitest (jsdom)** | `src/**/*.test.ts[x]` | `npm run test:unit` | Pure logic, store transitions, and HTML-HUD component classes/text. No browser, no dev server. ~530 tests in ~10 s. |
-| **Playwright** | `scripts/verify/*.mjs` | `npm run test:e2e` | Only browser-dependent checks: the R3F/three scene + RAF wildlife, real layout geometry, canvas/WebGL init, pointer-lock, TTS audio, the CLAUDE.md §7.2 acceptance screenshots, and one end-to-end core flow. |
+| **Playwright** | `scripts/verify/*.mjs` | `npm test -- <suite>` | Only browser-dependent checks: the R3F/three scene + RAF wildlife, real layout geometry, canvas/WebGL init, pointer-lock, TTS audio, the CLAUDE.md §7.2 acceptance screenshots, and one end-to-end core flow. |
 
 ```
 npm run test:unit     # fast Vitest layer only (jsdom)

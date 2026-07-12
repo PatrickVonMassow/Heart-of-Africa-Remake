@@ -270,23 +270,25 @@ verify suite that proves it.
    sufficient). Buy dialogs use the aligned price-table layout and buy
    gear back for the local currency per §9. Verifiable:
    `scripts/verify/flow.mjs` asserts the price cells share a column
-   (aligned left edges); `scripts/verify/economy.mjs` asserts selling gear
-   in a port pays money.
+   (aligned left edges); `src/state/store.economy.test.ts` asserts selling
+   gear in a port pays money.
 6. **Village and cultural contact.** At least one enterable village with a
    chief's hut; a culturally correct gift is the condition for a hint —
    not mere observation (`design.md` §12). The village trading post
    barters the baseline goods for gifts and buys gear back for gifts —
-   money has no value there (§9). Verifiable: `scripts/verify/economy.mjs`
-   buys food in a village against gifts (money untouched), refuses a
-   purchase without gifts, and sells gear for gifts.
+   money has no value there (§9). Verifiable:
+   `src/state/store.economy.test.ts` buys food in a village against gifts
+   (money untouched), refuses a purchase without gifts, and sells gear for
+   gifts; `src/ui/Dialogs.test.tsx` prices village goods in gifts, not
+   money.
 7. **Language/direction system.** The full system of `design.md` §13 is
    implemented: the regional direction systems and glossary names of
    §13.2, taught by the village elder (a second talk reveals what the
    region reveres, §8); hints combine landmark, direction word and
    coordinate (§13.1); a raw hint deciphers retroactively in either order
-   (§13.2). Verifiable: `scripts/verify/hints.mjs` covers all five
-   regions, the retroactive deciphering, the gift lore and the in-world
-   words in the rendered journal.
+   (§13.2). Verifiable: `src/state/store.hints.test.ts` covers all five
+   regions, the retroactive deciphering (either order) and the gift lore;
+   `src/i18n/i18n.test.ts` the in-world words in the language files.
 8. **Chronicle/journal.** A journal exists, grows automatically on events
    and stores hints (`design.md` §15); plain text suffices here (the
    animated handwriting is pt. 29). First village visits are journaled
@@ -307,11 +309,12 @@ verify suite that proves it.
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints via the knowing-people
-    cascade of `design.md` §13.3. Verifiable: `scripts/verify/hints.mjs`
-    asserts that the deciphered latitude and longitude equal the actual
-    grave position and that non-knowing chiefs point to the knowing
-    people; `scripts/verify/flow.mjs` plays the full loop (gift → lesson →
-    deciphered latitude, the East leg for the longitude, then the dig).
+    cascade of `design.md` §13.3. Verifiable:
+    `src/state/store.hints.test.ts` asserts that the deciphered latitude
+    and longitude equal the actual grave position and that non-knowing
+    chiefs point to the knowing people; `scripts/verify/flow.mjs` plays
+    the full loop (gift → lesson → deciphered latitude, the East leg for
+    the longitude, then the dig).
 11. **Game graphics.** The visual presentation must be appealing and
     elaborate at AAA level and replace the POC's former schematic look.
     This includes smoothing the geometry of the continent and the rivers,
@@ -324,73 +327,80 @@ verify suite that proves it.
     the herds' family life with calf predation and water drama), the
     climate and landscape dressing of §19.9, the "Graphics and atmosphere"
     section (§2.4), and the elephant-graveyard dressing of §4.4 (readable
-    at a glance). Verifiable: automated checks force the feed state
-    (carcass, head animation, stain in the local ground slope, leave
-    phase), provoke a trampling via an injected elephant, prove an
-    elephant herd roams together (its centre moves, it stays clustered,
-    and it turns only in gentle arcs) and that prey ignore a distant
-    elephant but dart away from a close one (last-moment dodge) while
-    holding one steady escape direction rather than oscillating ~90°
-    between two flanking herd-mates — with the RENDERED facing itself
-    sampled under the universal turn cap through engage and disengage (no
-    snap when a flight ends), a tailing elephant unable to flap the dodge
-    at its ring (exit hysteresis), and an elephant's facing tracking its
-    roam heading; assert that lion hunts run in varied directions (low
-    mean-resultant length across hunts) with a weaving prey (its heading
-    oscillates around straight-away), that the lion takes more than one
-    kind of prey and every hunted species fits the region's pool; prove
-    the zoom-aware streaming despawn (an animal survives a tile-boundary
-    crossing while in view, despawns once well outside it, and a wider
-    zoom keeps animals the default view would have dropped) — with the
-    scripted predator obeying the same ring: after feeding it walks off
-    and is removed only beyond it, and a strayed chase aborts the same
-    way; that a non-lion (trampled) carcass draws a vulture that lands and
-    consumes it until it is removed — with the vulture spawning beyond the
-    zoom-aware view ring and flying in (no popping in), flying off after
-    the meal and despawning only well outside the view, and the
-    kill-circling flock flying the same in/out pattern; that a finished
-    hunt leaves a small prey remnant at the kill site which the ALREADY
-    CIRCLING kill flock then descends on and finishes — the ground
-    scavenger never takes a flocked kill's scrap (and a feed that ends
-    without a kill leaves none); that carcasses left far off-screen are
-    culled while a visible
-    one is kept (so kills stay bounded and never stall the frame loop);
-    that more than one kind of predator hunts and every predator/prey
-    pairing fits the region and the predator's food web; that prey flee a
-    predator smoothly without teleporting (no single-frame jump); that
-    herds raise young that keep close to a parent — rendered through their
-    own baby-schema build (proportionally larger head, shorter neck/body,
-    leggy stance, no adult ornaments; pure-tested in
-    `src/render/fauna.test.ts`, live-checked via the calf meshes) — and
-    that a parent moves
-    to interpose between an approaching predator and its calf; assert the
-    calf predation of §19.8 — a caught calf struggles alive (no stain or
-    shrink) for a few seconds before the kill, a parent that reaches the
-    predator is eaten in the calf's place while the calf escapes, a parent
-    that only got close by the window's end is eaten alongside the calf,
-    and the full LionHunt path runs a calf down and catches it (the parent
-    held out of shielding reach) — with the hunted calf visibly fleeing
-    the chase (slower than its hunter) instead of standing at its parent,
-    and a parent in reach holding itself between hunter and calf (living
-    shield) over visible real time until the hunter takes it in the
-    calf's place before any catch; assert the calf water drama of §19.8 — calves gambol
-    in visible hop-bouts, a calf on open water starts a struggle and its
-    parent wades in, pulls it out and both return to the bank alive, in
-    the water inside a waterfall's reach a calf is swept over and dies
-    with its parent plunging after it, and a rescuing parent wading into
-    the falls' reach is swept over itself while its calf survives; assert
-    the animal body separation of §19.5 — streamed animals keep their body
-    spacing after spawn (no two inside one another) and an animal placed
-    onto another parts from it within moments, while the elephant trample
-    remains possible; assert that an animal on an open-ocean cell is set
-    back to the nearest land (no animal strays into the impassable sea,
-    and the scripted hunt's prey balks at the waterline); that some shore
-    visitors bathe (wade in) beyond merely drinking; and assert the
-    graveyard's carcass/tusk/bone counts via the dev hook with a
-    screenshot (`scripts/verify/settings.mjs`,
-    `scripts/verify/enrichments.mjs`). OPEN: tree-climbing-to-flee and
-    additional new species/birds beyond the existing roster and the added
-    calves remain to be implemented (§9 open items).
+    at a glance). Verifiable (`scripts/verify/settings.mjs`,
+    `scripts/verify/enrichments.mjs`), by topic:
+    - Feeding and trampling: automated checks force the feed state
+      (carcass, head animation, stain in the local ground slope, leave
+      phase) and provoke a trampling via an injected elephant.
+    - Elephant herds and the dodge: an elephant herd roams together (its
+      centre moves, it stays clustered, it turns only in gentle arcs);
+      prey ignore a distant elephant but dart away from a close one
+      (last-moment dodge) while holding one steady escape direction
+      rather than oscillating ~90° between two flanking herd-mates — with
+      the RENDERED facing itself sampled under the universal turn cap
+      through engage and disengage (no snap when a flight ends), a
+      tailing elephant unable to flap the dodge at its ring (exit
+      hysteresis), and an elephant's facing tracking its roam heading.
+    - Hunt variety: lion hunts run in varied directions (low
+      mean-resultant length across hunts) with a weaving prey (its
+      heading oscillates around straight-away); the lion takes more than
+      one kind of prey and every hunted species fits the region's pool;
+      more than one kind of predator hunts and every predator/prey
+      pairing fits the region and the predator's food web; prey flee a
+      predator smoothly without teleporting (no single-frame jump).
+    - Streaming: the zoom-aware despawn holds (an animal survives a
+      tile-boundary crossing while in view, despawns once well outside
+      it, and a wider zoom keeps animals the default view would have
+      dropped) — with the scripted predator obeying the same ring: after
+      feeding it walks off and is removed only beyond it, and a strayed
+      chase aborts the same way.
+    - Vultures, remnants and carcass bounds: a non-lion (trampled)
+      carcass draws a vulture that lands and consumes it until it is
+      removed — the vulture spawning beyond the zoom-aware view ring and
+      flying in (no popping in), flying off after the meal and despawning
+      only well outside the view, and the kill-circling flock flying the
+      same in/out pattern; a finished hunt leaves a small prey remnant at
+      the kill site which the ALREADY CIRCLING kill flock then descends
+      on and finishes — the ground scavenger never takes a flocked kill's
+      scrap (and a feed that ends without a kill leaves none); carcasses
+      left far off-screen are culled while a visible one is kept (kills
+      stay bounded and never stall the frame loop).
+    - Calves and family life: herds raise young that keep close to a
+      parent — rendered through their own baby-schema build
+      (proportionally larger head, shorter neck/body, leggy stance, no
+      adult ornaments; pure-tested in `src/render/fauna.test.ts`,
+      live-checked via the calf meshes) — and a parent moves to interpose
+      between an approaching predator and its calf. Calf predation
+      (§19.8): a caught calf struggles alive (no stain or shrink) for a
+      few seconds before the kill, a parent that reaches the predator is
+      eaten in the calf's place while the calf escapes, a parent that
+      only got close by the window's end is eaten alongside the calf, and
+      the full LionHunt path runs a calf down and catches it (the parent
+      held out of shielding reach) — with the hunted calf visibly fleeing
+      the chase (slower than its hunter) instead of standing at its
+      parent, and a parent in reach holding itself between hunter and
+      calf (living shield) over visible real time until the hunter takes
+      it in the calf's place before any catch. Calf water drama (§19.8):
+      calves gambol in visible hop-bouts; a calf on open water starts a
+      struggle and its parent wades in, pulls it out and both return to
+      the bank alive; in the water inside a waterfall's reach a calf is
+      swept over and dies with its parent plunging after it, and a
+      rescuing parent wading into the falls' reach is swept over itself
+      while its calf survives.
+    - Bodies and boundaries: the §19.5 body separation holds — streamed
+      animals keep their body spacing after spawn (no two inside one
+      another) and an animal placed onto another parts from it within
+      moments, while the elephant trample remains possible; an animal on
+      an open-ocean cell is set back to the nearest land (no animal
+      strays into the impassable sea, and the scripted hunt's prey balks
+      at the waterline); some shore visitors bathe (wade in) beyond
+      merely drinking.
+    - Graveyard: the carcass/tusk/bone counts are asserted via the dev
+      hook with a screenshot.
+
+    OPEN: tree-climbing-to-flee and additional new species/birds beyond
+    the existing roster and the added calves remain to be implemented (§9
+    open items).
 13. **Real geodata.** The real-geodata terrain rendering of `design.md`
     §3.3 is implemented (DEM relief, ~1890 vector coasts/rivers/lakes
     without raster steps, biome-based PBR splatting, domain-warped
@@ -407,9 +417,9 @@ verify suite that proves it.
     water feature set: wave field, depth-dependent absorption over real
     bathymetry, shore/crest foam). Verifiable: screenshots of both
     perspectives show the active effects; the application runs without
-    console errors on both the WebGPU and WebGL 2 paths; simplifications
-    (e.g. TAA, true screen-space reflection/refraction) are named as open
-    items (see pt. 32).
+    console errors on both the WebGPU and WebGL 2 paths; the remaining
+    simplifications (SSR still in its supervised rollout, true water
+    refraction) are named as open items (see pt. 32).
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,
     inhabitants who believably use the settlement and their homes, clearly
@@ -505,31 +515,34 @@ verify suite that proves it.
     toggle); the canteen's consumption
     rates and capacity are editable (§21.2). Modal windows and full-screen
     overlays always render above the in-scene floating labels (§17.4).
-    Verifiable: `scripts/verify/settings.mjs` asserts the defaults
-    (including the single ambience volume 0.1, the 5.6 travel speed, the
-    canoe speed-up factor 3, the jungle/mountain factors and the canteen
-    capacity 500), the eye height, the 80 % strafe/backward factor (exact
-    via the pure velocity helper, plus an in-scene smoke check that both
-    directions move), the canoe and jungle factor fields edit at runtime,
-    the F3 full loadout, the F4 canoe toggle, the Tab journal toggle
-    (opens/closes without shifting focus onto a control, and does not
-    toggle while a debug field is focused; `design.md` §17.5), the working
-    debug-menu controls in both languages, that a nearby animal raises its
-    proximity call and it fades once the player leaves, and the lion-feed
-    depiction (pt. 12); `scripts/verify/enrichments.mjs` asserts the zoom
-    gate, at the zoom cap the built and visible far sheet, a fog far plane
-    beyond 2000 and haze opacity ~0 with a screenshot (87), during a
-    zoomed walk the water plane's scale uniform tracking its mesh scale
-    (no sea/land drift) and the chunk-bound dressing hidden, the
-    reversion at zoom 1 (haze, far sheet and dressing), the far sheet's
-    chunk-matched ground tone (`src/scenes/travel/farColor.test.ts`,
-    pure), the F3 zoom unlock (`src/ui/Hud.test.tsx`), the dropdowns, the
-    renderer row, and that with a
-    settlement label hit-tested on top, opening a modal makes the dialog
-    the topmost element at that point; `scripts/verify/collision.mjs`
-    additionally proves corner clearance at box buildings and an
-    inhabitant re-entering its dwelling (pt. 16); `scripts/verify/
-    voice.mjs` proves the automatic narration of a new entry (pt. 19).
+    Verifiable, by suite:
+    - `scripts/verify/settings.mjs`: the defaults (including the single
+      ambience volume 0.1, the 5.6 travel speed, the canoe speed-up
+      factor 3, the jungle/mountain factors and the canteen capacity
+      500), the eye height, the 80 % strafe/backward factor (exact via
+      the pure velocity helper, plus an in-scene smoke check that both
+      directions move), the canoe and jungle factor fields editing at
+      runtime, the F3 full loadout, the F4 canoe toggle, the Tab journal
+      toggle (opens/closes without shifting focus onto a control, and
+      does not toggle while a debug field is focused; `design.md` §17.5),
+      the working debug-menu controls in both languages, a nearby
+      animal's proximity call rising and fading once the player leaves,
+      and the lion-feed depiction (pt. 12).
+    - `scripts/verify/enrichments.mjs`: the zoom gate, at the zoom cap
+      the built and visible far sheet, a fog far plane beyond 2000 and
+      haze opacity ~0 with a screenshot (87), during a zoomed walk the
+      water plane's scale uniform tracking its mesh scale (no sea/land
+      drift) and the chunk-bound dressing hidden, the reversion at zoom 1
+      (haze, far sheet and dressing), the dropdowns, the renderer row,
+      and that with a settlement label hit-tested on top, opening a modal
+      makes the dialog the topmost element at that point. The far sheet's
+      chunk-matched ground tone is pure-tested in
+      `src/scenes/travel/farColor.test.ts`, the F3 zoom unlock in
+      `src/ui/Hud.test.tsx`.
+    - `scripts/verify/collision.mjs`: corner clearance at box buildings
+      and an inhabitant re-entering its dwelling (pt. 16).
+    - `scripts/verify/voice.mjs`: the automatic narration of a new entry
+      (pt. 19).
 21. **Water realism.** The visual water realism of `design.md` §11.3 is
     implemented (rivers in carved beds rendering as one continuous,
     unbroken ribbon descending from source to mouth, bridged stray sea
@@ -563,14 +576,14 @@ verify suite that proves it.
     condition (§19.6); health/afflictions travel with the checkpoint; all
     drains/thresholds are balance values adjustable in the debug menu,
     which also toggles afflictions for testing. Verifiable:
-    `scripts/verify/health.mjs` asserts defaults, dehydration
+    `src/state/store.health.test.ts` asserts defaults, dehydration
     onset/recovery, the canteen fill draining away from water, emptying
     into thirst then health loss, and refilling at fresh water,
-    regeneration, fever drain and medicine cure (and
-    `src/state/store.health.test.ts` the staged natural wound healing:
-    light heals fed, severe eases to light, starving blocks it), the
-    sun-blindness veil and its recovery, vultures, the H query and the
-    death/successor flow.
+    regeneration, fever drain and medicine cure, the staged natural wound
+    healing (light heals fed, severe eases to light, starving blocks it)
+    and the death/successor flow; `src/ui/Hud.test.tsx` the sun-blindness
+    veil and its recovery and the remains/defeat overlay;
+    `scripts/verify/health.mjs` the vultures circling at poor condition.
 23. **Random events.** `design.md` §14 is implemented as a hidden per-day
     roll while travelling, modulated by terrain and state: the event kinds
     of §14.1 (with the predator danger order cheetah < leopard < hyena <
@@ -586,26 +599,28 @@ verify suite that proves it.
     in both languages with voice markup (§16). Rates are balance values
     calibrated low so events are rare (§14.3); the debug menu can toggle
     the events and trigger each kind directly (§21.3). Verifiable:
-    `scripts/verify/events.mjs` asserts the reduced rates, the protection
-    ordering (pure functions), deterministic outcome mapping, the
-    plains-predator danger order (cheetah < leopard < hyena < lion) with
-    the lion's wider fatal band, the consequences of each trigger, a fatal
-    attack, autonomous firing while travelling, silence when disabled, and
-    that pinning a lion — and a hyena — on the player triggers that
-    predator's attack; `scripts/verify/enrichments.mjs` asserts each
-    first-time danger warning fires exactly once and marks its flag;
-    `src/state/store.events.test.ts` asserts the canoe-aware water warning
-    fires — once — and the advising text does not.
+    `src/systems/events.test.ts` asserts the reduced rates, the
+    protection ordering (pure functions), deterministic outcome mapping
+    and the plains-predator danger order (cheetah < leopard < hyena <
+    lion) with the lion's wider fatal band;
+    `src/state/store.events.test.ts` the consequences of each trigger, a
+    fatal attack, autonomous firing while travelling, silence when
+    disabled, and the canoe-aware water warning firing — once — without
+    the advising text; `scripts/verify/events.mjs` that pinning a lion —
+    and a hyena — on the player in the scene triggers that predator's
+    attack; `scripts/verify/enrichments.mjs` asserts each first-time
+    danger warning fires exactly once and marks its flag.
 24. **Deadline and successor.** The multi-year deadline of `design.md`
     §5/§18 is implemented (balance value, ~5 years) with staged journal
     warnings at 60 % and 85 % of the granted time — each exactly once, in
     both languages — the recall on expiry (defeat overlay, journal silent,
     no successor), and the §18 successor flow on death (pt. 22): resume at
     the last checkpoint, day penalty, silently inherited warning stage,
-    takeover entry. Verifiable: `scripts/verify/expedition.mjs` asserts
-    the staged warnings (exactly once each), the expiry defeat without
-    successor, and the death-to-successor flow including the day penalty
-    and takeover entry.
+    takeover entry. Verifiable: `src/state/store.expedition.test.ts`
+    asserts the staged warnings (exactly once each), the expiry defeat
+    without successor, and the death-to-successor flow including the day
+    penalty and takeover entry; `src/ui/Hud.test.tsx` the recalled-defeat
+    overlay without a successor button.
 25. **Trade economy.** `design.md` §8/§9/§10 is implemented:
     shovel-recovered treasure caches (one per region plus a statue site,
     placed anew each run) and the elephant graveyard's limited random
@@ -622,16 +637,18 @@ verify suite that proves it.
     reactions of the §8 matrix; and the baseline goods in every settlement
     with money in ports and gifts in villages (§9). All new texts exist in
     both languages with voice markup. Verifiable:
-    `scripts/verify/economy.mjs` asserts the capacity refusal and
-    auto-raise, the regional bid ordering and rejection, the stable
-    re-offer quote (identical price across re-offers, cleared on leaving
-    the port), the ferry to Zanzibar (fare, days, checkpoint), the bounty
-    crediting and its telegraphic-transfer report naming the discoveries,
-    the graveyard's random ivory haul (range 1..9, mean ~5) and its cap by
-    the remaining supply, digging a treasure cache and the statue site,
-    both valuable reactions, the baseline goods in every settlement,
-    buying food in a village against gifts (money untouched), the no-gifts
-    refusal, and selling gear for gifts (village) or money (port);
+    `src/state/store.economy.test.ts` (with the pure pricing/ferry/site
+    helpers in `src/systems/economy.test.ts`) asserts the capacity
+    refusal and auto-raise, the regional bid ordering and rejection, the
+    stable re-offer quote (identical price across re-offers, cleared on
+    leaving the port), the ferry to Zanzibar (fare, days, checkpoint),
+    the bounty crediting, the graveyard's random ivory haul (range 1..9,
+    mean ~5) and its cap by the remaining supply, digging a treasure
+    cache and the statue site, both valuable reactions, the baseline
+    goods in every settlement, buying food in a village against gifts
+    (money untouched), the no-gifts refusal, and selling gear for gifts
+    (village) or money (port); `src/ui/JournalPanel.test.tsx` the
+    telegraphic-transfer report naming the discoveries;
     `src/state/store.travel.test.ts` asserts the landmark-sighting entry
     with its kind for a mountain and a waterfall and that it fires only
     once.
@@ -646,13 +663,14 @@ verify suite that proves it.
     incl. the irretrievably forfeited friendship. Item effects are
     possession-based (§6.1/§7): merely carrying a rifle blocks no audience
     and scares no villager. All new texts exist in both languages with
-    voice markup. Verifiable: `scripts/verify/reputation.mjs` asserts a
-    rifle in the pack does not block the elder talk or audience, the
-    hostility/expulsion and its wear-off, the friend pledge (exactly
-    once), the capped attack outcomes with rescue entries, the near-death
-    aid, the free village supplies, the confirmation gate on the Rob
-    button and the rich money/gifts/provisions haul, and the permanent
-    robbery consequences including the forfeited friendship.
+    voice markup. Verifiable: `src/state/store.reputation.test.ts`
+    asserts a rifle in the pack does not block the elder talk or
+    audience, the hostility/expulsion and its wear-off, the friend pledge
+    (exactly once), the capped attack outcomes with rescue entries, the
+    near-death aid, the free village supplies, the rich
+    money/gifts/provisions haul, and the permanent robbery consequences
+    including the forfeited friendship; `src/ui/Dialogs.test.tsx` the
+    confirmation gate on the Rob button.
 27. **Camps (item caches).** The camps of `design.md` §6.3 are
     implemented: free camps pitched (or reopened nearby) with C in the
     open, holding any number of inventory items (taking back respects the
@@ -662,11 +680,11 @@ verify suite that proves it.
     entry on return; village caches gated by "Honored Friend", persistent,
     and irretrievably destroyed by a robbery in the region. All new texts
     exist in both languages with voice markup. Verifiable:
-    `scripts/verify/camps.mjs` asserts pitching and reopening,
+    `src/state/store.camps.test.ts` asserts pitching and reopening,
     storing/taking incl. the capacity refusal and the canoe put-away, the
-    loot-and-discover flow with its journal entry, the map X, the friend
-    gate on village caches, their persistence, and their destruction by
-    the robbery.
+    loot-and-discover flow with its journal entry, the friend gate on
+    village caches, their persistence, and their destruction by the
+    robbery (the map X rides on the covered `freeCamps` state).
 28. **Full saving and loading.** The port-snapshot saving and tabular load
     overview of `design.md` §18 are implemented — one snapshot per port
     visit (a placeholder cap keeps only the most recent ones), the
@@ -674,10 +692,10 @@ verify suite that proves it.
     health state, manual saving omitted. A legacy single-slot checkpoint
     migrates as one table row; the successor (pt. 24) resumes from the
     latest snapshot. All menu texts exist in both languages. Verifiable:
-    `scripts/verify/saveload.mjs` asserts one snapshot per port visit, the
-    table columns incl. the health state, resuming an older visit restores
-    that state, the successor uses the latest snapshot, and the legacy
-    migration.
+    `src/state/store.saveload.test.ts` asserts one snapshot per port
+    visit, resuming an older visit restores that state, the successor
+    using the latest snapshot, and the legacy migration;
+    `src/ui/Hud.test.tsx` the table columns incl. the health state.
 29. **Animated handwriting.** The animated handwriting of `design.md`
     §16.3 is implemented (stroke-by-stroke reveal behind the pen hand,
     click-to-finish, the wound level on the hand, persistent blood traces

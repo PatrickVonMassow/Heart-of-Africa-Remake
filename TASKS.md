@@ -46,14 +46,12 @@ the map).
   instead of the calf, and the calf gets up and escapes; if the parent arrives
   too late, both are eaten. In addition, parents charge the predator as soon as a
   calf is being eaten.
-  Reworked after review (the sacrifice fired but was invisible — the guarding
-  parent stood ~2 units from the calf, so the charge resolved within a couple
-  of frames and read as an ordinary kill): the hunted calf now flees the chase
-  (slower than the predator, so it is visibly run down), the parent escorts it
-  without ever abandoning it beyond a short range and stands clear at the
-  catch, making the rescue charge a visible run (~1 s). The calf-hunt chance
-  was raised (0.45 → 0.6), and a spawn bug was fixed where skipped (water)
-  placements mislinked a family across chunk groups.
+  Reworked after review (the sacrifice fired but was invisible — the guard
+  stood ~2 units from the calf, so the charge resolved within frames): the
+  hunted calf now visibly flees (slower than the predator), the parent stands
+  clear at the catch, making the rescue charge a visible ~1 s run; calf-hunt
+  chance 0.45 → 0.6; fixed a spawn bug that mislinked families across chunk
+  groups. Superseded by point 30 (living shield).
 - [x] 3. Calves hop about playfully and sometimes fall into the water. Parents
   wade in and pull them out. In the attempt a calf or a parent can be swept over
   a waterfall and die; if a calf goes over a waterfall, the parents plunge after
@@ -98,94 +96,66 @@ the map).
   massive clipping errors appear when walking close to a hut (likely the raised
   debug-zoom camera near plane carrying over into the first-person scene).
 
-- [x] 17. The movement oscillation persisted after point 1. Root cause found:
-  the summed threat field had smoothed the heading only WITHIN the dodge,
-  while the rendered facing was recomputed per behavior branch and snapped at
-  every boundary (dodge engage/disengage at the panic ring, flight end,
-  nurse↔follow, the drink turn-around) — and elephants never rendered their
-  travel heading at all. The suggested return to a discrete nearest-threat
-  choice was evaluated and rejected: it would reintroduce the ~90° flip
-  between two flankers and fix none of the boundary snaps. Fixed sustainably:
-  one persistent facing per animal, steered by every behavior at a capped
-  turn rate; exit-ring hysteresis on the dodge; a finished flight leaves the
-  animal facing where it ran; elephants face their line of travel.
+- [x] 17. The movement oscillation persisted after point 1. Root cause: the
+  summed threat field smoothed the heading only WITHIN the dodge, while the
+  rendered facing was recomputed per behavior branch and snapped at every
+  boundary — and elephants never rendered their travel heading at all. Fixed
+  with one persistent facing per animal, steered by every behavior at a
+  capped turn rate, exit-ring hysteresis on the dodge, flights ending in
+  their run direction, elephants facing their line of travel. (The suggested
+  nearest-threat pick was rejected: it would reintroduce the ~90° flip.)
 
 - [x] 18. The walkable continent ends at the Red Sea. Everything northeast of
   the African Red Sea coast (the Red Sea itself, Sinai, the Arabian peninsula)
   is open, impassable ocean — the same as the sea around the rest of the
   continent. No special treatment of the Red Sea as inland water.
-  (Boundary polyline slightly seaward of the ~1890 coast, Mediterranean →
-  Suez → Bab-el-Mandeb → Gulf of Aden past the Horn, in src/world/redSea.ts;
-  isBlocked() always blocks northeast of it, and loadGeodata() stamps those
-  DEM texels to ocean so Sinai/the Levant/Arabia no longer render as land —
-  the water bathymetry texture now reads the stamped pixels instead of
-  dem.png. Two baseline probes contradicted the task's assumptions and were
-  kept as-is per "unchanged as before": the Mozambique channel was already
-  BLOCKED (outside the mainland hull), and the Mediterranean off the Gulf of
-  Sidra at 15°E/34°N was already SWIMMABLE (a bay inside the hull) — the
-  tests pin the true unchanged behavior.)
+  (Boundary polyline slightly seaward of the ~1890 coast — Mediterranean →
+  Suez → Bab-el-Mandeb → Gulf of Aden — in src/world/redSea.ts; isBlocked()
+  blocks northeast of it and loadGeodata() stamps those DEM texels to ocean,
+  which the bathymetry texture also reads. Two baseline probes contradicted
+  the task and are pinned as-is: the Mozambique channel was already blocked,
+  the Sidra bight already swimmable.)
 
 - [x] 19. At the continent's edges one can swim a long way out into the open
   ocean — that must not be possible. Land masses outside the walkable
   continent are still visible on the map material and must be removed. And a
   scrap of the Red Sea still juts into the land.
-  (Swimmable sea is now capped at a calibratable coastal band —
+  (Swimmable sea capped at a calibratable coastal band —
   balance.oceanSwimMarginDeg 1.2°, debug-editable — on top of the unchanged
-  hull rules. The per-texel northeast stamp became a keep-flood trim in
+  hull rules. The northeast stamp became a keep-flood trim in
   trimToGameWorld(): only land connected to the game's land-mass seeds
-  survives, so southern Europe, Anatolia, the Canaries, Comoros, São Tomé
-  and all Red Sea islands are trimmed to ocean along with Sinai/Levant/
-  Arabia. The Red Sea scrap came from boundary vertices biting into the
-  real coast (Gulf of Suez, Sudan, Eritrea); the flood keeps
-  African-connected land regardless, the Gulf-of-Suez segment now hugs the
-  African west shore, and a raw-DEM scan test asserts trimmed land borders
-  kept land only at the Suez isthmus gate.)
+  survives. The Red Sea scrap came from boundary vertices biting into the
+  real coast; the flood keeps African-connected land, and a raw-DEM scan
+  asserts trimmed borders keep land only at the Suez isthmus gate.)
 - [x] 20. In the debug zoom-out, walking produces oddities: the ocean moves
   offset against the land mass, and the landscape is only rendered in a
   rectangular area that covers a fraction of the visible range.
-  (Two causes: the water plane is scaled up in the zoom range but its shader
-  reconstructed world XZ from the unscaled local position, so bathymetry and
-  pattern drifted against the land while walking — a planeScale uniform now
-  tracks the mesh scale. And the "rectangle" was the detailed chunk area
-  standing out against the far-terrain sheet: the sheet now bakes the chunks'
-  mean ground-texture response into its vertex colors (farColor.ts, pure
-  Vitest-tested), and the chunk-bound dressing (trees, rocks) hides beyond
-  zoom 3 — it only ever covers the chunk rectangle and read as a dark dressed
-  island. Verified per screenshot repro at zoom 5/10 and new enrichments
-  checks; the full regression needed one flake rerun each for the known
-  RAF-timing checks — calf sacrifice, walk smoke — both green standalone.)
+  (Two causes: the scaled water plane's shader reconstructed world XZ from
+  the unscaled local position — a planeScale uniform now tracks the mesh
+  scale; and the "rectangle" was the detailed chunk area against the
+  far-terrain sheet — the sheet now bakes the chunks' mean ground-texture
+  response (farColor.ts, pure-tested) and the chunk-bound dressing hides
+  beyond zoom 3.)
 - [x] 21. After the recent wave of design.md changes (restructure into numbered
   subsections, §7.1 slimming, the Red Sea/world-trim work), review README.md
   and bring it in step where it has drifted.
-  (No §-references needed fixing — the README cites none. Drift closed:
-  gameplay list caught up with the built systems (ambient wildlife, bazaar
-  arbitrage/ferries/bounties, reputation incl. robbery, camps, animated
-  handwriting, port-snapshot saving/successor, gamepad), kokoro-js added to
-  the stack list, `npm run test:unit` added to the scripts, the scripts/ tree
-  line now names the verify suites, the geodata section documents the
-  load-time world trim, and the status section links the hybrid test
-  strategy. The criteria count stays 32 (docs.mjs green). Full regression:
-  one known start-timing flake (flow journal auto-open), green standalone.)
+  (The README cites no §s, so none needed fixing. Drift closed across the
+  gameplay list, stack list, scripts, geodata trim note and test-strategy
+  link; the criteria count stays 32, docs.mjs green.)
 - [x] 22. Fully zoomed out in the debug mode, the ocean still renders
   incorrectly — especially in the northeast.
-  (Three layers fixed: the water shader clamp-repeated the bathymetry
-  texture's edge texels into endless streaks beyond the DEM bbox — it now
-  blends to plain deep ocean out there; the trim stamp depth rose from
-  -1000 m to -3000 m so trimmed land reads as the same deep ocean as the
-  bbox mask; and ghost shallows are removed — the shelf ring around every
-  trimmed island (Crete, Cyprus, the Canaries) is deepened via a box
-  dilation of the stamp mask, and all shallow sea northeast of the boundary
-  (Persian Gulf, Dahlak banks, Caspian corner) reads as deep open ocean.
-  The African coast keeps its real shelf bathymetry.)
+  (Three layers fixed: the shader clamp-repeated the bathymetry edge texels
+  into streaks — beyond the DEM bbox it now blends to plain deep ocean; the
+  trim stamp deepened -1000 → -3000 m; and ghost shallows (trimmed-island
+  shelf rings, shallow sea northeast of the boundary) are deepened via a
+  dilated stamp mask. The African coast keeps its real shelf bathymetry.)
 - [x] 23. In the west-southwest a large, unreachable land mass is still shown;
   it must be removed from the map as well.
-  (Not reproducible as literal land: cap-zoom sweeps from central, Cairo,
-  south-west and Cape positions show no land outside the game's land masses
-  — landFraction samples confirm it. The likeliest culprit is the point-22
-  family of artifacts (clamped edge bands and bright ghost shallows read as
-  sand-colored land masses and lay in arbitrary screen directions depending
-  on the player position); all of those are gone now. If a land mass still
-  shows after this build, a position/screenshot would pin it down.)
+  (Not reproducible as literal land: cap-zoom sweeps from four positions
+  show no land outside the game's land masses. Likeliest culprit was the
+  point-22 artifact family — clamped edge bands and bright ghost shallows
+  reading as sand-colored land — all gone now. Resolved as Madagascar in
+  point 25.)
 - [x] 24. F3 (full loadout) should also unlock the extended zoom mode.
   (The F3 handler now enables the wheel-zoom unlock alongside the loadout;
   asserted in src/ui/Hud.test.tsx via a window keydown.)
@@ -193,15 +163,11 @@ the map).
   screenshot): it is Madagascar. It cannot be reached in the game and must
   therefore be removed from the map material — the rendered world and the
   exploration map alike.
-  (Removed as a game land mass: its trim seed and coastline polygon are
-  gone, so the world trim stamps it to deep ocean and the exploration map
-  no longer sketches it. Its wide western shelf banks and steep old coast
-  slope left ghost outlines in the water, so shallow sea in the trimmed
-  Madagascar box — and in the trimmed northeast — is deepened up to 800 m,
-  and the water's deep tone now saturates by ~1600 m so trimmed stamps
-  match the surrounding basins. design.md §3.1 records Madagascar as not
-  part of the game world; CLAUDE.md pt. 4, README and the redSea tests
-  follow.)
+  (Trim seed and coastline polygon removed, so the world trim stamps it to
+  deep ocean and the exploration map no longer sketches it; its shelf banks
+  left ghost outlines, so trimmed-box shallows deepen up to 800 m and the
+  deep tone saturates by ~1600 m. design.md §3.1, CLAUDE.md pt. 4, README
+  and the redSea tests follow.)
 
 - [x] 26. One purchased food unit should last four weeks instead of one.
   (New balance value foodUnitDays 28, used by both buy paths — port money
@@ -234,11 +200,20 @@ the map).
   neck, shorter rounder body, leggy stance, no horns/tusks/beard/mane, the
   elephant calf with stubby trunk and smaller ears — rendered through own
   instanced calf meshes; fauna.test.ts asserts the proportions, enrichments
-  the live calf-mesh instancing. Points 30-31 land as one commit since they
-  share Wildlife.tsx/design.md/CLAUDE.md/enrichments hunks; it also hardens
-  the kill-flock remnant check, which under suite order/load inherited a
-  mid-fly-off flock from the zoom tests and timed out — the test now resets
-  the kill flight to idle up front, like it already reset the scavenger.)
+  the live calf-mesh instancing. Lands as one commit with point 30 (shared
+  hunks); also hardens the kill-flock remnant check against inherited
+  suite state by resetting the kill flight to idle up front.)
+- [x] 32. design.md reads as iteratively grown — mechanics described in too
+  many words (e.g. the parents' sacrifice, §19.8). Condense it against the
+  code, and rework the other MD files in the project.
+  (design.md tightened section by section with the § numbering and every
+  binding mechanic/value unchanged; CLAUDE.md §7.1 kept all Verifiable
+  conditions but moved the stale mappings of the seven deleted Playwright
+  suites (economy, hints, expedition, reputation, camps, saveload,
+  checkpoint) to their Vitest homes and split the pt. 12/20 walls into
+  topic bullets; README/scripts READMEs caught up (TRAA on by default,
+  current suite list); the long TASKS notes compacted to root cause +
+  outcome.)
 
 ## Closing (only after all points)
 

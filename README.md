@@ -68,8 +68,9 @@ end, not the complete game. `design.md` is the authoritative design document;
 
 Rendering features include real-DEM terrain with biome-based PBR texture
 splatting, hand-authored ~1890 hydrology vectors, a physically grounded
-scattering sky with IBL, cascaded shadows, SSAO, bloom, filmic tone mapping,
-and water with a wave field, depth-dependent absorption and shore foam.
+scattering sky with IBL, cascaded shadows, SSAO, TRAA, bloom, filmic tone
+mapping, and water with a wave field, depth-dependent absorption and shore
+foam.
 
 ## Getting started
 
@@ -135,9 +136,10 @@ src/
 ## Status
 
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
-evidence lives in `verification/`. Known simplifications (e.g. no TAA, no true
-screen-space reflections, English-only journal read-aloud) are recorded as open
-items in the code (`// OPEN:`). The full headless regression runs with
+evidence lives in `verification/`. Known simplifications (e.g. screen-space
+reflections still in their supervised WebGPU rollout, no true water
+refraction, English-only journal read-aloud) are recorded as open items in
+the code (`// OPEN:`). The full headless regression runs with
 `npm test` — a fast Vitest (jsdom) layer plus 13 Playwright browser suites;
 the test strategy and coverage map live in
 [`scripts/verify/README.md`](scripts/verify/README.md).

@@ -55,19 +55,22 @@ The whole regression runs with one command:
 
 ```
 npm test              # scripts/verify/run-all.mjs: type-check + build, oxlint,
-                      # then every suite against a managed dev server (:5173),
-                      # then the production-preview smoke test (:4173)
+                      # the fast Vitest layer (jsdom), then the browser suites
+                      # against a managed dev server (:5173), then the
+                      # production-preview smoke test (:4173)
 npm test -- flow      # a single suite (dev server managed for you)
 npm test -- build lint  # just the build + lint preflight
 ```
 
-`npm test` exits non-zero if any suite fails or logs a browser console error.
-The suites are, by topic: `docs` (README/CLAUDE.md consistency), `world`,
-`i18n`, `hints`, `flow`, `health`, `events`, `expedition`, `economy`,
-`reputation`, `camps`, `saveload`, `checkpoint`, `collision`, `handwriting`,
+`npm test` exits non-zero if any stage fails or a suite logs a browser console
+error. The Playwright suites are: `docs` (README/CLAUDE.md consistency),
+`world`, `i18n`, `flow`, `health`, `events`, `collision`, `handwriting`,
 `polish`, `gamepad`, `voice`, `settings`, `enrichments`, and `preview` (the
-production build). Each maps to the CLAUDE.md §7.1 criteria named in its header
-comment.
+production build). Each maps to the CLAUDE.md §7.1 criteria named in its
+header comment. The bulk of the regression (pure logic, store transitions,
+HTML-HUD components) runs in the Vitest layer (`npm run test:unit`); the
+layer split and the old→new coverage map live in
+[`scripts/verify/README.md`](verify/README.md).
 
 A single suite can also be run directly against a running `npm run dev`:
 `node scripts/verify/<name>.mjs` (except `docs`, which needs no server, and
