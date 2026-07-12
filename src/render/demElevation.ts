@@ -82,14 +82,19 @@ function getDemDataTexture(): THREE.DataTexture {
   const texelCount = dem.width * dem.height
   const waterMask = new Uint8Array(texelCount)
   bakeWaterMask(waterMask, dem.width, dem.height)
-  const data = new Uint16Array(texelCount * 2)
+  // RGBA half float: R = elevation (m), G = inland-water mask (rivers/
+  // lakes), B = dataset land flag (the DEM's own land/sea classification —
+  // the exact semantics for "does the open-sea plane belong here").
+  const data = new Uint16Array(texelCount * 4)
   const one = THREE.DataUtils.toHalfFloat(1)
   for (let i = 0; i < texelCount; i++) {
     const metersUp = dem.data[i * 4] * 256 + dem.data[i * 4 + 1] - meta.offsetMeters
-    data[i * 2] = THREE.DataUtils.toHalfFloat(metersUp)
-    data[i * 2 + 1] = waterMask[i] ? one : 0
+    data[i * 4] = THREE.DataUtils.toHalfFloat(metersUp)
+    data[i * 4 + 1] = waterMask[i] ? one : 0
+    data[i * 4 + 2] = dem.data[i * 4 + 2] > 0 ? one : 0
+    data[i * 4 + 3] = one
   }
-  const tex = new THREE.DataTexture(data, dem.width, dem.height, THREE.RGFormat, THREE.HalfFloatType)
+  const tex = new THREE.DataTexture(data, dem.width, dem.height, THREE.RGBAFormat, THREE.HalfFloatType)
   tex.needsUpdate = true
   tex.flipY = false
   tex.colorSpace = THREE.NoColorSpace
@@ -121,4 +126,12 @@ export function demInlandWater(
   lat: THREE.Node<'float'>,
 ): ReturnType<typeof float> {
   return texture(getDemDataTexture(), demUvAt(lon, lat)).g as unknown as ReturnType<typeof float>
+}
+
+/** TSL node: the dataset's own land flag in [0,1] at (lon, lat). */
+export function demDatasetLand(
+  lon: THREE.Node<'float'>,
+  lat: THREE.Node<'float'>,
+): ReturnType<typeof float> {
+  return texture(getDemDataTexture(), demUvAt(lon, lat)).b as unknown as ReturnType<typeof float>
 }

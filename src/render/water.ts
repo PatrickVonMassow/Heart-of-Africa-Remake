@@ -30,7 +30,7 @@ import {
   vec3,
 } from 'three/tsl'
 import { getDemMeta } from '../world/geodata'
-import { demElevation } from './demElevation'
+import { demDatasetLand, demElevation } from './demElevation'
 
 export interface WaterMaterialHandle {
   material: THREE.MeshStandardNodeMaterial
@@ -53,6 +53,11 @@ const UNITS_PER_DEGREE = 10
 export function createWaterMaterial(): WaterMaterialHandle {
   const m = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
+  // Never write depth: the plane spans the whole world at sea level, and its
+  // depth would cull the river/lake surfaces lying in beds carved below
+  // sea level (the lower Nile) — even where the land mask makes the plane
+  // fully transparent, since alpha-0 pixels still write depth.
+  m.depthWrite = false
   m.roughness = 0.08
   m.metalness = 0.02
 
@@ -156,12 +161,21 @@ export function createWaterMaterial(): WaterMaterialHandle {
   // Shallow water is clearer, deep water opaque; foam always opaque. Far
   // from the camera the surface turns fully opaque, so the end of the
   // terrain chunks underneath is never visible.
+  // The plane is the OPEN-SEA surface only: over dataset land it fades out
+  // entirely — keyed on the dataset's own land flag, not on elevation (the
+  // delta floodplain sits at ~0–2 m, where any height threshold leaks).
+  // River valleys carved below sea level (the lower Nile) would otherwise
+  // show the sheet as pale patches floating on the rivers' own dark
+  // surfaces — shifting with the chunk LOD as the traveller moves, since
+  // the carve depth depends on it.
+  const overSea = demDatasetLand(lon, lat).oneMinus()
   m.opacityNode = smoothstep(float(0), float(60), depthM)
     .mul(0.35)
     .add(0.58)
     .add(foam.mul(0.3))
     .max(smoothstep(float(110), float(150), camDist))
     .min(1)
+    .mul(overSea)
   // Foam is rough, open water glossy (sky reflections from the IBL).
   m.roughnessNode = foam.mul(0.7).add(0.08)
 
