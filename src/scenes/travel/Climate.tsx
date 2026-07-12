@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { float, max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
-import { demElevation } from '../../render/demElevation'
+import { demElevation, demInlandWater } from '../../render/demElevation'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import type { RegionId } from '../../world/geo'
@@ -72,12 +72,17 @@ export function Climate() {
     // silhouette of the layer quad ever shows.
     const edge = max(uv().x.sub(0.5).abs(), uv().y.sub(0.5).abs())
     const edgeFade = smoothstep(0.48, 0.2, edge)
-    // Ground dust belongs over the ground: over open water the pale veils
-    // read as gray cloud blobs on the dark sea, so the haze fades out across
-    // the shoreline (elevation from the shared decoded DEM texture).
+    // Ground dust belongs over dry ground: over open water the pale veils
+    // read as gray cloud blobs on the dark sea (and as milky drifting
+    // patches on the Nile), so the haze fades out across the shoreline and
+    // over rivers/lakes. Elevation alone cannot exclude rivers — their
+    // carved valleys lie above sea level — hence the baked inland-water
+    // channel of the shared DEM texture.
     const lon = positionWorld.x.div(10)
     const lat = positionWorld.z.negate().div(10)
-    const overLand = smoothstep(float(-6), float(6), demElevation(lon, lat))
+    const overLand = smoothstep(float(-6), float(6), demElevation(lon, lat)).mul(
+      demInlandWater(lon, lat).oneMinus(),
+    )
     m.colorNode = colorU
     m.opacityNode = n.mul(n).mul(opacityU).mul(edgeFade).mul(overLand)
     return { material: m, opacityU, colorU }
