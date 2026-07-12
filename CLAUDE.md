@@ -510,8 +510,9 @@ verify suite that proves it.
     terrain relief items are tunable as factors (§11/§21.2). All of these
     are adjustable at runtime in the debug menu (§21) in both languages.
     The zoom behavior of §21.4 holds: the bird's-eye mouse-wheel zoom is
-    always active (0.25x-16x) with a debug checkbox gating zoom-out beyond
-    factor 1 (disabling clamps a wider view back), the unlocked range
+    always active (0.25x-16x) starting at the closer default 0.5, with a
+    debug checkbox gating zoom-out beyond that default (disabling clamps a
+    wider view back to it), the unlocked range
     reaches a whole-continent view (coarse far-terrain sheet, glassy sea,
     fog receding to the horizon and ground haze fading, both returning as
     the zoom drops back), and the camera near plane snaps back to the
@@ -649,7 +650,9 @@ verify suite that proves it.
     discovery bounties credited on the next port visit as a telegraphic
     transfer whose journal entry names the discoveries and the amount, and
     kind-flavored first-sighting entries for landmarks (§10, once per
-    landmark, both languages, voice markup); the valuable-presentation
+    landmark, both languages, voice markup) — including the four built
+    cultural landmarks of §4.4 (Meroë, Great Zimbabwe, Lalibela, Kilwa),
+    framed as African achievements; the valuable-presentation
     reactions of the §8 matrix; and the baseline goods in every settlement
     with money in ports and gifts in villages (§9). All new texts exist in
     both languages with voice markup. Verifiable:
@@ -666,8 +669,13 @@ verify suite that proves it.
     (village) or money (port); `src/ui/JournalPanel.test.tsx` the
     telegraphic-transfer report naming the discoveries;
     `src/state/store.travel.test.ts` asserts the landmark-sighting entry
-    with its kind for a mountain and a waterfall and that it fires only
-    once.
+    with its kind for a mountain, a waterfall and the Meroë pyramids
+    (kind `pyramids`) and that it fires only once;
+    `src/i18n/i18n.test.ts` that each cultural landmark has a localized
+    name and a dedicated discovery flavor in both languages;
+    `scripts/verify/enrichments.mjs` that all four mount in the scene
+    (`__culturalLandmarks`), render a non-black frame at their coordinates
+    and reveal their label on sighting (screenshot 91).
 26. **Standing with the natives.** The reputation system of `design.md`
     §12 is implemented: hostility and expulsion on a rejected gift with
     the hostility period and its wear-off, the "Honored Friend" status

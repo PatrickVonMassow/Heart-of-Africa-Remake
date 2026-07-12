@@ -10,6 +10,7 @@ import { de } from './de'
 import { en } from './en'
 import { resolveText, getStrings, useLocale, DICTIONARIES, LANGUAGES } from './index'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
+import { CULTURAL_LANDMARKS } from '../world/data/landmarks'
 
 const TAGS = ['awe', 'whisper', 'excited', 'somber', 'weary', 'fear', 'emph', 'mute', 'pause', 'breath']
 const SPAN_TAGS = TAGS.filter((t) => t !== 'pause' && t !== 'breath')
@@ -135,4 +136,21 @@ describe('format functions (design.md §17)', () => {
     expect(en.status.provisionsWeeks('5')).toContain('5')
     expect(de.status.provisionsWeeks('5')).toContain('5')
   })
+})
+
+describe('cultural landmarks i18n coverage (design.md §4.4)', () => {
+  for (const lang of [en, de]) {
+    describe(lang.lang, () => {
+      it.each(CULTURAL_LANDMARKS)('$id has a localized name and a dedicated discovery flavor', (c) => {
+        const name = lang.landmarks[c.id]
+        expect(typeof name).toBe('string')
+        expect(name.length).toBeGreaterThan(0)
+        // A dedicated flavor case exists for this kind (not the mountain fallback).
+        const flavored = lang.journal.landmarkDiscovered({ landmark: c.id, kind: c.kind })
+        const fallback = lang.journal.landmarkDiscovered({ landmark: c.id, kind: 'mountain' })
+        expect(flavored).not.toBe(fallback)
+        expect(flavored).toContain(name)
+      })
+    })
+  }
 })

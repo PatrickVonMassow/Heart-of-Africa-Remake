@@ -7,7 +7,7 @@ import type { LatLon, Material, RegionId } from '../world/geo'
 import { PLACES, REGION_VALUES, regionAt, type PlaceDef } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
-import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../world/data/landmarks'
+import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../world/data/landmarks'
 import { LAKES } from '../world/data/lakes'
 
 /** Treasure finds/valuables (design.md §8): the matrix materials plus the statue. */
@@ -112,7 +112,7 @@ export interface LandmarkPoint extends LatLon {
   id: string
   /** What kind of landmark this is — the discovery journal entry (design.md
    *  §16) flavors its text by it. */
-  kind: 'mountain' | 'falls' | 'lake' | 'grave'
+  kind: 'mountain' | 'falls' | 'lake' | 'grave' | 'pyramids' | 'stone-city' | 'rock-churches' | 'coastal-ruins'
 }
 
 /** All bounty-relevant landmark positions (design.md §10 discovery bounty). */
@@ -121,6 +121,7 @@ export const LANDMARK_POINTS: LandmarkPoint[] = [
   ...WATERFALLS.map((w) => ({ id: w.id, lat: w.lat, lon: w.lon, kind: 'falls' as const })),
   ...LAKES.map((l) => ({ id: l.id, lat: l.center[1], lon: l.center[0], kind: 'lake' as const })),
   { id: ELEPHANT_GRAVEYARD.id, lat: ELEPHANT_GRAVEYARD.lat, lon: ELEPHANT_GRAVEYARD.lon, kind: 'grave' as const },
+  ...CULTURAL_LANDMARKS.map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, kind: c.kind })),
 ]
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

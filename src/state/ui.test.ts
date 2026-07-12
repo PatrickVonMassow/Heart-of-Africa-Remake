@@ -2,7 +2,7 @@
 // zoom clamp/unlock, dialog handling with the bazaar-bid discard, and the
 // toggles. No browser needed.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useUi } from './ui'
+import { useUi, DEFAULT_TRAVEL_ZOOM } from './ui'
 
 const u = () => useUi.getState()
 
@@ -10,16 +10,16 @@ beforeEach(() => {
   useUi.setState({
     dialog: null, prompt: null, debugOpen: false, mapOpen: false,
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
-    wheelZoomEnabled: false, journalDnd: false, travelZoom: 1, bazaarBid: null,
+    wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
   })
 })
 
 describe('travel zoom (design.md §21)', () => {
   it('zooms in freely but clamps zoom-out to the default without the unlock', () => {
-    u().setTravelZoom(0.5)
-    expect(u().travelZoom).toBe(0.5) // zoom-in always allowed
+    u().setTravelZoom(0.3)
+    expect(u().travelZoom).toBe(0.3) // zoom-in always allowed
     u().setTravelZoom(3)
-    expect(u().travelZoom).toBe(1) // zoom-out beyond default blocked
+    expect(u().travelZoom).toBe(DEFAULT_TRAVEL_ZOOM) // zoom-out beyond default blocked
     u().setTravelZoom(0.1)
     expect(u().travelZoom).toBe(0.25) // hard minimum
   })
@@ -36,12 +36,12 @@ describe('travel zoom (design.md §21)', () => {
     u().setWheelZoomEnabled(true)
     u().setTravelZoom(3)
     u().setWheelZoomEnabled(false)
-    expect(u().travelZoom).toBe(1)
+    expect(u().travelZoom).toBe(DEFAULT_TRAVEL_ZOOM)
 
     u().setWheelZoomEnabled(true)
-    u().setTravelZoom(0.5)
+    u().setTravelZoom(0.3)
     u().setWheelZoomEnabled(false)
-    expect(u().travelZoom).toBe(0.5)
+    expect(u().travelZoom).toBe(0.3)
   })
 })
 

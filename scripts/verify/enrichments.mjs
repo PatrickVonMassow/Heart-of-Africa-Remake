@@ -176,6 +176,44 @@ const kiliRevealed = await page.evaluate(() =>
 )
 check('a sighted landmark reveals its real name', kiliRevealed, '')
 
+// --- Cultural landmarks (§7.1.3, design.md §4.4) -----------------------------
+// The four built cultural landmarks (Meroë, Great Zimbabwe, Lalibela, Kilwa)
+// mount into the travel scene (dev hook) and their labels reveal on sighting.
+const cultural = await page.evaluate(() => window.__culturalLandmarks)
+check(
+  'four cultural landmarks are placed in the travel world',
+  cultural?.count === 4 &&
+    ['meroe', 'great-zimbabwe', 'lalibela', 'kilwa'].every((id) => cultural.ids.includes(id)),
+  JSON.stringify(cultural),
+)
+// Position the camera over each site and confirm a non-black frame renders.
+for (const c of [
+  { id: 'meroe', lat: 16.94, lon: 33.75 },
+  { id: 'great-zimbabwe', lat: -20.27, lon: 30.93 },
+  { id: 'lalibela', lat: 12.03, lon: 39.04 },
+  { id: 'kilwa', lat: -8.96, lon: 39.51 },
+]) {
+  await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), c)
+  await page.waitForTimeout(500)
+  // A rendered scene (terrain + geometry) compresses to a sizeable PNG; an empty
+  // black frame would be tiny. Combined with the console-error gate this confirms
+  // the camera-over-the-site frame renders.
+  const buf = await page.screenshot({ clip: { x: 480, y: 300, width: 320, height: 320 } })
+  check(`cultural landmark ${c.id} renders a non-black frame`, buf.length > 3000, `png bytes ${buf.length}`)
+}
+// Reveal a site's label and screenshot it as evidence.
+await page.evaluate(() => window.__game.getState().debugJumpTo(16.94, 33.75)) // Meroë
+await page.evaluate(() =>
+  window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'meroe'] }),
+)
+await page.waitForTimeout(500)
+const meroeRevealed = await page.evaluate(() =>
+  [...document.querySelectorAll('.map-label')].some((l) => /Mero/.test(l.textContent)),
+)
+check('the Meroë pyramids reveal their name once sighted', meroeRevealed, '')
+await page.screenshot({ path: `${OUT}91-cultural-landmark-meroe.png` })
+console.log('shot 91-cultural-landmark-meroe.png')
+
 // --- Rivers: cascades, springs, lake surfaces (§7.1.21) ----------------------
 const rivers = await page.evaluate(() => window.__rivers)
 check('Rivers: 5 waterfall cascades', rivers?.falls === 5, `${rivers?.falls}`)
@@ -1633,6 +1671,9 @@ const vulFlight = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w.herdsRef.current
   const p = () => window.__game.getState().pos
+  // These view-ring distance checks are calibrated at zoom 1; the default zoom
+  // is closer (0.5), so unlock and set zoom 1 to reach the calibrated ring.
+  window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(1)
   for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
   herds.elephant.length = 0
@@ -1723,6 +1764,9 @@ const killFlock = await page.evaluate(async () => {
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   const f = window.__vultures.killFlight.current
+  // Calibrated at zoom 1 (default is the closer 0.5).
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(1)
   // Purge carcasses from earlier checks: a leftover hunt remnant would now
   // legitimately hold the flock on site (it consumes the scrap) and mask
   // the fly-off this check asserts.
@@ -1771,6 +1815,8 @@ const leaveOffstage = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
+  // Calibrated at zoom 1 (default is the closer 0.5).
+  window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(1)
   L.victim = null
   L.victimHunt = false
@@ -1802,6 +1848,9 @@ const chaseAbort = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
+  // Calibrated at zoom 1 (default is the closer 0.5).
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(1)
   L.victim = null
   L.victimHunt = false
   L.mode = 'chase'
@@ -1826,6 +1875,11 @@ const chaseAbort = await page.evaluate(async () => {
 })
 check('a strayed chase aborts only beyond the view ring (not in sight)',
   chaseAbort.abortDist !== null && chaseAbort.abortDist > 100, JSON.stringify(chaseAbort))
+// Restore the default (closer) zoom and re-lock for the checks that follow.
+await page.evaluate(() => {
+  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
+})
 
 // Zoom-aware ring: at a narrower zoom the stage edge sits closer in.
 const leaveZoom = await page.evaluate(async () => {

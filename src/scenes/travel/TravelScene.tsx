@@ -28,7 +28,7 @@ import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world
 import { sampleTerrain, RIVER_WIDTH_DEG, type TerrainType } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
-import { ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
+import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
 import { RiversAndLakes, SURFACE_LIFT } from './Rivers'
 import { farTerrainColor } from './farColor'
@@ -49,6 +49,7 @@ import {
   buildTermiteMound,
 } from '../../render/flora'
 import { buildElephant } from '../../render/fauna'
+import { buildMeroePyramids, buildStoneCity, buildRockChurches, buildCoastalRuins } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
 import { Climate } from './Climate'
 import { RegionBorders } from './RegionBorders'
@@ -834,7 +835,15 @@ function LandmarkLabels() {
       y: Math.max(0.5, sampleTerrain(g.lat, g.lon, seed).height) + 0.8,
       water: false,
     }
-    return [...lakes, ...mountains, ...falls, graveyard]
+    const cultural = CULTURAL_LANDMARKS.map((c) => ({
+      key: c.id,
+      name: t.landmarks[c.id],
+      lat: c.lat,
+      lon: c.lon,
+      y: Math.max(0.5, sampleTerrain(c.lat, c.lon, seed).height) + 1.0,
+      water: false,
+    }))
+    return [...lakes, ...mountains, ...falls, graveyard, ...cultural]
   }, [seed, t])
   return (
     <>
@@ -999,6 +1008,70 @@ function ElephantGraveyard() {
         <mesh key={`b${i}`} geometry={ribGeo} material={boneMat} position={[b.x, 0.08 * b.s, b.z]} rotation={[0, b.rot, 0]} scale={b.s} castShadow />
       ))}
     </group>
+  )
+}
+
+/**
+ * Built cultural landmarks (design.md §4.4): the pyramids of Meroë, Great
+ * Zimbabwe, the rock-hewn churches of Lalibela and the coastal ruins of Kilwa,
+ * each placed at its real ~1890 position with a per-run yaw jitter. Achievements
+ * of African civilisations — the discovery journal (§16) carries that framing.
+ */
+function CulturalLandmarks() {
+  const seed = useGame((s) => s.seed)
+  const geos = useMemo(
+    () => ({
+      pyramids: buildMeroePyramids(),
+      'stone-city': buildStoneCity(),
+      'rock-churches': buildRockChurches(),
+      'coastal-ruins': buildCoastalRuins(),
+    }),
+    [],
+  )
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), [])
+  const items = useMemo(
+    () =>
+      CULTURAL_LANDMARKS.map((c, i) => {
+        const w = latLonToWorld(c.lat, c.lon)
+        const y = Math.max(0.2, sampleTerrain(c.lat, c.lon, seed).height)
+        // Seeded per-run, per-site yaw so orientation varies between playthroughs.
+        const yaw = mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
+        return { id: c.id, kind: c.kind, x: w.x, z: w.z, y, yaw }
+      }),
+    [seed],
+  )
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__culturalLandmarks = { count: items.length, ids: items.map((it) => it.id) }
+    return () => {
+      delete w.__culturalLandmarks
+    }
+  }, [items])
+
+  useEffect(
+    () => () => {
+      Object.values(geos).forEach((g) => g.dispose())
+      material.dispose()
+    },
+    [geos, material],
+  )
+
+  return (
+    <>
+      {items.map((it) => (
+        <mesh
+          key={it.id}
+          geometry={geos[it.kind]}
+          material={material}
+          position={[it.x, it.y, it.z]}
+          rotation={[0, it.yaw, 0]}
+          castShadow
+          receiveShadow
+        />
+      ))}
+    </>
   )
 }
 
@@ -1429,6 +1502,7 @@ export function TravelScene() {
       ))}
       <LandmarkLabels />
       <ElephantGraveyard />
+      <CulturalLandmarks />
       <CampMarkers />
       <GraveMarker />
       <Player />

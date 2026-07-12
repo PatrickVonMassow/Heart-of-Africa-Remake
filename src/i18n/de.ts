@@ -82,6 +82,10 @@ const LANDMARKS: Record<string, string> = {
   'victoria-falls': 'Victoria-Fälle',
   'augrabies-falls': 'Augrabies-Fälle',
   'elephant-graveyard': 'Elefantenfriedhof',
+  meroe: 'Pyramiden von Meroë',
+  'great-zimbabwe': 'Groß-Simbabwe',
+  lalibela: 'Lalibela',
+  kilwa: 'Kilwa',
 }
 
 const RIVERS: Record<string, string> = {
@@ -590,6 +594,10 @@ export const de: Strings = {
         falls: `[awe]Ein fernes Donnern rollte über das Land, lange bevor ich es sah:[pause] ${name}![/awe] [excited]Der Fluss stürzt sich in weißen Wänden in die Tiefe —[pause] ein Anblick, den ich nie vergessen werde.[/excited]`,
         lake: `[awe]Ein großes Wasser öffnete sich vor mir —[pause] ${name}, bis zum Horizont gedehnt wie ein Meer.[/awe] [somber]Ich habe sein Ufer auf meiner Karte vermerkt.[/somber]`,
         grave: `[whisper]Ich gehe zwischen gebleichten Knochen und mächtigen Stoßzähnen —[pause] der Friedhof der Elefanten.[/whisper] [awe]Die alten Geschichten haben also die Wahrheit gesagt.[/awe]`,
+        pyramids: `[awe]Steile Pyramiden drängen sich am Ostufer des Nils —[pause] ${name}, die Königsstadt von Kusch.[/awe] [excited]Ein Reich, das diese Gräber errichtete und in eigener Schrift schrieb —[pause] ein afrikanisches Reich aus eigenem Recht, kein Schatten Ägyptens.[/excited]`,
+        'stone-city': `[awe]Fugenlose Mauern aus behauenem Granit schwingen über den Hügel, überragt von einem großen Kegelturm —[pause] ${name}.[/awe] [somber]Afrikanische Hände errichteten diese Hauptstadt, was die Siedler daheim auch behaupten mögen.[/somber]`,
+        'rock-churches': `[awe]In den lebenden Fels hinabgehauene Kirchen, Kreuz um Kreuz in den Stein gesenkt —[pause] ${name}.[/awe] [excited]Das Werk eines christlichen äthiopischen Königreichs,[pause] und noch heute knien Gläubige darin.[/excited]`,
+        'coastal-ruins': `[somber]Mauern aus Korallenstein und geborstene Bögen stehen über der Flutlinie —[pause] ${name}.[/somber] [awe]Eine Suaheli-Stadt, die eigene Münzen prägte und über den ganzen Indischen Ozean handelte, lange vor jedem europäischen Segel.[/awe]`,
       }
       return flavors[p.kind as string] ?? flavors.mountain
     },

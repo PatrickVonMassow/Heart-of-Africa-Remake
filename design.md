@@ -118,6 +118,8 @@ Blue Nile, Nile, White Nile, Jubba, Ruvuma, Zambezi, Limpopo, Vaal, Orange, Sank
 ### 4.4 Landmarks
 Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudolf, Lake Tanganyika, Lake Nyasa), mountains (Toubkal, Emi Koussi, Kilimanjaro, Mount Kenya, Mount Elgon and others), waterfalls (Stanley, Livingstone, Kabalega, Victoria, Augrabies Falls). Special site: the Elephant Graveyard (valuable ivory) — recognizable at a glance in the bird's-eye view by fallen, bleached elephant carcasses and ivory tusks and bones strewn across a pale patch of ground. Each dig with the shovel frees a random ivory haul (averaging about five pieces) from the site's limited supply, until the bones hold no more.
 
+Built cultural landmarks — the game's first structures (the rest are natural): the Nubian pyramids of Meroë (kingdom of Kush), Great Zimbabwe, the rock-hewn churches of Lalibela and the coastal ruins of Kilwa Kisiwani, each at its real ~1890 position and existing by 1890. These are sighted and journaled like the natural landmarks (§10), but their discovery entry frames each as an achievement of an African civilisation — evidence of an African polity's own history, never a European "find" (§16).
+
 ### 4.5 Region Assignment
 | Region | Landscape | Peoples |
 |---|---|---|

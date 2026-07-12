@@ -341,21 +341,41 @@ the map).
   and forth. The body-separation pass parts a calf from its own parent every
   frame while play/follow pulls it back; exclude the parent-calf pair.
   (The separation neighbour scan skips an animal's own child/parent.)
-- [x] 55. The default bird's-eye zoom should start more zoomed in.
-  (ui travelZoom default 1 → 0.7; the player can still zoom out to 1, or wider
-  with the debug unlock.)
+- [ ] 54. Make the exploration map look like a real hand-drawn map (parchment,
+  decorative border, a title cartouche, ink coastlines/rivers, region names
+  North/West/Central/East/South) as in the reference image, keeping the
+  discovery gating: unexplored areas are hidden under fog of war.
+- [x] 55. The default bird's-eye zoom should start more zoomed in. Default 0.5,
+  and without the debug unlock the wheel cannot zoom out past that default.
+  (ui DEFAULT_TRAVEL_ZOOM = 0.5 is both the start and the no-unlock zoom-out
+  clamp — setWheelZoomEnabled/setTravelZoom clamp to it instead of 1; zoom-in
+  to 0.25 stays free, the unlock opens up to 16. ui.test follows.)
 - [ ] 56. The player should collide with animals and large plants (trees) in
   the bird's-eye view instead of walking through them.
 - [x] 57. Styling: when affliction badges show (e.g. "Fever") the health bar
   slips slightly downward. Keep the bar fixed regardless of the badges.
   (.health-status has a fixed 22px height, so taller badges never nudge the
   centred bar.)
-- [ ] 54. Make the exploration map look like a real hand-drawn map (parchment,
-  decorative border, a title cartouche, ink coastlines/rivers, region names
-  North/West/Central/East/South) as in the reference image, keeping the
-  discovery gating: unexplored areas are hidden under fog of war.
-- [ ] 58. Add the pyramids near Cairo as a landmark in the bird's-eye view (and
-  the Cairo surroundings), for period atmosphere.
+- [x] 58. Add four real, BUILT cultural landmarks to the travel world — the
+  Nubian pyramids of Meroë, Great Zimbabwe, the rock-hewn churches of Lalibela
+  and the coastal ruins of Kilwa Kisiwani — at their real ~1890 positions.
+  Postcolonial framing (design.md §4.4/§16): achievements of African
+  civilisations, never a European "find". Data in landmarks.ts
+  (CULTURAL_LANDMARKS), spread into economy LANDMARK_POINTS (bounty stays flat),
+  de/en names + a landmarkDiscovered flavor per kind (existing voice markup
+  only, English is the spoken one), map labels, stylized low-poly geometry per
+  kind (render/landmarks.ts), a CulturalLandmarks scene component with a
+  __culturalLandmarks dev hook, tests (sighting/bounty/journal + i18n
+  completeness) and a Playwright screenshot per site. Scope is exactly these
+  four; do NOT add the 1907 Great Mosque of Djenné.
+  (All four placed at their real coords, sighted/bounty-credited/journaled like
+  the natural landmarks with a per-kind discovery flavor (de + en, existing
+  markup) framing each as an African civilisation's achievement. Stylized
+  merged low-poly geometry per kind (steep Nubian pyramids, a dry-stone
+  enclosure + conical tower, a cross-plan rock-cut church, coral-stone ruins);
+  __culturalLandmarks dev hook; store.travel + i18n coverage tests;
+  enrichments asserts the four mount, render and reveal (screenshot 91). The
+  Kokoro speech stack was not touched. Full regression green.)
 
 ## Closing (only after all points)
 

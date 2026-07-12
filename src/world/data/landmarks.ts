@@ -51,3 +51,25 @@ export const WATERFALLS: WaterfallDef[] = [
 // Digging here with the shovel recovers a limited supply of ivory treasures
 // (store.dig, balance.economy.graveyardIvory).
 export const ELEPHANT_GRAVEYARD = { id: 'elephant-graveyard', lon: 36.6, lat: -4.9 }
+
+// Built cultural landmarks (design.md §4.4): achievements of African
+// civilisations — the Nubian pyramids of Meroë (kingdom of Kush), Great
+// Zimbabwe, the Zagwe-era rock-hewn churches of Lalibela, and the coastal
+// ruins of the Swahili Kilwa Sultanate. Real positions (~1890 geography);
+// all existed as standing structures or ruins by 1890. These are the game's
+// first built landmarks (the rest are natural peaks/falls/lakes plus the
+// fictional elephant graveyard).
+export interface CulturalLandmarkDef {
+  id: string
+  lon: number
+  lat: number
+  /** Drives geometry and the discovery-journal flavor. */
+  kind: 'pyramids' | 'stone-city' | 'rock-churches' | 'coastal-ruins'
+}
+
+export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = [
+  { id: 'meroe', lon: 33.75, lat: 16.94, kind: 'pyramids' },
+  { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
+  { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },
+  { id: 'kilwa', lon: 39.51, lat: -8.96, kind: 'coastal-ruins' },
+]

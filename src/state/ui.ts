@@ -73,6 +73,11 @@ interface UiState {
   setJournalDnd: (dnd: boolean) => void
 }
 
+// Default bird's-eye zoom (design.md §21.4): the game starts here, and without
+// the debug unlock this is also the furthest the wheel can zoom out — only the
+// unlock opens the wider range. Zooming in (down to 0.25) is always available.
+export const DEFAULT_TRAVEL_ZOOM = 0.5
+
 export const useUi = create<UiState>()((set) => ({
   dialog: null,
   prompt: null,
@@ -85,9 +90,7 @@ export const useUi = create<UiState>()((set) => ({
   ssrEnabled: false,
   wheelZoomEnabled: false,
   journalDnd: false,
-  // Start more zoomed in than the default camera distance; the player can still
-  // zoom out to factor 1 (or wider with the debug unlock, §21.4).
-  travelZoom: 0.7,
+  travelZoom: DEFAULT_TRAVEL_ZOOM,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -103,12 +106,12 @@ export const useUi = create<UiState>()((set) => ({
   // Disabling the unlock clamps any zoom-out back to the default distance;
   // a zoomed-in view is kept.
   setWheelZoomEnabled: (wheelZoomEnabled) =>
-    set((s) => ({ wheelZoomEnabled, travelZoom: wheelZoomEnabled ? s.travelZoom : Math.min(1, s.travelZoom) })),
-  // Zooming in is always available; zooming out beyond the default camera
-  // distance (factor 1) requires the debug unlock (design.md §21). The
-  // unlocked range reaches far enough to take in the whole continent.
+    set((s) => ({ wheelZoomEnabled, travelZoom: wheelZoomEnabled ? s.travelZoom : Math.min(DEFAULT_TRAVEL_ZOOM, s.travelZoom) })),
+  // Zooming in is always available; zooming out beyond the default distance
+  // requires the debug unlock (design.md §21). The unlocked range reaches far
+  // enough to take in the whole continent.
   setTravelZoom: (travelZoom) =>
-    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : 1, Math.max(0.25, travelZoom)) })),
+    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : DEFAULT_TRAVEL_ZOOM, Math.max(0.25, travelZoom)) })),
   setJournalDnd: (journalDnd) => set({ journalDnd }),
 }))
 

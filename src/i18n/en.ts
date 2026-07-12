@@ -83,6 +83,10 @@ const LANDMARKS: Record<string, string> = {
   'victoria-falls': 'Victoria Falls',
   'augrabies-falls': 'Augrabies Falls',
   'elephant-graveyard': 'Elephant Graveyard',
+  meroe: 'Pyramids of Meroë',
+  'great-zimbabwe': 'Great Zimbabwe',
+  lalibela: 'Lalibela',
+  kilwa: 'Kilwa',
 }
 
 const RIVERS: Record<string, string> = {
@@ -583,6 +587,10 @@ export const en: Strings = {
         falls: `[awe]A distant thunder rolled over the land long before I saw it:[pause] ${name}![/awe] [excited]The river hurls itself into the deep in walls of white water —[pause] a sight I shall never forget.[/excited]`,
         lake: `[awe]A great water opened before me —[pause] ${name}, stretching away to the horizon like a sea.[/awe] [somber]I marked its shore upon my map.[/somber]`,
         grave: `[whisper]I walk among bleached bones and mighty tusks —[pause] the graveyard of the elephants.[/whisper] [awe]So the old tales told the truth after all.[/awe]`,
+        pyramids: `[awe]Steep pyramids crowd the Nile's east bank —[pause] ${name}, the royal city of Kush.[/awe] [excited]A kingdom that raised these tombs and wrote in its own script —[pause] an African realm in its own right, no shadow of Egypt.[/excited]`,
+        'stone-city': `[awe]Mortarless walls of fitted granite curve across the hill, crowned by a great conical tower —[pause] ${name}.[/awe] [somber]African hands raised this capital, whatever the settlers back home care to claim.[/somber]`,
+        'rock-churches': `[awe]Churches hewn downward out of the living rock, cross upon cross sunk into the stone —[pause] ${name}.[/awe] [excited]The work of a Christian Ethiopian kingdom,[pause] and worshippers kneel in them still.[/excited]`,
+        'coastal-ruins': `[somber]Coral-stone walls and broken arches stand above the tideline —[pause] ${name}.[/somber] [awe]A Swahili city that minted its own coin and traded clear across the Indian Ocean, long before any European sail.[/awe]`,
       }
       return flavors[p.kind as string] ?? flavors.mountain
     },

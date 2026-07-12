@@ -175,6 +175,19 @@ describe('landmark discovery bounty (design.md §10)', () => {
     expect(entries.length).toBe(1)
     expect(typeof entries[0].text === 'object' && entries[0].text.params?.kind).toBe('falls')
   })
+
+  it('sighting the Meroë pyramids registers, queues a bounty and journals the pyramids-flavored discovery', () => {
+    jumpTo(16.94, 33.75) // Pyramids of Meroë (a built cultural landmark)
+    expect(g().landmarksSeen).not.toContain('meroe') // '?' until seen
+    drive(0, -1, 3)
+    expect(g().landmarksSeen).toContain('meroe')
+    expect(g().pendingBounties.some((b) => b.kind === 'landmark' && b.id === 'meroe')).toBe(true)
+    const entries = discoveryEntries().filter(
+      (e) => typeof e.text === 'object' && e.text.params?.landmark === 'meroe',
+    )
+    expect(entries.length).toBe(1)
+    expect(typeof entries[0].text === 'object' && entries[0].text.params?.kind).toBe('pyramids')
+  })
 })
 
 describe('village first visit (design.md §16)', () => {
