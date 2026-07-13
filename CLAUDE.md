@@ -339,7 +339,10 @@ verify suite that proves it.
    (`src/ui/StatusBar.test.tsx`), and a canoe on
    water / medicine while afflicted gains `.inv-active` while an idle item
    does not (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is
-   full-width green at full health and shrinks/reddens toward zero, and an
+   full-width green at full health and shrinks/reddens toward zero, the
+   bar blinks (`.health-low`) below a third of max health and stops
+   above it, the canteen blinks (`.canteen-blink`) below a third of its
+   fill (§6.1), and an
    `.affliction-badge` renders left of the bar for each active affliction
    (`src/ui/Hud.test.tsx`).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;

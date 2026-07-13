@@ -169,6 +169,17 @@ textarea {
   transition: width 0.3s ease, background 0.3s ease;
 }
 
+/* Below a third the bar blinks for attention (design.md §17.1). */
+.health-bar.health-low {
+  animation: health-blink 0.7s steps(1, end) infinite;
+}
+
+@keyframes health-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .inventory-bar {
   position: absolute;
   left: 12px;
@@ -258,8 +269,8 @@ textarea {
   border-radius: 4px;
 }
 
-/* Canteen fill colour cue (design.md §6): yellow under 20 %, red under 5 %,
-   blinking red when empty. */
+/* Canteen fill colour cue (design.md §6): yellow and blinking under a third,
+   red under 5 %, still blinking when empty. */
 .inventory-bar .inv-item.canteen.canteen-low {
   border-color: #d8b13a;
   color: #e7c752;
@@ -271,6 +282,8 @@ textarea {
 .inventory-bar .inv-item.canteen.canteen-empty {
   border-color: #c0392b;
   color: #e0715f;
+}
+.inventory-bar .inv-item.canteen.canteen-blink {
   animation: canteen-blink 0.7s steps(1, end) infinite;
 }
 

@@ -191,6 +191,22 @@ describe('InventoryBar canteen glow (design.md §6)', () => {
     rerender(<Hud />)
     expect(invClass('canteen')).toContain('canteen-empty')
   })
+
+  it('blinks below a third of the fill and stops above it (design.md §6.1)', () => {
+    g().debugAddEquipment('canteen')
+    const { rerender } = render(<Hud />)
+    useGame.setState({ canteenFill: 0.32 })
+    rerender(<Hud />)
+    expect(invClass('canteen')).toContain('canteen-blink')
+    expect(invClass('canteen')).toContain('canteen-low') // yellow from a third down
+    useGame.setState({ canteenFill: 0.34 })
+    rerender(<Hud />)
+    expect(invClass('canteen')).not.toContain('canteen-blink')
+    expect(invClass('canteen')).not.toContain('canteen-low')
+    useGame.setState({ canteenFill: 0 })
+    rerender(<Hud />)
+    expect(invClass('canteen')).toContain('canteen-blink') // empty keeps blinking
+  })
 })
 
 describe('InventoryBar present-valuable button (design.md §8)', () => {
@@ -216,6 +232,16 @@ describe('HealthBar (design.md §17.1)', () => {
     expect(f).toBeTruthy()
     expect(f!.style.width).toBe('100%')
     expect(hueOf(f!)).toBe(120) // green
+    expect(document.querySelector('.health-bar')?.className).not.toContain('health-low')
+  })
+
+  it('blinks below a third of max health and stops above it (design.md §17.1)', () => {
+    useGame.setState({ health: balance.health.max / 3 - 1 })
+    const { rerender } = render(<Hud />)
+    expect(document.querySelector('.health-bar')?.className).toContain('health-low')
+    useGame.setState({ health: balance.health.max / 3 + 1 })
+    rerender(<Hud />)
+    expect(document.querySelector('.health-bar')?.className).not.toContain('health-low')
   })
 
   it('shrinks and reddens toward zero health', () => {

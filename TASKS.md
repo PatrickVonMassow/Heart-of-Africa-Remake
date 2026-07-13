@@ -730,14 +730,22 @@ the map).
   probe). design.md §17.1 + CLAUDE.md pt. 4/9 updated. Full regression
   green.)
 
-- [ ] 71. The health bar must BLINK once health falls below 1/3 (attention
+- [x] 71. The health bar must BLINK once health falls below 1/3 (attention
   pull, like the canteen's empty-blink). Coordinate with the point-70
   status-bar redesign (the bar moves into the status bar there); cover the
   threshold on/off behaviour in Hud.test.tsx.
-- [ ] 72. The canteen must also BLINK below 1/3 fill (today it glows yellow
+  (.health-low opacity-blink on the in-bar health bar below max/3;
+  threshold on/off pinned in Hud.test.tsx; design.md §17.1 + CLAUDE.md
+  pt. 9 updated. Done together with point 72; full regression green.)
+- [x] 72. The canteen must also BLINK below 1/3 fill (today it glows yellow
   below 20 %, red below 5 % and blinks only when empty — design.md §6.1's
   thresholds change accordingly, both language files if any text names
   them); cover the new threshold in Hud.test.tsx alongside point 71.
+  (canteen-blink animation below 1/3 fill with the yellow stage moving to
+  the same third (red <5 %, empty keeps blinking); no player-visible text
+  names the thresholds, so no language change. Threshold on/off and the
+  empty case pinned in Hud.test.tsx; design.md §6.1 updated. Full
+  regression green.)
 
 ## Closing (only after all points)
 

@@ -15,6 +15,9 @@ export function HealthBar() {
   // Hue sweeps green (120°) → red (0°) as health drops, so the colour reads
   // the condition at a glance without needing the H query.
   const hue = Math.round(120 * frac)
+  // Attention pull (design.md §17.1): the bar blinks once health drops
+  // below a third, like the canteen's low-fill blink.
+  const low = frac < 1 / 3
   const badges = [
     afflictions.fever ? t.health.fever : null,
     afflictions.dehydration ? t.health.dehydration : null,
@@ -28,7 +31,7 @@ export function HealthBar() {
           {label}
         </span>
       ))}
-      <div className="health-bar" title={t.hud.healthBar} aria-label={t.hud.healthBar}>
+      <div className={`health-bar${low ? ' health-low' : ''}`} title={t.hud.healthBar} aria-label={t.hud.healthBar}>
         <div
           className="health-bar-fill"
           data-hue={hue}

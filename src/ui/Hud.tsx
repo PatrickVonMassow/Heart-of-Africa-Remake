@@ -55,8 +55,11 @@ function InventoryBar() {
   if ((equipment.medicine ?? 0) > 0 && (afflictions.fever || afflictions.wounds > 0)) active.add('medicine')
 
   const canteenPct = Math.round(canteenFill * 100)
+  // Low-fill cue (design.md §6.1): yellow and BLINKING below a third, red
+  // below 5 %, still blinking when empty.
   const canteenGlow =
-    canteenFill <= 0 ? ' canteen-empty' : canteenFill < 0.05 ? ' canteen-crit' : canteenFill < 0.2 ? ' canteen-low' : ''
+    canteenFill <= 0 ? ' canteen-empty' : canteenFill < 0.05 ? ' canteen-crit' : canteenFill < 1 / 3 ? ' canteen-low' : ''
+  const canteenBlink = canteenFill < 1 / 3 ? ' canteen-blink' : ''
 
   return (
     <div className="inventory-bar">
@@ -64,7 +67,7 @@ function InventoryBar() {
         const activeCls = active.has(e) ? ' inv-active' : ''
         if (e === 'canteen') {
           return (
-            <span key={e} data-eq={e} className={`inv-item canteen${canteenGlow}`} title={t.hud.canteenTooltip}>
+            <span key={e} data-eq={e} className={`inv-item canteen${canteenGlow}${canteenBlink}`} title={t.hud.canteenTooltip}>
               {t.equipment.canteen} {canteenPct}%
             </span>
           )
