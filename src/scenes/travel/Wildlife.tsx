@@ -629,8 +629,9 @@ function Herds() {
   const spawnedChunks = useRef(new Set<string>())
   // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
   const herdState = useRef(new Map<number, { heading: number; phase: number }>())
-  // Rotating index of the open-ocean backstop sweep (design.md §19).
-  const oceanSweep = useRef(0)
+  // Rotating index of the water backstop sweep (open sea AND river/lake
+  // water outside the scripted dramas, design.md §19).
+  const waterSweep = useRef(0)
   // Scavenger vulture that flies to and consumes a non-lion carcass. Its x/z
   // and mode live in a FlightState so it flies in from — and departs to —
   // beyond the zoom-aware view ring instead of popping (design.md §19).
@@ -1097,7 +1098,7 @@ function Herds() {
     // nearest land. This backstops every mover — flee, dodge, follow, escort
     // and the separation pushes — without sampling every animal every frame.
     {
-      const phase = oceanSweep.current++ % 7
+      const phase = waterSweep.current++ % 7
       for (const sp of SPECIES) {
         // Flamingos are shoreline waders — standing in shallow water is their
         // design (§19); everyone else is set back to land.

@@ -18,7 +18,7 @@ export const SURFACE_LIFT = 0.3
 /** Lake sheets sit this far above their highest interior bed sample. */
 export const LAKE_LIFT = 0.12
 /** Sampling step along a river axis (matches the ribbon build in Rivers.tsx). */
-export const STEP_DEG = 0.08
+const STEP_DEG = 0.08
 
 /** Densify a river polyline at STEP_DEG — the exact ribbon sampling. */
 export function densifyRiver(points: Array<[number, number]>): Array<{ lat: number; lon: number }> {
