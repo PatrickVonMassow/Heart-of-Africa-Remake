@@ -1273,7 +1273,9 @@ function Player() {
     // detects the ribbon, so a mouth cell misclassified as ocean keeps the
     // lift.
     const refY = Math.max(0, t.height)
-    const surfaceY = waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0
+    // Query the surface only while actually riding: the lookup is cheap, but
+    // the common no-canoe walk should not pay it every frame.
+    const surfaceY = canoeing ? (waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0) : 0
     const boatBaseY = surfaceY - refY + CANOE_HULL_CLEARANCE
 
     if (inner.current) {

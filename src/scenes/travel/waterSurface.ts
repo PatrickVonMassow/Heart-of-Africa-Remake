@@ -48,6 +48,35 @@ const GRID = 0.25 // ≥ COVER_RANGE_DEG, so ±1 cell covers every query
 type AxisIndex = Map<string, Array<{ lat: number; lon: number; surf: number }>>
 const axisIndexCache = new Map<number, AxisIndex>()
 
+function insertAxisSample(grid: AxisIndex, lat: number, lon: number, surf: number) {
+  const key = `${Math.floor(lon / GRID)}:${Math.floor(lat / GRID)}`
+  let list = grid.get(key)
+  if (!list) {
+    list = []
+    grid.set(key, list)
+  }
+  list.push({ lat, lon, surf })
+}
+
+/**
+ * Adopt the ribbon build's own axis samples (Rivers.tsx computes them anyway
+ * when the travel scene mounts): zero re-sampling, and the float heights are
+ * literally the rendered ribbon's values. Without a registration the lazy
+ * build below computes the identical data — but synchronously, which must
+ * never happen inside the frame loop (it stalls the scene switch).
+ */
+export function registerRiverSurfaces(
+  seed: number,
+  samples: Array<{ lat: number; lon: number; surf: number }>,
+): void {
+  // The travel scene remounts on every settlement visit and re-registers the
+  // identical data — the first registration (or a lazy build) wins.
+  if (axisIndexCache.has(seed)) return
+  const grid: AxisIndex = new Map()
+  for (const s of samples) insertAxisSample(grid, s.lat, s.lon, s.surf)
+  axisIndexCache.set(seed, grid)
+}
+
 function axisIndex(seed: number): AxisIndex {
   const hit = axisIndexCache.get(seed)
   if (hit) return hit
@@ -55,13 +84,7 @@ function axisIndex(seed: number): AxisIndex {
   for (const river of RIVERS_DATA) {
     for (const p of densifyRiver(river.points)) {
       const surf = Math.max(-0.05, sampleTerrain(p.lat, p.lon, seed).height + SURFACE_LIFT)
-      const key = `${Math.floor(p.lon / GRID)}:${Math.floor(p.lat / GRID)}`
-      let list = grid.get(key)
-      if (!list) {
-        list = []
-        grid.set(key, list)
-      }
-      list.push({ lat: p.lat, lon: p.lon, surf })
+      insertAxisSample(grid, p.lat, p.lon, surf)
     }
   }
   axisIndexCache.set(seed, grid)

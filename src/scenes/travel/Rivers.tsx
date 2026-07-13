@@ -34,7 +34,7 @@ import { WATERFALLS } from '../../world/data/landmarks'
 // The surface heights and the axis sampling are shared with the module the
 // floating canoe reads (waterSurface.ts), so a floater and the rendered
 // surface can never diverge.
-import { SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver } from './waterSurface'
+import { SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, registerRiverSurfaces } from './waterSurface'
 
 const HALF_WIDTH = 1.7 // ribbon half width in world units (matches RIVER_WIDTH_DEG)
 
@@ -68,6 +68,7 @@ function buildRivers(seed: number): {
   const falls: FallDef[] = []
   const springs: SpringDef[] = []
   const report: Record<string, { strips: number; buried: number }> = {}
+  const axisSamples: Array<{ lat: number; lon: number; surf: number }> = []
 
   for (const river of RIVERS_DATA) {
     const pts = densifyRiver(river.points)
@@ -82,6 +83,7 @@ function buildRivers(seed: number): {
     const surf: number[] = []
     for (let i = 0; i < pts.length; i++) {
       surf.push(Math.max(-0.05, samples[i].height + SURFACE_LIFT))
+      axisSamples.push({ lat: pts[i].lat, lon: pts[i].lon, surf: surf[i] })
     }
 
     // Flow speed: base current plus local slope; boosted near the river's
@@ -175,6 +177,10 @@ function buildRivers(seed: number): {
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
   geometry.setIndex(indices)
+  // Hand the axis samples to the float-height module: the canoe then floats
+  // on literally these ribbon heights, and the frame loop never has to build
+  // the index itself (a synchronous build there stalls the scene switch).
+  registerRiverSurfaces(seed, axisSamples)
   return { geometry, falls, springs, report }
 }
 

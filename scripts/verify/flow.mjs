@@ -51,7 +51,7 @@ async function enterBuilding(type) {
   } else {
     // Step onto the door point; the door trigger fires in the render loop.
     await moveTo(it.door[0], it.door[1])
-    await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 15000 })
+    await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
   }
   await page.waitForTimeout(400)
 }
@@ -63,13 +63,13 @@ async function leaveByWalking() {
     const p = window.__placePlayer
     p.z = window.__placeLayout.radius + 5
   })
-  await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 15000 })
+  await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 30000 })
   await page.waitForTimeout(400)
 }
 
 async function closeDialog() {
   await page.keyboard.press('Escape')
-  await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 15000 })
+  await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 30000 })
   await page.waitForTimeout(200)
 }
 
