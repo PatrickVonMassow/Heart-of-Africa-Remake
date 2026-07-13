@@ -327,3 +327,32 @@ export function buildWetland(): THREE.BufferGeometry {
   }
   return merge(parts)
 }
+
+/**
+ * Table Mountain skyline massif for Cape Town's first-person backdrop
+ * (design.md §4.4 Part C): a broad flat-topped plateau flanked by two lesser
+ * peaks (Devil's Peak, Lion's Head), sized for the settlement panorama
+ * (~140 units wide) rather than the travel map. Placed and scaled by the
+ * scene; origin at the ground, the plateau top around y≈26.
+ */
+export function buildTableMountain(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  // The main table: a wide truncated prism with a flat top.
+  const table = new THREE.CylinderGeometry(52, 68, 26, 26, 1)
+  table.scale(1.35, 1, 0.42)
+  table.translate(0, 13, 0)
+  parts.push(tint(table, '#7d7468', 0.07, 5300))
+  // A slightly lighter plateau cap reads as the sunlit table top.
+  const cap = new THREE.CylinderGeometry(52.5, 53, 1.6, 26, 1)
+  cap.scale(1.35, 1, 0.42)
+  cap.translate(0, 26.2, 0)
+  parts.push(tint(cap, '#948a7a', 0.05, 5301))
+  // Devil's Peak (east) and Lion's Head (west): steeper flanking cones.
+  const devils = new THREE.ConeGeometry(26, 30, 16)
+  devils.translate(96, 15, 6)
+  parts.push(tint(devils, '#776e62', 0.08, 5302))
+  const lions = new THREE.ConeGeometry(14, 22, 14)
+  lions.translate(-92, 11, -4)
+  parts.push(tint(lions, '#7d7468', 0.08, 5303))
+  return merge(parts)
+}

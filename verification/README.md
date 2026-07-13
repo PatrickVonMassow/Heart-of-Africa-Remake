@@ -44,6 +44,8 @@ point(s).
 | 93-orientation-highlight.png | 31 — gift-unlocked building markers |
 | 94-cultural-landmark-aksum.png | 25 — stage-2 cultural site (stelae), label revealed |
 | 95-natural-site-ngorongoro.png | 25 — natural point-landmark (crater), label revealed |
+| 96-capetown-table-mountain.png | 15 — Table Mountain skyline behind Cape Town |
+| 97-timbuktu-djinguereber.png | 15 — Djinguereber mosque in Timbuktu's fabric |
 
 ## Open items (§9)
 

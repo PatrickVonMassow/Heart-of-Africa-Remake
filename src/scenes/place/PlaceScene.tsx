@@ -30,6 +30,7 @@ import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, proceduralBump } from '../../render/materials'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
+import { buildTableMountain } from '../../render/landmarks'
 import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
@@ -64,7 +65,7 @@ function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interact
 }
 
 /** Non-enterable dwellings and outbuildings (design.md §2 lively settlements). */
-export type DwellingKind = 'hut' | 'box' | 'granary' | 'tent' | 'warehouse' | 'stall' | 'shed' | 'tower'
+export type DwellingKind = 'hut' | 'box' | 'granary' | 'tent' | 'warehouse' | 'stall' | 'shed' | 'tower' | 'mosque'
 
 export interface DwellingDef {
   x: number
@@ -271,6 +272,23 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
       paths.push({ points: [it.pos, target], width: 1.4 })
     }
 
+    // Timbuktu's Djinguereber mosque (design.md §4.4): the authentic 1327
+    // Sudano-Sahelian mud landmark. Placed BEFORE the dwelling rows so the
+    // procedural fabric grows around it (isFree checks earlier dwellings),
+    // which guarantees the landmark a spot in every run.
+    if (placeId === 'timbuktu') {
+      for (const [mx, mz] of [
+        [-13.5, -7.5],
+        [13.5, -8.5],
+        [-14.5, 12.5],
+        [14.5, 13.5],
+      ] as const) {
+        if (!isFree(mx, mz, 6)) continue
+        addDwelling('mosque', mx, mz, faceTo(mx, mz, 0, 3), 3.6, 4.6)
+        break
+      }
+    }
+
     // Dense adobe town: rows of houses flanking both streets.
     for (const sx of [-6.8, 6.8]) {
       for (let z = -13 - ext; z <= 21 + ext; z += 4.6) {
@@ -462,6 +480,9 @@ function buildLayout(placeId: string, seed: number): PlaceLayout {
         break
       case 'tower':
         colliders.push({ x: d.x, z: d.z, r: d.r + 0.4 })
+        break
+      case 'mosque':
+        colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.8, d.rot))
         break
       default:
         colliders.push({ x: d.x, z: d.z, r: d.r + 0.3 }) // round hut
@@ -991,6 +1012,76 @@ function Tower({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
   )
 }
 
+/**
+ * The Djinguereber mosque of Timbuktu (design.md §4.4): the authentic 1327
+ * Sudano-Sahelian mud landmark — a buttressed mud body and the pyramidal
+ * minaret bristling with toron timbers. Door on local +Z like every
+ * rectangular building (the collider is an oriented box).
+ */
+function Mosque({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+  const torons = useMemo(() => {
+    const out: Array<[number, number, number]> = [] // [y, angle, length]
+    for (let level = 0; level < 4; level++) {
+      for (let i = 0; i < 6; i++) {
+        out.push([1.6 + level * 0.75, (i / 6) * Math.PI * 2 + level * 0.3, 0.5 + (i % 2) * 0.15])
+      }
+    }
+    return out
+  }, [])
+  const w = d.r
+  const depth = d.r * 0.8
+  return (
+    <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
+      {/* Prayer-hall body with a slightly battered profile. */}
+      <mesh position={[0, 1.4, 0]} castShadow receiveShadow material={mats.mud}>
+        <boxGeometry args={[w * 2, 2.8, depth * 2]} />
+      </mesh>
+      {/* Wall buttresses: rounded mud ribs along the long faces. */}
+      {[-0.75, -0.25, 0.25, 0.75].map((fx, i) =>
+        [-1, 1].map((side) => (
+          <mesh key={`${i}-${side}`} position={[fx * w, 1.3, side * depth]} castShadow material={mats.mud}>
+            <cylinderGeometry args={[0.22, 0.3, 2.6, 6]} />
+          </mesh>
+        )),
+      )}
+      {/* Parapet pinnacles along the roofline. */}
+      {[-0.8, -0.4, 0, 0.4, 0.8].map((fx, i) => (
+        <mesh key={`p${i}`} position={[fx * w, 3.05, 0]} castShadow material={mats.mud}>
+          <coneGeometry args={[0.22, 0.55, 6]} />
+        </mesh>
+      ))}
+      {/* The pyramidal minaret, offset toward the rear corner. */}
+      <group position={[-w * 0.45, 0, -depth * 0.35]}>
+        <mesh position={[0, d.h / 2 + 0.4, 0]} castShadow receiveShadow material={mats.mud}>
+          <cylinderGeometry args={[0.55, 1.5, d.h + 0.8, 8]} />
+        </mesh>
+        {/* Toron: protruding timber stakes ringing the minaret. */}
+        {torons.map(([y, a, len], i) => {
+          const rr = 1.5 - (y / (d.h + 0.8)) * 0.9
+          return (
+            <mesh
+              key={i}
+              position={[Math.sin(a) * rr, y, Math.cos(a) * rr]}
+              rotation={[Math.PI / 2, 0, -a]}
+              castShadow
+              material={mats.wood}
+            >
+              <cylinderGeometry args={[0.045, 0.045, len, 4]} />
+            </mesh>
+          )
+        })}
+        <mesh position={[0, d.h + 0.9, 0]} castShadow material={mats.mud}>
+          <coneGeometry args={[0.5, 0.7, 8]} />
+        </mesh>
+      </group>
+      {/* Door on the front face (+Z), matching the layout's door point. */}
+      <mesh position={[0, 0.95, depth + 0.02]} material={mats.wood}>
+        <boxGeometry args={[1.1, 1.9, 0.08]} />
+      </mesh>
+    </group>
+  )
+}
+
 /** Small utility shed with a slanted roof and a wood pile. */
 function Shed({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
   return (
@@ -1034,6 +1125,8 @@ function Dwelling({ d, mats, style, variant }: { d: DwellingDef; mats: PlaceMate
       return <Stall d={d} mats={mats} />
     case 'tower':
       return <Tower d={d} mats={mats} />
+    case 'mosque':
+      return <Mosque d={d} mats={mats} />
     default:
       return <Shed d={d} mats={mats} />
   }
@@ -1372,6 +1465,30 @@ function backdropHeightAt(x: number, z: number, lat: number, lon: number, seed: 
   const ri = ((BACKDROP_RINGS - 1) * Math.log(Math.max(r, r0) / r0)) / Math.log(BACKDROP_OUTER / r0)
   const taper = Math.min(1, ri / 5)
   return capped * taper - 2
+}
+
+/**
+ * Table Mountain behind Cape Town (design.md §4.4 Part C): the flat-topped
+ * massif with its flanking peaks as a fixed skyline feature north of the
+ * town, in front of the generic DEM backdrop. Height and distance keep its
+ * elevation angle well under the §2.5 looming bound (~11° from the centre).
+ */
+function TableMountainSkyline({ placeId }: { placeId: string }) {
+  const show = placeId === 'capetown'
+  const geometry = useMemo(() => (show ? buildTableMountain() : null), [show])
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+  useEffect(() => () => geometry?.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
+  useEffect(() => {
+    if (!import.meta.env.DEV || !show) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeSkyline = 'table-mountain'
+    return () => {
+      delete w.__placeSkyline
+    }
+  }, [show])
+  if (!geometry) return null
+  return <mesh geometry={geometry} material={material} position={[0, -1.5, -118]} scale={[1, 1.3, 1]} />
 }
 
 function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
@@ -1741,6 +1858,7 @@ export function PlaceScene() {
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
       <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
+      <TableMountainSkyline placeId={place.id} />
       <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} />
 
       {/* Ground disc with procedural mottling */}

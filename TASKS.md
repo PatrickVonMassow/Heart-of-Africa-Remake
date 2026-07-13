@@ -682,7 +682,7 @@ the map).
   hooks, renders a frame at all 11 coordinates and takes evidence shots
   94 (Aksum) / 95 (Ngorongoro). design.md §4.4 + CLAUDE.md pt. 25
   updated; Part C recorded as point 69. Full regression green.)
-- [ ] 69. (Deferred Part C of point 68 — own scoped task, own verification.)
+- [x] 69. (Deferred Part C of point 68 — own scoped task, own verification.)
   Two landmarks sit on existing ports and belong in their PlaceScenes as
   skyline features, not on the travel map (a map marker would duplicate the
   port marker): Table Mountain as a flat-topped massif backdrop behind Cape
@@ -691,6 +691,18 @@ the map).
   PlaceScene (size-2 port, west region) — the authentic 1327 landmark
   standing in for the excluded 1907 Djenné mosque. Touches region-specific
   PlaceScene rendering (src/scenes/place/).
+  (Table Mountain: buildTableMountain() — a wide flat-topped truncated
+  prism with a lit plateau cap and the Devil's Peak/Lion's Head flanks —
+  mounted north of Cape Town at ~11° elevation (under the §2.5 looming
+  bound), DEV hook __placeSkyline, profile pure-tested (wide/flat, 14
+  builder tests total in landmarks.test.ts). Djinguereber: a new 'mosque'
+  DwellingKind — buttressed mud body, parapet pinnacles, pyramidal
+  toron-studded minaret, door on the front face — placed BEFORE the
+  procedural rows so the fabric grows around it (guaranteed a spot every
+  run), colliding as an oriented box like every rectangular building.
+  polish.mjs asserts the skyline hook and the mosque dwelling and records
+  screenshots 96/97. design.md §4.4 + CLAUDE.md pt. 15 updated. Full
+  regression green.)
 
 - [ ] 70. Status-bar redesign: replace the words "Date", "Funds",
   "Provisions", "Gifts" and "Region" with fitting SYMBOLS (stylistically

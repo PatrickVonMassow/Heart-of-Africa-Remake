@@ -123,6 +123,8 @@ Lakes (Lake Chad, Lake Tana, Lake Albert, Lake Edward, Lake Victoria, Lake Rudol
 
 Built cultural landmarks — the game's structures among the otherwise natural landmarks: the Nubian pyramids of Meroë (kingdom of Kush), Great Zimbabwe, the rock-hewn churches of Lalibela, the coastal ruins of Kilwa Kisiwani, the towering stelae of Aksum (an Aksumite kingdom that struck its own coinage and traded across the Red Sea), the Gondarine castles of Fasil Ghebbi (imperial Ethiopia) and the Dogon cliff dwellings of the Bandiagara escarpment (built above the older Tellem sites), each at its real ~1890 position and existing by 1890. These are sighted and journaled like the natural landmarks (§10), but their discovery entry frames each as an achievement of an African civilisation — evidence of an African polity's own history, never a European "find" (§16).
 
+Two further landmarks live in their port's first-person scene rather than on the travel map (a map marker would duplicate the port marker): Table Mountain stands as a flat-topped massif skyline behind Cape Town, and the Djinguereber mosque (the authentic 1327 Sudano-Sahelian mud landmark, standing in for the excluded 1907 Djenné mosque) rises inside Timbuktu's town fabric — buttressed mud walls and a pyramidal toron-studded minaret, impenetrable like every building (§2.6).
+
 ### 4.5 Region Assignment
 | Region | Landscape | Peoples |
 |---|---|---|

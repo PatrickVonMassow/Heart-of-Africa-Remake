@@ -89,6 +89,67 @@ await page.waitForTimeout(500)
 const other = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
 check('other settlements stay unmarked without a gift', other === 0, `${other}`)
 
+// --- Port skyline landmarks (design.md §4.4 Part C) ---------------------------
+// Cape Town: Table Mountain stands as a flat-topped massif behind the town.
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.leavePlace()
+  g.enterPlace('capetown')
+})
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'capetown', { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(1200)
+const skyline = await page.evaluate(() => window.__placeSkyline)
+check('Cape Town mounts the Table Mountain skyline', skyline === 'table-mountain', `${skyline}`)
+await page.evaluate(() => {
+  window.__game.getState().setJournalOpen(false)
+  const p = window.__placePlayer
+  p.x = 0
+  p.z = window.__placeLayout.radius - 3
+  p.yaw = 0
+})
+await page.waitForTimeout(600)
+await page.screenshot({ path: `${OUT}96-capetown-table-mountain.png` })
+console.log('shot 96-capetown-table-mountain.png')
+
+// Timbuktu: the Djinguereber mosque stands inside the town fabric, with a
+// collider (an oriented box like every rectangular building).
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.leavePlace()
+  g.enterPlace('timbuktu')
+})
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'timbuktu', { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(1200)
+const mosque = await page.evaluate(() => {
+  const d = window.__placeLayout.dwellings.find((dd) => dd.kind === 'mosque')
+  return d ? { x: d.x, z: d.z, door: d.door } : null
+})
+check('Timbuktu builds the Djinguereber mosque', !!mosque, JSON.stringify(mosque))
+if (mosque) {
+  await page.evaluate((m) => {
+    window.__game.getState().setJournalOpen(false)
+    const p = window.__placePlayer
+    // Stand back from the door point (guaranteed free ground) facing the mosque.
+    const dx = m.x - m.door[0]
+    const dz = m.z - m.door[1]
+    const dl = Math.hypot(dx, dz) || 1
+    // Stand on the door approach (kept free by the layout rules), close
+    // enough that no neighbouring house can block the view.
+    p.x = m.door[0] - (dx / dl) * 5
+    p.z = m.door[1] - (dz / dl) * 5
+    p.pitch = 0.3 // tilt up so the minaret is in frame
+    // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+    p.yaw = Math.atan2(m.x - p.x, m.z - p.z) + Math.PI
+  }, mosque)
+  await page.waitForTimeout(600)
+  await page.screenshot({ path: `${OUT}97-timbuktu-djinguereber.png` })
+  console.log('shot 97-timbuktu-djinguereber.png')
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

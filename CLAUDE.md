@@ -480,7 +480,11 @@ verify suite that proves it.
     measured edge-energy bar (Laplacian of a ground crop,
     `scripts/verify/settings.mjs`) and the settlement materials wire both
     a color and a micro-relief normal node
-    (`src/render/materials.test.ts`).
+    (`src/render/materials.test.ts`); the §4.4 port skyline landmarks
+    hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
+    its flat wide profile pure-tested in `src/render/landmarks.test.ts`)
+    and Timbuktu builds the Djinguereber mosque as a collidable dwelling
+    (`scripts/verify/polish.mjs`, screenshots 96/97).
 16. **Collision inside settlements.** The collision rules of `design.md`
     §2.6 are implemented (impenetrable buildings and solid objects,
     sliding movement, inhabitants never permanently stuck, reachable
