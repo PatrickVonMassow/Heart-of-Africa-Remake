@@ -44,6 +44,29 @@ await page.waitForTimeout(400)
 const eyeY = await page.evaluate(() => window.__placeCamera?.position.y)
 check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${eyeY}`)
 
+// --- First-person surface detail (§7.1 pt. 11/15, design.md §2.6) -------------
+// The ground at eye height must carry visible micro-structure (grain, pebble
+// relief), not a soft wash: measure the mean edge energy (Laplacian) of a
+// ground crop from the start position. The flat pre-detail ground measured
+// ~0.5 here; the structured ground clears 1.5 with headroom.
+{
+  const shot = await page.screenshot()
+  const crop = await sharp(shot).extract({ left: 500, top: 700, width: 600, height: 170 }).greyscale().raw().toBuffer({ resolveWithObject: true })
+  const { data, info } = crop
+  let energy = 0
+  let n = 0
+  for (let y = 1; y < info.height - 1; y++) {
+    for (let x = 1; x < info.width - 1; x++) {
+      const i = y * info.width + x
+      const lap = 4 * data[i] - data[i - 1] - data[i + 1] - data[i - info.width] - data[i + info.width]
+      energy += Math.abs(lap)
+      n++
+    }
+  }
+  const mean = energy / n
+  check('first-person ground shows micro-detail (edge energy)', mean > 1.5, `laplacian mean ${mean.toFixed(2)}`)
+}
+
 // --- Strafe/backward move in the scene (design.md §2) ------------------------
 // The exact 80 % ratio is proven by the pure velocity helper in Vitest
 // (src/systems/movement.test.ts); here we only confirm both directions move a
@@ -63,13 +86,15 @@ async function measureWalk(code) {
   await page.waitForTimeout(80)
   const p0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
   await page.evaluate((c) => window.dispatchEvent(new KeyboardEvent('keydown', { code: c })), code)
-  // Hold the key until the character has clearly moved (or 4s): headless RAF is
-  // throttled, so a fixed short hold can span too few frames under load.
+  // Hold the key until the character has clearly moved (or 15s): headless RAF
+  // can stall to fractions of a frame per second under full-regression load,
+  // so the window is generous and the poll runs on an interval — the default
+  // raf polling would itself starve with the frame loop.
   await page
     .waitForFunction(
       (start) => Math.hypot(window.__placePlayer.x - start.x, window.__placePlayer.z - start.z) > 0.6,
       p0,
-      { timeout: 4000 },
+      { timeout: 15000, polling: 100 },
     )
     .catch(() => {})
   await page.evaluate((c) => window.dispatchEvent(new KeyboardEvent('keyup', { code: c })), code)

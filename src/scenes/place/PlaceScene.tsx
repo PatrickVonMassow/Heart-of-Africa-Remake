@@ -8,6 +8,17 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
+import {
+  attribute,
+  color,
+  float,
+  mix,
+  mx_fractal_noise_float,
+  normalWorldGeometry,
+  positionWorld,
+  smoothstep,
+  vec3,
+} from 'three/tsl'
 import { useGame } from '../../state/store'
 import { useUi, type BuildingType } from '../../state/ui'
 import { balance } from '../../config/balance'
@@ -17,7 +28,7 @@ import { mulberry32 } from '../../world/noise'
 import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
-import { createGroundMaterial, createNoisyMaterial } from '../../render/materials'
+import { createGroundMaterial, createNoisyMaterial, proceduralBump } from '../../render/materials'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
@@ -522,17 +533,21 @@ function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
 
 function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: THREE.Texture | null) {
   return useMemo(() => {
-    const plaster = createNoisyMaterial({ base: '#e6d9b4', alt: '#c6b488', scale: 0.6 })
-    const plasterDark = createNoisyMaterial({ base: '#d3c294', alt: '#ab9668', scale: 0.7 })
-    const mud = createNoisyMaterial({ base: style.hutWall.base, alt: style.hutWall.alt, scale: 0.9 })
+    // Wall/roof materials carry real micro-relief and weathering (design.md
+    // §2.6): fine plaster grain, coarser mud daub, deep anisotropic thatch,
+    // wood grain — each with a darkened base course and run-off streaks.
+    const plaster = createNoisyMaterial({ base: '#e6d9b4', alt: '#c6b488', scale: 0.6, bump: 2.6, weathered: true })
+    const plasterDark = createNoisyMaterial({ base: '#d3c294', alt: '#ab9668', scale: 0.7, bump: 2.6, weathered: true })
+    const mud = createNoisyMaterial({ base: style.hutWall.base, alt: style.hutWall.alt, scale: 0.9, bump: 3.6, weathered: true })
     const thatch = createNoisyMaterial({
       base: style.hutThatch.base,
       alt: style.hutThatch.alt,
       scale: [2.2, 7, 2.2],
       octaves: 3,
+      bump: 4.8,
     })
-    const wood = createNoisyMaterial({ base: '#7a5a32', alt: '#573e1f', scale: [1.2, 4, 1.2], roughness: 0.85 })
-    const cloth = createNoisyMaterial({ base: '#d9cdb0', alt: '#b8ab8a', scale: 1.4, roughness: 0.9 })
+    const wood = createNoisyMaterial({ base: '#7a5a32', alt: '#573e1f', scale: [1.2, 4, 1.2], roughness: 0.85, bump: 3.0 })
+    const cloth = createNoisyMaterial({ base: '#d9cdb0', alt: '#b8ab8a', scale: 1.4, roughness: 0.9, bump: 0.7 })
     const pathOpts = pathTex
       ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }
       : undefined
@@ -1341,7 +1356,7 @@ const BACKDROP_HEIGHT = 30 // vertical exaggeration of the map relief
 // camera. atan(0.32) ≈ 18°.
 const BACKDROP_MAX_SLOPE = 0.32
 const BACKDROP_RINGS = 24
-const BACKDROP_SEGS = 96
+const BACKDROP_SEGS = 160 // smoother far-range silhouette (shader adds detail)
 const BACKDROP_OUTER = 340 // outermost ring radius
 
 /**
@@ -1404,11 +1419,29 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     geo.computeVertexNormals()
     return geo
   }, [lat, lon, seed, innerRadius])
-  const material = useMemo(
+  const material = useMemo(() => {
     // Double-sided so steep far slopes never show as black backface overhangs.
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide }),
-    [],
-  )
+    // The relief itself is shaded (design.md §2.5/§7.1 pt. 11): rocky fBm
+    // structure over the biome vertex colors, steeper faces darkening toward
+    // bare rock, and a bump normal so ridges catch the light — the flat
+    // vertex-color wash read soft and detail-less behind the settlement.
+    const m = new THREE.MeshStandardNodeMaterial()
+    m.vertexColors = true
+    m.roughness = 0.95
+    m.metalness = 0
+    m.side = THREE.DoubleSide
+    const p = positionWorld
+    const rock = mx_fractal_noise_float(p.mul(vec3(0.16, 0.28, 0.16)), 4).mul(0.5).add(0.5)
+    const fine = mx_fractal_noise_float(p.mul(0.65), 3).mul(0.5).add(0.5)
+    // Steepness from the mesh normal: flat ground keeps its biome color,
+    // steeper faces mix toward a bare rock tone with banded structure.
+    const steep = smoothstep(float(0.95), float(0.55), normalWorldGeometry.y)
+    let col = attribute('color', 'vec3') as unknown as ReturnType<typeof vec3>
+    col = mix(col, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof col
+    m.colorNode = col.mul(rock.mul(0.22).add(0.89)).mul(fine.mul(0.12).add(0.94))
+    m.normalNode = proceduralBump(rock.mul(0.7).add(fine.mul(0.3)), float(2.6))
+    return m
+  }, [])
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 

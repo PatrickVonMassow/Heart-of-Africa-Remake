@@ -566,7 +566,7 @@ the map).
   is cosmetic and must never kill); the herd test keeps a diagnostics
   object in its report. Full regression green.)
 
-- [ ] 67. In the first-person view inside settlements the surfaces are too
+- [x] 67. In the first-person view inside settlements the surfaces are too
   low-detail/soft — fine structure is missing, most of all on the ground
   and on the background mountains (the panorama). The buildings and their
   surfaces must also become clearly more detailed (wall/roof material
@@ -574,6 +574,23 @@ the map).
   (e.g. ground micro-relief/texture detail at eye height, sharper panorama
   relief shading, structured building materials) fitting the AAA bar of
   §7.1 pt. 11.
+  (Root cause: the materials mixed COLOR by noise but never perturbed the
+  NORMAL, so light ignored all micro-structure. three's bumpMap() cannot
+  do it for procedural fields (it re-samples a TEXTURE at offset UVs; a
+  world-position noise node ignores that context — zero gradient), so
+  materials.ts gains proceduralBump(): the Mikkelsen screen-space bump on
+  direct dFdx/dFdy of the height node. Ground now carries ripples, sandy
+  grain, pebble relief and specks (trodden paths worn SMOOTHER); walls
+  (plaster/mud) carry grain plus a darkened base course and weather
+  run-off streaks; thatch/wood get strong anisotropic relief; the
+  panorama backdrop is a node material with rocky fBm structure, steep
+  faces mixing toward lit bare rock, its own bump and 160 ring segments.
+  Verified: materials.test.ts pins the color+normal node wiring (4
+  cases); settings.mjs measures the ground crop's Laplacian edge energy
+  (2.8 vs bar 1.5; the flat pre-detail ground sat near 0.5); before/after
+  probes of Cairo and Masai Village confirm the look, 0 console errors.
+  design.md §2.5/§2.6 + CLAUDE.md pt. 15 record the target. Full
+  regression green.)
 
 - [ ] 68. Second expansion stage for the travel-world landmarks, building on
   the stage-1 code paths (CULTURAL_LANDMARKS/CulturalLandmarkDef in
@@ -658,6 +675,26 @@ the map).
   PlaceScene (size-2 port, west region) — the authentic 1327 landmark
   standing in for the excluded 1907 Djenné mosque. Touches region-specific
   PlaceScene rendering (src/scenes/place/).
+
+- [ ] 70. Status-bar redesign: replace the words "Date", "Funds",
+  "Provisions", "Gifts" and "Region" with fitting SYMBOLS (stylistically
+  matching the game, expressive, much narrower than the text). Show the
+  date as DD.MM.YYYY. Transient status hints (e.g. dragging the canoe on
+  land) move from the top right to the top CENTRE of the bar. The space
+  gained on the right hosts the health bar and the affliction badges INSIDE
+  the status bar (instead of below it) — then the journal panel can no
+  longer cover them. Update the affected §7.1 pt. 9/pt. 4 verifiable
+  conditions (hint geometry, health-bar/badge selectors) and design.md
+  §17.1 accordingly, in both languages where text is involved.
+
+- [ ] 71. The health bar must BLINK once health falls below 1/3 (attention
+  pull, like the canteen's empty-blink). Coordinate with the point-70
+  status-bar redesign (the bar moves into the status bar there); cover the
+  threshold on/off behaviour in Hud.test.tsx.
+- [ ] 72. The canteen must also BLINK below 1/3 fill (today it glows yellow
+  below 20 %, red below 5 % and blinks only when empty — design.md §6.1's
+  thresholds change accordingly, both language files if any text names
+  them); cover the new threshold in Hud.test.tsx alongside point 71.
 
 ## Closing (only after all points)
 

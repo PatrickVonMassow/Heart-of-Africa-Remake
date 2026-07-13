@@ -463,18 +463,24 @@ verify suite that proves it.
     refraction) are named as open items (see pt. 32).
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,
-    inhabitants who believably use the settlement and their homes, clearly
+    surface micro-structure at eye height — ground grain/pebble relief,
+    structured and weathered building materials — inhabitants who
+    believably use the settlement and their homes, clearly
     highlighted functional buildings), §4.1 (settlement size mirrors real
     ~1890 importance; enlarged ports outscale villages), §19.10 (the
     village life vignettes) and §2.5 (the surroundings panorama of the
-    real map landscape, its relief capped and double-sided) are
-    implemented. Verifiable: screenshots of a port city and a village show
+    real map landscape, its relief capped, double-sided and rock-shaded)
+    are implemented. Verifiable: screenshots of a port city and a village show
     dense building fabric with paths and several non-functional buildings;
     inhabitants move about and use their dwellings; Cairo's walkable
     radius and dwelling count exceed Boma's; the backdrop mesh is present
     and Berber Village's backdrop stays a low horizon range (max elevation
     angle bounded); the application loads without console errors
-    (`scripts/verify/enrichments.mjs`).
+    (`scripts/verify/enrichments.mjs`); the first-person ground clears a
+    measured edge-energy bar (Laplacian of a ground crop,
+    `scripts/verify/settings.mjs`) and the settlement materials wire both
+    a color and a micro-relief normal node
+    (`src/render/materials.test.ts`).
 16. **Collision inside settlements.** The collision rules of `design.md`
     §2.6 are implemented (impenetrable buildings and solid objects,
     sliding movement, inhabitants never permanently stuck, reachable
