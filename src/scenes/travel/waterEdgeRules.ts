@@ -12,10 +12,10 @@ export const BANK_GAP_DEG = 0.015
 /** A bather wades this far past the drinker's bank stop (shallow edge). */
 export const BATHE_WADE_DEG = 0.05
 /** Reed belt around the river waterline. */
-export const REED_BELT_INNER_DEG = RIVER_WIDTH_DEG - 0.03
-export const REED_BELT_OUTER_DEG = RIVER_WIDTH_DEG + 0.045
+const REED_BELT_INNER_DEG = RIVER_WIDTH_DEG - 0.03
+const REED_BELT_OUTER_DEG = RIVER_WIDTH_DEG + 0.045
 /** Reed belt around a lake shore. */
-export const REED_LAKE_SHORE_DEG = 0.04
+const REED_LAKE_SHORE_DEG = 0.04
 
 /** Reeds (papyrus) grow in a band hugging the waterline — never mid-channel. */
 export function inReedBelt(riverD: number, lakeShoreD: number): boolean {

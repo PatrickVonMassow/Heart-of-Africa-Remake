@@ -92,7 +92,7 @@ function axisIndex(seed: number): AxisIndex {
 }
 
 /** Highest ribbon surface covering a point, or null when no river is near. */
-export function riverSurfaceAt(lat: number, lon: number, seed: number): number | null {
+function riverSurfaceAt(lat: number, lon: number, seed: number): number | null {
   const grid = axisIndex(seed)
   const bx = Math.floor(lon / GRID)
   const by = Math.floor(lat / GRID)

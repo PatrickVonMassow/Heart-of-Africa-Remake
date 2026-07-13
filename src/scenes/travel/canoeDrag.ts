@@ -15,7 +15,7 @@ export interface TrailPoint {
 /** Player → hull far end (the dragged tip resting on the ground). */
 export const CANOE_TRAIL_FAR = 2.4
 /** Player → hull centre (where the mesh group sits). */
-export const CANOE_TRAIL_CENTRE = 1.35
+const CANOE_TRAIL_CENTRE = 1.35
 /** Height of the hand grip holding the hull's near end. */
 export const CANOE_GRIP_HEIGHT = 0.5
 /** The resting far end's centre line sits this far above the ground. */
