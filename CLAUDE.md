@@ -490,7 +490,13 @@ verify suite that proves it.
     measured edge-energy bar (Laplacian of a ground crop,
     `scripts/verify/settings.mjs`) and the settlement materials wire both
     a color and a micro-relief normal node
-    (`src/render/materials.test.ts`); the §4.4 port skyline landmarks
+    (`src/render/materials.test.ts`); the mid-distance ground is
+    temporally stable under TRAA with a static camera (min frame diff
+    gated, `scripts/verify/settings.mjs`) and no panorama silhouette
+    stands sunken below the settlement ground plane — the clamp and the
+    backdrop heightfield bounds pure-tested in
+    `src/scenes/place/backdrop.test.ts`, the live standing heights via
+    the dev hook (`scripts/verify/polish.mjs`); the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`)
     and Timbuktu builds the Djinguereber mosque as a collidable dwelling

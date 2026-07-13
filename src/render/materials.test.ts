@@ -4,7 +4,7 @@
 // surfaces read soft and washed out. The visual result is covered by the
 // Playwright detail checks; here the node wiring itself is pinned.
 import { describe, it, expect } from 'vitest'
-import { createGroundMaterial, createNoisyMaterial, proceduralBump } from './materials'
+import { createGroundMaterial, createNoisyMaterial, detailFade, proceduralBump } from './materials'
 import { float, mx_fractal_noise_float, positionWorld } from 'three/tsl'
 
 describe('createNoisyMaterial', () => {
@@ -43,5 +43,14 @@ describe('proceduralBump', () => {
     const height = mx_fractal_noise_float(positionWorld.mul(2), 3)
     const node = proceduralBump(height, float(2))
     expect(node).toBeTruthy()
+  })
+})
+
+describe('detailFade', () => {
+  it('builds a view-distance fade node usable as a detail amplitude', () => {
+    const fade = detailFade(16, 48)
+    expect(fade).toBeTruthy()
+    // Composes with a bump strength (the anti-trembling wiring).
+    expect(proceduralBump(mx_fractal_noise_float(positionWorld, 2), float(2).mul(fade))).toBeTruthy()
   })
 })

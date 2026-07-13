@@ -67,6 +67,38 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
   check('first-person ground shows micro-detail (edge energy)', mean > 1.5, `laplacian mean ${mean.toFixed(2)}`)
 }
 
+// --- Temporal stability of the distant ground (§7.1 pt. 15) -------------------
+// With a STATIC camera and TRAA on, the mid-distance ground must not tremble:
+// unfaded sub-pixel procedural noise resampled under the TRAA jitter shimmered
+// across the WHOLE band below the horizon (mean |frame diff| ~1.9), while the
+// distance-faded detail leaves the ground still. Gated on the FRACTION of
+// changed pixels, minimum across pairs: legitimate movers (a villager, a
+// drifting panorama silhouette) touch only a small local patch even under
+// full-regression load, whereas the trembling moved most of the crop.
+{
+  const frames = []
+  for (let i = 0; i < 4; i++) {
+    frames.push(await page.screenshot())
+    await page.waitForTimeout(250)
+  }
+  let minFrac = Infinity
+  let prev = null
+  for (const f of frames) {
+    const raw = await sharp(f).extract({ left: 100, top: 470, width: 800, height: 120 }).greyscale().raw().toBuffer()
+    if (prev) {
+      let changed = 0
+      for (let i = 0; i < raw.length; i++) if (Math.abs(raw[i] - prev[i]) > 4) changed++
+      minFrac = Math.min(minFrac, changed / raw.length)
+    }
+    prev = raw
+  }
+  check(
+    'distant ground is temporally stable under TRAA (no trembling)',
+    minFrac < 0.08,
+    `min changed-pixel fraction ${(minFrac * 100).toFixed(2)} %`,
+  )
+}
+
 // --- Strafe/backward move in the scene (design.md §2) ------------------------
 // The exact 80 % ratio is proven by the pure velocity helper in Vitest
 // (src/systems/movement.test.ts); here we only confirm both directions move a

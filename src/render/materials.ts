@@ -46,6 +46,17 @@ export function proceduralBump(height: unknown, strength: unknown) {
   return det.abs().mul(normalView).sub(grad).normalize()
 }
 
+/**
+ * Fades procedural detail out with view distance. High-frequency world-space
+ * noise turns sub-pixel in the distance, where the TRAA camera jitter samples
+ * a different value every frame and the temporal resolve cannot converge —
+ * the ground visibly trembles. Detail amplitudes are multiplied by this fade
+ * so far surfaces fall back to their flat base color/normal.
+ */
+export function detailFade(near: number, far: number) {
+  return smoothstep(float(far), float(near), positionView.z.negate())
+}
+
 export interface NoisyMaterialOptions {
   base: string
   alt: string
@@ -69,10 +80,13 @@ export function createNoisyMaterial(opts: NoisyMaterialOptions): THREE.MeshStand
   const s = typeof opts.scale === 'number' ? [opts.scale, opts.scale, opts.scale] : opts.scale
   const p = positionWorld.mul(vec3(...s))
   const n = mx_fractal_noise_float(p, opts.octaves ?? 4).mul(0.5).add(0.5)
-  // A finer second octave breaks the soft look at close range (grain).
+  // A finer second octave breaks the soft look at close range (grain); it is
+  // centred and distance-faded so far walls keep the mean brightness without
+  // the sub-pixel noise (TRAA trembling).
+  const fade = detailFade(14, 40)
   const fine = mx_fractal_noise_float(p.mul(4.0), 2).mul(0.5).add(0.5)
   let col = mix(color(opts.base), color(opts.alt), n.clamp(0, 1))
-  col = col.mul(fine.mul(0.24).add(0.88))
+  col = col.mul(fine.sub(0.5).mul(0.24).mul(fade).add(1.0))
   if (opts.weathered) {
     // Base course: the lowest ~0.6 units darken toward the ground (splash
     // zone), and faint vertical streaks run down the walls (weather run-off).
@@ -88,7 +102,7 @@ export function createNoisyMaterial(opts: NoisyMaterialOptions): THREE.MeshStand
   // bump strength works on screen-space derivatives, so the high-frequency
   // octave carries the visible structure at eye height.
   const height = n.mul(0.35).add(fine.mul(0.65))
-  m.normalNode = proceduralBump(height, float(opts.bump ?? 1.2))
+  m.normalNode = proceduralBump(height, float(opts.bump ?? 1.2).mul(fade))
   return m
 }
 
@@ -126,8 +140,8 @@ export function createGroundMaterial(
   const pebbles = mx_worley_noise_float(vec3(p.mul(1.6), 11.0))
   let col = mix(color(base), color(alt), large.clamp(0, 1))
   col = mix(col, color(patch), cells.oneMinus().pow(3).mul(0.5))
-  // Scattered pebbles/clods read as small dark specks at eye height.
-  col = col.mul(pebbles.oneMinus().pow(6).mul(-0.22).add(1))
+  // Scattered pebbles/clods read as small dark specks at eye height (the
+  // distance-faded speck term joins the colorNode below).
   const pathMask = (() => {
     if (!paths) return float(0)
     // Mask canvas maps the square ±extent around the place origin.
@@ -142,10 +156,16 @@ export function createGroundMaterial(
       .clamp(0, 1)
   })()
   if (paths) col = mix(col, color(paths.color), pathMask.mul(float(0.95)))
-  m.colorNode = col.mul(micro.mul(0.25).add(0.87)).mul(grain.mul(0.2).add(0.9))
+  // The fine grain and pebble specks are centred and distance-faded: they are
+  // sub-pixel past ~50 units, where the TRAA jitter made the ground tremble.
+  const fade = detailFade(16, 48)
+  m.colorNode = col
+    .mul(micro.mul(0.25).add(0.87))
+    .mul(grain.sub(0.5).mul(0.2).mul(fade).add(1.0))
+    .mul(pebbles.oneMinus().pow(6).mul(-0.22).mul(fade).add(1))
   // Real micro-relief: soft ripples + sandy grain + pebble bumps; trodden
   // paths are worn flat (bump fades where the mask is strong).
   const height = micro.mul(0.3).add(grain.mul(0.45)).add(pebbles.oneMinus().pow(4).mul(0.6))
-  m.normalNode = proceduralBump(height, pathMask.oneMinus().mul(3.4).add(0.6))
+  m.normalNode = proceduralBump(height, pathMask.oneMinus().mul(3.4).add(0.6).mul(fade))
   return m
 }

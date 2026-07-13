@@ -746,6 +746,176 @@ the map).
   names the thresholds, so no language change. Threshold on/off and the
   empty case pinned in Hud.test.tsx; design.md §6.1 updated. Full
   regression green.)
+- [x] 73. Settlement graphics glitches (user screenshot, first-person view):
+  (a) flat BLACK artifacts lie on the ground in places — elongated dark
+  shapes at player height between the buildings; (b) near the backdrop
+  mountains the distant ground SHIMMERS/trembles (likely z-fighting between
+  the ground plane and the panorama/far terrain). Diagnose both causes
+  (suspects: panorama-wildlife silhouettes sitting at ground level instead
+  of beyond the settlement edge; depth precision / coplanar meshes at the
+  backdrop seam), fix them, and add regression coverage on the right
+  layer(s).
+  ((a) was panorama wildlife standing on the backdrop's inner plain (~2
+  below the ground disc), horizon-clipped by the disc edge to black
+  back-slivers — standing height now clamps to the ground plane
+  (backdrop.ts panoramaGroundY, pure-tested; live heights gated in
+  polish.mjs). (b) was TRAA jitter resampling sub-pixel procedural ground
+  detail every frame (measured 1.87 mean frame diff static, 0.00 with
+  TRAA off) — grain/pebble/bump amplitudes now distance-fade
+  (detailFade in materials.ts; backdrop fine octave/bump likewise);
+  measured 0.03 after, near-field detail unchanged (edge energy 2.88).
+  Temporal-stability gate added to settings.mjs; design.md §2.5/§2.6 and
+  CLAUDE.md pt. 15 updated. Full regression green.)
+- [ ] 74. Status-bar layout fix (user report): the health bar and its
+  affliction badges currently sit LEFT in the status bar, right after the
+  stats. They must be RIGHT-ALIGNED at the bar's end — badges (e.g.
+  "Dehydrated") to the LEFT of the health bar — while the centre of the bar
+  keeps the transient hints (e.g. the canoe-carried-on-land notice), per the
+  point-70 design. Cover the alignment on the right layer(s).
+- [ ] 75. The Meroë pyramids must render MUCH larger in the travel view —
+  today's build reads too small; scale the landmark geometry up so the
+  pyramid field is unmistakable at travel zoom (keep the label/sighting
+  behaviour; adjust the pure geometry test accordingly).
+- [ ] 76. Canoe clipping still occurs (user screenshot): a canoe DRAGGED ON
+  LAND near a water edge protrudes into the water surface. The drag pose
+  must keep the hull on the land side of the bank (or resting visibly ON
+  the ground, never piercing the river/lake sheet). Extend the
+  canoeDrag/waterSurface coverage with a bank-adjacent drag case.
+- [ ] 77. "A Discovery" is a poor journal-entry heading (user feedback).
+  Rework the generic discovery/sighting entry titles into evocative,
+  entry-specific headings in BOTH languages (e.g. naming the landmark or
+  its kind) — journal texts keep the voice markup; update the affected
+  i18n tests.
+- [ ] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
+  boundary lines render in the middle of the water where two channels
+  join — the shore/edge treatment (foam/outline) must appear only at real
+  banks, never across the joined water body. Diagnose the seam (likely the
+  per-channel ribbon edges overlapping inside the merged water), fix it,
+  and cover it on the right layer(s).
+- [ ] 79. In-settlement map: opening the map INSIDE a settlement must show a
+  plan of the current place — the walkable area with the functional
+  (enterable) buildings marked and named — instead of (or in front of) the
+  continental exploration map. Localized labels in both languages; cover
+  the mode switch and the building markers on the right layer(s).
+- [ ] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
+  while feeding at a carcass — feet/body must stay on the surface for the
+  whole feed; (b) after the predator has left a kill they wait too long
+  before landing — shorten the descent trigger once the site is clear.
+  Extend the vulture live-checks/pure tests accordingly.
+- [ ] 81. Recognizable settlement surroundings (user report): the current
+  panorama never reads as the actual map neighbourhood — mountains, rivers,
+  lakes and the local fauna around the settlement are unrecognizable (the
+  24x160 vertex-color annulus smears water courses away, the 18° relief cap
+  genericizes mountains, the 5 drifting silhouettes ignore the real nearby
+  wildlife). Rework it so the first-person horizon shows the REAL
+  surroundings: preferred approach — capture a panorama (cubemap/cylinder)
+  from the travel scene itself at the settlement's position on entry
+  (direction-true mountains/water/fauna as just seen in the bird's-eye
+  view; blend/hide the near field, match light and haze). Fallback if the
+  capture path fails quality/lighting: a much higher-resolution textured
+  backdrop fed by the same terrain/hydrology rendering. Cover on both
+  layers (pure: whatever mapping/projection helpers emerge; Playwright:
+  the panorama shows the settlement's river/mountain where one exists,
+  e.g. the Nile at the Nubian village).
+- [ ] 82. After point 81: add the GIZA PYRAMIDS as a built cultural landmark
+  in the travel view (real ~1890 position just west of Cairo — Khufu,
+  Khafre, Menkaure with the Sphinx readable at a glance; the design.md §4.4
+  cultural-landmark roster, localized names and a kind-flavored discovery
+  entry in both languages grow accordingly, framed like the other African
+  achievements). Via the point-81 panorama capture it then appears in
+  Cairo's first-person skyline automatically — verify that (screenshot +
+  the landmark checks extended to 8 cultural landmarks).
+- [ ] 83. Animals must be unable to walk into the open ocean, exactly like
+  the player (user report): predators currently do it when they WALK AWAY
+  after feeding — the scripted leave path apparently bypasses the §19.5
+  water backstop that pins streamed animals to land. Route every scripted
+  movement (leave-after-feed, chase abort, any waypoint walk) through the
+  same land constraint: the walk-off deflects along the coast instead of
+  entering ocean cells. Cover the leave path on both layers (pure: the
+  deflected step rule; live: a post-feed lion walking off at a coast stays
+  on land until it despawns).
+- [ ] 84. Full phone/tablet support, with ZERO change to PC play: a touch
+  layer as a third input source in the existing merged input path (like the
+  gamepad: synthetic events, deliberate-input engagement guard — the
+  overlay mounts only after a real first touch, so desktops, including
+  touch-screen laptops never touched, see pixel-identical behaviour).
+  Left virtual stick = movement; right-half touch-drag = first-person
+  look / bird's-eye steering without pointer lock (same sensitivity
+  constant); pinch = the existing wheel zoom; the interaction prompt
+  becomes tappable and HUD shortcuts (camp/journal) stay buttons; HUD
+  scaling/safe areas for small landscape screens; a reduced mobile
+  quality preset (TRAA/SSAO/shadow resolution) tied to the same
+  activation, never to user-agent sniffing; TTS keeps the WASM path.
+  Localized labels for any new visible control in both languages.
+  Verifiable: a Playwright run with emulated touch shows the overlay
+  after a first touch, drives the player with the virtual stick, turns
+  the first-person view by drag and zooms by pinch; the desktop suites
+  prove the overlay absent and inputs unchanged without touch; unit
+  tests cover the touch→axis mapping and the engagement guard.
+- [ ] 85. Smooth the settlement figures (user report, screenshot of faceted
+  cone bodies): raise the villager/figure primitive tessellation so neither
+  the lighting facets nor the polygonal silhouette read at first-person
+  range — body cones 8 → ~24 radial segments, the head spheres (10x8) to a
+  visibly round resolution, and the same treatment for other close-range
+  faceted primitives (hut cones, pestle/mortar props) where the eye gets
+  near them. Negligible vertex cost (a handful of figures); no shader
+  change needed. Cover the raised tessellation with a pure test on the
+  built geometry (segment/vertex floor).
+- [ ] 86. Distance-stable surface roughness via BAKED TEXTURES (user report:
+  distant walls read detailed/rough while close-up they turn unnaturally
+  smooth; approach approved by the user): replace the runtime procedural
+  wall/ground shading with reproducibly GENERATED tileable textures —
+  extend the scripts/generate-terrain-textures.mjs pattern to bake the
+  existing fBm/Worley fields into albedo + normal maps (millimetre grain
+  included) for plaster, mud, thatch, wood and settlement ground; load
+  them with mipmaps + anisotropy so the GPU's mip chain band-limits
+  automatically (near = sharp, far = calm, relief distance-stable — this
+  structurally supersedes the hand-tuned near/far fades where the
+  textures take over), apply in TSL via world-space/triplanar mapping (no
+  UV work, seamless across meshes as today), and break up tiling
+  repetition by noise-modulated blending of two scales. No external
+  assets, no new dependency; keep weathering (base course, run-off
+  streaks) and path wear working on top. The point-73 anti-trembling gate
+  must stay green and the settings.mjs edge-energy bar must not regress
+  (near detail should rise); screenshots for the user's look check.
+  Cover the generator output (tileability: opposite edges match; normal
+  map normalisation) and material construction in Vitest; re-verify both
+  Playwright gates.
+- [ ] 87. Natural settlement layout (user report, screenshot): the building
+  placement — especially in large ports like Cairo — reads as randomly
+  scattered; some entrances are nearly unreachable behind other buildings
+  (squeezing around corners), and windows face directly into neighbouring
+  walls. Rework the procedural layout so buildings line IMPLICIT STREETS:
+  an organic, period-appropriate lane network (winding alleys, small
+  irregular squares — explicitly NOT a rectangular grid), buildings
+  fronting the lanes with their door side, every door reachable directly
+  from a lane, and every building's windows keeping a clear line outward
+  (no window pressed against a neighbouring wall). Keep region-typical
+  density/size gradation (§2.6/§4.1), the existing path-mask rendering
+  fed by the same lanes, and all collision/door invariants. Cover in
+  Vitest with pure layout invariants (door-to-lane reachability without
+  corner squeezes, window clearance, no building overlapping a lane) and
+  keep the collision/flow suites green; screenshot evidence of the new
+  fabric. SMALL NATIVE VILLAGES must read noticeably DIFFERENT from the
+  large ports: before implementing, RESEARCH how sub-Saharan/North-African
+  villages of the period were actually organised (e.g. compound/homestead
+  clusters around a central cattle kraal or meeting ground, concentric
+  ring layouts, family-group clusters with shared open space — likely no
+  established street network at all; the research decides per region) and
+  give villages their own period-accurate organising principle(s) per
+  region while only the ports get the dense organic lane fabric; record
+  the research result briefly in design.md (§2.6/§4.5) and reflect the
+  port/village difference in the layout invariants and screenshots.
+- [ ] 88. Cache the Kokoro TTS model for the headless verification: every
+  Playwright run uses a fresh profile and re-downloads the ~90 MB model
+  from the Hugging Face CDN — repeated regressions today tripped the CDN's
+  rate limit (HTTP 403 on the model file), failing voice.mjs on a healthy
+  codebase. Serve the model from a local cache in the verify runs (e.g.
+  download once into a git-ignored cache dir and intercept the request via
+  Playwright routing, or a persistent browser profile for voice.mjs) so
+  the regression is CDN-independent and faster; the production/player path
+  stays unchanged (browser cache + CDN streaming per CLAUDE.md §3). Cover
+  with the voice suite running green offline-from-HF (cache primed).
 
 ## Closing (only after all points)
 

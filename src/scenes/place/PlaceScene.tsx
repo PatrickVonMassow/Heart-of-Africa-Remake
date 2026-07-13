@@ -24,11 +24,20 @@ import { useUi, type BuildingType } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
+import {
+  BACKDROP_HEIGHT,
+  BACKDROP_MAX_SLOPE,
+  BACKDROP_OUTER,
+  BACKDROP_RINGS,
+  BACKDROP_SCALE,
+  BACKDROP_SEGS,
+  panoramaGroundY,
+} from './backdrop'
 import { mulberry32 } from '../../world/noise'
 import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
-import { createGroundMaterial, createNoisyMaterial, proceduralBump } from '../../render/materials'
+import { createGroundMaterial, createNoisyMaterial, detailFade, proceduralBump } from '../../render/materials'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain } from '../../render/landmarks'
 import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
@@ -1396,6 +1405,7 @@ function PanoramaWildlife({
     w.__placePanoramaWildlife = items.length
     return () => {
       delete w.__placePanoramaWildlife
+      delete w.__placePanoramaWildlifeInfo
     }
   }, [items])
 
@@ -1407,9 +1417,15 @@ function PanoramaWildlife({
       const a = it.angle + t * it.drift
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
-      // Sit on the backdrop relief (not a flat y=0) so the silhouette neither
-      // floats above a dip nor sinks into a dune/ridge; a gentle walk bob on top.
-      const groundY = backdropHeightAt(x, z, lat, lon, seed, centerH, innerRadius)
+      // Clamped standing height (backdrop.ts): follows the relief, but never
+      // sunken behind the ground disc's false horizon, where only a black
+      // back-sliver stayed visible; a gentle walk bob on top.
+      const groundY = panoramaGroundY(x, z, lat, lon, seed, centerH, innerRadius)
+      if (import.meta.env.DEV) {
+        const w = window as unknown as Record<string, unknown>
+        const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, number>
+        info[i] = groundY
+      }
       g.position.set(x, groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12, z)
       // Face the drift direction along the ring tangent.
       g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
@@ -1442,30 +1458,7 @@ function PanoramaWildlife({
  * coast that lie there in the bird's-eye view. Rendered as distant scenery
  * in biome colors; heights are exaggerated to read at person scale.
  */
-const BACKDROP_SCALE = 0.005 // degrees of map per place-unit of distance
-const BACKDROP_HEIGHT = 30 // vertical exaggeration of the map relief
-// Max backdrop rise as a fraction of the ring's distance (~tan of the elevation
-// angle): keeps mountains as a distant horizon range, never looming over the
-// camera. atan(0.32) ≈ 18°.
-const BACKDROP_MAX_SLOPE = 0.32
-const BACKDROP_RINGS = 24
-const BACKDROP_SEGS = 160 // smoother far-range silhouette (shader adds detail)
-const BACKDROP_OUTER = 340 // outermost ring radius
 
-/**
- * Height of the backdrop surface at a point (x, z) around the place centre —
- * the same formula the backdrop mesh is built from, so panorama wildlife can
- * sit on the relief instead of floating above it or sinking into it (§2.5).
- */
-function backdropHeightAt(x: number, z: number, lat: number, lon: number, seed: number, centerH: number, r0: number): number {
-  const r = Math.hypot(x, z)
-  const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
-  const relief = (smp.height - centerH) * BACKDROP_HEIGHT
-  const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
-  const ri = ((BACKDROP_RINGS - 1) * Math.log(Math.max(r, r0) / r0)) / Math.log(BACKDROP_OUTER / r0)
-  const taper = Math.min(1, ri / 5)
-  return capped * taper - 2
-}
 
 /**
  * Table Mountain behind Cape Town (design.md §4.4 Part C): the flat-topped
@@ -1555,8 +1548,12 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     const steep = smoothstep(float(0.95), float(0.55), normalWorldGeometry.y)
     let col = attribute('color', 'vec3') as unknown as ReturnType<typeof vec3>
     col = mix(col, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof col
-    m.colorNode = col.mul(rock.mul(0.22).add(0.89)).mul(fine.mul(0.12).add(0.94))
-    m.normalNode = proceduralBump(rock.mul(0.7).add(fine.mul(0.3)), float(2.6))
+    // The fine octave and the bump are distance-faded: past ~200 units they
+    // are sub-pixel and only fed the TRAA trembling (the low-frequency rock
+    // banding carries the far silhouette structure on its own).
+    const fade = detailFade(70, 200)
+    m.colorNode = col.mul(rock.mul(0.22).add(0.89)).mul(fine.sub(0.5).mul(0.12).mul(fade).add(1.0))
+    m.normalNode = proceduralBump(rock.mul(0.7).add(fine.mul(0.3)), float(2.6).mul(fade))
     return m
   }, [])
   useEffect(() => () => geometry.dispose(), [geometry])

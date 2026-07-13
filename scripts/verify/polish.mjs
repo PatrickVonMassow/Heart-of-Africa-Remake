@@ -43,6 +43,16 @@ await page.waitForTimeout(500)
 await page.waitForFunction(() => (window.__placePanoramaWildlife ?? 0) >= 3, null, { timeout: 20000 }).catch(() => {})
 const wildlife = await page.evaluate(() => window.__placePanoramaWildlife ?? 0)
 check('distant wildlife drifts through the panorama', wildlife >= 3, `${wildlife} animals`)
+// No silhouette may stand sunken behind the ground disc's false horizon
+// (user-reported black back-slivers): every standing height is clamped to
+// the disc plane or follows genuinely rising relief.
+await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 10000 }).catch(() => {})
+const groundYs = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
+check(
+  'no panorama silhouette sinks below the settlement ground plane',
+  groundYs.length >= 3 && groundYs.every((y) => y >= 0),
+  `groundY [${groundYs.map((y) => y.toFixed(2)).join(', ')}]`,
+)
 
 // --- Orientation after a gift (design.md §17) ---------------------------------------
 const before = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)

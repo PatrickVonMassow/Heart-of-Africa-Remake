@@ -1,0 +1,76 @@
+// Panorama backdrop geometry (design.md §2.5, CLAUDE.md §7.1 pt. 15): the
+// annulus heightfield formula and the panorama-wildlife standing height.
+// Guards the user-reported artifact where silhouettes standing on the sunken
+// inner plain (y ≈ -2) were horizon-clipped by the settlement's ground disc
+// to flat black back-slivers "lying on the sand".
+import { describe, it, expect, beforeAll } from 'vitest'
+import { backdropHeightAt, panoramaGroundY, BACKDROP_MAX_SLOPE, BACKDROP_OUTER } from './backdrop'
+import { placeById } from '../../world/geo'
+import { sampleTerrain } from '../../world/terrain'
+import { setupGeodata } from '../../test/geodata'
+
+const SEED = 42
+
+beforeAll(async () => {
+  await setupGeodata()
+})
+
+/** Mirror of the PlaceScene wiring: inner radius = layout radius + 12. */
+function placeParams(placeId: string, layoutRadius: number) {
+  const p = placeById(placeId)
+  const centerH = sampleTerrain(p.lat, p.lon, SEED).height
+  return { lat: p.lat, lon: p.lon, centerH, r0: layoutRadius + 12 }
+}
+
+describe('backdrop heightfield (design.md §2.5)', () => {
+  it('tucks the inner rim exactly 2 units below the settlement ground', () => {
+    const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
+    // At the inner radius the taper is 0, so the rim sits at -2 regardless
+    // of the surrounding relief — hidden under the wider ground disc.
+    for (const a of [0, 1.2, 2.5, 4.1]) {
+      const y = backdropHeightAt(Math.cos(a) * r0, Math.sin(a) * r0, lat, lon, SEED, centerH, r0)
+      expect(y).toBeCloseTo(-2, 5)
+    }
+  })
+
+  it('never exceeds the looming bound anywhere on the annulus', () => {
+    const { lat, lon, centerH, r0 } = placeParams('berber-village', 26)
+    for (let i = 0; i < 64; i++) {
+      const a = (i / 64) * Math.PI * 2
+      const r = r0 + (i % 8) * ((BACKDROP_OUTER - r0) / 8)
+      const y = backdropHeightAt(Math.cos(a) * r, Math.sin(a) * r, lat, lon, SEED, centerH, r0)
+      expect(y).toBeLessThanOrEqual(r * BACKDROP_MAX_SLOPE)
+    }
+  })
+})
+
+describe('panorama-wildlife standing height (user-reported black slivers)', () => {
+  it('clamps a silhouette on the sunken plain to just above the disc plane', () => {
+    const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
+    // Sweep the wildlife band (r0+14 .. r0+28): wherever the raw backdrop
+    // height is below the ground disc, the standing height clamps to 0.02;
+    // where the relief genuinely rises it is followed unchanged.
+    let clamped = 0
+    let followed = 0
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * Math.PI * 2
+      const r = r0 + 14 + (i % 3) * 7
+      const x = Math.cos(a) * r
+      const z = Math.sin(a) * r
+      const raw = backdropHeightAt(x, z, lat, lon, SEED, centerH, r0)
+      const y = panoramaGroundY(x, z, lat, lon, SEED, centerH, r0)
+      expect(y).toBeGreaterThanOrEqual(0.02)
+      if (raw < 0.02) {
+        expect(y).toBe(0.02)
+        clamped++
+      } else {
+        expect(y).toBe(raw)
+        followed++
+      }
+    }
+    // Cairo's flat delta surroundings must exercise the clamp; its dunes the
+    // relief-following branch — both paths are real, not vacuous.
+    expect(clamped).toBeGreaterThan(0)
+    expect(followed).toBeGreaterThan(0)
+  })
+})
