@@ -32,7 +32,7 @@ Entering and leaving a settlement happen purely through movement, without a dedi
 - In the bird's-eye view, walking onto a settlement's position enters it and switches to the first-person view.
 - Inside, walking beyond the settlement's walkable edge leaves it and switches back to the bird's-eye view with the field of view around the current position — there is no exit archway and no "leave" key.
 - A settlement just left stays closed to re-entry until the traveller has moved clear of it (a calibratable clearance beyond the enter radius), so leaving never bounces straight back in.
-- A settlement is not auto-entered while the traveller is on a water cell: riverside villages reach close to the channel, so canoeing a river would otherwise drift him in by accident. He enters by stepping onto land.
+- A settlement is not auto-entered while the traveller is on a water cell: even with the village-river clearance of §4.2, a riverside village's enter radius can touch the water, and canoeing a river must never drift him in by accident. He enters by stepping onto land.
 - Enterable buildings (trade, service and audience buildings) open by walking against their entrance door — the same deliberate opening the inhabitants use, no key press. Only the village elder is addressed with the interaction key.
 
 ### 2.4 Graphics and atmosphere
@@ -44,7 +44,7 @@ Villages and their inhabitants are styled typically for their region (building s
 The background of the first-person view plausibly matches the landscape one would see at this spot in the bird's-eye view:
 
 - The real map terrain around the settlement's position is rendered as a distant panorama — mountains and ridges, river courses, lakes and the sea appear where they actually lie, in their biome colors, with exaggerated relief so they read at person scale.
-- The relief is capped so that even a mountainous surrounding (e.g. the Atlas behind Berber Village) reads as a distant range on the horizon rather than looming up and arcing over the camera; the panorama surface is drawn double-sided so steep far slopes never show as dark overhanging gaps.
+- The relief is capped so that even a mountainous surrounding (e.g. the Atlas behind Berber Village) reads as a distant range on the horizon rather than looming over the camera. The panorama surface is drawn double-sided so steep far slopes never show as dark overhanging gaps.
 - Distant wildlife moves through the panorama: far-off, region-typical animals (elephants, giraffes, zebras in the savanna; antelope near the desert) drift slowly as silhouettes beyond the settlement edge, sitting on the backdrop relief (never floating above a dip or sinking into a ridge).
 
 ### 2.6 Lively, densely built settlements (first-person)
@@ -158,7 +158,7 @@ Afflictions alter controls/vision and can be fatal:
 - Fever/illness (mainly in wetlands) → temporarily uncontrolled movement.
 - Dehydration (desert without water) → drift; avoidable with a filled canteen.
 - Sun blindness (desert) → restricted vision, can end fatally — the canteen does not help against it; recovery only outside the desert.
-- Wounds (animals/robberies) — wounds also mend on their own while the traveler is fed: a severe wound subsides to a light one and a light wound closes over days (calibratable), so recovery without medicine is possible; medicine remains the instant cure. A wound also shows on the traveler's bird's-eye figure, scaling with severity — a bandaged head for a light wound, a bloodied head and shoulders for a severe one — just as it shows on the writing hand (§16.3).
+- Wounds (animals/robberies) — wounds also mend on their own while the traveler is fed: a severe wound subsides to a light one and a light wound closes over days (calibratable), so recovery without medicine is possible; medicine remains the instant cure. A wound also shows on the traveler's bird's-eye figure, scaling with severity: a bandaged head for a light wound, a bloodied head and shoulders for a severe one. The writing hand shows it too (§16.3).
 - Medicine cures fever and wounds.
 - Loss of the expedition → a successor takes over.
 
@@ -185,7 +185,7 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 | Map | Orientation aid; clicking it in the inventory bar opens the exploration overview |
 | Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles. Its depiction in the bird's-eye view makes the state legible: travelling water the explorer sits in the canoe (riding on the surface, paddling); on land he drags it along behind him |
 
-Core rule: a carried item acts by mere possession — it decides terrain mobility and treasure recovery, and a weapon (rifle or machete) in the pack protects against wild-animal attacks, the rifle more strongly than the machete (§14). There is no "in hand" state.
+Core rule: items act by possession alone, never "in hand" (§6.1); the table above carries the per-item effects.
 
 ---
 
@@ -245,12 +245,12 @@ Every settlement — port city or native village — offers at least the baselin
 | Jungle | Machete | without: nearly impassable; with: traversable |
 | Mountains | Rope | without: passable but slow and dangerous — the traveler is warned, then risks a fall on the rock (a light or severe wound, possibly losing a carried item); with: safe and faster |
 | River/lake | Canoe | with: fast, safe water travel; carried on any land (desert/savanna/jungle/mountain): marked speed penalty |
-| Savanna/open | Rifle (outside villages) | without: higher robbery risk. Carrying the canoe here slows travel |
+| Savanna/open | Rifle (outside villages) | without: higher robbery risk |
 | Dig site | Shovel | without: no find; with (click the shovel): dig it up |
 
 Movement happens in the bird's-eye view; the terrain is rendered in 3D, the controls remain top-down oriented.
 
-The traveller has a body in the bird's-eye view: he collides with the large, solid dressing (trees and boulder piles) and with the wildlife (§19), and cannot walk through them — a fast step is caught at the obstacle's near edge (no passing through), and movement slides along it. Small dressing (bushes, reeds, termite mounds, loose rocks) and carcasses stay passable.
+The traveller has a body in the bird's-eye view: he collides with the large, solid dressing (trees and boulder piles) and with the wildlife (§19) — a fast step is caught at the obstacle's near edge, and movement slides along it. Small dressing (bushes, reeds, termite mounds, loose rocks) and carcasses stay passable.
 
 ### 11.1 Visible slowdown reason
 
@@ -262,7 +262,7 @@ The first encounter of each penalty type is additionally announced once in the j
 
 Movement is restricted to the continent and its inland waters (rivers, lakes). Sea within the continent's outline — bays, gulfs and straits cutting into the landmass — counts as inland water and can be swum or crossed by canoe like a river or lake; the open ocean beyond is not navigable, so the continent cannot be left.
 
-Two seas are never inland water regardless of the outline: everything northeast of the African Red Sea coast (§3.1) — the Red Sea itself, Sinai and the Arabian peninsula — and the Mediterranean off the entire northern coast (Alexandria, the Nile delta, the Gulf of Sidra …) are open, impassable ocean, with no swimmable band. The other bays keep their outline treatment unchanged.
+Two seas are never inland water regardless of the outline: everything northeast of the African Red Sea coast (the Red Sea cut of §3.1) and the Mediterranean off the entire northern coast (Alexandria, the Nile delta, the Gulf of Sidra …) are open, impassable ocean, with no swimmable band. The other bays keep their outline treatment unchanged.
 
 Even inside the outline, swimmable sea reaches only a short band off the coast (a calibratable balance value, debug menu §21); further out the open ocean blocks — there is no swimming far out to sea.
 
@@ -341,7 +341,7 @@ Hidden triggering per time step/region/condition.
 - Wild-animal attacks (lions, cheetahs, leopards, hyenas and snakes): an attack can injure or kill. Danger order: lion (most likely to kill) > hyena > leopard > cheetah (rarely presses an attack home). A rifle or machete in the pack lowers the risk, the rifle more. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into a wandering predator in the bird's-eye view (§19) directly triggers that predator's attack (same outcome rules and protection).
 - Robber attacks: can injure and steal inventory items. As with animal attacks, a machete lowers the risk, a rifle more so.
 - Protection through "Honored Friend": near the villages of a region where you hold this status, the natives rush to help during animal and robber attacks; you can then at most be lightly injured (§12).
-- Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Without a canoe the rifle gets wet and does not help — then only a machete lowers the risk; in the canoe the rifle works normally (§11).
+- Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Against crocodiles only a machete helps out of the canoe; the rifle works from the canoe alone (§11.3).
 - Current at waterfalls: near waterfalls the strong current can sweep the character over — with injuries and the loss of a large part of the inventory (§11).
 - Illness/fever (climate/region dependent) → affliction (§6).
 - Fever delirium → temporarily uncontrolled movement.
@@ -351,12 +351,10 @@ Hidden triggering per time step/region/condition.
 
 ### 14.2 Item protection
 
-The fitting piece of equipment in the pack helps during events:
-
-- Rifle or machete lower the risk of animal and robber attacks on land (a rifle more than a machete); the rifle deters thieves.
-- Against crocodiles in water the machete always helps, a rifle only in the canoe (without a canoe it gets wet and fails).
-- Medicine cures wounds and fever.
-- The canteen protects against dehydration while it holds water (not against sun blindness).
+The fitting piece of equipment in the pack helps during events. Protection
+sources: weapons against animal/robber attacks per §7/§14.1 (rifle >
+machete; against crocodiles per §11.3), medicine as the instant cure
+(§6.2), the canteen against dehydration (§6.1).
 
 ### 14.3 Calibration
 
@@ -455,7 +453,7 @@ First-person view (settlements): walkable space, interaction prompts at building
 
 ### 17.4 Layering
 
-Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and does not extend to the bottom of the screen: it ends above the camp and journal buttons in the bottom corner, leaving a small gap, so those buttons are never covered.
+Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and ends above the camp and journal buttons in the bottom corner, so those buttons are never covered.
 
 ### 17.5 Controls and focus
 
@@ -511,7 +509,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - The big predators (lion, hyena) bring down the large grazers (wildebeest, zebra); the lighter cats (cheetah, leopard) take the smaller, faster game (antelope, warthog). A hunt's prey is the predator's scheme intersected with what the region actually holds.
 - Every wandering predator attacks the player on contact (§14), rate-limited by the event cooldown, with the §14 danger order (lion > hyena > leopard > cheetah, which is timid toward people) and protection rules (§7/§14). Away from a contact the predators remain scenery.
 - The predator closes in from a random direction, so hunts run any which way across the plain. The fleeing prey weaves left and right to shake the hunter, which pursues with a limited turning rate (sharp cuts throw it wide) yet is faster and closes in over time.
-- Brought-down prey is visibly fed on (schematic: the predator stands over the carcass with lowered, rhythmically tearing head movements, a red stain spreading beneath) while the carcass shrinks away piece by piece.
+- Brought-down prey is visibly fed on (the predator stands over the carcass with lowered, rhythmically tearing head movements, a red stain spreading beneath) while the carcass shrinks away piece by piece.
 - The kill is not stripped bare: a small remnant stays beside the stain when the predator walks off, and the vultures that circled the kill all along descend and finish it themselves. No new scavenger flies in for a flocked kill; the lone ground scavenger serves only carcasses without a circling flock (e.g. trampled animals).
 
 ### 19.4 Elephants and trampling
@@ -542,10 +540,10 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 
 ### 19.8 Family life in the herds
 
-- A herd raises a juvenile (a small calf or foal) that keeps close to a parent and nurses beside it. The young reads as young beyond mere size — a baby schema within the schematic style: a proportionally larger head on a shorter neck, a shorter, rounder body on relatively long, thin legs, none of the adult ornaments (no horns, tusks, beard or mane; the elephant calf with stubby trunk and smaller ears, the giraffe calf with a much shorter neck).
+- A herd raises a juvenile (a small calf or foal) that keeps close to a parent and nurses beside it. The young reads as young beyond mere size — a baby schema: a proportionally larger head on a shorter neck, a shorter, rounder body on relatively long, thin legs, none of the adult ornaments (no horns, tusks, beard or mane; the elephant calf with stubby trunk and smaller ears, the giraffe calf with a much shorter neck).
 - A predator closing on the young finds the parent moving between them: it stands off just in front of the calf, facing the danger down, instead of fleeing.
 - When a hunt targets the calf itself, the calf bolts and — slower than its hunter — is visibly run down in the open. The parent runs as a living shield on the escape line, holding itself between hunter and young: a hunter that closes in reaches the parent first and takes it in the calf's place, and the calf escapes uncaught.
-- If the shield is out of position and the calf is caught, it is not killed at once: it struggles alive for a few seconds (no wound or bloodstain yet) while the parent rushes the predator. Reaching it within that window, the parent is taken in the calf's place and the calf gets up and escapes; arriving merely close by the struggle's end, it is dragged down and eaten alongside the calf.
+- If the shield is out of position and the calf is caught, it is not killed at once: it struggles alive for a few seconds (no wound or bloodstain yet) while the parent rushes the predator. A parent that reaches the predator within that window is taken in the calf's place, and the calf gets up and escapes. A parent that only got close by the struggle's end is dragged down and eaten alongside the calf.
 - Calves are playful: on their own rhythm they break into short gambolling hop-bouts around the parent. At a shore a bout can carry a calf into open water, where it struggles and drifts with the current; the parent wades in, pulls it out on reach, and the two walk back to the bank.
 - Near a waterfall the current keeps its menace (§11) for the animals too: calf or parent in its reach is swept over the falls to its death — and a parent follows a swept calf, plunging after it and dying with it.
 

@@ -200,12 +200,12 @@ verify suite that proves it.
    without errors. The application loads without console errors.
 2. **Two perspectives.** Bird's-eye view (3D travel across the continent)
    and first-person view (walkable settlement) exist; switching between
-   them happens through movement alone per `design.md` §2.3 (walk in /
-   walk out, buildings open by walking against their door, only the elder
-   keeps the interaction key, a just-left settlement stays closed to
-   re-entry until the traveller has moved clear — a calibratable clearance
-   beyond the enter radius — and a settlement is not auto-entered while the
-   traveller is on a water cell, so a river passage never pulls him in).
+   them happens through movement alone per `design.md` §2.3. In
+   particular: buildings open by walking against their door and only the
+   elder keeps the interaction key. A just-left settlement stays closed to
+   re-entry until the traveller has moved clear (a calibratable clearance
+   beyond the enter radius). A settlement is not auto-entered while the
+   traveller is on a water cell, so a river passage never pulls him in.
    Entering focuses the controls without an extra click per `design.md`
    §17.5 (HUD buttons blurred; mouse-look engages on entry from the walk-in
    keypress, with the click as fallback). Verifiable: an automated run
@@ -221,10 +221,9 @@ verify suite that proves it.
    courses. Region borders carry the localized region name on each side of
    the line in both views (§3.2); map-point labels are discovery-gated
    (§17.2); coordinates are read out on demand via the position query
-   (§3.2, pt. 30), never shown permanently. The exploration map (§19.11)
-   reads as a real hand-drawn parchment chart (engraved border, title
-   cartouche, ink coasts/rivers/lakes, region names, compass) under a fog
-   of war that each explored area clears a window through. Every village
+   (§3.2, pt. 30), never shown permanently. The exploration map is
+   implemented per §19.11 (a hand-drawn parchment chart under a fog of war
+   that each explored area clears a window through). Every village
    keeps the small minimum river-water clearance of §4.2 (its footprint
    never reaches into a river; ports are exempt). Verifiable: near
    a border, `.region-label` elements name both regions on their sides;
@@ -237,58 +236,48 @@ verify suite that proves it.
    (`src/world/world.test.ts`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890).
-   The movement boundary of `design.md` §11.2 holds (enclosed sea
-   swimmable only within the calibratable coastal band, open ocean
-   blocks, the Red Sea cut of §3.1/§11.2: everything northeast of the
-   African Red Sea coast is blocked ocean, never inland water, the
-   Mediterranean always-blocked rule of §11.2: the sea off the northern
-   coast is open ocean with no swimmable band, and the
-   §3.1 world trim: no land renders outside the game's land masses), as
-   do the ropeless mountain climb with
-   its warning and fall risk (§7/§11), the visible movement-penalty reason
-   incl. the canoe-on-land penalty and its once-per-type journal
-   announcement (§11.1, both languages, voice markup, flag in the
-   checkpoint), and possession-based item effects (§6.1/§7 — no "in hand"
-   state), incl. the canoe depiction of §7 (with one in the pack the
-   explorer rides it seated on the water and drags it behind him on land),
-   and the bird's-eye collision with trees and animals (§11/§19 — the
-   traveller cannot walk through them, a fast step is caught at the near
-   edge with no tunnelling, small dressing and carcasses stay passable).
-   Verifiable: an automated move on enclosed sea advances the
-   position, a move on open ocean is refused with the blocking notice, a
-   move onto a mountain without a rope advances (with the warning) while
-   the rope makes it faster, and a forced fall wounds the traveler and can
-   drop an item; the penalty mapping is pure-tested for each terrain
-   (incl. the canoe-on-land penalty on every land type), a canoe run on
-   savanna covers clearly less ground than without it (the land malus is
-   real, not just a hint), the top-right HUD hint appears in jungle
-   without a machete and clears once the machete is in the pack, a
-   first jungle entry adds exactly one journal warning while a later entry
-   adds none, and with a canoe in the pack the explorer rides it on a
-   water tile (`__player.canoeing`) but drags it on a land tile
-   (`__player.carrying`) while removing the canoe clears both, and driving
-   straight into a pinned animal blocks the traveller at its body edge
-   without ever entering it while steering away afterwards moves him
-   clear — a collision never pins the traveller
-   (`scripts/verify/enrichments.mjs`), the swept
-   obstacle resolve pure-tested incl. the no-tunnelling case and the
+   The movement boundary, Red Sea cut, Mediterranean always-blocked rule
+   and world trim of `design.md` §11.2/§3.1 hold. So do the ropeless
+   mountain climb with its warning and fall risk (§7/§11), the visible
+   movement-penalty reason incl. the canoe-on-land penalty and its
+   once-per-type journal announcement (§11.1, both languages, voice
+   markup, flag in the checkpoint), possession-based item effects incl.
+   the canoe ride/drag depiction (§6.1/§7), and the bird's-eye collision
+   with trees and animals (§11/§19 — a fast step is caught at the near
+   edge with no tunnelling; small dressing and carcasses stay passable).
+   Verifiable: an automated move on enclosed sea advances the position; a
+   move on open ocean is refused with the blocking notice; a move onto a
+   mountain without a rope advances (with the warning) while the rope
+   makes it faster, and a forced fall wounds the traveler and can drop an
+   item. The penalty mapping is pure-tested for each terrain (incl. the
+   canoe-on-land penalty on every land type). A canoe run on savanna
+   covers clearly less ground than without it (the land malus is real,
+   not just a hint). The top-right HUD hint appears in jungle without a
+   machete and clears once the machete is in the pack; a first jungle
+   entry adds exactly one journal warning while a later entry adds none.
+   With a canoe in the pack the explorer rides it on a water tile
+   (`__player.canoeing`) but drags it on a land tile (`__player.carrying`),
+   and removing the canoe clears both. Driving straight into a pinned
+   animal blocks the traveller at its body edge without ever entering it,
+   and steering away afterwards moves him clear — a collision never pins
+   the traveller (`scripts/verify/enrichments.mjs`); the swept obstacle
+   resolve is pure-tested incl. the no-tunnelling case and the
    away/tangent moves from a resting contact staying free
-   (`src/systems/movement.test.ts`); the Red Sea cut and
-   world trim are pure-tested at the acceptance coordinates — mid Red
-   Sea, Sinai, the Arabian peninsula and the Gulf of Aden are blocked
-   ocean (Sinai/Arabia trimmed in the DEM, so no land route rounds the
-   Red Sea; shallow sea northeast of the boundary reads as deep open
-   ocean), foreign land (southern Spain, Sicily, Crete, the Canaries,
-   the Comoros … and the unreachable Madagascar) samples as ocean while
-   the game's reachable islands stay land,
-   no trimmed texel borders kept land outside the Suez isthmus gate (no
-   ocean scrap juts into the coast), the Nile delta and the African Red
-   Sea coast stay walkable land, nearshore sea swims while far-offshore
-   sea blocks even inside the hull (the margin edits at runtime), the
-   Mediterranean blocks everywhere — off the delta, off Alexandria, in
-   the Sidra bight — regardless of the swim margin, and the hull rules
-   for the open Atlantic and the Mozambique channel are unchanged
-   (`src/world/redSea.test.ts`).
+   (`src/systems/movement.test.ts`). The Red Sea cut and world trim are
+   pure-tested at the acceptance coordinates: mid Red Sea, Sinai, the
+   Arabian peninsula and the Gulf of Aden are blocked ocean (Sinai/Arabia
+   trimmed in the DEM, so no land route rounds the Red Sea; shallow sea
+   northeast of the boundary reads as deep open ocean); foreign land
+   (southern Spain, Sicily, Crete, the Canaries, the Comoros … and the
+   unreachable Madagascar) samples as ocean while the game's reachable
+   islands stay land; no trimmed texel borders kept land outside the Suez
+   isthmus gate (no ocean scrap juts into the coast); the Nile delta and
+   the African Red Sea coast stay walkable land; nearshore sea swims
+   while far-offshore sea blocks even inside the hull (the margin edits
+   at runtime); the Mediterranean blocks everywhere — off the delta, off
+   Alexandria, in the Sidra bight — regardless of the swim margin; and
+   the hull rules for the open Atlantic and the Mozambique channel are
+   unchanged (`src/world/redSea.test.ts`).
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (`design.md` §18; simplified saving is
@@ -326,10 +315,8 @@ verify suite that proves it.
    coordinates (removed on user request); transient status hints (e.g.
    the movement-penalty reason, pt. 4) render as a right-aligned item
    inside the status bar itself, not in a separate floating panel; the
-   inventory item currently in use glows (§17.1); a top-right health bar
-   (below the status bar, at the FPS-counter height) is green at full
-   health and reddens toward zero, with the active afflictions shown as
-   badges to its left (§17.1). Verifiable: the hint element is a descendant
+   inventory item currently in use glows, and the top-right health bar
+   with its affliction badges renders per §17.1. Verifiable: the hint element is a descendant
    of `.status-bar` and its box stays within the bar's box, and a canoe on
    water / medicine while afflicted gains `.inv-active` while an idle item
    does not (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is
@@ -528,15 +515,13 @@ verify suite that proves it.
     terrain relief items are tunable as factors (§11/§21.2). All of these
     are adjustable at runtime in the debug menu (§21) in both languages.
     The zoom behavior of §21.4 holds: the bird's-eye mouse-wheel zoom is
-    always active (0.25x-16x) starting at the closer default 0.5, with a
-    debug checkbox gating zoom-out beyond that default (disabling clamps a
-    wider view back to it), the unlocked range
-    reaches a whole-continent view (coarse far-terrain sheet, glassy sea,
-    fog receding to the horizon and ground haze fading, both returning as
-    the zoom drops back), and the camera near plane snaps back to the
-    first-person default the moment another scene takes the shared camera
-    — entering a settlement straight out of the debug zoom must never clip
-    hut walls. The debug menu offers the §21.3 dropdown selectors
+    always active (0.25x-16x) starting at the closer default 0.5. A debug
+    checkbox gates zoom-out beyond that default (disabling clamps a wider
+    view back to it), and the unlocked range reaches a whole-continent
+    view per §21.4. The camera near plane snaps back to the first-person
+    default the moment another scene takes the shared camera — entering a
+    settlement straight out of the debug zoom must never clip hut walls.
+    The debug menu offers the §21.3 dropdown selectors
     (jump-to: ports/villages, the elephant graveyard and the tomb;
     equipment; gifts), the read-only render-backend row and the journal
     do-not-disturb option (§16.2; also F2); the §21.1 shortcuts hold (F1
@@ -824,13 +809,8 @@ After completion and after every major system:
 
 - Multiplayer in any form.
 - Onboarding, tutorials, lowering of the entry barrier.
-  (The animated handwriting with blood traces, formerly listed here,
-  became part of the target via criterion §7.1 pt. 29.)
 - Full balance calibration; a debug menu (§21 `design.md`) beyond what §2
-  and the verification require. (Audio, dynamic music and ambient wildlife
-  were formerly listed here; they became part of the target via criterion
-  §7.1 pt. 12 and are implemented. The tabular load menu, formerly listed
-  here too, became part of the target via criterion §7.1 pt. 28.)
+  and the verification require.
 
 These points are not to be started, not even partially, as long as the
 acceptance criteria of §7.1 are not fully met.
