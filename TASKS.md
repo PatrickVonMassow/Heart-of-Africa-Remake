@@ -394,6 +394,26 @@ the map).
   __culturalLandmarks dev hook; store.travel + i18n coverage tests;
   enrichments asserts the four mount, render and reveal (screenshot 91). The
   Kokoro speech stack was not touched. Full regression green.)
+- [x] 59. The auto focus-on-controls of point 49 must not run at the initial
+  start while the checkpoint-load choice (StartOverlay) is shown — the cursor
+  is needed to make that choice. Do not grab the pointer while any full-screen
+  overlay (start choice, defeat, victory) is up.
+  (grab() in PlaceScene skips the pointer lock while any `.overlay` is in the
+  DOM — the overlay is committed before the effect runs, so the start-of-game
+  grab already sees it; covers defeat/victory too. design.md §17.5 updated;
+  flow.mjs spies requestPointerLock across two loads — fresh start grabs, a
+  seeded checkpoint's start-choice overlay does not, and the post-choice
+  canvas click grabs. Full regression green.)
+- [ ] 60. The Nubian Village on the Nile still reaches into the water, so
+  canoeing the Nile drifts the traveller into it. Keep a small minimum
+  clearance between every river and every village so their footprints never
+  overlap the water.
+- [ ] 61. BLOCKER: after the bird's-eye traveller collides with a tree once,
+  steering stops working entirely (the figure can even vanish). The swept
+  obstacle resolver of point 56 pins the traveller to the obstacle boundary
+  even when the move leads away from it. Fix so a collision only ever clamps a
+  move that genuinely enters the obstacle; moving away or sliding along stays
+  free.
 
 ## Closing (only after all points)
 

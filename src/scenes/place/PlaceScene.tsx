@@ -1519,6 +1519,11 @@ export function PlaceScene() {
     const el = gl.domElement
     ;(document.activeElement as HTMLElement | null)?.blur?.()
     const grab = () => {
+      // Never grab the pointer while a full-screen overlay is up (the initial
+      // checkpoint-load choice, defeat or victory): the cursor is needed to
+      // click it. The DOM is committed before this effect runs, so the overlay
+      // is already present on the start-of-game grab.
+      if (document.querySelector('.overlay')) return
       if (!useUi.getState().dialog && document.pointerLockElement !== el) {
         try {
           const r = el.requestPointerLock() as unknown as Promise<void> | undefined

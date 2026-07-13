@@ -299,6 +299,50 @@ s = await state()
 check('Victory state after digging at the site (shovel clicked)', s.victory === true)
 await shot('07-victory')
 
+// --- Point 59: mouse-look is not grabbed while the start-choice overlay is up -
+// (design.md §17.5) A checkpoint at startup shows the StartOverlay; the pointer
+// must not be grabbed then, or the load choice is unclickable. Spy on
+// requestPointerLock across two loads: fresh (no overlay) grabs, with a
+// checkpoint (overlay up) does not.
+const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
+page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))
+await page2.addInitScript(() => {
+  window.__plCalls = 0
+  const orig = HTMLCanvasElement.prototype.requestPointerLock
+  HTMLCanvasElement.prototype.requestPointerLock = function (...a) {
+    window.__plCalls++
+    try {
+      return orig.apply(this, a)
+    } catch {
+      return undefined
+    }
+  }
+})
+await page2.goto(BASE)
+await page2.evaluate(() => localStorage.clear())
+await page2.reload()
+await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
+await page2.waitForTimeout(700)
+const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
+check('a fresh start (no overlay) grabs the pointer for mouse-look', !fresh.overlay && fresh.calls > 0)
+// Seed a checkpoint (entering a port saves one) and reload → the StartOverlay shows.
+await page2.evaluate(() => window.__game.getState().enterPlace('cairo'))
+await page2.waitForTimeout(200)
+await page2.reload()
+await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
+await page2.waitForTimeout(700)
+const withCp = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
+check('with a checkpoint the start-choice overlay shows and the pointer is NOT grabbed', withCp.overlay && withCp.calls === 0)
+// Choosing an option dismisses the overlay; a canvas click then grabs as usual.
+await page2.evaluate(() => [...document.querySelectorAll('.overlay .actions button')].pop()?.click())
+await page2.waitForTimeout(400)
+await page2.locator('canvas').click({ position: { x: 640, y: 400 } })
+await page2.waitForTimeout(200)
+const afterChoice = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
+check('after the choice a canvas click grabs the pointer', !afterChoice.overlay && afterChoice.calls > 0)
+await page2.close()
+
 console.log('---')
 console.log('CONSOLE ERRORS:', errors.length === 0 ? 'none' : errors.length)
 for (const e of errors.slice(0, 10)) console.log('  -', e)
