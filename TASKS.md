@@ -437,6 +437,39 @@ the map).
   (point 55) the zoom-scaled streaming ring starved its shore sample; the
   roam now pins zoom 1 like the other ring checks. Full regression green.)
 
+- [x] 62. The ridden canoe still floods on the Nile (screenshot: desert
+  stretch, canoe hull interior under the river surface). Find the actual
+  height mismatch between the canoe float height and the rendered river
+  ribbon and fix it so the hull rides above the surface along the whole
+  course; add a measured regression (ribbon Y vs boat Y along the river).
+  (Measured root cause: the ribbon is FLAT across its width at the AXIS bed
+  height, while the canoe floated on the LOCAL bed under the player — on
+  cross-sloping stretches (the Nubian cataract Nile) the local bed lies up
+  to 0.47 lower, sinking the hull under the ribbon; confluences/bends add
+  cases where a second, higher ribbon covers the point. New shared module
+  src/scenes/travel/waterSurface.ts holds the surface construction: a
+  per-seed index of the exact ribbon axis samples (same densify/lift as
+  Rivers.tsx, which now imports it) plus the lake bedMax/sheet heights; the
+  Player floats on the highest covering surface. waterSurface.test.ts scans
+  the whole Nile channel and all 17 rivers against a mirrored ribbon build,
+  proves the old construction violated by > the hull clearance (regression
+  witness), and covers lakes/null cases; the enrichments canoe-ride
+  screenshot (88) moved to the previously flooded cataract stretch. Full
+  regression green.)
+- [ ] 63. The exploration map is neither visually appealing nor functional:
+  region labels sit at odd spots, repeat per region and overlap each other.
+  Research what a handsome, functional ~1890 map looks like and rebuild the
+  current one completely into something clearly better and more elaborate,
+  including embellishments such as a worn-paper look.
+- [ ] 64. The dragged canoe on LAND still clips into the ground and objects
+  in many situations (point 62 fixed the water side). Test broadly and fix:
+  many different ground types and height profiles (dunes, slopes, rocky
+  terrain), dragging the canoe across a stone, an animal standing in the
+  canoe's spot, how level the canoe lies on uneven ground, and the canoe
+  protruding into a village/settlement — the hull must follow the terrain
+  under it (pitch along the drag direction, no end buried in a rise, no
+  floating over a dip) and must never intersect solid obstacles.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

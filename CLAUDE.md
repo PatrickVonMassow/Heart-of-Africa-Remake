@@ -257,7 +257,10 @@ verify suite that proves it.
    entry adds exactly one journal warning while a later entry adds none.
    With a canoe in the pack the explorer rides it on a water tile
    (`__player.canoeing`) but drags it on a land tile (`__player.carrying`),
-   and removing the canoe clears both. Driving straight into a pinned
+   and removing the canoe clears both; the float height clears the rendered
+   ribbon across every river channel — incl. cross-sloping and confluence
+   stretches — and the lake sheets
+   (`src/scenes/travel/waterSurface.test.ts`). Driving straight into a pinned
    animal blocks the traveller at its body edge without ever entering it,
    and steering away afterwards moves him clear — a collision never pins
    the traveller (`scripts/verify/enrichments.mjs`); the swept obstacle

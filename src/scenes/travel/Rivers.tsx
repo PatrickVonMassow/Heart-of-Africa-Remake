@@ -31,12 +31,12 @@ import { lakeContains } from '../../world/hydro'
 import { RIVERS_DATA } from '../../world/data/rivers'
 import { LAKES } from '../../world/data/lakes'
 import { WATERFALLS } from '../../world/data/landmarks'
+// The surface heights and the axis sampling are shared with the module the
+// floating canoe reads (waterSurface.ts), so a floater and the rendered
+// surface can never diverge.
+import { SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver } from './waterSurface'
 
-const STEP_DEG = 0.08 // sampling step along a river (0.8 world units)
 const HALF_WIDTH = 1.7 // ribbon half width in world units (matches RIVER_WIDTH_DEG)
-// Water surface above the carved bed centerline. Exported so the travel Player
-// can float the canoe on the river surface rather than on the bed height.
-export const SURFACE_LIFT = 0.3
 
 interface FallDef {
   x: number
@@ -50,21 +50,6 @@ interface SpringDef {
   x: number
   z: number
   y: number
-}
-
-/** Densified river centerlines with world positions and arc lengths. */
-function densifyRiver(points: Array<[number, number]>): Array<{ lat: number; lon: number }> {
-  const out: Array<{ lat: number; lon: number }> = []
-  for (let s = 0; s < points.length - 1; s++) {
-    const [lon0, lat0] = points[s]
-    const [lon1, lat1] = points[s + 1]
-    const steps = Math.max(1, Math.round(Math.hypot(lon1 - lon0, lat1 - lat0) / STEP_DEG))
-    for (let i = 0; i < steps; i++) {
-      out.push({ lat: lat0 + ((lat1 - lat0) * i) / steps, lon: lon0 + ((lon1 - lon0) * i) / steps })
-    }
-  }
-  out.push({ lat: points[points.length - 1][1], lon: points[points.length - 1][0] })
-  return out
 }
 
 function buildRivers(seed: number): {
@@ -254,42 +239,20 @@ function createLakeMaterial(): THREE.MeshStandardNodeMaterial {
 function buildLakeSurfaces(
   seed: number,
 ): Array<{ geometry: THREE.BufferGeometry; y: number; bedMax: number }> {
-  return LAKES.map((lake) => {
+  return LAKES.map((lake, li) => {
     const shape = new THREE.Shape()
-    let minLon = Infinity
-    let maxLon = -Infinity
-    let minLat = Infinity
-    let maxLat = -Infinity
     lake.points.forEach(([lon, lat], i) => {
       const w = latLonToWorld(lat, lon)
       if (i === 0) shape.moveTo(w.x, -w.z)
       else shape.lineTo(w.x, -w.z)
-      minLon = Math.min(minLon, lon)
-      maxLon = Math.max(maxLon, lon)
-      minLat = Math.min(minLat, lat)
-      maxLat = Math.max(maxLat, lat)
     })
-    // The surface sits just above the highest interior bed sample. The old
-    // min-over-the-shore-points height let a single low outlier (an outlet
-    // gorge) pull the sheet under the carved bed, which then showed through
-    // in flickering blotches across the lake (TASKS pt. 11).
-    let bedMax = -Infinity
-    const N = 9
-    for (let i = 1; i < N; i++) {
-      for (let j = 1; j < N; j++) {
-        const lon = minLon + ((maxLon - minLon) * i) / N
-        const lat = minLat + ((maxLat - minLat) * j) / N
-        if (!lakeContains(lat, lon)) continue
-        bedMax = Math.max(bedMax, sampleTerrain(lat, lon, seed).height)
-      }
-    }
-    if (bedMax === -Infinity) {
-      // A sliver of a lake between grid points: fall back to its centre.
-      bedMax = sampleTerrain(lake.center[1], lake.center[0], seed).height
-    }
+    // The sheet sits just above the highest interior bed sample (see
+    // lakeBedMax; a min over the shore points let a single low outlier pull
+    // the sheet under the carved bed, TASKS pt. 11).
+    const bedMax = lakeBedMax(li, seed)
     const geometry = new THREE.ShapeGeometry(shape)
     geometry.rotateX(-Math.PI / 2)
-    return { geometry, y: Math.max(-0.05, bedMax + 0.12), bedMax }
+    return { geometry, y: Math.max(-0.05, bedMax + LAKE_LIFT), bedMax }
   })
 }
 

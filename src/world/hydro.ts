@@ -160,6 +160,7 @@ export function riverDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY
   return bucketDistance(lon, lat, riverSegs, riverBuckets, maxDist)
 }
 
+
 /** Exact distance (degrees) to the nearest lake shoreline, capped. */
 export function lakeShoreDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY): number {
   return bucketDistance(lon, lat, lakeSegs, lakeBuckets, maxDist)
@@ -206,7 +207,13 @@ export function riverFlowExact(
 
 /** True if the point lies inside one of the ~1890 lake outlines. */
 export function lakeContains(lat: number, lon: number): boolean {
-  for (const { ring, minX, minY, maxX, maxY } of lakeRings) {
+  return lakeIndexAt(lat, lon) >= 0
+}
+
+/** Index (into LAKES order) of the lake containing the point, or -1. */
+export function lakeIndexAt(lat: number, lon: number): number {
+  for (let li = 0; li < lakeRings.length; li++) {
+    const { ring, minX, minY, maxX, maxY } = lakeRings[li]
     if (lon < minX || lon > maxX || lat < minY || lat > maxY) continue
     // Ray casting.
     let inside = false
@@ -220,7 +227,7 @@ export function lakeContains(lat: number, lon: number): boolean {
         inside = !inside
       }
     }
-    if (inside) return true
+    if (inside) return li
   }
-  return false
+  return -1
 }

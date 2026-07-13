@@ -353,7 +353,11 @@ const findTile = (ty, lat0, lat1, lon0, lon1) =>
     },
     { ty, lat0, lat1, lon0, lon1 },
   )
-const waterSpot = await findTile('water', 2, -6, 12, 34)
+// Prefer the Nile's Nubian cataract stretch for the ride: its cross-channel
+// bed slope is where the hull used to sink under the flat ribbon (the
+// "flooded canoe"), so the evidence screenshot documents exactly that spot.
+const waterSpot =
+  (await findTile('water', 27, 25.5, 31.4, 33.2)) ?? (await findTile('water', 2, -6, 12, 34))
 const landSpot = await findTile('desert', 24, 14, -6, 26)
 if (waterSpot && landSpot) {
   await page.evaluate((s) => {
@@ -364,9 +368,11 @@ if (waterSpot && landSpot) {
   await page.waitForTimeout(400)
   const ride = await page.evaluate(() => window.__player)
   check('Canoe: the explorer rides the canoe on water', ride?.canoeing === true && ride?.carrying === false, JSON.stringify(ride))
-  // Zoom in for legible evidence (zoom-in below 1 is always allowed).
+  // Zoom in for legible evidence (zoom-in below 1 is always allowed). The
+  // camera and the freshly jumped-to chunks need a moment to settle, or the
+  // shot catches a mid-transition view instead of the close-up.
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
-  await page.waitForTimeout(500)
+  await page.waitForTimeout(1800)
   await page.screenshot({ path: `${OUT}88-canoe-ride.png` })
   console.log('shot 88-canoe-ride.png')
 

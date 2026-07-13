@@ -25,13 +25,14 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
-import { sampleTerrain, RIVER_WIDTH_DEG, type TerrainType } from '../../world/terrain'
+import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
-import { RiversAndLakes, SURFACE_LIFT } from './Rivers'
+import { RiversAndLakes } from './Rivers'
+import { waterSurfaceY } from './waterSurface'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -1262,14 +1263,17 @@ function Player() {
       }
     }
 
-    // Float the canoe on the actual water surface. A river/lake ribbon sits
-    // SURFACE_LIFT above the carved bed; the sea plane sits at ~0. "On a river"
-    // is detected by river proximity, not terrain type — near the mouth the
-    // biome map can misclassify a river cell as ocean, which would otherwise
-    // drop the lift and flood the hull on an elevated river (design.md §7/§11).
+    // Float the canoe on the rendered water surface (waterSurface.ts): the
+    // river ribbon is flat across its width at the AXIS bed height and the
+    // lake sheet at the lake-wide bedMax, so the float height comes from that
+    // same construction — the local bed under the hull can lie far lower
+    // where the relief slopes across the channel, and floating on it sank
+    // the hull under the ribbon (design.md §7/§11.3). The sea plane sits at
+    // ~0 and covers everything else; river proximity (not terrain type)
+    // detects the ribbon, so a mouth cell misclassified as ocean keeps the
+    // lift.
     const refY = Math.max(0, t.height)
-    const onRiver = t.type === 'water' || riverDistance(ll.lat, ll.lon) < RIVER_WIDTH_DEG * 1.4
-    const surfaceY = onRiver ? Math.max(-0.05, t.height + SURFACE_LIFT) : 0
+    const surfaceY = waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0
     const boatBaseY = surfaceY - refY + CANOE_HULL_CLEARANCE
 
     if (inner.current) {
