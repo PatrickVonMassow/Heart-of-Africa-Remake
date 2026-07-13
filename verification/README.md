@@ -42,6 +42,8 @@ point(s).
 | 91-cultural-landmark-meroe.png | 25 — built cultural landmark in scene |
 | 92-map-fog-of-war.png | 3 — parchment map, fog of war |
 | 93-orientation-highlight.png | 31 — gift-unlocked building markers |
+| 94-cultural-landmark-aksum.png | 25 — stage-2 cultural site (stelae), label revealed |
+| 95-natural-site-ngorongoro.png | 25 — natural point-landmark (crater), label revealed |
 
 ## Open items (§9)
 

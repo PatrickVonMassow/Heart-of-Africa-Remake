@@ -683,9 +683,11 @@ verify suite that proves it.
     discovery bounties credited on the next port visit as a telegraphic
     transfer whose journal entry names the discoveries and the amount, and
     kind-flavored first-sighting entries for landmarks (§10, once per
-    landmark, both languages, voice markup) — including the four built
-    cultural landmarks of §4.4 (Meroë, Great Zimbabwe, Lalibela, Kilwa),
-    framed as African achievements; the valuable-presentation
+    landmark, both languages, voice markup) — including the seven built
+    cultural landmarks of §4.4 (Meroë, Great Zimbabwe, Lalibela, Kilwa,
+    Aksum, Gondar, Bandiagara), framed as African achievements, and the
+    four natural point-landmarks (Ngorongoro, Ol Doinyo Lengai, Okavango,
+    Sudd); the valuable-presentation
     reactions of the §8 matrix; and the baseline goods in every settlement
     with money in ports and gifts in villages (§9). All new texts exist in
     both languages with voice markup. Verifiable:
@@ -702,13 +704,16 @@ verify suite that proves it.
     (village) or money (port); `src/ui/JournalPanel.test.tsx` the
     telegraphic-transfer report naming the discoveries;
     `src/state/store.travel.test.ts` asserts the landmark-sighting entry
-    with its kind for a mountain, a waterfall and the Meroë pyramids
-    (kind `pyramids`) and that it fires only once;
-    `src/i18n/i18n.test.ts` that each cultural landmark has a localized
-    name and a dedicated discovery flavor in both languages;
-    `scripts/verify/enrichments.mjs` that all four mount in the scene
-    (`__culturalLandmarks`), render a non-black frame at their coordinates
-    and reveal their label on sighting (screenshot 91).
+    with its kind for a mountain, a waterfall, the Meroë pyramids (kind
+    `pyramids`) and the Ngorongoro crater (kind `crater`) and that it
+    fires only once;
+    `src/i18n/i18n.test.ts` that each cultural landmark and natural site
+    has a localized name and a dedicated discovery flavor in both
+    languages; `scripts/verify/enrichments.mjs` that all seven cultural
+    landmarks (`__culturalLandmarks`) and all four natural sites
+    (`__naturalSites`) mount in the scene, render a non-black frame at
+    their coordinates and reveal their label on sighting (screenshots 91,
+    94, 95).
 26. **Standing with the natives.** The reputation system of `design.md`
     §12 is implemented: hostility and expulsion on a rejected gift with
     the hostility period and its wear-off, the "Honored Friend" status

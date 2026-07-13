@@ -87,6 +87,13 @@ const LANDMARKS: Record<string, string> = {
   'great-zimbabwe': 'Great Zimbabwe',
   lalibela: 'Lalibela',
   kilwa: 'Kilwa',
+  aksum: 'Aksum',
+  gondar: 'Gondar',
+  bandiagara: 'Bandiagara',
+  ngorongoro: 'Ngorongoro Crater',
+  lengai: 'Ol Doinyo Lengai',
+  okavango: 'Okavango Delta',
+  sudd: 'Sudd',
 }
 
 export const en: Strings = {
@@ -583,6 +590,13 @@ export const en: Strings = {
         'stone-city': `[awe]Mortarless walls of fitted granite curve across the hill, crowned by a great conical tower —[pause] ${name}.[/awe] [somber]African hands raised this capital, whatever the settlers back home care to claim.[/somber]`,
         'rock-churches': `[awe]Churches hewn downward out of the living rock, cross upon cross sunk into the stone —[pause] ${name}.[/awe] [excited]The work of a Christian Ethiopian kingdom,[pause] and worshippers kneel in them still.[/excited]`,
         'coastal-ruins': `[somber]Coral-stone walls and broken arches stand above the tideline —[pause] ${name}.[/somber] [awe]A Swahili city that minted its own coin and traded clear across the Indian Ocean, long before any European sail.[/awe]`,
+        stelae: `[awe]Granite needles taller than any mast rise from the grass, one fallen giant among them —[pause] the stelae of ${name}.[/awe] [excited]The Aksumite kingdom carved these, struck its own coinage and traded across the Red Sea —[pause] an African power of the first rank.[/excited]`,
+        castles: `[awe]Stone castles with battlements and round towers stand on the highland —[pause] ${name}, seat of Ethiopia's emperors.[/awe] [somber]African masons raised every wall of it, against everything the colonial accounts care to claim.[/somber]`,
+        'cliff-dwellings': `[awe]Dwellings terraced into the sheer escarpment, granaries clinging to ledges high above the plain —[pause] ${name}.[/awe] [excited]The Dogon read this land vertically, building their homes over the older houses of the Tellem.[/excited]`,
+        crater: `[awe]The rim fell away beneath me into a vast green bowl —[pause] ${name}, a walled world teeming with game.[/awe] [somber]Its ring stands against the plains like a rampart raised by the earth itself.[/somber]`,
+        volcano: `[fear]The ground trembled underfoot,[pause] and above me the steep cone smoked —[/fear] [awe]${name}, the mountain the Maasai call the mountain of God.[/awe] [whisper]I did not linger on its slopes.[/whisper]`,
+        delta: `[awe]A river that never finds the sea —[pause] ${name}, spending itself into the sands.[/awe] [excited]Its waters braid into a maze of channels and reed islands as far as the eye reaches.[/excited]`,
+        wetland: `[somber]The Nile simply vanishes here —[pause] swallowed by ${name}, an endless papyrus swamp.[/somber] [weary]For days the channel loses itself among floating reed;[pause] no bank, no landmark, only green.[/weary]`,
       }
       return flavors[p.kind as string] ?? flavors.mountain
     },

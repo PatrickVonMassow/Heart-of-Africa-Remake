@@ -54,17 +54,27 @@ export const ELEPHANT_GRAVEYARD = { id: 'elephant-graveyard', lon: 36.6, lat: -4
 
 // Built cultural landmarks (design.md §4.4): achievements of African
 // civilisations — the Nubian pyramids of Meroë (kingdom of Kush), Great
-// Zimbabwe, the Zagwe-era rock-hewn churches of Lalibela, and the coastal
-// ruins of the Swahili Kilwa Sultanate. Real positions (~1890 geography);
-// all existed as standing structures or ruins by 1890. These are the game's
-// first built landmarks (the rest are natural peaks/falls/lakes plus the
-// fictional elephant graveyard).
+// Zimbabwe, the Zagwe-era rock-hewn churches of Lalibela, the coastal
+// ruins of the Swahili Kilwa Sultanate, the towering stelae of the Aksumite
+// kingdom, the Gondarine castles of Fasil Ghebbi (imperial Ethiopia), and
+// the Dogon cliff dwellings of the Bandiagara escarpment above the older
+// Tellem sites. Real positions (~1890 geography); all existed as standing
+// structures or ruins by 1890. These are the game's built landmarks (the
+// rest are natural peaks/falls/lakes/sites plus the fictional elephant
+// graveyard).
 export interface CulturalLandmarkDef {
   id: string
   lon: number
   lat: number
   /** Drives geometry and the discovery-journal flavor. */
-  kind: 'pyramids' | 'stone-city' | 'rock-churches' | 'coastal-ruins'
+  kind:
+    | 'pyramids'
+    | 'stone-city'
+    | 'rock-churches'
+    | 'coastal-ruins'
+    | 'stelae'
+    | 'castles'
+    | 'cliff-dwellings'
 }
 
 export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = [
@@ -72,4 +82,24 @@ export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = [
   { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
   { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },
   { id: 'kilwa', lon: 39.51, lat: -8.96, kind: 'coastal-ruins' },
+  { id: 'aksum', lon: 38.72, lat: 14.13, kind: 'stelae' },
+  { id: 'gondar', lon: 37.47, lat: 12.61, kind: 'castles' },
+  { id: 'bandiagara', lon: -3.4, lat: 14.35, kind: 'cliff-dwellings' },
+]
+
+// Natural point-landmarks (design.md §4.4): real natural wonders sighted and
+// journaled like the other landmarks. Okavango is deliberately offset south
+// so marker and label do not collide with the nearby village marker.
+export interface NaturalSiteDef {
+  id: string
+  lon: number
+  lat: number
+  kind: 'crater' | 'volcano' | 'delta' | 'wetland'
+}
+
+export const NATURAL_SITES: NaturalSiteDef[] = [
+  { id: 'ngorongoro', lon: 35.58, lat: -3.16, kind: 'crater' },
+  { id: 'lengai', lon: 35.9, lat: -2.76, kind: 'volcano' },
+  { id: 'okavango', lon: 22.9, lat: -19.5, kind: 'delta' },
+  { id: 'sudd', lon: 30.5, lat: 8.0, kind: 'wetland' },
 ]

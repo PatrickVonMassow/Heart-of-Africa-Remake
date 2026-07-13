@@ -10,7 +10,7 @@ import { de } from './de'
 import { en } from './en'
 import { resolveText, getStrings, useLocale, DICTIONARIES, LANGUAGES } from './index'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
-import { CULTURAL_LANDMARKS } from '../world/data/landmarks'
+import { CULTURAL_LANDMARKS, NATURAL_SITES } from '../world/data/landmarks'
 
 const TAGS = ['awe', 'whisper', 'excited', 'somber', 'weary', 'fear', 'emph', 'mute', 'pause', 'breath']
 const SPAN_TAGS = TAGS.filter((t) => t !== 'pause' && t !== 'breath')
@@ -138,10 +138,10 @@ describe('format functions (design.md §17)', () => {
   })
 })
 
-describe('cultural landmarks i18n coverage (design.md §4.4)', () => {
+describe('cultural and natural landmarks i18n coverage (design.md §4.4)', () => {
   for (const lang of [en, de]) {
     describe(lang.lang, () => {
-      it.each(CULTURAL_LANDMARKS)('$id has a localized name and a dedicated discovery flavor', (c) => {
+      it.each([...CULTURAL_LANDMARKS, ...NATURAL_SITES])('$id has a localized name and a dedicated discovery flavor', (c) => {
         const name = lang.landmarks[c.id]
         expect(typeof name).toBe('string')
         expect(name.length).toBeGreaterThan(0)

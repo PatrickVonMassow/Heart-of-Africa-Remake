@@ -86,6 +86,13 @@ const LANDMARKS: Record<string, string> = {
   'great-zimbabwe': 'Groß-Simbabwe',
   lalibela: 'Lalibela',
   kilwa: 'Kilwa',
+  aksum: 'Aksum',
+  gondar: 'Gondar',
+  bandiagara: 'Bandiagara',
+  ngorongoro: 'Ngorongoro-Krater',
+  lengai: 'Ol Doinyo Lengai',
+  okavango: 'Okavango-Delta',
+  sudd: 'Sudd',
 }
 
 export const de: Strings = {
@@ -590,6 +597,13 @@ export const de: Strings = {
         'stone-city': `[awe]Fugenlose Mauern aus behauenem Granit schwingen über den Hügel, überragt von einem großen Kegelturm —[pause] ${name}.[/awe] [somber]Afrikanische Hände errichteten diese Hauptstadt, was die Siedler daheim auch behaupten mögen.[/somber]`,
         'rock-churches': `[awe]In den lebenden Fels hinabgehauene Kirchen, Kreuz um Kreuz in den Stein gesenkt —[pause] ${name}.[/awe] [excited]Das Werk eines christlichen äthiopischen Königreichs,[pause] und noch heute knien Gläubige darin.[/excited]`,
         'coastal-ruins': `[somber]Mauern aus Korallenstein und geborstene Bögen stehen über der Flutlinie —[pause] ${name}.[/somber] [awe]Eine Suaheli-Stadt, die eigene Münzen prägte und über den ganzen Indischen Ozean handelte, lange vor jedem europäischen Segel.[/awe]`,
+        stelae: `[awe]Granitnadeln, höher als jeder Mast, ragen aus dem Gras, ein gestürzter Riese darunter —[pause] die Stelen von ${name}.[/awe] [excited]Das Reich von Aksum hat sie gehauen, eigene Münzen geprägt und über das Rote Meer gehandelt —[pause] eine afrikanische Macht ersten Ranges.[/excited]`,
+        castles: `[awe]Steinerne Burgen mit Zinnen und Rundtürmen stehen auf dem Hochland —[pause] ${name}, Sitz der Kaiser Äthiopiens.[/awe] [somber]Afrikanische Baumeister haben jede dieser Mauern errichtet, allen kolonialen Berichten zum Trotz.[/somber]`,
+        'cliff-dwellings': `[awe]Wohnungen, terrassiert in die steile Felswand, Speicher an Simsen hoch über der Ebene —[pause] ${name}.[/awe] [excited]Die Dogon lesen dieses Land senkrecht und bauen ihre Häuser über den älteren Kammern der Tellem.[/excited]`,
+        crater: `[awe]Der Kraterrand fiel unter mir in eine gewaltige grüne Schüssel ab —[pause] ${name}, eine ummauerte Welt voller Wild.[/awe] [somber]Sein Ring steht gegen die Ebene wie ein Wall, den die Erde selbst aufgeworfen hat.[/somber]`,
+        volcano: `[fear]Der Boden bebte unter den Füßen,[pause] und über mir rauchte der steile Kegel —[/fear] [awe]${name}, der Berg, den die Massai den Berg Gottes nennen.[/awe] [whisper]Ich bin nicht lange an seinen Hängen geblieben.[/whisper]`,
+        delta: `[awe]Ein Fluss, der nie das Meer findet —[pause] ${name}, der sich in den Sand verströmt.[/awe] [excited]Sein Wasser flicht sich in ein Labyrinth aus Kanälen und Schilfinseln, so weit das Auge reicht.[/excited]`,
+        wetland: `[somber]Der Nil verschwindet hier einfach —[pause] verschluckt vom ${name}, einem endlosen Papyrussumpf.[/somber] [weary]Tagelang verliert sich die Fahrrinne im treibenden Schilf;[pause] kein Ufer, keine Landmarke, nur Grün.[/weary]`,
       }
       return flavors[p.kind as string] ?? flavors.mountain
     },

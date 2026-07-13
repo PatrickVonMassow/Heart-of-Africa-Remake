@@ -28,7 +28,7 @@ import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
-import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
+import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { RiversAndLakes } from './Rivers'
@@ -59,7 +59,15 @@ import {
   buildTermiteMound,
 } from '../../render/flora'
 import { buildElephant } from '../../render/fauna'
-import { buildMeroePyramids, buildStoneCity, buildRockChurches, buildCoastalRuins } from '../../render/landmarks'
+import { buildMeroePyramids, buildStoneCity, buildRockChurches, buildCoastalRuins,
+  buildStelae,
+  buildCastles,
+  buildCliffDwellings,
+  buildCrater,
+  buildVolcano,
+  buildDelta,
+  buildWetland,
+} from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
 import { Climate } from './Climate'
 import { RegionBorders } from './RegionBorders'
@@ -920,7 +928,17 @@ function LandmarkLabels() {
       y: Math.max(0.5, sampleTerrain(c.lat, c.lon, seed).height) + 1.0,
       water: false,
     }))
-    return [...lakes, ...mountains, ...falls, graveyard, ...cultural]
+    // Natural point-landmarks (design.md §4.4): delta and wetland read as
+    // water features (water-label styling like the lakes).
+    const natural = NATURAL_SITES.map((n) => ({
+      key: n.id,
+      name: t.landmarks[n.id],
+      lat: n.lat,
+      lon: n.lon,
+      y: Math.max(0.5, sampleTerrain(n.lat, n.lon, seed).height) + 1.0,
+      water: n.kind === 'delta' || n.kind === 'wetland',
+    }))
+    return [...lakes, ...mountains, ...falls, graveyard, ...cultural, ...natural]
   }, [seed, t])
   return (
     <>
@@ -1090,9 +1108,11 @@ function ElephantGraveyard() {
 
 /**
  * Built cultural landmarks (design.md §4.4): the pyramids of Meroë, Great
- * Zimbabwe, the rock-hewn churches of Lalibela and the coastal ruins of Kilwa,
- * each placed at its real ~1890 position with a per-run yaw jitter. Achievements
- * of African civilisations — the discovery journal (§16) carries that framing.
+ * Zimbabwe, the rock-hewn churches of Lalibela, the coastal ruins of Kilwa,
+ * the stelae of Aksum, the Gondarine castles and the Bandiagara cliff
+ * dwellings, each placed at its real ~1890 position with a per-run yaw
+ * jitter. Achievements of African civilisations — the discovery journal
+ * (§16) carries that framing.
  */
 function CulturalLandmarks() {
   const seed = useGame((s) => s.seed)
@@ -1102,6 +1122,9 @@ function CulturalLandmarks() {
       'stone-city': buildStoneCity(),
       'rock-churches': buildRockChurches(),
       'coastal-ruins': buildCoastalRuins(),
+      stelae: buildStelae(),
+      castles: buildCastles(),
+      'cliff-dwellings': buildCliffDwellings(),
     }),
     [],
   )
@@ -1124,6 +1147,70 @@ function CulturalLandmarks() {
     w.__culturalLandmarks = { count: items.length, ids: items.map((it) => it.id) }
     return () => {
       delete w.__culturalLandmarks
+    }
+  }, [items])
+
+  useEffect(
+    () => () => {
+      Object.values(geos).forEach((g) => g.dispose())
+      material.dispose()
+    },
+    [geos, material],
+  )
+
+  return (
+    <>
+      {items.map((it) => (
+        <mesh
+          key={it.id}
+          geometry={geos[it.kind]}
+          material={material}
+          position={[it.x, it.y, it.z]}
+          rotation={[0, it.yaw, 0]}
+          castShadow
+          receiveShadow
+        />
+      ))}
+    </>
+  )
+}
+
+/**
+ * Natural point-landmarks (design.md §4.4): the Ngorongoro crater, the
+ * smoking Ol Doinyo Lengai, the Okavango delta and the Sudd — mirroring
+ * CulturalLandmarks exactly (shared vertex-color material, per-run yaw,
+ * disposal, DEV hook).
+ */
+function NaturalSites() {
+  const seed = useGame((s) => s.seed)
+  const geos = useMemo(
+    () => ({
+      crater: buildCrater(),
+      volcano: buildVolcano(),
+      delta: buildDelta(),
+      wetland: buildWetland(),
+    }),
+    [],
+  )
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), [])
+  const items = useMemo(
+    () =>
+      NATURAL_SITES.map((n, i) => {
+        const w = latLonToWorld(n.lat, n.lon)
+        const y = Math.max(0.2, sampleTerrain(n.lat, n.lon, seed).height)
+        // Seeded per-run, per-site yaw so orientation varies between playthroughs.
+        const yaw = mulberry32((seed ^ (0x85ebca6b * (i + 1))) >>> 0)() * Math.PI * 2
+        return { id: n.id, kind: n.kind, x: w.x, z: w.z, y, yaw }
+      }),
+    [seed],
+  )
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__naturalSites = { count: items.length, ids: items.map((it) => it.id) }
+    return () => {
+      delete w.__naturalSites
     }
   }, [items])
 
@@ -1646,6 +1733,7 @@ export function TravelScene() {
       <LandmarkLabels />
       <ElephantGraveyard />
       <CulturalLandmarks />
+      <NaturalSites />
       <CampMarkers />
       <GraveMarker />
       <Player />

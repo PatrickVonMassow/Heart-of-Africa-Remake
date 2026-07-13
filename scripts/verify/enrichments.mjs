@@ -194,14 +194,25 @@ const kiliRevealed = await page.evaluate(() =>
 check('a sighted landmark reveals its real name', kiliRevealed, '')
 
 // --- Cultural landmarks (§7.1.3, design.md §4.4) -----------------------------
-// The four built cultural landmarks (Meroë, Great Zimbabwe, Lalibela, Kilwa)
-// mount into the travel scene (dev hook) and their labels reveal on sighting.
+// The seven built cultural landmarks (Meroë, Great Zimbabwe, Lalibela, Kilwa,
+// Aksum, Gondar, Bandiagara) mount into the travel scene (dev hook) and their
+// labels reveal on sighting.
 const cultural = await page.evaluate(() => window.__culturalLandmarks)
 check(
-  'four cultural landmarks are placed in the travel world',
-  cultural?.count === 4 &&
-    ['meroe', 'great-zimbabwe', 'lalibela', 'kilwa'].every((id) => cultural.ids.includes(id)),
+  'seven cultural landmarks are placed in the travel world',
+  cultural?.count === 7 &&
+    ['meroe', 'great-zimbabwe', 'lalibela', 'kilwa', 'aksum', 'gondar', 'bandiagara'].every((id) =>
+      cultural.ids.includes(id),
+    ),
   JSON.stringify(cultural),
+)
+// The four natural point-landmarks mount alongside them (design.md §4.4).
+const naturalSites = await page.evaluate(() => window.__naturalSites)
+check(
+  'four natural sites are placed in the travel world',
+  naturalSites?.count === 4 &&
+    ['ngorongoro', 'lengai', 'okavango', 'sudd'].every((id) => naturalSites.ids.includes(id)),
+  JSON.stringify(naturalSites),
 )
 // Position the camera over each site and confirm a non-black frame renders.
 for (const c of [
@@ -209,6 +220,13 @@ for (const c of [
   { id: 'great-zimbabwe', lat: -20.27, lon: 30.93 },
   { id: 'lalibela', lat: 12.03, lon: 39.04 },
   { id: 'kilwa', lat: -8.96, lon: 39.51 },
+  { id: 'aksum', lat: 14.13, lon: 38.72 },
+  { id: 'gondar', lat: 12.61, lon: 37.47 },
+  { id: 'bandiagara', lat: 14.35, lon: -3.4 },
+  { id: 'ngorongoro', lat: -3.16, lon: 35.58 },
+  { id: 'lengai', lat: -2.76, lon: 35.9 },
+  { id: 'okavango', lat: -19.5, lon: 22.9 },
+  { id: 'sudd', lat: 8.0, lon: 30.5 },
 ]) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), c)
   await page.waitForTimeout(500)
@@ -230,6 +248,31 @@ const meroeRevealed = await page.evaluate(() =>
 check('the Meroë pyramids reveal their name once sighted', meroeRevealed, '')
 await page.screenshot({ path: `${OUT}91-cultural-landmark-meroe.png` })
 console.log('shot 91-cultural-landmark-meroe.png')
+
+// Stage-2 evidence: one new cultural site (Aksum stelae) and one natural site
+// (Ngorongoro crater) with their labels revealed.
+await page.evaluate(() => window.__game.getState().debugJumpTo(14.13, 38.72)) // Aksum
+await page.evaluate(() =>
+  window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'aksum'] }),
+)
+await page.waitForTimeout(1800)
+const aksumRevealed = await page.evaluate(() =>
+  [...document.querySelectorAll('.map-label')].some((l) => /Aksum/.test(l.textContent)),
+)
+check('the Aksum stelae reveal their name once sighted', aksumRevealed, '')
+await page.screenshot({ path: `${OUT}94-cultural-landmark-aksum.png` })
+console.log('shot 94-cultural-landmark-aksum.png')
+await page.evaluate(() => window.__game.getState().debugJumpTo(-3.16, 35.58)) // Ngorongoro
+await page.evaluate(() =>
+  window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'ngorongoro'] }),
+)
+await page.waitForTimeout(1800)
+const ngoroRevealed = await page.evaluate(() =>
+  [...document.querySelectorAll('.map-label')].some((l) => /Ngorongoro/.test(l.textContent)),
+)
+check('the Ngorongoro crater reveals its name once sighted', ngoroRevealed, '')
+await page.screenshot({ path: `${OUT}95-natural-site-ngorongoro.png` })
+console.log('shot 95-natural-site-ngorongoro.png')
 
 // --- Exploration map: parchment look + fog of war (§7.1.3, design.md §19) -----
 // Explore a swath of the north, open the map and confirm the explored area is a
@@ -1144,8 +1187,11 @@ const shoreSpots = await page.evaluate(() => {
   // East/central African lakes-and-rivers belt — plenty of savanna shoreline.
   // Keep the spots spread out: neighbouring scan cells respawn the very same
   // deterministic herds, which would only re-count the same drinkers.
-  for (let lat = 3; lat >= -12 && spots.length < 32; lat -= 0.4)
-    for (let lon = 29; lon <= 37 && spots.length < 32; lon += 0.4)
+  // A wide band and a generous spot cap: the bathe flag is a 40% roll per
+  // drinker and re-seeds per run, so a small drinker sample fails ~3% of
+  // runs by pure chance — the roam must be able to gather a real sample.
+  for (let lat = 4; lat >= -16 && spots.length < 48; lat -= 0.4)
+    for (let lon = 27; lon <= 38 && spots.length < 48; lon += 0.4)
       if (
         T(lat, lon, seed) === 'savanna' &&
         nearWater(lat, lon) &&

@@ -592,7 +592,7 @@ the map).
   design.md §2.5/§2.6 + CLAUDE.md pt. 15 record the target. Full
   regression green.)
 
-- [ ] 68. Second expansion stage for the travel-world landmarks, building on
+- [x] 68. Second expansion stage for the travel-world landmarks, building on
   the stage-1 code paths (CULTURAL_LANDMARKS/CulturalLandmarkDef in
   src/world/data/landmarks.ts; the spread into LANDMARK_POINTS + kind union
   in src/systems/economy.ts; tint()/merge() builders in
@@ -666,6 +666,22 @@ the map).
   updated in the established style.
   ACCURACY: no marker on top of the Tahat label (Hoggar) and nothing
   overlapping the village near the Okavango (hence the offset).
+  (Done exactly per spec: Parts A+B end to end on the stage-1 code paths —
+  data + kind unions, LANDMARK_POINTS spreads (flat bounty unchanged),
+  seven geometry builders (stelae with a fallen giant, crenellated keep +
+  conical-capped towers, terraced cliff dwellings, tilted crater rim,
+  smoking basalt cone via tinted geometry (no particle system), braided
+  delta ribbons + papyrus reuse, papyrus flat over a shallow disc),
+  NaturalSites component mirroring CulturalLandmarks with __naturalSites
+  hook, natural label branch (water styling for delta/wetland), i18n
+  names + kind flavors in both languages (postcolonial voice for the
+  cultural, natural-wonder awe for the natural; only existing markup
+  tags; speech files untouched). Tests: i18n coverage widened to all 11
+  sites × 2 languages; Ngorongoro sighting test mirrors Meroë (bounty +
+  kind 'crater'). enrichments counts 7 cultural + 4 natural via the
+  hooks, renders a frame at all 11 coordinates and takes evidence shots
+  94 (Aksum) / 95 (Ngorongoro). design.md §4.4 + CLAUDE.md pt. 25
+  updated; Part C recorded as point 69. Full regression green.)
 - [ ] 69. (Deferred Part C of point 68 — own scoped task, own verification.)
   Two landmarks sit on existing ports and belong in their PlaceScenes as
   skyline features, not on the travel map (a map marker would duplicate the

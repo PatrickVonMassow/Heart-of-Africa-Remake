@@ -188,6 +188,19 @@ describe('landmark discovery bounty (design.md §10)', () => {
     expect(entries.length).toBe(1)
     expect(typeof entries[0].text === 'object' && entries[0].text.params?.kind).toBe('pyramids')
   })
+
+  it('sighting the Ngorongoro crater registers, queues a bounty and journals the crater-flavored discovery', () => {
+    jumpTo(-3.16, 35.58) // Ngorongoro (a natural point-landmark)
+    expect(g().landmarksSeen).not.toContain('ngorongoro') // '?' until seen
+    drive(0, -1, 3)
+    expect(g().landmarksSeen).toContain('ngorongoro')
+    expect(g().pendingBounties.some((b) => b.kind === 'landmark' && b.id === 'ngorongoro')).toBe(true)
+    const entries = discoveryEntries().filter(
+      (e) => typeof e.text === 'object' && e.text.params?.landmark === 'ngorongoro',
+    )
+    expect(entries.length).toBe(1)
+    expect(typeof entries[0].text === 'object' && entries[0].text.params?.kind).toBe('crater')
+  })
 })
 
 describe('village first visit (design.md §16)', () => {
