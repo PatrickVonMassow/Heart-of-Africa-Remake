@@ -40,6 +40,7 @@ import {
   CANOE_DRAG_LEN,
   type TrailPoint,
 } from './canoeDrag'
+import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -725,12 +726,18 @@ function Vegetation() {
           const z = (ccz + rz) * CHUNK_SIZE
           const ll = worldToLatLon(x, z)
           const s = sampleTerrain(ll.lat, ll.lon, seed)
-          // Reed belts: within ~0.05° of a river centerline or lake shore.
-          const nearWater =
-            s.height > 0.05 &&
-            (riverDistance(ll.lat, ll.lon, 0.08) < 0.05 || lakeDistance(ll.lat, ll.lon, 0.08) < 0.04)
+          const rd = riverDistance(ll.lat, ll.lon, 0.3)
+          const lsd = lakeDistance(ll.lat, ll.lon, 0.1)
+          // Reed belts hug the waterline (a band around the river's water
+          // edge or the lake shore) — not the mid-channel (design.md §19).
+          const nearWater = s.height > 0.05 && inReedBelt(rd, lsd)
           const species = pickSpecies(s.type, roll, nearWater)
           if (!species || s.height <= 0.05) continue
+          // Keep the channels clear (design.md §11/§19): apart from the reed
+          // belts, no dressing inside or hard against river/lake water — a
+          // tree or boulder there reads as standing in the river and its
+          // body/canopy blocks the canoe's way.
+          if (species !== 'papyrus' && !solidDressingAllowed(s.type, rd, lsd)) continue
           if (species === 'rock' && s.type === 'mountain' && s.height > 6.5) continue // snow line
           // Keep place surroundings clear so markers stay readable.
           let blockedByPlace = false

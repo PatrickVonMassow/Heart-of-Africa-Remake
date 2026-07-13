@@ -420,9 +420,16 @@ verify suite that proves it.
       animals keep their body spacing after spawn (no two inside one
       another) and an animal placed onto another parts from it within
       moments, while the elephant trample remains possible; an animal on
-      an open-ocean cell is set back to the nearest land (no animal
-      strays into the impassable sea, and the scripted hunt's prey balks
-      at the waterline); some shore visitors bathe (wade in) beyond
+      an open-ocean cell — and, outside the §19.8 water dramas and the
+      wading flamingos, on any river/lake water cell — is set back to
+      the nearest land (no animal strays into the impassable sea or
+      stands in a channel, and the scripted hunt's prey balks at the
+      waterline); drinkers walk only to the bank and bathers one wade
+      past it (the bank-targeting rules pure-tested in
+      `src/scenes/travel/waterEdgeRules.test.ts`, the standing rule
+      live-checked in `scripts/verify/enrichments.mjs`); solid dressing
+      keeps clear of the channels while reed belts hug the waterline
+      (same rules module); some shore visitors bathe (wade in) beyond
       merely drinking.
     - Graveyard: the carcass/tusk/bone counts are asserted via the dev
       hook with a screenshot.

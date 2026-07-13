@@ -22,6 +22,7 @@ import { setAmbienceAnimals } from '../../systems/ambience'
 import { setAnimalCollider } from './wildlifeCollision'
 import { latLonToWorld, regionAt, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
+import { drinkWalkDistance } from './waterEdgeRules'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk } from '../../world/noise'
 import {
@@ -560,7 +561,9 @@ function placeGroup(
     // Animals near water periodically walk to the shore and drink
     // (design.md §19); the shore point follows the water-distance gradient.
     if (!shoreline) {
-      const wd = Math.min(lakeDistance(ll.lat, ll.lon, 0.5), riverDistance(ll.lat, ll.lon, 0.5))
+      const rd = riverDistance(ll.lat, ll.lon, 0.5)
+      const ld = lakeDistance(ll.lat, ll.lon, 0.5)
+      const wd = Math.min(ld, rd)
       if (wd > 0.02 && wd < 0.35) {
         const e = 0.03
         const gLat =
@@ -571,13 +574,16 @@ function placeGroup(
           Math.min(lakeDistance(ll.lat, ll.lon - e, 0.6), riverDistance(ll.lat, ll.lon - e, 0.6))
         const gl = Math.hypot(gLat, gLon)
         if (gl > 1e-4) {
-          // Step down the gradient to just short of the waterline.
-          const shoreLat = ll.lat - (gLat / gl) * (wd * 0.85)
-          const shoreLon = ll.lon - (gLon / gl) * (wd * 0.85)
+          // Walk down the gradient only to the BANK, never into the channel;
+          // a bather's target wades a small step past it into the shallow
+          // edge (waterEdgeRules, design.md §19).
+          const bathe = hash(ccx, ccz, 40 + i, seed) < 0.4
+          const walk = drinkWalkDistance(rd, ld, bathe)
+          const shoreLat = ll.lat - (gLat / gl) * walk
+          const shoreLon = ll.lon - (gLon / gl) * walk
           const w = latLonToWorld(shoreLat, shoreLon)
           animal.drink = { tx: w.x, tz: w.z }
-          // Some shore visitors also wade in and bathe, not just drink (§19).
-          if (hash(ccx, ccz, 40 + i, seed) < 0.4) animal.bathe = true
+          if (bathe) animal.bathe = true
         }
       }
     }
@@ -1067,12 +1073,21 @@ function Herds() {
     {
       const phase = oceanSweep.current++ % 7
       for (const sp of SPECIES) {
+        // Flamingos are shoreline waders — standing in shallow water is their
+        // design (§19); everyone else is set back to land.
+        if (sp === 'flamingo') continue
         const list = herds[sp]
         for (let i = phase; i < list.length; i += 7) {
           const a = list[i]
-          if (a.dead || a.inWater !== undefined) continue // water drama owns its own
+          // Water drama (struggle, rescue, plunge, a wading parent) owns its
+          // own movement; everyone else must never STAND in water — not in
+          // the open sea, and not in a river or lake either (an animal only
+          // reaches the water's edge to drink, design.md §19).
+          if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo) continue
+          if (a.child && !a.child.dead && a.child.inWater !== undefined) continue
           const ll = worldToLatLon(a.x, a.z)
-          if (sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean') {
+          const ter = sampleTerrain(ll.lat, ll.lon, seed).type
+          if (ter === 'ocean' || ter === 'water') {
             const back = findLandNear(a.x, a.z, seed)
             a.x = back.x
             a.z = back.z
@@ -1320,9 +1335,10 @@ function Herds() {
           const cycle = ((t + a.phase * 40) % 75) / 75
           if (cycle < 0.5) {
             const k = cycle < 0.12 ? cycle / 0.12 : cycle < 0.38 ? 1 : (0.5 - cycle) / 0.12
-            const reach = a.bathe ? 1.12 : 1 // bathers step a little into the water
-            const toX = (a.drink.tx - px) * reach
-            const toZ = (a.drink.tz - pz) * reach
+            // The target itself sits at the bank (a bather's a step into the
+            // shallow edge) — never overshoot toward the channel.
+            const toX = a.drink.tx - px
+            const toZ = a.drink.tz - pz
             px += toX * k
             pz += toZ * k
             if (k > 0.04) yaw = Math.atan2(toX, toZ) + (cycle >= 0.38 ? Math.PI : 0)

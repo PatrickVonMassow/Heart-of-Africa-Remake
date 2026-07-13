@@ -1775,6 +1775,41 @@ const spacing = await page.evaluate(async () => {
 check('spawned animals keep body spacing (no two inside one another)',
   spacing.animals > 5 && spacing.worst >= 0.7, JSON.stringify(spacing))
 
+// --- No animal stands in river/lake water (design.md §19): the water-drama
+// participants own their moments; everyone else is set back to land by the
+// backstop sweep. Flamingos are shoreline waders and exempt. Poll until the
+// sweep (1/7 of the animals per frame) has settled everyone.
+const inWater = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const seed = window.__game.getState().seed
+  const count = () => {
+    const herds = window.__wildlife.herdsRef.current
+    let bad = 0
+    let seen = 0
+    for (const sp of Object.keys(herds)) {
+      if (sp === 'flamingo') continue
+      for (const a of herds[sp]) {
+        if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo) continue
+        if (a.child && !a.child.dead && a.child.inWater !== undefined) continue
+        seen++
+        const lat = -a.z / 10
+        const lon = a.x / 10
+        const t = window.__terrainType(lat, lon, seed)
+        if (t === 'water' || t === 'ocean') bad++
+      }
+    }
+    return { bad, seen }
+  }
+  let r = count()
+  const deadline = Date.now() + 6000
+  while (Date.now() < deadline && r.bad > 0) {
+    await sleep(250)
+    r = count()
+  }
+  return r
+})
+check('no animal stands in river/lake water (banks only)', inWater.seen > 10 && inWater.bad === 0, JSON.stringify(inWater))
+
 const parting = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current

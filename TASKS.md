@@ -497,12 +497,35 @@ the map).
   the just-left-village rim (trail pinned at the 2.0 clearance). design.md
   §7 and CLAUDE.md pt. 4 record the behaviour. Full regression green.)
 
-- [ ] 65. Plants still reach into rivers and block the canoe's way
+- [x] 65. Plants still reach into rivers and block the canoe's way
   (screenshot: trees and boulders overlapping the channel), and animals
   stand/spawn IN the water. Flora and solid dressing must keep clear of
   river/lake water so a passage is never blocked; animals must never spawn
   on water cells; drinking animals walk only to the water's EDGE (the bank)
   and never into the water — bathers wade at the shore, not mid-channel.
+  (Three root causes, one shared pure rules module
+  (src/scenes/travel/waterEdgeRules.ts): (1) drink targets walked 85 % of
+  the way to the river AXIS — riverDistance measures to the centerline,
+  so drinkers ended mid-channel and bathers (×1.12 overshoot) past it;
+  targets now stop at the bank (waterline + gap), bathers one small wade
+  past it, no overshoot factor. (2) The §19.5 backstop corrected only
+  open-ocean cells; it now also sets any non-drama, non-flamingo animal
+  standing on river/lake water back to the nearest land. (3) Reed belts
+  spawned within 0.05° of the AXIS (mid-channel papyrus) and solid
+  dressing was allowed right up to the ribbon edge; reeds now hug the
+  waterline band and trees/boulders/kopjes keep RIVER_WIDTH+0.06° axis
+  clearance plus a lake-shore band. 10 pure tests cover the rules;
+  enrichments gains a polled no-animal-stands-in-water check; a probe at
+  the reported river stretch shows 0/49 animals in water and clear
+  channels. design.md §19.7 + CLAUDE.md pt. 12 record the rules. Full
+  regression green.)
+
+- [ ] 66. Animals still tend to jitter/tremble — especially the gambolling
+  calves, but also e.g. animals dodging elephants. Investigate the jitter
+  problem intensively (find every oscillation source: per-frame direction
+  flips, competing behaviours fighting over the same animal, render-facing
+  vs movement-heading mismatches, separation push-pull cycles) and land a
+  reliable, verified fix rather than another spot damping.
 
 ## Closing (only after all points)
 

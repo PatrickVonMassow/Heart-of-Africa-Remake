@@ -535,8 +535,9 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 
 ### 19.7 Shore and grazing life
 
-- Animals living near a river or lake periodically walk to the shore, drink and return to the herd; grazing species dip their heads into the grass on open land; flamingos wade in the shallows.
-- Some shore visitors go beyond drinking and bathe — a low, splashing wallow a little further into the shallow water.
+- Animals living near a river or lake periodically walk to the shore, drink and return to the herd — only to the water's EDGE (the bank), never into the channel; grazing species dip their heads into the grass on open land; flamingos wade in the shallows.
+- Some shore visitors go beyond drinking and bathe — a low, splashing wallow one small wade past the bank into the shallow edge, still never mid-channel.
+- Apart from the water dramas (§19.8) and the wading flamingos, no animal ever STANDS in river or lake water: like the open-sea backstop (§19.5), an animal that ends up on a water cell is set back to the nearest land. Channels also stay clear of solid dressing — reeds hug the waterline, but no tree or boulder stands in or hard against the water where it would block a canoe passage (§11).
 
 ### 19.8 Family life in the herds
 
