@@ -438,12 +438,12 @@ Players who do not want to be interrupted can turn the automatic presentation of
 
 ### 17.1 Bird's-eye HUD
 
-- Field of view of the surroundings; status bar with date, funds, provisions, gifts and the current region (no hand-object slot — item effects are possession-based, §6/§7).
+- Field of view of the surroundings; status bar with date, funds, provisions, gifts and the current region (no hand-object slot — item effects are possession-based, §6/§7). Each stat is led by a narrow, expedition-styled SYMBOL instead of its word (the localized word remains as the tooltip/accessible label), and the date reads compactly as DD.MM.YYYY.
 - The coordinates are not shown permanently; they are read out on demand via the position query.
-- Transient status hints — e.g. the reason for a movement penalty (§11) — appear as a right-aligned item inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
+- Transient status hints — e.g. the reason for a movement penalty (§11) — appear CENTRED inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
 - The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
 - An item that is currently in use lights up (glows) in the inventory bar: the relief item countering the present terrain (the canoe on water, the machete in the jungle, the rope on a mountain) and medicine while a curable affliction (fever or a wound) is active — so the player sees at a glance which piece of equipment is doing its work right now.
-- A health bar sits at the top right, below the status bar at the FPS-counter height: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. To its left, the currently active afflictions (fever, dehydration, sun blindness, wounds) show as small badges. The detailed state stays on the health query (H).
+- A health bar sits INSIDE the status bar at its right end — where the journal panel can never cover it: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query. To its left, the currently active afflictions (fever, dehydration, sun blindness, wounds) show as small badges. The detailed state stays on the health query (H).
 - Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
 
 ### 17.2 Discovery-gated labels

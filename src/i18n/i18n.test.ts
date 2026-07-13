@@ -138,6 +138,14 @@ describe('format functions (design.md §17)', () => {
   })
 })
 
+describe('formatDateShort (design.md §17.1)', () => {
+  it('renders DD.MM.YYYY in both languages', () => {
+    expect(en.formatDateShort(0, 1890)).toBe('01.01.1890')
+    expect(de.formatDateShort(0, 1890)).toBe('01.01.1890')
+    expect(en.formatDateShort(370, 1890)).toBe('06.01.1891')
+  })
+})
+
 describe('cultural and natural landmarks i18n coverage (design.md §4.4)', () => {
   for (const lang of [en, de]) {
     describe(lang.lang, () => {

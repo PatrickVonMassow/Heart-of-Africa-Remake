@@ -256,7 +256,7 @@ verify suite that proves it.
    item. The penalty mapping is pure-tested for each terrain (incl. the
    canoe-on-land penalty on every land type). A canoe run on savanna
    covers clearly less ground than without it (the land malus is real,
-   not just a hint). The top-right HUD hint appears in jungle without a
+   not just a hint). The centred status-bar hint appears in jungle without a
    machete and clears once the machete is in the pack; a first jungle
    entry adds exactly one journal warning while a later entry adds none.
    With a canoe in the pack the explorer rides it on a water tile
@@ -325,11 +325,18 @@ verify suite that proves it.
 9. **Status bar.** Date, funds, provisions, gifts and current region are
    displayed per `design.md` §17.1 — no hand-item slot, no permanent
    coordinates (removed on user request); transient status hints (e.g.
-   the movement-penalty reason, pt. 4) render as a right-aligned item
-   inside the status bar itself, not in a separate floating panel; the
-   inventory item currently in use glows, and the top-right health bar
-   with its affliction badges renders per §17.1. Verifiable: the hint element is a descendant
-   of `.status-bar` and its box stays within the bar's box, and a canoe on
+   the movement-penalty reason, pt. 4) render CENTRED inside the status
+   bar itself, not in a separate floating panel; each stat is led by its
+   symbol with the localized word as tooltip and the date reads
+   DD.MM.YYYY; the inventory item currently in use glows, and the health
+   bar with its affliction badges sits inside the bar's right end per
+   §17.1 (never covered by the journal). Verifiable: the hint element is a descendant
+   of `.status-bar`, its box stays within the bar's box and it sits at
+   the bar's centre; each stat carries its localized title and a
+   `.stat-icon` while the date renders DD.MM.YYYY
+   (`src/ui/StatusBar.test.tsx`, `src/i18n/i18n.test.ts`); the
+   `.health-bar-fill` lives inside `.status-bar`
+   (`src/ui/StatusBar.test.tsx`), and a canoe on
    water / medicine while afflicted gains `.inv-active` while an idle item
    does not (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is
    full-width green at full health and shrinks/reddens toward zero, and an

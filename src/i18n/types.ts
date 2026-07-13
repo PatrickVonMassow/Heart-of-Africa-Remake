@@ -21,6 +21,8 @@ export interface Strings {
   months: string[]
   /** Full in-game date, e.g. "3. Januar 1890" / "January 3, 1890". */
   formatDate(day: number, startYear: number): string
+  /** Compact DD.MM.YYYY for the status bar (design.md §17.1). */
+  formatDateShort(day: number, startYear: number): string
   /** Coordinate line for the status bar. */
   formatLatLon(lat: number, lon: number): string
   /** Locale decimal formatting with one fraction digit. */

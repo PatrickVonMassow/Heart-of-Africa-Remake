@@ -704,7 +704,7 @@ the map).
   screenshots 96/97. design.md §4.4 + CLAUDE.md pt. 15 updated. Full
   regression green.)
 
-- [ ] 70. Status-bar redesign: replace the words "Date", "Funds",
+- [x] 70. Status-bar redesign: replace the words "Date", "Funds",
   "Provisions", "Gifts" and "Region" with fitting SYMBOLS (stylistically
   matching the game, expressive, much narrower than the text). Show the
   date as DD.MM.YYYY. Transient status hints (e.g. dragging the canoe on
@@ -714,6 +714,21 @@ the map).
   longer cover them. Update the affected §7.1 pt. 9/pt. 4 verifiable
   conditions (hint geometry, health-bar/badge selectors) and design.md
   §17.1 accordingly, in both languages where text is involved.
+  (Each stat now leads with a narrow engraved inline-SVG symbol (calendar,
+  coin stack, provision sack, gift, compass) tinted in the HUD accent; the
+  localized word stays as title/aria label. New i18n formatDateShort()
+  renders DD.MM.YYYY in both languages (journal keeps the long form). The
+  bar is a three-zone flex row: stats left, transient hints pinned to the
+  bar's TRUE centre (absolute-centred — the flex zones are asymmetric),
+  and the HealthBar (moved from Hud.tsx into its own module, mounted
+  inside the bar) with its affliction badges at the right end — the
+  journal panel can no longer cover it. StatusBar.test asserts
+  symbol+tooltip per stat, the DD.MM.YYYY text, the language switch and
+  the in-bar health bar; i18n.test pins formatDateShort in both
+  languages; the parity function-leaf count moved to 56; enrichments'
+  hint-geometry check now asserts centredness (measured offset 0 in the
+  probe). design.md §17.1 + CLAUDE.md pt. 4/9 updated. Full regression
+  green.)
 
 - [ ] 71. The health bar must BLINK once health falls below 1/3 (attention
   pull, like the canteen's empty-blink). Coordinate with the point-70

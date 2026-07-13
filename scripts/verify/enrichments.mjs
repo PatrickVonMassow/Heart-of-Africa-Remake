@@ -383,17 +383,20 @@ if (jungleSpot) {
     const r = el.getBoundingClientRect()
     const br = bar.getBoundingClientRect()
     // The hint is an actual child of the status bar (not a floating panel):
-    // it is contained in the bar's DOM and its box stays within the bar's box.
+    // it is contained in the bar's DOM, its box stays within the bar's box,
+    // and it sits at the bar's CENTRE (design.md §17.1).
     const insideBar = bar.contains(el) && r.top >= br.top - 1 && r.bottom <= br.bottom + 1
+    const centreOff = Math.abs(r.left + r.width / 2 - (br.left + br.width / 2))
     return {
-      topRight: r.left > window.innerWidth / 2 && insideBar,
+      centred: centreOff < br.width * 0.1 && insideBar,
+      centreOff: Math.round(centreOff),
       hintTop: Math.round(r.top),
       barBottom: Math.round(br.bottom),
     }
   })
   await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
   console.log('shot 84-movement-penalty.png')
-  check('Movement penalty hint sits inside the status bar (right-aligned)', hint.topRight === true, `hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
+  check('Movement penalty hint sits centred inside the status bar', hint.centred === true, `centreOff ${hint.centreOff}, hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
 } else {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
 }

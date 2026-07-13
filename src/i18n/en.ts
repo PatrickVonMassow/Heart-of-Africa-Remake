@@ -105,6 +105,11 @@ export const en: Strings = {
     const d = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000)
     return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`
   },
+  formatDateShort(day, startYear) {
+    const d = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000)
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`
+  },
   formatLatLon(lat, lon) {
     const latDir = lat >= 0 ? 'North' : 'South'
     const lonDir = lon >= 0 ? 'East' : 'West'

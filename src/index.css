@@ -65,20 +65,61 @@ textarea {
   left: 0;
   right: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 18px;
-  align-items: baseline;
-  padding: 8px 14px;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px;
   background: var(--hud-bg);
   border-bottom: 1px solid var(--hud-border);
   font-size: 15px;
   pointer-events: none;
 }
 
-.status-bar .stat b {
+/* Left zone: the stats, each led by a narrow engraved symbol (the localized
+   word lives in the title/aria attributes). */
+.status-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.status-bar .stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-icon {
+  width: 15px;
+  height: 15px;
   color: var(--hud-accent);
-  font-weight: 600;
-  margin-right: 4px;
+  flex: none;
+}
+
+/* Centre zone: transient status hints (movement penalty etc.), pinned to the
+   BAR's true centre (the flex zones are asymmetric). */
+.status-hints {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 42%;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.status-hints .movement-penalty {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right zone: the health bar + affliction badges INSIDE the bar, where the
+   journal panel can never cover them (design.md §17.1). */
+.status-health {
+  display: flex;
+  align-items: center;
+  flex: none;
 }
 
 /* --- Inventory bar -------------------------------------------------------- */
@@ -93,12 +134,9 @@ textarea {
   gap: 8px;
 }
 
-/* Health status top-right, below the status bar, at the FPS-counter height:
-   the affliction badges sit to the left of the health bar. */
+/* Health status inside the status bar's right end (design.md §17.1): the
+   affliction badges sit to the left of the health bar. */
 .health-status {
-  position: absolute;
-  top: 46px;
-  right: 12px;
   height: 22px; /* fixed, so adding taller affliction badges never nudges the bar */
   display: flex;
   align-items: center;
@@ -118,8 +156,8 @@ textarea {
 }
 
 .health-bar {
-  width: 180px;
-  height: 16px;
+  width: 150px;
+  height: 14px;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid var(--hud-border);
   border-radius: 3px;

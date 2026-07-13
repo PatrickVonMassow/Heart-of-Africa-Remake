@@ -21,23 +21,35 @@ afterEach(() => {
   useLocale.getState().setLang('en')
 })
 
-describe('StatusBar localization', () => {
-  it('shows the English labels and no permanent coordinate display', () => {
+describe('StatusBar localization and symbols (design.md §17.1)', () => {
+  it('leads each stat with a symbol; the localized word is the tooltip, not text', () => {
     render(<StatusBar />)
-    expect(screen.getByText(en.status.date)).toBeInTheDocument()
-    expect(screen.getByText(en.status.cash)).toBeInTheDocument()
-    expect(screen.getByText(en.status.provisions)).toBeInTheDocument()
-    expect(screen.getByText(en.status.gifts)).toBeInTheDocument()
+    for (const label of [en.status.date, en.status.cash, en.status.provisions, en.status.gifts, en.status.region]) {
+      const stat = screen.getByTitle(label)
+      expect(stat).toBeInTheDocument()
+      expect(stat.querySelector('.stat-icon')).toBeInTheDocument()
+      // The word itself no longer takes bar width.
+      expect(stat.textContent).not.toContain(label)
+    }
     expect(document.body.textContent).not.toMatch(/Latitude|Longitude/)
   })
 
-  it('renders the German labels after a runtime language switch', () => {
+  it('shows the date as DD.MM.YYYY', () => {
+    render(<StatusBar />)
+    expect(screen.getByTitle(en.status.date).textContent).toBe('01.01.1890')
+  })
+
+  it('localizes the tooltips after a runtime language switch', () => {
     useLocale.getState().setLang('de')
     render(<StatusBar />)
-    expect(screen.getByText(de.status.date)).toBeInTheDocument()
-    expect(screen.getByText(de.status.cash)).toBeInTheDocument()
-    // No English leftovers on screen.
+    expect(screen.getByTitle(de.status.date)).toBeInTheDocument()
+    expect(screen.getByTitle(de.status.cash)).toBeInTheDocument()
     expect(document.body.textContent).not.toContain(en.status.cash)
+  })
+
+  it('hosts the health bar inside the bar (never covered by the journal)', () => {
+    render(<StatusBar />)
+    expect(document.querySelector('.status-bar .status-health .health-bar-fill')).toBeInTheDocument()
   })
 })
 
