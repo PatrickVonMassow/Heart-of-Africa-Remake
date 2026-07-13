@@ -196,6 +196,8 @@ export const en: Strings = {
   mapOverlay: {
     title: 'Map',
     continent: 'Africa',
+    subtitle: 'From the surveys of the expedition · 1890',
+    scaleMiles: 'English Miles',
     explored: (region, percent) => `${region}: ${percent}% explored`,
     close: 'Close (M)',
   },

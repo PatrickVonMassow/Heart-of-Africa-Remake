@@ -222,8 +222,10 @@ verify suite that proves it.
    the line in both views (§3.2); map-point labels are discovery-gated
    (§17.2); coordinates are read out on demand via the position query
    (§3.2, pt. 30), never shown permanently. The exploration map is
-   implemented per §19.11 (a hand-drawn parchment chart under a fog of war
-   that each explored area clears a window through). Every village
+   implemented per §19.11 (an engraved ~1890 atlas plate on worn paper —
+   graticule, blue water ink, hachures, each region named once in spaced
+   capitals — under a fog of war that each explored area clears a window
+   through). Every village
    keeps the small minimum river-water clearance of §4.2 (its footprint
    never reaches into a river; ports are exempt). Verifiable: near
    a border, `.region-label` elements name both regions on their sides;
@@ -233,7 +235,9 @@ verify suite that proves it.
    unexplored area (under fog) with a screenshot (92)
    (`scripts/verify/enrichments.mjs`); all 22 villages hold the river
    clearance while the Nubian village stays riverside on the Nile
-   (`src/world/world.test.ts`).
+   (`src/world/world.test.ts`); the map's region-name anchors sit once per
+   region on that region's own land and far enough apart that the names
+   cannot collide (`src/ui/mapLayout.test.ts`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890).
    The movement boundary, Red Sea cut, Mediterranean always-blocked rule

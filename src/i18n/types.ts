@@ -109,6 +109,10 @@ export interface Strings {
     title: string
     /** Continent name shown in the map's title cartouche. */
     continent: string
+    /** Cartouche subtitle line, in the style of a period atlas plate. */
+    subtitle: string
+    /** Scale-bar caption (period atlases print "English Miles"). */
+    scaleMiles: string
     explored(region: string, percent: number): string
     close: string
   }

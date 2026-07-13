@@ -456,11 +456,25 @@ the map).
   witness), and covers lakes/null cases; the enrichments canoe-ride
   screenshot (88) moved to the previously flooded cataract stretch. Full
   regression green.)
-- [ ] 63. The exploration map is neither visually appealing nor functional:
+- [x] 63. The exploration map is neither visually appealing nor functional:
   region labels sit at odd spots, repeat per region and overlap each other.
   Research what a handsome, functional ~1890 map looks like and rebuild the
   current one completely into something clearly better and more elaborate,
   including embellishments such as a worn-paper look.
+  (Researched period conventions (1890s George Philip/Johnston atlas
+  plates): graticule with degree numbers in a piano-key border, blue water
+  ink vs sepia land ink with seaward-fading coastal hatching, hachure
+  relief, region names once in spaced capitals across the heartland, small
+  italics for feature names, cartouche with scale bar. MapOverlay rebuilt
+  accordingly on worn paper (fold creases, ring stains, darkened corners);
+  region labels now come from src/ui/mapLayout.ts — one land-centroid
+  anchor per region, nudged onto region land, pure-tested for placement
+  and non-collision (mapLayout.test.ts); sighted landmarks (§17.2) print
+  their name in italics, explored mountains get hachure clusters; plate
+  furniture (frame, graticule numbers, cartouche, region names, borders)
+  prints over the fog, geography stays discovery-gated beneath it.
+  design.md §19.11 + CLAUDE.md pt. 3 updated; new i18n strings (subtitle,
+  scale caption) in both languages. Full regression green.)
 - [ ] 64. The dragged canoe on LAND still clips into the ground and objects
   in many situations (point 62 fixed the water side). Test broadly and fix:
   many different ground types and height profiles (dunes, slopes, rocky
@@ -469,6 +483,13 @@ the map).
   protruding into a village/settlement — the hull must follow the terrain
   under it (pitch along the drag direction, no end buried in a rise, no
   floating over a dip) and must never intersect solid obstacles.
+
+- [ ] 65. Plants still reach into rivers and block the canoe's way
+  (screenshot: trees and boulders overlapping the channel), and animals
+  stand/spawn IN the water. Flora and solid dressing must keep clear of
+  river/lake water so a passage is never blocked; animals must never spawn
+  on water cells; drinking animals walk only to the water's EDGE (the bank)
+  and never into the water — bathers wade at the shore, not mid-channel.
 
 ## Closing (only after all points)
 

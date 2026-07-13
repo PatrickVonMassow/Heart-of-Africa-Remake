@@ -195,6 +195,8 @@ export const de: Strings = {
   mapOverlay: {
     title: 'Karte',
     continent: 'Afrika',
+    subtitle: 'Nach den Aufnahmen der Expedition · 1890',
+    scaleMiles: 'Englische Meilen',
     explored: (region, percent) => `${region}: ${percent} % erkundet`,
     close: 'Schließen (M)',
   },
