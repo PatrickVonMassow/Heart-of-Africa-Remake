@@ -495,8 +495,20 @@ await page.evaluate(() => {
 
 // --- Elephant trampling (§7.1.12) --------------------------------------------
 // Jump to open savanna so herds exist, then ring a victim with elephants.
+// Poll for a prey herd instead of a fixed sleep: under full-regression load
+// the streaming takes far longer than usual to fill the plains.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-await page.waitForTimeout(2500)
+await page
+  .waitForFunction(
+    () => {
+      const h = window.__wildlife?.herdsRef?.current
+      return !!h && ['zebra', 'antelope', 'giraffe'].some((sp) => (h[sp] ?? []).some((a) => !a.dead))
+    },
+    null,
+    { timeout: 25000 },
+  )
+  .catch(() => {})
+await page.waitForTimeout(600)
 const trample = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w?.herdsRef?.current
@@ -578,7 +590,7 @@ const herdTest = await page.evaluate(async () => {
   for (let i = 0; i < 5; i++) {
     members.push({ x: spot.x + ((i % 3) - 1) * 2.2, z: spot.z + (Math.floor(i / 3) - 0.5) * 2.2, y: 0.2, rot: 0, scale: 1, phase: i * 1.3, herd: 424242 })
   }
-  herds.elephant.push(...members)
+  herds.elephant.unshift(...members) // front: stay inside the behaviour window
   const c0 = { x: mean(members, 'x'), z: mean(members, 'z') }
   const spreads = []
   const headingSnaps = []
@@ -609,10 +621,13 @@ const herdTest = await page.evaluate(async () => {
 
   // Prey dodges only at the last moment: far elephant → no dodge; near → flee.
   clear()
+  // Inject at the FRONT: the behaviour loop processes at most MAX_INSTANCES
+  // animals per species, and with the streamed population near its cap an
+  // appended animal falls outside that window and never behaves at all.
   const prey = { x: spot.x, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.5 }
-  herds.zebra.push(prey)
+  herds.zebra.unshift(prey)
   const eleph = { x: spot.x + 7, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0, heading: 0 }
-  herds.elephant.push(eleph)
+  herds.elephant.unshift(eleph)
   const pf0 = { x: prey.x, z: prey.z }
   for (let k = 0; k < 10; k++) { eleph.x = spot.x + 7; eleph.z = spot.z; await sleep(120) }
   const movedWhileFar = Math.hypot(prey.x - pf0.x, prey.z - pf0.z)
@@ -620,7 +635,17 @@ const herdTest = await page.evaluate(async () => {
   let dNearEnd = dNearStart
   for (let k = 0; k < 55; k++) { eleph.x = spot.x + 2; eleph.z = spot.z; await sleep(110); dNearEnd = Math.hypot(prey.x - eleph.x, prey.z - eleph.z) }
 
-  return { ok: true, centreMoved, maxSpread, maxTurn, movedWhileFar, dNearStart, dNearEnd }
+  // Diagnostics kept in the report: whether the injected pair was still being
+  // simulated at the end (streaming can remove or displace injected animals).
+  const diag = {
+    preyIdx: herds.zebra.indexOf(prey),
+    zebraN: herds.zebra.length,
+    elephIdx: herds.elephant.indexOf(eleph),
+    elephN: herds.elephant.length,
+    playerDist: Math.hypot(window.__game.getState().pos.x - spot.x, window.__game.getState().pos.z - spot.z),
+    dodge: prey.dodgeHeading ?? null,
+  }
+  return { ok: true, centreMoved, maxSpread, maxTurn, movedWhileFar, dNearStart, dNearEnd, diag }
 })
 check('an elephant herd roams (its centre moves)', herdTest.ok && herdTest.centreMoved > 1.5, JSON.stringify(herdTest))
 check('the herd stays together (does not disperse)', herdTest.ok && herdTest.maxSpread < 16, JSON.stringify(herdTest))
@@ -906,24 +931,48 @@ check('the scavenged carcass dissolves and is removed', scavenge.dissolveStarted
 // confirm his path never enters the animal's body — he is turned aside (slides
 // around) rather than passing through it (which would drop the distance to ~0).
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-await page.waitForTimeout(600)
+// Poll until streamed animals exist: the injected test zebra borrows a live
+// chunk key from them, and under load the streaming lags a fixed sleep.
+await page
+  .waitForFunction(
+    () => {
+      const h = window.__wildlife?.herdsRef?.current
+      if (!h) return false
+      for (const sp of Object.keys(h)) if (h[sp].some((a) => a.chunk && !a.dead)) return true
+      return false
+    },
+    null,
+    { timeout: 25000 },
+  )
+  .catch(() => {})
+await page.waitForTimeout(400)
 const animalHit = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p0 = window.__game.getState().pos
   const ax = p0.x + 2.6 // 2.6 east — clear of the player (body+player ≈ 1.2)
   const az = p0.z
-  const zebra = { x: ax, z: az, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: 'collide-test' }
+  // A VALID nearby chunk key (borrowed from any live streamed animal) keeps
+  // the injected zebra out of the streaming despawn entirely: with an invalid
+  // key it was despawned and re-injected each poll, and under full-regression
+  // load the player could drive through it inside that gap. Front insertion
+  // keeps it inside the MAX_INSTANCES behaviour window.
+  const liveChunk = (() => {
+    const h = window.__wildlife.herdsRef.current
+    if (!h) return undefined
+    for (const sp of Object.keys(h)) for (const a of h[sp]) if (a.chunk && !a.dead) return a.chunk
+    return undefined
+  })()
+  const zebra = { x: ax, z: az, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: liveChunk ?? 'collide-test' }
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' })) // drive east, straight at it
   let minDist = Infinity
   let reached = false // the player got within engaging range at some point
   const t0 = Date.now()
   while (Date.now() - t0 < 2500) {
-    // Keep the pinned zebra alive in the CURRENT herds: driving across chunk
-    // boundaries streams the injected (invalid-chunk) animal out, so re-add and
-    // re-pin it each poll — the real game collides against genuinely streamed
-    // animals, this only keeps the fixed test target present.
+    // Fallback: should the zebra be streamed out regardless, re-add and re-pin
+    // it — the real game collides against genuinely streamed animals, this
+    // only keeps the fixed test target present.
     const herds = window.__wildlife.herdsRef.current
-    if (herds && !herds.zebra.includes(zebra)) herds.zebra.push(zebra)
+    if (herds && !herds.zebra.includes(zebra)) herds.zebra.unshift(zebra)
     zebra.x = ax
     zebra.z = az
     const p = window.__game.getState().pos
@@ -941,7 +990,7 @@ const animalHit = await page.evaluate(async () => {
   const t1 = Date.now()
   while (Date.now() - t1 < 1500) {
     const herds2 = window.__wildlife.herdsRef.current
-    if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.push(zebra)
+    if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.unshift(zebra)
     zebra.x = ax
     zebra.z = az
     await sleep(20)
@@ -1014,6 +1063,52 @@ const familyLife = await page.evaluate(() => {
   return { young, close }
 })
 check('herds raise young that keep close to a parent (nursing)', familyLife.young > 0 && familyLife.close > 0, JSON.stringify(familyLife))
+
+// --- No jitter (design.md §19): a playing calf's step direction must not saw
+// back and forth between frames (the old play/follow boundary ping-pong).
+// Track any hopping calf's position; count per-sample direction reversals.
+const calfJitter = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
+  let samples = 0
+  let flips = 0
+  let tracked = null
+  let last = null
+  let lastStep = null
+  const deadline = Date.now() + 20000
+  while (Date.now() < deadline && samples < 40) {
+    if (!tracked || tracked.dead || tracked.hop === undefined) {
+      tracked = null
+      for (const sp of SP) {
+        tracked = (herds[sp] ?? []).find((a) => a.young && a.hop !== undefined && !a.dead)
+        if (tracked) break
+      }
+      last = null
+      lastStep = null
+    }
+    if (tracked) {
+      if (last) {
+        const dx = tracked.x - last.x
+        const dz = tracked.z - last.z
+        const m = Math.hypot(dx, dz)
+        if (m > 0.01) {
+          if (lastStep && dx * lastStep.dx + dz * lastStep.dz < 0) flips++
+          lastStep = { dx, dz }
+          samples++
+        }
+      }
+      last = { x: tracked.x, z: tracked.z }
+    }
+    await sleep(80)
+  }
+  return { samples, flips }
+})
+check(
+  'a playing calf moves without direction sawtooth (no trembling)',
+  calfJitter.samples >= 20 && calfJitter.flips / Math.max(1, calfJitter.samples) < 0.15,
+  JSON.stringify(calfJitter),
+)
 
 // Bathing needs shore visitors, which only spawn where a savanna herd sits
 // within reach of water. Find savanna tiles near water for the current seed
@@ -1090,7 +1185,10 @@ for (const spot of shoreSpots) {
         for (const sp of Object.keys(h))
           for (const a of h[sp]) {
             animals++
-            if (a.drink) drinkers.push(`${sp}:${a.drink.tx.toFixed(2)},${a.drink.tz.toFixed(2)}`)
+            // Key by SPAWN position (deterministic per chunk), not the drink
+            // target: bank targets legitimately collapse onto the same shore
+            // point since the banks-only rule, which broke the unique count.
+            if (a.drink) drinkers.push(`${sp}:${a.x.toFixed(1)},${a.z.toFixed(1)}`)
             if (a.bathe) bathers++
           }
       return { drinkers, bathers, animals }

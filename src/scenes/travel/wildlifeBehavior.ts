@@ -246,3 +246,40 @@ export function turnToward(current: number, target: number, maxStep: number): nu
   while (dh < -Math.PI) dh += Math.PI * 2
   return current + Math.max(-maxStep, Math.min(maxStep, dh))
 }
+
+/**
+ * Leashed gambol direction (design.md §19.8): damp the OUTWARD component of
+ * the bout heading toward zero at the play range's edge — the tangential
+ * component always survives, so a scamper ORBITS its parent instead of
+ * crossing the range boundary. Crossing it used to switch play off and the
+ * (faster) follow yank on — a per-frame sawtooth that visibly trembled the
+ * calf. Damping (rather than blending an opposing home pull) has no
+ * cancellation point, so the direction can never alternate between frames.
+ * Returns the step direction, length 0..1 (a radially-pinned calf briefly
+ * stands rather than jittering).
+ */
+export function leashedGambolDir(
+  heading: number,
+  toParentX: number,
+  toParentZ: number,
+  dist: number,
+  range: number,
+): [number, number] {
+  let dx = Math.sin(heading)
+  let dz = Math.cos(heading)
+  if (dist > 1e-6 && range > 0) {
+    const ox = -toParentX / dist // outward unit (away from the parent)
+    const oz = -toParentZ / dist
+    const rad = dx * ox + dz * oz // outward component of the bout direction
+    if (rad > 0) {
+      // Free play near the parent; outward motion dies smoothly at the edge.
+      const keep = 1 - Math.min(1, (dist / range) ** 3)
+      dx -= ox * rad * (1 - keep)
+      dz -= oz * rad * (1 - keep)
+    }
+  }
+  const l = Math.hypot(dx, dz)
+  if (l < 1e-4) return [0, 0]
+  return l > 1 ? [dx / l, dz / l] : [dx, dz]
+}
+

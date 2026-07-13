@@ -31,6 +31,7 @@ import {
   flightStep,
   gambolState,
   groundNormal,
+  leashedGambolDir,
   separationPush,
   turnToward,
   type FlightState,
@@ -105,6 +106,16 @@ interface Animal {
   /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
    *  the facing never snaps between flanking threats (design.md §19). */
   dodgeHeading?: number
+  /** Blended amplitude of the idle shuffle render offset: behaviours fade it
+   *  instead of switching it — a hard on/off popped the rendered position at
+   *  every behaviour transition (design.md §19). */
+  wobAmp?: number
+  /** Play lock after a bout ended out of range: no new bout until the calf is
+   *  well inside the range again (hysteresis against play/follow ping-pong). */
+  playLock?: boolean
+  /** Bout detour applied after hitting the sea mid-bout: the scamper bends
+   *  along the bank for the rest of the bout instead of vibrating against it. */
+  boutDetour?: number
   /** Seconds of struggle left while a predator eats this calf (design.md §19):
    *  during the window the calf is alive and wriggling (no stain/shrink yet), and
    *  a parent may still save it. */
@@ -372,6 +383,9 @@ const BODY_RADIUS: Record<Species, number> = {
 }
 /** Grid cell size for the runtime separation pass (≥ 2·max body radius). */
 const SEPARATION_CELL = 4
+// Body separation acts as a bounded force (units/s), not a per-frame teleport:
+// clamped corrections cannot vibrate against the behaviours' own steps.
+const SEPARATION_MAX_SPEED = 2.2
 
 /**
  * Live animals near a point as collision circles `[x, z, radius]` (design.md
@@ -1018,7 +1032,11 @@ function Herds() {
         b.inWater !== undefined ||
         b.rescued !== undefined ||
         b.plungeTo !== undefined ||
-        (b.child !== undefined && !b.child.dead && b.child.caught !== undefined)
+        (b.child !== undefined && !b.child.dead && b.child.caught !== undefined) ||
+        // The active chase victim and its blocking parent sprint on exact
+        // lines; herd-mates shoving them every frame trembled the hunt.
+        (LION_STATE.mode === 'chase' &&
+          (LION_STATE.victim === b || (b.child !== undefined && LION_STATE.victim === b.child)))
       const grid = new Map<string, Array<{ a: Animal; sp: Species }>>()
       for (const sp of SPECIES) {
         for (const a of herds[sp]) {
@@ -1058,8 +1076,16 @@ function Herds() {
           if (neighbors.length === 0) continue
           const [dx, dz] = separationPush(a.x, a.z, neighbors)
           if (dx !== 0 || dz !== 0) {
-            a.x += dx
-            a.z += dz
+            // Clamp the correction to a walking pace: the full geometric
+            // half-overlap per frame acted as a teleport that the behaviours
+            // reversed next frame — a push-pull vibration wherever animals
+            // bunch (dodging an elephant, playing calves). As a bounded
+            // force the pair still parts within moments, just smoothly.
+            const m = Math.hypot(dx, dz)
+            const cap = SEPARATION_MAX_SPEED * dt
+            const k = m > cap ? cap / m : 1
+            a.x += dx * k
+            a.z += dz * k
           }
         }
       }
@@ -1093,6 +1119,11 @@ function Herds() {
             a.z = back.z
             const l2 = worldToLatLon(a.x, a.z)
             a.y = Math.max(0.02, sampleTerrain(l2.lat, l2.lon, seed).height)
+            // Clear the dodge heading: after the land teleport the escape
+            // direction must re-engage exactly (re-seeding it from the old
+            // facing sent the prey RUNNING at the threat until the turn cap
+            // caught up). The RENDERED facing stays smooth regardless — it
+            // is turn-capped separately (FACE_TURN).
             a.dodgeHeading = undefined
           }
         }
@@ -1315,11 +1346,15 @@ function Herds() {
         const wob = Math.sin(t * 0.25 + a.phase)
         let px: number
         let pz: number
+        // The idle shuffle is a render offset ADDED after the behaviours with
+        // a BLENDED amplitude (wobTarget per behaviour): switching it on/off
+        // per branch popped the rendered position at every behaviour change.
+        let wobTarget = sp === 'elephant' ? 0 : 0.8
         if (sp === 'elephant') {
           ;[px, pz] = elephantPos[eIdx++]
         } else {
-          px = a.x + wob * 0.8
-          pz = a.z + Math.cos(t * 0.2 + a.phase) * 0.8
+          px = a.x
+          pz = a.z
         }
         // Desired heading this frame; the branches below overwrite it. An
         // elephant faces its line of travel (it walks its own heading), all
@@ -1334,6 +1369,7 @@ function Herds() {
         if (a.drink && sp !== 'elephant') {
           const cycle = ((t + a.phase * 40) % 75) / 75
           if (cycle < 0.5) {
+            wobTarget = 0.2
             const k = cycle < 0.12 ? cycle / 0.12 : cycle < 0.38 ? 1 : (0.5 - cycle) / 0.12
             // The target itself sits at the bank (a bather's a step into the
             // shallow edge) — never overshoot toward the channel.
@@ -1442,24 +1478,38 @@ function Herds() {
             const toX = a.parent.x - a.x
             const toZ = a.parent.z - a.z
             const d = Math.hypot(toX, toZ)
-            const canPlay = !lionActive && d <= GAMBOL_RANGE && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
+            // Play-lock hysteresis: a bout that ended out of range (a parent
+            // that walked off) does not restart at the boundary — only well
+            // inside it — so play and follow never alternate per frame.
+            if (a.playLock && d < GAMBOL_RANGE * 0.6) a.playLock = undefined
+            if (!a.playLock && d > GAMBOL_RANGE) a.playLock = true
+            const canPlay =
+              !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
             const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
             if (bout) {
               // Playful gambolling (design.md §19): scampering hops around the
-              // parent. The step is real, so a bout at the shore can carry the
+              // parent, LEASHED — a homeward pull grows toward the range edge
+              // so the scamper orbits the parent instead of crossing the
+              // boundary (crossing switched play/follow per frame: trembling).
+              // The step is real, so a bout at the shore can still carry the
               // calf into the water — the accident the rescue drama hangs on.
+              const heading = bout.heading + (a.boutDetour ?? 0)
+              const [sx, sz] = leashedGambolDir(heading, toX, toZ, d, GAMBOL_RANGE)
               const beforeX = a.x
               const beforeZ = a.z
-              a.x += Math.sin(bout.heading) * GAMBOL_SPEED * dt
-              a.z += Math.cos(bout.heading) * GAMBOL_SPEED * dt
+              a.x += sx * GAMBOL_SPEED * dt
+              a.z += sz * GAMBOL_SPEED * dt
               const llp = worldToLatLon(a.x, a.z)
               const terp = sampleTerrain(llp.lat, llp.lon, seed)
               if (terp.type === 'water') {
                 // Hopped off the bank: remember the entry for the rescue.
                 a.rescueEntry = { x: beforeX, z: beforeZ }
               } else if (terp.type === 'ocean' || terp.height <= 0.02) {
+                // Never gambol into the open sea: bend the rest of the bout
+                // along the bank instead of vibrating in place against it.
                 a.x = beforeX
-                a.z = beforeZ // never gambol into the open sea
+                a.z = beforeZ
+                a.boutDetour = ((a.boutDetour ?? 0) + Math.PI / 2) % (Math.PI * 2)
               } else {
                 a.y = Math.max(0.02, terp.height)
               }
@@ -1467,10 +1517,14 @@ function Herds() {
               px = a.x
               pz = a.z
               bodyY = a.y + bout.hop * 0.35
-              yaw = bout.heading
+              // Face the actual step, not the raw bout heading; a radially
+              // pinned calf ([0,0] step) keeps its facing instead of snapping.
+              if (Math.hypot(sx, sz) > 0.05) yaw = Math.atan2(sx, sz)
+              else yaw = a.face ?? a.rot
               pitch = 0
             } else if (d > YOUNG_FOLLOW_RADIUS) {
               a.hop = undefined
+              a.boutDetour = undefined
               a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
               a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
               px = a.x
@@ -1478,6 +1532,7 @@ function Herds() {
               yaw = Math.atan2(toX, toZ)
             } else {
               a.hop = undefined
+              a.boutDetour = undefined
               pitch = -0.22 // nurse: head up toward the parent's flank
             }
             familyHeld = true
@@ -1503,6 +1558,9 @@ function Herds() {
             }
           }
         }
+        // Every drama/play/follow/guard behaviour moves deliberately: the idle
+        // shuffle fades out for them (blended below, never switched).
+        if (familyHeld) wobTarget = 0
         // Grazing dips on the open grassland.
         if (pitch === 0 && (sp === 'zebra' || sp === 'antelope' || sp === 'wildebeest' || sp === 'warthog')) {
           const g = Math.sin(t * 0.35 + a.phase * 3)
@@ -1519,8 +1577,9 @@ function Herds() {
             const urgency = (FLEE_RADIUS - d) / FLEE_RADIUS
             a.x += (dx / d) * FLEE_SPEED * urgency * dt
             a.z += (dz / d) * FLEE_SPEED * urgency * dt
-            px = a.x + wob * 0.3
-            pz = a.z + Math.cos(t * 0.2 + a.phase) * 0.3
+            px = a.x
+            pz = a.z
+            wobTarget = 0.3
             yaw = Math.atan2(dx, dz) // face away while fleeing
             pitch = 0
           }
@@ -1543,6 +1602,7 @@ function Herds() {
             a.z += Math.cos(a.dodgeHeading) * PREY_PANIC_SPEED * dt
             px = a.x
             pz = a.z
+            wobTarget = 0
             yaw = a.dodgeHeading
             pitch = 0
           } else if (a.dodgeHeading !== undefined) {
@@ -1552,16 +1612,25 @@ function Herds() {
             a.dodgeHeading = undefined
           }
         }
-        // Under an elephant: trampled, stays dead on the ground. (A calf killed
-        // by a predator above is already dead; skip the scan and just re-render.)
+        // Apply the blended idle-shuffle offset (never a hard on/off switch:
+        // the amplitude fades between the behaviours' targets over ~0.4 s).
+        if (sp !== 'elephant') {
+          const cur = a.wobAmp ?? wobTarget
+          const amp = cur + (wobTarget - cur) * Math.min(1, dt * 2.5)
+          a.wobAmp = amp
+          px += wob * amp
+          pz += Math.cos(t * 0.2 + a.phase) * amp
+        }
+        // Under an elephant: trampled, stays dead on the ground. Checked on
+        // the SIM position — the idle-shuffle render offset is cosmetic and
+        // must never carry an animal under a trample. (A calf killed by a
+        // predator above is already dead; skip the scan and just re-render.)
         if (sp !== 'elephant') {
           if (!a.dead) {
             for (const [ex, ez] of elephantPos) {
-              if (Math.hypot(px - ex, pz - ez) < TRAMPLE_RADIUS) {
+              if (Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS) {
                 a.dead = true
-                a.x = px
-                a.z = pz
-                pushStain(px, pz)
+                pushStain(a.x, a.z)
                 break
               }
             }

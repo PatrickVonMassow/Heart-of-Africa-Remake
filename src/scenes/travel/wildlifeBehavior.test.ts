@@ -7,6 +7,7 @@ import {
   flightStep,
   gambolState,
   groundNormal,
+  leashedGambolDir,
   separationPush,
   turnToward,
   type FlightState,
@@ -314,5 +315,155 @@ describe('turnToward', () => {
 
   it('reaches the target when within one step', () => {
     expect(turnToward(0, 0.05, 0.2)).toBeCloseTo(0.05, 6)
+  })
+})
+
+describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', () => {
+  const GAMBOL_RANGE = 4
+  const GAMBOL_SPEED = 2.2
+  const YOUNG_FOLLOW_SPEED = 4.5
+  const YOUNG_FOLLOW_RADIUS = 1.8
+
+  it('plays freely near the parent (the leash barely bends the heading)', () => {
+    for (const h of [0, 1.2, Math.PI, -2]) {
+      const [dx, dz] = leashedGambolDir(h, 0.5, 0.5, 0.7, GAMBOL_RANGE)
+      const dot = dx * Math.sin(h) + dz * Math.cos(h)
+      expect(dot, `heading ${h}`).toBeGreaterThan(0.9) // nearly the bout direction
+    }
+  })
+
+  it('never steps outward at the range edge, for EVERY bout heading', () => {
+    for (let i = 0; i < 16; i++) {
+      const h = (i / 16) * Math.PI * 2
+      // Parent sits at the origin, calf at range distance east: outward is
+      // +x, and the damped step must carry none of it at the edge.
+      const [dx] = leashedGambolDir(h, -GAMBOL_RANGE, 0, GAMBOL_RANGE, GAMBOL_RANGE)
+      expect(dx, `heading ${h}`).toBeLessThanOrEqual(1e-9)
+    }
+  })
+
+  it('returns a finite unit direction in the degenerate cases', () => {
+    for (const [tx, tz, d] of [
+      [0, 0, 0],
+      [1e-9, 0, 1e-9],
+    ] as const) {
+      const [dx, dz] = leashedGambolDir(1, tx, tz, d, GAMBOL_RANGE)
+      expect(Number.isFinite(dx) && Number.isFinite(dz)).toBe(true)
+      expect(Math.hypot(dx, dz)).toBeLessThanOrEqual(1 + 1e-9)
+    }
+  })
+
+  // Frame-loop simulation in the shape of the real integrator: the calf must
+  // never leave the play range mid-bout (so the follow yank never alternates
+  // with play), and its step direction must not saw back and forth.
+  it('a full simulated bout stays leashed with no direction sawtooth', () => {
+    const dt = 1 / 60
+    let x = 0.5
+    let z = 0
+    const parent = { x: 0, z: 0 }
+    let prevStepX: number | null = null
+    let prevStepZ: number | null = null
+    let flips = 0
+    let steps = 0
+    let maxDist = 0
+    for (let f = 0; f < 3600; f++) {
+      const t = f * dt
+      const bout = gambolState(t, 0.37)
+      const toX = parent.x - x
+      const toZ = parent.z - z
+      const d = Math.hypot(toX, toZ)
+      if (bout) {
+        const [sx, sz] = leashedGambolDir(bout.heading, toX, toZ, d, GAMBOL_RANGE)
+        x += sx * GAMBOL_SPEED * dt
+        z += sz * GAMBOL_SPEED * dt
+        if (prevStepX !== null && prevStepZ !== null && sx * prevStepX + sz * prevStepZ < 0) flips++
+        prevStepX = sx
+        prevStepZ = sz
+        steps++
+      } else {
+        prevStepX = null
+        prevStepZ = null
+        if (d > YOUNG_FOLLOW_RADIUS) {
+          x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
+          z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+        }
+      }
+      maxDist = Math.max(maxDist, Math.hypot(x - parent.x, z - parent.z))
+    }
+    expect(steps).toBeGreaterThan(400) // the bout actually ran
+    expect(maxDist).toBeLessThanOrEqual(GAMBOL_RANGE + 0.05) // leashed — never past the edge
+    expect(flips / Math.max(1, steps)).toBeLessThan(0.02) // no per-frame sawtooth
+  })
+
+  it('the OLD unleashed range-switch genuinely sawtoothed (regression witness)', () => {
+    const dt = 1 / 60
+    let x = 0.5
+    let z = 0
+    let prevStepX: number | null = null
+    let prevStepZ: number | null = null
+    let flips = 0
+    let steps = 0
+    for (let f = 0; f < 3600; f++) {
+      const t = f * dt
+      const d = Math.hypot(x, z)
+      const bout = d <= GAMBOL_RANGE ? gambolState(t, 0.37) : null
+      if (bout) {
+        const sx = Math.sin(bout.heading)
+        const sz = Math.cos(bout.heading)
+        x += sx * GAMBOL_SPEED * dt
+        z += sz * GAMBOL_SPEED * dt
+        if (prevStepX !== null && prevStepZ !== null && sx * prevStepX + sz * prevStepZ < 0) flips++
+        prevStepX = sx
+        prevStepZ = sz
+        steps++
+      } else {
+        if (d > YOUNG_FOLLOW_RADIUS) {
+          const sx = -x / d
+          const sz = -z / d
+          x += sx * YOUNG_FOLLOW_SPEED * dt
+          z += sz * YOUNG_FOLLOW_SPEED * dt
+          if (prevStepX !== null && prevStepZ !== null && sx * prevStepX + sz * prevStepZ < 0) flips++
+          prevStepX = sx
+          prevStepZ = sz
+          steps++
+        } else {
+          prevStepX = null
+          prevStepZ = null
+        }
+      }
+    }
+    expect(flips / Math.max(1, steps)).toBeGreaterThan(0.05) // the boundary buzz the fix removes
+  })
+})
+
+describe('clamped separation (design.md §19 — a force, not a teleport)', () => {
+  const SEPARATION_MAX_SPEED = 2.2
+
+  it('parts an overlapping pair smoothly and monotonically', () => {
+    const dt = 1 / 60
+    let ax = 0
+    let bx = 0.4 // deep overlap, minDist 1.4
+    let prevGap = bx - ax
+    for (let f = 0; f < 240; f++) {
+      const [pa] = separationPush(ax, 0, [[bx, 0, 1.4]])
+      const [pb] = separationPush(bx, 0, [[ax, 0, 1.4]])
+      const cap = SEPARATION_MAX_SPEED * dt
+      ax += Math.max(-cap, Math.min(cap, pa))
+      bx += Math.max(-cap, Math.min(cap, pb))
+      const gap = bx - ax
+      expect(gap).toBeGreaterThanOrEqual(prevGap - 1e-9) // monotone, no overshoot back
+      prevGap = gap
+    }
+    expect(prevGap).toBeGreaterThanOrEqual(1.4 - 1e-6) // fully parted…
+    expect(prevGap).toBeLessThan(1.5) // …but not flung apart
+  })
+
+  it('a clamped push never exceeds the walking pace in one frame', () => {
+    const dt = 1 / 60
+    const [dx, dz] = separationPush(0, 0, [[0.01, 0, 2.0]])
+    const m = Math.hypot(dx, dz)
+    const cap = SEPARATION_MAX_SPEED * dt
+    const k = m > cap ? cap / m : 1
+    expect(Math.hypot(dx * k, dz * k)).toBeLessThanOrEqual(cap + 1e-9)
   })
 })

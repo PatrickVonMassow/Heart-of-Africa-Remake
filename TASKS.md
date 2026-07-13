@@ -520,12 +520,144 @@ the map).
   channels. design.md §19.7 + CLAUDE.md pt. 12 record the rules. Full
   regression green.)
 
-- [ ] 66. Animals still tend to jitter/tremble — especially the gambolling
+- [x] 66. Animals still tend to jitter/tremble — especially the gambolling
   calves, but also e.g. animals dodging elephants. Investigate the jitter
   problem intensively (find every oscillation source: per-frame direction
   flips, competing behaviours fighting over the same animal, render-facing
   vs movement-heading mismatches, separation push-pull cycles) and land a
   reliable, verified fix rather than another spot damping.
+  (Full causal analysis found six sources; all fixed at the integrator:
+  (1) THE calf tremble: a bout carried the calf across GAMBOL_RANGE where
+  play switched off and the faster follow yanked it back — per-frame
+  sawtooth at the boundary. leashedGambolDir damps the OUTWARD component
+  of the bout heading to zero at the range edge (no cancellation point —
+  a blended home pull turned out to alternate at its equilibrium radius,
+  measured and discarded), plus a play-lock hysteresis and facing from
+  the actual step. (2) The every-frame separation push teleported the
+  full half-overlap that behaviours reversed next frame; now clamped to
+  a walking pace (SEPARATION_MAX_SPEED) — still parts within moments,
+  monotonically. (3) The idle-shuffle render offset (±0.8) switched
+  on/off per behaviour branch, popping the rendered position at every
+  transition; it is now a per-animal amplitude blended over ~0.4 s
+  (wobAmp) with per-behaviour targets. (4) The water backstop keeps
+  CLEARING dodgeHeading: re-seeding it from the old facing (tried first)
+  sent the prey running AT the threat until the turn cap caught up —
+  caught by the live dodge check; after a land teleport the escape
+  direction must re-engage exactly, and the rendered facing is
+  turn-capped separately (FACE_TURN), so no visible snap occurs.
+  (5) A bout against the sea reverted in place
+  and vibrated; it now bends the rest of the bout along the bank
+  (boutDetour). (6) The chase victim and its blocking parent were not
+  separation-exempt and got shoved mid-sprint; they are now inDrama.
+  7 new pure tests incl. a 3600-frame bout simulation (leash holds, flip
+  rate < 2 %) and a regression witness proving the old range-switch
+  sawtoothed; enrichments tracks a live playing calf (60 samples,
+  0 flips). Two suite interactions surfaced by the longer polls were
+  hardened too: injected test animals now unshift to the array FRONT
+  (an appended animal falls outside the MAX_INSTANCES behaviour window
+  once the streamed population nears its cap), and the bathe check's
+  unique-drinker key moved from the drink target to the spawn position
+  (banks-only targets legitimately collapse onto the same shore point).
+  The live dodge check then caught a REAL regression of fix (3): the
+  trample scan measured against the RENDER position, and the blended
+  idle-shuffle offset (up to ±0.8 while fading in) carried freshly
+  engaged prey under the elephant — trampled before it could flee, which
+  froze the dodge. The trample now checks the SIM position (the shuffle
+  is cosmetic and must never kill); the herd test keeps a diagnostics
+  object in its report. Full regression green.)
+
+- [ ] 67. In the first-person view inside settlements the surfaces are too
+  low-detail/soft — fine structure is missing, most of all on the ground
+  and on the background mountains (the panorama). The buildings and their
+  surfaces must also become clearly more detailed (wall/roof material
+  structure, edges, weathering). Add believable high-frequency detail
+  (e.g. ground micro-relief/texture detail at eye height, sharper panorama
+  relief shading, structured building materials) fitting the AAA bar of
+  §7.1 pt. 11.
+
+- [ ] 68. Second expansion stage for the travel-world landmarks, building on
+  the stage-1 code paths (CULTURAL_LANDMARKS/CulturalLandmarkDef in
+  src/world/data/landmarks.ts; the spread into LANDMARK_POINTS + kind union
+  in src/systems/economy.ts; tint()/merge() builders in
+  src/render/landmarks.ts; CulturalLandmarks component + __culturalLandmarks
+  hook + cultural LandmarkLabels branch in TravelScene.tsx;
+  landmarkDiscovered flavor maps in de.ts/en.ts with `?? flavors.mountain`
+  fallback; i18n coverage + Meroë sighting tests; enrichments check).
+  Scope is exactly Parts A and B; Part C is point 69 (do NOT implement).
+  Real ~1890 geography; nothing previously removed returns; bounty stays
+  the flat balance.economy.bountyLandmark; TTS untouched (English-only
+  Kokoro; only existing voiceMarkup tags [awe][whisper][excited][somber]
+  [weary][fear][emph][pause][breath][mute]; German carries the same markup
+  unspoken).
+  PART A — three more cultural landmarks, stage-1 pattern end to end:
+  aksum (lon 38.72, lat 14.13, kind 'stelae' — Aksumite obelisk field),
+  gondar (37.47, 12.61, 'castles' — Fasil Ghebbi imperial capital),
+  bandiagara (-3.40, 14.35, 'cliff-dwellings' — Dogon escarpment homes
+  above older Tellem sites; all standing by 1890). Kind union grows by
+  'stelae' | 'castles' | 'cliff-dwellings'. i18n names (Aksum/Gondar/
+  Bandiagara both languages) + one flavor case per kind (~2 sentences,
+  postcolonial voice: achievements of African polities, never a European
+  "find", each distinct from the mountain fallback): stelae = towering
+  carved granite obelisks of a kingdom that struck its own coinage and
+  traded across the Red Sea; castles = battlements and towers raised by
+  African masons against everything colonial accounts claimed;
+  cliff-dwellings = dwellings terraced into a sheer escarpment, a people
+  reading the land vertically. Geometry (origin at ground, ~2-4 unit
+  footprint): buildStelae() 3-4 tall thin tapered obelisks with rounded
+  caps, one leaning/fallen, weathered granite; buildCastles() crenellated
+  keep + two round corner towers with conical caps, grey stone;
+  buildCliffDwellings() angled cliff slab with small box dwellings on
+  ledges at two heights, ochre mud. Extend the CulturalLandmarks geos map;
+  labels/sighting/disposal/hook unchanged.
+  PART B — four natural point-landmarks via a new exported NATURAL_SITES
+  list (NaturalSiteDef {id, lon, lat, kind: 'crater'|'volcano'|'delta'|
+  'wetland'}): ngorongoro (35.58, -3.16, crater), lengai (35.90, -2.76,
+  volcano — Ol Doinyo Lengai, active in the period), okavango (22.90,
+  -19.50, delta — deliberately offset south so marker/label do not collide
+  with the nearby village; keep that separation), sudd (30.50, 8.00,
+  wetland). Spread into LANDMARK_POINTS exactly like CULTURAL_LANDMARKS;
+  widen the kind union; flat bounty applies. i18n names de: Ngorongoro-
+  Krater/Ol Doinyo Lengai/Okavango-Delta/Sudd, en: Ngorongoro Crater/Ol
+  Doinyo Lengai/Okavango Delta/Sudd; flavor per kind (natural-wonder awe):
+  crater = a vast game-filled bowl, its rim a wall against the plains;
+  volcano = steep smoking cone, the trembling Maasai "mountain of God";
+  delta = a river emptying into the sands, braiding into channels and reed
+  islands; wetland = an endless papyrus swamp that swallows the Nile.
+  Geometry: buildCrater() low broad circular rim of tilted rock segments,
+  dry-grass/rock tone; buildVolcano() steep dark basalt cone, flattened
+  top, subtle translucent smoke hint (no new particle system);
+  buildDelta() low braided blue strips + papyrus tufts (reuse buildPapyrus
+  from flora.ts); buildWetland() broad even papyrus flat over a shallow
+  blue disc (vast/uniform, distinct from the delta). Scene: NaturalSites
+  component mirroring CulturalLandmarks exactly (memoized geos, shared
+  vertex-color material, latLonToWorld + sampleTerrain height, mulberry32
+  per-run yaw, disposal, DEV hook __naturalSites = {count, ids}) mounted
+  next to <CulturalLandmarks />; LandmarkLabels natural branch with
+  water:true for delta/wetland, water:false for crater/volcano, height
+  offset +1.0.
+  TESTS: i18n coverage extended to NATURAL_SITES (names + dedicated
+  flavors vs mountain fallback, both languages); store.travel gains a
+  Ngorongoro sighting test mirroring Meroë (not seen before, registered,
+  bounty queued, journal kind 'crater').
+  VERIFICATION: build + full test run green, no console errors (WebGL 2
+  headless); enrichments cultural check counts 7 incl. the three new ids;
+  parallel natural-sites check via __naturalSites (count 4, all ids); one
+  screenshot of a new cultural site and one of a natural site with
+  revealed labels; do NOT run the speech regression (no speech files
+  touched); report shot paths and all seven coordinates.
+  DOCS: design.md §4.4 extended with all seven sites; CLAUDE.md §7.1
+  updated in the established style.
+  ACCURACY: no marker on top of the Tahat label (Hoggar) and nothing
+  overlapping the village near the Okavango (hence the offset).
+- [ ] 69. (Deferred Part C of point 68 — own scoped task, own verification.)
+  Two landmarks sit on existing ports and belong in their PlaceScenes as
+  skyline features, not on the travel map (a map marker would duplicate the
+  port marker): Table Mountain as a flat-topped massif backdrop behind Cape
+  Town's PlaceScene (size-3 port, south region), and the Djinguereber
+  mosque as a distinctive Sudano-Sahelian mud building inside Timbuktu's
+  PlaceScene (size-2 port, west region) — the authentic 1327 landmark
+  standing in for the excluded 1907 Djenné mosque. Touches region-specific
+  PlaceScene rendering (src/scenes/place/).
 
 ## Closing (only after all points)
 

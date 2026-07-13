@@ -410,7 +410,12 @@ verify suite that proves it.
       parent, and a parent in reach holding itself between hunter and
       calf (living shield) over visible real time until the hunter takes
       it in the calf's place before any catch. Calf water drama (§19.8):
-      calves gambol in visible hop-bouts; a calf on open water starts a
+      calves gambol in visible hop-bouts that orbit the parent without
+      trembling — the leashed scamper, the clamped body-separation force
+      and the blended idle-shuffle offset are pure-tested
+      (`src/scenes/travel/wildlifeBehavior.test.ts`) and a playing calf's
+      step direction is live-checked against sawtoothing
+      (`scripts/verify/enrichments.mjs`); a calf on open water starts a
       struggle and its parent wades in, pulls it out and both return to
       the bank alive; in the water inside a waterfall's reach a calf is
       swept over and dies with its parent plunging after it, and a
