@@ -224,13 +224,17 @@ verify suite that proves it.
    (§3.2, pt. 30), never shown permanently. The exploration map (§19.11)
    reads as a real hand-drawn parchment chart (engraved border, title
    cartouche, ink coasts/rivers/lakes, region names, compass) under a fog
-   of war that each explored area clears a window through. Verifiable: near
+   of war that each explored area clears a window through. Every village
+   keeps the small minimum river-water clearance of §4.2 (its footprint
+   never reaches into a river; ports are exempt). Verifiable: near
    a border, `.region-label` elements name both regions on their sides;
    undiscovered `.map-label` elements read "?", a visited place (Cairo)
    shows its name, and sighting a landmark reveals its name; the opened
    exploration map's explored area reads lighter (cleared) than the
    unexplored area (under fog) with a screenshot (92)
-   (`scripts/verify/enrichments.mjs`).
+   (`scripts/verify/enrichments.mjs`); all 22 villages hold the river
+   clearance while the Nubian village stays riverside on the Nile
+   (`src/world/world.test.ts`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890).
    The movement boundary of `design.md` §11.2 holds (enclosed sea

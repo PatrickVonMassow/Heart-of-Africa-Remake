@@ -404,10 +404,19 @@ the map).
   flow.mjs spies requestPointerLock across two loads — fresh start grabs, a
   seeded checkpoint's start-choice overlay does not, and the post-choice
   canvas click grabs. Full regression green.)
-- [ ] 60. The Nubian Village on the Nile still reaches into the water, so
+- [x] 60. The Nubian Village on the Nile still reaches into the water, so
   canoeing the Nile drifts the traveller into it. Keep a small minimum
   clearance between every river and every village so their footprints never
   overlap the water.
+  (Standing rule, enforced in code: geo.ts nudges every village up the
+  river-distance gradient until VILLAGE_RIVER_CLEARANCE_DEG (0.35°) holds —
+  water band ~0.165° + marker footprint ~0.145° + margin; deterministic pure
+  river geometry, no seed. Only the Nubian village actually moved (0.158°,
+  now riverD 0.36, still riverside); the other 21 already complied. Ports
+  stay exempt (Cairo/Khartoum/Timbuktu sit on banks by design). world.test.ts
+  asserts the clearance for all 22 villages, the bounded nudge per heartland
+  anchor, and that the Nubian anchor genuinely violated the rule. design.md
+  §4.2 + CLAUDE.md §7.1 pt. 3 record the rule. Full regression green.)
 - [x] 61. BLOCKER: after the bird's-eye traveller collides with a tree once,
   steering stops working entirely (the figure can even vanish). The swept
   obstacle resolver of point 56 pins the traveller to the obstacle boundary

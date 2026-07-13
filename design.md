@@ -111,6 +111,8 @@ The size of a settlement in the game mirrors its real importance at the end of t
 Carriers of the hints and of regional trade. Region assignment see §4.5.
 Masai, Bantu, Zulu, Bushmen, Batwa, Lunda, Pygmies, Swahili, Somali, Hausa, Mongo, Sidamo, Banda, Nubians, Tuareg, Berbers, Bombara, Mandingo, Bemba, Bambundu, Uganda, Fang.
 
+Each people's village sits at its ~1890 heartland, and every village keeps a small minimum clearance to river water: its footprint never reaches into a river, so a canoe passage carries the traveller past a riverside village instead of into its huts. Ports are exempt — they sit on coasts and river banks by design.
+
 ### 4.3 Rivers (17)
 Basis of the direction/location hints (mouth/source); navigable by canoe.
 Blue Nile, Nile, White Nile, Jubba, Ruvuma, Zambezi, Limpopo, Vaal, Orange, Sankuru, Kasai, Ubangi, Congo, Benue, Volta, Niger, Senegal. Each river has one named source and one named mouth location.

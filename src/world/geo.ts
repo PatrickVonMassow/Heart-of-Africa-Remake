@@ -6,6 +6,7 @@
 // procedural per run (design.md §18).
 
 import { RIVERS_DATA, type RiverDef } from './data/rivers'
+import { riverDistanceExact } from './hydro'
 
 /** World units per degree of latitude/longitude (flat equirectangular mapping). */
 export const UNITS_PER_DEGREE = 10
@@ -148,11 +149,44 @@ const PORTS: PlaceDef[] = [
   { id: 'capetown', kind: 'port', lat: -33.8, lon: 18.5, region: 'south', size: 3 },
 ]
 
+// Minimum river clearance for villages (design.md §4.2): the river water band
+// reaches ~0.165° from the axis (terrain.ts RIVER_WIDTH_DEG) and the village
+// marker footprint ~0.145° (TravelScene VillageMarker at 10 units/degree), so
+// 0.35° keeps every hut dry with a small margin. Ports are exempt — they sit
+// on coasts and river banks by design (Cairo, Khartoum, Timbuktu).
+export const VILLAGE_RIVER_CLEARANCE_DEG = 0.35
+
+// Nudge a village up the river-distance gradient until the clearance holds.
+// Deterministic (pure river geometry, no seed involved) and bounded; a village
+// already clear returns unchanged after one distance query.
+function clearedOfRivers(lat: number, lon: number): LatLon {
+  let a = lat
+  let o = lon
+  for (let i = 0; i < 24; i++) {
+    const d = riverDistanceExact(a, o, 1)
+    if (d >= VILLAGE_RIVER_CLEARANCE_DEG) break
+    const e = 0.02
+    const gLat = riverDistanceExact(a + e, o, 1) - riverDistanceExact(a - e, o, 1)
+    const gLon = riverDistanceExact(a, o + e, 1) - riverDistanceExact(a, o - e, 1)
+    const gl = Math.hypot(gLat, gLon)
+    if (gl < 1e-6) {
+      a += e // flat gradient (dead centre of a channel): fixed nudge, re-aim
+      continue
+    }
+    const step = Math.min(0.08, VILLAGE_RIVER_CLEARANCE_DEG - d + 0.01)
+    a += (gLat / gl) * step
+    o += (gLon / gl) * step
+  }
+  return { lat: a, lon: o }
+}
+
 // One village per each of the 22 peoples (design.md §4.2), region membership
 // per design.md §4.5. Positions are educated guesses at each people's ~1890
 // heartland; where the design region and the historical heartland disagree
 // (Bombara, Bemba, Fang), the position is shifted toward the design region.
-const VILLAGES: PlaceDef[] = [
+// These are the raw heartland anchors — the exported VILLAGES below shift each
+// off nearby river water per the clearance rule (exported for the world test).
+export const VILLAGE_HEARTLANDS: PlaceDef[] = [
   // North — Tuareg, Berbers, Nubians, Bombara
   { id: 'tuareg-village', kind: 'village', peopleId: 'tuareg', lat: 23.2, lon: 5.8, region: 'north' },
   { id: 'berber-village', kind: 'village', peopleId: 'berbers', lat: 31.7, lon: -7.2, region: 'north' },
@@ -181,6 +215,15 @@ const VILLAGES: PlaceDef[] = [
   { id: 'zulu-village', kind: 'village', peopleId: 'zulu', lat: -28.4, lon: 31.3, region: 'south' },
   { id: 'bushmen-village', kind: 'village', peopleId: 'bushmen', lat: -22.5, lon: 21.0, region: 'south' },
 ]
+
+// A village footprint must never reach into river water (design.md §4.2): a
+// canoe passage should carry the traveller PAST a riverside village, not into
+// its huts. Each village keeps VILLAGE_RIVER_CLEARANCE_DEG to the nearest
+// river axis; the nudge is a small, deterministic shift off the water.
+const VILLAGES: PlaceDef[] = VILLAGE_HEARTLANDS.map((v) => ({
+  ...v,
+  ...clearedOfRivers(v.lat, v.lon),
+}))
 
 export const PLACES: PlaceDef[] = [...PORTS, ...VILLAGES]
 

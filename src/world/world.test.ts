@@ -3,7 +3,7 @@
 // no browser. The characteristic bird's-eye screenshots stay a Playwright §7.2
 // proof.
 import { describe, it, expect, beforeAll } from 'vitest'
-import { PLACES, RIVERS, regionAt } from './geo'
+import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, placeById } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
 import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
@@ -44,6 +44,33 @@ describe('settlements sit on walkable land', () => {
     const t = sampleTerrain(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon, SEED)
     expect(t.type).not.toBe('ocean')
     expect(t.type).not.toBe('water')
+  })
+})
+
+describe('villages keep clearance from rivers (design.md §4.2)', () => {
+  // The river water band reaches ~0.165° from the axis and the village marker
+  // footprint ~0.145°, so the clearance keeps every hut dry — a canoe passage
+  // carries the traveller past a riverside village, never into its huts.
+  it.each(villages.map((v) => [v.id, v] as const))('%s keeps the river clearance', (_id, v) => {
+    expect(riverDistance(v.lat, v.lon)).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
+  })
+
+  it('the clearance nudge stays a small shift off each heartland anchor', () => {
+    for (const v of villages) {
+      const raw = VILLAGE_HEARTLANDS.find((h) => h.id === v.id)
+      expect(raw, v.id).toBeDefined()
+      expect(Math.hypot(v.lat - (raw?.lat ?? 0), v.lon - (raw?.lon ?? 0)), v.id).toBeLessThanOrEqual(0.6)
+    }
+  })
+
+  it('the Nubian village sits clear of the Nile water but stays riverside', () => {
+    const v = placeById('nubian-village')
+    const d = riverDistance(v.lat, v.lon)
+    expect(d).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
+    expect(d).toBeLessThanOrEqual(0.45) // moved off the water, not away from the Nile
+    // The anchor genuinely violated the clearance — the rule does real work here.
+    const raw = VILLAGE_HEARTLANDS.find((h) => h.id === 'nubian-village')
+    expect(riverDistance(raw?.lat ?? 0, raw?.lon ?? 0)).toBeLessThan(VILLAGE_RIVER_CLEARANCE_DEG)
   })
 })
 
