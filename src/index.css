@@ -81,11 +81,7 @@ textarea {
   margin-right: 4px;
 }
 
-.status-bar .spacer {
-  flex: 1;
-}
-
-/* --- Inventory / hand bar ------------------------------------------------ */
+/* --- Inventory bar -------------------------------------------------------- */
 
 /* Bottom-right row: camp/journal buttons with the health bar at the far right. */
 .hud-bottom-right {
@@ -205,12 +201,6 @@ textarea {
 }
 .rob-confirm .danger-text {
   color: #e0715f;
-}
-
-.inventory-bar button.active {
-  background: #5a4520;
-  border-color: var(--hud-accent);
-  color: var(--hud-accent);
 }
 
 .inventory-bar button:hover,

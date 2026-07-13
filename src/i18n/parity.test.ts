@@ -32,7 +32,7 @@ function getAtPath(obj: unknown, path: string): unknown {
 // not require de and en to list the same keys — a value present in only one
 // language would slip through. Assert the key sets match and nothing is blank.
 const MAP_PATHS = [
-  'places', 'peoples', 'landmarks', 'rivers', 'equipment', 'gifts',
+  'places', 'peoples', 'landmarks', 'equipment', 'gifts',
   'treasures', 'buildings', 'sketches', 'regions', 'animals',
   'overlays.deathCauses', 'hud.movementPenalty', 'health.states',
 ]

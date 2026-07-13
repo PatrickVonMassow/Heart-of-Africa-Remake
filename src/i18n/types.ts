@@ -32,7 +32,6 @@ export interface Strings {
   places: Record<string, string>
   peoples: Record<string, string>
   landmarks: Record<string, string>
-  rivers: Record<string, string>
   equipment: Record<EquipmentId, string>
   gifts: Record<Material, string>
   /** Treasure finds/valuables (design.md §8). */
@@ -46,8 +45,6 @@ export interface Strings {
     provisions: string
     provisionsWeeks(weeks: string): string
     gifts: string
-    hand: string
-    handEmpty: string
     region: string
   }
 

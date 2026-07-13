@@ -89,14 +89,6 @@ const LANDMARKS: Record<string, string> = {
   kilwa: 'Kilwa',
 }
 
-const RIVERS: Record<string, string> = {
-  nile: 'Nile', 'white-nile': 'White Nile', 'blue-nile': 'Blue Nile',
-  jubba: 'Jubba', ruvuma: 'Ruvuma', zambezi: 'Zambezi', limpopo: 'Limpopo',
-  vaal: 'Vaal', orange: 'Orange', sankuru: 'Sankuru', kasai: 'Kasai',
-  ubangi: 'Ubangi', congo: 'Congo', benue: 'Benue', volta: 'Volta',
-  niger: 'Niger', senegal: 'Senegal',
-}
-
 export const en: Strings = {
   lang: 'en',
   languageName: 'English',
@@ -118,7 +110,6 @@ export const en: Strings = {
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
-  rivers: RIVERS,
   equipment: {
     shovel: 'Shovel', rope: 'Rope', machete: 'Machete', rifle: 'Rifle',
     medicine: 'Medicine', canteen: 'Canteen', map: 'Map', canoe: 'Canoe',
@@ -159,8 +150,6 @@ export const en: Strings = {
     provisions: 'Provisions',
     provisionsWeeks: (weeks) => `${weeks} weeks`,
     gifts: 'Gifts',
-    hand: 'Holding',
-    handEmpty: '—',
     region: 'Region',
   },
 
