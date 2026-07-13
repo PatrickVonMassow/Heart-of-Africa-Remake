@@ -126,4 +126,130 @@ describe('resolveTravelMove (swept tree/animal collision, design.md §19)', () =
     const p = resolveTravelMove(-2, 0.6, 0, 0.6, [[0, 0, 1]], 0.5)
     expect(dist(p, 0, 0)).toBeGreaterThanOrEqual(1.5 - 1e-6) // never inside the body
   })
+
+  // Regression for the collision blocker: once the traveller rested against a
+  // tree, the resolver clamped *every* subsequent move back to the boundary —
+  // including moves leading away — so steering died on first contact. A step
+  // that leads away from (or slides tangent to) an obstacle must stay free.
+  it('does not pin a traveller that steers straight away from a touched obstacle', () => {
+    // Resting on the west boundary (x=-1.5, minD 1.5), heading further west.
+    const p = resolveTravelMove(-1.5, 0, -2, 0, [[0, 0, 1]], 0.5)
+    expect(p[0]).toBeCloseTo(-2, 6) // free to leave — not pinned at -1.5
+    expect(p[1]).toBeCloseTo(0, 6)
+  })
+
+  it('lets a traveller slide tangentially along an obstacle it rests against', () => {
+    // On the west boundary, pushing due north (tangent): the tangent line stays
+    // outside the body, so the full lateral move is kept.
+    const p = resolveTravelMove(-1.5, 0, -1.5, 0.5, [[0, 0, 1]], 0.5)
+    expect(p[0]).toBeCloseTo(-1.5, 6)
+    expect(p[1]).toBeCloseTo(0.5, 6)
+  })
+
+  it('keeps an away-and-sideways escape from a resting contact free', () => {
+    // Diagonally away from the boundary: the whole path is outside the body.
+    const p = resolveTravelMove(-1.5, 0, -2, 0.5, [[0, 0, 1]], 0.5)
+    expect(p[0]).toBeCloseTo(-2, 6)
+    expect(p[1]).toBeCloseTo(0.5, 6)
+  })
+
+  it('still blocks a re-entry attempt from the boundary (into the body)', () => {
+    // Resting on the west boundary, pushing east *into* the tree: stays clamped.
+    const p = resolveTravelMove(-1.5, 0, -1.2, 0, [[0, 0, 1]], 0.5)
+    expect(dist(p, 0, 0)).toBeGreaterThanOrEqual(1.5 - 1e-6)
+  })
+
+  // Property sweep: for a dense grid of start angles/distances and step
+  // directions/lengths around one obstacle, the resolved position is never
+  // inside the body, never NaN, and a step pointing strictly away from a
+  // resting contact is never shortened.
+  it('never resolves inside the body and never yields NaN (dense sweep)', () => {
+    const OB: [number, number, number] = [0, 0, 1]
+    const MIND = 1.5
+    for (let ai = 0; ai < 16; ai++) {
+      const ang = (ai / 16) * Math.PI * 2
+      for (const d0 of [0, 0.4, 1.2, MIND, 1.6, 3]) {
+        const ox = Math.cos(ang) * d0
+        const oz = Math.sin(ang) * d0
+        for (let mi = 0; mi < 16; mi++) {
+          const ma = (mi / 16) * Math.PI * 2
+          for (const step of [0.05, 0.5, 2, 6]) {
+            const p = resolveTravelMove(ox, oz, ox + Math.cos(ma) * step, oz + Math.sin(ma) * step, [OB], 0.5)
+            expect(Number.isFinite(p[0]) && Number.isFinite(p[1])).toBe(true)
+            expect(dist(p, 0, 0)).toBeGreaterThanOrEqual(MIND - 1e-6)
+          }
+        }
+      }
+    }
+  })
+
+  it('a step pointing strictly outward from a resting contact is never shortened', () => {
+    const OB: [number, number, number] = [0, 0, 1]
+    const MIND = 1.5
+    for (let ai = 0; ai < 24; ai++) {
+      const ang = (ai / 24) * Math.PI * 2
+      const ox = Math.cos(ang) * MIND
+      const oz = Math.sin(ang) * MIND
+      const tx = ox + Math.cos(ang) * 0.8 // straight away along the contact normal
+      const tz = oz + Math.sin(ang) * 0.8
+      const p = resolveTravelMove(ox, oz, tx, tz, [OB], 0.5)
+      expect(p[0]).toBeCloseTo(tx, 6)
+      expect(p[1]).toBeCloseTo(tz, 6)
+    }
+  })
+
+  // Multi-frame steering simulations — the shape of the real game loop: many
+  // small resolved steps in sequence. These would have caught the collision
+  // blocker (steering died after first contact) directly.
+  const simulate = (
+    start: [number, number],
+    dir: () => [number, number],
+    frames: number,
+    obstacles: ReadonlyArray<readonly [number, number, number]>,
+  ) => {
+    let [x, z] = start
+    for (let i = 0; i < frames; i++) {
+      const [dx, dz] = dir()
+      ;[x, z] = resolveTravelMove(x, z, x + dx, z + dz, obstacles, 0.5)
+    }
+    return [x, z] as [number, number]
+  }
+
+  it('driving into a tree then reversing frees the traveller (frame sequence)', () => {
+    const OB: [number, number, number] = [0, 0, 1]
+    // 30 frames east into the tree…
+    let pos = simulate([-3, 0], () => [0.15, 0], 30, [OB])
+    expect(dist(pos, 0, 0)).toBeCloseTo(1.5, 5) // resting on the boundary
+    // …then 30 frames west again: must travel the full distance back out.
+    pos = simulate(pos, () => [-0.15, 0], 30, [OB])
+    expect(pos[0]).toBeLessThan(-5)
+  })
+
+  it('holding a diagonal against a tree rounds it instead of sticking (slide)', () => {
+    const OB: [number, number, number] = [0, 0, 1]
+    // Aim northeast while the tree blocks east: the traveller should slip past
+    // on the north side and end up well east of the obstacle.
+    const pos = simulate([-3, -0.2], () => [0.12, 0.09], 80, [OB])
+    expect(pos[0]).toBeGreaterThan(1.5) // made it past
+    expect(dist(pos, 0, 0)).toBeGreaterThanOrEqual(1.5 - 1e-6)
+  })
+
+  it('escapes a two-tree pocket by reversing out (no permanent trap)', () => {
+    const OBS: ReadonlyArray<readonly [number, number, number]> = [[0, 1.2, 1], [0, -1.2, 1]]
+    // Drive east into the gap (too narrow for the 0.5 body), then back west.
+    let pos = simulate([-4, 0], () => [0.15, 0], 40, OBS)
+    for (const [ox, oz, r] of OBS) expect(dist(pos, ox, oz)).toBeGreaterThanOrEqual(r + 0.5 - 1e-6)
+    pos = simulate(pos, () => [-0.15, 0], 40, OBS)
+    expect(pos[0]).toBeLessThan(-4.5)
+  })
+
+  it('an obstacle dropped onto the traveller does not trap him (animal steps in)', () => {
+    // Start dead-centre inside the body (an animal moved onto the resting
+    // traveller between frames), then walk east: within a few frames he is out
+    // and moving freely.
+    const OB: [number, number, number] = [0, 0, 1]
+    const pos = simulate([0, 0], () => [0.15, 0], 40, [OB])
+    expect(dist(pos, 0, 0)).toBeGreaterThanOrEqual(1.5 - 1e-6)
+    expect(pos[0]).toBeGreaterThan(3) // kept travelling after parting from it
+  })
 })

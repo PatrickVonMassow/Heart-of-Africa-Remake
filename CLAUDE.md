@@ -264,8 +264,11 @@ verify suite that proves it.
    water tile (`__player.canoeing`) but drags it on a land tile
    (`__player.carrying`) while removing the canoe clears both, and driving
    straight into a pinned animal blocks the traveller at its body edge
-   without ever entering it (`scripts/verify/enrichments.mjs`), the swept
-   obstacle resolve pure-tested incl. the no-tunnelling case
+   without ever entering it while steering away afterwards moves him
+   clear — a collision never pins the traveller
+   (`scripts/verify/enrichments.mjs`), the swept
+   obstacle resolve pure-tested incl. the no-tunnelling case and the
+   away/tangent moves from a resting contact staying free
    (`src/systems/movement.test.ts`); the Red Sea cut and
    world trim are pure-tested at the acceptance coordinates — mid Red
    Sea, Sinai, the Arabian peninsula and the Gulf of Aden are blocked

@@ -903,13 +903,33 @@ const animalHit = await page.evaluate(async () => {
     await sleep(20)
   }
   window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
+  // Escape phase (regression for the collision blocker): once stopped against the
+  // animal, steering must still work — drive back WEST, away from it, and confirm
+  // the traveller actually moves clear instead of being pinned to the boundary.
+  const contact = window.__game.getState().pos
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' })) // drive west, away
+  const t1 = Date.now()
+  while (Date.now() - t1 < 1500) {
+    const herds2 = window.__wildlife.herdsRef.current
+    if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.push(zebra)
+    zebra.x = ax
+    zebra.z = az
+    await sleep(20)
+  }
+  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA' }))
+  const escaped = contact.x - window.__game.getState().pos.x // >0 means moved west, away
   const herds = window.__wildlife.herdsRef.current
   if (herds) herds.zebra = herds.zebra.filter((a) => a !== zebra)
-  return { minDist, reached }
+  return { minDist, reached, escaped }
 })
 check(
   'the traveller collides with an animal (drives into it but never enters its body)',
   animalHit.reached && animalHit.minDist > 0.95,
+  JSON.stringify(animalHit),
+)
+check(
+  'steering still works after the collision (the traveller drives back clear, not pinned)',
+  animalHit.escaped > 1.5,
   JSON.stringify(animalHit),
 )
 
@@ -994,7 +1014,13 @@ const shoreSpots = await page.evaluate(() => {
 })
 // Aggregate drinkers/bathers over ALL roamed shores: ~40 % of drinkers bathe,
 // so a single shore with a handful of drinkers can easily hold none — the
-// union across shores makes the sample large enough to be reliable.
+// union across shores makes the sample large enough to be reliable. The roam
+// runs at zoom 1: the streaming ring scales with the zoom, and the closer 0.5
+// default streams too small a shore population for a reliable sample.
+await page.evaluate(() => {
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(1)
+})
 const bathe = { drinkers: 0, bathers: 0, animalsSeen: 0 }
 const drinkerKeys = new Set() // unique drinkers only — respawns must not re-count
 for (const spot of shoreSpots) {
@@ -1056,6 +1082,8 @@ for (const spot of shoreSpots) {
   }
 }
 check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, `${JSON.stringify(bathe)} spots=${shoreSpots.length}`)
+// Back to the game defaults (disabling the unlock clamps the zoom to 0.5).
+await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
 
 // Return to the herd-dense plains for the predator-guard check below.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
@@ -1678,28 +1706,41 @@ check('a rescuing parent wading into the falls\' reach is swept over (calf survi
 // elephant×smaller-prey pair stays exempt (trampling is designed; its own test
 // above still passes). Body radii mirror Wildlife.tsx BODY_RADIUS.
 await pinFamily(-2.9, 34.2)
+// Freshly restocked animals may briefly overlap until the separation behaviour
+// has run a few frames — under load that takes visibly longer, so poll until
+// the spacing holds instead of sampling a single instant.
 const spacing = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const RAD = { elephant: 1.3, giraffe: 0.9, zebra: 0.7, wildebeest: 0.75, antelope: 0.6, warthog: 0.45, flamingo: 0.25 }
-  const herds = window.__wildlife.herdsRef.current
-  const all = []
-  for (const sp of Object.keys(RAD)) {
-    for (const a of herds[sp] ?? []) {
-      if (a.dead || a.caught !== undefined || a.inWater !== undefined || a.rescued !== undefined) continue
-      if (a.chunk === undefined) continue // only real streamed animals
-      all.push({ x: a.x, z: a.z, r: RAD[sp] * a.scale, sp })
+  const sample = () => {
+    const herds = window.__wildlife.herdsRef.current
+    const all = []
+    for (const sp of Object.keys(RAD)) {
+      for (const a of herds[sp] ?? []) {
+        if (a.dead || a.caught !== undefined || a.inWater !== undefined || a.rescued !== undefined) continue
+        if (a.chunk === undefined) continue // only real streamed animals
+        all.push({ x: a.x, z: a.z, r: RAD[sp] * a.scale, sp })
+      }
     }
-  }
-  let worst = Infinity
-  for (let i = 0; i < all.length; i++) {
-    for (let j = i + 1; j < all.length; j++) {
-      const A = all[i], B = all[j]
-      if ((A.sp === 'elephant') !== (B.sp === 'elephant')) continue // trample pair exempt
-      const minD = A.r + B.r
-      const d = Math.hypot(A.x - B.x, A.z - B.z)
-      worst = Math.min(worst, d / minD)
+    let worst = Infinity
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const A = all[i], B = all[j]
+        if ((A.sp === 'elephant') !== (B.sp === 'elephant')) continue // trample pair exempt
+        const minD = A.r + B.r
+        const d = Math.hypot(A.x - B.x, A.z - B.z)
+        worst = Math.min(worst, d / minD)
+      }
     }
+    return { animals: all.length, worst: +worst.toFixed(3) }
   }
-  return { animals: all.length, worst: +worst.toFixed(3) }
+  let s = sample()
+  const deadline = Date.now() + 8000
+  while (Date.now() < deadline && !(s.animals > 5 && s.worst >= 0.7)) {
+    await sleep(200)
+    s = sample()
+  }
+  return s
 })
 check('spawned animals keep body spacing (no two inside one another)',
   spacing.animals > 5 && spacing.worst >= 0.7, JSON.stringify(spacing))

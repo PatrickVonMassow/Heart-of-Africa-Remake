@@ -408,12 +408,25 @@ the map).
   canoeing the Nile drifts the traveller into it. Keep a small minimum
   clearance between every river and every village so their footprints never
   overlap the water.
-- [ ] 61. BLOCKER: after the bird's-eye traveller collides with a tree once,
+- [x] 61. BLOCKER: after the bird's-eye traveller collides with a tree once,
   steering stops working entirely (the figure can even vanish). The swept
   obstacle resolver of point 56 pins the traveller to the obstacle boundary
   even when the move leads away from it. Fix so a collision only ever clamps a
   move that genuinely enters the obstacle; moving away or sliding along stays
   free.
+  (Root cause: resolveTravelMove clamped every step whose sweep line crossed
+  the obstacle — including steps leading away from a resting contact, whose
+  whole inside interval lies behind the start. Now it clamps only when part of
+  the inside interval lies ahead AND is entered within the step
+  (tExit > 0 && tEnter < 1); away/tangent moves from the boundary stay free.
+  Test-gap closed on both layers: movement.test.ts adds four regression cases
+  (away, tangent, diagonal escape free; re-entry still blocked) — the old
+  suite only asserted stopping, never steering afterwards — and the
+  enrichments live collision check gained an escape phase (drive back after
+  contact, assert the traveller actually moves clear). The bathe check's
+  separate flake was diagnosed and fixed too: since the 0.5 default zoom
+  (point 55) the zoom-scaled streaming ring starved its shore sample; the
+  roam now pins zoom 1 like the other ring checks. Full regression green.)
 
 ## Closing (only after all points)
 

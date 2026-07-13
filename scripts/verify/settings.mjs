@@ -51,6 +51,10 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
 // are not directly comparable).
 async function measureWalk(code) {
   await page.evaluate(() => {
+    // A previous measurement's walk can have strayed into a building door and
+    // opened its dialog (walk-in doors, design.md §2) — a modal blocks
+    // movement, so close any before measuring.
+    window.__ui.getState().setDialog(null)
     const p = window.__placePlayer
     p.x = 0
     p.z = 16

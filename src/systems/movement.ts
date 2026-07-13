@@ -137,12 +137,20 @@ export function resolveTravelMove(
     const b = 2 * (vsx * mx + vsz * mz)
     const c = ds * ds - minD * minD
     const disc = b * b - 4 * a * c
-    if (disc < 0) continue // the path misses this obstacle
-    const t = (-b - Math.sqrt(disc)) / (2 * a)
-    if (t < 1) {
-      // Enters the circle within the step → stop at the first contact.
-      cx = sx + mx * Math.max(0, t)
-      cz = sz + mz * Math.max(0, t)
+    if (disc <= 1e-12) continue // misses the obstacle, or only grazes tangentially
+    const sq = Math.sqrt(disc)
+    const tEnter = (-b - sq) / (2 * a)
+    const tExit = (-b + sq) / (2 * a)
+    // Clamp only a move that genuinely passes *into* the obstacle this step: part
+    // of the inside interval lies ahead (tExit > 0) and it is entered before the
+    // step ends (tEnter < 1). A move that leads *away* from an obstacle the
+    // traveller rests against has its whole inside interval behind the start
+    // (tExit ≤ 0) and stays free — without this the resolver pinned the traveller
+    // to the boundary and steering died the moment it touched a tree.
+    if (tExit > 0 && tEnter < 1) {
+      const t = Math.max(0, tEnter)
+      cx = sx + mx * t
+      cz = sz + mz * t
     }
   }
   return [cx, cz]
