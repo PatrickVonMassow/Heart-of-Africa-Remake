@@ -94,7 +94,10 @@ check("left stick travels in the bird's-eye view", travelled > 0.5, `moved ${tra
 // it maps to the E interaction, which addresses the village elder. The
 // northern Nubian village keeps the following position query in the North.
 await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
-await page.waitForTimeout(2000)
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "nubian-village", { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(500)
 await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
   const el = window.__placeLayout.interactives.find((i) => i.type === 'villager')

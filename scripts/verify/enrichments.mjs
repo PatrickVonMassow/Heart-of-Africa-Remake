@@ -82,7 +82,10 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
-await page.waitForTimeout(4000)
+// The game starts inside Cairo: wait for the place scene's layout hook
+// instead of a fixed sleep (load-dependent under the full regression).
+await page.waitForFunction(() => !!window.__placeLayout, null, { timeout: 60000 }).catch(() => {})
+await page.waitForTimeout(700)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(300)
 // Keep the wildlife/geometry checks deterministic (random events are covered by
@@ -102,7 +105,14 @@ check('Cairo: landscape backdrop mesh present', cairo.backdrop > 1000, `${cairo.
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1200)
 await page.evaluate(() => window.__game.getState().enterPlace('boma'))
-await page.waitForTimeout(2200)
+await page
+  .waitForFunction(
+    (want) => window.__game.getState().placeId === want && !!window.__placeLayout,
+    "boma",
+    { timeout: 30000 },
+  )
+  .catch(() => {})
+await page.waitForTimeout(500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 const boma = await page.evaluate(() => ({
   radius: window.__placeLayout.radius,
@@ -118,7 +128,14 @@ check(
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(800)
 await page.evaluate(() => window.__game.getState().enterPlace('masai-village'))
-await page.waitForTimeout(2200)
+await page
+  .waitForFunction(
+    (want) => window.__game.getState().placeId === want && !!window.__placeLayout,
+    "masai-village",
+    { timeout: 30000 },
+  )
+  .catch(() => {})
+await page.waitForTimeout(500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 const village = await page.evaluate(() => ({
   walkers: window.__placeWalkers ? window.__placeWalkers.states.length : 0,
@@ -2566,7 +2583,16 @@ console.log('shot 85-elephant-graveyard.png')
 // In a settlement the buildings carry floating map-labels (drei <Html>); an
 // opened modal dialog must cover them, not sit behind them.
 await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
-await page.waitForTimeout(2500)
+await page
+  .waitForFunction(
+    (want) => window.__game.getState().placeId === want && !!window.__placeLayout,
+    "cairo",
+    { timeout: 30000 },
+  )
+  .catch(() => {})
+await page.waitForTimeout(500)
+// The floating labels mount a beat after the layout.
+await page.waitForFunction(() => !!document.querySelector('.map-label'), null, { timeout: 15000 }).catch(() => {})
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 const zorder = await page.evaluate(async () => {

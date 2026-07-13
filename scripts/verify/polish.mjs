@@ -35,7 +35,12 @@ await page.evaluate(() => {
   g.leavePlace()
   g.enterPlace('masai-village')
 })
-await page.waitForTimeout(2500)
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "masai-village", { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(500)
+// The panorama animals stream in over the first seconds of the scene.
+await page.waitForFunction(() => (window.__placePanoramaWildlife ?? 0) >= 3, null, { timeout: 20000 }).catch(() => {})
 const wildlife = await page.evaluate(() => window.__placePanoramaWildlife ?? 0)
 check('distant wildlife drifts through the panorama', wildlife >= 3, `${wildlife} animals`)
 
@@ -64,7 +69,10 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(600)
 await page.evaluate(() => window.__game.getState().enterPlace('masai-village'))
-await page.waitForTimeout(2000)
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "masai-village", { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(500)
 const again = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
 check('the orientation persists across re-entry', again >= 1, `${again} markers`)
 
@@ -74,7 +82,10 @@ await page.evaluate(() => {
   g.leavePlace()
   g.enterPlace('swahili-village')
 })
-await page.waitForTimeout(2000)
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "swahili-village", { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(500)
 const other = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
 check('other settlements stay unmarked without a gift', other === 0, `${other}`)
 

@@ -265,7 +265,10 @@ for (let corner = 0; corner < 4; corner++) {
 
 // === Village (Masai) =========================================================
 await page.evaluate(() => window.__game.getState().enterPlace('masai-village'))
-await page.waitForTimeout(2500)
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "masai-village", { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 

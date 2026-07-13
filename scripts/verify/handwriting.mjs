@@ -54,7 +54,10 @@ check(
 )
 await page.screenshot({ path: `${OUT}81-handwriting.png` })
 console.log('shot 81-handwriting.png')
-await page.waitForTimeout(3500)
+// Wait for the stroke animation to END (a fixed sleep undershoots when the
+// throttled headless RAF slows the reveal under full-regression load).
+await page.waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 }).catch(() => {})
+await page.waitForTimeout(300)
 const finished = await page.evaluate(() => ({
   writing: document.querySelectorAll('.journal .entry.writing').length,
   text: [...document.querySelectorAll('.journal .entry p')].at(-1)?.textContent ?? '',
