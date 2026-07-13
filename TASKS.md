@@ -358,8 +358,18 @@ the map).
   (ui DEFAULT_TRAVEL_ZOOM = 0.5 is both the start and the no-unlock zoom-out
   clamp — setWheelZoomEnabled/setTravelZoom clamp to it instead of 1; zoom-in
   to 0.25 stays free, the unlock opens up to 16. ui.test follows.)
-- [ ] 56. The player should collide with animals and large plants (trees) in
+- [x] 56. The player should collide with animals and large plants (trees) in
   the bird's-eye view instead of walking through them.
+  (The travel movement loop resolves the player against nearby obstacle circles
+  after each move: large flora (acacia/jungle/palm/baobab/dead tree/kopje —
+  recomputed from the same deterministic chunk placement the Vegetation is
+  built from) and live animals (registered from Wildlife via wildlifeCollision,
+  reading the streamed herds). resolveTravelMove is a swept circle resolve — it
+  clamps a step to an obstacle's near edge (no tunnelling at speed) and slides
+  along it; small dressing and carcasses stay passable. Pure-tested in
+  movement.test (incl. the no-tunnelling case); enrichments drives into a
+  pinned animal and asserts the body is never entered (min distance = body +
+  player radius).)
 - [x] 57. Styling: when affliction badges show (e.g. "Fever") the health bar
   slips slightly downward. Keep the bar fixed regardless of the badges.
   (.health-status has a fixed 22px height, so taller badges never nudge the

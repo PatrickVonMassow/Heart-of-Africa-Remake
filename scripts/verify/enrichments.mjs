@@ -870,6 +870,49 @@ const scavenge = await page.evaluate(async () => {
 check('a scavenger flies in and lands on a non-lion carcass', scavenge.landed, JSON.stringify(scavenge))
 check('the scavenged carcass dissolves and is removed', scavenge.dissolveStarted && scavenge.removed, JSON.stringify(scavenge))
 
+// --- Point 56: the traveller collides with animals -----------------------------
+// design.md §19: the bird's-eye traveller cannot walk through wildlife. Pin a
+// live animal ahead of the player (clear of him), drive straight at it, and
+// confirm his path never enters the animal's body — he is turned aside (slides
+// around) rather than passing through it (which would drop the distance to ~0).
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.waitForTimeout(600)
+const animalHit = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p0 = window.__game.getState().pos
+  const ax = p0.x + 2.6 // 2.6 east — clear of the player (body+player ≈ 1.2)
+  const az = p0.z
+  const zebra = { x: ax, z: az, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: 'collide-test' }
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' })) // drive east, straight at it
+  let minDist = Infinity
+  let reached = false // the player got within engaging range at some point
+  const t0 = Date.now()
+  while (Date.now() - t0 < 2500) {
+    // Keep the pinned zebra alive in the CURRENT herds: driving across chunk
+    // boundaries streams the injected (invalid-chunk) animal out, so re-add and
+    // re-pin it each poll — the real game collides against genuinely streamed
+    // animals, this only keeps the fixed test target present.
+    const herds = window.__wildlife.herdsRef.current
+    if (herds && !herds.zebra.includes(zebra)) herds.zebra.push(zebra)
+    zebra.x = ax
+    zebra.z = az
+    const p = window.__game.getState().pos
+    const d = Math.hypot(p.x - ax, p.z - az)
+    minDist = Math.min(minDist, d)
+    if (d < 2) reached = true
+    await sleep(20)
+  }
+  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
+  const herds = window.__wildlife.herdsRef.current
+  if (herds) herds.zebra = herds.zebra.filter((a) => a !== zebra)
+  return { minDist, reached }
+})
+check(
+  'the traveller collides with an animal (drives into it but never enters its body)',
+  animalHit.reached && animalHit.minDist > 0.95,
+  JSON.stringify(animalHit),
+)
+
 // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
 // A single scavenger cannot keep up with every kill, so carcasses left far off
 // the screen are culled silently; only near (visible) ones linger. Without this

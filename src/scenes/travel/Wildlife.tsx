@@ -19,6 +19,7 @@ import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
+import { setAnimalCollider } from './wildlifeCollision'
 import { latLonToWorld, regionAt, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
@@ -371,6 +372,28 @@ const BODY_RADIUS: Record<Species, number> = {
 /** Grid cell size for the runtime separation pass (≥ 2·max body radius). */
 const SEPARATION_CELL = 4
 
+/**
+ * Live animals near a point as collision circles `[x, z, radius]` (design.md
+ * §19): the bird's-eye traveller collides with animals instead of walking
+ * through them. Reads the streamed herds shared each frame via ACTIVE_HERDS;
+ * carcasses are passable. The Wildlife component registers this with
+ * `setAnimalCollider` so the movement loop can call it (see wildlifeCollision).
+ */
+function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[number, number, number]> {
+  const herds = ACTIVE_HERDS
+  if (!herds) return []
+  const out: Array<[number, number, number]> = []
+  for (const sp of SPECIES) {
+    const br = BODY_RADIUS[sp]
+    for (const a of herds[sp]) {
+      if (a.dead) continue
+      const r = br * a.scale
+      if (Math.abs(a.x - px) < radius + r && Math.abs(a.z - pz) < radius + r) out.push([a.x, a.z, r])
+    }
+  }
+  return out
+}
+
 // Wildlife placement salts the seed so it decorrelates from the terrain
 // scatter that shares hashChunk (design.md §19).
 const hash = (cx: number, cz: number, i: number, seed: number): number => hashChunk(cx, cz, i, seed ^ 0xa51ce5)
@@ -692,6 +715,13 @@ function Herds() {
   // Drop the shared herd pointer when this scene unmounts so a stale reference
   // never outlives it (design.md §19).
   useEffect(() => () => { ACTIVE_HERDS = null }, [])
+
+  // Let the travel movement loop collide the player with the streamed animals
+  // (design.md §19), cleared on unmount so no stale query survives the scene.
+  useEffect(() => {
+    setAnimalCollider(nearAnimalObstacles)
+    return () => setAnimalCollider(null)
+  }, [])
 
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.1)

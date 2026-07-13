@@ -248,6 +248,8 @@ Every settlement — port city or native village — offers at least the baselin
 
 Movement happens in the bird's-eye view; the terrain is rendered in 3D, the controls remain top-down oriented.
 
+The traveller has a body in the bird's-eye view: he collides with the large, solid dressing (trees and boulder piles) and with the wildlife (§19), and cannot walk through them — a fast step is caught at the obstacle's near edge (no passing through), and movement slides along it. Small dressing (bushes, reeds, termite mounds, loose rocks) and carcasses stay passable.
+
 ### 11.1 Visible slowdown reason
 
 Whenever the current terrain slows the traveler and the relieving item is not carried — dense jungle without a machete, water without a canoe, mountain rock without a rope, or the canoe carried across any land (dead weight on desert, savanna, jungle and mountain alike) — the bird's-eye view shows a short hint naming the cause and the relieving item. A movement penalty is never silent.

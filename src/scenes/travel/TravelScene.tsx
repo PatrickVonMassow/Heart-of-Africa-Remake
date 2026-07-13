@@ -30,6 +30,7 @@ import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, WATERFALLS } from '../../world/data/landmarks'
 import { moveAxes, onKeyPress } from '../../systems/input'
+import { resolveTravelMove } from '../../systems/movement'
 import { RiversAndLakes, SURFACE_LIFT } from './Rivers'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
@@ -54,6 +55,7 @@ import { mulberry32, hashChunk } from '../../world/noise'
 import { Climate } from './Climate'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
+import { collidableAnimalsNear } from './wildlifeCollision'
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 
 const CHUNK_SIZE = 24 // world units
@@ -573,6 +575,66 @@ function pickSpecies(type: TerrainType, roll: number, nearWater: boolean): Speci
     default:
       return null
   }
+}
+
+// Large, solid dressing the traveller collides with (design.md §19): trees and
+// boulder piles, by their horizontal footprint radius (before per-instance
+// scale). Bushes, reeds, termite mounds and loose rocks stay passable.
+const COLLIDABLE_FLORA: Partial<Record<Species, number>> = {
+  acacia: 0.4,
+  jungle: 0.5,
+  palm: 0.32,
+  baobab: 0.7,
+  deadtree: 0.3,
+  kopje: 1.0,
+}
+
+/**
+ * Collidable dressing near a point as circles `[x, z, radius]` — the same
+ * deterministic chunk placement the Vegetation instances are built from (so
+ * collision matches what is drawn), restricted to the player's chunk and its
+ * neighbours and the collidable species. The rare instance-cap overflow is
+ * ignored (caps are far above the local density), as it is for what renders.
+ */
+function collidableFloraNear(px: number, pz: number, seed: number): Array<[number, number, number]> {
+  const out: Array<[number, number, number]> = []
+  const pcx = Math.floor(px / CHUNK_SIZE)
+  const pcz = Math.floor(pz / CHUNK_SIZE)
+  const QUERY = 3 // only dressing this close can block the traveller
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const ccx = pcx + dx
+      const ccz = pcz + dz
+      for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
+        const rx = hashChunk(ccx, ccz, i * 4, seed)
+        const rz = hashChunk(ccx, ccz, i * 4 + 1, seed)
+        const x = (ccx + rx) * CHUNK_SIZE
+        const z = (ccz + rz) * CHUNK_SIZE
+        if (Math.abs(x - px) > QUERY + 1.2 || Math.abs(z - pz) > QUERY + 1.2) continue // cheap reject before sampling
+        const ll = worldToLatLon(x, z)
+        const s = sampleTerrain(ll.lat, ll.lon, seed)
+        if (s.height <= 0.05) continue
+        const roll = hashChunk(ccx, ccz, i * 4 + 2, seed)
+        const nearWater =
+          riverDistance(ll.lat, ll.lon, 0.08) < 0.05 || lakeDistance(ll.lat, ll.lon, 0.08) < 0.04
+        const species = pickSpecies(s.type, roll, nearWater)
+        const baseR = species ? COLLIDABLE_FLORA[species] : undefined
+        if (baseR === undefined) continue
+        let blocked = false
+        for (const p of PLACES) {
+          const w = latLonToWorld(p.lat, p.lon)
+          if (Math.hypot(x - w.x, z - w.z) < 4) {
+            blocked = true
+            break
+          }
+        }
+        if (blocked) continue
+        const r4 = hashChunk(ccx, ccz, i * 4 + 3, seed)
+        out.push([x, z, baseR * (0.75 + r4 * 0.55)])
+      }
+    }
+  }
+  return out
 }
 
 function Vegetation() {
@@ -1417,11 +1479,27 @@ export function TravelScene() {
     // being read aloud) no longer freezes travel (design.md §16); only a modal
     // dialog blocks movement.
     if (!useUi.getState().dialog) {
+      const beforeX = s.pos.x // position before this frame's move (s is the pre-move snapshot)
+      const beforeZ = s.pos.z
       const a = moveAxes()
       if (a.x !== 0 || a.y !== 0) s.moveTravel(a.x, -a.y, dt)
       // The river current sweeps the traveller downstream even while idle
       // (design.md §11); moving with it is faster, against it slower.
       s.driftCurrent(dt)
+
+      // Collision with trees and animals (design.md §19): the traveller cannot
+      // walk through the large dressing or the wildlife. The swept resolve
+      // clamps the move at an obstacle it enters (no tunnelling at speed) and
+      // slides along it, so movement never passes through.
+      const p = useGame.getState().pos
+      const PLAYER_R = 0.5
+      const obstacles = collidableFloraNear(p.x, p.z, s.seed)
+      const animals = collidableAnimalsNear(p.x, p.z, PLAYER_R + 1.5)
+      for (const o of animals) obstacles.push(o)
+      if (obstacles.length > 0) {
+        const [nx, nz] = resolveTravelMove(beforeX, beforeZ, p.x, p.z, obstacles, PLAYER_R)
+        if (nx !== p.x || nz !== p.z) useGame.setState({ pos: { x: nx, z: nz } })
+      }
     }
 
     // Camera follows from above with a slight tilt; the zoom factor scales

@@ -50,7 +50,110 @@ export function placeWalkVelocity(
   return [nf * speed * (nf >= 0 ? 1 : strafeFactor), ns * speed * strafeFactor]
 }
 
+/**
+ * Push a point clear of every overlapping obstacle circle (design.md §19): given
+ * obstacles as `[x, z, radius]`, returns the `[x, z]` moved just outside each
+ * overlap with a body of `selfR`. Used so the bird's-eye traveller collides with
+ * trees and animals — sliding along them instead of walking through. Coincident
+ * points get a fixed +x nudge so the divide-by-zero case still parts.
+ */
+export function pushOutOfCircles(
+  x: number,
+  z: number,
+  obstacles: ReadonlyArray<readonly [number, number, number]>,
+  selfR: number,
+): [number, number] {
+  let nx = x
+  let nz = z
+  for (const [ox, oz, orr] of obstacles) {
+    const dx = nx - ox
+    const dz = nz - oz
+    const d = Math.hypot(dx, dz)
+    const minD = orr + selfR
+    if (d >= minD) continue
+    if (d < 1e-5) {
+      nx += minD
+      continue
+    }
+    const push = minD - d
+    nx += (dx / d) * push
+    nz += (dz / d) * push
+  }
+  return [nx, nz]
+}
+
+/**
+ * Resolve a bird's-eye move from `(ox,oz)` to `(nx,nz)` against obstacle circles
+ * `[x, z, radius]` for a body of `selfR` (design.md §19): the traveller collides
+ * with trees and animals instead of walking through them. For an obstacle the
+ * path *enters* this frame the move is clamped to the near boundary (a swept
+ * test, so a fast step cannot tunnel through and pop out the far side); an
+ * obstacle already overlapped at the start is pushed straight out. Returns the
+ * resolved `[x, z]`.
+ */
+export function resolveTravelMove(
+  ox: number,
+  oz: number,
+  nx: number,
+  nz: number,
+  obstacles: ReadonlyArray<readonly [number, number, number]>,
+  selfR: number,
+): [number, number] {
+  let cx = nx
+  let cz = nz
+  for (const [obx, obz, r] of obstacles) {
+    const minD = r + selfR
+    // Sweep origin = the frame's start, pushed out to the boundary if it began
+    // inside (float drift, or an animal that moved onto the traveller). Sweeping
+    // from a point on the near side guarantees the destination is only ever
+    // clamped to the near boundary — a fast step can never tunnel out the far
+    // side, and a barely-inside start can never be flung across.
+    let sx = ox
+    let sz = oz
+    let vsx = ox - obx
+    let vsz = oz - obz
+    let ds = Math.hypot(vsx, vsz)
+    if (ds < minD) {
+      if (ds < 1e-5) {
+        sx = obx + minD
+        sz = obz
+      } else {
+        sx = obx + (vsx / ds) * minD
+        sz = obz + (vsz / ds) * minD
+      }
+      vsx = sx - obx
+      vsz = sz - obz
+      ds = minD
+    }
+    const mx = cx - sx
+    const mz = cz - sz
+    const a = mx * mx + mz * mz
+    if (a < 1e-12) {
+      // No travel from the (possibly pushed-out) origin: rest there.
+      cx = sx
+      cz = sz
+      continue
+    }
+    const b = 2 * (vsx * mx + vsz * mz)
+    const c = ds * ds - minD * minD
+    const disc = b * b - 4 * a * c
+    if (disc < 0) continue // the path misses this obstacle
+    const t = (-b - Math.sqrt(disc)) / (2 * a)
+    if (t < 1) {
+      // Enters the circle within the step → stop at the first contact.
+      cx = sx + mx * Math.max(0, t)
+      cz = sz + mz * Math.max(0, t)
+    }
+  }
+  return [cx, cz]
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  ;(window as unknown as Record<string, unknown>).__movement = { movementPenalty, placeWalkVelocity }
+  ;(window as unknown as Record<string, unknown>).__movement = {
+    movementPenalty,
+    placeWalkVelocity,
+    pushOutOfCircles,
+    resolveTravelMove,
+  }
 }

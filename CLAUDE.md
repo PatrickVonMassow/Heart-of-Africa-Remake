@@ -246,7 +246,10 @@ verify suite that proves it.
    announcement (§11.1, both languages, voice markup, flag in the
    checkpoint), and possession-based item effects (§6.1/§7 — no "in hand"
    state), incl. the canoe depiction of §7 (with one in the pack the
-   explorer rides it seated on the water and drags it behind him on land).
+   explorer rides it seated on the water and drags it behind him on land),
+   and the bird's-eye collision with trees and animals (§11/§19 — the
+   traveller cannot walk through them, a fast step is caught at the near
+   edge with no tunnelling, small dressing and carcasses stay passable).
    Verifiable: an automated move on enclosed sea advances the
    position, a move on open ocean is refused with the blocking notice, a
    move onto a mountain without a rope advances (with the warning) while
@@ -259,8 +262,11 @@ verify suite that proves it.
    first jungle entry adds exactly one journal warning while a later entry
    adds none, and with a canoe in the pack the explorer rides it on a
    water tile (`__player.canoeing`) but drags it on a land tile
-   (`__player.carrying`) while removing the canoe clears both
-   (`scripts/verify/enrichments.mjs`); the Red Sea cut and
+   (`__player.carrying`) while removing the canoe clears both, and driving
+   straight into a pinned animal blocks the traveller at its body edge
+   without ever entering it (`scripts/verify/enrichments.mjs`), the swept
+   obstacle resolve pure-tested incl. the no-tunnelling case
+   (`src/systems/movement.test.ts`); the Red Sea cut and
    world trim are pure-tested at the acceptance coordinates — mid Red
    Sea, Sinai, the Arabian peninsula and the Gulf of Aden are blocked
    ocean (Sinai/Arabia trimmed in the DEM, so no land route rounds the
