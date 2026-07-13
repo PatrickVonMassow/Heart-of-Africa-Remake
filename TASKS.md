@@ -475,7 +475,7 @@ the map).
   prints over the fog, geography stays discovery-gated beneath it.
   design.md §19.11 + CLAUDE.md pt. 3 updated; new i18n strings (subtitle,
   scale caption) in both languages. Full regression green.)
-- [ ] 64. The dragged canoe on LAND still clips into the ground and objects
+- [x] 64. The dragged canoe on LAND still clips into the ground and objects
   in many situations (point 62 fixed the water side). Test broadly and fix:
   many different ground types and height profiles (dunes, slopes, rocky
   terrain), dragging the canoe across a stone, an animal standing in the
@@ -483,6 +483,19 @@ the map).
   protruding into a village/settlement — the hull must follow the terrain
   under it (pitch along the drag direction, no end buried in a rise, no
   floating over a dip) and must never intersect solid obstacles.
+  (The hull was pinned rigidly to the yawing figure at a fixed height/tilt.
+  New pure module src/scenes/travel/canoeDrag.ts: a rope-constrained trail
+  point follows the walked path like a trailer and is pushed clear of
+  obstacle circles (flora, animals via the collision bridge, and settlement
+  markers r=1.6); the pose pitches the hull from the hand grip down to
+  where its far end rests on its own ground sample (clamped ±), with a
+  clamped cross-slope roll. 13 pure tests cover the matrix (straight/corner
+  following, stone/animal/village clearance every frame, flat/moderate/
+  cliff profiles, roll signs and clamps, grip invariant, NaN guard);
+  enrichments asserts the live resting invariant via __player.drag; probes
+  verified dunes/highlands (farY = ground + 0.15 exactly, roll clamped) and
+  the just-left-village rim (trail pinned at the 2.0 clearance). design.md
+  §7 and CLAUDE.md pt. 4 record the behaviour. Full regression green.)
 
 - [ ] 65. Plants still reach into rivers and block the canoe's way
   (screenshot: trees and boulders overlapping the channel), and animals

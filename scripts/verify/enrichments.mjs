@@ -383,6 +383,18 @@ if (waterSpot && landSpot) {
   await page.waitForTimeout(500)
   const drag = await page.evaluate(() => window.__player)
   check('Canoe: on land the explorer drags the canoe (not ridden)', drag?.carrying === true && drag?.canoeing === false, JSON.stringify(drag))
+  // The dragged hull lies ON the terrain (design.md §7/§11): its far end
+  // rests just above its own ground sample, with a bounded pose. The full
+  // behaviour matrix (slopes, stones, animals, village edges) is pure-tested
+  // in src/scenes/travel/canoeDrag.test.ts.
+  check(
+    'Canoe: the dragged hull rests on the ground behind (not buried, not floating)',
+    typeof drag?.drag?.farY === 'number' &&
+      Math.abs(drag.drag.farY - drag.drag.ground - 0.15) < 0.2 &&
+      Math.abs(drag.drag.pitch) <= 0.66 &&
+      Math.abs(drag.drag.roll) <= 0.36,
+    JSON.stringify(drag?.drag),
+  )
   await page.screenshot({ path: `${OUT}89-canoe-carry.png` })
   console.log('shot 89-canoe-carry.png')
   await page.evaluate(() => window.__ui.getState().setTravelZoom(1))

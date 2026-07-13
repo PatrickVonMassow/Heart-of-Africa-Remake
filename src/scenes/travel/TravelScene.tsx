@@ -33,6 +33,13 @@ import { moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
+import {
+  updateTrailPoint,
+  canoeDragPose,
+  CANOE_TRAIL_FAR,
+  CANOE_DRAG_LEN,
+  type TrailPoint,
+} from './canoeDrag'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -1222,6 +1229,7 @@ function Player() {
   const wasCanoeing = useRef<boolean | null>(null)
   const wasCarrying = useRef<boolean | null>(null)
   const wasWounds = useRef<number | null>(null)
+  const trailRef = useRef<TrailPoint | null>(null)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1294,6 +1302,49 @@ function Player() {
     // A gentle, one-sided paddle stroke while riding.
     if (paddle.current) paddle.current.rotation.x = 0.35 + Math.sin(bobTime.current * 3.2) * 0.4
 
+    // Dragged canoe (design.md §7/§11): a trailer behind the walked path,
+    // swung clear of stones, trees, animals and settlement edges, lying on
+    // the terrain (pitch to the tail's ground, roll on cross-slopes).
+    if (carrying && carry.current) {
+      const obstacles = collidableFloraNear(s.pos.x, s.pos.z, s.seed)
+      for (const a of collidableAnimalsNear(s.pos.x, s.pos.z, CANOE_TRAIL_FAR + 2)) obstacles.push(a)
+      for (const p of PLACES) {
+        const w = latLonToWorld(p.lat, p.lon)
+        if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) < CANOE_TRAIL_FAR + 4) obstacles.push([w.x, w.z, 1.6])
+      }
+      const trail = updateTrailPoint(s.pos.x, s.pos.z, trailRef.current, heading.current, obstacles)
+      trailRef.current = trail
+      const groundAt = (x: number, z: number) => {
+        const g = worldToLatLon(x, z)
+        return Math.max(0, sampleTerrain(g.lat, g.lon, s.seed).height)
+      }
+      const dLen = Math.hypot(trail.x - s.pos.x, trail.z - s.pos.z) || 1
+      const pdx = -(trail.z - s.pos.z) / dLen
+      const pdz = (trail.x - s.pos.x) / dLen
+      const gT = groundAt(trail.x, trail.z)
+      const gL = groundAt(trail.x + pdx * 0.7, trail.z + pdz * 0.7)
+      const gR = groundAt(trail.x - pdx * 0.7, trail.z - pdz * 0.7)
+      const pose = canoeDragPose(s.pos.x, s.pos.z, refY, trail, gT, gL, gR)
+      carry.current.rotation.order = 'YXZ'
+      carry.current.position.set(pose.centreX, pose.centreY, pose.centreZ)
+      carry.current.rotation.set(pose.pitch, pose.yaw, pose.roll)
+      if (import.meta.env.DEV) {
+        const w = window as unknown as Record<string, Record<string, unknown>>
+        if (w.__player) {
+          w.__player.drag = {
+            x: trail.x,
+            z: trail.z,
+            ground: gT,
+            farY: refY + pose.centreY + (CANOE_DRAG_LEN / 2) * Math.tan(pose.pitch),
+            pitch: pose.pitch,
+            roll: pose.roll,
+          }
+        }
+      }
+    } else if (!carrying) {
+      trailRef.current = null
+    }
+
     // Wounds show on the figure, scaling with severity (design.md §6/§16).
     const wounds = s.afflictions.wounds
     if (wasCanoeing.current !== canoeing || wasCarrying.current !== carrying || wasWounds.current !== wounds) {
@@ -1329,16 +1380,17 @@ function Player() {
           </mesh>
         </group>
       </group>
-      <group ref={inner}>
-        {/* Dragged canoe on land: trails behind the walking figure, near end
-            lifted to the grip, far end resting on the ground (toggled in frame). */}
-        <group ref={carry} visible={false} position={[0, 0.26, -1.2]} rotation={[-0.2, 0, 0]}>
-          <CanoeHull />
-          {/* Paddle stowed lengthwise inside the hull. */}
-          <group position={[0.09, 0.0, 0.1]} rotation={[Math.PI / 2, 0, 0.05]}>
-            <CanoePaddle />
-          </group>
+      {/* Dragged canoe on land: a trailer following the walked path around
+          obstacles, lying on the terrain behind the figure (posed per frame
+          from canoeDrag.ts — child of the root, not of the yawing figure). */}
+      <group ref={carry} visible={false}>
+        <CanoeHull />
+        {/* Paddle stowed lengthwise inside the hull. */}
+        <group position={[0.09, 0.0, 0.1]} rotation={[Math.PI / 2, 0, 0.05]}>
+          <CanoePaddle />
         </group>
+      </group>
+      <group ref={inner}>
         {/* Legs (hidden inside the hull while canoeing). */}
         <group ref={legs}>
           <mesh position={[-0.11, 0.22, 0]} castShadow>
