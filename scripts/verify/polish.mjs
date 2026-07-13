@@ -54,8 +54,8 @@ check('the gift unlocks the building markers', after >= 1, `${after} markers`)
 check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
-await page.screenshot({ path: `${OUT}83-orientation-highlight.png` })
-console.log('shot 83-orientation-highlight.png')
+await page.screenshot({ path: `${OUT}93-orientation-highlight.png` })
+console.log('shot 93-orientation-highlight.png')
 
 // Persistence: leaving and re-entering keeps the orientation.
 await page.evaluate(() => {

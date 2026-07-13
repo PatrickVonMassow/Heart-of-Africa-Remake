@@ -259,6 +259,18 @@ check(
   Array.isArray(rivers?.lakeInfo) && rivers.lakeInfo.length === 8 && rivers.lakeInfo.every((l) => l.y > l.bedMax),
   JSON.stringify(rivers?.lakeInfo),
 )
+// §7.1 pt. 21 screenshot evidence (71-73): the real water courses at the Nile
+// (Aswan), Victoria Falls and Lake Victoria.
+for (const [name, lat, lon] of [
+  ['71-water-nile-aswan', 24.1, 32.9],
+  ['72-water-victoria-falls', -17.92, 25.85],
+  ['73-water-lake-victoria', -1.0, 33.0],
+]) {
+  await page.evaluate(([a, o]) => window.__game.getState().debugJumpTo(a, o), [lat, lon])
+  await page.waitForTimeout(1500) // let the chunks and water surfaces stream in
+  await page.screenshot({ path: `${OUT}${name}.png` })
+  console.log(`shot ${name}.png`)
+}
 
 // --- Region border labels (§7.1.3) -------------------------------------------
 await page.evaluate(() => window.__game.getState().debugJumpTo(17.2, -2))
