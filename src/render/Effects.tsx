@@ -118,7 +118,8 @@ export function Effects() {
       )
       disposables.push(ssrNode)
       // Placeholder tuning for the game's world scale (10 units/degree,
-      // bird's-eye camera ~40 units up); calibrated in the manual check loop.
+      // bird's-eye camera ~40 units up at zoom 1 — ~21 at the 0.5 default);
+      // calibrated in the manual check loop.
       ssrNode.maxDistance.value = 40
       ssrNode.thickness.value = 0.5
       ssrNode.resolutionScale = 0.5

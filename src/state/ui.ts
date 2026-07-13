@@ -54,7 +54,8 @@ interface UiState {
    * open the journal nor auto-narrate; they stay readable on manual open.
    */
   journalDnd: boolean
-  /** Current bird's-eye zoom factor (1 = default camera distance). */
+  /** Current bird's-eye zoom factor scaling the base camera offset (the game
+   *  starts at DEFAULT_TRAVEL_ZOOM). */
   travelZoom: number
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
