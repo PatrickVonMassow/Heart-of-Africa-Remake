@@ -4,6 +4,7 @@
 // entry, and do-not-disturb writes silently. Dev server only.
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
+import { installTtsCache } from './ttsCache.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -15,6 +16,11 @@ const check = (name, ok, detail) => {
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// TTS assets from the local point-88 cache: adding an entry auto-narrates,
+// and a cold CDN model download stalls the reveal start past the check's
+// timing (observed ~14 s under today's CDN throttling). The cache is owned
+// and marked complete by voice.mjs; here it is only consumed.
+await installTtsCache(page)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
