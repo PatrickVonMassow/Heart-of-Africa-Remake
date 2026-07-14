@@ -37,6 +37,23 @@ export function directionToU(dx: number, dz: number): number {
 }
 
 /**
+ * EMPIRICAL BAND CONVENTION (point 90, pinned 14.07.2026 on the WebGL2
+ * path): the captured band stores content at the NEGATED compass angle —
+ * a landmark at true bearing a appears at the buffer column of -a (slice k
+ * therefore holds compass [N, W, S, E][k]). Verified against the Giza field
+ * (true 259.3°, measured u 0.405 = mirrored 256.5°) and the Nubian Nile
+ * water fractions. Consumers sample the buffer via bufferU (the mirror of
+ * directionToU); the WebGPU path needs its own manual confirmation.
+ */
+export function bufferU(dx: number, dz: number): number {
+  // The mirror of directionToU: negate the east component.
+  return directionToU(-dx, dz)
+}
+
+/** Compass meaning of readback slice k under the mirrored convention. */
+export const SECTOR_COMPASS = ['N', 'W', 'S', 'E'] as const
+
+/**
  * Height of the horizon cylinder that shows the band at radius r: the band
  * spans ±BAND_V_FOV/2 around the horizontal, seen from the cylinder's axis.
  */

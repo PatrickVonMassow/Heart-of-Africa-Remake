@@ -507,12 +507,14 @@ verify suite that proves it.
     backdrop heightfield bounds pure-tested in
     `src/scenes/place/backdrop.test.ts`, the live standing heights via
     the dev hook (`scripts/verify/polish.mjs`); the §2.5 travel-scene panorama holds — entering from the bird's-eye
-    view shows the captured, direction-true surroundings (the riverside
-    Nubian village reads a directional water signal in its band via the
-    dev hook; a direct place-to-place enter falls back to the geometry
-    backdrop; sector/UV math pure-tested in
-    `src/scenes/travel/panoramaMath.test.ts`;
-    `scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
+    view shows the captured, direction-true surroundings: the band stores
+    content at the NEGATED bearing (empirical convention, pinned via the
+    Giza measurement and pure-tested as bufferU/SECTOR_COMPASS in
+    `src/scenes/travel/panoramaMath.test.ts`), the horizon cylinder
+    samples the mirrored column, and a magenta probe injected due west
+    of the capture point proves the rendered horizon compass-true
+    seed-independently; a direct place-to-place enter falls back to the
+    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
     Cairo mounts the Giza pyramids as its western skyline (point 82) and

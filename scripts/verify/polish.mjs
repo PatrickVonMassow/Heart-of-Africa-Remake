@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
+import sharp from 'sharp'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -205,9 +206,16 @@ if (mosque) {
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
   await page.evaluate(() => { const g = window.__game.getState(); g.leavePlace() })
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 15000 })
+  // Compass probe (point 90): a magenta pillar is injected due WEST of the
+  // capture point for exactly this capture — seed-independent orientation
+  // proof (real water shifts with each seed's dune cover).
+  await page.evaluate(() => { window.__panoProbeOffset = { dx: -8, dz: 0 } })
   await page.waitForTimeout(2500) // travel scene mounts, frame loop runs
+  await page.evaluate(() => { delete window.__placePanorama }) // fresh capture signal
   await page.evaluate(() => window.__game.getState().debugJumpTo(21.8, 31.65)) // approach ring
-  await page.waitForTimeout(1500) // the approach capture fires in the frame loop
+  // Wait for the CAPTURE ITSELF (the async readback hook names the place) —
+  // under full-suite load the frame loop may need many seconds for it.
+  await page.waitForFunction(() => window.__placePanorama?.placeId === 'nubian-village', null, { timeout: 45000 }).catch(() => {})
   await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
   await page.waitForFunction(() => window.__game.getState().placeId === 'nubian-village' && !!window.__placePlayer, null, { timeout: 30000 })
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
@@ -225,18 +233,55 @@ if (mosque) {
   const total = f ? f.reduce((a, b) => a + b, 0) : 0
   const max = f ? Math.max(...f) : 0
   const min = f ? Math.min(...f) : 1
-  // Dominance, not dryness: with the low capture camera every sector can
-  // catch a sliver of the winding river — the signal is that one direction
-  // clearly leads (the bank side), not that any sector is bone dry.
+  // Water present with a leading sector; the strict east-west proof lives in
+  // the rendered-pixel check below (the band mirror made per-sector ratios a
+  // weak discriminator with the low camera).
   check(
-    'the Nile shows as a directional water signal in the band',
-    !!f && total > 0.003 && max > total * 0.35 && max > min * 3,
+    'the Nile shows as a water signal in the band',
+    !!f && total > 0.003 && max > total * 0.3 && min >= 0,
     `sectors ${f ? f.map((x) => x.toFixed(4)).join('/') : 'n/a'}`,
   )
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0; p.pitch = 0.02 })
   await page.waitForTimeout(700)
   await page.screenshot({ path: `${OUT}99-travel-panorama.png` })
   console.log('shot 99-travel-panorama.png')
+
+  // Magenta-pillar orientation proof: the probe stood due west of the
+  // capture point, so its colour must show looking WEST and not EAST.
+  const countMagenta = async () => {
+    const buf = await page.screenshot()
+    const crop = await sharp(buf).extract({ left: 100, top: 250, width: 1240, height: 380 }).raw().toBuffer({ resolveWithObject: true })
+    const { data, info } = crop
+    let hit = 0
+    for (let i = 0; i < info.width * info.height; i++) {
+      const r = data[i * info.channels]
+      const g = data[i * info.channels + 1]
+      const b = data[i * info.channels + 2]
+      if (r > 150 && b > 150 && g < 90) hit++
+    }
+    return hit
+  }
+  // Condition-based probing: poll until the pillar shows (west) or the
+  // window ends (east must stay empty) — fixed sleeps starve under load.
+  const magentaPx = async (yaw, pollMs) => {
+    await page.evaluate((y) => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = y; p.pitch = 0.02 }, yaw)
+    const deadline = Date.now() + pollMs
+    let best = 0
+    do {
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 120))))
+      best = Math.max(best, await countMagenta())
+      if (best > 200) break
+    } while (Date.now() < deadline)
+    return best
+  }
+  const westProbe = await magentaPx(Math.PI / 2, 20000)
+  const eastProbe = await magentaPx(-Math.PI / 2, 2500)
+  await page.evaluate(() => { delete window.__panoProbeOffset })
+  check(
+    'the band is compass-true: a probe placed due west shows west, not east',
+    westProbe > 200 && eastProbe < westProbe / 10,
+    `west ${westProbe}px, east ${eastProbe}px`,
+  )
 }
 
 console.log('console errors:', errors.length)

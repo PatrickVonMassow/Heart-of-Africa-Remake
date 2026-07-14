@@ -883,6 +883,21 @@ function PanoramaCaptureTrigger() {
       if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) > ring) continue
       if (hasPanoramaCapture(p.id, s.seed)) return
       const h = Math.max(0, sampleTerrain(p.lat, p.lon, s.seed).height)
+      // DEV probe (point 90 verification): a loud magenta pillar injected at
+      // a known offset for exactly this capture — the place scene then
+      // proves the band's compass orientation seed-independently.
+      let probe: THREE.Mesh | null = null
+      if (import.meta.env.DEV) {
+        const off = (window as unknown as Record<string, { dx: number; dz: number } | undefined>).__panoProbeOffset
+        if (off) {
+          probe = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 8, 2),
+            new THREE.MeshBasicMaterial({ color: '#ff00ff' }),
+          )
+          probe.position.set(w.x + off.dx, h + 4, w.z + off.dz)
+          ;(scene as unknown as THREE.Scene).add(probe)
+        }
+      }
       // Low camera: near landmarks (Giza at Cairo) must rise ABOVE the
       // horizon line to survive onto the horizon cylinder.
       capturePanorama(
@@ -893,6 +908,11 @@ function PanoramaCaptureTrigger() {
         s.seed,
         ['traveller-root', `place-marker-${p.id}`, 'travel-sky', 'travel-climate', 'travel-dressing', 'travel-markers'],
       )
+      if (probe) {
+        ;(scene as unknown as THREE.Scene).remove(probe)
+        probe.geometry.dispose()
+        ;(probe.material as THREE.Material).dispose()
+      }
       return
     }
   })

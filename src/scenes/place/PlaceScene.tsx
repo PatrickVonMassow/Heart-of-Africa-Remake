@@ -1088,7 +1088,10 @@ function TravelPanorama({ placeId }: { placeId: string }) {
     // perspective shots, so WITHIN a sector the pixel column is linear in
     // tan(angle from the sector centre) — mapped exactly, no warping.
     const H = bandHeightAt(PANORAMA_RADIUS)
-    const alpha = atan(positionWorld.x, positionWorld.z.negate())
+    // Point 90: the band stores content at the NEGATED bearing (empirical
+    // convention, panoramaMath) — sample the mirrored column or the whole
+    // horizon reads east-west flipped.
+    const alpha = atan(positionWorld.x.negate(), positionWorld.z.negate())
     const kSector = alpha.div(Math.PI / 2).round()
     const localT = tan(alpha.sub(kSector.mul(Math.PI / 2)))
     const u = kSector.add(localT.add(1).mul(0.5)).mul(0.25).add(1).fract()

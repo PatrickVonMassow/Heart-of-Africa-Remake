@@ -4,6 +4,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   CAPTURE_SECTORS,
+  bufferU,
+  SECTOR_COMPASS,
   SECTOR_H_FOV_DEG,
   BAND_V_FOV_DEG,
   sectorYaw,
@@ -55,5 +57,24 @@ describe('bandHeightAt', () => {
   it('spans the vertical FOV seen from the cylinder axis', () => {
     const r = 200
     expect(bandHeightAt(r)).toBeCloseTo(2 * r * Math.tan(((BAND_V_FOV_DEG / 2) * Math.PI) / 180))
+  })
+})
+
+describe('bufferU (the empirically pinned mirrored band, point 90)', () => {
+  it('stores content at the negated bearing: E and W swap, N and S stay', () => {
+    expect(bufferU(0, -1)).toBeCloseTo(0.125) // north stays in slice 0
+    expect(bufferU(0, 1)).toBeCloseTo(0.625) // south stays in slice 2
+    expect(bufferU(1, 0)).toBeCloseTo(0.875) // EAST content sits in slice 3
+    expect(bufferU(-1, 0)).toBeCloseTo(0.375) // WEST content sits in slice 1
+  })
+
+  it('reproduces the measured Giza column', () => {
+    // True bearing 259.3° (WSW of Cairo at capture time) → measured u ≈ 0.405.
+    const a = (259.3 * Math.PI) / 180
+    expect(bufferU(Math.sin(a), -Math.cos(a))).toBeCloseTo(0.399, 2)
+  })
+
+  it('labels the slices N, W, S, E', () => {
+    expect([...SECTOR_COMPASS]).toEqual(['N', 'W', 'S', 'E'])
   })
 })

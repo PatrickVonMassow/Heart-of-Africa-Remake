@@ -12,7 +12,9 @@ runs: when a point touches a scene core (TravelScene/Wildlife/PlaceScene, the
 renderer/post pipeline, store.ts core), at every ~4th point as a collective
 gate, before every Closing, and whenever a flake retry failed twice. Flake
 policy: if exactly one suite fails on a check from the documented flake list
-(movement 0.00 m, bathe probability, TTS timing), rerun THAT suite standalone
+(movement 0.00 m, bathe probability, TTS timing, calf-sacrifice behaviour
+window, frame-starved screenshot probes, spawn body-spacing settle window),
+rerun THAT suite standalone
 once — green counts as green (noted in the tick); red twice means a real
 investigation. WATCHDOG: if this process ever lets a bug slip through that the
 full-per-point regression would have caught, REPORT it to the user immediately
@@ -33,7 +35,10 @@ on completion its result note ends with a tracking line
 `(track: <start> -> <finish>, <minutes> min, ~<tokens>, <model+settings>)`.
 Times are Berlin local; non-work waits (external blocks) are called out;
 token figures are order-of-magnitude estimates (not measurable in-session),
-always marked ~. Model/settings name the model ID, effort level and thinking switch (source:
+always marked ~ and split into INPUT and OUTPUT tokens (user mandate
+2026-07-14). Split heuristic while no exact counters exist: ~85 % input
+(tool results, file reads, context) / ~15 % output (code, prose) of the
+estimated total — refined per point when its shape clearly deviates. Model/settings name the model ID, effort level and thinking switch (source:
 the user-level ~/.claude/settings.json — model claude-fable-5[1m], effort
 high — plus the visible thinking state) and the session settings (autonomous
 batch in the VS Code extension, permissions defaultMode dontAsk).
@@ -360,7 +365,8 @@ as-is; only the sequence changes.
   (Pointer lock is now requested on entry — the walk-in keypress carries the
   activation the browser needs — with the canvas click kept as fallback and a
   dialog/Escape releasing it. §17.5 updated; needs a manual real-hardware check
-  since headless has no user activation.)
+  since headless has no user activation. Signed off by the user on
+  14.07.2026 via the dashboard checks inventory.)
 - [x] 50. Feeding vultures clip down into the ground. Keep the vulture on the
   surface while it feeds.
   (The landed scavenger group rises to target.y+0.5, the body hop is
@@ -776,7 +782,7 @@ as-is; only the sequence changes.
   (.health-low opacity-blink on the in-bar health bar below max/3;
   threshold on/off pinned in Hud.test.tsx; design.md §17.1 + CLAUDE.md
   pt. 9 updated. Done together with point 72; full regression green.)
-  (track: 13.07. 21:35 -> 21:58 together with 72, ~12 min its share, ~25k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 13.07. 21:35 -> 21:58 together with 72, ~12 min its share, ~21k in / ~4k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 72. The canteen must also BLINK below 1/3 fill (today it glows yellow
   below 20 %, red below 5 % and blinks only when empty — design.md §6.1's
   thresholds change accordingly, both language files if any text names
@@ -786,7 +792,7 @@ as-is; only the sequence changes.
   names the thresholds, so no language change. Threshold on/off and the
   empty case pinned in Hud.test.tsx; design.md §6.1 updated. Full
   regression green.)
-  (track: 13.07. 21:35 -> 21:58 together with 71, ~11 min its share, ~20k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 13.07. 21:35 -> 21:58 together with 71, ~11 min its share, ~17k in / ~3k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 73. Settlement graphics glitches (user screenshot, first-person view):
   (a) flat BLACK artifacts lie on the ground in places — elongated dark
   shapes at player height between the buildings; (b) near the backdrop
@@ -807,7 +813,7 @@ as-is; only the sequence changes.
   measured 0.03 after, near-field detail unchanged (edge energy 2.88).
   Temporal-stability gate added to settings.mjs; design.md §2.5/§2.6 and
   CLAUDE.md pt. 15 updated. Full regression green.)
-  (track: 13.07. 22:40 -> 14.07. 01:56, ~195 min incl. ~45 min external HF-CDN block and two full regressions, ~180k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 13.07. 22:40 -> 14.07. 01:56, ~195 min incl. ~45 min external HF-CDN block and two full regressions, ~153k in / ~27k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 74. Status-bar layout fix (user report): the health bar and its
   affliction badges currently sit LEFT in the status bar, right after the
   stats. They must be RIGHT-ALIGNED at the bar's end — badges (e.g.
@@ -820,7 +826,7 @@ as-is; only the sequence changes.
   enrichments.mjs (bar hugs the right edge, badge left of it, dehydration
   toggled as probe); CLAUDE.md pt. 9 Verifiable extended. Full regression
   green.)
-  (track: 14.07. 01:58 -> 02:24, 26 min, ~35k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 14.07. 01:58 -> 02:24, 26 min, ~30k in / ~5k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 75. The Meroë pyramids must render MUCH larger in the travel view —
   today's build reads too small; scale the landmark geometry up so the
   pyramid field is unmistakable at travel zoom (keep the label/sighting
@@ -830,7 +836,7 @@ as-is; only the sequence changes.
   landmarks.test.ts (height 3-8, footprint 6-14, grounded) with the
   generic <6 bound kept for the other sites. Verified visually at Meroë.
   Full regression green.)
-  (track: 14.07. 02:25 -> 05:55, 210 min incl. two flake-hardening regression reruns (escape poll, run-all crash tail), ~90k tokens)
+  (track: 14.07. 02:25 -> 05:55, 210 min incl. two flake-hardening regression reruns (escape poll, run-all crash tail), ~76k in / ~14k out)
 - [x] 76. Canoe clipping still occurs (user screenshot): a canoe DRAGGED ON
   LAND near a water edge protrudes into the water surface. The drag pose
   must keep the hull on the land side of the bank (or resting visibly ON
@@ -844,7 +850,7 @@ as-is; only the sequence changes.
   canoeDrag.test.ts (bank swing, waterward turn, spit shortening, dry
   no-op); design.md §7 and CLAUDE.md pt. 4 record the rule. Full
   regression green.)
-  (track: 14.07. 05:56 -> 06:19, 23 min, ~45k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 14.07. 05:56 -> 06:19, 23 min, ~38k in / ~7k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 77. "A Discovery" is a poor journal-entry heading (user feedback).
   Rework the generic discovery/sighting entry titles into evocative,
   entry-specific headings in BOTH languages (e.g. naming the landmark or
@@ -859,7 +865,7 @@ as-is; only the sequence changes.
   the treasure headings, parity pin 56→58. "A Grim Discovery"
   (findRemains) kept — it is specific to its event. design.md §10 and
   CLAUDE.md pt. 25 record the heading rule. Full regression green.)
-  (track: 14.07. 06:20 -> 06:44, 24 min, ~50k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 14.07. 06:20 -> 06:44, 24 min, ~43k in / ~7k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
   boundary lines render in the middle of the water where two channels
   join — the shore/edge treatment (foam/outline) must appear only at real
@@ -877,7 +883,7 @@ as-is; only the sequence changes.
   Scene-switch timing unchanged (23 s baseline == 23 s after, the cost is
   the chunk build). design.md §11.3 and CLAUDE.md pt. 21 record the
   rule. Full regression green.)
-  (track: 14.07. 06:45 -> 07:19, 34 min, ~85k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 14.07. 06:45 -> 07:19, 34 min, ~72k in / ~13k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 79. In-settlement map: opening the map INSIDE a settlement must show a
   plan of the current place — the walkable area with the functional
   (enterable) buildings marked and named — instead of (or in front of) the
@@ -892,7 +898,7 @@ as-is; only the sequence changes.
   pinned in MapOverlay.test.tsx (port roster, village chief/market,
   atlas return on leaving); live check + screenshot 98 in polish.mjs.
   design.md §6.1/§7 and CLAUDE.md pt. 3 updated. Full regression green.)
-  (track: 14.07. 07:20 -> 07:50, 30 min, ~80k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 14.07. 07:20 -> 07:50, 30 min, ~68k in / ~12k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
   while feeding at a carcass — feet/body must stay on the surface for the
   whole feed; (b) after the predator has left a kill they wait too long
@@ -910,7 +916,7 @@ as-is; only the sequence changes.
   (lx/lz). enrichments gates the descend timing (mode 'leave' at descend)
   and the landed clearance via the new dev hook; design.md §19.6 and
   CLAUDE.md pt. 12 updated. Full regression green.)
-  (track: 14.07. 07:51 -> 08:36, 45 min, ~75k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
+  (track: 14.07. 07:51 -> 08:36, 45 min, ~64k in / ~11k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 81. Recognizable settlement surroundings (user report): the current
   panorama never reads as the actual map neighbourhood — mountains, rivers,
   lakes and the local fauna around the settlement are unrecognizable (the
@@ -941,7 +947,7 @@ as-is; only the sequence changes.
   user's manual check on real hardware on 14.07.2026 ("Es sieht alles
   gut aus") — the band convention holds on both backends. design.md §2.5
   and CLAUDE.md pt. 15 updated.
-  (track: 14.07. 08:37 -> 09:37, 60 min, ~230k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
+  (track: 14.07. 08:37 -> 09:37, 60 min, ~196k in / ~34k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 - [x] 82. After point 81: add the GIZA PYRAMIDS as a built cultural landmark
   in the travel view (real ~1890 position just west of Cairo — Khufu,
   Khafre, Menkaure with the Sphinx readable at a glance; the design.md §4.4
@@ -965,7 +971,7 @@ as-is; only the sequence changes.
   rendered band: moved to the west-bank desert (lon 30.65, ~0.52° off
   the axis) with a footprint-rim river-clearance probe in world.test.ts
   (riverDistance saturates at 0.45, so the rim is probed directly).
-  (track: 14.07. 09:39 -> 11:12, 93 min incl. two verify hardenings, ~260k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
+  (track: 14.07. 09:39 -> 11:12, 93 min incl. two verify hardenings, ~221k in / ~39k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 - [x] 83. Animals must be unable to walk into the open ocean, exactly like
   the player (user report): predators currently do it when they WALK AWAY
   after feeding — the scripted leave path apparently bypasses the §19.5
@@ -987,7 +993,7 @@ as-is; only the sequence changes.
   runtime-located west coast: 92 samples, zero ocean cells, ~30 units
   of shoreline covered. design.md §19.5 and CLAUDE.md pt. 12 record it.
   (track: 14.07. 11:14 -> 12:50, 96 min incl. three live-trace fix
-  rounds, ~140k tokens, model claude-fable-5[1m], effort high, thinking
+  rounds, ~119k in / ~21k out, model claude-fable-5[1m], effort high, thinking
   on, autonomous batch, dontAsk))
 - [ ] 84. Full phone/tablet support, with ZERO change to PC play: a touch
   layer as a third input source in the existing merged input path (like the
@@ -1081,7 +1087,7 @@ as-is; only the sequence changes.
   suite green in strict mode (7 hits, 0 misses); a stale-header fulfill
   bug (content-encoding on decoded bodies) fixed en route. CLAUDE.md
   pt. 19 and scripts/verify/README.md record the cache.
-  (track: 14.07. 12:52 -> 13:35, 43 min, ~70k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
+  (track: 14.07. 12:52 -> 13:35, 43 min, ~60k in / ~10k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [ ] 89. Map presentation (user request): the opened map — continental
   atlas AND in-place town plan — must sit BOTTOM-LEFT instead of centred,
@@ -1091,7 +1097,7 @@ as-is; only the sequence changes.
   recognizable on the map in both modes. Cover the placement geometry and
   the position marker on the right layer(s).
 
-- [ ] 90. Panorama-capture band anomaly (diagnosis material in the point-82
+- [x] 90. Panorama-capture band anomaly (diagnosis material in the point-82
   work): a tall landmark standing ~4 world units from the capture point
   (Giza at Cairo, on higher plateau terrain) appears OVERSIZED and at an
   unexpected texture u (measured sector 1 instead of the computed western
@@ -1103,6 +1109,27 @@ as-is; only the sequence changes.
   landmarks render direction-true and correctly scaled in the band; then
   re-evaluate whether the Cairo skyline can come from the capture alone.
   Extend panoramaMath tests with the empirically confirmed conventions.
+  (Nailed: the band stores content at the NEGATED compass bearing — the
+  Giza column (measured u 0.405) matches the mirrored true bearing
+  (256.5° vs 259.3°), and the Nubian water fractions read correctly
+  under slice labels [N, W, S, E]. The horizon cylinder now samples the
+  mirrored column (alpha negated in the shader); bufferU/SECTOR_COMPASS
+  pin the convention with 9 pure tests; the capture hook exposes named
+  compass fractions. Seed-independent live proof: a magenta pillar
+  injected due WEST of the capture point (DEV probe in the trigger)
+  renders 48.7k px looking west, 0 px looking east (a water-based W/E
+  test flipped with each seed's dune cover and was replaced). Giza's
+  "oversize" was legitimate perspective (4 wu distance + plateau); the
+  explicit Cairo skyline stays (deterministic, user-approved), though a
+  capture-only skyline is now viable. WebGPU needs the user's manual
+  E/W re-check (dashboard card). CLAUDE.md pt. 15 updated. The compass
+  live-check was hardened condition-based after full-load flakes (wait
+  for the capture readback itself, poll the west view until the pillar
+  shows) — final FULL regression all green (17 suites), two flake
+  retries en route (settings forward-walk 0.00 m, enrichments body
+  spacing 0.401 — both green standalone, body-spacing added to the
+  documented flake list).
+  (track: 14.07. 13:36 -> 15:05, 89 min, ~145k in / ~25k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [ ] 91. Model the SPHINX distinctly more elaborately (user request): the
   current three-box stand-in must become a clearly recognizable sphinx —
@@ -1111,6 +1138,29 @@ as-is; only the sequence changes.
   and scaled up in Cairo's skyline. Extend the Giza geometry pin
   (landmarks.test.ts) for the added parts; screenshot evidence in both
   views.
+
+- [ ] 92. Floating animals inside settlements (user screenshot, Cairo): the
+  drifting panorama silhouettes sometimes stand in MID-AIR — feet clearly
+  above the visible horizon line. Likely cause: since point 81 the visible
+  horizon is the captured travel band (cylinder), but the silhouettes still
+  stand on the geometry backdrop's formula height (panoramaGroundY /
+  backdropHeightAt) — where band content and backdrop relief disagree, the
+  animals hover. Rework their standing height to match the VISIBLE ground
+  (sample the band's terrain silhouette or hide silhouettes where the
+  capture is active in that direction), keep the point-73 no-sinking rule,
+  and extend the polish live-check (no silhouette hovering above the
+  visible horizon).
+
+- [ ] 93. The map is no longer an inventory ITEM but always available (user
+  request): remove it from the equipment/shop roster (existing saves keep
+  working; owned maps migrate away gracefully) and add a MAP BUTTON at the
+  bottom right, LEFT of the journal button, opening the same overview
+  (continental atlas / town plan). The CAMP button shows only where camping
+  is actually possible: in the open travel world and inside villages whose
+  region holds "Honored Friend" status — hidden everywhere else (ports,
+  non-friend villages). Localized labels stay; update design.md (§6.1/§7
+  map item, §6.3/§17.4 camp button) and the affected Vitest/HUD tests plus
+  the button geometry checks.
 
 ## Closing (only after all points)
 

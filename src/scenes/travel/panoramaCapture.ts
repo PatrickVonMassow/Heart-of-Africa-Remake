@@ -150,7 +150,12 @@ export function capturePanorama(
         if (current && current.placeId === placeId) {
           current.waterFractions = fractions
           const w = window as unknown as Record<string, unknown>
-          w.__placePanorama = { placeId, waterFractions: fractions }
+          // Slice k holds compass [N, W, S, E][k] (panoramaMath, point 90).
+          w.__placePanorama = {
+            placeId,
+            waterFractions: fractions,
+            compass: { n: fractions[0], w: fractions[1], s: fractions[2], e: fractions[3] },
+          }
         }
       } catch {
         // Readback is a verification aid only; the capture itself stands.
