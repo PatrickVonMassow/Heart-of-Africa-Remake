@@ -29,6 +29,24 @@ await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
 })
 
+// --- Giza skyline behind Cairo (design.md §4.4, point 82) ----------------------
+// The game starts inside Cairo: the great pyramids stand as the western
+// skyline silhouette (point-69 pattern, like Cape Town's Table Mountain).
+{
+  const sky = await page.evaluate(() => window.__placeSkyline ?? 'none')
+  check('Cairo mounts the Giza pyramid skyline', sky === 'giza-pyramids', `${sky}`)
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = -(window.__placeLayout.radius - 8)
+    p.z = 0
+    p.yaw = Math.PI / 2
+    p.pitch = 0.02
+  })
+  await page.waitForTimeout(700)
+  await page.screenshot({ path: `${OUT}100-cairo-giza-skyline.png` })
+  console.log('shot 100-cairo-giza-skyline.png')
+}
+
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
 await page.evaluate(() => {
   const g = window.__game.getState()
@@ -207,9 +225,12 @@ if (mosque) {
   const total = f ? f.reduce((a, b) => a + b, 0) : 0
   const max = f ? Math.max(...f) : 0
   const min = f ? Math.min(...f) : 1
+  // Dominance, not dryness: with the low capture camera every sector can
+  // catch a sliver of the winding river — the signal is that one direction
+  // clearly leads (the bank side), not that any sector is bone dry.
   check(
     'the Nile shows as a directional water signal in the band',
-    !!f && total > 0.003 && max > total * 0.4 && min < max * 0.15,
+    !!f && total > 0.003 && max > total * 0.35 && max > min * 3,
     `sectors ${f ? f.map((x) => x.toFixed(4)).join('/') : 'n/a'}`,
   )
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0; p.pitch = 0.02 })

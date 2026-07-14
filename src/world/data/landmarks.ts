@@ -69,6 +69,7 @@ export interface CulturalLandmarkDef {
   /** Drives geometry and the discovery-journal flavor. */
   kind:
     | 'pyramids'
+    | 'giza-pyramids'
     | 'stone-city'
     | 'rock-churches'
     | 'coastal-ruins'
@@ -79,6 +80,12 @@ export interface CulturalLandmarkDef {
 
 export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = [
   { id: 'meroe', lon: 33.75, lat: 16.94, kind: 'pyramids' },
+  // Just west of Cairo across the Nile — via the travel-scene panorama the
+  // field also stands on the port's first-person horizon (point 82).
+  // West of the Nile's rendered band (axis ~31.22 at this latitude, half
+  // width 0.17°): the whole FIELD FOOTPRINT (±~0.29° incl. the Sphinx) must
+  // stand on the west-bank desert, not in the channel (user report).
+  { id: 'giza', lon: 30.65, lat: 29.98, kind: 'giza-pyramids' },
   { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
   { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },
   { id: 'kilwa', lon: 39.51, lat: -8.96, kind: 'coastal-ruins' },

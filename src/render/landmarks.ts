@@ -64,6 +64,36 @@ export function buildMeroePyramids(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** Giza: the three great pyramids in their real southwest-diagonal row —
+ *  Khufu, Khafre, Menkaure, flatter-sided than the steep Nubian tombs
+ *  (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with the Sphinx
+ *  crouching east of Khafre, readable at a glance (design.md §4.4). */
+export function buildGizaPyramids(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  // [x, z, base half-extent]: the diagonal row, Khufu largest in the NE.
+  // Kept compact: the field stands only ~4 world units west of Cairo (the
+  // real 13 km), so the symbol must not swallow the port marker or the Nile.
+  const row: Array<[number, number, number]> = [
+    [1.3, -1.3, 1.6], // Khufu
+    [0, 0, 1.5], // Khafre
+    [-1.2, 1.2, 0.8], // Menkaure
+  ]
+  row.forEach(([x, z, b], i) => {
+    parts.push(pyramid(x, z, b, b * 0.64 * 2, 8200 + i))
+  })
+  // Sphinx east of Khafre: a crouching body, chest riser and head block.
+  const body = new THREE.BoxGeometry(1.0, 0.28, 0.35)
+  body.translate(2.1, 0.14, 0.3)
+  parts.push(tint(body, '#c29c66', 0.08, 8210))
+  const chest = new THREE.BoxGeometry(0.33, 0.25, 0.33)
+  chest.translate(2.47, 0.38, 0.3)
+  parts.push(tint(chest, '#c29c66', 0.08, 8211))
+  const head = new THREE.BoxGeometry(0.21, 0.23, 0.21)
+  head.translate(2.47, 0.6, 0.3)
+  parts.push(tint(head, '#b8905c', 0.08, 8212))
+  return merge(parts)
+}
+
 /** Great Zimbabwe: a curved mortarless dry-stone wall (segmented boxes) and a
  *  solid conical tower, weathered granite-grey. */
 export function buildStoneCity(): THREE.BufferGeometry {

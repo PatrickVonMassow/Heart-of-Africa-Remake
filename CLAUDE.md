@@ -511,9 +511,10 @@ verify suite that proves it.
     `src/scenes/travel/panoramaMath.test.ts`;
     `scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
-    its flat wide profile pure-tested in `src/render/landmarks.test.ts`)
-    and Timbuktu builds the Djinguereber mosque as a collidable dwelling
-    (`scripts/verify/polish.mjs`, screenshots 96/97).
+    its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
+    Cairo mounts the Giza pyramids as its western skyline (point 82) and
+    Timbuktu builds the Djinguereber mosque as a collidable dwelling
+    (`scripts/verify/polish.mjs`, screenshots 96/97/100).
 16. **Collision inside settlements.** The collision rules of `design.md`
     §2.6 are implemented (impenetrable buildings and solid objects,
     sliding movement, inhabitants never permanently stuck, reachable
@@ -718,9 +719,9 @@ verify suite that proves it.
     discovery bounties credited on the next port visit as a telegraphic
     transfer whose journal entry names the discoveries and the amount, and
     kind-flavored first-sighting entries for landmarks (§10, once per
-    landmark, both languages, voice markup) — including the seven built
-    cultural landmarks of §4.4 (Meroë, Great Zimbabwe, Lalibela, Kilwa,
-    Aksum, Gondar, Bandiagara), framed as African achievements, and the
+    landmark, both languages, voice markup) — including the eight built
+    cultural landmarks of §4.4 (Meroë, Giza, Great Zimbabwe, Lalibela,
+    Kilwa, Aksum, Gondar, Bandiagara), framed as African achievements, and the
     four natural point-landmarks (Ngorongoro, Ol Doinyo Lengai, Okavango,
     Sudd); the valuable-presentation
     reactions of the §8 matrix; and the baseline goods in every settlement

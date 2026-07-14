@@ -9,7 +9,7 @@ import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND 
 import { lakeContains } from './hydro'
 import { LAKES } from './data/lakes'
 import { LAND_POLYGONS } from './data/coastline'
-import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD } from './data/landmarks'
+import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS } from './data/landmarks'
 import { setupGeodata } from '../test/geodata'
 
 const SEED = 42
@@ -44,6 +44,37 @@ describe('settlements sit on walkable land', () => {
     const t = sampleTerrain(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon, SEED)
     expect(t.type).not.toBe('ocean')
     expect(t.type).not.toBe('water')
+  })
+})
+
+describe('built cultural landmarks stand clear of river channels (design.md §4.4)', () => {
+  // Giza initially landed inside the Nile's rendered band (user report):
+  // every built landmark must stand outside the water ribbon so no
+  // structure rises out of a channel. RIVER_WIDTH_DEG is the band half
+  // width; a small margin keeps the footprint's edge dry too.
+  it.each(CULTURAL_LANDMARKS.map((c) => [c.id, c] as const))('%s stands outside the water band', (_id, c) => {
+    expect(riverDistance(c.lat, c.lon)).toBeGreaterThanOrEqual(RIVER_WIDTH_DEG + 0.05 - 1e-9)
+  })
+
+  it('Giza stands on west-bank land near Cairo, not in the Nile', () => {
+    const giza = CULTURAL_LANDMARKS.find((c) => c.id === 'giza')
+    expect(giza).toBeDefined()
+    if (!giza) return
+    const t2 = sampleTerrain(giza.lat, giza.lon, SEED)
+    expect(t2.type).not.toBe('ocean')
+    expect(t2.type).not.toBe('water')
+    // The field GEOMETRY spans ±~0.29° around the anchor (Sphinx east end),
+    // and the seeded yaw can rotate it any way — every point of the
+    // footprint's rim must clear the water band, not only the centre
+    // (riverDistance saturates at ~0.45, so the rim is probed directly).
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2
+      const rim = riverDistance(giza.lat + Math.sin(a) * 0.32, giza.lon + Math.cos(a) * 0.32)
+      expect(rim, `rim direction ${k}`).toBeGreaterThanOrEqual(RIVER_WIDTH_DEG + 0.03 - 1e-9)
+    }
+    const cairo = placeById('cairo')
+    expect(giza.lon).toBeLessThan(cairo.lon) // west of the city
+    expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(0.85) // still AT Cairo
   })
 })
 

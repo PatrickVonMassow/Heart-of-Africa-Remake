@@ -194,14 +194,14 @@ const kiliRevealed = await page.evaluate(() =>
 check('a sighted landmark reveals its real name', kiliRevealed, '')
 
 // --- Cultural landmarks (§7.1.3, design.md §4.4) -----------------------------
-// The seven built cultural landmarks (Meroë, Great Zimbabwe, Lalibela, Kilwa,
-// Aksum, Gondar, Bandiagara) mount into the travel scene (dev hook) and their
-// labels reveal on sighting.
+// The eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela,
+// Kilwa, Aksum, Gondar, Bandiagara) mount into the travel scene (dev hook)
+// and their labels reveal on sighting.
 const cultural = await page.evaluate(() => window.__culturalLandmarks)
 check(
-  'seven cultural landmarks are placed in the travel world',
-  cultural?.count === 7 &&
-    ['meroe', 'great-zimbabwe', 'lalibela', 'kilwa', 'aksum', 'gondar', 'bandiagara'].every((id) =>
+  'eight cultural landmarks are placed in the travel world',
+  cultural?.count === 8 &&
+    ['meroe', 'giza', 'great-zimbabwe', 'lalibela', 'kilwa', 'aksum', 'gondar', 'bandiagara'].every((id) =>
       cultural.ids.includes(id),
     ),
   JSON.stringify(cultural),
@@ -2715,7 +2715,15 @@ await page.waitForTimeout(500)
 await page.waitForFunction(() => !!document.querySelector('.map-label'), null, { timeout: 15000 }).catch(() => {})
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
+// The arrival/checkpoint entries can auto-open the journal a beat later and
+// its panel covers the right-side labels (and outranks the dialog backdrop),
+// which false-failed both probes under full-suite timing — close it right
+// before measuring and wait until the panel is gone.
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+await page.waitForFunction(() => !document.querySelector('.journal'), null, { timeout: 5000 }).catch(() => {})
 const zorder = await page.evaluate(async () => {
+  window.__game.getState().setJournalOpen(false)
+  await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)))
   const label = [...document.querySelectorAll('.map-label')].find((l) => {
     const r = l.getBoundingClientRect()
     return r.width > 0 && r.height > 0 && r.top > 80 && r.left > 0 && r.bottom < window.innerHeight - 80

@@ -13,9 +13,13 @@ reference the TASKS point number.
 
 Tracking (user mandate 2026-07-14): a point being worked on is marked `[*]`;
 on completion its result note ends with a tracking line
-`(track: <start> -> <finish>, <minutes> min, ~<tokens>)`. Times are Berlin
-local; non-work waits (external blocks) are called out; token figures are
-order-of-magnitude estimates (not measurable in-session), always marked ~.
+`(track: <start> -> <finish>, <minutes> min, ~<tokens>, <model+settings>)`.
+Times are Berlin local; non-work waits (external blocks) are called out;
+token figures are order-of-magnitude estimates (not measurable in-session),
+always marked ~. Model/settings name the model ID, effort level and thinking switch (source:
+the user-level ~/.claude/settings.json — model claude-fable-5[1m], effort
+high — plus the visible thinking state) and the session settings (autonomous
+batch in the VS Code extension, permissions defaultMode dontAsk).
 
 ## Regression command
 
@@ -743,7 +747,7 @@ the map).
   (.health-low opacity-blink on the in-bar health bar below max/3;
   threshold on/off pinned in Hud.test.tsx; design.md §17.1 + CLAUDE.md
   pt. 9 updated. Done together with point 72; full regression green.)
-  (track: 13.07. 21:35 -> 21:58 together with 72, ~12 min its share, ~25k tokens)
+  (track: 13.07. 21:35 -> 21:58 together with 72, ~12 min its share, ~25k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 72. The canteen must also BLINK below 1/3 fill (today it glows yellow
   below 20 %, red below 5 % and blinks only when empty — design.md §6.1's
   thresholds change accordingly, both language files if any text names
@@ -753,7 +757,7 @@ the map).
   names the thresholds, so no language change. Threshold on/off and the
   empty case pinned in Hud.test.tsx; design.md §6.1 updated. Full
   regression green.)
-  (track: 13.07. 21:35 -> 21:58 together with 71, ~11 min its share, ~20k tokens)
+  (track: 13.07. 21:35 -> 21:58 together with 71, ~11 min its share, ~20k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 73. Settlement graphics glitches (user screenshot, first-person view):
   (a) flat BLACK artifacts lie on the ground in places — elongated dark
   shapes at player height between the buildings; (b) near the backdrop
@@ -774,7 +778,7 @@ the map).
   measured 0.03 after, near-field detail unchanged (edge energy 2.88).
   Temporal-stability gate added to settings.mjs; design.md §2.5/§2.6 and
   CLAUDE.md pt. 15 updated. Full regression green.)
-  (track: 13.07. 22:40 -> 14.07. 01:56, ~195 min incl. ~45 min external HF-CDN block and two full regressions, ~180k tokens)
+  (track: 13.07. 22:40 -> 14.07. 01:56, ~195 min incl. ~45 min external HF-CDN block and two full regressions, ~180k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 74. Status-bar layout fix (user report): the health bar and its
   affliction badges currently sit LEFT in the status bar, right after the
   stats. They must be RIGHT-ALIGNED at the bar's end — badges (e.g.
@@ -787,7 +791,7 @@ the map).
   enrichments.mjs (bar hugs the right edge, badge left of it, dehydration
   toggled as probe); CLAUDE.md pt. 9 Verifiable extended. Full regression
   green.)
-  (track: 14.07. 01:58 -> 02:24, 26 min, ~35k tokens)
+  (track: 14.07. 01:58 -> 02:24, 26 min, ~35k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 75. The Meroë pyramids must render MUCH larger in the travel view —
   today's build reads too small; scale the landmark geometry up so the
   pyramid field is unmistakable at travel zoom (keep the label/sighting
@@ -811,7 +815,7 @@ the map).
   canoeDrag.test.ts (bank swing, waterward turn, spit shortening, dry
   no-op); design.md §7 and CLAUDE.md pt. 4 record the rule. Full
   regression green.)
-  (track: 14.07. 05:56 -> 06:19, 23 min, ~45k tokens)
+  (track: 14.07. 05:56 -> 06:19, 23 min, ~45k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 77. "A Discovery" is a poor journal-entry heading (user feedback).
   Rework the generic discovery/sighting entry titles into evocative,
   entry-specific headings in BOTH languages (e.g. naming the landmark or
@@ -826,7 +830,7 @@ the map).
   the treasure headings, parity pin 56→58. "A Grim Discovery"
   (findRemains) kept — it is specific to its event. design.md §10 and
   CLAUDE.md pt. 25 record the heading rule. Full regression green.)
-  (track: 14.07. 06:20 -> 06:44, 24 min, ~50k tokens)
+  (track: 14.07. 06:20 -> 06:44, 24 min, ~50k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
   boundary lines render in the middle of the water where two channels
   join — the shore/edge treatment (foam/outline) must appear only at real
@@ -844,7 +848,7 @@ the map).
   Scene-switch timing unchanged (23 s baseline == 23 s after, the cost is
   the chunk build). design.md §11.3 and CLAUDE.md pt. 21 record the
   rule. Full regression green.)
-  (track: 14.07. 06:45 -> 07:19, 34 min, ~85k tokens)
+  (track: 14.07. 06:45 -> 07:19, 34 min, ~85k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 79. In-settlement map: opening the map INSIDE a settlement must show a
   plan of the current place — the walkable area with the functional
   (enterable) buildings marked and named — instead of (or in front of) the
@@ -859,7 +863,7 @@ the map).
   pinned in MapOverlay.test.tsx (port roster, village chief/market,
   atlas return on leaving); live check + screenshot 98 in polish.mjs.
   design.md §6.1/§7 and CLAUDE.md pt. 3 updated. Full regression green.)
-  (track: 14.07. 07:20 -> 07:50, 30 min, ~80k tokens)
+  (track: 14.07. 07:20 -> 07:50, 30 min, ~80k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
   while feeding at a carcass — feet/body must stay on the surface for the
   whole feed; (b) after the predator has left a kill they wait too long
@@ -877,7 +881,7 @@ the map).
   (lx/lz). enrichments gates the descend timing (mode 'leave' at descend)
   and the landed clearance via the new dev hook; design.md §19.6 and
   CLAUDE.md pt. 12 updated. Full regression green.)
-  (track: 14.07. 07:51 -> 08:36, 45 min, ~75k tokens)
+  (track: 14.07. 07:51 -> 08:36, 45 min, ~75k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk)
 - [x] 81. Recognizable settlement surroundings (user report): the current
   panorama never reads as the actual map neighbourhood — mountains, rivers,
   lakes and the local fauna around the settlement are unrecognizable (the
@@ -907,8 +911,8 @@ the map).
   verified headless; the WebGPU path (v-flip convention!) needs the
   user's manual check per the point-32 rollout lesson. design.md §2.5
   and CLAUDE.md pt. 15 updated.
-  (track: 14.07. 08:37 -> 09:37, 60 min, ~230k tokens))
-- [ ] 82. After point 81: add the GIZA PYRAMIDS as a built cultural landmark
+  (track: 14.07. 08:37 -> 09:37, 60 min, ~230k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
+- [x] 82. After point 81: add the GIZA PYRAMIDS as a built cultural landmark
   in the travel view (real ~1890 position just west of Cairo — Khufu,
   Khafre, Menkaure with the Sphinx readable at a glance; the design.md §4.4
   cultural-landmark roster, localized names and a kind-flavored discovery
@@ -916,6 +920,22 @@ the map).
   achievements). Via the point-81 panorama capture it then appears in
   Cairo's first-person skyline automatically — verify that (screenshot +
   the landmark checks extended to 8 cultural landmarks).
+  (Giza added as the eighth cultural landmark with its own kind:
+  compact travel-scale field (Khufu/Khafre/Menkaure diagonal + Sphinx,
+  Old-Kingdom 52° slopes) at 29.98/31.08 west of the Nile, localized
+  name/flavor/heading in both languages, geometry pin in
+  landmarks.test.ts, roster checks moved to 8. The "automatic skyline
+  via panorama" DEVIATED: at ~4 world units the capture geometry
+  produced an oversized/misplaced silhouette (see point 90), so Cairo
+  gets an explicit Giza western skyline via the proven point-69 pattern
+  (GizaSkyline, __placeSkyline hook, polish check + screenshot 100) —
+  deterministic and testable; the travel landmark itself still appears
+  in captures from other viewpoints. design.md §4.4 and CLAUDE.md
+  pt. 15/25 updated. User caught the field standing IN the Nile's
+  rendered band: moved to the west-bank desert (lon 30.65, ~0.52° off
+  the axis) with a footprint-rim river-clearance probe in world.test.ts
+  (riverDistance saturates at 0.45, so the rim is probed directly).
+  (track: 14.07. 09:39 -> 10:45, 66 min, ~230k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 - [ ] 83. Animals must be unable to walk into the open ocean, exactly like
   the player (user report): predators currently do it when they WALK AWAY
   after feeding — the scripted leave path apparently bypasses the §19.5
@@ -1015,6 +1035,27 @@ the map).
   no button is covered. And the CURRENT PLAYER POSITION must be clearly
   recognizable on the map in both modes. Cover the placement geometry and
   the position marker on the right layer(s).
+
+- [ ] 90. Panorama-capture band anomaly (diagnosis material in the point-82
+  work): a tall landmark standing ~4 world units from the capture point
+  (Giza at Cairo, on higher plateau terrain) appears OVERSIZED and at an
+  unexpected texture u (measured sector 1 instead of the computed western
+  sector 3; scratch band dump band82.png). Diagnose systematically —
+  capture a known object placed in each cardinal direction, verify the
+  sector sweep/readback orientation empirically on BOTH backends, check
+  the elevation term for capture points below/above surrounding terrain —
+  and fix the mapping (or capture height rule) so nearby elevated
+  landmarks render direction-true and correctly scaled in the band; then
+  re-evaluate whether the Cairo skyline can come from the capture alone.
+  Extend panoramaMath tests with the empirically confirmed conventions.
+
+- [ ] 91. Model the SPHINX distinctly more elaborately (user request): the
+  current three-box stand-in must become a clearly recognizable sphinx —
+  lion body with fore paws stretched forward, haunches, the royal
+  headdress (nemes) silhouette, readable both in the travel-scale field
+  and scaled up in Cairo's skyline. Extend the Giza geometry pin
+  (landmarks.test.ts) for the added parts; screenshot evidence in both
+  views.
 
 ## Closing (only after all points)
 

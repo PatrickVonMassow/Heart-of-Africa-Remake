@@ -43,7 +43,7 @@ import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, detailFade, proceduralBump } from '../../render/materials'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
-import { buildTableMountain } from '../../render/landmarks'
+import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
 import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
@@ -1020,6 +1020,31 @@ function PanoramaWildlife({
  * town, in front of the generic DEM backdrop. Height and distance keep its
  * elevation angle well under the §2.5 looming bound (~11° from the centre).
  */
+/**
+ * Giza behind Cairo (design.md §4.4, point 82): the great pyramids stand as
+ * a fixed western-horizon silhouette — the real field lies ~13 km west of
+ * the city across the Nile. Same pattern as Cape Town's Table Mountain.
+ */
+function GizaSkyline({ placeId }: { placeId: string }) {
+  const show = placeId === 'cairo'
+  const geometry = useMemo(() => (show ? buildGizaPyramids() : null), [show])
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+  useEffect(() => () => geometry?.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
+  useEffect(() => {
+    if (!import.meta.env.DEV || !show) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeSkyline = 'giza-pyramids'
+    return () => {
+      delete w.__placeSkyline
+    }
+  }, [show])
+  if (!geometry) return null
+  // West of the town, scaled to a distant-monument silhouette under the
+  // §2.5 looming bound (peak ~26 at 130 out ≈ 11°).
+  return <mesh geometry={geometry} material={material} position={[-130, -1.2, 10]} rotation={[0, 0.35, 0]} scale={[13, 13, 13]} />
+}
+
 function TableMountainSkyline({ placeId }: { placeId: string }) {
   const show = placeId === 'capetown'
   const geometry = useMemo(() => (show ? buildTableMountain() : null), [show])
@@ -1472,6 +1497,7 @@ export function PlaceScene() {
       <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
+      <GizaSkyline placeId={place.id} />
       <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} />
 
       {/* Ground disc with procedural mottling */}

@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildMeroePyramids,
+  buildGizaPyramids,
   buildStoneCity,
   buildRockChurches,
   buildCoastalRuins,
@@ -20,6 +21,7 @@ import {
 
 const BUILDERS = {
   buildMeroePyramids,
+  buildGizaPyramids,
   buildStoneCity,
   buildRockChurches,
   buildCoastalRuins,
@@ -45,6 +47,7 @@ describe('landmark builders', () => {
     for (const [name, build] of Object.entries(BUILDERS)) {
       if (name === 'buildTableMountain') continue // skyline scale by design
       if (name === 'buildMeroePyramids') continue // deliberately oversized (own pin below)
+      if (name === 'buildGizaPyramids') continue // deliberately oversized (own pin below)
       const geo = build()
       geo.computeBoundingBox()
       const b = geo.boundingBox
@@ -54,6 +57,23 @@ describe('landmark builders', () => {
       expect(Math.max(b.max.x - b.min.x, b.max.z - b.min.z), name).toBeLessThan(6)
       geo.dispose()
     }
+  })
+
+  it('Giza: three flat-sided great pyramids with the Sphinx, Khufu tallest', () => {
+    const geo = buildGizaPyramids()
+    geo.computeBoundingBox()
+    const b = geo.boundingBox
+    expect(b).toBeTruthy()
+    if (!b) return
+    expect(b.min.y).toBeGreaterThanOrEqual(-0.1) // grounded
+    // Khufu (base half-extent 1.6, Old-Kingdom slope) peaks at ~2 — a compact
+    // symbol: the field stands only ~4 world units from Cairo's marker.
+    expect(b.max.y).toBeGreaterThan(1.7)
+    expect(b.max.y).toBeLessThan(3)
+    const footprint = Math.max(b.max.x - b.min.x, b.max.z - b.min.z)
+    expect(footprint).toBeGreaterThan(3.5)
+    expect(footprint).toBeLessThan(8)
+    geo.dispose()
   })
 
   it('the Meroë pyramid field is unmistakable at travel zoom (user request)', () => {

@@ -118,6 +118,7 @@ export interface LandmarkPoint extends LatLon {
     | 'lake'
     | 'grave'
     | 'pyramids'
+    | 'giza-pyramids'
     | 'stone-city'
     | 'rock-churches'
     | 'coastal-ruins'

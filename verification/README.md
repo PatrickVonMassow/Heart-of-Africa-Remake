@@ -60,3 +60,4 @@ point(s).
   design.md (balance.ts maps gifts onto the §8 culture/value materials).
 - `98-place-plan.png` — the map inside a settlement: the town plan with named functional buildings (pt. 3, point 79).
 - `99-travel-panorama.png` — the first-person horizon after entering from the travel scene: the captured real surroundings (pt. 15, point 81).
+- `100-cairo-giza-skyline.png` — the Giza pyramids as Cairo's western first-person skyline (pt. 15/25, point 82).

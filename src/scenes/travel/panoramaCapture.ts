@@ -71,9 +71,10 @@ export function capturePanorama(
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
   })
-  // Near plane 8: travel-world units are kilometres — anything closer than
-  // that belongs to the settlement's own scene, not its horizon.
-  const cam = new THREE.PerspectiveCamera(BAND_V_FOV_DEG, Math.tan((SECTOR_H_FOV_DEG / 2) * (Math.PI / 180)) / Math.tan((BAND_V_FOV_DEG / 2) * (Math.PI / 180)), 8, 900)
+  // Near plane 3: close terrain belongs to the settlement's own scene, but
+  // nearby landmarks must stay in (Giza stands ~4 units west of Cairo); the
+  // oversized symbolic dressing is hidden anyway.
+  const cam = new THREE.PerspectiveCamera(BAND_V_FOV_DEG, Math.tan((SECTOR_H_FOV_DEG / 2) * (Math.PI / 180)) / Math.tan((BAND_V_FOV_DEG / 2) * (Math.PI / 180)), 3, 900)
   cam.position.set(pos.x, pos.y, pos.z)
 
   const prevTarget = renderer.getRenderTarget()

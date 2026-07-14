@@ -60,7 +60,7 @@ import {
   buildTermiteMound,
 } from '../../render/flora'
 import { buildElephant } from '../../render/fauna'
-import { buildMeroePyramids, buildStoneCity, buildRockChurches, buildCoastalRuins,
+import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurches, buildCoastalRuins,
   buildStelae,
   buildCastles,
   buildCliffDwellings,
@@ -883,10 +883,12 @@ function PanoramaCaptureTrigger() {
       if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) > ring) continue
       if (hasPanoramaCapture(p.id, s.seed)) return
       const h = Math.max(0, sampleTerrain(p.lat, p.lon, s.seed).height)
+      // Low camera: near landmarks (Giza at Cairo) must rise ABOVE the
+      // horizon line to survive onto the horizon cylinder.
       capturePanorama(
         gl as unknown as THREE.WebGPURenderer,
         scene as unknown as THREE.Scene,
-        { x: w.x, y: h + 2.2, z: w.z },
+        { x: w.x, y: h + 1.2, z: w.z },
         p.id,
         s.seed,
         ['traveller-root', `place-marker-${p.id}`, 'travel-sky', 'travel-climate', 'travel-dressing', 'travel-markers'],
@@ -1155,6 +1157,7 @@ function CulturalLandmarks() {
   const geos = useMemo(
     () => ({
       pyramids: buildMeroePyramids(),
+      'giza-pyramids': buildGizaPyramids(),
       'stone-city': buildStoneCity(),
       'rock-churches': buildRockChurches(),
       'coastal-ruins': buildCoastalRuins(),
