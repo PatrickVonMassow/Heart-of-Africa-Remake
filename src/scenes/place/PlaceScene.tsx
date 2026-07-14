@@ -42,6 +42,7 @@ import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/i
 import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial, detailFade, proceduralBump } from '../../render/materials'
+import { TESSELLATION } from '../../render/figures'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
 import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
@@ -288,12 +289,12 @@ function VillageHut({
         </>
       ) : style.roof === 'dome' ? (
         <mesh position={[0, base + wallH, 0]} castShadow material={mats.thatch}>
-          <sphereGeometry args={[r * 1.18, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <sphereGeometry args={[r * 1.18, ...TESSELLATION.hutDome, 0, Math.PI * 2, 0, Math.PI / 2]} />
         </mesh>
       ) : (
         <>
           <mesh position={[0, base + wallH + r * (style.roof === 'tallCone' ? 0.8 : 0.5), 0]} castShadow material={mats.thatch}>
-            <coneGeometry args={[r * 1.45, r * (style.roof === 'tallCone' ? 1.95 : 1.25), 12]} />
+            <coneGeometry args={[r * 1.45, r * (style.roof === 'tallCone' ? 1.95 : 1.25), TESSELLATION.hutRoof]} />
           </mesh>
           <mesh position={[0, base + wallH + r * (style.roof === 'tallCone' ? 1.85 : 1.12), 0]} castShadow material={mats.thatch}>
             <sphereGeometry args={[r * 0.14, 6, 5]} />
@@ -364,21 +365,21 @@ function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle 
     <group position={[item.pos[0], 0, item.pos[1]]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
-        <coneGeometry args={[0.42, 1.25, 10]} />
+        <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={robe} roughness={0.95} />
       </mesh>
       {/* Torso and shoulder cloth */}
       <mesh position={[0, 1.28, 0]} castShadow>
-        <cylinderGeometry args={[0.22, 0.28, 0.5, 8]} />
+        <cylinderGeometry args={[0.22, 0.28, 0.5, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={shoulder} roughness={0.95} />
       </mesh>
       {/* Head with gray hair */}
       <mesh position={[0, 1.68, 0]} castShadow>
-        <sphereGeometry args={[0.2, 12, 10]} />
+        <sphereGeometry args={[0.2, ...TESSELLATION.figureHead]} />
         <meshStandardMaterial color="#5c3317" roughness={0.85} />
       </mesh>
       <mesh position={[0, 1.8, 0]}>
-        <sphereGeometry args={[0.19, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
+        <sphereGeometry args={[0.19, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2.6]} />
         <meshStandardMaterial color="#cfc8bd" roughness={1} />
       </mesh>
       {/* Walking staff */}
@@ -387,7 +388,7 @@ function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle 
         <meshStandardMaterial color="#5f4526" roughness={0.9} />
       </mesh>
       <mesh position={[0.4, 1.92, 0.05]}>
-        <sphereGeometry args={[0.06, 6, 5]} />
+        <sphereGeometry args={[0.06, ...TESSELLATION.figureHand]} />
         <meshStandardMaterial color="#4a3018" roughness={0.9} />
       </mesh>
       <Html center position={[0, 2.3, 0]} distanceFactor={14}>
@@ -468,7 +469,7 @@ function Granary({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
         <cylinderGeometry args={[d.r, d.r * 1.1, d.h, 10]} />
       </mesh>
       <mesh position={[0, 0.64 + d.h + d.r * 0.42, 0]} castShadow material={mats.thatch}>
-        <coneGeometry args={[d.r * 1.35, d.r * 1.05, 10]} />
+        <coneGeometry args={[d.r * 1.35, d.r * 1.05, TESSELLATION.granary]} />
       </mesh>
       {/* Small filling hatch */}
       <mesh position={[0, 0.64 + d.h * 0.75, d.r * 0.95]}>
@@ -484,7 +485,7 @@ function Tent({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
   return (
     <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
       <mesh position={[0, d.h / 2, 0]} castShadow material={mats.cloth}>
-        <coneGeometry args={[d.r * 1.25, d.h, 8]} />
+        <coneGeometry args={[d.r * 1.25, d.h, TESSELLATION.granary]} />
       </mesh>
       <mesh position={[0, d.h + 0.12, 0]} castShadow material={mats.wood}>
         <cylinderGeometry args={[0.03, 0.03, 0.45, 5]} />
@@ -557,7 +558,7 @@ function Stall({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
         <meshStandardMaterial color="#8a6a3a" roughness={0.9} />
       </mesh>
       <mesh position={[0.5, 0.95, 0.55]} castShadow>
-        <sphereGeometry args={[0.28, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[0.28, ...TESSELLATION.goods, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color="#a3702e" roughness={0.95} />
       </mesh>
     </group>
@@ -580,7 +581,7 @@ function Tower({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
         <cylinderGeometry args={[d.r * 0.55, d.r * 0.62, 1.15, 9]} />
       </mesh>
       <mesh position={[0, d.h + 1.65, 0]} castShadow>
-        <sphereGeometry args={[d.r * 0.55, 9, 7]} />
+        <sphereGeometry args={[d.r * 0.55, ...TESSELLATION.goods]} />
         <meshStandardMaterial color="#8f9573" roughness={0.5} metalness={0.35} />
       </mesh>
     </group>

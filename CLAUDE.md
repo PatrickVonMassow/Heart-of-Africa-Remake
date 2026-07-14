@@ -516,7 +516,10 @@ verify suite that proves it.
     and wire both a color and a micro-relief normal node — the fields'
     exact tileability, the normal-map normalisation and the mid-brightness
     albedo pure-tested in `src/render/surfaceTextures.test.ts`, the wiring
-    and sampler state in `src/render/materials.test.ts`; the mid-distance ground is
+    and sampler state in `src/render/materials.test.ts`; the close-range
+    primitives (figure bodies/heads, hut roofs and domes, granaries,
+    mortar/pestle and stall goods) hold their tessellation floors so no
+    facets read at eye height (`src/render/figures.test.ts`); the mid-distance ground is
     temporally stable under TRAA with a static camera (min frame diff
     gated, `scripts/verify/settings.mjs`) and no panorama silhouette
     stands sunken below the settlement ground plane — the clamp and the

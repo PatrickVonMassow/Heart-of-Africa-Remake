@@ -1013,7 +1013,7 @@ as-is; only the sequence changes.
   the first-person view by drag and zooms by pinch; the desktop suites
   prove the overlay absent and inputs unchanged without touch; unit
   tests cover the touch→axis mapping and the engagement guard.
-- [ ] 85. Smooth the settlement figures (user report, screenshot of faceted
+- [x] 85. Smooth the settlement figures (user report, screenshot of faceted
   cone bodies): raise the villager/figure primitive tessellation so neither
   the lighting facets nor the polygonal silhouette read at first-person
   range — body cones 8 → ~24 radial segments, the head spheres (10x8) to a
@@ -1022,6 +1022,17 @@ as-is; only the sequence changes.
   near them. Negligible vertex cost (a handful of figures); no shader
   change needed. Cover the raised tessellation with a pure test on the
   built geometry (segment/vertex floor).
+  (src/render/figures.ts centralizes the segment counts (TESSELLATION):
+  figure bodies 8→24, heads 10x8→20x14, caps/turbans, hands, hut roof
+  cones 12→24, domes 12x8→24x12, granaries, mortar/pestle, stall goods,
+  the elder's shoulder-cloth cylinder 8→24. PlaceScene/PlaceLife use the
+  constants — no literal segment counts left at the touched sites.
+  figures.test.ts pins the floors and the vertex counts of the geometry
+  built from them. Elder close-up probe shows round silhouettes. Vitest
+  1429, build/lint/audit clean, flow 31 + polish 19 green.
+  (track: 14.07. 18:15 -> 20:02, ~35 min active (interrupted by the
+  chat-idle gap), ~25k in / ~6k out, model claude-fable-5[1m], effort
+  high, thinking on, autonomous batch, dontAsk))
 - [x] 86. Distance-stable surface roughness via BAKED TEXTURES (user report:
   distant walls read detailed/rough while close-up they turn unnaturally
   smooth; approach approved by the user): replace the runtime procedural
@@ -1254,6 +1265,61 @@ as-is; only the sequence changes.
   staged compilation), and gate the transition time in a browser suite
   (leave after several visits well under a few seconds). The polish
   leave-timeout hardening from point 86 can then tighten back down.
+- [ ] 97. First-person walking inside settlements feels artificial (user
+  report): movement snaps to full speed instantly, the camera is rigidly
+  fixed at eye height, and steps are silent. Add a first stage of walk-feel
+  polish to the PlaceScene player controller — scope is EXACTLY the five
+  measures below; walk speed itself (`balance.placeWalkSpeed`) stays
+  unchanged, and the travel scene is untouched.
+
+  (a) INERTIA. Extend the player ref with a velocity state and ease the
+  current horizontal velocity toward the target from `placeWalkVelocity`
+  each frame (exponential smoothing, separate accelerate/decelerate time
+  constants), replacing the direct position stepping in the walk block.
+  Collision resolution (`resolveMove`) keeps operating on the resolved
+  per-frame delta; sliding along walls must not jitter or build up speed.
+
+  (b) STEP PHASE + HEAD BOB. Introduce a single step-phase accumulator
+  driven by the actual horizontal speed (phase advances only while
+  moving). Derive from it a vertical camera bob and a half-frequency
+  lateral sway (figure-eight), both scaled by current speed so they fade
+  out smoothly when stopping. Applied on top of EYE_HEIGHT at the camera
+  write; amplitudes are balance values.
+
+  (c) FOOTSTEP SOUNDS. Add a procedural `emitFootstep(surface)` one-shot
+  to `src/systems/ambience.ts` in the style of the existing emitters
+  (filtered noise impulse, short decay; duller timbre on open ground/sand,
+  harder/brighter on 'stone' paths). PlaceScene triggers it on each
+  step-phase zero crossing; the surface is classified via the existing
+  path proximity test (on-path kind vs. open ground) from the layout.
+  Volume respects the existing ambience master/settings gain. No audio
+  assets, no new dependencies.
+
+  (d) STRAFE ROLL. Add a small camera roll (~2-4° max) proportional to
+  the current lateral velocity, smoothed, zero at rest. Keep the yaw-only
+  look model otherwise intact (pointer lock, gamepad look unchanged).
+
+  (e) STOP SETTLE + IDLE SWAY. Stopping lets the bob/roll ease back to
+  neutral via (a)+(b) scaling; standing still gets a barely visible slow
+  idle sway (amplitude well under 0.01 m) so the camera never freezes
+  dead.
+
+  All tunables (time constants, bob/sway/roll amplitudes, step cadence,
+  footstep gains) live centralized in `src/config/balance.ts` — no magic
+  numbers in the scene. Pure step-phase/bob/roll math goes into a small
+  pure module (e.g. `src/systems/walkFeel.ts`) with Vitest coverage
+  (phase advance vs. speed, zero-crossing detection, amplitude fade at
+  v→0, roll sign/clamp). Expose a dev hook (e.g. `window.__walkFeel`:
+  current phase, bob offset, roll, last footstep surface) per CLAUDE.md
+  §7.2 and gate the live behaviour in the collision or polish suite
+  (camera y oscillates while walking, returns to EYE_HEIGHT at rest;
+  footstep fires on phase crossing with the expected surface class).
+  Interaction distances, door triggers, and the leave-radius check keep
+  using the logical player position — the bob is camera-only and must not
+  affect gameplay geometry. No speech files are touched; skip the voice
+  regression. design.md §2 records the walk-feel rules. Scoped suites per
+  the diff mapping (`src/scenes/place/` → collision, polish, settings;
+  plus Vitest), then full regression.
 
 ## Closing (only after all points)
 

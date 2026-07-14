@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
 import { buildGoat } from '../../render/fauna'
+import { TESSELLATION } from '../../render/figures'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, type Collider } from './collision'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
@@ -34,11 +35,11 @@ function Figure({
   return (
     <group scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
       <mesh position={[0, bodyH * 0.5, 0]} castShadow>
-        <coneGeometry args={[0.32, bodyH, 8]} />
+        <coneGeometry args={[0.32, bodyH, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={cloth} roughness={0.95} />
       </mesh>
       <mesh position={[0, bodyH + 0.18, 0]} castShadow>
-        <sphereGeometry args={[0.16, 10, 8]} />
+        <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
         <meshStandardMaterial color={skin} roughness={0.85} />
       </mesh>
     </group>
@@ -67,7 +68,7 @@ function Cook({ x, z, cloth }: { x: number; z: number; cloth: string }) {
           )
         })}
         <mesh position={[0, 0.42, 0]} castShadow>
-          <sphereGeometry args={[0.17, 8, 6, 0, Math.PI * 2, 0, Math.PI / 1.6]} />
+          <sphereGeometry args={[0.17, ...TESSELLATION.goods, 0, Math.PI * 2, 0, Math.PI / 1.6]} />
           <meshStandardMaterial color="#2c2622" roughness={0.7} />
         </mesh>
       </group>
@@ -310,12 +311,12 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
       </group>
       {/* Mortar */}
       <mesh position={[0, 0.21, 0]} castShadow>
-        <cylinderGeometry args={[0.2, 0.26, 0.42, 8]} />
+        <cylinderGeometry args={[0.2, 0.26, 0.42, TESSELLATION.mortar]} />
         <meshStandardMaterial color="#5f4526" roughness={0.95} />
       </mesh>
       {/* Pestle */}
       <mesh ref={pestle} position={[0, 1.05, 0]} castShadow>
-        <cylinderGeometry args={[0.045, 0.055, 1.05, 5]} />
+        <cylinderGeometry args={[0.045, 0.055, 1.05, TESSELLATION.pestle]} />
         <meshStandardMaterial color="#7a5a32" roughness={0.9} />
       </mesh>
     </group>
@@ -348,7 +349,7 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
           position={[hx, 0.78, 0.42]}
           castShadow
         >
-          <sphereGeometry args={[0.07, 6, 5]} />
+          <sphereGeometry args={[0.07, ...TESSELLATION.figureHand]} />
           <meshStandardMaterial color="#5c3317" roughness={0.85} />
         </mesh>
       ))}
