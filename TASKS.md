@@ -1693,40 +1693,73 @@ as-is; only the sequence changes.
   the skyline RIGHT NEXT TO the pyramids; after leaving to the bird's-eye
   view there were no animals by the pyramids and none anywhere nearby.
   ROOT CAUSE (two independent systems): the §2.5 first-person silhouettes
-  (`PanoramaWildlife`, a decorative ring around the settlement) are NOT the
-  same individuals as the bird's-eye wildlife streaming
-  (`src/scenes/travel/` Wildlife, which spawns/despawns around the traveller).
-  Full individual consistency between the two is out of scope (the bird's-eye
-  wildlife is a live sim); the two concrete breakages ARE fixable:
+  (`PanoramaWildlife`, a decorative ring around the settlement) are NOT
+  the same individuals as the bird's-eye wildlife streaming
+  (`src/scenes/travel/` Wildlife, which spawns/despawns around the
+  traveller). Full individual consistency is OUT OF SCOPE (the bird's-eye
+  wildlife is a live sim) and must not be attempted; scope is exactly
+  (a)-(c).
 
-  (a) SILHOUETTES NEVER CROSS A FIXED SKYLINE LANDMARK. A drifting
-  silhouette must not pass across a settlement's fixed skyline feature —
-  Cairo's Giza pyramids (`__placeSkyline`/`GizaSkyline`), Cape Town's Table
-  Mountain, Timbuktu's mosque. Compute each landmark's azimuth span (from
-  its placement) and skip/hide any silhouette whose ring azimuth falls
-  within that span plus a margin, so animals never appear on or beside the
-  monument. Pure-test the azimuth-exclusion helper.
+  (a) SILHOUETTES NEVER CROSS A FIXED SKYLINE LANDMARK. Exactly TWO
+  skyline features exist, both distant meshes outside the town with a
+  well-defined bearing from the town centre: `GizaSkyline` (cairo,
+  positioned ~(-130, 10) relative to centre) and `TableMountainSkyline`
+  (capetown, ~(0, -118)) — the `__placeSkyline` dev hook marks them. The
+  Djinguereber mosque is NOT a skyline feature (it is an in-town
+  `DwellingKind`; a horizon silhouette behind town buildings is a normal
+  depth relationship) — do not build an exclusion for it. Implement: a
+  pure helper computing a landmark's excluded azimuth span from its
+  placement (position, footprint width, plus `panoramaLandmarkMarginDeg`,
+  a new balance value ~8°), and in `PanoramaWildlife` DROP any silhouette
+  whose ring azimuth falls inside an excluded span (no redistribution to
+  other azimuths — fewer animals is fine and invisible). Wire the two
+  landmarks' spans through a small per-place table next to the skyline
+  components, not hardcoded inside the wildlife code, so a future third
+  skyline only adds a table row. Pure-test the helper (span from
+  placement, margin applied, inside/outside classification incl.
+  wrap-around at 0°/360°).
 
-  (b) THE BIRD'S-EYE VICINITY OF A SETTLEMENT IS NOT EMPTY. Leaving a
-  settlement should not reveal a barren plain where the first-person view
-  showed life. Either (design decision, pick and record in design.md §2.5):
-  seed a few ambient bird's-eye wildlife near every settlement so the
-  vicinity is populated on exit, OR reduce/omit the first-person silhouettes
-  in directions where the bird's-eye is genuinely empty so the two views do
-  not contradict. Prefer the first (a livelier world) unless it fights the
-  streaming/despawn budget. Whichever: after leaving a settlement the
-  bird's-eye must show at least some region-typical wildlife within view
-  (live-checked).
+  (b) THE BIRD'S-EYE VICINITY OF A SETTLEMENT IS NOT EMPTY. Decision
+  (record in design.md §2.5): SEED ambient bird's-eye wildlife near every
+  settlement — the alternative (thinning first-person silhouettes) was
+  rejected as it makes the world feel emptier. Rules: on spawning the
+  chunks around a settlement, guarantee a minimum presence of
+  region-typical animals (`panoramaVicinityMinAnimals`, balance value
+  ~6, within `panoramaVicinityRadius`, ~1.5x the view ring) by seeding
+  additional herds ONLY when the normal chunk spawn produced fewer —
+  never additive on top of an already-populated vicinity. Seeded animals
+  are ordinary animals: seed-deterministic placement (derived from world
+  seed + settlement id), same species pool as the region, normal chunk
+  membership, normal streaming despawn, no special lifecycle, and they
+  count against the existing spawn budget/clamps (if the budget is
+  exhausted, seed less — never exceed it). Respect existing spacing rules
+  (no spawn inside dwellings/other animals) and keep away from the
+  settlement's leave position by a small clearance so the player never
+  materializes inside a herd.
 
-  (c) SPECIES/DENSITY MATCH the region's actual bird's-eye wildlife pool
-  (mostly true already — north=antelope, etc.; verify and align).
+  (c) SPECIES MATCH. Verify the `PanoramaWildlife` species selection per
+  region equals the bird's-eye region pool (mostly true already —
+  north=antelope etc.); where a first-person species is absent from the
+  region's bird's-eye pool, align the FIRST-PERSON list to the bird's-eye
+  pool (the sim is the source of truth). Result is a tick-note listing
+  per region either "already aligned" or the corrected species.
 
-  Verifiable: pure azimuth-exclusion test; `scripts/verify/polish.mjs` — no
-  panorama silhouette sits within a landmark's azimuth span in Cairo
-  (screenshot); `scripts/verify/enrichments.mjs` — after leaving a
-  settlement, region-typical bird's-eye wildlife is present within the
-  view ring. design.md §2.5 records the landmark-exclusion rule and the
-  vicinity-population decision.
+  Verifiable: pure azimuth-exclusion tests (Vitest, incl. wrap-around);
+  `scripts/verify/polish.mjs` — Cairo first-person screenshot with the
+  panorama active asserts via `__placePanorama`/silhouette dev state that
+  no silhouette azimuth lies inside the Giza span (assert on the state,
+  not on pixels); `scripts/verify/enrichments.mjs` — after `leavePlace()`
+  at a settlement, at least `panoramaVicinityMinAnimals` region-typical
+  animals exist within `panoramaVicinityRadius` of the leave position
+  (assert via `__wildlife`, deterministic under the fixed test seed).
+  Must NOT regress: the pt. 94 distance/size/haze bounds, the pt. 92
+  visible-ground standing, and the streaming budget (no growth of the
+  spawn clamp). design.md §2.5 records the landmark-exclusion rule (with
+  the explicit note that in-town buildings like the Timbuktu mosque are
+  NOT excluded and why) and the vicinity-seeding decision with its
+  balance values. No speech files are touched; skip the voice
+  regression. Scoped suites per the diff mapping (place scene → polish;
+  travel wildlife → enrichments; plus Vitest), then full regression.
 
 ## Closing (only after all points)
 
