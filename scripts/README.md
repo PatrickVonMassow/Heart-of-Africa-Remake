@@ -4,8 +4,9 @@ The runtime assets under `public/geodata/` are produced fully reproducibly
 by these scripts (Node ≥ 20, no npm dependencies):
 
 ```
-node scripts/build-geodata.mjs             # DEM: public/geodata/dem.png + dem.json
-node scripts/generate-terrain-textures.mjs # ground textures: public/geodata/tex/*.png
+node scripts/build-geodata.mjs              # DEM: public/geodata/dem.png + dem.json
+node scripts/generate-terrain-textures.mjs  # terrain textures: public/geodata/tex/*.png
+node scripts/generate-surface-textures.mjs  # settlement surfaces: public/tex/*.png
 ```
 
 ## build-geodata.mjs — real elevation model
@@ -40,10 +41,20 @@ periodic value/Worley noise) for sand, grass, rock and forest canopy. They
 are blended in the terrain material (TravelScene) via vertex splat
 weights; steep slopes receive bi-planar projected rock.
 
+## generate-surface-textures.mjs — settlement surfaces
+
+Same pattern at 512² for the first-person settlement materials (plaster,
+mud daub, thatch, wood, trodden ground), written to `public/tex/`. The
+shared noise fields and bake loop live in `textureFields.mjs`; their exact
+tileability and normal normalisation are pinned by
+`src/render/surfaceTextures.test.ts`. At runtime the maps are sampled
+world-space triplanar with mip/anisotropy band-limiting
+(`src/render/materials.ts`).
+
 ## png.mjs
 
 Dependency-free PNG codec (decode: 8-bit gray/RGB/RGBA non-interlaced;
-encode: 8-bit RGB), used by both scripts.
+encode: 8-bit RGB), used by all three generators.
 
 # Verification Suite (CLAUDE.md §7.2)
 

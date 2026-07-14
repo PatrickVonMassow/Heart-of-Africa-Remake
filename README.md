@@ -104,7 +104,8 @@ are generated reproducibly (no npm dependencies) by the scripts in
 
 ```sh
 node scripts/build-geodata.mjs              # DEM from public Terrarium tiles
-node scripts/generate-terrain-textures.mjs  # tileable ground textures
+node scripts/generate-terrain-textures.mjs  # tileable terrain textures (bird's-eye)
+node scripts/generate-surface-textures.mjs  # tileable settlement surfaces (first-person)
 ```
 
 At load time the DEM is trimmed to the game world: only land connected to the
@@ -141,10 +142,11 @@ per-point runtimes and pending manual checks — on the
 (private; visible to the repository owner's Claude account only).
 
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
-evidence lives in `verification/`. Known simplifications (e.g. screen-space
-reflections still in their supervised WebGPU rollout, no true water
-refraction, English-only journal read-aloud) are recorded as open items in
-the code (`// OPEN:`). The full headless regression runs with
+evidence lives in `verification/`. Known simplifications (e.g. no true water
+refraction, English-only journal read-aloud; screen-space reflections were
+integrated, found visually irrelevant for this game's camera and are slated
+for removal) are recorded as open items in the code (`// OPEN:`) and in
+`TASKS.md`. The full headless regression runs with
 `npm test` — a fast Vitest (jsdom) layer plus 13 Playwright browser suites;
 the test strategy and coverage map live in
 [`scripts/verify/README.md`](scripts/verify/README.md).
