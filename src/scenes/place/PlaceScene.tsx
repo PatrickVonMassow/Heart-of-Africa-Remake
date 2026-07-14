@@ -52,6 +52,7 @@ import { resolveMove } from './collision'
 import { buildLayout, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import { silhouetteScale, apparentAngleDeg, hazeColor, luminance } from './panoramaWildlife'
+import { placePlayerPosition } from './playerPosition'
 import { bandHeightAt } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { getStrings, useStrings } from '../../i18n'
@@ -1340,6 +1341,13 @@ export function PlaceScene() {
   useEffect(() => {
     player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
     doorLatch.current = null
+    // Seed the shared position for the town-plan map marker (point 89).
+    placePlayerPosition.x = player.current.x
+    placePlayerPosition.z = player.current.z
+    placePlayerPosition.active = true
+    return () => {
+      placePlayerPosition.active = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId])
 
@@ -1494,6 +1502,9 @@ export function PlaceScene() {
 
     camera.position.set(p.x, EYE_HEIGHT, p.z)
     camera.rotation.set(0, p.yaw, 0, 'YXZ')
+    // Share the live position so the town-plan map marker can track it.
+    placePlayerPosition.x = p.x
+    placePlayerPosition.z = p.z
 
     // Walking against an entrance door opens the building (design.md §2);
     // the latch re-arms only after stepping away from the door.

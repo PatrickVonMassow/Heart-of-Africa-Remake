@@ -301,7 +301,49 @@ check(
 )
 await page.locator('.map-overlay').screenshot({ path: `${OUT}92-map-fog-of-war.png` })
 console.log('shot 92-map-fog-of-war.png')
+
+// Point 89: the opened map sits BOTTOM-LEFT, clear of the inventory bar and the
+// bottom-right camp/map/journal buttons, and shows a "you are here" marker.
+const atlasPlace = await page.evaluate(() => {
+  const ov = document.querySelector('.map-overlay')
+  if (!ov) return null
+  const o = ov.getBoundingClientRect()
+  const rect = (sel) => { const e = document.querySelector(sel); return e ? e.getBoundingClientRect() : null }
+  const btn = (re) => { const b = [...document.querySelectorAll('button')].find((x) => re.test(x.textContent || '')); return b ? b.getBoundingClientRect() : null }
+  const overlaps = (a, b) => !!a && !!b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom)
+  return {
+    left: o.left, right: o.right, bottom: o.bottom, vw: window.innerWidth, vh: window.innerHeight,
+    overlapInv: overlaps(o, rect('.inventory-bar')),
+    overlapJournalBtn: overlaps(o, btn(/Journal|Tagebuch/)),
+    hasPlayer: !!document.querySelector('.map-overlay .map-player'),
+  }
+})
+check(
+  'the opened map is anchored bottom-left (point 89)',
+  atlasPlace && atlasPlace.left < atlasPlace.vw * 0.2 && atlasPlace.bottom > atlasPlace.vh * 0.5 && atlasPlace.right < atlasPlace.vw * 0.65,
+  JSON.stringify(atlasPlace),
+)
+check(
+  'the map overlaps neither the inventory bar nor the bottom-right buttons (point 89)',
+  atlasPlace && !atlasPlace.overlapInv && !atlasPlace.overlapJournalBtn,
+  JSON.stringify(atlasPlace),
+)
+check('the atlas shows a you-are-here marker (point 89)', !!atlasPlace?.hasPlayer, JSON.stringify(atlasPlace))
 await page.evaluate(() => window.__ui.getState().toggleMap())
+
+// Point 89: inside a settlement the town plan shows the live player marker too.
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.enterPlace('cairo')
+})
+await page.waitForFunction(() => window.__game.getState().placeId === 'cairo', null, { timeout: 30000 }).catch(() => {})
+await page.waitForTimeout(400)
+await page.evaluate(() => window.__ui.getState().toggleMap())
+await page.waitForTimeout(300)
+const planMarker = await page.evaluate(() => !!document.querySelector('.map-place-plan .map-player.map-player-svg'))
+check('the town plan shows a you-are-here marker (point 89)', planMarker, `plan marker ${planMarker}`)
+await page.evaluate(() => { window.__ui.getState().toggleMap(); window.__game.getState().leavePlace() })
+await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 }).catch(() => {})
 
 // --- Rivers: cascades, springs, lake surfaces (§7.1.21) ----------------------
 const rivers = await page.evaluate(() => window.__rivers)

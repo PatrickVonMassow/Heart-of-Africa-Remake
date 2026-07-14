@@ -236,7 +236,12 @@ verify suite that proves it.
    (`scripts/verify/enrichments.mjs`); inside a settlement the map opens
    as a town plan naming the functional buildings instead of the atlas
    (`src/ui/MapOverlay.test.tsx`; `scripts/verify/polish.mjs`,
-   screenshot 98); all 22 villages hold the river
+   screenshot 98); the opened map sits bottom-left clear of the inventory
+   bar and the bottom-right buttons and shows a live "you are here" marker
+   in both the atlas and the town plan (§19.11) — the marker presence and
+   position pure-tested in `src/ui/MapOverlay.test.tsx`, the bottom-left
+   placement, non-overlap and both markers live-checked in
+   `scripts/verify/enrichments.mjs`; all 22 villages hold the river
    clearance while the Nubian village stays riverside on the Nile
    (`src/world/world.test.ts`); the map's region-name anchors sit once per
    region on that region's own land and far enough apart that the names

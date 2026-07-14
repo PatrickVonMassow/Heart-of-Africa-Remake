@@ -319,17 +319,77 @@ textarea {
 
 .map-overlay {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(-0.4deg);
+  left: 12px;
+  /* Bottom-left, clear ABOVE the (wrapping) inventory bar — mirror of the
+     journal panel's right-side placement rules (design.md §17.4). */
+  bottom: 88px;
+  transform: rotate(-0.4deg);
   background: var(--paper);
   color: var(--paper-ink);
   border: 1px solid #8a6f45;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
   padding: 10px 14px 14px;
-  max-height: 92vh;
-  max-width: 92vw;
+  /* Capped so the plate can never reach the bottom-right camp/map/journal
+     buttons, even on small landscape screens; the plate scales to fit. */
+  max-width: min(560px, 52vw);
+  max-height: calc(100vh - 150px);
   overflow: auto;
+}
+
+/* The plate scales inside its capped box; the player marker overlays it. */
+.map-canvas-wrap {
+  position: relative;
+  line-height: 0;
+}
+.map-overlay canvas,
+.map-overlay svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* "You are here" (design.md §19.11): an ink dot with a fine pulsing ring, in
+   both the atlas (a div over the canvas) and the town plan (an SVG group). */
+.map-player {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.map-player.map-player-dom::before,
+.map-player.map-player-dom::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.map-player.map-player-dom::before {
+  width: 7px;
+  height: 7px;
+  background: #8c2f22;
+}
+.map-player.map-player-dom::after {
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid #8c2f22;
+  animation: map-player-pulse 1.8s ease-out infinite;
+}
+@keyframes map-player-pulse {
+  from { width: 7px; height: 7px; opacity: 0.8; }
+  to { width: 24px; height: 24px; opacity: 0; }
+}
+.map-player-dot { fill: #8c2f22; }
+.map-player-ring {
+  fill: none;
+  stroke: #8c2f22;
+  stroke-width: 1.2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: map-ring-pulse 1.8s ease-out infinite;
+}
+@keyframes map-ring-pulse {
+  from { transform: scale(0.4); opacity: 0.85; }
+  to { transform: scale(2.6); opacity: 0; }
 }
 
 .map-overlay header {

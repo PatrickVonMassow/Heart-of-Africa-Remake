@@ -18,6 +18,7 @@ import { LAKES } from '../world/data/lakes'
 import { MOUNTAINS, WATERFALLS, CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { CELL_OCEAN, cellAt } from '../world/geoIndex'
 import { buildLayout, type Interactive } from '../scenes/place/layout'
+import { placePlayerPosition } from '../scenes/place/playerPosition'
 import type { BuildingType } from '../state/ui'
 import { LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, REGION_IDS, regionStats } from './mapLayout'
 
@@ -446,17 +447,8 @@ export function MapOverlay() {
     }
     ctx.globalAlpha = 1
 
-    // Current position: red ink cross.
-    const ll = worldToLatLon(pos.x, pos.z)
-    const [px, py] = project(ll.lon, ll.lat)
-    ctx.strokeStyle = '#8c2f22'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(px - 5, py - 5)
-    ctx.lineTo(px + 5, py + 5)
-    ctx.moveTo(px + 5, py - 5)
-    ctx.lineTo(px - 5, py + 5)
-    ctx.stroke()
+    // The current position is drawn as a DOM ".map-player" marker overlaid on
+    // the canvas (engraved dot + pulsing ring, point 89), not a canvas cross.
 
     // --- Compass rose, top right: an eight-pointed engraved star.
     const cx = W - 58
@@ -635,6 +627,12 @@ export function MapOverlay() {
 
   if (!open) return null
   if (placeId) return <PlacePlan placeId={placeId} />
+  // Current position on the atlas, in the SAME projection as the map points
+  // (point 89): a ".map-player" marker overlaid on the canvas, hidden only if
+  // the position falls outside the plate.
+  const ll = worldToLatLon(pos.x, pos.z)
+  const [ppx, ppy] = project(ll.lon, ll.lat)
+  const playerInside = ppx >= 0 && ppx <= W && ppy >= 0 && ppy <= H
   return (
     <div className="map-overlay">
       <header>
@@ -642,7 +640,16 @@ export function MapOverlay() {
         <span className="map-progress">{t.mapOverlay.explored(t.regions[region], regionPercent)}</span>
         <button onClick={() => useUi.getState().toggleMap()}>{t.mapOverlay.close}</button>
       </header>
-      <canvas ref={canvasRef} width={W} height={H} />
+      <div className="map-canvas-wrap">
+        <canvas ref={canvasRef} width={W} height={H} />
+        {playerInside && (
+          <div
+            className="map-player map-player-dom"
+            data-testid="map-player"
+            style={{ left: `${(ppx / W) * 100}%`, top: `${(ppy / H) * 100}%` }}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -662,6 +669,22 @@ function PlacePlan({ placeId }: { placeId: string }) {
   const S = 560 // rendered square size
   const extent = layout.radius + 6
   const sx = (x: number) => (x / extent) * (S / 2)
+  // Live "you are here" marker (point 89): the first-person player position is
+  // shared from PlaceScene; a RAF loop moves the marker without a React
+  // re-render. The initial transform is set in JSX so it is correct at first
+  // paint (and assertable in jsdom, where RAF may not fire).
+  const playerRef = useRef<SVGGElement>(null)
+  useEffect(() => {
+    let raf = 0
+    const tick = () => {
+      const g = playerRef.current
+      if (g) g.setAttribute('transform', `translate(${sx(placePlayerPosition.x)} ${sx(placePlayerPosition.z)})`)
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeId])
   const label = (type: Interactive['type']) => (type === 'villager' ? t.labels.talkToElder : t.buildings[type as BuildingType])
   return (
     <div className="map-overlay map-place-plan">
@@ -720,6 +743,16 @@ function PlacePlan({ placeId }: { placeId: string }) {
           fill={INK}
           opacity={0.8}
         />
+        {/* "You are here" (point 89): an ink dot with a pulsing ring. */}
+        <g
+          className="map-player map-player-svg"
+          data-testid="map-player"
+          ref={playerRef}
+          transform={`translate(${sx(placePlayerPosition.x)} ${sx(placePlayerPosition.z)})`}
+        >
+          <circle className="map-player-ring" r={9} />
+          <circle className="map-player-dot" r={3.5} />
+        </g>
       </svg>
     </div>
   )

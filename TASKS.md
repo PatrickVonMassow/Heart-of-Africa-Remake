@@ -1165,7 +1165,7 @@ as-is; only the sequence changes.
   pt. 19 and scripts/verify/README.md record the cache.
   (track: 14.07. 12:52 -> 13:35, 43 min, ~60k in / ~10k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
-- [*] 89. Map presentation (user request): the opened map — continental
+- [x] 89. Map presentation (user request): the opened map — continental
   atlas AND in-place town plan — must sit BOTTOM-LEFT instead of centred,
   and both modes must show the CURRENT PLAYER POSITION.
 
@@ -1196,6 +1196,22 @@ as-is; only the sequence changes.
   `.inventory-bar` nor the bottom-right buttons, and `.map-player` is
   present in atlas and town plan (screenshots 92/98 refresh showing the
   new placement). design.md §19.11/§17.4 record placement and marker.
+  (a) `.map-overlay` moved from centred to bottom-left (left:12px,
+  bottom:88px, capped max-width/height), mirroring the journal's
+  right-side rules; the plate scales to fit and never reaches the
+  bottom-right buttons. (b) Player marker in BOTH modes: the atlas draws a
+  DOM `.map-player` (ink dot + pulsing ring) at `project(worldToLatLon
+  (pos))`, replacing the old canvas cross, hidden if outside the plate;
+  the town plan draws an SVG `.map-player` at `sx(placePlayerPosition)`,
+  a new shared module PlaceScene writes each frame, updated live via RAF.
+  MapOverlay.test.tsx pins both markers' presence + position; enrichments
+  live-checks the bottom-left anchor, non-overlap with the inventory
+  bar/buttons, and both markers. Look-check screenshots confirm.
+  design.md §19.11 + CLAUDE.md pt. 3 updated. FULL regression 17/17
+  green, no flakes (the port-runner fix held).
+  (track: 15.07. 00:37 -> 01:22, ~45 min, ~55k in / ~13k out (interleaved
+  with the port-robustness fix and point 102 spec), model
+  claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [x] 90. Panorama-capture band anomaly (diagnosis material in the point-82
   work): a tall landmark standing ~4 world units from the capture point

@@ -11,6 +11,7 @@ import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, g } from '../test/store'
 import { useGame } from '../state/store'
+import { placePlayerPosition } from '../scenes/place/playerPosition'
 
 // cellAt/regionAt in the progress computation need the real geodata index.
 withWorld()
@@ -111,5 +112,49 @@ describe('settlement plan (design.md §6.1, point 79)', () => {
     rerender(<MapOverlay />)
     expect(document.querySelector('.map-place-plan')).not.toBeInTheDocument()
     expect(document.querySelector('.map-overlay canvas')).toBeInTheDocument()
+  })
+})
+
+describe('player position marker (point 89)', () => {
+  afterEach(() => {
+    placePlayerPosition.x = 0
+    placePlayerPosition.z = 0
+  })
+
+  it('the continental atlas overlays a .map-player marker inside the plate', () => {
+    // Travel mode (the fresh game sits at Cairo's world position, which
+    // projects well inside the map plate).
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    const marker = document.querySelector('.map-player.map-player-dom') as HTMLElement | null
+    expect(marker).toBeInTheDocument()
+    const left = parseFloat(marker!.style.left)
+    const top = parseFloat(marker!.style.top)
+    for (const v of [left, top]) {
+      expect(v).toBeGreaterThan(0)
+      expect(v).toBeLessThan(100)
+    }
+  })
+
+  it('the town plan draws a .map-player marker at the shared player position', () => {
+    placePlayerPosition.x = 5
+    placePlayerPosition.z = -3
+    useGame.setState({ placeId: 'cairo' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    const marker = document.querySelector('.map-place-plan .map-player.map-player-svg')
+    expect(marker).toBeInTheDocument()
+    // The dot and the pulsing ring are both present.
+    expect(marker!.querySelector('.map-player-dot')).toBeInTheDocument()
+    expect(marker!.querySelector('.map-player-ring')).toBeInTheDocument()
+    const m = (marker!.getAttribute('transform') ?? '').match(/translate\(([-\d.]+) ([-\d.]+)\)/)
+    expect(m).toBeTruthy()
+    const tx = parseFloat(m![1])
+    const ty = parseFloat(m![2])
+    // Player at (+5, -3) place-local → +x, -y in the SVG, inside the ±280 box.
+    expect(tx).toBeGreaterThan(0)
+    expect(ty).toBeLessThan(0)
+    expect(Math.abs(tx)).toBeLessThan(280)
+    expect(Math.abs(ty)).toBeLessThan(280)
   })
 })
