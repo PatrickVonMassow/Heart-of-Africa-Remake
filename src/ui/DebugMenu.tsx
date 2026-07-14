@@ -9,7 +9,14 @@ import { EVENT_KINDS } from '../systems/events'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
-import { ELEPHANT_GRAVEYARD } from '../world/data/landmarks'
+import {
+  CULTURAL_LANDMARKS,
+  ELEPHANT_GRAVEYARD,
+  MOUNTAINS,
+  NATURAL_SITES,
+  WATERFALLS,
+} from '../world/data/landmarks'
+import { LAKES } from '../world/data/lakes'
 import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
 
 const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
@@ -39,6 +46,40 @@ function ActionSelect({
         <option value="">{placeholder}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Like ActionSelect but the options are split into <optgroup>s. */
+function GroupedActionSelect({
+  label,
+  placeholder,
+  groups,
+  onPick,
+}: {
+  label: string
+  placeholder: string
+  groups: Array<{ label: string; options: Array<{ value: string; label: string }> }>
+  onPick: (value: string) => void
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onPick(e.target.value)
+        }}
+      >
+        <option value="">{placeholder}</option>
+        {groups.map((g) => (
+          <optgroup key={g.label} label={g.label}>
+            {g.options.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </optgroup>
         ))}
       </select>
     </label>
@@ -87,6 +128,42 @@ export function DebugMenu() {
   const game = useGame()
 
   if (!open) return null
+
+  // Jump-to targets (design.md §21.3, point 98): every NAMED map point,
+  // grouped by category in a fixed order and sorted alphabetically by the
+  // localized name within each group. `jumpCoords` resolves the picked value
+  // back to coordinates; the tomb stays a placeholder resolved at pick time
+  // (its position is per-run).
+  const jumpCoords = new Map<string, { lat: number; lon: number }>()
+  const namedGroup = <T,>(
+    items: readonly T[],
+    toEntry: (it: T) => { value: string; label: string; lat: number; lon: number },
+  ) => {
+    const options = items.map((it) => {
+      const { value, label, lat, lon } = toEntry(it)
+      jumpCoords.set(value, { lat, lon })
+      return { value, label }
+    })
+    options.sort((a, b) => a.label.localeCompare(b.label, lang))
+    return options
+  }
+  jumpCoords.set('#graveyard', { lat: ELEPHANT_GRAVEYARD.lat, lon: ELEPHANT_GRAVEYARD.lon })
+  const jumpGroups = [
+    { label: t.debug.jumpGroups.ports, options: namedGroup(PLACES.filter((p) => p.kind === 'port'), (p) => ({ value: p.id, label: t.places[p.id], lat: p.lat, lon: p.lon })) },
+    { label: t.debug.jumpGroups.villages, options: namedGroup(PLACES.filter((p) => p.kind === 'village'), (p) => ({ value: p.id, label: t.places[p.id], lat: p.lat, lon: p.lon })) },
+    { label: t.debug.jumpGroups.mountains, options: namedGroup(MOUNTAINS, (m) => ({ value: m.id, label: t.landmarks[m.id], lat: m.lat, lon: m.lon })) },
+    { label: t.debug.jumpGroups.waterfalls, options: namedGroup(WATERFALLS, (w) => ({ value: w.id, label: t.landmarks[w.id], lat: w.lat, lon: w.lon })) },
+    { label: t.debug.jumpGroups.lakes, options: namedGroup(LAKES, (l) => ({ value: l.id, label: t.landmarks[l.id], lat: l.center[1], lon: l.center[0] })) },
+    { label: t.debug.jumpGroups.cultural, options: namedGroup(CULTURAL_LANDMARKS, (c) => ({ value: c.id, label: t.landmarks[c.id], lat: c.lat, lon: c.lon })) },
+    { label: t.debug.jumpGroups.natural, options: namedGroup(NATURAL_SITES, (n) => ({ value: n.id, label: t.landmarks[n.id], lat: n.lat, lon: n.lon })) },
+    {
+      label: t.debug.jumpGroups.other,
+      options: [
+        { value: '#graveyard', label: t.landmarks['elephant-graveyard'] },
+        { value: '#grave', label: t.debug.grave },
+      ].sort((a, b) => a.label.localeCompare(b.label, lang)),
+    },
+  ]
 
   const set = <K extends keyof typeof balance>(key: K, v: (typeof balance)[K]) => {
     balance[key] = v
@@ -234,21 +311,17 @@ export function DebugMenu() {
       </div>
 
       <div className="section">
-        <ActionSelect
+        <GroupedActionSelect
           label={t.debug.jumpTo}
           placeholder={t.debug.choose}
-          options={[
-            ...PLACES.map((p) => ({ value: p.id, label: t.places[p.id] })),
-            { value: '#graveyard', label: t.landmarks['elephant-graveyard'] },
-            { value: '#grave', label: t.debug.grave },
-          ]}
+          groups={jumpGroups}
           onPick={(v) => {
-            if (v === '#grave') game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)
-            else if (v === '#graveyard') game.debugJumpTo(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)
-            else {
-              const p = PLACES.find((pl) => pl.id === v)
-              if (p) game.debugJumpTo(p.lat, p.lon)
+            if (v === '#grave') {
+              game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)
+              return
             }
+            const c = jumpCoords.get(v)
+            if (c) game.debugJumpTo(c.lat, c.lon)
           }}
         />
         <ActionSelect

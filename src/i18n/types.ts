@@ -285,6 +285,17 @@ export interface Strings {
     cash: string
     foodDays: string
     jumpTo: string
+    /** optgroup labels of the jump-to dropdown (design.md §21.3). */
+    jumpGroups: {
+      ports: string
+      villages: string
+      mountains: string
+      waterfalls: string
+      lakes: string
+      cultural: string
+      natural: string
+      other: string
+    }
     /** Placeholder entry of the debug dropdowns. */
     choose: string
     grave: string

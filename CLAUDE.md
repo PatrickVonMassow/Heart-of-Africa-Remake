@@ -618,8 +618,11 @@ verify suite that proves it.
     default the moment another scene takes the shared camera — entering a
     settlement straight out of the debug zoom must never clip hut walls.
     The debug menu offers the §21.3 dropdown selectors
-    (jump-to: ports/villages, the elephant graveyard and the tomb;
-    equipment; gifts), the read-only render-backend row and the journal
+    (jump-to: every named map point — ports, villages, mountains,
+    waterfalls, lakes, cultural landmarks, natural sites, the elephant
+    graveyard and the tomb — grouped by category and alphabetically
+    sorted per group (`src/ui/DebugMenu.test.tsx`); equipment; gifts),
+    the read-only render-backend row and the journal
     do-not-disturb option (§16.2; also F2); the §21.1 shortcuts hold (F1
     menu, F2 do-not-disturb, F3 full loadout — all gear/treasures, 100000
     gifts/dollars/provisions, full health, full canteen, no afflictions,

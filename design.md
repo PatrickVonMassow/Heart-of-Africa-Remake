@@ -643,7 +643,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Checkbox: do not disturb with journal entries (§16), off by default; also toggled with F2. New entries then neither open the journal nor auto-narrate.
 - Checkbox: temporal anti-aliasing (TRAA, §2.7), on by default; when off, anti-aliasing falls back to the render pass' multisampling.
-- Instant jump to any port city or village, the elephant graveyard, or the tomb, via a dropdown selector.
+- Instant jump to any NAMED map point via a dropdown selector: ports, villages, mountains, waterfalls, lakes, the built cultural landmarks and the natural sites, plus the elephant graveyard and the tomb. The entries are grouped by category (in that order) and sorted alphabetically by their localized name within each group.
 - Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.
 - Language selector for the game language (English/German; default English, §17).
 - Read-only display of the active render backend (WebGPU, or WebGL 2 after the fallback of §1).

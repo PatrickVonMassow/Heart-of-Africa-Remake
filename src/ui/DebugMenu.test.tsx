@@ -13,7 +13,9 @@ import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
-import { freshGame, withWorld } from '../test/store'
+import { freshGame, withWorld, useGame } from '../test/store'
+import { MOUNTAINS } from '../world/data/landmarks'
+import { latLonToWorld } from '../world/geo'
 
 withWorld()
 
@@ -178,19 +180,66 @@ describe('DebugMenu renderer row and dropdown selectors (enrichments.mjs)', () =
     expect(screen.getByText(en.debug.addGift)).toBeInTheDocument()
   })
 
-  it('the jump-to dropdown offers the elephant graveyard and the grave', () => {
-    render(<DebugMenu />)
-    const jumpSelect = selectWithOption('#graveyard')
-    expect(jumpSelect).toBeDefined()
-    const values = [...(jumpSelect as HTMLSelectElement).options].map((o) => o.value)
-    expect(values).toContain('#graveyard')
-    expect(values).toContain('#grave')
-  })
-
   it('the equipment and gift dropdowns list their items', () => {
     render(<DebugMenu />)
     // Equipment select carries a machete option; gift select a copper option.
     expect(selectWithOption('machete')).toBeDefined()
     expect(selectWithOption('copper')).toBeDefined()
+  })
+})
+
+describe('DebugMenu jump-to covers every named map point (design.md §21.3, point 98)', () => {
+  const jumpSelect = () => selectWithOption('kilimanjaro') as HTMLSelectElement
+  const groupLabels = () => [...jumpSelect().querySelectorAll('optgroup')].map((g) => g.label)
+  const optionsOf = (groupLabel: string) => {
+    const grp = [...jumpSelect().querySelectorAll('optgroup')].find((g) => g.label === groupLabel)
+    return [...(grp?.querySelectorAll('option') ?? [])].map((o) => o.textContent ?? '')
+  }
+
+  it('offers a named entry from every category plus the graveyard and grave', () => {
+    render(<DebugMenu />)
+    const values = [...jumpSelect().options].map((o) => o.value)
+    for (const v of ['cairo', 'nubian-village', 'kilimanjaro', 'victoria-falls', 'lake-victoria', 'meroe', 'ngorongoro', '#graveyard', '#grave']) {
+      expect(values, v).toContain(v)
+    }
+  })
+
+  it('groups the entries into optgroups in the fixed category order', () => {
+    render(<DebugMenu />)
+    expect(groupLabels()).toEqual([
+      en.debug.jumpGroups.ports,
+      en.debug.jumpGroups.villages,
+      en.debug.jumpGroups.mountains,
+      en.debug.jumpGroups.waterfalls,
+      en.debug.jumpGroups.lakes,
+      en.debug.jumpGroups.cultural,
+      en.debug.jumpGroups.natural,
+      en.debug.jumpGroups.other,
+    ])
+  })
+
+  it('sorts each group alphabetically by localized name in English', () => {
+    render(<DebugMenu />)
+    const mountains = optionsOf(en.debug.jumpGroups.mountains)
+    expect(mountains.length).toBeGreaterThan(1)
+    expect([...mountains].sort((a, b) => a.localeCompare(b, 'en'))).toEqual(mountains)
+  })
+
+  it('sorts each group alphabetically by localized name in German', () => {
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    const lakes = optionsOf(de.debug.jumpGroups.lakes)
+    expect(lakes.length).toBeGreaterThan(1)
+    expect([...lakes].sort((a, b) => a.localeCompare(b, 'de'))).toEqual(lakes)
+  })
+
+  it('jumps to the picked point coordinates', () => {
+    render(<DebugMenu />)
+    fireEvent.change(jumpSelect(), { target: { value: 'kilimanjaro' } })
+    const k = MOUNTAINS.find((m) => m.id === 'kilimanjaro')!
+    const expected = latLonToWorld(k.lat, k.lon)
+    const pos = useGame.getState().pos
+    expect(pos.x).toBeCloseTo(expected.x, 4)
+    expect(pos.z).toBeCloseTo(expected.z, 4)
   })
 })

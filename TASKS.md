@@ -1485,7 +1485,7 @@ as-is; only the sequence changes.
   the diff mapping (`src/scenes/place/` → collision, polish, settings;
   plus Vitest), then full regression.
 
-- [ ] 98. Jump-to covers every named map point, grouped and sorted (user
+- [x] 98. Jump-to covers every named map point, grouped and sorted (user
   request while testing SSR: Victoria Falls and Lake Victoria were
   missing). The debug menu's jump-to dropdown (`src/ui/DebugMenu.tsx`,
   design.md §21.3) currently offers only ports, villages, the elephant
@@ -1515,6 +1515,20 @@ as-is; only the sequence changes.
   languages, and choosing an entry calls the store jump with that
   point's coordinates. design.md §21.3 and CLAUDE.md pt. 20 (dropdown
   selectors) record the extended scope.
+  (A new GroupedActionSelect renders <optgroup>s; the jump-to targets are
+  built from PLACES + MOUNTAINS/WATERFALLS/LAKES/CULTURAL_LANDMARKS/
+  NATURAL_SITES + graveyard/tomb, grouped in the fixed order and sorted
+  by localizedName.localeCompare(lang) within each group; a value->coords
+  map resolves the pick (tomb stays per-run). New jumpGroups labels in
+  de/en/types. 5 Vitest cases (category samples incl. Victoria Falls /
+  Lake Victoria, fixed group order, alphabetical en+de, jump coordinates);
+  live dropdown dump confirms 8 sorted groups. design.md §21.3 + CLAUDE.md
+  pt. 20 updated. FULL regression incl. all browser suites green (17/17,
+  Vitest 1431, no flakes — user-requested precaution after the
+  parallel-instance episode).
+  (track: 14.07. 22:11 -> 23:16, ~40 min active across the parallel-stop
+  interruption, ~45k in / ~11k out, model claude-opus-4-8[1m], effort
+  high, thinking on, autonomous batch, dontAsk))
 
 - [x] 99. REMOVE the SSR feature (user decision after the manual check:
   with the bird's-eye camera never reaching grazing angles and the
