@@ -67,8 +67,8 @@ The whole regression runs with one command:
 ```
 npm test              # scripts/verify/run-all.mjs: type-check + build, oxlint,
                       # the fast Vitest layer (jsdom), then the browser suites
-                      # against a managed dev server (:5173), then the
-                      # production-preview smoke test (:4173)
+                      # against a managed dev server, then the
+                      # production-preview smoke test
 npm test -- flow      # a single suite (dev server managed for you)
 npm test -- build lint  # just the build + lint preflight
 ```
@@ -83,9 +83,14 @@ HTML-HUD components) runs in the Vitest layer (`npm run test:unit`); the
 layer split and the old→new coverage map live in
 [`scripts/verify/README.md`](verify/README.md).
 
-A single suite can also be run directly against a running `npm run dev`:
-`node scripts/verify/<name>.mjs` (except `docs`, which needs no server, and
-`preview`, which needs `npm run build && npm run preview` on :4173).
+`npm test` manages its own servers: each run's dev/preview server binds an
+**auto-assigned free port** (never the default :5173/:4173) and passes it to
+the suites via `BASE_URL`, so a manual `npm run dev` you leave open on :5173
+can be started, used and terminated at any time without ever colliding with a
+regression. A single suite can also be run directly against a manual server:
+`node scripts/verify/<name>.mjs` hits `BASE_URL` (default :5173), so start
+`npm run dev` first (except `docs`, which needs no server, and `preview`,
+which needs a `npm run build && npm run preview` on :4173).
 
 Notes:
 

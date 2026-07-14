@@ -8,17 +8,31 @@
 // Requires the dev dependencies installed (Playwright + Chromium).
 import { spawn, spawnSync } from 'node:child_process'
 import http from 'node:http'
+import net from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const isWin = process.platform === 'win32'
 
+/** An OS-assigned free ephemeral port. */
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer()
+    srv.once('error', reject)
+    srv.listen(0, '127.0.0.1', () => {
+      const port = srv.address().port
+      srv.close(() => resolve(port))
+    })
+  })
+}
+
 // Hybrid test architecture: the fast, deterministic Vitest layer (jsdom, no
 // browser) runs first (`unit` stage below) and covers all pure logic, store
 // transitions and HTML-HUD component classes/text. Only the checks that
 // genuinely need a real browser remain here as Playwright suites against the
-// dev server (:5173): the R3F/three scene + RAF wildlife, real layout geometry,
+// dev server (on an auto-assigned free port, never the default :5173, so a
+// manual `npm run dev` never collides): the R3F/three scene + RAF wildlife, real layout geometry,
 // canvas/WebGL init, pointer-lock, TTS audio, the §7.2 acceptance screenshots
 // and one end-to-end core flow. `docs` is a pure Node check that runs in the
 // same pass for a single report. See scripts/verify/README.md for the full
@@ -54,8 +68,42 @@ function killTree(child) {
   else process.kill(-child.pid, 'SIGTERM')
 }
 
-function runSuite(name) {
-  const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], { encoding: 'utf8' })
+/**
+ * Start a vite server (`npm run dev` / `npm run preview`) on its OWN
+ * OS-assigned free port and return { child, base }. The regression NEVER uses
+ * the default :5173/:4173, so a developer can start, use and terminate a
+ * manual `npm run dev` at any time without ever colliding with a test run.
+ * `--strictPort` makes vite fail loudly rather than drift if the chosen port
+ * were somehow taken in the tiny window before it binds; that (astronomically
+ * rare) race is closed by one retry on a fresh port.
+ */
+async function launchServer(npmScript, label, cwd) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const port = await getFreePort()
+    const base = `http://localhost:${port}/`
+    console.log(`# starting ${label} server (:${port})…`)
+    const child = spawn(`${npmScript} -- --port ${port} --strictPort`, { cwd, shell: true, detached: !isWin, stdio: 'ignore' })
+    try {
+      await waitForServer(base, 60000)
+      return { child, base }
+    } catch (err) {
+      killTree(child)
+      if (attempt === 1) {
+        console.log(`# ${label} server did not bind :${port} (port race?) — retrying on a fresh port`)
+        continue
+      }
+      throw err
+    }
+  }
+}
+
+function runSuite(name, baseUrl) {
+  const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
+    encoding: 'utf8',
+    // The suites read BASE_URL (default :5173/:4173); pass the actual server
+    // URL so they hit the regression's own server, not a manual dev server.
+    env: baseUrl ? { ...process.env, BASE_URL: baseUrl } : process.env,
+  })
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   const pass = (out.match(/^PASS/gm) ?? []).length
   const fail = (out.match(/^FAIL/gm) ?? []).length
@@ -135,12 +183,10 @@ if (!filter.length || filter.includes('unit')) {
 
 let dev
 try {
-  const runDev = pick(DEV_SUITES).length > 0
-  if (runDev) {
-    console.log('# starting dev server (vite :5173)…')
-    dev = spawn('npm run dev', { cwd: join(HERE, '..', '..'), shell: true, detached: !isWin, stdio: 'ignore' })
-    await waitForServer('http://localhost:5173/', 60000)
-    for (const s of pick(DEV_SUITES)) results.push(runSuite(s))
+  if (pick(DEV_SUITES).length > 0) {
+    const server = await launchServer('npm run dev', 'dev', join(HERE, '..', '..'))
+    dev = server.child
+    for (const s of pick(DEV_SUITES)) results.push(runSuite(s, server.base))
   }
 } finally {
   killTree(dev)
@@ -148,7 +194,7 @@ try {
 
 // Production-preview smoke test (unless a filter excludes it).
 if (!filter.length || filter.includes('preview')) {
-  console.log('# building + starting preview server (:4173)…')
+  console.log('# building for the production-preview smoke test…')
   const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, stdio: 'inherit' })
   if (build.status !== 0) {
     console.log('FAIL  build failed — skipping preview')
@@ -156,9 +202,9 @@ if (!filter.length || filter.includes('preview')) {
   } else {
     let preview
     try {
-      preview = spawn('npm run preview', { cwd: join(HERE, '..', '..'), shell: true, detached: !isWin, stdio: 'ignore' })
-      await waitForServer('http://localhost:4173/', 60000)
-      results.push(runSuite('preview'))
+      const server = await launchServer('npm run preview', 'preview', join(HERE, '..', '..'))
+      preview = server.child
+      results.push(runSuite('preview', server.base))
     } finally {
       killTree(preview)
     }
