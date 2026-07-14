@@ -80,5 +80,6 @@ ported asserts now live in Vitest:
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
 `handwriting.mjs` (the writing animation is timing/DOM-sensitive and stays
-here), `docs.mjs` (pure Node doc-structure check), `preview.mjs` (production
-build acceptance).
+here; consumes the `.cache/tts/` replay cache because adding an entry
+auto-narrates — voice.mjs owns and primes that cache), `docs.mjs` (pure Node
+doc-structure check), `preview.mjs` (production build acceptance).

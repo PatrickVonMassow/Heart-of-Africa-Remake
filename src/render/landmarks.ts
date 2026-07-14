@@ -1,10 +1,11 @@
 // Low-poly, vertex-colored geometry for the built cultural landmarks of
-// design.md §4.4 (the Nubian pyramids of Meroë, Great Zimbabwe, the rock-hewn
-// churches of Lalibela, the coastal ruins of Kilwa). Same pattern as flora.ts:
-// each builder merges its parts into one BufferGeometry with a base color and
-// slight per-vertex jitter for a hand-made look; the origin sits at the ground
-// and the footprint stays ~2–4 units so the silhouette reads from the travel
-// camera.
+// design.md §4.4 (Meroë, Giza incl. the Sphinx, Great Zimbabwe, Lalibela,
+// Kilwa, Aksum, Gondar, Bandiagara) plus the natural-site and skyline builders
+// (Table Mountain). Same pattern as flora.ts: each builder merges its parts
+// into one BufferGeometry with a base color and slight per-vertex jitter for a
+// hand-made look; the origin sits at the ground and the footprint stays small
+// enough that the silhouette reads from the travel camera (Meroë/Giza are
+// deliberately larger, see their pins in landmarks.test.ts).
 
 import * as THREE from 'three/webgpu'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'

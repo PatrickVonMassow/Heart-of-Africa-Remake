@@ -590,7 +590,9 @@ verify suite that proves it.
     read-aloud control into the speaking state without a click; the start
     entry narrates on the first gesture; with the journal open at game
     start, driving movement still advances the player position
-    (`scripts/verify/voice.mjs`); walking into a hut door with the journal
+    (`scripts/verify/voice.mjs` — the voice and handwriting suites replay
+    the TTS assets from the git-ignored local `.cache/tts/` cache, so the
+    regression is CDN-independent); walking into a hut door with the journal
     forced open still opens the building (`scripts/verify/flow.mjs`); with
     the journal open, the `.journal` panel's bottom edge sits above the
     `.camp-toggle` and `.journal-toggle` button tops and its right edge
