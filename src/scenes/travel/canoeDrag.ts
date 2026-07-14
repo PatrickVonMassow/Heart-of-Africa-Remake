@@ -35,6 +35,11 @@ export const CANOE_ROLL_MAX = 0.35
  * the player, following the walked path like a trailer), then push it clear
  * of obstacle circles `[x, z, r]` — a stone, a tree, an animal or a
  * settlement edge swings the hull aside instead of being clipped through.
+ * A water predicate (the rendered river/lake sheet plus ocean) is applied
+ * LAST and wins: a hull dragged on land must never pierce the water surface
+ * at a bank (design.md §7 — on land he drags it; user-reported clipping).
+ * The rope rotates to the nearest land at full length; on a spit too narrow
+ * for that, it shortens toward the land-standing player instead.
  */
 export function updateTrailPoint(
   px: number,
@@ -42,6 +47,7 @@ export function updateTrailPoint(
   prev: TrailPoint | null,
   heading: number,
   obstacles: ReadonlyArray<readonly [number, number, number]>,
+  isWater?: (x: number, z: number) => boolean,
 ): TrailPoint {
   let dx: number
   let dz: number
@@ -61,6 +67,38 @@ export function updateTrailPoint(
   let tx = px + (dx / d) * CANOE_TRAIL_FAR
   let tz = pz + (dz / d) * CANOE_TRAIL_FAR
   ;[tx, tz] = pushOutOfCircles(tx, tz, obstacles, CANOE_END_RADIUS)
+  if (isWater && isWater(tx, tz)) {
+    const baseA = Math.atan2(tx - px, tz - pz)
+    let found = false
+    // Nearest rotation first, alternating sides, up to ±120° — continuity
+    // with the current rope angle keeps the swing visually smooth.
+    for (let step = 1; step <= 12 && !found; step++) {
+      for (const sgn of [1, -1]) {
+        const a = baseA + sgn * step * (Math.PI / 18)
+        const cx = px + Math.sin(a) * CANOE_TRAIL_FAR
+        const cz = pz + Math.cos(a) * CANOE_TRAIL_FAR
+        if (!isWater(cx, cz)) {
+          tx = cx
+          tz = cz
+          found = true
+          break
+        }
+      }
+    }
+    if (!found) {
+      // Spit narrower than the rope: pull the hull in toward the player,
+      // who stands on land by definition while dragging.
+      for (let f = 0.85; f >= 0.25; f -= 0.1) {
+        const cx = px + Math.sin(baseA) * CANOE_TRAIL_FAR * f
+        const cz = pz + Math.cos(baseA) * CANOE_TRAIL_FAR * f
+        if (!isWater(cx, cz)) {
+          tx = cx
+          tz = cz
+          break
+        }
+      }
+    }
+  }
   return { x: tx, z: tz }
 }
 

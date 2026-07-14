@@ -269,7 +269,9 @@ verify suite that proves it.
    clamped — `__player.drag` in `scripts/verify/enrichments.mjs`), and the
    trailer/pose behaviour matrix — following the walked path, swinging
    clear of stones, animals and settlement edges, slope and cross-slope
-   profiles — is pure-tested (`src/scenes/travel/canoeDrag.test.ts`). Driving straight into a pinned
+   profiles, and the water-edge rule (the dragged hull never pierces the
+   rendered water sheet: rope rotation to land, spit shortening) — is
+   pure-tested (`src/scenes/travel/canoeDrag.test.ts`). Driving straight into a pinned
    animal blocks the traveller at its body edge without ever entering it,
    and steering away afterwards moves him clear — a collision never pins
    the traveller (`scripts/verify/enrichments.mjs`); the swept obstacle

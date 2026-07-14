@@ -1406,7 +1406,15 @@ function Player() {
         const w = latLonToWorld(p.lat, p.lon)
         if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) < CANOE_TRAIL_FAR + 4) obstacles.push([w.x, w.z, 1.6])
       }
-      const trail = updateTrailPoint(s.pos.x, s.pos.z, trailRef.current, heading.current, obstacles)
+      // The rendered water sheet is a hard bound for the dragged hull: the
+      // trailer swings to land rather than piercing a river/lake surface or
+      // the sea at a bank (user-reported clipping).
+      const isWater = (x: number, z: number) => {
+        const g = worldToLatLon(x, z)
+        const t = sampleTerrain(g.lat, g.lon, s.seed)
+        return t.type === 'ocean' || waterSurfaceY(g.lat, g.lon, s.seed, t.height) !== null
+      }
+      const trail = updateTrailPoint(s.pos.x, s.pos.z, trailRef.current, heading.current, obstacles, isWater)
       trailRef.current = trail
       const groundAt = (x: number, z: number) => {
         const g = worldToLatLon(x, z)

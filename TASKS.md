@@ -787,11 +787,19 @@ the map).
   landmarks.test.ts (height 3-8, footprint 6-14, grounded) with the
   generic <6 bound kept for the other sites. Verified visually at Meroë.
   Full regression green.)
-- [ ] 76. Canoe clipping still occurs (user screenshot): a canoe DRAGGED ON
+- [x] 76. Canoe clipping still occurs (user screenshot): a canoe DRAGGED ON
   LAND near a water edge protrudes into the water surface. The drag pose
   must keep the hull on the land side of the bank (or resting visibly ON
   the ground, never piercing the river/lake sheet). Extend the
   canoeDrag/waterSurface coverage with a bank-adjacent drag case.
+  (The trailer now takes a water predicate — the rendered river/lake sheet
+  (waterSurfaceY) plus ocean — applied after the obstacle push and winning:
+  the rope rotates to the nearest land at full length (±120°, nearest side
+  first for continuity) or shortens toward the land-standing player on a
+  spit narrower than the rope. Four bank-drag cases pure-tested in
+  canoeDrag.test.ts (bank swing, waterward turn, spit shortening, dry
+  no-op); design.md §7 and CLAUDE.md pt. 4 record the rule. Full
+  regression green.)
 - [ ] 77. "A Discovery" is a poor journal-entry heading (user feedback).
   Rework the generic discovery/sighting entry titles into evocative,
   entry-specific headings in BOTH languages (e.g. naming the landmark or

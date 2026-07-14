@@ -96,6 +96,58 @@ describe('updateTrailPoint (trailer following)', () => {
     expect(Number.isFinite(t.x) && Number.isFinite(t.z)).toBe(true)
     expect(Math.hypot(t.x - 3, t.z - 3)).toBeCloseTo(CANOE_TRAIL_FAR, 6)
   })
+
+  // Bank-adjacent drags (user-reported clipping): the hull must never pierce
+  // the rendered water sheet — the rope swings to land, or shortens on a spit.
+  describe('water-edge rule', () => {
+    // A straight bank: everything east of x = 1 is water.
+    const bankAt1 = (x: number) => x > 1
+
+    it('walking along a bank swings the hull to the land side at full rope length', () => {
+      let t: TrailPoint | null = null
+      // Walk north 0.6 units from the bank; the naive trail would stay behind
+      // on land — so drag INTO a bend: walk diagonally toward the water, the
+      // unconstrained trailer would cross x=1.
+      for (let i = 0; i < 50; i++) {
+        const px = Math.min(0.9, -2 + i * 0.12)
+        const pz = i * 0.12
+        t = updateTrailPoint(px, pz, t, 0, [], bankAt1)
+        expect(bankAt1((t as TrailPoint).x)).toBe(false) // never in the water
+        // Rope stays at full length while rotation suffices.
+        expect(Math.hypot((t as TrailPoint).x - px, (t as TrailPoint).z - pz)).toBeCloseTo(CANOE_TRAIL_FAR, 6)
+      }
+    })
+
+    it('turning waterward keeps the hull on land instead of piercing the sheet', () => {
+      // Force the previous trail straight toward the water from a bank-side
+      // player: the deflection must rotate it back to land.
+      const t = updateTrailPoint(0.9, 0, { x: 0.9 + CANOE_TRAIL_FAR, z: 0 }, -Math.PI / 2, [], bankAt1)
+      expect(bankAt1(t.x)).toBe(false)
+      expect(Math.hypot(t.x - 0.9, t.z - 0)).toBeCloseTo(CANOE_TRAIL_FAR, 6)
+    })
+
+    it('on a spit narrower than the rope the hull pulls in toward the player', () => {
+      // Water everywhere beyond 1.2 units of the player: no full-length
+      // rotation lands, so the rope shortens (the player stands on land).
+      const pond = (x: number, z: number) => Math.hypot(x, z) > 1.2
+      const t = updateTrailPoint(0, 0, { x: 0, z: -CANOE_TRAIL_FAR }, 0, [], pond)
+      expect(pond(t.x, t.z)).toBe(false)
+      expect(Math.hypot(t.x, t.z)).toBeLessThan(1.2)
+      expect(Math.hypot(t.x, t.z)).toBeGreaterThan(0.4) // still dragged behind, not on the boots
+    })
+
+    it('without water contact the predicate changes nothing', () => {
+      const dry = () => false
+      let a: TrailPoint | null = null
+      let b: TrailPoint | null = null
+      for (let i = 0; i < 20; i++) {
+        a = updateTrailPoint(0, i * 0.2, a, 0, [])
+        b = updateTrailPoint(0, i * 0.2, b, 0, [], dry)
+      }
+      expect((b as TrailPoint).x).toBeCloseTo((a as TrailPoint).x, 10)
+      expect((b as TrailPoint).z).toBeCloseTo((a as TrailPoint).z, 10)
+    })
+  })
 })
 
 describe('canoeDragPose (terrain-lying hull)', () => {
