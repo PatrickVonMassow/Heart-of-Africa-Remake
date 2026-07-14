@@ -279,8 +279,6 @@ export interface Strings {
     fpsCounter: string
     /** TRAA toggle (design.md §2.7/§21), default on. */
     traa: string
-    /** SSR toggle (design.md §2.7/§21), WebGPU only; default off pending the manual check. */
-    ssr: string
     health: string
     wheelZoom: string
     journalDnd: string

@@ -361,7 +361,6 @@ export const de: Strings = {
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
     traa: 'TRAA (zeitliche Kantenglättung)',
-    ssr: 'SSR (Bildraum-Spiegelungen, nur WebGPU)',
     health: 'Gesundheit',
     wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',

@@ -1505,7 +1505,7 @@ as-is; only the sequence changes.
   point's coordinates. design.md §21.3 and CLAUDE.md pt. 20 (dropdown
   selectors) record the extended scope.
 
-- [ ] 99. REMOVE the SSR feature (user decision after the manual check:
+- [x] 99. REMOVE the SSR feature (user decision after the manual check:
   with the bird's-eye camera never reaching grazing angles and the
   first-person scenes having no water/gloss, no in-game situation shows
   screen-space reflections — the integration cannot be meaningfully
@@ -1554,6 +1554,21 @@ as-is; only the sequence changes.
   from the user's screenshots persist WITHOUT SSR, they are NOT
   SSR-caused — leave them to point 92's family and note the finding in
   this point's tick note; do not chase them here.
+  (Removed the SSRNode wiring from Effects.tsx — import, metalness/
+  roughness MRT tap, additive composite, the ssrActive gate — so the
+  chain reads exactly as after pt. 32 step 1; dropped ssrEnabled/
+  setSsrEnabled from ui.ts, the debug checkbox from DebugMenu.tsx, the
+  de/en/types labels, the DebugMenu SSR tests and the settings.mjs
+  inert-gate. Bundle −22 kB, SSRNode confirmed absent from dist, TRAA
+  untouched. design.md §2.7 (water list + debug checkbox), CLAUDE.md
+  pt. 14/32, water.ts and the verify README updated. 99(e) FINDING: the
+  flat black shapes near the river PERSIST with SSR fully gone → NOT
+  SSR-caused; they are in the TRAVEL scene (distinct from pt. 92's
+  settlement panorama), logged as the new point 101. Vitest 1425,
+  full regression green (handwriting was the deferred-pt-100 cold-TTS
+  flake, hardened test-side in 16840b6, then green).
+  (track: 14.07. 21:30 -> 22:05, ~35 min, ~40k in / ~9k out, model
+  claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [ ] 100. Cold TTS model load janks the MAIN thread ~14 s (found while
   diagnosing the handwriting flake): with an unprimed browser profile,
@@ -1585,6 +1600,37 @@ as-is; only the sequence changes.
   mode) asserting the journal reveal advances within its normal cadence
   while the model is still loading (reveal timing independent of TTS
   readiness).
+
+- [ ] 101. Flat BLACK vertical shapes in the TRAVEL scene, near rivers
+  (confirmed while removing SSR, point 99(e): they persist with SSR fully
+  gone, so they are NOT SSR-caused; distinct from point 92, which is the
+  SETTLEMENT panorama silhouettes). In the bird's-eye view at close zoom,
+  thin near-black rectangular bars stand upright next to the river channel
+  (screenshot: jump to Kabalega/Murchison Falls ~2.28 N, 31.68 E, zoom
+  0.25). The user also reported all-WHITE animals in earlier screenshots;
+  verify whether those share a cause.
+
+  (a) IDENTIFY. With a dev server, jump to the repro and enumerate what
+  sits at the black-bar screen positions via the existing scene dev hooks
+  (`__wildlife`, `__rivers`, and the dressing/flora instancing in
+  `src/scenes/travel/`): are they wildlife meshes, river-bank dressing,
+  flora, or shadow/depth artifacts? Log the mesh type and material. Prime
+  suspects: a wildlife or dressing mesh whose material lost its
+  vertex-color/instance-color attribute (renders black), or a
+  billboard/silhouette drawn edge-on. The all-white-animals report points
+  the same way (missing/!inverted vertex colors).
+
+  (b) FIX at the source: restore the material's color input (vertex or
+  instance color, or the correct base color) so the mesh renders in its
+  intended tone, OR cull it if it is stray dressing that should not be
+  there. Do not paper over with a post-process mask.
+
+  (c) COVER: a pure test on the mesh/material builder that the color
+  attribute/tone is present (whatever the identified culprit is), and a
+  travel-scene live check (enrichments.mjs) that samples the pixels at a
+  known river-side dressing/wildlife position and asserts they are not
+  near-black (and not pure-white). Screenshot at the repro spot showing
+  the shapes gone. design.md note only if a design rule is involved.
 
 ## Closing (only after all points)
 

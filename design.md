@@ -68,7 +68,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 - Image-based lighting: an HDRI sky serves as the environment light source (IBL) for physically plausible material reflections; the visible sky follows a physically grounded atmosphere/scattering model instead of a simple gradient, consistent with the sun position.
 - Shadows via cascaded shadow maps (high resolution near the camera, soft edges), tuned for both perspectives.
 - Post-processing: screen-space ambient occlusion (SSAO/GTAO), bloom, temporal anti-aliasing, filmic tone mapping with color grading; a subtle vignette and depth of field are permissible but must not reduce the readability of the map view.
-- Water: screen-space reflections, refraction with depth-dependent absorption (shallow water lighter/greener, deep water dark blue), a wave field (e.g. Gerstner) and foam along shores and wave crests.
+- Water: refraction with depth-dependent absorption (shallow water lighter/greener, deep water dark blue), a wave field (e.g. Gerstner) and foam along shores and wave crests; sky reflections come from the image-based lighting. (Screen-space reflections were integrated once and removed again — with the bird's-eye camera never at grazing angles and the first-person scenes having no water or gloss, no in-game situation makes them read; revisit only if the camera or scene content changes.)
 - Distance fog is replaced by — or combined with — the atmospheric scattering; the regional climate moods of §19 remain as a modulation on top.
 
 ---
@@ -643,7 +643,6 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Checkbox: do not disturb with journal entries (§16), off by default; also toggled with F2. New entries then neither open the journal nor auto-narrate.
 - Checkbox: temporal anti-aliasing (TRAA, §2.7), on by default; when off, anti-aliasing falls back to the render pass' multisampling.
-- Checkbox: screen-space reflections (SSR, §2.7), off by default while its rollout is being confirmed on real hardware. WebGPU only — on the WebGL 2 fallback the checkbox is disabled and reflections come from the image-based lighting alone.
 - Instant jump to any port city or village, the elephant graveyard, or the tomb, via a dropdown selector.
 - Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.
 - Language selector for the game language (English/German; default English, §17).

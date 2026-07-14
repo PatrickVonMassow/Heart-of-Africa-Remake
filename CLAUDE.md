@@ -479,8 +479,8 @@ verify suite that proves it.
     bathymetry, shore/crest foam). Verifiable: screenshots of both
     perspectives show the active effects; the application runs without
     console errors on both the WebGPU and WebGL 2 paths; the remaining
-    simplifications (SSR still in its supervised rollout, true water
-    refraction) are named as open items (see pt. 32).
+    simplification (true water refraction) is named as an open item (see
+    pt. 32; SSR was tried and removed).
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,
     surface micro-structure at eye height — ground grain/pebble relief,
@@ -858,34 +858,31 @@ verify suite that proves it.
     markers before and markers after the gift plus the toast, their
     persistence across re-entry, and the panorama wildlife count via the
     dev hook, with a screenshot of the highlighted village.
-32. **Render pipeline upgrades — in progress.** TRAA, screen-space
-    reflections and true water refraction (`design.md` §2.7) are being
-    rebuilt in small backend-neutral steps with a supervised manual test
-    loop: the headless verification runs on the WebGL 2 fallback only
-    (Chromium gets no WebGPU without a display), so after each step the
-    user confirms the WebGPU path on real hardware — the lesson from the
-    reverted first attempt, whose WebGPU-only TRAA/SSR branch went
-    untested and rendered a black scene. Step 1 is done and accepted:
-    TRAA runs backend-neutrally (upstream `TRAANode`, velocity MRT, MSAA
-    off), passed its manual WebGPU check (stable across repeated toggles
-    after the pipeline-rebuild disposal fix, visually on par with 4×
-    MSAA) and is on by default; the debug checkbox (`design.md` §21.3)
-    switches back to the render pass' MSAA. Step 2 is delivered for its
-    manual check: SSR (upstream `SSRNode`, metalness/roughness MRT,
-    dielectrics included so the water reflects, additive composite
-    before the temporal resolve) sits behind a default-off debug
-    checkbox and runs on the WebGPU backend only — three r185's SSRNode
-    emits invalid GLSL on WebGL 2 (upstream), so on the fallback the
-    checkbox is disabled, the flag is inert and reflections stay with
-    the IBL. True water refraction remains OPEN. Verifiable:
+32. **Render pipeline upgrades.** TRAA, screen-space reflections and true
+    water refraction (`design.md` §2.7) were rebuilt in small
+    backend-neutral steps with a supervised manual test loop: the headless
+    verification runs on the WebGL 2 fallback only (Chromium gets no WebGPU
+    without a display), so each step was confirmed on real hardware — the
+    lesson from the reverted first attempt, whose WebGPU-only TRAA/SSR
+    branch went untested and rendered a black scene. Step 1 is done and
+    accepted: TRAA runs backend-neutrally (upstream `TRAANode`, velocity
+    MRT, MSAA off), passed its manual WebGPU check (stable across repeated
+    toggles after the pipeline-rebuild disposal fix, visually on par with
+    4× MSAA) and is on by default; the debug checkbox (`design.md` §21.3)
+    switches back to the render pass' MSAA. Step 2 (SSR: upstream
+    `SSRNode`, metalness/roughness MRT, additive composite before the
+    temporal resolve, WebGPU backend only) was delivered and went through
+    its manual WebGPU check on 14.07.2026 — verdict: with the bird's-eye
+    camera never at grazing angles and the first-person scenes having no
+    water or gloss, no in-game situation makes SSR read, so by user
+    decision it was REMOVED again (the pipeline reads exactly as after
+    step 1). True water refraction remains OPEN. Verifiable:
     `scripts/verify/settings.mjs` toggles TRAA at runtime, asserts a
     non-black frame without console errors on the WebGL 2 path (with
-    screenshot 69), gates the rebuild leak on a flat renderer texture
-    count across repeated toggle cycles, and asserts the SSR flag stays
-    inert on the WebGL 2 fallback (no shader errors, frame intact);
-    `src/ui/DebugMenu.test.tsx` asserts both localized checkboxes (TRAA
-    default on, SSR default off and disabled on the fallback) writing
-    through to the UI store.
+    screenshot 69), and gates the rebuild leak on a flat renderer texture
+    count across repeated toggle cycles; `src/ui/DebugMenu.test.tsx`
+    asserts the localized TRAA checkbox (default on) writing through to
+    the UI store.
 
 ### 7.2 Self-Verification (mandatory)
 

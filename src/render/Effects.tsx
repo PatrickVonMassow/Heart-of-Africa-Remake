@@ -10,21 +10,20 @@
 // pass' MSAA samples. TRAA requires MSAA off and a velocity MRT target, so
 // the scene pass is built per mode.
 //
-// Screen-space reflections (design.md §2.7) sit behind a default-off debug
-// toggle and run on the WebGPU backend only — three r185's SSRNode emits
-// invalid GLSL on WebGL 2 (upstream), so on the fallback the toggle is inert
-// and reflections stay with the IBL environment.
+// Screen-space reflections were integrated (design.md §2.7) but removed again
+// after the manual WebGPU check (CLAUDE.md pt. 32): with the bird's-eye camera
+// never reaching grazing angles and the first-person scenes having no water or
+// gloss, no in-game situation makes SSR read, so it was dead weight.
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
 import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { metalness, mix, mrt, normalView, output, pass, roughness, smoothstep, vec2, vec3, vec4, velocity, viewportUV } from 'three/tsl'
+import { mix, mrt, normalView, output, pass, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
-import { ssr } from 'three/addons/tsl/display/SSRNode.js'
 import { createEnvironmentTexture } from './environment'
 import { useUi } from '../state/ui'
 
@@ -48,11 +47,6 @@ export function Effects() {
   }, [scene])
 
   const traaEnabled = useUi((s) => s.traaEnabled)
-  const ssrEnabled = useUi((s) => s.ssrEnabled)
-  const webglFallback = useUi((s) => s.webglFallback)
-  // Hard backend gate: SSRNode compiles to invalid GLSL on WebGL 2 (upstream,
-  // three r185), so the toggle is inert on the fallback.
-  const ssrActive = ssrEnabled && !webglFallback
 
   const post = useMemo(() => {
     // The toggle rebuilds the whole pipeline, and three's RenderPipeline
@@ -63,8 +57,7 @@ export function Effects() {
     const disposables: Array<{ dispose: () => void }> = []
 
     // TRAA jitters the camera and resolves temporally, so MSAA must be off
-    // and the pass must write per-pixel velocities. SSR additionally needs
-    // per-pixel metalness/roughness targets. The samples MUST be set
+    // and the pass must write per-pixel velocities. The samples MUST be set
     // explicitly: an omitted option inherits renderer.samples (4, from
     // antialias: true), and a multisampled depth breaks TRAA's history copy
     // with per-frame WebGPU validation errors.
@@ -79,8 +72,6 @@ export function Effects() {
         output,
         normal: normalView,
         ...(traaEnabled ? { velocity } : {}),
-        // Combined attachment as in the upstream SSR example.
-        ...(ssrActive ? { metalrough: vec2(metalness, roughness) } : {}),
       }),
     )
     const color = scenePass.getTextureNode('output')
@@ -94,44 +85,7 @@ export function Effects() {
     const aoNoise = (aoPass as unknown as { _noiseNode?: { value?: { dispose: () => void } } })
       ._noiseNode?.value
     disposables.push({ dispose: () => aoNoise?.dispose() })
-    let aoComposed = color.mul(aoPass.getTextureNode().r)
-
-    // Screen-space reflections (WebGPU only, design.md §2.7): mirror trace
-    // with roughness-driven blur, dielectrics included so the water (a
-    // non-metal) picks up shore and terrain reflections on top of its IBL
-    // sky. Added before the temporal resolve so TRAA settles the SSR noise.
-    if (ssrActive) {
-      const metalRough = scenePass.getTextureNode('metalrough')
-      // The upstream declaration types the inputs as plain value nodes, but
-      // the implementation samples them at arbitrary UVs — the pass texture
-      // nodes are exactly what it needs (as in the upstream example).
-      const ssrNode = ssr(
-        color,
-        depth as unknown as THREE.Node<'float'>,
-        normal as unknown as THREE.Node<'vec3'>,
-        {
-          metalnessNode: metalRough.r,
-          roughnessNode: metalRough.g,
-          reflectNonMetals: true,
-          camera,
-        },
-      )
-      disposables.push(ssrNode)
-      // Placeholder tuning for the game's world scale (10 units/degree,
-      // bird's-eye camera ~40 units up at zoom 1 — ~21 at the 0.5 default);
-      // calibrated in the manual check loop.
-      ssrNode.maxDistance.value = 40
-      ssrNode.thickness.value = 0.5
-      ssrNode.resolutionScale = 0.5
-      // Additive reflection contribution (alpha untouched; the SSR alpha
-      // channel carries the ray distance, not opacity) — masked to SMOOTH
-      // surfaces. reflectNonMetals traces every dielectric, and the blurred
-      // reflections of rough ground (sand/rock, roughness ~0.9) smear huge
-      // gray clouds over the whole frame; only the near-mirror water and
-      // glossy surfaces are meant to reflect.
-      const smoothMask = smoothstep(0.15, 0.45, metalRough.g).oneMinus()
-      aoComposed = aoComposed.add(vec4(ssrNode.rgb.mul(smoothMask), 0))
-    }
+    const aoComposed = color.mul(aoPass.getTextureNode().r)
 
     // Temporal resolve over the AO-composed image, so the accumulation also
     // settles the (jittered) AO term instead of re-aliasing it afterwards.
@@ -202,7 +156,7 @@ export function Effects() {
       }
     }
     return { processing, dispose }
-  }, [gl, scene, camera, traaEnabled, ssrActive])
+  }, [gl, scene, camera, traaEnabled])
 
   useEffect(() => {
     return () => {

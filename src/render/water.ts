@@ -7,10 +7,9 @@
 // the IBL environment provides sky reflections. World-anchored via a uniform
 // offset so the plane can follow the player without the pattern swimming.
 //
-// Screen-space reflections come from the post pipeline's SSR pass on WebGPU
-// (render/Effects.tsx, debug-gated); the IBL environment provides the sky
-// reflections everywhere. OPEN: true refraction (design.md §2) is beyond the
-// POC pipeline.
+// The IBL environment provides the sky reflections everywhere. OPEN: true
+// refraction (design.md §2) is beyond the POC pipeline. (Screen-space
+// reflections were tried and removed — see render/Effects.tsx.)
 
 import * as THREE from 'three/webgpu'
 import {
