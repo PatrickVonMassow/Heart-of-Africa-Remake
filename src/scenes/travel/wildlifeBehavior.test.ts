@@ -11,6 +11,8 @@ import {
   separationPush,
   turnToward,
   type FlightState,
+  killFlockMayDescend,
+  VULTURE_DESCEND_CLEAR_DIST,
 } from './wildlifeBehavior'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
@@ -465,5 +467,21 @@ describe('clamped separation (design.md §19 — a force, not a teleport)', () =
     const cap = SEPARATION_MAX_SPEED * dt
     const k = m > cap ? cap / m : 1
     expect(Math.hypot(dx * k, dz * k)).toBeLessThanOrEqual(cap + 1e-9)
+  })
+})
+
+describe('killFlockMayDescend (design.md §19.6 — land once the site is clear)', () => {
+  it('never lands while the predator feeds', () => {
+    expect(killFlockMayDescend('feed', 0, 0, 0, 0)).toBe(false)
+    expect(killFlockMayDescend('feed', 100, 100, 0, 0)).toBe(false)
+  })
+
+  it('during the walk-off it lands as soon as the predator cleared the site', () => {
+    expect(killFlockMayDescend('leave', 5, 0, 0, 0)).toBe(false) // still close
+    expect(killFlockMayDescend('leave', VULTURE_DESCEND_CLEAR_DIST + 1, 0, 0, 0)).toBe(true)
+  })
+
+  it('a gone predator frees the site immediately', () => {
+    expect(killFlockMayDescend('idle', 0, 0, 0, 0)).toBe(true)
   })
 })

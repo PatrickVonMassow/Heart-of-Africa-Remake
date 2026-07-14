@@ -845,11 +845,23 @@ the map).
   pinned in MapOverlay.test.tsx (port roster, village chief/market,
   atlas return on leaving); live check + screenshot 98 in polish.mjs.
   design.md §6.1/§7 and CLAUDE.md pt. 3 updated. Full regression green.)
-- [ ] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
+- [x] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
   while feeding at a carcass — feet/body must stay on the surface for the
   whole feed; (b) after the predator has left a kill they wait too long
   before landing — shorten the descent trigger once the site is clear.
   Extend the vulture live-checks/pure tests accordingly.
+  ((a) the kill and player flocks sat on y=0 instead of the terrain height
+  and landed birds ignored the slope beside the carcass — both flocks now
+  sit on the sampled ground and every landed bird (kill flock and ground
+  scavenger) lifts with the slope under its own feet, positive-only hop.
+  (b) the flock now lands once the predator has CLEARED THE SITE
+  (killFlockMayDescend, 12-unit rule, pure-tested) instead of waiting out
+  the whole walk-off — fixing en route a second real bug the new live
+  check caught: the rule first measured against the kill coordinate
+  (px/pz), which stays at the site during leave, not the walking lion
+  (lx/lz). enrichments gates the descend timing (mode 'leave' at descend)
+  and the landed clearance via the new dev hook; design.md §19.6 and
+  CLAUDE.md pt. 12 updated. Full regression green.)
 - [ ] 81. Recognizable settlement surroundings (user report): the current
   panorama never reads as the actual map neighbourhood — mountains, rivers,
   lakes and the local fauna around the settlement are unrecognizable (the

@@ -34,6 +34,7 @@ import {
   leashedGambolDir,
   separationPush,
   turnToward,
+  killFlockMayDescend,
   type FlightState,
 } from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
@@ -1294,10 +1295,14 @@ function Herds() {
             const ph = (i / sg.children.length) * Math.PI * 2
             if (sc.landed) {
               const r = 0.5 + i * 0.35
-              // Positive-only hop so the body never dips below the group, and a
-              // gentler peck so the head tilts down to the carcass without
-              // swinging under the ground.
-              bird.position.set(Math.cos(ph) * r, 0.05 + Math.abs(Math.sin(t * 3 + ph)) * 0.1, Math.sin(ph) * r)
+              const bx = Math.cos(ph) * r
+              const bz = Math.sin(ph) * r
+              // Positive-only hop so the body never dips below the group, a
+              // gentler peck, and a slope lift: on rising ground beside the
+              // carcass the bird stands on ITS ground, not the carcass point.
+              const bll = worldToLatLon(sc.x + bx, sc.z + bz)
+              const lift = Math.max(0, Math.max(0, sampleTerrain(bll.lat, bll.lon, seed).height) - sc.y)
+              bird.position.set(bx, lift + 0.05 + Math.abs(Math.sin(t * 3 + ph)) * 0.1, bz)
               bird.rotation.set(0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3, ph, 0) // heads pecking down
             } else {
               const a2 = t * 0.6 + ph
@@ -2098,6 +2103,8 @@ function Vultures() {
   const killFlight = useRef<FlightState>({ mode: 'idle', x: 0, z: 0 })
   /** 0 = circling overhead, 1 = landed on the remnant and feeding. */
   const killDescend = useRef(0)
+  /** Dev/verify: this frame's minimum landed-bird clearance above ground. */
+  const clearance = useRef(Infinity)
   const geo = useMemo(() => buildVulture(), [])
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
@@ -2108,7 +2115,7 @@ function Vultures() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__vultures = { player: group, kill: killGroup, playerFlight, killFlight, killDescend }
+    w.__vultures = { player: group, kill: killGroup, playerFlight, killFlight, killDescend, clearance }
     return () => {
       delete w.__vultures
     }
@@ -2142,7 +2149,10 @@ function Vultures() {
       }
       group.current.visible = f.mode !== 'idle'
       if (f.mode !== 'idle') {
-        group.current.position.set(f.x, 0, f.z)
+        // Circle relative to the local ground — over high terrain a y=0 base
+        // pulled the flock into (or under) the relief.
+        const gll = worldToLatLon(f.x, f.z)
+        group.current.position.set(f.x, Math.max(0, sampleTerrain(gll.lat, gll.lon, s.seed).height), f.z)
         circle(group.current, t, 4.5, 5.5)
       }
     }
@@ -2163,7 +2173,13 @@ function Vultures() {
           }
         }
       }
-      const toRemnant = !feeding && remnant !== null
+      // The flock lands as soon as the predator has cleared the site — not
+      // only after its whole walk-off despawned (user report: too late).
+      // lx/lz is the predator's actual position — during the walk-off px/pz
+      // stays at the kill site and would keep the distance at zero forever.
+      const toRemnant =
+        remnant !== null &&
+        killFlockMayDescend(LION_STATE.mode, LION_STATE.lx, LION_STATE.lz, remnant.x, remnant.z)
       const f = killFlight.current
       flightStep(
         f,
@@ -2196,8 +2212,12 @@ function Vultures() {
         Math.min(1, killDescend.current + (consuming ? dt / 1.4 : -dt / 1.4)),
       )
       killGroup.current.visible = f.mode !== 'idle'
+      let killMinClear = Infinity
+      clearance.current = Infinity
       if (f.mode !== 'idle') {
-        killGroup.current.position.set(f.x, 0, f.z)
+        const kll = worldToLatLon(f.x, f.z)
+        const killGroundY = Math.max(0, sampleTerrain(kll.lat, kll.lon, s.seed).height)
+        killGroup.current.position.set(f.x, killGroundY, f.z)
         const dsc = killDescend.current
         if (dsc <= 0) {
           circle(killGroup.current, t * 1.15, 3.2, 4.6)
@@ -2214,9 +2234,14 @@ function Vultures() {
             const cz = Math.sin(a) * r
             const lr = 0.5 + i * 0.35
             const lx = Math.cos(phase) * lr
-            const ly = 0.25 + Math.sin(t * 3 + phase) * 0.12
             const lz = Math.sin(phase) * lr
+            // Positive-only hop, lifted by the slope under the bird so no
+            // body ever sinks into rising ground beside the remnant.
+            const bll = worldToLatLon(f.x + lx, f.z + lz)
+            const lift = Math.max(0, Math.max(0, sampleTerrain(bll.lat, bll.lon, s.seed).height) - killGroundY)
+            const ly = lift + 0.15 + Math.abs(Math.sin(t * 3 + phase)) * 0.12
             bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
+            if (dsc > 0.6) killMinClear = Math.min(killMinClear, ly - lift)
             if (dsc > 0.6) {
               bird.rotation.set(0.6 + Math.sin(t * 4 + phase) * 0.3, phase, 0) // pecking down
             } else {
@@ -2225,6 +2250,7 @@ function Vultures() {
             bird.scale.setScalar(1.6)
           })
         }
+        clearance.current = killMinClear
       }
     }
   })

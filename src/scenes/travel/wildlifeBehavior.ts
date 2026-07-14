@@ -283,3 +283,22 @@ export function leashedGambolDir(
   return l > 1 ? [dx / l, dz / l] : [dx, dz]
 }
 
+
+/** The circling kill flock may land once the predator no longer guards the
+ *  site: never during the feed, and during the walk-off only after it has
+ *  moved this far from the remnant — not only once it despawned beyond the
+ *  view ring, which made the flock wait far too long (user report). */
+export const VULTURE_DESCEND_CLEAR_DIST = 12
+
+export function killFlockMayDescend(
+  predatorMode: string,
+  predatorX: number,
+  predatorZ: number,
+  remnantX: number,
+  remnantZ: number,
+): boolean {
+  if (predatorMode === 'feed') return false
+  if (predatorMode === 'leave')
+    return Math.hypot(predatorX - remnantX, predatorZ - remnantZ) > VULTURE_DESCEND_CLEAR_DIST
+  return true
+}

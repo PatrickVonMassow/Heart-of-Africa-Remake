@@ -2322,11 +2322,13 @@ const remnant = await page.evaluate(async () => {
   const sc = w.scavenger.current
   sc.target = null
   sc.mode = 'idle'
-  // Reset the kill flight too: the zoom tests above leave it mid fly-off, and
-  // under full-suite RAF throttling finishing that cycle plus the fresh fly-in
-  // can exceed the landing window — from idle it spawns at the view ring like
-  // any real kill's flock (setup only; the descent itself stays live).
-  window.__vultures.killFlight.current.mode = 'idle'
+  // Park the kill flock CIRCLING OVER THE KILL, as it genuinely is during a
+  // real feed (the zoom tests above leave it mid fly-off; a fresh fly-in from
+  // the ring would let the predator finish its whole walk-off first and
+  // falsify the lands-while-leaving timing below).
+  window.__vultures.killFlight.current.mode = 'active'
+  window.__vultures.killFlight.current.x = p().x + 6
+  window.__vultures.killFlight.current.z = p().z
   window.__vultures.killDescend.current = 0
   L.victim = null
   L.victimHunt = false
@@ -2362,12 +2364,25 @@ const remnant = await page.evaluate(async () => {
   while (Date.now() - t0 < 45000) {
     if (sc.target === rem) out.scavengerUninvolved = false
     const f = kf()
+    // The flock must start its descent while the predator is still walking
+    // off in sight — not only after the whole leave despawned (user report).
+    if (out.modeAtDescend === undefined && window.__vultures.killDescend.current > 0.5) out.modeAtDescend = L.mode
     if (
       f.mode === 'active' &&
       Math.hypot(f.x - rem.x, f.z - rem.z) < 2.5 &&
       window.__vultures.killDescend.current > 0.7
     ) { out.flockLanded = true; break }
     await sleep(100)
+  }
+  // While the flock feeds, no landed bird may sink into the terrain: the dev
+  // hook reports the frame's minimum bird clearance above its own ground.
+  if (out.flockLanded) {
+    out.minClearance = Infinity
+    for (let i = 0; i < 12; i++) {
+      const c = window.__vultures.clearance.current
+      if (typeof c === 'number' && Number.isFinite(c)) out.minClearance = Math.min(out.minClearance, c)
+      await sleep(100)
+    }
   }
   t0 = Date.now()
   while (Date.now() - t0 < 30000) {
@@ -2384,6 +2399,11 @@ check('a finished hunt leaves a small prey remnant at the kill site',
   remnant.remnantFound && remnant.small, JSON.stringify(remnant))
 check('the circling kill flock descends on the remnant and finishes it (scavenger uninvolved)',
   remnant.flockLanded && remnant.consumed && remnant.scavengerUninvolved, JSON.stringify(remnant))
+check('the flock lands while the predator is still walking off in sight',
+  remnant.modeAtDescend === 'leave', `mode at descend: ${remnant.modeAtDescend}`)
+check('no landed vulture sinks into the terrain while feeding',
+  typeof remnant.minClearance === 'number' && remnant.minClearance > -0.05,
+  `min clearance ${remnant.minClearance}`)
 
 const noRemnant = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

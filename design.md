@@ -513,7 +513,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - Every wandering predator attacks the player on contact (§14), rate-limited by the event cooldown, with the §14 danger order (lion > hyena > leopard > cheetah, which is timid toward people) and protection rules (§7/§14). Away from a contact the predators remain scenery.
 - The predator closes in from a random direction, so hunts run any which way across the plain. The fleeing prey weaves left and right to shake the hunter, which pursues with a limited turning rate (sharp cuts throw it wide) yet is faster and closes in over time.
 - Brought-down prey is visibly fed on (the predator stands over the carcass with lowered, rhythmically tearing head movements, a red stain spreading beneath) while the carcass shrinks away piece by piece.
-- The kill is not stripped bare: a small remnant stays beside the stain when the predator walks off, and the vultures that circled the kill all along descend and finish it themselves. No new scavenger flies in for a flocked kill; the lone ground scavenger serves only carcasses without a circling flock (e.g. trampled animals).
+- The kill is not stripped bare: a small remnant stays beside the stain when the predator walks off, and the vultures that circled the kill all along descend and finish it themselves — starting as soon as the predator has cleared the site (a dozen strides away), not only once its walk-off has left the whole view. No new scavenger flies in for a flocked kill; the lone ground scavenger serves only carcasses without a circling flock (e.g. trampled animals).
 
 ### 19.4 Elephants and trampling
 
@@ -532,7 +532,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 ### 19.6 Vultures and carcasses
 
 - Vultures gather and circle above a lion kill.
-- A carcass the predator did not eat — a trampled animal, any other death — is not left lying forever: a vulture flies in, lands and feeds, and the carcass shrinks away the same way a lion kill dissolves.
+- A carcass the predator did not eat — a trampled animal, any other death — is not left lying forever: a vulture flies in, lands and feeds, and the carcass shrinks away the same way a lion kill dissolves. Feeding birds stand ON the ground under their own feet — flocks sit on the local terrain height and each landed bird lifts with the slope beside the carcass, so no vulture ever sinks into rising ground.
 - No vulture ever pops into or out of the picture: every flight — lone scavenger and flocks alike — appears beyond the visible surroundings (however far the current zoom reaches), flies in, and once its reason has passed flies off and vanishes only well outside the view again.
 - If the character is in poor health (§6), vultures circle above and follow them for a while — an atmospheric signal without its own mechanics.
 
