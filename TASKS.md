@@ -1165,7 +1165,7 @@ as-is; only the sequence changes.
   pt. 19 and scripts/verify/README.md record the cache.
   (track: 14.07. 12:52 -> 13:35, 43 min, ~60k in / ~10k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
-- [ ] 89. Map presentation (user request): the opened map — continental
+- [*] 89. Map presentation (user request): the opened map — continental
   atlas AND in-place town plan — must sit BOTTOM-LEFT instead of centred,
   and both modes must show the CURRENT PLAYER POSITION.
 
@@ -1687,6 +1687,46 @@ as-is; only the sequence changes.
   known river-side dressing/wildlife position and asserts they are not
   near-black (and not pure-white). Screenshot at the repro spot showing
   the shapes gone. design.md note only if a design rule is involved.
+
+- [ ] 102. First-person surroundings wildlife doesn't match the bird's-eye
+  landscape (user report): in Cairo (first-person) animals drifted through
+  the skyline RIGHT NEXT TO the pyramids; after leaving to the bird's-eye
+  view there were no animals by the pyramids and none anywhere nearby.
+  ROOT CAUSE (two independent systems): the §2.5 first-person silhouettes
+  (`PanoramaWildlife`, a decorative ring around the settlement) are NOT the
+  same individuals as the bird's-eye wildlife streaming
+  (`src/scenes/travel/` Wildlife, which spawns/despawns around the traveller).
+  Full individual consistency between the two is out of scope (the bird's-eye
+  wildlife is a live sim); the two concrete breakages ARE fixable:
+
+  (a) SILHOUETTES NEVER CROSS A FIXED SKYLINE LANDMARK. A drifting
+  silhouette must not pass across a settlement's fixed skyline feature —
+  Cairo's Giza pyramids (`__placeSkyline`/`GizaSkyline`), Cape Town's Table
+  Mountain, Timbuktu's mosque. Compute each landmark's azimuth span (from
+  its placement) and skip/hide any silhouette whose ring azimuth falls
+  within that span plus a margin, so animals never appear on or beside the
+  monument. Pure-test the azimuth-exclusion helper.
+
+  (b) THE BIRD'S-EYE VICINITY OF A SETTLEMENT IS NOT EMPTY. Leaving a
+  settlement should not reveal a barren plain where the first-person view
+  showed life. Either (design decision, pick and record in design.md §2.5):
+  seed a few ambient bird's-eye wildlife near every settlement so the
+  vicinity is populated on exit, OR reduce/omit the first-person silhouettes
+  in directions where the bird's-eye is genuinely empty so the two views do
+  not contradict. Prefer the first (a livelier world) unless it fights the
+  streaming/despawn budget. Whichever: after leaving a settlement the
+  bird's-eye must show at least some region-typical wildlife within view
+  (live-checked).
+
+  (c) SPECIES/DENSITY MATCH the region's actual bird's-eye wildlife pool
+  (mostly true already — north=antelope, etc.; verify and align).
+
+  Verifiable: pure azimuth-exclusion test; `scripts/verify/polish.mjs` — no
+  panorama silhouette sits within a landmark's azimuth span in Cairo
+  (screenshot); `scripts/verify/enrichments.mjs` — after leaving a
+  settlement, region-typical bird's-eye wildlife is present within the
+  view ring. design.md §2.5 records the landmark-exclusion rule and the
+  vicinity-population decision.
 
 ## Closing (only after all points)
 
