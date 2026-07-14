@@ -1,12 +1,17 @@
-// Shared TSL node materials for surfaces that need procedural texture
-// (plaster, mud, thatch, ground). World-space noise keeps them seamless
-// across separately placed meshes without any UV work. Every material also
-// perturbs its NORMAL from a matching height field (design.md §2.6/§7.1
-// pt. 11): color noise alone reads soft and washed out at first-person eye
-// height — the fine structure comes from light reacting to micro-relief.
+// Shared TSL node materials for the settlement surfaces. The micro-structure
+// (colour grain and normal relief) comes from BAKED tileable textures
+// (scripts/generate-surface-textures.mjs, design.md §2.6): loaded with
+// mipmaps + anisotropy, the GPU mip chain band-limits the detail
+// automatically — near surfaces stay sharp at millimetre grain, far surfaces
+// calm down without the hand-tuned distance fades the procedural fields
+// needed (the fades remain only for the few still-procedural materials).
+// World-space triplanar mapping keeps every mesh seamless without UV work,
+// and blending two texture scales by a low-frequency mask hides the tiling
+// repetition.
 
 import * as THREE from 'three/webgpu'
 import {
+  cameraViewMatrix,
   color,
   dFdx,
   dFdy,
@@ -16,12 +21,14 @@ import {
   mx_fractal_noise_float,
   mx_worley_noise_float,
   normalView,
+  normalWorld,
   positionView,
   positionWorld,
   smoothstep,
   texture,
   vec2,
   vec3,
+  vec4,
 } from 'three/tsl'
 
 /**
@@ -51,16 +58,175 @@ export function proceduralBump(height: unknown, strength: unknown) {
  * noise turns sub-pixel in the distance, where the TRAA camera jitter samples
  * a different value every frame and the temporal resolve cannot converge —
  * the ground visibly trembles. Detail amplitudes are multiplied by this fade
- * so far surfaces fall back to their flat base color/normal.
+ * so far surfaces fall back to their flat base color/normal. (The baked
+ * settlement textures need none of this: their mip chain band-limits.)
  */
 export function detailFade(near: number, far: number) {
   return smoothstep(float(far), float(near), positionView.z.negate())
 }
 
+// --- Baked surface textures ------------------------------------------------------
+
+/** Baked settlement-surface kinds (scripts/generate-surface-textures.mjs). */
+export type SurfaceKind = 'plaster' | 'mud' | 'thatch' | 'wood' | 'ground'
+
+/** World-space tile size in metres per surface kind (512 px per tile). */
+const SURFACE_TILE: Record<SurfaceKind, number> = {
+  plaster: 1.4,
+  mud: 1.6,
+  thatch: 1.1,
+  wood: 0.9,
+  ground: 2.4,
+}
+
+const surfaceTexCache = new Map<string, THREE.Texture>()
+
+/**
+ * Loads a baked surface map with repeat wrapping, mipmaps and anisotropy —
+ * the mip/anisotropy setup is what makes the relief distance-stable. The
+ * albedo is a mid-gray structure map multiplied onto the region tint, so it
+ * stays linear (NoColorSpace) like the normal map. Under Vitest (jsdom, no
+ * image decode) a bare Texture with the same sampler state stands in.
+ */
+export function loadSurfaceTexture(name: string): THREE.Texture {
+  const cached = surfaceTexCache.get(name)
+  if (cached) return cached
+  const t =
+    import.meta.env.MODE === 'test'
+      ? new THREE.Texture()
+      : new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}tex/${name}.png`)
+  t.wrapS = THREE.RepeatWrapping
+  t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = THREE.NoColorSpace
+  t.anisotropy = 8
+  surfaceTexCache.set(name, t)
+  return t
+}
+
+/** Triplanar blend weights from the world normal (sharpened, sum = 1). */
+function triplanarWeights() {
+  const bw = normalWorld.abs().pow(3)
+  return bw.div(bw.x.add(bw.y).add(bw.z))
+}
+
+// Projections use pos.zy / pos.xz / pos.xy (Ben Golus's convention): both
+// side projections keep texture v along world Y, so anisotropic maps
+// (thatch strands, wood grain) run vertically on every wall face.
+
+// The freq/strength/uv parameters are TSL float/vec nodes; the published
+// node typings are narrower than the runtime (same gap proceduralBump
+// bridges), so they pass as `unknown` with local casts.
+
+/** Triplanar albedo sample in world space. */
+function triplanarColor(tex: THREE.Texture, freq: unknown) {
+  const p = positionWorld.mul(freq as never)
+  const w = triplanarWeights()
+  return texture(tex, p.zy)
+    .mul(w.x)
+    .add(texture(tex, p.xz).mul(w.y))
+    .add(texture(tex, p.xy).mul(w.z))
+}
+
+/**
+ * Triplanar tangent-space normal map applied to the world normal ("whiteout"
+ * blend). `strength` scales the tangent-space xy deflection (0 = flat, e.g.
+ * worn paths). Returns a world-space normal.
+ */
+function triplanarNormal(tex: THREE.Texture, freq: unknown, strength: unknown) {
+  const p = positionWorld.mul(freq as never)
+  const w = triplanarWeights()
+  const unpack = (uv: unknown) => {
+    const t = texture(tex, uv as never).xyz.mul(2).sub(1)
+    return vec3(t.x.mul(strength as never) as never, t.y.mul(strength as never) as never, t.z as never)
+  }
+  const tnx = unpack(p.zy)
+  const tny = unpack(p.xz)
+  const tnz = unpack(p.xy)
+  const wn = normalWorld
+  const nx = vec3(tnx.x.add(wn.z) as never, tnx.y.add(wn.y) as never, tnx.z.abs().mul(wn.x) as never)
+  const ny = vec3(tny.x.add(wn.x) as never, tny.y.add(wn.z) as never, tny.z.abs().mul(wn.y) as never)
+  const nz = vec3(tnz.x.add(wn.x) as never, tnz.y.add(wn.y) as never, tnz.z.abs().mul(wn.z) as never)
+  return nx.zyx.mul(w.x).add(ny.xzy.mul(w.y)).add(nz.xyz.mul(w.z)).normalize()
+}
+
+/** Low-frequency 0..1 mask that switches between the two texture scales. */
+function tileBreakMask() {
+  return smoothstep(
+    float(0.3),
+    float(0.7),
+    mx_fractal_noise_float(positionWorld.mul(0.17), 2).mul(0.5).add(0.5),
+  )
+}
+
+/** Structure factor (~1.0 mean): baked albedo at two scales, mask-blended. */
+function surfaceStructure(kind: SurfaceKind) {
+  const aTex = loadSurfaceTexture(`${kind}_a`)
+  const f1 = float(1 / SURFACE_TILE[kind])
+  const f2 = f1.mul(0.353)
+  return mix(triplanarColor(aTex, f1), triplanarColor(aTex, f2), tileBreakMask()).rgb.mul(2.0)
+}
+
+/** Baked normal at two scales, mask-blended in world space, view-space out. */
+function surfaceNormal(kind: SurfaceKind, strength: unknown) {
+  const nTex = loadSurfaceTexture(`${kind}_n`)
+  const f1 = float(1 / SURFACE_TILE[kind])
+  const f2 = f1.mul(0.353)
+  const blended = mix(
+    triplanarNormal(nTex, f1, strength),
+    triplanarNormal(nTex, f2, strength),
+    tileBreakMask(),
+  ).normalize()
+  // The blend runs in WORLD space, so view space is one camera rotation away.
+  // (transformNormalToView is wrong here: it expects an OBJECT-space normal
+  // and would apply each mesh's model rotation a second time — rotated
+  // buildings and the tilted ground disc rendered with broken lighting.)
+  return cameraViewMatrix.mul(vec4(blended, 0)).xyz.normalize()
+}
+
+export interface SurfaceMaterialOptions {
+  base: string
+  alt: string
+  roughness?: number
+  /** Scales the normal map's tangent deflection (1 = as baked). */
+  bump?: number
+  /** Weathering: darkened base course and faint vertical run-off streaks. */
+  weathered?: boolean
+}
+
+/**
+ * Settlement wall/roof material from the baked maps: the region tint (base→
+ * alt by low-frequency world noise) multiplied with the baked structure
+ * albedo, and the baked normal map as micro-relief. Low-frequency parts
+ * (tint mix, weathering) stay procedural — they cannot tremble under TRAA.
+ */
+export function createSurfaceMaterial(
+  kind: Exclude<SurfaceKind, 'ground'>,
+  opts: SurfaceMaterialOptions,
+): THREE.MeshStandardNodeMaterial {
+  const m = new THREE.MeshStandardNodeMaterial()
+  m.roughness = opts.roughness ?? 0.95
+  m.metalness = 0
+  const tone = mx_fractal_noise_float(positionWorld.mul(0.5), 3).mul(0.5).add(0.5)
+  let col = mix(color(opts.base), color(opts.alt), tone.clamp(0, 1)).mul(surfaceStructure(kind))
+  if (opts.weathered) {
+    // Base course: the lowest ~0.6 units darken toward the ground (splash
+    // zone), and faint vertical streaks run down the walls (weather run-off).
+    const base = smoothstep(float(0.7), float(0.05), positionWorld.y)
+    const streaks = mx_fractal_noise_float(positionWorld.mul(vec3(2.2, 0.25, 2.2)), 3)
+      .mul(0.5)
+      .add(0.5)
+    col = col.mul(base.mul(-0.18).add(1))
+    col = col.mul(streaks.mul(0.12).add(0.94))
+  }
+  m.colorNode = col
+  m.normalNode = surfaceNormal(kind, float(opts.bump ?? 1))
+  return m
+}
+
 export interface NoisyMaterialOptions {
   base: string
   alt: string
-  /** Noise frequency per world unit; a vec3 allows anisotropy (e.g. thatch). */
+  /** Noise frequency per world unit; a vec3 allows anisotropy (e.g. cloth). */
   scale: number | [number, number, number]
   roughness?: number
   octaves?: number
@@ -71,8 +237,9 @@ export interface NoisyMaterialOptions {
 }
 
 /** Standard material whose color blends base→alt by world-space fBm noise,
- *  with the same field driving a micro-relief bump so the surface structure
- *  catches the light instead of reading as a flat wash. */
+ *  with the same field driving a micro-relief bump. Still fully procedural —
+ *  for the materials without a baked map (e.g. cloth); the distance fade
+ *  keeps its high-frequency grain from trembling under TRAA. */
 export function createNoisyMaterial(opts: NoisyMaterialOptions): THREE.MeshStandardNodeMaterial {
   const m = new THREE.MeshStandardNodeMaterial()
   m.roughness = opts.roughness ?? 0.95
@@ -116,12 +283,11 @@ export interface GroundPathOptions {
 }
 
 /**
- * Ground material: large noise patches, Worley cell mottling and a fine sandy
- * grain, e.g. for trampled sand or dry village earth. The relief is real:
- * ripples, grain and pebble cells perturb the normal, and trodden paths are
- * SMOOTHER than the surrounding ground (worn flat) rather than a painted
- * stripe. An optional path mask blends the street/path network into the
- * ground (design.md §2 lively settlements).
+ * Ground material: region tint and large Worley patch mottling over the baked
+ * earth structure (grain, pebbles — relief from the baked normal map, so it
+ * stays distance-stable under the mip chain). Trodden paths from the optional
+ * mask are SMOOTHER than the surrounding ground (worn flat) rather than a
+ * painted stripe (design.md §2 lively settlements).
  */
 export function createGroundMaterial(
   base: string,
@@ -134,14 +300,9 @@ export function createGroundMaterial(
   m.metalness = 0
   const p = positionWorld.xz
   const large = mx_fractal_noise_float(vec3(p.mul(0.08), 2.0), 4).mul(0.5).add(0.5)
-  const micro = mx_fractal_noise_float(vec3(p.mul(1.1), 5.0), 3).mul(0.5).add(0.5)
-  const grain = mx_fractal_noise_float(vec3(p.mul(4.2), 7.0), 2).mul(0.5).add(0.5)
   const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0))
-  const pebbles = mx_worley_noise_float(vec3(p.mul(1.6), 11.0))
   let col = mix(color(base), color(alt), large.clamp(0, 1))
   col = mix(col, color(patch), cells.oneMinus().pow(3).mul(0.5))
-  // Scattered pebbles/clods read as small dark specks at eye height (the
-  // distance-faded speck term joins the colorNode below).
   const pathMask = (() => {
     if (!paths) return float(0)
     // Mask canvas maps the square ±extent around the place origin.
@@ -156,16 +317,9 @@ export function createGroundMaterial(
       .clamp(0, 1)
   })()
   if (paths) col = mix(col, color(paths.color), pathMask.mul(float(0.95)))
-  // The fine grain and pebble specks are centred and distance-faded: they are
-  // sub-pixel past ~50 units, where the TRAA jitter made the ground tremble.
-  const fade = detailFade(16, 48)
-  m.colorNode = col
-    .mul(micro.mul(0.25).add(0.87))
-    .mul(grain.sub(0.5).mul(0.2).mul(fade).add(1.0))
-    .mul(pebbles.oneMinus().pow(6).mul(-0.22).mul(fade).add(1))
-  // Real micro-relief: soft ripples + sandy grain + pebble bumps; trodden
-  // paths are worn flat (bump fades where the mask is strong).
-  const height = micro.mul(0.3).add(grain.mul(0.45)).add(pebbles.oneMinus().pow(4).mul(0.6))
-  m.normalNode = proceduralBump(height, pathMask.oneMinus().mul(3.4).add(0.6).mul(fade))
+  m.colorNode = col.mul(surfaceStructure('ground'))
+  // Baked micro-relief; trodden paths are worn flat (the tangent deflection
+  // fades where the mask is strong).
+  m.normalNode = surfaceNormal('ground', pathMask.oneMinus().mul(0.85).add(0.15))
   return m
 }

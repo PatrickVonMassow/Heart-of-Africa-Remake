@@ -205,7 +205,10 @@ if (mosque) {
   const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
   await page.evaluate(() => { const g = window.__game.getState(); g.leavePlace() })
-  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 15000 })
+  // Generous timeout: after several place mounts the main thread stalls
+  // ~13-16 s on this transition (pre-existing, measured on the pre-baked-
+  // texture build too; TASKS point 96), so 15 s raced the stall under load.
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
   // Compass probe (point 90): a magenta pillar is injected due WEST of the
   // capture point for exactly this capture — seed-independent orientation
   // proof (real water shifts with each seed's dune cover).

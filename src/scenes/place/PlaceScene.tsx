@@ -41,7 +41,7 @@ import { mulberry32 } from '../../world/noise'
 import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
-import { createGroundMaterial, createNoisyMaterial, detailFade, proceduralBump } from '../../render/materials'
+import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial, detailFade, proceduralBump } from '../../render/materials'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
 import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
@@ -118,19 +118,14 @@ function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
 function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: THREE.Texture | null) {
   return useMemo(() => {
     // Wall/roof materials carry real micro-relief and weathering (design.md
-    // §2.6): fine plaster grain, coarser mud daub, deep anisotropic thatch,
-    // wood grain — each with a darkened base course and run-off streaks.
-    const plaster = createNoisyMaterial({ base: '#e6d9b4', alt: '#c6b488', scale: 0.6, bump: 2.6, weathered: true })
-    const plasterDark = createNoisyMaterial({ base: '#d3c294', alt: '#ab9668', scale: 0.7, bump: 2.6, weathered: true })
-    const mud = createNoisyMaterial({ base: style.hutWall.base, alt: style.hutWall.alt, scale: 0.9, bump: 3.6, weathered: true })
-    const thatch = createNoisyMaterial({
-      base: style.hutThatch.base,
-      alt: style.hutThatch.alt,
-      scale: [2.2, 7, 2.2],
-      octaves: 3,
-      bump: 4.8,
-    })
-    const wood = createNoisyMaterial({ base: '#7a5a32', alt: '#573e1f', scale: [1.2, 4, 1.2], roughness: 0.85, bump: 3.0 })
+    // §2.6) from the baked tileable maps: fine plaster grain, coarser mud
+    // daub, deep anisotropic thatch, wood grain — each with a darkened base
+    // course and run-off streaks. Only cloth stays procedural (no baked map).
+    const plaster = createSurfaceMaterial('plaster', { base: '#e6d9b4', alt: '#c6b488', weathered: true })
+    const plasterDark = createSurfaceMaterial('plaster', { base: '#d3c294', alt: '#ab9668', weathered: true })
+    const mud = createSurfaceMaterial('mud', { base: style.hutWall.base, alt: style.hutWall.alt, bump: 1.3, weathered: true })
+    const thatch = createSurfaceMaterial('thatch', { base: style.hutThatch.base, alt: style.hutThatch.alt, bump: 1.5 })
+    const wood = createSurfaceMaterial('wood', { base: '#7a5a32', alt: '#573e1f', roughness: 0.85 })
     const cloth = createNoisyMaterial({ base: '#d9cdb0', alt: '#b8ab8a', scale: 1.4, roughness: 0.9, bump: 0.7 })
     const pathOpts = pathTex
       ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }

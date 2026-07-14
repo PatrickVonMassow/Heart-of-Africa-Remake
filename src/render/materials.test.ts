@@ -1,11 +1,58 @@
 // Material construction (CLAUDE.md §7.1 pt. 11/15, design.md §2.6): the
-// settlement surfaces carry procedural COLOR structure and a real NORMAL
-// perturbation — the missing normal detail was exactly why first-person
-// surfaces read soft and washed out. The visual result is covered by the
-// Playwright detail checks; here the node wiring itself is pinned.
+// settlement surfaces carry COLOR structure and a real NORMAL perturbation
+// from the baked tileable maps — the missing normal detail was exactly why
+// first-person surfaces read soft and washed out. The visual result is
+// covered by the Playwright detail checks; here the node wiring and the
+// distance-stability sampler state (mips, anisotropy, repeat) are pinned.
 import { describe, it, expect } from 'vitest'
-import { createGroundMaterial, createNoisyMaterial, detailFade, proceduralBump } from './materials'
+import * as THREE from 'three/webgpu'
+import {
+  createGroundMaterial,
+  createNoisyMaterial,
+  createSurfaceMaterial,
+  detailFade,
+  loadSurfaceTexture,
+  proceduralBump,
+} from './materials'
 import { float, mx_fractal_noise_float, positionWorld } from 'three/tsl'
+
+describe('createSurfaceMaterial', () => {
+  it('wires a color node AND a baked micro-relief normal node', () => {
+    for (const kind of ['plaster', 'mud', 'thatch', 'wood'] as const) {
+      const m = createSurfaceMaterial(kind, { base: '#aa8855', alt: '#886633' })
+      expect(m.colorNode).toBeTruthy()
+      expect(m.normalNode).toBeTruthy()
+      expect(m.metalness).toBe(0)
+    }
+  })
+
+  it('accepts roughness, bump scale and weathering', () => {
+    const m = createSurfaceMaterial('mud', {
+      base: '#aa8855',
+      alt: '#886633',
+      bump: 1.3,
+      weathered: true,
+      roughness: 0.8,
+    })
+    expect(m.normalNode).toBeTruthy()
+    expect(m.roughness).toBe(0.8)
+  })
+})
+
+describe('loadSurfaceTexture', () => {
+  it('sets the distance-stability sampler state: repeat, mips, anisotropy', () => {
+    const t = loadSurfaceTexture('plaster_a')
+    expect(t.wrapS).toBe(THREE.RepeatWrapping)
+    expect(t.wrapT).toBe(THREE.RepeatWrapping)
+    expect(t.generateMipmaps).toBe(true)
+    expect(t.anisotropy).toBeGreaterThan(1)
+    expect(t.colorSpace).toBe(THREE.NoColorSpace)
+  })
+
+  it('caches by name (one texture per map)', () => {
+    expect(loadSurfaceTexture('ground_n')).toBe(loadSurfaceTexture('ground_n'))
+  })
+})
 
 describe('createNoisyMaterial', () => {
   it('wires a color node AND a micro-relief normal node', () => {

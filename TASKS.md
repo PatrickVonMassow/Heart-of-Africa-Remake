@@ -1022,7 +1022,7 @@ as-is; only the sequence changes.
   near them. Negligible vertex cost (a handful of figures); no shader
   change needed. Cover the raised tessellation with a pure test on the
   built geometry (segment/vertex floor).
-- [ ] 86. Distance-stable surface roughness via BAKED TEXTURES (user report:
+- [x] 86. Distance-stable surface roughness via BAKED TEXTURES (user report:
   distant walls read detailed/rough while close-up they turn unnaturally
   smooth; approach approved by the user): replace the runtime procedural
   wall/ground shading with reproducibly GENERATED tileable textures —
@@ -1042,6 +1042,24 @@ as-is; only the sequence changes.
   Cover the generator output (tileability: opposite edges match; normal
   map normalisation) and material construction in Vitest; re-verify both
   Playwright gates.
+  (scripts/textureFields.mjs shares the periodic-noise bake core (terrain
+  output stays byte-identical); generate-surface-textures.mjs bakes
+  512² albedo+normal for plaster/mud/thatch/wood/ground into public/tex/.
+  materials.ts samples them world-space triplanar (Golus projections keep
+  thatch/wood fibres vertical on every wall), whiteout-blends the normal
+  maps and mixes two scales by a low-frequency mask against tiling;
+  weathering and path wear ride on top; cloth stays procedural. Fixed en
+  route: a world-space normal fed through transformNormalToView (expects
+  object space) double-rotated on rotated buildings — near-black walls,
+  user screenshot — now rotated by the camera view matrix directly. The
+  user-reported look check passed (bright dusty Cairo). polish's 15 s
+  leave-timeout raced a pre-existing ~13-16 s transition stall (measured
+  on the old build too) — timeout hardened to 45 s, stall filed as point
+  96. 30 new Vitest cases (tileability, normal normalisation,
+  mid-brightness, wiring, sampler state); Vitest 1425, build/lint/audit,
+  settings 25 (edge-energy + TRAA gates) and polish 18 all green.
+  (track: 14.07. 16:57 -> 17:50, ~53 min, ~85k in / ~20k out, model
+  claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 - [x] 87. Natural settlement layout (user report, screenshot): the building
   placement — especially in large ports like Cairo — reads as randomly
   scattered; some entrances are nearly unreachable behind other buildings
@@ -1152,17 +1170,23 @@ as-is; only the sequence changes.
   (landmarks.test.ts) for the added parts; screenshot evidence in both
   views.
 
-- [ ] 92. Floating animals inside settlements (user screenshot, Cairo): the
-  drifting panorama silhouettes sometimes stand in MID-AIR — feet clearly
-  above the visible horizon line. Likely cause: since point 81 the visible
-  horizon is the captured travel band (cylinder), but the silhouettes still
-  stand on the geometry backdrop's formula height (panoramaGroundY /
-  backdropHeightAt) — where band content and backdrop relief disagree, the
-  animals hover. Rework their standing height to match the VISIBLE ground
-  (sample the band's terrain silhouette or hide silhouettes where the
-  capture is active in that direction), keep the point-73 no-sinking rule,
-  and extend the polish live-check (no silhouette hovering above the
-  visible horizon).
+- [ ] 92. Panorama silhouettes stand wrong against the VISIBLE ground
+  (two user screenshots, Cairo): the drifting silhouettes sometimes stand
+  in MID-AIR — feet clearly above the visible horizon line — and sometimes
+  SUNKEN, clipped by the ground disc into flat BLACK shapes on the ground
+  (the point-73(a) artifact class returned; second Cairo screenshot
+  14.07. ~17:30). Cause: since point 81 the visible horizon is the
+  captured travel band (cylinder), but the silhouettes still stand on the
+  geometry backdrop's formula height (panoramaGroundY /
+  backdropHeightAt) — where band content and backdrop relief disagree,
+  the animals hover or sink. WATCHDOG note: the point-73 polish gate
+  checks the FORMULA ground height, so it stayed green while the visible
+  result broke — the reworked live-check must gate against the VISIBLE
+  ground line instead. Rework their standing height to match the visible
+  ground (sample the band's terrain silhouette or hide silhouettes where
+  the capture is active in that direction), keep the point-73
+  no-sinking rule (no black clipped slivers either), and extend the
+  polish live-check accordingly (no hovering, no clipping).
 
 - [ ] 93. The map is no longer an inventory ITEM but always available (user
   request): remove it from the equipment/shop roster (existing saves keep
@@ -1189,6 +1213,32 @@ as-is; only the sequence changes.
   fix both together if one rework covers them. Keep the polish.mjs
   wildlife-count hook green; extend the live check with a bound on the
   rendered silhouette's apparent size; screenshot evidence.
+
+- [ ] 95. Sell dialogs align like a table too (user request, bazaar
+  screenshot): the BUY dialogs already use the aligned price-table layout
+  (CLAUDE.md pt. 5 — name/price/action columns with shared left edges);
+  the SELL listings (bazaar sell side, port gear buy-back, village
+  trading post buy-back) still set each row's price ragged. Give every
+  sell listing the same column grid so names, prices and buttons stand
+  cleanly under each other — and while at it verify the bazaar BUY list
+  from the user's screenshot really shares the price column (the shown
+  prices read ragged; fix if the aligned-table rule only covers the shop
+  dialogs). Both languages untouched (layout only). Extend the
+  Dialogs.test.tsx layout assertions to the sell rows and the flow.mjs
+  aligned-column check to a sell dialog.
+- [ ] 96. Leaving a settlement freezes the game for ~13-16 s once several
+  settlements were visited in a session (found via the polish gate racing
+  its 15 s timeout; measured 13.5 s with the baked textures and 15.7 s
+  WITHOUT them, so it is pre-existing and unrelated to point 86; leaving
+  the very first settlement takes <1.5 s). The main thread blocks between
+  leavePlace() and the travel scene's first frame — suspects: shader
+  (re)compilation of the travel materials after many place-scene programs
+  accumulated, the §2.5 panorama capture readback ("GPU stall due to
+  ReadPixels" warnings), or disposal work from the unmounted place scenes.
+  Profile it, fix the stall (e.g. program cache reuse, async readback,
+  staged compilation), and gate the transition time in a browser suite
+  (leave after several visits well under a few seconds). The polish
+  leave-timeout hardening from point 86 can then tighten back down.
 
 ## Closing (only after all points)
 
