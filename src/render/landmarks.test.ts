@@ -44,6 +44,7 @@ describe('landmark builders', () => {
   it('the sites stay within the travel-marker footprint, grounded at y=0', () => {
     for (const [name, build] of Object.entries(BUILDERS)) {
       if (name === 'buildTableMountain') continue // skyline scale by design
+      if (name === 'buildMeroePyramids') continue // deliberately oversized (own pin below)
       const geo = build()
       geo.computeBoundingBox()
       const b = geo.boundingBox
@@ -53,6 +54,23 @@ describe('landmark builders', () => {
       expect(Math.max(b.max.x - b.min.x, b.max.z - b.min.z), name).toBeLessThan(6)
       geo.dispose()
     }
+  })
+
+  it('the Meroë pyramid field is unmistakable at travel zoom (user request)', () => {
+    const geo = buildMeroePyramids()
+    geo.computeBoundingBox()
+    const b = geo.boundingBox
+    expect(b).toBeTruthy()
+    if (!b) return
+    expect(b.min.y).toBeGreaterThanOrEqual(-0.1) // grounded
+    // Well above tree height (acacia ~2, baobab ~2.6) but no mountain.
+    expect(b.max.y).toBeGreaterThan(3)
+    expect(b.max.y).toBeLessThan(8)
+    // A spread field, still bounded as a point landmark.
+    const footprint = Math.max(b.max.x - b.min.x, b.max.z - b.min.z)
+    expect(footprint).toBeGreaterThan(6)
+    expect(footprint).toBeLessThan(14)
+    geo.dispose()
   })
 
   it('Table Mountain reads as a broad flat-topped massif', () => {

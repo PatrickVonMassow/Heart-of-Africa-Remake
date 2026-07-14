@@ -42,22 +42,24 @@ function pyramid(x: number, z: number, base: number, height: number, seed: numbe
 }
 
 /** Meroë: a cluster of steep-sided Nubian pyramids (steeper than Giza),
- *  sandstone-toned, with slight size/position jitter. */
+ *  sandstone-toned, with slight size/position jitter. Rendered well above
+ *  tree height (acacia ~2, baobab ~2.6) so the field is unmistakable at
+ *  travel zoom (user request: much larger). */
 export function buildMeroePyramids(): THREE.BufferGeometry {
   const rand = mulberry32(4201)
   const parts: THREE.BufferGeometry[] = []
   const spots: Array<[number, number]> = [
     [0, 0],
-    [0.95, 0.35],
-    [-0.85, 0.5],
-    [0.4, -0.9],
-    [-0.5, -0.8],
-    [1.5, -0.4],
+    [2.85, 1.05],
+    [-2.55, 1.5],
+    [1.2, -2.7],
+    [-1.5, -2.4],
+    [4.5, -1.2],
   ]
   spots.forEach(([x, z], i) => {
-    const b = 0.32 + rand() * 0.12
+    const b = 1.0 + rand() * 0.4
     const h = b * (2.6 + rand() * 0.6) // steep: height well over twice the base
-    parts.push(pyramid(x + (rand() - 0.5) * 0.2, z + (rand() - 0.5) * 0.2, b, h, 4210 + i))
+    parts.push(pyramid(x + (rand() - 0.5) * 0.6, z + (rand() - 0.5) * 0.6, b, h, 4210 + i))
   })
   return merge(parts)
 }

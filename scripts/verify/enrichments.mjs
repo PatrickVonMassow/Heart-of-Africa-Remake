@@ -1080,18 +1080,23 @@ const animalHit = await page.evaluate(async () => {
   // Escape phase (regression for the collision blocker): once stopped against the
   // animal, steering must still work — drive back WEST, away from it, and confirm
   // the traveller actually moves clear instead of being pinned to the boundary.
+  // Condition-polled with a generous timeout: the distance covered per wall-clock
+  // window is frame-count-dependent and collapses under full-regression load
+  // (a fixed 1500 ms window flaked at escaped 1.36 vs 5.3 standalone).
   const contact = window.__game.getState().pos
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' })) // drive west, away
   const t1 = Date.now()
-  while (Date.now() - t1 < 1500) {
+  let escaped = 0
+  while (Date.now() - t1 < 12000) {
     const herds2 = window.__wildlife.herdsRef.current
     if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.unshift(zebra)
     zebra.x = ax
     zebra.z = az
+    escaped = contact.x - window.__game.getState().pos.x // >0 means moved west, away
+    if (escaped > 1.6) break // clear of the boundary — not pinned
     await sleep(20)
   }
   window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA' }))
-  const escaped = contact.x - window.__game.getState().pos.x // >0 means moved west, away
   const herds = window.__wildlife.herdsRef.current
   if (herds) herds.zebra = herds.zebra.filter((a) => a !== zebra)
   return { minDist, reached, escaped }

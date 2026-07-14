@@ -65,6 +65,11 @@ function runSuite(name) {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(12)} ${pass} pass, ${fail} fail, ${consoleErrors} console-errors (exit ${res.status})`)
   if (!ok) {
     for (const line of out.split('\n')) if (/^FAIL|ERR:/.test(line)) console.log('      ' + line)
+    // A non-zero exit without any FAIL line is a CRASH (uncaught exception,
+    // timeout throw): echo the tail so the cause is not swallowed.
+    if (res.status !== 0 && fail === 0) {
+      for (const line of out.split('\n').filter((l) => l.trim()).slice(-12)) console.log('      | ' + line)
+    }
   }
   return ok
 }

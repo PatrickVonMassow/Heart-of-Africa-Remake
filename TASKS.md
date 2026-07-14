@@ -778,10 +778,15 @@ the map).
   enrichments.mjs (bar hugs the right edge, badge left of it, dehydration
   toggled as probe); CLAUDE.md pt. 9 Verifiable extended. Full regression
   green.)
-- [ ] 75. The Meroë pyramids must render MUCH larger in the travel view —
+- [x] 75. The Meroë pyramids must render MUCH larger in the travel view —
   today's build reads too small; scale the landmark geometry up so the
   pyramid field is unmistakable at travel zoom (keep the label/sighting
   behaviour; adjust the pure geometry test accordingly).
+  (Field scaled ~3.5x: peaks 3.4-4.6 units — well above tree height
+  (acacia ~2, baobab ~2.6) — footprint ~10 units; own geometry pin in
+  landmarks.test.ts (height 3-8, footprint 6-14, grounded) with the
+  generic <6 bound kept for the other sites. Verified visually at Meroë.
+  Full regression green.)
 - [ ] 76. Canoe clipping still occurs (user screenshot): a canoe DRAGGED ON
   LAND near a water edge protrudes into the water surface. The drag pose
   must keep the hull on the land side of the bank (or resting visibly ON
