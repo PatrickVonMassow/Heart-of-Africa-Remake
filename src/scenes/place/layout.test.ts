@@ -115,6 +115,18 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
     }
   })
 
+  it.each(VILLAGES.map((v) => [v.id] as const))('%s: the elder stands clear of every door trigger', (id) => {
+    const layout = buildLayout(id, seed)
+    const elder = layout.interactives.find((i) => i.type === 'villager')!
+    for (const it2 of layout.interactives) {
+      if (!it2.door) continue
+      expect(
+        Math.hypot(elder.pos[0] - it2.door[0], elder.pos[1] - it2.door[1]),
+        `${id}: elder vs ${it2.type} door`,
+      ).toBeGreaterThan(3.3)
+    }
+  })
+
   it.each(PLACES.map((p) => [p.id] as const))('%s: no building corner reaches the walkable edge', (id) => {
     const layout = buildLayout(id, seed)
     for (const d of layout.dwellings) {

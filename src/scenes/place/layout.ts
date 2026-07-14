@@ -142,7 +142,19 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       marketPos[1] = chiefPos[1] + nz * 7.25
     }
     interactives.push({ type: 'market', pos: marketPos, door: hutDoor(marketPos) })
-    interactives.push({ type: 'villager', pos: [jitter(4, 3), jitter(-4, 2)] })
+    // The elder never stands inside a door trigger: talking to him must not
+    // pop the chief's or trading post's dialog instead.
+    const elderPos: [number, number] = [jitter(4, 3), jitter(-4, 2)]
+    for (const door of [hutDoor(chiefPos), hutDoor(marketPos)]) {
+      const dE = Math.hypot(elderPos[0] - door[0], elderPos[1] - door[1])
+      if (dE < 3.6) {
+        const nx = dE > 1e-6 ? (elderPos[0] - door[0]) / dE : 0
+        const nz = dE > 1e-6 ? (elderPos[1] - door[1]) / dE : 1
+        elderPos[0] = door[0] + nx * 3.6
+        elderPos[1] = door[1] + nz * 3.6
+      }
+    }
+    interactives.push({ type: 'villager', pos: elderPos })
   }
 
   const dwellings: DwellingDef[] = []
