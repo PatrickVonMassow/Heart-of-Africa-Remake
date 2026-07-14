@@ -1162,13 +1162,28 @@ as-is; only the sequence changes.
   documented flake list).
   (track: 14.07. 13:36 -> 15:05, 89 min, ~145k in / ~25k out, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
-- [ ] 91. Model the SPHINX distinctly more elaborately (user request): the
+- [x] 91. Model the SPHINX distinctly more elaborately (user request): the
   current three-box stand-in must become a clearly recognizable sphinx —
   lion body with fore paws stretched forward, haunches, the royal
   headdress (nemes) silhouette, readable both in the travel-scale field
   and scaled up in Cairo's skyline. Extend the Giza geometry pin
   (landmarks.test.ts) for the added parts; screenshot evidence in both
   views.
+  (buildSphinx() in landmarks.ts: couchant torso, raised haunches over
+  folded hind legs, both fore paws stretched forward, tail around the
+  right haunch, upright chest, face block under the trapezoid nemes with
+  flat crown — 11 parts, exported and pinned in landmarks.test.ts
+  (couchant proportions, paw reach, bounded head height, part count).
+  Found en route: the per-run random landmark yaw rotated Giza too — the
+  new asymmetric sphinx made it visible (a probe showed it west of the
+  field); Giza's yaw is now pinned to 0 since its row diagonal and the
+  east-facing Sphinx toward the Nile are real geography. polish.mjs
+  gained a travel-scale section (zoom 0.25 south-east of the field,
+  screenshot 103, giza-mount check); the skyline shows in shot 100.
+  design.md §4.4 and CLAUDE.md pt. 15 record the depiction. Vitest 1426,
+  build/lint/audit clean, polish 19 green.
+  (track: 14.07. 17:52 -> 18:14, ~22 min, ~35k in / ~8k out, model
+  claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [ ] 92. Panorama silhouettes stand wrong against the VISIBLE ground
   (two user screenshots, Cairo): the drifting silhouettes sometimes stand

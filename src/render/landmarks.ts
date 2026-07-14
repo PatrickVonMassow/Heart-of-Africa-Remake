@@ -81,16 +81,65 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
   row.forEach(([x, z, b], i) => {
     parts.push(pyramid(x, z, b, b * 0.64 * 2, 8200 + i))
   })
-  // Sphinx east of Khafre: a crouching body, chest riser and head block.
-  const body = new THREE.BoxGeometry(1.0, 0.28, 0.35)
-  body.translate(2.1, 0.14, 0.3)
-  parts.push(tint(body, '#c29c66', 0.08, 8210))
-  const chest = new THREE.BoxGeometry(0.33, 0.25, 0.33)
-  chest.translate(2.47, 0.38, 0.3)
-  parts.push(tint(chest, '#c29c66', 0.08, 8211))
-  const head = new THREE.BoxGeometry(0.21, 0.23, 0.21)
-  head.translate(2.47, 0.6, 0.3)
-  parts.push(tint(head, '#b8905c', 0.08, 8212))
+  // Sphinx east of Khafre, facing east like the real one.
+  const sphinx = buildSphinx()
+  sphinx.translate(2.1, 0, 0.3)
+  parts.push(sphinx)
+  return merge(parts)
+}
+
+/** The Great Sphinx as a couchant lion under the nemes (design.md §4.4,
+ *  user request: clearly more than a box stand-in): a lying torso with
+ *  raised haunches and folded hind legs, both fore paws stretched forward,
+ *  the tail around the right haunch, an upright chest and the head under
+ *  the trapezoid nemes silhouette (widening down toward the shoulders,
+ *  flat crown). Faces +x (east); origin on the ground at the body centre.
+ *  Proportions are readability-exaggerated for the travel camera; the same
+ *  geometry scales up in Cairo's western skyline. */
+export function buildSphinx(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  const sand = '#c29c66'
+  const put = (g: THREE.BufferGeometry, hex: string, seed: number) => parts.push(tint(g, hex, 0.07, seed))
+  // Lying torso between haunches and shoulders.
+  const torso = new THREE.BoxGeometry(0.78, 0.22, 0.34)
+  torso.translate(-0.05, 0.17, 0)
+  put(torso, sand, 8210)
+  // Raised haunches over the folded hind legs — wider than the torso (hips).
+  const haunch = new THREE.BoxGeometry(0.36, 0.30, 0.40)
+  haunch.translate(-0.36, 0.15, 0)
+  put(haunch, sand, 8211)
+  for (const side of [-1, 1]) {
+    // Folded hind leg along each flank.
+    const hind = new THREE.BoxGeometry(0.42, 0.1, 0.09)
+    hind.translate(-0.3, 0.05, side * 0.21)
+    put(hind, sand, side < 0 ? 8212 : 8213)
+    // Fore paw stretched forward from below the chest.
+    const paw = new THREE.BoxGeometry(0.6, 0.1, 0.1)
+    paw.translate(0.52, 0.05, side * 0.12)
+    put(paw, sand, side < 0 ? 8214 : 8215)
+  }
+  // Tail curling around the right haunch.
+  const tail = new THREE.BoxGeometry(0.06, 0.06, 0.26)
+  tail.translate(-0.52, 0.06, 0.26)
+  put(tail, sand, 8216)
+  // Upright chest between the shoulders.
+  const chest = new THREE.BoxGeometry(0.26, 0.3, 0.3)
+  chest.translate(0.26, 0.33, 0)
+  put(chest, sand, 8217)
+  // Nemes: the headdress silhouette, a truncated four-sided pyramid
+  // widening down toward the shoulders.
+  const nemes = new THREE.CylinderGeometry(0.1, 0.19, 0.22, 4, 1)
+  nemes.rotateY(Math.PI / 4)
+  nemes.translate(0.24, 0.55, 0)
+  put(nemes, sand, 8218)
+  // Face block proud of the nemes front.
+  const head = new THREE.BoxGeometry(0.14, 0.16, 0.15)
+  head.translate(0.3, 0.55, 0)
+  put(head, '#b8905c', 8219)
+  // Flat nemes crown.
+  const crown = new THREE.BoxGeometry(0.14, 0.05, 0.14)
+  crown.translate(0.24, 0.68, 0)
+  put(crown, sand, 8220)
   return merge(parts)
 }
 

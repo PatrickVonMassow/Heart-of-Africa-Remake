@@ -1193,8 +1193,11 @@ function CulturalLandmarks() {
       CULTURAL_LANDMARKS.map((c, i) => {
         const w = latLonToWorld(c.lat, c.lon)
         const y = Math.max(0.2, sampleTerrain(c.lat, c.lon, seed).height)
-        // Seeded per-run, per-site yaw so orientation varies between playthroughs.
-        const yaw = mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
+        // Seeded per-run, per-site yaw so orientation varies between
+        // playthroughs — except Giza: its row diagonal (Khufu NE) and the
+        // east-facing Sphinx are real geography the geometry encodes, and the
+        // west-bank footprint clearance assumes the unrotated extent.
+        const yaw = c.kind === 'giza-pyramids' ? 0 : mulberry32((seed ^ (0x9e3779b1 * (i + 1))) >>> 0)() * Math.PI * 2
         return { id: c.id, kind: c.kind, x: w.x, z: w.z, y, yaw }
       }),
     [seed],

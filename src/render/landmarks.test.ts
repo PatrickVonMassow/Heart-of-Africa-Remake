@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildMeroePyramids,
   buildGizaPyramids,
+  buildSphinx,
   buildStoneCity,
   buildRockChurches,
   buildCoastalRuins,
@@ -73,6 +74,30 @@ describe('landmark builders', () => {
     const footprint = Math.max(b.max.x - b.min.x, b.max.z - b.min.z)
     expect(footprint).toBeGreaterThan(3.5)
     expect(footprint).toBeLessThan(8)
+    geo.dispose()
+  })
+
+  it('the Sphinx reads as a couchant lion under the nemes (user request)', () => {
+    const geo = buildSphinx()
+    geo.computeBoundingBox()
+    const b = geo.boundingBox
+    expect(b).toBeTruthy()
+    if (!b) return
+    expect(b.min.y).toBeGreaterThanOrEqual(-0.05) // grounded
+    const length = b.max.x - b.min.x
+    const width = b.max.z - b.min.z
+    const height = b.max.y
+    // Couchant: clearly longer than tall, and longer than wide.
+    expect(length / height).toBeGreaterThan(1.6)
+    expect(length / width).toBeGreaterThan(2)
+    // The fore paws stretch forward well beyond the chest front (chest face
+    // at x ≈ 0.39): the +x extreme is the paw tips.
+    expect(b.max.x).toBeGreaterThan(0.7)
+    // Head under the nemes crowns the silhouette at a bounded height.
+    expect(height).toBeGreaterThan(0.6)
+    expect(height).toBeLessThan(0.85)
+    // Distinctly more parts than the old three-box stand-in (72 vertices).
+    expect(geo.attributes.position.count).toBeGreaterThan(200)
     geo.dispose()
   })
 

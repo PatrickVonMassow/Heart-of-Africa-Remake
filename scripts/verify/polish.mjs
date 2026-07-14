@@ -318,6 +318,29 @@ for (const [placeId, shot] of [
   await page.waitForTimeout(200)
 }
 
+// --- Sphinx at travel scale (design.md §4.4, point 91) -------------------------
+// The Giza field's Sphinx is a modelled couchant lion now; screenshot it from
+// the travel camera just south of the field (the skyline-scale view is shot
+// 100 above).
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    window.__ui.getState().setTravelZoom(0.25) // closest zoom, sphinx readable
+    window.__game.getState().debugJumpTo(29.955, 30.67) // just south-east of the field
+  })
+  await page.waitForTimeout(2500) // travel scene settles, landmark chunk streams in
+  const giza = await page.evaluate(() => window.__culturalLandmarks)
+  check('the Giza field (with the Sphinx) is mounted at travel scale', !!giza?.ids?.includes('giza'), JSON.stringify(giza))
+  await page.screenshot({ path: `${OUT}103-giza-sphinx-travel.png` })
+  console.log('shot 103-giza-sphinx-travel.png')
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

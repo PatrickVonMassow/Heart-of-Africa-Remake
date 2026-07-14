@@ -533,7 +533,10 @@ verify suite that proves it.
     geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
-    Cairo mounts the Giza pyramids as its western skyline (point 82) and
+    Cairo mounts the Giza pyramids as its western skyline (point 82) —
+    the field's Sphinx modelled as a recognizable couchant lion under the
+    nemes (proportions and part count pure-tested via `buildSphinx` in
+    `src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
     Timbuktu builds the Djinguereber mosque as a collidable dwelling
     (`scripts/verify/polish.mjs`, screenshots 96/97/100).
 16. **Collision inside settlements.** The collision rules of `design.md`
