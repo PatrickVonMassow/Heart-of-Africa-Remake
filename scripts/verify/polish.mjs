@@ -63,14 +63,26 @@ await page.waitForFunction(() => (window.__placePanoramaWildlife ?? 0) >= 3, nul
 const wildlife = await page.evaluate(() => window.__placePanoramaWildlife ?? 0)
 check('distant wildlife drifts through the panorama', wildlife >= 3, `${wildlife} animals`)
 // No silhouette may stand sunken behind the ground disc's false horizon
-// (user-reported black back-slivers): every standing height is clamped to
-// the disc plane or follows genuinely rising relief.
+// (user-reported black back-slivers): without a live capture the standing
+// height is clamped to the disc plane. Points 92/94: every silhouette also
+// stays SMALL (bounded subtended angle) and HAZED toward the sky (not a flat
+// near-black blob).
 await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 10000 }).catch(() => {})
-const groundYs = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
+const wInfo = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
 check(
   'no panorama silhouette sinks below the settlement ground plane',
-  groundYs.length >= 3 && groundYs.every((y) => y >= 0),
-  `groundY [${groundYs.map((y) => y.toFixed(2)).join(', ')}]`,
+  wInfo.length >= 3 && wInfo.every((w) => w.y >= 0),
+  `y [${wInfo.map((w) => w.y.toFixed(2)).join(', ')}]`,
+)
+check(
+  'every panorama silhouette reads small (bounded subtended angle, point 94)',
+  wInfo.length >= 3 && wInfo.every((w) => w.apparentDeg <= 2.6),
+  `apparentDeg [${wInfo.map((w) => w.apparentDeg.toFixed(2)).join(', ')}]`,
+)
+check(
+  'every panorama silhouette is hazed toward the sky, not flat black (point 94)',
+  wInfo.length >= 3 && wInfo.every((w) => w.hazeLum > 0.42),
+  `hazeLum [${wInfo.map((w) => w.hazeLum.toFixed(2)).join(', ')}]`,
 )
 
 // --- Settlement plan on the map (design.md §6.1, point 79) --------------------
@@ -228,6 +240,17 @@ if (mosque) {
     fractions: window.__placePanorama?.waterFractions ?? null,
   }))
   check('entering from the travel scene shows the captured panorama', pano.active === true, JSON.stringify(pano))
+  // Point 92: with a capture active the visible horizon is the band cylinder,
+  // whose horizon line sits at EYE_HEIGHT (1.5). The silhouettes must stand ON
+  // that visible line — not hovering above it and not sunk below into black
+  // clipped slivers. So every y sits close to the horizon (feet just below).
+  await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 15000 }).catch(() => {})
+  const capW = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
+  check(
+    'with a capture active, silhouettes stand on the visible horizon line (point 92)',
+    capW.length >= 3 && capW.every((w) => Math.abs(w.y - w.visibleY) < 1.0 && w.y <= w.visibleY + 0.2),
+    `y vs horizon [${capW.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}`).join(', ')}]`,
+  )
   const f = pano.fractions
   // The Nile must show as a clearly DIRECTIONAL water signal: real water
   // pixels overall, concentrated in some sectors while others stay dry

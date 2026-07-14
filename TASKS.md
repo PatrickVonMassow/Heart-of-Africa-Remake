@@ -1256,7 +1256,7 @@ as-is; only the sequence changes.
   (track: 14.07. 17:52 -> 18:14, ~22 min, ~35k in / ~8k out, model
   claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
-- [ ] 92. Panorama silhouettes stand wrong against the VISIBLE ground
+- [x] 92. Panorama silhouettes stand wrong against the VISIBLE ground
   (two user screenshots, Cairo): the drifting silhouettes sometimes stand
   in MID-AIR — feet clearly above the visible horizon line — and sometimes
   SUNKEN, clipped by the ground disc into flat BLACK shapes on the ground
@@ -1300,6 +1300,19 @@ as-is; only the sequence changes.
   Coordinate with point 94 (ring distance changes there) — implement
   together if one rework covers both, and re-derive the radii here if
   94 lands first.
+  (Done together with point 94, one PanoramaWildlife rework. KEY INSIGHT:
+  the captured band cylinder's horizon line sits at EYE_HEIGHT by
+  construction (TravelPanorama's v-mapping), so instead of extracting a
+  per-sector band silhouette by readback — which the point-96 freeze
+  flags as a stall risk and which the pt-90 note says needs WebGPU
+  confirmation I can't do headless — the silhouettes now stand ON that
+  horizon line (EYE_HEIGHT − sinkEpsilon) whenever a capture is active;
+  without one they keep the panoramaGroundY clamp. This structurally
+  fixes BOTH hover and sink (no readback, matches the band exactly).
+  polish gains a capture-active check (Nubian: |y − visibleY| bounded,
+  feet at/below the horizon) alongside the no-capture ground-plane
+  check. backdrop.test.ts (formula clamp) unchanged.
+  (track folded into point 94's note below.))
 
 - [ ] 93. The map is no longer an inventory ITEM but always available (user
   request), and the camp button shows only where camping is possible.
@@ -1337,7 +1350,7 @@ as-is; only the sequence changes.
   visibility, button row) and CLAUDE.md pt. 9/20 updated wherever the
   map item or the button row is named.
 
-- [ ] 94. Panorama wildlife reads as looming monument, not distant animal
+- [x] 94. Panorama wildlife reads as looming monument, not distant animal
   (user screenshot, Swahili Village: a giant coal-black elephant on the
   skyline, mistaken for an elephant-graveyard depiction). The §2.5
   silhouettes stand only ~14-28 m beyond the settlement edge at up to
@@ -1371,6 +1384,24 @@ as-is; only the sequence changes.
   screenshot. All new numbers in `src/config/balance.ts`. design.md §2.5
   records the far-wildlife reading (small, hazed, horizon-true).
   Implement together with point 92 if one rework covers both.
+  (One PanoramaWildlife rework covering 92 + 94. Pushed the ring out
+  (balance.panoramaWildlife ringInner 55 + spread 30, was +14..28);
+  the scale is clamped DOWN so each silhouette subtends ≤ maxApparent-
+  AngleDeg (2.5°) via silhouetteScale(buildHeight, ringDist, …); the
+  colour lerps toward the scene's sky-horizon tone by hazeMix (0.55,
+  a touch more for farther rings) via hazeColor, per-animal material.
+  Pure sizing/haze math in src/scenes/place/panoramaWildlife.ts, 7
+  Vitest cases. polish gains: every silhouette small (apparentDeg ≤ 2.6),
+  hazed (luminance > 0.42, not flat black), on the ground plane (no
+  capture) or the band horizon (capture). Swahili look-check: the
+  monumental black elephant is now a small hazed silhouette on the far
+  hill. design.md §2.5 + CLAUDE.md pt. 31 updated. FULL regression:
+  polish 22/22 (the gate) green in the full run; the two red suites
+  (enrichments, preview) were load-induced flakes, both green standalone
+  (WATCHDOG: no slipped bug — environmental, reproduced green solo).
+  (track: 14.07. 23:17 -> 15.07. 00:17, ~60 min, ~70k in / ~16k out,
+  model claude-opus-4-8[1m], effort high, thinking on, autonomous batch,
+  dontAsk))
 
 - [x] 95. Sell dialogs align like a table too (user request, bazaar
   screenshot): the BUY dialogs already use the aligned price-table layout

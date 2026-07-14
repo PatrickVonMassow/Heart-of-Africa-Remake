@@ -860,10 +860,17 @@ verify suite that proves it.
     the important, enterable buildings after the first accepted gift,
     persisted per settlement, announced by a localized toast), as does the
     §2.5 panorama wildlife (region-typical silhouettes drifting beyond the
-    settlement edge). Verifiable: `scripts/verify/polish.mjs` asserts no
-    markers before and markers after the gift plus the toast, their
-    persistence across re-entry, and the panorama wildlife count via the
-    dev hook, with a screenshot of the highlighted village.
+    settlement edge — far and small, hazed toward the sky, standing on the
+    VISIBLE horizon line rather than a monument looming or clipping to a
+    black sliver; points 92/94). Verifiable: `scripts/verify/polish.mjs`
+    asserts no markers before and markers after the gift plus the toast,
+    their persistence across re-entry, and the panorama wildlife count via
+    the dev hook, with a screenshot of the highlighted village; plus that
+    every silhouette reads small (bounded subtended angle), is hazed (not
+    flat black), stands at/above the ground plane without a capture, and
+    sits on the band's horizon line (`|y − visibleY|` bounded) with a
+    capture active — the sizing/haze math pure-tested in
+    `src/scenes/place/panoramaWildlife.test.ts`.
 32. **Render pipeline upgrades.** TRAA, screen-space reflections and true
     water refraction (`design.md` §2.7) were rebuilt in small
     backend-neutral steps with a supervised manual test loop: the headless

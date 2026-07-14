@@ -51,6 +51,7 @@ import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
 import { buildLayout, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
+import { silhouetteScale, apparentAngleDeg, hazeColor, luminance } from './panoramaWildlife'
 import { bandHeightAt } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { getStrings, useStrings } from '../../i18n'
@@ -931,6 +932,7 @@ function PanoramaWildlife({
   innerRadius,
   lat,
   lon,
+  skyHorizon,
 }: {
   region: RegionId
   placeId: string
@@ -938,6 +940,8 @@ function PanoramaWildlife({
   innerRadius: number
   lat: number
   lon: number
+  /** Sky horizon tone the far silhouettes haze toward (atmospheric perspective). */
+  skyHorizon: string
 }) {
   const centerH = useMemo(() => sampleTerrain(lat, lon, seed).height, [lat, lon, seed])
   const geos = useMemo(() => {
@@ -947,23 +951,56 @@ function PanoramaWildlife({
     if (region === 'central') return [buildElephant(), buildAntelope()]
     return [buildElephant(), buildGiraffe(), buildZebra()]
   }, [region])
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#4d4639', roughness: 1 }),
-    [],
+  // World height of each mesh, for the apparent-size clamp (point 94).
+  const geoHeights = useMemo(
+    () => geos.map((g) => {
+      g.computeBoundingBox()
+      const b = g.boundingBox
+      return b ? b.max.y - b.min.y : 2
+    }),
+    [geos],
   )
+  const baseRgb = useMemo(() => {
+    const c = new THREE.Color('#4d4639')
+    return [c.r, c.g, c.b] as [number, number, number]
+  }, [])
+  const skyRgb = useMemo(() => {
+    const c = new THREE.Color(skyHorizon)
+    return [c.r, c.g, c.b] as [number, number, number]
+  }, [skyHorizon])
+  const pw = balance.panoramaWildlife
   const items = useMemo(() => {
     let hash = 0
     for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
     const rand = mulberry32(((seed ^ hash) + 0x5eed) >>> 0)
-    return Array.from({ length: 5 }, (_, i) => ({
-      angle: rand() * Math.PI * 2,
-      radius: innerRadius + 14 + rand() * 14,
-      scale: 2.6 + rand() * 1.6,
-      drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
-      geo: geos[i % geos.length],
-      phase: rand() * Math.PI * 2,
-    }))
-  }, [placeId, seed, innerRadius, geos])
+    // Pushed far out (point 94): close silhouettes loomed; a distant ring keeps
+    // the subtended angle small. The scale is clamped down so the animal never
+    // exceeds maxApparentAngleDeg, and the colour hazes toward the sky
+    // (stronger for farther rings) so it reads as distance, not a black blob.
+    return Array.from({ length: 5 }, (_, i) => {
+      const radius = innerRadius + pw.ringInner + rand() * pw.ringSpread
+      const gi = i % geos.length
+      const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, 2.6 + rand() * 1.6)
+      // Farther rings haze a touch more (ringInner..ringInner+spread → +0..0.15).
+      const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
+      const rgb = hazeColor(baseRgb, skyRgb, hazeMix)
+      return {
+        angle: rand() * Math.PI * 2,
+        radius,
+        scale,
+        drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
+        geo: geos[gi],
+        material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
+        apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
+        hazeLum: luminance(rgb),
+        phase: rand() * Math.PI * 2,
+      }
+    })
+  }, [placeId, seed, innerRadius, geos, geoHeights, baseRgb, skyRgb, pw])
+  useEffect(
+    () => () => items.forEach((it) => it.material.dispose()),
+    [items],
+  )
   const refs = useRef<Array<THREE.Group | null>>([])
 
   useEffect(() => {
@@ -978,22 +1015,33 @@ function PanoramaWildlife({
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
+    // With a capture active the visible horizon IS the captured band cylinder,
+    // whose horizon line sits at EYE_HEIGHT by construction (TravelPanorama's
+    // v-mapping). Standing on the geometry heightfield (panoramaGroundY)
+    // disagreed with it — the silhouettes hovered above or sank below into
+    // black clipped slivers (points 73/92). So place the feet on that visible
+    // horizon line (minus a small sink) whenever a capture stands; without one
+    // (snapshot/ferry) the geometry backdrop is the horizon, so keep the clamp.
+    const captureActive = !!getPanoramaCapture(placeId, seed)
+    const horizonY = EYE_HEIGHT - pw.sinkEpsilon
     items.forEach((it, i) => {
       const g = refs.current[i]
       if (!g) return
       const a = it.angle + t * it.drift
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
-      // Clamped standing height (backdrop.ts): follows the relief, but never
-      // sunken behind the ground disc's false horizon, where only a black
-      // back-sliver stayed visible; a gentle walk bob on top.
-      const groundY = panoramaGroundY(x, z, lat, lon, seed, centerH, innerRadius)
+      const groundY = captureActive
+        ? horizonY
+        : panoramaGroundY(x, z, lat, lon, seed, centerH, innerRadius)
+      const y = groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
-        const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, number>
-        info[i] = groundY
+        const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
+        // y vs the visible horizon line (EYE_HEIGHT); the apparent size and the
+        // hazed luminance for the point-92/94 live gates.
+        info[i] = { y, visibleY: captureActive ? EYE_HEIGHT : groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum }
       }
-      g.position.set(x, groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12, z)
+      g.position.set(x, y, z)
       // Face the drift direction along the ring tangent.
       g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
     })
@@ -1009,7 +1057,7 @@ function PanoramaWildlife({
             refs.current[i] = el
           }}
         >
-          <mesh geometry={it.geo} material={material} />
+          <mesh geometry={it.geo} material={it.material} />
         </group>
       ))}
     </>
@@ -1514,7 +1562,7 @@ export function PlaceScene() {
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <GizaSkyline placeId={place.id} />
-      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
 
       {/* Ground disc with procedural mottling */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>

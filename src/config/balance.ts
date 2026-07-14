@@ -164,6 +164,18 @@ export interface BalanceConfig {
     /** Radius in degrees for reopening/discovering a camp. */
     campRadiusDeg: number
   }
+  /** §2.5 panorama wildlife: distant drifting silhouettes (points 92/94). */
+  panoramaWildlife: {
+    /** Ring distance beyond the settlement edge: innerRadius + inner..(+spread). */
+    ringInner: number
+    ringSpread: number
+    /** Max subtended angle (deg) of a silhouette — scale is clamped down to it. */
+    maxApparentAngleDeg: number
+    /** Atmospheric-haze mix toward the sky horizon tone (0 base .. 1 sky). */
+    hazeMix: number
+    /** Feet sink below the visible horizon line so they never appear to float. */
+    sinkEpsilon: number
+  }
   /** Trade economy (design.md §8/§10). */
   economy: {
     /** Base prices of the treasure finds in $ (before regional factors). */
@@ -290,6 +302,13 @@ export const balance: BalanceConfig = {
   camps: {
     lootChancePerDay: 0.03,
     campRadiusDeg: 0.3,
+  },
+  panoramaWildlife: {
+    ringInner: 55, // was +14..28: far too close, so the silhouettes loomed
+    ringSpread: 30,
+    maxApparentAngleDeg: 2.5, // a distant animal subtends only a couple degrees
+    hazeMix: 0.55, // lift the flat near-black toward the sky horizon
+    sinkEpsilon: 0.4, // feet just below the horizon line, never floating
   },
   economy: {
     treasureBase: { gold: 60, silver: 35, emerald: 70, copper: 20, ivory: 45, statue: 150 },
