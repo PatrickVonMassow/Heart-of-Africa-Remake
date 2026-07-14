@@ -195,26 +195,32 @@ function BazaarDialog() {
           </div>
         )}
         {owned.length > 0 && <p className="flavor">{t.dialogs.bazaarSell}</p>}
-        {owned.map((id) => (
-          <div className="row" key={`sell-${id}`}>
-            <span>{t.treasures[id]} ({t.dialogs.stock(treasures[id])})</span>
-            <button className="hud-button" onClick={() => offerTreasure(id)}>{t.dialogs.offer}</button>
+        {owned.length > 0 && (
+          <div className="trade-grid offer-grid">
+            {owned.map((id) => (
+              <div className="trade-row" key={`sell-${id}`}>
+                <span className="trade-name">{t.treasures[id]} ({t.dialogs.stock(treasures[id])})</span>
+                <button className="hud-button" onClick={() => offerTreasure(id)}>{t.dialogs.offer}</button>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
         <p className="flavor">{t.dialogs.bazaarBuy}</p>
-        {TREASURE_IDS.map((id) => {
-          const price = treasureBuyPrice(id, region)
-          if (price === null) return null // rejected material: not stocked here
-          return (
-            <div className="row" key={`buy-${id}`}>
-              <span>{t.treasures[id]}</span>
-              <span className="price">{price} $</span>
-              <button className="hud-button" onClick={() => buyTreasure(id)} disabled={money < price}>
-                {t.dialogs.buy}
-              </button>
-            </div>
-          )
-        })}
+        <div className="trade-grid buy-grid">
+          {TREASURE_IDS.map((id) => {
+            const price = treasureBuyPrice(id, region)
+            if (price === null) return null // rejected material: not stocked here
+            return (
+              <div className="trade-row" key={`buy-${id}`}>
+                <span className="trade-name">{t.treasures[id]}</span>
+                <span className="price">{price} $</span>
+                <button className="hud-button" onClick={() => buyTreasure(id)} disabled={money < price}>
+                  {t.dialogs.buy}
+                </button>
+              </div>
+            )
+          })}
+        </div>
         <div className="actions">
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
         </div>
@@ -240,18 +246,20 @@ function AgencyDialog() {
         <h3>{t.buildings.agency}</h3>
         <p className="flavor">{t.dialogs.agencyGreeting}</p>
         <div className="row"><span>{t.dialogs.cash}</span><span className="price">{Math.floor(money)} $</span></div>
-        {destinations.map((dest) => {
-          const cost = ferryCost(from, dest)
-          return (
-            <div className="row" key={dest.id}>
-              <span>{t.dialogs.passage(t.places[dest.id], ferryDays(from, dest))}</span>
-              <span className="price">{cost} $</span>
-              <button className="hud-button" onClick={() => bookFerry(dest.id)} disabled={money < cost}>
-                {t.dialogs.book}
-              </button>
-            </div>
-          )
-        })}
+        <div className="trade-grid ferry-grid">
+          {destinations.map((dest) => {
+            const cost = ferryCost(from, dest)
+            return (
+              <div className="trade-row" key={dest.id}>
+                <span className="trade-name">{t.dialogs.passage(t.places[dest.id], ferryDays(from, dest))}</span>
+                <span className="price">{cost} $</span>
+                <button className="hud-button" onClick={() => bookFerry(dest.id)} disabled={money < cost}>
+                  {t.dialogs.book}
+                </button>
+              </div>
+            )
+          })}
+        </div>
         <div className="actions">
           <button className="hud-button" onClick={() => setDialog(null)}>{t.dialogs.leave}</button>
         </div>

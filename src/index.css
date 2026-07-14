@@ -748,6 +748,11 @@ textarea {
   gap: 2px 14px;
 }
 
+/* The bazaar's sell (offer) list has no price cell — name / action only. */
+.trade-grid.offer-grid {
+  grid-template-columns: 1fr auto;
+}
+
 .trade-row {
   display: contents;
 }

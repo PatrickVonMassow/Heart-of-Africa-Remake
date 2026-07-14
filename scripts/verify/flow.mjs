@@ -125,6 +125,23 @@ s = await state()
 check('Gold-jewelry gift bought (−$30)', s.gifts.gold === 1 && s.money === 200)
 await closeDialog()
 
+// The SELL/treasure lists use the same aligned column grid as the buy list
+// (point 95): open the bazaar with a couple of treasures and assert the buy
+// prices share a left edge and the offer (sell) names share a left edge.
+await page.evaluate(() => {
+  window.__game.getState().debugAddTreasure('gold')
+  window.__game.getState().debugAddTreasure('ivory')
+  window.__ui.getState().setDialog({ kind: 'bazaar' })
+})
+await page.waitForTimeout(250)
+const bazaarAligned = await page.evaluate(() => {
+  const lefts = (sel) => [...document.querySelectorAll(sel)].map((e) => Math.round(e.getBoundingClientRect().left))
+  const aligned = (xs) => xs.length >= 2 && xs.every((l) => Math.abs(l - xs[0]) <= 1)
+  return aligned(lefts('.buy-grid .price')) && aligned(lefts('.offer-grid .trade-name'))
+})
+check('Bazaar buy prices and sell names align in columns (table layout)', bazaarAligned)
+await closeDialog()
+
 // --- 3. Leave place by walking out → travel mode (criterion 2) ---
 await leaveByWalking()
 s = await state()

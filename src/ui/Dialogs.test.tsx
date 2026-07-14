@@ -47,6 +47,20 @@ describe('trade dialog (design.md §9)', () => {
     expect(txt).toMatch(/gifts|Gaben/i)
     expect(txt).not.toContain('$')
   })
+
+  it('lays the gear buy-back (sell) list out in the same aligned grid (point 95)', () => {
+    g().enterPlace('cairo')
+    g().debugAddEquipment('shovel')
+    g().debugAddEquipment('rope')
+    useUi.getState().setDialog({ kind: 'trade', building: 'shop' })
+    render(<Dialogs />)
+    const sellRows = document.querySelectorAll('.sell-grid .trade-row')
+    expect(sellRows.length).toBeGreaterThan(0) // owned gear is sellable
+    for (const row of sellRows) {
+      expect(row.querySelector('.trade-name')).toBeInTheDocument()
+      expect(row.querySelector('.price')).toBeInTheDocument()
+    }
+  })
 })
 
 describe('rob the chief (design.md §12)', () => {
@@ -89,6 +103,29 @@ describe('bazaar dialog (design.md §10)', () => {
     expect(offerBtns().length).toBeGreaterThan(0)
   })
 
+  it('lays the buy and offer lists out in aligned grids, not ragged rows (point 95)', () => {
+    g().enterPlace('cairo')
+    g().debugAddTreasure('gold')
+    useUi.getState().setDialog({ kind: 'bazaar' })
+    render(<Dialogs />)
+    // Buy list: name / price / action columns.
+    const buyRows = document.querySelectorAll('.buy-grid .trade-row')
+    expect(buyRows.length).toBeGreaterThan(0)
+    for (const row of buyRows) {
+      expect(row.querySelector('.trade-name')).toBeInTheDocument()
+      expect(row.querySelector('.price')).toBeInTheDocument()
+    }
+    // Offer (sell) list: name / action columns (no price cell until a bid).
+    const offerRows = document.querySelectorAll('.offer-grid .trade-row')
+    expect(offerRows.length).toBeGreaterThan(0)
+    for (const row of offerRows) {
+      expect(row.querySelector('.trade-name')).toBeInTheDocument()
+    }
+    // The treasure lists no longer use the ragged flex .row layout — only the
+    // single cash header row remains a plain .row (no bid active here).
+    expect(document.querySelectorAll('.dialog .row').length).toBe(1)
+  })
+
   it('shows an accept/decline bid row after offering a treasure', () => {
     g().enterPlace('cairo')
     g().debugAddTreasure('gold')
@@ -116,6 +153,13 @@ describe('travel agency dialog (design.md §10)', () => {
     const text = document.querySelector('.dialog')?.textContent ?? ''
     expect(text).toContain('$')
     expect(text).toMatch(/days/i)
+    // Aligned grid: every passage row has a name and a price cell (point 95).
+    const rows = document.querySelectorAll('.ferry-grid .trade-row')
+    expect(rows.length).toBe(otherPorts)
+    for (const row of rows) {
+      expect(row.querySelector('.trade-name')).toBeInTheDocument()
+      expect(row.querySelector('.price')).toBeInTheDocument()
+    }
   })
 
   it('disables the book button when money is below the fare', () => {

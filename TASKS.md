@@ -1372,7 +1372,7 @@ as-is; only the sequence changes.
   records the far-wildlife reading (small, hazed, horizon-true).
   Implement together with point 92 if one rework covers both.
 
-- [ ] 95. Sell dialogs align like a table too (user request, bazaar
+- [x] 95. Sell dialogs align like a table too (user request, bazaar
   screenshot): the BUY dialogs already use the aligned price-table layout
   (CLAUDE.md pt. 5 — name/price/action columns with shared left edges);
   the SELL listings (bazaar sell side, port gear buy-back, village
@@ -1384,6 +1384,17 @@ as-is; only the sequence changes.
   dialogs). Both languages untouched (layout only). Extend the
   Dialogs.test.tsx layout assertions to the sell rows and the flow.mjs
   aligned-column check to a sell dialog.
+  (The actually-ragged lists were the BAZAAR (sell + buy) and the FERRY,
+  which used the flex `.row` layout; the shop's gear buy-back already used
+  the aligned `.trade-grid`. Moved bazaar offer/buy and ferry to
+  `.trade-grid`/`.trade-row` (name/price/action columns; a 2-col
+  `.offer-grid` for the price-less sell list); shared left edges verified
+  in flow.mjs (bazaar buy prices + sell names) and the grid cells pinned
+  in Dialogs.test.tsx (sell, bazaar, ferry). Bazaar screenshot confirms
+  the clean right-aligned price column. Both languages untouched (layout
+  only). CLAUDE.md pt. 5 updated. Vitest 1427, flow 32 green.
+  (track: 14.07. 22:00 -> 22:11, ~11 min, ~30k in / ~7k out, model
+  claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
 - [ ] 96. Leaving a settlement freezes the game for ~13-16 s once several
   settlements were visited in a session (found via the polish gate racing
   its 15 s timeout; measured 13.5 s with the baked textures and 15.7 s

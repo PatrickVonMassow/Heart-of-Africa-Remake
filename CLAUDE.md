@@ -298,11 +298,14 @@ verify suite that proves it.
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
    automatic checkpoint (`design.md` §18; simplified saving is
-   sufficient). Buy dialogs use the aligned price-table layout and buy
-   gear back for the local currency per §9. Verifiable:
-   `scripts/verify/flow.mjs` asserts the price cells share a column
-   (aligned left edges); `src/state/store.economy.test.ts` asserts selling
-   gear in a port pays money.
+   sufficient). Buy AND sell dialogs (shop buy-back, bazaar buy/sell,
+   ferry) use the same aligned price-table layout and buy gear back for the
+   local currency per §9. Verifiable: `scripts/verify/flow.mjs` asserts the
+   buy price cells share a column and, in the bazaar, the buy prices and
+   sell names each share a left edge (`src/ui/Dialogs.test.tsx` pins the
+   name/price grid cells on the sell, bazaar and ferry lists);
+   `src/state/store.economy.test.ts` asserts selling gear in a port pays
+   money.
 6. **Village and cultural contact.** At least one enterable village with a
    chief's hut; a culturally correct gift is the condition for a hint —
    not mere observation (`design.md` §12). The village trading post
