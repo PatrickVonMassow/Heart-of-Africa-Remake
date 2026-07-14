@@ -58,3 +58,4 @@ point(s).
   roster and calves (§7.1 pt. 12).
 - `// OPEN` markers in code: purchasable gift items are not itemized in
   design.md (balance.ts maps gifts onto the §8 culture/value materials).
+- `98-place-plan.png` — the map inside a settlement: the town plan with named functional buildings (pt. 3, point 79).

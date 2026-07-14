@@ -370,6 +370,23 @@ textarea {
     radial-gradient(ellipse at 75% 80%, rgba(140, 110, 60, 0.1), transparent 55%);
 }
 
+/* Settlement plan (point 79): the same worn-paper look as the atlas plate,
+   with engraved-style labels on the functional buildings. */
+.map-place-plan svg {
+  display: block;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(140, 110, 60, 0.08), transparent 60%),
+    radial-gradient(ellipse at 75% 80%, rgba(140, 110, 60, 0.1), transparent 55%);
+}
+
+.map-place-plan .plan-building-label {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 12px;
+  paint-order: stroke;
+  stroke: #eadfc2;
+  stroke-width: 3px;
+}
+
 /* --- Prompt + toast ------------------------------------------------------ */
 
 .prompt {

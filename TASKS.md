@@ -831,11 +831,20 @@ the map).
   Scene-switch timing unchanged (23 s baseline == 23 s after, the cost is
   the chunk build). design.md §11.3 and CLAUDE.md pt. 21 record the
   rule. Full regression green.)
-- [ ] 79. In-settlement map: opening the map INSIDE a settlement must show a
+- [x] 79. In-settlement map: opening the map INSIDE a settlement must show a
   plan of the current place — the walkable area with the functional
   (enterable) buildings marked and named — instead of (or in front of) the
   continental exploration map. Localized labels in both languages; cover
   the mode switch and the building markers on the right layer(s).
+  (buildLayout extracted into the pure scenes/place/layout.ts (also the
+  groundwork for point 87); the map overlay branches on placeId to an SVG
+  town plan in the atlas paper style — walkable circle, lanes, unlabelled
+  dwelling blocks, functional buildings marked and named via the existing
+  localized buildings dict, southern entrance arrow; new mapOverlay.plan
+  header in both languages (parity pin 59). Mode switch and labels
+  pinned in MapOverlay.test.tsx (port roster, village chief/market,
+  atlas return on leaving); live check + screenshot 98 in polish.mjs.
+  design.md §6.1/§7 and CLAUDE.md pt. 3 updated. Full regression green.)
 - [ ] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
   while feeding at a carcass — feet/body must stay on the surface for the
   whole feed; (b) after the predator has left a kill they wait too long

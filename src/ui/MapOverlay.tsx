@@ -17,6 +17,8 @@ import { RIVERS_DATA } from '../world/data/rivers'
 import { LAKES } from '../world/data/lakes'
 import { MOUNTAINS, WATERFALLS, CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { CELL_OCEAN, cellAt } from '../world/geoIndex'
+import { buildLayout, type Interactive } from '../scenes/place/layout'
+import type { BuildingType } from '../state/ui'
 import { LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, REGION_IDS, regionStats } from './mapLayout'
 
 const W = 640
@@ -72,6 +74,7 @@ export function MapOverlay() {
   const freeCamps = useGame((s) => s.freeCamps)
   const pos = useGame((s) => s.pos)
   const region = useGame((s) => s.region)
+  const placeId = useGame((s) => s.placeId)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const regionPercent = useMemo(() => {
@@ -631,6 +634,7 @@ export function MapOverlay() {
   }, [open, explored, visitedPlaces, landmarksSeen, freeCamps, pos, t])
 
   if (!open) return null
+  if (placeId) return <PlacePlan placeId={placeId} />
   return (
     <div className="map-overlay">
       <header>
@@ -639,6 +643,84 @@ export function MapOverlay() {
         <button onClick={() => useUi.getState().toggleMap()}>{t.mapOverlay.close}</button>
       </header>
       <canvas ref={canvasRef} width={W} height={H} />
+    </div>
+  )
+}
+
+/**
+ * Settlement plan (design.md §6.1/§19.11 point 79): inside a place the map
+ * shows a plan of the town instead of the continental atlas — the walkable
+ * area with every functional (enterable) building marked and named, the
+ * dwellings as unlabelled blocks and the lanes as light strokes, in the same
+ * worn-paper ink style. Pure SVG over the deterministic layout, so it needs
+ * no canvas and is fully assertable in jsdom.
+ */
+function PlacePlan({ placeId }: { placeId: string }) {
+  const t = useStrings()
+  const seed = useGame((s) => s.seed)
+  const layout = useMemo(() => buildLayout(placeId, seed), [placeId, seed])
+  const S = 560 // rendered square size
+  const extent = layout.radius + 6
+  const sx = (x: number) => (x / extent) * (S / 2)
+  const label = (type: Interactive['type']) => (type === 'villager' ? t.labels.talkToElder : t.buildings[type as BuildingType])
+  return (
+    <div className="map-overlay map-place-plan">
+      <header>
+        <span>{t.mapOverlay.plan(t.places[placeId] ?? placeId)}</span>
+        <button onClick={() => useUi.getState().toggleMap()}>{t.mapOverlay.close}</button>
+      </header>
+      <svg viewBox={`${-S / 2} ${-S / 2} ${S} ${S}`} width={S} height={S} role="img">
+        {/* Paper ground + settlement edge */}
+        <rect x={-S / 2} y={-S / 2} width={S} height={S} fill="#eadfc2" />
+        <circle r={sx(layout.radius)} fill="#e2d3ad" stroke={INK} strokeWidth={1.6} strokeDasharray="7 4" />
+        {/* Lanes as light strokes */}
+        {layout.paths.map((p, i) => (
+          <polyline
+            key={`p${i}`}
+            points={p.points.map(([x, z]) => `${sx(x)},${sx(z)}`).join(' ')}
+            fill="none"
+            stroke="#c9b789"
+            strokeWidth={Math.max(3, sx(p.width))}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+        {/* Non-functional dwellings: small unlabelled ink blocks */}
+        {layout.dwellings.map((d, i) => (
+          <rect
+            key={`d${i}`}
+            className="plan-dwelling"
+            x={sx(d.x - d.r)}
+            y={sx(d.z - d.r)}
+            width={Math.max(3, sx(d.r * 2))}
+            height={Math.max(3, sx(d.r * 2))}
+            transform={`rotate(${(-d.rot * 180) / Math.PI} ${sx(d.x)} ${sx(d.z)})`}
+            fill="none"
+            stroke={INK}
+            strokeWidth={1}
+            opacity={0.55}
+          />
+        ))}
+        {/* Functional, enterable buildings: filled markers with their names */}
+        {layout.interactives.map((it, i) => (
+          <g key={`f${i}`} className="plan-building">
+            {it.type === 'villager' ? (
+              <circle cx={sx(it.pos[0])} cy={sx(it.pos[1])} r={5} fill={REGION_INK} />
+            ) : (
+              <rect x={sx(it.pos[0]) - 6} y={sx(it.pos[1]) - 6} width={12} height={12} fill={REGION_INK} />
+            )}
+            <text className="plan-building-label" x={sx(it.pos[0])} y={sx(it.pos[1]) - 10} textAnchor="middle" fill={INK}>
+              {label(it.type)}
+            </text>
+          </g>
+        ))}
+        {/* Southern entrance (the spawn corridor) */}
+        <path
+          d={`M 0 ${sx(layout.radius) + 12} L -7 ${sx(layout.radius) + 22} L 7 ${sx(layout.radius) + 22} Z`}
+          fill={INK}
+          opacity={0.8}
+        />
+      </svg>
     </div>
   )
 }

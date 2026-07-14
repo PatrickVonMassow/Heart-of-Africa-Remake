@@ -210,6 +210,7 @@ export const de: Strings = {
     subtitle: 'Nach den Aufnahmen der Expedition · 1890',
     scaleMiles: 'Englische Meilen',
     explored: (region, percent) => `${region}: ${percent} % erkundet`,
+    plan: (place: string) => `Ortsplan von ${place}`,
     close: 'Schließen (M)',
   },
 

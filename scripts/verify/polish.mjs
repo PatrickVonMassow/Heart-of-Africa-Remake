@@ -54,6 +54,23 @@ check(
   `groundY [${groundYs.map((y) => y.toFixed(2)).join(', ')}]`,
 )
 
+// --- Settlement plan on the map (design.md §6.1, point 79) --------------------
+// Inside a place the map opens as a plan of the town: functional buildings
+// marked and named, no continental canvas.
+await page.evaluate(() => window.__ui.getState().toggleMap())
+await page.waitForTimeout(400)
+const plan = await page.evaluate(() => {
+  const el = document.querySelector('.map-place-plan')
+  const labels = [...document.querySelectorAll('.plan-building-label')].map((n) => n.textContent)
+  return { present: !!el, labels, canvas: !!document.querySelector('.map-overlay canvas') }
+})
+await page.screenshot({ path: `${OUT}98-place-plan.png` })
+console.log('shot 98-place-plan.png')
+check('inside a settlement the map shows the town plan', plan.present && !plan.canvas, JSON.stringify({ canvas: plan.canvas }))
+check('the plan names the functional buildings', plan.labels.length >= 2, `labels [${plan.labels.join(', ')}]`)
+await page.evaluate(() => window.__ui.getState().toggleMap())
+await page.waitForTimeout(200)
+
 // --- Orientation after a gift (design.md §17) ---------------------------------------
 const before = await page.evaluate(() => document.querySelectorAll('.building-highlight').length)
 check('no building markers before the gift', before === 0, `${before}`)

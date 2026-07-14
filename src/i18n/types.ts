@@ -116,6 +116,8 @@ export interface Strings {
     /** Scale-bar caption (period atlases print "English Miles"). */
     scaleMiles: string
     explored(region: string, percent: number): string
+    /** Header of the settlement plan the map shows while inside a place. */
+    plan(place: string): string
     close: string
   }
 

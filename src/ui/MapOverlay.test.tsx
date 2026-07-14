@@ -10,6 +10,7 @@ import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, g } from '../test/store'
+import { useGame } from '../state/store'
 
 // cellAt/regionAt in the progress computation need the real geodata index.
 withWorld()
@@ -18,6 +19,9 @@ beforeEach(() => {
   freshGame()
   useLocale.getState().setLang('en')
   useUi.setState({ mapOpen: false })
+  // The game starts inside Cairo, where the map shows the PLACE PLAN (point
+  // 79); the atlas tests below inspect the continental map, so leave first.
+  useGame.setState({ placeId: null })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
@@ -67,5 +71,45 @@ describe('exploration progress (design.md §17)', () => {
     rerender(<MapOverlay />)
     expect(g().region).toBe('north')
     expect(pct()).toBeGreaterThan(before)
+  })
+})
+
+describe('settlement plan (design.md §6.1, point 79)', () => {
+  it('inside a port the map shows the town plan with all functional buildings named', () => {
+    useGame.setState({ placeId: 'cairo' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    const plan = document.querySelector('.map-place-plan')
+    expect(plan).toBeInTheDocument()
+    expect(plan?.textContent).toContain(en.mapOverlay.plan(en.places.cairo))
+    // The continental atlas (canvas) is replaced, not stacked.
+    expect(document.querySelector('.map-overlay canvas')).not.toBeInTheDocument()
+    // Every enterable trade building of a port is marked and named.
+    const labels = [...document.querySelectorAll('.plan-building-label')].map((e) => e.textContent)
+    for (const type of ['shop', 'weapons', 'tools', 'market', 'bazaar', 'agency'] as const) {
+      expect(labels).toContain(en.buildings[type])
+    }
+    // The dwelling fabric shows as unlabelled context blocks.
+    expect(document.querySelectorAll('.plan-dwelling').length).toBeGreaterThan(10)
+  })
+
+  it('inside a village the plan names the chief hut and the market', () => {
+    useGame.setState({ placeId: 'masai-village' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    const labels = [...document.querySelectorAll('.plan-building-label')].map((e) => e.textContent)
+    expect(labels).toContain(en.buildings.chief)
+    expect(labels).toContain(en.buildings.market)
+  })
+
+  it('leaving the settlement returns the map to the continental atlas', () => {
+    useGame.setState({ placeId: 'cairo' })
+    useUi.getState().toggleMap()
+    const { rerender } = render(<MapOverlay />)
+    expect(document.querySelector('.map-place-plan')).toBeInTheDocument()
+    useGame.setState({ placeId: null })
+    rerender(<MapOverlay />)
+    expect(document.querySelector('.map-place-plan')).not.toBeInTheDocument()
+    expect(document.querySelector('.map-overlay canvas')).toBeInTheDocument()
   })
 })

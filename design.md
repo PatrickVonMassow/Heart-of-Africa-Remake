@@ -152,7 +152,7 @@ Two further landmarks live in their port's first-person scene rather than on the
 - Provisions (food): consumed per time step; can be bought.
 - Water: the canteen holds a fill level (a percentage). It refills to full at fresh water (river, lake, swimmable sea), drains slowly on land — faster in the desert — and, once empty, thirst builds and then health drops. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
 - Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
-- Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the map opens the exploration overview, the shovel digs).
+- Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the map opens the exploration overview — inside a settlement the place plan, §7 —, the shovel digs).
 
 ### 6.2 Afflictions and healing
 
@@ -185,7 +185,7 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 | Medicine | Cures fever/illness and wounds; used by clicking it in the inventory bar |
 | Gifts | Trade goods for chiefs (goodwill, hints) |
 | Canteen | Holds a fill level; refills at fresh water, drains on land (faster in the desert); protects against dehydration in the desert while it holds water (not against sun blindness) |
-| Map | Orientation aid; clicking it in the inventory bar opens the exploration overview |
+| Map | Orientation aid; clicking it in the inventory bar opens the exploration overview — and inside a settlement a PLAN OF THE PLACE instead: the walkable area with every functional (enterable) building marked and named (localized), dwellings as unlabelled context and the lanes sketched, in the same worn-paper style |
 | Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles. Its depiction in the bird's-eye view makes the state legible: travelling water the explorer sits in the canoe (riding on the surface, paddling); on land he drags it along behind him — the hull trails the walked path like a trailer, lies on the terrain (pitching down to where its far end rests on the ground, rolling slightly on cross-slopes) and swings clear of stones, trees, animals and settlement edges instead of clipping through them; at a bank it stays on the land side — the rope rotates to land at full length (or shortens on a spit narrower than the rope), so the dragged hull never pierces a river, lake or sea surface |
 
 Core rule: items act by possession alone, never "in hand" (§6.1); the table above carries the per-item effects.

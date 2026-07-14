@@ -211,6 +211,7 @@ export const en: Strings = {
     subtitle: 'From the surveys of the expedition · 1890',
     scaleMiles: 'English Miles',
     explored: (region, percent) => `${region}: ${percent}% explored`,
+    plan: (place: string) => `Plan of ${place}`,
     close: 'Close (M)',
   },
 

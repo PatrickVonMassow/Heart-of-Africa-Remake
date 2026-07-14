@@ -120,6 +120,7 @@ const POSITIONAL: Record<string, unknown[]> = {
   'hud.fps': [60],
   'prompts.interact': ['Trade'],
   'mapOverlay.explored': ['North', 50],
+  'mapOverlay.plan': ['Cairo'],
   'toasts.bought': ['Machete'],
   'toasts.discovered': ['Kilimanjaro'],
   'toasts.sold': ['Gold', 100],
@@ -167,9 +168,9 @@ collectFunctionPaths(en, '', FUNCTION_PATHS)
 
 describe('template-function callability (de and en behave alike)', () => {
   it('finds the expected number of function leaves', () => {
-    // Guards the walk itself: 24 positional + 33 journal templates. A drift
+    // Guards the walk itself: 25 positional + 34 journal templates. A drift
     // here means a template was added/removed and this suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(58)
+    expect(FUNCTION_PATHS.length).toBe(59)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {
