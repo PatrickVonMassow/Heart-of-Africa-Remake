@@ -490,7 +490,19 @@ verify suite that proves it.
     ~1890 importance; enlarged ports outscale villages), §19.10 (the
     village life vignettes) and §2.5 (the surroundings panorama of the
     real map landscape, its relief capped, double-sided and rock-shaded)
-    are implemented. Verifiable: screenshots of a port city and a village show
+    are implemented, as is the §2.6 street rule: ports grow an organic lane
+    network (winding alleys, small irregular squares — no grid) whose
+    buildings front their lane with the door side, while every village
+    follows its people's period-accurate ~1890 organising principle
+    (design.md §4.5: ring/street/compound/scatter/ksar/riverstrip/coastrow).
+    Verifiable: the layout invariants are pure-tested across every place and
+    several seeds (`src/scenes/place/layout.test.ts`: door reachable with no
+    corner squeeze, window clearance between all building bodies, no
+    building standing on a lane, winding port lanes with a square and six
+    lane-fronting trade houses, each village matching its plan, the spawn
+    corridor clear, Cairo outscaling Boma); the town-plan screenshots show
+    the fabric difference (98 masai ring, 101 street village, 102 Cairo
+    lanes, `scripts/verify/polish.mjs`); screenshots of a port city and a village show
     dense building fabric with paths and several non-functional buildings;
     inhabitants move about and use their dwellings; Cairo's walkable
     radius and dwelling count exceed Boma's; the backdrop mesh is present

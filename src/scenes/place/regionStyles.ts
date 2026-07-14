@@ -8,8 +8,65 @@ import type { RegionId } from '../../world/geo'
 
 export type HutRoof = 'cone' | 'tallCone' | 'dome' | 'flat'
 export type WallShape = 'round' | 'box'
-export type VillageLayout = 'lanes' | 'cluster' | 'kraal'
 export type FenceKind = 'none' | 'thorn' | 'woven' | 'stone'
+
+/**
+ * Period-accurate organising principle of a village, keyed by people
+ * (design.md §4.5, researched against the ~1890 record):
+ * - `ring`     — Central Cattle Pattern / enkang: huts on a ring around the
+ *                central cattle enclosure inside a perimeter fence.
+ * - `street`   — Congo-basin street village: one cleared, swept axis with
+ *                two facing house rows and a palaver shelter.
+ * - `compound` — Sahel compound cluster: walled family enclosures around a
+ *                central meeting ground, granaries inside.
+ * - `scatter`  — dispersed camp: loose family groups of tents/small huts,
+ *                no lanes, no shared fence.
+ * - `ksar`     — fortified North-African block: dense flat-roofed houses on
+ *                narrow lanes inside a perimeter wall with one gate.
+ * - `riverstrip` — Nile fellah strip: house rows along one river-parallel
+ *                lane just above the flood line.
+ * - `coastrow` — Swahili mji: rectangular houses in a double row along one
+ *                sandy shore path under palms.
+ */
+export type VillagePlanKind =
+  | 'ring'
+  | 'street'
+  | 'compound'
+  | 'scatter'
+  | 'ksar'
+  | 'riverstrip'
+  | 'coastrow'
+
+/** People → village plan (design.md §4.5; every game people is mapped). */
+export const VILLAGE_PLANS: Record<string, VillagePlanKind> = {
+  // North: Tuareg camp, Berber ksar, Nile strip, Sahel compounds.
+  tuareg: 'scatter',
+  berbers: 'ksar',
+  nubians: 'riverstrip',
+  bombara: 'compound',
+  // West: compound architecture (Hausa gida, Mande lu); Fang street village.
+  hausa: 'compound',
+  mandingo: 'compound',
+  fang: 'street',
+  // Central: the cleared street village of the Congo basin; Twa forest camps.
+  mongo: 'street',
+  pygmies: 'scatter',
+  banda: 'street',
+  bambundu: 'street',
+  lunda: 'street',
+  // East: enkang thorn rings, Swahili coast row, highland/lakes compounds.
+  masai: 'ring',
+  somali: 'ring',
+  swahili: 'coastrow',
+  sidamo: 'compound',
+  uganda: 'compound',
+  // South: the Central Cattle Pattern; San camps.
+  zulu: 'ring',
+  bantu: 'ring',
+  bemba: 'ring',
+  batwa: 'scatter',
+  bushmen: 'scatter',
+}
 
 export interface RegionPlaceStyle {
   /** Ground material palette: base, alt, patch. */
@@ -29,8 +86,6 @@ export interface RegionPlaceStyle {
   flora: { palm: number; acacia: number; jungle: number; bush: number }
   /** Grass tuft density factor relative to the default. */
   grass: number
-  /** Settlement pattern of the dwellings (design.md §2 lively settlements). */
-  villageLayout: VillageLayout
   /** Compound/kraal fencing style. */
   fence: FenceKind
   /** Trodden path color drawn into the ground. */
@@ -55,7 +110,6 @@ export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
     cloth: ['#3a4a7c', '#e8e2d0', '#7c3a2a'],
     flora: { palm: 0.8, acacia: 0, jungle: 0, bush: 0.2 },
     grass: 0.3,
-    villageLayout: 'lanes',
     fence: 'none',
     pathColor: '#f0e2b8',
     granaries: false,
@@ -74,7 +128,6 @@ export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
     cloth: ['#a3502f', '#c98a2e', '#7a3b5a'],
     flora: { palm: 0.15, acacia: 0.45, jungle: 0, bush: 0.4 },
     grass: 1,
-    villageLayout: 'cluster',
     fence: 'woven',
     pathColor: '#a07a48',
     granaries: true,
@@ -93,7 +146,6 @@ export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
     cloth: ['#3f6b3a', '#8a6a2c', '#5a3b2a'],
     flora: { palm: 0.2, acacia: 0, jungle: 0.6, bush: 0.2 },
     grass: 0.8,
-    villageLayout: 'cluster',
     fence: 'none',
     pathColor: '#55432a',
     granaries: true,
@@ -112,7 +164,6 @@ export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
     cloth: ['#a32b20', '#c04a2e', '#7c2a4a'],
     flora: { palm: 0, acacia: 0.4, jungle: 0, bush: 0.6 },
     grass: 0.7,
-    villageLayout: 'kraal',
     fence: 'thorn',
     pathColor: '#96602f',
     granaries: false,
@@ -131,7 +182,6 @@ export const REGION_PLACE_STYLES: Record<RegionId, RegionPlaceStyle> = {
     cloth: ['#3a5a8a', '#8a4a2a', '#c2b090'],
     flora: { palm: 0, acacia: 0.3, jungle: 0, bush: 0.7 },
     grass: 0.9,
-    villageLayout: 'cluster',
     fence: 'stone',
     pathColor: '#8f7345',
     granaries: true,

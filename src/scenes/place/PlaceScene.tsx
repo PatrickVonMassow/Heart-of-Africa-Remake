@@ -148,7 +148,8 @@ type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
 
 function PortBuilding({ item, mats, variant }: { item: Interactive; mats: PlaceMaterials; variant: number }) {
   const t = useStrings()
-  const rot = ((variant * 137) % 40) / 100 - 0.2
+  // The yaw ships in the layout data: the trade house fronts its lane.
+  const rot = item.rot ?? 0
   return (
     <group position={[item.pos[0], 0, item.pos[1]]} rotation={[0, rot, 0]}>
       {/* Walls */}
@@ -336,7 +337,23 @@ function VillageHut({
         </>
       )}
       {label && (
-        <Html center position={[0, h + r * 1.4 + 0.8, 0]} distanceFactor={18}>
+        // Sit the label just above the actual roof peak (dome/flat roofs are
+        // much lower than the tall cone the old flat offset was sized for).
+        <Html
+          center
+          position={[
+            0,
+            base +
+              (style.roof === 'dome'
+                ? wallH + r * 1.18
+                : style.roof === 'flat'
+                  ? wallH + 0.5
+                  : wallH + r * (style.roof === 'tallCone' ? 1.9 : 1.2)) +
+              0.7,
+            0,
+          ]}
+          distanceFactor={18}
+        >
           <div className="map-label">{label}</div>
         </Html>
       )}

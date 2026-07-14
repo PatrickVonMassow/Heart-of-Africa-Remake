@@ -1042,7 +1042,7 @@ as-is; only the sequence changes.
   Cover the generator output (tileability: opposite edges match; normal
   map normalisation) and material construction in Vitest; re-verify both
   Playwright gates.
-- [ ] 87. Natural settlement layout (user report, screenshot): the building
+- [x] 87. Natural settlement layout (user report, screenshot): the building
   placement — especially in large ports like Cairo — reads as randomly
   scattered; some entrances are nearly unreachable behind other buildings
   (squeezing around corners), and windows face directly into neighbouring
@@ -1067,6 +1067,19 @@ as-is; only the sequence changes.
   region while only the ports get the dense organic lane fabric; record
   the research result briefly in design.md (§2.6/§4.5) and reflect the
   port/village difference in the layout invariants and screenshots.
+  (lanePlan.ts grows the port lane web — winding main lanes, branch
+  alleys, an irregular square — and layout.ts slots buildings door-first
+  along the lanes (laneSlots) with door-reachability, window-clearance
+  and no-building-on-lane rules enforced at placement; villages follow
+  seven researched ~1890 plans (ring/street/compound/scatter/ksar/
+  riverstrip/coastrow) mapped per people. design.md §2.6 + §4 research
+  table, CLAUDE.md pt. 15 updated; layout.test.ts covers the invariants
+  across every place and several seeds; screenshots 98/101/102 show the
+  fabric. Vitest 1334 green; flow/collision/polish/enrichments green;
+  build/lint/audit clean.
+  (track: 14.07. ~15:06 -> 16:53, ~107 min across a chat-window restart,
+  token split of the first leg unavailable, model claude-fable-5[1m],
+  effort high, thinking on, autonomous batch, dontAsk))
 - [x] 88. Cache the Kokoro TTS model for the headless verification: every
   Playwright run uses a fresh profile and re-downloads the ~90 MB model
   from the Hugging Face CDN — repeated regressions today tripped the CDN's
@@ -1161,6 +1174,21 @@ as-is; only the sequence changes.
   non-friend villages). Localized labels stay; update design.md (§6.1/§7
   map item, §6.3/§17.4 camp button) and the affected Vitest/HUD tests plus
   the button geometry checks.
+
+- [ ] 94. Panorama wildlife reads as looming monument, not distant animal
+  (user screenshot, Swahili Village: a giant coal-black elephant on the
+  skyline, mistaken for an elephant-graveyard depiction). The §2.5
+  silhouettes stand only ~14-28 m beyond the settlement edge at up to
+  4.2x scale, in a flat near-black material, right on the horizon seam
+  where they clash with the cloud band's hard lower edge. Rework them to
+  read as believable FAR wildlife: a distance/size relation that keeps
+  the subtended angle small (push the ring out and/or scale down),
+  atmospheric perspective (haze-tinted, lighter with distance) instead
+  of the flat dark blob, and no silhouette straddling the horizon seam.
+  Coordinate with point 92 (standing height on the visible horizon) —
+  fix both together if one rework covers them. Keep the polish.mjs
+  wildlife-count hook green; extend the live check with a bound on the
+  rendered silhouette's apparent size; screenshot evidence.
 
 ## Closing (only after all points)
 

@@ -53,6 +53,7 @@ Settlements do not read as a sparse cluster of a few functional buildings but as
 
 - A clear majority of the buildings is non-functional: dwellings, granaries, animal pens, workshops, tents and storage buildings the player cannot enter, beside the enterable trade, service and audience buildings (§9). Density, size gradation and arrangement are region-typical (§2.4, §4.5) and procedurally varied per settlement (§18); port cities build denser and more massively than villages.
 - A recognizable path network connects buildings, squares and the settlement edge, in region-typical material and routing (dusty tracks, stamped clay paths, busy harbor lanes); it structures the settlement and guides player and inhabitants.
+- Buildings line implicit streets rather than scattering freely. Port cities grow an organic, period-appropriate lane network — winding alleys and small irregular squares, explicitly not a rectangular grid — and every building fronts its lane with the door side: each door is reachable directly from a lane, every window keeps a clear line outward (no wall pressed against a neighbour's), and no building stands on a lane. Villages do NOT use the port fabric: each people follows its own period-accurate organising principle per §4.5 (researched against the ~1890 record), from ring plans around a cattle enclosure to a single cleared street to dispersed camps without any lane at all.
 - Every surface carries believable micro-structure at first-person eye height — never a flat color wash: the ground shows grain, ripples and pebble relief (trodden paths worn smoother than the surroundings), and the building materials (plaster, mud daub, thatch, wood) show real relief the light reacts to, with a darkened base course and faint weather run-off streaks on the walls. The high-frequency detail (color grain and relief) fades out with view distance: past the range where it turns sub-pixel it would only shimmer under the temporal anti-aliasing, so far surfaces fall back to their calm base tones.
 - The inhabitants visibly go about their business: they walk the paths, linger and work at squares (§19.10), and enter and leave the dwellings they live in — not static props but a living everyday routine. The settlement must recognizably feel "inhabited".
 - The functional, enterable buildings stay clearly recognizable within the denser fabric (§17: highlighting of the important buildings).
@@ -133,6 +134,27 @@ Two further landmarks live in their port's first-person scene rather than on the
 | Central | Jungle/Congo basin | Mongo, Pygmies, Banda, Bambundu, Lunda |
 | East | Mountains/lakes/rift | Masai, Swahili, Somali, Sidamo, Uganda |
 | South | High plateau | Batwa, Bemba, Bantu, Zulu, Bushmen |
+
+**Village organising principles (~1890, researched).** Small native villages
+read noticeably differently from the ports: they follow the spatial pattern
+their people actually used at the end of the 19th century — mostly no street
+network at all — instead of a shared template. Each people maps to one of
+seven researched plans:
+
+| Plan | Historical pattern | Peoples |
+|---|---|---|
+| `ring` | Central Cattle Pattern / Maasai enkang: huts on a ring around the central cattle enclosure inside a perimeter fence; thorn rings carry extra gates (one per family head), the chief's great hut sits opposite the south gate | Zulu, Bantu, Bemba, Masai, Somali |
+| `street` | Congo-basin street village (documented pre-colonially, e.g. Schweinfurth 1870): ONE cleared, swept axis with two facing house rows and a palaver shelter at its edge | Mongo, Banda, Bambundu, Lunda, Fang |
+| `compound` | Sahel compound architecture (Hausa *gida*): walled family enclosures around a central meeting ground, granaries inside, lanes to each compound entrance | Hausa, Mandingo, Bombara, Sidamo, Uganda |
+| `scatter` | Dispersed camp: loose family groups of tents or small huts with irregular spacing, no lanes, no shared fence; Tuareg camps add a thornbrush goat pen | Tuareg, Pygmies, Batwa, Bushmen |
+| `ksar` | Fortified North-African block: small flat-roofed houses packed on narrow winding lanes inside a stone perimeter wall with one south gate; the communal agadir tower rises near the centre | Berbers |
+| `riverstrip` | Nile fellah strip: flat-roofed houses banding one river-parallel lane just above the flood line, a short cross alley to the common ground | Nubians |
+| `coastrow` | Swahili rural mji: rectangular gable houses in a double row along one sandy shore path under palms | Swahili |
+
+Post-1900 patterns (corrugated iron, gridded "chief's line" rows, colonial
+resettlement) are deliberately absent. The generator's geometric parameters
+are calibratable stylizations of the researched ranges, not measured
+invariants.
 
 ---
 

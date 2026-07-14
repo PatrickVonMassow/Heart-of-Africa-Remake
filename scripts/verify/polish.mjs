@@ -284,6 +284,37 @@ if (mosque) {
   )
 }
 
+// --- Settlement fabric per plan (design.md §2.6/§4.5) -------------------------
+// Screenshot evidence of the port/village difference: the Congo street
+// village's single axis (101) vs Cairo's organic lane fabric (102); the
+// masai ring already shows in shot 98.
+for (const [placeId, shot] of [
+  ['mongo-village', '101-street-village-plan.png'],
+  ['cairo', '102-cairo-lane-plan.png'],
+]) {
+  await page.evaluate((id) => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+    g.enterPlace(id)
+  }, placeId)
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, placeId, { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(400)
+  await page.evaluate(() => window.__ui.getState().toggleMap())
+  await page.waitForTimeout(400)
+  const fabric = await page.evaluate(() => ({
+    plan: !!document.querySelector('.map-place-plan'),
+    paths: window.__placeLayout.paths.length,
+    dwellings: window.__placeLayout.dwellings.length,
+  }))
+  await page.screenshot({ path: `${OUT}${shot}` })
+  console.log(`shot ${shot}`)
+  check(`${placeId}: the town plan draws the plan fabric`, fabric.plan && fabric.dwellings >= 6, JSON.stringify(fabric))
+  await page.evaluate(() => window.__ui.getState().toggleMap())
+  await page.waitForTimeout(200)
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
