@@ -1555,6 +1555,37 @@ as-is; only the sequence changes.
   SSR-caused — leave them to point 92's family and note the finding in
   this point's tick note; do not chase them here.
 
+- [ ] 100. Cold TTS model load janks the MAIN thread ~14 s (found while
+  diagnosing the handwriting flake): with an unprimed browser profile,
+  adding a journal entry (auto-narration) froze the handwriting reveal —
+  a plain 60 ms `setInterval` on the main thread — for ~14 s while the
+  Kokoro model downloaded (probe: first revealed char after ~13.9 s,
+  twice). The worker isolation (CLAUDE.md §3) should keep the main
+  thread smooth during the download; something in the cold path stalls
+  it. Affects a real player exactly once (first narration ever, until
+  the browser cache holds the model), but a 14 s freeze is a hard UX
+  defect.
+
+  (a) MEASURE in both dev and `npm run preview` (the dev-mode Vite
+  worker-module transform is a suspect that would vanish in the built
+  app): a probe that clears the profile, adds an entry and samples RAF
+  timestamps/`setInterval` drift on the main thread during the model
+  download. If the freeze is DEV-ONLY, document that in
+  scripts/verify/README.md and downgrade this point to done with that
+  note.
+
+  (b) If it freezes in the built app too: bisect the cold path —
+  worker spawn (`new Worker` module compile), the main-thread device
+  probe in `src/journal/speech.ts`, kokoro-js/onnxruntime WASM
+  instantiation (should live in the worker), `AudioContext` creation.
+  Fix so the main thread never blocks longer than a frame budget
+  (~two frames) during a cold start; narration may simply begin later.
+
+  (c) GATE: a voice.mjs check with a CLEARED cache directory (record
+  mode) asserting the journal reveal advances within its normal cadence
+  while the model is still loading (reveal timing independent of TTS
+  readiness).
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
