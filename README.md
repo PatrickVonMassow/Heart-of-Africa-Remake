@@ -135,6 +135,11 @@ src/
 
 ## Status
 
+The autonomous build batch reports its live progress — current point, queue,
+per-point runtimes and pending manual checks — on the
+[batch dashboard](https://claude.ai/code/artifact/fe669d50-9b71-43a3-bf82-2fce7abe774b)
+(private; visible to the repository owner's Claude account only).
+
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
 evidence lives in `verification/`. Known simplifications (e.g. screen-space
 reflections still in their supervised WebGPU rollout, no true water
