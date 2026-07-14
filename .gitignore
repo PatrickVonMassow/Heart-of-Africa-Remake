@@ -28,3 +28,7 @@ scripts/.tile-cache
 
 # Local TTS asset cache of scripts/verify/ttsCache.mjs (re-primed on demand)
 .cache/
+
+# Batch coordination state (scripts/batch-lock.mjs): runtime lock + pause marker
+.claude/batch-lock.json
+.claude/batch-paused
