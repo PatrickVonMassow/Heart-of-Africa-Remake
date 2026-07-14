@@ -302,3 +302,36 @@ export function killFlockMayDescend(
     return Math.hypot(predatorX - remnantX, predatorZ - remnantZ) > VULTURE_DESCEND_CLEAR_DIST
   return true
 }
+
+/**
+ * One step of a scripted walk under the land constraint (design.md §19.5,
+ * point 83): the predator's walk-off must never enter the open ocean — like
+ * every streamed animal, it deflects along the coast instead. Tries the
+ * intended heading first, then swings alternately outward up to ±90°; if
+ * every probe is blocked (a dead-end spit), it stands rather than swims.
+ */
+export function deflectedStep(
+  x: number,
+  z: number,
+  heading: number,
+  dist: number,
+  blocked: (x: number, z: number) => boolean,
+  lookahead = dist,
+): { x: number; z: number; heading: number; moved: boolean } {
+  // The PROBE reaches `lookahead` ahead while the STEP stays `dist`: a
+  // single land cell poking into the water reads as blocked from outside,
+  // so the walker never enters a one-cell dead end it must bounce out of.
+  const probe = Math.max(dist, lookahead)
+  for (let step = 0; step <= 6; step++) {
+    for (const sgn of step === 0 ? [1] : [1, -1]) {
+      const h = heading + sgn * step * (Math.PI / 12) // 15° steps
+      const sx = x + Math.sin(h) * dist
+      const sz = z + Math.cos(h) * dist
+      // Both the STEP TARGET and the far probe must be dry: the lookahead
+      // alone let a walker step into a narrow channel with land beyond it.
+      if (blocked(sx, sz) || blocked(x + Math.sin(h) * probe, z + Math.cos(h) * probe)) continue
+      return { x: sx, z: sz, heading: h, moved: true }
+    }
+  }
+  return { x, z, heading, moved: false }
+}

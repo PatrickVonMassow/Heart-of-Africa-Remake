@@ -504,6 +504,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - Living wildlife as scenery: non-threatening animals in the field of view (elephant herds, giraffes, grazing herds of zebra, wildebeest, antelope and warthog on the savanna, flamingos at the lakes). Purely visual, anchoring place and region; the animals also interact with one another (say, a lion bringing down a grazer).
 - The scenery streams with the journey: an animal is removed only once it is clearly outside the field of view — how far that reaches follows the bird's-eye zoom (zooming out keeps animals the default view would have dropped) — and an animal merely crossing a tile boundary while on screen is never culled.
 - The hunting predator obeys the same rule: a finished hunt trots off away from the traveller and leaves the stage only well beyond the visible surroundings, and a strayed hunt ends the same way — no animal vanishes in sight.
+- Scripted walks obey the same land rule: a predator's walk-off after a kill (or an aborted chase) deflects along the coastline instead of trotting into the open ocean; boxed in on a spit it turns back inland — it never swims and never vanishes in sight.
 - The one exception is a dead animal, which dissolves on screen (eaten by lion or vulture) rather than popping away; a carcass left far off screen, out of the single scavenger's reach, is instead culled silently, so kills never pile up without bound and choke the frame loop.
 
 ### 19.3 The predator hunt

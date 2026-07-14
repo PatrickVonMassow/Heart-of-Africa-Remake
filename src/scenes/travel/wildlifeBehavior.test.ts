@@ -13,6 +13,7 @@ import {
   type FlightState,
   killFlockMayDescend,
   VULTURE_DESCEND_CLEAR_DIST,
+  deflectedStep,
 } from './wildlifeBehavior'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
@@ -483,5 +484,59 @@ describe('killFlockMayDescend (design.md §19.6 — land once the site is clear)
 
   it('a gone predator frees the site immediately', () => {
     expect(killFlockMayDescend('idle', 0, 0, 0, 0)).toBe(true)
+  })
+})
+
+describe('deflectedStep (scripted walks obey the land constraint, point 83)', () => {
+  it('walks straight while the way is clear', () => {
+    const r = deflectedStep(0, 0, 0, 1, () => false)
+    expect(r.moved).toBe(true)
+    expect(r.x).toBeCloseTo(0)
+    expect(r.z).toBeCloseTo(1)
+    expect(r.heading).toBeCloseTo(0)
+  })
+
+  it('deflects along a coast instead of entering the ocean', () => {
+    // Ocean everywhere north of z = 0.5; heading north (0).
+    const blocked = (_x: number, z: number) => z > 0.5
+    const r = deflectedStep(0, 0, 0, 1, blocked)
+    expect(r.moved).toBe(true)
+    expect(blocked(r.x, r.z)).toBe(false)
+    expect(Math.abs(r.heading)).toBeLessThanOrEqual(Math.PI / 2 + 1e-9) // swings at most to the flank
+  })
+
+  it('prefers the smallest swing that clears the water', () => {
+    // A diagonal coast: the first 15° probe to one side already clears it.
+    const blocked = (x: number, z: number) => z > 0.5 && x > -0.2
+    const r = deflectedStep(0, 0, 0, 1, blocked)
+    expect(r.moved).toBe(true)
+    expect(r.heading).toBeLessThan(0) // swung west, away from the blocked side
+  })
+
+  it('stands rather than swims when every forward probe is water', () => {
+    const r = deflectedStep(0, 0, 0, 1, () => true)
+    expect(r.moved).toBe(false)
+    expect(r.x).toBe(0)
+    expect(r.z).toBe(0)
+  })
+
+  it('never steps into a narrow channel even when land lies beyond it', () => {
+    // Water only in z ∈ (1.0, 1.1) — a thin channel; the far probe (0.6)
+    // lands on dry ground beyond it, but the step itself must not get wet.
+    const blocked = (_x: number, z: number) => z > 1.0 && z < 1.1
+    const r = deflectedStep(0, 0.98, 0, 0.05, blocked, 0.6)
+    expect(r.moved).toBe(true)
+    expect(blocked(r.x, r.z)).toBe(false)
+  })
+
+  it('the lookahead keeps the walker out of a one-cell dead end', () => {
+    // A single land cell at z ∈ [1, 1.2] pokes into water (z > 1.2 wet,
+    // z in (1, 1.2] dry pocket). With a probe reaching past the pocket the
+    // walker treats the pocket as blocked and swings aside instead.
+    const blocked = (x: number, z: number) => z > 1.2 || (z > 1 && Math.abs(x) < 0.05)
+    const r = deflectedStep(0, 0.95, 0, 0.1, blocked, 0.6)
+    expect(r.moved).toBe(true)
+    // It did NOT step straight into the pocket column.
+    expect(Math.abs(r.heading)).toBeGreaterThan(0.01)
   })
 })

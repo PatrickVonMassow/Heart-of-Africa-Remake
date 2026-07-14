@@ -2268,6 +2268,52 @@ const chaseAbort = await page.evaluate(async () => {
 })
 check('a strayed chase aborts only beyond the view ring (not in sight)',
   chaseAbort.abortDist !== null && chaseAbort.abortDist > 100, JSON.stringify(chaseAbort))
+
+// --- Point 83: the walk-off obeys the land constraint --------------------------
+// A predator leaving straight toward the sea must deflect along the coast —
+// never standing on an ocean cell — while still making distance.
+const coastLeave = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const g = window.__game.getState()
+  const seed = g.seed
+  // Find a west coast: scan west from inland Senegal until the sea, then
+  // stand the lion just inside the land edge (world x = lon*10, z = -lat*10).
+  let coastLon = null
+  for (let lon = -15.5; lon > -18.5; lon -= 0.05) {
+    if (window.__terrainType(14.7, lon, seed) === 'ocean') { coastLon = lon; break }
+  }
+  if (coastLon === null) return { ok: false, why: 'no coast found' }
+  const before = { lat: g.pos ? -g.pos.z / 10 : null, lon: g.pos ? g.pos.x / 10 : null }
+  const startLon = coastLon + 0.12 // on land, a stride from the water
+  g.debugJumpTo(14.7, startLon + 0.15)
+  await sleep(600)
+  const L = window.__lionHunt.state
+  L.victim = null
+  L.victimHunt = false
+  L.lx = startLon * 10
+  L.lz = -14.7 * 10
+  L.px = L.lx
+  L.pz = L.lz
+  L.heading = -Math.PI / 2 // due west, straight at the sea
+  L.mode = 'leave'
+  const start = { x: L.lx, z: L.lz }
+  const out = { ok: true, everOcean: false, samples: 0, moved: 0 }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 8000 && L.mode === 'leave') {
+    if (window.__terrainType(-L.lz / 10, L.lx / 10, seed) === 'ocean') out.everOcean = true
+    out.samples++
+    out.moved = Math.hypot(L.lx - start.x, L.lz - start.z)
+    await sleep(80)
+  }
+  L.mode = 'idle'
+  L.timer = 99999
+  if (before.lat !== null) g.debugJumpTo(before.lat, before.lon) // leave the world as found
+  return out
+})
+check('the predator walk-off never stands on an ocean cell (deflects at the coast)',
+  coastLeave.ok && coastLeave.samples > 30 && !coastLeave.everOcean, JSON.stringify(coastLeave))
+check('the deflected walk-off still makes distance along the shore',
+  coastLeave.ok && coastLeave.moved > 8, JSON.stringify(coastLeave))
 // Restore the default (closer) zoom and re-lock for the checks that follow.
 await page.evaluate(() => {
   window.__ui.getState().setTravelZoom(1)

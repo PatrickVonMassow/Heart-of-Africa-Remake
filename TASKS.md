@@ -45,6 +45,10 @@ assertable without a browser, Playwright (`scripts/verify/*.mjs`) only for the
 scene/RAF/geometry/CSS/audio/screenshot cases (`scripts/verify/README.md` holds
 the map).
 
+Work order (user override, 2026-07-14): after point 83, the open points are
+worked in THIS order — 88, 90, 87, 86, 91, 85, 84, 89. The numbering stays
+as-is; only the sequence changes.
+
 ## Checklist
 
 - [x] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
@@ -908,8 +912,9 @@ the map).
   band v-flip on the WebGL2 readback path, water-fraction heuristic
   excluding sky. polish.mjs gates fallback, capture-active and a
   directional Nile water signal (screenshot 99). NOTE: the WebGL2 path is
-  verified headless; the WebGPU path (v-flip convention!) needs the
-  user's manual check per the point-32 rollout lesson. design.md §2.5
+  verified headless; the WebGPU path (v-flip convention!) passed the
+  user's manual check on real hardware on 14.07.2026 ("Es sieht alles
+  gut aus") — the band convention holds on both backends. design.md §2.5
   and CLAUDE.md pt. 15 updated.
   (track: 14.07. 08:37 -> 09:37, 60 min, ~230k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 - [x] 82. After point 81: add the GIZA PYRAMIDS as a built cultural landmark
@@ -935,8 +940,8 @@ the map).
   rendered band: moved to the west-bank desert (lon 30.65, ~0.52° off
   the axis) with a footprint-rim river-clearance probe in world.test.ts
   (riverDistance saturates at 0.45, so the rim is probed directly).
-  (track: 14.07. 09:39 -> 10:45, 66 min, ~230k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
-- [ ] 83. Animals must be unable to walk into the open ocean, exactly like
+  (track: 14.07. 09:39 -> 11:12, 93 min incl. two verify hardenings, ~260k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
+- [x] 83. Animals must be unable to walk into the open ocean, exactly like
   the player (user report): predators currently do it when they WALK AWAY
   after feeding — the scripted leave path apparently bypasses the §19.5
   water backstop that pins streamed animals to land. Route every scripted
@@ -945,6 +950,20 @@ the map).
   entering ocean cells. Cover the leave path on both layers (pure: the
   deflected step rule; live: a post-feed lion walking off at a coast stays
   on land until it despawns).
+  (The walk-off (and the chase abort, which shares the leave path) now
+  steps through deflectedStep: the escape course re-aims radially away
+  from the traveller each frame under a turn cap (a persisted deflected
+  heading let a shoreline hold the predator tangentially in the view
+  ring); probes check BOTH the step target and a 0.8-unit lookahead
+  (one-cell coast pockets and narrow channels caught live); boxed in it
+  walks back inland, and standing IN water (stale/scripted state) it
+  wades to the nearest dry probe first. 6 pure cases in
+  wildlifeBehavior.test.ts; enrichments walks a lion at a
+  runtime-located west coast: 92 samples, zero ocean cells, ~30 units
+  of shoreline covered. design.md §19.5 and CLAUDE.md pt. 12 record it.
+  (track: 14.07. 11:14 -> 12:50, 96 min incl. three live-trace fix
+  rounds, ~140k tokens, model claude-fable-5[1m], effort high, thinking
+  on, autonomous batch, dontAsk))
 - [ ] 84. Full phone/tablet support, with ZERO change to PC play: a touch
   layer as a third input source in the existing merged input path (like the
   gamepad: synthetic events, deliberate-input engagement guard — the

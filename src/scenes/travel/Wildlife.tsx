@@ -35,6 +35,7 @@ import {
   separationPush,
   turnToward,
   killFlockMayDescend,
+  deflectedStep,
   type FlightState,
 } from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
@@ -1992,9 +1993,42 @@ function LionHunt() {
     } else {
       // Moving on: trot straight away from the traveller and leave the stage
       // only well beyond the visible surroundings (zoom-aware) — the predator
-      // never despawns in sight (design.md §19).
-      s.lx += Math.sin(s.heading) * HUNT_LEAVE_SPEED * dt
-      s.lz += Math.cos(s.heading) * HUNT_LEAVE_SPEED * dt
+      // never despawns in sight (design.md §19). The walk-off obeys the same
+      // land constraint as every animal: at a coast it deflects along the
+      // shoreline instead of trotting into the open ocean (point 83).
+      // The escape course re-aims AWAY FROM THE TRAVELLER every frame; the
+      // coast deflection applies per STEP only. A persisted deflected
+      // heading let a shoreline hold the predator tangentially inside the
+      // view ring forever — it must always strive outward.
+      const oceanAt = (nx: number, nz: number) => {
+        const ll = worldToLatLon(nx, nz)
+        return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
+      }
+      // Steer toward the radial escape under a turn cap: an instant flip
+      // back to the radial after an inland detour re-entered the same coast
+      // pocket every other frame (an oscillating stand-still).
+      const radial = leaveHeading(s.lx, s.lz, pos.x, pos.z)
+      s.heading = turnToward(s.heading, radial, 1.8 * dt)
+      if (oceanAt(s.lx, s.lz)) {
+        // Standing IN water (a stale or scripted mishap): wade toward the
+        // nearest dry probe first; the land rule takes over on the shore.
+        for (let k = 0; k < 12; k++) {
+          const h = s.heading + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * (Math.PI / 6)
+          if (!oceanAt(s.lx + Math.sin(h) * 1.2, s.lz + Math.cos(h) * 1.2)) {
+            s.heading = h
+            break
+          }
+        }
+        s.lx += Math.sin(s.heading) * HUNT_LEAVE_SPEED * dt
+        s.lz += Math.cos(s.heading) * HUNT_LEAVE_SPEED * dt
+      } else {
+        let leaveStep = deflectedStep(s.lx, s.lz, s.heading, HUNT_LEAVE_SPEED * dt, oceanAt, 0.8)
+        // Boxed in on a spit: walk back inland this frame rather than swim.
+        if (!leaveStep.moved) leaveStep = deflectedStep(s.lx, s.lz, s.heading + Math.PI, HUNT_LEAVE_SPEED * dt, oceanAt, 0.8)
+        s.lx = leaveStep.x
+        s.lz = leaveStep.z
+        if (leaveStep.moved) s.heading = leaveStep.heading
+      }
       if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR) {
         s.mode = 'idle'
         s.timer = 30 + Math.random() * 30

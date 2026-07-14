@@ -444,7 +444,10 @@ verify suite that proves it.
       moments, while the elephant trample remains possible; an animal on
       an open-ocean cell — and, outside the §19.8 water dramas and the
       wading flamingos, on any river/lake water cell — is set back to
-      the nearest land (no animal strays into the impassable sea or
+      the nearest land; the scripted walk-off deflects along the coast
+      instead of entering the ocean (the step rule pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`, the coast walk
+      live-gated in `scripts/verify/enrichments.mjs`) (no animal strays into the impassable sea or
       stands in a channel, and the scripted hunt's prey balks at the
       waterline); drinkers walk only to the bank and bathers one wade
       past it (the bank-targeting rules pure-tested in
