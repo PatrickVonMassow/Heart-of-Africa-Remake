@@ -115,11 +115,15 @@ textarea {
 }
 
 /* Right zone: the health bar + affliction badges INSIDE the bar, where the
-   journal panel can never cover them (design.md §17.1). */
+   journal panel can never cover them (design.md §17.1). margin-left: auto
+   pushes the zone to the bar's right edge — the centred hints are absolutely
+   positioned and take no flex space, so without it the health bar would sit
+   directly after the stats (user-reported layout bug). */
 .status-health {
   display: flex;
   align-items: center;
   flex: none;
+  margin-left: auto;
 }
 
 /* --- Inventory bar -------------------------------------------------------- */

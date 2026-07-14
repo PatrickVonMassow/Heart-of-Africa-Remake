@@ -336,7 +336,9 @@ verify suite that proves it.
    `.stat-icon` while the date renders DD.MM.YYYY
    (`src/ui/StatusBar.test.tsx`, `src/i18n/i18n.test.ts`); the
    `.health-bar-fill` lives inside `.status-bar`
-   (`src/ui/StatusBar.test.tsx`), and a canoe on
+   (`src/ui/StatusBar.test.tsx`); the health bar hugs the status bar's
+   right edge with the affliction badges to its left
+   (`scripts/verify/enrichments.mjs`), and a canoe on
    water / medicine while afflicted gains `.inv-active` while an idle item
    does not (`scripts/verify/enrichments.mjs`); the `.health-bar-fill` is
    full-width green at full health and shrinks/reddens toward zero, the

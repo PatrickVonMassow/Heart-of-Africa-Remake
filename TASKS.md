@@ -766,12 +766,18 @@ the map).
   measured 0.03 after, near-field detail unchanged (edge energy 2.88).
   Temporal-stability gate added to settings.mjs; design.md §2.5/§2.6 and
   CLAUDE.md pt. 15 updated. Full regression green.)
-- [ ] 74. Status-bar layout fix (user report): the health bar and its
+- [x] 74. Status-bar layout fix (user report): the health bar and its
   affliction badges currently sit LEFT in the status bar, right after the
   stats. They must be RIGHT-ALIGNED at the bar's end — badges (e.g.
   "Dehydrated") to the LEFT of the health bar — while the centre of the bar
   keeps the transient hints (e.g. the canoe-carried-on-land notice), per the
   point-70 design. Cover the alignment on the right layer(s).
+  (Root cause: .status-health had no margin-left auto — the centred hints
+  are absolutely positioned and take no flex space, so the health zone sat
+  directly after the stats. One-line CSS fix; real-layout geometry gated in
+  enrichments.mjs (bar hugs the right edge, badge left of it, dehydration
+  toggled as probe); CLAUDE.md pt. 9 Verifiable extended. Full regression
+  green.)
 - [ ] 75. The Meroë pyramids must render MUCH larger in the travel view —
   today's build reads too small; scale the landmark geometry up so the
   pyramid field is unmistakable at travel zoom (keep the label/sighting

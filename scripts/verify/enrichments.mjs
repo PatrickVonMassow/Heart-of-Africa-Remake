@@ -401,6 +401,38 @@ if (jungleSpot) {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
 }
 
+// Status-bar right zone (design.md §17.1, user-reported layout bug): the
+// health bar hugs the BAR'S RIGHT EDGE — not the slot right after the stats —
+// and an active affliction badge renders to the LEFT of the health bar.
+// Real-layout geometry, so it lives here rather than in jsdom.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__game.setState({ afflictions: { ...g.afflictions, dehydration: true } })
+  })
+  await page.waitForTimeout(150)
+  const layout = await page.evaluate(() => {
+    const bar = document.querySelector('.status-bar')
+    const health = document.querySelector('.health-bar')
+    const badge = document.querySelector('.affliction-badge')
+    if (!bar || !health) return { ok: false, why: 'missing elements' }
+    const br = bar.getBoundingClientRect()
+    const hr = health.getBoundingClientRect()
+    const rightGap = br.right - hr.right
+    const badgeLeftOfBar = badge ? badge.getBoundingClientRect().right <= hr.left + 1 : false
+    return { ok: rightGap >= 0 && rightGap < 40 && badgeLeftOfBar, rightGap: Math.round(rightGap), badgeLeftOfBar }
+  })
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__game.setState({ afflictions: { ...g.afflictions, dehydration: false } })
+  })
+  check(
+    'health bar hugs the status bar right edge, badges to its left',
+    layout.ok === true,
+    `rightGap ${layout.rightGap}px, badgeLeftOfBar ${layout.badgeLeftOfBar}`,
+  )
+}
+
 // --- Canoe depiction: ridden on water, dragged on land (§7.1.4, design.md §7) --
 // With a canoe in the pack, travelling a water tile rides it (seated in the
 // hull); on land the explorer drags it behind him; with no canoe he just walks.
