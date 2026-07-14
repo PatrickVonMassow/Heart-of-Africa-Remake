@@ -9,6 +9,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import {
+  atan,
   attribute,
   color,
   float,
@@ -17,6 +18,9 @@ import {
   normalWorldGeometry,
   positionWorld,
   smoothstep,
+  tan,
+  texture as textureNode,
+  vec2,
   vec3,
 } from 'three/tsl'
 import { useGame } from '../../state/store'
@@ -45,6 +49,8 @@ import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
 import { buildLayout, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { getPanoramaCapture } from '../travel/panoramaCapture'
+import { bandHeightAt } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { getStrings, useStrings } from '../../i18n'
 
@@ -1032,6 +1038,67 @@ function TableMountainSkyline({ placeId }: { placeId: string }) {
   return <mesh geometry={geometry} material={material} position={[0, -1.5, -118]} scale={[1, 1.3, 1]} />
 }
 
+/**
+ * Real-surroundings panorama (design.md §2.5, point 81): the 360° horizon
+ * band captured from the travel scene at this settlement's position on
+ * entry, shown as a cylinder around the town — mountains, water courses and
+ * dressing appear where they actually lie, direction-true. Fades into the
+ * sky at its top and into the backdrop ground at its bottom; without a
+ * capture (snapshot load, ferry arrival) the geometry backdrop alone stands.
+ */
+const PANORAMA_RADIUS = 200
+
+function TravelPanorama({ placeId }: { placeId: string }) {
+  const seed = useGame((s) => s.seed)
+  const capture = useMemo(() => getPanoramaCapture(placeId, seed), [placeId, seed])
+  const material = useMemo(() => {
+    if (!capture) return null
+    const m = new THREE.MeshBasicNodeMaterial()
+    m.transparent = true
+    m.side = THREE.BackSide
+    m.depthWrite = false
+    m.fog = false
+    // Direction-true UV from the world position around the town centre
+    // (panoramaMath.directionToU, same math): the capture is four 90°
+    // perspective shots, so WITHIN a sector the pixel column is linear in
+    // tan(angle from the sector centre) — mapped exactly, no warping.
+    const H = bandHeightAt(PANORAMA_RADIUS)
+    const alpha = atan(positionWorld.x, positionWorld.z.negate())
+    const kSector = alpha.div(Math.PI / 2).round()
+    const localT = tan(alpha.sub(kSector.mul(Math.PI / 2)))
+    const u = kSector.add(localT.add(1).mul(0.5)).mul(0.25).add(1).fract()
+    const v = positionWorld.y.sub(EYE_HEIGHT - H / 2).div(H)
+    // The render-target texture reads with v flipped on this pipeline (the
+    // near-field Nile appeared as a blue dome overhead until inverted).
+    const band = textureNode(capture.texture, vec2(u, v.oneMinus()))
+    m.colorNode = band.rgb
+    // Blend: the band's own alpha carves the sky out (alpha-0 capture clear);
+    // the bottom fades into the backdrop ground, a soft top guard remains.
+    m.opacityNode = band.a
+      .mul(smoothstep(float(0.02), float(0.22), v))
+      .mul(smoothstep(float(1.0), float(0.8), v))
+      .mul(0.96)
+    return m
+  }, [capture])
+  const geometry = useMemo(() => {
+    if (!capture) return null
+    const H = bandHeightAt(PANORAMA_RADIUS)
+    return new THREE.CylinderGeometry(PANORAMA_RADIUS, PANORAMA_RADIUS, H, 96, 1, true)
+  }, [capture])
+  useEffect(() => () => geometry?.dispose(), [geometry])
+  useEffect(() => () => material?.dispose(), [material])
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placePanoramaActive = !!capture
+    return () => {
+      delete w.__placePanoramaActive
+    }
+  }, [capture])
+  if (!geometry || !material) return null
+  return <mesh geometry={geometry} material={material} position={[0, EYE_HEIGHT, 0]} />
+}
+
 function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
   const geometry = useMemo(() => {
     const r0 = innerRadius
@@ -1403,6 +1470,7 @@ export function PlaceScene() {
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
       <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
+      <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} />
 

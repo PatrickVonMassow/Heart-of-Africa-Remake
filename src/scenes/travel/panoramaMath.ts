@@ -1,0 +1,45 @@
+// Pure geometry of the travel-scene panorama (point 81): sector layout of
+// the 360° horizon band and its mapping onto the first-person horizon
+// cylinder. Kept three-free so the direction-trueness is unit-testable.
+
+/** Number of camera sectors stitched side by side into the band texture. */
+export const CAPTURE_SECTORS = 4
+/** Horizontal field of view per sector (sectors close the full circle). */
+export const SECTOR_H_FOV_DEG = 360 / CAPTURE_SECTORS
+/** Vertical field of view of the band (centred on the horizon). */
+export const BAND_V_FOV_DEG = 44
+
+/**
+ * Camera yaw for sector k. three's yaw 0 looks along -Z (map north in both
+ * scenes: +z is south, +x east); positive yaw turns CCW (toward west), so
+ * successive sectors step by -90° to sweep N → E → S → W, matching the
+ * left-to-right texture order.
+ */
+export function sectorYaw(k: number): number {
+  return -k * (SECTOR_H_FOV_DEG * Math.PI) / 180
+}
+
+/**
+ * Texture U for a world direction (dx, dz) from the capture point. Sector k
+ * covers u ∈ [k/4, (k+1)/4]; its camera looks along k·90° (N, E, S, W), and
+ * WITHIN a sector the perspective image is linear in tan(angle from the
+ * sector centre), not in the angle itself — the mapping honours that, so a
+ * direction lands exactly on the pixel column that photographed it.
+ */
+export function directionToU(dx: number, dz: number): number {
+  // atan2(east, north): 0 at north, +90° at east — the capture sweep order.
+  const a = Math.atan2(dx, -dz)
+  const half = Math.PI / 2
+  const k = Math.round(a / half)
+  const local = a - k * half // -45°..45° within the sector
+  const u = (k + (Math.tan(local) + 1) / 2) / CAPTURE_SECTORS
+  return ((u % 1) + 1) % 1
+}
+
+/**
+ * Height of the horizon cylinder that shows the band at radius r: the band
+ * spans ±BAND_V_FOV/2 around the horizontal, seen from the cylinder's axis.
+ */
+export function bandHeightAt(radius: number): number {
+  return 2 * radius * Math.tan(((BAND_V_FOV_DEG / 2) * Math.PI) / 180)
+}

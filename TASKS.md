@@ -11,6 +11,12 @@ broken base. Tests are never weakened; a red run is fixed in the production code
 This file and every new entry are written in English. Commit messages do not
 reference the TASKS point number.
 
+Tracking (user mandate 2026-07-14): a point being worked on is marked `[*]`;
+on completion its result note ends with a tracking line
+`(track: <start> -> <finish>, <minutes> min, ~<tokens>)`. Times are Berlin
+local; non-work waits (external blocks) are called out; token figures are
+order-of-magnitude estimates (not measurable in-session), always marked ~.
+
 ## Regression command
 
 ```sh
@@ -737,6 +743,7 @@ the map).
   (.health-low opacity-blink on the in-bar health bar below max/3;
   threshold on/off pinned in Hud.test.tsx; design.md §17.1 + CLAUDE.md
   pt. 9 updated. Done together with point 72; full regression green.)
+  (track: 13.07. 21:35 -> 21:58 together with 72, ~12 min its share, ~25k tokens)
 - [x] 72. The canteen must also BLINK below 1/3 fill (today it glows yellow
   below 20 %, red below 5 % and blinks only when empty — design.md §6.1's
   thresholds change accordingly, both language files if any text names
@@ -746,6 +753,7 @@ the map).
   names the thresholds, so no language change. Threshold on/off and the
   empty case pinned in Hud.test.tsx; design.md §6.1 updated. Full
   regression green.)
+  (track: 13.07. 21:35 -> 21:58 together with 71, ~11 min its share, ~20k tokens)
 - [x] 73. Settlement graphics glitches (user screenshot, first-person view):
   (a) flat BLACK artifacts lie on the ground in places — elongated dark
   shapes at player height between the buildings; (b) near the backdrop
@@ -766,6 +774,7 @@ the map).
   measured 0.03 after, near-field detail unchanged (edge energy 2.88).
   Temporal-stability gate added to settings.mjs; design.md §2.5/§2.6 and
   CLAUDE.md pt. 15 updated. Full regression green.)
+  (track: 13.07. 22:40 -> 14.07. 01:56, ~195 min incl. ~45 min external HF-CDN block and two full regressions, ~180k tokens)
 - [x] 74. Status-bar layout fix (user report): the health bar and its
   affliction badges currently sit LEFT in the status bar, right after the
   stats. They must be RIGHT-ALIGNED at the bar's end — badges (e.g.
@@ -778,6 +787,7 @@ the map).
   enrichments.mjs (bar hugs the right edge, badge left of it, dehydration
   toggled as probe); CLAUDE.md pt. 9 Verifiable extended. Full regression
   green.)
+  (track: 14.07. 01:58 -> 02:24, 26 min, ~35k tokens)
 - [x] 75. The Meroë pyramids must render MUCH larger in the travel view —
   today's build reads too small; scale the landmark geometry up so the
   pyramid field is unmistakable at travel zoom (keep the label/sighting
@@ -787,6 +797,7 @@ the map).
   landmarks.test.ts (height 3-8, footprint 6-14, grounded) with the
   generic <6 bound kept for the other sites. Verified visually at Meroë.
   Full regression green.)
+  (track: 14.07. 02:25 -> 05:55, 210 min incl. two flake-hardening regression reruns (escape poll, run-all crash tail), ~90k tokens)
 - [x] 76. Canoe clipping still occurs (user screenshot): a canoe DRAGGED ON
   LAND near a water edge protrudes into the water surface. The drag pose
   must keep the hull on the land side of the bank (or resting visibly ON
@@ -800,6 +811,7 @@ the map).
   canoeDrag.test.ts (bank swing, waterward turn, spit shortening, dry
   no-op); design.md §7 and CLAUDE.md pt. 4 record the rule. Full
   regression green.)
+  (track: 14.07. 05:56 -> 06:19, 23 min, ~45k tokens)
 - [x] 77. "A Discovery" is a poor journal-entry heading (user feedback).
   Rework the generic discovery/sighting entry titles into evocative,
   entry-specific headings in BOTH languages (e.g. naming the landmark or
@@ -814,6 +826,7 @@ the map).
   the treasure headings, parity pin 56→58. "A Grim Discovery"
   (findRemains) kept — it is specific to its event. design.md §10 and
   CLAUDE.md pt. 25 record the heading rule. Full regression green.)
+  (track: 14.07. 06:20 -> 06:44, 24 min, ~50k tokens)
 - [x] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
   boundary lines render in the middle of the water where two channels
   join — the shore/edge treatment (foam/outline) must appear only at real
@@ -831,6 +844,7 @@ the map).
   Scene-switch timing unchanged (23 s baseline == 23 s after, the cost is
   the chunk build). design.md §11.3 and CLAUDE.md pt. 21 record the
   rule. Full regression green.)
+  (track: 14.07. 06:45 -> 07:19, 34 min, ~85k tokens)
 - [x] 79. In-settlement map: opening the map INSIDE a settlement must show a
   plan of the current place — the walkable area with the functional
   (enterable) buildings marked and named — instead of (or in front of) the
@@ -845,6 +859,7 @@ the map).
   pinned in MapOverlay.test.tsx (port roster, village chief/market,
   atlas return on leaving); live check + screenshot 98 in polish.mjs.
   design.md §6.1/§7 and CLAUDE.md pt. 3 updated. Full regression green.)
+  (track: 14.07. 07:20 -> 07:50, 30 min, ~80k tokens)
 - [x] 80. Vultures (user screenshot): (a) they still CLIP INTO THE GROUND
   while feeding at a carcass — feet/body must stay on the surface for the
   whole feed; (b) after the predator has left a kill they wait too long
@@ -862,7 +877,8 @@ the map).
   (lx/lz). enrichments gates the descend timing (mode 'leave' at descend)
   and the landed clearance via the new dev hook; design.md §19.6 and
   CLAUDE.md pt. 12 updated. Full regression green.)
-- [ ] 81. Recognizable settlement surroundings (user report): the current
+  (track: 14.07. 07:51 -> 08:36, 45 min, ~75k tokens)
+- [x] 81. Recognizable settlement surroundings (user report): the current
   panorama never reads as the actual map neighbourhood — mountains, rivers,
   lakes and the local fauna around the settlement are unrecognizable (the
   24x160 vertex-color annulus smears water courses away, the 18° relief cap
@@ -877,6 +893,21 @@ the map).
   layers (pure: whatever mapping/projection helpers emerge; Playwright:
   the panorama shows the settlement's river/mountain where one exists,
   e.g. the Nile at the Nubian village).
+  (Implemented as the capture approach: nearing a settlement (enter
+  radius + 4) renders a 360° horizon band from its position out of the
+  live travel scene — 4x90° sectors, sky alpha-carved (the place dome
+  shows through), symbolic dressing/markers/traveller hidden, near plane
+  8 — cached per place+seed and shown in the place scene on a horizon
+  cylinder with exact per-sector tan mapping (panoramaMath, pure-tested);
+  direct place-to-place enters fall back to the geometry backdrop.
+  Debugging en route: renderer viewport/scissor restore (black frame),
+  band v-flip on the WebGL2 readback path, water-fraction heuristic
+  excluding sky. polish.mjs gates fallback, capture-active and a
+  directional Nile water signal (screenshot 99). NOTE: the WebGL2 path is
+  verified headless; the WebGPU path (v-flip convention!) needs the
+  user's manual check per the point-32 rollout lesson. design.md §2.5
+  and CLAUDE.md pt. 15 updated.
+  (track: 14.07. 08:37 -> 09:37, 60 min, ~230k tokens))
 - [ ] 82. After point 81: add the GIZA PYRAMIDS as a built cultural landmark
   in the travel view (real ~1890 position just west of Cairo — Khufu,
   Khafre, Menkaure with the Sphinx readable at a glance; the design.md §4.4
@@ -976,6 +1007,14 @@ the map).
   the regression is CDN-independent and faster; the production/player path
   stays unchanged (browser cache + CDN streaming per CLAUDE.md §3). Cover
   with the voice suite running green offline-from-HF (cache primed).
+
+- [ ] 89. Map presentation (user request): the opened map — continental
+  atlas AND in-place town plan — must sit BOTTOM-LEFT instead of centred,
+  with a margin to the screen edge and to the bottom-left buttons
+  (mirroring the journal panel's placement rules on the right side), so
+  no button is covered. And the CURRENT PLAYER POSITION must be clearly
+  recognizable on the map in both modes. Cover the placement geometry and
+  the position marker on the right layer(s).
 
 ## Closing (only after all points)
 

@@ -33,6 +33,7 @@ import { moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
+import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
 import {
   updateTrailPoint,
   canoeDragPose,
@@ -861,6 +862,41 @@ function VillageMarker() {
   )
 }
 
+/**
+ * Panorama capture on settlement APPROACH (design.md §2.5, point 81): a few
+ * strides before the enter radius, the travel scene renders the 360° horizon
+ * band from the settlement's position — proactively, because once placeId is
+ * set React switches the scene before another frame runs. The capture is
+ * cached per place+seed, so entering finds it ready.
+ */
+const CAPTURE_APPROACH_RING = 4 // world units beyond the enter radius
+
+function PanoramaCaptureTrigger() {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  useFrame(() => {
+    const s = useGame.getState()
+    if (s.placeId) return
+    const ring = balance.placeEnterRadius + CAPTURE_APPROACH_RING
+    for (const p of PLACES) {
+      const w = latLonToWorld(p.lat, p.lon)
+      if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) > ring) continue
+      if (hasPanoramaCapture(p.id, s.seed)) return
+      const h = Math.max(0, sampleTerrain(p.lat, p.lon, s.seed).height)
+      capturePanorama(
+        gl as unknown as THREE.WebGPURenderer,
+        scene as unknown as THREE.Scene,
+        { x: w.x, y: h + 2.2, z: w.z },
+        p.id,
+        s.seed,
+        ['traveller-root', `place-marker-${p.id}`, 'travel-sky', 'travel-climate', 'travel-dressing', 'travel-markers'],
+      )
+      return
+    }
+  })
+  return null
+}
+
 function PlaceMarker({ place }: { place: PlaceDef }) {
   const t = useStrings()
   const seed = useGame((s) => s.seed)
@@ -870,7 +906,7 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const p = latLonToWorld(place.lat, place.lon)
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
   return (
-    <group position={[p.x, y, p.z]}>
+    <group position={[p.x, y, p.z]} name={`place-marker-${place.id}`}>
       {place.kind === 'port' ? <PortMarker /> : <VillageMarker />}
       <Html center position={[0, 2.9, 0]} distanceFactor={60}>
         <div className={`map-label${discovered ? '' : ' undiscovered'}`}>{discovered ? t.places[place.id] : '?'}</div>
@@ -1466,7 +1502,7 @@ function Player() {
   })
 
   return (
-    <group ref={ref}>
+    <group ref={ref} name="traveller-root">
       {/* Ridden dugout, shown only while travelling water (toggled in useFrame). */}
       <group ref={boat} visible={false}>
         <CanoeHull />
@@ -1724,8 +1760,14 @@ export function TravelScene() {
 
   return (
     <>
-      <SkyDome preset={TRAVEL_SKY} sunDirection={SUN_DIR} />
-      <Climate />
+      {/* Named so the panorama capture can hide sky and weather: the band
+          keeps alpha-0 sky, and the place scene's own dome shows through. */}
+      <group name="travel-sky">
+        <SkyDome preset={TRAVEL_SKY} sunDirection={SUN_DIR} />
+      </group>
+      <group name="travel-climate">
+        <Climate />
+      </group>
       <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
       <Sun />
       <TerrainChunks />
@@ -1733,17 +1775,26 @@ export function TravelScene() {
       <RiversAndLakes />
       <RegionBorders />
       <WaterPlane />
-      <Vegetation />
-      <Wildlife />
+      {/* Named for the panorama capture: the symbolic travel-scale dressing
+          (trees the size of hills, animals, markers) would read absurd on
+          the person-scale horizon — the capture keeps terrain, water,
+          mountains and the built landmarks. */}
+      <group name="travel-dressing">
+        <Vegetation />
+        <Wildlife />
+      </group>
       {PLACES.map((p) => (
         <PlaceMarker key={p.id} place={p} />
       ))}
+      <PanoramaCaptureTrigger />
       <LandmarkLabels />
       <ElephantGraveyard />
       <CulturalLandmarks />
       <NaturalSites />
-      <CampMarkers />
-      <GraveMarker />
+      <group name="travel-markers">
+        <CampMarkers />
+        <GraveMarker />
+      </group>
       <Player />
     </>
   )

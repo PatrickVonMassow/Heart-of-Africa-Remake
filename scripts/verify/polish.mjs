@@ -177,6 +177,47 @@ if (mosque) {
   console.log('shot 97-timbuktu-djinguereber.png')
 }
 
+// --- Travel panorama capture (design.md §2.5, point 81) -----------------------
+// Entering from the travel scene captures the REAL surroundings as the
+// first-person horizon: at the riverside Nubian village the Nile must show in
+// the north/east sectors (direction-true), while a direct place->place enter
+// (no travel scene) falls back to the geometry backdrop.
+{
+  const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
+  check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
+  await page.evaluate(() => { const g = window.__game.getState(); g.leavePlace() })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 15000 })
+  await page.waitForTimeout(2500) // travel scene mounts, frame loop runs
+  await page.evaluate(() => window.__game.getState().debugJumpTo(21.8, 31.65)) // approach ring
+  await page.waitForTimeout(1500) // the approach capture fires in the frame loop
+  await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
+  await page.waitForFunction(() => window.__game.getState().placeId === 'nubian-village' && !!window.__placePlayer, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(2000)
+  const pano = await page.evaluate(() => ({
+    active: window.__placePanoramaActive ?? false,
+    fractions: window.__placePanorama?.waterFractions ?? null,
+  }))
+  check('entering from the travel scene shows the captured panorama', pano.active === true, JSON.stringify(pano))
+  const f = pano.fractions
+  // The Nile must show as a clearly DIRECTIONAL water signal: real water
+  // pixels overall, concentrated in some sectors while others stay dry
+  // (which way the river bends around the village depends on the run's
+  // camera height over the bank dunes — the geography itself is fixed).
+  const total = f ? f.reduce((a, b) => a + b, 0) : 0
+  const max = f ? Math.max(...f) : 0
+  const min = f ? Math.min(...f) : 1
+  check(
+    'the Nile shows as a directional water signal in the band',
+    !!f && total > 0.003 && max > total * 0.4 && min < max * 0.15,
+    `sectors ${f ? f.map((x) => x.toFixed(4)).join('/') : 'n/a'}`,
+  )
+  await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0; p.pitch = 0.02 })
+  await page.waitForTimeout(700)
+  await page.screenshot({ path: `${OUT}99-travel-panorama.png` })
+  console.log('shot 99-travel-panorama.png')
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

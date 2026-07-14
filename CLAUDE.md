@@ -503,7 +503,13 @@ verify suite that proves it.
     stands sunken below the settlement ground plane — the clamp and the
     backdrop heightfield bounds pure-tested in
     `src/scenes/place/backdrop.test.ts`, the live standing heights via
-    the dev hook (`scripts/verify/polish.mjs`); the §4.4 port skyline landmarks
+    the dev hook (`scripts/verify/polish.mjs`); the §2.5 travel-scene panorama holds — entering from the bird's-eye
+    view shows the captured, direction-true surroundings (the riverside
+    Nubian village reads a directional water signal in its band via the
+    dev hook; a direct place-to-place enter falls back to the geometry
+    backdrop; sector/UV math pure-tested in
+    `src/scenes/travel/panoramaMath.test.ts`;
+    `scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`)
     and Timbuktu builds the Djinguereber mosque as a collidable dwelling
