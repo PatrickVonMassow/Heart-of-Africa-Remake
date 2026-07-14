@@ -1221,8 +1221,10 @@ as-is; only the sequence changes.
   test flipped with each seed's dune cover and was replaced). Giza's
   "oversize" was legitimate perspective (4 wu distance + plateau); the
   explicit Cairo skyline stays (deterministic, user-approved), though a
-  capture-only skyline is now viable. WebGPU needs the user's manual
-  E/W re-check (dashboard card). CLAUDE.md pt. 15 updated. The compass
+  capture-only skyline is now viable. WebGPU manual E/W check ACCEPTED
+  by the user 14.07. ~20:20 ("Nubian Village entered from the travel
+  scene — the Nile lies west in the first-person view; looks good").
+  CLAUDE.md pt. 15 updated. The compass
   live-check was hardened condition-based after full-load flakes (wait
   for the capture readback itself, poll the west view until the pillar
   shows) — final FULL regression all green (17 suites), two flake
@@ -1471,6 +1473,37 @@ as-is; only the sequence changes.
   regression. design.md §2 records the walk-feel rules. Scoped suites per
   the diff mapping (`src/scenes/place/` → collision, polish, settings;
   plus Vitest), then full regression.
+
+- [ ] 98. Jump-to covers every named map point, grouped and sorted (user
+  request while testing SSR: Victoria Falls and Lake Victoria were
+  missing). The debug menu's jump-to dropdown (`src/ui/DebugMenu.tsx`,
+  design.md §21.3) currently offers only ports, villages, the elephant
+  graveyard and the tomb.
+
+  (a) ENTRIES. Extend the dropdown to every NAMED point of the world
+  map: ports, villages, mountains (`MOUNTAINS`), waterfalls
+  (`WATERFALLS`), lakes (`LAKES`, jump to the lake centre or its named
+  anchor), the cultural landmarks (`CULTURAL_LANDMARKS`), the natural
+  sites (`NATURAL_SITES`), the elephant graveyard and the tomb — data
+  all in `src/world/data/` and `src/world/geo.ts` (PLACES); jump via the
+  existing `debugJumpTo(lat, lon)`.
+
+  (b) GROUPING + ORDER. Use `<optgroup>` per category with a localized
+  category label (de + en dictionary entries: Ports, Villages,
+  Mountains, Waterfalls, Lakes, Cultural landmarks, Natural sites,
+  Other), categories in that fixed order; WITHIN each group sort
+  alphabetically by the LOCALIZED display name (locale-aware compare,
+  `localeCompare` with the active language). Entry labels use the same
+  localized names the map/labels use (`t.landmarks`, place names) — no
+  new strings except the category labels.
+
+  (c) TESTS + DOCS. `src/ui/DebugMenu.test.tsx`: the select contains an
+  entry for a sample of each category (e.g. Victoria Falls, Lake
+  Victoria, Kilimanjaro, Ngorongoro, Meroë), groups appear in the fixed
+  order, entries within a group are alphabetically sorted in BOTH
+  languages, and choosing an entry calls the store jump with that
+  point's coordinates. design.md §21.3 and CLAUDE.md pt. 20 (dropdown
+  selectors) record the extended scope.
 
 ## Closing (only after all points)
 
