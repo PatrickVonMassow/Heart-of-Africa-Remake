@@ -996,23 +996,57 @@ as-is; only the sequence changes.
   rounds, ~119k in / ~21k out, model claude-fable-5[1m], effort high, thinking
   on, autonomous batch, dontAsk))
 - [ ] 84. Full phone/tablet support, with ZERO change to PC play: a touch
-  layer as a third input source in the existing merged input path (like the
-  gamepad: synthetic events, deliberate-input engagement guard — the
-  overlay mounts only after a real first touch, so desktops, including
-  touch-screen laptops never touched, see pixel-identical behaviour).
-  Left virtual stick = movement; right-half touch-drag = first-person
-  look / bird's-eye steering without pointer lock (same sensitivity
-  constant); pinch = the existing wheel zoom; the interaction prompt
-  becomes tappable and HUD shortcuts (camp/journal) stay buttons; HUD
-  scaling/safe areas for small landscape screens; a reduced mobile
-  quality preset (TRAA/SSAO/shadow resolution) tied to the same
-  activation, never to user-agent sniffing; TTS keeps the WASM path.
-  Localized labels for any new visible control in both languages.
-  Verifiable: a Playwright run with emulated touch shows the overlay
-  after a first touch, drives the player with the virtual stick, turns
-  the first-person view by drag and zooms by pinch; the desktop suites
-  prove the overlay absent and inputs unchanged without touch; unit
-  tests cover the touch→axis mapping and the engagement guard.
+  layer as a third input source beside keyboard and gamepad. Scope is
+  exactly (a)-(c); walk/travel speeds, sensitivities and all gameplay
+  rules stay unchanged.
+
+  (a) TOUCH STATE + ENGAGEMENT GUARD. In `src/systems/input.ts`, add a
+  touch path in the style of the existing gamepad path (`gamepadMove`/
+  `gamepadLook`): a module-level `touchState` holding the virtual-stick
+  axes [-1..1], accumulated look-drag deltas (px) and a pending pinch
+  ratio, written only by the overlay (b) and consumed at the SAME merge
+  points the gamepad uses — `moveAxes()` merges the stick axes exactly
+  like the gamepad axes; the first-person look consumes the drag deltas
+  where `gamepadLook` is consumed, through the same
+  `balance.lookSensitivity` (0.0011 rad/px); the bird's-eye zoom consumes
+  the pinch ratio through the same clamp and debug gate as the mouse
+  wheel (0.25-16, §21.4). Deliberate-input guard like the gamepad's:
+  nothing mounts and no behaviour changes before a real first
+  `touchstart` on the app — desktops, including touch-screen laptops
+  never touched, stay pixel-identical.
+
+  (b) OVERLAY. New `src/ui/TouchControls.tsx`, mounted by the HUD only
+  when a new `touchActive` flag in `src/state/ui.ts` is set (set once by
+  the guard): bottom-left virtual stick (pointer capture, dead zone,
+  normalized axes into `touchState`), the right screen half as a look/
+  steer drag surface (no pointer lock on touch), two-finger pinch there
+  for zoom. The interaction prompt stays one element but becomes
+  tappable: tapping it dispatches the same synthetic key event the
+  prompt's key would (reuse the gamepad's synthetic-key helper — no
+  second input path). Camp/journal (and the pt. 93 map button once it
+  exists) remain ordinary buttons. With `touchActive`, the HUD respects
+  `env(safe-area-inset-*)` and scales compactly below ~700 px viewport
+  height.
+
+  (c) QUALITY PRESET. Tied to `touchActive` (NEVER user-agent sniffing):
+  TRAA off (falls back to the render pass MSAA per pt. 32 via
+  `ui.traaEnabled`), SSAO off, shadow map size halved — applied where
+  App.tsx wires the pipeline flags; the debug menu can re-enable each
+  individually. TTS keeps the WASM path (already the default off
+  Chromium-desktop; no change needed, just do not regress it).
+
+  Tunables (stick radius, dead zone, drag-to-look factor, pinch factor)
+  in `src/config/balance.ts`. Localized labels (de + en) for every new
+  visible control. Vitest: pure mapping tests (stick vector → axes with
+  dead zone and diagonal normalization; pinch → zoom clamp; the guard's
+  state machine) and a HUD test that `touchActive: false` renders no
+  `.touch-controls`. Playwright: new `scripts/verify/touch.mjs` with a
+  `hasTouch: true` context — first tap mounts the overlay; stick drag
+  moves the player (dev position hook); right-half drag turns the
+  first-person yaw; pinch changes the zoom; tapping the prompt opens the
+  audience. The existing desktop suites double as the absence proof (no
+  `.touch-controls`, inputs unchanged). design.md §17.5 records the
+  touch layer; CLAUDE.md pt. 30 gains the touch verifiables.
 - [x] 85. Smooth the settlement figures (user report, screenshot of faceted
   cone bodies): raise the villager/figure primitive tessellation so neither
   the lighting facets nor the polygonal silhouette read at first-person
@@ -1133,11 +1167,35 @@ as-is; only the sequence changes.
 
 - [ ] 89. Map presentation (user request): the opened map — continental
   atlas AND in-place town plan — must sit BOTTOM-LEFT instead of centred,
-  with a margin to the screen edge and to the bottom-left buttons
-  (mirroring the journal panel's placement rules on the right side), so
-  no button is covered. And the CURRENT PLAYER POSITION must be clearly
-  recognizable on the map in both modes. Cover the placement geometry and
-  the position marker on the right layer(s).
+  and both modes must show the CURRENT PLAYER POSITION.
+
+  (a) PLACEMENT. Anchor `.map-overlay` (both variants in
+  `src/ui/MapOverlay.tsx` and its CSS) fixed bottom-left: constant gaps
+  to the left and bottom screen edges and clear ABOVE the
+  `.inventory-bar` (mirror of the `.journal` panel's right-side rules
+  from pt. 19: never covering the bar, gap to the edge). Cap the size
+  (viewport-relative max width/height, aspect preserved) so it can never
+  reach the camp/journal buttons bottom-right, even on small landscape
+  screens. The map stays non-modal (movement continues).
+
+  (b) PLAYER MARKER. Atlas mode: project the traveller's lat/lon with
+  the SAME projection the atlas already uses for its map points/labels
+  (helpers in `src/ui/mapLayout.ts` / the overlay's own toPx) and render
+  a `.map-player` marker at it — engraved style per §19.11 (ink-colored
+  dot with a fine pulsing ring; no neon), hidden only if the position
+  fell outside the plate. Town-plan mode: project the in-place player
+  position with the plan's existing building transform and render the
+  same marker class. The marker updates live while the map is open.
+
+  Verifiable: `src/ui/MapOverlay.test.tsx` asserts the marker exists in
+  BOTH modes and its computed position lies inside the overlay box for a
+  known store state (atlas: the Cairo start position; plan: a fixed
+  `__placePlayer`-equivalent), plus the placement class on the overlay.
+  `scripts/verify/enrichments.mjs` (map section): the opened overlay box
+  lies in the bottom-left screen quadrant, overlaps neither
+  `.inventory-bar` nor the bottom-right buttons, and `.map-player` is
+  present in atlas and town plan (screenshots 92/98 refresh showing the
+  new placement). design.md §19.11/§17.4 record placement and marker.
 
 - [x] 90. Panorama-capture band anomaly (diagnosis material in the point-82
   work): a tall landmark standing ~4 world units from the capture point
@@ -1208,37 +1266,109 @@ as-is; only the sequence changes.
   the animals hover or sink. WATCHDOG note: the point-73 polish gate
   checks the FORMULA ground height, so it stayed green while the visible
   result broke — the reworked live-check must gate against the VISIBLE
-  ground line instead. Rework their standing height to match the visible
-  ground (sample the band's terrain silhouette or hide silhouettes where
-  the capture is active in that direction), keep the point-73
-  no-sinking rule (no black clipped slivers either), and extend the
-  polish live-check accordingly (no hovering, no clipping).
+  ground line.
+
+  (a) CAPTURE THE VISIBLE GROUND LINE. In
+  `src/scenes/travel/panoramaCapture.ts`, where the capture readback
+  already scans the band pixels per azimuth sector (waterFractions), ALSO
+  extract per sector the elevation angle of the highest terrain pixel
+  (first non-sky pixel from the top; classify sky the way the water
+  classifier separates classes) and store it on the capture object
+  (`__placePanorama.groundElevation[sector]`, radians above horizontal).
+
+  (b) STAND ON THE VISIBLE LINE. In `PanoramaWildlife`
+  (`src/scenes/place/PlaceScene.tsx`), when a capture is active
+  (`__placePanoramaActive`): derive each silhouette's azimuth from its
+  ring position using the band's convention (mind the NEGATED-bearing
+  storage pinned in `src/scenes/travel/panoramaMath.test.ts`, pt. 90),
+  linearly interpolate `groundElevation` between the two neighbouring
+  sectors, and set the standing height to
+  `tan(elevation) * ringRadius` minus a small sink epsilon. Without a
+  capture, keep today's `panoramaGroundY` clamp. In BOTH paths keep the
+  pt. 73 floor: never below the ground disc's false horizon (no black
+  clipped slivers).
+
+  (c) GATE AGAINST THE VISIBLE RESULT. `__placePanoramaWildlifeInfo`
+  gains `{y, visibleY}` per silhouette; the polish live-check asserts
+  |y − visibleY| under a small bound for EVERY silhouette while a
+  capture is active, plus one pixel probe under a silhouette's feet
+  (no black sliver column). The formula-height clamp stays pure-tested
+  in `src/scenes/place/backdrop.test.ts`.
+
+  Coordinate with point 94 (ring distance changes there) — implement
+  together if one rework covers both, and re-derive the radii here if
+  94 lands first.
 
 - [ ] 93. The map is no longer an inventory ITEM but always available (user
-  request): remove it from the equipment/shop roster (existing saves keep
-  working; owned maps migrate away gracefully) and add a MAP BUTTON at the
-  bottom right, LEFT of the journal button, opening the same overview
-  (continental atlas / town plan). The CAMP button shows only where camping
-  is actually possible: in the open travel world and inside villages whose
-  region holds "Honored Friend" status — hidden everywhere else (ports,
-  non-friend villages). Localized labels stay; update design.md (§6.1/§7
-  map item, §6.3/§17.4 camp button) and the affected Vitest/HUD tests plus
-  the button geometry checks.
+  request), and the camp button shows only where camping is possible.
+
+  (a) REMOVE THE MAP ITEM. Drop 'map' from the equipment roster and every
+  shop/price listing (find every gate by grepping the map item id across
+  `src/config/balance.ts`, `src/state/store.ts`, `src/ui/Dialogs.tsx`,
+  `src/ui/MapOverlay.tsx`); opening the map (M key and overlay) no longer
+  checks possession. SAVE MIGRATION: the checkpoint/snapshot loader
+  silently strips an owned map from the bag (and its capacity use) —
+  loading an old save must never fail or warn.
+
+  (b) MAP BUTTON. In `src/ui/Hud.tsx`, add `.map-toggle` bottom-right,
+  immediately LEFT of `.journal-toggle` (row: camp, map, journal),
+  toggling the same overview (atlas in travel, town plan in place; M
+  stays the shortcut). Localized labels in both languages (en "Map (M)",
+  de "Karte (M)").
+
+  (c) CAMP BUTTON GATING. `.camp-toggle` renders only where §6.3 allows
+  pitching: travel mode always; place mode only in a VILLAGE whose
+  region holds "Honored Friend"; never in ports. Implement as one store
+  selector used by BOTH the button visibility and the C-shortcut path,
+  so keyboard and button can never disagree.
+
+  Verifiable: `src/state/store.saveload.test.ts` — a legacy save with an
+  owned map loads with the map stripped and capacity correct;
+  `src/ui/Hud.test.tsx` — map button present with the localized label
+  and positioned left of the journal button, camp button visible in
+  travel and in a friend village, absent in a port and a non-friend
+  village; `src/ui/Dialogs.test.tsx` — no map row in any shop listing;
+  `scripts/verify/enrichments.mjs` — the bottom-right button row does
+  not overlap and orders map left of journal (x-coordinates), and the
+  journal-panel clearance check (pt. 19) still passes with three
+  buttons. design.md §6.1/§7 (map item removed), §6.3/§17.4 (camp
+  visibility, button row) and CLAUDE.md pt. 9/20 updated wherever the
+  map item or the button row is named.
 
 - [ ] 94. Panorama wildlife reads as looming monument, not distant animal
   (user screenshot, Swahili Village: a giant coal-black elephant on the
   skyline, mistaken for an elephant-graveyard depiction). The §2.5
   silhouettes stand only ~14-28 m beyond the settlement edge at up to
-  4.2x scale, in a flat near-black material, right on the horizon seam
-  where they clash with the cloud band's hard lower edge. Rework them to
-  read as believable FAR wildlife: a distance/size relation that keeps
-  the subtended angle small (push the ring out and/or scale down),
-  atmospheric perspective (haze-tinted, lighter with distance) instead
-  of the flat dark blob, and no silhouette straddling the horizon seam.
-  Coordinate with point 92 (standing height on the visible horizon) —
-  fix both together if one rework covers them. Keep the polish.mjs
-  wildlife-count hook green; extend the live check with a bound on the
-  rendered silhouette's apparent size; screenshot evidence.
+  4.2x scale, in a flat near-black material (`#4d4639`), right on the
+  horizon seam where they clash with the cloud band's hard lower edge
+  (`PanoramaWildlife` in `src/scenes/place/PlaceScene.tsx`).
+
+  (a) DISTANCE/SIZE. Push the drift ring out (order of
+  `innerRadius + 55..85` instead of `+ 14..28`) and cap the scale so the
+  subtended angle stays small: enforce
+  `buildHeight · scale ≤ tan(maxApparentAngle) · ringDistance` with
+  `maxApparentAngle` a balance value (~2.5°); clamp scale DOWN when the
+  bound would be exceeded, never up.
+
+  (b) ATMOSPHERIC PERSPECTIVE. Replace the flat dark color: lerp the
+  silhouette material color toward the scene's sky horizon tone by a
+  `panoramaHazeMix` balance value (~0.55), slightly stronger for the
+  farther radii, so distant animals read lighter and hazed (roughness 1,
+  no emissive, one shared material — tint via vertex color or per-mesh
+  material clone, whichever the existing pattern uses).
+
+  (c) SEAM. With pt. 92's visible-ground standing in place, additionally
+  assert no silhouette's screen-space box crosses the cloud band's lower
+  edge; where one would, the (a) clamp shrinks it below the seam.
+
+  Verifiable: the polish live-check keeps `__placePanoramaWildlife` > 0
+  (§2.5 stays fulfilled), gains an apparent-size bound (project each
+  silhouette's bounding sphere through the camera and assert the pixel
+  height under the bound) and a color probe (sampled silhouette pixels
+  measurably closer to the sky tone than to black); refreshed horizon
+  screenshot. All new numbers in `src/config/balance.ts`. design.md §2.5
+  records the far-wildlife reading (small, hazed, horizon-true).
+  Implement together with point 92 if one rework covers both.
 
 - [ ] 95. Sell dialogs align like a table too (user request, bazaar
   screenshot): the BUY dialogs already use the aligned price-table layout
@@ -1257,14 +1387,35 @@ as-is; only the sequence changes.
   its 15 s timeout; measured 13.5 s with the baked textures and 15.7 s
   WITHOUT them, so it is pre-existing and unrelated to point 86; leaving
   the very first settlement takes <1.5 s). The main thread blocks between
-  leavePlace() and the travel scene's first frame — suspects: shader
-  (re)compilation of the travel materials after many place-scene programs
-  accumulated, the §2.5 panorama capture readback ("GPU stall due to
-  ReadPixels" warnings), or disposal work from the unmounted place scenes.
-  Profile it, fix the stall (e.g. program cache reuse, async readback,
-  staged compilation), and gate the transition time in a browser suite
-  (leave after several visits well under a few seconds). The polish
-  leave-timeout hardening from point 86 can then tighten back down.
+  `leavePlace()` and the travel scene's first frame.
+
+  (a) MEASURE FIRST — do not guess the fix. Dev-only instrumentation:
+  `performance.mark` at `leavePlace()` and at the travel scene's first
+  rendered frame (one-shot `onAfterRender`); log
+  `renderer.info.programs.length` and `renderer.info.memory` before and
+  after; wrap the §2.5 capture path and any terrain/geodata (re)builds
+  in `console.time` pairs. Reproduce with the known recipe: enter
+  masai-village → swahili-village → capetown → timbuktu (dev hooks),
+  then `leavePlace()`. Known signals: "GPU stall due to ReadPixels"
+  driver warnings; the FIRST leave of a session is fast, so plain
+  travel-shader compilation is not the whole story. Prime suspects:
+  program re-links after the four place scenes' materials were disposed,
+  a synchronous GPU readback on the transition, or a disposal storm from
+  the unmounted place scenes.
+
+  (b) FIX the dominant block. Candidates by cause: keep shared travel
+  programs alive across place visits (do not let place-scene unmounts
+  dispose shared shader programs); switch synchronous readbacks to
+  `renderer.readRenderTargetPixelsAsync`; spread heavy disposals over
+  idle frames. Must NOT regress: the pt. 86 texture pipeline, the §2.5
+  capture correctness (polish compass/panorama checks), or the pt. 20
+  near-plane snap on scene switch.
+
+  (c) GATE. New polish check on the same 4-visit recipe: the leave
+  transition (leavePlace → travel first frame) completes in under
+  3000 ms; with that green, tighten the pt. 86 leave timeout in
+  `scripts/verify/polish.mjs` back from 45 s to 15 s. Record the
+  measured before/after numbers in this point's tick note.
 - [ ] 97. First-person walking inside settlements feels artificial (user
   report): movement snaps to full speed instantly, the camera is rigidly
   fixed at eye height, and steps are silent. Add a first stage of walk-feel
