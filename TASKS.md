@@ -2,14 +2,31 @@
 
 Working file for the current batch. Exactly one point is in progress at a time.
 Each point: implement → adapt docs (incl. README/CLAUDE.md/design.md) → add
-acceptance tests → run the full regression → commit atomically (only if fully
-green) → tick it here → clear context and re-enter from this file.
+acceptance tests → run the SCOPED regression (below) → commit atomically (only
+if fully green) → tick it here → clear context and re-enter from this file.
+
+Scoped regression (user mandate 2026-07-14, replacing full-per-point): build +
+lint + audit + the whole Vitest layer run for EVERY point; of the browser
+suites, only those the diff touches (mapping below). The FULL regression still
+runs: when a point touches a scene core (TravelScene/Wildlife/PlaceScene, the
+renderer/post pipeline, store.ts core), at every ~4th point as a collective
+gate, before every Closing, and whenever a flake retry failed twice. Flake
+policy: if exactly one suite fails on a check from the documented flake list
+(movement 0.00 m, bathe probability, TTS timing), rerun THAT suite standalone
+once — green counts as green (noted in the tick); red twice means a real
+investigation. WATCHDOG: if this process ever lets a bug slip through that the
+full-per-point regression would have caught, REPORT it to the user immediately
+— the policy is then reconsidered.
 
 On failure after correction attempts: STOP, report, and do not build further on a
 broken base. Tests are never weakened; a red run is fixed in the production code.
 
 This file and every new entry are written in English. Commit messages do not
 reference the TASKS point number.
+
+Point states (user mandate 2026-07-14): `[ ]` not started · `[*]` in
+progress · `[~]` implemented, regression/commit still pending · `[x]` done —
+ticked ONLY after the scoped regression is green AND the commit is pushed.
 
 Tracking (user mandate 2026-07-14): a point being worked on is marked `[*]`;
 on completion its result note ends with a tracking line
@@ -39,6 +56,14 @@ smoke test (`preview.mjs`, :4173). It exits non-zero if any stage fails or logs 
 browser console error. Prerequisites: `npm install` (Playwright + Chromium), a
 free :5173/:4173. Individual browser suites can also be run directly with
 `node scripts/verify/<name>.mjs` against a running dev server.
+
+Diff → browser-suite mapping (scoped runs): `src/i18n/` → i18n; store/systems
+logic → Vitest only (flow if the core loop is touched); `src/scenes/place/` →
+collision, polish, settings; `src/scenes/travel/` → enrichments, events,
+health; `src/render/` → settings, enrichments, polish; `src/ui/` → i18n,
+enrichments, settings, flow (dialogs); journal/TTS → voice, handwriting;
+`src/world/` → world, enrichments; `scripts/verify/X.mjs` → X itself; `*.md`
+→ docs. When unsure, include the suite.
 
 **Every point adds a test on the appropriate layer** — Vitest for anything
 assertable without a browser, Playwright (`scripts/verify/*.mjs`) only for the
@@ -1036,7 +1061,7 @@ as-is; only the sequence changes.
   region while only the ports get the dense organic lane fabric; record
   the research result briefly in design.md (§2.6/§4.5) and reflect the
   port/village difference in the layout invariants and screenshots.
-- [ ] 88. Cache the Kokoro TTS model for the headless verification: every
+- [x] 88. Cache the Kokoro TTS model for the headless verification: every
   Playwright run uses a fresh profile and re-downloads the ~90 MB model
   from the Hugging Face CDN — repeated regressions today tripped the CDN's
   rate limit (HTTP 403 on the model file), failing voice.mjs on a healthy
@@ -1046,6 +1071,17 @@ as-is; only the sequence changes.
   the regression is CDN-independent and faster; the production/player path
   stays unchanged (browser cache + CDN streaming per CLAUDE.md §3). Cover
   with the voice suite running green offline-from-HF (cache primed).
+  (Record-and-replay cache in scripts/verify/ttsCache.mjs: page routes for
+  huggingface.co/*.huggingface.co/cdn.jsdelivr.net record every asset
+  (model, tokenizers, ORT-WASM runtime) into the git-ignored .cache/tts/
+  on first run and serve later runs STRICTLY offline; bodies stream from
+  a tiny local HTTP server via 302 (fulfilling ~90 MB through the
+  DevTools protocol killed the browser); the fp32 model.onnx probe is
+  aborted outright, forcing the quantized WASM path immediately. voice
+  suite green in strict mode (7 hits, 0 misses); a stale-header fulfill
+  bug (content-encoding on decoded bodies) fixed en route. CLAUDE.md
+  pt. 19 and scripts/verify/README.md record the cache.
+  (track: 14.07. 12:52 -> 13:35, 43 min, ~70k tokens, model claude-fable-5[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [ ] 89. Map presentation (user request): the opened map — continental
   atlas AND in-place town plan — must sit BOTTOM-LEFT instead of centred,

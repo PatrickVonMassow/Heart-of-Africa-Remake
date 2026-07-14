@@ -25,3 +25,6 @@ scripts/.tile-cache
 *.njsproj
 *.sln
 *.sw?
+
+# Local TTS asset cache of scripts/verify/ttsCache.mjs (re-primed on demand)
+.cache/

@@ -9,6 +9,7 @@
 // Hugging Face CDN), the screenshots (64-66) and the console-error gate.
 // Dev server only (dev hooks).
 import { chromium } from 'playwright'
+import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -21,6 +22,9 @@ const check = (name, ok, detail) => {
 
 const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// TTS assets come from the local cache (point 88): first run records, later
+// runs replay strictly offline-from-CDN.
+const ttsStats = await installTtsCache(page)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -139,4 +143,13 @@ await page.waitForTimeout(400)
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
+// Cache verdict (point 88): once complete, the whole suite must run without
+// a single CDN request for the TTS assets; the first (recording) run instead
+// proves it captured them.
+if (ttsStats.strict) {
+  check('TTS assets served offline from the local cache', ttsStats.hits > 0 && ttsStats.misses === 0, JSON.stringify(ttsStats))
+} else {
+  check('TTS assets recorded into the local cache', ttsStats.hits + ttsStats.misses > 0, JSON.stringify(ttsStats))
+  if (failures === 0 && errors.length === 0) markTtsCacheComplete()
+}
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)

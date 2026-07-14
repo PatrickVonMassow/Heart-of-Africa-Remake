@@ -1,5 +1,11 @@
 # Test architecture (hybrid: Vitest + Playwright)
 
+Shared boot helpers for suites and probes live in `_boot.mjs` (bootGame,
+enterTravel, jumpAndEnter) — new scripts use them instead of repeating the
+launch/clear/wait boilerplate. Per-point runs are SCOPED (Vitest always,
+browser suites by the diff mapping in TASKS.md); the full 13-suite chain runs
+at scene-core diffs, every ~4th point, and before every Closing.
+
 The regression is split in two layers so the bulk runs in **seconds** and can
 never flicker on RAF/browser timing, while the handful of things that truly
 need a real browser stay in Playwright.
@@ -69,7 +75,7 @@ ported asserts now live in Vitest:
 | `events.mjs` | touch-a-lion / touch-a-hyena contact (RAF scene) | `src/systems/events.test.ts`, `src/state/store.events.test.ts` |
 | `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path), SSR backend gate (flag inert on the fallback) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA/SSR checkboxes) |
 | `enrichments.mjs` | all wildlife/RAF, drei map/region labels, river/graveyard scene, layout geometry, real WheelEvent, screenshots | `src/systems/movement.test.ts`, `src/state/store.*.test.ts`, `src/ui/{StatusBar,Hud,DebugMenu}.test.tsx` |
-| `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud, screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx` |
+| `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx` |
 
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
