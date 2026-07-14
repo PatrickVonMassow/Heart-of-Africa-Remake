@@ -311,6 +311,20 @@ check('Rivers: 8 lake surfaces', rivers?.lakes === 8, `${rivers?.lakes}`)
 // Point 13: every river renders as one continuous, never-buried ribbon.
 check('Rivers: no interior gaps (all continuous)', rivers?.gaps === 0, `gaps ${rivers?.gaps}`)
 check('Rivers: surface never buried under the terrain', rivers?.buried === 0, `buried ${rivers?.buried}`)
+// Confluence bank rule (user-reported artifact): tributaries mask their bank
+// foam where their edges lie inside the joined water — the Nile system's
+// joining rivers must report interior edges, while the masking stays LOCAL
+// (only a small fraction of all edge vertices, never whole rivers).
+{
+  const rep = rivers?.report ?? {}
+  const joined = ['white-nile', 'blue-nile'].map((id) => rep[id]?.interiorEdges ?? 0)
+  const totals = Object.values(rep).reduce(
+    (a, r) => ({ interior: a.interior + (r.interiorEdges ?? 0), strips: a.strips + r.strips }),
+    { interior: 0, strips: 0 },
+  )
+  check('Rivers: confluence edges are masked (Nile tributaries report them)', joined.every((n) => n > 0), `white/blue nile ${joined.join('/')}`)
+  check('Rivers: bank masking stays local (small interior fraction)', totals.interior > 0 && totals.interior < 400, `total interior edges ${totals.interior}`)
+}
 check('Rivers: the Nile is a single continuous strip', rivers?.report?.nile?.strips === 1, JSON.stringify(rivers?.report?.nile))
 // TASKS pt. 11: every lake surface clears its highest interior bed sample —
 // a buried sheet showed through in flickering blotches (Lake Victoria).

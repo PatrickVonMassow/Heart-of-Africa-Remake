@@ -814,12 +814,23 @@ the map).
   the treasure headings, parity pin 56→58. "A Grim Discovery"
   (findRemains) kept — it is specific to its event. design.md §10 and
   CLAUDE.md pt. 25 record the heading rule. Full regression green.)
-- [ ] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
+- [x] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
   boundary lines render in the middle of the water where two channels
   join — the shore/edge treatment (foam/outline) must appear only at real
   banks, never across the joined water body. Diagnose the seam (likely the
   per-channel ribbon edges overlapping inside the merged water), fix it,
   and cover it on the right layer(s).
+  (Exactly that: each ribbon painted its bank foam along its own lateral
+  edges, so a tributary's edges drew "banks" across the joined water. A
+  per-edge-vertex bank attribute now masks the foam wherever the probe
+  just OUTSIDE the edge is water — another channel's band (spatial-hashed
+  axis index in riverBanks.ts, own-bend arc exclusion), a lake or the
+  sea. Rule pure-tested (riverBanks.test.ts, 5 cases incl. own-bend and
+  oxbow); enrichments gates the dev-hook report (Nile tributaries report
+  interior edges; masking stays local, 104 of ~11k edge vertices).
+  Scene-switch timing unchanged (23 s baseline == 23 s after, the cost is
+  the chunk build). design.md §11.3 and CLAUDE.md pt. 21 record the
+  rule. Full regression green.)
 - [ ] 79. In-settlement map: opening the map INSIDE a settlement must show a
   plan of the current place — the walkable area with the functional
   (enterable) buildings marked and named — instead of (or in front of) the

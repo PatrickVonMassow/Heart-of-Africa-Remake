@@ -285,7 +285,7 @@ Visual water realism:
 - The surface itself is calm (only slight movement, no ocean-style wave field) with a recognizable downstream current (drifting streaks) that visibly accelerates at rapids and waterfalls.
 - Waterfalls (§4.4) are rendered as white cascades with plunge-pool foam and mist; rivers that rise in open land show a spring at their source.
 - Lakes are flat surfaces at their local shore height, laid just above the highest point of their carved bed — the bed never shows through the water sheet.
-- Further realism measures: foam along river banks, depth-tinted beds, glossy sky reflections on open water and a subdued ocean swell.
+- Further realism measures: foam along river banks, depth-tinted beds, glossy sky reflections on open water and a subdued ocean swell. Bank foam appears only at REAL banks: where a ribbon edge lies inside the joined water body — a confluence, a lake mouth, the sea — it is masked, so no shoreline ever draws across open water.
 
 ---
 

@@ -629,8 +629,10 @@ verify suite that proves it.
     Verifiable: `scripts/verify/enrichments.mjs` asserts 5 cascades, at
     least one spring and 8 lake surfaces, that no river has an interior
     gap and no river surface is buried, that every lake surface clears its
-    interior bed, and that the Nile is a single continuous strip, via the
-    dev hook; screenshots of the Nile, Victoria Falls and Lake Victoria
+    interior bed, that the Nile is a single continuous strip, and that
+    confluence edges are bank-masked (the Nile tributaries report interior
+    edges, the masking stays local) via the dev hook — the interior-edge
+    rule itself pure-tested in `src/scenes/travel/riverBanks.test.ts`; screenshots of the Nile, Victoria Falls and Lake Victoria
     (71-73) show the courses; an idle traveller on a river is swept
     downstream, the drift near a waterfall exceeds the unboosted drift,
     and being swept consumes time and provisions.

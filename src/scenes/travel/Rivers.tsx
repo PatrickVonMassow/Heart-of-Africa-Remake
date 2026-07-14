@@ -25,8 +25,8 @@ import {
   vec3,
 } from 'three/tsl'
 import { useGame } from '../../state/store'
-import { latLonToWorld } from '../../world/geo'
-import { sampleTerrain } from '../../world/terrain'
+import { latLonToWorld, worldToLatLon } from '../../world/geo'
+import { sampleTerrain, RIVER_WIDTH_DEG } from '../../world/terrain'
 import { lakeContains } from '../../world/hydro'
 import { RIVERS_DATA } from '../../world/data/rivers'
 import { LAKES } from '../../world/data/lakes'
@@ -35,6 +35,7 @@ import { WATERFALLS } from '../../world/data/landmarks'
 // floating canoe reads (waterSurface.ts), so a floater and the rendered
 // surface can never diverge.
 import { SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, registerRiverSurfaces } from './waterSurface'
+import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
 
 const HALF_WIDTH = 1.7 // ribbon half width in world units (matches RIVER_WIDTH_DEG)
 
@@ -59,19 +60,29 @@ function buildRivers(seed: number): {
   /** Per-river continuity report (dev/verification): number of drawn ribbon
    *  strips (1 = fully continuous) and points where the surface would sit below
    *  the bed (0 = never buried under the terrain). */
-  report: Record<string, { strips: number; buried: number }>
+  report: Record<string, { strips: number; buried: number; interiorEdges: number }>
 } {
   const positions: number[] = []
   const uvs: number[] = []
   const flows: number[] = []
+  const banks: number[] = []
   const indices: number[] = []
   const falls: FallDef[] = []
   const springs: SpringDef[] = []
-  const report: Record<string, { strips: number; buried: number }> = {}
+  const report: Record<string, { strips: number; buried: number; interiorEdges: number }> = {}
   const axisSamples: Array<{ lat: number; lon: number; surf: number }> = []
 
-  for (const river of RIVERS_DATA) {
-    const pts = densifyRiver(river.points)
+  // Phase 1 — densify every axis first: the bank mask below must see ALL
+  // rivers' bands, not only the ones built so far (confluences are between
+  // rivers in either build order).
+  const densified = RIVERS_DATA.map((river) => ({ river, pts: densifyRiver(river.points) }))
+  const bankSamples: BankAxisSample[] = []
+  for (const { river, pts } of densified) {
+    pts.forEach((p, i) => bankSamples.push({ riverId: river.id, index: i, lat: p.lat, lon: p.lon }))
+  }
+  const bankIndex = buildBankIndex(bankSamples)
+
+  for (const { river, pts } of densified) {
     const world = pts.map((p) => latLonToWorld(p.lat, p.lon))
     const samples = pts.map((p) => sampleTerrain(p.lat, p.lon, seed))
 
@@ -144,6 +155,17 @@ function buildRivers(seed: number): {
     let oceanRun = 0
     let strips = 0
     let buried = 0
+    let interiorEdges = 0
+    // A ribbon edge is a real bank only when the probe just OUTSIDE it is
+    // land: outside another channel's band (riverBanks), no lake, no ocean.
+    const bankAt = (wx: number, wz: number, i: number): number => {
+      const q = worldToLatLon(wx, wz)
+      if (edgeIsInterior(q.lat, q.lon, river.id, i, bankIndex, RIVER_WIDTH_DEG)) return 0
+      if (lakeContains(q.lat, q.lon)) return 0
+      if (sampleTerrain(q.lat, q.lon, seed).type === 'ocean') return 0
+      return 1
+    }
+    const PROBE = (HALF_WIDTH + BANK_PROBE_DEG * 10) / HALF_WIDTH
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
       if (samples[i].type === 'ocean') {
@@ -165,17 +187,22 @@ function buildRivers(seed: number): {
       uvs.push(arc, 0, arc, 1)
       const f = flowAt(i)
       flows.push(f, f)
+      const bankL = bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
+      const bankR = bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
+      interiorEdges += (1 - bankL) + (1 - bankR)
+      banks.push(bankL, bankR)
       if (stripStart >= 0) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
       else strips++ // a land point with no open strip begins a new drawn strip
       stripStart = i
     }
-    report[river.id] = { strips, buried }
+    report[river.id] = { strips, buried, interiorEdges }
   }
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
+  geometry.setAttribute('bank', new THREE.BufferAttribute(new Float32Array(banks), 1))
   geometry.setIndex(indices)
   // Hand the axis samples to the float-height module: the canoe then floats
   // on literally these ribbon heights, and the frame loop never has to build
@@ -201,6 +228,9 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   const v = uv().y
   // Cast: the TSL typings do not carry the attribute's float type through.
   const flow = attribute('flow', 'float') as unknown as ReturnType<typeof float>
+  // 1 at real banks, 0 where the edge lies inside the joined water body
+  // (confluences, lake mouths, the sea) — no bank foam across open water.
+  const bank = attribute('bank', 'float') as unknown as ReturnType<typeof float>
 
 
   // Streaks elongated along the flow, scrolling downstream with the current.
@@ -213,7 +243,9 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
 
   const base = mix(color('#2c6285'), color('#4189a4'), streak.mul(0.45))
   const edgeD = min(v, v.oneMinus())
-  const bankFoam = smoothstep(float(0.14), float(0.02), edgeD).mul(smoothstep(float(0.35), float(0.7), streak))
+  const bankFoam = smoothstep(float(0.14), float(0.02), edgeD)
+    .mul(smoothstep(float(0.35), float(0.7), streak))
+    .mul(bank)
   const rapidFoam = smoothstep(float(1.7), float(3.0), flow).mul(smoothstep(float(0.3), float(0.62), streak))
   const foam = max(bankFoam, rapidFoam)
   m.colorNode = mix(base, color('#eef6f7'), foam.mul(0.9))
