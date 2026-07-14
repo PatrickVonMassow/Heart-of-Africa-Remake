@@ -44,19 +44,36 @@ const lastEntryText = () => page.evaluate(() => [...document.querySelectorAll('.
 await page.evaluate(() =>
   window.__game.getState().addEntry({ key: 'journal.titles.foodLow' }, { key: 'journal.foodLow' }),
 )
-await page.waitForTimeout(350)
-const early = await page.evaluate(() => ({
-  writing: document.querySelectorAll('.journal .entry.writing').length,
-  hand: document.querySelectorAll('.writing-hand').length,
-  text: document.querySelector('.journal .entry.writing p')?.textContent ?? '',
-}))
+// The reveal is a main-thread setInterval; adding the entry also fires the
+// auto-narration, whose FIRST-EVER TTS model load (worker WASM compile) can
+// block the main thread for several seconds and delay the first stroke
+// (point 100). So poll for the reveal — condition-based, the documented flake
+// pattern — instead of sampling at a fixed 350 ms: capture the writing/hand
+// state and the first revealed length once a stroke shows, then confirm it
+// keeps advancing.
+let early = { writing: 0, hand: 0, len: 0 }
+const revealDeadline = Date.now() + 25000
+while (Date.now() < revealDeadline) {
+  early = await page.evaluate(() => ({
+    writing: document.querySelectorAll('.journal .entry.writing').length,
+    hand: document.querySelectorAll('.writing-hand').length,
+    len: document.querySelector('.journal .entry.writing p')?.textContent?.length ?? 0,
+  }))
+  if (early.len > 0) break
+  await page.waitForTimeout(80)
+}
 check('a new entry starts in the writing state with the hand', early.writing === 1 && early.hand === 1, '')
-await page.waitForTimeout(900)
-const later = await lastEntryText()
+let laterLen = early.len
+const advanceDeadline = Date.now() + 5000
+while (Date.now() < advanceDeadline) {
+  laterLen = (await lastEntryText()).length
+  if (laterLen > early.len) break
+  await page.waitForTimeout(80)
+}
 check(
   'the text reveals stroke by stroke',
-  early.text.length > 0 && later.length > early.text.length,
-  `${early.text.length} → ${later.length} chars`,
+  early.len > 0 && laterLen > early.len,
+  `${early.len} → ${laterLen} chars`,
 )
 await page.screenshot({ path: `${OUT}81-handwriting.png` })
 console.log('shot 81-handwriting.png')
