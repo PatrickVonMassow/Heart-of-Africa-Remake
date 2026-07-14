@@ -236,7 +236,7 @@ Every settlement — port city or native village — offers at least the baselin
 - Bazaar (treasure finds): offer an item → the merchant names a bid → accept or decline. If the item does not fit the regional value profile, it is rejected. The bid is a standing quote for that port: declining and re-offering the same item shows the identical price, not a freshly haggled one. The quote expires only on leaving the port (a different port haggles anew).
 - Price logic: a base price per good; treasure finds additionally carry a regional factor and a buy/sell spread. Profit comes from regional arbitrage.
 - Ferries (travel agency): passage between ports for a fee; saves time compared to overland travel.
-- Discovery bounty: money for reported discoveries (new villages, landmarks), credited on the next port visit as a telegraphic transfer; the chronicle entry names the discoveries and the amount. The first sighting of a landmark is itself a journal moment, with its own entry flavored by what was found — a mountain rising against the sky, a thundering waterfall, a sea-like lake, the elephant graveyard.
+- Discovery bounty: money for reported discoveries (new villages, landmarks), credited on the next port visit as a telegraphic transfer; the chronicle entry names the discoveries and the amount. The first sighting of a landmark is itself a journal moment, with its own entry flavored by what was found — a mountain rising against the sky, a thundering waterfall, a sea-like lake, the elephant graveyard. Entry HEADINGS are specific too: a sighting heads with the landmark's name shaped by its kind, and a dug find heads with the treasure's name — never a generic one-size title like "A Discovery".
 
 ---
 

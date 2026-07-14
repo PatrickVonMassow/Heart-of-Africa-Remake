@@ -800,11 +800,20 @@ the map).
   canoeDrag.test.ts (bank swing, waterward turn, spit shortening, dry
   no-op); design.md §7 and CLAUDE.md pt. 4 record the rule. Full
   regression green.)
-- [ ] 77. "A Discovery" is a poor journal-entry heading (user feedback).
+- [x] 77. "A Discovery" is a poor journal-entry heading (user feedback).
   Rework the generic discovery/sighting entry titles into evocative,
   entry-specific headings in BOTH languages (e.g. naming the landmark or
   its kind) — journal texts keep the voice markup; update the affected
   i18n tests.
+  (titles.landmarkDiscovered is now a kind-shaped template naming the
+  landmark — 15 kinds per language ("The Thunder of Victoria Falls",
+  "Die Stelen von Aksum") — and titles.treasure names the dug find
+  ("Gold from the Earth" / graveyard: "Ivory Among the Bones"); the
+  title refs carry the params, storage stays language-neutral. Headings
+  stay markup-free; i18n.test asserts name-in-title for all 11 sites +
+  the treasure headings, parity pin 56→58. "A Grim Discovery"
+  (findRemains) kept — it is specific to its event. design.md §10 and
+  CLAUDE.md pt. 25 record the heading rule. Full regression green.)
 - [ ] 78. Graphics artifacts at river CONFLUENCES (user screenshot): bank
   boundary lines render in the middle of the water where two channels
   join — the shore/edge treatment (foam/outline) must appear only at real

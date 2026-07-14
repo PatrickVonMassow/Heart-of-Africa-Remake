@@ -733,7 +733,9 @@ verify suite that proves it.
     fires only once;
     `src/i18n/i18n.test.ts` that each cultural landmark and natural site
     has a localized name and a dedicated discovery flavor in both
-    languages; `scripts/verify/enrichments.mjs` that all seven cultural
+    languages, that the sighting entry's heading names the site
+    (kind-shaped, markup-free) and that a dug find heads with the
+    treasure's name (§10); `scripts/verify/enrichments.mjs` that all seven cultural
     landmarks (`__culturalLandmarks`) and all four natural sites
     (`__naturalSites`) mount in the scene, render a non-black frame at
     their coordinates and reveal their label on sighting (screenshots 91,

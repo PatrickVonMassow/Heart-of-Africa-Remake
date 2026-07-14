@@ -339,13 +339,16 @@ export interface Strings {
       dangerWetland: string
       /** A fall while climbing without a rope (design.md §11). */
       mountainFall: string
-      /** Sighting a landmark for the first time (design.md §10/§16). */
-      landmarkDiscovered: string
+      /** Sighting a landmark for the first time (design.md §10/§16):
+       *  a kind-specific heading naming the landmark ("A Discovery" was
+       *  too generic, user feedback). */
+      landmarkDiscovered(p: TextParams): string
       discovery: string
       deadline1: string
       deadline2: string
       successor: string
-      treasure: string
+      /** Digging a find: names the treasure, or the graveyard-ivory case. */
+      treasure(p: TextParams): string
       bounty: string
       ferry: string
       valuableReaction: string

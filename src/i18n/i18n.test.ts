@@ -146,6 +146,15 @@ describe('formatDateShort (design.md §17.1)', () => {
   })
 })
 
+describe('treasure entry headings name the find (user feedback)', () => {
+  it('a dug cache heads with the treasure name, the graveyard with the bones', () => {
+    expect(en.journal.titles.treasure({ treasure: 'gold' })).toContain(en.treasures.gold)
+    expect(de.journal.titles.treasure({ treasure: 'gold' })).toContain(de.treasures.gold)
+    expect(en.journal.titles.treasure({})).toBe('Ivory Among the Bones')
+    expect(de.journal.titles.treasure({})).toBe('Elfenbein zwischen den Knochen')
+  })
+})
+
 describe('cultural and natural landmarks i18n coverage (design.md §4.4)', () => {
   for (const lang of [en, de]) {
     describe(lang.lang, () => {
@@ -158,6 +167,11 @@ describe('cultural and natural landmarks i18n coverage (design.md §4.4)', () =>
         const fallback = lang.journal.landmarkDiscovered({ landmark: c.id, kind: 'mountain' })
         expect(flavored).not.toBe(fallback)
         expect(flavored).toContain(name)
+        // The entry HEADING is specific too — it names the landmark and is
+        // never the generic one-size title (user feedback on "A Discovery").
+        const title = lang.journal.titles.landmarkDiscovered({ landmark: c.id, kind: c.kind })
+        expect(title).toContain(name)
+        expect(title).not.toMatch(/[|]/) // headings carry no voice markup
       })
     })
   }

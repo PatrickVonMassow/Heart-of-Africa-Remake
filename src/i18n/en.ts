@@ -410,12 +410,35 @@ export const en: Strings = {
       dangerWater: 'Crocodiles Lie in Wait',
       dangerWetland: 'Fever in the Thicket',
       mountainFall: 'A Fall',
-      landmarkDiscovered: 'A Discovery',
+      landmarkDiscovered: (p: TextParams) => {
+        const name = en.landmarks[p.landmark as keyof typeof en.landmarks]
+        const titles: Record<string, string> = {
+          mountain: `${name} in Sight`,
+          falls: `The Thunder of ${name}`,
+          lake: `An Inland Sea: ${name}`,
+          grave: 'Where the Elephants Die',
+          pyramids: `The Pyramids of ${name}`,
+          'stone-city': `The Stone Walls of ${name}`,
+          'rock-churches': `The Rock Churches of ${name}`,
+          'coastal-ruins': `The Ruins of ${name}`,
+          stelae: `The Stelae of ${name}`,
+          castles: `The Castles of ${name}`,
+          'cliff-dwellings': `The Cliffs of ${name}`,
+          crater: `The Green Caldera: ${name}`,
+          volcano: `The Smoking Mountain: ${name}`,
+          delta: `A River Lost in the Sands: ${name}`,
+          wetland: `The Great Swamp: ${name}`,
+        }
+        return titles[p.kind as string] ?? `${name} in Sight`
+      },
       discovery: 'A Grim Discovery',
       deadline1: 'A Letter from the Financiers',
       deadline2: 'The Final Warning',
       successor: 'A New Hand',
-      treasure: 'A Treasure!',
+      treasure: (p: TextParams) => {
+        const name = p.treasure ? en.treasures[p.treasure as keyof typeof en.treasures] : undefined
+        return name ? `${name} from the Earth` : 'Ivory Among the Bones'
+      },
       bounty: 'The Bounty of Discovery',
       ferry: 'Passage by Sea',
       valuableReaction: 'The Valuable in My Hand',

@@ -416,12 +416,35 @@ export const de: Strings = {
       dangerWater: 'Lauernde Krokodile',
       dangerWetland: 'Fieberdunst im Dickicht',
       mountainFall: 'Ein Sturz',
-      landmarkDiscovered: 'Eine Entdeckung',
+      landmarkDiscovered: (p: TextParams) => {
+        const name = de.landmarks[p.landmark as keyof typeof de.landmarks]
+        const titles: Record<string, string> = {
+          mountain: `${name} in Sicht`,
+          falls: `Tosendes Wasser: ${name}`,
+          lake: `Ein Binnenmeer: ${name}`,
+          grave: 'Wo die Elefanten sterben',
+          pyramids: `Die Pyramiden von ${name}`,
+          'stone-city': `Die Steinmauern von ${name}`,
+          'rock-churches': `Die Felsenkirchen von ${name}`,
+          'coastal-ruins': `Die Ruinen von ${name}`,
+          stelae: `Die Stelen von ${name}`,
+          castles: `Die Burgen von ${name}`,
+          'cliff-dwellings': `Die Felswand von ${name}`,
+          crater: `Der grüne Kessel: ${name}`,
+          volcano: `Der rauchende Berg: ${name}`,
+          delta: `Im Sand verlorene Wasser: ${name}`,
+          wetland: `Der große Sumpf: ${name}`,
+        }
+        return titles[p.kind as string] ?? `${name} in Sicht`
+      },
       discovery: 'Ein düsterer Fund',
       deadline1: 'Ein Brief der Geldgeber',
       deadline2: 'Die letzte Warnung',
       successor: 'Eine neue Hand',
-      treasure: 'Ein Schatz!',
+      treasure: (p: TextParams) => {
+        const name = p.treasure ? de.treasures[p.treasure as keyof typeof de.treasures] : undefined
+        return name ? `${name} aus der Erde` : 'Elfenbein zwischen den Knochen'
+      },
       bounty: 'Der Lohn der Entdeckungen',
       ferry: 'Passage übers Meer',
       valuableReaction: 'Der Schatz in meiner Hand',

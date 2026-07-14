@@ -738,7 +738,7 @@ export const useGame = create<GameState>()((set, get) => ({
         toast: getStrings().toasts.discovered(getStrings().landmarks[lm.id]),
       }))
       get().addEntry(
-        { key: 'journal.titles.landmarkDiscovered' },
+        { key: 'journal.titles.landmarkDiscovered', params: { landmark: lm.id, kind: lm.kind } },
         { key: 'journal.landmarkDiscovered', params: { landmark: lm.id, kind: lm.kind } },
       )
     }
@@ -1770,7 +1770,7 @@ export const useGame = create<GameState>()((set, get) => ({
         graveyardIvoryLeft: s.graveyardIvoryLeft - count,
         treasures: { ...s.treasures, ivory: s.treasures.ivory + count },
       })
-      get().addEntry({ key: 'journal.titles.treasure' }, { key: 'journal.ivoryFound', params: { count } }, 'event')
+      get().addEntry({ key: 'journal.titles.treasure', params: {} }, { key: 'journal.ivoryFound', params: { count } }, 'event')
       return
     }
 
@@ -1789,7 +1789,7 @@ export const useGame = create<GameState>()((set, get) => ({
         treasures: { ...s.treasures, [site.treasure]: s.treasures[site.treasure] + 1 },
       })
       get().addEntry(
-        { key: 'journal.titles.treasure' },
+        { key: 'journal.titles.treasure', params: { treasure: site.treasure } },
         { key: 'journal.treasureFound', params: { treasure: site.treasure } },
         'event',
       )
