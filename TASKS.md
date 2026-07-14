@@ -1505,6 +1505,56 @@ as-is; only the sequence changes.
   point's coordinates. design.md §21.3 and CLAUDE.md pt. 20 (dropdown
   selectors) record the extended scope.
 
+- [ ] 99. REMOVE the SSR feature (user decision after the manual check:
+  with the bird's-eye camera never reaching grazing angles and the
+  first-person scenes having no water/gloss, no in-game situation shows
+  screen-space reflections — the integration cannot be meaningfully
+  verified and stays dead weight). TRAA is NOT touched; true water
+  refraction stays an OPEN item.
+
+  (a) PIPELINE. Remove the SSR wiring from the post-processing chain
+  (find it via grep for `SSRNode` / `ssr` in `src/` — expected: the
+  chain builder in App.tsx or the render-pipeline module): the SSRNode
+  import (three addons), the metalness/roughness MRT targets that exist
+  ONLY for SSR, the additive composite step before the temporal resolve,
+  and the WebGPU-backend gate around it. The chain must read afterwards
+  exactly as before SSR (pt. 32 step 1 state): render pass (+ MSAA
+  fallback) → TRAA → tone mapping etc. If the MRT also feeds something
+  else, keep that consumer and remove only the SSR tap.
+
+  (b) STATE + UI. Remove `ssrEnabled`/`setSsrEnabled` from
+  `src/state/ui.ts` and the SSR checkbox block from
+  `src/ui/DebugMenu.tsx`; delete the localized label strings from BOTH
+  language files (grep the i18n key; both de.ts and en.ts). No
+  savegame/localStorage migration needed unless the ui store persists
+  the flag — check the store's persistence list and drop the key there
+  too (a stale persisted key must not crash the loader; tolerate and
+  ignore it).
+
+  (c) TESTS + SUITES. `src/ui/DebugMenu.test.tsx`: remove the SSR
+  checkbox assertions (keep TRAA's). `src/i18n/i18n.test.ts`: key-parity
+  checks must pass with the removed keys. `scripts/verify/settings.mjs`:
+  remove the SSR-inert-on-fallback check (keep every TRAA gate,
+  including the toggle/leak gates). Full `npm run build` — the SSRNode
+  import must be gone from the bundle (no dead import).
+
+  (d) DOCS. design.md §2.7: remove SSR from the pipeline feature list
+  and record the decision in place ("SSR removed — no in-game situation
+  reaches the grazing angles where it reads; revisit only if the camera
+  or the scene content changes"). CLAUDE.md pt. 32: rewrite the step-2
+  passage — SSR was delivered, went through the manual check on
+  14.07.2026 with the verdict above and was REMOVED again by user
+  decision; keep the pt. 32 numbering and the TRAA/step-1 record and
+  the open water-refraction item intact. Update pt. 20's debug-menu
+  enumeration (drop the SSR row mention) and the dashboard's manual
+  check card (the SSR acceptance is resolved by removal).
+
+  (e) AFTER the removal, re-check the Kabalega-Falls repro (jump to a
+  waterfall, closest zoom): if the flat BLACK shapes / all-WHITE animals
+  from the user's screenshots persist WITHOUT SSR, they are NOT
+  SSR-caused — leave them to point 92's family and note the finding in
+  this point's tick note; do not chase them here.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
