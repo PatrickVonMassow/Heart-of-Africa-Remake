@@ -50,6 +50,17 @@ interface UiState {
   /** Current bird's-eye zoom factor scaling the base camera offset (the game
    *  starts at DEFAULT_TRAVEL_ZOOM). */
   travelZoom: number
+  /**
+   * Touch/tablet layer active (design.md §17.5, point 84): armed once by the
+   * first real touch (deliberate-input guard in input.ts) — never by user-agent
+   * sniffing — so a desktop with no touch events stays pixel-identical. Mounts
+   * the on-screen controls and applies the mobile quality preset.
+   */
+  touchActive: boolean
+  /** Screen-space ambient occlusion (design.md §2.7); off in the touch preset. */
+  ssaoEnabled: boolean
+  /** Half-size shadow maps (1024²) for the touch preset; full (2048²) otherwise. */
+  shadowMapHalf: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -64,6 +75,10 @@ interface UiState {
   setWheelZoomEnabled: (enabled: boolean) => void
   setTravelZoom: (zoom: number) => void
   setJournalDnd: (dnd: boolean) => void
+  /** Arm the touch layer and apply the mobile quality preset (once). */
+  activateTouch: () => void
+  setSsaoEnabled: (enabled: boolean) => void
+  setShadowMapHalf: (half: boolean) => void
 }
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
@@ -83,6 +98,9 @@ export const useUi = create<UiState>()((set) => ({
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
+  touchActive: false,
+  ssaoEnabled: true,
+  shadowMapHalf: false,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -104,6 +122,14 @@ export const useUi = create<UiState>()((set) => ({
   setTravelZoom: (travelZoom) =>
     set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : DEFAULT_TRAVEL_ZOOM, Math.max(0.25, travelZoom)) })),
   setJournalDnd: (journalDnd) => set({ journalDnd }),
+  // First touch arms the layer and drops to the mobile quality preset: TRAA off
+  // (back to the render pass' MSAA), SSAO off, half-size shadow maps. Each stays
+  // individually re-enablable in the debug menu. Idempotent — later touches are
+  // a no-op so a debug re-enable is not clobbered.
+  activateTouch: () =>
+    set((s) => (s.touchActive ? s : { touchActive: true, traaEnabled: false, ssaoEnabled: false, shadowMapHalf: true })),
+  setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
+  setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
 }))
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

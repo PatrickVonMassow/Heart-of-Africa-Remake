@@ -183,6 +183,10 @@ export const de: Strings = {
       mountain: 'Der steile Fels bremst den Aufstieg — mit einem Seil geht es sicherer und schneller.',
       canoeOnLand: 'Das Kanu ist an Land totes Gewicht und bremst mich — für lange Landwege lasse ich es besser im Lager.',
     },
+    touch: {
+      moveStick: 'Bewegen (ziehen zum Gehen)',
+      lookArea: 'Umsehen und zoomen (ziehen zum Drehen, spreizen zum Zoomen)',
+    },
   },
 
   prompts: {
@@ -362,6 +366,8 @@ export const de: Strings = {
     showHidden: 'Versteckte Objekte anzeigen',
     fpsCounter: 'FPS-Anzeige',
     traa: 'TRAA (zeitliche Kantenglättung)',
+    ssao: 'SSAO (Umgebungsverdeckung)',
+    shadowMapHalf: 'Schatten in halber Auflösung',
     health: 'Gesundheit',
     wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',

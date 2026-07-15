@@ -161,6 +161,28 @@ describe('DebugMenu TRAA toggle (design.md §2.7/§21)', () => {
   })
 })
 
+describe('DebugMenu quality-preset toggles (design.md §17.5, point 84)', () => {
+  it('renders the SSAO and half-shadow checkboxes reflecting their store defaults', () => {
+    useUi.setState({ ssaoEnabled: true, shadowMapHalf: false })
+    render(<DebugMenu />)
+    const ssao = screen.getByText(en.debug.ssao).closest('label')?.querySelector('input') as HTMLInputElement
+    const shadow = screen.getByText(en.debug.shadowMapHalf).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(ssao.checked).toBe(true)
+    expect(shadow.checked).toBe(false)
+  })
+
+  it('re-enabling SSAO / toggling shadows writes through to the UI store', () => {
+    useUi.setState({ ssaoEnabled: false, shadowMapHalf: true })
+    render(<DebugMenu />)
+    const ssao = screen.getByText(en.debug.ssao).closest('label')?.querySelector('input') as HTMLInputElement
+    fireEvent.click(ssao)
+    expect(useUi.getState().ssaoEnabled).toBe(true)
+    const shadow = screen.getByText(en.debug.shadowMapHalf).closest('label')?.querySelector('input') as HTMLInputElement
+    fireEvent.click(shadow)
+    expect(useUi.getState().shadowMapHalf).toBe(false)
+  })
+})
+
 describe('DebugMenu renderer row and dropdown selectors (enrichments.mjs)', () => {
   it('shows the read-only renderer row with the active backend', () => {
     render(<DebugMenu />)

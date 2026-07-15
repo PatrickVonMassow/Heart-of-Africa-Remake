@@ -120,6 +120,8 @@ export function DebugMenu() {
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
   const traaEnabled = useUi((s) => s.traaEnabled)
+  const ssaoEnabled = useUi((s) => s.ssaoEnabled)
+  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -263,6 +265,22 @@ export function DebugMenu() {
           type="checkbox"
           checked={traaEnabled}
           onChange={(e) => useUi.getState().setTraaEnabled(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.ssao}</span>
+        <input
+          type="checkbox"
+          checked={ssaoEnabled}
+          onChange={(e) => useUi.getState().setSsaoEnabled(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.shadowMapHalf}</span>
+        <input
+          type="checkbox"
+          checked={shadowMapHalf}
+          onChange={(e) => useUi.getState().setShadowMapHalf(e.target.checked)}
         />
       </label>
       <label>

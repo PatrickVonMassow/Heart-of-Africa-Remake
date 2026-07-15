@@ -184,6 +184,10 @@ export const en: Strings = {
       mountain: 'The steep rock slows the climb — a rope makes it safer and faster.',
       canoeOnLand: 'The canoe is dead weight on land and slows me — better left in a camp for long overland stretches.',
     },
+    touch: {
+      moveStick: 'Move (drag to walk)',
+      lookArea: 'Look and zoom (drag to turn, pinch to zoom)',
+    },
   },
 
   prompts: {
@@ -363,6 +367,8 @@ export const en: Strings = {
     showHidden: 'Show hidden objects',
     fpsCounter: 'FPS counter',
     traa: 'TRAA (temporal anti-aliasing)',
+    ssao: 'SSAO (ambient occlusion)',
+    shadowMapHalf: 'Half-resolution shadows',
     health: 'Health',
     wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",

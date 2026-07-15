@@ -29,7 +29,7 @@ import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
-import { moveAxes, onKeyPress } from '../../systems/input'
+import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
@@ -494,6 +494,19 @@ function FarTerrain() {
 function Sun() {
   const lightRef = useRef<THREE.DirectionalLight>(null)
   const targetRef = useRef<THREE.Object3D>(null)
+  // The touch quality preset (point 84) halves the shadow-map resolution.
+  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
+  const shadowSize = shadowMapHalf ? 1024 : 2048
+
+  // A mapSize change only takes effect once the existing shadow render target
+  // is freed, so three rebuilds it at the new resolution.
+  useEffect(() => {
+    const map = lightRef.current?.shadow.map
+    if (map) {
+      map.dispose()
+      lightRef.current!.shadow.map = null as unknown as typeof map
+    }
+  }, [shadowSize])
 
   // Attach the CSM shadow node once the light exists.
   useEffect(() => {
@@ -524,7 +537,7 @@ function Sun() {
         castShadow
         color="#fff1da"
         intensity={2.4}
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[shadowSize, shadowSize]}
         shadow-camera-near={10}
         shadow-camera-far={400}
         shadow-bias={-0.0004}
@@ -1723,6 +1736,18 @@ export function TravelScene() {
         if (nx !== p.x || nz !== p.z) useGame.setState({ pos: { x: nx, z: nz } })
       }
     }
+
+    // Touch pinch drives the bird's-eye zoom through the same clamp/debug gate
+    // as the wheel (design.md §17.5/§21.4, point 84); the look-drag is drained
+    // and ignored here (there is no yaw in the bird's-eye view).
+    if (!useUi.getState().dialog) {
+      const pinch = consumeTouchPinch()
+      if (pinch !== 1) {
+        const ui = useUi.getState()
+        ui.setTravelZoom(ui.travelZoom * pinch)
+      }
+    }
+    consumeTouchLook()
 
     // Camera follows from above with a slight tilt; the zoom factor scales
     // the offset while the wheel zoom is unlocked (debug menu).

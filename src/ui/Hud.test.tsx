@@ -21,11 +21,11 @@ beforeEach(() => {
   // newGame() does not reset hasCheckpoint, and the UI store is a singleton —
   // clear both so overlays/prompts from a prior test never leak in.
   useGame.setState({ hasCheckpoint: false })
-  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false })
+  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
-  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false })
+  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
 })
 
 const invClass = (eq: string) => document.querySelector(`[data-eq="${eq}"]`)?.className ?? ''
@@ -328,5 +328,39 @@ describe('F3 unlocks the extended zoom alongside the loadout (design.md §21.1)'
     fireEvent.keyDown(window, { code: 'F3' })
     expect(useUi.getState().wheelZoomEnabled).toBe(true)
     expect(g().money).toBe(100000)
+  })
+})
+
+describe('Touch controls mount only with ui.touchActive (design.md §17.5, point 84)', () => {
+  it('renders no .touch-controls on desktop (touchActive false)', () => {
+    render(<Hud />)
+    expect(document.querySelector('.touch-controls')).toBeNull()
+  })
+
+  it('mounts the stick and look surface when touchActive', () => {
+    useUi.setState({ touchActive: true })
+    render(<Hud />)
+    expect(document.querySelector('.touch-controls')).not.toBeNull()
+    expect(document.querySelector('.touch-stick')).not.toBeNull()
+    expect(document.querySelector('.touch-look')).not.toBeNull()
+  })
+
+  it('leaves the prompt a plain label on desktop and makes it tappable on touch', () => {
+    useUi.setState({ prompt: 'E — Elder' })
+    const { rerender } = render(<Hud />)
+    // Desktop: a non-interactive div, no tappable button.
+    expect(document.querySelector('.prompt')?.tagName).toBe('DIV')
+    expect(document.querySelector('.prompt-tappable')).toBeNull()
+    // Touch: the prompt becomes a button that dispatches the E interaction key.
+    useUi.setState({ touchActive: true })
+    rerender(<Hud />)
+    const tappable = document.querySelector('.prompt-tappable') as HTMLButtonElement
+    expect(tappable).not.toBeNull()
+    let sawKeyE = false
+    const onKey = (e: KeyboardEvent) => { if (e.code === 'KeyE') sawKeyE = true }
+    window.addEventListener('keydown', onKey)
+    fireEvent.click(tappable)
+    window.removeEventListener('keydown', onKey)
+    expect(sawKeyE).toBe(true)
   })
 })

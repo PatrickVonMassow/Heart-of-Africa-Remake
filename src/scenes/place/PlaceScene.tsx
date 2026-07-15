@@ -38,7 +38,7 @@ import {
   panoramaGroundY,
 } from './backdrop'
 import { mulberry32 } from '../../world/noise'
-import { gamepadLook, gamepadMove, isKeyDown, onKeyPress } from '../../systems/input'
+import { consumeTouchLook, gamepadLook, gamepadMove, isKeyDown, onKeyPress, touchMove } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial, detailFade, proceduralBump } from '../../render/materials'
@@ -1341,6 +1341,17 @@ export function PlaceScene() {
   // Walk feel (design.md §2, point 97): body-relative eased velocity, the
   // step-phase accumulator and the smoothed camera roll — all camera/feel only.
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
+  // The touch quality preset (point 84) halves the shadow-map resolution.
+  const sunRef = useRef<THREE.DirectionalLight>(null)
+  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
+  const shadowSize = shadowMapHalf ? 1024 : 2048
+  useEffect(() => {
+    const map = sunRef.current?.shadow.map
+    if (map) {
+      map.dispose()
+      sunRef.current!.shadow.map = null as unknown as typeof map
+    }
+  }, [shadowSize])
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
@@ -1477,16 +1488,24 @@ export function PlaceScene() {
       // Gamepad right stick turns the view (design.md §17).
       const look = gamepadLook()
       if (look.x !== 0) p.yaw -= look.x * 2.4 * dt
+      // Touch look-drag turns the view through the same sensitivity as the
+      // mouse (design.md §17.5, point 84): the accumulated drag px maps 1:1 to
+      // mouse px, so touch and pointer-lock look identical.
+      const touchLook = consumeTouchLook()
+      if (touchLook.dx !== 0) p.yaw -= touchLook.dx * balance.mouseSensitivity
       let forward = 0
       let strafe = 0
       if (isKeyDown('KeyW') || isKeyDown('ArrowUp')) forward += 1
       if (isKeyDown('KeyS') || isKeyDown('ArrowDown')) forward -= 1
       if (isKeyDown('KeyA')) strafe -= 1
       if (isKeyDown('KeyD')) strafe += 1
-      // Gamepad left stick walks/strafes (design.md §17).
+      // Gamepad left stick / touch virtual stick walk/strafe (design.md §17).
       const stick = gamepadMove()
       forward += stick.y
       strafe += stick.x
+      const tstick = touchMove()
+      forward += tstick.y
+      strafe += tstick.x
       if (forward !== 0 || strafe !== 0) {
         // Strafing and walking backward are slower than walking forward
         // (design.md §2, placeWalkVelocity).
@@ -1616,11 +1635,12 @@ export function PlaceScene() {
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
       <hemisphereLight args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', 0.8]} />
       <directionalLight
+        ref={sunRef}
         position={[SUN_DIR[0] * 60, SUN_DIR[1] * 60, SUN_DIR[2] * 60]}
         color="#fff1d8"
         intensity={2.4}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[shadowSize, shadowSize]}
         shadow-camera-left={-55}
         shadow-camera-right={55}
         shadow-camera-top={55}

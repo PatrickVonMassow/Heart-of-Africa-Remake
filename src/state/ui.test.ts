@@ -11,6 +11,7 @@ beforeEach(() => {
     dialog: null, prompt: null, debugOpen: false, mapOpen: false,
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
+    traaEnabled: true, touchActive: false, ssaoEnabled: true, shadowMapHalf: false,
   })
 })
 
@@ -72,5 +73,32 @@ describe('toggles and flags', () => {
     u().dismissWebglWarning()
     expect(u().webglFallback).toBe(true)
     expect(u().webglWarningDismissed).toBe(true)
+  })
+})
+
+describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () => {
+  it('activateTouch arms the layer and drops to the mobile preset', () => {
+    expect(u().touchActive).toBe(false)
+    u().activateTouch()
+    expect(u().touchActive).toBe(true)
+    expect(u().traaEnabled).toBe(false) // back to render-pass MSAA
+    expect(u().ssaoEnabled).toBe(false)
+    expect(u().shadowMapHalf).toBe(true)
+  })
+
+  it('is idempotent — a later touch does not clobber a debug re-enable', () => {
+    u().activateTouch()
+    // The player re-enables SSAO in the debug menu.
+    u().setSsaoEnabled(true)
+    u().activateTouch() // another touchstart
+    expect(u().ssaoEnabled).toBe(true) // not reset by the second activation
+    expect(u().touchActive).toBe(true)
+  })
+
+  it('each preset flag stays individually settable', () => {
+    u().setSsaoEnabled(false)
+    expect(u().ssaoEnabled).toBe(false)
+    u().setShadowMapHalf(true)
+    expect(u().shadowMapHalf).toBe(true)
   })
 })

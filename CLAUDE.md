@@ -878,6 +878,27 @@ verify suite that proves it.
     nothing, stick travel movement, right-stick turning in the
     first-person view, the A-button interaction and Y-button journal
     toggle, and the position-query toast in both languages.
+    The touch/tablet layer of `design.md` §17.5 (point 84) holds as a
+    third input source with zero change to desktop play: a virtual stick,
+    a right-half look/steer drag surface with two-finger pinch zoom, a
+    tappable interaction prompt (dispatching the key it names — one input
+    path), the deliberate-input guard that arms the layer only on the
+    first real touch, and the touch-tied mobile quality preset (TRAA/SSAO
+    off, half-resolution shadows, each debug-re-enablable — never
+    user-agent sniffing). Verifiable: the stick/pinch/latch math is
+    pure-tested (`src/systems/touchInput.test.ts`); `src/ui/Hud.test.tsx`
+    that `touchActive: false` renders no `.touch-controls` while
+    `touchActive: true` mounts the stick and look surface and makes the
+    prompt a tappable button firing the E key; `src/state/ui.test.ts` that
+    `activateTouch` arms the layer with the preset and is idempotent (a
+    debug re-enable is not clobbered); `src/ui/DebugMenu.test.tsx` the
+    localized SSAO and half-shadow checkboxes writing through to the store;
+    `scripts/verify/touch.mjs` (a `hasTouch` context, real CDP touch
+    events) that no overlay shows before the first touch, the first touch
+    mounts it and applies the preset, the stick walks the character (and
+    releasing it settles), a right-half drag turns the first-person yaw,
+    tapping the prompt addresses the elder, and a two-finger pinch changes
+    the bird's-eye zoom — all without console errors.
 31. **Settlement orientation and panorama wildlife.** The gift-unlocked
     building orientation of `design.md` §17.3 holds (pulsing markers on
     the important, enterable buildings after the first accepted gift,

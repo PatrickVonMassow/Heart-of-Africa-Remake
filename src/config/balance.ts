@@ -193,6 +193,17 @@ export interface BalanceConfig {
     /** Feet sink below the visible horizon line so they never appear to float. */
     sinkEpsilon: number
   }
+  /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
+   *  gameplay speeds and sensitivities are unchanged. */
+  touch: {
+    /** Virtual-stick travel radius (px) and its resting dead zone (px). */
+    stickRadius: number
+    stickDeadZone: number
+    /** Look-drag gain: multiplies the raw px delta before mouseSensitivity. */
+    lookDragFactor: number
+    /** Pinch gain: how strongly a finger-spread ratio drives the zoom (1 = raw). */
+    pinchFactor: number
+  }
   /** Trade economy (design.md §8/§10). */
   economy: {
     /** Base prices of the treasure finds in $ (before regional factors). */
@@ -337,6 +348,12 @@ export const balance: BalanceConfig = {
     maxApparentAngleDeg: 2.5, // a distant animal subtends only a couple degrees
     hazeMix: 0.55, // lift the flat near-black toward the sky horizon
     sinkEpsilon: 0.4, // feet just below the horizon line, never floating
+  },
+  touch: {
+    stickRadius: 60, // px from the stick centre to full deflection
+    stickDeadZone: 8, // px resting slack
+    lookDragFactor: 1, // 1 = drag px maps 1:1 to mouse px through mouseSensitivity
+    pinchFactor: 1, // 1 = raw finger-spread ratio drives the zoom
   },
   economy: {
     treasureBase: { gold: 60, silver: 35, emerald: 70, copper: 20, ivory: 45, statue: 150 },

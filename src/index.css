@@ -459,6 +459,81 @@ textarea {
   padding: 8px 18px;
   border-radius: 6px;
   font-size: 16px;
+  /* Above the touch overlay (z-index 5) so a tappable prompt is never swallowed
+     by the look/steer surface that spans the right screen half (point 84). */
+  z-index: 6;
+}
+
+/* On touch the prompt is a tappable button; keep it visually identical to the
+   plain label but with a comfortable tap target (design.md §17.5, point 84). */
+.prompt-tappable {
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+/* Touch controls (design.md §17.5, point 84): a transparent full-screen layer;
+   only the stick and the look surface capture pointer events, so the rest of
+   the HUD stays clickable. Mounted only while ui.touchActive. */
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.touch-stick {
+  position: absolute;
+  left: calc(24px + env(safe-area-inset-left, 0px));
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: rgba(20, 24, 28, 0.28);
+  border: 1px solid var(--hud-accent);
+  pointer-events: auto;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.touch-stick-knob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(210, 220, 230, 0.4);
+  border: 1px solid var(--hud-accent);
+  will-change: transform;
+}
+/* The right screen half steers the look and pinches to zoom. */
+.touch-look {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* With the touch layer the HUD honours the notch/safe-area insets and tightens
+   on short viewports so nothing is clipped (design.md §17.5, point 84). */
+.game-root.touch-active .status-bar {
+  padding-left: calc(10px + env(safe-area-inset-left, 0px));
+  padding-right: calc(10px + env(safe-area-inset-right, 0px));
+}
+.game-root.touch-active .hud-bottom-right {
+  right: calc(12px + env(safe-area-inset-right, 0px));
+}
+@media (max-height: 700px) {
+  .game-root.touch-active .hud-button {
+    padding: 5px 9px;
+    font-size: 13px;
+  }
+  .game-root.touch-active .inventory-bar {
+    transform: scale(0.85);
+    transform-origin: bottom left;
+  }
 }
 
 /* Reason for an active movement slowdown (design.md §11/§17): a right-aligned

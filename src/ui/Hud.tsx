@@ -14,7 +14,8 @@ import { JournalPanel } from './JournalPanel'
 import { Dialogs } from './Dialogs'
 import { DebugMenu } from './DebugMenu'
 import { MapOverlay } from './MapOverlay'
-import { onKeyPress } from '../systems/input'
+import { TouchControls } from './TouchControls'
+import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
 import { getStrings, useStrings } from '../i18n'
 
 function InventoryBar() {
@@ -153,7 +154,19 @@ function RendererWarning() {
 function Prompt() {
   const prompt = useUi((s) => s.prompt)
   const dialog = useUi((s) => s.dialog)
+  const touchActive = useUi((s) => s.touchActive)
   if (!prompt || dialog) return null
+  // On touch the prompt is the only interaction affordance, so it becomes
+  // tappable: a tap dispatches the same synthetic E keydown the prompt's key
+  // would (design.md §17.5, point 84) — one input path. On desktop it stays a
+  // plain, non-interactive label (PC play unchanged).
+  if (touchActive) {
+    return (
+      <button className="prompt prompt-tappable" onClick={() => dispatchSyntheticKey('KeyE')}>
+        {prompt}
+      </button>
+    )
+  }
   return <div className="prompt">{prompt}</div>
 }
 
@@ -304,6 +317,11 @@ export function Hud() {
   const campHonored = useGame((s) => s.honoredFriend)
   const campRobbed = useGame((s) => s.regionRobbed)
   const showCamp = canCampHere({ mode: campMode, placeId: campPlaceId, honoredFriend: campHonored, regionRobbed: campRobbed })
+  const touchActive = useUi((s) => s.touchActive)
+
+  // The first real touch arms the touch layer (deliberate-input guard in
+  // input.ts) and applies the mobile quality preset (design.md §17.5, point 84).
+  useEffect(() => onTouchEngage(() => useUi.getState().activateTouch()), [])
 
   useEffect(() => {
     // Tab toggles the journal (design.md §17). It is handled directly rather
@@ -432,6 +450,7 @@ export function Hud() {
         </button>
       </div>
       <Prompt />
+      {touchActive && <TouchControls />}
       <Toast />
       <JournalPanel />
       <MapOverlay />

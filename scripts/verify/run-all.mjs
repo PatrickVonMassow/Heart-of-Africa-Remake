@@ -39,7 +39,7 @@ function getFreePort() {
 // old→new mapping table.
 const DEV_SUITES = [
   'docs', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
-  'polish', 'gamepad', 'voice', 'settings', 'enrichments',
+  'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments',
 ]
 
 const filter = process.argv.slice(2)

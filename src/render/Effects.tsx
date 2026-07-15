@@ -47,6 +47,7 @@ export function Effects() {
   }, [scene])
 
   const traaEnabled = useUi((s) => s.traaEnabled)
+  const ssaoEnabled = useUi((s) => s.ssaoEnabled)
 
   const post = useMemo(() => {
     // The toggle rebuilds the whole pipeline, and three's RenderPipeline
@@ -78,14 +79,21 @@ export function Effects() {
     const depth = scenePass.getTextureNode('depth')
     const normal = scenePass.getTextureNode('normal')
 
-    // Screen-space ambient occlusion (single-channel target → use .r).
-    const aoPass = ao(depth, normal, camera)
-    disposables.push(aoPass)
-    // GTAO's dispose() misses its internal noise DataTexture.
-    const aoNoise = (aoPass as unknown as { _noiseNode?: { value?: { dispose: () => void } } })
-      ._noiseNode?.value
-    disposables.push({ dispose: () => aoNoise?.dispose() })
-    const aoComposed = color.mul(aoPass.getTextureNode().r)
+    // Screen-space ambient occlusion (single-channel target → use .r). Off in
+    // the touch quality preset (point 84), where the AO pass is skipped
+    // entirely so it costs nothing on mobile GPUs.
+    // Typed as the mul result (Node<vec4>) so the AO-off branch (plain color)
+    // and the AO-on branch (color × occlusion) share one type.
+    let aoComposed: ReturnType<typeof color.mul> = color
+    if (ssaoEnabled) {
+      const aoPass = ao(depth, normal, camera)
+      disposables.push(aoPass)
+      // GTAO's dispose() misses its internal noise DataTexture.
+      const aoNoise = (aoPass as unknown as { _noiseNode?: { value?: { dispose: () => void } } })
+        ._noiseNode?.value
+      disposables.push({ dispose: () => aoNoise?.dispose() })
+      aoComposed = color.mul(aoPass.getTextureNode().r)
+    }
 
     // Temporal resolve over the AO-composed image, so the accumulation also
     // settles the (jittered) AO term instead of re-aliasing it afterwards.
@@ -156,7 +164,7 @@ export function Effects() {
       }
     }
     return { processing, dispose }
-  }, [gl, scene, camera, traaEnabled])
+  }, [gl, scene, camera, traaEnabled, ssaoEnabled])
 
   useEffect(() => {
     return () => {

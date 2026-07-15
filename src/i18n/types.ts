@@ -83,6 +83,8 @@ export interface Strings {
     healthBar: string
     /** Reason shown while a terrain slowdown is active (design.md §11). */
     movementPenalty: { jungle: string; water: string; mountain: string; canoeOnLand: string }
+    /** Accessible labels for the on-screen touch controls (design.md §17.5). */
+    touch: { moveStick: string; lookArea: string }
   }
 
   prompts: {
@@ -280,6 +282,10 @@ export interface Strings {
     fpsCounter: string
     /** TRAA toggle (design.md §2.7/§21), default on. */
     traa: string
+    /** SSAO toggle (design.md §2.7); off in the touch quality preset (point 84). */
+    ssao: string
+    /** Half-size shadow maps toggle; on in the touch quality preset (point 84). */
+    shadowMapHalf: string
     health: string
     wheelZoom: string
     journalDnd: string

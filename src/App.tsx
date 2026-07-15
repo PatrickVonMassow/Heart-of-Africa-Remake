@@ -18,8 +18,10 @@ extend(THREE as unknown as Parameters<typeof extend>[0])
 
 export default function App() {
   const mode = useGame((s) => s.mode)
+  // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
+  const touchActive = useUi((s) => s.touchActive)
   return (
-    <div className="game-root">
+    <div className={touchActive ? 'game-root touch-active' : 'game-root'}>
       <Canvas
         camera={{ fov: 50, near: 0.1, far: 2000, position: [0, 40, 20] }}
         shadows

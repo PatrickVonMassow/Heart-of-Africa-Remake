@@ -995,7 +995,7 @@ as-is; only the sequence changes.
   (track: 14.07. 11:14 -> 12:50, 96 min incl. three live-trace fix
   rounds, ~119k in / ~21k out, model claude-fable-5[1m], effort high, thinking
   on, autonomous batch, dontAsk))
-- [ ] 84. Full phone/tablet support, with ZERO change to PC play: a touch
+- [x] 84. Full phone/tablet support, with ZERO change to PC play: a touch
   layer as a third input source beside keyboard and gamepad. Scope is
   exactly (a)-(c); walk/travel speeds, sensitivities and all gameplay
   rules stay unchanged.
@@ -1047,6 +1047,23 @@ as-is; only the sequence changes.
   audience. The existing desktop suites double as the absence proof (no
   `.touch-controls`, inputs unchanged). design.md §17.5 records the
   touch layer; CLAUDE.md pt. 30 gains the touch verifiables.
+  TRACK: pure `src/systems/touchInput.ts` (stickVector with dead-zone +
+  diagonal clamp, pinchRatio, createEngageLatch) + 9 Vitest cases;
+  input.ts gains touchState + a first-touchstart engage guard consumed at
+  the gamepad merge points (moveAxes stick, consumeTouchLook in the
+  first-person yaw through mouseSensitivity, consumeTouchPinch in the
+  travel zoom), plus a shared `dispatchSyntheticKey`; `src/ui/TouchControls.tsx`
+  overlay (bottom-left stick with pointer capture, right-half look/pinch
+  surface) mounted by the HUD on `ui.touchActive`; the prompt becomes a
+  tappable button firing KeyE and sits above the touch layer (z-index);
+  ui.ts `activateTouch` arms the layer + mobile preset (traa/ssao off,
+  half shadows) idempotently, with `ssaoEnabled`/`shadowMapHalf` gating
+  Effects' AO pass and both scenes' shadow-map size (freed on change);
+  balance `touch` block; de+en labels (stick/look, SSAO/shadow debug
+  checkboxes). New `scripts/verify/touch.mjs` (hasTouch context, CDP touch
+  events) 8/8 green. design.md §17.5 + CLAUDE.md pt. 30 + verify/README
+  updated. Full regression green (18 suites incl. touch, 1478 Vitest,
+  lint/audit clean).
 - [x] 85. Smooth the settlement figures (user report, screenshot of faceted
   cone bodies): raise the villager/figure primitive tessellation so neither
   the lighting facets nor the polygonal silhouette read at first-person
