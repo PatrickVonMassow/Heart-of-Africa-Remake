@@ -84,3 +84,24 @@ buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
 here; consumes the `.cache/tts/` replay cache because adding an entry
 auto-narrates — voice.mjs owns and primes that cache), `docs.mjs` (pure Node
 doc-structure check), `preview.mjs` (production build acceptance).
+
+## Headless limitations (WebGL 2 fallback only)
+
+Headless Chromium has no WebGPU adapter, so every suite here runs on the game's
+**WebGL 2 fallback** path. Backend-specific behaviour therefore cannot be gated
+headless and needs a manual check on real WebGPU hardware. Two documented
+artifacts of the fallback path (not real-hardware bugs):
+
+- **Ground black-patch class (point 111).** `pow(negative, y)` is `NaN` on
+  WGSL/WebGPU but returns a value on GLSL/WebGL 2, so a shader that fed a
+  possibly-negative base into `pow` (the ground's Worley `oneMinus().pow(3)`)
+  blackened only on WebGPU. The fix clamps the base; the class is a reminder that
+  a clean WebGL 2 run does not prove WebGPU shader math.
+
+- **~15 s rAF stall in the built app (point 105) — headless-only artifact.** The
+  `vite preview`/production bundle showed a ~15 s requestAnimationFrame gap
+  ~14.5 s after boot on a fresh headless profile (TTS-independent; dev was clean).
+  The user confirmed on real Chromium/WebGPU (deployed page, fresh tab, ~30 s
+  idle) that **no freeze occurs on real hardware**, so it is an artifact of the
+  headless WebGL 2 fallback path (compositor/GPU-process timing), not a bug.
+  Closed 15.07.2026; nothing to fix.

@@ -2071,7 +2071,7 @@ as-is; only the sequence changes.
   claude-fable-5[1m], effort high, thinking on, user-supervised batch,
   dontAsk)
 
-- [ ] 105. DEFERRED (logged finding from the point-100 measurements,
+- [x] 105. DEFERRED (logged finding from the point-100 measurements,
   15.07.2026 — needs a user go before being worked; the batch-resume hook
   skips DEFERRED lines). The BUILT app (vite preview / production bundle)
   shows a ~15 s requestAnimationFrame stall starting ~14.5 s after boot —
@@ -2088,6 +2088,11 @@ as-is; only the sequence changes.
   bisect if real: a delayed pipeline/shader compile batch, the renderer's
   WebGPU→WebGL fallback timing, an asset decode (baked surface textures),
   or a headless GPU-process watchdog.
+  RESOLVED (15.07.2026): the user ran the real-hardware check (deployed prod page,
+  fresh tab, ~30 s idle) and confirmed NO freeze on real Chromium/WebGPU. So the
+  stall is a HEADLESS-ONLY artifact of the WebGL 2 fallback path (the game runs
+  WebGPU on real hardware) — not a real-hardware bug. Documented in
+  scripts/verify/README.md and closed; nothing to fix.
 
 - [x] 106. Flat BLACK blob on the settlement ground (user screenshot on the
   DEPLOYED v0.1 build, real-hardware Chromium/WebGPU): a large pure-black
