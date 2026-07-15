@@ -12,6 +12,16 @@ This repository contains the proof of concept: the core gameplay loop end to
 end, not the complete game. `design.md` is the authoritative design document;
 `CLAUDE.md` defines the POC scope, acceptance criteria and build rules.
 
+## Versions
+
+Both stands are playable on the same GitHub Pages site:
+
+- **Latest (main):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/> —
+  redeployed on every push to `main`.
+- **Frozen POC 0.1 (tag `v0.1`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.1/> —
+  rebuilt from the immutable tag on every deploy, so this exact stand stays
+  playable regardless of what `main` does.
+
 ## Gameplay
 
 - **Two perspectives.** A 3D bird's-eye view for the journey across the

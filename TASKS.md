@@ -1926,7 +1926,7 @@ as-is; only the sequence changes.
   seeding fired). Full regression green (18 suites; two different RAF
   wildlife checks flaked across runs, all green on a clean standalone run).
 
-- [ ] 103. Version tag `v0.1` plus a permanently playable frozen build of it
+- [x] 103. Version tag `v0.1` plus a permanently playable frozen build of it
   on GitHub Pages, while the existing page keeps tracking main (user
   request 15.07.2026). GitHub allows ONE Pages site per repository, so the
   frozen stand is served as a SUBPATH of the same site, not a second site:
@@ -1971,6 +1971,23 @@ as-is; only the sequence changes.
   engineering; CLAUDE.md untouched — §7.1 gains no new point).
   EXECUTION ORDER: worked AFTER point 104 (the tag freezes the stand
   including the demo start defaults).
+  TRACK: annotated tag v0.1 on b9b0a55 (the Closing HEAD: 96 + 100 + 104
+  all in, ALL-GREEN regression) pushed to origin. deploy-pages.yml gains
+  a guarded tag-build stage after the main build: `git ls-remote --tags`
+  existence check (main-only deploys keep working before the tag exists),
+  `git fetch --depth 1 origin tag v0.1` + `git worktree add v01-src v0.1`,
+  `npm ci` + `tsc -b` + `vite build --base=/Heart-of-Africa-Remake/v0.1/`
+  in the worktree, copied to `dist/v0.1` — ONE Pages artifact carries
+  both stands; permissions/concurrency untouched. Local (c) verification:
+  the base-override build stamps every index.html asset URL (5/5) and the
+  in-chunk ttsWorker URL with /Heart-of-Africa-Remake/v0.1/ — measured
+  with MSYS2_ARG_CONV_EXCL (Git-Bash mangles leading-slash args; the
+  Linux runner is unaffected); normal dist restored afterwards. README
+  gains the Versions section naming both URLs. CI deploy verified green
+  after the push; curl smoke 200 on /v0.1/index.html and the root.
+  (track: 15.07. 11:15 -> 11:40, ~25 min, ~30k in / ~7k out, model
+  claude-fable-5[1m], effort high, thinking on, user-supervised batch,
+  dontAsk)
 
 - [x] 104. Demo-friendly game-start defaults (user request 15.07.2026,
   BEFORE the v0.1 tag — point 103 freezes this stand). Four changes to
