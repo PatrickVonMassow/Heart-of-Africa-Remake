@@ -340,6 +340,8 @@ export const de: Strings = {
     strafeFactor: 'Seitwärts/Rückwärts-Faktor',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     ambienceVolume: 'Ambiente-Lautstärke',
+    footstepVolume: 'Schritt-Lautstärke',
+    ambientVolume: 'Übrige Ambiente-Lautstärke',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',
     canteenDrain: 'Wasserverbrauch/Tag (Land)',
     canteenDesertDrain: 'Wasserverbrauch/Tag (Wüste)',

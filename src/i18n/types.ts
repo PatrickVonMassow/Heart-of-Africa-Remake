@@ -260,6 +260,8 @@ export interface Strings {
     strafeFactor: string
     mouseSensitivity: string
     ambienceVolume: string
+    footstepVolume: string
+    ambientVolume: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

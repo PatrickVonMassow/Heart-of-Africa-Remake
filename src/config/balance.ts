@@ -18,6 +18,13 @@ export interface BalanceConfig {
   /** Single ambience volume: the noise beds (wind/surf/murmur), their gust/swell
    *  modulation and the proximity animal calls are all scaled by it (1 = full). */
   ambienceVolume: number
+  /** Relative loudness of footsteps under the master ambience volume (user
+   *  request: footsteps twice as loud as the rest). */
+  footstepVolume: number
+  /** Relative loudness of every NON-footstep ambient sound (beds, calls, the
+   *  interaction chime/"ding-dong") under the master ambience volume (user
+   *  request: half as loud as before). */
+  ambientVolume: number
   /** In-game days that pass per world unit traveled on the map. */
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
@@ -258,6 +265,8 @@ export const balance: BalanceConfig = {
   placeStrafeFactor: 0.8,
   mouseSensitivity: 0.0011,
   ambienceVolume: 0.1,
+  footstepVolume: 2, // footsteps twice as loud as the rest (user request)
+  ambientVolume: 0.5, // every other ambient sound half as loud (user request)
   daysPerUnit: 0.2,
   foodPerDay: 0, // demo start preset (point 104): no hunger by default; debug-editable
   foodUnitDays: 28, // one purchased food unit lasts four weeks (user calibration)

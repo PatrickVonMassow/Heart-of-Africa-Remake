@@ -24,6 +24,8 @@ withWorld()
 const DEFAULTS = {
   mouseSensitivity: balance.mouseSensitivity,
   ambienceVolume: balance.ambienceVolume,
+  footstepVolume: balance.footstepVolume,
+  ambientVolume: balance.ambientVolume,
   canoeSpeedup: balance.canoeSpeedup,
   canteenCapacity: balance.health.canteenCapacity,
 }
@@ -65,6 +67,8 @@ beforeEach(() => {
 afterEach(() => {
   balance.mouseSensitivity = DEFAULTS.mouseSensitivity
   balance.ambienceVolume = DEFAULTS.ambienceVolume
+  balance.footstepVolume = DEFAULTS.footstepVolume
+  balance.ambientVolume = DEFAULTS.ambientVolume
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   useLocale.getState().setLang('en')
@@ -121,6 +125,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
   const editable: Array<{ label: string; read: () => number; value: number }> = [
     { label: en.debug.mouseSensitivity, read: () => balance.mouseSensitivity, value: 0.002 },
     { label: en.debug.ambienceVolume, read: () => balance.ambienceVolume, value: 0.5 },
+    { label: en.debug.footstepVolume, read: () => balance.footstepVolume, value: 3 },
+    { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },

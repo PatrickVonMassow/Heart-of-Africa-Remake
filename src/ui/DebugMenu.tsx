@@ -206,6 +206,16 @@ export function DebugMenu() {
           set('ambienceVolume', Math.max(0, v))
           refreshAmbienceVolume()
         }} />
+      <NumberField label={t.debug.footstepVolume} value={balance.footstepVolume} step={0.1}
+        onChange={(v) => {
+          set('footstepVolume', Math.max(0, v))
+          refreshAmbienceVolume()
+        }} />
+      <NumberField label={t.debug.ambientVolume} value={balance.ambientVolume} step={0.05}
+        onChange={(v) => {
+          set('ambientVolume', Math.max(0, v))
+          refreshAmbienceVolume()
+        }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.canteenDrain} value={balance.health.canteenDrainPerDay} step={0.1}

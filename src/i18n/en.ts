@@ -341,6 +341,8 @@ export const en: Strings = {
     strafeFactor: 'Strafe/backward factor',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     ambienceVolume: 'Ambience volume',
+    footstepVolume: 'Footstep volume',
+    ambientVolume: 'Other ambient volume',
     foodPerDay: 'Food use per day (0 = infinite)',
     canteenDrain: 'Water use per day (land)',
     canteenDesertDrain: 'Water use per day (desert)',

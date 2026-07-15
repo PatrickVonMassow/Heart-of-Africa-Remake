@@ -2234,7 +2234,7 @@ as-is; only the sequence changes.
   cascade on WebGPU. design.md unchanged
   (render-quality safeguard; no new CLAUDE §7.1 point). One atomic commit once fixed.
 
-- [ ] 112. Audio balance (user request): footsteps twice as loud, and ALL other
+- [x] 112. Audio balance (user request): footsteps twice as loud, and ALL other
   ambient sounds half as loud — including the "ding-dong" (the interaction/enter
   chime). ANCHOR: src/systems/ambience.ts (footstep `emitFootstep`, the ambient bed,
   the ding-dong chime, the §19.1 proximity calls) under the single ambience volume
@@ -2247,6 +2247,13 @@ as-is; only the sequence changes.
   audio graph exposes gains; settings.mjs checks the debug fields exist and edit at
   runtime. Any new debug labels in de+en. DOCS: design.md §20/§21 audio + CLAUDE §7.1
   pt.20 verifiable. One atomic commit.
+  DONE: two sub-buses under the master (ambience.ts) — footstepBus (×2) and
+  ambientBus (×0.5); every layer/emitter routes through ambientBus, footsteps
+  through footstepBus, so the ding-dong (an ambient emitter) is halved
+  automatically with no per-sound change. Factors footstepVolume 2 / ambientVolume
+  0.5 in balance.ts, both debug-editable (two new NumberFields + de/en labels +
+  types.ts). DebugMenu.test covers render+write-through; a browser smoke confirmed
+  the graph builds with 0 console errors. Vitest 1496, build/lint clean.
 
 - [ ] 113. In the bird's-eye/travel view, walking into a tree leaves the traveller
   stuck inside it — he cannot get out (user report). CLAUDE §7.1 pt.4/pt.12 already

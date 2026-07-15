@@ -23,6 +23,12 @@ const FADE = 1.6 // seconds
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+// Two sub-buses under the master so footsteps and every other ambient sound can
+// be balanced against each other (design.md §20; user request): footsteps ×2,
+// all else ×0.5. Every layer/emitter routes through ambientBus, footsteps
+// through footstepBus, so the split needs no per-emit change.
+let footstepBus: GainNode | null = null
+let ambientBus: GainNode | null = null
 const layers: Record<string, Layer> = {}
 let scene: AmbienceScene = { region: 'north', mode: 'place', placeKind: 'port', nearVillage: false }
 let started = false
@@ -33,7 +39,7 @@ function layer(name: string): Layer {
   if (!l) {
     const gain = ctx.createGain()
     gain.gain.value = 0
-    gain.connect(master)
+    gain.connect(ambientBus ?? master)
     l = { gain, target: 0 }
     layers[name] = l
   }
@@ -261,6 +267,14 @@ function buildGraph() {
   master = ctx.createGain()
   master.gain.value = 0.5
   master.connect(ctx.destination)
+  // Footstep and ambient sub-buses (design.md §20): footsteps twice as loud,
+  // every other ambient sound half as loud, both under the master volume.
+  ambientBus = ctx.createGain()
+  ambientBus.gain.value = balance.ambientVolume
+  ambientBus.connect(master)
+  footstepBus = ctx.createGain()
+  footstepBus.gain.value = balance.footstepVolume
+  footstepBus.connect(master)
 
   noiseBed('wind', 'lowpass', 420)
   wobble('wind', 0.13, 0.35)
@@ -342,7 +356,7 @@ export function emitFootstep(surface: 'ground' | 'stone') {
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
   src.connect(filter)
   filter.connect(g)
-  g.connect(master)
+  g.connect(footstepBus ?? master)
   src.start(t0)
   src.stop(t0 + dur + 0.02)
 }
@@ -381,6 +395,8 @@ export function refreshAmbienceVolume() {
   if (!ctx) return
   applyScene()
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume
+  if (ambientBus) ambientBus.gain.value = balance.ambientVolume
+  if (footstepBus) footstepBus.gain.value = balance.footstepVolume
 }
 
 /** Update the ambience to the current game situation. */
