@@ -354,7 +354,10 @@ verify suite that proves it.
    Chants-of-Sennaar-like direction; e.g. a West African drum-signal
    tongue). The mechanic is undecided and needs its own research pass
    first, so §13.2's glossary and §13.3's delivery are placeholders under
-   review. Do not build on them.
+   review. Do not build on them — and do not PROTECT them either: until
+   the new mechanic is settled, disturbing this system is not a reason to
+   compromise a change elsewhere. Once it IS settled and built, it becomes
+   load-bearing like any other system.
 8. **Chronicle/journal.** A journal exists, grows automatically on events
    and stores hints (`design.md` §15); plain text suffices here (the
    animated handwriting is pt. 29). First village visits are journaled

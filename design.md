@@ -372,6 +372,8 @@ Rough direction (first thoughts, deliberately not yet binding):
 
 **This section is the flag CLAUDE.md §2 requires: the concept is missing, so it is recorded as an open item rather than invented.** It needs (a) research into how each region really communicated around 1890, in the manner of `docs/climate-1890.md` and `docs/peoples-1890.md`, and (b) a decision on the mechanic itself, before any implementation point can be written.
 
+**Until then, §13.1–13.3 is NOT a constraint on other work.** It is placeholder machinery awaiting replacement, so disturbing it is not a reason to compromise a change elsewhere — do not bend an accurate implementation to protect the elder's lesson, the glossary or the knowing-people cascade. (Being *free* to disturb it is not licence to leave the suite red: if a change breaks `store.hints.test.ts`, adjust the test to the new truth or state plainly that the point knowingly leaves it broken.) **The moment the new mechanic is decided and built, that reverses: it then becomes load-bearing and must be protected like any other system.**
+
 ---
 
 ## 14. Random Events

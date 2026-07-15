@@ -3137,18 +3137,22 @@ as-is; only the sequence changes.
   commit. (Decided 15.07.2026.)
 
 - [ ] 133. The rinderpest years, modelled as the date-dependent state they were.
-  **CORRECTED 16.07.2026 — my earlier refusal was argued from two claims I never
-  checked, and both were false.** I had written that a faithful depiction would
-  empty the Maasai village and break §13.3's knowing-people cascade. It would
-  not, for two independent reasons:
-  * **The history does not say the village emptied.** It says ~90 % of the
-    HERDS died and the people starved; *some* fled to the farming peoples they
-    had lorded over, others stayed and raided more desperately. The FAO source
-    explicitly has the enkang keeping "a core of people who resided there
-    permanently". The accurate depiction is a **devastated but inhabited**
-    village — the chief stands, gives his hint, and the cascade runs untouched.
-    "Village abandoned" would have been an error in MY modelling, not the price
-    of accuracy.
+  **CORRECTED 16.07.2026 — my earlier refusal rested on a constraint that does
+  not exist.** I had written that a faithful depiction would empty the Maasai
+  village and break §13.3's knowing-people cascade, and refused it on that
+  ground. Three things are wrong with that, each enough on its own:
+  * **The cascade is not something to protect** (design.md §13.4, user
+    16.07.2026): the whole hint system is placeholder machinery awaiting
+    replacement, so disturbing it is never a reason to compromise a change
+    elsewhere. I used it first as a reason to refuse and then as a reason to
+    allow — it was never a yardstick at all.
+  * **The history does not say the village emptied.** ~90 % of the HERDS died
+    and the people starved; *some* fled to the farming peoples they had lorded
+    over, others stayed and raided more desperately. The FAO source has the
+    enkang keeping "a core of people who resided there permanently". The
+    accurate depiction is a **devastated but inhabited** village. "Village
+    abandoned" would have been an error in MY modelling, not the price of
+    accuracy.
   * Even if a village COULD go empty, `pickKnowingVillages` (`store.ts:367`)
     picks any village of a region and works with any count ≥ 1.
   So: implement it accurately. The research (`docs/peoples-1890.md` §5) is
