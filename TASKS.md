@@ -2377,6 +2377,31 @@ as-is; only the sequence changes.
   asserts it matches the journal (~56px) alongside the kept non-overlap checks —
   measured 54px, overlapInv/overlapJournalBtn false, suite green.
 
+- [x] 117. Read-aloud: fast start but stutters again mid-entry (user report after
+  116; "was better at some point — maybe an earlier optimization broke it"). Correct:
+  the root is point 100 (TTS moved from WebGPU/fp32 to q8/WASM to stop the ~15 s
+  cold-load GPU freeze — a locked CLAUDE.md §3 decision, so WebGPU is out), and WASM
+  synthesis is SLOWER THAN REALTIME. 114's whole-entry pre-buffer was gapless but
+  slow to start; 116's fixed 4 s lead started fast but starved mid-entry on longer
+  notes. A synth-timing probe also showed the dominant START cost is the model
+  COLD LOAD (~seconds), not the buffer. FIX (two parts):
+  (a) PRE-WARM the model — a `warmup` message to ttsWorker loads the engine without
+  synthesizing; `warmupSpeech()` is called ~3 s after App mount (deferred so it does
+  not fight the initial asset load; only when the language has a voice), so the first
+  narration only synthesizes. Loading on WASM never touches the GPU process, so the
+  game keeps rendering (point 100).
+  (b) ADAPTIVE lead (speech.ts) — instead of a fixed 4 s, measure the LIVE synthesis
+  rate and estimate the entry length from the buffered segments, then start once the
+  buffer covers the drain (`bufferedAudio ≥ remainingAudio × (1 − synthRate) + 0.5`).
+  A short/fast note starts almost at once; a long/slow one gets just enough cushion to
+  play gapless — and it self-tunes to the machine's load (the user's synth benchmark
+  was skewed by other CPU use, so a hardcoded rate would be wrong). Verifiable:
+  voice.mjs green (narration, speaking state without a click, rAF liveness max 17 ms
+  through the cold load, 0 console errors); journal Vitest green. The real
+  start-speed/no-stutter balance is a USER check on hardware (headless replays the
+  cached weights, so it cannot measure real synth latency). design.md unchanged
+  (CLAUDE §7.1 pt.19). One atomic commit.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

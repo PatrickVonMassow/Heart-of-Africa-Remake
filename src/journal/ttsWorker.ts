@@ -39,6 +39,12 @@ interface GenerateRequest {
   speed: number
 }
 
+interface WarmupRequest {
+  warmup: true
+}
+
+type WorkerRequest = GenerateRequest | WarmupRequest
+
 let enginePromise: Promise<KokoroLike> | null = null
 
 function loadEngine(): Promise<KokoroLike> {
@@ -58,7 +64,13 @@ function loadEngine(): Promise<KokoroLike> {
   return enginePromise
 }
 
-self.onmessage = async (e: MessageEvent<GenerateRequest>) => {
+self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
+  // Warm-up: start the (slow) model download+init early so the first real
+  // narration only has to synthesize, not cold-load (point 117). Fire-and-forget.
+  if ('warmup' in e.data) {
+    void loadEngine().catch(() => {})
+    return
+  }
   const { id, text, voice, speed } = e.data
   try {
     const tts = await loadEngine()

@@ -55,6 +55,22 @@ function getWorker(): Worker {
   return worker
 }
 
+/**
+ * Kick off the model download+init in the worker WITHOUT synthesizing, so the
+ * first narration only pays for synthesis, not the ~seconds-long cold load
+ * (point 117). Safe to call anytime and repeatedly (the worker loads once); it
+ * needs no AudioContext, so it can run before the first user gesture. Loading on
+ * the WASM path never touches the GPU process, so it does not freeze the game
+ * (point 100).
+ */
+export function warmupSpeech(): void {
+  try {
+    getWorker().postMessage({ warmup: true })
+  } catch {
+    // No worker support (e.g. SSR): read-aloud is simply unavailable.
+  }
+}
+
 /** Synthesize one segment in the worker; resolves with its raw PCM. */
 function synthesize(text: string, voice: string, speed: number): Promise<RawAudioLike> {
   const id = ++reqId
@@ -129,21 +145,30 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   // (a failed request resolves to null and must not surface as an unhandled
   // rejection, e.g. after a cancel).
   const audios = segments.map((seg) => synthesize(seg.text, VOICE, seg.speed).catch(() => null))
-  // Buffer a LEAD of audio before starting, then play while the rest synthesizes.
+  // Buffer an ADAPTIVE lead before playback, then play while the rest synthesizes.
   // On the WASM path (point 100) synthesis is slower than realtime, so a one-ahead
-  // lookahead starves mid-entry and the narration stutters (points 108/114); but
-  // pre-buffering the WHOLE entry left the start entry silent through the model
-  // cold-load PLUS every segment's synthesis (point 116). A few seconds of lead
-  // cushions the sub-realtime synthesis so playback rarely starves, while the
-  // first sound comes after only the cold load and the first ~LEAD seconds.
-  const LEAD_SECONDS = 4
+  // lookahead starves mid-entry and stutters (points 108/114), yet pre-buffering
+  // the WHOLE entry left the start silent through the model cold-load plus every
+  // segment (point 116). Instead, measure the LIVE synthesis rate and estimate the
+  // entry length from the buffered segments, and start once the buffer covers the
+  // drain — `bufferedAudio ≥ remainingAudio × (1 − synthRate)` — so a short/fast
+  // entry starts almost at once while a long/slow one gets just enough cushion to
+  // play gapless (point 117; the model is pre-warmed via warmupSpeech so this rate
+  // reflects synthesis, not the cold load).
+  const startedAt = performance.now()
   const raws: (RawAudioLike | null)[] = []
-  let lead = 0
-  while (raws.length < segments.length && lead < LEAD_SECONDS) {
+  let bufferedAudio = 0
+  while (raws.length < segments.length) {
     if (run.cancelled) return
     const raw = await audios[raws.length]
     raws.push(raw)
-    if (raw) lead += raw.audio.length / raw.sampling_rate
+    if (raw) bufferedAudio += raw.audio.length / raw.sampling_rate
+    if (raws.length >= segments.length || bufferedAudio <= 0) continue
+    const elapsed = (performance.now() - startedAt) / 1000
+    const synthRate = elapsed > 0 ? bufferedAudio / elapsed : 1 // audio-seconds per wall-second
+    const estTotal = (bufferedAudio / raws.length) * segments.length
+    const drain = Math.max(0, estTotal - bufferedAudio) * Math.max(0, 1 - Math.min(synthRate, 1))
+    if (bufferedAudio >= drain + 0.5) break // cushion covers the estimated drain (+0.5 s margin)
   }
   if (run.cancelled) return
   let started = false

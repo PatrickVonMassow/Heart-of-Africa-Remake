@@ -1,8 +1,10 @@
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Canvas, extend, type ThreeToJSXElements } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { useGame } from './state/store'
 import { useUi } from './state/ui'
+import { useLocale } from './i18n'
+import { speechAvailable, warmupSpeech } from './journal/speech'
 import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
 import { Effects } from './render/Effects'
@@ -20,6 +22,16 @@ export default function App() {
   const mode = useGame((s) => s.mode)
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
+  // Pre-warm the read-aloud model shortly after mount (point 117) so the first
+  // narration only synthesizes rather than cold-loading the model. Deferred so it
+  // does not compete with the initial scene/asset load, and only when the current
+  // language actually has a voice (English). Loading on the WASM path never
+  // touches the GPU process, so the game keeps rendering (point 100).
+  useEffect(() => {
+    if (!speechAvailable(useLocale.getState().lang)) return
+    const t = setTimeout(() => warmupSpeech(), 3000)
+    return () => clearTimeout(t)
+  }, [])
   return (
     <div className={touchActive ? 'game-root touch-active' : 'game-root'}>
       <Canvas
