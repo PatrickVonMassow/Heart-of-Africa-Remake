@@ -2539,16 +2539,33 @@ as-is; only the sequence changes.
   the weather typical for it at that time of year (e.g. rain; snow where it
   genuinely occurs), and plants AND animals must be visibly affected by it.
   Today the world is season-less: one fixed look per biome, no weather.
-  (a) RESEARCH FIRST (explicitly requested): document, in the repo, the real
-      ~1890 seasonal climate per region — the tropical rain belt's migration
-      (double rains near the equator, single wet/dry season in the Sahel and
-      the southern savanna, the Mediterranean winter rain of the north coast,
-      the Cape's winter rain, the near-rainless central Sahara), the harmattan
-      dust season, and where snow is real (only the high summits — Kilimanjaro,
-      Mt Kenya, Ruwenzori, the High Atlas — NOT the savanna). Source it against
-      the end-of-19th-century state like §3.1's geography, and record the table
-      it produces alongside the geodata preprocessing docs so the values are
-      reproducible and reviewable rather than invented.
+  (a) DONE (15.07.2026) — RESEARCH: `docs/climate-1890.md`, sourced and with the
+      modern-normals-retro-applied caveat marked per claim. Findings that CHANGE
+      the design and must be honoured by (b)-(e):
+      * The Sahel around 1890 was **WET, not dry** — the game window sits inside
+        the 1870-1895 humid period; the drying starts ~1895. Render the Sahel
+        greener than any modern reference, and Lake Chad at its ~28,000 km²
+        period extent (vs <1,500 today).
+      * Equatorial glaciers stood 8-12x today's (Kilimanjaro ~12-20 km² vs 0.98).
+        Their break-up happened INSIDE the window (early 1890s).
+      * Do NOT drive rain off the convergence line's latitude: the rain lags
+        400+ km SOUTH of it, or the model rains on the Sahara every August.
+      * East Africa is NOT rain-belt-derivable — hard-code its bimodal MAM/OND.
+      * Cairo (the start port) is SAHARAN, not Mediterranean: ~25 mm/yr, Jun-Sep
+        absolutely rainless. A bare 32°N gate is wrong in both directions.
+      * Snow ONLY above the 4,500-4,800 m equilibrium line (Kilimanjaro, Mt
+        Kenya, Rwenzori) plus seasonal High Atlas (Nov-Apr) and Drakensberg
+        (Jun-Aug). Savanna snow is physically impossible; hail is the only
+        defensible white ground at low altitude.
+      * The Nile flood is unregulated in 1890 (no dam until 1898): rise from
+        early June, peak at Cairo in OCTOBER — the most visible cycle in the
+        game, right at the start port.
+  (a2) OPEN RESEARCH (user, 15.07.2026): period-typical CLOTHING per region
+      ~1890, for the settlement inhabitants of (g) — what people in each region
+      actually wore, and how it differed with the season/temperature. Document
+      it in the repo the same way as the climate (sourced, caveats marked). Must
+      depict the peoples of design.md §3.2/§4.5 respectfully and accurately, not
+      as a costume cliché.
   (b) Model: derive a season from the in-game date + the region's latitude
       (`design.md` §3.2 regions), and from (season, region) a weather state.
       Central, calibratable values in `src/config/balance.ts`, debug-editable
@@ -2565,13 +2582,36 @@ as-is; only the sequence changes.
       weather touch movement/health (§6/§11) or stay pure ambience like the
       rest of §19? Ambience-only is the safer default; flag it as a question
       rather than inventing a mechanic (CLAUDE §2 forbids design invention).
-  TESTS: pure (season/weather derivation from date+region — every region across
-  the year, snow only where real) in a new `src/systems/season.test.ts`; live
-  (`scripts/verify/enrichments.mjs`) that a forced season/weather renders and
-  that the plant/animal response is observable, plus screenshots.
+  (g) INSIDE SETTLEMENTS TOO (user, 15.07.2026) — the weather must not stop at
+      the bird's-eye view. In the first-person settlement scenes (§2.6):
+      * the sky/skyline carries the season's weather (the §2.5 panorama and the
+        §4.4 skyline landmarks included — e.g. Kilimanjaro's ice per (a));
+      * snow lies ON THE GROUND where snow is real per (a) — which for the
+        settlements means essentially nowhere: every village/port sits far below
+        the equilibrium line, so this is the High Atlas edge case at most. Do
+        NOT put snow in a savanna village; if no settlement qualifies, say so
+        in design.md rather than faking it;
+      * overcast/dust dims the light — and the §19.10 fire glow reads MORE
+        strongly for it (a deliberate, welcome consequence: less ambient light
+        means the firelight carries). Route this through the §2.7 lighting
+        pipeline, not a separate hack;
+      * INHABITANTS DRESS FOR THE TEMPERATURE, in their region's real ~1890
+        clothing per (a2) — the same figure wears more in the cold season.
+        Anchors: `src/render/figures.ts` (the inhabitant builds) and the
+        settlement walkers (`__placeWalkers`).
+  TESTS: pure (season/weather derivation from date+lat+lon — every region across
+  the year; snow ONLY above the equilibrium line and never in savanna; the Sahel
+  reading wet in the 1890s window; Cairo rainless Jun-Sep) in a new
+  `src/systems/season.test.ts`, plus the clothing choice per (region,
+  temperature) as a pure mapping; live (`scripts/verify/enrichments.mjs` for the
+  travel view, `scripts/verify/polish.mjs` for the settlement) that a forced
+  season/weather renders, the plant/animal response is observable, the
+  settlement sky/light changes and the inhabitants change dress — with
+  screenshots of both views in two contrasting seasons.
   DOCS: design.md (new subsection under §19 for seasons/weather, referenced
-  from §19.9) and CLAUDE.md §7.1 (new acceptance point with its verify suites).
-  SIZE: this is large — split into several atomic commits along (a)…(e) rather
+  from §19.9 and §2.6/§2.7 for the settlement side) and CLAUDE.md §7.1 (new
+  acceptance point with its verify suites).
+  SIZE: this is large — split into several atomic commits along (a2)…(g) rather
   than one, each with its own tests/docs. (Reported 15.07.2026.)
 
 - [ ] 121. Family drama: the vigil at the calf's carcass. The parent that did
