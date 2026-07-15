@@ -2653,9 +2653,18 @@ as-is; only the sequence changes.
   (c) Vultures: while the parent stands vigil, no vulture may LAND on that
       carcass (the flock keeps circling, the ground scavenger does not commit) —
       gate the landing on a live vigil-keeper within a small radius.
-  (d) The death: the vigil-keeper does not flee an approaching predator. Reuse
-      the existing hunt: a predator that reaches it takes it (dead, stain,
-      `lionFed`) — it must not be an extra kill path of its own.
+  (d) The death — RESOLVED (user question, 15.07.2026): "does it just let itself
+      be eaten?" No. My first cut had the vigil-keeper simply not fleeing, which
+      is kitsch, not behaviour: real ungulates stand over a dead calf and drive
+      vultures off, but they DO run from a charging lion. Instead the parent
+      **flees, only too late** — grief makes it careless, not suicidal: while a
+      vigil is active its flee reaction distance is cut to a calibratable
+      fraction of the normal one (it is not watching its back). It is therefore
+      caught OFTEN but not always. Reuse the existing hunt for the kill — a
+      predator that reaches it takes it (dead, stain, `lionFed`) — never a
+      second kill path. This shares one principle with point 125 (the sacrifice
+      may succeed) rather than being a second special case: **grief makes an
+      animal careless, and carelessness is sometimes survivable.**
   (e) RESOLVE ALWAYS (the point-118 lesson): the vigil ends when the carcass is
       gone/dissolved or `VIGIL_SECONDS` runs out, and the parent rejoins the
       herd. Never a drive with no exit.
@@ -2996,6 +3005,151 @@ as-is; only the sequence changes.
   §19.8 pointer) and CLAUDE.md §7.1 pt. 12 (new verifiable conditions; narrow
   the open item to the species still missing). Split into atomic commits along
   (a)…(e) if it grows. (Reported 15.07.2026.)
+
+- [ ] 131. Name the peoples correctly, and de-anachronise their vignettes.
+  Decided under the user's accuracy principle (15.07.2026): "make it as accurate
+  as possible unless it balloons into extreme effort, collides with the game
+  concept, or merely annoys instead of contributing to authentic atmosphere."
+  This one is cheap, collides with nothing and is pure atmosphere gain — the
+  research is in `docs/peoples-1890.md` §1 and §2.
+  (a) DISPLAY NAMES (`src/i18n/en.ts`/`de.ts`, the `peoples` map ~line 52): the
+      player-visible name is what must be right. `masai` → **Maasai**;
+      `bombara` → **Bambara**; `mandingo` → **Mandinka**; `sidamo` → **Sidama**
+      (the exonym was coined in **1891 by Menelik's generals** as degradation —
+      at the game's 1890 start the word does not exist); `pygmies` → **Mbuti**;
+      `bushmen` → **San**; `bantu` → **Pedi** (Bantu is a language family of
+      ~500 languages, not a people); `uganda` → **Baganda** (a colonial
+      territory name, not a people — the vignette already says "the Kabaka's
+      kingdom", so the text knows better than the label). Both languages.
+  (b) INTERNAL IDs: keep `peopleId` values AS THEY ARE for now. They are code
+      identifiers, not player-visible, and `store.ts` writes `peopleId` into
+      journal entry PARAMS (~line 877/899/1130) — a rename would break the
+      language-neutral journal of existing saves (design.md §17.7). If the IDs
+      are renamed later it needs a save migration like the legacy map-item strip
+      (§7.1 pt. 28), which is a separate point. Note the tension in a comment so
+      the next reader does not "tidy" the ids and break saves.
+  (c) VIGNETTES (`src/i18n/*.ts` ~line 500+), fixing what the research proved
+      wrong — both languages, voice markup intact (§15.2), and these are
+      first-visit journal texts so §16 applies:
+      * **Maasai**: "Warriors wrapped in red" is an anachronism by ~70 years.
+        Thomson (1883–84, PERIOD) has sheepskin over the left shoulder and
+        scraped bullock-hide, greased and ochred; cloth reached them ONLY as the
+        *naibere* war-dress (a white sheet with ONE coloured stripe). Rewrite to
+        ochred hide; the crimson may survive only as that stripe.
+      * **Bambara**: "millet fields run to the horizon" cannot happen at the
+        village's coordinate (17.2N — 150–200 mm/yr). Either fix with point 132
+        or drop the claim.
+      * **San**: the current text (grass shelters, poisoned arrows, ostrich-egg
+        water, eland paintings "older than any memory alive") is the pure
+        isolationist portrait — beautiful, not false, but it takes a side in the
+        live Kalahari Debate on the weaker-evidence side, and at exactly the date
+        where the revisionists are strongest (by 1890 many San stood in client
+        relationships to Tswana cattle-holders). Soften: keep the detail, drop
+        the timelessness.
+      * **Baganda**: KEEP the bark-cloth line — Roscoe (1911) affirms it, and it
+        is the one dress detail in the codebase the research could confirm
+        outright.
+  (d) Do NOT put a Basotho blanket on the Zulu: that garment is period-correct
+      for *Lesotho* (normal dress by 1890), the game has no Basotho village, and
+      no dating for Zulu blanket adoption was found.
+  TESTS: `src/i18n/i18n.test.ts` / `villages.test.ts` already assert one
+  distinct, markup-clean vignette per village in both languages — extend to pin
+  the corrected names; `src/i18n/parity.test.ts` covers key parity. DOCS:
+  design.md §3.2/§4.5 (the peoples list) — this IS design content, so update it
+  in the same commit per CLAUDE §4. One atomic commit. (Decided 15.07.2026.)
+
+- [ ] 132. Put the misplaced villages on their real ground.
+  Same accuracy principle. Three villages sit on ground that contradicts their
+  own vignette (`docs/peoples-1890.md` §1/§1.1). Region membership is design
+  (design.md §4.5) and each region's count must survive, so the fix is chosen to
+  keep every region's roster size unchanged.
+  (a) **Batwa (19.0S 22.5E) → rename to WAYEYI**, do not move. The Batwa are
+      Great Lakes forest people ~2000 km away; the coordinate is the **Okavango
+      Delta**, whose peoples are the Hambukushu, Dceriku, **Wayeyi (BaYei)**,
+      Bugakhwe and ǁanikhwe under **Batawana** overlordship. Moving the village
+      to ~2S 29E would drop the south from five peoples to four — that collides
+      with the design, so rename instead. Rewrite the vignette around what is
+      actually there: the flood, fishing, and the **mekoro** dugout the BaYei
+      are known for — the game already has a canoe, which makes this cheap and
+      rewarding. NOTE the likely origin of the error, so it is not repeated:
+      Nguni ***Abathwa*** is a southern-African exonym for the **San**, and it
+      looks like it was fused with the Great Lakes **Batwa** — two referents,
+      one lookalike root.
+  (b) **The Okavango flood pulse is the payoff, and it belongs to point 120:**
+      the water peaks at Maun **June–August, in the middle of the dry season**,
+      and recedes as the rains start — "while most river systems flood during
+      the local rainy season, the Okavango does the opposite". Physical
+      geography, so safe to retro-apply. Wire it into 120's season model as this
+      village's calendar (molapo flood-recession farming keys to the recession).
+  (c) **Bambara (17.2N 3.5W)**: the point is ~50 km NW of Timbuktu — wrong
+      rainfall for its millet vignette, wrong people (Songhai/Tuareg/Arma
+      country in 1890), wrong polity (Ségou fell to al-Hajj Umar Tal in 1861 and
+      to the French in 1890–91). The heartland is Ségou, **13.45N 6.27W** — but
+      moving it there shifts it from the north region to the west and breaks
+      both counts. **Decision: keep the coordinate, relabel the people to
+      SONGHAI**, and rebuild the vignette around what is real there — Niger
+      flood-recession farming, *bourgou* dry-season grazing, the Timbuktu
+      caravan trade. This keeps the north at four peoples and makes the place
+      honest. (If the user would rather keep a Bambara village, the alternative
+      is to move it to Ségou and accept the region-count change — flag, do not
+      decide silently.)
+  (d) **Nubians (21.8N 31.6E)**: the coordinate is **Wadi Halfa**, and in 1890
+      that is the **Anglo-Egyptian frontier garrison facing the Mahdist state**
+      — the Sudan in 1890 is the **Mahdiyya**, not Egyptian-ruled, the Khalifa's
+      invasion was crushed at Toski (3 Aug 1889) right there, and the *Sanat
+      Sitta* famine of 1889–90 had just passed. Do NOT move it and do NOT model
+      the war: that collides with the game concept (§13.3 needs every village
+      functional as a hint-giver). Instead let the **vignette** carry it — a
+      frontier under arms, a river of ivory and gum arabic under tax, a country
+      one year out of famine. Atmosphere, not mechanic.
+  (e) Nubian farming is **saqia-lift onto narrow terraces**, NOT basin
+      flood-recession — the valley above Aswan has almost no floodplain. If 120
+      gives the Nile a flood calendar, this village must not inherit the Egyptian
+      one. Nice touch if cheap: the saqia works **hardest for least land** at low
+      water in the hottest months.
+  TESTS: `src/world/world.test.ts` already pins all 22 villages and the river
+  clearance — extend for the renames; `src/i18n/villages.test.ts` for the new
+  vignettes in both languages. DOCS: design.md §3.2/§4.5 and §4.2. One atomic
+  commit. (Decided 15.07.2026.)
+
+- [ ] 133. The rinderpest years as atmosphere — deliberately NOT as a mechanic.
+  Decided under the accuracy principle, and this is the case where the principle
+  cuts BOTH ways. The research (`docs/peoples-1890.md` §5) is unambiguous: the
+  game's own window, 1890–95, IS the great African rinderpest panzootic —
+  >90 % of cattle dead across East/Central/West Africa, Maasailand gutted in
+  1891–92 by rinderpest + smallpox + locusts, survivors fleeing to the farming
+  peoples they had lorded over, and Europeans behind them mistaking the emptiness
+  for virgin land.
+  **But modelling it faithfully would empty the Maasai village — and §13.3's
+  knowing-people cascade needs every village functional as a hint-giver. That is
+  a hard collision with the game concept, so the full depiction is REFUSED, on
+  purpose, and recorded here so the refusal is a decision rather than an
+  oversight.**
+  What to do instead — flavour only, no state change:
+  (a) The **Maasai** and **Sidama** vignettes carry it: dead herds, a people at
+      the edge. Baumann was there in **March 1892** and his German is verbatim in
+      the research doc — **use his own words for the German text, never a
+      back-translation from the English paraphrase** (the widely-quoted
+      "walking skeletons" is not his phrase).
+  (b) The **Sudan/Nubia** vignette (point 132d) carries *Sanat Sitta*.
+  (c) Optional and cheap if the wildlife system allows: **carcasses** in the
+      bird's-eye vicinity of Maasailand. The game already has carcass and vulture
+      systems; rinderpest killed ~95 % of buffalo and wildebeest in two years,
+      and Baumann himself recorded it striking "nicht nur Rinder, sondern auch
+      Büffel, Gnus und Antilopen".
+  (d) Accuracy guards for whatever text is written: **camels are immune** (FAO),
+      so the Somali and Tuareg herds survive — but Sahel **pack oxen** died,
+      breaking the grain freight to the oases. The **Bemba kept no cattle at
+      all** (tsetse belt) — for them it is game depletion, not herd loss. The
+      **Zulu, Pedi and San are rinderpest-free until 1896**, i.e. for the whole
+      window. And **Menelik grew STRONGER** from the famine, not weaker.
+  (e) Do NOT assert the rinderpest→Maasai-dress-change link (unsourced). The
+      shield link IS sound: the *elongo* was male buffalo hide, and the buffalo
+      died — but that is a texture, not a mechanic.
+  TESTS: `src/i18n/villages.test.ts` (distinct, markup-clean, both languages).
+  DOCS: design.md §16 (the vignettes) — and record in design.md that the
+  panzootic is deliberately atmosphere-only, with the reason, so a later reader
+  does not "fix" it into a system. One atomic commit. (Decided 15.07.2026.)
 
 ## Closing (only after all points)
 
