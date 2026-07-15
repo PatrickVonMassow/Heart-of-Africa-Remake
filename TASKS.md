@@ -2560,12 +2560,29 @@ as-is; only the sequence changes.
       * The Nile flood is unregulated in 1890 (no dam until 1898): rise from
         early June, peak at Cairo in OCTOBER — the most visible cycle in the
         game, right at the start port.
-  (a2) OPEN RESEARCH (user, 15.07.2026): period-typical CLOTHING per region
-      ~1890, for the settlement inhabitants of (g) — what people in each region
-      actually wore, and how it differed with the season/temperature. Document
-      it in the repo the same way as the climate (sourced, caveats marked). Must
-      depict the peoples of design.md §3.2/§4.5 respectfully and accurately, not
-      as a costume cliché.
+  (a2) RESEARCH STILL OPEN — the research phase is NOT finished with (a). (a)
+      covered the CLIMATE only; the settlement requirement (g) needs its own
+      research into HOW THE SEASONS REACH THE PEOPLE (user, 15.07.2026 — my
+      first cut wrongly narrowed this to clothing alone). Document it in the
+      repo like the climate: sourced, caveats marked, and depicting the peoples
+      of design.md §3.2/§4.5 accurately and with respect, never as costume
+      cliché or a generic "African village". Cover, per region and people:
+      * CLOTHING ~1890 and how it changed with season/temperature — the same
+        person wearing more in the cold or dry-dusty season (harmattan wraps,
+        highland cloaks) — plus what the materials actually were.
+      * SEASONAL WORK: the agricultural calendar (when the ground is broken,
+        sown, weeded, harvested, stored) tied to the rain months of (a); who is
+        even present — Sahel/Maasai herders follow the rains, so a village can
+        stand seasonally empty or full; fishing seasons on the rivers/lakes.
+      * SEASONAL DAILY LIFE: what is out on the market stalls in which season,
+        when fires burn and how much (this drives the (g) fire-glow), indoor vs
+        outdoor life, roof/wall maintenance before the rains, water fetched from
+        near vs far as the waterholes shrink.
+      * The 1890-specific overlay: the rinderpest panzootic (a) records was
+        destroying 80-90% of cattle across East/Central/West Africa exactly in
+        the game window — a cattle-keeping people in 1890-95 is not living a
+        normal year. Establish whether to depict this; it is design content, so
+        FLAG it for the user rather than deciding it here (CLAUDE §2).
   (b) Model: derive a season from the in-game date + the region's latitude
       (`design.md` §3.2 regions), and from (season, region) a weather state.
       Central, calibratable values in `src/config/balance.ts`, debug-editable
