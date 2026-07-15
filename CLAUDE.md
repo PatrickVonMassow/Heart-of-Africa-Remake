@@ -213,7 +213,12 @@ verify suite that proves it.
    past the settlement edge to leave, without any key press; standing on
    the just-left marker does not re-enter until the traveller has moved
    clear; on entering, no HUD control (button/input) retains focus
-   (`scripts/verify/flow.mjs`).
+   (`scripts/verify/flow.mjs`). The leave transition stays FLUID: the
+   travel scene's shared materials/meshes survive remounts as module
+   singletons (surgical dispose opt-outs — a full remount used to re-link
+   the whole travel program set synchronously, freezing the main thread
+   10-16 s after several visits), gated in `scripts/verify/polish.mjs`
+   (leave after several settlement visits completes in under 3 s).
 3. **World model.** The fixed, authentic ~1890 geography of `design.md`
    §3.1/§3.2 — researched against the real end-of-19th-century state —
    with all 10 port cities, 22 peoples, 17 rivers and every landmark of
