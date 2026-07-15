@@ -2089,6 +2089,44 @@ as-is; only the sequence changes.
   WebGPU→WebGL fallback timing, an asset decode (baked surface textures),
   or a headless GPU-process watchdog.
 
+- [x] 106. Flat BLACK blob on the settlement ground (user screenshot on the
+  DEPLOYED v0.1 build, real-hardware Chromium/WebGPU): a large pure-black
+  shape lies on the sand at the base of a near foreground building in Cairo's
+  first-person view, while the other buildings' cast shadows render as normal
+  soft grey. Distinct from the earlier black-artifact fixes: points 73(a)/92/94
+  were the DISTANT panorama silhouettes at the horizon, point 101 was the
+  region-border ribbons in the BIRD'S-EYE scene — this is a FOREGROUND ground
+  shape in the first-person settlement. Does NOT reproduce on the WebGL 2
+  headless path (verified: soft shadows, no blob), so it is WebGPU-specific and
+  the headless suites cannot gate it (the known WebGPU-untestable-headless
+  limitation). CAUSE (same family as point 101): the screen-space GTAO term is
+  applied multiplicatively (`color.mul(ao.r)` in `src/render/Effects.tsx`), so
+  where GTAO over-occludes — worst at the base of a large near wall, stronger on
+  the WebGPU backend — it crushes the already-sun-shadowed ground to ~0 = flat
+  black. FIX: floor the AO factor (`max(AO_FLOOR, ao.r)`, AO_FLOOR 0.4) so the
+  deepest occlusion reads as a dark grey, never a void — backend-neutral, and it
+  cannot regress the WebGL 2 look (AO is mild there; screenshot confirms the
+  settlement is unchanged). Verifiable: the WebGL 2 render suites stay green
+  (settings TRAA/non-black-frame/leak gate, the point-101 border AO check in
+  enrichments, polish settlement shots); the real fix is a USER check on WebGPU
+  hardware (the blob is gone), since headless cannot exercise that path. Note:
+  the frozen /v0.1/ page keeps the blob (it is the tagged stand); only main
+  gets the fix unless the user re-tags. design.md unchanged (render-quality
+  safeguard; CLAUDE.md §7.1 gains no new point).
+  TRACK: Effects.tsx AO composite `color.mul(ao.r)` → `color.mul(max(float(
+  AO_FLOOR), ao.r))`, AO_FLOOR 0.4 (new module const). Ruled out a point-101-
+  style transparent decal: the settlement paths are a grayscale MASK baked into
+  the ground's standard node material, not a separate mesh, and every surface is
+  a normal-writing node material — so GTAO gets valid input and the only route
+  to pure black is the multiply reaching ~0, which the floor caps. WebGL 2
+  unaffected (settings 27/27, enrichments point-101 border AO checks green,
+  first-person screenshot unchanged). MANUAL WebGPU ACCEPTANCE by the user
+  PENDING (headless is WebGL 2 only) — the deployed main build carries the fix
+  for their check. Committed as its own point after the run's completion, on
+  the user's report.
+  (track: 15.07. 11:45 -> 12:10, ~25 min, ~40k in / ~9k out, model
+  claude-opus-4-8[1m], effort high, thinking on, user-supervised, dontAsk)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

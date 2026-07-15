@@ -20,7 +20,7 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { mix, mrt, normalView, output, pass, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
+import { float, max, mix, mrt, normalView, output, pass, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
 import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
@@ -29,6 +29,11 @@ import { useUi } from '../state/ui'
 
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
 const IBL_SUN: [number, number, number] = [0.5, 0.65, 0.36]
+
+/** Minimum screen-space AO factor: occlusion darkens a surface to at most this
+ *  fraction, so the deepest crevice reads as a dark grey rather than crushing an
+ *  already-shadowed ground to flat black (point 106). */
+const AO_FLOOR = 0.4
 
 export function Effects() {
   const gl = useThree((s) => s.gl) as unknown as THREE.WebGPURenderer
@@ -92,7 +97,13 @@ export function Effects() {
       const aoNoise = (aoPass as unknown as { _noiseNode?: { value?: { dispose: () => void } } })
         ._noiseNode?.value
       disposables.push({ dispose: () => aoNoise?.dispose() })
-      aoComposed = color.mul(aoPass.getTextureNode().r)
+      // Floor the occlusion so it can never multiply an already-shadowed
+      // surface down to FLAT BLACK: the GTAO term over-occludes at the base of
+      // a large near wall (worse on the WebGPU backend, which the WebGL 2
+      // headless verification cannot exercise — user report of a black blob on
+      // the settlement ground, same GTAO-blackening family as point 101).
+      // Clamped to AO_FLOOR the deepest crevice reads as a dark grey, not void.
+      aoComposed = color.mul(max(float(AO_FLOOR), aoPass.getTextureNode().r))
     }
 
     // Temporal resolve over the AO-composed image, so the accumulation also
