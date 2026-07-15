@@ -125,7 +125,7 @@ export const en: Strings = {
   landmarks: LANDMARKS,
   equipment: {
     shovel: 'Shovel', rope: 'Rope', machete: 'Machete', rifle: 'Rifle',
-    medicine: 'Medicine', canteen: 'Canteen', map: 'Map', canoe: 'Canoe',
+    medicine: 'Medicine', canteen: 'Canteen', canoe: 'Canoe',
   },
   gifts: {
     gold: 'Gold Jewelry', silver: 'Silver Jewelry', emerald: 'Emerald',
@@ -169,6 +169,7 @@ export const en: Strings = {
   hud: {
     journalToggle: 'Journal (Tab)',
     campToggle: 'Camp (C)',
+    mapToggle: 'Map (M)',
     useTooltip: 'Click to use it here',
     passiveTooltip: 'Works automatically while you carry it',
     canteenTooltip: 'Canteen water level — refills at fresh water',

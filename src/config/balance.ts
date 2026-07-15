@@ -337,7 +337,6 @@ export const balance: BalanceConfig = {
 export const prices = {
   food: 5, // one food unit (foodUnitDays of provisions, four weeks by default)
   medicine: 12,
-  map: 10,
   shovel: 20,
   rope: 15,
   canteen: 10,

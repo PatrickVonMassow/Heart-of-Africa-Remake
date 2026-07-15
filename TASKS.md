@@ -1330,7 +1330,7 @@ as-is; only the sequence changes.
   check. backdrop.test.ts (formula clamp) unchanged.
   (track folded into point 94's note below.))
 
-- [ ] 93. The map is no longer an inventory ITEM but always available (user
+- [x] 93. The map is no longer an inventory ITEM but always available (user
   request), and the camp button shows only where camping is possible.
 
   (a) REMOVE THE MAP ITEM. Drop 'map' from the equipment roster and every
@@ -1365,6 +1365,22 @@ as-is; only the sequence changes.
   buttons. design.md §6.1/§7 (map item removed), §6.3/§17.4 (camp
   visibility, button row) and CLAUDE.md pt. 9/20 updated wherever the
   map item or the button row is named.
+  ('map' removed from EquipmentId, EQUIPMENT_IDS (store + debug), the
+  `prices` table, the shop goods and the inventory-click handler; the M
+  key was already possession-free. New `.map-toggle` button (t.hud.map-
+  Toggle de/en) sits left of `.journal-toggle`. Camp gating via one pure
+  `canCampHere(state)` used by BOTH the button visibility and the C key
+  (travel always; place only a friend, non-robbed village; never a port).
+  loadCheckpoint strips a legacy 'map' item so old saves load clean.
+  Tests: saveload migration, Hud (button order, camp per mode,
+  canCampHere pure), Dialogs (no map good), enrichments (button row order
+  + the journal clearance now gates on the always-present map button).
+  design.md §6.1/§7/§17.1/§17.4 + CLAUDE.md pt. 9/19 updated. FULL
+  regression: 16/17 green; collision was a load flake (empty colliders
+  under load → distance-0.00), green standalone (WATCHDOG: no slipped
+  bug — point 93 does not touch collision/PlaceScene).
+  (track: 15.07. 01:23 -> 02:07, ~44 min, ~50k in / ~12k out, model
+  claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
 
 - [x] 94. Panorama wildlife reads as looming monument, not distant animal
   (user screenshot, Swahili Village: a giant coal-black elephant on the

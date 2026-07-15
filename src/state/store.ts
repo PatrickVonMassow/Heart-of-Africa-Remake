@@ -29,10 +29,9 @@ export type EquipmentId =
   | 'rifle'
   | 'medicine'
   | 'canteen'
-  | 'map'
   | 'canoe'
 
-export const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
+export const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
 
 /** Item kinds movable between the pack and a camp cache (design.md §6). */
 export type ItemKind = 'equipment' | 'gift' | 'treasure'
@@ -1845,8 +1844,12 @@ export const useGame = create<GameState>()((set, get) => ({
       const snap = snaps[index ?? snaps.length - 1] as Partial<GameState> & { nextEntryId?: number }
       if (!snap) return false
       nextEntryId = snap.nextEntryId ?? 1000
+      // Legacy saves may carry the removed 'map' equipment item (point 93) —
+      // strip it so loading never fails and the bag/capacity read correctly.
+      const { map: _legacyMap, ...cleanEquipment } = (snap.equipment ?? {}) as Record<string, number>
       set({
         ...snap,
+        equipment: cleanEquipment,
         explored: snap.explored ?? {},
         health: snap.health ?? balance.health.max,
         penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false, canoeOnLand: false },
@@ -2008,11 +2011,27 @@ function spendGifts(gifts: Record<Material, number>, n: number): Record<Material
   return next
 }
 
+/**
+ * Whether a camp can be pitched here (design.md §6.3, point 93): always in the
+ * open bird's-eye world, in a settlement only inside a village whose region
+ * holds "Honored Friend" (and is not robbed), never in a port. One predicate
+ * for BOTH the camp button's visibility and the C-shortcut, so they agree.
+ */
+export function canCampHere(
+  s: Pick<GameState, 'mode' | 'placeId' | 'honoredFriend' | 'regionRobbed'>,
+): boolean {
+  if (s.mode === 'travel') return true
+  if (s.mode === 'place' && s.placeId) {
+    const p = placeById(s.placeId)
+    return p.kind === 'village' && !!s.honoredFriend[p.region] && !s.regionRobbed[p.region]
+  }
+  return false
+}
+
 export function priceOfGood(good: EquipmentId | 'food' | Material): number {
   switch (good) {
     case 'food': return prices.food
     case 'medicine': return prices.medicine
-    case 'map': return prices.map
     case 'shovel': return prices.shovel
     case 'rope': return prices.rope
     case 'canteen': return prices.canteen

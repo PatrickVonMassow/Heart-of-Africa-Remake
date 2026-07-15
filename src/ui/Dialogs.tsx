@@ -19,7 +19,7 @@ type Good = EquipmentId | 'food' | Material
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
 const BUILDING_GOODS: Record<TradeBuilding, Good[]> = {
-  shop: ['medicine', 'map', 'gold', 'silver', 'emerald', 'copper', 'ivory'],
+  shop: ['medicine', 'gold', 'silver', 'emerald', 'copper', 'ivory'],
   weapons: ['rifle', 'machete'],
   tools: ['shovel', 'rope', 'canteen'],
   market: ['canoe', 'food'],

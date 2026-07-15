@@ -65,6 +65,7 @@ export interface Strings {
   hud: {
     journalToggle: string
     campToggle: string
+    mapToggle: string
     /** Tooltip for a click-to-use item (medicine/map/shovel). */
     useTooltip: string
     /** Tooltip for a passive item whose effect follows possession. */

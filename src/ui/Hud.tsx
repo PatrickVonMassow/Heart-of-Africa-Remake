@@ -3,7 +3,7 @@
 // text comes from the language files (design.md §17 localization).
 
 import { useEffect, useState } from 'react'
-import { healthState, listCheckpoints, useGame, type EquipmentId } from '../state/store'
+import { healthState, listCheckpoints, canCampHere, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import { placeById, worldToLatLon } from '../world/geo'
 import { sampleTerrain } from '../world/terrain'
@@ -30,16 +30,16 @@ function InventoryBar() {
   const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0)
   if (owned.length === 0 && ownedTreasures.length === 0) return null
 
-  // Medicine, map and shovel are used by clicking them on the spot (design.md
-  // §17); the rest act by mere possession (rifle/rope/machete/canoe) or show a
-  // reading (canteen fill), so they are passive labels, not buttons.
+  // Medicine and shovel are used by clicking them on the spot (design.md §17);
+  // the rest act by mere possession (rifle/rope/machete/canoe) or show a
+  // reading (canteen fill), so they are passive labels, not buttons. (The map
+  // is no longer an item — it opens from its own button / M, point 93.)
   const activateItem = (e: EquipmentId) => {
     const g = useGame.getState()
     if (e === 'medicine') g.useMedicine()
-    else if (e === 'map') useUi.getState().toggleMap()
     else if (e === 'shovel') g.dig()
   }
-  const clickable = (e: EquipmentId) => e === 'medicine' || e === 'map' || e === 'shovel'
+  const clickable = (e: EquipmentId) => e === 'medicine' || e === 'shovel'
 
   // An item "in use" glows in the inventory: a carried relief item currently
   // countering the terrain (canoe on water, machete in jungle, rope on a
@@ -298,6 +298,12 @@ export function Hud() {
   const setJournalOpen = useGame((s) => s.setJournalOpen)
   const toggleDebug = useUi((s) => s.toggleDebug)
   const setDialog = useUi((s) => s.setDialog)
+  // Camp button visibility (point 93): the same predicate as the C-shortcut.
+  const campMode = useGame((s) => s.mode)
+  const campPlaceId = useGame((s) => s.placeId)
+  const campHonored = useGame((s) => s.honoredFriend)
+  const campRobbed = useGame((s) => s.regionRobbed)
+  const showCamp = canCampHere({ mode: campMode, placeId: campPlaceId, honoredFriend: campHonored, regionRobbed: campRobbed })
 
   useEffect(() => {
     // Tab toggles the journal (design.md §17). It is handled directly rather
@@ -347,6 +353,9 @@ export function Hud() {
     const offC = onKeyPress('KeyC', () => {
       if (useUi.getState().dialog) return
       const g = useGame.getState()
+      // Same gate as the camp button (point 93): no camping in ports or
+      // non-friend villages, so the key and the button never disagree.
+      if (!canCampHere(g)) return
       if (g.mode === 'travel') g.pitchOrOpenCamp()
       else g.openVillageCamp()
     })
@@ -397,15 +406,23 @@ export function Hud() {
       <FpsCounter />
       {/* Health bar top-right, below the status bar, at the FPS-counter height. */}
       <InventoryBar />
-      {/* Bottom-right: the camp and journal buttons. */}
+      {/* Bottom-right: camp (only where allowed), map and journal buttons. */}
       <div className="hud-bottom-right">
-        <button className="hud-button camp-toggle" onClick={() => {
-          if (useUi.getState().dialog) return
-          const g = useGame.getState()
-          if (g.mode === 'travel') g.pitchOrOpenCamp()
-          else g.openVillageCamp()
+        {showCamp && (
+          <button className="hud-button camp-toggle" onClick={() => {
+            if (useUi.getState().dialog) return
+            const g = useGame.getState()
+            if (!canCampHere(g)) return
+            if (g.mode === 'travel') g.pitchOrOpenCamp()
+            else g.openVillageCamp()
+          }}>
+            {t.hud.campToggle}
+          </button>
+        )}
+        <button className="hud-button map-toggle" onClick={() => {
+          if (!useUi.getState().dialog) useUi.getState().toggleMap()
         }}>
-          {t.hud.campToggle}
+          {t.hud.mapToggle}
         </button>
         <button className="hud-button journal-toggle" onClick={() => {
           const g = useGame.getState()

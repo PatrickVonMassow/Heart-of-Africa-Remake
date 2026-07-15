@@ -48,6 +48,16 @@ describe('trade dialog (design.md §9)', () => {
     expect(txt).not.toContain('$')
   })
 
+  it('no longer offers the map as a shop good (point 93)', () => {
+    g().enterPlace('cairo')
+    useUi.getState().setDialog({ kind: 'trade', building: 'shop' })
+    render(<Dialogs />)
+    const names = [...document.querySelectorAll('.buy-grid .trade-name')].map((e) => e.textContent)
+    expect(names.length).toBeGreaterThan(0)
+    expect(names).not.toContain('Map')
+    expect(names).not.toContain('Karte')
+  })
+
   it('lays the gear buy-back (sell) list out in the same aligned grid (point 95)', () => {
     g().enterPlace('cairo')
     g().debugAddEquipment('shovel')

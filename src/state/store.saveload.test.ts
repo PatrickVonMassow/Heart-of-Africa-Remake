@@ -114,6 +114,21 @@ describe('loadCheckpoint restores a specific visit (design.md §18)', () => {
     expect(g().money).toBe(300)
   })
 
+  it('a legacy save with the removed map item loads with it stripped (point 93)', () => {
+    // A checkpoint from before the map became a button, carrying the obsolete
+    // 'map' equipment item — loading must not fail and must drop it.
+    localStorage.setItem(CHECKPOINTS_KEY, JSON.stringify([{
+      placeId: 'cairo', money: 120, foodDays: 12, day: 4, health: 88, seed: 42,
+      equipment: { map: 1, shovel: 1, rope: 1 },
+    }]))
+    expect(g().loadCheckpoint(0)).toBe(true)
+    const eq = g().equipment as Record<string, number>
+    expect(eq.shovel).toBe(1)
+    expect(eq.rope).toBe(1)
+    expect('map' in eq).toBe(false)
+    expect(g().money).toBe(120)
+  })
+
   it('loadCheckpoint on empty storage returns false', () => {
     expect(g().loadCheckpoint()).toBe(false)
     expect(g().loadCheckpoint(0)).toBe(false)

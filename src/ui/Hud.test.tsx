@@ -8,7 +8,7 @@ import { render, fireEvent } from '@testing-library/react'
 import { Hud } from './Hud'
 import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
-import { useGame } from '../state/store'
+import { useGame, canCampHere } from '../state/store'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
 import { balance } from '../config/balance'
@@ -56,6 +56,57 @@ describe('InventoryBar .inv-active glow (design.md §17)', () => {
     g().debugSetAffliction('fever', true)
     render(<Hud />)
     expect(invClass('medicine')).toContain('inv-active')
+  })
+})
+
+describe('bottom-right button row: map always, camp only where allowed (point 93)', () => {
+  const btn = (cls: string) => document.querySelector(`.hud-bottom-right .${cls}`)
+
+  it('the map button sits left of the journal button and opens the map', () => {
+    render(<Hud />)
+    const map = btn('map-toggle')
+    const journal = btn('journal-toggle')
+    expect(map).toBeInTheDocument()
+    expect(journal).toBeInTheDocument()
+    expect(map!.textContent).toBe(en.hud.mapToggle)
+    // DOM order: the map button precedes the journal button.
+    expect(map!.compareDocumentPosition(journal!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    fireEvent.click(map!)
+    expect(useUi.getState().mapOpen).toBe(true)
+  })
+
+  it('shows the camp button while travelling', () => {
+    useGame.setState({ mode: 'travel', placeId: null })
+    render(<Hud />)
+    expect(btn('camp-toggle')).toBeInTheDocument()
+  })
+
+  it('hides the camp button in a port', () => {
+    useGame.setState({ mode: 'place', placeId: 'cairo' })
+    render(<Hud />)
+    expect(btn('camp-toggle')).not.toBeInTheDocument()
+    // The map and journal buttons stay.
+    expect(btn('map-toggle')).toBeInTheDocument()
+    expect(btn('journal-toggle')).toBeInTheDocument()
+  })
+
+  it('hides the camp button in a non-friend village but shows it in a friend village', () => {
+    useGame.setState({ mode: 'place', placeId: 'masai-village', honoredFriend: {}, regionRobbed: {} })
+    const { rerender } = render(<Hud />)
+    expect(btn('camp-toggle')).not.toBeInTheDocument()
+    // Masai village is in the East region; becoming its Honored Friend enables camping.
+    useGame.setState({ honoredFriend: { east: true } })
+    rerender(<Hud />)
+    expect(btn('camp-toggle')).toBeInTheDocument()
+  })
+
+  it('canCampHere matches the button: travel yes, port no, friend village yes (pure)', () => {
+    expect(canCampHere({ mode: 'travel', placeId: null, honoredFriend: {}, regionRobbed: {} })).toBe(true)
+    expect(canCampHere({ mode: 'place', placeId: 'cairo', honoredFriend: {}, regionRobbed: {} })).toBe(false)
+    expect(canCampHere({ mode: 'place', placeId: 'masai-village', honoredFriend: {}, regionRobbed: {} })).toBe(false)
+    expect(canCampHere({ mode: 'place', placeId: 'masai-village', honoredFriend: { east: true }, regionRobbed: {} })).toBe(true)
+    // A robbed region forfeits camping even as a friend.
+    expect(canCampHere({ mode: 'place', placeId: 'masai-village', honoredFriend: { east: true }, regionRobbed: { east: true } })).toBe(false)
   })
 })
 

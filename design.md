@@ -174,7 +174,7 @@ invariants.
 - Provisions (food): consumed per time step; can be bought.
 - Water: the canteen holds a fill level (a percentage). It refills to full at fresh water (river, lake, swimmable sea), drains slowly on land — faster in the desert — and, once empty, thirst builds and then health drops. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
 - Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
-- Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the map opens the exploration overview — inside a settlement the place plan, §7 —, the shovel digs).
+- Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the shovel digs). The map is NOT an inventory item: it is always available from its own button in the bottom-right button row (left of the journal button, §17.4) and the M key, opening the exploration overview — inside a settlement the place plan (§7/§19.11).
 
 ### 6.2 Afflictions and healing
 
@@ -207,10 +207,9 @@ Inventory caches relieve the limited inventory and allow, for instance, leaving 
 | Medicine | Cures fever/illness and wounds; used by clicking it in the inventory bar |
 | Gifts | Trade goods for chiefs (goodwill, hints) |
 | Canteen | Holds a fill level; refills at fresh water, drains on land (faster in the desert); protects against dehydration in the desert while it holds water (not against sun blindness) |
-| Map | Orientation aid; clicking it in the inventory bar opens the exploration overview — and inside a settlement a PLAN OF THE PLACE instead: the walkable area with every functional (enterable) building marked and named (localized), dwellings as unlabelled context and the lanes sketched, in the same worn-paper style |
 | Canoe | Fast, safe travel on rivers/lakes (the rifle also stays usable there); on land it slows the traveler markedly (a hint names it). Without a canoe, water is slower, more exposed to the current and to crocodiles. Its depiction in the bird's-eye view makes the state legible: travelling water the explorer sits in the canoe (riding on the surface, paddling); on land he drags it along behind him — the hull trails the walked path like a trailer, lies on the terrain (pitching down to where its far end rests on the ground, rolling slightly on cross-slopes) and swings clear of stones, trees, animals and settlement edges instead of clipping through them; at a bank it stays on the land side — the rope rotates to land at full length (or shortens on a spit narrower than the rope), so the dragged hull never pierces a river, lake or sea surface |
 
-Core rule: items act by possession alone, never "in hand" (§6.1); the table above carries the per-item effects.
+Core rule: items act by possession alone, never "in hand" (§6.1); the table above carries the per-item effects. The map is NOT among these items: it is always available (from a bottom-right button and the M key, §17.4), opening the exploration overview — and inside a settlement a PLAN OF THE PLACE instead: the walkable area with every functional (enterable) building marked and named (localized), dwellings as unlabelled context and the lanes sketched, in the same worn-paper style (§19.11).
 
 ---
 
@@ -463,10 +462,10 @@ Players who do not want to be interrupted can turn the automatic presentation of
 - Field of view of the surroundings; status bar with date, funds, provisions, gifts and the current region (no hand-object slot — item effects are possession-based, §6/§7). Each stat is led by a narrow, expedition-styled SYMBOL instead of its word (the localized word remains as the tooltip/accessible label), and the date reads compactly as DD.MM.YYYY.
 - The coordinates are not shown permanently; they are read out on demand via the position query.
 - Transient status hints — e.g. the reason for a movement penalty (§11) — appear CENTRED inside the status bar itself (in the row with date/funds/region), not in a separate panel floating over the scene.
-- The inventory bar shows the carried items; clickable ones act on click (medicine cures, the map opens the exploration overview, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
+- The inventory bar shows the carried items; clickable ones act on click (medicine cures, the shovel digs), the canteen shows its fill level, and treasures presented to a village trigger the §8 reaction.
 - An item that is currently in use lights up (glows) in the inventory bar: the relief item countering the present terrain (the canoe on water, the machete in the jungle, the rope on a mountain) and medicine while a curable affliction (fever or a wound) is active — so the player sees at a glance which piece of equipment is doing its work right now.
 - A health bar sits INSIDE the status bar at its right end — where the journal panel can never cover it: a filled bar that is green at full health and shades ever redder toward zero, so the condition reads at a glance without the health query; below a third of full health it BLINKS for attention (like the canteen's low-fill blink). To its left, the currently active afflictions (fever, dehydration, sun blindness, wounds) show as small badges. The detailed state stays on the health query (H).
-- Further functions: chronicle, position query, health query, and pitch camp (§6, the camp button).
+- Further functions: chronicle, position query, health query, and pitch camp (§6). The bottom-right button row holds, left to right, the CAMP button, the MAP button and the JOURNAL button. The map button is always present (the map is no longer an inventory item, §7) and opens the exploration overview / place plan. The camp button appears only where a camp can actually be pitched (§6.3): in the open bird's-eye world always, inside a settlement only in a village whose region holds "Honored Friend" — hidden in ports and non-friend villages, exactly matching the C key so button and key never disagree.
 
 ### 17.2 Discovery-gated labels
 
@@ -478,7 +477,7 @@ First-person view (settlements): walkable space, interaction prompts at building
 
 ### 17.4 Layering
 
-Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and ends above the camp and journal buttons in the bottom corner, so those buttons are never covered.
+Modal windows (trade, audience, bazaar, travel agency, camp caches) and the full-screen overlays (start/load, victory, defeat) always render on top of everything else in the scene, including the floating building and place labels. A modal is never obscured by an in-world label. The chronicle/journal panel (docked on the right) keeps a small gap to the right screen edge and ends above the bottom-right button row (camp / map / journal), so those buttons are never covered.
 
 ### 17.5 Controls and focus
 

@@ -359,7 +359,18 @@ verify suite that proves it.
    above it, the canteen blinks (`.canteen-blink`) below a third of its
    fill (§6.1), and an
    `.affliction-badge` renders left of the bar for each active affliction
-   (`src/ui/Hud.test.tsx`).
+   (`src/ui/Hud.test.tsx`). The map is NOT an inventory item (point 93):
+   the bottom-right button row holds camp / map / journal in that order,
+   the always-present MAP button opens the overview without any
+   possession check, and the CAMP button shows only where a camp can be
+   pitched (§6.3: travel always, a friend village inside a settlement,
+   never a port — one `canCampHere` predicate for the button and the C
+   key). A legacy save carrying the removed map item loads with it
+   stripped. Verifiable: `src/ui/Hud.test.tsx` (map button left of
+   journal, camp shown/hidden per mode, `canCampHere` pure);
+   `src/ui/Dialogs.test.tsx` (no map good in any shop listing);
+   `src/state/store.saveload.test.ts` (legacy map-item strip);
+   `scripts/verify/enrichments.mjs` (button-row order + non-overlap).
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints via the knowing-people
@@ -590,7 +601,7 @@ verify suite that proves it.
     blocked by the autoplay policy is deferred to the first gesture
     instead of dropped. The journal is non-modal per §16.1 (movement
     continues, only modal dialogs block; walking a door open works with
-    the journal open), and the panel ends above the camp/journal toggles
+    the journal open), and the panel ends above the camp/map/journal toggles
     per §17.4. German read-aloud stays an open item until a German-capable
     voice exists. Verifiable: spot check of both language files for
     markers; journal screenshot free of visible tags; starting narration
@@ -603,7 +614,7 @@ verify suite that proves it.
     regression is CDN-independent); walking into a hut door with the journal
     forced open still opens the building (`scripts/verify/flow.mjs`); with
     the journal open, the `.journal` panel's bottom edge sits above the
-    `.camp-toggle` and `.journal-toggle` button tops and its right edge
+    `.map-toggle` and `.journal-toggle` button tops and its right edge
     keeps a gap to the screen edge (`scripts/verify/enrichments.mjs`).
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px, walk speed inside

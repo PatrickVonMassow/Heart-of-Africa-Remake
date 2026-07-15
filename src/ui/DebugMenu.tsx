@@ -19,7 +19,7 @@ import {
 import { LAKES } from '../world/data/lakes'
 import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
 
-const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'map', 'canoe']
+const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
 
 /** Labeled dropdown that fires an action on pick and snaps back to the placeholder. */

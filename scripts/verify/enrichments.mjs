@@ -590,13 +590,15 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(true))
 await page.waitForTimeout(300)
 const journalFit = await page.evaluate(() => {
   const j = document.querySelector('.journal')?.getBoundingClientRect()
-  const camp = document.querySelector('.camp-toggle')?.getBoundingClientRect()
+  // The map button is always present (the camp button is conditional, point 93),
+  // so gate the clearance on it — it shares the row's top edge.
+  const map = document.querySelector('.map-toggle')?.getBoundingClientRect()
   const jbtn = document.querySelector('.journal-toggle')?.getBoundingClientRect()
-  return { jBottom: j?.bottom ?? null, campTop: camp?.top ?? null, jbtnTop: jbtn?.top ?? null, jRight: j?.right ?? null, vw: window.innerWidth }
+  return { jBottom: j?.bottom ?? null, mapTop: map?.top ?? null, jbtnTop: jbtn?.top ?? null, jRight: j?.right ?? null, vw: window.innerWidth }
 })
 check(
-  'journal panel ends above the camp button (with a gap)',
-  journalFit.jBottom !== null && journalFit.campTop !== null && journalFit.jBottom <= journalFit.campTop - 4,
+  'journal panel ends above the map button (with a gap)',
+  journalFit.jBottom !== null && journalFit.mapTop !== null && journalFit.jBottom <= journalFit.mapTop - 4,
   JSON.stringify(journalFit),
 )
 check(
@@ -610,6 +612,21 @@ check(
   JSON.stringify(journalFit),
 )
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+
+// --- Point 93: the bottom-right row orders map LEFT of journal, no overlap ----
+const btnRow = await page.evaluate(() => {
+  const r = (sel) => { const e = document.querySelector(sel); return e ? e.getBoundingClientRect() : null }
+  const map = r('.map-toggle'), journal = r('.journal-toggle'), camp = r('.camp-toggle')
+  const overlaps = (a, b) => !!a && !!b && !(a.right <= b.left || a.left >= b.right)
+  return {
+    hasMap: !!map, hasJournal: !!journal,
+    mapLeftOfJournal: !!map && !!journal && map.right <= journal.left + 1,
+    overlapMapJournal: overlaps(map, journal),
+    overlapCampMap: overlaps(camp, map),
+  }
+})
+check('the map button sits left of the journal button (point 93)', btnRow.hasMap && btnRow.hasJournal && btnRow.mapLeftOfJournal, JSON.stringify(btnRow))
+check('the bottom-right buttons do not overlap (point 93)', !btnRow.overlapMapJournal && !btnRow.overlapCampMap, JSON.stringify(btnRow))
 
 // --- Lion: carcass consumed, lion moves on (§7.1.12) -------------------------
 await page.evaluate(() => {

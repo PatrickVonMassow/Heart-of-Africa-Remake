@@ -162,7 +162,7 @@ describe('camps, village trade & shop prices (design.md §6/§9/§10)', () => {
 
   it('the port shop price table', () => {
     expect(prices).toEqual({
-      food: 5, medicine: 12, map: 10, shovel: 20, rope: 15, canteen: 10,
+      food: 5, medicine: 12, shovel: 20, rope: 15, canteen: 10,
       machete: 15, rifle: 60, canoe: 50,
       giftGold: 30, giftSilver: 12, giftEmerald: 28, giftCopper: 10, giftIvory: 22,
     })
