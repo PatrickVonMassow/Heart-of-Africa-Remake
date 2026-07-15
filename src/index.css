@@ -348,11 +348,16 @@ textarea {
 }
 
 /* "You are here" (design.md §19.11): an ink dot with a fine pulsing ring, in
-   both the atlas (a div over the canvas) and the town plan (an SVG group). */
+   both the atlas (a div over the canvas) and the town plan (an SVG group).
+   pointer-events only on the shared class — position/transform belong to the
+   DOM marker ONLY: on the SVG <g> a CSS transform would override its
+   `transform` attribute and strand the marker in the plate corner (point 109). */
 .map-player {
+  pointer-events: none;
+}
+.map-player.map-player-dom {
   position: absolute;
   transform: translate(-50%, -50%);
-  pointer-events: none;
 }
 .map-player.map-player-dom::before,
 .map-player.map-player-dom::after {
@@ -364,25 +369,29 @@ textarea {
   transform: translate(-50%, -50%);
 }
 .map-player.map-player-dom::before {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
   background: #8c2f22;
+  /* White halo so the dot reads over the busy engraved plate (point 109). */
+  box-shadow: 0 0 0 2px rgba(250, 245, 230, 0.95), 0 0 4px 3px rgba(0, 0, 0, 0.35);
 }
 .map-player.map-player-dom::after {
-  width: 7px;
-  height: 7px;
-  border: 1.5px solid #8c2f22;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #8c2f22;
   animation: map-player-pulse 1.8s ease-out infinite;
 }
 @keyframes map-player-pulse {
-  from { width: 7px; height: 7px; opacity: 0.8; }
-  to { width: 24px; height: 24px; opacity: 0; }
+  from { width: 10px; height: 10px; opacity: 0.85; }
+  to { width: 34px; height: 34px; opacity: 0; }
 }
-.map-player-dot { fill: #8c2f22; }
+/* A pale halo circle sits behind the town-plan dot for the same contrast. */
+.map-player-halo { fill: rgba(250, 245, 230, 0.95); }
+.map-player-dot { fill: #8c2f22; stroke: rgba(250, 245, 230, 0.95); stroke-width: 1; }
 .map-player-ring {
   fill: none;
   stroke: #8c2f22;
-  stroke-width: 1.2;
+  stroke-width: 1.6;
   transform-box: fill-box;
   transform-origin: center;
   animation: map-ring-pulse 1.8s ease-out infinite;

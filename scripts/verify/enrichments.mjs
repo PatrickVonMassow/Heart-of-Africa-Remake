@@ -341,8 +341,32 @@ await page.waitForFunction(() => window.__game.getState().placeId === 'cairo', n
 await page.waitForTimeout(400)
 await page.evaluate(() => window.__ui.getState().toggleMap())
 await page.waitForTimeout(300)
-const planMarker = await page.evaluate(() => !!document.querySelector('.map-place-plan .map-player.map-player-svg'))
-check('the town plan shows a you-are-here marker (point 89)', planMarker, `plan marker ${planMarker}`)
+const planMarker = await page.evaluate(() => {
+  const m = document.querySelector('.map-place-plan .map-player.map-player-svg')
+  const svg = document.querySelector('.map-place-plan svg')
+  if (!m || !svg) return { present: false }
+  // The marker's RENDERED centre must follow its `transform` attribute, not be
+  // stranded at the plate corner by a clobbering CSS transform (point 109). Map
+  // the attribute's view-box coordinate through the svg's client box and compare.
+  const vb = (svg.getAttribute('viewBox') || '0 0 0 0').split(/\s+/).map(Number)
+  const tr = (m.getAttribute('transform') || '').match(/translate\(([-\d.]+) ([-\d.]+)\)/)
+  const sr = svg.getBoundingClientRect()
+  const mr = m.getBoundingClientRect()
+  const mc = { x: mr.x + mr.width / 2, y: mr.y + mr.height / 2 }
+  if (!tr || vb[2] === 0) return { present: true, tracked: false }
+  const scale = sr.width / vb[2]
+  const expx = sr.x + (Number(tr[1]) - vb[0]) * scale
+  const expy = sr.y + (Number(tr[2]) - vb[1]) * scale
+  const drift = Math.hypot(mc.x - expx, mc.y - expy)
+  const cornerDist = Math.hypot(mc.x - sr.x, mc.y - sr.y)
+  return { present: true, tracked: drift < 12, drift: Math.round(drift), cornerDist: Math.round(cornerDist) }
+})
+check('the town plan shows a you-are-here marker (point 89)', planMarker.present, JSON.stringify(planMarker))
+check(
+  'the town-plan marker renders at its transform, not the plate corner (point 109)',
+  planMarker.tracked && planMarker.cornerDist > 40,
+  JSON.stringify(planMarker),
+)
 await page.evaluate(() => { window.__ui.getState().toggleMap(); window.__game.getState().leavePlace() })
 await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 }).catch(() => {})
 

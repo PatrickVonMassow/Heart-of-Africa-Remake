@@ -750,8 +750,9 @@ function PlacePlan({ placeId }: { placeId: string }) {
           ref={playerRef}
           transform={`translate(${sx(placePlayerPosition.x)} ${sx(placePlayerPosition.z)})`}
         >
-          <circle className="map-player-ring" r={9} />
-          <circle className="map-player-dot" r={3.5} />
+          <circle className="map-player-ring" r={10} />
+          <circle className="map-player-halo" r={6} />
+          <circle className="map-player-dot" r={4} />
         </g>
       </svg>
     </div>

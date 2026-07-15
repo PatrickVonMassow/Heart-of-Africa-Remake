@@ -2127,6 +2127,126 @@ as-is; only the sequence changes.
   (track: 15.07. 11:45 -> 12:10, ~25 min, ~40k in / ~9k out, model
   claude-opus-4-8[1m], effort high, thinking on, user-supervised, dontAsk)
 
+- [x] 107. Rocks (and other scattered dressing) disappear at certain in-settlement
+  standpoints and reappear when the player moves (user report, real hardware). CAUSE:
+  R3F `<instancedMesh>` defaults `frustumCulled` true, and the bounding sphere is
+  computed from the BASE geometry at the ORIGIN (0,0,0), not over the spread-out
+  instance matrices — so the whole mesh is frustum-culled the moment the origin
+  leaves the view, dropping every instance at once. FIX: `frustumCulled={false}` on
+  the five scattered instanced meshes in PlaceScene (Fences thorn/woven/stone,
+  Scatter tuft/rock) — they are small, bounded per chunk, and cheap to keep. TRACK:
+  src/scenes/place/PlaceScene.tsx (5 meshes). Verifiable: polish.mjs traverses
+  `window.__scenePass.scene`, counts InstancedMeshes carrying `frustumCulled` and
+  asserts `checked > 0 && culled === 0` (no scattered mesh culls itself away).
+  design.md unchanged (rendering-correctness fix; CLAUDE §7.1 pt.15 dressing).
+  (committed c790f75, shared with point 108)
+  (track: 15.07. ~13:00 -> 13:15, ~15 min, model claude-opus-4-8[1m], effort high,
+  thinking on, user-supervised, dontAsk)
+
+- [x] 108. Journal read-aloud is choppy from the first entry — a bit is spoken, then
+  a long pause, then a bit more (user report; a REGRESSION from point 100's q8/WASM
+  switch). CAUSE: the WASM synth path is slower than the old lockstep one-ahead
+  lookahead could hide, so the next segment finished synthesizing only AFTER the
+  current one stopped playing. FIX (src/journal/speech.ts): fire EVERY segment's
+  synthesis up front into the worker queue so it runs maximally ahead and builds a
+  growing buffer; playback awaits each in order and catches up during the longer
+  segments. Un-awaited rejections are swallowed so a cancel cannot surface an
+  unhandled rejection. Verifiable: voice.mjs stays green (narration produces audio,
+  the rAF liveness gate holds through the cold load). design.md unchanged (CLAUDE
+  §7.1 pt.19). (committed c790f75, shared with point 107)
+  (track: 15.07. ~13:00 -> 13:15, ~15 min, model claude-opus-4-8[1m], effort high,
+  thinking on, user-supervised, dontAsk)
+
+- [x] 109. The current-position marker is not visible/placed on the map as ordered
+  (user report; a point-89 regression). ROOT CAUSE: the shared `.map-player` CSS rule
+  set `position:absolute; transform:translate(-50%,-50%)` on BOTH markers, but on the
+  town-plan SVG `<g>.map-player-svg` that CSS transform OVERRODE the element's
+  `transform` attribute (`translate(sx(x) sx(z))`), stranding the marker in the plate
+  corner (measured: computed centre (292,680) vs. rendered (11,215) = svg top-left).
+  The atlas `.map-player-dom` div was correctly placed but a faint 7 px dot on a busy
+  plate. FIX (src/index.css + src/ui/MapOverlay.tsx): scope `position/transform` to
+  `.map-player-dom` only (the SVG keeps its attribute transform untouched); enlarge
+  both markers and add a pale halo for contrast (atlas ::before 10 px + white
+  box-shadow halo, pulsing ::after; town-plan adds a `.map-player-halo` circle behind
+  the dot, dot r 4, ring r 10). Verifiable: enrichments.mjs now maps the town-plan
+  marker's `transform` through the svg client box and asserts the rendered centre
+  follows it (`drift < 12 px`) and is not at the corner (`cornerDist > 40`);
+  MapOverlay.test.tsx stays green (dot/ring present, transform pinned). design.md
+  unchanged (CLAUDE §7.1 pt.3/pt.9 map marker).
+
+- [ ] 110. The Meroë pyramids partially stand in the water (user report). The site
+  (src/world/data/landmarks.ts `meroe` lon 33.75 / lat 16.94, kind `pyramids`) sits
+  right on the Nile's east bank; the cluster (src/render/landmarks.ts
+  `buildMeroePyramids`, spots spread x −2.55…+4.5, z −2.7…+1.5, plus ±0.3 jitter and
+  base ~1.0–1.4 → a footprint radius ≈ 6 world units) plus the per-run random yaw
+  overlaps the rendered river ribbon. ANCHOR: src/scenes/travel/TravelScene.tsx
+  `CulturalLandmarks` items map (~line 1252) computes `w = latLonToWorld(...)` and
+  `y = max(0.2, sampleTerrain(...).height)`. FIX: before mounting, nudge the Meroë
+  world position away from the nearest river/lake water until the whole footprint
+  radius clears water — a river-clearance step mirroring the §4.2 village rule.
+  Reuse the world water sampler (look in src/world for an `isWater`/nearest-land /
+  river-clearance helper the villages already use); sample the footprint disc
+  (radius ≈ 6, so the fix is yaw-independent) and, if any sample is river/lake water,
+  shift radially away from the nearest water cell (eastward, onto the desert bank),
+  capped. Keep it seed/yaw-independent. If no reusable helper exists, bake a verified
+  eastward offset into the meroe coordinate and prove it clears the full ribbon width.
+  Only Meroë sits on a river here, but write the clearance generically for any
+  cultural landmark. TESTS: a pure test (mirror world.test.ts village clearance) that
+  the Meroë mount's footprint disc contains no river/lake water cell across seeds; the
+  existing enrichments cultural-landmark check/screenshot shows the pyramids on dry
+  land. DOCS: both design.md §4.4 (note the built landmarks keep the §4.2 river
+  clearance) and CLAUDE §7.1 pt.25/pt.3 verifiable if the clearance is added there.
+  One atomic commit.
+
+- [ ] 111. The flat BLACK ground blob in the first-person settlement is STILL present
+  on real WebGPU hardware — point 106's AO floor (`max(0.4, ao.r)` in Effects.tsx) did
+  NOT fix it (user re-confirmed with a localhost screenshot: a sharp-edged flat-black
+  arrow shape on the sand). So GTAO over-occlusion is NOT the (sole) cause. This does
+  NOT reproduce on the WebGL 2 headless path (the known WebGPU-untestable-headless
+  limitation), so the headless suites cannot gate it and isolation needs the user on
+  real WebGPU hardware. NEXT STEP (user-gated): via the debug menu, toggle SSAO off,
+  TRAA off, and shadows off one at a time and report which removes the blob — that
+  names the subsystem. Suspects to bisect once isolated: the cascaded shadow map at a
+  near wall base on WebGPU (self-shadow acne/rank collapse), a bloom/grade interaction
+  crushing an already-dark ground, the surface-normal MRT on the WebGPU backend, or a
+  specific ground material. Then fix backend-neutrally and re-confirm on WebGPU. Keep
+  DEFERRED-style pending until the user's isolation narrows it. design.md unchanged
+  (render-quality safeguard; no new CLAUDE §7.1 point). One atomic commit once fixed.
+
+- [ ] 112. Audio balance (user request): footsteps twice as loud, and ALL other
+  ambient sounds half as loud — including the "ding-dong" (the interaction/enter
+  chime). ANCHOR: src/systems/ambience.ts (footstep `emitFootstep`, the ambient bed,
+  the ding-dong chime, the §19.1 proximity calls) under the single ambience volume
+  (default 0.1, design.md §20/§21). FIX: introduce calibratable balance factors in
+  src/config/balance.ts — `footstepVolume` (×2 relative to now) and `ambientVolume`
+  (×0.5, covering the bed, UI/interaction chimes incl. the ding-dong, and proximity
+  calls) — applied under the existing master ambience volume, and debug-editable per
+  CLAUDE §2/§21. The ding-dong belongs to the HALVED set, NOT the footstep set.
+  TESTS: assert the two factors (footstep 2, ambient 0.5) in a pure/unit test if the
+  audio graph exposes gains; settings.mjs checks the debug fields exist and edit at
+  runtime. Any new debug labels in de+en. DOCS: design.md §20/§21 audio + CLAUDE §7.1
+  pt.20 verifiable. One atomic commit.
+
+- [ ] 113. In the bird's-eye/travel view, walking into a tree leaves the traveller
+  stuck inside it — he cannot get out (user report). CLAUDE §7.1 pt.4/pt.12 already
+  require non-pinning collision with trees/animals ("steering away moves him clear — a
+  collision never pins the traveller"), so this is a bug against the acceptance rule.
+  ANCHOR: src/systems/movement.ts swept obstacle resolve (pure-tested in
+  src/systems/movement.test.ts: "the away/tangent moves from a resting contact stay
+  free", the no-tunnelling case) and the travel-scene tree collider registration
+  (src/scenes/travel/*, the flora/obstacle list feeding the resolver). HYPOTHESIS: the
+  animal path already resolves correctly (enrichments has the "driving into a pinned
+  animal blocks at its body edge … steering away moves him clear, never pins" live
+  check), but trees either are not routed through the same swept resolve (a hard block
+  that traps) or their collider radius/placement leaves the traveller inside with no
+  free escape vector. FIX: route tree collisions through the same swept obstacle
+  resolve as animals so an away/tangent step from a resting contact is always free, no
+  tunnelling. TESTS: extend movement.test.ts with a tree-sized static obstacle
+  (resting contact + away move stays free, tangent free, no tunnelling on a fast step);
+  add a live check in enrichments.mjs mirroring the animal one (pin a tree on the
+  player, assert a subsequent away-move increases clearance and never pins). design.md
+  §11/§19 unchanged (already requires it). One atomic commit.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
