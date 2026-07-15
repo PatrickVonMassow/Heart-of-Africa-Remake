@@ -24,9 +24,16 @@ try {
 
 try {
   const tasks = readFileSync(new URL('../TASKS.md', import.meta.url), 'utf8')
-  const open = tasks.match(/^- \[ \] (\d+)\./gm)
-  if (!open || open.length === 0) {
-    // Finished batch — start silently.
+  // Unticked point lines, MINUS the ones the user explicitly deferred: a point
+  // line carrying a `DEFERRED` marker is excluded from the batch and must never
+  // auto-resume (2026-07-15 fix — a parallel session resumed onto the excluded
+  // point 96 because the "except 96/100" exclusion lived only in the chat, not
+  // where this hook could see it). The exclusion now travels in TASKS.md itself.
+  const openLines = tasks.split('\n').filter((l) => /^- \[ \] \d+\./.test(l))
+  const open = openLines.filter((l) => !/\bDEFERRED\b/.test(l))
+  if (open.length === 0) {
+    // Nothing actionable — the batch is finished, or every remaining point is
+    // user-deferred. Start silently either way.
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0]).join(', ')
     const header = `[batch-resume] TASKS.md has ${open.length} open point(s): ${nums}.`

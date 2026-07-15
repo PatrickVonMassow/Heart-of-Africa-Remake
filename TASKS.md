@@ -1475,7 +1475,9 @@ as-is; only the sequence changes.
   only). CLAUDE.md pt. 5 updated. Vitest 1427, flow 32 green.
   (track: 14.07. 22:00 -> 22:11, ~11 min, ~30k in / ~7k out, model
   claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
-- [ ] 96. Leaving a settlement freezes the game for ~13-16 s once several
+- [ ] 96. DEFERRED (user-excluded from the batch — do NOT auto-resume onto
+  this point; the batch-resume hook skips any line tagged DEFERRED). Leaving a
+  settlement freezes the game for ~13-16 s once several
   settlements were visited in a session (found via the polish gate racing
   its 15 s timeout; measured 13.5 s with the baked textures and 15.7 s
   WITHOUT them, so it is pre-existing and unrelated to point 86; leaving
@@ -1687,7 +1689,9 @@ as-is; only the sequence changes.
   (track: 14.07. 21:30 -> 22:05, ~35 min, ~40k in / ~9k out, model
   claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
 
-- [ ] 100. Cold TTS model load janks the MAIN thread ~14 s (found while
+- [ ] 100. DEFERRED (user-excluded from the batch — do NOT auto-resume onto
+  this point; the batch-resume hook skips any line tagged DEFERRED). Cold TTS
+  model load janks the MAIN thread ~14 s (found while
   diagnosing the handwriting flake): with an unprimed browser profile,
   adding a journal entry (auto-narration) froze the handwriting reveal —
   a plain 60 ms `setInterval` on the main thread — for ~14 s while the
