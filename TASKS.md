@@ -2210,7 +2210,20 @@ as-is; only the sequence changes.
   near wall base on WebGPU (self-shadow acne/rank collapse), a bloom/grade interaction
   crushing an already-dark ground, the surface-normal MRT on the WebGPU backend, or a
   specific ground material. Then fix backend-neutrally and re-confirm on WebGPU. Keep
-  DEFERRED-style pending until the user's isolation narrows it. design.md unchanged
+  DEFERRED-style pending until the user's isolation narrows it.
+  UPDATE (15.07. ~13:55, user screenshot on the DEPLOYED main page, real WebGPU
+  160 fps): the shapes are SHARP-EDGED FLAT-BLACK QUADRILATERALS (hourglass/bowtie)
+  lying on the ground at building-wall bases — geometry-shaped, NOT a soft
+  screen-space AO gradient. Confirmed: Effects.tsx line 106 already floors AO at 0.4
+  (deployed), which mathematically cannot reach pure black, so GTAO is not the
+  (sole) cause. Buildings cast real sun shadows (CSM castShadow/receiveShadow, no
+  decal meshes). Leading hypotheses now: (a) the screen-space GTAO halo at the
+  wall↔ground DEPTH DISCONTINUITY multiplying an already sun-shadowed ground toward
+  black (hard band along the wall base), or (b) a first-cascade CSM shadow rendering
+  pure-black/hard on the WebGPU backend while far shadows stay soft grey. Isolation
+  (WebGPU-only, user): toggle SSAO off first — vanishes → (a), reduce GTAO radius/
+  raise floor or skip AO at depth edges; persists → (b), the shadow bias/intensity/
+  cascade on WebGPU. design.md unchanged
   (render-quality safeguard; no new CLAUDE §7.1 point). One atomic commit once fixed.
 
 - [ ] 112. Audio balance (user request): footsteps twice as loud, and ALL other
@@ -2246,6 +2259,20 @@ as-is; only the sequence changes.
   add a live check in enrichments.mjs mirroring the animal one (pin a tree on the
   player, assert a subsequent away-move increases clearance and never pins). design.md
   §11/§19 unchanged (already requires it). One atomic commit.
+
+- [x] 114. Journal read-aloud STILL stutters after point 108 (user re-report) —
+  a bit is spoken, then a long pause, then more. Point 108 pipelined the whole
+  worker queue, but on the q8/WASM path (point 100) Kokoro synthesis is SLOWER
+  THAN REALTIME, so any finite lookahead is eventually starved mid-entry and the
+  gap returns. FIX (src/journal/speech.ts): pre-synthesize the WHOLE entry before
+  playback (`Promise.all` over all segments, each `.catch(() => null)`), then play
+  the segments back-to-back — journal entries are short, so this costs only a
+  little initial latency and then guarantees gapless playback. `onSpeaking` still
+  fires when the first audio actually starts; a failed/cancelled segment resolves
+  to null and is skipped. Verifiable: voice.mjs stays green (narration produces
+  audio, the speaking state switches without a click, the rAF liveness gate holds
+  through the cold load — the worker synthesizes off the main thread). design.md
+  unchanged (CLAUDE §7.1 pt.19). One atomic commit.
 
 ## Closing (only after all points)
 

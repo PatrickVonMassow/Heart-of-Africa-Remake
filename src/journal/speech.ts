@@ -125,30 +125,30 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   if (ctx.state === 'suspended') await ctx.resume()
   if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')
 
-  // Fire EVERY segment's synthesis up front so the worker runs maximally ahead
-  // of playback and builds a growing buffer. A lockstep one-ahead lookahead was
-  // enough on the fast WebGPU path but not on the slower WASM path (point 100):
-  // there the next segment finished synthesizing only AFTER the current one
-  // stopped playing, so the narration stuttered — a bit, a long pause, a bit
-  // more. The worker processes the queued requests in order; playback consumes
-  // them in order, catching up during the longer segments. (One rejected
-  // request must not surface as an unhandled rejection on the ones we never
-  // await, e.g. after a cancel.)
-  const audios = segments.map((seg) => synthesize(seg.text, VOICE, seg.speed))
-  audios.forEach((p) => p.catch(() => {}))
-  let playing: Promise<void> = Promise.resolve()
+  // Synthesize the WHOLE entry BEFORE playback starts, then play the segments
+  // back-to-back. On the WASM path (point 100) synthesis is slower than realtime,
+  // so ANY one-ahead or finite lookahead is eventually starved mid-entry and the
+  // narration stutters — a bit, a long pause, a bit more (point 108 pipelined the
+  // queue but could not beat sub-realtime synthesis; point 114). Journal entries
+  // are short, so pre-buffering the whole entry costs only a little initial
+  // latency and then guarantees gapless playback. All requests are fired at once
+  // so the worker synthesizes them in parallel-queue order; a failed segment
+  // resolves to null and is skipped (and must not surface as an unhandled
+  // rejection, e.g. after a cancel).
+  const raws = await Promise.all(
+    segments.map((seg) => synthesize(seg.text, VOICE, seg.speed).catch(() => null)),
+  )
+  if (run.cancelled) return
   let started = false
   for (let i = 0; i < segments.length; i++) {
     if (run.cancelled) return
-    const raw = await audios[i]
-    await playing
-    if (run.cancelled) return
+    const raw = raws[i]
+    if (!raw) continue
     if (!started) {
       started = true
       onSpeaking?.()
     }
-    playing = playSegment(run, raw, segments[i])
+    await playSegment(run, raw, segments[i])
   }
-  await playing
   if (currentRun === run) currentRun = null
 }
