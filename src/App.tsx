@@ -29,7 +29,10 @@ export default function App() {
   // touches the GPU process, so the game keeps rendering (point 100).
   useEffect(() => {
     if (!speechAvailable(useLocale.getState().lang)) return
-    const t = setTimeout(() => warmupSpeech(), 3000)
+    // Small delay so it doesn't fight the first render, but early enough that the
+    // model is (nearly) loaded by the time the player triggers the first narration
+    // (point 117 tuning). The load runs in the worker, off the main thread.
+    const t = setTimeout(() => warmupSpeech(), 400)
     return () => clearTimeout(t)
   }, [])
   return (

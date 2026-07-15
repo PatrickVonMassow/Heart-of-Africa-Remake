@@ -167,8 +167,13 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
     const elapsed = (performance.now() - startedAt) / 1000
     const synthRate = elapsed > 0 ? bufferedAudio / elapsed : 1 // audio-seconds per wall-second
     const estTotal = (bufferedAudio / raws.length) * segments.length
-    const drain = Math.max(0, estTotal - bufferedAudio) * Math.max(0, 1 - Math.min(synthRate, 1))
-    if (bufferedAudio >= drain + 0.5) break // cushion covers the estimated drain (+0.5 s margin)
+    // PESSIMISTIC: assume synthesis can dip ~20 % below the measured average and
+    // keep at least a 15 % cushion, so a mid-entry rate drop does not starve
+    // playback (point 117 tuning: a 7 s mid-entry hang came from trusting the
+    // average). Costs a little more initial buffering on long entries.
+    const safeRate = Math.min(synthRate, 1) * 0.8
+    const drain = Math.max(0, estTotal - bufferedAudio) * Math.max(0.15, 1 - safeRate)
+    if (bufferedAudio >= drain + 1.0) break // cushion covers the estimated drain (+1 s margin)
   }
   if (run.cancelled) return
   let started = false
