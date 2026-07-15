@@ -3,6 +3,8 @@
 // special site (elephant graveyard). Positions are real (~1890 geography);
 // only the elephant graveyard is fictional and placed by educated guess.
 
+import { riverDistanceExact } from '../hydro'
+
 export interface MountainDef {
   /** Landmark id; display names come from the language files (i18n). */
   id: string
@@ -78,7 +80,39 @@ export interface CulturalLandmarkDef {
     | 'cliff-dwellings'
 }
 
-export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = [
+// The Meroë pyramid FIELD (render/landmarks.ts buildMeroePyramids) spreads
+// ~6.4 world units (0.64° at 10 units/°) from its mount and sits on the Nile's
+// east bank, so at its raw coordinate the westernmost tombs stand in the
+// rendered river band (user report). Shift the mount off the nearest river until
+// the WHOLE footprint clears the water: field radius + the river half-width
+// (terrain RIVER_WIDTH_DEG 0.17°) + a small margin. Deterministic (pure river
+// geometry), bounded; a site already clear returns unchanged after one query.
+// Only Meroë is river-side, but the shift is generic so any bank-side field is
+// nudged onto dry ground.
+const LANDMARK_FIELD_CLEARANCE_DEG = 0.9
+
+function clearedOfRiversBy(lat: number, lon: number, clearanceDeg: number): { lat: number; lon: number } {
+  let a = lat
+  let o = lon
+  for (let i = 0; i < 40; i++) {
+    const d = riverDistanceExact(a, o, 1)
+    if (d >= clearanceDeg) break
+    const e = 0.02
+    const gLat = riverDistanceExact(a + e, o, 1) - riverDistanceExact(a - e, o, 1)
+    const gLon = riverDistanceExact(a, o + e, 1) - riverDistanceExact(a, o - e, 1)
+    const gl = Math.hypot(gLat, gLon)
+    if (gl < 1e-6) {
+      o += e // dead centre of a channel: fixed eastward nudge, re-aim
+      continue
+    }
+    const step = Math.min(0.08, clearanceDeg - d + 0.01)
+    a += (gLat / gl) * step
+    o += (gLon / gl) * step
+  }
+  return { lat: a, lon: o }
+}
+
+const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   { id: 'meroe', lon: 33.75, lat: 16.94, kind: 'pyramids' },
   // Just west of Cairo across the Nile — via the travel-scene panorama the
   // field also stands on the port's first-person horizon (point 82).
@@ -93,6 +127,12 @@ export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = [
   { id: 'gondar', lon: 37.47, lat: 12.61, kind: 'castles' },
   { id: 'bandiagara', lon: -3.4, lat: 14.35, kind: 'cliff-dwellings' },
 ]
+
+// Meroë is shifted off the Nile so its whole pyramid field stands on the east
+// bank; every other field is already clear and returns unchanged.
+export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = CULTURAL_LANDMARK_DEFS.map((c) =>
+  c.id === 'meroe' ? { ...c, ...clearedOfRiversBy(c.lat, c.lon, LANDMARK_FIELD_CLEARANCE_DEG) } : c,
+)
 
 // Natural point-landmarks (design.md §4.4): real natural wonders sighted and
 // journaled like the other landmarks. Okavango is deliberately offset south

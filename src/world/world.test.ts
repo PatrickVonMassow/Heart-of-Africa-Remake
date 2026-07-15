@@ -76,6 +76,26 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     expect(giza.lon).toBeLessThan(cairo.lon) // west of the city
     expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(0.85) // still AT Cairo
   })
+
+  it('the Meroë pyramid field stands wholly on the Nile east bank, not in the river', () => {
+    const meroe = CULTURAL_LANDMARKS.find((c) => c.id === 'meroe')
+    expect(meroe).toBeDefined()
+    if (!meroe) return
+    const tm = sampleTerrain(meroe.lat, meroe.lon, SEED)
+    expect(tm.type).not.toBe('ocean')
+    expect(tm.type).not.toBe('water')
+    // The field GEOMETRY spreads ~0.64° from its mount (spot 4.5 + jitter + base)
+    // and the seeded yaw can rotate it any way — every point of the footprint's
+    // rim must clear the water band, not only the centre (point 110).
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2
+      const rim = riverDistance(meroe.lat + Math.sin(a) * 0.64, meroe.lon + Math.cos(a) * 0.64)
+      expect(rim, `rim direction ${k}`).toBeGreaterThanOrEqual(RIVER_WIDTH_DEG + 0.03 - 1e-9)
+    }
+    // Shifted east onto the desert bank, a bounded nudge off the real anchor.
+    expect(meroe.lon).toBeGreaterThan(33.75) // east of the raw Nile-side anchor
+    expect(Math.hypot(meroe.lat - 16.94, meroe.lon - 33.75)).toBeLessThan(1.4)
+  })
 })
 
 describe('villages keep clearance from rivers (design.md §4.2)', () => {

@@ -2174,7 +2174,7 @@ as-is; only the sequence changes.
   MapOverlay.test.tsx stays green (dot/ring present, transform pinned). design.md
   unchanged (CLAUDE §7.1 pt.3/pt.9 map marker).
 
-- [ ] 110. The Meroë pyramids partially stand in the water (user report). The site
+- [x] 110. The Meroë pyramids partially stand in the water (user report). The site
   (src/world/data/landmarks.ts `meroe` lon 33.75 / lat 16.94, kind `pyramids`) sits
   right on the Nile's east bank; the cluster (src/render/landmarks.ts
   `buildMeroePyramids`, spots spread x −2.55…+4.5, z −2.7…+1.5, plus ±0.3 jitter and
@@ -2197,6 +2197,14 @@ as-is; only the sequence changes.
   land. DOCS: both design.md §4.4 (note the built landmarks keep the §4.2 river
   clearance) and CLAUDE §7.1 pt.25/pt.3 verifiable if the clearance is added there.
   One atomic commit.
+  DONE: added a generic `clearedOfRiversBy(lat, lon, clearanceDeg)` in
+  data/landmarks.ts (imports `riverDistanceExact`, gradient-climbs off the nearest
+  river, eastward flat-gradient fallback) and shift only Meroë at the export by
+  `LANDMARK_FIELD_CLEARANCE_DEG` 0.9 (footprint 0.64° + band 0.17° + margin). Meroë
+  lands at 33.939°E / 16.700°N (~0.30° / 33 km SE of the raw anchor, still Nubian
+  desert). world.test.ts probes the 0.64° footprint rim in 12 directions clearing
+  the band (mirrors the Giza test) + on-land + bounded shift; a bird's-eye
+  screenshot confirms the field on dry sand clear of the Nile. Vitest 1494.
 
 - [ ] 111. The flat BLACK ground blob in the first-person settlement is STILL present
   on real WebGPU hardware — point 106's AO floor (`max(0.4, ao.r)` in Effects.tsx) did
@@ -2273,6 +2281,24 @@ as-is; only the sequence changes.
   audio, the speaking state switches without a click, the rAF liveness gate holds
   through the cold load — the worker synthesizes off the main thread). design.md
   unchanged (CLAUDE §7.1 pt.19). One atomic commit.
+
+- [ ] 115. The opened map should keep the SAME bottom gap to the bottom-row
+  buttons as the journal does (user request). Currently `.journal` sits at
+  `bottom: 56px` (src/index.css) while `.map-overlay` sits at `bottom: 88px` —
+  the map was lifted higher to clear the WRAPPING inventory bar (bottom-left,
+  where the map is), whereas the journal (bottom-right) only clears the
+  camp/map/journal button row. FIX: bring the map's bottom gap in line with the
+  journal's (target `bottom: 56px`), BUT the enrichments point-89 check asserts the
+  map overlaps neither the inventory bar nor the bottom-right buttons — so verify
+  at 56px the plate still clears the wrapping inventory bar; if it would overlap,
+  reconcile (e.g. match the journal's gap while keeping just enough clearance, or
+  confirm the inventory bar no longer reaches that high). ANCHOR: src/index.css
+  `.map-overlay { bottom: … }` vs `.journal { bottom: 56px }`. TESTS: the existing
+  enrichments.mjs point-89 non-overlap check (`overlapInv`/`overlapJournalBtn`
+  false) must stay green at the new offset; add an assertion that the map's bottom
+  gap equals the journal's within a small tolerance if both are open-comparable.
+  design.md §17.4 (map/journal placement) — update the note if the offset rule
+  changes. One atomic commit.
 
 ## Closing (only after all points)
 
