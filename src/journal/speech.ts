@@ -125,24 +125,32 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   if (ctx.state === 'suspended') await ctx.resume()
   if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')
 
-  // Synthesize the WHOLE entry BEFORE playback starts, then play the segments
-  // back-to-back. On the WASM path (point 100) synthesis is slower than realtime,
-  // so ANY one-ahead or finite lookahead is eventually starved mid-entry and the
-  // narration stutters — a bit, a long pause, a bit more (point 108 pipelined the
-  // queue but could not beat sub-realtime synthesis; point 114). Journal entries
-  // are short, so pre-buffering the whole entry costs only a little initial
-  // latency and then guarantees gapless playback. All requests are fired at once
-  // so the worker synthesizes them in parallel-queue order; a failed segment
-  // resolves to null and is skipped (and must not surface as an unhandled
+  // Fire EVERY segment's synthesis up front so the worker runs ahead of playback
+  // (a failed request resolves to null and must not surface as an unhandled
   // rejection, e.g. after a cancel).
-  const raws = await Promise.all(
-    segments.map((seg) => synthesize(seg.text, VOICE, seg.speed).catch(() => null)),
-  )
+  const audios = segments.map((seg) => synthesize(seg.text, VOICE, seg.speed).catch(() => null))
+  // Buffer a LEAD of audio before starting, then play while the rest synthesizes.
+  // On the WASM path (point 100) synthesis is slower than realtime, so a one-ahead
+  // lookahead starves mid-entry and the narration stutters (points 108/114); but
+  // pre-buffering the WHOLE entry left the start entry silent through the model
+  // cold-load PLUS every segment's synthesis (point 116). A few seconds of lead
+  // cushions the sub-realtime synthesis so playback rarely starves, while the
+  // first sound comes after only the cold load and the first ~LEAD seconds.
+  const LEAD_SECONDS = 4
+  const raws: (RawAudioLike | null)[] = []
+  let lead = 0
+  while (raws.length < segments.length && lead < LEAD_SECONDS) {
+    if (run.cancelled) return
+    const raw = await audios[raws.length]
+    raws.push(raw)
+    if (raw) lead += raw.audio.length / raw.sampling_rate
+  }
   if (run.cancelled) return
   let started = false
   for (let i = 0; i < segments.length; i++) {
     if (run.cancelled) return
-    const raw = raws[i]
+    const raw = i < raws.length ? raws[i] : await audios[i]
+    if (run.cancelled) return
     if (!raw) continue
     if (!started) {
       started = true

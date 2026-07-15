@@ -2268,7 +2268,7 @@ as-is; only the sequence changes.
   hardware (blob gone with Flat ground OFF). design.md unchanged
   (render-quality safeguard; no new CLAUDE §7.1 point).
 
-- [ ] 116. At game start it takes very long before the FIRST read-aloud (user report;
+- [x] 116. At game start it takes very long before the FIRST read-aloud (user report;
   a consequence of point 114). 114 pre-synthesizes the WHOLE journal entry before
   playback to guarantee gapless audio on the sub-realtime WASM path, but that means the
   start entry waits for the model cold-load PLUS every segment's synthesis before the
@@ -2280,6 +2280,11 @@ as-is; only the sequence changes.
   a failed/cancelled segment resolves to null and is skipped. Verifiable: voice.mjs
   stays green (narration produces audio, speaking state without a click, rAF liveness
   through the cold load). design.md unchanged (CLAUDE §7.1 pt.19). One atomic commit.
+  DONE: speech.ts now fires all syntheses up front, buffers a ~4 s LEAD (or all if
+  the entry is shorter), starts playback, and awaits the remaining segments as it
+  reaches them. Fast first sound, and the lead cushions the sub-realtime synthesis
+  against stutter. voice.mjs green (speaking state, auto-narration without a click,
+  rAF liveness max 17 ms through the cold load, 0 console errors); journal Vitest green.
 
 - [x] 112. Audio balance (user request): footsteps twice as loud, and ALL other
   ambient sounds half as loud — including the "ding-dong" (the interaction/enter
