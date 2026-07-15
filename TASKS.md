@@ -2653,18 +2653,25 @@ as-is; only the sequence changes.
   (c) Vultures: while the parent stands vigil, no vulture may LAND on that
       carcass (the flock keeps circling, the ground scavenger does not commit) —
       gate the landing on a live vigil-keeper within a small radius.
-  (d) The death — RESOLVED (user question, 15.07.2026): "does it just let itself
-      be eaten?" No. My first cut had the vigil-keeper simply not fleeing, which
-      is kitsch, not behaviour: real ungulates stand over a dead calf and drive
-      vultures off, but they DO run from a charging lion. Instead the parent
-      **flees, only too late** — grief makes it careless, not suicidal: while a
-      vigil is active its flee reaction distance is cut to a calibratable
-      fraction of the normal one (it is not watching its back). It is therefore
-      caught OFTEN but not always. Reuse the existing hunt for the kill — a
-      predator that reaches it takes it (dead, stain, `lionFed`) — never a
-      second kill path. This shares one principle with point 125 (the sacrifice
-      may succeed) rather than being a second special case: **grief makes an
-      animal careless, and carelessness is sometimes survivable.**
+  (d) The death — DECIDED BY THE USER (15.07.2026), and the decision is
+      deliberate, not an oversight: **the vigil-keeper stands and is eaten. No
+      flight attempt at all.** The user asked whether it just lets itself be
+      taken; I argued against it as unnaturalistic (real ungulates do run from a
+      charging lion) and proposed a "flees, only too late" reaction-distance
+      cut. **The user considered it and chose the standing version anyway. Do
+      not re-litigate this, and do not "fix" it into a flee-with-penalty later.**
+      The reasons it is right for THIS game: §19.8's existing register is already
+      exactly this — the waterfall plunge and the trample-throw (point 119) both
+      have a parent follow its calf into death with no survival logic whatever.
+      A vigil-keeper that bolts would be the odd one out, not the realistic one.
+      Grief unto death is the established emotional grammar here.
+      So: while a vigil is active the parent does not flee — it holds at the
+      carcass (`familyHeld = true`, which already suppresses both the lion flee
+      and the elephant dodge, cf. point 119's pose branch). A predator that
+      reaches it takes it via the EXISTING hunt kill (dead, stain, `lionFed`) —
+      never a second kill path. The (e) resolve guard still applies: if no
+      predator ever comes, the vigil ends on its timer and the parent rejoins the
+      herd, so this is a chosen death, not a stuck animal.
   (e) RESOLVE ALWAYS (the point-118 lesson): the vigil ends when the carcass is
       gone/dissolved or `VIGIL_SECONDS` runs out, and the parent rejoins the
       herd. Never a drive with no exit.
