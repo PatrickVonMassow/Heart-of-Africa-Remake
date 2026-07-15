@@ -2574,6 +2574,230 @@ as-is; only the sequence changes.
   SIZE: this is large — split into several atomic commits along (a)…(e) rather
   than one, each with its own tests/docs. (Reported 15.07.2026.)
 
+- [ ] 121. Family drama: the vigil at the calf's carcass. The parent that did
+  not reach the predator in time today simply resumes grazing beside its eaten
+  calf. Wanted (user, 15.07.2026): it stays at the carcass, drives the vultures
+  off, and — left alone by its herd — is taken there by a later predator: both
+  a sacrifice and a death of grief, at the spot where its young fell.
+  ANCHORS (`src/scenes/travel/Wildlife.tsx`): the predation resolution loop
+  (~935) already kills a too-late parent (`PARENT_TOO_LATE_DIST`); the parent
+  that stayed clear keeps a dead `a.child` and falls back to normal behaviour —
+  that is the gap. `LION_STATE.mode` runs `chase`→`feed`→`leave`; the kill flock
+  and the ground `scavenger` (~1390+) work the carcass; `dissolve`/`gone` retire
+  it. Mirror the `trampleTo`/`grief` feature (point 119) at each of its
+  integration points (type field, pre-pass, `inDrama` list, steering skip, pose
+  branch with `familyHeld = true`).
+  (a) State: `vigil?: { x: number; z: number }` + reuse a countdown like `grief`
+      (`VIGIL_SECONDS`, start 45, calibratable next to `TRAMPLE_GRIEF_SECONDS`).
+      Set it in the resolution loop when a calf dies by predation and its parent
+      is alive and did NOT charge (i.e. outside `PARENT_TOO_LATE_DIST`).
+  (b) Behaviour: the parent walks to the carcass and holds there facing it
+      (`familyHeld = true`, so it does not flee the lion or dodge elephants).
+  (c) Vultures: while the parent stands vigil, no vulture may LAND on that
+      carcass (the flock keeps circling, the ground scavenger does not commit) —
+      gate the landing on a live vigil-keeper within a small radius.
+  (d) The death: the vigil-keeper does not flee an approaching predator. Reuse
+      the existing hunt: a predator that reaches it takes it (dead, stain,
+      `lionFed`) — it must not be an extra kill path of its own.
+  (e) RESOLVE ALWAYS (the point-118 lesson): the vigil ends when the carcass is
+      gone/dissolved or `VIGIL_SECONDS` runs out, and the parent rejoins the
+      herd. Never a drive with no exit.
+  TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`) for any extracted
+  helper (e.g. the vigil-blocks-landing predicate); live
+  (`scripts/verify/enrichments.mjs`): after a calf is eaten with the parent held
+  clear, the parent CLOSES on the carcass and holds there, no vulture lands
+  while it stands, a predator pinned on it kills it there, and the vigil clears
+  once the carcass is gone (no stuck keeper). DOCS: design.md §19.8, CLAUDE.md
+  §7.1 pt. 12. One atomic commit. (Reported 15.07.2026.)
+
+- [ ] 122. Family drama: the swollen river of the rains, and drowning.
+  DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the wet
+  season the current turns the existing calf-in-water accident deadly — and,
+  explicitly added by the user, ANIMALS DROWN when a current carries them too
+  long. Today nobody drowns: `STRUGGLE_SELF_RESCUE` (25 s) always lets an unaided
+  calf clamber out, and only a waterfall kills (`FALLS_DEATH_RADIUS_DEG`).
+  SCOPE GUARD: do NOT add herd river-crossings. design.md §19.5/§19.7 rule that
+  no animal STANDS in river or lake water (drinkers reach the bank, bathers wade
+  one step); a fording herd would break that invariant and its tests. The season
+  modulates the EXISTING accidental entry (a gambol-bout at the bank, ~line 1013
+  loop), it does not create a new way in.
+  ANCHORS (`src/scenes/travel/Wildlife.tsx`): the water drama loop (~1013),
+  `CALF_DRIFT_DEG` (0.06), `STRUGGLE_SELF_RESCUE` (25), `WADE_SPEED`,
+  `RESCUE_REACH`, `RETURN_SPEED`, `inWater`, `rescued`, `plungeTo`; `riverFlow`
+  for the current.
+  (a) Season coupling: a wet-season factor on the drift (and on the falls' pull),
+      central and debug-editable in `src/config/balance.ts` per point 120.
+  (b) DROWNING (the user's addition): an animal carried by the current for longer
+      than `DROWN_SECONDS` (start 30, calibratable) dies — drowned, `lionFed`
+      (the river takes it; no scavenger lands on open water, as the waterfall
+      victims already do). This holds for ANY animal, not only calves: a parent
+      that waded in and cannot get out drowns too.
+      Reconcile with `STRUGGLE_SELF_RESCUE`: the self-rescue is what a CALM water
+      allows; in a strong current it must not fire, otherwise nothing ever
+      drowns. Gate the self-rescue on the local `riverFlow` strength — weak flow
+      clambers out (today's behaviour, unchanged), strong flow drowns.
+  (c) Consequence for the family: with the flood drift high the parent's rescue
+      genuinely fails sometimes — the calf is carried past its reach and drowns,
+      and a parent that stays in too long drowns beside it.
+  TESTS: pure — the drown/self-rescue decision as a helper over (flow strength,
+  seconds in water) in `src/scenes/travel/wildlifeBehavior.test.ts`: calm water
+  self-rescues and never drowns, strong current drowns at the threshold, and the
+  boundary is exact. Live (`scripts/verify/enrichments.mjs`): with a forced wet
+  season a calf in a strong current drowns (dead, not rescued), and in the dry
+  season the SAME setup still clambers out (the existing check must stay green).
+  DOCS: design.md §19.8 (the self-rescue sentence changes — say plainly that a
+  long-swept animal drowns) and CLAUDE.md §7.1 pt. 12/21. One atomic commit.
+  (Reported 15.07.2026.)
+
+- [ ] 123. Family drama: the drying waterhole of the dry season.
+  DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the dry
+  season a calf gets mired in the mud of a shrinking waterhole; the parent will
+  not leave its side while the herd moves on, and the predators that gather at
+  the last water take it there. Documented real dry-season behaviour.
+  ANCHORS: the lake surfaces and their beds (§11.3, the water/lake sampling used
+  by the water drama loop ~1013); the water-edge rules
+  (`src/scenes/travel/waterEdgeRules.ts`) that keep animals to the bank; the
+  hunt (`LION_STATE`); the family pose/`familyHeld` chain (~1550).
+  (a) A `mired?: number` state on a calf at a lake bank in the dry season (a
+      rare per-bout roll, balance-valued): it is stuck — it struggles in place,
+      does not drift (unlike the river), and cannot free itself.
+  (b) The parent stands beside it (`familyHeld = true`) instead of following the
+      herd; it does not flee an approaching predator.
+  (c) Predators concentrate at the remaining water in the dry season (a spawn/
+      target bias, balance-valued) so the pair is genuinely found.
+  (d) Outcome: the predator takes the calf and then the parent (reuse the
+      existing kill paths, no new one) — or, if none comes, the mire releases
+      after `MIRE_SECONDS` and both rejoin (RESOLVE ALWAYS, point-118 lesson).
+  (e) The mired calf must not violate the standing-in-water rule's TESTS: it is
+      a §19.8 water drama like the struggle, so add it to the same exemption the
+      dramas already hold.
+  TESTS: pure for the mire roll/release decision; live: with a forced dry season
+  a mired calf holds position, its parent stands beside it and does not flee a
+  pinned predator, both are killed there, and without a predator the mire
+  releases. DOCS: design.md §19.8, CLAUDE.md §7.1 pt. 12. One atomic commit.
+  (Reported 15.07.2026.)
+
+- [ ] 124. Family drama: the giraffe mother's kick.
+  Wanted (user, 15.07.2026): the iconic image — a giraffe cow driving a lion off
+  her calf with her kicks. Today giraffes are not prey at all: `PreyKind` (~212)
+  is zebra/wildebeest/antelope/warthog, so no hunt ever touches a giraffe.
+  ANCHORS (`src/scenes/travel/Wildlife.tsx`): `PreyKind` (~212), `PREY_SCALE`
+  (~214), `PREDATOR_PREY` (~230), `REGION_PREY` (~239), `CALF_HUNT_SPECIES`
+  (~339); the shield/charge resolution (~935-1003); `src/render/fauna.ts` for
+  the giraffe build (the calf baby-schema already exists).
+  (a) Make the giraffe huntable by the LION ONLY (realistic: cheetah/leopard/
+      hyena do not take giraffe) — add it to `PREDATOR_PREY.lion`, `PreyKind`,
+      `PREY_SCALE` and the region pools where giraffes live, and to
+      `CALF_HUNT_SPECIES` so the calf dramas apply.
+  (b) The kick: a giraffe parent that reaches the hunter does NOT die by default
+      — it drives the hunt off (abort the chase, the lion leaves). Render it as
+      a visible kick (a brief hind-leg strike pose), not a silent stop.
+  (c) Keep the danger real: the kick succeeds by a balance-valued chance
+      (start high for the giraffe, e.g. 0.75); a failed kick falls back to the
+      existing sacrifice (the parent is taken). Coordinate this with point 125 —
+      125 owns the general chance mechanic, 124 only gives the giraffe its own
+      high value and its kick pose. If 125 lands first, reuse its helper.
+  (d) Check the existing invariants still hold with a new prey species: region
+      pools (every hunted species fits the region), body separation, streaming.
+  TESTS: pure (`src/scenes/travel/fauna.test.ts` / `wildlifeBehavior.test.ts`):
+  the giraffe is lion-only prey and appears in no other predator's web; the kick
+  chance maps deterministically. Live: a lion hunt on a giraffe calf ends with
+  the mother driving the lion off and the calf alive. DOCS: design.md §19.8 (and
+  §19.3's food web), CLAUDE.md §7.1 pt. 12. One atomic commit.
+  (Reported 15.07.2026.)
+
+- [ ] 125. The sacrifice may succeed (variance instead of a script).
+  Wanted (user, 15.07.2026): today a parent that reaches the predator ALWAYS
+  dies — the shield take (~994), the charge sacrifice (~967) and the too-late
+  death (~950) are deterministic. Give the drama variance: sometimes the parent
+  drives the predator off and both live.
+  ANCHORS (`src/scenes/travel/Wildlife.tsx`): the three resolution branches at
+  ~935-1003; `LION_STATE` (an abort path already exists — a strayed chase
+  aborts, cf. the streaming checks).
+  (a) One shared, pure helper deciding the outcome of "parent reaches predator":
+      taken (today's behaviour) vs. drives it off. Per-species chance as a
+      balance value (debug-editable), defaulting LOW for the small grazers so
+      the existing drama stays the norm (e.g. 0.2) — the giraffe's high value
+      lives in point 124.
+  (b) On success: abort the hunt (the predator gives up and leaves, reusing the
+      existing leave/abort path — no new predator state), the calf keeps its
+      parent, both rejoin the herd. No stain, no carcass.
+  (c) The parent's charge must still LOOK committed either way — the outcome
+      resolves at contact, not by the parent hesitating.
+  (d) Determinism for the tests: derive the roll from existing per-animal state
+      (e.g. its `phase`), not `Math.random()`, so a seeded run is reproducible.
+  TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`): the outcome helper
+  maps deterministically, the default chance keeps the sacrifice the common case,
+  chance 0 always dies (the existing scripted checks must stay green) and chance
+  1 always survives. Live: with the chance forced to 1 a reached predator leaves
+  and both animals live; forced to 0 the existing sacrifice checks still pass.
+  DOCS: design.md §19.8, CLAUDE.md §7.1 pt. 12. One atomic commit.
+  (Reported 15.07.2026.)
+
+- [ ] 126. Elephant mourning at the graveyard.
+  Wanted (user, 15.07.2026): elephants keep vigil over their dead and touch their
+  bones — and §4.4's elephant graveyard already stands there with its carcasses,
+  tusks and bones. An elephant herd that comes to rest and mourn there would be
+  the strongest family scene in the game. NOTE (stated to the user): this is a
+  VIGIL, not a sacrifice — elephants mourn, they do not die of it. Kept as its
+  own point for exactly that reason.
+  ANCHORS: the graveyard dressing and its dev hook (the carcass/tusk/bone counts
+  asserted in `scripts/verify/enrichments.mjs`, CLAUDE §7.1 pt. 12); the elephant
+  roam/cohesion in `src/scenes/travel/Wildlife.tsx` (~1350-1390,
+  `ELEPHANT_SPEED`, `ELEPHANT_COHESION`, `ELEPHANT_TURN`); the family pose chain
+  (~1550, `familyHeld`).
+  (a) An elephant herd within a radius of the graveyard walks to the bones and
+      holds there: heads lowered to a bone (a touch pose, reusing the pitch the
+      feed/nurse poses already use), moving on only after `MOURN_SECONDS`
+      (calibratable). The gentle-arc turn cap must keep holding — no snapping.
+  (b) Extend it to their own dead once other points can kill an elephant (122's
+      drowning, 123's mire): a herd stands vigil over a dead herd-mate the same
+      way. Guard: an elephant CANNOT be trampled (the trample skips its own
+      species), so do not build a death path for it here.
+  (c) RESOLVE ALWAYS (point-118 lesson): the vigil ends after `MOURN_SECONDS` or
+      when the herd streams out; never a herd pinned at the bones forever.
+  TESTS: pure for the "should this herd mourn here" predicate (in range, not
+  already mourned, timer). Live (`scripts/verify/enrichments.mjs`): an elephant
+  herd placed near the graveyard closes on the bones, holds there with lowered
+  heads, and moves on after the window — with a screenshot. DOCS: design.md §19.8
+  (+ a pointer from §4.4), CLAUDE.md §7.1 pt. 12. One atomic commit.
+  (Reported 15.07.2026.)
+
+- [ ] 127. A parent runs faster when it rushes to its calf's rescue.
+  Wanted (user, 15.07.2026): a parent hurrying to save its young can run faster
+  than it otherwise does — the adrenaline burst. Partly there but unowned and
+  inconsistent: the rescue drives already use their own speeds
+  (`PARENT_CHARGE_SPEED` 6.5, `PARENT_BLOCK_SPEED` 6, `GUARD_SPEED` 5.5,
+  `WADE_SPEED` 4.2, all in `src/scenes/travel/Wildlife.tsx` ~305-351) — hand-set
+  numbers with no single rule, and the wade (4.2) is barely a hurry at all.
+  (a) Introduce ONE calibratable rescue burst — a factor over the parent's
+      ordinary movement speed — in `src/config/balance.ts` per CLAUDE §2, and
+      derive the rescue speeds from it instead of leaving four loose constants.
+      The burst must read as a burst: clearly faster than the same animal's
+      normal roaming/grazing, and it applies ONLY while a rescue drive is
+      active (charge, shield, guard, wade to a struggling calf).
+  (b) It is a RESCUE burst, not grief: point 119's `trampleTo` charge and
+      point 121's vigil walk are not rescues (nobody can be saved) — leave them
+      on their own speeds and say so in a comment, so a later reader does not
+      "unify" them by mistake.
+  (c) Debug-editable at runtime per CLAUDE §2/§21.
+  (d) BALANCE GUARD: the burst must not silently delete the existing drama. The
+      too-late death (`PARENT_TOO_LATE_DIST`, ~950) and the "parent held out of
+      shielding reach" cases must stay REACHABLE — a parent fast enough to
+      always arrive would erase both. Re-check those live checks and, if the
+      burst makes them unreachable at their forced distances, re-calibrate the
+      burst rather than weakening the checks.
+  TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`) — the shield
+  mini-simulation there hardcodes `PARENT_BLOCK_SPEED` 6 and
+  `HUNT_LION_SPEED` 5.6 and MUST be updated to the derived speed; assert the
+  burst exceeds the ordinary speed and that the hunter still reaches the shield
+  before the calf. Live (`scripts/verify/enrichments.mjs`): the whole existing
+  calf-drama battery stays green (sacrifice, too-late, held-out-of-reach, water
+  rescue), and a rescuing parent's measured speed exceeds its own roaming speed.
+  DOCS: design.md §19.8 (name the burst as part of the family drama) and
+  CLAUDE.md §7.1 pt. 12/20 (the tunable). One atomic commit.
+  (Reported 15.07.2026.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
