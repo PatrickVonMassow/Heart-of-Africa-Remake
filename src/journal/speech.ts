@@ -2,12 +2,17 @@
 // Kokoro TTS model (kokoro-js), fetched from the Hugging Face CDN on first use
 // and cached by the browser. The model runs in a Web Worker (ttsWorker.ts) so
 // synthesis never blocks the game loop — the main thread only posts text and
-// plays back the returned PCM through the AudioContext. The engine always runs
-// the quantized WASM path (q8, point 100): the onnxruntime WebGPU init
-// saturated the GPU process during the cold load and froze the rendered game
-// ~15 s. Kokoro currently has no German voice, so read-aloud is offered for
-// English only — German texts carry the same voice markup so a German-capable
-// engine can be added later.
+// plays back the returned PCM through the AudioContext. The device is decided
+// here on the main thread: the onnxruntime WebGPU compute path (separate from
+// the three.js renderer's WebGPU) synthesizes faster than realtime for a fast,
+// gapless read-aloud but is only reliable on Chromium, so it is gated to
+// Chromium; every other browser (and the headless verification) uses the
+// universally-working WASM path. The model is pre-warmed at game start
+// (warmupSpeech) so the WebGPU cold load's one-time GPU stall happens up front
+// (user decision, point 117, reversing point 100's WASM-only switch). Kokoro
+// currently has no German voice, so read-aloud is offered for English only —
+// German texts carry the same voice markup so a German-capable engine can be
+// added later.
 // OPEN: German read-aloud once a German-capable TTS voice is available.
 
 import type { SpeechSegment } from './voiceMarkup'
@@ -17,6 +22,22 @@ const SPEECH_LANGS = ['en']
 
 export function speechAvailable(lang: string): boolean {
   return SPEECH_LANGS.includes(lang)
+}
+
+/**
+ * Decide the synthesis device (main thread): the onnxruntime WebGPU backend is
+ * only reliable on Chromium (`navigator.userAgentData` is Chromium-only) and
+ * needs `navigator.gpu`; every other browser uses WASM. The headless
+ * verification forces WASM via a dev hook (it has no WebGPU adapter and must
+ * keep rendering through the cold load).
+ */
+function preferWebgpu(): boolean {
+  const forceWasm =
+    import.meta.env.DEV &&
+    typeof window !== 'undefined' &&
+    Boolean((window as unknown as Record<string, unknown>).__ttsForceWasm)
+  const chromium = typeof navigator !== 'undefined' && 'userAgentData' in navigator
+  return !forceWasm && chromium && 'gpu' in navigator
 }
 
 // British male voice — fits the Victorian explorer reading his own diary.
@@ -65,7 +86,7 @@ function getWorker(): Worker {
  */
 export function warmupSpeech(): void {
   try {
-    getWorker().postMessage({ warmup: true })
+    getWorker().postMessage({ warmup: true, preferWebgpu: preferWebgpu() })
   } catch {
     // No worker support (e.g. SSR): read-aloud is simply unavailable.
   }
@@ -76,7 +97,7 @@ function synthesize(text: string, voice: string, speed: number): Promise<RawAudi
   const id = ++reqId
   return new Promise<RawAudioLike>((resolve, reject) => {
     pending.set(id, { resolve, reject })
-    getWorker().postMessage({ id, text, voice, speed })
+    getWorker().postMessage({ id, text, voice, speed, preferWebgpu: preferWebgpu() })
   })
 }
 
@@ -141,45 +162,18 @@ export async function speakSegments(segments: SpeechSegment[], onSpeaking?: () =
   if (ctx.state === 'suspended') await ctx.resume()
   if ((ctx.state as string) !== 'running') throw new Error('audio context suspended')
 
-  // Fire EVERY segment's synthesis up front so the worker runs ahead of playback
-  // (a failed request resolves to null and must not surface as an unhandled
-  // rejection, e.g. after a cancel).
+  // Fire EVERY segment's synthesis up front so the worker runs ahead of playback,
+  // then play each in order as soon as it is ready. The WebGPU path synthesizes
+  // faster than realtime, so the next segment is ready before the current one
+  // finishes → a fast start and gapless delivery with no buffering tricks (point
+  // 117; the WASM fallback may gap between segments, which is acceptable for the
+  // non-Chromium path). A failed request resolves to null and is skipped (and must
+  // not surface as an unhandled rejection, e.g. after a cancel).
   const audios = segments.map((seg) => synthesize(seg.text, VOICE, seg.speed).catch(() => null))
-  // Buffer an ADAPTIVE lead before playback, then play while the rest synthesizes.
-  // On the WASM path (point 100) synthesis is slower than realtime, so a one-ahead
-  // lookahead starves mid-entry and stutters (points 108/114), yet pre-buffering
-  // the WHOLE entry left the start silent through the model cold-load plus every
-  // segment (point 116). Instead, measure the LIVE synthesis rate and estimate the
-  // entry length from the buffered segments, and start once the buffer covers the
-  // drain — `bufferedAudio ≥ remainingAudio × (1 − synthRate)` — so a short/fast
-  // entry starts almost at once while a long/slow one gets just enough cushion to
-  // play gapless (point 117; the model is pre-warmed via warmupSpeech so this rate
-  // reflects synthesis, not the cold load).
-  const startedAt = performance.now()
-  const raws: (RawAudioLike | null)[] = []
-  let bufferedAudio = 0
-  while (raws.length < segments.length) {
-    if (run.cancelled) return
-    const raw = await audios[raws.length]
-    raws.push(raw)
-    if (raw) bufferedAudio += raw.audio.length / raw.sampling_rate
-    if (raws.length >= segments.length || bufferedAudio <= 0) continue
-    const elapsed = (performance.now() - startedAt) / 1000
-    const synthRate = elapsed > 0 ? bufferedAudio / elapsed : 1 // audio-seconds per wall-second
-    const estTotal = (bufferedAudio / raws.length) * segments.length
-    // PESSIMISTIC: assume synthesis can dip ~20 % below the measured average and
-    // keep at least a 15 % cushion, so a mid-entry rate drop does not starve
-    // playback (point 117 tuning: a 7 s mid-entry hang came from trusting the
-    // average). Costs a little more initial buffering on long entries.
-    const safeRate = Math.min(synthRate, 1) * 0.8
-    const drain = Math.max(0, estTotal - bufferedAudio) * Math.max(0.15, 1 - safeRate)
-    if (bufferedAudio >= drain + 1.0) break // cushion covers the estimated drain (+1 s margin)
-  }
-  if (run.cancelled) return
   let started = false
   for (let i = 0; i < segments.length; i++) {
     if (run.cancelled) return
-    const raw = i < raws.length ? raws[i] : await audios[i]
+    const raw = await audios[i]
     if (run.cancelled) return
     if (!raw) continue
     if (!started) {

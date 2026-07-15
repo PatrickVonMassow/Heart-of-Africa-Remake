@@ -2401,6 +2401,21 @@ as-is; only the sequence changes.
   start-speed/no-stutter balance is a USER check on hardware (headless replays the
   cached weights, so it cannot measure real synth latency). design.md unchanged
   (CLAUDE §7.1 pt.19). One atomic commit.
+  FINAL RESOLUTION (15.07. ~17:15): the WASM tuning (warmup + adaptive/pessimistic
+  buffer) still left a slow start (14 s) and a mid-entry hang — the fundamental
+  limit is that WASM synthesis is sub-realtime, and no buffer wins both fast-start
+  and gapless for long entries. The "much better" the user recalled was the
+  pre-point-100 WebGPU voice (faster than realtime). Presented the trade-off and
+  the user chose to RESTORE WebGPU (accepting the one-time cold-load stall). So this
+  point ends by REVERSING point 100: ttsWorker loads WebGPU/fp32 on Chromium with a
+  WASM/q8 fallback (main-thread `preferWebgpu` decision restored); speech.ts drops
+  the buffering tricks for a plain "fire all, play as ready" pipeline (WebGPU is
+  fast enough); the ~1.2 s-after-mount warmup now FRONT-LOADS the WebGPU cold-load
+  stall to game start; CLAUDE §3 rewritten to document the WebGPU-primary decision
+  and the reversal. Headless forces WASM via `window.__ttsForceWasm` (voice.mjs +
+  handwriting.mjs addInitScript); voice 6/6 and handwriting 11/11 green, journal
+  Vitest 10/10, build/lint clean. The WebGPU voice quality/speed is a USER check on
+  Chromium hardware (headless has no WebGPU adapter).
 
 ## Closing (only after all points)
 

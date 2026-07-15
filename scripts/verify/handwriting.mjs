@@ -27,6 +27,12 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => errors.push(String(e)))
 
+// Force the WASM TTS path headless (no WebGPU adapter; keeps rendering through
+// the cold load) — point 117.
+await page.addInitScript(() => {
+  window.__ttsForceWasm = true
+})
+
 await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()

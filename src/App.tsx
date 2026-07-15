@@ -23,16 +23,14 @@ export default function App() {
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
   // Pre-warm the read-aloud model shortly after mount (point 117) so the first
-  // narration only synthesizes rather than cold-loading the model. Deferred so it
-  // does not compete with the initial scene/asset load, and only when the current
-  // language actually has a voice (English). Loading on the WASM path never
-  // touches the GPU process, so the game keeps rendering (point 100).
+  // narration only synthesizes rather than cold-loading the model, and so the
+  // WebGPU cold-load's one-time ~15 s GPU stall (user-accepted, reversing point
+  // 100) happens up front at game start rather than at the first narration.
+  // Deferred a moment so the scene is visible first, and only when the current
+  // language actually has a voice (English).
   useEffect(() => {
     if (!speechAvailable(useLocale.getState().lang)) return
-    // Small delay so it doesn't fight the first render, but early enough that the
-    // model is (nearly) loaded by the time the player triggers the first narration
-    // (point 117 tuning). The load runs in the worker, off the main thread.
-    const t = setTimeout(() => warmupSpeech(), 400)
+    const t = setTimeout(() => warmupSpeech(), 1200)
     return () => clearTimeout(t)
   }, [])
   return (

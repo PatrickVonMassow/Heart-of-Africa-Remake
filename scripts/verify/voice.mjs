@@ -32,6 +32,13 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => errors.push(String(e)))
 
+// Force the WASM TTS path: headless Chromium has no WebGPU adapter, and WASM
+// keeps the game rendering through the cold load (the liveness gate below). The
+// hook is read on the main thread in speech.ts (point 117).
+await page.addInitScript(() => {
+  window.__ttsForceWasm = true
+})
+
 await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()

@@ -78,15 +78,22 @@ WebGPU. Requirements:
 §15) uses the Kokoro TTS model via the `kokoro-js` package, fully
 in-browser. The model runs in a Web Worker (`src/journal/ttsWorker.ts`) so
 synthesis never blocks the game loop — the main thread only posts a text
-segment and plays back the returned PCM. The engine always runs the
-quantized WASM path (q8) on every browser: the onnxruntime WebGPU compute
-path (distinct from the three.js renderer's WebGPU) saturated the GPU
-process during the cold model load and stalled the game's rendering ~15 s
-(the compositor delivered no frames while the main thread kept ticking), and
-it needs the 4x larger fp32 weights for no audible gain on the 82M voice
-model — so no device decision exists anymore. The game must keep RENDERING
-through a cold TTS load (gated in `scripts/verify/voice.mjs` via an rAF
-liveness probe). The model weights are
+segment and plays back the returned PCM. The engine runs the onnxruntime
+WebGPU compute path (fp32, distinct from the three.js renderer's WebGPU) on
+Chromium and the WASM path (q8) everywhere else — the device is decided on
+the main thread and passed to the worker. WebGPU is chosen because it
+synthesizes FASTER THAN REALTIME, giving a fast, gapless read-aloud (user
+decision, point 117). Its one cost is the cold model load, whose onnxruntime
+init briefly saturates the GPU process (~15 s, no frames): the game
+therefore PRE-WARMS the model at start (`warmupSpeech`, ~1.2 s after mount)
+so that one stall happens up front rather than at the first narration. The
+WASM fallback never touches the GPU process and keeps the game rendering
+through its cold load; the headless verification forces WASM (no WebGPU
+adapter) via the `window.__ttsForceWasm` dev hook, and `scripts/verify/
+voice.mjs` gates that fallback path's liveness with an rAF probe. (History:
+point 100 had made the engine WASM-only to avoid the WebGPU cold-load
+freeze; point 117 reversed that on the user's decision — the smooth WebGPU
+voice is worth the one-time, front-loaded stall.) The model weights are
 streamed from the Hugging Face CDN on first use and cached by the browser;
 they are not part of the repository or the bundle. The TTS stack (worker
 included) is loaded lazily and must never enter the eagerly loaded startup
