@@ -320,9 +320,12 @@ textarea {
 .map-overlay {
   position: absolute;
   left: 12px;
-  /* Bottom-left, clear ABOVE the (wrapping) inventory bar — mirror of the
-     journal panel's right-side placement rules (design.md §17.4). */
-  bottom: 88px;
+  /* Bottom-left, the SAME gap to the bottom controls as the journal panel keeps
+     on the right (design.md §17.4; user request): both sit at 56px. The
+     single-row inventory bar (bottom: 12px) clears this; a debug full-loadout
+     that wraps it to a second row is the only case it can reach under, and the
+     plate then scrolls within its capped box. */
+  bottom: 56px;
   transform: rotate(-0.4deg);
   background: var(--paper);
   color: var(--paper-ink);

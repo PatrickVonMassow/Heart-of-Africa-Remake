@@ -2309,7 +2309,7 @@ as-is; only the sequence changes.
   through the cold load — the worker synthesizes off the main thread). design.md
   unchanged (CLAUDE §7.1 pt.19). One atomic commit.
 
-- [ ] 115. The opened map should keep the SAME bottom gap to the bottom-row
+- [x] 115. The opened map should keep the SAME bottom gap to the bottom-row
   buttons as the journal does (user request). Currently `.journal` sits at
   `bottom: 56px` (src/index.css) while `.map-overlay` sits at `bottom: 88px` —
   the map was lifted higher to clear the WRAPPING inventory bar (bottom-left,
@@ -2326,6 +2326,10 @@ as-is; only the sequence changes.
   gap equals the journal's within a small tolerance if both are open-comparable.
   design.md §17.4 (map/journal placement) — update the note if the offset rule
   changes. One atomic commit.
+  DONE: `.map-overlay` bottom 88px → 56px (matches `.journal`); the single-row
+  inventory bar clears it. enrichments now measures the map's bottom gap and
+  asserts it matches the journal (~56px) alongside the kept non-overlap checks —
+  measured 54px, overlapInv/overlapJournalBtn false, suite green.
 
 ## Closing (only after all points)
 

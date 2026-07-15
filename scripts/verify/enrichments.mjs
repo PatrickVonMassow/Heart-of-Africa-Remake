@@ -314,6 +314,7 @@ const atlasPlace = await page.evaluate(() => {
   const overlaps = (a, b) => !!a && !!b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom)
   return {
     left: o.left, right: o.right, bottom: o.bottom, vw: window.innerWidth, vh: window.innerHeight,
+    bottomGap: window.innerHeight - o.bottom,
     overlapInv: overlaps(o, rect('.inventory-bar')),
     overlapJournalBtn: overlaps(o, btn(/Journal|Tagebuch/)),
     hasPlayer: !!document.querySelector('.map-overlay .map-player'),
@@ -330,6 +331,13 @@ check(
   JSON.stringify(atlasPlace),
 )
 check('the atlas shows a you-are-here marker (point 89)', !!atlasPlace?.hasPlayer, JSON.stringify(atlasPlace))
+// Point 115: the map keeps the SAME bottom gap to the controls as the journal
+// panel (bottom: 56px), not the old raised 88px.
+check(
+  'the opened map bottom gap matches the journal (~56px, point 115)',
+  atlasPlace && Math.abs(atlasPlace.bottomGap - 56) <= 6,
+  `bottomGap ${atlasPlace?.bottomGap}`,
+)
 await page.evaluate(() => window.__ui.getState().toggleMap())
 
 // Point 89: inside a settlement the town plan shows the live player marker too.
