@@ -38,13 +38,13 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Frozen playable tag stands under /v0.1/ and /poc/ (TASKS point 103): the
-      # same Pages site serves main at the root and each tag at its subpath —
-      # GitHub allows one Pages site per repository, so every frozen stand is a
-      # subdirectory of the same artifact, rebuilt from its immutable tag on
-      # every deploy. Each tag is guarded so the workflow still deploys the ones
-      # that exist while another does not.
-      - name: Build the frozen tag stands (v0.1, poc)
+      # Frozen playable builds of each tag under /v0.1/ and /poc/ (TASKS point
+      # 103): the same Pages site serves main at the root and each tag at its
+      # subpath — GitHub allows one Pages site per repository, so every frozen
+      # build is a subdirectory of the same artifact, rebuilt from its immutable
+      # tag on every deploy. Each tag is guarded so the workflow still deploys
+      # the ones that exist while another does not.
+      - name: Build each tag's frozen site (v0.1, poc)
         run: |
           for tag in v0.1 poc; do
             if [ -z "$(git ls-remote --tags origin "$tag")" ]; then

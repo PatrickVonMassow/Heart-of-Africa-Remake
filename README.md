@@ -12,14 +12,9 @@ This repository contains the proof of concept: the core gameplay loop end to
 end, not the complete game. `design.md` is the authoritative design document;
 `CLAUDE.md` defines the POC scope, acceptance criteria and build rules.
 
-**▶ Play the proof of concept:** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
-
-## Versions
-
-The proof of concept is playable on GitHub Pages:
-
-- **Proof of concept (tag `poc`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/> —
-  the frozen POC stand, rebuilt from the immutable `poc` tag on every deploy.
+**▶ Play the proof of concept:** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/> —
+the frozen POC build on GitHub Pages, rebuilt from the immutable `poc` tag on
+every deploy.
 
 ## Gameplay
 
