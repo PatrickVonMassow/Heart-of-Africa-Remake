@@ -2,13 +2,12 @@
 // Kokoro TTS model (kokoro-js), fetched from the Hugging Face CDN on first use
 // and cached by the browser. The model runs in a Web Worker (ttsWorker.ts) so
 // synthesis never blocks the game loop — the main thread only posts text and
-// plays back the returned PCM through the AudioContext. The device is decided
-// here on the main thread: the onnxruntime WebGPU compute path (separate from
-// the three.js renderer's WebGPU) is only reliable on Chromium, so the GPU
-// path is gated to Chromium and every other browser (Firefox, Safari) uses the
-// universally-working WASM path. Kokoro currently has no German voice, so
-// read-aloud is offered for English only — German texts carry the same voice
-// markup so a German-capable engine can be added later.
+// plays back the returned PCM through the AudioContext. The engine always runs
+// the quantized WASM path (q8, point 100): the onnxruntime WebGPU init
+// saturated the GPU process during the cold load and froze the rendered game
+// ~15 s. Kokoro currently has no German voice, so read-aloud is offered for
+// English only — German texts carry the same voice markup so a German-capable
+// engine can be added later.
 // OPEN: German read-aloud once a German-capable TTS voice is available.
 
 import type { SpeechSegment } from './voiceMarkup'
@@ -58,19 +57,10 @@ function getWorker(): Worker {
 
 /** Synthesize one segment in the worker; resolves with its raw PCM. */
 function synthesize(text: string, voice: string, speed: number): Promise<RawAudioLike> {
-  // The device is decided here (main thread): the onnxruntime WebGPU backend is
-  // only reliable on Chromium (navigator.userAgentData is Chromium-only), so
-  // Firefox/Safari use WASM. The headless verification forces WASM (dev hook).
-  const forceWasm =
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    Boolean((window as unknown as Record<string, unknown>).__ttsForceWasm)
-  const chromium = typeof navigator !== 'undefined' && 'userAgentData' in navigator
-  const preferWebgpu = !forceWasm && chromium && 'gpu' in navigator
   const id = ++reqId
   return new Promise<RawAudioLike>((resolve, reject) => {
     pending.set(id, { resolve, reject })
-    getWorker().postMessage({ id, text, voice, speed, preferWebgpu })
+    getWorker().postMessage({ id, text, voice, speed })
   })
 }
 

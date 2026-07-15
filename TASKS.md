@@ -1721,8 +1721,7 @@ as-is; only the sequence changes.
   (track: 14.07. 21:30 -> 22:05, ~35 min, ~40k in / ~9k out, model
   claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
 
-- [ ] 100. DEFERRED (user-excluded from the batch — do NOT auto-resume onto
-  this point; the batch-resume hook skips any line tagged DEFERRED). Cold TTS
+- [x] 100. Cold TTS
   model load janks the MAIN thread ~14 s (found while
   diagnosing the handwriting flake): with an unprimed browser profile,
   adding a journal entry (auto-narration) froze the handwriting reveal —
@@ -1753,6 +1752,36 @@ as-is; only the sequence changes.
   mode) asserting the journal reveal advances within its normal cadence
   while the model is still loading (reveal timing independent of TTS
   readiness).
+  TRACK: (a) measured with an rAF + 60 ms-interval liveness probe on a
+  fresh profile in BOTH dev and the built app: the freeze is NOT dev-only
+  and NOT a main-thread block — the 60 ms interval kept firing (max gap
+  ~140 ms) while requestAnimationFrame stalled ~15 s: the RENDERED game
+  froze (compositor delivered no frames; queued input was delivered late,
+  which is why the old probe read it as a "main-thread" freeze).
+  (b) ROOT CAUSE: the TTS worker's onnxruntime WebGPU init — dev A/B:
+  skipping the webgpu attempt (wasm direct) drops the cold load from
+  ~20 s with a 15.0 s rAF stall to 4.9 s with max 50 ms gaps. FIX: the
+  engine now always runs the quantized WASM path (q8) — the webgpu
+  attempt and the main-thread device decision are removed (speech.ts /
+  ttsWorker.ts; __ttsForceWasm hook obsolete). q8 is audibly equivalent
+  on the 82M voice model and its weights are a quarter of the fp32
+  download the webgpu path needed. Verified in the BUILT app too: cold
+  TTS load 5.3 s with max 50 ms rAF gaps (probe after the boot stall,
+  see below). (c) GATE adapted: every voice.mjs run has a fresh browser
+  profile (client-cold; assets replay from the local .cache/tts route,
+  so the gate stays CDN-independent — a genuinely cleared cache dir
+  would re-download ~90 MB per run from the rate-limited HF CDN, the
+  point-88 problem); the suite samples rAF across the deferred
+  first-gesture narration (the cold engine load) and asserts the game
+  kept rendering: measured max 33 ms gap over 307 frames, bound 1500 ms.
+  FINDING while measuring, logged as point 105: the built app (preview)
+  shows a separate, TTS-INDEPENDENT ~15 s rAF stall at ~14.5 s after
+  boot (reproduced with no input at all; dev clean) — out of this
+  point's scope. CLAUDE.md §3 + scripts/README updated. voice 6/6 +
+  handwriting 10/10 + Vitest 1490 green, audit 0.
+  (track: 15.07. 10:12 -> 10:45, ~33 min, ~55k in / ~12k out, model
+  claude-fable-5[1m], effort high, thinking on, user-supervised batch,
+  dontAsk)
 
 - [x] 101. Flat BLACK vertical shapes in the TRAVEL scene, near rivers
   (confirmed while removing SSR, point 99(e): they persist with SSR fully
@@ -2000,6 +2029,24 @@ as-is; only the sequence changes.
   low" → default OFF, debug-enabled). Both docs per the standing rule.
   EXECUTION ORDER (user, 15.07.): directly after point 100; ONE Closing
   pass follows 100+104 together, then point 103 tags the stand.
+
+- [ ] 105. DEFERRED (logged finding from the point-100 measurements,
+  15.07.2026 — needs a user go before being worked; the batch-resume hook
+  skips DEFERRED lines). The BUILT app (vite preview / production bundle)
+  shows a ~15 s requestAnimationFrame stall starting ~14.5 s after boot —
+  TTS-INDEPENDENT (reproduced on a fresh profile with zero input and no
+  narration; the 60 ms-interval main-thread timers keep firing, so it is
+  a compositor/GPU-process stall, and queued input is delivered only
+  after it ends). Dev is clean (max 67 ms gaps over the same window), so
+  it is preview/bundle-specific; plausibly headless-specific (the game
+  runs the WebGL 2 fallback there) — REPRODUCE ON REAL HARDWARE FIRST:
+  if real Chromium/WebGPU shows no stall, document it as a headless
+  artifact in scripts/verify/README.md and close. Probe recipe: load the
+  built app on a fresh profile, sample rAF from canvas-up for ~35 s, no
+  input; measured gapStart ~14.3-14.5 s, gap ~15.0 s, twice. Suspects to
+  bisect if real: a delayed pipeline/shader compile batch, the renderer's
+  WebGPU→WebGL fallback timing, an asset decode (baked surface textures),
+  or a headless GPU-process watchdog.
 
 ## Closing (only after all points)
 

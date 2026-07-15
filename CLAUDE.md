@@ -78,11 +78,15 @@ WebGPU. Requirements:
 §15) uses the Kokoro TTS model via the `kokoro-js` package, fully
 in-browser. The model runs in a Web Worker (`src/journal/ttsWorker.ts`) so
 synthesis never blocks the game loop — the main thread only posts a text
-segment and plays back the returned PCM. WebGPU is used only on Chromium
-(the onnxruntime WebGPU compute path — distinct from the three.js renderer's
-WebGPU — is unreliable on Firefox/Safari even where `navigator.gpu` exists),
-and every other browser uses the WASM path; the device is decided on the main
-thread and passed to the worker. The model weights are
+segment and plays back the returned PCM. The engine always runs the
+quantized WASM path (q8) on every browser: the onnxruntime WebGPU compute
+path (distinct from the three.js renderer's WebGPU) saturated the GPU
+process during the cold model load and stalled the game's rendering ~15 s
+(the compositor delivered no frames while the main thread kept ticking), and
+it needs the 4x larger fp32 weights for no audible gain on the 82M voice
+model — so no device decision exists anymore. The game must keep RENDERING
+through a cold TTS load (gated in `scripts/verify/voice.mjs` via an rAF
+liveness probe). The model weights are
 streamed from the Hugging Face CDN on first use and cached by the browser;
 they are not part of the repository or the bundle. The TTS stack (worker
 included) is loaded lazily and must never enter the eagerly loaded startup

@@ -1,8 +1,12 @@
 // TTS worker (design.md §15/§16): runs the Kokoro model off the main thread so
 // synthesis never blocks the game loop. The main thread posts a text segment
 // and gets back raw PCM; all the heavy work (module import, model download and
-// init, phonemization, inference) happens here. The device is decided on the
-// main thread (WebGPU only on Chromium) and passed in as `preferWebgpu`.
+// init, phonemization, inference) happens here. The engine always runs the
+// quantized WASM path (q8): the onnxruntime WebGPU init saturated the GPU
+// process during the cold load and froze the RENDERED game ~15 s (the
+// compositor delivered no frames while timers kept firing — measured in dev
+// AND the built app, point 100), and the WebGPU path needs the 4x larger fp32
+// weights for no audible gain on an 82M voice model.
 
 /// <reference lib="webworker" />
 import { KokoroTTS } from 'kokoro-js'
@@ -33,30 +37,19 @@ interface GenerateRequest {
   text: string
   voice: string
   speed: number
-  preferWebgpu: boolean
 }
 
 let enginePromise: Promise<KokoroLike> | null = null
 
-function loadEngine(preferWebgpu: boolean): Promise<KokoroLike> {
+function loadEngine(): Promise<KokoroLike> {
   if (!enginePromise) {
-    enginePromise = (async () => {
-      // WASM q8 works everywhere; WebGPU needs fp32 (quantized weights sound
-      // wrong on the GPU path). WebGPU is available in workers on Chromium.
-      const build = (device: 'webgpu' | 'wasm') =>
-        KokoroTTS.from_pretrained(MODEL_ID, {
-          dtype: device === 'webgpu' ? 'fp32' : 'q8',
-          device,
-        }) as unknown as Promise<KokoroLike>
-      if (preferWebgpu && typeof navigator !== 'undefined' && 'gpu' in navigator) {
-        try {
-          return await build('webgpu')
-        } catch (err) {
-          console.warn('TTS worker: WebGPU init failed, falling back to WASM.', err)
-        }
-      }
-      return await build('wasm')
-    })()
+    // Quantized WASM everywhere (point 100): audibly equivalent for the 82M
+    // voice model, a quarter of the fp32 download, and it never touches the
+    // GPU process — so the game keeps rendering through the cold load.
+    enginePromise = KokoroTTS.from_pretrained(MODEL_ID, {
+      dtype: 'q8',
+      device: 'wasm',
+    }) as unknown as Promise<KokoroLike>
     // A failed load must not poison later attempts.
     enginePromise.catch(() => {
       enginePromise = null
@@ -66,9 +59,9 @@ function loadEngine(preferWebgpu: boolean): Promise<KokoroLike> {
 }
 
 self.onmessage = async (e: MessageEvent<GenerateRequest>) => {
-  const { id, text, voice, speed, preferWebgpu } = e.data
+  const { id, text, voice, speed } = e.data
   try {
-    const tts = await loadEngine(preferWebgpu)
+    const tts = await loadEngine()
     const raw = await tts.generate(text, { voice, speed })
     // Transfer the audio buffer instead of copying it back to the main thread.
     ;(self as unknown as Worker).postMessage(

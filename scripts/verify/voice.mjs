@@ -4,9 +4,10 @@
 // src/journal/voiceMarkup.test.ts, and the "no visible markers / prose intact /
 // speak-button de vs en" render asserts to src/ui/JournalPanel.test.tsx. What
 // stays here needs a real browser: movement continues while the journal is open
-// (scene), the in-browser Kokoro read-aloud reaching the speaking state (small
-// WASM model via the __ttsForceWasm dev hook; requires network access to the
-// Hugging Face CDN), the screenshots (64-66) and the console-error gate.
+// (scene), the in-browser Kokoro read-aloud reaching the speaking state (the
+// engine always runs the small quantized WASM model, point 100), the cold-load
+// render-liveness gate (point 100: the game must keep rendering while the
+// engine loads), the screenshots (64-66) and the console-error gate.
 // Dev server only (dev hooks).
 import { chromium } from 'playwright'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
@@ -66,11 +67,20 @@ console.log('shot 64-voice-german-journal-clean.png')
 await page.evaluate(() => window.__setLang('en'))
 await page.waitForTimeout(800)
 
-await page.evaluate(() => {
-  window.__ttsForceWasm = true
-})
-
 // --- The start entry narrates on the first user gesture (autoplay deferral) --
+// The browser profile is fresh, so this first narration is the COLD engine
+// load. Point 100 gate: sample rAF timestamps across it — the game must keep
+// RENDERING while the worker loads the model (the old WebGPU init saturated
+// the GPU process and stalled the compositor ~15 s; WASM never touches it).
+await page.evaluate(() => {
+  const raf = []
+  window.__rafProbe = { raf, running: true }
+  const loop = (t) => {
+    raf.push(t)
+    if (window.__rafProbe.running) requestAnimationFrame(loop)
+  }
+  requestAnimationFrame(loop)
+})
 // No trusted gesture has happened yet; a neutral key press is the first one.
 await page.keyboard.press('F8')
 let bootSpoke = false
@@ -89,10 +99,25 @@ try {
   bootSpoke = false
 }
 check('the start entry narrates on the first user gesture', bootSpoke, '')
-// Let it reach the speaking state, then stop it for the manual-control check.
+// Let it reach the speaking state (the cold engine load runs in between),
+// then read the liveness probe: the whole load must have kept rendering.
 await page
   .waitForFunction(() => document.querySelector('.journal .speak')?.textContent === '■', null, { timeout: 300000 })
   .catch(() => {})
+const rafGap = await page.evaluate(() => {
+  const p = window.__rafProbe
+  p.running = false
+  let max = 0
+  for (let i = 1; i < p.raf.length; i++) max = Math.max(max, p.raf[i] - p.raf[i - 1])
+  return { max: Math.round(max), frames: p.raf.length }
+})
+// Generous bound against machine load: the defect was a 15 s stall, normal
+// frames run at 16-70 ms even under a loaded suite.
+check(
+  'the game keeps rendering through the cold TTS load (point 100)',
+  rafGap.frames > 30 && rafGap.max < 1500,
+  `max rAF gap ${rafGap.max} ms over ${rafGap.frames} frames`,
+)
 await page.locator('.journal .speak').last().click()
 await page.waitForTimeout(500)
 
