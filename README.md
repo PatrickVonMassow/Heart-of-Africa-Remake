@@ -16,14 +16,10 @@ end, not the complete game. `design.md` is the authoritative design document;
 
 ## Versions
 
-Several stands are playable on the same GitHub Pages site:
+The proof of concept is playable on GitHub Pages:
 
 - **Proof of concept (tag `poc`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/> —
   the frozen POC stand, rebuilt from the immutable `poc` tag on every deploy.
-- **v0.1 (tag `v0.1`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.1/> —
-  the same stand under a version number.
-- **Latest (main):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/> —
-  redeployed on every push to `main`, so it may move ahead of the tags.
 
 ## Gameplay
 
