@@ -34,6 +34,30 @@ await page.evaluate(() => {
 // The game starts inside Cairo: the great pyramids stand as the western
 // skyline silhouette (point-69 pattern, like Cape Town's Table Mountain).
 {
+  // Point 107: the settlement scatter/fence InstancedMeshes must opt OUT of
+  // frustum culling — their bounding sphere is computed at the origin, not over
+  // the spread instances, so with culling ON the whole mesh (all rocks/fences)
+  // vanished whenever the camera looked away from the settlement centre (user
+  // report: "stones disappear at certain spots, reappear when you move").
+  const culled = await page.evaluate(() => {
+    const scene = window.__scenePass?.scene
+    if (!scene) return { checked: 0, culled: 0 }
+    let checked = 0
+    let culled = 0
+    scene.traverse((o) => {
+      if (o.isInstancedMesh) {
+        checked++
+        if (o.frustumCulled) culled++
+      }
+    })
+    return { checked, culled }
+  })
+  check(
+    'settlement instanced meshes opt out of origin-sphere frustum culling (point 107)',
+    culled.checked > 0 && culled.culled === 0,
+    JSON.stringify(culled),
+  )
+
   const sky = await page.evaluate(() => window.__placeSkyline ?? 'none')
   check('Cairo mounts the Giza pyramid skyline', sky === 'giza-pyramids', `${sky}`)
   await page.evaluate(() => {

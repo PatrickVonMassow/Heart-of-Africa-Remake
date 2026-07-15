@@ -769,9 +769,9 @@ function Fences({ fences, mats }: { fences: FenceDef[]; mats: PlaceMaterials }) 
 
   return (
     <>
-      <instancedMesh ref={thornRef} args={[bushGeo, thornMat, 220]} castShadow receiveShadow />
-      <instancedMesh ref={wovenRef} args={[panelGeo, mats.thatch, 160]} castShadow receiveShadow />
-      <instancedMesh ref={stoneRef} args={[stoneGeo, stoneMat, 160]} castShadow receiveShadow />
+      <instancedMesh ref={thornRef} args={[bushGeo, thornMat, 220]} castShadow receiveShadow frustumCulled={false} />
+      <instancedMesh ref={wovenRef} args={[panelGeo, mats.thatch, 160]} castShadow receiveShadow frustumCulled={false} />
+      <instancedMesh ref={stoneRef} args={[stoneGeo, stoneMat, 160]} castShadow receiveShadow frustumCulled={false} />
     </>
   )
 }
@@ -924,8 +924,8 @@ function GroundScatter({
 
   return (
     <>
-      <instancedMesh ref={tuftMesh} args={[tuftGeo, material, 96]} receiveShadow />
-      <instancedMesh ref={rockMesh} args={[rockGeo, material, 20]} castShadow receiveShadow />
+      <instancedMesh ref={tuftMesh} args={[tuftGeo, material, 96]} receiveShadow frustumCulled={false} />
+      <instancedMesh ref={rockMesh} args={[rockGeo, material, 20]} castShadow receiveShadow frustumCulled={false} />
     </>
   )
 }
