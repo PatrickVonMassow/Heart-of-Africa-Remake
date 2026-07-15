@@ -4,10 +4,12 @@
 // src/journal/voiceMarkup.test.ts, and the "no visible markers / prose intact /
 // speak-button de vs en" render asserts to src/ui/JournalPanel.test.tsx. What
 // stays here needs a real browser: movement continues while the journal is open
-// (scene), the in-browser Kokoro read-aloud reaching the speaking state (the
-// engine always runs the small quantized WASM model, point 100), the cold-load
-// render-liveness gate (point 100: the game must keep rendering while the
-// engine loads), the screenshots (64-66) and the console-error gate.
+// (scene), the in-browser Kokoro read-aloud reaching the speaking state, the
+// cold-load render-liveness gate (the WASM fallback keeps the game rendering
+// while the engine loads), the screenshots (64-66) and the console-error gate.
+// This run forces the WASM path via `window.__ttsForceWasm` — headless has no
+// WebGPU adapter, and WASM is what stays live (on Chromium hardware the engine
+// runs the faster WebGPU path, whose cold load the game pre-warms; point 117).
 // Dev server only (dev hooks).
 import { chromium } from 'playwright'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
@@ -76,9 +78,10 @@ await page.waitForTimeout(800)
 
 // --- The start entry narrates on the first user gesture (autoplay deferral) --
 // The browser profile is fresh, so this first narration is the COLD engine
-// load. Point 100 gate: sample rAF timestamps across it — the game must keep
-// RENDERING while the worker loads the model (the old WebGPU init saturated
-// the GPU process and stalled the compositor ~15 s; WASM never touches it).
+// load. Liveness gate: sample rAF timestamps across it — on this forced-WASM
+// headless path the game must keep RENDERING while the worker loads the model
+// (WASM never touches the GPU process). On Chromium hardware the WebGPU path is
+// used instead, whose cold-load GPU stall the game pre-warms up front (point 117).
 await page.evaluate(() => {
   const raf = []
   window.__rafProbe = { raf, running: true }
@@ -121,7 +124,7 @@ const rafGap = await page.evaluate(() => {
 // Generous bound against machine load: the defect was a 15 s stall, normal
 // frames run at 16-70 ms even under a loaded suite.
 check(
-  'the game keeps rendering through the cold TTS load (point 100)',
+  'the WASM fallback keeps the game rendering through the cold TTS load (point 117)',
   rafGap.frames > 30 && rafGap.max < 1500,
   `max rAF gap ${rafGap.max} ms over ${rafGap.frames} frames`,
 )

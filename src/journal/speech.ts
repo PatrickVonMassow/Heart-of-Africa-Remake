@@ -78,11 +78,11 @@ function getWorker(): Worker {
 
 /**
  * Kick off the model download+init in the worker WITHOUT synthesizing, so the
- * first narration only pays for synthesis, not the ~seconds-long cold load
- * (point 117). Safe to call anytime and repeatedly (the worker loads once); it
- * needs no AudioContext, so it can run before the first user gesture. Loading on
- * the WASM path never touches the GPU process, so it does not freeze the game
- * (point 100).
+ * first narration only pays for synthesis, not the ~seconds-long cold load, and
+ * so the WebGPU path's one-time cold-load GPU stall happens up front at game
+ * start rather than at the first narration (point 117). Safe to call anytime and
+ * repeatedly (the worker loads once); it needs no AudioContext, so it can run
+ * before the first user gesture.
  */
 export function warmupSpeech(): void {
   try {
