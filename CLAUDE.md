@@ -347,6 +347,14 @@ verify suite that proves it.
    (§13.2). Verifiable: `src/state/store.hints.test.ts` covers all five
    regions, the retroactive deciphering (either order) and the gift lore;
    `src/i18n/i18n.test.ts` the in-world words in the language files.
+   OPEN (`design.md` §13.4): this criterion pins what is BUILT, not the
+   target state. Understanding the inhabitants is to become a central
+   mechanic — learned by observing and testing rather than handed over by
+   an elder, with one invented-but-researched language per region (a
+   Chants-of-Sennaar-like direction; e.g. a West African drum-signal
+   tongue). The mechanic is undecided and needs its own research pass
+   first, so §13.2's glossary and §13.3's delivery are placeholders under
+   review. Do not build on them.
 8. **Chronicle/journal.** A journal exists, grows automatically on events
    and stores hints (`design.md` §15); plain text suffices here (the
    animated handwriting is pt. 29). First village visits are journaled

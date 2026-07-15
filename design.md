@@ -359,6 +359,19 @@ A village elder teaches the region's direction words; a second talk with the eld
 ### 13.3 Cascade and Time Limit
 Per region exactly one knowing people (seeded anew each run) reveals the region's component of the site: the North's chief the latitude, the East's the longitude, the other regions narrowing statements. Every other chief offers only unspecific knowledge (Oz Oz …) that points toward the region's knowing people. Several hints are triangulated into the exact position of the tomb.
 
+### 13.4 OPEN: the communication mechanic is not yet decided
+
+**§13.1–13.3 above describe what is BUILT, not the target state.** Understanding the inhabitants is meant to become a central mechanic of the game rather than a vocabulary list handed over by an elder, and the mechanic that carries it is still an open design question. Nothing in §13.1–13.3 should be treated as settled, and nothing should be built on top of it until this is decided.
+
+Rough direction (first thoughts, deliberately not yet binding):
+
+- **Learning, not being told.** Today the elder simply teaches the region's direction words and the hint decodes. The intent is that the player must *work out* what the inhabitants mean — by observing them, by interacting, by seeing a word used in a situation whose meaning is obvious, and by testing a guess and being wrong. The reference point is **Chants of Sennaar**: meaning is inferred from context and confirmed by use, and the player's own understanding is the progression, not an inventory flag.
+- **One invented language per region**, each **invented but resting on real local and historical practice** — the same standard the world's geography and peoples are held to (§3.1, §16). The research comes first and the language follows from it: where a region really communicated in a particular form, the invented language takes that form. Example (the user's, and it is a real West African practice): if the research shows that **talking drums** carried messages across West Africa, then the West's language is a drum-signal language the player must learn to hear.
+- **Consequence for §13.2's glossary:** the current word lists are placeholders from the original game, not researched material. They are likely to be replaced wholesale rather than extended.
+- **Consequence for §13.3:** the knowing-people cascade may survive as the *structure* of who holds which part of the answer, but its delivery — an elder's lesson, a raw hint decoded retroactively — belongs to the old mechanic and is under review with it.
+
+**This section is the flag CLAUDE.md §2 requires: the concept is missing, so it is recorded as an open item rather than invented.** It needs (a) research into how each region really communicated around 1890, in the manner of `docs/climate-1890.md` and `docs/peoples-1890.md`, and (b) a decision on the mechanic itself, before any implementation point can be written.
+
 ---
 
 ## 14. Random Events
