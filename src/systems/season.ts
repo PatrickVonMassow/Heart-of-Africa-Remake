@@ -97,19 +97,31 @@ function isHyperArid(lat: number, lon: number): boolean {
   return lat >= 22 && lat <= 31 && lon >= 22 && lon <= 33
 }
 
+/** Metres above which the Horn's terrain runs the kiremt/belg calendar. */
+export const HIGHLAND_ELEVATION_M = 1500
+
 /**
- * The climate zone at a coordinate (design.md §19; `docs/climate-1890.md` §3).
+ * The climate zone at a place (design.md §19; `docs/climate-1890.md` §3).
+ *
+ * `elevationM` is required rather than sampled here, and rather than defaulted:
+ * the module stays pure (the DEM is loaded async and `elevationAt` returns a
+ * silent 0 before it is), and a default would let the highland rule pass tests
+ * while never firing in the game.
  *
  * Note the Mediterranean gate: a bare parallel is wrong in BOTH directions.
  * Cairo (30.05N) is functionally Saharan at ~25mm/yr while Alexandria (31.2N)
  * is genuinely Mediterranean at 235mm — a 10x gradient across ~1.2 degrees. So
  * the coast itself, not just the latitude, has to qualify.
  */
-export function climateZoneAt(lat: number, lon: number): ClimateZone {
+export function climateZoneAt(lat: number, lon: number, elevationM: number): ClimateZone {
   if (lat <= -30) return 'cape'
   if (lat <= -12) return 'southern-plateau'
-  // The Ethiopian highlands run their own calendar inside the eastern belt.
-  if (lat >= 6 && lat <= 15 && lon >= 35 && lon <= 42) return 'ethiopian-highlands'
+  // The Ethiopian highlands run their own calendar — but they are HIGHLANDS,
+  // defined by elevation, not by a box drawn on the map. The Danakil depression
+  // sits inside the same bounds and lies below sea level; it runs no kiremt.
+  if (lat >= 6 && lat <= 15 && lon >= 35 && lon <= 42 && elevationM >= HIGHLAND_ELEVATION_M) {
+    return 'ethiopian-highlands'
+  }
   if (lat >= -12 && lat < 6 && lon >= 31.5) return 'east-rift'
   if (lat >= -5 && lat <= 5 && lon >= 12 && lon < 31.5) return 'congo'
   if (lat > 5 && lat < 11 && lon >= 12 && lon < 31.5) return 'congo-north'
@@ -146,9 +158,15 @@ export function dayOfYear(day: number, startYear: number): number {
  * Interpolated smoothly across the month profile so a season arrives and fades
  * rather than switching on a month boundary.
  */
-export function wetnessAt(day: number, lat: number, lon: number, startYear: number): number {
+export function wetnessAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+): number {
   if (isHyperArid(lat, lon)) return 0
-  const zone = climateZoneAt(lat, lon)
+  const zone = climateZoneAt(lat, lon, elevationM)
   const profile = MONTH_PROFILE[zone]
   // Month positions are their midpoints, so the curve peaks mid-month.
   const t = (dayOfYear(day, startYear) / 365.25) * 12 - 0.5

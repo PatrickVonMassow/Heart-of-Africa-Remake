@@ -3028,13 +3028,21 @@ as-is; only the sequence changes.
       ~500 languages, not a people); `uganda` → **Baganda** (a colonial
       territory name, not a people — the vignette already says "the Kabaka's
       kingdom", so the text knows better than the label). Both languages.
-  (b) INTERNAL IDs: keep `peopleId` values AS THEY ARE for now. They are code
-      identifiers, not player-visible, and `store.ts` writes `peopleId` into
-      journal entry PARAMS (~line 877/899/1130) — a rename would break the
-      language-neutral journal of existing saves (design.md §17.7). If the IDs
-      are renamed later it needs a save migration like the legacy map-item strip
-      (§7.1 pt. 28), which is a separate point. Note the tension in a comment so
-      the next reader does not "tidy" the ids and break saves.
+  (b) INTERNAL IDs: **rename them too** — `masai`→`maasai`, `bombara`→`bambara`,
+      `mandingo`→`mandinka`, `sidamo`→`sidama`, `pygmies`→`mbuti`,
+      `bushmen`→`san`, `bantu`→`pedi`, `uganda`→`baganda`, `batwa`→`wayeyi`
+      (per 132a). I had deferred this because `store.ts` writes `peopleId` into
+      journal entry PARAMS (~line 877/899/1130), so a rename empties the
+      language-neutral journal of existing saves (design.md §17.7). **The user
+      waived that (16.07.2026): "Wenn bestehende Spielstände kaputtgehen, ist das
+      egal. Noch ist es sowieso nur ein PoC, den noch nie jemand ernsthaft
+      gespielt hat."** So: no migration, break the old saves, and leaving
+      `pygmies`/`bushmen` sitting in the codebase is not defensible with "it is
+      not player-visible". Update every reference: `src/world/geo.ts` (~9),
+      `src/i18n/*.ts` (the `peoples` map + the vignette keys),
+      `src/i18n/parity.test.ts`, `src/state/store.travel.test.ts`,
+      `src/state/store.hints.test.ts`, `src/world/world.test.ts` (its peopleIds
+      list).
   (c) VIGNETTES (`src/i18n/*.ts` ~line 500+), fixing what the research proved
       wrong — both languages, voice markup intact (§15.2), and these are
       first-visit journal texts so §16 applies:
@@ -3088,18 +3096,27 @@ as-is; only the sequence changes.
       the local rainy season, the Okavango does the opposite". Physical
       geography, so safe to retro-apply. Wire it into 120's season model as this
       village's calendar (molapo flood-recession farming keys to the recession).
-  (c) **Bambara (17.2N 3.5W)**: the point is ~50 km NW of Timbuktu — wrong
-      rainfall for its millet vignette, wrong people (Songhai/Tuareg/Arma
-      country in 1890), wrong polity (Ségou fell to al-Hajj Umar Tal in 1861 and
-      to the French in 1890–91). The heartland is Ségou, **13.45N 6.27W** — but
-      moving it there shifts it from the north region to the west and breaks
-      both counts. **Decision: keep the coordinate, relabel the people to
-      SONGHAI**, and rebuild the vignette around what is real there — Niger
-      flood-recession farming, *bourgou* dry-season grazing, the Timbuktu
-      caravan trade. This keeps the north at four peoples and makes the place
-      honest. (If the user would rather keep a Bambara village, the alternative
-      is to move it to Ségou and accept the region-count change — flag, do not
-      decide silently.)
+  (c) **Bambara: MOVE it to Ségou, 13.45N 6.27W.** (Decided on authenticity by
+      the user's delegation, 16.07.2026 — and it reverses my earlier
+      "relabel to Songhai" call.)
+      The village sits at 17.2N 3.5W: wrong rainfall for its millet vignette
+      (150–200 mm/yr), wrong people (Songhai/Tuareg/Arma country in 1890), wrong
+      polity (Ségou fell to al-Hajj Umar Tal in 1861 and to the French in
+      1890–91). My earlier fix — relabel the point Songhai — dies on one fact I
+      had not checked: **Timbuktu is ALREADY a port in the game** (`geo.ts:141`,
+      16.77N −3.0), i.e. **~50 km from this village**. Timbuktu *is* the Songhai
+      Niger-bend world; a Songhai village beside it would be a duplicate of a
+      place the game already has. It also exposes a second oddity — the two sit
+      ~50 km apart in DIFFERENT regions, because the lat-17 border runs between
+      them.
+      So move the Bambara to their real heartland instead. Ségou lands in the
+      **west** region, so north goes 4→3 and west 3→4. That is fine: nothing
+      requires a fixed count (`pickKnowingVillages`, `store.ts:367`, filters by
+      region and picks any of them — my earlier "breaks the region count" claim
+      was wrong, and checking it is what killed it). **And a thinner north is
+      more authentic, not less: the Sahara really is empty.** The millet-and-
+      chiwara vignette becomes true at Ségou, and the absurd village-next-to-a-
+      port disappears.
   (d) **Nubians (21.8N 31.6E)**: the coordinate is **Wadi Halfa**, and in 1890
       that is the **Anglo-Egyptian frontier garrison facing the Mahdist state**
       — the Sudan in 1890 is the **Mahdiyya**, not Egyptian-ruled, the Khalifa's
@@ -3119,20 +3136,38 @@ as-is; only the sequence changes.
   vignettes in both languages. DOCS: design.md §3.2/§4.5 and §4.2. One atomic
   commit. (Decided 15.07.2026.)
 
-- [ ] 133. The rinderpest years as atmosphere — deliberately NOT as a mechanic.
-  Decided under the accuracy principle, and this is the case where the principle
-  cuts BOTH ways. The research (`docs/peoples-1890.md` §5) is unambiguous: the
-  game's own window, 1890–95, IS the great African rinderpest panzootic —
-  >90 % of cattle dead across East/Central/West Africa, Maasailand gutted in
-  1891–92 by rinderpest + smallpox + locusts, survivors fleeing to the farming
-  peoples they had lorded over, and Europeans behind them mistaking the emptiness
-  for virgin land.
-  **But modelling it faithfully would empty the Maasai village — and §13.3's
-  knowing-people cascade needs every village functional as a hint-giver. That is
-  a hard collision with the game concept, so the full depiction is REFUSED, on
-  purpose, and recorded here so the refusal is a decision rather than an
-  oversight.**
-  What to do instead — flavour only, no state change:
+- [ ] 133. The rinderpest years, modelled as the date-dependent state they were.
+  **CORRECTED 16.07.2026 — my earlier refusal was argued from two claims I never
+  checked, and both were false.** I had written that a faithful depiction would
+  empty the Maasai village and break §13.3's knowing-people cascade. It would
+  not, for two independent reasons:
+  * **The history does not say the village emptied.** It says ~90 % of the
+    HERDS died and the people starved; *some* fled to the farming peoples they
+    had lorded over, others stayed and raided more desperately. The FAO source
+    explicitly has the enkang keeping "a core of people who resided there
+    permanently". The accurate depiction is a **devastated but inhabited**
+    village — the chief stands, gives his hint, and the cascade runs untouched.
+    "Village abandoned" would have been an error in MY modelling, not the price
+    of accuracy.
+  * Even if a village COULD go empty, `pickKnowingVillages` (`store.ts:367`)
+    picks any village of a region and works with any count ≥ 1.
+  So: implement it accurately. The research (`docs/peoples-1890.md` §5) is
+  unambiguous — the game's own window IS the panzootic.
+  (0) **It is DATE-DEPENDENT, and that is the real work.** The game runs ~5
+      years from 1890, so the state must change as the date advances (the
+      season model of point 120 already keys off `day`; reuse that plumbing):
+      * **1890 (start):** Maasailand is ALREADY damaged — bovine
+        pleuropneumonia swept it 1883–87. Rinderpest has not arrived. Sudan is
+        one year past the *Sanat Sitta* famine and its herds are gone.
+      * **1891:** rinderpest reaches Maasailand (first recorded on
+        Kilimanjaro's slopes; Kedong valley March 1891) — the triple disaster
+        with smallpox 1892 and locusts. Senegal River by 1891, Dori April 1891.
+      * **1892–95:** famine and its aftermath; the disease sits north of the
+        Zambezi from July 1892.
+      * **1896:** it crosses the Zambezi (Bulawayo 3 March) and reaches the
+        Zulu, Pedi and San — **inside a long playthrough**. Until then those
+        three are clean.
+  Then the depiction, per place:
   (a) The **Maasai** and **Sidama** vignettes carry it: dead herds, a people at
       the edge. Baumann was there in **March 1892** and his German is verbatim in
       the research doc — **use his own words for the German text, never a
@@ -3153,10 +3188,37 @@ as-is; only the sequence changes.
   (e) Do NOT assert the rinderpest→Maasai-dress-change link (unsourced). The
       shield link IS sound: the *elongo* was male buffalo hide, and the buffalo
       died — but that is a texture, not a mechanic.
-  TESTS: `src/i18n/villages.test.ts` (distinct, markup-clean, both languages).
-  DOCS: design.md §16 (the vignettes) — and record in design.md that the
-  panzootic is deliberately atmosphere-only, with the reason, so a later reader
-  does not "fix" it into a system. One atomic commit. (Decided 15.07.2026.)
+  TESTS: pure — the date→phase mapping per region (`src/systems/season.test.ts`
+  or its own file): 1890 pre-arrival, 1891 Maasailand struck, southern Africa
+  clean until 1896 and struck after, and the camel peoples never struck at all.
+  `src/i18n/villages.test.ts` (distinct, markup-clean vignettes, both languages).
+  Live: the phase is observable via a dev hook, and the debug menu can force a
+  date/phase for testing (like 120's season selector).
+  DOCS: design.md §16 + the new §19 seasons subsection. One atomic commit — or
+  split state/vignettes/carcasses if it grows. (Decided 15.07.2026; the refusal
+  reversed 16.07.2026 after actually checking it.)
+
+- [ ] 134. The one deliberate inaccuracy: grief unto death stays.
+  Standing exception to the accuracy principle, set by the user (16.07.2026):
+  **"Die Elterntiere sollen sich nach wie vor freiwillig wie gehabt ohne Wehr in
+  den Tod stürzen, wenn ihre Jungtiere gestorben sind."**
+  This is NOT an oversight and NOT to be "corrected" toward realism. It covers,
+  as one family:
+  * the **waterfall plunge** (§19.8, existing): a parent follows its swept-over
+    calf and dies with it;
+  * the **trample-throw** (point 119, shipped): a parent throws itself before
+    the elephant that killed its calf;
+  * the **carcass vigil** (point 121): the parent stands over its dead calf and
+    is taken without fleeing.
+  Real ungulates do not do this — they run from a charging predator. The game
+  does it anyway, on purpose: it is the established emotional grammar of §19.8,
+  and an animal that bolted at the last moment would be the odd one out among
+  the three, not the realistic one. Everything ELSE in the world (climate,
+  peoples, dress, the panzootic, village placement) is to be as accurate as the
+  research allows — this is the single carve-out.
+  ACTION: record it in design.md §19.8 in those terms, so the exception is
+  visible where the behaviour is specified rather than buried in a task list.
+  No code. (Set 16.07.2026.)
 
 ## Closing (only after all points)
 

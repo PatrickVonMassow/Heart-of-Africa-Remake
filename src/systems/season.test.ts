@@ -6,7 +6,8 @@ import { START_YEAR } from '../config/balance'
 const on = (month: number, dayOfMonth: number, year = START_YEAR): number =>
   (Date.UTC(year, month - 1, dayOfMonth) - Date.UTC(START_YEAR, 0, 1)) / 86400000
 
-const wet = (m: number, lat: number, lon: number) => wetnessAt(on(m, 15), lat, lon, START_YEAR)
+const wet = (m: number, lat: number, lon: number, elev = 0) =>
+  wetnessAt(on(m, 15), lat, lon, START_YEAR, elev)
 
 // Coordinates of places the research actually names.
 const CAIRO = { lat: 30.05, lon: 31.24 }
@@ -18,39 +19,49 @@ const ACCRA = { lat: 5.55, lon: -0.2 }
 const CONAKRY = { lat: 9.5, lon: -13.7 }
 const CONGO = { lat: -1.5, lon: 21.0 }
 const NAIROBI = { lat: -1.3, lon: 36.8 }
-const ADDIS = { lat: 9.0, lon: 38.7 }
+const ADDIS = { lat: 9.0, lon: 38.7, elev: 2355 } // the plateau
+const DANAKIL = { lat: 13.5, lon: 40.5, elev: -100 } // below sea level, same box
 const ZAMBEZI = { lat: -17.9, lon: 25.9 }
 const CAPE_TOWN = { lat: -33.9, lon: 18.4 }
 
 describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regions)', () => {
   it('Cairo is Saharan, not Mediterranean — the trap a bare parallel falls into', () => {
     // ~25mm/yr: functionally desert, though it sits at 30N on the "north coast".
-    expect(climateZoneAt(CAIRO.lat, CAIRO.lon)).not.toBe('mediterranean')
+    expect(climateZoneAt(CAIRO.lat, CAIRO.lon, 0)).not.toBe('mediterranean')
   })
 
   it('Alexandria IS Mediterranean, 1.2 degrees north of Cairo', () => {
-    expect(climateZoneAt(ALEXANDRIA.lat, ALEXANDRIA.lon)).toBe('mediterranean')
+    expect(climateZoneAt(ALEXANDRIA.lat, ALEXANDRIA.lon, 0)).toBe('mediterranean')
   })
 
   it('splits the Sahara into a winter-rain north and a summer-rain south', () => {
-    expect(climateZoneAt(27, 5)).toBe('sahara-north')
-    expect(climateZoneAt(21, 5)).toBe('sahara-south')
+    expect(climateZoneAt(27, 5, 0)).toBe('sahara-north')
+    expect(climateZoneAt(21, 5, 0)).toBe('sahara-south')
   })
 
   it('separates the Guinea coast from the Atlantic-facing west coast by LONGITUDE', () => {
     // The August break is a Gulf-of-Guinea upwelling effect; Conakry is unimodal.
-    expect(climateZoneAt(ACCRA.lat, ACCRA.lon)).toBe('guinea-coast')
-    expect(climateZoneAt(CONAKRY.lat, CONAKRY.lon)).toBe('west-coast')
+    expect(climateZoneAt(ACCRA.lat, ACCRA.lon, 0)).toBe('guinea-coast')
+    expect(climateZoneAt(CONAKRY.lat, CONAKRY.lon, 0)).toBe('west-coast')
   })
 
   it('gives the Ethiopian highlands their own calendar inside the eastern belt', () => {
-    expect(climateZoneAt(ADDIS.lat, ADDIS.lon)).toBe('ethiopian-highlands')
-    expect(climateZoneAt(NAIROBI.lat, NAIROBI.lon)).toBe('east-rift')
+    expect(climateZoneAt(ADDIS.lat, ADDIS.lon, ADDIS.elev)).toBe('ethiopian-highlands')
+    expect(climateZoneAt(NAIROBI.lat, NAIROBI.lon, 0)).toBe('east-rift')
+  })
+
+  it('makes the highlands HIGH — the Danakil in the same bounds is not one', () => {
+    // The rule keys on elevation, not on a box drawn round the Horn: the
+    // Danakil depression lies below sea level inside those very bounds and
+    // runs no kiremt at all. A lat/lon rectangle would call it highland.
+    expect(climateZoneAt(DANAKIL.lat, DANAKIL.lon, DANAKIL.elev)).not.toBe('ethiopian-highlands')
+    // And the same coordinate flips once it is genuinely high ground.
+    expect(climateZoneAt(DANAKIL.lat, DANAKIL.lon, 2000)).toBe('ethiopian-highlands')
   })
 
   it('puts the Cape in its own zone, not with the plateau above it', () => {
-    expect(climateZoneAt(CAPE_TOWN.lat, CAPE_TOWN.lon)).toBe('cape')
-    expect(climateZoneAt(ZAMBEZI.lat, ZAMBEZI.lon)).toBe('southern-plateau')
+    expect(climateZoneAt(CAPE_TOWN.lat, CAPE_TOWN.lon, 0)).toBe('cape')
+    expect(climateZoneAt(ZAMBEZI.lat, ZAMBEZI.lon, 0)).toBe('southern-plateau')
   })
 })
 
@@ -120,7 +131,7 @@ describe('wetnessAt (the findings that must survive any refactor)', () => {
   })
 
   it('gives Ethiopia its kiremt peak in Jul/Aug and a bega dry Oct-Jan', () => {
-    const ad = (m: number) => wet(m, ADDIS.lat, ADDIS.lon)
+    const ad = (m: number) => wet(m, ADDIS.lat, ADDIS.lon, ADDIS.elev)
     expect(ad(7)).toBeGreaterThan(ad(3)) // kiremt over belg
     expect(ad(12)).toBeLessThan(0.1) // bega
   })
@@ -132,8 +143,8 @@ describe('wetnessAt (the findings that must survive any refactor)', () => {
   })
 
   it('is smooth across the turn of the year — no seam at 31 December', () => {
-    const a = wetnessAt(on(12, 31), ZAMBEZI.lat, ZAMBEZI.lon, START_YEAR)
-    const b = wetnessAt(on(1, 1, START_YEAR + 1), ZAMBEZI.lat, ZAMBEZI.lon, START_YEAR)
+    const a = wetnessAt(on(12, 31), ZAMBEZI.lat, ZAMBEZI.lon, START_YEAR, 0)
+    const b = wetnessAt(on(1, 1, START_YEAR + 1), ZAMBEZI.lat, ZAMBEZI.lon, START_YEAR, 0)
     expect(Math.abs(a - b)).toBeLessThan(0.05)
   })
 
