@@ -61,6 +61,9 @@ interface UiState {
   ssaoEnabled: boolean
   /** Half-size shadow maps (1024²) for the touch preset; full (2048²) otherwise. */
   shadowMapHalf: boolean
+  /** Directional sun shadows (design.md §2.7/§21); a debug switch to turn cast
+   *  shadows off entirely (default on). */
+  shadowsEnabled: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -79,6 +82,7 @@ interface UiState {
   activateTouch: () => void
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
+  setShadowsEnabled: (enabled: boolean) => void
 }
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
@@ -101,6 +105,7 @@ export const useUi = create<UiState>()((set) => ({
   touchActive: false,
   ssaoEnabled: true,
   shadowMapHalf: false,
+  shadowsEnabled: true,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -130,6 +135,7 @@ export const useUi = create<UiState>()((set) => ({
     set((s) => (s.touchActive ? s : { touchActive: true, traaEnabled: false, ssaoEnabled: false, shadowMapHalf: true })),
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
+  setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
 }))
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

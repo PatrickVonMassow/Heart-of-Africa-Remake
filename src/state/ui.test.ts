@@ -12,6 +12,7 @@ beforeEach(() => {
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
     traaEnabled: true, touchActive: false, ssaoEnabled: true, shadowMapHalf: false,
+    shadowsEnabled: true,
   })
 })
 
@@ -100,5 +101,8 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
     expect(u().ssaoEnabled).toBe(false)
     u().setShadowMapHalf(true)
     expect(u().shadowMapHalf).toBe(true)
+    expect(u().shadowsEnabled).toBe(true) // default on
+    u().setShadowsEnabled(false)
+    expect(u().shadowsEnabled).toBe(false)
   })
 })

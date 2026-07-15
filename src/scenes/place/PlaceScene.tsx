@@ -1400,6 +1400,7 @@ export function PlaceScene() {
   // The touch quality preset (point 84) halves the shadow-map resolution.
   const sunRef = useRef<THREE.DirectionalLight>(null)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
+  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
   const shadowSize = shadowMapHalf ? 1024 : 2048
   useEffect(() => {
     const map = sunRef.current?.shadow.map
@@ -1695,7 +1696,7 @@ export function PlaceScene() {
         position={[SUN_DIR[0] * 60, SUN_DIR[1] * 60, SUN_DIR[2] * 60]}
         color="#fff1d8"
         intensity={2.4}
-        castShadow
+        castShadow={shadowsEnabled}
         shadow-mapSize={[shadowSize, shadowSize]}
         shadow-camera-left={-55}
         shadow-camera-right={55}

@@ -371,6 +371,7 @@ export const en: Strings = {
     traa: 'TRAA (temporal anti-aliasing)',
     ssao: 'SSAO (ambient occlusion)',
     shadowMapHalf: 'Half-resolution shadows',
+    shadows: 'Sun shadows',
     health: 'Health',
     wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",

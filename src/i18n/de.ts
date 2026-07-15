@@ -370,6 +370,7 @@ export const de: Strings = {
     traa: 'TRAA (zeitliche Kantenglättung)',
     ssao: 'SSAO (Umgebungsverdeckung)',
     shadowMapHalf: 'Schatten in halber Auflösung',
+    shadows: 'Sonnenschatten',
     health: 'Gesundheit',
     wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',

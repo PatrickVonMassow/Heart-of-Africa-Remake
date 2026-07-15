@@ -122,6 +122,7 @@ export function DebugMenu() {
   const traaEnabled = useUi((s) => s.traaEnabled)
   const ssaoEnabled = useUi((s) => s.ssaoEnabled)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
+  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -291,6 +292,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={shadowMapHalf}
           onChange={(e) => useUi.getState().setShadowMapHalf(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.shadows}</span>
+        <input
+          type="checkbox"
+          checked={shadowsEnabled}
+          onChange={(e) => useUi.getState().setShadowsEnabled(e.target.checked)}
         />
       </label>
       <label>

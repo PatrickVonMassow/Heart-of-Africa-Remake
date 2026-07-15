@@ -288,6 +288,7 @@ export interface Strings {
     ssao: string
     /** Half-size shadow maps toggle; on in the touch quality preset (point 84). */
     shadowMapHalf: string
+    shadows: string
     health: string
     wheelZoom: string
     journalDnd: string

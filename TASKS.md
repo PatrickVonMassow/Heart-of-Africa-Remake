@@ -2231,7 +2231,18 @@ as-is; only the sequence changes.
   pure-black/hard on the WebGPU backend while far shadows stay soft grey. Isolation
   (WebGPU-only, user): toggle SSAO off first — vanishes → (a), reduce GTAO radius/
   raise floor or skip AO at depth edges; persists → (b), the shadow bias/intensity/
-  cascade on WebGPU. design.md unchanged
+  cascade on WebGPU.
+  UPDATE 2 (15.07. ~14:30): user ran all three available toggles on real WebGPU —
+  SSAO off, TRAA off, half-resolution shadows — NONE change the black shape. So it
+  is not post-AO, not temporal-AA, and not shadow-map-resolution-sensitive. But the
+  half-res test is NOT conclusive for shadow-vs-not (a cast shadow's SHAPE is
+  resolution-independent), so a decisive test needs shadows fully OFF — which had no
+  toggle. Added a "Sun shadows" debug checkbox (ui store `shadowsEnabled` default on
+  → the place-scene directional light's `castShadow`; DebugMenu + de/en label +
+  ui.test) so the user can turn cast shadows off entirely: vanishes → it IS the
+  shadow (fix shadow.intensity/ambient fill so shadowed ground keeps the hemisphere
+  fill instead of going black); persists → geometry/material rendering black on the
+  WebGPU backend (dig into the ground/building node material). design.md unchanged
   (render-quality safeguard; no new CLAUDE §7.1 point). One atomic commit once fixed.
 
 - [x] 112. Audio balance (user request): footsteps twice as loud, and ALL other
