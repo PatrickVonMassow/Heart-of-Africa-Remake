@@ -2880,6 +2880,66 @@ as-is; only the sequence changes.
   three free directions still move. DOCS: CLAUDE.md §7.1 pt. 4 if the rule
   sharpens. (Reported 15.07.2026.)
 
+- [ ] 130. Crocodiles: the ambush from the water.
+  Wanted (user, 15.07.2026): crocodiles in the regions that suit them, lying
+  HIDDEN at first and then bursting out of the water to take prey — with the
+  same parent sacrifice/grief scenarios as the other predators, including the
+  few seconds a parent has to save its young before the attack kills it. This
+  is a NEW AMBIENT SPECIES and closes part of the standing open item in
+  CLAUDE.md §7.1 pt. 12 ("additional new species beyond the current roster").
+  Note: a crocodile exists today ONLY in the random-event system (§14.2) and
+  `src/config/balance.ts`/i18n — there is no crocodile in the herd sim at all.
+  ANCHORS: `SPECIES` (`src/scenes/travel/Wildlife.tsx` ~65) and `MAX_INSTANCES`
+  (~66); `PredatorKind`/`REGION_PREDATORS`/`PREDATOR_PREY` (~210-235);
+  `src/scenes/travel/waterEdgeRules.ts` (drinkers walk to the bank, bathers wade
+  one step — that bank visit IS the ambush's prey); the calf-drama resolution
+  (~935-1003: `caught` countdown, `PARENT_SACRIFICE_DIST`,
+  `PARENT_TOO_LATE_DIST`, `PARENT_CHARGE_SPEED`); `src/render/fauna.ts` for the
+  build; `src/i18n/de.ts`/`en.ts` for the name.
+  (a) Species + placement: a `crocodile` that only ever exists in/at river and
+      lake water in the regions where the Nile crocodile really lived ~1890
+      (the Nile, the Congo basin, the eastern and southern river systems and
+      lakes — NOT the waterless desert). It is EXEMPT from the §19.5 rule that
+      no animal stands in water — like the wading flamingos, this is its home;
+      add it to the same exemption the water dramas already hold, and state
+      that in design.md so the rule stays honest.
+  (b) Hidden state: submerged, only eyes/snout above the surface — visually
+      almost nothing, and it must not read as a floating carcass. It waits; it
+      does not roam like a lion.
+  (c) The lunge: when an animal comes to the bank to drink (the existing
+      water-edge behaviour) within a strike radius, it bursts out — a fast,
+      short, visible lunge, not a teleport (the §19 no-snap turn rules and the
+      smooth-flee rule apply).
+  (d) The drama, reusing the EXISTING paths rather than a second copy: the
+      victim gets `caught` and struggles for the established window; the parent
+      charges; a parent that reaches in time is taken in the calf's place; one
+      that only got close by the window's end is taken alongside it. The
+      user's "a parent has a few seconds to save its young" IS today's struggle
+      window — reuse it, do not invent a second timer.
+      ARCHITECTURE WARNING: `LION_STATE` is a SINGLE global hunt state. A
+      crocodile ambush running while a lion hunts elsewhere must not clobber it
+      — either give the ambush its own small state or generalise the hunt state
+      properly. Decide this before writing code; a silent overwrite would break
+      the whole §19.8 battery.
+  (e) The player: walking into one must route through the EXISTING §14.2
+      crocodile event (machete always protects, rifle only from the canoe) like
+      the §19.3 wandering-predator attack does — no new attack path, no new
+      protection rules.
+  (f) Both languages, voice markup on any journal text (§15.2).
+  TESTS: pure — the region/water placement rule (crocodiles only in the right
+  regions and only on water) and the lunge trigger over (distance, prey at bank)
+  in `src/scenes/travel/wildlifeBehavior.test.ts` /
+  `src/scenes/travel/waterEdgeRules.test.ts`. Live
+  (`scripts/verify/enrichments.mjs`): a crocodile sits hidden until a drinker
+  comes, then lunges and catches it; the parent-rescue, the sacrifice and the
+  too-late outcomes all fire on a crocodile exactly as on a lion; a lion hunt
+  running at the same time is unaffected (the architecture guard in (d)); plus
+  a screenshot of the hidden and the lunging state. DOCS: design.md §19 (a
+  subsection for the ambush predator, plus the §19.5 water exemption and the
+  §19.8 pointer) and CLAUDE.md §7.1 pt. 12 (new verifiable conditions; narrow
+  the open item to the species still missing). Split into atomic commits along
+  (a)…(e) if it grows. (Reported 15.07.2026.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
