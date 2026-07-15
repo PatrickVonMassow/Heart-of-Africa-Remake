@@ -1358,6 +1358,43 @@ check(
   JSON.stringify(guardFlee),
 )
 
+// A calf trampled by an elephant takes its parent with it (point 119): the
+// parent throws itself before the elephant's feet and is trampled too. Grief,
+// not a rescue — it must CLOSE on the elephant (ordinary prey dodges away) and
+// end up dead over its own stain. Park an elephant on a calf and watch both.
+const trampleGrief = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const w = window.__wildlife
+  const herds = w.herdsRef.current
+  const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
+  let calf = null, parent = null
+  for (const sp of SP) for (const a of herds[sp] ?? []) {
+    if (!calf && a.young && a.parent && !a.dead && !a.parent.dead && a.inWater === undefined && a.parent.inWater === undefined) { calf = a; parent = a.parent }
+  }
+  if (!calf) return { error: 'no pair' }
+  parent.x = calf.x + 9; parent.z = calf.z // park it clear so the approach is measurable
+  const eleph = { x: calf.x, z: calf.z, y: calf.y, rot: 0, scale: 1, phase: 0, heading: 0 }
+  herds.elephant.push(eleph)
+  const stains0 = w.stains.current.length
+  let calfDead = false
+  for (let i = 0; i < 40 && !calfDead; i++) { await sleep(100); calfDead = calf.dead === true }
+  const charged = parent.trampleTo !== undefined // it inherited the grief
+  const d0 = Math.hypot(parent.x - eleph.x, parent.z - eleph.z)
+  let parentDead = false
+  for (let i = 0; i < 60 && !parentDead; i++) { await sleep(100); parentDead = parent.dead === true }
+  const d1 = Math.hypot(parent.x - eleph.x, parent.z - eleph.z)
+  const stainsAdded = w.stains.current.length - stains0
+  const idx = herds.elephant.indexOf(eleph)
+  if (idx >= 0) herds.elephant.splice(idx, 1) // calm the scene for the next check
+  return { calfDead, charged, parentDead, closed: d0 - d1, stainsAdded }
+})
+check(
+  'a parent whose calf is trampled throws itself before the elephant and is trampled too (point 119)',
+  trampleGrief && !trampleGrief.error && trampleGrief.calfDead && trampleGrief.charged &&
+    trampleGrief.parentDead && trampleGrief.closed > 2 && trampleGrief.stainsAdded >= 2,
+  JSON.stringify(trampleGrief),
+)
+
 // Bathing needs shore visitors, which only spawn where a savanna herd sits
 // within reach of water. Find savanna tiles near water for the current seed
 // (so this does not depend on hand-picked coordinates), then roam them until a

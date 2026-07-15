@@ -578,6 +578,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - If the shield is out of position and the calf is caught, it is not killed at once: it struggles alive for a few seconds (no wound or bloodstain yet) while the parent rushes the predator. A parent that reaches the predator within that window is taken in the calf's place, and the calf gets up and escapes. A parent that only got close by the struggle's end is dragged down and eaten alongside the calf.
 - Calves are playful: on their own rhythm they break into short gambolling hop-bouts around the parent. At a shore a bout can carry a calf into open water, where it struggles and drifts with the current; the parent wades in, pulls it out on reach, and the two walk back to the bank.
 - Near a waterfall the current keeps its menace (§11) for the animals too: calf or parent in its reach is swept over the falls to its death — and a parent follows a swept calf, plunging after it and dying with it.
+- The same grief drives a parent whose calf is trampled underfoot by an elephant (§19.4): it does not dodge the herd like ordinary prey but throws itself before the elephant's feet and is trampled too, dying beside its young. Unlike the living shield against a hunter, this saves nobody — the calf is already dead and both are lost. The parent charges the elephant's moving feet, not the spot where its calf fell; should the herd be gone before it arrives, the grief passes and the parent rejoins its own.
 
 ### 19.9 Climate and landscape dressing
 

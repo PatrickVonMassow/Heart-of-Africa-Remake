@@ -2471,6 +2471,109 @@ as-is; only the sequence changes.
   beside a feeding lion does not saw-tooth and moves away (flees); the guard reuses
   the already-pure-tested blockHeading. design.md §19.8 / CLAUDE §7.1 pt.12 unchanged.
 
+- [ ] 119. A parent sacrifices itself to the elephant that trampled its calf.
+  Today a calf trampled by an elephant simply dies and its parent goes on grazing
+  (it even DODGES the elephant like any other prey). Wanted (user, 15.07.2026):
+  when a juvenile is trampled to death by an elephant, the parent throws itself
+  before that elephant's feet and lets itself be trampled too — the same grief
+  logic that already exists at a waterfall, where a calf swept over sets
+  `plungeTo` on the parent, which rushes after it and dies (§19.8). Both die; this
+  is grief, NOT a rescue (unlike the lion shield, nobody is saved).
+  ANCHORS (all in `src/scenes/travel/Wildlife.tsx` unless noted) — mirror the
+  existing `plungeTo` feature at every one of its integration points:
+  (a) Type field: add `trampleTo?: { x: number; z: number }` next to `plungeTo`
+      (~line 139) plus `grief?: number` (the resolve backstop), documented like
+      its neighbours.
+  (b) Tunables next to `PLUNGE_SPEED`/`PLUNGE_REACH` (~line 345), commented as
+      calibratable: `TRAMPLE_GRIEF_SPEED` (start 6.5, matching
+      `PARENT_CHARGE_SPEED` — the parent RUSHES) and `TRAMPLE_GRIEF_SECONDS`
+      (start 12) as the window after which an unresolved grief clears.
+  (c) Trigger: in the trample kill inside the render loop (~line 1757-1766, the
+      `Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS` branch), when the victim
+      is a calf with a living parent (`a.young && a.parent && !a.parent.dead`),
+      set `par.trampleTo = { x: a.x, z: a.z }`, `par.grief = TRAMPLE_GRIEF_SECONDS`,
+      `par.child = undefined`, `a.parent = undefined` — exactly the link teardown
+      the waterfall branch does (~line 1044-1049).
+  (d) Movement pre-pass over the FULL herd lists (like the predation loop at ~935
+      and the water loop at ~1013, so it resolves off the rendered slice too), for
+      every non-elephant species (calves exist for ALL non-shoreline species, see
+      ~line 617 — not just `CALF_HUNT_SPECIES`): for an animal with `trampleTo`,
+      pick the nearest LIVING elephant from `herds.elephant` (the parent charges
+      the elephant's moving FEET, not the stale death spot), steer to it at
+      `TRAMPLE_GRIEF_SPEED` and refresh `trampleTo` to its live position (the pose
+      in (f) faces it). Count `grief` down by dt. Do NOT write a second kill: the
+      EXISTING trample check in (c) kills the arriving parent (dead + stain) —
+      that IS "letting itself be trampled" and keeps one code path.
+  (e) STUCK-RISK (the lesson from point 118 — an unresolved drive that never ends
+      is exactly the bug just fixed): the grief MUST always resolve. Clear
+      `trampleTo`/`grief` when no living elephant exists (all despawned/streamed
+      out) or when `grief` reaches 0, returning the parent to normal behaviour.
+      Never leave it charging a target that cannot kill it.
+  (f) Exemptions + pose, mirroring `plungeTo` at each site: add `trampleTo` to the
+      body-separation exempt list (~line 1154) and to the water/steering skip
+      (~line 1232, `if (a.dead || a.inWater !== undefined || a.rescued ||
+      a.plungeTo) continue`); add a pose branch beside the `plungeTo` one (~line
+      1553) that holds the sim position, faces `trampleTo` and sets
+      `familyHeld = true`. The `familyHeld` flag is LOAD-BEARING: the elephant
+      dodge at ~line 1722 is gated on `!familyHeld`, so without it the grieving
+      parent would flee the very elephant it means to die under.
+  TESTS (per the hybrid architecture):
+  (g) Pure (`src/scenes/travel/wildlifeBehavior.test.ts`): extract the target
+      choice as a small pure helper in `wildlifeBehavior.ts` (e.g.
+      `griefTarget(x, z, elephants)` → nearest living elephant position or
+      `null`), and test: nearest of several is chosen, a dead elephant is
+      ignored, and an empty/all-dead list returns `null` (the (e) resolve path).
+  (h) Live (`scripts/verify/enrichments.mjs`, next to the existing
+      'Elephant tramples a smaller animal (dead over a stain)' check at ~line 739
+      and the plunge checks at ~line 2032): inject an elephant onto a calf, then
+      assert the calf dies trampled, its parent CLOSES on the elephant (distance
+      shrinks — it does not dodge away) and ends up dead with a stain of its own.
+  DOCS: design.md §19.8 (add the trample sacrifice to the calf drama — grief, both
+  die, distinct from the lion shield's rescue) and CLAUDE.md §7.1 pt. 12 under
+  "Calves and family life" (add the verifiable condition, naming the suites). No
+  journal text (ambient wildlife is not journaled). One atomic commit.
+  (Reported 15.07.2026.)
+
+- [ ] 120. Seasons and region-typical weather (large ambience extension).
+  Wanted (user, 15.07.2026): the date should drive SEASONS, each region showing
+  the weather typical for it at that time of year (e.g. rain; snow where it
+  genuinely occurs), and plants AND animals must be visibly affected by it.
+  Today the world is season-less: one fixed look per biome, no weather.
+  (a) RESEARCH FIRST (explicitly requested): document, in the repo, the real
+      ~1890 seasonal climate per region — the tropical rain belt's migration
+      (double rains near the equator, single wet/dry season in the Sahel and
+      the southern savanna, the Mediterranean winter rain of the north coast,
+      the Cape's winter rain, the near-rainless central Sahara), the harmattan
+      dust season, and where snow is real (only the high summits — Kilimanjaro,
+      Mt Kenya, Ruwenzori, the High Atlas — NOT the savanna). Source it against
+      the end-of-19th-century state like §3.1's geography, and record the table
+      it produces alongside the geodata preprocessing docs so the values are
+      reproducible and reviewable rather than invented.
+  (b) Model: derive a season from the in-game date + the region's latitude
+      (`design.md` §3.2 regions), and from (season, region) a weather state.
+      Central, calibratable values in `src/config/balance.ts`, debug-editable
+      per CLAUDE §2 (a debug selector to force season/weather for testing).
+  (c) Visuals: region-typical precipitation and sky (rain, harmattan haze,
+      summit snow), fitting the §2.7 lighting/§19.9 dressing pipeline; TSL, no
+      raw GLSL/WGSL, both renderer backends.
+  (d) Plants: the vegetation and dressing of §19.9 respond — green/lush in the
+      wet season, dry/sparse in the dry season.
+  (e) Animals: the §19.2-§19.8 wildlife responds (e.g. presence/behaviour at
+      water in the dry season). Must not break the existing wildlife
+      invariants (streaming, body separation, water-edge rules, the dramas).
+  (f) Gameplay coupling is OPEN and must be decided before implementing: does
+      weather touch movement/health (§6/§11) or stay pure ambience like the
+      rest of §19? Ambience-only is the safer default; flag it as a question
+      rather than inventing a mechanic (CLAUDE §2 forbids design invention).
+  TESTS: pure (season/weather derivation from date+region — every region across
+  the year, snow only where real) in a new `src/systems/season.test.ts`; live
+  (`scripts/verify/enrichments.mjs`) that a forced season/weather renders and
+  that the plant/animal response is observable, plus screenshots.
+  DOCS: design.md (new subsection under §19 for seasons/weather, referenced
+  from §19.9) and CLAUDE.md §7.1 (new acceptance point with its verify suites).
+  SIZE: this is large — split into several atomic commits along (a)…(e) rather
+  than one, each with its own tests/docs. (Reported 15.07.2026.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

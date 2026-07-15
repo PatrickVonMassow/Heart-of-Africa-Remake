@@ -81,6 +81,35 @@ export function blockHeading(
 }
 
 /**
+ * Target for a parent whose calf was trampled (design.md §19): it throws itself
+ * before the feet of the nearest LIVING elephant and lets itself be trampled
+ * too. Returns that elephant's position, or `null` when none is left — the
+ * caller then ends the grief instead of charging a target that can no longer
+ * trample it (a drive with no resolution is a stuck animal).
+ *
+ * The nearest LIVE position is picked each frame rather than the calf's death spot:
+ * the elephant walks on, and the parent means to reach its feet, not the patch
+ * of ground where its calf fell.
+ */
+export function griefTarget(
+  x: number,
+  z: number,
+  elephants: ReadonlyArray<{ x: number; z: number; dead?: boolean }>,
+): { x: number; z: number } | null {
+  let best: { x: number; z: number } | null = null
+  let bestD = Infinity
+  for (const e of elephants) {
+    if (e.dead) continue
+    const d = Math.hypot(e.x - x, e.z - z)
+    if (d < bestD) {
+      bestD = d
+      best = { x: e.x, z: e.z }
+    }
+  }
+  return best
+}
+
+/**
  * Playful gambolling of a herd calf (design.md §19): on a per-calf cycle the
  * calf breaks into a short bout of scampering hops around its parent. Returns
  * the bout's current heading and hop height (0..1), or `null` outside a bout.

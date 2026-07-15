@@ -28,6 +28,7 @@ import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import {
   blockHeading,
+  griefTarget,
   fleeHeading,
   flightStep,
   gambolState,
@@ -137,6 +138,15 @@ interface Animal {
   /** Where this parent's calf went over a waterfall: the parent plunges after
    *  it and dies there (design.md §19). */
   plungeTo?: { x: number; z: number }
+  /** Where this parent's calf was trampled: the parent throws itself before the
+   *  elephant's feet and is trampled too (design.md §19). Tracks the elephant's
+   *  live position, not the death spot — it charges the moving feet. Grief, not
+   *  a rescue: nobody is saved, both die. */
+  trampleTo?: { x: number; z: number }
+  /** Seconds of grief left (design.md §19): the charge above always resolves —
+   *  it clears at 0 (or when no elephant is left) so a parent can never be
+   *  stuck chasing a target that cannot trample it. */
+  grief?: number
   /** Current playful-hop height (0..1) while a calf gambols (design.md §19);
    *  kept as state so the verification can observe the play. */
   hop?: number
@@ -345,6 +355,8 @@ const FALLS_DEATH_RADIUS_DEG = 0.2 // in water this close to a fall = swept over
 const PLUNGE_SPEED = 5.5 // a parent rushing after its swept-over calf
 const PLUNGE_REACH = 1
 const STRUGGLE_SELF_RESCUE = 25 // s after which an unaided calf clambers out
+const TRAMPLE_GRIEF_SPEED = 6.5 // a parent rushing the elephant that trampled its calf
+const TRAMPLE_GRIEF_SECONDS = 12 // grief window; an unresolved charge clears here
 // OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
 // light animal escaping up a kopje/tree) and further new species/birds beyond
 // the current roster and the added calves are not yet implemented.
@@ -1139,6 +1151,35 @@ function Herds() {
       }
     }
 
+    // Trample grief (design.md §19), over the FULL lists like the dramas above:
+    // a parent whose calf was trampled charges the nearest elephant's feet and
+    // lets itself be trampled too. It runs at the LIVE elephant, not the death
+    // spot — the herd walks on. No kill here: the trample check in the render
+    // loop takes the arriving parent, which is the whole point (one code path).
+    // Every species but the elephant raises calves that can be trampled.
+    for (const sp of SPECIES) {
+      if (sp === 'elephant') continue
+      for (const a of herds[sp]) {
+        if (a.dead || a.trampleTo === undefined) continue
+        // The grief ALWAYS resolves: with no elephant left to trample it (all
+        // dead or streamed out), or once the window runs out, the parent stops
+        // and rejoins the herd — never a drive that cannot end.
+        const target = griefTarget(a.x, a.z, herds.elephant)
+        a.grief = (a.grief ?? 0) - dt
+        if (target === null || a.grief <= 0) {
+          a.trampleTo = undefined
+          a.grief = undefined
+          continue
+        }
+        a.trampleTo = target
+        const dx = target.x - a.x
+        const dz = target.z - a.z
+        const d = Math.hypot(dx, dz) || 1
+        a.x += (dx / d) * TRAMPLE_GRIEF_SPEED * dt
+        a.z += (dz / d) * TRAMPLE_GRIEF_SPEED * dt
+      }
+    }
+
     // Animal-animal collision (design.md §19): live animals never stand in or
     // walk through one another — each frame every overlapping pair parts, each
     // member resolving its own half of the overlap (a spatial grid keeps the
@@ -1152,6 +1193,7 @@ function Herds() {
         b.inWater !== undefined ||
         b.rescued !== undefined ||
         b.plungeTo !== undefined ||
+        b.trampleTo !== undefined ||
         (b.child !== undefined && !b.child.dead && b.child.caught !== undefined) ||
         // The active chase victim and its blocking parent sprint on exact
         // lines; herd-mates shoving them every frame trembled the hunt.
@@ -1229,7 +1271,7 @@ function Herds() {
           // own movement; everyone else must never STAND in water — not in
           // the open sea, and not in a river or lake either (an animal only
           // reaches the water's edge to drink, design.md §19).
-          if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo) continue
+          if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo || a.trampleTo) continue
           if (a.child && !a.child.dead && a.child.inWater !== undefined) continue
           const ll = worldToLatLon(a.x, a.z)
           const ter = sampleTerrain(ll.lat, ll.lon, seed).type
@@ -1557,6 +1599,16 @@ function Herds() {
             yaw = Math.atan2(a.plungeTo.x - a.x, a.plungeTo.z - a.z)
             pitch = 0
             familyHeld = true
+          } else if (a.trampleTo) {
+            // Charging the elephant that trampled its calf (movement in the
+            // pre-pass). familyHeld is load-bearing here: it suppresses the
+            // elephant dodge below, so the parent runs INTO the feet it means
+            // to die under instead of darting aside like ordinary prey.
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(a.trampleTo.x - a.x, a.trampleTo.z - a.z)
+            pitch = 0
+            familyHeld = true
           } else if (a.child && !a.child.dead && a.child.inWater !== undefined) {
             // Wading to (or escorting) the calf in the water (pre-pass moves).
             px = a.x
@@ -1760,6 +1812,17 @@ function Herds() {
               if (Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS) {
                 a.dead = true
                 pushStain(a.x, a.z)
+                // A trampled CALF takes its parent with it (design.md §19): the
+                // parent throws itself before the elephant's feet and is
+                // trampled by this same check on arrival. Grief, not a rescue —
+                // mirrors the waterfall plunge, where nobody is saved either.
+                const par = a.parent
+                if (a.young && par && !par.dead) {
+                  par.trampleTo = { x: ex, z: ez }
+                  par.grief = TRAMPLE_GRIEF_SECONDS
+                  par.child = undefined
+                  a.parent = undefined
+                }
                 break
               }
             }

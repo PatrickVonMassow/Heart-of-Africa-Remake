@@ -481,7 +481,15 @@ verify suite that proves it.
       the bank alive; in the water inside a waterfall's reach a calf is
       swept over and dies with its parent plunging after it, and a
       rescuing parent wading into the falls' reach is swept over itself
-      while its calf survives.
+      while its calf survives. Calf trample grief (§19.8): a calf
+      trampled by an elephant takes its parent with it — the parent does
+      not dodge the herd but closes on the elephant's feet and is
+      trampled too, dead over its own stain (`scripts/verify/
+      enrichments.mjs`); the grief always resolves rather than chasing a
+      target that cannot trample it — the nearest-living-elephant choice
+      returning null with none left is pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`, which also pins that
+      the charge reaches a walking elephant well inside the grief window.
     - Bodies and boundaries: the §19.5 body separation holds — streamed
       animals keep their body spacing after spawn (no two inside one
       another) and an animal placed onto another parts from it within

@@ -6,6 +6,7 @@ import {
   FLIGHT_SPAWN_OUT,
   flightStep,
   gambolState,
+  griefTarget,
   groundNormal,
   leashedGambolDir,
   separationPush,
@@ -159,6 +160,64 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
     expect(taken).toBe(true) // the hunter meets the shield…
     expect(caught).toBe(false) // …never the calf
     expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
+  })
+})
+
+describe('griefTarget (design.md §19 — the parent charges the elephant that trampled its calf)', () => {
+  it('picks the nearest living elephant', () => {
+    const near = griefTarget(0, 0, [
+      { x: 20, z: 0 },
+      { x: 4, z: 3 }, // distance 5 — the nearest
+      { x: 0, z: 12 },
+    ])
+    expect(near).toEqual({ x: 4, z: 3 })
+  })
+
+  it('ignores a dead elephant and takes the next living one', () => {
+    const t = griefTarget(0, 0, [
+      { x: 1, z: 0, dead: true },
+      { x: 9, z: 0 },
+    ])
+    expect(t).toEqual({ x: 9, z: 0 })
+  })
+
+  it('returns null with no elephants at all — the grief must end, not chase nothing', () => {
+    expect(griefTarget(0, 0, [])).toBeNull()
+  })
+
+  it('returns null when every elephant is dead', () => {
+    expect(griefTarget(0, 0, [{ x: 1, z: 1, dead: true }, { x: 5, z: 5, dead: true }])).toBeNull()
+  })
+
+  it('the charge reaches the trampling feet well inside the grief window', () => {
+    // Mini-simulation of the contract; the numbers mirror Wildlife.tsx
+    // (TRAMPLE_GRIEF_SPEED 6.5, ELEPHANT_SPEED 1.5, TRAMPLE_GRIEF_SECONDS 12,
+    // TRAMPLE_RADIUS 1.5). The parent must catch an elephant WALKING AWAY from
+    // it — otherwise the window would expire and the sacrifice would silently
+    // never happen.
+    const dt = 1 / 60
+    let px = 0
+    let pz = 0
+    const eleph = { x: 10, z: 0 }
+    let grief = 12
+    let trampled = false
+    while (grief > 0) {
+      eleph.x += 1.5 * dt // roaming straight away from the parent
+      const t = griefTarget(px, pz, [eleph])
+      expect(t).not.toBeNull()
+      const dx = t!.x - px
+      const dz = t!.z - pz
+      const d = Math.hypot(dx, dz) || 1
+      px += (dx / d) * 6.5 * dt
+      pz += (dz / d) * 6.5 * dt
+      if (Math.hypot(eleph.x - px, eleph.z - pz) < 1.5) {
+        trampled = true
+        break
+      }
+      grief -= dt
+    }
+    expect(trampled).toBe(true)
+    expect(grief).toBeGreaterThan(6) // reached with the window barely touched
   })
 })
 
