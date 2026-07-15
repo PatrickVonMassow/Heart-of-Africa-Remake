@@ -1,9 +1,14 @@
 # CI safety net beside the local verification (user-approved 2026-07-14):
-# a fast gate (build + lint + audit + the whole Vitest layer) on every push,
-# and the full 13-suite browser regression nightly / on demand. The browser
-# job runs on Windows to match the local pipeline (the suites launch Chromium
-# with --use-angle=d3d11); the Kokoro TTS assets persist via the actions
-# cache, so only the very first nightly run touches the Hugging Face CDN.
+# a fast gate (build + lint + audit + the whole Vitest layer) on every push.
+#
+# The full browser regression is NOT run in CI: the Playwright scene suites
+# need a real GPU (RAF-driven wildlife, screenshots, timing), and GitHub's
+# hosted runners have none — Chromium falls back to a software rasterizer at
+# ~1 fps, so the RAF suites all time out (13/18 failed, pure-data suites
+# aside). The browser regression is therefore verified LOCALLY on real GPU
+# hardware (see scripts/verify/README.md); it would only return to CI with a
+# self-hosted GPU runner. (Removed 2026-07-15 after the nightly job proved
+# unwinnable on the hosted runners.)
 name: CI
 
 on:
@@ -11,13 +16,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      browser:
-        description: Run the full browser regression
-        type: boolean
-        default: true
-  schedule:
-    - cron: '23 2 * * *' # nightly full regression, 02:23 UTC
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -38,26 +36,3 @@ jobs:
       - run: npm run lint
       - run: npm audit
       - run: npm run test:unit
-
-  browser:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.browser)
-    runs-on: windows-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install chromium
-      - uses: actions/cache@v4
-        with:
-          path: .cache/tts
-          key: tts-kokoro-v1
-      - run: npm test
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: verification-screenshots
-          path: verification/
