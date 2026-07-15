@@ -139,6 +139,51 @@ const strafeD = await measureWalk('KeyD')
 check('forward walking actually moves the character', fwd > 0.5, `${fwd.toFixed(2)} m`)
 check('strafing actually moves the character', strafeD > 0.5, `${strafeD.toFixed(2)} m`)
 
+// --- Walk feel: head bob oscillates while walking, settles at rest (point 97) --
+// Bob/footsteps follow the eased VELOCITY and step phase (held-input driven),
+// not the distance travelled, so the position is pinned to the centre each
+// sample to keep the traveller from walking out of the settlement.
+await page.evaluate(() => {
+  window.__ui.getState().setDialog(null)
+  const p = window.__placePlayer
+  p.x = 0; p.z = 0; p.yaw = 0
+  delete window.__walkFeel
+})
+await page.waitForTimeout(120)
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+const bobSamples = []
+let footSurface = null
+for (let i = 0; i < 20; i++) {
+  await page.waitForTimeout(100)
+  const s = await page.evaluate(() => {
+    const p = window.__placePlayer; p.x = 0; p.z = 0 // pin to centre
+    return { y: window.__walkFeel?.cameraY ?? null, foot: window.__walkFeel?.lastFootstepSurface ?? null }
+  })
+  if (s.y !== null) bobSamples.push(s.y)
+  if (s.foot) footSurface = s.foot
+  if (footSurface && bobSamples.length >= 8) break
+}
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+const bobDev = bobSamples.length ? Math.max(...bobSamples.map((y) => Math.abs(y - 1.5))) : 0
+check(
+  'the head bobs off the eye height while walking (point 97)',
+  bobSamples.length >= 5 && bobDev > 0.008,
+  `max |y-1.5| ${bobDev.toFixed(3)} over ${bobSamples.length} samples`,
+)
+check(
+  'a footstep fires with a surface class while walking (point 97)',
+  footSurface === 'ground' || footSurface === 'stone',
+  `surface ${footSurface}`,
+)
+// After stopping, the camera settles back to the eye height (stop settle).
+await page.waitForTimeout(600)
+const restY = await page.evaluate(() => window.__walkFeel?.cameraY ?? null)
+check(
+  'the head bob settles back to eye height at rest (point 97)',
+  restY !== null && Math.abs(restY - 1.5) < 0.006,
+  `rest y ${restY}`,
+)
+
 // --- Debug menu open: user-select computed style + screenshot ----------------
 // The German label/field/dropdown asserts moved to Vitest (DebugMenu.test.tsx);
 // the debug menu is opened here for the real-CSS user-select check and the

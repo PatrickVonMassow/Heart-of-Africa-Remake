@@ -49,12 +49,14 @@ import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../re
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
-import { buildLayout, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { buildLayout, isOnLane, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import { silhouetteScale, apparentAngleDeg, hazeColor, luminance } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
 import { bandHeightAt } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
+import { emitFootstep } from '../../systems/ambience'
+import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idleSway } from '../../systems/walkFeel'
 import { getStrings, useStrings } from '../../i18n'
 
 const INTERACT_RADIUS = 4.5
@@ -1336,11 +1338,15 @@ export function PlaceScene() {
   const nearRef = useRef<Interactive | null>(null)
   // Door the player currently stands at; blocks re-triggering until they step away.
   const doorLatch = useRef<Interactive | null>(null)
+  // Walk feel (design.md §2, point 97): body-relative eased velocity, the
+  // step-phase accumulator and the smoothed camera roll — all camera/feel only.
+  const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
     player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
     doorLatch.current = null
+    walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
     // Seed the shared position for the town-plan map marker (point 89).
     placePlayerPosition.x = player.current.x
     placePlayerPosition.z = player.current.z
@@ -1452,11 +1458,16 @@ export function PlaceScene() {
     }
   }, [setPrompt])
 
-  useFrame((_, rawDt) => {
+  useFrame(({ clock }, rawDt) => {
     if (!layout) return
     const dt = Math.min(rawDt, 0.1)
     const p = player.current
+    const w = walk.current
+    const wf = balance.walkFeel
 
+    // Target body-relative velocity from the input (0 while no input / modal).
+    let tf = 0
+    let ts = 0
     // The open journal (even while narrating) no longer freezes walking
     // (design.md §16); only a modal dialog blocks it.
     if (!useUi.getState().dialog) {
@@ -1477,34 +1488,85 @@ export function PlaceScene() {
       forward += stick.y
       strafe += stick.x
       if (forward !== 0 || strafe !== 0) {
-        const sin = Math.sin(p.yaw)
-        const cos = Math.cos(p.yaw)
         // Strafing and walking backward are slower than walking forward
         // (design.md §2, placeWalkVelocity).
-        const [vf, vs] = placeWalkVelocity(forward, strafe, balance.placeWalkSpeed, balance.placeStrafeFactor)
-        // Forward is -Z rotated by yaw; strafe is +X rotated by yaw.
-        const dx = (-sin * vf + cos * vs) * dt
-        const dz = (-cos * vf - sin * vs) * dt
-        // Solid objects are impenetrable; the pushout lets the player slide
-        // along walls (design.md §2 collision inside settlements).
-        const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
-        p.x = rx
-        p.z = rz
+        ;[tf, ts] = placeWalkVelocity(forward, strafe, balance.placeWalkSpeed, balance.placeStrafeFactor)
       }
     }
 
+    // Inertia (point 97a): ease the body-relative velocity toward the target,
+    // then step the position by it. Sliding along a wall can't build up speed —
+    // the velocity is bounded by the walk speed and only the position resolves.
+    w.velF = easeSpeed(w.velF, tf, wf.accelTau, wf.decelTau, dt)
+    w.velS = easeSpeed(w.velS, ts, wf.accelTau, wf.decelTau, dt)
+    // Snap the tail to a clean stop so a standing camera sits at exactly
+    // EYE_HEIGHT (no perpetual sub-millimetre bob from residual velocity).
+    if (tf === 0 && Math.abs(w.velF) < 1e-3) w.velF = 0
+    if (ts === 0 && Math.abs(w.velS) < 1e-3) w.velS = 0
+    if (Math.abs(w.velF) > 1e-4 || Math.abs(w.velS) > 1e-4) {
+      const sin = Math.sin(p.yaw)
+      const cos = Math.cos(p.yaw)
+      // Forward is -Z rotated by yaw; strafe is +X rotated by yaw.
+      const dx = (-sin * w.velF + cos * w.velS) * dt
+      const dz = (-cos * w.velF - sin * w.velS) * dt
+      const [rx, rz] = resolveMove(layout.colliders, p.x + dx, p.z + dz, PLAYER_RADIUS)
+      p.x = rx
+      p.z = rz
+    }
+
     // Walking beyond the settlement's edge leaves it (design.md §2 "Switching"):
-    // no exit key, purely position-based.
+    // no exit key, purely position-based — the LOGICAL position, not the bobbed
+    // camera.
     if (Math.hypot(p.x, p.z) > layout.radius) {
       useGame.getState().leavePlace()
       return
     }
 
-    camera.position.set(p.x, EYE_HEIGHT, p.z)
-    camera.rotation.set(0, p.yaw, 0, 'YXZ')
-    // Share the live position so the town-plan map marker can track it.
+    // Step phase + footsteps (point 97b/c): advance by the actual speed; on each
+    // half-stride crossing play a footstep whose timbre depends on the surface
+    // underfoot (a lane reads as a firm path, off it as soft ground).
+    const speed = Math.hypot(w.velF, w.velS)
+    const step = advanceStepPhase(w.phase, speed, wf.stepCadence, dt)
+    w.phase = step.phase
+    let lastSurface: 'ground' | 'stone' | null = null
+    if (step.footstep && speed > 0.5) {
+      lastSurface = isOnLane(p.x, p.z, layout.paths) ? 'stone' : 'ground'
+      emitFootstep(lastSurface)
+    }
+
+    // Head bob, strafe roll and idle sway (point 97b/d/e) — CAMERA ONLY: the
+    // logical p.x/p.z used for interaction/door/leave above are untouched.
+    const speedFrac = speed / balance.placeWalkSpeed
+    const bob = headBob(w.phase, speedFrac, wf.bobAmp, wf.swayAmp)
+    w.roll = easeToward(
+      w.roll,
+      strafeRollTarget(w.velS, balance.placeWalkSpeed * balance.placeStrafeFactor, (wf.maxRollDeg * Math.PI) / 180),
+      wf.rollTau,
+      dt,
+    )
+    // A barely-visible idle sway keeps the camera alive at rest, fading out as
+    // soon as the walk bob takes over.
+    const idle = idleSway(clock.elapsedTime, wf.idleSwayAmp, wf.idleSwayRate) * (1 - Math.min(1, speedFrac * 3))
+    const sin = Math.sin(p.yaw)
+    const cos = Math.cos(p.yaw)
+    // Lateral bob/idle along the camera's right axis (cos, -sin).
+    const lateral = bob.dx + idle
+    camera.position.set(p.x + cos * lateral, EYE_HEIGHT + bob.dy, p.z - sin * lateral)
+    camera.rotation.set(0, p.yaw, w.roll, 'YXZ')
+    // Share the live LOGICAL position so the town-plan map marker can track it.
     placePlayerPosition.x = p.x
     placePlayerPosition.z = p.z
+
+    if (import.meta.env.DEV) {
+      const win = window as unknown as Record<string, unknown>
+      const wfh = (win.__walkFeel ?? (win.__walkFeel = {})) as Record<string, unknown>
+      wfh.phase = w.phase
+      wfh.bobY = bob.dy
+      wfh.roll = w.roll
+      wfh.speed = speed
+      wfh.cameraY = EYE_HEIGHT + bob.dy
+      if (lastSurface) wfh.lastFootstepSurface = lastSurface
+    }
 
     // Walking against an entrance door opens the building (design.md §2);
     // the latch re-arms only after stepping away from the door.

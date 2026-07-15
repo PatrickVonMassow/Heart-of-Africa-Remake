@@ -658,7 +658,14 @@ verify suite that proves it.
       does not toggle while a debug field is focused; `design.md` §17.5),
       the working debug-menu controls in both languages, a nearby
       animal's proximity call rising and fading once the player leaves,
-      and the lion-feed depiction (pt. 12).
+      the lion-feed depiction (pt. 12), and the first-person walk feel
+      (point 97): while holding forward the camera y bobs off the 1.5 m
+      eye height and settles back to it at rest, and a footstep fires with
+      a surface class (`window.__walkFeel`). The walk-feel math — velocity
+      inertia, step-phase/footstep crossings, the speed-scaled bob and the
+      strafe-roll sign/clamp — is pure-tested in
+      `src/systems/walkFeel.test.ts`; the bob is camera-only and never
+      moves the logical position (interaction/door/leave-radius).
     - `scripts/verify/enrichments.mjs`: the zoom gate, at the zoom cap
       the built and visible far sheet, a fog far plane beyond 2000 and
       haze opacity ~0 with a screenshot (87), during a zoomed walk the

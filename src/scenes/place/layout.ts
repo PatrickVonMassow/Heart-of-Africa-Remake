@@ -94,6 +94,13 @@ function fenceRing(
  * non-enterable dwellings and outbuildings than functional buildings, a
  * path network and fences (design.md §2 "Lively, densely built settlements").
  */
+/** Whether a point lies on a lane (within its width) — the footstep-surface
+ *  classification (point 97): on a lane reads as a firmer stone/clay path, off
+ *  it as softer open ground. */
+export function isOnLane(x: number, z: number, paths: PathDef[]): boolean {
+  return paths.some((p) => closestOnPolyline(p.points, x, z).dist < p.width / 2)
+}
+
 export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
   const style = REGION_PLACE_STYLES[place.region]

@@ -25,6 +25,8 @@ On entering a village or a port city, the game switches to the first-person view
 
 Walking speed: inside settlements, walking forward is fastest; strafing sideways and walking backward move at a reduced factor of the forward speed (a calibratable value, default 80 %, adjustable in the debug menu §21). A diagonal is never faster than walking straight.
 
+Walk feel: the first-person walk reads as a person, not a floating camera. The velocity carries inertia — it eases up to speed and settles back to a stop rather than snapping (separate accelerate/settle time constants). While moving, the camera has a subtle head bob (a vertical rise-and-fall at twice the step rate, plus a half-rate lateral sway forming a gentle figure-eight), both scaling with speed so they fade to nothing on stopping; strafing leans the view into a small roll (a few degrees at most), smoothed and zero at rest; and standing still keeps a barely-perceptible idle sway so the camera never freezes dead. Each footstep plays a short procedural sound whose timbre matches the surface underfoot (softer on open ground, firmer on a lane/stone path), through the single ambience volume (§21). All of this is CAMERA/feel only: the head bob never shifts the logical position used for interaction, doors or the leave-radius, and it is calibratable in the debug menu (§21). (Walk speed itself is unchanged — 10 m/s, §21.)
+
 ### 2.3 Switching (walk in, walk out)
 
 Entering and leaving a settlement happen purely through movement, without a dedicated key:

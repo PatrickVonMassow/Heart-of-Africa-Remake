@@ -164,6 +164,23 @@ export interface BalanceConfig {
     /** Radius in degrees for reopening/discovering a camp. */
     campRadiusDeg: number
   }
+  /** First-person walk feel inside settlements (design.md §2, point 97). */
+  walkFeel: {
+    /** Velocity ease time constants (s): ramp up, settle down. */
+    accelTau: number
+    decelTau: number
+    /** Step-phase radians advanced per metre walked (cadence). */
+    stepCadence: number
+    /** Head-bob amplitudes at full speed (m): vertical, lateral figure-eight. */
+    bobAmp: number
+    swayAmp: number
+    /** Max strafe roll (deg) and its smoothing time constant (s). */
+    maxRollDeg: number
+    rollTau: number
+    /** Barely-visible idle sway when standing (m, < 0.01) and its rate (rad/s). */
+    idleSwayAmp: number
+    idleSwayRate: number
+  }
   /** §2.5 panorama wildlife: distant drifting silhouettes (points 92/94). */
   panoramaWildlife: {
     /** Ring distance beyond the settlement edge: innerRadius + inner..(+spread). */
@@ -302,6 +319,17 @@ export const balance: BalanceConfig = {
   camps: {
     lootChancePerDay: 0.03,
     campRadiusDeg: 0.3,
+  },
+  walkFeel: {
+    accelTau: 0.10, // brisk ramp-up, no rubber-banding
+    decelTau: 0.06, // settles a touch faster than it starts
+    stepCadence: 0.9, // step-phase rad per metre (≈ a stride every ~1.7 m at bob 2x)
+    bobAmp: 0.045, // m vertical head bob at full speed
+    swayAmp: 0.025, // m lateral figure-eight
+    maxRollDeg: 2.5, // strafe lean
+    rollTau: 0.09,
+    idleSwayAmp: 0.004, // m — well under a centimetre
+    idleSwayRate: 0.7,
   },
   panoramaWildlife: {
     ringInner: 55, // was +14..28: far too close, so the silhouettes loomed

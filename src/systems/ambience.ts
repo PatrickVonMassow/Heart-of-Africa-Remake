@@ -316,6 +316,37 @@ function applyScene() {
   applyAnimalTargets()
 }
 
+/**
+ * A single footstep (point 97): a short filtered-noise impulse through the
+ * master bus, so it respects the single ambience volume like every other
+ * sound. Duller and softer on open ground/sand, harder and brighter on a
+ * stone/clay path. One-shot — no layer, no scheduling.
+ */
+export function emitFootstep(surface: 'ground' | 'stone') {
+  if (!ctx || !master) return
+  const t0 = ctx.currentTime
+  const dur = surface === 'stone' ? 0.09 : 0.13
+  const buffer = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = surface === 'stone' ? 1400 : 680
+  filter.Q.value = surface === 'stone' ? 1.2 : 0.7
+  const g = ctx.createGain()
+  const peak = (surface === 'stone' ? 0.5 : 0.38) * balance.ambienceVolume
+  g.gain.setValueAtTime(0.0001, t0)
+  g.gain.linearRampToValueAtTime(peak, t0 + 0.006)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+  src.connect(filter)
+  filter.connect(g)
+  g.connect(master)
+  src.start(t0)
+  src.stop(t0 + dur + 0.02)
+}
+
 /** Report the closest wildlife to the player (design.md §19): each field is a
  *  0..1 proximity that raises that voice's calls, scaled by the ambience
  *  volume. Called every frame by the travel scene while animals are near. */

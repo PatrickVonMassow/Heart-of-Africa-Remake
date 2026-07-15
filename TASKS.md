@@ -1492,7 +1492,7 @@ as-is; only the sequence changes.
   3000 ms; with that green, tighten the pt. 86 leave timeout in
   `scripts/verify/polish.mjs` back from 45 s to 15 s. Record the
   measured before/after numbers in this point's tick note.
-- [ ] 97. First-person walking inside settlements feels artificial (user
+- [x] 97. First-person walking inside settlements feels artificial (user
   report): movement snaps to full speed instantly, the camera is rigidly
   fixed at eye height, and steps are silent. Add a first stage of walk-feel
   polish to the PlaceScene player controller — scope is EXACTLY the five
@@ -1547,6 +1547,18 @@ as-is; only the sequence changes.
   regression. design.md §2 records the walk-feel rules. Scoped suites per
   the diff mapping (`src/scenes/place/` → collision, polish, settings;
   plus Vitest), then full regression.
+  TRACK: pure `src/systems/walkFeel.ts` (easeSpeed inertia with split
+  accel/decel taus, advanceStepPhase footstep crossings, headBob
+  figure-eight fading with speed, strafeRollTarget, easeToward, idleSway)
+  + 14 Vitest cases; `emitFootstep(surface)` in ambience.ts (filtered
+  noise, stone vs. ground timbre, ambience-gain aware); PlaceScene walk
+  block rebuilt on eased velocity with step-phase footsteps (surface via
+  layout `isOnLane`), camera-only bob/roll/idle-sway, snap-to-zero for an
+  exact resting EYE_HEIGHT, dev hook `window.__walkFeel`; balance
+  `walkFeel` block (all debug-editable, walk speed unchanged);
+  settings.mjs live gate (bob oscillates walking, settles to 1.5 m at
+  rest, footstep surface class). design.md §2.2 + CLAUDE.md pt. 20
+  updated. Full regression green (17 suites).
 
 - [x] 98. Jump-to covers every named map point, grouped and sorted (user
   request while testing SSR: Victoria Falls and Lake Victoria were
