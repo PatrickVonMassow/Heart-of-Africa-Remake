@@ -2798,6 +2798,88 @@ as-is; only the sequence changes.
   CLAUDE.md §7.1 pt. 12/20 (the tunable). One atomic commit.
   (Reported 15.07.2026.)
 
+- [ ] 128. Scavenger vultures still sink into the ground at a carcass.
+  User report + screenshot (15.07.2026, deployed build): "Geier clippen immer
+  noch in den Boden rein" — a bird feeding at a carcass is half inside the
+  terrain. "Still" is the key word: the suite has a green check for exactly this
+  ('no landed vulture sinks into the terrain while feeding'), so the check does
+  not cover what the user sees.
+  ROOT CAUSE (found by reading `src/scenes/travel/Wildlife.tsx`, no repro needed
+  — the two vulture systems are built differently):
+  * The KILL FLOCK (~2415-2437) does it right: for every bird it samples the
+    terrain UNDER THAT BIRD's own offset (`f.x + lx, f.z + lz`) and lifts it by
+    `lift = max(0, terrainHeight - killGroundY)`, then `ly = lift + 0.15 + hop`.
+    Rising ground beside the remnant therefore pushes each bird up.
+  * The SCAVENGER (~1437-1460) — the lone bird that works a trampled/non-lion
+    carcass, i.e. the one in the user's screenshot — only lifts the GROUP:
+    `sc.y = target.y + 0.5`, the carcass's own height plus a fixed 0.5. Its
+    birds are then scattered at radius `0.5 + i * 0.35` (over a unit away) with
+    a "positive-only hop", but with NO per-bird terrain lift. On ground that
+    rises more than the fixed 0.5 across that offset, the bird sinks in.
+  * And it is invisible to the tests: `clearance.current` is only ever written
+    from `killMinClear` (~2437), so `__vultures.clearance` — and the check built
+    on it — reports the FLOCK only. The scavenger has never been measured.
+  FIX (one atomic commit):
+  (a) Give the scavenger's landed birds the same per-bird terrain lift the kill
+      flock already uses; factor the shared "lift a landed bird onto its own
+      ground" maths into one pure helper rather than copying it, so the two
+      systems cannot drift apart again.
+  (b) Report the scavenger's landed clearance into `clearance.current` too (the
+      minimum over BOTH systems), so the existing check actually covers it.
+  (c) Re-check the fixed `+0.5` group offset against the model: `buildVulture`
+      (`src/render/fauna.ts` ~443) has its body sphere reaching ~0.096 below the
+      origin, so the offset is not the main sinner — the missing per-bird lift
+      is. Do not paper over (a) by simply raising 0.5.
+  TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`) for the extracted
+  lift helper: flat ground lifts nothing, rising ground lifts by exactly the
+  rise, falling ground never pulls a bird DOWN (positive-only). Live
+  (`scripts/verify/enrichments.mjs`): extend the existing sink check to a
+  SCAVENGER carcass on sloped ground (the current one only exercises the flock)
+  and tighten the tolerance — it currently passes anything above -0.05, i.e. it
+  tolerates a 5 cm sink; a landed bird should never be below its own ground at
+  all. DOCS: design.md §19.6, CLAUDE.md §7.1 pt. 12. (Reported 15.07.2026.)
+
+- [ ] 129. Traveller blocked in open ground with nothing visible (NOT
+  reproducible yet — needs the user's exact spot).
+  User report (15.07.2026, screenshots): at ~13.5°N / 10.6°E (West region,
+  inland Niger) the traveller cannot walk WEST (an earlier report said EAST at a
+  similar spot); north is blocked by a visible tree, which the user accepts. To
+  the west there is nothing to see.
+  INVESTIGATION SO FAR (scratch repro via `debugJumpTo(13.5, 10.6)` + driven
+  keys): at that coordinate ALL FOUR directions move freely (W -10.1, E +11.5,
+  N -11.3, S +11.9) and `collidableFloraNear` returns an EMPTY list — no
+  obstacle stands there at all. So the block is not at the nominal coordinate:
+  the position readout rounds to 0.1° (~0.5 world units at this latitude), and
+  the user is pressed somewhere inside that patch, almost certainly against the
+  tree that blocks their north.
+  HYPOTHESES to test, in order:
+  (a) A resting contact that also kills the tangential move. `resolveTravelMove`
+      (`src/systems/movement.ts` ~94-180) is supposed to allow this (point 113
+      added the slide, and `movement.test.ts` pins "away/tangent moves from a
+      resting contact stay free") — but the pure test uses ONE circle. Check TWO
+      overlapping trees, and the interaction of the per-obstacle slide with the
+      final 8-iteration `pushOutOfCircles`: the de-penetration may be undoing the
+      tangential progress the slide just made.
+  (b) The rendered canopy is far wider than the collision radius (`baseR` 0.3-1.0
+      in `COLLIDABLE_FLORA`, TravelScene.tsx ~664), so "nothing visible west"
+      does not rule out a collision circle west — verify against the real list,
+      not the picture.
+  (c) `collidableFloraNear`'s `QUERY = 3` window (~684) and its 3×3 chunk
+      neighbourhood: confirm no obstacle can act on the traveller from outside
+      the queried set (an asymmetric window would block one direction only —
+      which would fit "west but not east" exactly). This is the most promising
+      lead for a DIRECTIONAL block.
+  NEEDED FROM THE USER if (a)-(c) do not reproduce it: the exact spot. Ask for a
+  reproducible walk (e.g. jump to the coordinate, then which way they walked into
+  the tree), or add a debug readout of the raw position and the active obstacle
+  circles. A dev hook for the obstacle list (`__vegetation.obstaclesNear`) was
+  added during this investigation — keep it, the fix's live check wants it.
+  TESTS: pure (`src/systems/movement.test.ts`) for whatever (a)/(c) turns up —
+  at minimum, a resting contact against two overlapping circles must leave every
+  tangential and outward direction free. Live: walk into a tree and prove all
+  three free directions still move. DOCS: CLAUDE.md §7.1 pt. 4 if the rule
+  sharpens. (Reported 15.07.2026.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

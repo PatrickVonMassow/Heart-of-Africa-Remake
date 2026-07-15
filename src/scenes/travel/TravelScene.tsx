@@ -766,7 +766,12 @@ function Vegetation() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__vegetation = { visible: () => !hiddenRef.current }
+    w.__vegetation = {
+      visible: () => !hiddenRef.current,
+      // The collidable dressing the traveller is actually tested against, so a
+      // blocked step can be traced to the circle that blocks it.
+      obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
+    }
     return () => {
       delete w.__vegetation
     }
