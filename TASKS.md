@@ -1475,8 +1475,7 @@ as-is; only the sequence changes.
   only). CLAUDE.md pt. 5 updated. Vitest 1427, flow 32 green.
   (track: 14.07. 22:00 -> 22:11, ~11 min, ~30k in / ~7k out, model
   claude-opus-4-8[1m], effort high, thinking on, autonomous batch, dontAsk))
-- [ ] 96. DEFERRED (user-excluded from the batch — do NOT auto-resume onto
-  this point; the batch-resume hook skips any line tagged DEFERRED). Leaving a
+- [x] 96. Leaving a
   settlement freezes the game for ~13-16 s once several
   settlements were visited in a session (found via the polish gate racing
   its 15 s timeout; measured 13.5 s with the baked textures and 15.7 s
@@ -1511,6 +1510,39 @@ as-is; only the sequence changes.
   3000 ms; with that green, tighten the pt. 86 leave timeout in
   `scripts/verify/polish.mjs` back from 45 s to 15 s. Record the
   measured before/after numbers in this point's tick note.
+  TRACK (special provenance: implemented by the unwanted parallel
+  headless session — the user's accidentally-closed 14.07 window — then
+  audited, completed and committed by this session on the user's order):
+  ROOT CAUSE (CDP-profiled by the parallel session, A/B-verified here):
+  unmounting the travel scene disposed its materials, and each remount
+  built a fresh CSMShadowNode whose setup() renames its cascade uniform
+  buffer in every shadow-receiving material's generated code — so the
+  first draw after leavePlace() re-linked the whole travel program set
+  synchronously (getProgramParameter self-time). MEASURED: leave after
+  4+ settlement visits 9.9-10.1 s on clean HEAD (13-16 s originally under
+  load) → 955-1599 ms fixed (polish gate < 3000 ms, timeout 45 s → 15 s).
+  FIX: module singletons for every travel material (terrain incl. its
+  textures, water, river/lake, border, far sheet, bone/ivory/landmark),
+  the sun+CSM (StableCSMShadowNode memoizes setup, fog/hemi singletons)
+  and the instanced dressing/wildlife pools. COMPLETION by this session:
+  the parallel session's blanket dispose={null} on the scene root leaked
+  the ~270 per-mount JSX geometries per place visit (12-cycle probe:
+  +270/cycle linear, no plateau) — replaced by SURGICAL per-element
+  dispose={null} on singleton-referencing elements only, plus module
+  caches for the heavy per-mount geometries (seed-keyed chunk cache,
+  rivers+lakes bundle, border geometry, hunt/vulture/graveyard geos,
+  water plane). Leak after: +9 geometries/+1 texture per cycle — BETTER
+  than the pre-fix baseline (+57/+15); residue is pre-existing.
+  Companion fix (own commit): the Timbuktu mosque was silently missing
+  in ~6 % of seeds (all four preferred spots occupied — the polish
+  "flake") — a deterministic golden-angle sweep now guarantees placement,
+  sweep-tested across 120 seeds. Full regression ALL GREEN (18 suites,
+  1490 Vitest, first fully flake-free run), lint/audit clean.
+  (track: 15.07. ~07:30 -> 08:01 parallel session (killed), 09:01 -> 10:35
+  this session: audit, A/B, leak probes, surgical completion, ~180k in /
+  ~35k out combined estimate, model claude-fable-5[1m] (parallel leg) +
+  claude-opus-4-8[1m]→claude-fable-5[1m] (this leg), effort high, thinking
+  on, user-ordered takeover, dontAsk)
 - [x] 97. First-person walking inside settlements feels artificial (user
   report): movement snaps to full speed instantly, the camera is rigidly
   fixed at eye height, and steps are silent. Add a first stage of walk-feel
@@ -1864,6 +1896,110 @@ as-is; only the sequence changes.
   unchanged; shot 105), enrichments (Cairo vicinity = exactly 6 = min, so
   seeding fired). Full regression green (18 suites; two different RAF
   wildlife checks flaked across runs, all green on a clean standalone run).
+
+- [ ] 103. Version tag `v0.1` plus a permanently playable frozen build of it
+  on GitHub Pages, while the existing page keeps tracking main (user
+  request 15.07.2026). GitHub allows ONE Pages site per repository, so the
+  frozen stand is served as a SUBPATH of the same site, not a second site:
+  `…github.io/Heart-of-Africa-Remake/` stays the main build (unchanged),
+  `…github.io/Heart-of-Africa-Remake/v0.1/` serves the tag build forever.
+
+  (a) TAG. After the preceding points (96, 100 AND 104 — the demo start
+  defaults, user insertion 15.07.) and their Closing are committed and
+  pushed, create an annotated tag on that HEAD and push it:
+  `git tag -a v0.1 -m "POC 0.1 — first frozen playable stand" && git push
+  origin v0.1`. The tag must include the leave-freeze fix (96) and the TTS
+  cold-start fix (100) so the frozen demo plays cleanly.
+
+  (b) WORKFLOW. Extend `.github/workflows/deploy-pages.yml`'s `build` job
+  (anchor: the step named `Build`, currently `npm run build`, which uses
+  the `GITHUB_ACTIONS`-gated base `/Heart-of-Africa-Remake/` from
+  `vite.config.ts`). After the main build and BEFORE `Upload Pages
+  artifact`, add steps that (1) check out the tag into a separate
+  directory: `git fetch --depth 1 origin tag v0.1` and `git worktree add
+  v0.1-src v0.1` (the runner clone is shallow — the fetch makes the tag
+  available); (2) install its dependencies (`npm ci` inside `v0.1-src`);
+  (3) build it with the subpath base, overriding the config on the CLI:
+  `npx vite build --base=/Heart-of-Africa-Remake/v0.1/` (run in
+  `v0.1-src`; `tsc -b` first, mirroring `npm run build`); (4) copy
+  `v0.1-src/dist` to `dist/v0.1` so the single Pages artifact carries
+  both. The `Upload Pages artifact` step stays pointed at `dist`. Guard
+  the tag steps with a tag-exists check (`git ls-remote --tags origin
+  v0.1` non-empty) so the workflow still deploys main-only before the tag
+  exists (no hard failure). Keep permissions/concurrency unchanged.
+
+  (c) VERIFY. Locally (no browser needed): run the subpath build once
+  (`npx vite build --base=/Heart-of-Africa-Remake/v0.1/`) and assert the
+  emitted `dist/index.html` references assets under
+  `/Heart-of-Africa-Remake/v0.1/assets/…` (a grep suffices — this proves
+  the base override reaches every asset URL, incl. the TTS worker chunk);
+  restore the normal `dist` afterwards (`npm run build`). CI-side: after
+  the next main push, confirm the workflow run is green and BOTH URLs
+  load (the user can play-check `/v0.1/`; a `curl -I` 200 on
+  `…/v0.1/index.html` is the automated smoke). README: add a "Versions"
+  note naming both URLs (main = latest, `/v0.1/` = frozen POC 0.1).
+  No game code, no language files, no design.md change (pure release
+  engineering; CLAUDE.md untouched — §7.1 gains no new point).
+  EXECUTION ORDER: worked AFTER point 104 (the tag freezes the stand
+  including the demo start defaults).
+
+- [ ] 104. Demo-friendly game-start defaults (user request 15.07.2026,
+  BEFORE the v0.1 tag — point 103 freezes this stand). Four changes to
+  what a NEW game starts with; every survival mechanic stays implemented
+  and debug-adjustable (§21), only the DEFAULTS move to a relaxed
+  exploration preset:
+
+  (a) STARTING INVENTORY. A new game starts with one each of shovel,
+  rope, machete, rifle, medicine and canteen — the canteen FULL (100 %).
+  Anchor: `newGame()` in `src/state/store.ts` currently starts with
+  `equipment: {}`; give it the six items (`canoe` stays unowned) and set
+  `canteenFill` to `balance.health.canteenCapacity`. The starting
+  capacity check must still hold (raise nothing: 6 items fit the default
+  capacity; assert in the test). Money stays $250, start stays Cairo 1890
+  (design.md fixed values).
+
+  (b) ZERO CONSUMPTION BY DEFAULT. `balance.foodPerDay` 1 → 0 and BOTH
+  canteen drain rates (`balance.health.canteenDrainPerDay`,
+  `canteenDesertDrainPerDay`) → 0, so provisions and canteen fill do not
+  drain per travelled day by default. The mechanics stay fully
+  implemented: the debug menu edits all three at runtime (§21.2 —
+  fields already exist). Tests that EXERCISE hunger/thirst mechanics
+  (`src/state/store.health.test.ts`, expedition/economy tests relying on
+  food drain) must set their rates explicitly in the test instead of
+  relying on defaults — grep for assertions that break and inject
+  non-zero rates locally; the balance-defaults test
+  (`src/config/balance.test.ts`) pins the new zeros.
+
+  (c) RANDOM EVENTS OFF BY DEFAULT. `balance.randomEventsEnabled`
+  true → false. The debug menu keeps its toggle (§21.3) and the direct
+  event triggers stay; `src/state/store.events.test.ts` enables the
+  system explicitly where it asserts autonomous firing (its
+  silence-when-disabled case now mirrors the default). The §14.4
+  first-time danger warnings stay untouched (they are not random events).
+
+  (d) ALPHABETICAL INVENTORY. The inventory bar lists owned gear
+  alphabetically by the LOCALIZED display name (re-sorts on language
+  switch), treasures after gear (alphabetical too), instead of the
+  roster/acquisition order. Anchor: `InventoryBar` in `src/ui/Hud.tsx`
+  builds `owned` from `Object.keys(equipment)`; sort by the i18n label
+  before rendering.
+
+  Verifiable: `src/state/store.saveload.test.ts` or a new
+  `newGame`-focused case asserts the six start items + full canteen +
+  events-off; `src/config/balance.test.ts` pins foodPerDay 0 and both
+  canteen drains 0; `src/ui/Hud.test.tsx` asserts the alphabetical order
+  in both languages (e.g. de: Feldflasche < Gewehr < Machete < Medizin
+  < Schaufel < Seil; en: Canteen < Machete < Medicine < Rifle < Rope
+  < Shovel); a full-regression pass proves no suite silently depended on
+  the old defaults (flow.mjs buys food/gifts explicitly, so the core
+  loop is unaffected). design.md records the relaxed start preset (§5/§6
+  provisions/canteen defaults, §14.3 events default-off, §6.1/§17.1
+  starting gear + sorted bar) and CLAUDE.md §7.1 adjusts wherever it
+  names the old defaults (pt. 4 provisions advance → date advances,
+  provisions drain only with a non-zero rate; pt. 23 rates "calibrated
+  low" → default OFF, debug-enabled). Both docs per the standing rule.
+  EXECUTION ORDER (user, 15.07.): directly after point 100; ONE Closing
+  pass follows 100+104 together, then point 103 tags the stand.
 
 ## Closing (only after all points)
 

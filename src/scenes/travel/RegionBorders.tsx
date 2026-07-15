@@ -12,6 +12,19 @@ import { sampleTerrain } from '../../world/terrain'
 import { useStrings } from '../../i18n'
 import { buildBorderGeometry, BORDER_INK } from './borderGeometry'
 
+// Module singletons (point 96): material and geometry are reused across
+// travel remounts — the material keeps its program in the renderer cache, the
+// seed-keyed geometry skips the border sweep's terrain sampling on re-entry
+// (a fresh run disposes and rebuilds).
+let borderMaterialCache: THREE.MeshStandardNodeMaterial | null = null
+let borderGeometryCache: { seed: number; geometry: THREE.BufferGeometry } | null = null
+function getBorderGeometry(seed: number): THREE.BufferGeometry {
+  if (borderGeometryCache && borderGeometryCache.seed === seed) return borderGeometryCache.geometry
+  borderGeometryCache?.geometry.dispose()
+  borderGeometryCache = { seed, geometry: buildBorderGeometry(seed) }
+  return borderGeometryCache.geometry
+}
+
 const LABEL_SPACING_DEG = 4
 const LABEL_OFFSET_DEG = 0.9
 const LABEL_VIEW_RADIUS = 55 // world units around the player
@@ -60,8 +73,9 @@ function BorderLabels({ seed }: { seed: number }) {
 
 export function RegionBorders() {
   const seed = useGame((s) => s.seed)
-  const geometry = useMemo(() => buildBorderGeometry(seed), [seed])
+  const geometry = useMemo(() => getBorderGeometry(seed), [seed])
   const material = useMemo(() => {
+    if (borderMaterialCache) return borderMaterialCache
     // A STANDARD node material like the terrain itself — opaque, and it writes
     // both depth AND a ground-facing normal into the MRT scene pass. The old
     // transparent basic material wrote no valid normal, so the screen-space AO
@@ -74,10 +88,9 @@ export function RegionBorders() {
     m.roughness = 0.95
     m.metalness = 0
     m.side = THREE.DoubleSide // ribbon winding varies with border direction
+    borderMaterialCache = m
     return m
   }, [])
-  useEffect(() => () => geometry.dispose(), [geometry])
-  useEffect(() => () => material.dispose(), [material])
 
   // Dev hook for the headless verification (CLAUDE.md §7.2, point 101): report
   // the ink tone and material type, and project a near-player border vertex to
@@ -117,7 +130,7 @@ export function RegionBorders() {
 
   return (
     <>
-      <mesh geometry={geometry} material={material} renderOrder={1} />
+      <mesh geometry={geometry} material={material} renderOrder={1} dispose={null} />
       <BorderLabels seed={seed} />
     </>
   )

@@ -37,15 +37,23 @@ const FOG_PRESETS: Record<RegionId, FogPreset> = {
 
 const HAZE_LAYERS = 5
 
+// MODULE singletons (point 96): scene.fog participates in every material's
+// pipeline cache key, so a fresh Fog instance per mount would invalidate and
+// re-link the whole travel program set on re-entry after a place visit.
+const TRAVEL_FOG = new THREE.Fog('#cfe0ea', 95, 260)
+const TRAVEL_BACKGROUND = new THREE.Color('#cfe0ea')
+
 export function Climate() {
   const scene = useThree((s) => s.scene)
   const hazeGroup = useRef<THREE.Group>(null)
 
   // Imperative fog so near/far/color can be lerped smoothly per frame.
   useEffect(() => {
-    const fog = new THREE.Fog('#cfe0ea', 95, 260)
-    scene.fog = fog
-    scene.background = new THREE.Color('#cfe0ea')
+    TRAVEL_FOG.color.set('#cfe0ea')
+    TRAVEL_FOG.near = 95
+    TRAVEL_FOG.far = 260
+    scene.fog = TRAVEL_FOG
+    scene.background = TRAVEL_BACKGROUND
     return () => {
       scene.fog = null
       scene.background = null

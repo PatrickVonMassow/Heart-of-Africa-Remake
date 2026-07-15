@@ -236,11 +236,26 @@ if (mosque) {
 {
   const before = await page.evaluate(() => window.__placePanoramaActive ?? null)
   check('a direct enter without the travel scene falls back (no capture)', before === false, `active ${before}`)
-  await page.evaluate(() => { const g = window.__game.getState(); g.leavePlace() })
-  // Generous timeout: after several place mounts the main thread stalls
-  // ~13-16 s on this transition (pre-existing, measured on the pre-baked-
-  // texture build too; TASKS point 96), so 15 s raced the stall under load.
-  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
+  // Point 96 gate: this leave happens AFTER several settlement visits (the
+  // suite has entered masai, swahili, capetown, timbuktu, mongo and cairo by
+  // now) — exactly the recipe that used to freeze the main thread 13-16 s on
+  // synchronous shader re-links. With the module-singleton meshes/materials/
+  // CSM the travel programs survive the place visits, so the transition must
+  // stay fluid.
+  const leaveMs = await page.evaluate(async () => {
+    const t0 = performance.now()
+    window.__game.getState().leavePlace()
+    await new Promise((resolve) => {
+      const poll = () => {
+        if (!window.__game.getState().placeId) requestAnimationFrame(() => resolve(null))
+        else setTimeout(poll, 16)
+      }
+      poll()
+    })
+    return Math.round(performance.now() - t0)
+  })
+  check('leaving after several settlement visits stays fluid (point 96)', leaveMs < 3000, `${leaveMs} ms`)
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 15000 })
   // Compass probe (point 90): a magenta pillar is injected due WEST of the
   // capture point for exactly this capture — seed-independent orientation
   // proof (real water shifts with each seed's dune cover).

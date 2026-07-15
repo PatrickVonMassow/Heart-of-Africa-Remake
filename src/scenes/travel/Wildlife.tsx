@@ -689,10 +689,88 @@ function seedSettlementVicinity(
   }
 }
 
+// The wildlife InstancedMeshes are MODULE singletons (point 96): fresh
+// InstancedMesh objects per mount create fresh internal instance-matrix
+// buffer nodes, whose generated uniform names differ — every travel remount
+// then produced byte-new shader sources for the whole herd set and the
+// renderer re-linked them synchronously after leavePlace().
+interface WildlifeMeshPool {
+  adult: Record<Species, THREE.InstancedMesh>
+  calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
+  stain: THREE.InstancedMesh
+  material: THREE.MeshStandardMaterial
+  vultureGeo: THREE.BufferGeometry
+}
+let wildlifeMeshCache: WildlifeMeshPool | null = null
+function getWildlifeMeshes(): WildlifeMeshPool {
+  if (wildlifeMeshCache) return wildlifeMeshCache
+  const geometries: Record<Species, THREE.BufferGeometry> = {
+    elephant: buildElephant(),
+    giraffe: buildGiraffe(),
+    zebra: buildZebra(),
+    wildebeest: buildWildebeest(),
+    antelope: buildAntelope(),
+    warthog: buildWarthog(),
+    flamingo: buildFlamingo(),
+  }
+  const calfGeometries: Record<(typeof CALF_SPECIES)[number], THREE.BufferGeometry> = {
+    elephant: buildElephant(true),
+    giraffe: buildGiraffe(true),
+    zebra: buildZebraCalf(),
+    wildebeest: buildWildebeestCalf(),
+    antelope: buildAntelopeCalf(),
+    warthog: buildWarthogCalf(),
+  }
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
+  const adult = {} as Record<Species, THREE.InstancedMesh>
+  for (const sp of SPECIES) {
+    const m = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
+    m.castShadow = true
+    m.frustumCulled = false
+    m.count = 0
+    adult[sp] = m
+  }
+  const calf = {} as Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
+  for (const sp of CALF_SPECIES) {
+    const m = new THREE.InstancedMesh(calfGeometries[sp], material, MAX_CALF_INSTANCES)
+    m.castShadow = true
+    m.frustumCulled = false
+    m.count = 0
+    calf[sp] = m
+  }
+  const stain = new THREE.InstancedMesh(
+    new THREE.CircleGeometry(0.9, 16),
+    new THREE.MeshStandardMaterial({ color: '#a51512', roughness: 1, transparent: true, opacity: 0.8 }),
+    MAX_STAINS,
+  )
+  stain.frustumCulled = false
+  stain.count = 0
+  wildlifeMeshCache = { adult, calf, stain, material, vultureGeo: buildVulture() }
+  return wildlifeMeshCache
+}
+
+// Lion-hunt predator/prey geometries, module-cached for the same reason: the
+// scripted hunt remounts with the travel scene and must not rebuild (and,
+// under dispose={null}, leak) its geometry set per place visit.
+interface HuntGeos {
+  predator: Record<PredatorKind, THREE.BufferGeometry>
+  prey: Record<PreyKind, THREE.BufferGeometry>
+}
+let huntGeoCache: HuntGeos | null = null
+function getHuntGeos(): HuntGeos {
+  if (huntGeoCache) return huntGeoCache
+  huntGeoCache = {
+    predator: { lion: buildLion(), cheetah: buildCheetah(), leopard: buildLeopard(), hyena: buildHyena() },
+    prey: { zebra: buildZebra(), wildebeest: buildWildebeest(), antelope: buildAntelope(), warthog: buildWarthog() },
+  }
+  return huntGeoCache
+}
+
 /** Instanced herds, softly shuffling in place. */
 function Herds() {
   const seed = useGame((s) => s.seed)
-  const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
+  const pool = getWildlifeMeshes()
+  const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>(pool.adult)
   const herdsRef = useRef<Record<Species, Animal[]> | null>(null)
   // Chunks currently populated in herdsRef (streaming key set).
   const spawnedChunks = useRef(new Set<string>())
@@ -714,37 +792,11 @@ function Herds() {
     target: null,
   })
 
-  const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
-    () => ({
-      elephant: buildElephant(),
-      giraffe: buildGiraffe(),
-      zebra: buildZebra(),
-      wildebeest: buildWildebeest(),
-      antelope: buildAntelope(),
-      warthog: buildWarthog(),
-      flamingo: buildFlamingo(),
-    }),
-    [],
-  )
-  // Juveniles get their own baby-schema build (design.md §19): a bigger head
-  // on a shorter neck, a rounder body on leggy limbs, no adult ornaments.
-  const calfGeometries = useMemo<Record<(typeof CALF_SPECIES)[number], THREE.BufferGeometry>>(
-    () => ({
-      elephant: buildElephant(true),
-      giraffe: buildGiraffe(true),
-      zebra: buildZebraCalf(),
-      wildebeest: buildWildebeestCalf(),
-      antelope: buildAntelopeCalf(),
-      warthog: buildWarthogCalf(),
-    }),
-    [],
-  )
-  const calfMeshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
-    [],
-  )
-  const vultureGeo = useMemo(() => buildVulture(), [])
+  // Juveniles keep their own baby-schema build (design.md §19) — geometries,
+  // materials and meshes all live in the module pool (point 96).
+  const calfMeshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>(pool.calf)
+  const material = pool.material
+  const vultureGeo = pool.vultureGeo
 
   useEffect(() => {
     herdsRef.current = emptyHerds()
@@ -761,7 +813,7 @@ function Herds() {
   const nrm = useMemo(() => new THREE.Vector3(), [])
   const vpos = useMemo(() => new THREE.Vector3(), [])
   const vscl = useMemo(() => new THREE.Vector3(), [])
-  const stainMesh = useRef<THREE.InstancedMesh>(null)
+  const stainMesh = useRef<THREE.InstancedMesh>(pool.stain)
   // Each stain lies in the local slope plane (position + ground normal): a
   // horizontal disc on a hillside got wedges swallowed by the ground and read
   // as a Pac-Man (design.md §19).
@@ -775,11 +827,6 @@ function Herds() {
     const [nx, ny, nz] = groundNormal(x, z, heightAt)
     stains.current.push({ x, y: Math.max(0.02, heightAt(x, z)), z, nx, ny, nz })
   }
-  const stainGeo = useMemo(() => new THREE.CircleGeometry(0.9, 16), [])
-  const stainMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#a51512', roughness: 1, transparent: true, opacity: 0.8 }),
-    [],
-  )
 
   // Dev hook for the headless verification (CLAUDE.md §7.2). `restock` empties
   // every herd in place AND forgets the spawned chunks, so the next frame
@@ -1788,31 +1835,15 @@ function Herds() {
   return (
     <>
       {SPECIES.map((sp) => (
-        <instancedMesh
-          key={sp}
-          ref={(el) => {
-            meshRefs.current[sp] = el ?? undefined
-          }}
-          args={[geometries[sp], material, MAX_INSTANCES[sp]]}
-          castShadow
-          frustumCulled={false}
-        />
+        <primitive key={sp} object={pool.adult[sp]} dispose={null} />
       ))}
       {CALF_SPECIES.map((sp) => (
-        <instancedMesh
-          key={`${sp}-calf`}
-          ref={(el) => {
-            calfMeshRefs.current[sp] = el ?? undefined
-          }}
-          args={[calfGeometries[sp], material, MAX_CALF_INSTANCES]}
-          castShadow
-          frustumCulled={false}
-        />
+        <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
       ))}
-      <instancedMesh ref={stainMesh} args={[stainGeo, stainMat, MAX_STAINS]} frustumCulled={false} />
+      <primitive object={pool.stain} dispose={null} />
       <group ref={scavengeGroup} visible={false}>
         {[0, 1, 2].map((i) => (
-          <mesh key={i} geometry={vultureGeo} material={material} />
+          <mesh key={i} geometry={vultureGeo} material={material} dispose={null} />
         ))}
       </group>
     </>
@@ -1840,30 +1871,12 @@ function LionHunt() {
   // Module-shared state so the herds and vultures can react to the hunt.
   const state = useRef(LION_STATE)
 
-  // Predator meshes swapped per hunt so different hunters roam the plains.
-  const predatorGeo = useMemo<Record<PredatorKind, THREE.BufferGeometry>>(
-    () => ({
-      lion: buildLion(),
-      cheetah: buildCheetah(),
-      leopard: buildLeopard(),
-      hyena: buildHyena(),
-    }),
-    [],
-  )
-  // Prey meshes swapped per hunt so the predator takes varied, fitting game.
-  const preyGeo = useMemo<Record<PreyKind, THREE.BufferGeometry>>(
-    () => ({
-      zebra: buildZebra(),
-      wildebeest: buildWildebeest(),
-      antelope: buildAntelope(),
-      warthog: buildWarthog(),
-    }),
-    [],
-  )
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
-    [],
-  )
+  // Predator/prey meshes swapped per hunt so different hunters roam the
+  // plains and take varied game — geometries and material from the module
+  // pool (point 96): with the travel scene's dispose={null} a per-mount
+  // useMemo would leak a fresh geometry set on every place visit.
+  const { predator: predatorGeo, prey: preyGeo } = getHuntGeos()
+  const material = getWildlifeMeshes().material
   const stainUp = useMemo(() => new THREE.Vector3(0, 1, 0), [])
   const stainNrm = useMemo(() => new THREE.Vector3(), [])
   const stainFlat = useMemo(() => new THREE.Quaternion(), [])
@@ -2180,10 +2193,10 @@ function LionHunt() {
   return (
     <>
       <group ref={lion} visible={false}>
-        <mesh ref={predatorMesh} geometry={predatorGeo.lion} material={material} castShadow />
+        <mesh ref={predatorMesh} geometry={predatorGeo.lion} material={material} castShadow dispose={null} />
       </group>
       <group ref={prey} visible={false}>
-        <mesh ref={preyMesh} geometry={preyGeo.zebra} material={material} castShadow />
+        <mesh ref={preyMesh} geometry={preyGeo.zebra} material={material} castShadow dispose={null} />
       </group>
       <mesh ref={stain} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[1.1, 20]} />
@@ -2209,11 +2222,10 @@ function Vultures() {
   const killDescend = useRef(0)
   /** Dev/verify: this frame's minimum landed-bird clearance above ground. */
   const clearance = useRef(Infinity)
-  const geo = useMemo(() => buildVulture(), [])
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
-    [],
-  )
+  // Geometry/material from the module pool (point 96): no per-mount rebuild,
+  // no leak under the travel scene's dispose={null}.
+  const geo = getWildlifeMeshes().vultureGeo
+  const material = getWildlifeMeshes().material
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
@@ -2363,12 +2375,12 @@ function Vultures() {
     <>
       <group ref={group} visible={false}>
         {[0, 1, 2].map((i) => (
-          <mesh key={i} geometry={geo} material={material} />
+          <mesh key={i} geometry={geo} material={material} dispose={null} />
         ))}
       </group>
       <group ref={killGroup} visible={false}>
         {[0, 1, 2].map((i) => (
-          <mesh key={i} geometry={geo} material={material} />
+          <mesh key={i} geometry={geo} material={material} dispose={null} />
         ))}
       </group>
     </>

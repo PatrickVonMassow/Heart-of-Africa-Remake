@@ -227,7 +227,34 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
  * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
  * normal maps and bi-planar rock on steep slopes.
  */
+// Travel materials are MODULE singletons (point 96): a remounted travel scene
+// must reuse the same material instances, or the renderer builds ~100 fresh
+// programs per visit cycle and the first draw after leavePlace() links them
+// synchronously (~7-10 s main-thread freeze, CDP-profiled).
+let terrainMaterialCache: THREE.MeshStandardNodeMaterial | null = null
+let waterHandleCache: ReturnType<typeof createWaterMaterial> | null = null
+const FAR_TERRAIN_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })
+const BONE_MATERIAL = new THREE.MeshStandardMaterial({ color: '#c7bda6', roughness: 1, vertexColors: false })
+const IVORY_MATERIAL = new THREE.MeshStandardMaterial({ color: '#e9dec6', roughness: 0.65 })
+const LANDMARK_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
+
+// The water plane's geometry, shared across mounts (point 96): larger than
+// the fog far distance so its edge is never visible.
+const WATER_PLANE_GEOMETRY = new THREE.PlaneGeometry(CHUNK_SIZE * 30, CHUNK_SIZE * 30, 180, 180)
+
+// Seed-independent elephant-graveyard geometries (point 96), built lazily once.
+let graveyardGeoCache: { elephantGeo: THREE.BufferGeometry; tuskGeo: THREE.BufferGeometry; ribGeo: THREE.BufferGeometry } | null = null
+function getGraveyardGeos() {
+  if (graveyardGeoCache) return graveyardGeoCache
+  const tuskGeo = new THREE.ConeGeometry(0.1, 1.3, 6)
+  tuskGeo.rotateZ(Math.PI / 2)
+  const ribGeo = new THREE.CylinderGeometry(0.05, 0.06, 1.0, 5)
+  ribGeo.rotateZ(Math.PI / 2)
+  graveyardGeoCache = { elephantGeo: buildElephant(), tuskGeo, ribGeo }
+  return graveyardGeoCache
+}
 function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
+  if (terrainMaterialCache) return terrainMaterialCache
   const base = import.meta.env.BASE_URL
   const loader = new THREE.TextureLoader()
   const load = (name: string, srgb: boolean) => {
@@ -282,18 +309,28 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
   // Large-scale brightness variation keeps distant terrain from tiling.
   const macro = mx_fractal_noise_float(vec3(positionWorld.xz.mul(0.05), 1.0), 3).mul(0.5).add(0.5)
   mat.colorNode = mat.colorNode.mul(macro.mul(0.3).add(0.85))
+  terrainMaterialCache = mat
   return mat
 }
 
+// The chunk-geometry cache is MODULE state (point 96): under the travel
+// scene's dispose={null} a per-mount cache would leak every visited chunk's
+// GPU buffers on each place visit; the module cache instead REUSES them on
+// re-entry (no rebuild either). Seed-keyed — a new run disposes and restarts.
+const chunkGeometryCache = new Map<string, THREE.BufferGeometry>()
+let chunkCacheSeed: number | null = null
+
 function TerrainChunks() {
   const seed = useGame((s) => s.seed)
-  const cache = useRef(new Map<string, THREE.BufferGeometry>())
+  const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
   const lastCenter = useRef<string | null>(null)
   const material = useMemo(() => createTerrainMaterial(), [])
 
-  // Reset the cache when a new run (seed) starts.
+  // Reset the cache when a new run (seed) starts — NOT on remount.
   useEffect(() => {
+    if (chunkCacheSeed === seed) return
+    chunkCacheSeed = seed
     cache.current.forEach((g) => g.dispose())
     cache.current.clear()
     lastCenter.current = null
@@ -338,7 +375,7 @@ function TerrainChunks() {
       {active.map((key) => {
         const geo = cache.current.get(key)
         if (!geo) return null
-        return <mesh key={key} geometry={geo} material={material} receiveShadow />
+        return <mesh key={key} geometry={geo} material={material} receiveShadow dispose={null} />
       })}
     </>
   )
@@ -347,7 +384,7 @@ function TerrainChunks() {
 /** Animated water surface at sea level, following the player. */
 function WaterPlane() {
   const ref = useRef<THREE.Mesh>(null)
-  const { material, offset, calm, planeScale } = useMemo(() => createWaterMaterial(), [])
+  const { material, offset, calm, planeScale } = useMemo(() => (waterHandleCache ??= createWaterMaterial()), [])
   useFrame(() => {
     const pos = useGame.getState().pos
     const zoom = useUi.getState().travelZoom
@@ -381,10 +418,9 @@ function WaterPlane() {
     }
   }, [planeScale])
   return (
-    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} material={material}>
-      {/* Larger than the fog far distance, so its edge is never visible. */}
-      <planeGeometry args={[CHUNK_SIZE * 30, CHUNK_SIZE * 30, 180, 180]} />
-    </mesh>
+    // Geometry and material are module singletons; the whole element opts out
+    // of auto-dispose (point 96).
+    <mesh ref={ref} rotation={[-Math.PI / 2, 0, 0]} geometry={WATER_PLANE_GEOMETRY} material={material} dispose={null} />
   )
 }
 
@@ -449,7 +485,7 @@ function FarTerrain() {
   const seed = useGame((s) => s.seed)
   const zoom = useUi((s) => s.travelZoom)
   const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null)
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+  const material = FAR_TERRAIN_MATERIAL
 
   // Reset on a new game (the biome warp is seeded).
   useEffect(() => {
@@ -484,16 +520,53 @@ function FarTerrain() {
   // Sunk a little below the detailed chunks so they stay on top around the
   // traveller without z-fighting; at continent distance the offset (and the
   // slightly fattened coastline it causes) is imperceptible.
-  return <mesh geometry={geo} material={material} position={[0, -0.4, 0]} frustumCulled={false} />
+  return <mesh geometry={geo} material={material} position={[0, -0.4, 0]} frustumCulled={false} dispose={null} />
 }
 
 /**
  * Sun light tracking the player, with cascaded shadow maps (design.md §2):
  * high resolution near the camera, softer/coarser further out.
  */
+// The sun light, its target and the CSM shadow node are MODULE singletons
+// (point 96): a fresh CSMShadowNode per mount sits in every material's lights
+// graph, changes every pipeline cache key and forces the renderer to re-link
+// the whole travel program set on the first draw after leavePlace().
+const TRAVEL_HEMI_LIGHT = new THREE.HemisphereLight('#bdd7e8', '#8a7a55', 0.85)
+
+// CSMShadowNode.setup() creates fresh reference nodes on every lights-graph
+// rebuild, which renames its cascade uniform buffer in the GENERATED code of
+// every shadow-receiving material — so a travel remount produced ~80 byte-new
+// shader sources and the renderer re-linked them all synchronously (the point
+// 96 freeze). Memoizing the setup keeps the node graph — and therefore the
+// generated source — stable, and the code-keyed program cache hits instead.
+class StableCSMShadowNode extends CSMShadowNode {
+  private stableSetup: ReturnType<CSMShadowNode['setup']> = null
+  setup(builder: Parameters<CSMShadowNode['setup']>[0]): ReturnType<CSMShadowNode['setup']> {
+    this.stableSetup ??= super.setup(builder)
+    return this.stableSetup
+  }
+}
+
+let sunSingleton: { light: THREE.DirectionalLight; target: THREE.Object3D } | null = null
+function getSun() {
+  if (sunSingleton) return sunSingleton
+  const light = new THREE.DirectionalLight('#fff1da', 2.4)
+  light.castShadow = true
+  light.shadow.mapSize.set(2048, 2048)
+  light.shadow.camera.near = 10
+  light.shadow.camera.far = 400
+  light.shadow.bias = -0.0004
+  const target = new THREE.Object3D()
+  light.target = target
+  const csm = new StableCSMShadowNode(light, { cascades: 3, maxFar: 240, mode: 'practical' })
+  csm.fade = true
+  ;(light.shadow as unknown as { shadowNode: unknown }).shadowNode = csm
+  sunSingleton = { light, target }
+  return sunSingleton
+}
+
 function Sun() {
-  const lightRef = useRef<THREE.DirectionalLight>(null)
-  const targetRef = useRef<THREE.Object3D>(null)
+  const { light, target } = getSun()
   // The touch quality preset (point 84) halves the shadow-map resolution.
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowSize = shadowMapHalf ? 1024 : 2048
@@ -501,47 +574,24 @@ function Sun() {
   // A mapSize change only takes effect once the existing shadow render target
   // is freed, so three rebuilds it at the new resolution.
   useEffect(() => {
-    const map = lightRef.current?.shadow.map
+    if (light.shadow.mapSize.x === shadowSize) return
+    light.shadow.mapSize.set(shadowSize, shadowSize)
+    const map = light.shadow.map
     if (map) {
       map.dispose()
-      lightRef.current!.shadow.map = null as unknown as typeof map
+      light.shadow.map = null as unknown as typeof map
     }
-  }, [shadowSize])
-
-  // Attach the CSM shadow node once the light exists.
-  useEffect(() => {
-    const light = lightRef.current
-    if (!light) return
-    const csm = new CSMShadowNode(light, { cascades: 3, maxFar: 240, mode: 'practical' })
-    csm.fade = true
-    ;(light.shadow as unknown as { shadowNode: unknown }).shadowNode = csm
-    return () => {
-      ;(light.shadow as unknown as { shadowNode: unknown }).shadowNode = null
-    }
-  }, [])
+  }, [light, shadowSize])
 
   useFrame(() => {
     const pos = useGame.getState().pos
-    const l = lightRef.current
-    const t = targetRef.current
-    if (!l || !t) return
-    l.position.set(pos.x + SUN_DIR[0] * 130, SUN_DIR[1] * 130, pos.z + SUN_DIR[2] * 130)
-    t.position.set(pos.x, 0, pos.z)
-    l.target = t
+    light.position.set(pos.x + SUN_DIR[0] * 130, SUN_DIR[1] * 130, pos.z + SUN_DIR[2] * 130)
+    target.position.set(pos.x, 0, pos.z)
   })
   return (
     <>
-      <object3D ref={targetRef} />
-      <directionalLight
-        ref={lightRef}
-        castShadow
-        color="#fff1da"
-        intensity={2.4}
-        shadow-mapSize={[shadowSize, shadowSize]}
-        shadow-camera-near={10}
-        shadow-camera-far={400}
-        shadow-bias={-0.0004}
-      />
+      <primitive object={target} dispose={null} />
+      <primitive object={light} dispose={null} />
     </>
   )
 }
@@ -668,31 +718,45 @@ function collidableFloraNear(px: number, pz: number, seed: number): Array<[numbe
   return out
 }
 
+// The vegetation InstancedMeshes are MODULE singletons (point 96): a fresh
+// InstancedMesh per mount creates a fresh internal instance-matrix buffer
+// node whose generated uniform name differs, so every remount produced
+// byte-new shader sources for the whole dressing set and re-linked them
+// synchronously after leavePlace().
+let vegetationMeshCache: Record<Species, THREE.InstancedMesh> | null = null
+function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
+  if (vegetationMeshCache) return vegetationMeshCache
+  const geometries: Record<Species, THREE.BufferGeometry> = {
+    acacia: buildAcacia(),
+    jungle: buildJungleTree(),
+    palm: buildPalm(false),
+    bush: buildBush(),
+    rock: buildRock(),
+    baobab: buildBaobab(),
+    termite: buildTermiteMound(),
+    deadtree: buildDeadTree(),
+    papyrus: buildPapyrus(),
+    kopje: buildKopje(),
+  }
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 })
+  const out = {} as Record<Species, THREE.InstancedMesh>
+  for (const sp of SPECIES) {
+    const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    mesh.frustumCulled = false
+    mesh.count = 0
+    out[sp] = mesh
+  }
+  vegetationMeshCache = out
+  return out
+}
+
 function Vegetation() {
   const seed = useGame((s) => s.seed)
-  const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>({})
+  const meshes = getVegetationMeshes()
   const lastCenter = useRef<string | null>(null)
   const hiddenRef = useRef(false)
-
-  const geometries = useMemo<Record<Species, THREE.BufferGeometry>>(
-    () => ({
-      acacia: buildAcacia(),
-      jungle: buildJungleTree(),
-      palm: buildPalm(false),
-      bush: buildBush(),
-      rock: buildRock(),
-      baobab: buildBaobab(),
-      termite: buildTermiteMound(),
-      deadtree: buildDeadTree(),
-      papyrus: buildPapyrus(),
-      kopje: buildKopje(),
-    }),
-    [],
-  )
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }),
-    [],
-  )
 
   useEffect(() => {
     lastCenter.current = null // force rebuild on new run
@@ -715,8 +779,7 @@ function Vegetation() {
     if (hide !== hiddenRef.current) {
       hiddenRef.current = hide
       for (const sp of SPECIES) {
-        const mesh = meshRefs.current[sp]
-        if (mesh) mesh.visible = !hide
+        meshes[sp].visible = !hide
       }
     }
     if (hide) return
@@ -778,15 +841,14 @@ function Vegetation() {
           const sc = 0.75 + r4 * 0.55
           scl.set(sc, sc * (0.85 + roll * 0.3), sc)
           mtx.compose(new THREE.Vector3(x, s.height, z), quat, scl)
-          meshRefs.current[species]?.setMatrixAt(idx, mtx)
+          meshes[species].setMatrixAt(idx, mtx)
           counts[species] = idx + 1
         }
       }
     }
 
     for (const sp of SPECIES) {
-      const mesh = meshRefs.current[sp]
-      if (!mesh) continue
+      const mesh = meshes[sp]
       mesh.count = counts[sp]
       mesh.instanceMatrix.needsUpdate = true
     }
@@ -795,16 +857,7 @@ function Vegetation() {
   return (
     <>
       {SPECIES.map((sp) => (
-        <instancedMesh
-          key={sp}
-          ref={(el) => {
-            meshRefs.current[sp] = el ?? undefined
-          }}
-          args={[geometries[sp], material, MAX_INSTANCES[sp]]}
-          castShadow
-          receiveShadow
-          frustumCulled={false}
-        />
+        <primitive key={sp} object={meshes[sp]} dispose={null} />
       ))}
     </>
   )
@@ -1112,20 +1165,12 @@ function ElephantGraveyard() {
     return { center, groundY, carcasses, tusks: scatter(22), bones: scatter(16) }
   }, [seed])
 
-  const elephantGeo = useMemo(() => buildElephant(), [])
+  // Seed-independent geometries from the module cache (point 96): a per-mount
+  // useMemo would leak a fresh set on every place visit under dispose={null}.
+  const { elephantGeo, tuskGeo, ribGeo } = getGraveyardGeos()
   // Bleached carcass/bone material (flat, ignores the elephant's vertex colors).
-  const boneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#c7bda6', roughness: 1, vertexColors: false }), [])
-  const ivoryMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#e9dec6', roughness: 0.65 }), [])
-  const tuskGeo = useMemo(() => {
-    const g = new THREE.ConeGeometry(0.1, 1.3, 6)
-    g.rotateZ(Math.PI / 2)
-    return g
-  }, [])
-  const ribGeo = useMemo(() => {
-    const g = new THREE.CylinderGeometry(0.05, 0.06, 1.0, 5)
-    g.rotateZ(Math.PI / 2)
-    return g
-  }, [])
+  const boneMat = BONE_MATERIAL
+  const ivoryMat = IVORY_MATERIAL
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1153,7 +1198,7 @@ function ElephantGraveyard() {
       {layout.carcasses.map((c, i) => (
         <group key={`c${i}`} position={[c.x, 0, c.z]} rotation={[0, c.yaw, 0]}>
           <group position={[0, 0.8 * c.s, 0]} rotation={[0, 0, c.roll]} scale={c.s}>
-            <mesh geometry={elephantGeo} material={boneMat} castShadow />
+            <mesh geometry={elephantGeo} material={boneMat} castShadow dispose={null} />
           </group>
         </group>
       ))}
@@ -1167,11 +1212,12 @@ function ElephantGraveyard() {
           rotation={[t.tilt, t.rot, 0]}
           scale={t.s}
           castShadow
+          dispose={null}
         />
       ))}
       {/* Scattered rib bones. */}
       {layout.bones.map((b, i) => (
-        <mesh key={`b${i}`} geometry={ribGeo} material={boneMat} position={[b.x, 0.08 * b.s, b.z]} rotation={[0, b.rot, 0]} scale={b.s} castShadow />
+        <mesh key={`b${i}`} geometry={ribGeo} material={boneMat} position={[b.x, 0.08 * b.s, b.z]} rotation={[0, b.rot, 0]} scale={b.s} castShadow dispose={null} />
       ))}
     </group>
   )
@@ -1200,7 +1246,7 @@ function CulturalLandmarks() {
     }),
     [],
   )
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), [])
+  const material = LANDMARK_MATERIAL
   const items = useMemo(
     () =>
       CULTURAL_LANDMARKS.map((c, i) => {
@@ -1228,7 +1274,6 @@ function CulturalLandmarks() {
   useEffect(
     () => () => {
       Object.values(geos).forEach((g) => g.dispose())
-      material.dispose()
     },
     [geos, material],
   )
@@ -1244,6 +1289,7 @@ function CulturalLandmarks() {
           rotation={[0, it.yaw, 0]}
           castShadow
           receiveShadow
+          dispose={null}
         />
       ))}
     </>
@@ -1267,7 +1313,7 @@ function NaturalSites() {
     }),
     [],
   )
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), [])
+  const material = LANDMARK_MATERIAL
   const items = useMemo(
     () =>
       NATURAL_SITES.map((n, i) => {
@@ -1292,7 +1338,6 @@ function NaturalSites() {
   useEffect(
     () => () => {
       Object.values(geos).forEach((g) => g.dispose())
-      material.dispose()
     },
     [geos, material],
   )
@@ -1308,6 +1353,7 @@ function NaturalSites() {
           rotation={[0, it.yaw, 0]}
           castShadow
           receiveShadow
+          dispose={null}
         />
       ))}
     </>
@@ -1810,7 +1856,18 @@ export function TravelScene() {
   })
 
   return (
-    <>
+    // Disposal is SURGICAL here (point 96): every element that references a
+    // module-cached singleton (terrain/water/river materials, the CSM sun,
+    // the instanced dressing/wildlife pools, cached geometries) carries its
+    // own dispose={null}, so unmounting the travel scene never drops their
+    // shader programs from the renderer cache — releasing them made every
+    // later leave re-link the whole travel program set synchronously
+    // (~7-10 s main-thread freeze, CDP-profiled: getProgramParameter
+    // self-time). A blanket dispose={null} on this root is deliberately NOT
+    // used: it also spared the ~270 per-mount JSX geometries (player figure,
+    // markers, camps, waterfalls …) and leaked them on every place visit.
+    // See the leave-transition gate in scripts/verify/polish.mjs.
+    <group>
       {/* Named so the panorama capture can hide sky and weather: the band
           keeps alpha-0 sky, and the place scene's own dome shows through. */}
       <group name="travel-sky">
@@ -1819,7 +1876,7 @@ export function TravelScene() {
       <group name="travel-climate">
         <Climate />
       </group>
-      <hemisphereLight args={['#bdd7e8', '#8a7a55', 0.85]} />
+      <primitive object={TRAVEL_HEMI_LIGHT} dispose={null} />
       <Sun />
       <TerrainChunks />
       <FarTerrain />
@@ -1847,6 +1904,6 @@ export function TravelScene() {
         <GraveMarker />
       </group>
       <Player />
-    </>
+    </group>
   )
 }

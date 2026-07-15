@@ -217,8 +217,14 @@ function buildRivers(seed: number): {
  * coordinate, foam along the banks and white water where the flow attribute
  * rises (rapids, waterfalls).
  */
+// Module singletons (point 96): remounts must reuse the same materials so the
+// renderer keeps their programs (a fresh set re-links synchronously on the
+// first draw after leavePlace()).
+let riverMaterialCache: THREE.MeshStandardNodeMaterial | null = null
+let lakeMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
-  const m = new THREE.MeshStandardNodeMaterial()
+  if (riverMaterialCache) return riverMaterialCache
+  const m = riverMaterialCache = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
   m.roughness = 0.14
   m.metalness = 0.02
@@ -262,7 +268,8 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
 
 /** Calm lake surface: soft ripple, sky gloss, no current. */
 function createLakeMaterial(): THREE.MeshStandardNodeMaterial {
-  const m = new THREE.MeshStandardNodeMaterial()
+  if (lakeMaterialCache) return lakeMaterialCache
+  const m = lakeMaterialCache = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
   m.roughness = 0.1
   m.metalness = 0.02
@@ -334,10 +341,30 @@ function Spring({ spring }: { spring: SpringDef }) {
   )
 }
 
+// River ribbon + lake sheets, MODULE-cached by seed (point 96): under the
+// travel scene's dispose={null} a per-mount build would leak the whole river
+// network's GPU buffers on every place visit — the cache reuses them on
+// re-entry (and skips the CPU rebuild); a new run disposes and rebuilds.
+let riversBundleCache: {
+  seed: number
+  rivers: ReturnType<typeof buildRivers>
+  lakes: ReturnType<typeof buildLakeSurfaces>
+} | null = null
+function getRiversBundle(seed: number) {
+  if (riversBundleCache && riversBundleCache.seed === seed) return riversBundleCache
+  if (riversBundleCache) {
+    riversBundleCache.rivers.geometry.dispose()
+    riversBundleCache.lakes.forEach((l) => l.geometry.dispose())
+  }
+  riversBundleCache = { seed, rivers: buildRivers(seed), lakes: buildLakeSurfaces(seed) }
+  return riversBundleCache
+}
+
 export function RiversAndLakes() {
   const seed = useGame((s) => s.seed)
-  const { geometry, falls, springs, report } = useMemo(() => buildRivers(seed), [seed])
-  const lakes = useMemo(() => buildLakeSurfaces(seed), [seed])
+  const bundle = useMemo(() => getRiversBundle(seed), [seed])
+  const { geometry, falls, springs, report } = bundle.rivers
+  const lakes = bundle.lakes
   const riverMat = useMemo(() => createRiverMaterial(), [])
   const lakeMat = useMemo(() => createLakeMaterial(), [])
 
@@ -361,9 +388,9 @@ export function RiversAndLakes() {
 
   return (
     <>
-      <mesh geometry={geometry} material={riverMat} renderOrder={1} />
+      <mesh geometry={geometry} material={riverMat} renderOrder={1} dispose={null} />
       {lakes.map((l, i) => (
-        <mesh key={i} geometry={l.geometry} material={lakeMat} position={[0, l.y, 0]} renderOrder={1} />
+        <mesh key={i} geometry={l.geometry} material={lakeMat} position={[0, l.y, 0]} renderOrder={1} dispose={null} />
       ))}
       {falls.map((f, i) => (
         <Waterfall key={i} fall={f} />
