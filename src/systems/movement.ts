@@ -149,10 +149,33 @@ export function resolveTravelMove(
     // to the boundary and steering died the moment it touched a tree.
     if (tExit > 0 && tEnter < 1) {
       const t = Math.max(0, tEnter)
-      cx = sx + mx * t
-      cz = sz + mz * t
+      const hitx = sx + mx * t
+      const hitz = sz + mz * t
+      // Clamp to the contact (no tunnelling), then SLIDE the leftover move along
+      // the obstacle surface instead of killing it (point 113): a hard stop at
+      // the contact let two overlapping trees' opposing radial push-outs cancel
+      // and pin the traveller in their lens with no way out. Removing only the
+      // inward normal component keeps the tangential motion, so he slides free.
+      const lx = cx - hitx
+      const lz = cz - hitz
+      let nnx = hitx - obx
+      let nnz = hitz - obz
+      const nl = Math.hypot(nnx, nnz) || 1
+      nnx /= nl
+      nnz /= nl
+      const dot = lx * nnx + lz * nnz
+      const inward = Math.min(dot, 0) // only the part pushing into the surface
+      cx = hitx + (lx - nnx * inward)
+      cz = hitz + (lz - nnz * inward)
     }
   }
+  // The per-obstacle slide can leave the point a hair inside a DIFFERENT
+  // obstacle it slid toward; a final radial de-penetration guarantees the
+  // resolved position never rests inside any body (point 113), without undoing
+  // the tangential progress that frees an overlapping-obstacle pin. A few
+  // iterations settle the point at the mouth of two overlapping bodies (each
+  // single pass pushing out of one nudges toward the other).
+  for (let i = 0; i < 8; i++) [cx, cz] = pushOutOfCircles(cx, cz, obstacles, selfR)
   return [cx, cz]
 }
 

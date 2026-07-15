@@ -159,6 +159,23 @@ describe('resolveTravelMove (swept tree/animal collision, design.md §19)', () =
     expect(dist(p, 0, 0)).toBeGreaterThanOrEqual(1.5 - 1e-6)
   })
 
+  it('frees a traveller pinned in the lens between two overlapping obstacles (point 113)', () => {
+    // Two trees whose collision bodies overlap; the traveller starts inside the
+    // lens where each one's radial push-out points opposite the other's. A hard
+    // clamp swallowed the escape direction and trapped him on the axis; sliding
+    // keeps the tangential motion, so steering out (here: north) walks him clear.
+    const A: [number, number, number] = [0, 0, 0.6]
+    const B: [number, number, number] = [1.5, 0, 0.6]
+    const obs = [A, B]
+    let px = 0.75
+    let pz = 0.1
+    for (let s = 0; s < 40; s++) {
+      ;[px, pz] = resolveTravelMove(px, pz, px, pz + 0.15, obs, 0.4)
+    }
+    expect(dist([px, pz], A[0], A[1])).toBeGreaterThanOrEqual(0.6 + 0.4 - 0.02)
+    expect(dist([px, pz], B[0], B[1])).toBeGreaterThanOrEqual(0.6 + 0.4 - 0.02)
+  })
+
   // Property sweep: for a dense grid of start angles/distances and step
   // directions/lengths around one obstacle, the resolved position is never
   // inside the body, never NaN, and a step pointing strictly away from a

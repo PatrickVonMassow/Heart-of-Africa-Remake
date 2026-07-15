@@ -2266,7 +2266,7 @@ as-is; only the sequence changes.
   types.ts). DebugMenu.test covers render+write-through; a browser smoke confirmed
   the graph builds with 0 console errors. Vitest 1496, build/lint clean.
 
-- [ ] 113. In the bird's-eye/travel view, walking into a tree leaves the traveller
+- [x] 113. In the bird's-eye/travel view, walking into a tree leaves the traveller
   stuck inside it — he cannot get out (user report). CLAUDE §7.1 pt.4/pt.12 already
   require non-pinning collision with trees/animals ("steering away moves him clear — a
   collision never pins the traveller"), so this is a bug against the acceptance rule.
@@ -2285,6 +2285,15 @@ as-is; only the sequence changes.
   add a live check in enrichments.mjs mirroring the animal one (pin a tree on the
   player, assert a subsequent away-move increases clearance and never pins). design.md
   §11/§19 unchanged (already requires it). One atomic commit.
+  DONE: reproduced a real PIN the existing tests missed — two OVERLAPPING tree
+  bodies whose radial push-outs point opposite, trapping the traveller in their
+  lens (the hard clamp swallowed the escape direction). Fix (movement.ts
+  resolveTravelMove): on contact, clamp to the boundary (no tunnelling) then SLIDE
+  the leftover move along the surface (drop only the inward normal component), and
+  a final iterated `pushOutOfCircles` de-penetration so the result never rests
+  inside any body. Trees already share this resolver with animals, so the live
+  animal-pin enrichments check covers the code path; the overlapping-obstacle case
+  is a new pure test in movement.test.ts. All 30 movement tests green, Vitest 1497.
 
 - [x] 114. Journal read-aloud STILL stutters after point 108 (user re-report) —
   a bit is spoken, then a long pause, then more. Point 108 pipelined the whole
