@@ -245,6 +245,16 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
     },
   )
 
+  it('timbuktu always builds the Djinguereber mosque', () => {
+    // The landmark is guaranteed per run (design.md §4.4) — a fixed-spot-only
+    // placement silently skipped it in ~6 % of seeds (found by the polish
+    // gate); sweep-verified across a wide seed range here.
+    for (let s = seed; s < seed + 40; s++) {
+      const layout = buildLayout('timbuktu', s)
+      expect(layout.dwellings.some((d) => d.kind === 'mosque'), `seed ${s}`).toBe(true)
+    }
+  })
+
   it('ports outscale villages in fabric (Cairo vs Boma)', () => {
     const cairo = buildLayout('cairo', seed)
     const boma = buildLayout('boma', seed)

@@ -350,12 +350,22 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // procedural fabric grows around it (isFree checks earlier dwellings),
     // which guarantees the landmark a spot in every run.
     if (placeId === 'timbuktu') {
-      for (const [mx, mz] of [
+      // Four preferred spots, then a deterministic golden-angle sweep as the
+      // GUARANTEE: some seeds fill all four (23/400 measured), and the
+      // landmark must stand in every run (design.md §4.4).
+      const preferred: Array<[number, number]> = [
         [-13.5, -7.5],
         [13.5, -8.5],
         [-14.5, 12.5],
         [14.5, 13.5],
-      ] as const) {
+      ]
+      const spots = [...preferred]
+      for (let i = 0; i < 48; i++) {
+        const a = 0.7 + i * 2.399963
+        const r = 11 + (i % 6) * 1.7
+        spots.push([Math.cos(a) * r, Math.sin(a) * r])
+      }
+      for (const [mx, mz] of spots) {
         if (!isFree(mx, mz, 6, 3.6) || onLane(mx, mz, 3.6)) continue
         // The mosque fronts its nearest lane with the portal, and its own
         // forecourt spur ties the portal into the lane network.
