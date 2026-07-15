@@ -364,3 +364,26 @@ describe('Touch controls mount only with ui.touchActive (design.md §17.5, point
     expect(sawKeyE).toBe(true)
   })
 })
+
+describe('inventory bar sorts alphabetically by localized name (point 104)', () => {
+  const domOrder = () => [...document.querySelectorAll('[data-eq]')].map((el) => el.getAttribute('data-eq'))
+
+  it('orders gear by the English labels', () => {
+    for (const item of ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen'] as const) {
+      g().debugAddEquipment(item)
+    }
+    render(<Hud />)
+    // Canteen < Machete < Medicine < Rifle < Rope < Shovel
+    expect(domOrder()).toEqual(['canteen', 'machete', 'medicine', 'rifle', 'rope', 'shovel'])
+  })
+
+  it('re-sorts on a language switch (German labels)', () => {
+    for (const item of ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen'] as const) {
+      g().debugAddEquipment(item)
+    }
+    useLocale.getState().setLang('de')
+    render(<Hud />)
+    // Feldflasche < Gewehr < Machete < Medizin < Schaufel < Seil
+    expect(domOrder()).toEqual(['canteen', 'rifle', 'machete', 'medicine', 'shovel', 'rope'])
+  })
+})

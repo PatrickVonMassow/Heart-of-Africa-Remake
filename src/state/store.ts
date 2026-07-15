@@ -403,7 +403,10 @@ function startState(seed: number) {
     foodDays: START_FOOD_DAYS,
     // Start gifts (design.md §18 table: 2) — neutral copper trinkets.
     gifts: { gold: 0, silver: 0, emerald: 0, copper: START_GIFTS, ivory: 0 } as Record<Material, number>,
-    equipment: {} as Partial<Record<EquipmentId, number>>,
+    // Demo start preset (point 104): the expedition sets out fully equipped —
+    // one of each tool except the canoe. The canteen starts full (canteenFill
+    // 1 below). Money/start place stay the design.md fixed values.
+    equipment: { shovel: 1, rope: 1, machete: 1, rifle: 1, medicine: 1, canteen: 1 } as Partial<Record<EquipmentId, number>>,
     treasures: { gold: 0, silver: 0, emerald: 0, copper: 0, ivory: 0, statue: 0 } as Record<TreasureId, number>,
     treasureSites: generateTreasureSites(seed),
     graveyardIvoryLeft: balance.economy.graveyardIvory,

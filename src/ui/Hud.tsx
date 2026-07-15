@@ -27,8 +27,14 @@ function InventoryBar() {
   const pos = useGame((s) => s.pos)
   const seed = useGame((s) => s.seed)
   const afflictions = useGame((s) => s.afflictions)
-  const owned = (Object.keys(equipment) as EquipmentId[]).filter((e) => (equipment[e] ?? 0) > 0)
-  const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0)
+  // Alphabetical by the LOCALIZED display name (point 104): the bar re-sorts
+  // on a language switch; gear first, treasures after (each sorted).
+  const owned = (Object.keys(equipment) as EquipmentId[])
+    .filter((e) => (equipment[e] ?? 0) > 0)
+    .sort((a, b) => t.equipment[a].localeCompare(t.equipment[b], t.lang))
+  const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0).sort((a, b) =>
+    t.treasures[a].localeCompare(t.treasures[b], t.lang),
+  )
   if (owned.length === 0 && ownedTreasures.length === 0) return null
 
   // Medicine and shovel are used by clicking them on the spot (design.md §17);

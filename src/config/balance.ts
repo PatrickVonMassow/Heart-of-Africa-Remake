@@ -259,7 +259,7 @@ export const balance: BalanceConfig = {
   mouseSensitivity: 0.0011,
   ambienceVolume: 0.1,
   daysPerUnit: 0.2,
-  foodPerDay: 1,
+  foodPerDay: 0, // demo start preset (point 104): no hunger by default; debug-editable
   foodUnitDays: 28, // one purchased food unit lasts four weeks (user calibration)
   terrainCost: {
     desert: 1.2,
@@ -287,7 +287,7 @@ export const balance: BalanceConfig = {
   goodwillForHint: 2,
   goodwillRevered: 2,
   goodwillNeutral: 1,
-  randomEventsEnabled: true,
+  randomEventsEnabled: false, // demo start preset (point 104): events off by default; debug toggle
   // Per-day base probabilities (design.md §14). Reduced by a factor of 5 from
   // the earlier calibration on user request — events should be markedly rarer.
   events: {
@@ -319,8 +319,8 @@ export const balance: BalanceConfig = {
     woundHealLightDays: 6, // a light wound closes on its own in about a week (fed)
     woundHealSevereDays: 10, // a severe wound subsides to a light one (fed)
     dehydrationOnsetDays: 0.5,
-    canteenDrainPerDay: 0.9, // consumption raised 200x (user request), offset by the 2000x capacity below
-    canteenDesertDrainPerDay: 3.0, // 200x; desert is faster
+    canteenDrainPerDay: 0, // demo start preset (point 104): no thirst by default (was 0.9); debug-editable
+    canteenDesertDrainPerDay: 0, // demo start preset (point 104): was 3.0; debug-editable
     canteenCapacity: 500, // user calibration: reduced from 2000; a full canteen now lasts 500/0.9 ≈ 555 land days
     sunblindRecoveryDays: 3,
     poorThreshold: 40,

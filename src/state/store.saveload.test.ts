@@ -205,3 +205,23 @@ describe('listCheckpoints row shape (design.md §18 table columns)', () => {
     expect(second.gifts).toBe(2)
   })
 })
+
+describe('demo start preset (point 104)', () => {
+  it('a new game starts fully kitted with a full canteen, inside capacity', () => {
+    // Direct newGame — NOT freshGame, which strips the pack for the
+    // mechanics-focused tests above.
+    localStorage.clear()
+    g().newGame()
+    const s = g()
+    for (const item of ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen'] as const) {
+      expect(s.equipment[item], item).toBe(1)
+    }
+    expect(s.equipment.canoe ?? 0).toBe(0) // the canoe stays a purchase
+    expect(s.canteenFill).toBe(1) // 100 %
+    // The design.md fixed values stay untouched.
+    expect(s.money).toBe(250)
+    expect(s.placeId).toBe('cairo')
+    // The six items + start gifts fit the default capacity — nothing raised.
+    expect(balance.inventoryCapacity).toBe(20)
+  })
+})

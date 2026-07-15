@@ -256,7 +256,10 @@ verify suite that proves it.
    region on that region's own land and far enough apart that the names
    cannot collide (`src/ui/mapLayout.test.ts`).
 4. **Movement and time.** The character moves in the bird's-eye view; date
-   and provisions advance with the journey (calendar display, start 1890).
+   and provisions advance with the journey (calendar display, start 1890) —
+   in the relaxed exploration preset (`design.md` §6.1) the provision and
+   canteen drain RATES default to zero, so the date advances while stocks
+   drain only once a non-zero rate is set in the debug menu.
    The movement boundary, Red Sea cut, Mediterranean always-blocked rule
    and world trim of `design.md` §11.2/§3.1 hold. So do the ropeless
    mountain climb with its warning and fall risk (§7/§11), the visible
@@ -756,8 +759,10 @@ verify suite that proves it.
     Wounds/afflictions feed the health system (pt. 22), fatal attacks end
     in the remains report, and every event is told through a journal entry
     in both languages with voice markup (§16). Rates are balance values
-    calibrated low so events are rare (§14.3); the debug menu can toggle
-    the events and trigger each kind directly (§21.3). Verifiable:
+    calibrated low so events are rare, and in the relaxed exploration
+    preset the whole random-event system defaults to OFF (§14.3); the
+    debug menu toggles it on and triggers each kind directly (§21.3), and
+    the §14.4 first-time danger warnings stay active either way. Verifiable:
     `src/systems/events.test.ts` asserts the reduced rates, the
     protection ordering (pure functions), deterministic outcome mapping
     and the plains-predator danger order (cheetah < leopard < hyena <

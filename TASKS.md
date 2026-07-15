@@ -1972,7 +1972,7 @@ as-is; only the sequence changes.
   EXECUTION ORDER: worked AFTER point 104 (the tag freezes the stand
   including the demo start defaults).
 
-- [ ] 104. Demo-friendly game-start defaults (user request 15.07.2026,
+- [x] 104. Demo-friendly game-start defaults (user request 15.07.2026,
   BEFORE the v0.1 tag — point 103 freezes this stand). Four changes to
   what a NEW game starts with; every survival mechanic stays implemented
   and debug-adjustable (§21), only the DEFAULTS move to a relaxed
@@ -2029,6 +2029,30 @@ as-is; only the sequence changes.
   low" → default OFF, debug-enabled). Both docs per the standing rule.
   EXECUTION ORDER (user, 15.07.): directly after point 100; ONE Closing
   pass follows 100+104 together, then point 103 tags the stand.
+  TRACK: (a) startState ships shovel/rope/machete/rifle/medicine/canteen
+  ×1 (canoe stays a purchase), canteenFill was already 1 (100 %); money
+  $250 / Cairo 1890 untouched; 6 items + 2 gifts fit capacity 20. (b)
+  foodPerDay 1→0, canteenDrainPerDay 0.9→0, canteenDesertDrainPerDay
+  3.0→0. (c) randomEventsEnabled true→false (debug toggle + direct
+  triggers unchanged; §14.4 first-time warnings unaffected). (d) the
+  inventory bar sorts gear AND treasures by the localized name
+  (localeCompare with the active lang; re-sorts on switch). Tests: the
+  central test helper freshGame() now restores MECHANICS-ACTIVE rates and
+  an empty pack (one place instead of 17 test edits — the survival tests
+  keep exercising the mechanics), the real preset pinned in a dedicated
+  newGame case (store.saveload.test.ts); balance.test pins the three
+  zeros + events-off; Hud.test asserts the alphabetical order in BOTH
+  languages (en: canteen<machete<medicine<rifle<rope<shovel; de:
+  Feldflasche<Gewehr<Machete<Medizin<Schaufel<Seil); flow.mjs adapted
+  (buy-grid-scoped Schaufel click — the sell-back list now also carries
+  one — and shovel count 2 after the buy), events.mjs enables the event
+  system explicitly (it tests exactly that system). design.md §6.1/§14.3
+  (relaxed exploration preset) + CLAUDE.md pt. 4/23 updated. Vitest
+  1493 green, flow 32/32, events 2/2; full regression in the Closing
+  pass that follows.
+  (track: 15.07. 10:46 -> 11:10, ~24 min, ~40k in / ~9k out, model
+  claude-fable-5[1m], effort high, thinking on, user-supervised batch,
+  dontAsk)
 
 - [ ] 105. DEFERRED (logged finding from the point-100 measurements,
   15.07.2026 — needs a user go before being worked; the batch-resume hook

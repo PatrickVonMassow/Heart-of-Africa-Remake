@@ -112,10 +112,13 @@ const priceAligned = await page.evaluate(() => {
   return lefts.length >= 2 && lefts.every((l) => Math.abs(l - lefts[0]) <= 1)
 })
 check('Buy prices are aligned in a column (table layout)', priceAligned)
-await page.locator('.trade-row', { hasText: 'Schaufel' }).locator('button').click()
+// Scope to the BUY grid: with the start kit (point 104) the sell-back list
+// also carries a 'Schaufel' row, so the unscoped locator matched twice.
+await page.locator('.buy-grid .trade-row', { hasText: 'Schaufel' }).locator('button').click()
 await page.waitForTimeout(300)
 s = await state()
-check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 1 && s.money === 230)
+// The demo start kit (point 104) already holds one shovel; the buy adds a second.
+check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 2 && s.money === 230)
 await closeDialog()
 
 await enterBuilding('shop')

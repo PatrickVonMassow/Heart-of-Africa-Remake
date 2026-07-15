@@ -29,7 +29,12 @@ await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
 await page.waitForTimeout(4000)
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+await page.evaluate(() => {
+  window.__game.getState().setJournalOpen(false)
+  // The random-event system is OFF by default (demo preset, point 104); this
+  // suite tests exactly that system, so switch it on.
+  window.__balance.randomEventsEnabled = true
+})
 
 // Leave into the bird's-eye view where the wandering predators mount.
 await page.evaluate(() => window.__game.getState().leavePlace())

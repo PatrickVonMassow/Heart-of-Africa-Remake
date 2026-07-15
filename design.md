@@ -175,9 +175,10 @@ invariants.
 ### 6.1 Resources
 
 - Currency: \$ (means of payment in the port cities). Starting capital \$250. Used for: equipment, provisions, ferries, gifts; income through sales and discovery bounties.
-- Provisions (food): consumed per time step; can be bought.
-- Water: the canteen holds a fill level (a percentage). It refills to full at fresh water (river, lake, swimmable sea), drains slowly on land — faster in the desert — and, once empty, thirst builds and then health drops. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
+- Provisions (food): consumed per time step; can be bought. The POC ships a relaxed exploration preset (user calibration 15.07.2026): the default consumption rate is ZERO — provisions do not drain unless the rate is raised in the debug menu (§21.2); the mechanic itself stays fully implemented.
+- Water: the canteen holds a fill level (a percentage). It refills to full at fresh water (river, lake, swimmable sea), drains on land — faster in the desert — and, once empty, thirst builds and then health drops. In the relaxed exploration preset both drain rates default to ZERO (debug-editable, §21.2); the thirst mechanics stay fully implemented. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
 - Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
+- A new expedition sets out fully equipped (relaxed exploration preset): one each of shovel, rope, machete, rifle, medicine and a FULL canteen; only the canoe remains a purchase. Starting capital stays \$250 and the start stays Cairo 1890 (fixed values). The inventory bar lists gear alphabetically by the localized item name (re-sorting on a language switch), treasures after gear.
 - Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the shovel digs). The map is NOT an inventory item: it is always available from its own button in the bottom-right button row (left of the journal button, §17.4) and the M key, opening the exploration overview — inside a settlement the place plan (§7/§19.11).
 
 ### 6.2 Afflictions and healing
@@ -386,7 +387,7 @@ machete; against crocodiles per §11.3), medicine as the instant cure
 
 ### 14.3 Calibration
 
-Concrete probabilities are calibrated freely for balance. They are tuned to keep events rare, so the journey is only occasionally interrupted.
+Concrete probabilities are calibrated freely for balance. They are tuned to keep events rare, so the journey is only occasionally interrupted. In the relaxed exploration preset the random-event system is OFF by default; the debug menu's toggle (§21.3) switches it on at runtime, and the direct triggers stay available either way. The first-time danger warnings (§14.4) are not random events and stay active.
 
 ### 14.4 First-time danger warnings
 

@@ -24,14 +24,22 @@ export function withWorld(): void {
 export const TEST_SEED = 42
 
 /**
- * Reset to a clean new game with the deterministic seed and default balance
- * flags. Tests that mutate `balance` fields must restore them themselves.
+ * Reset to a clean new game with the deterministic seed and MECHANICS-ACTIVE
+ * balance flags. The demo start preset (point 104) relaxes the shipped
+ * DEFAULTS — events off, zero hunger/thirst, a full starting kit — but the
+ * store tests exercise the survival MECHANICS, so a fresh test game restores
+ * the non-zero rates and an empty pack. The start preset itself is pinned in
+ * its own newGame test (store.saveload.test.ts). Tests that mutate further
+ * `balance` fields must restore them themselves.
  */
 export function freshGame(seed = TEST_SEED): void {
   localStorage.clear()
   useGame.getState().newGame()
-  useGame.setState({ seed })
+  useGame.setState({ seed, equipment: {} })
   balance.randomEventsEnabled = true
+  balance.foodPerDay = 1
+  balance.health.canteenDrainPerDay = 0.9
+  balance.health.canteenDesertDrainPerDay = 3.0
 }
 
 /** Terrain type the store sees at a coordinate under the current seed. */

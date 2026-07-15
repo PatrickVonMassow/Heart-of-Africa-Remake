@@ -59,8 +59,9 @@ describe('health drains & thresholds (design.md §6)', () => {
     expect(h.poorThreshold).toBe(40)
     expect(h.sunblindRecoveryDays).toBe(3)
     expect(h.dehydrationOnsetDays).toBe(0.5)
-    expect(h.canteenDrainPerDay).toBe(0.9)
-    expect(h.canteenDesertDrainPerDay).toBe(3.0)
+    // Demo start preset (point 104): no thirst by default; debug-editable.
+    expect(h.canteenDrainPerDay).toBe(0)
+    expect(h.canteenDesertDrainPerDay).toBe(0)
   })
 })
 
@@ -126,7 +127,10 @@ describe('current, terrain cost & movement (design.md §11)', () => {
     expect(balance.currentWaterfallBoost).toBe(4)
     expect(balance.currentWaterfallRadius).toBe(0.5)
     expect(balance.daysPerUnit).toBe(0.2)
-    expect(balance.foodPerDay).toBe(1)
+    // Demo start preset (point 104): no hunger by default; debug-editable.
+    expect(balance.foodPerDay).toBe(0)
+    // Demo start preset (point 104): random events off by default (debug toggle).
+    expect(balance.randomEventsEnabled).toBe(false)
     expect(balance.inventoryCapacity).toBe(20)
     expect(balance.digRadius).toBe(3)
     expect(balance.placeEnterRadius).toBe(2.5)
