@@ -1660,23 +1660,28 @@ function Herds() {
               pitch = -0.22 // nurse: head up toward the parent's flank
             }
             familyHeld = true
-          } else if (a.child && !a.child.dead && lionActive) {
-            const cx = a.child.x
-            const cz = a.child.z
-            const pdx = LION_STATE.lx - cx
-            const pdz = LION_STATE.lz - cz
-            const pd = Math.hypot(pdx, pdz)
-            if (pd < GUARD_RADIUS && pd > 0.01) {
-              const gx = cx + (pdx / pd) * GUARD_STANDOFF
-              const gz = cz + (pdz / pd) * GUARD_STANDOFF
-              const toX = gx - a.x
-              const toZ = gz - a.z
-              const gd = Math.hypot(toX, toZ) || 1
-              a.x += (toX / gd) * GUARD_SPEED * dt
-              a.z += (toZ / gd) * GUARD_SPEED * dt
+          } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase') {
+            // A parent guards its calf only against a HUNTING (chasing) lion that
+            // comes near — not a lion FEEDING on other prey nearby (point 118): a
+            // feeder is no approaching threat, and treating it as one made the
+            // parent orbit the feeding lion forever (calf never hunted, so never
+            // caught or saved). When the lion only feeds, this branch is skipped
+            // and the family flees it below like any other prey. The station is
+            // the same living-shield point as the chase shield (blockHeading with
+            // GUARD_STANDOFF), whose hold-zone stops the parent re-chasing every
+            // micro-move of the lion (the old per-frame retarget oscillated).
+            const calf = a.child
+            if (Math.hypot(LION_STATE.lx - calf.x, LION_STATE.lz - calf.z) < GUARD_RADIUS) {
+              const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, GUARD_STANDOFF)
+              if (h !== null) {
+                a.x += Math.sin(h) * GUARD_SPEED * dt
+                a.z += Math.cos(h) * GUARD_SPEED * dt
+                yaw = h
+              } else {
+                yaw = Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z) // on station: face it down
+              }
               px = a.x
               pz = a.z
-              yaw = Math.atan2(pdx, pdz) // face the predator down
               pitch = 0
               familyHeld = true
             }

@@ -2417,7 +2417,7 @@ as-is; only the sequence changes.
   Vitest 10/10, build/lint clean. The WebGPU voice quality/speed is a USER check on
   Chromium hardware (headless has no WebGPU adapter).
 
-- [ ] 118. Calf predation / living-shield gets STUCK and never resolves (user
+- [x] 118. Calf predation / living-shield gets STUCK and never resolves (user
   screenshots, South savanna): during a lion hunt on a calf, the parent runs wildly
   BACK AND FORTH at the lion instead of committing to the sacrifice, the calf barely
   moves (it should flee), NOBODY is ever caught/eaten, the lion eventually gives up
@@ -2451,6 +2451,25 @@ as-is; only the sequence changes.
   journal text (if any) in both languages with voice markup. design.md §19.8 /
   CLAUDE §7.1 pt.12 unchanged (this restores the specified behaviour). One atomic
   commit. (Reported 15.07.2026; worked in the new batch after the Closing + tags.)
+  ROOT CAUSE + FIX (15.07.2026, via a __lionHunt/__wildlife scene repro): the
+  chase-SHIELD/sacrifice was NOT the bug — a forced calf hunt resolved cleanly in
+  two configs (parent taken at PARENT_TAKE_DIST, calf escapes). The real culprit is
+  the parent GUARD branch (Wildlife.tsx ~1663): its trigger was `lionActive`, which
+  is `mode === 'chase' OR 'feed'`. So when a lion FED on other prey right beside a
+  calf, the parent kept running to a guard station that followed the feeding lion —
+  orbiting it forever (repro: step-reversal rate 0.23, never resolves), while the
+  calf (not the hunt's victim) neither fled nor was caught, matching the user's
+  "parent runs wildly at the lion, nobody eaten, vultures circle" exactly (the
+  vultures were the lion's real kill-flock, correct). FIX: gate the guard to a
+  HUNTING lion only (`LION_STATE.mode === 'chase'`), so beside a feeder the family
+  flees like any prey; and compute the guard station via the existing `blockHeading`
+  (offset GUARD_STANDOFF), whose hold-zone stops the per-frame re-chase oscillation.
+  Repro after the fix: reversal rate 0.23 → 0.01, and on the lion's feed the family
+  flees (parent–lion distance climbs steadily). No separate vulture cull needed —
+  the kill-flock is correctly tied to the feed/leave/remnant lifecycle and clears
+  once the lion finishes. Verifiable: a new enrichments live check asserts a parent
+  beside a feeding lion does not saw-tooth and moves away (flees); the guard reuses
+  the already-pure-tested blockHeading. design.md §19.8 / CLAUDE §7.1 pt.12 unchanged.
 
 ## Closing (only after all points)
 

@@ -1316,6 +1316,48 @@ check(
   JSON.stringify(calfJitter),
 )
 
+// A parent does NOT orbit a lion that is FEEDING on other prey near its calf
+// (point 118): the guard only engages a HUNTING lion, so beside a feeder the
+// family flees instead of the parent oscillating around it forever. Force a lion
+// feeding beside a calf and sample the parent: its step direction must not
+// saw-tooth and it must move AWAY from the lion. (Runs after the ambient
+// playing-calf check above so its lion-feed disturbance cannot starve it.)
+const guardFlee = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const s = window.__lionHunt.state
+  const SP = ['zebra', 'wildebeest', 'antelope', 'warthog']
+  let calf = null, parent = null, decoy = null
+  for (const sp of SP) for (const a of herds[sp] ?? []) {
+    if (!calf && a.young && a.parent && !a.parent.dead && !a.dead && a.inWater === undefined && a.parent.inWater === undefined) { calf = a; parent = a.parent }
+  }
+  if (!calf) return { error: 'no pair' }
+  for (const sp of SP) for (const a of herds[sp] ?? []) { if (!decoy && a !== calf && a !== parent && !a.dead && !a.young && a.inWater === undefined) decoy = a }
+  if (!decoy) return { error: 'no decoy' }
+  parent.child = calf; calf.parent = parent
+  decoy.x = calf.x + 2; decoy.z = calf.z + 1
+  s.mode = 'feed'; s.victim = decoy; s.timer = 60
+  s.lx = calf.x + 2; s.lz = calf.z + 1; s.px = s.lx; s.pz = s.lz // lion feeding ~2 from the calf
+  const dStart = Math.hypot(parent.x - s.lx, parent.z - s.lz)
+  let last = null, lastStep = null, flips = 0, samples = 0
+  for (let i = 0; i < 20; i++) {
+    await sleep(150)
+    if (last) {
+      const dx = parent.x - last.x, dz = parent.z - last.z
+      if (Math.hypot(dx, dz) > 0.02) { if (lastStep && dx * lastStep.dx + dz * lastStep.dz < 0) flips++; lastStep = { dx, dz }; samples++ }
+    }
+    last = { x: parent.x, z: parent.z }
+  }
+  const dEnd = Math.hypot(parent.x - s.lx, parent.z - s.lz)
+  s.mode = 'idle'; s.timer = 0; s.victim = null; s.victimHunt = false // calm the scene again
+  return { reversalRate: +(flips / Math.max(1, samples)).toFixed(2), fled: dEnd - dStart, samples }
+})
+check(
+  'a parent flees a feeding lion beside its calf instead of orbiting it (point 118)',
+  guardFlee && !guardFlee.error && guardFlee.samples >= 6 && guardFlee.reversalRate < 0.2 && guardFlee.fled > 2,
+  JSON.stringify(guardFlee),
+)
+
 // Bathing needs shore visitors, which only spawn where a savanna herd sits
 // within reach of water. Find savanna tiles near water for the current seed
 // (so this does not depend on hand-picked coordinates), then roam them until a
