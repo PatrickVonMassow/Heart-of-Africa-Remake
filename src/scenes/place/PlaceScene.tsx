@@ -1692,6 +1692,11 @@ export function PlaceScene() {
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
       <hemisphereLight args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', 0.8]} />
       <directionalLight
+        // Remount the light when shadows toggle so the shadow map is rebuilt from
+        // scratch: flipping castShadow in place left the WebGPU shadow pipeline in
+        // a broken state (the whole ground turned black on re-enable, point 111
+        // side-finding).
+        key={shadowsEnabled ? 'sun-shadowed' : 'sun-plain'}
         ref={sunRef}
         position={[SUN_DIR[0] * 60, SUN_DIR[1] * 60, SUN_DIR[2] * 60]}
         color="#fff1d8"
