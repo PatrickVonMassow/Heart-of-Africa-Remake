@@ -2471,7 +2471,7 @@ as-is; only the sequence changes.
   beside a feeding lion does not saw-tooth and moves away (flees); the guard reuses
   the already-pure-tested blockHeading. design.md §19.8 / CLAUDE §7.1 pt.12 unchanged.
 
-- [ ] 119. A parent sacrifices itself to the elephant that trampled its calf.
+- [x] 119. A parent sacrifices itself to the elephant that trampled its calf.
   Today a calf trampled by an elephant simply dies and its parent goes on grazing
   (it even DODGES the elephant like any other prey). Wanted (user, 15.07.2026):
   when a juvenile is trampled to death by an elephant, the parent throws itself
