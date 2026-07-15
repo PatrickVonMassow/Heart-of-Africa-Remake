@@ -2242,7 +2242,17 @@ as-is; only the sequence changes.
   ui.test) so the user can turn cast shadows off entirely: vanishes → it IS the
   shadow (fix shadow.intensity/ambient fill so shadowed ground keeps the hemisphere
   fill instead of going black); persists → geometry/material rendering black on the
-  WebGPU backend (dig into the ground/building node material). design.md unchanged
+  WebGPU backend (dig into the ground/building node material).
+  UPDATE 3 (15.07. ~15:05): user confirmed sun-shadows OFF does NOT remove the
+  blob → shadow definitively ruled out (after SSAO + TRAA). Side-finding: toggling
+  sun-shadows off→on blackened the whole ground (a runtime castShadow flip left the
+  WebGPU shadow pipeline broken) — fixed by remounting the light on the toggle
+  (751fcc8). Blob is now isolated to a WebGPU-only material/geometry render. Next
+  diagnostic (user-approved): a "Flat ground (debug)" toggle (ui `groundDebugFlat`
+  → the place-scene ground uses a plain MeshStandardMaterial, no TSL surface
+  structure/normal). Deployed; the user tests on WebGPU — blob gone → the TSL
+  ground shader (then fix it precisely); blob stays → a building/geometry, isolate
+  further. design.md unchanged
   (render-quality safeguard; no new CLAUDE §7.1 point). One atomic commit once fixed.
 
 - [x] 112. Audio balance (user request): footsteps twice as loud, and ALL other

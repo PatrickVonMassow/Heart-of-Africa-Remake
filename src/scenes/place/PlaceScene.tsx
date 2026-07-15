@@ -129,6 +129,9 @@ function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
 }
 
 function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: THREE.Texture | null) {
+  // Debug diagnosis (point 111): swap the ground for a plain material to see
+  // whether a WebGPU-only black patch comes from the TSL ground node material.
+  const flatGround = useUi((s) => s.groundDebugFlat)
   return useMemo(() => {
     // Wall/roof materials carry real micro-relief and weathering (design.md
     // §2.6) from the baked tileable maps: fine plaster grain, coarser mud
@@ -143,11 +146,13 @@ function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: TH
     const pathOpts = pathTex
       ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }
       : undefined
-    const ground = isPort
-      ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
-      : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
+    const ground = flatGround
+      ? new THREE.MeshStandardMaterial({ color: isPort ? '#dcc99c' : style.ground[0], roughness: 1, metalness: 0 })
+      : isPort
+        ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
+        : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
     return { plaster, plasterDark, mud, thatch, wood, cloth, ground }
-  }, [isPort, style, pathTex])
+  }, [isPort, style, pathTex, flatGround])
 }
 
 type PlaceMaterials = ReturnType<typeof usePlaceMaterials>

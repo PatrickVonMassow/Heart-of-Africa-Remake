@@ -371,6 +371,7 @@ export const de: Strings = {
     ssao: 'SSAO (Umgebungsverdeckung)',
     shadowMapHalf: 'Schatten in halber Auflösung',
     shadows: 'Sonnenschatten',
+    flatGround: 'Flacher Boden (Debug)',
     health: 'Gesundheit',
     wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',

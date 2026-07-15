@@ -64,6 +64,10 @@ interface UiState {
   /** Directional sun shadows (design.md §2.7/§21); a debug switch to turn cast
    *  shadows off entirely (default on). */
   shadowsEnabled: boolean
+  /** Debug diagnosis (point 111): render the settlement ground with a plain
+   *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
+   *  patch. Default off. */
+  groundDebugFlat: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -83,6 +87,7 @@ interface UiState {
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
+  setGroundDebugFlat: (flat: boolean) => void
 }
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
@@ -106,6 +111,7 @@ export const useUi = create<UiState>()((set) => ({
   ssaoEnabled: true,
   shadowMapHalf: false,
   shadowsEnabled: true,
+  groundDebugFlat: false,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -136,6 +142,7 @@ export const useUi = create<UiState>()((set) => ({
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
+  setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
 }))
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

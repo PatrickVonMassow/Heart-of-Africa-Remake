@@ -372,6 +372,7 @@ export const en: Strings = {
     ssao: 'SSAO (ambient occlusion)',
     shadowMapHalf: 'Half-resolution shadows',
     shadows: 'Sun shadows',
+    flatGround: 'Flat ground (debug)',
     health: 'Health',
     wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",
