@@ -2417,6 +2417,41 @@ as-is; only the sequence changes.
   Vitest 10/10, build/lint clean. The WebGPU voice quality/speed is a USER check on
   Chromium hardware (headless has no WebGPU adapter).
 
+- [ ] 118. Calf predation / living-shield gets STUCK and never resolves (user
+  screenshots, South savanna): during a lion hunt on a calf, the parent runs wildly
+  BACK AND FORTH at the lion instead of committing to the sacrifice, the calf barely
+  moves (it should flee), NOBODY is ever caught/eaten, the lion eventually gives up
+  and walks off — and the vultures that spawned for the kill circle the whole time
+  and STAY (no kill → no carcass → their despawn condition never fires). Expected
+  (design.md §19.8, CLAUDE §7.1 pt.12): the hunted calf visibly flees (slower than
+  its hunter); a parent that reaches the predator interposes as a LIVING SHIELD over
+  visible real time and is eaten IN THE CALF'S PLACE before any catch (calf escapes);
+  a parent that only got close by the window's end is eaten alongside the calf; the
+  hunt ALWAYS RESOLVES in a kill (parent or calf), and the kill's vulture flock then
+  descends/consumes and leaves. ANCHORS: src/scenes/travel/Wildlife.tsx (the LionHunt
+  calf branch — the shield/catch/parent-eaten-in-place state machine), the
+  pure behaviour in src/scenes/travel/wildlifeBehavior.test.ts, the vulture
+  spawn/despawn tied to a kill/carcass (search for the vulture ring + kill-flock
+  logic), and the parent-oscillation stabiliser (points 1/30 fixed a ~90° flip-flop
+  — the parent here flip-flops AT the lion, so the same stabiliser may not cover the
+  shield-approach). LIKELY causes to check: (a) the catch/sacrifice condition is
+  gated on the parent being within a reach it never stably enters because it
+  oscillates → add a commit/hysteresis so the shield-in-reach resolves; (b) the calf
+  flee is disabled/zeroed while shielded so it stands still and the hunt stalls; (c)
+  the lion's give-up (patience) fires before the shield resolves, leaving the calf
+  alive AND the vultures orphaned; (d) the vulture despawn is conditioned on a
+  carcass that never spawns → also cull/despawn the hunt's vultures when the hunt
+  ENDS without a kill (give-up), so they never circle forever. FIX so the sequence
+  always terminates: either a kill (parent-shield or calf) or, on give-up, the
+  vultures leave. TESTS: extend wildlifeBehavior.test.ts / the LionHunt path so a
+  calf hunt with a reaching parent resolves in the parent's sacrifice within the
+  window (calf survives), a late parent yields both caught, and a given-up hunt
+  removes its vultures; a live check in scripts/verify/enrichments.mjs (or the
+  wildlife suite) that a forced calf hunt terminates (no perpetual circling). All new
+  journal text (if any) in both languages with voice markup. design.md §19.8 /
+  CLAUDE §7.1 pt.12 unchanged (this restores the specified behaviour). One atomic
+  commit. (Reported 15.07.2026; worked in the new batch after the Closing + tags.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
