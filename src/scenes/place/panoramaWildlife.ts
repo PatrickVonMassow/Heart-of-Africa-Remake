@@ -49,3 +49,37 @@ export function hazeColor(
 export function luminance(rgb: readonly [number, number, number]): number {
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
 }
+
+/** An azimuth interval on the panorama ring, centred at `center` (radians,
+ *  atan2(z, x)) with a half-width `half`. */
+export interface AzimuthSpan {
+  center: number
+  half: number
+}
+
+/**
+ * The azimuth span a fixed skyline landmark occupies as seen from the town
+ * centre: its bearing atan2(z, x) ± (half its footprint's subtended angle plus a
+ * clearance margin). A drifting silhouette inside this span would visibly cross
+ * the monument (the Cairo "animals next to the pyramids" report, point 102), so
+ * it is dropped rather than rendered in front of the landmark.
+ */
+export function excludedAzimuthSpan(
+  px: number,
+  pz: number,
+  halfWidthWorld: number,
+  marginRad: number,
+): AzimuthSpan {
+  const dist = Math.hypot(px, pz) || 1
+  return { center: Math.atan2(pz, px), half: Math.atan2(halfWidthWorld, dist) + marginRad }
+}
+
+/** True if `azimuth` (radians) lies within any excluded span, wrapping cleanly
+ *  across the ±π seam. */
+export function isAzimuthExcluded(azimuth: number, spans: readonly AzimuthSpan[]): boolean {
+  for (const s of spans) {
+    const d = Math.atan2(Math.sin(azimuth - s.center), Math.cos(azimuth - s.center))
+    if (Math.abs(d) <= s.half) return true
+  }
+  return false
+}

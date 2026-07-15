@@ -192,6 +192,16 @@ export interface BalanceConfig {
     hazeMix: number
     /** Feet sink below the visible horizon line so they never appear to float. */
     sinkEpsilon: number
+    /** Clearance (deg) added around a fixed skyline landmark's footprint: no
+     *  drifting silhouette enters that azimuth span, so none crosses the
+     *  monument (design.md §2.5, point 102). */
+    landmarkMarginDeg: number
+    /** Minimum region-typical bird's-eye animals seeded near a settlement so
+     *  its vicinity is never empty (point 102). */
+    vicinityMinAnimals: number
+    /** Radius (world units) around a settlement's leave point within which that
+     *  minimum presence is guaranteed (≈ 1.5× the default-zoom view ring). */
+    vicinityRadius: number
   }
   /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
    *  gameplay speeds and sensitivities are unchanged. */
@@ -348,6 +358,9 @@ export const balance: BalanceConfig = {
     maxApparentAngleDeg: 2.5, // a distant animal subtends only a couple degrees
     hazeMix: 0.55, // lift the flat near-black toward the sky horizon
     sinkEpsilon: 0.4, // feet just below the horizon line, never floating
+    landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
+    vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement
+    vicinityRadius: 75, // ≈ 1.5× the default-zoom view ring (VIEW_AT_ZOOM1·0.5)
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection

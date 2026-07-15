@@ -20,11 +20,12 @@ import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
 import { setAnimalCollider } from './wildlifeCollision'
-import { latLonToWorld, regionAt, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
+import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { drinkWalkDistance } from './waterEdgeRules'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
-import { hashChunk } from '../../world/noise'
+import { hashChunk, mulberry32 } from '../../world/noise'
+import { balance } from '../../config/balance'
 import {
   blockHeading,
   fleeHeading,
@@ -622,6 +623,72 @@ function placeGroup(
   }
 }
 
+/**
+ * Keep the bird's-eye vicinity of every settlement from reading empty (point
+ * 102, design.md §2.5): after the normal chunk spawn, guarantee a minimum
+ * presence of region-typical grazers within `vicinityRadius` of each nearby
+ * settlement by seeding ONE deterministic herd — but ONLY when the normal spawn
+ * produced fewer than the minimum (never additive on an already-populated
+ * vicinity). Seeded animals are ordinary herd animals: seed-deterministic
+ * placement, the region's own species pool, normal chunk membership (so they
+ * stream out with the settlement's chunk) and the existing spacing/capacity
+ * rules. A clearance keeps them off the leave point so the player never
+ * materialises inside a herd.
+ */
+function seedSettlementVicinity(
+  herds: Record<Species, Animal[]>,
+  pos: { x: number; z: number },
+  seed: number,
+  spawnedChunks: Set<string>,
+): void {
+  const min = balance.panoramaWildlife.vicinityMinAnimals
+  const radius = balance.panoramaWildlife.vicinityRadius
+  const CLEARANCE = 14 // world units clear of the leave point
+  const SPREAD = 6
+  for (const place of PLACES) {
+    const w = latLonToWorld(place.lat, place.lon)
+    if (Math.hypot(w.x - pos.x, w.z - pos.z) > radius + SPAWN_MARGIN) continue
+    // Tag seeded animals with the settlement's own chunk so they stream out with
+    // it; only seed once that chunk is live (else they'd be culled at once).
+    const scx = Math.floor(w.x / CHUNK_SIZE)
+    const scz = Math.floor(w.z / CHUNK_SIZE)
+    const chunkKey = `${scx},${scz}`
+    if (!spawnedChunks.has(chunkKey)) continue
+    const region = regionAt(place.lat, place.lon)
+    const pool = REGION_PREY[region]
+    if (!pool || pool.length === 0) continue
+    // Count region-typical grazers already within the radius.
+    let count = 0
+    for (const sp of pool) {
+      for (const a of herds[sp]) if (!a.dead && Math.hypot(a.x - w.x, a.z - w.z) <= radius) count++
+    }
+    if (count >= min) continue
+    const deficit = min - count
+    // Deterministic placement from the settlement id + world seed.
+    let h = 0
+    for (const c of place.id) h = (h * 31 + c.charCodeAt(0)) | 0
+    const rand = mulberry32(((seed ^ h) + 0x102) >>> 0)
+    const species = pool[Math.floor(rand() * pool.length)]
+    if (herds[species].length + deficit > MAX_INSTANCES[species]) continue
+    // Search a few deterministic offsets for a land anchor inside the ring,
+    // past the clearance — a coastal port may face water on some bearings.
+    let ax = 0
+    let az = 0
+    let found = false
+    for (let k = 0; k < 8 && !found; k++) {
+      const dir = rand() * Math.PI * 2
+      const dist = CLEARANCE + SPREAD + rand() * (radius - CLEARANCE - 2 * SPREAD - 8)
+      ax = w.x + Math.cos(dir) * dist
+      az = w.z + Math.sin(dir) * dist
+      const ll = worldToLatLon(ax, az)
+      const s = sampleTerrain(ll.lat, ll.lon, seed)
+      if (s.type !== 'ocean' && s.type !== 'water' && s.height > 0.05) found = true
+    }
+    if (!found) continue
+    placeGroup(herds[species], scx, scz, ax, az, deficit, SPREAD, seed, 0.9, BODY_RADIUS[species], false, undefined, chunkKey)
+  }
+}
+
 /** Instanced herds, softly shuffling in place. */
 function Herds() {
   const seed = useGame((s) => s.seed)
@@ -800,6 +867,9 @@ function Herds() {
       }
       stains.current = stains.current.filter((st) => Math.hypot(st.x - pos.x, st.z - pos.z) <= despawnR)
     }
+    // Never leave a settlement's bird's-eye vicinity empty (point 102): top the
+    // region-typical presence up to the minimum where the chunk spawn fell short.
+    seedSettlementVicinity(herds, pos, seed, spawnedChunks.current)
     // Render nearest-first so the visible cap keeps the animals closest to the
     // player when a chunk range holds more than an instanced mesh can show.
     for (const sp of SPECIES) {

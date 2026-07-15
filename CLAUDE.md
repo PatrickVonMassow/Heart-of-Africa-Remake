@@ -418,7 +418,13 @@ verify suite that proves it.
       it, and a wider zoom keeps animals the default view would have
       dropped) — with the scripted predator obeying the same ring: after
       feeding it walks off and is removed only beyond it, and a strayed
-      chase aborts the same way.
+      chase aborts the same way. A settlement's bird's-eye vicinity is
+      never empty (point 102): where the normal spawn falls short, the
+      region-typical presence within `panoramaVicinityRadius` of a
+      settlement is seeded up to `panoramaVicinityMinAnimals` — verified
+      in `scripts/verify/enrichments.mjs` (after leaving Cairo, at least
+      the minimum region-typical grazers stand within the radius via
+      `__wildlife`, deterministic under the fixed seed).
     - Vultures, remnants and carcass bounds: a non-lion (trampled)
       carcass draws a vulture that lands and consumes it until it is
       removed — the vulture spawning beyond the zoom-aware view ring and
@@ -906,7 +912,9 @@ verify suite that proves it.
     §2.5 panorama wildlife (region-typical silhouettes drifting beyond the
     settlement edge — far and small, hazed toward the sky, standing on the
     VISIBLE horizon line rather than a monument looming or clipping to a
-    black sliver; points 92/94). Verifiable: `scripts/verify/polish.mjs`
+    black sliver; points 92/94; their species the region's own bird's-eye
+    pool and never crossing a fixed skyline landmark, point 102).
+    Verifiable: `scripts/verify/polish.mjs`
     asserts no markers before and markers after the gift plus the toast,
     their persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village; plus that
@@ -914,7 +922,11 @@ verify suite that proves it.
     flat black), stands at/above the ground plane without a capture, and
     sits on the band's horizon line (`|y − visibleY|` bounded) with a
     capture active — the sizing/haze math pure-tested in
-    `src/scenes/place/panoramaWildlife.test.ts`.
+    `src/scenes/place/panoramaWildlife.test.ts`; and that in Cairo no
+    visible silhouette's azimuth lies inside the Giza skyline span
+    (`__placeSkylineExclusion`/`__placePanoramaWildlifeInfo`, point 102),
+    the azimuth-exclusion helper (span from placement, margin, inside/
+    outside with ±π wrap-around) pure-tested in the same file.
 32. **Render pipeline upgrades.** TRAA, screen-space reflections and true
     water refraction (`design.md` §2.7) were rebuilt in small
     backend-neutral steps with a supervised manual test loop: the headless

@@ -1766,7 +1766,7 @@ as-is; only the sequence changes.
   screenshot 104). Full regression green (18 suites; the lone enrichments
   animal-collision miss was a load flake, green standalone).
 
-- [ ] 102. First-person surroundings wildlife doesn't match the bird's-eye
+- [x] 102. First-person surroundings wildlife doesn't match the bird's-eye
   landscape (user report): in Cairo (first-person) animals drifted through
   the skyline RIGHT NEXT TO the pyramids; after leaving to the bird's-eye
   view there were no animals by the pyramids and none anywhere nearby.
@@ -1838,6 +1838,28 @@ as-is; only the sequence changes.
   balance values. No speech files are touched; skip the voice
   regression. Scoped suites per the diff mapping (place scene → polish;
   travel wildlife → enrichments; plus Vitest), then full regression.
+  TRACK: (a) pure `excludedAzimuthSpan`/`isAzimuthExcluded` (span from
+  placement + margin, inside/outside with ±π wrap) in panoramaWildlife.ts
+  + 5 Vitest cases; a per-place PLACE_SKYLINES table in PlaceScene (Giza
+  −130/10 scale 13, Table Mountain 0/−118; footprint measured from the
+  built geometry) feeds the spans, and PanoramaWildlife hides any
+  silhouette whose live azimuth falls inside one (dev hooks
+  `__placeSkylineExclusion` + azimuth/visible in `__placePanoramaWildlifeInfo`).
+  (b) `seedSettlementVicinity` in Wildlife.tsx tops region-typical grazers
+  up to `vicinityMinAnimals` (6) within `vicinityRadius` (75) of a nearby
+  settlement's chunk — only the shortfall, seed-deterministic (world seed +
+  place id), land-anchored with a leave-point clearance, tagged to the
+  settlement chunk for normal despawn, capped by MAX_INSTANCES.
+  (c) SPECIES MATCH — already aligned: every first-person species was
+  already in the region's bird's-eye pool; centralised as PANORAMA_FAUNA
+  (north antelope; west zebra/antelope; central elephant/antelope; east +
+  south elephant/giraffe/zebra/antelope), a clean per-region subset of the
+  sim's pool. balance panoramaWildlife gains landmarkMarginDeg 8,
+  vicinityMinAnimals 6, vicinityRadius 75. design.md §2.5 + CLAUDE.md pt.
+  12/31 updated. Verified: polish (Cairo Giza-span, 0 violating; pt 92/94
+  unchanged; shot 105), enrichments (Cairo vicinity = exactly 6 = min, so
+  seeding fired). Full regression green (18 suites; two different RAF
+  wildlife checks flaked across runs, all green on a clean standalone run).
 
 ## Closing (only after all points)
 

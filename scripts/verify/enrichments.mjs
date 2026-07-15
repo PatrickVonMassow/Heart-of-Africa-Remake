@@ -2851,6 +2851,44 @@ const zorder = await page.evaluate(async () => {
 check('a settlement label is hit-tested on top before a dialog opens', zorder.ok && zorder.labelOnTopBefore, JSON.stringify(zorder))
 check('a modal dialog covers the in-scene labels', zorder.ok && zorder.dialogOnTop, JSON.stringify(zorder))
 
+// --- A settlement's bird's-eye vicinity is never empty (point 102, part b) ------
+// Leaving Cairo (arid north, where the natural chunk spawn is sparse) must still
+// leave at least vicinityMinAnimals region-typical grazers within vicinityRadius
+// of the leave point — the seeding tops the presence up.
+await page.evaluate(() => {
+  window.__balance.randomEventsEnabled = false
+  window.__game.getState().enterPlace('cairo')
+})
+await page
+  .waitForFunction(() => window.__game.getState().placeId === 'cairo', null, { timeout: 30000 })
+  .catch(() => {})
+await page.waitForTimeout(600)
+await page.evaluate(() => window.__game.getState().leavePlace())
+await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
+await page.waitForTimeout(2500)
+const vicinity = await page.evaluate(() => {
+  const pos = window.__game.getState().pos
+  const region = window.__game.getState().region
+  const pool = {
+    east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    central: ['antelope', 'warthog', 'zebra'],
+    west: ['antelope', 'warthog', 'zebra'],
+    north: ['antelope', 'warthog'],
+  }[region] ?? []
+  const herds = window.__wildlife.herdsRef.current ?? {}
+  const radius = window.__balance.panoramaWildlife.vicinityRadius
+  const min = window.__balance.panoramaWildlife.vicinityMinAnimals
+  let count = 0
+  for (const sp of pool) for (const a of herds[sp] ?? []) if (!a.dead && Math.hypot(a.x - pos.x, a.z - pos.z) <= radius) count++
+  return { region, count, radius, min }
+})
+check(
+  'a settlement vicinity holds region-typical animals after leaving (point 102)',
+  vicinity.count >= vicinity.min,
+  JSON.stringify(vicinity),
+)
+
 // --- Region border near a river renders a legible tone, not a black slab -------
 // (point 101) A transparent border ribbon wrote no valid MRT normal, so the
 // screen-space AO blackened it into "black bars near rivers". Park on land by

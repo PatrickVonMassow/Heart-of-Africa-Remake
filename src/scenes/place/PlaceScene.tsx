@@ -51,7 +51,15 @@ import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
 import { buildLayout, isOnLane, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
-import { silhouetteScale, apparentAngleDeg, hazeColor, luminance } from './panoramaWildlife'
+import {
+  silhouetteScale,
+  apparentAngleDeg,
+  hazeColor,
+  luminance,
+  excludedAzimuthSpan,
+  isAzimuthExcluded,
+  type AzimuthSpan,
+} from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
 import { bandHeightAt } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
@@ -924,6 +932,47 @@ function GroundScatter({
 
 // --- Distant panorama wildlife (design.md §2) -----------------------------------
 
+// Fixed skyline landmarks per settlement (point 102): each excludes an azimuth
+// arc on the panorama ring so no drifting silhouette crosses the monument (the
+// Cairo "animals next to the pyramids" report). A future third skyline is just
+// another row; the in-town Timbuktu mosque is NOT here (a horizon silhouette
+// behind town buildings is a normal depth relationship, not a crossing). The
+// positions/scaleX mirror the <GizaSkyline>/<TableMountainSkyline> meshes below.
+const PLACE_SKYLINES: Record<string, Array<{ build: () => THREE.BufferGeometry; x: number; z: number; scaleX: number }>> = {
+  cairo: [{ build: buildGizaPyramids, x: -130, z: 10, scaleX: 13 }],
+  capetown: [{ build: buildTableMountain, x: 0, z: -118, scaleX: 1 }],
+}
+
+/** Excluded azimuth spans on the panorama ring for a settlement's skyline
+ *  landmarks (empty when it has none). The footprint half-width is measured from
+ *  the built geometry's x-extent (scaled), so the table only holds placement. */
+function skylineExclusionSpans(placeId: string): AzimuthSpan[] {
+  const rows = PLACE_SKYLINES[placeId]
+  if (!rows) return []
+  const marginRad = (balance.panoramaWildlife.landmarkMarginDeg * Math.PI) / 180
+  return rows.map((r) => {
+    const g = r.build()
+    g.computeBoundingBox()
+    const bb = g.boundingBox
+    const halfWidthWorld = bb ? ((bb.max.x - bb.min.x) * r.scaleX) / 2 : 20
+    g.dispose()
+    return excludedAzimuthSpan(r.x, r.z, halfWidthWorld, marginRad)
+  })
+}
+
+// Region-typical large fauna for the panorama silhouettes — a subset of what the
+// bird's-eye sim shows in each region so the two views agree (point 102, part c):
+// the arid north carries only antelope, the plains east/south the full herd mix,
+// the wooded west/centre a narrower range. Every entry is a species the
+// bird's-eye view also spawns in that region.
+const PANORAMA_FAUNA: Record<RegionId, Array<() => THREE.BufferGeometry>> = {
+  north: [buildAntelope],
+  west: [buildZebra, buildAntelope],
+  central: [buildElephant, buildAntelope],
+  east: [buildElephant, buildGiraffe, buildZebra, buildAntelope],
+  south: [buildElephant, buildGiraffe, buildZebra, buildAntelope],
+}
+
 /**
  * Far-off animals drifting through the surroundings panorama: dark, slightly
  * oversized silhouettes on the backdrop ring so they read at person scale.
@@ -947,13 +996,11 @@ function PanoramaWildlife({
   skyHorizon: string
 }) {
   const centerH = useMemo(() => sampleTerrain(lat, lon, seed).height, [lat, lon, seed])
-  const geos = useMemo(() => {
-    // Region-typical species: the desert north shows antelope (oryx), the
-    // rest a savanna mix; giraffes stay out of the deep forest.
-    if (region === 'north') return [buildAntelope()]
-    if (region === 'central') return [buildElephant(), buildAntelope()]
-    return [buildElephant(), buildGiraffe(), buildZebra()]
-  }, [region])
+  // Region-typical species aligned to the bird's-eye pool (point 102, part c).
+  const geos = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
+  // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
+  // into one is hidden so it never crosses the monument (point 102, part a).
+  const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
   // World height of each mesh, for the apparent-size clamp (point 94).
   const geoHeights = useMemo(
     () => geos.map((g) => {
@@ -1010,11 +1057,14 @@ function PanoramaWildlife({
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
     w.__placePanoramaWildlife = items.length
+    // Excluded skyline azimuth spans (point 102) for the polish assertion.
+    w.__placeSkylineExclusion = exclusionSpans.map((s) => ({ center: s.center, half: s.half }))
     return () => {
       delete w.__placePanoramaWildlife
       delete w.__placePanoramaWildlifeInfo
+      delete w.__placeSkylineExclusion
     }
-  }, [items])
+  }, [items, exclusionSpans])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -1031,6 +1081,11 @@ function PanoramaWildlife({
       const g = refs.current[i]
       if (!g) return
       const a = it.angle + t * it.drift
+      // Azimuth on the ring; hide a silhouette that has drifted into a skyline
+      // landmark's arc so it never crosses the monument (point 102, part a).
+      const azimuth = Math.atan2(Math.sin(a), Math.cos(a))
+      const hidden = isAzimuthExcluded(azimuth, exclusionSpans)
+      g.visible = !hidden
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
       const groundY = captureActive
@@ -1041,8 +1096,9 @@ function PanoramaWildlife({
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
         // y vs the visible horizon line (EYE_HEIGHT); the apparent size and the
-        // hazed luminance for the point-92/94 live gates.
-        info[i] = { y, visibleY: captureActive ? EYE_HEIGHT : groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum }
+        // hazed luminance for the point-92/94 live gates; azimuth/visible for
+        // the point-102 skyline-exclusion gate.
+        info[i] = { y, visibleY: captureActive ? EYE_HEIGHT : groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden }
       }
       g.position.set(x, y, z)
       // Face the drift direction along the ring tangent.

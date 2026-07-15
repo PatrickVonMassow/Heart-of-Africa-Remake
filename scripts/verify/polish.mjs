@@ -46,6 +46,26 @@ await page.evaluate(() => {
   await page.waitForTimeout(700)
   await page.screenshot({ path: `${OUT}100-cairo-giza-skyline.png` })
   console.log('shot 100-cairo-giza-skyline.png')
+
+  // Point 102 (a): in Cairo no VISIBLE panorama silhouette may fall inside the
+  // Giza skyline's excluded azimuth span — otherwise an animal drifts across the
+  // pyramids (the user's report). Asserted on the dev state, not on pixels.
+  await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 15000 }).catch(() => {})
+  const gizaExcl = await page.evaluate(() => {
+    const spans = window.__placeSkylineExclusion ?? []
+    const info = Object.values(window.__placePanoramaWildlifeInfo ?? {})
+    const wrap = (d) => Math.atan2(Math.sin(d), Math.cos(d))
+    const inSpan = (az) => spans.some((s) => Math.abs(wrap(az - s.center)) <= s.half)
+    const violating = info.filter((v) => v.visible !== false && inSpan(v.azimuth)).length
+    return { skyline: window.__placeSkyline, spanCount: spans.length, sils: info.length, violating }
+  })
+  check(
+    'no Cairo panorama silhouette crosses the Giza skyline span (point 102)',
+    gizaExcl.skyline === 'giza-pyramids' && gizaExcl.spanCount >= 1 && gizaExcl.sils >= 3 && gizaExcl.violating === 0,
+    JSON.stringify(gizaExcl),
+  )
+  await page.screenshot({ path: `${OUT}105-cairo-panorama-giza-clear.png` })
+  console.log('shot 105-cairo-panorama-giza-clear.png')
 }
 
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
