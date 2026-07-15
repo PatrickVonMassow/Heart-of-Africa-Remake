@@ -2206,7 +2206,7 @@ as-is; only the sequence changes.
   the band (mirrors the Giza test) + on-land + bounded shift; a bird's-eye
   screenshot confirms the field on dry sand clear of the Nile. Vitest 1494.
 
-- [ ] 111. The flat BLACK ground blob in the first-person settlement is STILL present
+- [x] 111. The flat BLACK ground blob in the first-person settlement is STILL present
   on real WebGPU hardware — point 106's AO floor (`max(0.4, ao.r)` in Effects.tsx) did
   NOT fix it (user re-confirmed with a localhost screenshot: a sharp-edged flat-black
   arrow shape on the sand). So GTAO over-occlusion is NOT the (sole) cause. This does
@@ -2252,8 +2252,34 @@ as-is; only the sequence changes.
   → the place-scene ground uses a plain MeshStandardMaterial, no TSL surface
   structure/normal). Deployed; the user tests on WebGPU — blob gone → the TSL
   ground shader (then fix it precisely); blob stays → a building/geometry, isolate
-  further. design.md unchanged
-  (render-quality safeguard; no new CLAUDE §7.1 point). One atomic commit once fixed.
+  further.
+  ROOT CAUSE + FIX (15.07. ~15:20, user confirmed "Flat ground" ON removes the blob
+  / OFF brings it back on WebGPU → it IS the ground node material): createGroundMaterial's
+  colorNode mixed a "patch" tone by `cells.oneMinus().pow(3)` where `cells` is
+  `mx_worley_noise_float(...)` — Worley returns a cell DISTANCE that can exceed 1, so
+  `oneMinus()` goes negative, and `pow(negative, 3)` is NaN on WGSL/WebGPU (pow =
+  exp(y·log(x)), log of a negative = NaN). The NaN propagated to a flat-black ground
+  patch; the WebGL 2/GLSL pow handled the negative base without NaN, so headless never
+  showed it (the WebGPU-untestable-headless limitation). FIX (materials.ts): clamp
+  `cells` to [0,1] so `oneMinus()` stays non-negative and pow is well-defined —
+  backend-neutral, no WebGL 2 look change (verified by screenshot; material tests
+  30/30). The "Flat ground (debug)" and "Sun shadows" toggles added during isolation
+  stay as debug features. Headless cannot gate the WebGPU fix, so the user confirms on
+  hardware (blob gone with Flat ground OFF). design.md unchanged
+  (render-quality safeguard; no new CLAUDE §7.1 point).
+
+- [ ] 116. At game start it takes very long before the FIRST read-aloud (user report;
+  a consequence of point 114). 114 pre-synthesizes the WHOLE journal entry before
+  playback to guarantee gapless audio on the sub-realtime WASM path, but that means the
+  start entry waits for the model cold-load PLUS every segment's synthesis before the
+  first sound. FIX (src/journal/speech.ts): start playback after a LEAD buffer of ~4 s
+  of audio (or all segments if the entry is shorter) instead of the whole entry, while
+  the worker keeps synthesizing the rest ahead. The lead cushions the sub-realtime
+  synthesis so playback rarely starves, but the first sound comes after only the cold
+  load + the first ~4 s of synthesis. `onSpeaking` still fires on the first real audio;
+  a failed/cancelled segment resolves to null and is skipped. Verifiable: voice.mjs
+  stays green (narration produces audio, speaking state without a click, rAF liveness
+  through the cold load). design.md unchanged (CLAUDE §7.1 pt.19). One atomic commit.
 
 - [x] 112. Audio balance (user request): footsteps twice as loud, and ALL other
   ambient sounds half as loud — including the "ding-dong" (the interaction/enter

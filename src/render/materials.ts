@@ -300,7 +300,12 @@ export function createGroundMaterial(
   m.metalness = 0
   const p = positionWorld.xz
   const large = mx_fractal_noise_float(vec3(p.mul(0.08), 2.0), 4).mul(0.5).add(0.5)
-  const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0))
+  // Worley noise returns a cell DISTANCE that can exceed 1, so clamp it before
+  // `oneMinus().pow(3)`: without the clamp a value > 1 makes the base negative,
+  // and pow(negative, 3) is NaN on WGSL/WebGPU (pow = exp(y·log(x)), log of a
+  // negative = NaN) — the NaN propagated to a flat-black ground patch that the
+  // WebGL 2 path never showed (point 111).
+  const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0)).clamp(0, 1)
   let col = mix(color(base), color(alt), large.clamp(0, 1))
   col = mix(col, color(patch), cells.oneMinus().pow(3).mul(0.5))
   const pathMask = (() => {
