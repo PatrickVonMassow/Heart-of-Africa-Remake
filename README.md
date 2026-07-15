@@ -12,15 +12,18 @@ This repository contains the proof of concept: the core gameplay loop end to
 end, not the complete game. `design.md` is the authoritative design document;
 `CLAUDE.md` defines the POC scope, acceptance criteria and build rules.
 
+**▶ Play the proof of concept:** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
+
 ## Versions
 
-Both stands are playable on the same GitHub Pages site:
+Several stands are playable on the same GitHub Pages site:
 
+- **Proof of concept (tag `poc`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/> —
+  the frozen POC stand, rebuilt from the immutable `poc` tag on every deploy.
+- **v0.1 (tag `v0.1`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.1/> —
+  the same stand under a version number.
 - **Latest (main):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/> —
-  redeployed on every push to `main`.
-- **Frozen POC 0.1 (tag `v0.1`):** <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.1/> —
-  rebuilt from the immutable tag on every deploy, so this exact stand stays
-  playable regardless of what `main` does.
+  redeployed on every push to `main`, so it may move ahead of the tags.
 
 ## Gameplay
 
@@ -148,14 +151,13 @@ src/
 
 The autonomous build batch reports its live progress — current point, queue,
 per-point runtimes and pending manual checks — on the
-[batch dashboard](https://claude.ai/code/artifact/fe669d50-9b71-43a3-bf82-2fce7abe774b)
-(private; visible to the repository owner's Claude account only).
+[batch dashboard](https://claude.ai/code/artifact/fe669d50-9b71-43a3-bf82-2fce7abe774b).
 
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
 evidence lives in `verification/`. Known simplifications (e.g. no true water
 refraction, English-only journal read-aloud; screen-space reflections were
-integrated, found visually irrelevant for this game's camera and are slated
-for removal) are recorded as open items in the code (`// OPEN:`) and in
+integrated, found visually irrelevant for this game's camera and removed
+again) are recorded as open items in the code (`// OPEN:`) and in
 `TASKS.md`. The full headless regression runs with
 `npm test` — a fast Vitest (jsdom) layer plus 13 Playwright browser suites;
 the test strategy and coverage map live in

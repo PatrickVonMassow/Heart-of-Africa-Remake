@@ -38,33 +38,25 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Frozen playable v0.1 stand under /v0.1/ (TASKS point 103): the same
-      # Pages site serves main at the root and the v0.1 tag at the subpath —
-      # GitHub allows one Pages site per repository, so the frozen stand is a
-      # subdirectory of the same artifact, rebuilt from the immutable tag on
-      # every deploy. Guarded so the workflow still deploys main-only while
-      # the tag does not exist yet.
-      - name: Check for the v0.1 tag
-        id: v01
+      # Frozen playable tag stands under /v0.1/ and /poc/ (TASKS point 103): the
+      # same Pages site serves main at the root and each tag at its subpath —
+      # GitHub allows one Pages site per repository, so every frozen stand is a
+      # subdirectory of the same artifact, rebuilt from its immutable tag on
+      # every deploy. Each tag is guarded so the workflow still deploys the ones
+      # that exist while another does not.
+      - name: Build the frozen tag stands (v0.1, poc)
         run: |
-          if [ -n "$(git ls-remote --tags origin v0.1)" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build the frozen v0.1 stand
-        if: steps.v01.outputs.exists == 'true'
-        run: |
-          git fetch --depth 1 origin tag v0.1
-          git worktree add v01-src v0.1
-          cd v01-src
-          npm ci
-          npx tsc -b
-          npx vite build --base=/Heart-of-Africa-Remake/v0.1/
-          cd ..
-          mkdir -p dist/v0.1
-          cp -r v01-src/dist/. dist/v0.1/
+          for tag in v0.1 poc; do
+            if [ -z "$(git ls-remote --tags origin "$tag")" ]; then
+              echo "tag $tag does not exist yet — skipping"
+              continue
+            fi
+            git fetch --depth 1 origin tag "$tag"
+            git worktree add "src-$tag" "$tag"
+            ( cd "src-$tag" && npm ci && npx tsc -b && npx vite build --base="/Heart-of-Africa-Remake/$tag/" )
+            mkdir -p "dist/$tag"
+            cp -r "src-$tag/dist/." "dist/$tag/"
+          done
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
