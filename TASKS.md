@@ -1718,7 +1718,7 @@ as-is; only the sequence changes.
   while the model is still loading (reveal timing independent of TTS
   readiness).
 
-- [ ] 101. Flat BLACK vertical shapes in the TRAVEL scene, near rivers
+- [x] 101. Flat BLACK vertical shapes in the TRAVEL scene, near rivers
   (confirmed while removing SSR, point 99(e): they persist with SSR fully
   gone, so they are NOT SSR-caused; distinct from point 92, which is the
   SETTLEMENT panorama silhouettes). In the bird's-eye view at close zoom,
@@ -1748,6 +1748,23 @@ as-is; only the sequence changes.
   known river-side dressing/wildlife position and asserts they are not
   near-black (and not pure-white). Screenshot at the repro spot showing
   the shapes gone. design.md note only if a design rule is involved.
+  TRACK: the black bars were the REGION-BORDER ribbons (design.md §3.1), not
+  wildlife/flora. Root cause (found via a dev-server raycast/A-B/SSAO probe):
+  the ribbon used a transparent classic MeshBasicMaterial with depthWrite off,
+  so it wrote no valid normal into the TSL node pipeline's MRT scene pass and
+  the screen-space GTAO read full occlusion on those pixels and multiplied them
+  to flat black — worst near rivers, where the ribbon also floated over the
+  bank drop. Fix (src/scenes/travel/borderGeometry.ts, new module): an OPAQUE
+  MeshStandardNodeMaterial (writes a ground normal → AO treats it like the
+  ground) in a warm sepia BORDER_INK, plus per-corner terrain sampling so every
+  ribbon corner lies flush on its own ground (no floating gap) and a per-corner
+  water skip. The all-white-animals report did NOT reproduce (fauna render in
+  colour) and is unrelated. No design rule changed (§3.1 already calls the
+  border a "subtle dashed ground marking"). Tests: borderGeometry.test.ts
+  (flush corners, land-only, mid-tone ink) + enrichments.mjs (AO-safe material
+  via __regionBorder, and a sampled ribbon pixel luminance ~184, not black;
+  screenshot 104). Full regression green (18 suites; the lone enrichments
+  animal-collision miss was a load flake, green standalone).
 
 - [ ] 102. First-person surroundings wildlife doesn't match the bird's-eye
   landscape (user report): in Cairo (first-person) animals drifted through

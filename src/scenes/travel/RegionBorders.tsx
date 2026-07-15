@@ -3,66 +3,14 @@
 // with the region's name shown on its side of the line.
 
 import { useEffect, useMemo, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import { useGame } from '../../state/store'
-import { REGION_BORDERS, latLonToWorld, regionBorderLabelAnchors } from '../../world/geo'
+import { latLonToWorld, regionBorderLabelAnchors } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { useStrings } from '../../i18n'
-
-const STEP_DEG = 0.1 // sampling step along a border line (1 world unit)
-const DASH_ON = 4 // samples drawn per dash
-const DASH_PERIOD = 7 // samples per dash + gap cycle
-const HALF_WIDTH = 0.28 // ribbon half width in world units
-const LIFT = 0.22 // height above the terrain; hides LOD deviation of far chunks
-
-function buildBorderGeometry(seed: number): THREE.BufferGeometry {
-  const positions: number[] = []
-  const indices: number[] = []
-
-  for (const line of REGION_BORDERS) {
-    let dash = 0
-    for (let s = 0; s < line.length - 1; s++) {
-      const [lon0, lat0] = line[s]
-      const [lon1, lat1] = line[s + 1]
-      const steps = Math.max(1, Math.round(Math.hypot(lon1 - lon0, lat1 - lat0) / STEP_DEG))
-      for (let i = 0; i < steps; i++, dash++) {
-        if (dash % DASH_PERIOD >= DASH_ON) continue
-        const ta = i / steps
-        const tb = (i + 1) / steps
-        const aLat = lat0 + (lat1 - lat0) * ta
-        const aLon = lon0 + (lon1 - lon0) * ta
-        const bLat = lat0 + (lat1 - lat0) * tb
-        const bLon = lon0 + (lon1 - lon0) * tb
-        const ha = sampleTerrain(aLat, aLon, seed).height
-        const hb = sampleTerrain(bLat, bLon, seed).height
-        if (ha <= 0.05 || hb <= 0.05) continue // land only
-        const a = latLonToWorld(aLat, aLon)
-        const b = latLonToWorld(bLat, bLon)
-        // Perpendicular in the ground plane.
-        let px = -(b.z - a.z)
-        let pz = b.x - a.x
-        const inv = HALF_WIDTH / (Math.hypot(px, pz) || 1)
-        px *= inv
-        pz *= inv
-        const vi = positions.length / 3
-        positions.push(
-          a.x - px, ha + LIFT, a.z - pz,
-          a.x + px, ha + LIFT, a.z + pz,
-          b.x - px, hb + LIFT, b.z - pz,
-          b.x + px, hb + LIFT, b.z + pz,
-        )
-        indices.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3)
-      }
-    }
-  }
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
-  geo.setIndex(indices)
-  return geo
-}
+import { buildBorderGeometry, BORDER_INK } from './borderGeometry'
 
 const LABEL_SPACING_DEG = 4
 const LABEL_OFFSET_DEG = 0.9
@@ -113,19 +61,60 @@ function BorderLabels({ seed }: { seed: number }) {
 export function RegionBorders() {
   const seed = useGame((s) => s.seed)
   const geometry = useMemo(() => buildBorderGeometry(seed), [seed])
-  const material = useMemo(
-    () =>
-      new THREE.MeshBasicMaterial({
-        color: '#33261a',
-        transparent: true,
-        opacity: 0.5,
-        depthWrite: false,
-        side: THREE.DoubleSide, // ribbon winding varies with border direction
-      }),
-    [],
-  )
+  const material = useMemo(() => {
+    // A STANDARD node material like the terrain itself — opaque, and it writes
+    // both depth AND a ground-facing normal into the MRT scene pass. The old
+    // transparent basic material wrote no valid normal, so the screen-space AO
+    // read full occlusion on the ribbon pixels and multiplied them to flat
+    // BLACK — the "black bars near rivers" (point 101). With a real surface
+    // normal the AO treats the dashed marking (design.md §3.1) exactly like the
+    // ground beneath it, keeping it a subtle warm sepia line lit with the land.
+    const m = new THREE.MeshStandardNodeMaterial()
+    m.color = new THREE.Color(BORDER_INK)
+    m.roughness = 0.95
+    m.metalness = 0
+    m.side = THREE.DoubleSide // ribbon winding varies with border direction
+    return m
+  }, [])
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2, point 101): report
+  // the ink tone and material type, and project a near-player border vertex to
+  // screen pixels so the suite can sample the ribbon exactly where it renders.
+  const { camera, gl } = useThree()
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__regionBorder = {
+      ink: BORDER_INK,
+      matType: material.type,
+      opaque: material.transparent === false,
+      screenProbe: () => {
+        const pos = useGame.getState().pos
+        const p = geometry.attributes.position
+        let best = -1
+        let bd = Infinity
+        for (let i = 0; i < p.count; i++) {
+          const dx = p.getX(i) - pos.x
+          const dz = p.getZ(i) - pos.z
+          const d = dx * dx + dz * dz
+          if (d < bd) {
+            bd = d
+            best = i
+          }
+        }
+        if (best < 0) return null
+        const v = new THREE.Vector3(p.getX(best), p.getY(best), p.getZ(best)).project(camera)
+        const el = gl.domElement as HTMLCanvasElement
+        return { sx: (v.x * 0.5 + 0.5) * el.clientWidth, sy: (-v.y * 0.5 + 0.5) * el.clientHeight, dist: Math.sqrt(bd) }
+      },
+    }
+    return () => {
+      delete w.__regionBorder
+    }
+  }, [camera, gl, geometry, material])
+
   return (
     <>
       <mesh geometry={geometry} material={material} renderOrder={1} />

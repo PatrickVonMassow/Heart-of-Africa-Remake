@@ -14,6 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
+import sharp from 'sharp'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -2849,6 +2850,55 @@ const zorder = await page.evaluate(async () => {
 })
 check('a settlement label is hit-tested on top before a dialog opens', zorder.ok && zorder.labelOnTopBefore, JSON.stringify(zorder))
 check('a modal dialog covers the in-scene labels', zorder.ok && zorder.dialogOnTop, JSON.stringify(zorder))
+
+// --- Region border near a river renders a legible tone, not a black slab -------
+// (point 101) A transparent border ribbon wrote no valid MRT normal, so the
+// screen-space AO blackened it into "black bars near rivers". Park on land by
+// Kabalega Falls, project a near-player border vertex to screen and sample the
+// ribbon pixels: they must be a mid-tone sepia, never near-black (nor white).
+await page.evaluate(() => {
+  window.__balance.randomEventsEnabled = false
+  window.__game.getState().setJournalOpen(false)
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(0.35)
+  window.__game.getState().debugJumpTo(2.28, 31.68)
+  // Park just to the side of the border line on land so the traveller does not
+  // drift downstream and the border sits stably on screen.
+  window.__borderPark = { x: 317.28, z: -21 }
+})
+for (let i = 0; i < 14; i++) {
+  await page.evaluate(() => window.__game.setState({ pos: { ...window.__borderPark } }))
+  await page.waitForTimeout(120)
+}
+const borderMat = await page.evaluate(() => {
+  const b = window.__regionBorder
+  return b ? { matType: b.matType, opaque: b.opaque, ink: b.ink } : null
+})
+// The opaque STANDARD node material is what writes the ground normal the AO
+// needs — the fix that stops the ribbon blackening.
+check(
+  'region border uses the AO-safe opaque standard node material (point 101)',
+  !!borderMat && /Standard/.test(borderMat.matType) && borderMat.opaque === true,
+  JSON.stringify(borderMat),
+)
+const probe = await page.evaluate(() => window.__regionBorder?.screenProbe())
+let borderLum = null
+if (probe && probe.dist < 12) {
+  const clip = { x: Math.max(0, Math.round(probe.sx - 5)), y: Math.max(0, Math.round(probe.sy - 5)), width: 10, height: 10 }
+  const buf = await page.screenshot({ clip })
+  const { data } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+  let sum = 0
+  const px = data.length / 3
+  for (let i = 0; i < data.length; i += 3) sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+  borderLum = sum / px
+}
+check(
+  'region border near a river renders a legible tone, not a black slab (point 101)',
+  borderLum !== null && borderLum > 45 && borderLum < 245,
+  `mean luminance ${borderLum === null ? 'n/a' : borderLum.toFixed(1)} at ${JSON.stringify(probe)}`,
+)
+await page.screenshot({ path: `${OUT}104-region-border-river.png` })
+console.log('shot 104-region-border-river.png')
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
