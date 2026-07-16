@@ -802,7 +802,14 @@ verify suite that proves it.
     (read through the app's dev hook, never a dynamic import — HMR hands a
     fresh module instance whose flood state is untouched), and the ribbon
     continuity and never-buried invariants are re-asserted AT flood peak
-    (`scripts/verify/enrichments.mjs`, screenshots 117/118).
+    (`scripts/verify/enrichments.mjs`, screenshots 117/118). The Okavango
+    inversion (§19.13, point 139) holds: the delta floods in the LOCAL dry
+    season — pure-tested in both directions (July flood > 0.8 while local
+    wetness < 0.1; low in December as the local rains fall) and without
+    leaking into normal rivers (the Zambezi keeps its January, the Nile its
+    October); live, the delta's water fan reads visibly fuller in July than
+    in January via `__naturalSites.deltaFlood`/`deltaWaterScale`
+    (screenshots 119/120).
 22. **Health and afflictions.** The health system of `design.md` §6 is
     implemented: a health pool drained by starvation and the afflictions
     of §6.2 (fever delirium, dehydration with the canteen fill mechanics

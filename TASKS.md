@@ -3666,7 +3666,7 @@ the remaining open points in their numeric order.
   and why) and §19.13 (it is a season); CLAUDE.md §7.1 pt. 21.
   (Filed 16.07.2026.)
 
-- [ ] 139. The Okavango floods in the DRY season — a documented wrong to fix.
+- [x] 139. The Okavango floods in the DRY season — a documented wrong to fix.
   Wanted (user, 16.07.2026). This one is not a gap but an ERROR the research
   already caught and the build then walked past: `docs/peoples-1890.md` §4.0.4
   records that at 19.0S 22.5E "the water arrives when the sky is driest" — the
@@ -3700,6 +3700,17 @@ the remaining open points in their numeric order.
   DOCS: design.md §11.3/§19.13 — record the inversion as a deliberate, sourced
   oddity, like the §19.8 grief carve-out, so it survives the next reader's
   intuition. (Filed 16.07.2026.)
+  DONE (16.07.2026, c1c950a): okavangoFloodAt consumes the Nile's remote-source
+  + lag pattern (Angolan highlands, 180 days); pure tests pin the inversion in
+  BOTH directions and its non-leakage (Zambezi/Nile unchanged). The delta has
+  no ribbon (it is a point landmark), so its water fan became its own geometry
+  (buildDeltaWater) scaled OBJECT-level with the flood — affine and safe, the
+  deliberate opposite of the vertex-mask displacement that shattered the trees
+  the same day. January 0.70 -> July 1.25, live check + screenshots 119/120.
+  NOTE: the 120e animal catchment needs no inversion handling — in the July dry
+  season the animals gather at remaining water, and the delta HAS water then;
+  the behaviour is already correct. The wider-catchment rule reads the sky,
+  the delta supplies the water, and the two compose.
 
 - [ ] 140. The harmattan as a season — and its counter-intuitive look.
   Wanted (user, 16.07.2026). `docs/climate-1890.md` documents it richly and the
