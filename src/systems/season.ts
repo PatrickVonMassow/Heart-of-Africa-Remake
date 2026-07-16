@@ -257,6 +257,54 @@ export function coldnessAt(
   return Math.min(1, seasonal * amplitude + elevation * 0.6)
 }
 
+// The harmattan (docs/climate-1890.md): the West African winter dust wind.
+// Core late November to mid-March, worst in January, reaching ~5N to ~20N.
+const HARMATTAN_PEAK_DOY = 15 // mid-January, the worst of it
+const HARMATTAN_HALF_WIDTH_DAYS = 58 // late Nov .. mid-Mar around the peak
+const HARMATTAN_LAT_CORE = [10, 18] as const
+const HARMATTAN_LAT_FADE = 4
+/**
+ * East of the Chad basin the wind is not the harmattan — it is a WEST African
+ * phenomenon, blowing off the Sahara toward the Gulf of Guinea. INFERRED: the
+ * research gives the latitude band (~5-20N) but no longitude, so this eastern
+ * bound is reasoned from what the harmattan IS, not read off a source.
+ */
+const HARMATTAN_LON_EAST = 25
+const HARMATTAN_LON_FADE = 6
+
+/**
+ * How hard the harmattan blows at a place and time, 0 .. 1 (design.md §19.13).
+ *
+ * Deliberately NOT folded into `coldnessAt`, though the research stresses the
+ * cold: the harmattan is a SWING, not a cold season — "cold at dawn and hot by
+ * afternoon — the swing is the phenomenon", with a 15-20 °C diurnal range. A
+ * place under it is not cold at noon, so adding it to coldness would dress a
+ * Hausa villager for a chill he does not have at midday. It is its own driver,
+ * and the dress and the sky each read what they need from it.
+ *
+ * The other half of why this exists: `coldnessAt`'s amplitude falls off toward
+ * the equator (correctly — the annual swing does), so the Sahel reads "never
+ * cold" all year. That is right about the ANNUAL swing and wrong about the
+ * January dawn, and only a separate driver can hold both.
+ */
+export function harmattanAt(day: number, lat: number, lon: number, startYear: number): number {
+  const doy = dayOfYear(day, startYear)
+  // Distance from the January peak, wrapped across the year end (the season
+  // straddles it: late Nov .. mid Mar).
+  const raw = Math.abs(doy - HARMATTAN_PEAK_DOY)
+  const dist = Math.min(raw, 365 - raw)
+  const season = Math.max(0, 1 - dist / HARMATTAN_HALF_WIDTH_DAYS)
+  // Full strength across the core band, fading out to either side.
+  const [south, north] = HARMATTAN_LAT_CORE
+  let band = 1
+  if (lat < south) band = Math.max(0, 1 - (south - lat) / HARMATTAN_LAT_FADE)
+  else if (lat > north) band = Math.max(0, 1 - (lat - north) / HARMATTAN_LAT_FADE)
+  const west = lon > HARMATTAN_LON_EAST
+    ? Math.max(0, 1 - (lon - HARMATTAN_LON_EAST) / HARMATTAN_LON_FADE)
+    : 1
+  return season * band * west
+}
+
 /**
  * Wetness at a place and time, 0 (rainless) .. 1 (the wettest the world gets).
  * Interpolated smoothly across the month profile so a season arrives and fades

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, dayOfMonthJump, dayOfYear, effectiveWetness, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveWetness, harmattanAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -217,6 +217,75 @@ describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () 
     expect(sunDimFactor(1, 0)).toBe(1)
     expect(sunDimFactor(1, 1)).toBeLessThan(1)
     expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
+  })
+})
+
+describe('harmattanAt (point 137 — the West African winter dust wind)', () => {
+  const START = 1890
+  const JAN = 15
+  const APR = 105
+  const AUG = 227
+  const DEC_10 = 343
+  // The game's own villages, so the model is tested where it is actually read.
+  const HAUSA = { lat: 12.0, lon: 8.5 }
+  const BAMBARA = { lat: 13.45, lon: -6.27 }
+  const TUAREG = { lat: 23.2, lon: 5.8 }
+  const SOMALI = { lat: 5.5, lon: 45.0 }
+  const MAASAI = { lat: -2.5, lon: 36.8 }
+  const ZULU = { lat: -28.4, lon: 31.3 }
+
+  it('blows hardest in January over the Sahel — the research names it the worst month', () => {
+    expect(harmattanAt(JAN, HAUSA.lat, HAUSA.lon, START)).toBeGreaterThan(0.8)
+    expect(harmattanAt(JAN, BAMBARA.lat, BAMBARA.lon, START)).toBeGreaterThan(0.8)
+  })
+
+  it('is gone in the wet season — the dust wind is a DRY-season phenomenon', () => {
+    expect(harmattanAt(AUG, HAUSA.lat, HAUSA.lon, START)).toBe(0)
+    expect(harmattanAt(APR, HAUSA.lat, HAUSA.lon, START)).toBe(0)
+  })
+
+  it('straddles the year end: mid-December already blows', () => {
+    // The season runs late Nov - mid Mar, so a naive |doy - peak| without the
+    // wrap would read December as the far side of the year and return 0.
+    expect(harmattanAt(DEC_10, HAUSA.lat, HAUSA.lon, START)).toBeGreaterThan(0)
+  })
+
+  it('never reaches the south, and never the east coast', () => {
+    for (const day of [JAN, APR, AUG, DEC_10]) {
+      expect(harmattanAt(day, MAASAI.lat, MAASAI.lon, START)).toBe(0)
+      expect(harmattanAt(day, ZULU.lat, ZULU.lon, START)).toBe(0)
+      // The Horn is not West Africa — the harmattan blows toward the Gulf of
+      // Guinea, not out of it.
+      expect(harmattanAt(day, SOMALI.lat, SOMALI.lon, START)).toBe(0)
+    }
+  })
+
+  it('fades rather than switching at the band edge', () => {
+    // The deep Sahara is past the core band but not cleanly outside it.
+    const tuareg = harmattanAt(JAN, TUAREG.lat, TUAREG.lon, START)
+    expect(tuareg).toBeLessThan(harmattanAt(JAN, HAUSA.lat, HAUSA.lon, START))
+  })
+
+  it('stays inside 0..1 everywhere, every day of the year', () => {
+    for (let day = 0; day < 365; day += 5) {
+      for (const lat of [-34, -10, 0, 5, 12, 20, 31]) {
+        for (const lon of [-17, -6, 8, 25, 45]) {
+          const h = harmattanAt(day, lat, lon, START)
+          expect(h).toBeGreaterThanOrEqual(0)
+          expect(h).toBeLessThanOrEqual(1)
+        }
+      }
+    }
+  })
+
+  it('is NOT folded into coldness: the Sahel stays warm by day under it', () => {
+    // The research resolves the hot/cold contradiction as a diurnal SWING —
+    // cold at dawn, hot by afternoon. A harmattan that raised `coldnessAt`
+    // would dress a Hausa villager for a midday chill he does not have.
+    expect(harmattanAt(JAN, HAUSA.lat, HAUSA.lon, START)).toBeGreaterThan(0.8)
+    expect(coldnessAt(JAN, HAUSA.lat, HAUSA.lon, START, 486)).toBeLessThan(
+      COLD_DRESS_THRESHOLD,
+    )
   })
 })
 
