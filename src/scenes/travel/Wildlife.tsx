@@ -23,6 +23,7 @@ import { setAnimalCollider } from './wildlifeCollision'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { drinkWalkDistance } from './waterEdgeRules'
+import { CURRENT_WEATHER } from '../../systems/season'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
@@ -593,7 +594,14 @@ function placeGroup(
       const rd = riverDistance(ll.lat, ll.lon, 0.5)
       const ld = lakeDistance(ll.lat, ll.lon, 0.5)
       const wd = Math.min(ld, rd)
-      if (wd > 0.02 && wd < 0.35) {
+      // The dry season widens the catchment (design.md §19.13, point 120e):
+      // as the land dries, animals walk to the water from farther out, so the
+      // remaining rivers and lakes visibly gather the wildlife. The traveller's
+      // local weather is the spawn's proxy — chunks spawn near the traveller.
+      const dryness =
+        (1 - CURRENT_WEATHER.wetness) * Math.min(1, Math.max(0, balance.season.weatherStrength))
+      const catchment = 0.35 + 0.25 * dryness
+      if (wd > 0.02 && wd < catchment) {
         const e = 0.03
         const gLat =
           Math.min(lakeDistance(ll.lat + e, ll.lon, 0.6), riverDistance(ll.lat + e, ll.lon, 0.6)) -

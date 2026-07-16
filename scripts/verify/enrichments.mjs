@@ -2731,6 +2731,33 @@ check(
   JSON.stringify({ wetTint: season.wet.tint, dryTint: season.dry.tint }),
 )
 
+// The dry season gathers the wildlife at the remaining water (point 120e): a
+// wider shore catchment at spawn. Same seed, same chunks — the only variable
+// is the forced season, so the drinker counts are deterministic.
+const drinkersAt = async (override) => {
+  await page.evaluate((o) => window.__ui.getState().setSeasonWetnessOverride(o), override)
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-17.9, 25.9)) // the Zambezi
+  await page.waitForTimeout(600)
+  await page.evaluate(() => window.__wildlife.restock())
+  await page.waitForTimeout(2500)
+  return page.evaluate(() => {
+    const h = window.__wildlife.herdsRef.current
+    let drink = 0
+    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']) {
+      for (const a of h[sp] ?? []) if (a.drink) drink++
+    }
+    return drink
+  })
+}
+const dryDrinkers = await drinkersAt(0)
+const wetDrinkers = await drinkersAt(1)
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+check(
+  'the dry season draws more animals to the remaining water (point 120e)',
+  dryDrinkers > wetDrinkers && wetDrinkers > 0,
+  JSON.stringify({ dryDrinkers, wetDrinkers }),
+)
+
 // haze is shown — the fog recedes to the horizon and the ground haze fades.
 const continentZoom = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
