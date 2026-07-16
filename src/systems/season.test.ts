@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, karifAt, nileFloodAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, karifAt, nileFloodAt, okavangoFloodAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -369,6 +369,47 @@ describe('nileFloodAt (point 138 — the flood is remote-fed, not local rain)', 
   it('stays inside 0..1 across the whole 1890-1895 window', () => {
     for (let day = 0; day < 365 * 6; day += 5) {
       const f = nileFloodAt(day, START_YEAR)
+      expect(f).toBeGreaterThanOrEqual(0)
+      expect(f).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('okavangoFloodAt (point 139 — the delta floods in the LOCAL DRY SEASON)', () => {
+  const DELTA = { lat: -19.5, lon: 22.9 } // the game's okavango landmark
+  const flood = (m: number) => okavangoFloodAt(on(m, 15), START_YEAR)
+
+  it('peaks in July-August while the delta sky is at its annual driest — the inversion, asserted so nobody "corrects" it back', () => {
+    // Andersson, PERIOD: "Its annual overflow takes place in June, July, and
+    // August." Livingstone, PERIOD: "this is the dry season. That the rise is
+    // not caused by rains, is evident, from the water being so pure."
+    expect(flood(7)).toBeGreaterThan(0.8)
+    expect(wet(7, DELTA.lat, DELTA.lon)).toBeLessThan(0.1)
+  })
+
+  it('sits low when the LOCAL rains fall — water and sky move in opposition', () => {
+    // November-December: Botswana's own rains begin, and the flood recedes.
+    expect(flood(12)).toBeLessThan(0.25)
+    expect(wet(12, DELTA.lat, DELTA.lon)).toBeGreaterThan(0.4)
+  })
+
+  it('lags the Angolan source by roughly half a year', () => {
+    // The source rains peak in the austral summer; the pulse arrives mid-year.
+    const sourceJan = wet(1, -12.5, 16.0, 1700)
+    const sourceJul = wet(7, -12.5, 16.0, 1700)
+    expect(sourceJan).toBeGreaterThan(sourceJul) // source: summer rains
+    expect(flood(7)).toBeGreaterThan(flood(1)) // delta: winter flood
+  })
+
+  it('does not leak the inversion into normal rivers — the Zambezi still peaks WITH its rains', () => {
+    // The inversion is the Okavango's own hydrology, not a new global rule.
+    expect(wet(1, ZAMBEZI.lat, ZAMBEZI.lon)).toBeGreaterThan(wet(7, ZAMBEZI.lat, ZAMBEZI.lon))
+    expect(nileFloodAt(on(10, 15), START_YEAR)).toBeGreaterThan(0.8) // and the Nile keeps October
+  })
+
+  it('stays inside 0..1 across the whole 1890-1895 window', () => {
+    for (let day = 0; day < 365 * 6; day += 5) {
+      const f = okavangoFloodAt(day, START_YEAR)
       expect(f).toBeGreaterThanOrEqual(0)
       expect(f).toBeLessThanOrEqual(1)
     }

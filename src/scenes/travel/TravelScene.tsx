@@ -31,7 +31,7 @@ import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
-import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, sunDimFactor } from '../../systems/season'
+import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, okavangoFloodAt, sunDimFactor } from '../../systems/season'
 import { SEASON_TINT_U, seasonTintNode } from '../../render/seasonTint'
 import { NILE_FLOOD } from './waterSurface'
 import { elevationAt } from '../../world/geodata'
@@ -71,6 +71,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildCrater,
   buildVolcano,
   buildDelta,
+  buildDeltaWater,
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
@@ -1363,6 +1364,7 @@ function NaturalSites() {
       crater: buildCrater(),
       volcano: buildVolcano(),
       delta: buildDelta(),
+      deltaWater: buildDeltaWater(),
       wetland: buildWetland(),
     }),
     [],
@@ -1383,7 +1385,13 @@ function NaturalSites() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__naturalSites = { count: items.length, ids: items.map((it) => it.id) }
+    w.__naturalSites = {
+      count: items.length,
+      ids: items.map((it) => it.id),
+      // Point 139 — read through the app graph (the HMR fresh-instance trap).
+      deltaFlood: () => deltaFlood.current,
+      deltaWaterScale: () => deltaWaterRef.current?.scale.x ?? null,
+    }
     return () => {
       delete w.__naturalSites
     }
@@ -1396,19 +1404,37 @@ function NaturalSites() {
     [geos, material],
   )
 
+  // The Okavango inversion (point 139): the delta's water fan swells to its
+  // peak in the LOCAL dry season (Jun-Aug) and shrinks when Botswana's own
+  // rains fall — the Angolan flood pulse arriving half a year late. Scaled at
+  // OBJECT level (whole mesh, affine): safe where per-vertex mask displacement
+  // is not (the bare-branches shards, point 144).
+  const deltaWaterRef = useRef<THREE.Mesh>(null)
+  const deltaFlood = useRef(0)
+  useFrame(() => {
+    const m = deltaWaterRef.current
+    if (!m) return
+    const target = okavangoFloodAt(useGame.getState().day, START_YEAR)
+    deltaFlood.current += (target - deltaFlood.current) * 0.02
+    const sc = 0.7 + deltaFlood.current * 0.55 // 0.7 at low water .. 1.25 at the July peak
+    m.scale.set(sc, 1, sc)
+  })
+
   return (
     <>
       {items.map((it) => (
-        <mesh
-          key={it.id}
-          geometry={geos[it.kind]}
-          material={material}
-          position={[it.x, it.y, it.z]}
-          rotation={[0, it.yaw, 0]}
-          castShadow
-          receiveShadow
-          dispose={null}
-        />
+        <group key={it.id} position={[it.x, it.y, it.z]} rotation={[0, it.yaw, 0]}>
+          <mesh geometry={geos[it.kind]} material={material} castShadow receiveShadow dispose={null} />
+          {it.kind === 'delta' && (
+            <mesh
+              ref={deltaWaterRef}
+              geometry={geos.deltaWater}
+              material={material}
+              receiveShadow
+              dispose={null}
+            />
+          )}
+        </group>
       ))}
     </>
   )

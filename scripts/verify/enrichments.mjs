@@ -2803,6 +2803,35 @@ check(
   await page.waitForTimeout(1500)
 }
 
+// Point 139 — the Okavango INVERSION: the delta peaks in the LOCAL dry season
+// (Andersson and Livingstone, both PERIOD — the water is the Angolan rains
+// arriving half a year late). Asserted so nobody "corrects" it back to
+// flooding with the local rains.
+{
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-19.2, 22.9)) // the delta
+  await page.waitForTimeout(1200)
+  const deltaAt = async (month) => {
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.waitForTimeout(4500) // the swell blends at 0.02/frame
+    return page.evaluate(() => ({
+      flood: window.__naturalSites.deltaFlood(),
+      scale: window.__naturalSites.deltaWaterScale(),
+    }))
+  }
+  const jan = await deltaAt(1) // Botswana's own rains — and LOW water
+  await page.screenshot({ path: `${OUT}119-okavango-low-january.png` })
+  const jul = await deltaAt(7) // the local dry season — and the FLOOD
+  await page.screenshot({ path: `${OUT}120-okavango-flood-july.png` })
+  console.log('shot 119-okavango-low-january.png, 120-okavango-flood-july.png')
+  check(
+    'the Okavango delta is FULLER in the local dry season than in the local rains (point 139)',
+    jul.scale !== null && jan.scale !== null && jul.scale > jan.scale + 0.2,
+    `January scale ${jan.scale?.toFixed(2)} (flood ${jan.flood.toFixed(2)}) -> July ${jul.scale?.toFixed(2)} (flood ${jul.flood.toFixed(2)})`,
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+  await page.waitForTimeout(1000)
+}
+
 // Point 147(b) — VISIBLE, and measured in PIXELS rather than the tint uniform:
 // the whole reason this class of check exists. A savanna spot's ground must
 // differ on screen between its driest and wettest month, and a Congo spot —

@@ -544,6 +544,40 @@ export function nileFloodAt(day: number, startYear: number): number {
   return Math.min(1, Math.max(0, (kiremt - NILE_FLOOD_FLOOR) / (NILE_FLOOD_PEAK - NILE_FLOOD_FLOOR)))
 }
 
+// The Okavango inversion (docs/peoples-1890.md §4.0.4/§7.3, point 139): the
+// delta floods in the middle of the LOCAL DRY SEASON. The Angolan summer rains
+// (Nov-Mar) feed the Cubango and Cuito, the pulse shows at the panhandle around
+// March-April and reaches the distal delta in JUNE-AUGUST — "while most river
+// systems flood during the local rainy season, the Okavango does the opposite".
+// PERIOD-confirmed twice: Andersson ("Its annual overflow takes place in June,
+// July, and August"), and Livingstone, who deduced the remote origin from the
+// water's CLARITY ("this is the dry season. That the rise is not caused by
+// rains, is evident, from the water being so pure").
+//
+// Same shape as the Nile flood — remote rain, months of lag — consuming the
+// same pattern; the difference is that the lag is long enough to land the peak
+// in the local dry season, which is the proof the abstraction is real and not
+// a Nile special case.
+const OKAVANGO_SOURCE = { lat: -12.5, lon: 16.0, elevationM: 1700 } // the Angolan highlands
+const OKAVANGO_FLOOD_LAG_DAYS = 180 // source peak mid-Jan -> delta peak mid-Jul
+const OKAVANGO_FLOOD_FLOOR = 0.05
+const OKAVANGO_FLOOD_PEAK = 0.6
+
+/** The Okavango delta's flood level at a day, 0 (low) .. 1 (the July peak). */
+export function okavangoFloodAt(day: number, startYear: number): number {
+  const angolanRains = wetnessAt(
+    day - OKAVANGO_FLOOD_LAG_DAYS,
+    OKAVANGO_SOURCE.lat,
+    OKAVANGO_SOURCE.lon,
+    startYear,
+    OKAVANGO_SOURCE.elevationM,
+  )
+  return Math.min(
+    1,
+    Math.max(0, (angolanRains - OKAVANGO_FLOOD_FLOOR) / (OKAVANGO_FLOOD_PEAK - OKAVANGO_FLOOD_FLOOR)),
+  )
+}
+
 /** Below this zone peak a place is too arid to carry green worth bleaching. */
 const GREENING_ZONE_FLOOR = 0.5
 

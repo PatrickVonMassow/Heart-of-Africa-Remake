@@ -361,18 +361,11 @@ export function buildVolcano(): THREE.BufferGeometry {
 /** Okavango: low braided water ribbons (thin flat blue strips splitting
  *  outward) interspersed with papyrus tufts. */
 export function buildDelta(): THREE.BufferGeometry {
-  const rand = mulberry32(5100)
+  // Papyrus tufts between the channels. The WATER fan is a separate build
+  // (buildDeltaWater) so the Okavango inversion can scale it with the flood —
+  // object-level, whole-mesh, which is safe where vertex-mask displacement is
+  // not (the bare-branches shards, point 144).
   const parts: THREE.BufferGeometry[] = []
-  // Braided ribbons fanning outward from an apex.
-  for (let i = 0; i < 5; i++) {
-    const a = -0.7 + i * 0.35
-    const len = 2.2 + rand() * 0.8
-    const ribbon = new THREE.BoxGeometry(0.28, 0.04, len)
-    ribbon.rotateY(a)
-    ribbon.translate(Math.sin(a) * (len / 2), 0.05, Math.cos(a) * (len / 2) - 1.2)
-    parts.push(tint(ribbon, '#4a7d97', 0.06, 5100 + i))
-  }
-  // Papyrus tufts between the channels.
   const tufts: Array<[number, number]> = [
     [-0.8, 0.3],
     [0.7, 0.1],
@@ -386,6 +379,25 @@ export function buildDelta(): THREE.BufferGeometry {
     t.translate(x, 0, z)
     parts.push(t)
   })
+  return merge(parts)
+}
+
+/**
+ * The delta's braided water fan, separate so it can swell and shrink with the
+ * flood (point 139): the Okavango peaks in the LOCAL dry season, June-August.
+ */
+export function buildDeltaWater(): THREE.BufferGeometry {
+  const rand = mulberry32(5100)
+  const parts: THREE.BufferGeometry[] = []
+  // Braided ribbons fanning outward from an apex.
+  for (let i = 0; i < 5; i++) {
+    const a = -0.7 + i * 0.35
+    const len = 2.2 + rand() * 0.8
+    const ribbon = new THREE.BoxGeometry(0.28, 0.04, len)
+    ribbon.rotateY(a)
+    ribbon.translate(Math.sin(a) * (len / 2), 0.05, Math.cos(a) * (len / 2) - 1.2)
+    parts.push(tint(ribbon, '#4a7d97', 0.06, 5100 + i))
+  }
   return merge(parts)
 }
 
