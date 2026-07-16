@@ -87,6 +87,12 @@ against the river's geometry. So: 120 → 136 → 122 → 123 → the remaining 
 points in their numeric order. The numbering stays as-is; only the sequence
 changes.
 
+Work order (user override, 2026-07-16, later): 137 (seasonal dress by educated
+guess) goes NEXT, ahead of 136 — the user asked for it "als nächstes
+eingereiht" while 136 had only just started (nothing of 136 is committed, so
+nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
+remaining open points in their numeric order.
+
 ## Checklist
 
 - [x] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
@@ -3340,6 +3346,93 @@ changes.
   DOCS: design.md §11.3 (the width/scale trade-off stated outright, so the
   deliberate inaccuracy is on record like the §19.8 grief carve-out) and
   CLAUDE.md §7.1 pt. 21. (Reported 16.07.2026.)
+
+- [ ] 137. Seasonal dress: educated guessing on indicia, instead of one cloak.
+  Wanted (user, 16.07.2026): "Wenn die Belege hier so dünn sind, dann mache ein
+  Educated Guessing, das möglichst gut auf Indizien beruht. Falls notwendig
+  führe eine zusätzliche ausführliche Recherche dafür durch… Es soll deutliche
+  Unterschiede bzgl. der Kleidung je nach Region und Jahreszeit geben — aber
+  nur sofern sie plausibel sind."
+  ORDER: NEXT, ahead of 136 (see the work-order note at the top).
+  WHAT THIS REVERSES — read this before touching `src/systems/dress.ts`. Point
+  120g shipped a deliberately narrow rule: a cold-weather cloak ONLY for the
+  Zulu, because Mayr (1907) is the one PERIOD source among the game's peoples,
+  and nothing for anyone else because `docs/peoples-1890.md` §2.6 reads "Sahel
+  harmattan: EVIDENCE ABSENT — do not invent". That was the right call under
+  the old rule (CLAUDE §2 forbids INVENTING design content) and it is now
+  superseded by an explicit user decision: absence of a period photograph is no
+  longer a reason to render a people identical in January and July. The new
+  standard is EDUCATED GUESSING FROM INDICIA — weaker than proof, much stronger
+  than invention. Do not "restore" the strict gate later; this note is the
+  authority, like the §19.8 grief carve-out.
+  THE BAR a guess must clear (all four, else the people stays unchanged):
+  1. A PHYSICAL DRIVER the game already models or the climate research states:
+     real cold (austral winter, highland elevation, Saharan/harmattan nights),
+     real rain, real dust. `docs/climate-1890.md` has the harmattan's 15-20 °C
+     diurnal swing and "cold at dawn and hot by afternoon — the swing is the
+     phenomenon"; that is an indicium, not a guess.
+  2. A GARMENT THE PEOPLE DEMONSTRABLY HAD, from the period record or the
+     material record (locally woven cotton — Kano was a textile centre; wool in
+     the Atlas; hides; bark cloth for the Baganda; the Tuareg tagelmust; trade
+     blankets, whose 1890 spread the research already dates). Never a garment
+     invented for the occasion.
+  3. A PLAUSIBLE USE of that garment under that driver — and the research
+     already names the honest form: dress here is cloaks and wraps, adjustable
+     single pieces, so the seasonal signal is often HOW a garment is worn
+     (drawn tight, pulled over head and shoulders, wrapped across the face)
+     rather than how many are worn. §2.6 explicitly prefers this reading over
+     inventing an extra garment; the user's "nur sofern plausibel" points the
+     same way.
+  4. NOT A COSTUME CLICHÉ, and not a 20th-century back-projection. The traps
+     are already documented and must stay caught: the patterned "Victoria
+     England" blanket is 1897; the Maasai red shuka is an anachronism; the
+     Tuareg "winter" claims found were tourism copy. A guess that happens to
+     match the tourist image needs MORE evidence, not less.
+  (a) RESEARCH FIRST, and it is a real pass, not a skim. Extend
+      `docs/peoples-1890.md` (a new section, so §2.6's negative findings stay
+      readable as what they are) covering, per people of design.md §3.2/§4.5:
+      what garments the record gives them; what the local climate actually does
+      across the year; and what the DEFENSIBLE seasonal reading is. Mark every
+      claim as the doc already does — PERIOD / MODERN / RETRO-APPLIED /
+      CONTESTED / GAP — and now additionally INFERRED, with the indicia it
+      rests on named. An inference whose indicia cannot be named is not an
+      educated guess; it is invention, and it does not ship.
+      Leads §2.6 named but could not chase: Barth and Clapperton on the
+      harmattan; Nicolaisen (1963) on the Tuareg (itself a retro-application
+      risk — weigh it, do not just cite it).
+  (b) MODEL: extend `coldnessAt` (or add siblings) so the drivers the dress
+      keys on are the real ones — cold, and at least the harmattan's dust/night
+      chill, which is a WEST/NORTH dry-season phenomenon the current
+      coldness-only model cannot express (its amplitude falls off toward the
+      equator, so the Sahel reads "never cold" while its January nights are
+      genuinely cold). Balance-calibratable and debug-editable per CLAUDE §2.
+  (c) DRESS: replace the single `COLD_CLOAKS` map with a per-people seasonal
+      dress derived from (a), so the difference is VISIBLE and REGIONAL — the
+      user asked for "deutliche Unterschiede… je nach Region und Jahreszeit".
+      Keep the two properties 120g's tests pin: the choice stays deterministic
+      and stable per figure, and it spreads across the settlement's palette
+      (the palette-index keying exists because a colour hash collided and hid
+      the black hide entirely).
+  (d) FIGURES: the primitive figures can carry more than the one shoulder cone.
+      §2.6's "worn differently" reading needs a shape difference (a wrap drawn
+      over head and shoulders vs. hanging), which is exactly what 120g recorded
+      as OPEN because it was not modelled. If it stays unmodelled, say so in
+      design.md again rather than pretending the palette swap covers it.
+  TESTS: extend `src/systems/dress.test.ts` — every people asserted across the
+  four seasons (a people with no defensible seasonal reading must still assert
+  as unchanged, so the negative cases stay honest); the drivers pure-tested at
+  the named coordinates (the Sahel's cold January night, the Zulu winter, the
+  never-cold equator); the determinism/spread properties kept. Live: extend the
+  §19.13 block in `scripts/verify/polish.mjs` (it is LAST in that file on
+  purpose — see the comment there) with at least one contrasting region pair
+  and re-take screenshot 112.
+  DOCS: `docs/peoples-1890.md` (the research), design.md §19.13 (the dress
+  paragraph currently states the narrow Zulu-only rule and its refusals —
+  rewrite it to the new standard and record that educated guessing is the
+  user's explicit decision) and CLAUDE.md §7.1 pt. 12 (its dress sentence names
+  dress.test.ts and the "stays bare however cold" traps).
+  SIZE: research + model + dress + figures is several commits, not one. (Filed
+  16.07.2026.)
 
 ## Closing (only after all points)
 
