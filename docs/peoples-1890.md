@@ -1036,3 +1036,952 @@ Merker (1904) for Maasai dress; **Passarge (1896–98)** for the San against a
 period source rather than a 1960s model; **Stanley's Ituri accounts (1887–89)**
 for period Mbuti; the **Mahdiyya** for the Nubian region's actual 1890
 government; **Roscoe (1911)** for the Ganda year.
+
+---
+
+## 7. Second dress pass (TASKS point 137) — seasonal dress by educated guessing
+
+**Why this section exists.** Point 120g shipped a deliberately narrow rule: a
+cold-weather cloak for the **Zulu alone**, because Mayr (§2.3) is the one period
+source among the game's peoples, and nothing for anyone else because §2.6 found
+the evidence absent. The project owner reversed that on 16.07.2026: where period
+proof is thin, an **educated guess grounded in indicia** is wanted — clear
+regional and seasonal differences wherever they are *plausible*. §2's negative
+findings stay above, unedited, as what they were; this section is the second,
+deeper pass. The bar every inference must clear: a **physical driver** the
+climate research states, a **garment the people demonstrably had**, a
+**plausible use**, and **no costume cliché**. An inference whose indicia cannot
+be named is invention and does not ship.
+
+New marker in this section: **INFERRED**, always followed by the indicia it
+rests on.
+
+### 7.0 ★★ The cross-cutting find: one re-tie, three peoples, three garments
+
+§2.6's structural inference — that dress here is cloaks and wraps, so the honest
+signal is **how** a garment is worn rather than how many — is now **confirmed by
+three independent period sources on three different peoples, in the same rule**:
+
+- **Maasai** — Thomson (1885) p. 276: *"The kid-skin garment which hangs at his
+  shoulder is now folded up, and tied tightly round his waist like a belt, **so
+  as to leave his arms free**."*
+- **Baganda** — Roscoe (1911): *"A man wore a barkcloth knotted over the right
+  shoulder… hanging down like a Roman toga; **when at work, he tied a band round
+  the waist**, to keep the barkcloth together, and allow him the full use of his
+  arms."*
+- **Somali** — Swayne (1895): *"**for a fight** the chest and arms are left bare,
+  the part which was thrown over the shoulders being **wound many times round the
+  waist**."*
+
+Three garments (kidskin, barkcloth, cotton tobe), one identical re-tie:
+**shoulder-drape → waist-belt, to free the arms.** PERIOD, triple-attested.
+
+**But it fires on ACTIVITY, not on season** — and that is itself the finding:
+the record hands the game a *work/fight* toggle far more clearly than it hands
+it a *season* toggle.
+
+### 7.1 East and the Horn — the seasonal signal is real, but DISPLACED
+
+The headline of this pass: east of the Nile the evidence for seasonal *dress* is
+genuinely thin (§2.6 was right), but the seasonal signal exists — it just does
+not land on the body. It lands on the **hut**, the **sleeping place** and the
+**week**.
+
+#### Maasai (−2.5, 36.8 — village at 1731 m): the hides go on the HUT
+
+- **Climate, PERIOD and it settles the equator question.** Thomson: *"a night of
+  low temperature — and even frequently of intense cold… you rise, shivering, in
+  the morning, to see the grass covered with **hoar frost**, and then in the
+  afternoon find yourself perspiring… with the temperature above 90° Fahr."*
+  **Hoar frost at dawn, 90 °F by afternoon, at this village's altitude.** The
+  cold is a NIGHT, not a season — exactly as `coldnessAt` says.
+- **The reading — INFERRED, and it is architectural.** Thomson, twice
+  independently: *"To keep out the wind a composition of cow's dung was liberally
+  plastered over the boughs. This sufficed for the dry season, but **for the rainy
+  one a further covering of hides had to be laid upon it**"*; and of a stone
+  kraal, *"holes in the centre, which **in the inclement weather could be covered
+  with bullock's hides**"*. Indicia: two independent PERIOD passages, both
+  answering the rains with hides on the DWELLING. Fully compatible with the
+  ochred-leather figure — it never touches the garment.
+- **§4.0.3 UPGRADE: RETRO-APPLIED → PERIOD.** Thomson has the transhumance
+  direction from a period pen: *"moving up from the plains to the **highlands in
+  the dry season** and vice versa in the wet season."* Months still absent; the
+  counter-intuitive direction is no longer an inference.
+- ⚠️ **A passage the next reader will misread.** Thomson: *"it was simply
+  wonderful to see how the men would lie in the open air without a shred of
+  clothing, and with the temperature at the freezing-point."* **"The men" are his
+  own coast porters, not Maasai** — the next paragraph turns to the damp cold
+  being *"singularly fatal to the coast natives"*. NOT evidence about Maasai
+  practice.
+- ⚠️ **Rinderpest and hides — chased, and it inverts.** FAO (MODERN): sheep and
+  goats mostly survive rinderpest (subacute form); cattle die at ~90%. Mapped onto
+  Thomson's gendered dress, the **warrior's sheepskin sits on an unaffected supply
+  while the women's ox-hide garment sits on the collapsed one** — INFERRED. But
+  the timing trap runs the other way: mass death is a short-term **glut** of
+  hides, not a shortage; any scarcity is a renewal failure over years, not an 1891
+  event. The rinderpest→cloth-adoption link is NOT asserted (no scholarly source
+  makes it).
+- Hollis (1905) Plate II shows *"Masai elder wearing a fur cloak"* — the cloak is
+  period-attested, but the caption explains its shape (*"supposed to resemble a
+  cobra's hood"*) and says **nothing about weather**. Do not turn it into a
+  winter coat.
+
+#### Swahili (−6.5, 38.7): nothing seasonal — but something WEEKLY
+
+- **§2.3 UPGRADE: THIN → PERIOD.** §2.3 said the kanzu's dating "rests entirely
+  on tertiary sources — no period source found". There is one. **Charles New,
+  *Life, Wanderings and Labours in Eastern Africa* (1873)**, PERIOD, gives the
+  whole outfit with its in-world names: *"a loin cloth… called **kikoi**… Next
+  over this is drawn the **kansu**, a long, straight, narrow garment… often of
+  white calico… Upon this is worn a **kisbao**, a kind of sleeveless waistcoat…
+  On great occasions, and generally on Friday… the **joho** is worn. This is a
+  long overcoat of fine cloth… reaching to the very heels… sometimes a red fez…
+  a white needleworked cap, called **kofia**, and about this is bound the
+  **kilemba** or turban."*
+- **The reading — INFERRED, and the honest cycle is WEEKLY.** The only period
+  statement locating the joho in time locates it on **"great occasions, and
+  generally on Friday"** — not on weather. Indicium: that sentence. A game that
+  puts the joho on for the cool *kipupwe* is inventing; a game that puts it on
+  **on Fridays** is quoting New. The calendar already knows the day.
+- **Burton (1872) reframes the equatorial question, PERIOD:** *"where tropical
+  downfalls are heavy, the excessive humidity intercepting the solar rays… **make
+  the rainy season the cold weather**."* And: *"It has **two winters**; the
+  shorter in December, and in **July the longer**."* He gives the period in-world
+  season names — **Kipupwe** (first winter, Jul–early Aug), Kaskazi, Masika Mku,
+  Kausi/Kusi, Demani — and notes the Zanzibaris reckon **five** seasons.
+  **In period understanding the rains ARE the cold season** in equatorial East
+  Africa. Useful for §13's in-world words.
+- **Seasonal dress change: GAP.** No period source states coast dress changes with
+  the monsoon.
+- ⚠️ Burton's izar/kilemba/burka passages describe the **Omani-Arab elite of
+  Zanzibar town**, not mainland Swahili villagers; Burton himself: *"Respectable
+  Wasawahili dress like Arabs."* And his blanket-coats and *"bit of fire"* against
+  chills are advice to **European sailors**, not a description of Swahili
+  practice — the easiest misreading in that chapter.
+
+#### Somali (5.5, 45.0): the one real seasonal dress change — and it may be at the wrong latitude
+
+- **The best single find of the pass.** Swayne (1895, fieldwork **1885–93** — the
+  game's exact decade and region), PERIOD, gives the tobe **and its states**:
+  *"The tobe is a simple cotton sheet… about fifteen feet long, and is **worn in
+  a variety of ways**. Generally it is thrown over one or both shoulders, a turn
+  given round the waist, and allowed to fall to the ankles. **In cold weather the
+  head is muffled up in it after the fashion of an Algerian 'burnouse.'** When
+  sleeping round a camp fire the body is **enveloped in it from head to foot, as
+  in a winding-sheet**. …for a fight the chest and arms are left bare, the part
+  which was thrown over the shoulders being wound many times round the waist."*
+  **One cloth, four documented configurations, from an eyewitness on the exact
+  people in the exact years.** Nothing else in this research is this clean.
+- **The cold is a WIND in the HOT season, and altitude-gated.** Swayne's period
+  table: *"(3) **Haga** — July, August, September — the hot weather. The **karíf**
+  wind… blows furiously. It is **hot in Guban**, with sand-storms, but **cold on
+  the Haud and other parts of the high interior**."* The intuitive "harsh dry
+  season = cold" is **wrong** here: *jilál* (Jan–Apr on Swayne's period reckoning)
+  is *"the driest season; great heat"*.
+- **The reading — INFERRED:** in the karif (haga, Jul–Sep) the tobe goes up over
+  the head as a burnouse; otherwise it drapes. Indicia: (a) Swayne's explicit
+  *"In cold weather the head is muffled up in it"*, (b) his explicit location of
+  the cold in haga via the karif, (c) both from one source, one people, the game's
+  own years.
+- ⚠️ **GEOGRAPHY CAVEAT — the game's point may be in the wrong place for it.**
+  Swayne puts that cold *"on the Haud and other parts of the high interior"*
+  (~8–9°N, 1000 m+), and his own contrast is that the same wind is *"hot in
+  Guban"*. **The game's Somali village is at 5.5°N, 45.0°E — south of the Haud and
+  low.** So the muffle is defensible **for the Haud and not clearly defensible at
+  this coordinate**. Honest options: move the point north into the Haud/Ogo, or
+  hold the muffle as GAP-at-this-latitude and use the tobe's other three states,
+  which are location-free.
+- Also PERIOD: some tobes *"dipped in red clay… of a bright burnt-sienna colour"*;
+  the elite **khaili**; *"In no tribe that I have seen do the Somáli women cover
+  the face"*; married women's hair in *"a chignon, enclosed in a dark blue bag"*.
+  And the cold-morning image: the men *"**warming their spears**, thereby storing
+  up heat for ten minutes longer to comfort their hands on their cold morning
+  march."*
+- ⚠️ **Camels are immune to rinderpest** (FAO) — the Somali are the one East
+  African people the game's window does NOT devastate. Their cloth economy is
+  imported cotton, untouched. Do not import the Maasai catastrophe here.
+
+#### Sidama (6.7, 38.4 — village at 1801 m): GAP, and a NEW category-error trap
+
+- ⚠️⚠️ **"Sidama" in a period source means the OMO BASIN — not this people.** The
+  source that looks decisive is **Jules Borelli, *Éthiopie méridionale: journal de
+  mon voyage aux pays Amhara, Oromo et Sidama* (1890, fieldwork 1885–88)** —
+  published in the game's start year, naming the Sidama in its title, and he wears
+  the dress himself. **It cannot be used.** Borelli defines his own term in his
+  annexe: *"Les pays sidama sont bornés au nord par la Godjeb et s'étendent sur la
+  **rive gauche de l'Omo**… **A l'est, les pays sidama ont pour limites le
+  territoire des Arroussi-Galla**"* — and lists Kaffa, Garo, Zingéro,
+  Koullo/Daouro. **His "Sidama" is a 19th-century regional cover term for the
+  Omo-basin kingdoms, bounded on the EAST by Arsi country; the game's village at
+  38.4°E lies ~130 km east of the Omo, outside it entirely.** His dress
+  descriptions (the nettle-fibre *dosseh*; the Koullo embroidered trousers) belong
+  to Kullo/Dawro and Janjero — **different peoples**. Transferring them would be
+  the §1 category error, and WORSE than the existing ones, because it would carry
+  a period citation and therefore look settled.
+- **Nuance for §1, offered as a finding.** §1 says the word "Sidamo" does not
+  exist at the 1890 start (coined 1891). Compatible — but **"Sidama" was already
+  in European print as a REGIONAL label before 1891** (Borelli's 1890 title,
+  fieldwork from 1885). Both hold: the derogatory *Sidamo* is the 1891 coinage;
+  *Sidama* in period European usage names an Omo-basin **region**. The practical
+  consequence is sharp: **a period source saying "Sidama" is probably not talking
+  about this village.**
+- **Sidama (Hawassa) dress ~1890: GAP.** Confirmed after direct searching of
+  Parkyns, Borelli and Donaldson Smith. **The §2.6 gap stands.**
+- **Climate, PERIOD, measured — and it settles the altitude question.** Borelli's
+  own highland journal: *"Malgré la latitude, le climat est relativement froid"*
+  (the period traveller names the equator paradox himself); *"Le temps est froid;
+  — huit degrés et demi"* (8.5 °C, measured); *"La terre est blanche de givre; le
+  froid me coupe le visage"*; *"Le froid est vif. J'ai la figure et les mains
+  gercées par une véritable bise."* **Hoar frost and 8.5 °C in the Ethiopian
+  highlands, period-measured** — an ELEVATION effect, year-round, not a season.
+- **What CAN be shown is behavioural, and it is period-sourced — for highlanders
+  generally (Parkyns, Tigray-observed, marked as such).** Two mechanics:
+  * **§2.7 UPGRADE — the day-cloth IS the night-blanket, now direct from the
+    period source** (§2.7 had it only as a 403'd Pankhurst snippet): *"It is the
+    custom always to sleep naked, but **covered with the quarrie or cotton cloth
+    worn in the daytime**; and the only bedding used is a piece of native-tanned
+    leather."* This anchors §2.6's mechanic (2) for the highlands as well as for
+    Mayr's Zulu.
+  * **The season moves the BODY, not the wardrobe** — INFERRED, indicium: this one
+    Parkyns sentence: *"In these hot climates… **it is more usual to sleep out of
+    doors**; the 'arat' inside of the house being used for **cold or wet weather
+    only**."* Compounds with §4.9's Barth finding (the rains move people out to
+    field huts) as the same class of mechanic.
+- ⚠️ **The cloak-over-the-head is NOT a cold gesture in Ethiopia.** Donaldson
+  Smith (1894–95), PERIOD: *"It is the custom of the Abyssinians to **hide their
+  faces under their cloaks when they are eating or drinking**."* This is
+  **propriety** — exactly parallel to §2.4's warning that the tagelmust is not a
+  hat. If the game pulls a highlander's cloak over the head in cold,
+  period-literate eyes read *eating*, not *freezing*. (Parkyns' *"Roll your head
+  completely up in your cloth, which will then act as a respirator"* is real and
+  *"always adopted by the natives"*, but his stated rationale is **miasma/fever**,
+  not warmth.)
+- ⚠️ **The Amhara are not the Sidama — and in 1890–91 that is the whole point.**
+  The doubled white-and-red *shamma* is solid PERIOD for Abyssinians (Donaldson
+  Smith: *"eight feet long and **doubled**… pure white, with a scarlet band…"*,
+  matching Parkyns' *"clean white quarry or sheet, with red border"* across 50
+  years). But at this coordinate in 1890–91 an Amhara in a shamma is **Menelik's
+  conquering soldier** — the Sidama are being conquered in 1891 (§5). Dressing the
+  villagers in shammas would put **the invader's uniform on the invaded**.
+- The *gabi*-for-cold-months detail remains **MODERN and THIN** — no period
+  support found; not upgraded.
+
+#### Baganda (0.75, 32.55 — ~1200 m): nothing, and the record RULES OUT the obvious guess
+
+- **Garments, PERIOD (Roscoe, resident through the 1890s)** — confirms §2.5: *"The
+  clothing of the people was universally the picturesque barkcloth. A man wore a
+  barkcloth knotted over the right shoulder… like a Roman toga… The women wore
+  barkcloths wrapped round their bodies… These cloths were of a rich **terracotta
+  tint**."* **Terracotta, not brown** — a free accuracy win for the renderer.
+  Skins are the OLDER and COURTLY layer, not the poor one: *"King Semakokiro first
+  forced his people to go about clothed; prior to his reign the people wore no
+  clothes but small skins"*; gatekeepers wore *"finely-dressed skins"*.
+- **Climate, PERIOD, the flattest year of the five:** *"In Uganda there was
+  **seldom a full month, even in the driest season, in which some rain did not
+  fall**… the rainy season occurring between February and June was termed **Togo
+  mukazi**… the second rainy season from August to November was called **Dumbi
+  Musajja**, because of the thunder."*
+- **§3.4 PARTIAL UPGRADE — the Ganda year is six months long.** Roscoe: *"**A
+  season of rain followed by drought made up a year**; accordingly, the people
+  regarded the year as consisting of **six months**, or moons, and they called it
+  the **mwaka**."* PERIOD, in-world, and the season names are **gendered**
+  (*mukazi* = woman, *musajja* = man — the thunder season is the male one). Exactly
+  the kind of in-world word §13 wants.
+- ⚠️⚠️ **NEW TRAP: a second barkcloth means SACRED, not cold.** The tempting
+  inference was "two barkcloths in the cold". It is wrong. Every Roscoe occurrence
+  of the second cloth is ritual status: twin-parents (*"the father wore two
+  barkcloths, one knotted over each shoulder"*), the King's investiture (*"robed
+  him with two barkcloths"*), priests (*"she dressed like one of the priests with
+  two barkcloths"*). **Indicia against the cold reading: four independent
+  passages, all ritual, none weather.** A game that adds one for warmth writes a
+  costume error that a period reader parses as *"this peasant is a priest"*.
+- **Baganda seasonal dress: nothing** — no month without rain, no cold season, and
+  the record positively argues against the obvious guess. The only period
+  dress-state change Roscoe gives is the **work belt** (§7.0).
+- ⚠️ Roscoe's index entry *"feeling cold, 287"* is under **Ghosts** — the dead feel
+  cold, and graves are lined with thatch *"to keep off the cold"*. Do not let a
+  full-text search turn Ganda eschatology into Ganda outerwear.
+- ⚠️ Cotton is the anachronism, not barkcloth (§2.5) — reconfirmed.
+
+#### What the game can defensibly show — East and the Horn
+
+| People | What changes with the season |
+| --- | --- |
+| **Maasai** | **Nothing on the figure — the hides go on the HUT** (Thomson, PERIOD, twice). Compatible with the ochred-leather ruling. Bonus, now PERIOD: the camp moves **up to the highlands in the DRY season**. |
+| **Swahili** | **Nothing seasonal — the *joho* goes on for great occasions and FRIDAYS** (New, PERIOD). A weekly rhythm the calendar can already compute. |
+| **Somali** | **The one real seasonal dress change: in the karif (Jul–Sep) the tobe is muffled over the head** (Swayne, PERIOD, exact people and years). ⚠️ But that cold is on the **Haud**, not at the game's low 5.5°N point — move the point north or hold it as GAP-at-this-latitude. The other three tobe states are location-free. |
+| **Sidama** | **Nothing — GAP.** No period source describes Hawassa dress; the one that seems to (Borelli) means the Omo basin. What CAN be shown: **sleeping outdoors normally, indoors in cold or wet** (Parkyns), and the day-cloth as night-blanket. **Never an Amhara shamma — in 1891 that is the invader's dress.** |
+| **Baganda** | **Nothing — and the record rules out the obvious guess** (the second barkcloth is priesthood). Only the **work belt**. |
+
+**Bottom line for the east:** §2.6's verdict was broadly right — seasonal *dress*
+evidence east of the Nile is thin, and where it exists (Swayne) it is a
+**how-worn** signal exactly as §2.6 predicted, not an extra garment. What this
+pass adds is that the seasonal signal is real but **displaced**: onto the **hut**
+(Maasai), the **sleeping place** (highlands) and the **week** (Swahili).
+
+### 7.2 Sahara and Sahel — ★★ the headline: §2.6's "EVIDENCE ABSENT" is upgradable, and the answer is NOT the tourist image
+
+**Method note that makes the negatives real.** Full texts were downloaded and grepped
+locally rather than trusted from search snippets: Barth vols 1–3, Park, Caillié
+vols 1–2, Thomson (*Atlas*), Burckhardt (*Nubia*), Ohrwalder, Robinson
+(*Hausaland* + *Dictionary*). One trap nearly cost the negatives: **archive.org OCR
+uses double spaces, so multi-word greps silently return zero.** Every phrase search
+was re-run against whitespace-normalised copies. **The negatives below are
+post-normalisation and are therefore real, not artefacts.**
+
+**★★ THE CONVERGENCE.** Across **every** period source read, the recorded response
+to cold in this belt is **fire, shelter and architecture** — and where a garment
+answers, it is always a **cloak or wrap already on the body**, drawn closer or
+doubled as bedding. **Not one period source describes a person putting ON a
+seasonal garment.** Seven independent observers, one convergent answer: that is
+what makes §2.6's "worn differently, not worn more" reading *defensible* rather
+than merely convenient.
+
+#### Tuareg (23.2, 5.8 — Ahaggar, village at 2110 m)
+
+- **Garments, PERIOD (Barth, 1850–51, Kel Owi of Aïr).** The veil under its period
+  orthography: *"the black **'tesilgemist'** or lithám, which covers the whole face,
+  leaving nothing but the eyes visible, and **the shawls wound over this and round
+  the cap**"*. Everyday: *"blue shirts, and a black shawl round the face"*. Over the
+  tobes, *"the principal people wear **a red bernus thrown across their
+  shoulders**"* — occasion/prestige wear. **The veil is a Kano product**: Barth's
+  Kano export list names *"the **ráwani baki, or black lithám**"*. The Tuareg veil
+  is *bought*, not made.
+- **Climate.** MODERN: Tamanrasset (1400 m) January mean min **5.4 °C**, **frost
+  ~29 days/yr**, absolute min −6 °C; Assekrem (2780 m) winter nights regularly
+  below freezing, −12 °C recorded. **The game's point at 2110 m sits between the
+  two — freezing winter nights are physically certain.** PERIOD MEASURED (Barth,
+  February): *"the thermometer in the morning indicating only **5° above
+  freezing-point**"*.
+- ⚠️ **The harmattan framing does NOT apply here.** Its extent is ~5–20°N; this
+  point is at 23.2°N. This is **Saharan winter**, not harmattan — and at ≤10 mm/yr
+  there is barely a wet season to contrast with. (`harmattanAt` already returns ~0
+  here; that is correct, not a bug.)
+- **The reading — INFERRED.** Two Barth passages carry it. **13 December, in the
+  mountains:** *"a cold wind made our old friend the chief **shiver** and regard
+  with feelings of envy my **thick black bernús**"*. **31 December, on the salt
+  caravan:** the companion *"began to complain of the **intense cold**… while I
+  seemed to be so comfortable in my warm clothes"*, and presents a cheese as a
+  *"**mágani-n-dári**"* — *"**a remedy against the cold**"* — the joke being that
+  the real magani-n-dari is Barth's bernus. And Barth's own reaction: the hints
+  *"effected nothing more than to make me **draw my warm clothing closer round my
+  body**."*
+  Indicia: (a) the bernus/cloak is period-attested in Tuareg-country caravans as
+  *the* garment against cold, and is coveted and gift-worthy — therefore **not
+  universally owned**; (b) an in-language idiom exists for an anti-cold remedy
+  (*dari* = cold, confirmed independently in Robinson 1899), and its referent is a
+  cloak; (c) the gesture actually recorded is **drawing the existing wrap closer**,
+  in the Sahara, in late December; (d) 2110 m freezes.
+  → **Same tagelmust and tobe year-round; in the cold months a bernus/shawl about
+  the shoulders for those of rank who own one, and the wrap drawn closer. The
+  change is tightness and posture, not a new garment.**
+- ⚠️ **The dust-veil trap, TESTED AND NEGATIVE.** Searching all six normalised
+  period texts for "over/across/round the face", "cover the face", "conceal the
+  face", "muffled" yields **no source describing the tagelmust drawn differently
+  against dust, sand or cold**; **"harmattan" occurs ZERO times in Barth vols 1–2.**
+  The veil-tightened-against-the-sandstorm image is inference at best — keep it
+  modest.
+- ⚠️ **Nicolaisen (1963): fieldwork 1947–63 — RETRO-APPLIED**, could not be
+  consulted directly, and therefore **no seasonal clothing claim in it is
+  verified. Do not cite it for 1890** — it is exactly the retro-application risk.
+- ⚠️ **No red fez on a Tuareg.** Barth: red caps *"are an article **quite foreign to
+  the original dress of the Tarki**, and are obnoxious to the tribes of pure
+  blood"*.
+- ⚠️ Barth's Tuareg are **Kel Owi of Aïr**, not Ahaggar (§4.0.1 already flags this
+  extrapolation).
+
+#### Berbers (31.7, −7.2 — High Atlas, village at 914 m)
+
+- **Garments — PERIOD, and almost exactly on the game's date: Joseph Thomson,
+  *Travels in the Atlas and Southern Morocco* (1889, fieldwork 1888).** Shluh
+  women: *"They wear **a single sheet of woollen or cotton cloth wound round the
+  body**, the ends meeting over the breast, where they are attached by **two silver
+  clasps**… further fastened and adorned by **thick cords in gay colours** coiled
+  round the waist."* Men (notables): *"a huge turban, and voluminous haik, and
+  enveloped besides in a creamy-coloured burnous"*. The haik itself: *"**nothing
+  more nor less than a very large woollen blanket, heavier than any used in
+  England**."*
+- **Climate — the INVERTED case in this scope.** Per `climate-1890.md`, >~31°N
+  coastal is a **winter-rain** regime, so the High Atlas is **cold AND wet**
+  Nov–Mar, hot and dry Jun–Aug. **The harmattan does not reach here at all.**
+  Thomson's text is saturated with *"snow-clad"*, *"the winter snows of the
+  Atlas"*, *"shut in by the snows of winter"*.
+- **★ The one people with a DIRECT PERIOD STATEMENT of seasonal dress** — and the
+  honest reading is the disappointing one. Thomson, of Shluh women:
+  *"**Underneath they wear other garments according to the time of the year.**"*
+  **The seasonal change he records is UNDERNEATH the outer sheet — i.e. not
+  visible.** The silhouette (wound sheet, silver clasps, cord belt) is **the same
+  in both seasons**.
+- **What Thomson DOES put on show is the SETTLEMENT.** Berber houses *"are built…
+  with the object of **keeping out the winter's cold** at the expense of light and
+  ventilation"*; the low doorway *"in inclement winter weather was kept closed"*;
+  livestock indoors because *"the quadrupeds help to keep the room cosy and
+  comfortable by **their vital fires**"*; a raised bed *"intended to raise the
+  sleeper **above the cold damp floor**"*; silos *"for the **winter storage of grain
+  and fodder**… goats when shut in by the snows of winter"*; and high-glen men with
+  *"eyes bleared and rheumy, as of men who spend half their lives in
+  semi-darkness and amidst pungent smoke, as is indeed his fate in some districts
+  **for two or three months in the year**."*
+- INFERRED (indicia: the haik is a heavy woollen blanket; Thomson records it drawn
+  *different ways* — *"drawn round by the chin and held there by the hand"*, at
+  Amsmiz *"held by both hands… to form a narrow slit quite a foot long"*, at
+  Safi/Mogador *"nothing but one eye is shown"*): the outer sheet is the adjustable
+  piece and can defensibly be drawn closer or over the head in the cold-wet months.
+  ⚠️ **But Thomson attributes that variation to PLACE, not season** — a seasonal
+  draw is inference, not his statement.
+- ⚠️ **Do not veil Atlas Berber women.** Thomson is explicit that at Demnat they
+  *"**do not veil their faces**… they move about **without the haik**"*. The veiled
+  woman belongs to the **towns** (Marrakesh, Safi, Mogador). This matches the
+  tourist image of Morocco, so per the bar it needs MORE evidence — and the period
+  source says the opposite.
+- ⚠️ **No djellaba**: grep for jellab/djellab/jelab across Thomson returns **zero** —
+  GAP, do not add one as a winter coat.
+- ⚠️ The burnous is period and present but Thomson shows it on a **sheikh/notable**
+  — prestige, not universal.
+
+#### Nubians (21.8, 31.6 — Wadi Halfa)
+
+- **PERIOD but DATED (Burckhardt, journey 1813–14 — 77 years early):** north of
+  Derr *"the dress is usually **a linen shirt only**… **or the woollen cloak of the
+  peasants of Upper Egypt**"*. At Taka: *"Both sexes wear the common Nubian dress,
+  **a Dammour shirt, and a cloke of the same stuff thrown over the shoulders**"* —
+  **the cloak is part of standard dress, year-round.** ⚠️ And directly on the game's
+  coordinate: *"**South of Derr, and principally at Sukkot and in Mahass, grown up
+  people go quite naked**"* — Wadi Halfa lies in that reach. **1813,
+  pre-Turkiyya/pre-Mahdiyya Islamisation — do NOT project onto 1890.**
+- **PERIOD AND ON THE GAME'S DATE (Ohrwalder, *Ten Years' Captivity in the Mahdi's
+  Camp*, publ. 1892, eyewitness 1882–92).** The Mahdi *"made curious regulations
+  regarding the manufacture of **jibbehs**… they should be made of **damur, a rough
+  cotton fabric of the Sudan**, and if torn, they should be mended with new patches
+  or old rags, but that **on no account should a new jibbeh ever be worn**"*, and
+  *"the poorest of clothes should be worn, the feet bared or in sandals"*. The
+  prescribed dress: *"a **takia** (skull cap)… a **turban**… the **jibbeh**; a pair
+  of **drawers**; and a **girdle made of straw**."* Drift by ~1890: *"Jibbehs were
+  still worn, but their ragged condition… gave way to **as much embellishment as
+  such a garment would admit of**."* The patches' origin: Khartoum's looted
+  *"coloured stuffs were cut up and utilised for making the patches"*.
+- **★ Bonus economy fact (PERIOD, Burckhardt): cloth IS money here.** *"one piece of
+  Dammour is exactly sufficient to make one shirt for a full grown man; this is
+  called **Tob**… one dollar was paid for two Tob"*; the Tob divides into two
+  *Ferde*, the Ferde into two *Fittige*, which *"serve for nothing else than a
+  currency"*; blood-money = **1000 Tob Dammour**.
+- **Climate.** Effectively rainless (≤10 mm/yr). PERIOD on the cold: Burckhardt — on
+  the Nubian desert road *"neither trees nor shrubs are any where found…
+  passengers are obliged to **carry wood with them** to dress their meals, and **to
+  warm themselves in winter**"*. Ohrwalder, Omdurman: destitute prisoners
+  *"remained naked, **scorched under the burning sun by day, and perished with cold
+  at night**"* — the diurnal swing, in period, in Sudan; and troops built *"small
+  mud shelters, evidently made… to **protect themselves from the cold and strong
+  winds**"*. ⚠️ Summer dust here is the **haboob**, not the harmattan.
+- **The reading — INFERRED, and unusually clean.** The Mahdist jibbeh is a
+  **doctrinally fixed uniform with an explicit religious injunction against better
+  clothes**. **A religiously mandated uniform is, by construction, not seasonal.**
+  For any Mahdist-aligned figure in 1890 the honest answer is **nothing changes**.
+  The cold is real and period-attested — and the recorded responses are **carried
+  firewood** and **mud wind-shelters**: architecture and fire, never a garment. The
+  one garment indicium: Burckhardt's shoulder-cloak is standard year-round dress, so
+  the adjustable piece exists; INFERRED that it is drawn closer on winter nights.
+- ⚠️⚠️ **"farwa" is a FALSE FRIEND.** In Arabic elsewhere it is a fur/sheepskin
+  *coat*. Ohrwalder shows that in Mahdist Omdurman it is a **sheepskin to sit and
+  pray on**: *"One slave is especially told off to carry the '**farwa**' or sheepskin
+  **to the mosque**"*; the Khalifa *"seated on his sheepskin"*. **Do not render a
+  farwa as a winter coat** — precisely the lexical slip that would manufacture a
+  fake winter garment.
+- ⚠️ Wadi Halfa in 1890 is the **Anglo-Egyptian garrison frontier** (§1), not
+  Mahdist-ruled — the jibbeh is the dress *across the line*. **GAP: no eyewitness of
+  ordinary Wadi Halfa villager dress in 1890 was found.**
+
+#### Hausa (12.0, 8.5 — Kano, village at 486 m) — ★ the richest indicia in the pass
+
+- **Garments, PERIOD (Barth, Kano chapter, 1851).** Kano's commerce is *"the cotton
+  cloth woven and dyed here… in the form of **tobes or rigona**; **túrkedi**, or the
+  oblong piece of dress of dark-blue colour worn by the women; the **zenne** or
+  plaid, of various colours; and the **ráwani baki, or black lithám**."*
+  PERIOD (Barth, a Hausa town): *"for the man, **a wide shirt and trowsers**, mostly
+  of a dark colour… **a light cap of cotton cloth, which is negligently worn**…
+  **Only the wealthier amongst them can afford the 'zenne' or shawl, thrown over the
+  shoulder like the plaid of the Highlanders.**"*
+  PERIOD (Robinson, *Hausaland*, 1896 — on the game's date): *"His turban will take
+  perhaps **thirty yards**… an additional garment… **up to a hundred yards**"*;
+  Thomson's *"**elephant tobe**… quite sufficient cloth in one of them to cover that
+  quadruped"*.
+- **★ THE *GWADO* LEAD — chased to a verdict, and it does NOT confirm.** Tested
+  against the period lexicon, **Robinson, *Dictionary of the Hausa Language* (1899)
+  — PERIOD**:
+  * *"**bed**, n. **gad(d)o**"* — Barth's thick zenne *"gádo"* is named for the **bed**.
+  * *"**blanket**, n. **bergo** or **burgo**"* — **not** gwado.
+  * *"**cloak**, n. **alkebba**"*; *"**shawl, made in strips**, n. **alkil(l)a**"* —
+    **the same word Barth lists as a zenne kind in 1851**: two independent period
+    sources, 48 years apart, on the same Kano shawl.
+  * *"**rug, woollen sleeping-**, n. **kilishi**"*.
+  * *"**cold**, n. 1. **dari**, sainyi… 3. **spec. c. felt at night funturu**"*.
+  **Verdict: *gwado* is NOT CONFIRMED as "blanket" in the period lexicon** — the
+  1899 word for blanket is ***bergo/burgo***. What IS confirmed: Barth's *gádo* zenne
+  is *"white and black and of thick thread"*, and *gado* means **bed**. So a
+  thick-thread zenne named for the bed is **plausibly a sleeping-cloth** —
+  **INFERRED** from the name plus the material note, stated by no source. **Do not
+  upgrade it.** (Bargery 1934 is where *gwado* = thick woven blanket would be
+  checked — **RETRO-APPLIED by 44 years**, not consulted: **GAP**.)
+- **Climate.** Harmattan core late Nov–mid Mar, worst January, diurnal swing
+  15–20 °C. Kano January lows 13–14 °C, extremes to 8 °C (MODERN); **Barth measured
+  48 °F = 8.9 °C in period.** The **hungry season is the rainy season** (§3.1).
+  PERIOD (Barth): a **second, irrigated harvest *"in the middle of the cold
+  season"*** — confirmed by normalised grep.
+- **★ The reading — INFERRED, and it is WEALTH-STRATIFIED.** The answer is neither
+  "nothing" nor "they put on a coat":
+  (a) The cold season is **named in the language**: ***funturu*, "cold felt at
+      night"**, a dedicated period lexeme beside *dari* — night-cold is salient
+      enough to lexicalise, not a traveller's fancy.
+  (b) A period **idiom** ties a garment to it: *"**mágani-n-dári**"*, "a remedy
+      against the cold", whose real referent is a thick cloak (Barth).
+  (c) **The objects exist and Kano makes them**: a thick-thread zenne (*gádo*), a
+      strip shawl (*alkilla*), a blanket (*bergo*), a cloak (*alkebba*), a woollen
+      sleeping-rug (*kilishi*).
+  (d) But the zenne is **wealth-gated**: *"**Only the wealthier** amongst them can
+      afford"* it (Barth).
+  (e) The period eye-height image is the poor with **nothing extra**: Barth's
+      schoolboys *"in the **cold season**, and with **scarcely a rag of a shirt
+      on**, sitting round a **miserable fire** as early as four o'clock in the
+      morning."*
+  (f) The indoor answer is **fire and architecture**: Robinson (1896) — the clay
+      bedstead with *"a hollow space where a **fire is lighted**… to prevent **the
+      sleeper suffering from cold**"*.
+  → **In Kano's harmattan the rich man puts a *zenne* over his shoulder; the poor
+  man sits at a pre-dawn fire in the same rag he wears in August.** Note too that
+  Hausa dress is **already voluminous year-round** (100 yards) — there is no "add a
+  layer" room in it.
+- ⚠️ **"harmattan" occurs ZERO times in Barth vols 1–2 and ZERO in Robinson's
+  *Hausaland*** — the word is old in English, but these two period observers *in the
+  exact region* do not use it; **do not put it in a Hausa mouth on their
+  authority.**
+
+#### Bambara (13.45, −6.27 — Ségou) and Mandinka (11.5, −9.0)
+
+- **PERIOD but DATED (Mungo Park, 1796–97 — 94 years early):** *"The dress of both
+  sexes is composed of **cotton cloth, of their own manufacture**; that of the men
+  is **a loose frock, not unlike a surplice**, with **drawers**… and **white cotton
+  caps**. The women's dress consists of **two pieces of cloth**… one of these they
+  **wrap round the waist**… the other is **thrown negligently over the bosom and
+  shoulders**."* And Park generalises on his own authority: *"**This account of
+  their clothing is indeed nearly applicable to the natives of all the different
+  countries in this part of Africa**"* — which is why one entry covers both peoples.
+  PERIOD (Caillié, 1827–28): the ***coussabe*** — *"a piece of cloth two yards long…
+  doubled and sewed together, with holes left for the arms… **a sort of shirt
+  without sleeves**"*, of blue *pagne*.
+  Mandinka head-dress: the ***jalla***, *"a narrow stripe of cotton cloth, **wrapped
+  many times round**, immediately over the forehead"*. Cotton is locally made: a
+  woman *"will spin from **six to nine garments** of this cloth in one year"*.
+  Period Mandinka lexeme from Park's own vocabulary: *"**Cold, *ninno***"* — cold is
+  a named thing in the language here too.
+- **★ The reading — INFERRED, and the best single indicium is Park's own adverb.**
+  The woman's second cloth is *"**thrown negligently** over the bosom and
+  shoulders"*. *Negligently* names an arrangement that is **loose by default and can
+  therefore be drawn close** — the garment that would change is **already on the
+  body, year-round**. And the cold is severe enough to force the issue: **Park,
+  17 February** (harmattan), measured — *"the **thermometer being so low as 68°**,
+  none of the Negroes could sleep **on account of the cold**."* **20 °C, and people
+  cannot sleep.** Park's own explanation is acclimatisation: *"the Africans are
+  sensible of the smallest variation in the temperature of the air, and
+  **frequently complain of cold when a European is oppressed with heat**."*
+  **Park, 6 December** (harmattan onset), the king of Wuli: *"sitting upon a
+  **bullock's hide, warming himself before a large fire**"* — the period
+  cold-response image for this zone: **a fire, and a hide to sit on.**
+- ⚠️ **The honest limit: no period source searched shows a Bambara or Mandinka
+  putting ON a garment for the cold season.** Park was there through a December, a
+  February *and* a rainy season and never records it.
+- **★ A period WET-season behaviour that INVERTS the intuition (Caillié):** caught
+  in a storm, *"The Moors **took off their coussabes**… and put them into the pots
+  to protect them from the rain: I did the same, so that **we were all naked**…
+  When the storm had ceased, we **again put on our coussabes, which were perfectly
+  dry**."* **Garments come OFF in the rain.** Park corroborates the why: *"the air
+  during the rainy season is so loaded with moisture, that **clothes, shoes,
+  trunks… become damp and mouldy**; and the inhabitants may be said to live in a
+  sort of **vapour bath**."* ⚠️ Caillié's companions here are **Moors**, not Bambara
+  — an indicium, not evidence.
+- **★ Park on the harmattan itself — the one period description in this zone, and it
+  corroborates the §140 look-trap independently:** *"About this period is commonly
+  felt the **harmattan**, a dry and parching wind, blowing from the north-east, and
+  accompanied by **a thick smoky haze; through which the sun appears of a dull red
+  colour**… Its ill effects are, that it produces **chaps in the lips**, and
+  afflicts many of the natives with **sore eyes**."* It is *"reckoned very
+  salutary"*. And the dry-season landscape event: *"Whenever the grass is
+  sufficiently dry, the Negroes **set it on fire**… In the middle of the night, I
+  could see the plains and mountains, as far as my eye could reach, **variegated
+  with lines of fire**."*
+- ⚠️ **If the game wants a harmattan tell on a Mandinka figure, the one with a
+  period citation behind it is ON THE FACE, not the clothes:** chapped lips and sore
+  eyes (Park).
+- ⚠️ Do not put a veil on Mandinka figures on the strength of Park's **Moors** (the
+  head bandage *"serve[s] to conceal the face when they walk **in the sun**"* — sun,
+  not dust, and Moors, not Mandinka).
+- ⚠️ **Park is 1796, not 1890** — a 94-year gap across which the Umarian conquest
+  (1861) and Islamisation ran. **GAP: Mage (1868) and Gallieni (1880s)** — the French
+  sources closest to 1890 for Ségou — were not reached, and are the highest-value
+  unread sources for this village.
+
+#### ★ 7.2.1 The one place the ADDED-GARMENT model IS period-attested — and why it is only an indicium
+
+**Caillié, Lake Aleg, 10 December — PERIOD, and explicitly seasonal:**
+
+> *"It was now beginning to be cold; the north wind blew violently… **At this
+> season** the Moors set up the ***varroi***, a large covering made of tanned
+> sheep-skins sewed firmly together; they stretch it over stakes in their tents…
+> so as to **keep off the wind during the night**. They have also **woollen
+> counterpanes, or cloaks**, which they buy from the Koont traders… **They wrap
+> themselves up in these counterpanes at night, and also in the day, when the cold
+> is severe.** The slaves sleep also under the varroi, upon the ground, with **no
+> other covering than the sheep-skin which serves for their clothing**."*
+
+Caillié's own chapter heading formalises it: *"**Manner of protecting oneself from
+cold in the tents.**"* Three things fall out, and all three **independently
+reproduce the exact structure §2.6 proved for the Zulu *isipuku***: a seasonal
+windbreak added to the **dwelling**; a traded woollen cloak that is **day-coat and
+night-blanket at once**; and **class stratification** — slaves have only the skin
+that is also their clothing.
+
+⚠️ **But these are Hassaniya Moors on the Senegal (~17°N 14°W) — NOT one of the
+game's peoples.** A strong **INDICIUM** for the Saharan/Sahelian pattern and a direct
+corroboration of the day-cloak/night-blanket identity in *this* climatic band. It is
+**not evidence** for any of the six, and must not be dressed up as such.
+
+One further period gem on the same structural point — the Moorish woman's
+***malafa***: seven yards wrapped three times round, *"the third passes over the
+head, and forms a head-dress"*, and *"**In mourning, or in the presence of
+strangers**… they put it on so as to **show nothing but their eyes**"*. **One cloth,
+rearranged by context** — §2.6's insight, period-attested.
+
+#### What the game can defensibly show — Sahara and Sahel
+
+| People | What changes with the season |
+| --- | --- |
+| **Tuareg** | **Same tagelmust and tobe** — but in the cold months a shawl/bernus about the shoulders **if he is a man of rank**, and the wrap **drawn closer** (the gesture Barth performed and recorded on 31 December). No winter garment; **no dust-tightened veil** (tested, negative); no red cap. |
+| **Berbers** | **Nothing changes on the figure** — Thomson's period statement puts the seasonal garments *underneath* the outer sheet, i.e. invisible. Put the season into the **settlement**: closed low doors, smoke, animals indoors, fodder in silos, people shut in for two or three months. The one people whose cold season is also its **wet** season. |
+| **Nubians** | **Nothing changes** — the Mahdist jibbeh is a religiously prescribed patched *damur* uniform with an explicit injunction against better clothes; the period cold-response on the Nubian Nile is **carried firewood and mud wind-shelters**. At most the standard shoulder-cloak drawn closer at night. **Never a "farwa coat".** |
+| **Hausa** | **A CLASS SPLIT AT DAWN** — the wealthy man wears his *zenne* plaid over the shoulder (*"only the wealthier can afford"* it), the poor sit round a small fire before sunrise in the same rag they wear in August. The cold has a name (*funturu*) and a proverbial remedy (*magani-n-dari*). The honest render is **fire at dawn plus one draped plaid on the rich** — not a village in coats. |
+| **Bambara** | The woman's upper cloth, *"thrown **negligently** over the bosom and shoulders"* in the heat, is **drawn close** in the harmattan, and the **dawn fire** is lit — nothing is added. In the rains the intuition inverts: garments come **off** to stay dry, and the village reads **emptier** (people out at the field huts, §4.9). |
+| **Mandinka** | As Bambara — drawn-close upper cloth, dawn fire — plus the two period-attested bodily tells that cost no garment at all: **chapped lips and sore eyes** (Park), under a sun *"of a dull red colour"*, with the night horizon *"variegated with lines of fire"* from the burning grass. |
+
+**Sources:** Barth vols 1–3 (archive.org) · Park (Gutenberg 74976) · Caillié
+vols 1–2 · Thomson, *Travels in the Atlas and Southern Morocco* (1889) ·
+Burckhardt, *Travels in Nubia* · Ohrwalder (1892) · Robinson, *Hausaland* (1896) ·
+Robinson, *Dictionary of the Hausa Language* (1899) · Nicolaisen (1963) —
+RETRO-APPLIED, **not consulted**.
+
+### 7.3 The south — ★★ the cloak-is-bedding pattern is proven, and half the roster BEARS the cold
+
+Two of the project's three "highest-value unread sources" were read in this pass:
+**Passarge (1896–98)** in full, and a Pedi equivalent of Mayr in **Merensky**.
+
+#### ★★ 7.3.1 The cloak IS the bedding — four peoples, four independent period sources
+
+§2.6's mechanic (2) was "Mayr's finding". It is now a **documented regional
+pattern across the southern third of the continent**:
+
+| People | Source | Statement |
+| --- | --- | --- |
+| **Zulu** | Mayr 1907 (§2.3) | *isipuku*: *"During the night this cloak served as **sleeping blanket**."* |
+| **San** | Passarge 1907, p. 34 | *‡nau*: *"groß genug, um den Buschmann **beim Schlafen zu bedecken**"*; in a storm *"**kriecht man unter den Ledermantel**"*. |
+| **Pedi** | Merensky 1899 | ox hide *"früher als **Mantel oder Schlafdecke** gebraucht"*; at night *"**hüllte [sich] in die Decke**"*, no separate bed. |
+| **Wayeyi** | Andersson 1856 | goat skins *"converted into **sleeping rugs, and carosses for wear**"* — a *same-material* pairing, **weaker than Mayr's same-object claim; cite it as such**. |
+
+Livingstone independently carried *"a sheep-skin mantle as a blanket"* himself.
+Three of the four are same-object claims.
+
+#### ★★ 7.3.2 The honest counter-pattern — for half the roster the cold is BORNE
+
+| People | Source | Statement |
+| --- | --- | --- |
+| **Bambundu** | Monteiro 1875 | *"**No provision whatever is made** by the bulk of the natives against this great change"* → **fire + huddle**. |
+| **San** | Passarge 1907 | *"solche Kälte **nackt**, notdürftig von einem Ledertuch bedeckt, **an einem Feuer** zuzubringen"*; coals dragged to the belly; children often **without a Mantel at all**. |
+| **Bemba** | Gouldsbury 1911 | *"**Natives can bear actual cold well enough** … but cold and **wet** weather combined are too much."* |
+
+**★ DESIGN CONSEQUENCE, and it is the most useful line in this research:** for
+most of these peoples the defensible seasonal signal is **not a garment swap at
+all**. It is **fire, huddling and posture** — which the game already has the
+machinery for (§19.10 firelight, and point 120g already makes that firelight
+carry further under an overcast sun). **The cheapest CORRECT implementation is a
+cold-morning huddle-and-fire vignette, not a winter wardrobe.**
+
+#### Pedi (−24.5, 29.5 — village at 853 m): right answer, WRONG REASON
+
+- **Merensky (1899, in the Transvaal 1859–92) — the Mayr-equivalent, and his
+  dating is now pinned:** Gerlachshoop founded 14 Aug 1860, Pedi work from
+  c. 1861, Botshabelo 1865 — so his *"at our arrival"* means **c. 1860, thirty
+  years before the game**. Verbatim: men *"eine aus feinem, gut gegerbtem Fell
+  gefertigte Lendenbedeckung"*, women *"eine Lederschürze und eine Art ledernen
+  Fracks"*, upper body mostly bare, with antelope or — **among notables** —
+  **leopard** skins worn *"mit vielem Anstand etwa wie bei uns 'Umhänge'"*.
+  **And the transition, in his own eyes:** *"**Die gegerbte [Kuh-] oder
+  Ochsen-Haut, welche früher als Mantel oder Schlafdecke gebraucht wurde, hatte
+  schon bei unserer Ankunft vielfach wollenen oder baumwollenen Decken
+  europäischen Fabrikats weichen müssen.**"* The **Pelzmäntel of wealthy men**
+  were expected to outlast it.
+  Bedding: *"Eine besondere Lagerstätte fand sich im Hause nicht; abends breitete
+  man Matten aus, legte ein Stück Holz oder ein zusammengerolltes Fell unter den
+  Kopf und **hüllte [sich] in die Decke**."*
+- ⚠️⚠️ **THE "HIGHVELD FROST" PREMISE FAILS AT THIS COORDINATE.** The game's own
+  measured elevation is **853 m**. Sekhukhune runs ~800 m in the south; the
+  Steelpoort valley sits ~900 m with *"dry, mild winters"*. For contrast
+  **Lydenburg at 1,430 m** (~60 km NE, the nearest real highveld station) has a
+  July mean minimum of **4.4 °C and, on average, ZERO days below 0 °C** (MODERN).
+  **`dress.ts` currently carries the Pedi as a "crosses the coldness threshold,
+  wears nothing extra" trap case. The OUTCOME is right and the RATIONALE is
+  wrong:** the honest reason is not "they endure the frost" but **"there is no
+  frost at 853 m"**. Fix the comment, keep the answer.
+- **Reading: almost nothing changes.** By 1890 the Pedi everyday outer garment is
+  a **plain European trade blanket** (Merensky, PERIOD, ~30 years past the shift)
+  which doubles as bedding. **This reaches the same destination as the Basotho
+  story by an entirely independent road — which is exactly how §2.2's trap is
+  avoided. Cite Merensky; never the Moshoeshoe story.** INFERRED (indicia:
+  Merensky's own note that the wealthy man's Pelzmantel will "last longer";
+  Livingstone's Sotho-Tswana *"mantle exactly like that of the women"*): a
+  **prosperous** Pedi may wear a sewn fur cloak where a poor one wears the
+  blanket — **a WEALTH signal, not a season signal. Do not season-gate it.**
+  **GAP: no period source describes a Pedi seasonal dress change.**
+- ⚠️ **Rinderpest is doubly wrong here**: southern Africa is clean until **1896**
+  (§5), and the shift is ~1860 anyway — it predates rinderpest by 36 years.
+- ⚠️ Mönnig, *The Pedi* (1967) is RETRO-APPLIED — not consulted, do not backfill.
+
+#### San (−22.5, 21.0 — village at 1175 m): Passarge INVERTS the received claim
+
+- **Passarge, *Die Buschmänner der Kalahari* (1907), fieldwork 1896–98 — the
+  project's #1 unread source, now read.** p. 34, verbatim: *"Keinem fehlt das
+  **Schamtuch — ‡kai —**, ein Ledertuch mit drei Zipfeln…"*; and the cloak:
+  *"Das nächste kaum je fehlende Bekleidungsstück ist der **Ledermantel —
+  ‡nau —**, ein rechteckiges Leder, **groß genug, um den Buschmann beim Schlafen
+  zu bedecken**. Es wird meist mit Lederbändern… **über der rechten Schulter
+  zusammengeknüpft**, so daß es über dem Rücken herabhängt und die linke Schulter
+  bedeckt oder auch freiläßt. **Auch über beiden Schultern wird es getragen und
+  unter dem Kinn zusammengeknüpft, je nach Laune und Absicht des Trägers.**"*
+  Women: the same Ledermantel but often larger, and **infants are carried in
+  it**. Children: *"**häufig nicht einmal einen Mantel**"*.
+- **Climate — PERIOD, with a number.** Passarge p. ~68: *"Leider sind die Monate
+  **Mai bis Juli** morgens meist empfindlich kalt. Es ist ein Elend, diese
+  klappernden Gestalten um ein Feuer hocken zu sehen nach einer eisigen
+  Sturmnacht **bei 5° unter dem Gefrierpunkt**."* **−5 °C, in period, in the
+  game's own region.** Corroborated at Ghanzi (~100 km): July mean min 3.8 °C,
+  frost common Jun–Aug, ~9.5 frost days/yr, station extreme **−9.0 °C (Jul
+  1926)** (MODERN).
+  > **CORRECTION to §4.9:** the doc says *"the −10 °C figure is tourism copy — do
+  > not use"*. Right for a *typical* night, wrong as a *magnitude*: −9.0 °C is a
+  > real station record. Clean formulation: **typical winter nights near
+  > freezing, snaps to ~−5 °C (Passarge, PERIOD), extremes to ~−9 °C.**
+- **PERIOD seasonal residence:** the Ngami Bushmen have *"**durchweg scharf
+  abgetrennte Winter- und Sommerquartiere**"*, and initiation happens *"während
+  der Trockenzeit, [in] der kältesten Zeit im Jahr"*. (Supports the *pattern*
+  without needing Lee/DeVore's 1960s model — §4.1.)
+- ⚠️⚠️ **The tertiary "kaross worn in cold weather" claim was half-right and
+  MISLEADING.** Passarge, flatly negative: *"Welche Abhärtung… **solche Kälte
+  nackt, notdürftig von einem Ledertuch bedeckt, an einem Feuer zuzubringen!**
+  Von Schlafen ist nicht viel die Rede, **man schiebt glühende Kohlen nahe an
+  Bauch und Brust heran.** … Leute, namentlich Kinder, die übrigens **häufig
+  nicht einmal einen Mantel haben**, mit **Brandwunden auf Leib und Brust**, sind
+  eine tagtägliche Erscheinung."* And in a storm: *"dann **kriecht man unter den
+  Ledermantel**… **zitternd vor Frost liegen alle zusammengedrängt auf nasser
+  Erde unter nassem Mantel**."* **The ‡nau is what you sleep UNDER, not what you
+  put ON. "Worn in cold weather" misdescribes it.**
+- **The one positive seasonal reading — INFERRED, indicia named:** Passarge
+  attests **two configurations** of the same garment (right shoulder, left free
+  or covered; vs **over both shoulders, knotted under the chin**) but attributes
+  the choice to *"**Laune und Absicht**"* — **mood and intention, explicitly NOT
+  weather**. The weather link comes from an **independent period source on the
+  same garment class ~350 km north**: Andersson's Wayeyi caross *"accommodated to
+  the body according to the state of the weather"*. On those two indicia a winter
+  San figure closing the ‡nau over both shoulders is defensible — **but it stays
+  INFERRED: Passarge says mood, not cold.**
+- ⚠️ **Source bias, and it is the doc's own live fight.** Passarge is a period
+  eyewitness *and* an evolutionist of his era ("Buschmannrasse", the "Paradies"
+  of the hunting life, children *"dressiert"*). §4.1's **Kalahari Debate** caveat
+  bites exactly here — **Wilmsen's** case that the San were a
+  historically-constituted underclass rather than isolates is CONTESTED and
+  unresolved. **His observations (the −5 °C morning, the ‡nau's cut, the burns)
+  are separable from his interpretation; take the former, refuse the latter.**
+
+#### Wayeyi (−19.0, 22.5 — village at 976 m): ★★ the strongest finding of the run
+
+- **Andersson, *Lake Ngami* (1856), and he ascended the Teoge himself. His
+  "Bayeye" are the game's people at the game's coordinate.** Verbatim: the men
+  wear the Bechuana waist skin *"and, in addition to this, **they wear a skin, or
+  light caross, which they accommodate to the body according to the state of the
+  weather.**"* And: *"They are permitted, however, to rear a few goats… **for the
+  skins, which are converted into sleeping rugs, and carosses for wear.**"*
+  **§2.6's structural insight — the adjustable single piece, worn differently by
+  weather — stated VERBATIM by a period eyewitness. For the Wayeyi it needs no
+  inference at all.**
+- ★★ **AND IT CLOSES §4.0.4's OPEN GAP — the Okavango flood months are now
+  PERIOD, twice.** §4.0.4 marks the inversion MODERN and lists "the flood-pulse
+  timing" as GAP. Two independent eyewitnesses close it:
+  * **Andersson:** *"**Its annual overflow takes place in June, July, and August,
+    and sometimes even later.**"* — and he **did not know the river's source**
+    (*"The source of the Teoge is as yet unknown, but it is supposed to be very
+    distant"*), which makes his months a **theory-free observation**.
+  * **Livingstone, quoted verbatim in Andersson:** *"One remarkable feature in
+    this river is, its periodical rise and fall. **It has risen nearly three feet
+    since our arrival; and this is the dry season. That the rise is not caused by
+    rains, is evident, from the water being so pure.**"* — **he deduced the
+    non-rain origin from the water's CLARITY.**
+  **The inversion moves MODERN → PERIOD.** (This upgrades TASKS point 139.)
+- ★ **A period in-world explanation of the flood, and it is directionally TRUE:**
+  *"**The people could give no reason for the rise of the water, further than
+  that a chief, who lives in a part of the country to the north, called
+  Mazzekiva, kills a man annually, and throws his body into the stream, after
+  which the water begins to flow.**"* The flood is attributed to a **distant
+  northern agency** — which is where the water actually comes from (the Angolan
+  highlands). **The belief encodes true geographic knowledge in mythic form** —
+  unusually good material for a game about outsiders' names for insiders'
+  realities. ⚠️ Livingstone was on the **Zouga** among Batawana/Bayeye: attribute
+  to **the Ngami-area peoples**, not specifically the Wayeyi.
+- **Does the dress or work hang on the flood? NO for both.** Andersson: *"**A
+  month or two before the rainy season**, the ground for cultivation is
+  selected… **After the first heavy rains, they begin to sow the corn.**"* So the
+  corn cycle keys to the **RAIN** (Nov–Dec) while the flood is a separate
+  **June–August** water event — **decoupled in the period record**. *Molapo*
+  (flood-recession) farming is a delta-margin practice Andersson does not
+  describe here — **GAP, do not assert it**.
+- ⚠️ **Trade blankets in Ngamiland — GAP.** A trade route demonstrably reached
+  them before 1880 (Batawana ivory trade, Selous 1879, LMS Khwebe 1893–96) but
+  **no source states blankets displaced skins among the Wayeyi**. Andersson's
+  skins are 1856. **Depict skins/light caross; do not assert the transition
+  either way.**
+- ⚠️ Andersson is 1856, 34 years early, and his register is of its time.
+
+#### Bemba (−12.5, 31.0 — village at 1460 m, the highest of the six): the WRONG SIDE of the transition
+
+- **Gouldsbury & Sheane (1911), explicitly retrospective — which is what makes it
+  usable:** *"**Before the introduction of calico the Wemba, both men and women,
+  usually dressed in bark-cloth.** … **Nowadays** Wemba men wear a **loin-cloth
+  of calico**."* Women near Boma stations wear the trade **nkanga**, *"But the
+  poorer rustic woman must make shift with **bark-cloth, which, indeed, is
+  warmer**"* — worked with fibre thread and reddened with **camwood** — over a
+  small apron, the **buchushi**. Bark-cloth is made **by men only**, and *"until
+  recently it was the duty of every suitor to make such clothes for his betrothed
+  **as part of the dowry**"*.
+  A physical property that matters: *"The best trees… are the **mitawa, muombo,
+  and ngalati**, since they are **washable**, whereas cloth made from the bark of
+  the **ching'anse** or the **misoho** trees **will fall to pieces if wetted in a
+  heavy shower**."*
+- ★ **INFERRED on a dated hinge: in 1890 the Bemba are PRE-transition, not
+  mid-transition.** Indicia: (a) Gouldsbury's own *"before the introduction of
+  calico"* / *"nowadays"* contrast, written 1911; (b) §5.1's finding that *"when
+  the British arrived on the scene in 1890, the Bemba were still an independent
+  political state"*. **Calico arrives WITH the administration; in 1890 it has
+  barely begun. The 1890 Bemba figure wears bark-cloth, not calico.** ★ **This is
+  a DIFFERENT answer from the Zulu — the mid-transition framing does not
+  transfer. It is a date-shifted transition and the game's start sits BEFORE
+  it.**
+- **Why they have no cloak — two independent lines, same conclusion.** No kaross,
+  cloak or mantle is attested for the Bemba anywhere in Gouldsbury; and §5.1
+  explains it independently — they settled in **tsetse country and were not a
+  cattle people**. **No herds → no hide-cloak economy. Do not give the Bemba a
+  cloak.**
+- **Climate:** Kasama (~1,380 m): July coldest, minima ~7 °C, Jun–Jul essentially
+  rainless (MODERN). **Cool nights, no frost.** And the period-adjacent
+  counter-indicium: *"Hence coughs and colds are very prevalent **in the first
+  months of the year**"* — **Jan–Mar, the WET season. The Bemba health stress is
+  the rains, not the dry winter.**
+- **The seasonal signal points BOTH ways and therefore cancels — GAP.**
+  Bark-cloth is *warmer* than trade cloth (suits the cool dry) **and** destroyed
+  by rain in the poorer grades (fails the wet). A real tension — **but no period
+  source says the Bemba changed garments by season, and "natives bear cold well"
+  cuts against it. Do not invent the swap.**
+- ⚠️ Richards' citemene material is 1930s (RETRO-APPLIED, §3.3). ⚠️ No cattle → no
+  rinderpest dress story (§5.1: it destroyed their **game**, and reached the
+  region **July 1892**, after the start).
+
+#### Lunda (−10.0, 23.4 — village at 1007 m): the transition runs by RANK, not by date
+
+- **Livingstone (1854–56), a dedicated Balonda dress passage — PERIOD:** *"**The
+  dress of the Balonda men consists of the softened skins of small animals, as
+  the jackal or wild cat, hung before and behind from a girdle round the
+  loins.**"*
+- ★ **The chief Manenko — the key passage, because he names the FUNCTION:** *"Her
+  body was **smeared all over with a mixture of fat and red ochre, as a
+  protection against the weather**; a necessary precaution, for… she was
+  otherwise in a state of frightful nudity. **This was not from want of
+  clothing**, for, being a chief, she might have been as well clad as any of her
+  subjects, **but from her peculiar ideas of elegance in dress**."*
+  **Two things fall out: the weather protection is APPLIED TO THE SKIN, not worn
+  — and the near-nudity is a deliberate AESTHETIC CHOICE, not poverty.**
+  Livingstone states the same function for the neighbouring Sotho-Tswana: fat and
+  ochre *"protecting the pores of the skin from the influence of the **sun by day
+  and of the cold by night**"*.
+- **Reading — PERIOD negative + weakly-held INFERRED.** **No cloak is attested for
+  the Lunda at all — do not give them a kaross.** The weather response is a
+  **grease-and-ochre coat on the body**. ⚠️ **But Livingstone never says it is
+  applied more heavily or more often in any season — a seasonal intensification
+  is NOT supported. Mark the mechanic PERIOD; mark any seasonality GAP.**
+- ★ **INFERRED (indicia: Arnot, *Garenganze*, 1889 — dated on the game's exact
+  year): the transition here is VERTICAL, not horizontal.** Arnot's picture of
+  cloth is rank-skewed: an *"important personage, **bedecked with lots of
+  calico**, and sitting in state"*; a **96-yard** calico present to a king;
+  *"**The difficulties of obtaining calico and goods from the coast**"*; while a
+  commoner may receive *"**a paltry yard or two of calico**"*. **Where the Zulu
+  transition is a DATE, the Lunda transition is a RANK — model it by station, not
+  by year.**
+- ⚠️ Livingstone is 35 years early and his "Balonda" spans Shinte to Kazembe.
+  ⚠️ **Two different Lunda centres:** §4.0.5's Mwansabombwe note is **Mwata
+  Kazembe on the Luapula**, a different capital from the game's point (toward the
+  **Mwata Yamvo** heartland). **Do not merge them.**
+
+#### Bambundu (−9.3, 15.3 — Angola/Kwanza): the record says "nothing" OUTRIGHT
+
+- ★★ **The strongest evidence class available — an explicit period negative.**
+  **Monteiro, *Angola and the River Congo* (1875), long resident on the Kwanza:**
+  *"From the sudden fall of the high temperature of the hot season to the
+  '**cacimbo**' the natives, as might be expected, suffer most from diseases of
+  the respiratory organs. **No provision whatever is made by the bulk of the
+  natives against this great change**, and the quick transition from the clear
+  warm nights of the hot season to the cold wet ones of the 'cacimbo', when the
+  ground is covered with a heavy mist, tells on their **nearly naked and
+  unprotected bodies** with terribly fatal effect."*
+  **And blankets were AVAILABLE and simply not used that way** — Monteiro's own
+  list of what commerce had spread on this coast: *"Manchester goods, guns,
+  gunpowder, **blankets, rugs, coats**, knives…"*. **Supply is not the
+  constraint, which makes the negative far stronger than a mere absence.**
+- ★ **A period Angolan season calendar with a period NAME — and `climate-1890.md`
+  has no Angola row.** Monteiro: *"**cacimbo**" = **June to August**; hot season
+  80–86 °F by day, **cacimbo 70–75 °F day / 60–65 °F night**; *"for not less than
+  six months in the year a blanket on the bed at night is found comfortable"*;
+  *"During the cool or 'cacimbo' season, **the sun is often not visible for days
+  together**, a thick uniform white sky preventing its position being seen at any
+  time of the day. **A thick white mist covers the ground at night**"*; *"**Rain
+  only falls in the hot season**, or from the end of **October** to the beginning
+  or middle of **May**"*, with a **January–February break**; *"the last rains are
+  the heaviest, and seldom occur after the 12th or 15th of May"*.
+- ★ **The mechanic, directly observed — PERIOD:** *"It is a wonderful scene when
+  travelling with a caravan in the '**cacimbo**' season, to see perhaps **two or
+  three hundred blacks wake up in the cold misty mornings, and crouch in circles
+  of ten or a dozen together round a fire, shivering and chattering their
+  teeth.**"* **The same answer as Passarge's San, from a wholly independent
+  observer ~2,000 km away: fire and huddling, not cloth. Two period sources, two
+  regions, one convergent mechanic.**
+- ⚠️⚠️ **SOURCE BIAS — SEVERE, and it must be quarantined.** The passage
+  immediately following calls the death toll *"a wise provision of nature for
+  keeping down the otherwise excessive numbers of the human animal"* and the
+  people *"lazy, happy brutes"*; his *"by far the greater part of the blacks die
+  from this cause"* is an **impression, not a count**. **Take the observation (no
+  extra clothing; fire and huddling; respiratory illness in the cacimbo), discard
+  the interpretation entirely, and never put Monteiro's voice in the game.**
+- ⚠️⚠️ **NAMING FINDING for §1's rule-list.** At **9.3°S 15.3°E** the people are
+  the **Ambundu** (Mbundu, **Kimbundu**-speaking, the Luanda/Kwanza hinterland) —
+  **not** the **Ovimbundu** (**Umbundu**-speaking, the Benguela highlands, ~12°S).
+  "Bambundu" is ambiguous between them and the two are constantly conflated.
+  **Consequence: Arnot's Bihe/Ovimbundu material is the WRONG PEOPLE for this
+  coordinate.**
+
+#### What the game can defensibly show — the south
+
+| People | What changes with the season |
+| --- | --- |
+| **Pedi** | **Nothing seasonal — and fix the driver.** A plain European trade blanket as everyday outer wear (Merensky, PERIOD, the shift ~30 years old by 1890), doubling as bedding; **at 853 m there is no frost to dress against**. The `dress.ts` trap case reaches the right answer for the wrong reason. |
+| **San** | **The ‡nau closes** — from the right shoulder (left free) in summer to **over both shoulders, knotted under the chin** in the May–July cold (configurations PERIOD; the weather trigger INFERRED from Andersson) — **but the real mechanic is a pre-dawn fire with figures huddled at it**, some with no cloak at all, because Passarge's −5 °C mornings are met **naked at the embers**. |
+| **Wayeyi** | **The one people needing NO inference:** the light caross is *"accommodated to the body according to the state of the weather"* (Andersson, PERIOD, verbatim) — drawn tight and closed in the cool dry months, loose or off in the heat. |
+| **Bemba** | **Nothing — and they are the wrong side of the transition:** **bark-cloth, not calico** (calico arrives with the British, who arrive in 1890), reddened with camwood; **no cloak** (tsetse country, no cattle); the record says they **bear the cold well**, and their hard season is the **wet** one. |
+| **Lunda** | **Nothing worn changes:** small-animal skins at the loins year-round, with **fat and red ochre on the body "as a protection against the weather"** (Livingstone, PERIOD) — and if any figure shows cloth, make it **the chief** swathed in calico while commoners have a yard or none: the transition runs **by rank, not by date**. |
+| **Bambundu** | **Nothing — and a period source says so outright.** Show the **cacimbo morning** (Jun–Aug): figures crouched in circles of ten round a fire, shivering, in a settlement drowned in white mist under a sky where the sun is invisible for days — though blankets and coats sit unbought in the coastal trade goods. |
+
+**Sources:** Merensky, *Erinnerungen aus dem Missionsleben in Transvaal 1859–1882*
+(1899) · Passarge, *Die Buschmänner der Kalahari* (1907, fieldwork 1896–98) ·
+Andersson, *Lake Ngami* (1856) · Gouldsbury & Sheane, *The Great Plateau of
+Northern Rhodesia* (1911) · Livingstone, *Missionary Travels* (1857) · Arnot,
+*Garenganze* (1889) · Monteiro, *Angola and the River Congo* (1875).
