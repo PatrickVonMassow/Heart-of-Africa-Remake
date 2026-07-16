@@ -3934,7 +3934,7 @@ the remaining open points in their numeric order.
   polish.mjs §19.13 (screenshot 114). The debug override still forces a season
   everywhere (that is its purpose), so the Cairo-dry check uses real months.
 
-- [ ] 144. The plants themselves change: cover AND condition, not just colour.
+- [x] 144. The plants themselves change: cover AND condition, not just colour.
   Wanted (user, 16.07.2026): "Wenn angebracht, sollte sich der Pflanzenbewuchs
   und der Zustand der Pflanzen auch je nach Jahreszeit ändern." — asked while
   reporting, correctly and repeatedly, that stepping through the months shows
@@ -4058,8 +4058,15 @@ the remaining open points in their numeric order.
   flora builders at build time — never on the jittered colour. The colour
   MASK is fine for TINTING (a wrong colour is a subtle error; a wrong
   position is a shard).
-  STILL OPEN here: bare branches via the baked attribute; grass
-  density/height; wet-ground puddles. The burnt land stays with 145(a).
+  RETRY DONE (16.07.2026, 139a2c8): bare branches rebuilt on a baked, BINARY,
+  per-part `foliage` attribute (crowns/fronds/bushes/reeds/grass 1, wood/stone
+  0; merge() fills unmarked parts; landmarks.ts' own merge learned the same
+  fill after the delta/Sudd failed to build). Verified clean at the exact spot
+  and month of the critical bug; the dry Zambezi shows compact bare trunks —
+  the silhouette change, stable. The grass flattens via the same collapse
+  (blades are foliage=1). REMAINING, folded into 149's re-verification rather
+  than held open here: wet-ground puddles (nice-to-have; the overcast dim
+  already darkens wet ground). The burnt land stays with 145(a).
 
 - [ ] 145. Three more parental sacrifices — a human cause, a lie, and a predator
   as a parent.
