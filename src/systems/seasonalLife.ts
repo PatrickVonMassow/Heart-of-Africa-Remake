@@ -59,3 +59,20 @@ export function presenceAt(peopleId: string, day: number, startYear: number): nu
       : doy >= rule.fromDoy || doy <= rule.toDoy // wraps the year end
   return inWindow ? rule.presence : 1
 }
+
+/**
+ * How full the market stalls stand, 0..1 (point 142, the §3.1 finding — "the
+ * best-verified finding in the document"): the Sahel's HUNGRY SEASON IS THE
+ * RAINY SEASON. The intuition is backwards — the rains are when the granary is
+ * empty and the work hardest; the harvest (October) fills the stalls and the
+ * dry season is market and caravan season. Applied only to the farming peoples
+ * the finding covers; everywhere else the stalls stand as they are (no
+ * evidence, no invention).
+ */
+export function marketPlentyAt(peopleId: string, day: number, startYear: number): number {
+  if (peopleId !== 'hausa' && peopleId !== 'bambara' && peopleId !== 'mandinka') return 1
+  const doy = dayOfYear(day, startYear)
+  // Jun-Sep: the granary runs down as the rains run; the October harvest refills.
+  if (doy >= 152 && doy <= 273) return 0.35
+  return 1
+}

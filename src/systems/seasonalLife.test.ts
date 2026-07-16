@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { presenceAt } from './seasonalLife'
+import { marketPlentyAt, presenceAt } from './seasonalLife'
 import { START_YEAR } from '../config/balance'
 
 const on = (month: number, dayOfMonth: number): number =>
@@ -40,6 +40,23 @@ describe('presenceAt (point 142 — "the young men are gone", and who never leav
     for (let m = 1; m <= 12; m++) {
       expect(presenceAt('zulu', on(m, 15), START_YEAR)).toBe(1)
       expect(presenceAt('not-a-people', on(m, 15), START_YEAR)).toBe(1)
+    }
+  })
+})
+
+describe('marketPlentyAt (point 142 — the hungry season IS the rainy season)', () => {
+  it('thins the Sahel stalls in the rains and refills them after the harvest', () => {
+    for (const p of ['hausa', 'bambara', 'mandinka']) {
+      expect(marketPlentyAt(p, on(8, 15), START_YEAR)).toBeLessThan(0.5) // August: hungry
+      expect(marketPlentyAt(p, on(11, 15), START_YEAR)).toBe(1) // after the October harvest
+      expect(marketPlentyAt(p, on(1, 15), START_YEAR)).toBe(1) // the dry season is market season
+    }
+  })
+
+  it('touches nobody else — the finding is the Sahel farmers, not a world rule', () => {
+    for (let m = 1; m <= 12; m++) {
+      expect(marketPlentyAt('maasai', on(m, 15), START_YEAR)).toBe(1)
+      expect(marketPlentyAt('bemba', on(m, 15), START_YEAR)).toBe(1)
     }
   })
 })

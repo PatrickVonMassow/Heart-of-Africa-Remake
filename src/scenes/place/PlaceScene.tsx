@@ -29,6 +29,7 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor } from '../../systems/season'
+import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
@@ -585,7 +586,7 @@ function Warehouse({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
 }
 
 /** Market stall: poles, cloth roof, counter with goods. */
-function Stall({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
+function Stall({ d, mats, plenty = 1 }: { d: DwellingDef; mats: PlaceMaterials; plenty?: number }) {
   return (
     <group position={[d.x, 0, d.z]} rotation={[0, d.rot, 0]}>
       {[
@@ -609,7 +610,11 @@ function Stall({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
         <boxGeometry args={[0.5, 0.3, 0.4]} />
         <meshStandardMaterial color="#8a6a3a" roughness={0.9} />
       </mesh>
-      <mesh position={[0.5, 0.95, 0.55]} castShadow>
+      {/* The grain mound shrinks with the granary (point 142): the Sahel's
+          hungry season IS the rainy season — thin stalls in the rains, full
+          again after the October harvest. Object-level scale, colour/geometry
+          untouched. */}
+      <mesh position={[0.5, 0.95, 0.55]} scale={[plenty, plenty, plenty]} castShadow>
         <sphereGeometry args={[0.28, ...TESSELLATION.goods, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color="#a3702e" roughness={0.95} />
       </mesh>
@@ -737,7 +742,7 @@ function Shed({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
 }
 
 /** Dispatch a dwelling to its regional building component. */
-function Dwelling({ d, mats, style, variant }: { d: DwellingDef; mats: PlaceMaterials; style: RegionPlaceStyle; variant: number }) {
+function Dwelling({ d, mats, style, variant, plenty }: { d: DwellingDef; mats: PlaceMaterials; style: RegionPlaceStyle; variant: number; plenty: number }) {
   switch (d.kind) {
     case 'hut':
       return <VillageHut x={d.x} z={d.z} r={d.r} h={d.h} rot={d.rot} mats={mats} style={style} />
@@ -750,7 +755,7 @@ function Dwelling({ d, mats, style, variant }: { d: DwellingDef; mats: PlaceMate
     case 'warehouse':
       return <Warehouse d={d} mats={mats} />
     case 'stall':
-      return <Stall d={d} mats={mats} />
+      return <Stall d={d} mats={mats} plenty={plenty} />
     case 'tower':
       return <Tower d={d} mats={mats} />
     case 'mosque':
@@ -1447,6 +1452,14 @@ export function PlaceScene() {
     )
     return 1 + 0.5 * Math.min(1, chill)
   }, [placeId])
+  // The market's season (point 142, §3.1): the stalls' food goods thin in the
+  // hungry season — which for the Sahel farmers is the RAINS.
+  const marketPlenty = useMemo(() => {
+    if (!placeId) return 1
+    const place = placeById(placeId)
+    if (!place.peopleId) return 1
+    return marketPlentyAt(place.peopleId, useGame.getState().day, START_YEAR)
+  }, [placeId])
   const pathTex = usePathTexture(layout?.paths ?? null)
   const mats = usePlaceMaterials(!!isPort, style, pathTex)
   const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
@@ -1878,7 +1891,7 @@ export function PlaceScene() {
 
       {/* Non-enterable dwellings and outbuildings (design.md §2 lively settlements) */}
       {layout.dwellings.map((d, i) => (
-        <Dwelling key={i} d={d} mats={mats} style={style} variant={i} />
+        <Dwelling key={i} d={d} mats={mats} style={style} variant={i} plenty={marketPlenty} />
       ))}
 
       <Fences fences={layout.fences} mats={mats} />
