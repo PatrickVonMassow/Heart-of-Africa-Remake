@@ -10,6 +10,7 @@
 // repetition.
 
 import * as THREE from 'three/webgpu'
+import { seasonTintNode } from './seasonTint'
 import {
   cameraViewMatrix,
   color,
@@ -322,7 +323,12 @@ export function createGroundMaterial(
       .clamp(0, 1)
   })()
   if (paths) col = mix(col, color(paths.color), pathMask.mul(float(0.95)))
-  m.colorNode = col.mul(surfaceStructure('ground'))
+  // The settlement ground follows the season like the travel terrain does
+  // (design.md §19.13, point 143): the tint bleaches any greenish earth toward
+  // straw in the dry season and deepens it in the rains, and leaves bare sand
+  // and trodden paths alone (its greenness mask). createGroundMaterial is
+  // settlement-only, so this never double-tints the travel scene.
+  m.colorNode = seasonTintNode(col).mul(surfaceStructure('ground'))
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
   // fades where the mask is strong).
   m.normalNode = surfaceNormal('ground', pathMask.oneMinus().mul(0.85).add(0.15))

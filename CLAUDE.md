@@ -535,18 +535,26 @@ verify suite that proves it.
       to green, and the dry season's wider shore catchment gathers the
       animals at the remaining water (`scripts/verify/enrichments.mjs`);
       inside a settlement the season is derived from the PLACE's own
-      coordinates and dims the sun and sky light while graying the dome
-      and thickening its cloud deck, so the §19.10 firelight carries
-      further under the overcast (`scripts/verify/polish.mjs`,
-      screenshots 110/111). The inhabitants' cold-weather dress is
-      evidence-gated: the Zulu isipuku (Mayr 1907, the one period source
-      among the game's peoples) appears in the austral winter and is shed
-      in summer, while every people the research found no period evidence
-      for stays bare however cold its ground gets — pure-tested in
-      `src/systems/dress.test.ts` (incl. the two named traps: the San's
-      cold Kalahari and the Pedi highveld both cross the coldness
-      threshold and still wear nothing extra), live-checked via
-      `__placeDress` in `scripts/verify/polish.mjs` (screenshot 112).
+      coordinates and dims the sun and sky light, grays the dome, thickens
+      the cloud deck, RAINS (a near-vertical eye-height field, calibrated
+      apart from the bird's-eye's tilted streaks) and bleaches/greens the
+      ground and flora with the shared per-zone tint — so the §19.10
+      firelight carries further under the overcast and a desert port
+      (Cairo) stays rainless in every month, all live-checked via
+      `__placeSeason`/`__placeDress` in `scripts/verify/polish.mjs`
+      (screenshots 110/111/114). The inhabitants' seasonal dress is
+      evidence-gated per `docs/peoples-1890.md` §7: SIX peoples change on
+      their own driver — the Zulu isipuku (cold), the rank-gated Tuareg
+      bernus (cold) and Hausa zenne (harmattan), the San ‡nau (cold), the
+      Wayeyi caross (cold) and the Somali tobe drawn over the head (karif)
+      — while the other sixteen stay bare however cold their ground gets,
+      the cold being a class experience where it is felt at all. The
+      per-people mapping, the three drivers, the rank gate and the two
+      named traps (the San's cold Kalahari IS dressed on Passarge's
+      evidence; the Pedi highveld crosses the threshold and is NOT, the
+      blanket being a people the game lacks) are pure-tested in
+      `src/systems/dress.test.ts`; the live half is `__placeDress` in
+      `scripts/verify/polish.mjs` (screenshots 112/113).
 
     OPEN: tree-climbing-to-flee and additional new species/birds beyond
     the existing roster and the added calves remain to be implemented (§9

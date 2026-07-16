@@ -22,11 +22,13 @@ import {
   texture as textureNode,
   vec2,
   vec3,
+  vertexColor,
 } from 'three/tsl'
+import { SEASON_TINT_U, seasonTintNode, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { effectiveWetness, RAIN_GRAY, skyOvercastParams, sunDimFactor } from '../../systems/season'
+import { effectiveGreenness, effectiveWetness, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor } from '../../systems/season'
 import { cloakForCloth } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
@@ -44,6 +46,7 @@ import {
 import { mulberry32 } from '../../world/noise'
 import { consumeTouchLook, gamepadLook, gamepadMove, isKeyDown, onKeyPress, touchMove } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
+import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial, detailFade, proceduralBump } from '../../render/materials'
@@ -931,7 +934,15 @@ function GroundScatter({
 
   const tuftGeo = useMemo(() => buildGrassTuft(), [])
   const rockGeo = useMemo(() => buildRock(), [])
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), [])
+  // Grass tufts follow the season (point 143); the shared rock instances ride the
+  // same material, and the tint's greenness mask leaves their grey untouched.
+  const material = useMemo(() => {
+    const m = new THREE.MeshStandardNodeMaterial()
+    m.vertexColors = true
+    m.roughness = 0.95
+    m.colorNode = seasonTintNode(vertexColor().rgb)
+    return m
+  }, [])
   const tuftMesh = useRef<THREE.InstancedMesh>(null)
   const rockMesh = useRef<THREE.InstancedMesh>(null)
 
@@ -1424,10 +1435,15 @@ export function PlaceScene() {
     () => ({ palm: buildPalm(true), acacia: buildAcacia(), jungle: buildJungleTree(), bush: buildBush() }),
     [],
   )
-  const floraMaterial = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
-    [],
-  )
+  const floraMaterial = useMemo(() => {
+    // A node material so the settlement's trees and bushes follow the season
+    // (design.md §19.13, point 143), with the same tint the travel flora uses.
+    const m = new THREE.MeshStandardNodeMaterial()
+    m.vertexColors = true
+    m.roughness = 0.9
+    m.colorNode = seasonTintNode(vertexColor().rgb)
+    return m
+  }, [])
 
   // yaw 0 faces -Z (toward the place center from the southern spawn point).
   const player = useRef({ x: 0, z: 18, yaw: 0 })
@@ -1481,6 +1497,8 @@ export function PlaceScene() {
       sun: sunRef.current?.intensity ?? 0,
       hemi: hemiRef.current?.intensity ?? 0,
       sky: skyOvercast(),
+      rain: rainAmount(placeWetness.current, balance.season.weatherStrength),
+      tint: SEASON_TINT_U.value,
     })
     return () => {
       delete w.__placeSeason
@@ -1598,6 +1616,14 @@ export function PlaceScene() {
       const dim = sunDimFactor(wet, balance.season.weatherStrength)
       const sky = skyOvercastParams(wet, balance.season.weatherStrength)
       setSkyOvercast(sky.grayMix, sky.cloudBoost)
+      // The ground and flora bleach/green with the season, driven from THIS
+      // place's greenness — relative-per-zone like the travel scene, so a
+      // savanna village bleaches fully while the desert and the basin stay put.
+      const green = effectiveGreenness(
+        useGame.getState().day, place.lat, place.lon, START_YEAR,
+        elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,
+      )
+      setSeasonTint(green, balance.season.weatherStrength)
       const k = Math.min(1, dt * 0.8)
       // The fog carries the overcast onto the §2.5 backdrop, which is otherwise
       // lit by the preset alone and would stay sunny behind a rained-out village.
@@ -1773,6 +1799,7 @@ export function PlaceScene() {
       <color attach="background" args={[sky.horizon]} />
       <fog attach="fog" args={[sky.horizon, 42, 320]} />
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
+      <PlaceRain wetness={placeWetness} />
       <hemisphereLight ref={hemiRef} args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />
       <directionalLight
         // Remount the light when shadows toggle so the shadow map is rebuilt from

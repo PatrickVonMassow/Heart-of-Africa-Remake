@@ -298,8 +298,51 @@ if (mosque) {
     14 / wet.sun > 14 / dry.sun,
     `fire-to-sun ratio dry ${(14 / dry.sun).toFixed(2)} -> wet ${(14 / wet.sun).toFixed(2)}`,
   )
+  // Point 143: the settlement's own rain and flora, which were MISSING — the
+  // rain field lived only in the travel scene and the tint only in the travel
+  // terrain, so a player stood in a village at the peak of its rains and saw
+  // neither. Both must now move with the season.
+  check(
+    'it rains inside the settlement in the wet season, and clears in the dry',
+    wet.rain > 0.5 && dry.rain === 0,
+    `rain wet ${wet.rain.toFixed(2)} -> dry ${dry.rain.toFixed(2)}`,
+  )
+  check(
+    'the settlement ground/flora tint bleaches to straw and deepens to green',
+    wet.tint > 0.75 && dry.tint < 0.25,
+    `tint wet ${wet.tint.toFixed(2)} -> dry ${dry.tint.toFixed(2)}`,
+  )
+  await page.screenshot({ path: `${OUT}114-village-rain.png` })
+  console.log('shot 114-village-rain.png')
   // Leave no forced weather behind for the checks below.
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+
+  // A desert PORT never rains, on the real calendar, in any month — Cairo is
+  // hyper-arid and wetnessAt returns 0 there. (The debug override deliberately
+  // forces a season everywhere to test the renderer, so this uses real months.)
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  let cairoMaxRain = 0
+  for (let m = 1; m <= 12; m++) {
+    await page.evaluate(() => { const g = window.__game.getState(); if (g.placeId) g.leavePlace() })
+    await page.evaluate((mm) => window.__game.getState().debugJumpToMonth(mm), m)
+    await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
+    await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
+    await page.waitForTimeout(200)
+    cairoMaxRain = Math.max(cairoMaxRain, await page.evaluate(() => window.__placeSeason().rain))
+  }
+  check('Cairo stays bone dry in every month (hyper-arid, no rain)', cairoMaxRain === 0, `max rain ${cairoMaxRain.toFixed(3)}`)
+  // Restore what the panorama check below expects: standing in a DIRECTLY
+  // entered place (place->place, no travel scene, so no capture). Enter without
+  // leaving first, and reset the calendar.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.debugJumpToMonth(1)
+    g.enterPlace('maasai-village') // from cairo, a direct place->place enter
+  })
+  await page.waitForFunction(() => !!window.__placeLayout, null, { timeout: 30000 })
 }
 
 // --- Travel panorama capture (design.md §2.5, point 81) -----------------------
