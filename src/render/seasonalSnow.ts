@@ -11,10 +11,16 @@
 // must move with the calendar.
 
 import { float, mix, positionWorld, smoothstep, uniform, vec2, vec3 } from 'three/tsl'
+import { Vector2 } from 'three/webgpu'
 import { snowMassifDef } from '../systems/season'
 
 export const ATLAS_SNOW_U = uniform(0)
 export const DRAKENSBERG_SNOW_U = uniform(0)
+// Hail (point 141b): a brief white dusting of the ground around the storm —
+// the one defensible white ground at low altitude. Centre follows the
+// traveller (the storm cell is where the weather is computed).
+export const HAIL_U = uniform(0)
+export const HAIL_CENTER_U = uniform(new Vector2())
 
 /** Drive from the frame loop with `seasonalSnowAt` for each massif. */
 export function setSeasonalSnow(atlas: number, drakensberg: number) {
@@ -22,9 +28,15 @@ export function setSeasonalSnow(atlas: number, drakensberg: number) {
   DRAKENSBERG_SNOW_U.value = drakensberg
 }
 
+/** Drive from the frame loop with `hailAt` and the traveller's world position. */
+export function setHail(strength: number, x: number, z: number) {
+  HAIL_U.value = strength
+  ;(HAIL_CENTER_U.value as Vector2).set(x, z)
+}
+
 /** Dev-hook readout (the app-graph rule: never read uniforms via a parallel import). */
-export function seasonalSnow(): { atlas: number; drakensberg: number } {
-  return { atlas: ATLAS_SNOW_U.value, drakensberg: DRAKENSBERG_SNOW_U.value }
+export function seasonalSnow(): { atlas: number; drakensberg: number; hail: number } {
+  return { atlas: ATLAS_SNOW_U.value, drakensberg: DRAKENSBERG_SNOW_U.value, hail: HAIL_U.value }
 }
 
 const SNOW_TONE = vec3(0.93, 0.94, 0.96)
@@ -54,8 +66,13 @@ function massifTerm(centerLon: number, centerLat: number, radiusDeg: number, dep
 export function seasonalSnowNode(col: any) {
   const atlas = snowMassifDef('atlas')
   const drak = snowMassifDef('drakensberg')
+  // The hail dusting: a radial white patch around the storm, light on purpose
+  // (a dusting, not a snowfield) and gone with the storm.
+  const hailD = positionWorld.xz.sub(HAIL_CENTER_U).length()
+  const hail = smoothstep(float(42), float(22), hailD).mul(HAIL_U).mul(0.45)
   const t = massifTerm(atlas.lon, atlas.lat, atlas.radiusDeg, ATLAS_SNOW_U)
     .add(massifTerm(drak.lon, drak.lat, drak.radiusDeg, DRAKENSBERG_SNOW_U))
+    .add(hail)
     .clamp(0, 1)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return mix(col as any, SNOW_TONE as any, t.mul(0.9) as any)

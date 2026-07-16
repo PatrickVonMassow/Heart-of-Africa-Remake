@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -9,6 +9,9 @@ const on = (month: number, dayOfMonth: number, year = START_YEAR): number =>
 
 const wet = (m: number, lat: number, lon: number, elev = 0) =>
   wetnessAt(on(m, 15), lat, lon, START_YEAR, elev)
+/** wetness at a raw in-game day (for day-loop tests). */
+const wet2 = (day: number, lat: number, lon: number, elev = 0) =>
+  wetnessAt(day, lat, lon, START_YEAR, elev)
 
 // Coordinates of places the research actually names.
 const CAIRO = { lat: 30.05, lon: 31.24 }
@@ -648,5 +651,40 @@ describe('seasonalSnowAt + the ice massifs (point 141 — snow only where it was
     expect(inIceMassif(13.24, 38.37)).toBe(false) // Ras Dashen — dry when it is cold
     expect(inIceMassif(4.2, 9.17)).toBe(false) // Mount Cameroon — occasional dusting only
     expect(inIceMassif(19.87, 18.55)).toBe(false) // Emi Koussi — snow ~once in seven years
+  })
+})
+
+describe('hailAt (point 141b — the only defensible white ground at low altitude)', () => {
+  it('never hails where it never storms — Cairo and the deep Sahara stay clear all window', () => {
+    for (let day = 0; day < 365 * 6; day += 1) {
+      expect(hailAt(day, CAIRO.lat, CAIRO.lon, START_YEAR, 20)).toBe(0)
+      expect(hailAt(day, 25, 10, START_YEAR, 300)).toBe(0)
+    }
+  })
+
+  it('is RARE even in the wettest zone — a few days a year, not a season', () => {
+    let hailDays = 0
+    for (let day = 0; day < 365; day++) {
+      if (hailAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372) > 0) hailDays++
+    }
+    expect(hailDays).toBeGreaterThan(0) // it does exist
+    expect(hailDays).toBeLessThan(25) // and stays an event, not weather
+  })
+
+  it('fires only inside a genuinely heavy storm', () => {
+    for (let day = 0; day < 365; day++) {
+      const h = hailAt(day, KANO.lat, KANO.lon, START_YEAR, 486)
+      if (h > 0) {
+        expect(rainAmount(wet2(day, KANO.lat, KANO.lon, 486), 1)).toBeGreaterThanOrEqual(0.6)
+      }
+    }
+  })
+
+  it('is deterministic — the same day and place always agree', () => {
+    for (const day of [200, 210, 220]) {
+      expect(hailAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372)).toBe(
+        hailAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372),
+      )
+    }
   })
 })

@@ -6,16 +6,18 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, hash, instanceIndex, max, mx_fractal_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
+import { float, hash, instanceIndex, max, mix, mx_fractal_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { demElevation, demInlandWater } from '../../render/demElevation'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setSkyHarmattan, setSkyOvercast } from '../../render/skyOvercast'
+import { setHail } from '../../render/seasonalSnow'
 import {
   CURRENT_WEATHER,
   effectiveWetness,
   HARMATTAN_PALE,
+  hailAt,
   harmattanAt,
   harmattanSkyParams,
   RAIN_GRAY,
@@ -58,10 +60,11 @@ const RAIN_COUNT = 900
 const RAIN_RADIUS = 55
 const RAIN_HEIGHT = 42
 const RAIN_FALL_SPEED = 26
-let rainSingleton: { material: THREE.MeshBasicNodeMaterial; opacityU: { value: number } } | null = null
+let rainSingleton: { material: THREE.MeshBasicNodeMaterial; opacityU: { value: number }; hailU: { value: number } } | null = null
 function getRain() {
   if (rainSingleton) return rainSingleton
   const opacityU = uniform(0)
+  const hailU = uniform(0)
   const m = new THREE.MeshBasicNodeMaterial()
   m.transparent = true
   m.depthWrite = false
@@ -76,12 +79,13 @@ function getRain() {
   const phase = hash(i.mul(3))
   const fall = phase.mul(RAIN_HEIGHT).sub(time.mul(RAIN_FALL_SPEED)).mod(RAIN_HEIGHT)
   m.positionNode = positionLocal.add(vec3(rx, fall, rz))
-  m.colorNode = vec3(0.62, 0.68, 0.75)
+  // Hail whitens the falling streaks into pellets (point 141b).
+  m.colorNode = mix(vec3(0.62, 0.68, 0.75), vec3(0.95, 0.96, 0.98), hailU)
   // Fade toward the column edge so no square silhouette shows, and thin the
   // streaks with the rain amount.
   const edge = max(rx.abs(), rz.abs()).div(RAIN_RADIUS)
   m.opacityNode = opacityU.mul(smoothstep(float(1), float(0.55), edge)).mul(0.75)
-  rainSingleton = { material: m, opacityU }
+  rainSingleton = { material: m, opacityU, hailU }
   return rainSingleton
 }
 let rainGeometrySingleton: THREE.PlaneGeometry | null = null
@@ -173,6 +177,7 @@ export function Climate() {
       seasonWetness: () => wetness.current,
       rainOpacity: () => rain.opacityU.value,
       dust: () => CURRENT_WEATHER.dust,
+      hail: () => rain.hailU.value,
     }
     return () => {
       delete w.__climate
@@ -222,6 +227,13 @@ export function Climate() {
 
     // Rain follows the traveller and fades out in the debug zoom, like the
     // haze: a zoomed-out map view full of streaks would read as noise.
+    // Hail (point 141b): rare, deterministic, only inside a heavy storm. The
+    // pellets ride the rain field (whitened, via hailU) and the ground takes a
+    // brief white dusting around the storm cell.
+    const hail = hailAt(s.day, lat, lon, START_YEAR, elevationAt(lat, lon)) *
+      Math.min(1, Math.max(0, balance.season.weatherStrength))
+    setHail(hail * (1 - hazeClear), s.pos.x, s.pos.z)
+    rain.hailU.value += (hail - rain.hailU.value) * k
     const rainTarget = rainAmount(wet, balance.season.weatherStrength) * (1 - hazeClear)
     rain.opacityU.value += (rainTarget - rain.opacityU.value) * k
     const rg = rainGroup.current

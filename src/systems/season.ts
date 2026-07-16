@@ -499,6 +499,36 @@ export function seasonalSnowAt(day: number, massif: SnowMassif, startYear: numbe
   return Math.max(0, 1 - dist / def.halfWidthDays)
 }
 
+// Hail (point 141b): the research names it "the only defensible white ground
+// at low altitude" — savanna snow is physically impossible, hail is real and
+// brief. Deterministic per (day, coarse cell) so tests and reloads agree.
+const HAIL_CHANCE = 0.05 // of heavy-rain days; rare on purpose
+
+/**
+ * Whether a hailstorm stands over this place today, 0 or the storm's strength.
+ * Only ever fires during genuinely heavy wet-season rain (the storm is the
+ * precondition, so a rainless zone can never hail), and on a small random
+ * fraction of such days, keyed deterministically on the date and a ~2° cell.
+ */
+export function hailAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+): number {
+  const wet = wetnessAt(day, lat, lon, startYear, elevationM)
+  const storm = rainAmount(wet, 1)
+  if (storm < 0.6) return 0
+  // Deterministic roll: integer day + coarse cell -> 0..1.
+  const cellX = Math.floor(lon / 2)
+  const cellY = Math.floor(lat / 2)
+  let h = (Math.floor(day) * 374761393 + cellX * 668265263 + cellY * 2246822519) | 0
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  const roll = ((h ^ (h >>> 16)) >>> 0) / 4294967296
+  return roll < HAIL_CHANCE ? storm : 0
+}
+
 /** The harmattan pall's tone: whitish ochre dust, NOT the wet RAIN_GRAY. */
 export const HARMATTAN_PALE = '#d9cdb2'
 
