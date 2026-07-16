@@ -8,6 +8,8 @@ import { TREASURE_IDS } from '../systems/economy'
 import { placeById, worldToLatLon } from '../world/geo'
 import { sampleTerrain } from '../world/terrain'
 import { START_YEAR } from '../config/balance'
+import { MONTH_KEYS } from '../systems/season'
+
 import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
@@ -398,6 +400,17 @@ export function Hud() {
     })
     // F4 toggles the canoe in and out of the pack (design.md §21).
     const offF4 = onKeyPress('F4', () => useGame.getState().debugToggleCanoe())
+    // The twelve keys of the number row jump to the twelve months of the
+    // current year, for stepping through the seasons (design.md §21.1).
+    // PHYSICAL codes, so the row reads 1..0 ß ´ on a German keyboard and
+    // 1..0 - = on a US one — the same twelve adjacent keys either way.
+    const offMonths = MONTH_KEYS.map((code, i) =>
+      onKeyPress(code, () => {
+        useGame.getState().debugJumpToMonth(i + 1)
+        const s = getStrings()
+        useGame.getState().setToast(`${s.months[i]} ${s.formatDateShort(useGame.getState().day, START_YEAR).slice(6)}`)
+      }),
+    )
     const offEsc = onKeyPress('Escape', () => {
       if (useUi.getState().dialog) setDialog(null)
       else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
@@ -416,6 +429,7 @@ export function Hud() {
       offF2()
       offF3()
       offF4()
+      offMonths.forEach((off) => off())
       offH()
       offP()
       offC()

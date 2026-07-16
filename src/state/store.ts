@@ -2,7 +2,8 @@
 // travel position, place/audience state and win condition.
 
 import { create } from 'zustand'
-import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY } from '../config/balance'
+import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
+import { dayOfMonthJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
 import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
@@ -273,6 +274,8 @@ export interface GameState {
   /** Debug (design.md §21, F4): toggle the canoe in and out of the pack. */
   debugToggleCanoe: () => void
   debugJumpTo: (lat: number, lon: number) => void
+  /** Debug: jump the calendar to a month (1..12) of the CURRENT in-game year (design.md §21.1). */
+  debugJumpToMonth: (month: number) => void
 }
 
 // v2: entries are language-neutral TextRefs only (plain-string journal
@@ -1986,6 +1989,12 @@ export const useGame = create<GameState>()((set, get) => ({
     const p = latLonToWorld(lat, lon)
     const ex = withExplored(get().explored, lat, lon)
     set({ mode: 'travel', placeId: null, pos: p, region: regionAt(lat, lon), ...(ex ? { explored: ex } : {}) })
+  },
+  debugJumpToMonth: (month) => {
+    // Keeps the YEAR (and thus the expedition's progress) and moves only the
+    // month, so the seasons can be stepped through without ending the run:
+    // the deadline is not touched and no day-driven system is ticked.
+    set({ day: dayOfMonthJump(get().day, month, START_YEAR) })
   },
 }))
 

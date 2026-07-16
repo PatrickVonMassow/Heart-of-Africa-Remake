@@ -145,6 +145,30 @@ function isNearNorthCoast(lat: number, lon: number): boolean {
   return false
 }
 
+/** The number row, left to right: on a German keyboard 1..9 0 ß ´ — twelve
+ *  adjacent keys for the twelve months (design.md §21.1). Physical `code`s,
+ *  so the mapping follows the ROW, not the layout's characters. */
+export const MONTH_KEYS = [
+  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6',
+  'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal',
+]
+
+/**
+ * Debug (design.md §21.1): the in-game day for the 15th of `month` (1..12) in
+ * the year `day` currently falls in — the season selector's calendar twin, so
+ * the seasons can be stepped through month by month.
+ *
+ * Keeps the YEAR deliberately: jumping the month must not end the expedition
+ * or rewrite its progress. Mid-month (the 15th) rather than the 1st, because
+ * the wetness curve interpolates between month midpoints — the 15th is where
+ * a month's profile value actually reads.
+ */
+export function dayOfMonthJump(day: number, month: number, startYear: number): number {
+  const m = Math.min(12, Math.max(1, Math.round(month)))
+  const year = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000).getUTCFullYear()
+  return (Date.UTC(year, m - 1, 15) - Date.UTC(startYear, 0, 1)) / 86400000
+}
+
 /** Continuous day of the year, 0..365 (fractional), from the in-game day. */
 export function dayOfYear(day: number, startYear: number): number {
   const ms = Date.UTC(startYear, 0, 1) + day * 86400000

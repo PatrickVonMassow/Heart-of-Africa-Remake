@@ -9,6 +9,8 @@ import { Hud } from './Hud'
 import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
 import { useGame, canCampHere } from '../state/store'
+import { START_YEAR } from '../config/balance'
+import { MONTH_KEYS } from '../systems/season'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
 import { balance } from '../config/balance'
@@ -385,5 +387,28 @@ describe('inventory bar sorts alphabetically by localized name (point 104)', () 
     render(<Hud />)
     // Feldflasche < Gewehr < Machete < Medizin < Schaufel < Seil
     expect(domOrder()).toEqual(['canteen', 'rifle', 'machete', 'medicine', 'shovel', 'rope'])
+  })
+})
+
+
+describe('month keys (design.md §21.1 — stepping the seasons)', () => {
+  it('binds the twelve adjacent keys of the number row, in month order', () => {
+    // PHYSICAL codes: the row reads 1..0 ß ´ on a German keyboard and 1..0 - =
+    // on a US one, and the same twelve keys mean Jan..Dec either way.
+    expect(MONTH_KEYS).toEqual([
+      'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6',
+      'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal',
+    ])
+    expect(MONTH_KEYS).toHaveLength(12)
+    expect(new Set(MONTH_KEYS).size).toBe(12) // no key means two months
+  })
+
+  it('jumps the store to that month, keeping the year', () => {
+    const year3 = (Date.UTC(START_YEAR + 2, 5, 20) - Date.UTC(START_YEAR, 0, 1)) / 86400000
+    useGame.setState({ day: year3 })
+    useGame.getState().debugJumpToMonth(MONTH_KEYS.indexOf('Equal') + 1) // the last key = December
+    const d = new Date(Date.UTC(START_YEAR, 0, 1) + useGame.getState().day * 86400000)
+    expect(d.getUTCMonth()).toBe(11)
+    expect(d.getUTCFullYear()).toBe(START_YEAR + 2) // the expedition keeps its year
   })
 })

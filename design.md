@@ -651,6 +651,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - **F2** toggles the journal do-not-disturb option (§16).
 - **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health, a full canteen and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything, and the extended zoom of §21.4 is unlocked along with it.
 - **F4** toggles the canoe in and out of the pack (for quickly testing water travel and the on-land penalty).
+- **The number row jumps the months** (for stepping through the seasons of §19.13): the twelve adjacent keys left to right — on a German keyboard `1 2 3 4 5 6 7 8 9 0 ß ´` — jump to January … December of the CURRENT in-game year, landing mid-month. The year is deliberately kept, so stepping the seasons never ends the expedition. Bound to the physical keys of the row, so the same twelve keys work on any layout.
 
 ### 21.2 Tunable values
 

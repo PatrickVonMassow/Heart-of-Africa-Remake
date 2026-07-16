@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, dayOfYear, effectiveWetness, rainAmount, seasonFogParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, dayOfMonthJump, dayOfYear, effectiveWetness, rainAmount, seasonFogParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -217,6 +217,35 @@ describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () 
     expect(sunDimFactor(1, 0)).toBe(1)
     expect(sunDimFactor(1, 1)).toBeLessThan(1)
     expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
+  })
+})
+
+describe('dayOfMonthJump (design.md §21.1 — the month keys)', () => {
+  it('lands mid-month, where the wetness curve actually reads the profile', () => {
+    // The curve interpolates between month MIDPOINTS, so the 15th is the day
+    // that reads a month's own value rather than a blend with its neighbour.
+    const d = dayOfMonthJump(0, 8, START_YEAR)
+    expect(d).toBe(on(8, 15))
+    expect(wetnessAt(d, KANO.lat, KANO.lon, START_YEAR, 0)).toBeGreaterThan(0.6) // Sahel at its August peak
+  })
+
+  it('KEEPS the year — jumping a month must not end the expedition', () => {
+    const inYear3 = on(6, 20, START_YEAR + 2)
+    const jumped = dayOfMonthJump(inYear3, 1, START_YEAR)
+    expect(jumped).toBe(on(1, 15, START_YEAR + 2))
+    expect(dayOfMonthJump(inYear3, 12, START_YEAR)).toBe(on(12, 15, START_YEAR + 2))
+  })
+
+  it('walks the whole year forward in twelve steps, each in its own month', () => {
+    for (let m = 1; m <= 12; m++) {
+      const d = dayOfMonthJump(0, m, START_YEAR)
+      expect(new Date(Date.UTC(START_YEAR, 0, 1) + d * 86400000).getUTCMonth()).toBe(m - 1)
+    }
+  })
+
+  it('clamps a month outside 1..12 instead of drifting into another year', () => {
+    expect(dayOfMonthJump(0, 0, START_YEAR)).toBe(on(1, 15))
+    expect(dayOfMonthJump(0, 13, START_YEAR)).toBe(on(12, 15))
   })
 })
 
