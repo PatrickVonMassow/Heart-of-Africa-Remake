@@ -93,6 +93,11 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, seventh): 146 (revenge) depends on 125's
+shared outcome helper and its (prey, predator) matrix, so it is built directly
+AFTER 125 rather than at the end — it extends that helper to a third outcome and
+would otherwise be written twice. 125 keeps its place in the numeric tail.
+
 Work order (user override, 2026-07-16, sixth): 145 (three more parental
 sacrifices) goes at the END of the batch, on the user's explicit instruction —
 and its (a) depends on 144 (the burnt-land state) anyway, so the order is
@@ -2918,15 +2923,23 @@ the remaining open points in their numeric order.
         sees a giraffe drive off a lion and an antelope die to one should be
         able to infer why. Prefer a matrix flat enough to read over one tuned to
         feel fair.
-      * ⚠️ **THE LINE THAT MUST NOT MOVE — this is a RESCUE mechanic, never a
-        grief mechanic.** The §19.8/point-134 carve-out stands: where the calf
-        is ALREADY DEAD, the parent has no defence and no chance at all. The
-        vigil-keeper (121), the trample-throw (119) and the waterfall plunge are
-        not fights — they are grief, and the user chose them deliberately and
-        told me not to re-litigate them. Only the branch where the calf is still
-        ALIVE and the parent attacks to save it may roll. Keeping the two apart
-        is what stops "more sacrifices succeed" from quietly dissolving the
-        emotional register the whole of §19.8 is built on.
+      * ⚠️ **THE LINE, AND IT IS NOT WHERE I FIRST DREW IT.** I first wrote this
+        as "the calf is already dead → no roll, that is grief". Point 146
+        (revenge, user 16.07.2026) proves that wrong: a parent may also attack
+        AFTER its calf is dead, and win. So the line is not *when* but *what the
+        parent does*:
+        - **A parent that SURRENDERS never rolls.** The vigil-keeper stands and
+          is eaten (121d), the trample-throw goes under the feet (119), the
+          waterfall plunge follows the calf over. These are not fights — the
+          animal offers no defence, and the user chose that deliberately (point
+          134) and told me not to re-litigate it. **Chance zero, always.**
+        - **A parent that ATTACKS rolls** — whether the calf is still alive
+          (this point: rescue) or already dead (point 146: revenge). The roll
+          differs, the principle does not.
+        That is the distinction the register actually rests on, and it is
+        cleaner than the one I had: it is not the calf's pulse that decides, it
+        is whether the animal fights or gives itself. Keeping THAT line is what
+        stops "more sacrifices succeed" from dissolving §19.8.
   (b) On success: abort the hunt (the predator gives up and leaves, reusing the
       existing leave/abort path — no new predator state), the calf keeps its
       parent, both rejoin the herd. No stain, no carcass.
@@ -2942,9 +2955,10 @@ the remaining open points in their numeric order.
   leopard < hyena < lion; for a fixed predator, it rises with the prey's
   defence (giraffe > zebra > wildebeest/warthog > antelope); and the giraffe-vs-
   lion case the user names reads clearly better than antelope-vs-lion. And the
-  line that must not move, asserted: a parent whose calf is already DEAD has
-  chance ZERO against every predator — the grief branches (119, 121, the
-  waterfall) never roll. Live: with the chance forced to 1 a reached predator
+  line, asserted as REVISED (see (a2)): a parent that SURRENDERS has chance ZERO
+  against every predator — the grief branches (119, 121d, the waterfall) never
+  roll — while a parent that ATTACKS rolls whether its calf is alive (here) or
+  dead (point 146, revenge). Live: with the chance forced to 1 a reached predator
   leaves and both animals live; forced to 0 the existing sacrifice checks still
   pass. DOCS: design.md §19.8 (record that the rescue may succeed while grief
   never does — the two are different mechanics wearing the same silhouette),
@@ -3999,6 +4013,77 @@ the remaining open points in their numeric order.
   its OPEN list once (b) and (c) land.
   SIZE: three separate dramas — one commit each, in the order (a), (b), (c).
   (Filed 16.07.2026.)
+
+- [ ] 146. Revenge: a strong parent kills a weak predator and walks away.
+  Wanted (user, 16.07.2026): "Es soll auch noch eine Rache-Mechanik von Eltern
+  geben. Ein relativ starkes Eltern-Beutetier soll, wenn es nach dem Tod seines
+  Jungen einen relativ schwachen Prädator angreift, manchmal nicht von diesem
+  gefressen werden, sondern es schaffen, dieses zu töten und selbst
+  davonzukommen. Auch hier wieder Erfolgschancen analog berechnen."
+  ★ WHY THIS IS A THIRD THING, not a variant — and it corrected me. §19.8 had
+  two states and I had just written the line between them wrongly: I claimed
+  that once the calf is dead the parent has no roll, because that is grief.
+  Revenge disproves it. The real distinction is not the calf's pulse but **what
+  the parent does**:
+  * **surrenders** — the vigil-keeper standing to be eaten (121d), the
+    trample-throw (119), the waterfall plunge: no defence, no roll, always
+    fatal. The user's own carve-out (134); do not touch it.
+  * **rescues** — the calf still alive, the parent attacks to save it: rolls
+    (point 125 a2).
+  * **avenges** — THIS point: the calf already dead, and the parent attacks
+    anyway. Not to save anything. It rolls too.
+  Today that third case exists and is deterministic: the too-late charge kills
+  the parent every time (`src/scenes/travel/Wildlife.tsx` ~950,
+  `PARENT_TOO_LATE_DIST`).
+  (a) OUTCOME — the helper becomes THREE-way, not two. Point 125(a) introduces
+      one shared pure helper for "parent reaches predator"; extend that same
+      helper rather than adding a second: **taken** / **predator driven off**
+      (125) / **predator KILLED** (here). Do not fork the resolution.
+  (b) THE CHANCE — "analog", i.e. the SAME matrix, at a higher bar. Reuse
+      125(a2)'s (prey, predator) matrix and §14.1's existing danger order
+      (cheetah < leopard < hyena < lion), and hold the obvious invariant:
+      **killing is harder than driving off**, so for any pair
+      `chance(kill) <= chance(driveOff)`. The user's own framing names the gate:
+      a **relatively strong** parent against a **relatively weak** predator. So
+      a giraffe or a zebra may kill a cheetah; an antelope kills nothing; and
+      **nothing kills a lion** — the lion is the top of the order and the drama
+      of §19 depends on it staying frightening. Balance values, debug-editable.
+  (c) ★ THE CONSEQUENCE THE OTHER POINTS DO NOT HAVE: a DEAD PREDATOR on the
+      ground. That is new — 125's success only drives it off. A predator carcass
+      must enter the EXISTING carcass system (the kill flock, the ground
+      scavenger, `dissolve`/`gone`) rather than a special case: the vultures
+      should work a dead lion exactly as they work a dead zebra. This is the
+      cheapest and best part of the point — the systems already exist, and a
+      hyena being eaten by vultures is an image the game has never shown.
+      ⚠️ Check the food-web rules (§19.3) before wiring it: they gate which
+      species may feed on which, and a predator carcass is a case they were
+      probably never written for.
+  (d) THE PARENT WALKS AWAY. "und selbst davonzukommen" — on a kill the parent
+      survives, un-wounded, and rejoins its herd. It does not then stand vigil
+      (121): the vigil is the surrender state and this animal did not surrender.
+      Make sure the two cannot both fire on the same carcass.
+  (e) ⚠️ ARCHITECTURE: `LION_STATE` is the single global hunt state and this
+      DELETES the hunter mid-hunt. Points 121(f), 130 and 145(c) all carry a
+      version of this warning; by the time this point is built one of them
+      should have settled who owns the resolution — follow that, do not invent a
+      fourth answer.
+  (f) ⚠️ AND THE REGISTER: revenge that usually works would turn §19.8 from
+      tragedy into a power fantasy, which is the opposite of the point. Default
+      the kill chances LOW enough that being eaten stays the common ending, and
+      keep 134's grief deaths untouched. The user asked for "manchmal" — build
+      *sometimes*, not *often*.
+  TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`): the three-way
+  helper maps deterministically; `chance(kill) <= chance(driveOff)` holds for
+  EVERY (prey, predator) pair (the invariant, swept, not spot-checked); no prey
+  ever kills a lion; a surrendering parent still rolls nothing. Live
+  (`scripts/verify/enrichments.mjs`): with the kill chance forced to 1 a
+  too-late giraffe/zebra parent kills its cheetah, survives and rejoins, and the
+  predator's carcass is then worked by the vultures like any other; forced to 0
+  the existing deterministic sacrifice checks stay green. DOCS: design.md §19.8
+  (the three states named — surrender / rescue / revenge — since that trio is
+  now the section's actual grammar), CLAUDE.md §7.1 pt. 12.
+  DEPENDS ON 125 (its helper and its matrix). Build after it. One atomic commit
+  on top. (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
