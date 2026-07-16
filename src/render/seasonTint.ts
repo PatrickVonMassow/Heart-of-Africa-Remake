@@ -40,8 +40,13 @@ export function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
     float(1).sub(c.r.sub(c.g).mul(4)).clamp(0, 1),
   )
   const luma = c.r.mul(0.35).add(c.g.mul(0.5)).add(c.b.mul(0.15))
-  const straw = vec3(luma.mul(1.9), luma.mul(1.55), luma.mul(0.6))
-  const lush = vec3(luma.mul(0.5), luma.mul(1.25), luma.mul(0.45))
+  // Deliberately EXAGGERATED per design.md §19.13's licence (point 144): a
+  // near-white bleached straw against a deep saturated green, so the season
+  // reads at a glance rather than as a subtle shift. The restrained pair
+  // (straw 1.9/1.55/0.6, lush 0.5/1.25/0.45) moved the Sahel's on-screen green
+  // excess only 41->51 across its whole year — a fact the player could not see.
+  const straw = vec3(luma.mul(2.15), luma.mul(1.75), luma.mul(0.4))
+  const lush = vec3(luma.mul(0.28), luma.mul(1.5), luma.mul(0.3))
   const dryK = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
   const lushK = SEASON_TINT_U.mul(2).sub(1).clamp(0, 1)
   return mix(mix(c, straw, greenness.mul(dryK)), lush, greenness.mul(lushK))
