@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, karifAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -406,6 +406,56 @@ describe('harmattanAt (point 137 — the West African winter dust wind)', () => 
     expect(coldnessAt(JAN, HAUSA.lat, HAUSA.lon, START, 486)).toBeLessThan(
       COLD_DRESS_THRESHOLD,
     )
+  })
+})
+
+describe('karifAt (point 137 — the Horn cold that is a WIND in the HOT season)', () => {
+  const START = 1890
+  const JAN = 15 // jilal — "the driest season; great heat", and NOT the cold one
+  const APR = 105
+  const AUG = 227 // haga — Swayne's hot weather, and the karif blows
+  const HAUD_M = 964 // the moved Somali village
+  const GUBAN_M = 60 // the coastal lowland Swayne contrasts it with
+
+  it('blows cold on the Haud in haga — the season the intuition calls hot', () => {
+    expect(karifAt(AUG, SOMALI_HAUD.lat, SOMALI_HAUD.lon, START, HAUD_M)).toBeGreaterThan(0.9)
+  })
+
+  it('is HOT in Guban at the same moment — the gate is altitude, not latitude', () => {
+    // Swayne: "It is hot in Guban, with sand-storms, but cold on the Haud and
+    // other parts of the high interior." Same wind, same day, opposite result.
+    expect(karifAt(AUG, 10.4, 45.0, START, GUBAN_M)).toBe(0)
+  })
+
+  it('does NOT blow in jilal — the harsh dry season is not the cold one', () => {
+    expect(karifAt(JAN, SOMALI_HAUD.lat, SOMALI_HAUD.lon, START, HAUD_M)).toBe(0)
+    expect(karifAt(APR, SOMALI_HAUD.lat, SOMALI_HAUD.lon, START, HAUD_M)).toBe(0)
+  })
+
+  it('stays in the Horn — it is not the harmattan and not a global wind', () => {
+    for (const [lat, lon] of [[12.0, 8.5], [-2.5, 36.8], [-28.4, 31.3], [9.0, 38.7]]) {
+      expect(karifAt(AUG, lat, lon, START, 2000)).toBe(0)
+    }
+  })
+
+  it('is why coldnessAt could not carry it: the annual swing says July is summer', () => {
+    // The two drivers must disagree here, and that disagreement is the finding.
+    expect(karifAt(AUG, SOMALI_HAUD.lat, SOMALI_HAUD.lon, START, HAUD_M)).toBeGreaterThan(0.9)
+    expect(coldnessAt(AUG, SOMALI_HAUD.lat, SOMALI_HAUD.lon, START, HAUD_M)).toBeLessThan(
+      COLD_DRESS_THRESHOLD,
+    )
+  })
+
+  it('stays inside 0..1 everywhere, every day', () => {
+    for (let day = 0; day < 365; day += 5) {
+      for (const lat of [0, 5, 9, 12, 16]) {
+        for (const el of [0, 500, 964, 2500]) {
+          const k = karifAt(day, lat, 45, START, el)
+          expect(k).toBeGreaterThanOrEqual(0)
+          expect(k).toBeLessThanOrEqual(1)
+        }
+      }
+    }
   })
 })
 

@@ -354,6 +354,51 @@ function zoneShapeAt(day: number, zone: ClimateZone, startYear: number): number 
   return a + (b - a) * smooth
 }
 
+// The karif (docs/peoples-1890.md §7.1, Swayne 1895): the Horn's south-west
+// monsoon, blowing through haga (Jul-Sep). Its cold is ALTITUDE-GATED, and that
+// is the whole point — Swayne: "It is hot in Guban, with sand-storms, but COLD
+// on the Haud and other parts of the high interior."
+const KARIF_PEAK_DOY = 227 // mid-August, the middle of haga
+const KARIF_HALF_WIDTH_DAYS = 46 // Jul .. Sep around the peak
+const KARIF_LAT = [5, 12.5] as const
+const KARIF_LON_WEST = 42
+const KARIF_HIGHLAND_M = [600, 1000] as const // Guban below, the Haud/Ogo above
+
+/**
+ * How hard the karif blows COLD at a place and time, 0 .. 1 (design.md §19.13).
+ *
+ * A third driver beside `coldnessAt` and `harmattanAt`, and it has to be, for
+ * two reasons the research forces:
+ *
+ * - It is a WIND IN THE HOT SEASON. `coldnessAt` reads July at 9N as the
+ *   northern SUMMER and returns almost nothing — correctly, for the annual
+ *   temperature swing. But Swayne's period table names haga (Jul-Sep) as "the
+ *   hot weather" and puts the cold in it anyway, carried by the wind. The
+ *   intuitive reading is wrong twice over: jilal, "the driest season; great
+ *   heat", is Jan-Apr and is NOT the cold one.
+ * - It is gated by ALTITUDE, not latitude: the same wind that chills the Haud
+ *   bakes the Guban lowland. That is why the Somali village was moved into the
+ *   Haud (9.0N, 964 m) — at its old 349 m the cold never applied to it.
+ */
+export function karifAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+): number {
+  const doy = dayOfYear(day, startYear)
+  const raw = Math.abs(doy - KARIF_PEAK_DOY)
+  const dist = Math.min(raw, 365 - raw)
+  const season = Math.max(0, 1 - dist / KARIF_HALF_WIDTH_DAYS)
+  const [south, north] = KARIF_LAT
+  if (lat < south || lat > north || lon < KARIF_LON_WEST) return 0
+  // Hot in Guban, cold on the high interior — the gate IS the finding.
+  const [low, high] = KARIF_HIGHLAND_M
+  const highland = Math.min(1, Math.max(0, (elevationM - low) / (high - low)))
+  return season * highland
+}
+
 /**
  * Wetness at a place and time, 0 (rainless) .. 1 (the wettest the world gets).
  * Interpolated smoothly across the month profile so a season arrives and fades
