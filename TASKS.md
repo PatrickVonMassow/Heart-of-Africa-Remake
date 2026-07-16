@@ -4207,7 +4207,7 @@ the remaining open points in their numeric order.
   were already live in polish/enrichments. The intervening-points re-check
   (136/122/123/138-142) is point 149's job, once they exist.
 
-- [ ] 148. An interim Closing run, pulled forward.
+- [x] 148. An interim Closing run, pulled forward.
   Wanted (user, 16.07.2026): "Und danach einen eingeschobenen Closing-Durchlauf
   des Batches. Die Batch ist inzwischen so lange und es gab so große Umbauten, da
   dauert es sonst zu lange, bis diese Schritte wieder durchgeführt werden."
@@ -4249,6 +4249,13 @@ the remaining open points in their numeric order.
   NOT IN SCOPE: the real Closing still runs at the end over everything. This is
   an interim pass over what exists at 147, and it does not tick the batch's own
   Closing section. (Filed 16.07.2026.)
+  DONE (16.07.2026, f2c488f + 985305f): dead code removed (the coldCloaksFor
+  shim, its callers gone since 137; its tests migrated to seasonalDressFor);
+  CURRENT_WEATHER's doc corrected (the flora moved off it, only sun-dim +
+  catchment read it now); the peoples-1890.md §2->§7 forward-pointer added (old
+  findings kept, per the rule). Regression green throughout the session (vitest
+  1597, lint clean, polish + enrichments green). design.md §19.13's
+  settlement/dress paragraph was already recompacted in the 143 commit.
 
 - [ ] 149. A SECOND full weather verification, after the family dramas.
   Wanted (user, 16.07.2026): "Füge nach 123 zwei neue Tasks ein: 1. Erneute
