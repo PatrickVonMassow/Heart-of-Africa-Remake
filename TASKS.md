@@ -2683,7 +2683,9 @@ the remaining open points in their numeric order.
   not reach the predator in time today simply resumes grazing beside its eaten
   calf. Wanted (user, 15.07.2026): it stays at the carcass, drives the vultures
   off, and — left alone by its herd — is taken there by a later predator: both
-  a sacrifice and a death of grief, at the spot where its young fell.
+  a sacrifice and a death of grief, at the spot where its young fell. The
+  predator does not merely happen along: the carcass DRAWS it, so the scenario
+  reliably fires — see (f).
   ANCHORS (`src/scenes/travel/Wildlife.tsx`): the predation resolution loop
   (~935) already kills a too-late parent (`PARENT_TOO_LATE_DIST`); the parent
   that stayed clear keeps a dead `a.child` and falls back to normal behaviour —
@@ -2723,13 +2725,55 @@ the remaining open points in their numeric order.
   (e) RESOLVE ALWAYS (the point-118 lesson): the vigil ends when the carcass is
       gone/dissolved or `VIGIL_SECONDS` runs out, and the parent rejoins the
       herd. Never a drive with no exit.
+  (f) ★ A PREDATOR MUST ACTUALLY COME (user, 16.07.2026): "Es soll dann auch
+      demnächst ein Raubtier kommen, von dem sich der Elter freiwillig fressen
+      lässt, damit dieses Szenario greift." Without this the point is a
+      dead-end: (a)-(e) describe what happens IF a predator arrives, and (e)
+      then quietly lets the vigil expire — so in practice the decision would
+      almost never be reached and the whole drama would exist only in the code.
+      The vigil must SUMMON its ending.
+      * **The hook is real, not a contrivance.** A carcass draws predators and
+        scavengers; that is why the vultures already come (§19.6). So the
+        carcass draws a predator, with the vigil-keeper standing over it.
+      * **Follow the vulture pattern exactly** (§19.6, CLAUDE §7.1 pt. 12): the
+        drawn predator SPAWNS BEYOND the zoom-aware view ring and WALKS IN. It
+        must never pop into existence at the carcass — the checks for "no
+        popping in" exist and are the standard here.
+      * **Species must still fit** the region's own predator pool and the food
+        web (§19.3) — the drawn predator is chosen from the same rules as any
+        other, never a lion airlifted into the Sahara.
+      * ⚠️ **ARCHITECTURE: `LION_STATE` is a single global hunt state.** A drawn
+        predator must not clobber a hunt already running, and a hunt starting
+        elsewhere must not silently cancel this one. Same warning as point 130
+        (crocodiles) — decide it once and note which point owns the resolution.
+      * **Timing is a balance value** (`vigilPredatorDelay`, debug-editable per
+        CLAUDE §2): "demnächst" means within the vigil window, so either the
+        delay fits inside `VIGIL_SECONDS` or that value grows to fit it. The
+        arrival must be visible — the player should see it come, not find it
+        already feeding.
+      * **(e) still stands as the backstop, not as the normal case.** If the
+        drawn predator cannot reach the carcass (water, terrain, a despawn), the
+        vigil still ends on its timer and the parent rejoins the herd. The
+        difference is that expiry becomes the exception rather than the rule.
+      * ⚠️ **This is deliberately a GUARANTEE inside a stochastic sim — the exact
+        shape that point 135 records as failing twice.** Learn from it here
+        rather than repeating it: make the arrival reliable IN THE GAME (a
+        scripted draw with its own state, not a hope that the ambient spawner
+        wanders one past), so the live check can assert it without racing.
   TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`) for any extracted
-  helper (e.g. the vigil-blocks-landing predicate); live
-  (`scripts/verify/enrichments.mjs`): after a calf is eaten with the parent held
-  clear, the parent CLOSES on the carcass and holds there, no vulture lands
-  while it stands, a predator pinned on it kills it there, and the vigil clears
+  helper (e.g. the vigil-blocks-landing predicate, and the drawn predator's
+  species/region pick from (f)); live (`scripts/verify/enrichments.mjs`): after a
+  calf is eaten with the parent held clear, the parent CLOSES on the carcass and
+  holds there, no vulture lands while it stands, and — the (f) case, which is the
+  point of the whole drama — a predator ARRIVES on its own from outside the view
+  ring within the window and takes the standing parent, without the check having
+  to pin one on it. Keep a pinned-predator check too, as the narrow test of the
+  kill path itself. And the backstop: with the draw disabled, the vigil clears
   once the carcass is gone (no stuck keeper). DOCS: design.md §19.8, CLAUDE.md
-  §7.1 pt. 12. One atomic commit. (Reported 15.07.2026.)
+  §7.1 pt. 12. SIZE: (f) may deserve its own commit after (a)-(e) — the vigil is
+  testable without it, and splitting keeps the draw's architecture question
+  (LION_STATE) from blocking the rest. (Reported 15.07.2026; (f) added
+  16.07.2026.)
 
 - [ ] 122. Family drama: the swollen river of the rains, and drowning.
   DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the wet
