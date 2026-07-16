@@ -6,18 +6,27 @@
 // pounded in a mortar, a drummer plays, and water is carried from the well.
 // Pure animation, no mechanics.
 
-import { useEffect, useMemo, useRef } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
 import { buildGoat } from '../../render/fauna'
 import { TESSELLATION } from '../../render/figures'
+import { cloakForCloth } from '../../systems/dress'
+import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, type Collider } from './collision'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
 const NPC_RADIUS = 0.3
+
+/**
+ * The cold-weather cloaks this settlement's people wear today (design.md
+ * §19.13), or null for the everyday dress. A context rather than a prop: every
+ * life vignette builds its own Figures, and only the Figure itself cares.
+ */
+const ColdCloaksContext = createContext<ColdDress | null>(null)
 
 /** Simple primitive human figure; `kneel` folds it down for sitting work. */
 function Figure({
@@ -32,12 +41,24 @@ function Figure({
   kneel?: boolean
 }) {
   const bodyH = kneel ? 0.55 : 1.0
+  const cold = useContext(ColdCloaksContext)
   return (
     <group scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
       <mesh position={[0, bodyH * 0.5, 0]} castShadow>
         <coneGeometry args={[0.32, bodyH, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={cloth} roughness={0.95} />
       </mesh>
+      {/* The cold-weather cloak is worn OVER the everyday dress (Mayr): a
+          shell around the shoulders, leaving the dress showing below. */}
+      {cold && (
+        <mesh position={[0, bodyH * 0.66, 0]} castShadow>
+          <coneGeometry args={[0.355, bodyH * 0.68, TESSELLATION.figureBody]} />
+          <meshStandardMaterial
+            color={cloakForCloth(cold.cloaks, cold.palette, cloth)}
+            roughness={0.8} // greased hide sits glossier than the cloth beneath
+          />
+        </mesh>
+      )}
       <mesh position={[0, bodyH + 0.18, 0]} castShadow>
         <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
         <meshStandardMaterial color={skin} roughness={0.85} />
@@ -797,18 +818,23 @@ export function PlaceLife({
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
   const localSeed = (seed ^ hash) >>> 0
 
+  // The cold-weather dress of §19.13, from THIS settlement's own place and the
+  // date — like the settlement's weather, and for the same reason. Almost every
+  // people has none: see the evidence notes in systems/dress.ts.
+  const cloaks = useColdCloaks(placeId, style.cloth)
+
   if (kind === 'port') {
     return (
-      <>
+      <ColdCloaksContext.Provider value={cloaks}>
         <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
         <Traders seed={localSeed} cloth={style.cloth} />
         <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
         <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
-      </>
+      </ColdCloaksContext.Provider>
     )
   }
   return (
-    <>
+    <ColdCloaksContext.Provider value={cloaks}>
       <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
       <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
       <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
@@ -840,6 +866,6 @@ export function PlaceLife({
           startDelay={9}
         />
       )}
-    </>
+    </ColdCloaksContext.Provider>
   )
 }

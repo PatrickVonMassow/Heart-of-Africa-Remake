@@ -211,6 +211,52 @@ export function dayOfYear(day: number, startYear: number): number {
   return (ms - yearStart) / 86400000
 }
 
+/** Coldness at or above which the cold-weather dress of §19.13 is worn. */
+export const COLD_DRESS_THRESHOLD = 0.5
+
+/** Peak of the cold season: mid-July in the south, mid-January in the north. */
+const SOUTHERN_WINTER_DOY = 196
+const NORTHERN_WINTER_DOY = 15
+
+/**
+ * How cold a place reads, 0 (never cold) .. 1 (the coldest the game's inhabited
+ * ground gets). Drives the cold-weather dress of §19.13 — NOT a temperature in
+ * degrees: `docs/climate-1890.md` carries no per-region monthly temperature
+ * table, so inventing one would be a false precision. What it does encode is
+ * what the research does support:
+ *
+ * - A seasonal swing that only exists AWAY from the equator. The research fixes
+ *   the cold season by hemisphere at the two ranges that actually take snow:
+ *   the Drakensberg Jun-Aug (austral winter) and the High Atlas Nov-Apr. In the
+ *   tropics the annual temperature swing is small, so the amplitude falls off
+ *   toward the equator and a Maasai or Baganda village is never "cold".
+ * - Elevation: the highlands are cool the year round (the ~6.5 °C/km lapse is
+ *   why the 0 °C isotherm sits at ~4,750 m on the equator per the research).
+ *
+ * `elevationM` is required for the same reason `climateZoneAt` requires it:
+ * `elevationAt` silently returns 0 before the DEM loads, and a defaulted
+ * parameter would hide that.
+ */
+export function coldnessAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+): number {
+  void lon // no longitudinal term in the model; kept for the shape of wetnessAt
+  const doy = dayOfYear(day, startYear)
+  const winterPeak = lat < 0 ? SOUTHERN_WINTER_DOY : NORTHERN_WINTER_DOY
+  // 1 at the winter peak, 0 at the summer peak.
+  const seasonal = Math.cos((2 * Math.PI * (doy - winterPeak)) / 365) * 0.5 + 0.5
+  // The swing needs latitude: at the equator there is effectively none, and by
+  // the game's southern edge (~-34°) it is the whole story.
+  const amplitude = Math.min(1, Math.abs(lat) / 35)
+  // Height is cold regardless of the month.
+  const elevation = Math.min(1, Math.max(0, elevationM) / 3000)
+  return Math.min(1, seasonal * amplitude + elevation * 0.6)
+}
+
 /**
  * Wetness at a place and time, 0 (rainless) .. 1 (the wettest the world gets).
  * Interpolated smoothly across the month profile so a season arrives and fades

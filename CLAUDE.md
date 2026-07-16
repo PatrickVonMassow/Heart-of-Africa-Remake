@@ -538,11 +538,21 @@ verify suite that proves it.
       coordinates and dims the sun and sky light while graying the dome
       and thickening its cloud deck, so the §19.10 firelight carries
       further under the overcast (`scripts/verify/polish.mjs`,
-      screenshots 110/111).
+      screenshots 110/111). The inhabitants' cold-weather dress is
+      evidence-gated: the Zulu isipuku (Mayr 1907, the one period source
+      among the game's peoples) appears in the austral winter and is shed
+      in summer, while every people the research found no period evidence
+      for stays bare however cold its ground gets — pure-tested in
+      `src/systems/dress.test.ts` (incl. the two named traps: the San's
+      cold Kalahari and the Pedi highveld both cross the coldness
+      threshold and still wear nothing extra), live-checked via
+      `__placeDress` in `scripts/verify/polish.mjs` (screenshot 112).
 
     OPEN: tree-climbing-to-flee and additional new species/birds beyond
     the existing roster and the added calves remain to be implemented (§9
-    open items); the inhabitants' season-appropriate dress (§19.13).
+    open items); the one seasonal-dress reading the research allows but the
+    figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather
+    than in greater number (§19.13).
 13. **Real geodata.** The real-geodata terrain rendering of `design.md`
     §3.3 is implemented (DEM relief, ~1890 vector coasts/rivers/lakes
     without raster steps, biome-based PBR splatting, domain-warped

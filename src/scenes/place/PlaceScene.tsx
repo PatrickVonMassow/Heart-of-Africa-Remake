@@ -27,6 +27,8 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { effectiveWetness, RAIN_GRAY, skyOvercastParams, sunDimFactor } from '../../systems/season'
+import { cloakForCloth } from '../../systems/dress'
+import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
@@ -385,10 +387,24 @@ function VillageHut({
   )
 }
 
-function Villager({ item, style }: { item: Interactive; style: RegionPlaceStyle }) {
+function Villager({
+  item,
+  style,
+  dress,
+}: {
+  item: Interactive
+  style: RegionPlaceStyle
+  dress: ColdDress | null
+}) {
   const t = useStrings()
   const robe = style.cloth[0]
-  const shoulder = style.cloth[1 % style.cloth.length]
+  // In the cold the elder wears his cloak over the shoulders (design.md
+  // §19.13) — the shoulder cloth IS that garment, so it takes the cloak's
+  // colour rather than growing a second one. Without it he would stand in
+  // summer dress among cloaked villagers.
+  const shoulder = dress
+    ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
+    : style.cloth[1 % style.cloth.length]
   return (
     <group position={[item.pos[0], 0, item.pos[1]]}>
       {/* Robe */}
@@ -1394,6 +1410,9 @@ export function PlaceScene() {
   )
   const isPort = place?.kind === 'port'
   const style = REGION_PLACE_STYLES[place?.region ?? 'west']
+  // The settlement's cold-weather dress (§19.13). Shared with PlaceLife so the
+  // elder and the villagers dress for the same season.
+  const dress = useColdCloaks(placeId, style.cloth)
   const pathTex = usePathTexture(layout?.paths ?? null)
   const mats = usePlaceMaterials(!!isPort, style, pathTex)
   const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
@@ -1784,7 +1803,7 @@ export function PlaceScene() {
       </mesh>
 
       {layout.interactives.map((it, i) => {
-        if (it.type === 'villager') return <Villager key={i} item={it} style={style} />
+        if (it.type === 'villager') return <Villager key={i} item={it} style={style} dress={dress} />
         if (isPort) return <PortBuilding key={i} item={it} mats={mats} variant={i} />
         // Village trading post: a plain hut labelled as the market.
         if (it.type === 'market')

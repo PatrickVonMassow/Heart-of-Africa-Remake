@@ -472,6 +472,57 @@ for (const [placeId, shot] of [
   console.log('shot 103-giza-sphinx-travel.png')
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
+// --- Cold-weather dress (design.md §19.13, point 120g) ---
+// LAST in the file on purpose: it hops between settlements, and each leave
+// remounts the travel scene, which makes the next enter capture a panorama —
+// exactly the state the fallback check above asserts is absent.
+// --- (checks) ------------------------
+// The Zulu isipuku is the ONE period-sourced case (Mayr 1907): a cloak worn
+// over the everyday dress in cold weather. So the Zulu village must dress for
+// its austral winter and shed the cloak in its summer — while the peoples the
+// research found no evidence for stay bare in any month, however cold their
+// own ground gets. See src/systems/dress.ts for the per-people evidence.
+{
+  const dressAt = async (placeId, month) => {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), placeId)
+    await page.waitForFunction(() => !!window.__placeDress, null, { timeout: 30000 })
+    await page.waitForTimeout(300)
+    return page.evaluate(() => window.__placeDress?.cloaks ?? null)
+  }
+
+  const zuluWinter = await dressAt('zulu-village', 6) // July — austral winter
+  await page.screenshot({ path: `${OUT}112-zulu-winter-cloaks.png` })
+  console.log('shot 112-zulu-winter-cloaks.png')
+  const zuluSummer = await dressAt('zulu-village', 0) // January — austral summer
+  const maasaiWinter = await dressAt('maasai-village', 6) // the equator has no winter
+  const sanWinter = await dressAt('san-village', 6) // cold ground, but no period evidence
+
+  check(
+    'the Zulu wear the cold-weather cloak in their winter (Mayr, period source)',
+    Array.isArray(zuluWinter) && zuluWinter.length > 1,
+    JSON.stringify(zuluWinter),
+  )
+  check(
+    'and shed it in their summer — the cloak is the cold garment, not the dress',
+    zuluSummer === null,
+    JSON.stringify(zuluSummer),
+  )
+  check(
+    'the equatorial Maasai never dress for a cold season they do not have',
+    maasaiWinter === null,
+    JSON.stringify(maasaiWinter),
+  )
+  check(
+    'a people with no period evidence stays bare even on cold ground (San)',
+    sanWinter === null,
+    JSON.stringify(sanWinter),
+  )
+}
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
