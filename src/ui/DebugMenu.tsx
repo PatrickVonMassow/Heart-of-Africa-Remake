@@ -120,6 +120,7 @@ export function DebugMenu() {
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
   const traaEnabled = useUi((s) => s.traaEnabled)
+  const seasonWetnessOverride = useUi((s) => s.seasonWetnessOverride)
   const ssaoEnabled = useUi((s) => s.ssaoEnabled)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
@@ -238,6 +239,23 @@ export function DebugMenu() {
         onChange={(v) => set('canoeSpeedup', Math.max(1, v))} />
       <NumberField label={t.debug.junglePenalty} value={balance.junglePenalty} step={0.1}
         onChange={(v) => set('junglePenalty', Math.max(1, v))} />
+      <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
+        onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
+      <label>
+        <span>{t.debug.season}</span>
+        <select
+          value={seasonWetnessOverride === null ? 'auto' : String(seasonWetnessOverride)}
+          onChange={(e) => {
+            const v = e.target.value
+            useUi.getState().setSeasonWetnessOverride(v === 'auto' ? null : Number(v))
+          }}
+        >
+          <option value="auto">{t.debug.seasonAuto}</option>
+          <option value="0">{t.debug.seasonDry}</option>
+          <option value="0.5">{t.debug.seasonMid}</option>
+          <option value="1">{t.debug.seasonWet}</option>
+        </select>
+      </label>
       <NumberField label={t.debug.mountainPenalty} value={balance.mountainPenalty} step={0.1}
         onChange={(v) => set('mountainPenalty', Math.max(1, v))} />
       <NumberField label={t.debug.oceanSwimMargin} value={balance.oceanSwimMarginDeg} step={0.1}

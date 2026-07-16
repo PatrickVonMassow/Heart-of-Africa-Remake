@@ -140,6 +140,41 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
   })
 })
 
+describe('DebugMenu season selector (design.md §19/§21, point 120c)', () => {
+  it('renders the localized selector, defaulting to the calendar', () => {
+    render(<DebugMenu />)
+    const row = screen.getByText(en.debug.season).closest('label')
+    const sel = row?.querySelector('select') as HTMLSelectElement | null
+    expect(sel).not.toBeNull()
+    expect(sel?.value).toBe('auto')
+    expect(useUi.getState().seasonWetnessOverride).toBeNull()
+  })
+
+  it('forcing the rainy season writes through to the UI store, and back to auto', () => {
+    render(<DebugMenu />)
+    const row = screen.getByText(en.debug.season).closest('label')
+    const sel = row?.querySelector('select') as HTMLSelectElement
+    fireEvent.change(sel, { target: { value: '1' } })
+    expect(useUi.getState().seasonWetnessOverride).toBe(1)
+    fireEvent.change(sel, { target: { value: '0' } })
+    expect(useUi.getState().seasonWetnessOverride).toBe(0)
+    fireEvent.change(sel, { target: { value: 'auto' } })
+    expect(useUi.getState().seasonWetnessOverride).toBeNull()
+  })
+
+  it('the weather-strength field edits the balance value, clamped to 0..1', () => {
+    render(<DebugMenu />)
+    const row = screen.getByText(en.debug.seasonStrength).closest('label')
+    const input = row?.querySelector('input[type="number"]') as HTMLInputElement
+    expect(Number(input.value)).toBe(1)
+    fireEvent.change(input, { target: { value: '0.4' } })
+    expect(balance.season.weatherStrength).toBeCloseTo(0.4)
+    fireEvent.change(input, { target: { value: '9' } })
+    expect(balance.season.weatherStrength).toBe(1)
+    balance.season.weatherStrength = 1
+  })
+})
+
 describe('DebugMenu TRAA toggle (design.md §2.7/§21)', () => {
   it('renders the localized TRAA checkbox, default on', () => {
     render(<DebugMenu />)

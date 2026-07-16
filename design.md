@@ -655,6 +655,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Days of provisions one purchased food unit grants (§9; four weeks by default).
 - Speed of the canteen's water consumption per travelled day, split into the land rate and the (faster) desert rate (§6), and the canteen's capacity — a full canteen lasts capacity ÷ consumption travelled days.
 - Natural wound-healing durations (§6): the days until a light wound closes on its own and until a severe wound eases to a light one.
+- Strength of the seasonal weather look (§19; 0 disables it, 1 full, default 1).
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
 
@@ -668,6 +669,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - Checkbox: temporal anti-aliasing (TRAA, §2.7), on by default; when off, anti-aliasing falls back to the render pass' multisampling.
 - Instant jump to any NAMED map point via a dropdown selector: ports, villages, mountains, waterfalls, lakes, the built cultural landmarks and the natural sites, plus the elephant graveyard and the tomb. The entries are grouped by category (in that order) and sorted alphabetically by their localized name within each group.
 - Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.
+- Season selector for testing (§19): the seasonal weather follows the calendar by default and can be forced to dry season, transition or rainy season.
 - Language selector for the game language (English/German; default English, §17).
 - Read-only display of the active render backend (WebGPU, or WebGL 2 after the fallback of §1).
 

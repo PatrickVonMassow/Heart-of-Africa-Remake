@@ -8,8 +8,11 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { float, max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { demElevation, demInlandWater } from '../../render/demElevation'
+import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
+import { effectiveWetness, RAIN_GRAY, seasonFogParams } from '../../systems/season'
+import { elevationAt } from '../../world/geodata'
 import type { RegionId } from '../../world/geo'
 
 interface FogPreset {
@@ -97,7 +100,10 @@ export function Climate() {
   }, [])
 
   const targetColor = useMemo(() => new THREE.Color(), [])
+  const rainColor = useMemo(() => new THREE.Color(), [])
   const hazeTarget = useMemo(() => new THREE.Color(), [])
+  /** This frame's effective season wetness, for the dev hook. */
+  const wetness = useRef(0)
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
@@ -109,6 +115,7 @@ export function Climate() {
         return f ? { near: f.near, far: f.far } : null
       },
       hazeOpacity: () => haze.opacityU.value as number,
+      seasonWetness: () => wetness.current,
     }
     return () => {
       delete w.__climate
@@ -129,12 +136,28 @@ export function Climate() {
     const clearView = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
     const hazeClear = Math.min(1, Math.max(0, (zoom - 1) / 0.25))
 
+    // Season (design.md §19, point 120): the wet season closes the sight lines
+    // and grays the light toward overcast — derived from the in-game date and
+    // the traveller's place (lat/lon/elevation), or forced by the debug
+    // selector. The zoomed-out debug view stays season-free like it stays
+    // haze-free: clearView already lerps the fog to the horizon regardless.
+    const lon = s.pos.x / 10
+    const lat = -s.pos.z / 10
+    const wet = effectiveWetness(
+      s.day, lat, lon, START_YEAR, elevationAt(lat, lon),
+      useUi.getState().seasonWetnessOverride,
+    )
+    wetness.current = wet
+    const fogSeason = seasonFogParams(wet, balance.season.weatherStrength)
+
     const fog = scene.fog as THREE.Fog | null
     if (fog) {
       targetColor.set(preset.color)
+      rainColor.set(RAIN_GRAY)
+      targetColor.lerp(rainColor, fogSeason.grayMix * (1 - clearView))
       fog.color.lerp(targetColor, k)
-      const nearT = preset.near + (6000 - preset.near) * clearView
-      const farT = preset.far + (12000 - preset.far) * clearView
+      const nearT = preset.near * fogSeason.rangeFactor + (6000 - preset.near * fogSeason.rangeFactor) * clearView
+      const farT = preset.far * fogSeason.rangeFactor + (12000 - preset.far * fogSeason.rangeFactor) * clearView
       fog.near += (nearT - fog.near) * k
       fog.far += (farT - fog.far) * k
       if (scene.background instanceof THREE.Color) scene.background.lerp(targetColor, k)

@@ -158,6 +158,46 @@ export function dayOfYear(day: number, startYear: number): number {
  * Interpolated smoothly across the month profile so a season arrives and fades
  * rather than switching on a month boundary.
  */
+/**
+ * Wetness the game should act on: the debug override when set (design.md §21 —
+ * the season selector is the testing tool), else the date-derived value.
+ */
+export function effectiveWetness(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+  override: number | null,
+): number {
+  if (override !== null) return Math.min(1, Math.max(0, override))
+  return wetnessAt(day, lat, lon, startYear, elevationM)
+}
+
+/**
+ * How the wet season reads in the travel atmosphere (design.md §19 seasons,
+ * point 120c): rain-heavy air shortens the sight lines and grays the fog
+ * toward an overcast tone. `strength` is the calibratable master factor
+ * (`balance.season.weatherStrength`); 0 disables the whole seasonal look.
+ * Pure, so the boundaries are testable: dry (wet=0) must return the identity.
+ */
+export function seasonFogParams(
+  wetness: number,
+  strength: number,
+): { rangeFactor: number; grayMix: number } {
+  const w = Math.min(1, Math.max(0, wetness)) * Math.min(1, Math.max(0, strength))
+  return {
+    // Sight lines close in as the rains stand over the land — at full wetness
+    // the fog planes pull in to ~60% of the dry-season preset.
+    rangeFactor: 1 - 0.4 * w,
+    // And the light grays: how far the fog/sky color mixes toward overcast.
+    grayMix: 0.55 * w,
+  }
+}
+
+/** The overcast tone seasonFogParams' grayMix mixes toward. */
+export const RAIN_GRAY = '#aeb6ba'
+
 export function wetnessAt(
   day: number,
   lat: number,

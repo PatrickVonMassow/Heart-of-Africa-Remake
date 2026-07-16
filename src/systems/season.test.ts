@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, dayOfYear, wetnessAt } from './season'
+import { climateZoneAt, dayOfYear, effectiveWetness, seasonFogParams, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -158,6 +158,44 @@ describe('wetnessAt (the findings that must survive any refactor)', () => {
         }
       }
     }
+  })
+})
+
+describe('effectiveWetness (the debug override is the testing tool, §21)', () => {
+  it('returns the derived value when no override is set', () => {
+    expect(effectiveWetness(on(8, 15), KANO.lat, KANO.lon, START_YEAR, 0, null)).toBe(
+      wet(8, KANO.lat, KANO.lon),
+    )
+  })
+
+  it('an override wins over the calendar, clamped to 0..1', () => {
+    expect(effectiveWetness(on(8, 15), KANO.lat, KANO.lon, START_YEAR, 0, 0)).toBe(0)
+    expect(effectiveWetness(on(1, 15), CAIRO.lat, CAIRO.lon, START_YEAR, 0, 1)).toBe(1)
+    expect(effectiveWetness(on(1, 15), CAIRO.lat, CAIRO.lon, START_YEAR, 0, 7)).toBe(1)
+    expect(effectiveWetness(on(1, 15), CAIRO.lat, CAIRO.lon, START_YEAR, 0, -3)).toBe(0)
+  })
+})
+
+describe('seasonFogParams (point 120c — the wet season closes the sight lines)', () => {
+  it('dry season is the identity: nothing changes', () => {
+    expect(seasonFogParams(0, 1)).toEqual({ rangeFactor: 1, grayMix: 0 })
+  })
+
+  it('strength 0 disables the whole seasonal look regardless of wetness', () => {
+    expect(seasonFogParams(1, 0)).toEqual({ rangeFactor: 1, grayMix: 0 })
+  })
+
+  it('full wet season pulls the fog in and grays the light', () => {
+    const p = seasonFogParams(1, 1)
+    expect(p.rangeFactor).toBeLessThan(1)
+    expect(p.rangeFactor).toBeGreaterThan(0.5) // never claustrophobic
+    expect(p.grayMix).toBeGreaterThan(0.3)
+    expect(p.grayMix).toBeLessThanOrEqual(1)
+  })
+
+  it('scales monotonically with wetness', () => {
+    expect(seasonFogParams(0.5, 1).rangeFactor).toBeGreaterThan(seasonFogParams(1, 1).rangeFactor)
+    expect(seasonFogParams(0.5, 1).grayMix).toBeLessThan(seasonFogParams(1, 1).grayMix)
   })
 })
 

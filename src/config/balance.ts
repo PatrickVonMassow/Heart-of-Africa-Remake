@@ -212,6 +212,10 @@ export interface BalanceConfig {
   }
   /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
    *  gameplay speeds and sensitivities are unchanged. */
+  season: {
+    /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
+    weatherStrength: number
+  }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
     stickRadius: number
@@ -370,6 +374,9 @@ export const balance: BalanceConfig = {
     landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
     vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement
     vicinityRadius: 75, // ≈ 1.5× the default-zoom view ring (VIEW_AT_ZOOM1·0.5)
+  },
+  season: {
+    weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection
