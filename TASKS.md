@@ -93,6 +93,12 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, eighth): 147 (verify the whole weather
+system — correct AND visible) goes directly after 144, on the user's
+instruction: by then every weather point that changes the PICTURE has landed
+(120, 137, 143, 144), so it is the sweep over what exists. Order: 137 -> 143 ->
+144 -> 147 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136 -> 122 -> 123 -> rest.
+
 Work order (user override, 2026-07-16, seventh): 146 (revenge) depends on 125's
 shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
@@ -4084,6 +4090,72 @@ the remaining open points in their numeric order.
   now the section's actual grammar), CLAUDE.md §7.1 pt. 12.
   DEPENDS ON 125 (its helper and its matrix). Build after it. One atomic commit
   on top. (Filed 16.07.2026.)
+
+- [ ] 147. Verify the whole weather system: correct AND visible.
+  Wanted (user, 16.07.2026): "Füge nach 144 einen Verifikations-Task ein, der
+  prüft, ob alles in Bezug auf Wetter (innerorts und außerorts, Pflanzen, Tiere,
+  Kleidung, Darstellung, usw.) zum einen korrekt und zum anderen sichtbar
+  umgesetzt wurde."
+  ORDER: after 144, i.e. once every weather point that changes the PICTURE has
+  landed (120, 137, 143, 144). 138-142 come later and get their own checks; this
+  point is the sweep over what exists by then.
+  ★★ WHY THIS POINT EXISTS, and it is the most important line in it: on
+  16.07.2026 the season shipped with a full green suite while the user, playing
+  it, saw **nothing but rain and brightness**. Three separate rounds of
+  "passing" verification hid three separate defects, and every one of them hid
+  for the SAME reason — the checks measured the machine, not the picture:
+  * the tests forced `wetness = 1` through the debug override, a state the real
+    climate never produces outside the Congo (every zone is capped at its own
+    peak), so they measured a world the game cannot reach;
+  * the live check read the tint UNIFORM, which swung 0.00 -> 0.95 and proved
+    nothing about the screen;
+  * when pixels were finally measured, the Sahel's ground green excess moved
+    41 -> 45 across its whole year: the rains were changing the scene's
+    BRIGHTNESS and never its hue.
+  **So the deliverable of this point is not "the tests pass". It is a
+  measurement of what reaches the screen, at real dates, with no override.**
+  THE TOOL EXISTS: `scripts/verify/_pixel-season-probe.mjs` (kept from that
+  session; measures mean screen RGB and the green excess for a spot in two
+  months). It is a diagnostic — this point is where it becomes a real check.
+  (a) CORRECT — the model against the research. Sweep every village and port
+      coordinate through `climateZoneAt` and assert each lands in a plausible
+      zone, not merely a non-crashing one. This class of bug bit TWICE in one
+      day and both times a coordinate silently fell through the lat/lon rules
+      into a fallback: the Fang village classified `sahara-north` (0.000 wetness
+      in July, in rainforest), and the Somali village would have been given the
+      Congo's rains. **A per-place zone assertion would have caught both. Write
+      it.**
+  (b) VISIBLE, outdoors — the pixel probe, made permanent and swept: for each
+      climate zone that HAS a season, a spot's driest and wettest month must
+      differ on screen by a stated margin; and the zones that have none (the
+      basin, the desert) must NOT differ. The negative cases matter as much —
+      the Congo's measured delta is ~9, i.e. nothing, and that is correct.
+  (c) VISIBLE, indoors — the same, inside a settlement: rain present in the wet
+      month and absent in the dry, the ground/flora tint differing, the sun and
+      sky dimming (already checked at the uniform level in `polish.mjs` — add
+      the pixel measurement beside it), and Cairo bone dry in every month.
+  (d) PLANTS — 144's cover/condition change, measured as a SILHOUETTE difference
+      rather than a colour one (that is 144's whole premise: hue could not carry
+      it).
+  (e) ANIMALS — the dry-season shore catchment (120e) gathers them at the
+      remaining water; already checked, keep it and fold it into the sweep.
+  (f) DRESS — each of the six dressed peoples (zulu, tuareg, hausa, san, wayeyi,
+      somali) shows its change in its own month at its own village, and the
+      other fifteen never do in any month. The pure tests exist
+      (`src/systems/dress.test.ts`); this is the LIVE half — `__placeDress` is
+      the hook, and the rank-gated two (tuareg, hausa) must show it on some
+      figures and not others.
+  (g) THE HONEST REPORT — the point is not done when the checks are green. It is
+      done when a screenshot pair per zone/season is in `verification/` and a
+      human can SEE the difference. If a check passes and the screenshots look
+      identical, the check is wrong: say so and fix the game, in the direction
+      design.md §19.13's exaggeration licence allows.
+  TESTS: this point IS tests — but the standard is (g). Live in
+  `scripts/verify/enrichments.mjs` (outdoors) and `polish.mjs` (indoors, whose
+  §19.13 block is LAST in the file on purpose — see the comment there). Pure
+  additions where they belong. DOCS: CLAUDE.md §7.1 pt. 12's season bullet gains
+  the pixel standard; design.md needs nothing new.
+  (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
