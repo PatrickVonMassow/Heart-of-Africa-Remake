@@ -3785,6 +3785,40 @@ the remaining open points in their numeric order.
   its driest and wettest month, asserting a real on-screen difference, because
   every uniform-level check so far passed while the player saw nothing. Add the
   Congo as the negative case: it must NOT swing.
+  ★★ THE EXAGGERATION LICENCE (user, 16.07.2026) — read this before calibrating
+  anything: "Das ganze wird ja abstrakt stilistisch angezeigt und muss daher
+  nicht dezent realistisch aussehen. Die unterschiedlichen Klimazustände können
+  ruhig ein Bisschen kitschig übertrieben dargestellt werden, damit man sie gut
+  erkennen kann." Recorded in design.md §19.13 as the second deliberate carve-out
+  from the accuracy principle (alongside the §19.8 grief). It licenses the
+  DEPICTION, not the facts: state a real season loudly, never invent one. The
+  Congo still gets no dry season and the Sahara still never greens.
+  THE LEVERS, in measured order of effect — the first is the one the pixel probe
+  points at, and it is nearly free:
+  1. ★ **Apply the tint AFTER the albedo multiply, not before.** The terrain does
+     `seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6))`, so the hue is
+     multiplied back toward the baked texture's own colour — this is the measured
+     reason the ground barely shifts. Tinting the COMPOSED colour instead gives
+     the season authority over the final pixel. One line; try it first and
+     re-run the pixel probe before building anything else.
+  2. ★ **Bare branches.** The strongest silhouette signal available: a savanna
+     tree that drops its leaves in the dry season and carries a full crown in the
+     rains is unmistakable at any zoom, and it is real — Dybowski's burnt trees
+     are "mere skeletons; others… carrying tufts of leaves… where the buds had
+     not been destroyed". Anchor: `src/render/flora.ts` (`buildAcacia` etc.).
+  3. **Grass/scatter density.** Tufts short and sparse in the dry season, tall and
+     dense in the rains — see the determinism warning above.
+  4. **Push the straw and lush constants far apart.** They are currently
+     `luma*(1.9, 1.55, 0.6)` and `luma*(0.5, 1.25, 0.45)`. Under the licence,
+     bleached near-white straw against a saturated deep green is allowed and
+     wanted.
+  5. **Wet ground darkens, and holds water.** Rain-soaked earth reading darker,
+     with standing puddles in the wettest weeks, is both accurate and loud.
+  6. **The burnt land** (Banda, Jan-Mar, `docs/peoples-1890.md` §7.4): blackened
+     ground and skeletal trees after the annual firing. Period-sourced at the
+     game's own latitude, and the most dramatic state in the whole system.
+  7. The dust haze belongs to point 140 (harmattan) — do not build a second one
+     here.
   DOCS: design.md §19.13 and §19.9 (the dressing), CLAUDE.md §7.1 pt. 12.
   ORDER: after 143 (which finishes what 120 claimed), before the 138-142
   additions. (Filed 16.07.2026.)
