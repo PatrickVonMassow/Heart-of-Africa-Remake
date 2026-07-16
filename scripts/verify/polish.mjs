@@ -252,6 +252,56 @@ if (mosque) {
   console.log('shot 97-timbuktu-djinguereber.png')
 }
 
+// --- The season inside a settlement (design.md §19.13, point 120g) ------------
+// The travel scene's Climate component does not run here, so the settlement
+// derives the weather from its OWN coordinates. Overcast must dim the sun AND
+// gray the dome: a dimmed sun under a bright blue sky reads as a bug. The
+// §19.10 fire is a fixed point light, so its glow carries further for it.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
+  await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
+
+  const read = () => page.evaluate(() => window.__placeSeason())
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+  await page.waitForTimeout(2500) // the lights lerp toward the target
+  const dry = await read()
+  await page.screenshot({ path: `${OUT}110-village-season-dry.png` })
+  console.log('shot 110-village-season-dry.png')
+
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+  await page.waitForTimeout(2500)
+  const wet = await read()
+  await page.screenshot({ path: `${OUT}111-village-season-wet.png` })
+  console.log('shot 111-village-season-wet.png')
+
+  check(
+    'the dry-season settlement stands under the clear preset sky',
+    dry.sky.grayMix === 0 && dry.sky.cloudBoost === 0,
+    JSON.stringify(dry.sky),
+  )
+  check(
+    'the rains dim the settlement sun and sky light',
+    wet.sun < dry.sun - 0.5 && wet.hemi < dry.hemi,
+    JSON.stringify({ dry: { sun: dry.sun, hemi: dry.hemi }, wet: { sun: wet.sun, hemi: wet.hemi } }),
+  )
+  check(
+    'the rains gray the settlement dome and thicken its cloud deck',
+    wet.sky.grayMix > 0.5 && wet.sky.cloudBoost > 0.5,
+    JSON.stringify(wet.sky),
+  )
+  check(
+    'the fire glow carries further under the overcast sun (§19.10)',
+    14 / wet.sun > 14 / dry.sun,
+    `fire-to-sun ratio dry ${(14 / dry.sun).toFixed(2)} -> wet ${(14 / wet.sun).toFixed(2)}`,
+  )
+  // Leave no forced weather behind for the checks below.
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+}
+
 // --- Travel panorama capture (design.md §2.5, point 81) -----------------------
 // Entering from the travel scene captures the REAL surroundings as the
 // first-person horizon: at the riverside Nubian village the Nile must show in

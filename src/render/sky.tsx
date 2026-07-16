@@ -20,6 +20,8 @@ import {
   time,
   vec3,
 } from 'three/tsl'
+import { RAIN_GRAY } from '../systems/season'
+import { OVERCAST_CLOUDS_U, OVERCAST_GRAY_U } from './skyOvercast'
 import type { SkyPreset } from './skyPresets'
 
 /**
@@ -79,18 +81,30 @@ export function SkyDome({
     const halo = pow(s, float(6)).mul(0.22)
     col = col.add(color(preset.sun).mul(disc.add(halo)))
 
-    // Slow drifting cloud bank, faded out toward the horizon.
-    if (preset.clouds > 0) {
+    // Slow drifting cloud bank, faded out toward the horizon. Built for every
+    // preset so the wet season can grow a deck over a clear-sky region too;
+    // the presence factor keeps a cloudless preset cloudless while it is dry.
+    {
+      const effClouds = float(preset.clouds).add(OVERCAST_CLOUDS_U).clamp(0, 1)
+      const presence = effClouds.mul(4).clamp(0, 1)
       const cuv = dir.xz.div(y.abs().add(0.22)).mul(0.9)
       // Remap the signed MaterialX noise to [0, 1] before thresholding.
       const n = mx_fractal_noise_float(vec3(cuv.x.add(time.mul(0.006)), cuv.y, 3.7), 4)
         .mul(0.5)
         .add(0.5)
-      const cover = smoothstep(float(0.62 - preset.clouds * 0.22), float(0.85), n)
+      const cover = smoothstep(float(0.62).sub(effClouds.mul(0.22)), float(0.85), n)
         .mul(smoothstep(float(0.02), float(0.18), y))
-      const cloudCol = mix(color('#f6f9fc'), color('#c8d2da'), n)
+        .mul(presence)
+      // Rain clouds are the darker, heavier end of the same deck.
+      const cloudCol = mix(color('#f6f9fc'), color('#c8d2da'), n).mul(
+        float(1).sub(OVERCAST_CLOUDS_U.mul(0.35)),
+      )
       col = mix(col, cloudCol, cover.mul(0.9))
     }
+
+    // Overcast (§19.13): the whole dome, sun disc included, washes toward the
+    // rain tone — a dimmed sun under a bright blue sky would read as a bug.
+    col = mix(col, color(RAIN_GRAY).mul(0.62), OVERCAST_GRAY_U)
 
     m.colorNode = col
     return m

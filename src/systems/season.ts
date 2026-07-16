@@ -269,6 +269,20 @@ export function rainAmount(wetness: number, strength: number): number {
 }
 
 /**
+ * How the wet season reads on the sky dome: the blue grays toward RAIN_GRAY
+ * and the cloud deck thickens. Separate from seasonFogParams because the dome
+ * carries the weather further than the fog does — a dimmed sun under a bright
+ * blue sky reads as a bug, not as rain. Pure for the same reason.
+ */
+export function skyOvercastParams(
+  wetness: number,
+  strength: number,
+): { grayMix: number; cloudBoost: number } {
+  const w = Math.min(1, Math.max(0, wetness)) * Math.min(1, Math.max(0, strength))
+  return { grayMix: 0.75 * w, cloudBoost: 0.8 * w }
+}
+
+/**
  * How far the wet season dims the sun (multiplier on the light intensity).
  * Overcast, not night: at full rain the light drops to ~60%.
  */

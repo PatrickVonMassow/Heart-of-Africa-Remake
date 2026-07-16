@@ -11,7 +11,15 @@ import { demElevation, demInlandWater } from '../../render/demElevation'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { CURRENT_WEATHER, effectiveWetness, RAIN_GRAY, rainAmount, seasonFogParams } from '../../systems/season'
+import { setSkyOvercast } from '../../render/skyOvercast'
+import {
+  CURRENT_WEATHER,
+  effectiveWetness,
+  RAIN_GRAY,
+  rainAmount,
+  seasonFogParams,
+  skyOvercastParams,
+} from '../../systems/season'
 import { elevationAt } from '../../world/geodata'
 import type { RegionId } from '../../world/geo'
 
@@ -194,6 +202,11 @@ export function Climate() {
     wetness.current = wet
     CURRENT_WEATHER.wetness = wet
     const fogSeason = seasonFogParams(wet, balance.season.weatherStrength)
+
+    // The dome grays with the fog, and stays season-free in the debug zoom for
+    // the same reason the haze does.
+    const sky = skyOvercastParams(wet, balance.season.weatherStrength)
+    setSkyOvercast(sky.grayMix * (1 - clearView), sky.cloudBoost * (1 - clearView))
 
     // Rain follows the traveller and fades out in the debug zoom, like the
     // haze: a zoomed-out map view full of streaks would read as noise.

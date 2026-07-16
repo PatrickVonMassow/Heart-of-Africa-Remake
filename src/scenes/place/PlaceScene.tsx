@@ -25,7 +25,9 @@ import {
 } from 'three/tsl'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { balance } from '../../config/balance'
+import { balance, START_YEAR } from '../../config/balance'
+import { effectiveWetness, RAIN_GRAY, skyOvercastParams, sunDimFactor } from '../../systems/season'
+import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import {
@@ -40,6 +42,7 @@ import {
 import { mulberry32 } from '../../world/noise'
 import { consumeTouchLook, gamepadLook, gamepadMove, isKeyDown, onKeyPress, touchMove } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
+import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial, detailFade, proceduralBump } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
@@ -77,6 +80,14 @@ const DOOR_RELEASE_RADIUS = 2.0
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
+
+// Dry-season baseline of the settlement lighting; the season dims from here
+// (design.md §19.13, point 120g).
+const PLACE_SUN_INTENSITY = 2.4
+const PLACE_HEMI_INTENSITY = 0.8
+// Frame scratch for the seasonal fog tint (no per-frame allocation).
+const placeFogColor = new THREE.Color()
+const placeRainColor = new THREE.Color(RAIN_GRAY)
 
 /** Display label of an interactive in the current language. */
 function interactiveLabel(strings: ReturnType<typeof getStrings>, type: Interactive['type']): string {
@@ -1404,6 +1415,9 @@ export function PlaceScene() {
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
   // The touch quality preset (point 84) halves the shadow-map resolution.
   const sunRef = useRef<THREE.DirectionalLight>(null)
+  const hemiRef = useRef<THREE.HemisphereLight>(null)
+  /** This frame's season wetness at the settlement, for the dev hook. */
+  const placeWetness = useRef(0)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
   const shadowSize = shadowMapHalf ? 1024 : 2048
@@ -1438,7 +1452,14 @@ export function PlaceScene() {
     w.__placeLayout = layout
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
+    w.__placeSeason = () => ({
+      wetness: placeWetness.current,
+      sun: sunRef.current?.intensity ?? 0,
+      hemi: hemiRef.current?.intensity ?? 0,
+      sky: skyOvercast(),
+    })
     return () => {
+      delete w.__placeSeason
       delete w.__placePlayer
       delete w.__placeLayout
       delete w.__placeColliders
@@ -1531,12 +1552,45 @@ export function PlaceScene() {
     }
   }, [setPrompt])
 
-  useFrame(({ clock }, rawDt) => {
+  useFrame(({ clock, scene }, rawDt) => {
     if (!layout) return
     const dt = Math.min(rawDt, 0.1)
     const p = player.current
     const w = walk.current
     const wf = balance.walkFeel
+
+    // Season inside the settlement (design.md §19.13, point 120g). The wetness
+    // is computed from THIS place's own coordinates, not carried in from the
+    // travel scene: the travel Climate component does not run here, so its
+    // CURRENT_WEATHER would be a stale reading of wherever the traveller last
+    // stood. Overcast dims the sun and the sky light — and the §19.10 fire glow
+    // is a fixed point light, so it carries visibly further for it.
+    if (place) {
+      const wet = effectiveWetness(
+        useGame.getState().day, place.lat, place.lon, START_YEAR,
+        elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,
+      )
+      placeWetness.current = wet
+      const dim = sunDimFactor(wet, balance.season.weatherStrength)
+      const sky = skyOvercastParams(wet, balance.season.weatherStrength)
+      setSkyOvercast(sky.grayMix, sky.cloudBoost)
+      const k = Math.min(1, dt * 0.8)
+      // The fog carries the overcast onto the §2.5 backdrop, which is otherwise
+      // lit by the preset alone and would stay sunny behind a rained-out village.
+      const fog = scene.fog as THREE.Fog | null
+      if (fog) {
+        placeFogColor.set(isPort ? PORT_SKY.horizon : VILLAGE_SKY.horizon)
+        placeFogColor.lerp(placeRainColor, sky.grayMix)
+        fog.color.lerp(placeFogColor, k)
+        if (scene.background instanceof THREE.Color) scene.background.lerp(placeFogColor, k)
+      }
+      if (sunRef.current) {
+        sunRef.current.intensity += (PLACE_SUN_INTENSITY * dim - sunRef.current.intensity) * k
+      }
+      if (hemiRef.current) {
+        hemiRef.current.intensity += (PLACE_HEMI_INTENSITY * dim - hemiRef.current.intensity) * k
+      }
+    }
 
     // Target body-relative velocity from the input (0 while no input / modal).
     let tf = 0
@@ -1695,7 +1749,7 @@ export function PlaceScene() {
       <color attach="background" args={[sky.horizon]} />
       <fog attach="fog" args={[sky.horizon, 42, 320]} />
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
-      <hemisphereLight args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', 0.8]} />
+      <hemisphereLight ref={hemiRef} args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />
       <directionalLight
         // Remount the light when shadows toggle so the shadow map is rebuilt from
         // scratch: flipping castShadow in place left the WebGPU shadow pipeline in
@@ -1705,7 +1759,7 @@ export function PlaceScene() {
         ref={sunRef}
         position={[SUN_DIR[0] * 60, SUN_DIR[1] * 60, SUN_DIR[2] * 60]}
         color="#fff1d8"
-        intensity={2.4}
+        intensity={PLACE_SUN_INTENSITY}
         castShadow={shadowsEnabled}
         shadow-mapSize={[shadowSize, shadowSize]}
         shadow-camera-left={-55}

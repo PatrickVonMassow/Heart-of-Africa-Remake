@@ -521,10 +521,28 @@ verify suite that proves it.
       merely drinking.
     - Graveyard: the carcass/tusk/bone counts are asserted via the dev
       hook with a screenshot.
+    - Seasons and weather (§19.13): the wetness model is pure-tested
+      against the researched ~1890 climate (`docs/climate-1890.md`) —
+      Cairo rainless year round, no Sahara rain, the Sahel wet inside the
+      1870-1895 humid period, East Africa bimodal, the Cape opposite the
+      plateau, and the Ethiopian highlands keyed on ELEVATION rather than
+      a lat/lon box (the below-sea-level Danakil is not highland) — as
+      are the display curves (fog, rain, sun dim, sky overcast) and the
+      §21.1 month/year jumps with their 1890-1895 clamp
+      (`src/systems/season.test.ts`). Live: in the bird's-eye view the
+      rains close the fog, dim the sun and rain visibly while the debug
+      zoom stays season-free, the flora/ground bleach to straw and deepen
+      to green, and the dry season's wider shore catchment gathers the
+      animals at the remaining water (`scripts/verify/enrichments.mjs`);
+      inside a settlement the season is derived from the PLACE's own
+      coordinates and dims the sun and sky light while graying the dome
+      and thickening its cloud deck, so the §19.10 firelight carries
+      further under the overcast (`scripts/verify/polish.mjs`,
+      screenshots 110/111).
 
     OPEN: tree-climbing-to-flee and additional new species/birds beyond
     the existing roster and the added calves remain to be implemented (§9
-    open items).
+    open items); the inhabitants' season-appropriate dress (§19.13).
 13. **Real geodata.** The real-geodata terrain rendering of `design.md`
     §3.3 is implemented (DEM relief, ~1890 vector coasts/rivers/lakes
     without raster steps, biome-based PBR splatting, domain-warped

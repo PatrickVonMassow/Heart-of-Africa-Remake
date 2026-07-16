@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, dayOfMonthJump, dayOfYear, effectiveWetness, rainAmount, seasonFogParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, dayOfMonthJump, dayOfYear, effectiveWetness, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -217,6 +217,31 @@ describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () 
     expect(sunDimFactor(1, 0)).toBe(1)
     expect(sunDimFactor(1, 1)).toBeLessThan(1)
     expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
+  })
+})
+
+describe('skyOvercastParams (point 120g — the sky carries the weather)', () => {
+  it('dry weather and strength 0 leave the preset sky untouched', () => {
+    expect(skyOvercastParams(0, 1)).toEqual({ grayMix: 0, cloudBoost: 0 })
+    expect(skyOvercastParams(1, 0)).toEqual({ grayMix: 0, cloudBoost: 0 })
+  })
+
+  it('rain grays the dome and thickens the deck, both rising with the wetness', () => {
+    const half = skyOvercastParams(0.5, 1)
+    const full = skyOvercastParams(1, 1)
+    expect(half.grayMix).toBeGreaterThan(0)
+    expect(full.grayMix).toBeGreaterThan(half.grayMix)
+    expect(full.cloudBoost).toBeGreaterThan(half.cloudBoost)
+  })
+
+  it('grays the dome further than the fog, so a dimmed sun never stands under a blue sky', () => {
+    expect(skyOvercastParams(1, 1).grayMix).toBeGreaterThan(seasonFogParams(1, 1).grayMix)
+  })
+
+  it('stays within the mix range at full rain — an overcast sky, not a black one', () => {
+    const full = skyOvercastParams(1, 1)
+    expect(full.grayMix).toBeLessThanOrEqual(1)
+    expect(full.cloudBoost).toBeLessThanOrEqual(1)
   })
 })
 
