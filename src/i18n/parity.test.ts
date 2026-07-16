@@ -103,10 +103,10 @@ describe('registry coverage (every source id has a text in both languages)', () 
 // object). Values are ids/numbers the templates interpolate; correctness of the
 // rendered prose is out of scope here — only that both languages render text.
 const bag: Record<string, string | number> = {
-  region: 'north', place: 'cairo', people: 'masai', gift: 'gold', treasure: 'gold',
+  region: 'north', place: 'cairo', people: 'maasai', gift: 'gold', treasure: 'gold',
   material: 'gold', amount: 1, count: 1, days: 1, money: 1, from: 'cairo', to: 'zanzibar',
   lat: 25, lon: 30, result: 'light', animal: 'lions', word: 'Oz Oz', villages: '',
-  landmarks: 'kilimanjaro', people2: 'masai', direction: 'north', weeks: '2',
+  landmarks: 'kilimanjaro', people2: 'maasai', direction: 'north', weeks: '2',
   cause: 'wounds', percent: 50, region2: 'east',
 }
 

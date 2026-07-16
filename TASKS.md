@@ -3013,7 +3013,13 @@ as-is; only the sequence changes.
   the open item to the species still missing). Split into atomic commits along
   (a)…(e) if it grows. (Reported 15.07.2026.)
 
-- [ ] 131. Name the peoples correctly, and de-anachronise their vignettes.
+- [x] 131. Name the peoples correctly, and de-anachronise their vignettes.
+  (Done 16.07.2026 for every people that stays put — display names, internal ids,
+  village ids, region styles, tests, verify scripts and the design.md rosters.
+  The Maasai vignette wears ochred hide per Thomson instead of red cloth; the
+  San vignette keeps its detail but drops the timeless-isolate framing. The
+  bombara/batwa renames ride with their PLACE changes in point 132, so a
+  village never carries the wrong vignette in between.)
   Decided under the user's accuracy principle (15.07.2026): "make it as accurate
   as possible unless it balloons into extreme effort, collides with the game
   concept, or merely annoys instead of contributing to authentic atmosphere."

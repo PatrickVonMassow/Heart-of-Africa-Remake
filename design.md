@@ -115,7 +115,7 @@ The size of a settlement in the game mirrors its real importance at the end of t
 
 ### 4.2 Peoples (22)
 Carriers of the hints and of regional trade. Region assignment see §4.5.
-Masai, Bantu, Zulu, Bushmen, Batwa, Lunda, Pygmies, Swahili, Somali, Hausa, Mongo, Sidamo, Banda, Nubians, Tuareg, Berbers, Bombara, Mandingo, Bemba, Bambundu, Uganda, Fang.
+Maasai, Pedi, Zulu, San, Batwa, Lunda, Mbuti, Swahili, Somali, Hausa, Mongo, Sidama, Banda, Nubians, Tuareg, Berbers, Bombara, Mandinka, Bemba, Bambundu, Baganda, Fang.
 
 Each people's village sits at its ~1890 heartland, and every village keeps a small minimum clearance to river water: its footprint never reaches into a river, so a canoe passage carries the traveller past a riverside village instead of into its huts. Ports are exempt — they sit on coasts and river banks by design.
 
@@ -134,10 +134,10 @@ Two further landmarks live in their port's first-person scene rather than on the
 | Region | Landscape | Peoples |
 |---|---|---|
 | North | Desert/Sahara | Tuareg, Berbers, Nubians, Bombara |
-| West | Savanna | Hausa, Mandingo, Fang |
-| Central | Jungle/Congo basin | Mongo, Pygmies, Banda, Bambundu, Lunda |
-| East | Mountains/lakes/rift | Masai, Swahili, Somali, Sidamo, Uganda |
-| South | High plateau | Batwa, Bemba, Bantu, Zulu, Bushmen |
+| West | Savanna | Hausa, Mandinka, Fang |
+| Central | Jungle/Congo basin | Mongo, Mbuti, Banda, Bambundu, Lunda |
+| East | Mountains/lakes/rift | Maasai, Swahili, Somali, Sidama, Baganda |
+| South | High plateau | Batwa, Bemba, Pedi, Zulu, San |
 
 **Village organising principles (~1890, researched).** Small native villages
 read noticeably differently from the ports: they follow the spatial pattern
@@ -147,10 +147,10 @@ seven researched plans:
 
 | Plan | Historical pattern | Peoples |
 |---|---|---|
-| `ring` | Central Cattle Pattern / Maasai enkang: huts on a ring around the central cattle enclosure inside a perimeter fence; thorn rings carry extra gates (one per family head), the chief's great hut sits opposite the south gate | Zulu, Bantu, Bemba, Masai, Somali |
+| `ring` | Central Cattle Pattern / Maasai enkang: huts on a ring around the central cattle enclosure inside a perimeter fence; thorn rings carry extra gates (one per family head), the chief's great hut sits opposite the south gate | Zulu, Pedi, Bemba, Maasai, Somali |
 | `street` | Congo-basin street village (documented pre-colonially, e.g. Schweinfurth 1870): ONE cleared, swept axis with two facing house rows and a palaver shelter at its edge | Mongo, Banda, Bambundu, Lunda, Fang |
-| `compound` | Sahel compound architecture (Hausa *gida*): walled family enclosures around a central meeting ground, granaries inside, lanes to each compound entrance | Hausa, Mandingo, Bombara, Sidamo, Uganda |
-| `scatter` | Dispersed camp: loose family groups of tents or small huts with irregular spacing, no lanes, no shared fence; Tuareg camps add a thornbrush goat pen | Tuareg, Pygmies, Batwa, Bushmen |
+| `compound` | Sahel compound architecture (Hausa *gida*): walled family enclosures around a central meeting ground, granaries inside, lanes to each compound entrance | Hausa, Mandinka, Bombara, Sidama, Baganda |
+| `scatter` | Dispersed camp: loose family groups of tents or small huts with irregular spacing, no lanes, no shared fence; Tuareg camps add a thornbrush goat pen | Tuareg, Mbuti, Batwa, San |
 | `ksar` | Fortified North-African block: small flat-roofed houses packed on narrow winding lanes inside a stone perimeter wall with one south gate; the communal agadir tower rises near the centre | Berbers |
 | `riverstrip` | Nile fellah strip: flat-roofed houses banding one river-parallel lane just above the flood line, a short cross alley to the common ground | Nubians |
 | `coastrow` | Swahili rural mji: rectangular gable houses in a double row along one sandy shore path under palms | Swahili |
@@ -454,7 +454,7 @@ A dead character can write no more journal entries. Instead of an entry, a repor
 
 Events (animal and robber attacks, chiefs' hints, status changes and the like, §14) are not staged as separate scenes. The player learns of them because the journal opens automatically and a new entry appears.
 
-The entries read like the moment they record: the first visit to a village is told through that people's own ~1890 way of life — every village carries its own historically grounded vignette (the indigo-veiled Tuareg, the Hausa dye pits, the Masai cattle ring, the Swahili coral-stone lanes …), never a shared boilerplate.
+The entries read like the moment they record: the first visit to a village is told through that people's own ~1890 way of life — every village carries its own historically grounded vignette (the indigo-veiled Tuareg, the Hausa dye pits, the Maasai cattle ring, the Swahili coral-stone lanes …), never a shared boilerplate.
 
 ### 16.1 Non-modal journal
 

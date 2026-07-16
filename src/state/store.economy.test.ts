@@ -148,9 +148,9 @@ describe('discovery bounties (design.md §10)', () => {
     expect(g().landmarksSeen).toContain('kilimanjaro')
     expect(g().pendingBounties.some((b) => b.kind === 'landmark' && b.id === 'kilimanjaro')).toBe(true)
 
-    g().enterPlace('masai-village') // first-visit village (East) → village bounty
+    g().enterPlace('maasai-village') // first-visit village (East) → village bounty
     const pending = g().pendingBounties
-    expect(pending.some((b) => b.kind === 'village' && b.id === 'masai-village')).toBe(true)
+    expect(pending.some((b) => b.kind === 'village' && b.id === 'maasai-village')).toBe(true)
 
     const e = balance.economy
     const expected = pending.reduce((sum, b) => sum + (b.kind === 'village' ? e.bountyVillage : e.bountyLandmark), 0)
@@ -166,7 +166,7 @@ describe('discovery bounties (design.md §10)', () => {
     const bountyEntry = [...g().journal].reverse().find((x) => x.text.key === 'journal.bounty')
     const params = bountyEntry?.text.params
     expect(String(params?.landmarks ?? '')).toContain('kilimanjaro')
-    expect(String(params?.villages ?? '')).toContain('masai-village')
+    expect(String(params?.villages ?? '')).toContain('maasai-village')
   })
 })
 

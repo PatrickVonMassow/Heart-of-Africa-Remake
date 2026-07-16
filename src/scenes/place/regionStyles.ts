@@ -46,26 +46,26 @@ export const VILLAGE_PLANS: Record<string, VillagePlanKind> = {
   bombara: 'compound',
   // West: compound architecture (Hausa gida, Mande lu); Fang street village.
   hausa: 'compound',
-  mandingo: 'compound',
+  mandinka: 'compound',
   fang: 'street',
   // Central: the cleared street village of the Congo basin; Twa forest camps.
   mongo: 'street',
-  pygmies: 'scatter',
+  mbuti: 'scatter',
   banda: 'street',
   bambundu: 'street',
   lunda: 'street',
   // East: enkang thorn rings, Swahili coast row, highland/lakes compounds.
-  masai: 'ring',
+  maasai: 'ring',
   somali: 'ring',
   swahili: 'coastrow',
-  sidamo: 'compound',
-  uganda: 'compound',
+  sidama: 'compound',
+  baganda: 'compound',
   // South: the Central Cattle Pattern; San camps.
   zulu: 'ring',
-  bantu: 'ring',
+  pedi: 'ring',
   bemba: 'ring',
   batwa: 'scatter',
-  bushmen: 'scatter',
+  san: 'scatter',
 }
 
 export interface RegionPlaceStyle {

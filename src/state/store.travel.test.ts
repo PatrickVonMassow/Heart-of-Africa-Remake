@@ -205,12 +205,12 @@ describe('landmark discovery bounty (design.md §10)', () => {
 
 describe('village first visit (design.md §16)', () => {
   it('journals the people-specific vignette with the people param', () => {
-    g().enterPlace('masai-village')
+    g().enterPlace('maasai-village')
     const entry = g().journal.find(
       (e) => typeof e.text === 'object' && e.text.key === 'journal.villageFirstVisit',
     )
     expect(entry).toBeTruthy()
-    expect(entry && typeof entry.text === 'object' && entry.text.params?.people).toBe('masai')
+    expect(entry && typeof entry.text === 'object' && entry.text.params?.people).toBe('maasai')
   })
 })
 
@@ -280,7 +280,7 @@ describe('debugJumpTo (design.md §21)', () => {
 
 describe('enterPlace region (design.md §4.5)', () => {
   it("adopts the place's declared region, overriding the current position's", () => {
-    const place = placeById('masai-village') // declared region: east
+    const place = placeById('maasai-village') // declared region: east
     // Enter from a different region (central Sahara → north) to prove the
     // region comes from the place, not from the position it is entered from.
     g().debugJumpTo(...COORD.desert)

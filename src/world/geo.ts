@@ -194,26 +194,26 @@ export const VILLAGE_HEARTLANDS: PlaceDef[] = [
   { id: 'bombara-village', kind: 'village', peopleId: 'bombara', lat: 17.2, lon: -3.5, region: 'north' },
   // West — Hausa, Mandingo, Fang
   { id: 'hausa-village', kind: 'village', peopleId: 'hausa', lat: 12.0, lon: 8.5, region: 'west' },
-  { id: 'mandingo-village', kind: 'village', peopleId: 'mandingo', lat: 11.5, lon: -9.0, region: 'west' },
+  { id: 'mandinka-village', kind: 'village', peopleId: 'mandinka', lat: 11.5, lon: -9.0, region: 'west' },
   { id: 'fang-village', kind: 'village', peopleId: 'fang', lat: 1.8, lon: 11.5, region: 'west' },
   // Central — Mongo, Pygmies, Banda, Bambundu, Lunda
   { id: 'mongo-village', kind: 'village', peopleId: 'mongo', lat: -1.5, lon: 21.0, region: 'central' },
-  { id: 'pygmy-village', kind: 'village', peopleId: 'pygmies', lat: 1.4, lon: 28.6, region: 'central' },
+  { id: 'mbuti-village', kind: 'village', peopleId: 'mbuti', lat: 1.4, lon: 28.6, region: 'central' },
   { id: 'banda-village', kind: 'village', peopleId: 'banda', lat: 6.0, lon: 21.5, region: 'central' },
   { id: 'bambundu-village', kind: 'village', peopleId: 'bambundu', lat: -9.3, lon: 15.3, region: 'central' },
   { id: 'lunda-village', kind: 'village', peopleId: 'lunda', lat: -10.0, lon: 23.4, region: 'central' },
   // East — Masai, Swahili, Somali, Sidamo, Uganda
-  { id: 'masai-village', kind: 'village', peopleId: 'masai', lat: -2.5, lon: 36.8, region: 'east' },
+  { id: 'maasai-village', kind: 'village', peopleId: 'maasai', lat: -2.5, lon: 36.8, region: 'east' },
   { id: 'swahili-village', kind: 'village', peopleId: 'swahili', lat: -6.5, lon: 38.7, region: 'east' },
   { id: 'somali-village', kind: 'village', peopleId: 'somali', lat: 5.5, lon: 45.0, region: 'east' },
-  { id: 'sidamo-village', kind: 'village', peopleId: 'sidamo', lat: 6.7, lon: 38.4, region: 'east' },
-  { id: 'uganda-village', kind: 'village', peopleId: 'uganda', lat: 0.75, lon: 32.55, region: 'east' },
+  { id: 'sidama-village', kind: 'village', peopleId: 'sidama', lat: 6.7, lon: 38.4, region: 'east' },
+  { id: 'baganda-village', kind: 'village', peopleId: 'baganda', lat: 0.75, lon: 32.55, region: 'east' },
   // South — Batwa, Bemba, Bantu, Zulu, Bushmen
   { id: 'batwa-village', kind: 'village', peopleId: 'batwa', lat: -19.0, lon: 22.5, region: 'south' },
   { id: 'bemba-village', kind: 'village', peopleId: 'bemba', lat: -12.5, lon: 31.0, region: 'south' },
-  { id: 'bantu-village', kind: 'village', peopleId: 'bantu', lat: -24.5, lon: 29.5, region: 'south' },
+  { id: 'pedi-village', kind: 'village', peopleId: 'pedi', lat: -24.5, lon: 29.5, region: 'south' },
   { id: 'zulu-village', kind: 'village', peopleId: 'zulu', lat: -28.4, lon: 31.3, region: 'south' },
-  { id: 'bushmen-village', kind: 'village', peopleId: 'bushmen', lat: -22.5, lon: 21.0, region: 'south' },
+  { id: 'san-village', kind: 'village', peopleId: 'san', lat: -22.5, lon: 21.0, region: 'south' },
 ]
 
 // A village footprint must never reach into river water (design.md §4.2): a

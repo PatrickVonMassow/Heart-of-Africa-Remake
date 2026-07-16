@@ -237,7 +237,7 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
         // Compound cluster: lanes to the compound entrances (beyond the 3
         // common paths) and fenced enclosures where the region fences.
         expect(layout.paths.length).toBeGreaterThanOrEqual(6)
-        if (id === 'hausa-village' || id === 'mandingo-village') {
+        if (id === 'hausa-village' || id === 'mandinka-village') {
           expect(layout.fences.length, `${id}: walled compounds`).toBeGreaterThanOrEqual(3)
           expect(layout.dwellings.some((d) => d.kind === 'granary'), `${id}: granaries inside`).toBe(true)
         }

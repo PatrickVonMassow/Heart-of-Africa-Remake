@@ -91,7 +91,7 @@ describe('bottom-right button row: map always, camp only where allowed (point 93
   })
 
   it('hides the camp button in a non-friend village but shows it in a friend village', () => {
-    useGame.setState({ mode: 'place', placeId: 'masai-village', honoredFriend: {}, regionRobbed: {} })
+    useGame.setState({ mode: 'place', placeId: 'maasai-village', honoredFriend: {}, regionRobbed: {} })
     const { rerender } = render(<Hud />)
     expect(btn('camp-toggle')).not.toBeInTheDocument()
     // Masai village is in the East region; becoming its Honored Friend enables camping.
@@ -103,10 +103,10 @@ describe('bottom-right button row: map always, camp only where allowed (point 93
   it('canCampHere matches the button: travel yes, port no, friend village yes (pure)', () => {
     expect(canCampHere({ mode: 'travel', placeId: null, honoredFriend: {}, regionRobbed: {} })).toBe(true)
     expect(canCampHere({ mode: 'place', placeId: 'cairo', honoredFriend: {}, regionRobbed: {} })).toBe(false)
-    expect(canCampHere({ mode: 'place', placeId: 'masai-village', honoredFriend: {}, regionRobbed: {} })).toBe(false)
-    expect(canCampHere({ mode: 'place', placeId: 'masai-village', honoredFriend: { east: true }, regionRobbed: {} })).toBe(true)
+    expect(canCampHere({ mode: 'place', placeId: 'maasai-village', honoredFriend: {}, regionRobbed: {} })).toBe(false)
+    expect(canCampHere({ mode: 'place', placeId: 'maasai-village', honoredFriend: { east: true }, regionRobbed: {} })).toBe(true)
     // A robbed region forfeits camping even as a friend.
-    expect(canCampHere({ mode: 'place', placeId: 'masai-village', honoredFriend: { east: true }, regionRobbed: { east: true } })).toBe(false)
+    expect(canCampHere({ mode: 'place', placeId: 'maasai-village', honoredFriend: { east: true }, regionRobbed: { east: true } })).toBe(false)
   })
 })
 

@@ -128,11 +128,11 @@ check(
 
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(800)
-await page.evaluate(() => window.__game.getState().enterPlace('masai-village'))
+await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
 await page
   .waitForFunction(
     (want) => window.__game.getState().placeId === want && !!window.__placeLayout,
-    "masai-village",
+    "maasai-village",
     { timeout: 30000 },
   )
   .catch(() => {})
@@ -2771,7 +2771,7 @@ const nearAfterZoom = await page.evaluate(async () => {
   window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(12)
   await sleep(600) // let the travel frame apply the widened near plane
-  window.__game.getState().enterPlace('masai-village')
+  window.__game.getState().enterPlace('maasai-village')
   const t0 = Date.now()
   while (Date.now() - t0 < 15000) {
     const cam = window.__placeCamera

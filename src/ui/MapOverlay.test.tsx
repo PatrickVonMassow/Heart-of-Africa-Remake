@@ -95,7 +95,7 @@ describe('settlement plan (design.md §6.1, point 79)', () => {
   })
 
   it('inside a village the plan names the chief hut and the market', () => {
-    useGame.setState({ placeId: 'masai-village' })
+    useGame.setState({ placeId: 'maasai-village' })
     useUi.getState().toggleMap()
     render(<MapOverlay />)
     const labels = [...document.querySelectorAll('.plan-building-label')].map((e) => e.textContent)
