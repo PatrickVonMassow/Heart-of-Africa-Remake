@@ -24,13 +24,16 @@ const foliageOf = (geo: THREE.BufferGeometry) => {
   expect(attr, 'every flora geometry must carry the foliage attribute').toBeDefined()
   const arr = attr.array as Float32Array
   let ones = 0
+  let twos = 0
   for (const v of arr) {
-    // The attribute is BINARY — any in-between value would mean a vertex-level
-    // mask again, which is the exact thing that tore.
-    expect(v === 0 || v === 1).toBe(true)
+    // The attribute holds whole CLASSES (0 never moves, 1 crown collapse,
+    // 2 ground sprout — point 151) — any in-between value would mean a
+    // vertex-level mask again, which is the exact thing that tore.
+    expect(v === 0 || v === 1 || v === 2).toBe(true)
     if (v === 1) ones++
+    if (v === 2) twos++
   }
-  return { ones, total: arr.length }
+  return { ones, twos, total: arr.length }
 }
 
 describe('the baked foliage attribute (point 144 — per part, binary, never colour-derived)', () => {
@@ -44,21 +47,25 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
     }
   })
 
-  it('trees split trunk from crown: both classes present', () => {
+  it('trees split trunk from crown: both classes present, nothing sprouts', () => {
     for (const build of [buildAcacia, buildJungleTree, buildBaobab, () => buildPalm(false)]) {
-      const { ones, total } = foliageOf(build())
+      const { ones, twos, total } = foliageOf(build())
       expect(ones).toBeGreaterThan(0) // there is foliage to collapse
       expect(ones).toBeLessThan(total) // and a trunk that never moves
+      expect(twos).toBe(0) // a crown bares — it never sinks into the soil
     }
   })
 
-  it('the all-green and the never-green read as such', () => {
-    const bush = foliageOf(buildBush())
-    expect(bush.ones).toBe(bush.total) // a bush is all foliage
-    const grass = foliageOf(buildGrassTuft())
-    expect(grass.ones).toBe(grass.total)
+  it('ground flora is all sprout class, dead wood and stone never move', () => {
+    // Bush, grass and papyrus are anchored at the soil and sprout/withdraw
+    // there (point 151) — every vertex carries class 2.
+    for (const build of [buildBush, buildGrassTuft, buildPapyrus]) {
+      const g = foliageOf(build())
+      expect(g.twos).toBe(g.total)
+    }
     for (const build of [buildRock, buildTermiteMound, buildDeadTree, buildKopje]) {
-      expect(foliageOf(build()).ones).toBe(0) // dead wood and stone never collapse
+      const g = foliageOf(build())
+      expect(g.ones + g.twos).toBe(0) // dead wood and stone never collapse
     }
   })
 })

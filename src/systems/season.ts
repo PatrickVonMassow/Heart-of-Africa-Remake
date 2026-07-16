@@ -716,3 +716,50 @@ export function effectiveGreenness(
   if (override !== null) return Math.min(1, Math.max(0, override))
   return floraGreennessAt(day, lat, lon, startYear, elevationM)
 }
+
+/**
+ * The season-field slots (point 151): index 0 is the hyper-arid override
+ * (greenness 0 year round), then every climate zone in this FIXED order.
+ * The travel scene's greenness field texture stores per-texel blends of
+ * these slots; the order is part of that contract — append, never reorder.
+ */
+export const SEASON_SLOTS = [
+  'hyper-arid',
+  'mediterranean',
+  'sahara-north',
+  'sahara-south',
+  'sahel',
+  'guinea-coast',
+  'west-coast',
+  'congo',
+  'congo-north',
+  'atlantic-equatorial',
+  'ethiopian-highlands',
+  'east-rift',
+  'horn',
+  'southern-plateau',
+  'cape',
+] as const
+
+/** The season-field slot at a position — hyper-arid wins over its zone. */
+export function seasonSlotAt(lat: number, lon: number, elevationM: number): number {
+  if (isHyperArid(lat, lon)) return 0
+  const zone = climateZoneAt(lat, lon, elevationM)
+  const idx = (SEASON_SLOTS as readonly string[]).indexOf(zone)
+  return idx > 0 ? idx : 0
+}
+
+/**
+ * This day's greenness per slot (the same curve floraGreennessAt uses),
+ * with the §21 debug override filling every slot when set. Slot 0
+ * (hyper-arid) stays 0 except under the override — exactly the special
+ * case floraGreennessAt applies by position.
+ */
+export function slotGreenness(day: number, slot: number, startYear: number, override: number | null): number {
+  if (override !== null) return Math.min(1, Math.max(0, override))
+  if (slot <= 0 || slot >= SEASON_SLOTS.length) return 0
+  const zone = SEASON_SLOTS[slot] as ClimateZone
+  const shape = zoneShapeAt(day, zone, startYear)
+  const greenable = Math.min(1, ZONE_WETNESS[zone] / GREENING_ZONE_FLOOR)
+  return Math.min(1, Math.max(0, shape * greenable))
+}

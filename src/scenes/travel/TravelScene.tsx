@@ -31,13 +31,13 @@ import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
-import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
-import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode } from '../../render/seasonTint'
+import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
+import { seasonFoliagePosition, seasonTintNode } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
-import { elevationAt } from '../../world/geodata'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
+import { seasonFieldTintAt, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
 import {
   updateTrailPoint,
@@ -125,6 +125,9 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
   // normal-map TBN derives from uv screen derivatives, so without a real uv
   // attribute the tangent basis degenerates (and every material build warns).
   const uvs = new Float32Array(total * 2)
+  // The season field's texture coordinate (point 151): baked per vertex, so
+  // ground tint/collapse follow THIS spot's climate, not the player's.
+  const seasonUVs = new Float32Array(total * 2)
 
   // Height grid including a margin ring for normal computation.
   const m = n + 2
@@ -157,6 +160,12 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
       positions[vi * 3 + 2] = z0 + iz * step
       uvs[vi * 2] = (x0 + ix * step) * 0.5
       uvs[vi * 2 + 1] = (z0 + iz * step) * 0.5
+      {
+        const g = worldToLatLon(x0 + ix * step, z0 + iz * step)
+        const [su, svv] = seasonFieldUV(g.lat, g.lon)
+        seasonUVs[vi * 2] = su
+        seasonUVs[vi * 2 + 1] = svv
+      }
       const hl = heights[(iz + 1) * m + ix]
       const hr = heights[(iz + 1) * m + (ix + 2)]
       const hd = heights[iz * m + (ix + 1)]
@@ -209,6 +218,8 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
       for (let k = 0; k < 4; k++) splats[sv * 4 + k] = splats[src * 4 + k]
       uvs[sv * 2] = uvs[src * 2]
       uvs[sv * 2 + 1] = uvs[src * 2 + 1]
+      seasonUVs[sv * 2] = seasonUVs[src * 2]
+      seasonUVs[sv * 2 + 1] = seasonUVs[src * 2 + 1]
       sv++
     }
     for (let i = 0; i < n - 1; i++) {
@@ -224,6 +235,7 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
   geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+  geo.setAttribute('seasonUV', new THREE.BufferAttribute(seasonUVs, 2))
   geo.setIndex(indices)
   return geo
 }
@@ -233,10 +245,11 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
  * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
  * normal maps and bi-planar rock on steep slopes.
  */
-// The season tint (design.md §19.13) and its uniform now live in
-// render/seasonTint.ts so the settlement scene shares the same curve (point
-// 143). This scene drives SEASON_TINT_U from the traveller's own greenness
-// below; the place scene drives it from the place's coordinate.
+// The season tint curves live in render/seasonTint.ts so the settlement
+// scene shares them (point 143). THIS scene samples the per-position season
+// FIELD (render/seasonField.ts, point 151) through baked seasonUV
+// attributes; only the place scene still drives the single SEASON_TINT_U
+// uniform — one place, one greenness, correct there.
 
 // Travel materials are MODULE singletons (point 96): a remounted travel scene
 // must reuse the same material instances, or the renderer builds ~100 fresh
@@ -305,7 +318,9 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
 
   // Vertex tint carries biome/region hue; boost recenters the mid-gray
   // detail albedo around 1.0.
-  mat.colorNode = seasonalSnowNode(seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6)))
+  // Ground tint by the GROUND's own position (point 151): the chunk vertices
+  // carry seasonUV into the shared field — never the player's tint.
+  mat.colorNode = seasonalSnowNode(seasonTintNode(vertexColor().rgb, seasonFieldTintNode()).mul(albedo.mul(2.6)))
 
   // Blended detail normal map (top projection).
   let nrm = texture(normalsTex[0], uvTop).rgb.mul(w.x)
@@ -763,13 +778,22 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
   const material = new THREE.MeshStandardNodeMaterial()
   material.roughness = 0.92
   material.vertexColors = true
-  material.colorNode = seasonTintNode(vertexColor().rgb)
+  // Season by the PLANT's own position (point 151): tint and collapse sample
+  // the greenness field through the per-instance seasonUV — the old global
+  // uniform followed the player and made every crown in view slide while
+  // walking a wetness gradient.
+  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintNode())
   // Bare branches (point 144, second attempt): keyed on the baked per-part
   // foliage attribute, never the jittered colour — see seasonFoliagePosition.
-  material.positionNode = seasonFoliagePosition()
+  material.positionNode = seasonFoliagePosition(seasonFieldTintNode())
   const out = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
+    // One field coordinate per instance, written where the matrices are.
+    mesh.geometry.setAttribute(
+      'seasonUV',
+      new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES[sp] * 2), 2),
+    )
     mesh.castShadow = true
     mesh.receiveShadow = true
     mesh.frustumCulled = false
@@ -799,7 +823,12 @@ function Vegetation() {
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
-      seasonTint: () => SEASON_TINT_U.value,
+      // The field's tint at the traveller (point 151) — the scene has no
+      // global tint any more; checks read the value where the player stands.
+      seasonTint: () => {
+        const p = useGame.getState().pos
+        return seasonFieldTintAt(-p.z / 10, p.x / 10)
+      },
     }
     return () => {
       delete w.__vegetation
@@ -820,14 +849,15 @@ function Vegetation() {
     // vegetation asks "how wet for HERE". See floraGreennessAt.
     {
       const s = useGame.getState()
-      const lon = s.pos.x / 10
-      const lat = -s.pos.z / 10
-      const green = effectiveGreenness(
-        s.day, lat, lon, START_YEAR, elevationAt(lat, lon),
+      // The season field (point 151): every slot's greenness follows the
+      // calendar (lerped) and the ground/vegetation sample it per POSITION —
+      // the old player-position uniform made the whole scene's flora slide
+      // while walking a wetness gradient.
+      updateSeasonField(
+        s.day, START_YEAR,
         useUi.getState().seasonWetnessOverride,
+        Math.min(1, Math.max(0, balance.season.weatherStrength)),
       )
-      const target = 0.5 + (green - 0.5) * Math.min(1, Math.max(0, balance.season.weatherStrength))
-      SEASON_TINT_U.value += (target - SEASON_TINT_U.value) * 0.02
       // The Nile flood (point 138): one CPU source for the ribbon rise and the
       // canoe float height. Blended like the tint, so a debug month jump makes
       // the river rise over a moment rather than snap.
@@ -910,6 +940,11 @@ function Vegetation() {
           scl.set(sc, sc * (0.85 + roll * 0.3), sc)
           mtx.compose(new THREE.Vector3(x, s.height, z), quat, scl)
           meshes[species].setMatrixAt(idx, mtx)
+          {
+            const attr = meshes[species].geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute
+            const [su, svv] = seasonFieldUV(ll.lat, ll.lon)
+            attr.setXY(idx, su, svv)
+          }
           counts[species] = idx + 1
         }
       }
@@ -919,6 +954,7 @@ function Vegetation() {
       const mesh = meshes[sp]
       mesh.count = counts[sp]
       mesh.instanceMatrix.needsUpdate = true
+      ;(mesh.geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute).needsUpdate = true
     }
   })
 

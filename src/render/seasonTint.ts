@@ -35,7 +35,12 @@ export function setSeasonTint(greenness: number, strength: number) {
  * hue (measured: the Sahel's ground green excess moved 41 -> 45 across its whole
  * year). Keep both ends luma-keyed.
  */
-export function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
+export function seasonTintNode(
+  c: ReturnType<typeof vertexColor>['rgb'],
+  // The tint source: the shared uniform (settlement scene — one place, one
+  // greenness) or the travel scene's per-position season field (point 151).
+  tint: ReturnType<typeof float> = SEASON_TINT_U as unknown as ReturnType<typeof float>,
+) {
   const greenness = c.g.sub(c.b).mul(2.5).clamp(0, 1).mul(
     float(1).sub(c.r.sub(c.g).mul(4)).clamp(0, 1),
   )
@@ -47,8 +52,8 @@ export function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
   // excess only 41->51 across its whole year — a fact the player could not see.
   const straw = vec3(luma.mul(2.15), luma.mul(1.75), luma.mul(0.4))
   const lush = vec3(luma.mul(0.28), luma.mul(1.5), luma.mul(0.3))
-  const dryK = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
-  const lushK = SEASON_TINT_U.mul(2).sub(1).clamp(0, 1)
+  const dryK = float(1).sub(tint.mul(2)).clamp(0, 1)
+  const lushK = tint.mul(2).sub(1).clamp(0, 1)
   return mix(mix(c, straw, greenness.mul(dryK)), lush, greenness.mul(lushK))
 }
 
@@ -68,12 +73,27 @@ export function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
  * season — the Congo's evergreen trees stay full because their uniform never
  * leaves neutral.
  */
-export function seasonFoliagePosition() {
+export function seasonFoliagePosition(
+  tint: ReturnType<typeof float> = SEASON_TINT_U as unknown as ReturnType<typeof float>,
+) {
   // Cast: the TSL typings do not carry the attribute's float type through.
   const leaf = attribute('foliage', 'float') as unknown as ReturnType<typeof float>
-  const dryness = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
-  const collapse = leaf.mul(dryness)
+  const dryness = float(1).sub(tint.mul(2)).clamp(0, 1)
+  // Two foliage classes (both per-part-uniform, the 144 shard rule):
+  // 1 = a tree crown — bare branches: it shrinks toward the trunk and
+  //     settles down onto it, the trunk stands (the 144 look, unchanged);
+  // 2 = ground flora (bush, grass, papyrus) — anchored at y = 0 and scaled
+  //     toward the ground, so its seasonal appearance reads as SPROUTING
+  //     from the soil rather than floating in (user request, point 151).
+  const crownK = leaf.clamp(0, 1).mul(float(2).sub(leaf).clamp(0, 1))
+  const sproutK = leaf.sub(1).clamp(0, 1)
+  const collapse = crownK.mul(dryness)
   const p = positionLocal
   const shrink = float(1).sub(collapse.mul(0.6))
-  return vec3(p.x.mul(shrink), p.y.sub(collapse.mul(0.22)), p.z.mul(shrink))
+  const sprout = float(1).sub(sproutK.mul(dryness).mul(0.85))
+  return vec3(
+    p.x.mul(shrink).mul(sprout),
+    p.y.sub(collapse.mul(0.22)).mul(sprout),
+    p.z.mul(shrink).mul(sprout),
+  )
 }

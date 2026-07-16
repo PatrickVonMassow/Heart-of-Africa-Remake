@@ -4474,6 +4474,30 @@ the remaining open points in their numeric order.
   pt. 12. Priority insert: directly after point 122 (it corrects the
   just-shipped 143/144 look before 149 re-verifies the weather).
   (Reported 16.07.2026.)
+  WIP (16.07.2026, 22:52 — session-limit handoff; builds green, 1641 vitest
+  green): DONE so far — (a) season.ts SEASON_SLOTS/seasonSlotAt/slotGreenness;
+  (b) render/seasonField.ts (150x148 Uint8 field, blurred one-hot slot
+  weights r=4 texels, lerped slot greens, updateSeasonField per frame,
+  seasonFieldUV/TintAt/TintNode); (c) seasonTint.ts nodes take a tint-node
+  parameter (PlaceScene default SEASON_TINT_U unchanged) and
+  seasonFoliagePosition gained the SPROUT class (foliage=2 anchored at soil);
+  (d) flora.ts bush/grass/papyrus are class 2, flora.test.ts covers the
+  classes; (e) TravelScene: seasonUV baked per terrain-chunk vertex AND per
+  vegetation instance (InstancedBufferAttribute), terrain + vegetation
+  materials sample the field, the frame drive calls updateSeasonField (the
+  player-pos SEASON_TINT_U drive is REMOVED from travel — the __vegetation
+  .seasonTint dev hook now reads the field at the player).
+  STILL OPEN — (1) pure tests: seasonField.test.ts (slot mapping matches
+  floraGreennessAt at sample points incl. hyper-arid Cairo; a border texel
+  lies strictly between its two zones' greens; override fills every slot;
+  walk-independence is trivial by construction but pin the API), needs
+  setupGeodata; (2) live: enrichments witness — the field/greens do NOT
+  change when the player walks (old uniform did), the 120c season check
+  still passes (it reads the hook), screenshots at BOTH user spots (13.4N/
+  31.8E June, 18.1N/33.9E July) showing stable flora; (3) re-run polish.mjs
+  settlement-season block (PlaceScene path untouched but verify); (4) docs:
+  design.md §19.13 + CLAUDE.md pt. 12; (5) full browser regression + commit
+  as ONE feature commit, then dashboard.
 
 - [ ] 152. The swimming traveller floats ON the water — never walks the bed
   (user bug, 16.07.2026, screenshot at Lake Edward).

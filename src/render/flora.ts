@@ -32,9 +32,12 @@ function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): 
  * attribute set at build time is identical across a part by construction, so
  * the part moves as one and nothing can tear.
  */
-function foliage(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+// Class 1 = tree crown (bare-branch collapse), class 2 = ground flora
+// (anchored at the soil, it SPROUTS/withdraws there — point 151). Always one
+// value per part: per-vertex variation is what tore the crowns (16.07 bug).
+function foliage(geo: THREE.BufferGeometry, cls: 1 | 2 = 1): THREE.BufferGeometry {
   const count = geo.attributes.position.count
-  geo.setAttribute('foliage', new THREE.BufferAttribute(new Float32Array(count).fill(1), 1))
+  geo.setAttribute('foliage', new THREE.BufferAttribute(new Float32Array(count).fill(cls), 1))
   return geo
 }
 
@@ -153,12 +156,12 @@ export function buildBush(): THREE.BufferGeometry {
   b1.scale(1, 0.65, 1)
   b1.translate(0, 0.28, 0)
   tint(b1, '#7d7c35', 0.18, 61)
-  foliage(b1)
+  foliage(b1, 2)
   const b2 = new THREE.SphereGeometry(0.28, 5, 4)
   b2.scale(1, 0.7, 1)
   b2.translate(0.3, 0.2, 0.15)
   tint(b2, '#8a8340', 0.18, 62)
-  foliage(b2)
+  foliage(b2, 2)
   return merge([b1, b2])
 }
 
@@ -245,13 +248,13 @@ export function buildPapyrus(): THREE.BufferGeometry {
     stem.rotateY(a)
     stem.translate(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08)
     tint(stem, '#5f7c33', 0.15, 121 + i)
-    foliage(stem)
+    foliage(stem, 2)
     parts.push(stem)
     const head = new THREE.SphereGeometry(0.11, 5, 4)
     head.scale(1, 0.7, 1)
     head.translate(Math.cos(a) * (0.08 + Math.sin(lean) * 1.1), 1.18, Math.sin(a) * (0.08 + Math.sin(lean) * 1.1))
     tint(head, '#88a04a', 0.18, 131 + i)
-    foliage(head)
+    foliage(head, 2)
     parts.push(head)
   }
   return merge(parts)
@@ -286,7 +289,7 @@ export function buildGrassTuft(): THREE.BufferGeometry {
     blade.rotateY((i / 4) * Math.PI)
     blade.translate((i % 2) * 0.1 - 0.05, 0.2, ((i + 1) % 2) * 0.1 - 0.05)
     tint(blade, '#a89e55', 0.2, 81 + i)
-    foliage(blade)
+    foliage(blade, 2)
     parts.push(blade)
   }
   return merge(parts)
