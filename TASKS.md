@@ -3603,7 +3603,7 @@ the remaining open points in their numeric order.
   SIZE: research + model + dress + figures is several commits, not one. (Filed
   16.07.2026.)
 
-- [ ] 138. The Nile flood — the cycle the research calls the most visible one.
+- [x] 138. The Nile flood — the cycle the research calls the most visible one.
   Wanted (user, 16.07.2026, after asking what else the season research had
   turned up but the build had skipped). `docs/climate-1890.md` states it
   outright: the Nile in 1890 is UNREGULATED (the first Aswan dam is 1898), it
@@ -3643,6 +3643,17 @@ the remaining open points in their numeric order.
   measured against the flood MAXIMUM?), do not silently widen the test.
   ALSO: 136 (wider, smoother rivers) touches the same ribbon. Whichever lands
   second re-tunes; say so in its commit rather than being surprised.
+  DONE (16.07.2026, e63ddf8 + cb7b1f5 + c03b551): nileFloodAt keys on the Blue
+  Nile source lagged 62 days (pure-tested: October crest while Cairo wetness is
+  0); the ribbon gains a floodK vertex attribute and a module uniform, the CPU
+  float height adds the same rise from ONE source (waterSurface.NILE_FLOOD), so
+  canoe and surface never drift; rise is VERTICAL only, so the Nubian village
+  conflict resolves to the safe reading by construction (the flood-maximum
+  clearance variant stays an open option, recorded in design.md §19.13).
+  Balance: season.nileFloodRise (0.55). Live checks + invariants at flood peak
+  in enrichments (screenshots 117/118). Trap for later probes, noted in the
+  hook: NEVER read mutable module state via dynamic import — HMR's ?t= gives a
+  fresh instance; __rivers.floodRise()/surfaceAt() exist for that.
   TESTS: pure (in `src/systems/season.test.ts` or a sibling) — the flood peaks
   at Cairo in October while `wetnessAt` there is ~0 (the headline property); it
   rises from early June; the lag is real (the upstream kiremt peaks BEFORE the
