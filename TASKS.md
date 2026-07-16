@@ -93,6 +93,17 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, third): points 138-142 are the season
+findings that were RESEARCHED but never built (the user asked what else had
+been held back; the honest answer was that only the dress was held back for
+thin evidence — the rest was cut for scope, and one, the Okavango, is
+documented as wrong). They queue directly BEHIND the current point 137, in the
+order I proposed and the user accepted: the two physically safest and most
+visible first, then the harmattan, then the ice/hail, then the big one. So the
+full order is now: 137 → 138 (Nile flood) → 139 (Okavango inversion) → 140
+(harmattan) → 141 (glaciers + hail) → 142 (seasonal work) → 136 → 122 → 123 →
+the remaining open points in their numeric order.
+
 ## Checklist
 
 - [x] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
@@ -3433,6 +3444,220 @@ remaining open points in their numeric order.
   dress.test.ts and the "stays bare however cold" traps).
   SIZE: research + model + dress + figures is several commits, not one. (Filed
   16.07.2026.)
+
+- [ ] 138. The Nile flood — the cycle the research calls the most visible one.
+  Wanted (user, 16.07.2026, after asking what else the season research had
+  turned up but the build had skipped). `docs/climate-1890.md` states it
+  outright: the Nile in 1890 is UNREGULATED (the first Aswan dam is 1898), it
+  rises from early June and PEAKS AT CAIRO IN OCTOBER — "the most visible cycle
+  in the game, right at the start port". The game has no notion of it; a grep
+  for flood/river level finds nothing. Rivers never rise.
+  THE INSIGHT THAT MAKES THIS TESTABLE — and that a naive implementation will
+  get wrong: the flood is NOT local rain. Cairo is effectively rainless the year
+  round (the model already says so, correctly, and `isHyperArid` guards it), yet
+  the river there peaks in October. The water is the ETHIOPIAN kiremt (Jun-Sep,
+  65-95% of that zone's annual rain) arriving weeks late down the Blue Nile. So
+  the flood must key on the UPSTREAM zone's wetness plus a travel lag — never on
+  `wetnessAt` at the river point. That is the whole point of the feature and the
+  sharpest available test: flood high at Cairo in October WHILE local wetness is
+  ~0.
+  SHARED WITH 139: the Okavango is the same shape — remote rain, months late,
+  peaking against the local sky. Build the lag/source abstraction here so 139
+  consumes it rather than inventing a second one; 139 is the harder case (the
+  pulse is INVERTED) and will prove the abstraction.
+  ANCHORS: `src/systems/season.ts` (the zone model and `wetnessAt` — the flood
+  curve belongs beside them, pure and testable); `src/scenes/travel/
+  waterSurface.ts` (the rendered ribbon); `src/world/geodata.ts` (the courses
+  and the carved bed).
+  CARE — the invariants that must survive, all live-gated today (CLAUDE §7.1
+  pt. 21, `scripts/verify/enrichments.mjs`): the ribbon stays ONE continuous
+  unbroken strip with no interior gap and no surface buried under the terrain;
+  the canoe float height still clears the ribbon on every channel
+  (`src/scenes/travel/waterSurface.test.ts` — a rising surface is exactly what
+  breaks this); lake surfaces still clear their beds; confluence bank-masking
+  holds (`riverBanks.test.ts`).
+  THE CONFLICT TO RESOLVE, NOT PAPER OVER: `src/world/world.test.ts` asserts
+  every village keeps the §4.2 minimum river-water clearance — and the Nubian
+  village is deliberately riverside ON the Nile. A real flood reaching a
+  riverside settlement is historically the entire point of the Nile flood, but
+  it collides with a green invariant. Decide it explicitly and record the
+  decision (flood as a visual rise that respects the clearance? or clearance
+  measured against the flood MAXIMUM?), do not silently widen the test.
+  ALSO: 136 (wider, smoother rivers) touches the same ribbon. Whichever lands
+  second re-tunes; say so in its commit rather than being surprised.
+  TESTS: pure (in `src/systems/season.test.ts` or a sibling) — the flood peaks
+  at Cairo in October while `wetnessAt` there is ~0 (the headline property); it
+  rises from early June; the lag is real (the upstream kiremt peaks BEFORE the
+  Cairo crest); the curve stays bounded 0..1 across the whole 1890-1895 window.
+  Live (`scripts/verify/enrichments.mjs`): the Nile at Cairo/the delta reads
+  visibly higher/wider in October than in April via the dev hook, with
+  screenshots in both months; the continuity and float-clearance checks stay
+  green at flood peak, not just at low water.
+  DOCS: design.md §11.3 (the river section — state that the flood is remote-fed
+  and why) and §19.13 (it is a season); CLAUDE.md §7.1 pt. 21.
+  (Filed 16.07.2026.)
+
+- [ ] 139. The Okavango floods in the DRY season — a documented wrong to fix.
+  Wanted (user, 16.07.2026). This one is not a gap but an ERROR the research
+  already caught and the build then walked past: `docs/peoples-1890.md` §4.0.4
+  records that at 19.0S 22.5E "the water arrives when the sky is driest" — the
+  Angolan summer rains (Nov-Mar) feed the Cubango and Cuito, the pulse shows at
+  the panhandle March-April and reaches Maun JUNE-AUGUST, so "while most river
+  systems flood during the local rainy season, the Okavango does the opposite —
+  its waters peak in the middle of the dry season, when rainfall in Botswana has
+  stopped entirely and the surrounding Kalahari is at its most parched". The
+  research even flags it: "the game currently has no way to express it". Point
+  120's wetness model dries the Okavango exactly when it really floods, and
+  120e's dry-season shore catchment then gathers the animals at a delta that
+  should be at its fullest. The Wayeyi village (-19.0, 22.5) sits in it.
+  EVIDENCE STATUS — why this outranks most cultural findings: it is MODERN
+  sourcing, but it is physical geography, and the research says so explicitly:
+  "retro-application to 1890 is far safer here than for any cultural claim in
+  this document". The hydrology has not moved since.
+  BUILD ON 138: same shape (remote rain, months of lag), so consume 138's
+  lag/source abstraction. The difference is that here the lag is long enough to
+  land the peak in the local dry season — which is the proof the abstraction is
+  real and not a Nile special case.
+  ANCHORS: `src/systems/season.ts` (the model); `src/scenes/travel/
+  waterSurface.ts` (the delta's water); the 120e catchment in
+  `src/scenes/travel/Wildlife.tsx` (~`dryness`/`catchment`) — the animals must
+  follow the WATER, not the sky, or the delta will be full while the herds
+  crowd a puddle.
+  TESTS: pure — the Okavango's water peaks in Jul-Aug while `wetnessAt` there is
+  at its annual MINIMUM (the inversion stated as an assertion, so nobody
+  "corrects" it back); the Zambezi or another normal river still peaks WITH its
+  local rains (the inversion must not leak into every river). Live: the delta
+  reads fuller in July than in January via the dev hook, with screenshots.
+  DOCS: design.md §11.3/§19.13 — record the inversion as a deliberate, sourced
+  oddity, like the §19.8 grief carve-out, so it survives the next reader's
+  intuition. (Filed 16.07.2026.)
+
+- [ ] 140. The harmattan as a season — and its counter-intuitive look.
+  Wanted (user, 16.07.2026). `docs/climate-1890.md` documents it richly and the
+  game has none of it: a grep for "harmattan" finds only the dress module's
+  comment. The travel view has a static per-region dust haze (`FOG_PRESETS` in
+  `src/scenes/travel/Climate.tsx`), which is not a season and does not come and
+  go.
+  THE PERIOD SOURCE, quotable verbatim — Dobson's 1781 Royal Society paper:
+  "A fog or haze is one of the peculiarities which always accompanies the
+  Harmattan. The gloom occasioned by this fog is so great, as sometimes to make
+  even near objects obscure." / "The sun, concealed the greatest part of the
+  day, appears only about a few hours about noon, and then of a mild red." /
+  "No dew falls during the continuance of the harmattan."
+  THE TRAP — the research states it plainly and a "nice-looking" implementation
+  will get it backwards: the haze scatters all wavelengths roughly equally, so
+  the SKY LOSES ITS BLUE and goes whitish/grey, and "sunrises and sunsets lose
+  their lustre; haloes may disappear altogether". Do NOT render a spectacular
+  dusty sunset. The phenomenon is a milky pall that MUTES the sky and reddens
+  the noon sun — the opposite of the postcard.
+  TIMING/PHYSICS from the research: late Nov to mid-March; RH ~15-25% (vs 50-70%
+  wet season); diurnal swing 15-20 °C, and the hot/cold contradiction in the
+  sources resolves as "cold at dawn and hot by afternoon — the swing IS the
+  phenomenon"; dust emitted on ~40% of winter days.
+  BOUNDARY WITH 137 — do not duplicate: 137 (dress) may already have added a
+  harmattan DRIVER to the model (its (b) step calls for exactly that, because
+  the coldness curve's amplitude falls off toward the equator and so cannot
+  express a cold Sahel January night). If that driver exists when this point
+  starts, CONSUME it; if not, add it here and let 137's dress read it. One
+  driver, two consumers.
+  ANCHORS: `src/systems/season.ts` (a `harmattanAt`, zone- and month-keyed, pure
+  like `wetnessAt`); `src/scenes/travel/Climate.tsx` (fog/haze already lerp per
+  frame — the seasonal hook is there); `src/render/sky.tsx` +
+  `src/render/skyOvercast.ts` (the dome's overcast uniform machinery exists
+  since point 120g — but harmattan is a DISTINCT mode: RAIN_GRAY is a wet grey
+  and the dust is a whitish ochre, and the rain path does not redden the sun.
+  Add a second mode; do not overload `grayMix`).
+  TESTS: pure — harmattan fires in the Sahel/Guinea-coast dry season and NEVER
+  in the wet season, never south of the equator, and never at the Cape; its
+  months match the research (late Nov-mid Mar); the sun-reddening and
+  sky-whitening curves are bounded; and — the trap, asserted — the sunset is
+  MUTED rather than intensified. Live (`scripts/verify/enrichments.mjs`): in a
+  Sahel January the sight lines close and the sky whitens with a screenshot,
+  while a Sahel August (wet) shows none of it; the debug zoom stays season-free
+  like the rain does.
+  DOCS: design.md §19.13 (the harmattan alongside the rains) and CLAUDE.md §7.1
+  pt. 12's season bullet. (Filed 16.07.2026.)
+
+- [ ] 141. Equatorial ice — and hail, the only white ground low down.
+  Wanted (user, 16.07.2026). `docs/climate-1890.md` §(a) records that the
+  equatorial glaciers stood 8-12x today's extent (Kilimanjaro ~12-20 km² vs
+  0.98 today) and — the part that makes it a GAME fact rather than trivia —
+  "their break-up happened INSIDE the window (early 1890s)". The game has no
+  ice at all: a grep for glacier/snowcap/snowline finds only a rock-placement
+  rule in `src/scenes/travel/TravelScene.tsx` (~line 874, `s.height > 6.5 //
+  snow line`), which is a static dressing exclusion, not ice.
+  (a) THE ICE: the three massifs the research permits, and ONLY those —
+      Kilimanjaro, Mount Kenya, Rwenzori, all >4,400 m, above the 4,500-4,800 m
+      equilibrium line. The research also names the near misses to keep BARE,
+      and they are the test cases: Mount Elgon (4,321 m — "the highest African
+      mountain completely free of glaciation", missing the line by <200 m), Ras
+      Dashen (transient Dec-Feb only; Ethiopia's rain is summer, so the high
+      ground is dry when it is cold — a lovely, counter-intuitive reason), Mount
+      Cameroon (occasional dusting, no snowcap), Emi Koussi (snow about once
+      every seven years). Seasonal snow is allowed on the High Atlas (Nov-Apr,
+      settling to ~1,400 m) and the Drakensberg (Jun-Aug, >2,000 m).
+      The 1890s break-up is optional depth: the extent may simply be the period
+      one. Do not animate a retreat across the campaign unless it is cheap —
+      but do NOT render today's remnant.
+  (b) HAIL: the research names it as "the only defensible white ground at low
+      altitude" — savanna snow is physically impossible, and point 120g already
+      recorded in design.md §19.13 that no settlement qualifies for snow (now
+      verified: the Berber village, the highest candidate, sits at 914 m against
+      an Atlas snow line that settles to 1,400 m). So a rare hail event is the
+      one way white ever touches the ground where the player walks. Ambience,
+      rare, keyed to the wet season's storms.
+  ANCHORS: `src/render/landmarks.ts` (the skyline/mountain builds and their
+  pure test `landmarks.test.ts`); `src/scenes/travel/TravelScene.tsx` (the snow
+  -line rock rule — reconcile with it rather than adding a second notion of a
+  snow line); `src/systems/season.ts` (the hail roll and the Atlas/Drakensberg
+  months).
+  TESTS: pure — ice ONLY on the three permitted massifs and never on the four
+  named near misses (that list IS the test); the Atlas/Drakensberg snow months
+  match the research and are empty in their summers; hail never fires in a
+  rainless zone (no Saharan hail) and stays rare. Live: a screenshot of
+  Kilimanjaro carrying its period ice. DOCS: design.md §19.13 + §4.4 (the
+  landmark), CLAUDE.md §7.1 pt. 12. (Filed 16.07.2026.)
+
+- [ ] 142. The season reaches the people: work, presence, market, fire.
+  Wanted (user, 16.07.2026). This is the richest seam the (a2) research opened
+  and the build used none of it — `docs/peoples-1890.md` §3, §4 and §4.9 are
+  full of period-sourced seasonal LIFE, while the game's settlements run the
+  same vignettes in every month.
+  The findings, with the research's own star ratings:
+  * §3.1 "The Sahel's hungry season IS the rainy season — the best-verified
+    finding in the document." The intuition is backwards: the rains are when
+    the granary is empty and the work is hardest.
+  * §4.0.1 ★ "The best mechanic found: 'the young men are gone'" — transhumance
+    empties part of a village seasonally. A settlement that is visibly
+    half-populated in one month is a real, sourced, cheap-to-render mechanic.
+  * §4.9 ★ "The market has a season, and the caravans stop for a physical
+    reason" — what stands on the stalls, and whether the caravan is there at
+    all, is seasonal.
+  * §4.9 ★ "The fire image, and a period thermometer" — when fires burn and how
+    much. This one now has a renderer waiting for it: point 120g made the
+    §19.10 firelight carry visibly further under an overcast sun.
+  * §4.9 ★ "Indoor vs outdoor in the rains — the intuition is BACKWARDS" — read
+    it before writing the obvious thing.
+  * §4.0.5: Bemba and Lunda are SEDENTARY — no month empties them. A negative
+    finding, and it must be honoured: the mechanic is not universal.
+  * §4.0.2 ★ Swayne (1895) gives a PERIOD Somali season table (four named
+    seasons) that DISAGREES with the modern one — prefer the period table.
+  ANCHORS: `src/scenes/place/PlaceLife.tsx` (every vignette: Cook, Weaver, Kids,
+  Walkers, FireTender, Talkers, Pounder, Drummer, TaskWalker — and the
+  ColdCloaksContext pattern shows how to feed them settlement-wide state
+  without threading props through each); `src/scenes/place/lifeSpots.ts`;
+  `src/scenes/place/useColdCloaks.ts` (the "derive from the PLACE's own
+  coordinates and the date" rule this must follow too).
+  OVERLAP WITH 133 (rinderpest): §4.0 ★★ "the emutai: for this game's dates the
+  question is the wrong YEAR, not the wrong month" — the rinderpest years are
+  133's subject. Keep 142 about the NORMAL year and let 133 overlay the
+  catastrophe, or the two will fight over the same vignettes.
+  TESTS: pure — the per-people seasonal presence/work mapping across the year
+  (incl. the negative cases: Bemba/Lunda never empty; the Sahel's hungry season
+  lands in the RAINS, not the dry season). Live (`scripts/verify/polish.mjs`):
+  a transhumant village shows fewer inhabitants in its away month than in its
+  home month via `__placeWalkers`, with screenshots of both.
+  SIZE: large — split along the findings, one commit each. (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
