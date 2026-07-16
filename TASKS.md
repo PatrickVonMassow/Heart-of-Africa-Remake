@@ -3873,7 +3873,7 @@ the remaining open points in their numeric order.
   polish.mjs §19.13 (screenshot 114). The debug override still forces a season
   everywhere (that is its purpose), so the Cairo-dry check uses real months.
 
-- [x] 144. The plants themselves change: cover AND condition, not just colour.
+- [ ] 144. The plants themselves change: cover AND condition, not just colour.
   Wanted (user, 16.07.2026): "Wenn angebracht, sollte sich der Pflanzenbewuchs
   und der Zustand der Pflanzen auch je nach Jahreszeit ändern." — asked while
   reporting, correctly and repeatedly, that stepping through the months shows
@@ -3979,16 +3979,26 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 and §19.9 (the dressing), CLAUDE.md §7.1 pt. 12.
   ORDER: after 143 (which finishes what 120 claimed), before the 138-142
   additions. (Filed 16.07.2026.)
-  DONE (16.07.2026, 09cd768 + fa507fe): the tint pair exaggerated per the kitsch
-  licence (lever 4, Sahel green excess 46->61); and BARE BRANCHES (lever 2, the
-  strongest) — seasonFoliagePosition collapses green foliage vertices toward the
-  trunk as the tint uniform dries, reusing the greenness mask so evergreen zones
-  (Congo, uniform never leaves neutral) never go bare, no per-species rule. The
-  acacia thins to a wisp and the grass flattens in the dry season; the
-  screenshot pair is unmistakable where the tint alone was not. Levers left,
-  deliberately: the wet ground already darkens via the overcast sun-dim; the
-  BURNT LAND (lever 6) belongs to point 145(a), which builds the fire that
-  causes it.
+  PARTIALLY DONE, LEVER 2 REVERTED (16.07.2026): the tint pair is exaggerated
+  per the kitsch licence and stays (09cd768, Sahel green excess 46->61). BARE
+  BRANCHES shipped (fa507fe) and was REVERTED the same day (aec94a5) on a
+  critical user report with screenshot: at any dry month the trees exploded
+  into giant screen-spanning dark shards — reached by debug key AND by time
+  running normally into the month.
+  ⚠️ ROOT CAUSE, which the next attempt MUST honour: seasonFoliagePosition
+  displaced vertices in the POSITION stage by a mask derived from the
+  per-vertex COLOUR — and the colour jitters per vertex by design (flora.ts
+  tint(), the hand-made look). Neighbouring vertices of one crown collapsed by
+  different amounts, their shared triangles stretched into shards; on the
+  WebGL2 fallback catastrophically. My own screenshot 115 showed the shards
+  and I explained them away as "collapsed crowns seen from above" — the
+  user's report named them. LESSON: geometry displacement must key on a
+  UNIFORM per-part signal — a dedicated foliage attribute (0/1) baked in the
+  flora builders at build time — never on the jittered colour. The colour
+  MASK is fine for TINTING (a wrong colour is a subtle error; a wrong
+  position is a shard).
+  STILL OPEN here: bare branches via the baked attribute; grass
+  density/height; wet-ground puddles. The burnt land stays with 145(a).
 
 - [ ] 145. Three more parental sacrifices — a human cause, a lie, and a predator
   as a parent.
