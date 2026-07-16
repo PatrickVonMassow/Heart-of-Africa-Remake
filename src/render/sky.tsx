@@ -20,8 +20,8 @@ import {
   time,
   vec3,
 } from 'three/tsl'
-import { RAIN_GRAY } from '../systems/season'
-import { OVERCAST_CLOUDS_U, OVERCAST_GRAY_U } from './skyOvercast'
+import { HARMATTAN_PALE, RAIN_GRAY } from '../systems/season'
+import { HARMATTAN_DUST_U, OVERCAST_CLOUDS_U, OVERCAST_GRAY_U } from './skyOvercast'
 import type { SkyPreset } from './skyPresets'
 
 /**
@@ -75,11 +75,16 @@ export function SkyDome({
     const below = mix(color(preset.horizon), color(preset.ground), clamp(y.negate().mul(4), 0, 1))
     let col = mix(below, tinted, smoothstep(float(-0.015), float(0.01), y))
 
-    // Sun disc plus a wide warm halo.
+    // Sun disc plus a wide warm halo. Under the harmattan (point 140) the
+    // disc shows Dobson's "mild red" through the pall, and the HALO is MUTED —
+    // the counter-intuitive, researched half: "sunrises and sunsets lose their
+    // lustre; haloes may disappear altogether". Do not make the dust sunset
+    // spectacular; the phenomenon is the opposite.
     const s = max(mu, 0)
     const disc = pow(s, float(1200)).mul(3.0)
-    const halo = pow(s, float(6)).mul(0.22)
-    col = col.add(color(preset.sun).mul(disc.add(halo)))
+    const halo = pow(s, float(6)).mul(0.22).mul(float(1).sub(HARMATTAN_DUST_U.mul(0.75 / 0.7)))
+    const sunCol = mix(color(preset.sun), color('#c4502a'), HARMATTAN_DUST_U.mul(0.8 / 0.7).clamp(0, 1))
+    col = col.add(sunCol.mul(disc.add(halo)))
 
     // Slow drifting cloud bank, faded out toward the horizon. Built for every
     // preset so the wet season can grow a deck over a clear-sky region too;
@@ -105,6 +110,10 @@ export function SkyDome({
     // Overcast (§19.13): the whole dome, sun disc included, washes toward the
     // rain tone — a dimmed sun under a bright blue sky would read as a bug.
     col = mix(col, color(RAIN_GRAY).mul(0.62), OVERCAST_GRAY_U)
+    // The harmattan pall (point 140): a whitish-ochre dust wash, NOT the wet
+    // gray — the sky loses its blue into a milky pall. Applied after the rain
+    // mix; the two never fire together (the dust season is the dry season).
+    col = mix(col, color(HARMATTAN_PALE).mul(0.9), HARMATTAN_DUST_U)
 
     m.colorNode = col
     return m

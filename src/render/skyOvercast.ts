@@ -7,6 +7,10 @@ import { uniform } from 'three/tsl'
 // 0 = the preset's clear sky, 1 = full rain.
 export const OVERCAST_GRAY_U = uniform(0)
 export const OVERCAST_CLOUDS_U = uniform(0)
+// The harmattan pall (point 140): dust, not cloud — its own axis, because the
+// wet overcast grays toward RAIN_GRAY and thickens the deck, while the dust
+// whitens toward HARMATTAN_PALE, reddens the sun and MUTES the halo.
+export const HARMATTAN_DUST_U = uniform(0)
 
 /**
  * Set this frame's overcast look (from `skyOvercastParams`). Module-level, like
@@ -18,7 +22,12 @@ export function setSkyOvercast(grayMix: number, cloudBoost: number) {
   OVERCAST_CLOUDS_U.value = cloudBoost
 }
 
+/** Set this frame's harmattan pall (from `harmattanSkyParams`' paleMix). */
+export function setSkyHarmattan(paleMix: number) {
+  HARMATTAN_DUST_U.value = paleMix
+}
+
 /** The overcast currently on the dome (dev hooks / verification). */
-export function skyOvercast(): { grayMix: number; cloudBoost: number } {
-  return { grayMix: OVERCAST_GRAY_U.value, cloudBoost: OVERCAST_CLOUDS_U.value }
+export function skyOvercast(): { grayMix: number; cloudBoost: number; dust: number } {
+  return { grayMix: OVERCAST_GRAY_U.value, cloudBoost: OVERCAST_CLOUDS_U.value, dust: HARMATTAN_DUST_U.value }
 }

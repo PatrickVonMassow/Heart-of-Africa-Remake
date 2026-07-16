@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, karifAt, nileFloodAt, okavangoFloodAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -594,5 +594,33 @@ describe('dayOfYear', () => {
     expect(dayOfYear(0, START_YEAR)).toBe(0)
     expect(dayOfYear(on(12, 31), START_YEAR)).toBeGreaterThan(363)
     expect(dayOfYear(on(1, 1, START_YEAR + 1), START_YEAR)).toBe(0)
+  })
+})
+
+describe('harmattanSkyParams (point 140 — the look, incl. the counter-intuitive half)', () => {
+  it('is the identity with no dust, and at strength 0', () => {
+    expect(harmattanSkyParams(0, 1)).toEqual({ paleMix: 0, sunRedden: 0, haloMute: 0, rangeFactor: 1 })
+    expect(harmattanSkyParams(1, 0)).toEqual({ paleMix: 0, sunRedden: 0, haloMute: 0, rangeFactor: 1 })
+  })
+
+  it('whitens the sky and reddens the noon sun as the dust rises', () => {
+    const half = harmattanSkyParams(0.5, 1)
+    const full = harmattanSkyParams(1, 1)
+    expect(full.paleMix).toBeGreaterThan(half.paleMix)
+    expect(full.sunRedden).toBeGreaterThan(half.sunRedden)
+  })
+
+  it('MUTES the sunset — the trap, asserted: haloMute RISES with dust', () => {
+    // Dobson 1781 / the research: "sunrises and sunsets lose their lustre;
+    // haloes may disappear altogether." A build whose halo grows with the dust
+    // has the phenomenon backwards.
+    const p = harmattanSkyParams(1, 1)
+    expect(p.haloMute).toBeGreaterThan(harmattanSkyParams(0.4, 1).haloMute)
+    expect(p.haloMute).toBeGreaterThan(0.5)
+    expect(p.haloMute).toBeLessThanOrEqual(1)
+  })
+
+  it('closes the sight lines harder than the rain does — thick dust, <=1km haze', () => {
+    expect(harmattanSkyParams(1, 1).rangeFactor).toBeLessThan(seasonFogParams(1, 1).rangeFactor)
   })
 })

@@ -11,10 +11,13 @@ import { demElevation, demInlandWater } from '../../render/demElevation'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { setSkyOvercast } from '../../render/skyOvercast'
+import { setSkyHarmattan, setSkyOvercast } from '../../render/skyOvercast'
 import {
   CURRENT_WEATHER,
   effectiveWetness,
+  HARMATTAN_PALE,
+  harmattanAt,
+  harmattanSkyParams,
   RAIN_GRAY,
   rainAmount,
   seasonFogParams,
@@ -152,6 +155,7 @@ export function Climate() {
 
   const targetColor = useMemo(() => new THREE.Color(), [])
   const rainColor = useMemo(() => new THREE.Color(), [])
+  const dustColor = useMemo(() => new THREE.Color(), [])
   const hazeTarget = useMemo(() => new THREE.Color(), [])
   /** This frame's effective season wetness, for the dev hook. */
   const wetness = useRef(0)
@@ -168,6 +172,7 @@ export function Climate() {
       hazeOpacity: () => haze.opacityU.value as number,
       seasonWetness: () => wetness.current,
       rainOpacity: () => rain.opacityU.value,
+      dust: () => CURRENT_WEATHER.dust,
     }
     return () => {
       delete w.__climate
@@ -201,12 +206,19 @@ export function Climate() {
     )
     wetness.current = wet
     CURRENT_WEATHER.wetness = wet
+    // The harmattan (point 140): the Sahel's dry-season dust pall. Its own
+    // driver beside the wetness — the dust season IS the dry season, so the
+    // two never fire together at one place.
+    const dust = harmattanAt(s.day, lat, lon, START_YEAR)
+    CURRENT_WEATHER.dust = dust
     const fogSeason = seasonFogParams(wet, balance.season.weatherStrength)
+    const pall = harmattanSkyParams(dust, balance.season.weatherStrength)
 
     // The dome grays with the fog, and stays season-free in the debug zoom for
     // the same reason the haze does.
     const sky = skyOvercastParams(wet, balance.season.weatherStrength)
     setSkyOvercast(sky.grayMix * (1 - clearView), sky.cloudBoost * (1 - clearView))
+    setSkyHarmattan(pall.paleMix * (1 - clearView))
 
     // Rain follows the traveller and fades out in the debug zoom, like the
     // haze: a zoomed-out map view full of streaks would read as noise.
@@ -223,9 +235,14 @@ export function Climate() {
       targetColor.set(preset.color)
       rainColor.set(RAIN_GRAY)
       targetColor.lerp(rainColor, fogSeason.grayMix * (1 - clearView))
+      // The dust pall whitens the fog and closes the sight lines harder than
+      // the rain does ("a milky pall that masks distant views", <=1km haze).
+      dustColor.set(HARMATTAN_PALE)
+      targetColor.lerp(dustColor, pall.paleMix * (1 - clearView))
       fog.color.lerp(targetColor, k)
-      const nearT = preset.near * fogSeason.rangeFactor + (6000 - preset.near * fogSeason.rangeFactor) * clearView
-      const farT = preset.far * fogSeason.rangeFactor + (12000 - preset.far * fogSeason.rangeFactor) * clearView
+      const range = fogSeason.rangeFactor * pall.rangeFactor
+      const nearT = preset.near * range + (6000 - preset.near * range) * clearView
+      const farT = preset.far * range + (12000 - preset.far * range) * clearView
       fog.near += (nearT - fog.near) * k
       fog.far += (farT - fog.far) * k
       if (scene.background instanceof THREE.Color) scene.background.lerp(targetColor, k)

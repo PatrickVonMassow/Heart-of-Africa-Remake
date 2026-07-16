@@ -602,6 +602,8 @@ function Sun() {
     // wetness is Climate's per-frame scratch — one derivation for the whole
     // scene, not a second one here.
     light.intensity = SUN_BASE_INTENSITY * sunDimFactor(CURRENT_WEATHER.wetness, balance.season.weatherStrength)
+      // The harmattan pall conceals the sun (Dobson 1781) — a modest extra dim.
+      * (1 - CURRENT_WEATHER.dust * 0.25 * Math.min(1, Math.max(0, balance.season.weatherStrength)))
   })
   return (
     <>

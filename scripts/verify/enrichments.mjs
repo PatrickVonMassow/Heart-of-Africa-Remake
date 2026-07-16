@@ -2832,6 +2832,38 @@ check(
   await page.waitForTimeout(1000)
 }
 
+// Point 140 — the harmattan pall: the Sahel's dry-season dust. In January the
+// sky whitens toward the pall and the sight lines close HARDER than under
+// rain; in August (the rains) there is no dust at all. The counter-intuitive
+// look (muted sunsets, reddened noon sun) is pinned in the pure tests.
+{
+  await page.evaluate(() => window.__game.getState().debugJumpTo(12.5, 8.0)) // Sahel
+  await page.waitForTimeout(1200)
+  const at = async (month) => {
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.waitForTimeout(4000)
+    return page.evaluate(() => ({
+      dust: window.__climate.dust(),
+      fogFar: window.__climate.fog()?.far ?? null,
+    }))
+  }
+  const jan = await at(1)
+  await page.screenshot({ path: `${OUT}121-harmattan-pall-january.png` })
+  console.log('shot 121-harmattan-pall-january.png')
+  const aug = await at(8)
+  check(
+    'the harmattan palls the Sahel in January and is gone in the August rains (point 140)',
+    jan.dust > 0.8 && aug.dust === 0,
+    `dust Jan ${jan.dust.toFixed(2)} -> Aug ${aug.dust.toFixed(2)}`,
+  )
+  check(
+    'the pall closes the sight lines below the rainy-season fog',
+    jan.fogFar !== null && aug.fogFar !== null && jan.fogFar < aug.fogFar - 20,
+    `fogFar Jan ${jan.fogFar?.toFixed(0)} vs Aug ${aug.fogFar?.toFixed(0)}`,
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+}
+
 // Point 147(b) — VISIBLE, and measured in PIXELS rather than the tint uniform:
 // the whole reason this class of check exists. A savanna spot's ground must
 // differ on screen between its driest and wettest month, and a Congo spot —

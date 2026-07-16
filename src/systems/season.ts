@@ -470,6 +470,38 @@ export function skyOvercastParams(
   return { grayMix: 0.75 * w, cloudBoost: 0.8 * w }
 }
 
+/** The harmattan pall's tone: whitish ochre dust, NOT the wet RAIN_GRAY. */
+export const HARMATTAN_PALE = '#d9cdb2'
+
+/**
+ * How the harmattan reads on the sky (design.md §19.13, point 140) — a mode of
+ * its own, distinct from the rain overcast: dust, not cloud. The curves encode
+ * the researched look, including its counter-intuitive half:
+ *
+ * - The pall scatters all wavelengths roughly equally, so the SKY LOSES ITS
+ *   BLUE and goes whitish ("a milky pall that masks distant views") — paleMix.
+ * - The noon sun shows "of a mild red" through it (Dobson 1781) — sunRedden.
+ * - And the TRAP: "sunrises and sunsets lose their lustre; haloes may
+ *   disappear altogether." The dust MUTES the sunset rather than making it
+ *   spectacular — haloMute RISES with dust, and a build that intensifies the
+ *   halo instead has it backwards.
+ * - Sight lines close in ("thick dust haze <= 1,000 m") — rangeFactor.
+ *
+ * Pure, identity at dust 0, like seasonFogParams.
+ */
+export function harmattanSkyParams(
+  dust: number,
+  strength: number,
+): { paleMix: number; sunRedden: number; haloMute: number; rangeFactor: number } {
+  const d = Math.min(1, Math.max(0, dust)) * Math.min(1, Math.max(0, strength))
+  return {
+    paleMix: 0.7 * d,
+    sunRedden: 0.8 * d,
+    haloMute: 0.75 * d,
+    rangeFactor: 1 - 0.55 * d, // harder than the rain's 0.4: the dust is thicker
+  }
+}
+
 /**
  * How far the wet season dims the sun (multiplier on the light intensity).
  * Overcast, not night: at full rain the light drops to ~60%.
@@ -487,7 +519,7 @@ export function sunDimFactor(wetness: number, strength: number): number {
  * greenness per-zone via `effectiveGreenness` from the player's coordinate,
  * because the absolute wetness this holds cannot carry a per-zone flora look.
  */
-export const CURRENT_WEATHER = { wetness: 0 }
+export const CURRENT_WEATHER = { wetness: 0, dust: 0 }
 
 export function wetnessAt(
   day: number,
