@@ -120,6 +120,16 @@ vignette says "millet fields run to the horizon". The vignette describes Segou.
 
 ## 2. Dress around 1890
 
+> **⏩ FORWARD-POINTER (added by the point-148 cleanup, 16.07.2026).** §7 (the
+> point-137 second pass) went deeper into the period sources and OVERTURNED
+> several of this section's findings. §2 is kept unedited as the record of what
+> was known when, but read it alongside §7: the §2.6 "Sahel harmattan: EVIDENCE
+> ABSENT" is answered for the Tuareg, Hausa and San in §7.2 (a bernus, a zenne,
+> a ‡nau — all period-sourced); the §2.3 kanzu, marked THIN here, is
+> period-sourced in §7.1 (New 1873); and the §4.0.4 Okavango inversion, marked
+> MODERN, is period-confirmed twice in §7.3 (Andersson + Livingstone). What
+> shipped is §7's answer.
+
 ### 2.1 The Maasai red shuka is an anachronism — SETTLED from the period text ✅
 
 **Thomson, *Through Masai Land* (fieldwork 1883–84), read directly via the
