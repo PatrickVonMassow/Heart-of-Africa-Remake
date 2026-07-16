@@ -273,6 +273,8 @@ export interface Strings {
     canoeSpeedup: string
     junglePenalty: string
     riverWidthFactor: string
+    drownSeconds: string
+    wetFlowFactor: string
     seasonStrength: string
     season: string
     seasonAuto: string

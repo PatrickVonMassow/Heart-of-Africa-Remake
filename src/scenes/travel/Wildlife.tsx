@@ -40,6 +40,9 @@ import {
   killFlockMayDescend,
   deflectedStep,
   type FlightState,
+  channelDriftStep,
+  seasonFlowFactor,
+  waterStruggleFate,
 } from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
 import {
@@ -131,6 +134,10 @@ interface Animal {
   lionFed?: boolean
   /** Seconds this calf has been struggling in open water (design.md §19). */
   inWater?: number
+  /** Seconds a rescuing parent has been wading in open water (point 122) —
+   *  its own field, NOT inWater: that one carries calf-only pose/behaviour
+   *  couplings (facing freeze, dodge exemption, render struggle). */
+  wadeTime?: number
   /** Land point to walk back to after a water rescue (where the calf fell in). */
   rescueEntry?: { x: number; z: number }
   /** The parent reached its calf in the water: both walk back to the
@@ -440,16 +447,22 @@ function fallsDistanceDeg(lat: number, lon: number): number {
 }
 
 /** Nearest land spot around a water point (probing rings outward): the walk-
- *  back target of a rescue when the fall-in point was never seen on land. */
+ *  back target of a rescue when the fall-in point was never seen on land.
+ *  Two passes: proper dry land first, then any non-water cell regardless of
+ *  height — the widened river mouths (point 136) carve broad low aprons
+ *  where nothing clears the dry bar for many units, and a low coast cell is
+ *  still better than leaving an animal standing in the open sea. */
 function findLandNear(x: number, z: number, seed: number): { x: number; z: number } {
-  for (let r = 1; r <= 10; r += 1.5) {
-    for (let k = 0; k < 8; k++) {
-      const ang = (k / 8) * Math.PI * 2
-      const nx = x + Math.cos(ang) * r
-      const nz = z + Math.sin(ang) * r
-      const ll = worldToLatLon(nx, nz)
-      const t = sampleTerrain(ll.lat, ll.lon, seed)
-      if (t.type !== 'water' && t.type !== 'ocean' && t.height > 0.05) return { x: nx, z: nz }
+  for (const minHeight of [0.05, -Infinity]) {
+    for (let r = 1; r <= 14; r += 1.5) {
+      for (let k = 0; k < 12; k++) {
+        const ang = (k / 12) * Math.PI * 2
+        const nx = x + Math.cos(ang) * r
+        const nz = z + Math.sin(ang) * r
+        const ll = worldToLatLon(nx, nz)
+        const t = sampleTerrain(ll.lat, ll.lon, seed)
+        if (t.type !== 'water' && t.type !== 'ocean' && t.height > minHeight) return { x: nx, z: nz }
+      }
     }
   }
   return { x, z } // mid-lake with no bank in reach — hold position
@@ -1069,19 +1082,53 @@ function Herds() {
               }
               continue
             }
-            // Drift downstream, harder near a fall (§11-style current).
+            // Drift downstream, harder near a fall (§11-style current) and
+            // harder in the rains: the wet season swells the whole drama
+            // current (point 122, calibratable in balance.waterDrama).
+            const bw = balance.waterDrama
+            const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
             const flow = riverFlow(ll.lat, ll.lon)
             if (flow.strength > 0) {
               const boost =
                 fd < FALLS_DRIFT_RADIUS_DEG ? 1 + (FALLS_DRIFT_BOOST - 1) * (1 - fd / FALLS_DRIFT_RADIUS_DEG) : 1
-              const stepDeg = flow.strength * CALF_DRIFT_DEG * boost * dt
-              a.x += flow.dirLon * stepDeg * UNITS_PER_DEGREE
-              a.z -= flow.dirLat * stepDeg * UNITS_PER_DEGREE
+              const stepDeg = flow.strength * season * CALF_DRIFT_DEG * boost * dt
+              // The drift follows the CHANNEL (channelDriftStep): the raw
+              // segment tangent cut every bend and beached the calf, where
+              // the current dies and neither rescue nor drowning resolves.
+              const moved = channelDriftStep(
+                a.x,
+                a.z,
+                flow.dirLon * stepDeg * UNITS_PER_DEGREE,
+                -flow.dirLat * stepDeg * UNITS_PER_DEGREE,
+                (wx, wz) => {
+                  const w = worldToLatLon(wx, wz)
+                  return sampleTerrain(w.lat, w.lon, seed).type === 'water'
+                },
+              )
+              a.x = moved.x
+              a.z = moved.z
               const nll = worldToLatLon(a.x, a.z)
               a.y = Math.max(0.02, sampleTerrain(nll.lat, nll.lon, seed).height)
             }
-            // An unaided calf eventually clambers out exhausted on its own.
-            if (a.inWater > STRUGGLE_SELF_RESCUE) a.rescued = true
+            // Calm water lets an unaided calf clamber out exhausted; a swollen
+            // current holds it under until it drowns (design.md §19.8).
+            const fate = waterStruggleFate(
+              flow.strength * season,
+              a.inWater,
+              STRUGGLE_SELF_RESCUE,
+              bw.drownSeconds,
+              bw.drownFlowThreshold,
+            )
+            if (fate === 'drowned') {
+              a.dead = true
+              a.lionFed = true // the river takes it — it sinks, nothing scavenges
+              a.dissolve = CARCASS_DISSOLVE_SECONDS
+              const par = a.parent
+              a.parent = undefined
+              if (par) par.child = undefined
+              continue
+            }
+            if (fate === 'self-rescue') a.rescued = true
           }
           if (a.rescued) {
             // Pulled out (or clambering out): walk back to the entry bank.
@@ -1131,12 +1178,27 @@ function Herds() {
               if (!calf.rescueEntry) calf.rescueEntry = findLandNear(calf.x, calf.z, seed)
             }
             // The rescuer is at the river's mercy too: wading close to a fall
-            // it is swept over and dies, and the calf struggles on alone.
+            // it is swept over and dies, and the calf struggles on alone —
+            // and a parent that stays too long in a swollen current drowns
+            // beside its calf (point 122).
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             if (ter.type === 'water') {
               a.y = Math.max(0.02, ter.height)
-              if (fallsDistanceDeg(ll.lat, ll.lon) < FALLS_DEATH_RADIUS_DEG) {
+              a.wadeTime = (a.wadeTime ?? 0) + dt
+              const bw = balance.waterDrama
+              const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+              const wadeFlow = riverFlow(ll.lat, ll.lon)
+              const swept = fallsDistanceDeg(ll.lat, ll.lon) < FALLS_DEATH_RADIUS_DEG
+              const drowned =
+                waterStruggleFate(
+                  wadeFlow.strength * season,
+                  a.wadeTime,
+                  Infinity, // a wading parent never "self-rescues" — it leaves by escort
+                  bw.drownSeconds,
+                  bw.drownFlowThreshold,
+                ) === 'drowned'
+              if (swept || drowned) {
                 a.dead = true
                 a.lionFed = true
                 a.inWater = 0
@@ -1144,9 +1206,13 @@ function Herds() {
                 calf.parent = undefined
                 a.child = undefined
               }
+            } else {
+              a.wadeTime = undefined
             }
           } else if (calf.rescueEntry) {
-            // Escort the pulled-out calf back to the bank.
+            // Escort the pulled-out calf back to the bank. The wade is over —
+            // the drown clock must not carry into the next drama (point 122).
+            a.wadeTime = undefined
             const dx = calf.rescueEntry.x - a.x
             const dz = calf.rescueEntry.z - a.z
             const d = Math.hypot(dx, dz)

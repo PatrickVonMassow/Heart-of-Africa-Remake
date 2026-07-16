@@ -364,3 +364,62 @@ export function deflectedStep(
   }
   return { x, z, heading, moved: false }
 }
+
+/**
+ * Seasonal multiplier on the river current for the §19.8 water drama
+ * (point 122): the rains swell the rivers, the dry season tames them. Linear
+ * between the two calibratable factors over the local wetness (0..1).
+ */
+export function seasonFlowFactor(wetness: number, dryFactor: number, wetFactor: number): number {
+  const w = Math.min(1, Math.max(0, wetness))
+  return dryFactor + (wetFactor - dryFactor) * w
+}
+
+export type StruggleFate = 'struggling' | 'self-rescue' | 'drowned'
+
+/**
+ * The drown/self-rescue decision for an animal carried by the current
+ * (design.md §19.8, point 122). Calm water is what the self-rescue was
+ * always about: below the flow threshold an unaided animal clambers out
+ * exhausted after `selfRescueSeconds` and NEVER drowns. At or above the
+ * threshold the current is too strong to leave — the self-rescue must not
+ * fire (otherwise nothing ever drowns), and after `drownSeconds` the river
+ * takes the animal.
+ */
+export function waterStruggleFate(
+  effectiveFlow: number,
+  secondsInWater: number,
+  selfRescueSeconds: number,
+  drownSeconds: number,
+  drownFlowThreshold: number,
+): StruggleFate {
+  if (effectiveFlow >= drownFlowThreshold) {
+    return secondsInWater >= drownSeconds ? 'drowned' : 'struggling'
+  }
+  return secondsInWater > selfRescueSeconds ? 'self-rescue' : 'struggling'
+}
+
+/**
+ * One downstream drift step that FOLLOWS the channel (point 122): the raw
+ * tangent of the nearest river segment cuts every bend, and the swollen
+ * wet-season drift slid the struggling animal ashore within seconds — where
+ * the current dies and the drama fizzled. A step that would beach the animal
+ * falls back to its lon-only then lat-only component, and if every candidate
+ * is dry it stays put (still in the water at its old spot).
+ */
+export function channelDriftStep(
+  x: number,
+  z: number,
+  stepX: number,
+  stepZ: number,
+  isWater: (x: number, z: number) => boolean,
+): { x: number; z: number } {
+  for (const [nx, nz] of [
+    [x + stepX, z + stepZ],
+    [x + stepX, z],
+    [x, z + stepZ],
+  ] as const) {
+    if (isWater(nx, nz)) return { x: nx, z: nz }
+  }
+  return { x, z }
+}

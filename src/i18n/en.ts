@@ -353,6 +353,8 @@ export const en: Strings = {
     canoeSpeedup: 'Canoe speed factor (water)',
     junglePenalty: 'Jungle penalty factor (no machete)',
     riverWidthFactor: 'River width factor (applies on reload)',
+    drownSeconds: 'Drowning: seconds in a strong current',
+    wetFlowFactor: 'Drowning: wet-season current factor',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

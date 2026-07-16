@@ -2802,7 +2802,7 @@ the remaining open points in their numeric order.
   (LION_STATE) from blocking the rest. (Reported 15.07.2026; (f) added
   16.07.2026.)
 
-- [ ] 122. Family drama: the swollen river of the rains, and drowning.
+- [x] 122. Family drama: the swollen river of the rains, and drowning.
   DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the wet
   season the current turns the existing calf-in-water accident deadly — and,
   explicitly added by the user, ANIMALS DROWN when a current carries them too
@@ -2840,6 +2840,26 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.8 (the self-rescue sentence changes — say plainly that a
   long-swept animal drowns) and CLAUDE.md §7.1 pt. 12/21. One atomic commit.
   (Reported 15.07.2026.)
+  DONE (16.07.2026, 22:47): (a) balance.waterDrama {drownSeconds 30,
+  drownFlowThreshold 0.8, dryFlowFactor 0.6, wetFlowFactor 1.8}, debug-editable
+  (drownSeconds + wetFlowFactor fields, both languages). (b) pure
+  waterStruggleFate over (effective flow, seconds): calm water self-rescues
+  and NEVER drowns, a strong current never self-rescues and drowns exactly at
+  the threshold second; seasonFlowFactor interpolates dry->wet over
+  CURRENT_WEATHER.wetness (honours the debug override). (c) the wading parent
+  carries its own wadeTime clock (NOT inWater — that field has pose/dodge
+  couplings) and drowns beside its calf in a swollen current; cleared on
+  escort. TWO live findings fixed on the way: the swollen drift followed the
+  raw segment tangent and BEACHED the struggling calf at every bend
+  (channelDriftStep now clamps each drift step to water — pure-tested), and
+  findLandNear found no land near the point-136-widened Niger mouth (its
+  carve apron holds no cell above the dry bar for >2 units) — two-pass search
+  (dry first, then any non-water cell), which also refixed the §19.5
+  ocean-setback check. Live checks are staging-hardened (8 offset family
+  candidates; the water sweep can win the race when the calf is mid-catch —
+  a state the drama entry excludes but the sweep does not). Suite: 1641
+  vitest green, enrichments 165 PASS / exit 0 incl. the two new fate checks
+  (rains: drowned, never rescued; dry: clambers out alive).
 
 - [ ] 123. Family drama: the drying waterhole of the dry season.
   DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the dry

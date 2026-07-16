@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  channelDriftStep,
+  seasonFlowFactor,
+  waterStruggleFate,
   blockHeading,
   fleeHeading,
   FLIGHT_DESPAWN_OUT,
@@ -597,5 +600,77 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     expect(r.moved).toBe(true)
     // It did NOT step straight into the pocket column.
     expect(Math.abs(r.heading)).toBeGreaterThan(0.01)
+  })
+})
+
+describe('waterStruggleFate (design.md §19.8, point 122 — calm water rescues, a swollen current drowns)', () => {
+  const SELF_RESCUE = 25
+  const DROWN = 30
+  const THRESHOLD = 0.8
+
+  const fate = (flow: number, seconds: number) =>
+    waterStruggleFate(flow, seconds, SELF_RESCUE, DROWN, THRESHOLD)
+
+  it('calm water self-rescues after the exhaustion window and never drowns', () => {
+    expect(fate(0, 10)).toBe('struggling')
+    expect(fate(0, 25.1)).toBe('self-rescue')
+    expect(fate(0.5, 26)).toBe('self-rescue')
+    // Even absurdly long in calm water: exhaustion wins, the river never does.
+    expect(fate(0.79, 10_000)).toBe('self-rescue')
+  })
+
+  it('a strong current drowns exactly at the threshold second — and never self-rescues', () => {
+    expect(fate(1, 29.99)).toBe('struggling')
+    expect(fate(1, 30)).toBe('drowned')
+    // The self-rescue must NOT fire in a strong current, or nothing ever
+    // drowns: past the 25 s window it keeps struggling until the river takes it.
+    expect(fate(1, 26)).toBe('struggling')
+  })
+
+  it('the flow boundary is exact: just below clambers out, at it drowns', () => {
+    expect(fate(THRESHOLD - 1e-9, 40)).toBe('self-rescue')
+    expect(fate(THRESHOLD, 40)).toBe('drowned')
+  })
+
+  it('an Infinity self-rescue window (the wading parent) still drowns in a strong current', () => {
+    expect(waterStruggleFate(1, 30, Infinity, DROWN, THRESHOLD)).toBe('drowned')
+    expect(waterStruggleFate(0.5, 10_000, Infinity, DROWN, THRESHOLD)).toBe('struggling')
+  })
+})
+
+describe('seasonFlowFactor (point 122 — the rains swell the drama current)', () => {
+  it('interpolates dry -> wet over the wetness and clamps outside 0..1', () => {
+    expect(seasonFlowFactor(0, 0.6, 1.8)).toBeCloseTo(0.6, 9)
+    expect(seasonFlowFactor(1, 0.6, 1.8)).toBeCloseTo(1.8, 9)
+    expect(seasonFlowFactor(0.5, 0.6, 1.8)).toBeCloseTo(1.2, 9)
+    expect(seasonFlowFactor(-1, 0.6, 1.8)).toBeCloseTo(0.6, 9)
+    expect(seasonFlowFactor(2, 0.6, 1.8)).toBeCloseTo(1.8, 9)
+  })
+
+  it('with the shipped balance values, a mid-channel flow drowns only in the rains', () => {
+    // flow 1.0 (centerline): dry 0.6 < 0.8 (clambers out), rains 1.8 >= 0.8.
+    expect(1.0 * seasonFlowFactor(0.05, 0.6, 1.8)).toBeLessThan(0.8)
+    expect(1.0 * seasonFlowFactor(0.9, 0.6, 1.8)).toBeGreaterThanOrEqual(0.8)
+  })
+})
+
+describe('channelDriftStep (point 122 — the current follows the channel, never beaches)', () => {
+  it('takes the full step while it stays on water', () => {
+    const all = () => true
+    expect(channelDriftStep(0, 0, 1, 2, all)).toEqual({ x: 1, z: 2 })
+  })
+
+  it('falls back to the in-channel component when the full step would beach', () => {
+    // Water is the half-plane x <= 0.5: the x-component beaches, z flows.
+    const water = (x: number) => x <= 0.5
+    expect(channelDriftStep(0, 0, 1, 2, water)).toEqual({ x: 0, z: 2 })
+    // Water is z <= 0.5: the z-component beaches, x flows.
+    const waterZ = (_x: number, z: number) => z <= 0.5
+    expect(channelDriftStep(0, 0, 1, 2, waterZ)).toEqual({ x: 1, z: 0 })
+  })
+
+  it('stays put when every candidate is dry (still in the water at its old spot)', () => {
+    const none = () => false
+    expect(channelDriftStep(3, 4, 1, 1, none)).toEqual({ x: 3, z: 4 })
   })
 })

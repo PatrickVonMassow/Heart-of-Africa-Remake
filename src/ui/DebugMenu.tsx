@@ -243,6 +243,10 @@ export function DebugMenu() {
           the edit persists in balance and applies on the next reload. */}
       <NumberField label={t.debug.riverWidthFactor} value={balance.river.widthFactor} step={0.1}
         onChange={(v) => { balance.river.widthFactor = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.drownSeconds} value={balance.waterDrama.drownSeconds} step={5}
+        onChange={(v) => { balance.waterDrama.drownSeconds = Math.max(1, v); bump() }} />
+      <NumberField label={t.debug.wetFlowFactor} value={balance.waterDrama.wetFlowFactor} step={0.1}
+        onChange={(v) => { balance.waterDrama.wetFlowFactor = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>

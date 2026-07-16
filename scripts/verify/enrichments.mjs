@@ -2003,6 +2003,10 @@ check('juveniles render through their own baby-schema calf meshes',
 // water starts to struggle, the parent wades in from farther inland, pulls it
 // out and both walk back to land alive.
 await waitForFamily()
+// The rescue is the CALM-water behaviour — pin the season dry so the austral
+// rains can never swell the drama current under this check (point 122).
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+await page.waitForTimeout(400)
 const rescue = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
@@ -2060,6 +2064,85 @@ check('a calf on open water starts to struggle and its parent wades in',
   rescue.found && !rescue.noWater && rescue.fellIn && rescue.parentApproached, JSON.stringify(rescue))
 check('the parent pulls the calf out and both return to the bank alive',
   rescue.found && rescue.rescued && rescue.backOnLand && rescue.bothAlive, JSON.stringify(rescue))
+
+// --- Point 122: the swollen river of the rains, and drowning ------------------
+// design.md §19.8: in a SWOLLEN current the self-rescue must not fire — an
+// animal carried too long drowns (dead, sinking, never scavenged). The same
+// mid-channel setup in the dry season still clambers out on its own: the
+// season, not the script, decides the fate. One self-contained evaluate per
+// season: it stages a calf on a strong lower-Nile flow (no waterfall within
+// drift reach) with its parent held far beyond wading range, RETRIES with the
+// next family if the calf never enters the water state (the scripted lion may
+// be hunting exactly that calf, which blocks the fall-in), then follows that
+// one calf to its fate.
+const runDrownScenario = async () =>
+  page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+    const hydro = await import('/src/world/hydro.ts')
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    // Strong mid-channel flow on the lower Nile (lat 29..27 holds no falls).
+    let spot = null
+    outer: for (let lat = 29; lat >= 27; lat -= 0.04) {
+      for (let lon = 30.4; lon <= 31.8; lon += 0.04) {
+        if (window.__terrainType(lat, lon, seed) !== 'water') continue
+        if (hydro.riverFlowExact(lat, lon).strength >= 0.9) { spot = [lat, lon]; break outer }
+      }
+    }
+    if (!spot) return { noSpot: true }
+    const families = []
+    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+      for (const a of herds[sp] || [])
+        if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined)
+          families.push(a)
+    }
+    const U = 10
+    let calf = null
+    let tries = 0
+    for (const parent of families.slice(0, 8)) {
+      tries++
+      const c = parent.child
+      // Slightly offset per attempt: a rejected predecessor still stands at
+      // the spot, and stacking candidates trips the body separation.
+      c.x = spot[1] * U + (tries - 1) * 0.4
+      c.z = -spot[0] * U
+      // Far beyond wading reach for the whole drown window (WADE_SPEED 4.2).
+      parent.x = c.x - 180
+      parent.z = c.z
+      const t0 = Date.now()
+      while (Date.now() - t0 < 1500 && c.inWater === undefined && !c.dead) await sleep(100)
+      if (c.inWater !== undefined) { calf = c; break }
+      // Never entered the water state (the water sweep can win the race when
+      // the calf is the lion's current victim or mid-catch — states the drama
+      // entry excludes but the sweep does not): try the next family.
+    }
+    if (!calf) return { staged: false, tries }
+    const out = { staged: true, tries, drowned: false, rescued: false, out: false, lionFed: false }
+    const t1 = Date.now()
+    while (Date.now() - t1 < 45000) {
+      if (calf.rescued) out.rescued = true
+      if (calf.dead) { out.drowned = true; out.lionFed = !!calf.lionFed; break }
+      if (calf.inWater === undefined && !calf.dead) { out.out = true; break }
+      await sleep(150)
+    }
+    return out
+  })
+// (a) Forced rains: the current holds the calf under until it drowns.
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+await page.waitForTimeout(400)
+const drowned = await runDrownScenario()
+check('in the forced rains a calf in a strong current drowns — dead, never rescued (point 122)',
+  !drowned.noSpot && drowned.staged && drowned.drowned && !drowned.rescued && drowned.lionFed,
+  JSON.stringify(drowned))
+// (b) The dry season: the SAME setup still clambers out alive on its own.
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+await page.waitForTimeout(400)
+const clambered = await runDrownScenario()
+check('in the dry season the same mid-channel calf clambers out alive (point 122)',
+  !clambered.noSpot && clambered.staged && clambered.out && !clambered.drowned,
+  JSON.stringify(clambered))
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+await page.waitForTimeout(300)
 
 // (3) Waterfall: a calf in the water inside Victoria Falls' reach is swept over
 // and dies; its parent plunges after it and dies too. The player stays on the

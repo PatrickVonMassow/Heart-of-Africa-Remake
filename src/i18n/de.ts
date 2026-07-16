@@ -352,6 +352,8 @@ export const de: Strings = {
     canoeSpeedup: 'Kanu-Tempofaktor (Wasser)',
     junglePenalty: 'Malusfaktor Dschungel (ohne Machete)',
     riverWidthFactor: 'Flussbreiten-Faktor (greift nach Neuladen)',
+    drownSeconds: 'Ertrinken: Sekunden in starker Strömung',
+    wetFlowFactor: 'Ertrinken: Strömungsfaktor Regenzeit',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',

@@ -489,7 +489,14 @@ verify suite that proves it.
       step direction is live-checked against sawtoothing
       (`scripts/verify/enrichments.mjs`); a calf on open water starts a
       struggle and its parent wades in, pulls it out and both return to
-      the bank alive; in the water inside a waterfall's reach a calf is
+      the bank alive — in CALM water: the drown/self-rescue fate is
+      season-gated (point 122; pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`, the balance values
+      debug-editable): in the forced rains a calf in a strong mid-channel
+      current drowns (dead, sinking, never rescued or scavenged) while the
+      SAME setup in the dry season still clambers out alive, and a rescuing
+      parent that wades a swollen current too long drowns beside its calf
+      (both live in `scripts/verify/enrichments.mjs`); in the water inside a waterfall's reach a calf is
       swept over and dies with its parent plunging after it, and a
       rescuing parent wading into the falls' reach is swept over itself
       while its calf survives. Calf trample grief (§19.8): a calf

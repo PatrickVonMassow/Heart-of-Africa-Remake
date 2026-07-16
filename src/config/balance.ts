@@ -216,6 +216,17 @@ export interface BalanceConfig {
   }
   /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
    *  gameplay speeds and sensitivities are unchanged. */
+  /** Calf/parent water drama (design.md §19.8, point 122). */
+  waterDrama: {
+    /** Seconds a strong current may carry an animal before it drowns. */
+    drownSeconds: number
+    /** Effective flow at/above which self-rescue fails and drowning starts. */
+    drownFlowThreshold: number
+    /** Seasonal multiplier on the drama current at wetness 0 (dry season). */
+    dryFlowFactor: number
+    /** Seasonal multiplier on the drama current at wetness 1 (full rains). */
+    wetFlowFactor: number
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -392,6 +403,12 @@ export const balance: BalanceConfig = {
     landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
     vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement
     vicinityRadius: 75, // ≈ 1.5× the default-zoom view ring (VIEW_AT_ZOOM1·0.5)
+  },
+  waterDrama: {
+    drownSeconds: 30, // calibratable: how long the current may carry an animal
+    drownFlowThreshold: 0.8, // reached only by a wet-amplified or mid-channel flow
+    dryFlowFactor: 0.6, // dry-season rivers run tame — self-rescue always wins
+    wetFlowFactor: 1.8, // the rains swell the current past the drown threshold
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
