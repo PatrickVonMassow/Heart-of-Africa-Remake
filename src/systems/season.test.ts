@@ -24,6 +24,7 @@ const DANAKIL = { lat: 13.5, lon: 40.5, elev: -100 } // below sea level, same bo
 const ZAMBEZI = { lat: -17.9, lon: 25.9 }
 const CAPE_TOWN = { lat: -33.9, lon: 18.4 }
 const FANG = { lat: 1.8, lon: 11.5 } // the game's Fang village — Woleu-Ntem, Gabon
+const SOMALI_HAUD = { lat: 9.0, lon: 45.0 } // moved into the Haud (point 137)
 
 describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regions)', () => {
   it('Cairo is Saharan, not Mediterranean — the trap a bare parallel falls into', () => {
@@ -58,6 +59,30 @@ describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regi
     expect(climateZoneAt(DANAKIL.lat, DANAKIL.lon, DANAKIL.elev)).not.toBe('ethiopian-highlands')
     // And the same coordinate flips once it is genuinely high ground.
     expect(climateZoneAt(DANAKIL.lat, DANAKIL.lon, 2000)).toBe('ethiopian-highlands')
+  })
+
+  it('gives the Horn its own zone — east-rift stops at 6N and the rest fell through', () => {
+    // Found by the village-move conflict check (point 137): moving the Somali
+    // village into the Haud pushed it out of east-rift's lat < 6 and into the
+    // tropical fallback, i.e. the game would have given the Horn the CONGO's
+    // unimodal Jun-Sep rains.
+    expect(climateZoneAt(SOMALI_HAUD.lat, SOMALI_HAUD.lon, 964)).toBe('horn')
+    expect(climateZoneAt(10.3, 45.0, 10)).toBe('horn') // Berbera, the port
+    // And it must not swallow its neighbours.
+    expect(climateZoneAt(ADDIS.lat, ADDIS.lon, ADDIS.elev)).toBe('ethiopian-highlands')
+    expect(climateZoneAt(NAIROBI.lat, NAIROBI.lon, 0)).toBe('east-rift')
+  })
+
+  it("runs the Horn on Swayne's PERIOD seasons, which the research says disagree with the modern ones", () => {
+    // jilal (Jan-Mar) driest with great heat; gu (Apr-Jun) the main rains;
+    // haga (Jul-Sep) hot and dry; dayr (Oct-Dec) the lesser rains.
+    const h = (m: number) => wet(m, SOMALI_HAUD.lat, SOMALI_HAUD.lon, 964)
+    expect(h(2)).toBeLessThan(0.05) // jilal
+    expect(h(5)).toBeGreaterThan(h(11)) // gu is the MAIN rains, dayr the lesser
+    expect(h(11)).toBeGreaterThan(h(8)) // dayr over haga
+    expect(h(8)).toBeLessThan(0.05) // haga is dry
+    // And arid throughout — the Horn is far drier than the rift beside it.
+    for (let m = 1; m <= 12; m++) expect(h(m)).toBeLessThan(0.35)
   })
 
   it('does not send the Atlantic equator to the DESERT — the hole between two rules', () => {

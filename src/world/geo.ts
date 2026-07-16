@@ -204,8 +204,8 @@ export const VILLAGE_HEARTLANDS: PlaceDef[] = [
   { id: 'lunda-village', kind: 'village', peopleId: 'lunda', lat: -10.0, lon: 23.4, region: 'central' },
   // East — Masai, Swahili, Somali, Sidamo, Uganda
   { id: 'maasai-village', kind: 'village', peopleId: 'maasai', lat: -2.5, lon: 36.8, region: 'east' },
-  { id: 'swahili-village', kind: 'village', peopleId: 'swahili', lat: -6.5, lon: 38.7, region: 'east' },
-  { id: 'somali-village', kind: 'village', peopleId: 'somali', lat: 5.5, lon: 45.0, region: 'east' },
+  { id: 'swahili-village', kind: 'village', peopleId: 'swahili', lat: -2.4, lon: 40.6, region: 'east' },
+  { id: 'somali-village', kind: 'village', peopleId: 'somali', lat: 9.0, lon: 45.0, region: 'east' },
   { id: 'sidama-village', kind: 'village', peopleId: 'sidama', lat: 6.7, lon: 38.4, region: 'east' },
   { id: 'baganda-village', kind: 'village', peopleId: 'baganda', lat: 0.75, lon: 32.55, region: 'east' },
   // South — Wayeyi, Bemba, Pedi, Zulu, San

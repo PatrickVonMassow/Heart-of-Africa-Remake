@@ -38,6 +38,7 @@ export type ClimateZone =
   | 'atlantic-equatorial' // Gabon/south Cameroon: equatorial but with a hard Jun-Sep dry
   | 'ethiopian-highlands' // kiremt + belg
   | 'east-rift' // bimodal: long rains MAM, short rains OND
+  | 'horn' // Somalia/Ogaden: bimodal but ARID — Swayne's period four seasons
   | 'southern-plateau' // ~12-25S: summer rain
   | 'cape' // south of ~30S: winter rain — OPPOSITE to the rest of the south
 
@@ -71,6 +72,12 @@ const MONTH_PROFILE: Record<ClimateZone, readonly number[]> = {
   'ethiopian-highlands': [0.05, 0.2, 0.4, 0.45, 0.35, 0.6, 1, 0.95, 0.55, 0.1, 0.05, 0.03],
   // Long rains Mar-May (peak Apr), short rains Oct-Dec (peak Nov).
   'east-rift': [0.15, 0.15, 0.6, 1, 0.7, 0.15, 0.1, 0.1, 0.2, 0.6, 0.85, 0.5],
+  // Swayne's PERIOD four seasons (1895, fieldwork 1885-93 — the game's own
+  // decade), which docs/peoples-1890.md §7.1 records as DISAGREEING with the
+  // modern calendar; the period table wins: jilal (Jan-Mar/Apr) the driest with
+  // great heat, gu (Apr-Jun) the main rains, haga (Jul-Sep) hot and dry with the
+  // karif wind, dayr (Oct-Dec) the lesser rains.
+  horn: [0.02, 0.02, 0.08, 0.6, 1, 0.45, 0.06, 0.05, 0.12, 0.55, 0.8, 0.25],
   // Summer rain Nov-Mar, peak Jan-Feb; bone dry Jun-Aug.
   'southern-plateau': [1, 0.95, 0.7, 0.3, 0.1, 0.03, 0.02, 0.03, 0.1, 0.4, 0.8, 0.95],
   // Winter rain Apr-Oct — the inverse of the plateau above it.
@@ -93,6 +100,7 @@ const ZONE_WETNESS: Record<ClimateZone, number> = {
   'atlantic-equatorial': 0.9, // Gabon is very wet in its rains (~1800-3000mm/yr)
   'ethiopian-highlands': 0.7,
   'east-rift': 0.6,
+  horn: 0.3, // arid: the Horn is far drier than the rift it borders
   'southern-plateau': 0.65,
   cape: 0.5,
 }
@@ -128,6 +136,11 @@ export function climateZoneAt(lat: number, lon: number, elevationM: number): Cli
   if (lat >= 6 && lat <= 15 && lon >= 35 && lon <= 42 && elevationM >= HIGHLAND_ELEVATION_M) {
     return 'ethiopian-highlands'
   }
+  // The Horn, and it needs its own rule: east-rift stops at 6N, so everything
+  // above it out here fell through to the tropical fallback — the Somali village
+  // moved into the Haud would have been given the CONGO's rains. Found by the
+  // village-move conflict check, not by a test.
+  if (lat >= 6 && lat < 12.5 && lon >= 42) return 'horn'
   if (lat >= -12 && lat < 6 && lon >= 31.5) return 'east-rift'
   if (lat >= -5 && lat <= 5 && lon >= 12 && lon < 31.5) return 'congo'
   if (lat > 5 && lat < 11 && lon >= 12 && lon < 31.5) return 'congo-north'
