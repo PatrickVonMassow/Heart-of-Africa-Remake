@@ -2542,7 +2542,7 @@ changes.
   journal text (ambient wildlife is not journaled). One atomic commit.
   (Reported 15.07.2026.)
 
-- [ ] 120. Seasons and region-typical weather (large ambience extension).
+- [x] 120. Seasons and region-typical weather (large ambience extension).
   Wanted (user, 15.07.2026): the date should drive SEASONS, each region showing
   the weather typical for it at that time of year (e.g. rain; snow where it
   genuinely occurs), and plants AND animals must be visibly affected by it.
@@ -2608,10 +2608,14 @@ changes.
       weather touch movement/health (§6/§11) or stay pure ambience like the
       rest of §19? Ambience-only is the safer default; flag it as a question
       rather than inventing a mechanic (CLAUDE §2 forbids design invention).
-  (g) MOSTLY DONE (16.07.2026, 440c1e6) — sky, light and firelight shipped and
-      live-checked (polish.mjs, screenshots 110/111); snow resolved as
-      "nowhere" and recorded in design.md §19.13. STILL OPEN: the dress bullet
-      below. INSIDE SETTLEMENTS TOO (user, 15.07.2026) — the weather must not stop at
+  (g) DONE (16.07.2026, 440c1e6 + 6d01f23) — sky, light and firelight shipped
+      and live-checked (polish.mjs, screenshots 110/111); snow resolved as
+      "nowhere" and recorded in design.md §19.13; the dress shipped
+      evidence-gated (screenshot 112) — the Zulu isipuku is the one period-
+      sourced case and every other people stays bare on the record, see
+      src/systems/dress.ts. The one reading left open is carried in design.md
+      §19.13: a wrap worn DIFFERENTLY in the cold, which the primitive figures
+      cannot show. INSIDE SETTLEMENTS TOO (user, 15.07.2026) — the weather must not stop at
       the bird's-eye view. In the first-person settlement scenes (§2.6):
       * the sky/skyline carries the season's weather (the §2.5 panorama and the
         §4.4 skyline landmarks included — e.g. Kilimanjaro's ice per (a));
