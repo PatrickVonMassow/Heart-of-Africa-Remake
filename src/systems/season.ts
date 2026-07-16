@@ -35,6 +35,7 @@ export type ClimateZone =
   | 'west-coast' // ~4-10N, west of ~10W: UNIMODAL, not the Guinea regime
   | 'congo' // ~5S-5N: rain every month, two maxima
   | 'congo-north' // north of the basin's equatorial belt: unimodal
+  | 'atlantic-equatorial' // Gabon/south Cameroon: equatorial but with a hard Jun-Sep dry
   | 'ethiopian-highlands' // kiremt + belg
   | 'east-rift' // bimodal: long rains MAM, short rains OND
   | 'southern-plateau' // ~12-25S: summer rain
@@ -62,6 +63,10 @@ const MONTH_PROFILE: Record<ClimateZone, readonly number[]> = {
   congo: [0.5, 0.55, 0.85, 1, 0.8, 0.45, 0.4, 0.55, 0.85, 1, 0.9, 0.6],
   // North of the equatorial belt the basin is unimodal, dry Jan-Mar.
   'congo-north': [0.05, 0.08, 0.2, 0.5, 0.75, 0.9, 1, 0.95, 0.8, 0.5, 0.2, 0.08],
+  // Köppen As: rains Mar-May and Sep-Nov (peak October), a HARD big dry season
+  // Jun-Sep and a small dry Dec-Feb. Kingsley on this ground, PERIOD: the
+  // country is "absolutely impassable… except during the dry season".
+  'atlantic-equatorial': [0.15, 0.25, 0.6, 0.85, 0.8, 0.15, 0.05, 0.1, 0.5, 1, 0.9, 0.3],
   // belg Feb-May (minor), kiremt Jun-Sep (65-95% of the annual total), bega dry.
   'ethiopian-highlands': [0.05, 0.2, 0.4, 0.45, 0.35, 0.6, 1, 0.95, 0.55, 0.1, 0.05, 0.03],
   // Long rains Mar-May (peak Apr), short rains Oct-Dec (peak Nov).
@@ -85,6 +90,7 @@ const ZONE_WETNESS: Record<ClimateZone, number> = {
   'west-coast': 1, // up to 4000mm/yr
   congo: 0.95,
   'congo-north': 0.85,
+  'atlantic-equatorial': 0.9, // Gabon is very wet in its rains (~1800-3000mm/yr)
   'ethiopian-highlands': 0.7,
   'east-rift': 0.6,
   'southern-plateau': 0.65,
@@ -130,10 +136,23 @@ export function climateZoneAt(lat: number, lon: number, elevationM: number): Cli
   // the Gulf of Guinea and does not reach the Atlantic-facing coast at 10-15W.
   if (lat >= 4 && lat < 11 && lon >= -6 && lon < 12) return 'guinea-coast'
   if (lat >= 4 && lat < 11 && lon < -6) return 'west-coast'
+  // Gabon / Rio Muni / south Cameroon: equatorial, but NOT the basin regime.
+  // Woleu-Ntem is Köppen As with a hard Jun-Sep dry season, so the congo row's
+  // "rain every month" is the wrong year here. This rule closes the hole that
+  // sent the whole Atlantic equator to the desert default (see below).
+  if (lat >= -5 && lat < 4 && lon >= 7 && lon < 12) return 'atlantic-equatorial'
   if (lat >= 11 && lat < 18) return 'sahel'
   if (lat >= 18 && lat < 25) return 'sahara-south'
   // Mediterranean only on the coast proper; inland at the same latitude is desert.
   if (lat >= 31 && isNearNorthCoast(lat, lon)) return 'mediterranean'
+  // The fallback is a DESERT, so it must never be reachable from the tropics.
+  // It was: the rules above leave a hole between the congo row (which demands
+  // lon >= 12) and the guinea-coast row (which demands lat >= 4), and every
+  // equatorial coordinate west of 12E fell through it to 'sahara-north' — the
+  // Fang village at 1.8N/11.5E, in rainforest, sampled 0.000 wetness in July,
+  // the peak of its own rains. Whatever is added here, keep this guard: a
+  // tropical coordinate reaching a Saharan default is a bug, not a climate.
+  if (lat > -25 && lat < 18) return 'congo-north'
   return 'sahara-north'
 }
 

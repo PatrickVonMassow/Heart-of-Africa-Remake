@@ -23,6 +23,7 @@ const ADDIS = { lat: 9.0, lon: 38.7, elev: 2355 } // the plateau
 const DANAKIL = { lat: 13.5, lon: 40.5, elev: -100 } // below sea level, same box
 const ZAMBEZI = { lat: -17.9, lon: 25.9 }
 const CAPE_TOWN = { lat: -33.9, lon: 18.4 }
+const FANG = { lat: 1.8, lon: 11.5 } // the game's Fang village — Woleu-Ntem, Gabon
 
 describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regions)', () => {
   it('Cairo is Saharan, not Mediterranean — the trap a bare parallel falls into', () => {
@@ -57,6 +58,38 @@ describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regi
     expect(climateZoneAt(DANAKIL.lat, DANAKIL.lon, DANAKIL.elev)).not.toBe('ethiopian-highlands')
     // And the same coordinate flips once it is genuinely high ground.
     expect(climateZoneAt(DANAKIL.lat, DANAKIL.lon, 2000)).toBe('ethiopian-highlands')
+  })
+
+  it('does not send the Atlantic equator to the DESERT — the hole between two rules', () => {
+    // Found by the point-137 research, not by the eye: the congo row demands
+    // lon >= 12 and the guinea-coast row demands lat >= 4, so every equatorial
+    // coordinate west of 12E fell through every rule to the 'sahara-north'
+    // fallback. The Fang village sat in rainforest and sampled 0.000 wetness in
+    // July, the peak of its own rains.
+    expect(climateZoneAt(FANG.lat, FANG.lon, 642)).toBe('atlantic-equatorial')
+    expect(wetnessAt(on(10, 15), FANG.lat, FANG.lon, START_YEAR, 642)).toBeGreaterThan(0.5)
+  })
+
+  it('gives Gabon its hard Jun-Sep dry season — it is NOT the no-dry-month basin', () => {
+    // Woleu-Ntem is Köppen As. Kingsley, PERIOD, on this ground: the country is
+    // "absolutely impassable for any human being… except during the dry season".
+    const fang = (m: number) => wet(m, FANG.lat, FANG.lon, 642)
+    expect(fang(7)).toBeLessThan(0.2) // the big dry
+    expect(fang(10)).toBeGreaterThan(0.7) // the October peak
+    expect(fang(4)).toBeGreaterThan(0.5) // the Mar-May rains
+    // And the contrast that makes the zone worth having: the basin proper, at
+    // the same latitude, never dries out.
+    expect(wet(7, CONGO.lat, CONGO.lon)).toBeGreaterThan(fang(7))
+  })
+
+  it('never lets a tropical coordinate reach the Saharan fallback', () => {
+    // The guard, stated as a test: the fallback is a DESERT profile, so any
+    // tropical latitude reaching it is a bug rather than a climate.
+    for (let lat = -24; lat < 18; lat += 2) {
+      for (let lon = -17; lon <= 50; lon += 3) {
+        expect(climateZoneAt(lat, lon, 0)).not.toBe('sahara-north')
+      }
+    }
   })
 
   it('puts the Cape in its own zone, not with the plateau above it', () => {
