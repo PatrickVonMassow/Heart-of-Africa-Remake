@@ -1985,3 +1985,339 @@ cold-morning huddle-and-fire vignette, not a winter wardrobe.**
 Andersson, *Lake Ngami* (1856) · Gouldsbury & Sheane, *The Great Plateau of
 Northern Rhodesia* (1911) · Livingstone, *Missionary Travels* (1857) · Arnot,
 *Garenganze* (1889) · Monteiro, *Angola and the River Congo* (1875).
+
+### 7.4 Equatorial, west coast and central — where "nothing changes" is the ANSWER, and where it is not
+
+The starting position (the basin has no season, so expect nothing) was **half
+right, and the wrong half matters**: the basin proper genuinely has no seasonal
+dress signal, and this pass can now say *why with a number*. But **Fang country
+is not the basin** and has a hard dry season, and the **Banda** sit in a savanna
+that is set on fire once a year.
+
+#### ★★ 7.4.1 The find that fixed the model: the Fang coordinate is not the basin
+
+`climate-1890.md`'s row *"Congo 5N–5S → none — rain every month"* is a **basin**
+row, and at 11.5°E it produces the wrong year. The game's Fang point is
+essentially Oyem (1.6°N 11.6°E), Woleu-Ntem, which classifies **Köppen As —
+tropical wet-and-dry**, not Af: **big dry season ~June–September**, small dry
+~December–February, rains March–May and September–November (MODERN).
+
+Corroborated by two independent period eyewitnesses on that ground:
+- **Kingsley, PERIOD:** *"This bit of country must be **absolutely impassable for
+  any human being, black or white, except during the dry season**."*
+- **Du Chaillu, PERIOD**, the whole dry-season farming calendar: *"the men had
+  been busy **all the dry season cutting down trees**… so that in the wet season
+  the women might plant"*; *"let every thing lie till **the dry season has
+  sufficiently seasoned the great trees, when they set fire to the whole
+  mass**"*; *"This is the dry season, and **now all planting must be done, for in
+  a few weeks the rains come on, and then it is too late**."*
+
+> **This finding uncovered a real bug and it is fixed** (commit deb4a4c): the
+> game classified the Fang village as **`sahara-north`** — 0.000 wetness in July,
+> the peak of its own rains — because the congo rule demands lon >= 12 and the
+> guinea-coast rule demands lat >= 4, so every equatorial coordinate west of 12E
+> fell through into the desert fallback. There is now an `atlantic-equatorial`
+> zone, and a test that no tropical coordinate may ever reach the Saharan
+> fallback.
+
+#### Fang (1.8, 11.5 — village at 642 m): the garment does not change; the NIGHT does
+
+- **Du Chaillu (1861, fieldwork 1855–59) — PERIOD, the only substantial pre-1890
+  Fang dress description.** Men: *"They had **no cloth about the middle, but used
+  instead the soft inside bark of a tree**, over which, in front, was suspended
+  **the skin of some wild-cat or tiger**."* The chief: *"naked with exception of
+  the usual cloth about the middle, **made of the bark of a tree**, was painted
+  red"*, and *"The front of his middle-cloth was **a fine piece of tiger-skin**"*
+  — **the skin overlay is the PRESTIGE element, scaling with rank.** Women: *"a
+  strip of the Fan cloth, dyed red, and about four inches wide"*. Ceremonial: a
+  bridegroom who kills a leopard has *"its skin wrapped about his middle"*.
+  **So: beaten bark cloth is the Fang garment; there is a named "Fan cloth"; it
+  takes a red dye; cat skin is the status layer.**
+- **Kingsley (1897, fieldwork 1893–95) — PERIOD, and dated INSIDE the game's
+  window.** She gives no set-piece costume but something better — **the wearing
+  rule**: *"Kiva amused me much; **during our march his costume was exceeding
+  scant, but when we reached the towns he took from his bag garments, and attired
+  himself so resplendently**… and in the morning time he always devoted some time
+  to repacking."* **Fang dress is already contextual, and the trigger is
+  arrival-in-town, not weather.** She also notes *"the **bark huts** of the Fan"*
+  — bark as the general Fang material, building and clothing alike.
+- ★ **The reading — INFERRED, and it is this scope's counterpart to Barth's Sahel
+  schoolboys.** Du Chaillu, PERIOD: *"we stretched ourselves with our feet to the
+  fires, and wrapped up, I in my blankets, and **the men in whatever they could
+  get together of leaves and grass. No wonder the poor fellows love a fire. They
+  are very lightly dressed, and the winds here, near the equator as it is, in the
+  dry season are very bleak and cold when the sun is not up to warm them.** I
+  could not rest well for cold, though I had a thick blanket about me."*
+  Indicia: (1) **dry-season nights are cold enough to prevent sleep**, measured
+  against a European in a thick blanket, near the equator; (2) **the people are
+  "very lightly dressed" and answer the cold with a FIRE and improvised leaves
+  and grass — no extra garment appears.** That is decisive *negative* evidence:
+  the cold is real, the man is cold, and nothing is put on. (3) Kiva's good
+  clothes live in a bag and come out at the town, not at the cold.
+  → **No seasonal Fang garment is warranted. A dry-season night fire with
+  lightly-dressed figures around it IS warranted, from a period source, in the
+  right climate zone.**
+- ⚠️ **§4.9's "indoor vs outdoor is backwards" rule INVERTS here.** In the Sahel
+  the *rains* push people out to field huts; in Gabon it is the **dry season**
+  that empties the village to the farms — Du Chaillu on the neighbouring Mpongwe:
+  *"**during the dry season the Mpongwe villages are mostly deserted**, all
+  hands… being busily engaged on their farms."* (Mpongwe, not Fang — same climate
+  zone, adjacent people; marked as extrapolation.) **Do not port the Sahel rule
+  to Gabon.**
+- ⚠️ **Du Chaillu is 30 years early and is a CONTESTED witness** — the source of
+  the Victorian gorilla sensation, publicly attacked in his own lifetime, and his
+  Fang chapters are framed as *"real, unmistakable cannibals"*. **The dress
+  details are incidental and mundane, which is exactly why they are the credible
+  part** — but do not lift his cannibal theatre into the game. The Fang were the
+  *sensational* people of 1860s popular print; that is a genre, not an
+  ethnography.
+- ⚠️ **"Fang wear raffia" would be wrong** — raffia is south of the Congo. North
+  and west, including Gabon/Cameroon, the material is **fig-bast bark cloth**.
+- ⚠️ **Do not dress Fang in trade cotton by default** — Kingsley's cotton-saturated
+  figures are the **Igalwa/M'pongwe coastal trade elite** (European shawls,
+  printed cloths, parasols). That is the coast; the Fang at 1.8°N are the
+  interior.
+
+#### Mongo (−1.5, 21.0 — village at 372 m): ★★ "nothing changes", argued with a NUMBER
+
+- **Garments — the sources describe the ZONE far better than the people.**
+  Johnston, *George Grenfell and the Congo* vol. 2 (1908) — MODERN framing around
+  **PERIOD observations by Grenfell**, on that river from the 1880s. The zone
+  rule: *"from Stanley Pool to Stanley Falls… **the people are naked**"*; and the
+  actual body covering is **pigment, not cloth**: *"most of the naked tribes
+  **colour their bodies all over with a crimson paste** made of triturated wood
+  and palm oil (**nkula** of the Bakongo, **ngola** of the Babangi…)"* — from
+  **Baphia (camwood)**. The material divide: *"**south of the western Congo used
+  raphia cloth** ('Kasai cloths')… **north of that great river the common
+  material was fig-tree felted cloth ('bark cloth')**."* **The Mongo sit SOUTH →
+  raffia.**
+  The one direct Mongo sentence is hedged by its own author: *"The simplest
+  garment of the women is **a bunch of leaves** [this may be seen in the
+  north-east of Congoland **or perhaps among the Mongo tribes in the centre**]."*
+  **Dated to the game's exact year — Grenfell via Johnston, PERIOD:** *"The
+  nudity of women at Bopoto in 1886 was complete. **In February 1890**, though
+  they still wore no cloth, Grenfell records that they '**wear many more strings
+  of beads round their necks**.'"* — *the thing that changed in four years was
+  beads, not clothes.*
+- ★★ **The decisive climate finding.** Mbandaka, the nearest gauged station:
+  Köppen **Af**, no dry season, every month >=60 mm, ~1630 mm/yr. **And the
+  seasonal temperature fluctuation is 1.6 °C**, against a **~12 °C** diurnal
+  range (MODERN). **The day/night axis is roughly EIGHT TIMES the year axis. In
+  the Mongo's world, "cold" is a time of DAY, not a time of year.** At 372 m,
+  altitude contributes nothing.
+- ★ **Why this is a well-argued nothing rather than a shrug: the period record
+  CONTAINS the added-cloak mechanic and independently keys it to the DAILY
+  cycle.** Johnston on the **Bayanzi** (Kwa/Kasai confluence, same regime) —
+  PERIOD: *"The dress of the Bayanzi… consists… solely of a loin-cloth… **On days
+  when it is cold and in the evenings, the 'men of leisure' wear in addition a
+  piece of cloth of the same kind which they wind round their bodies, and which
+  they take care to lay aside when the temperature rises.**"*
+  **This is structurally the Zulu isipuku — the same figure, visibly more — but
+  the trigger is different, and the difference is the whole finding.** Indicia:
+  (1) the added wrap exists in the basin and is period-attested; (2) its stated
+  triggers are *"days when it is cold"* and *"in the evenings"* — **weather and
+  hour, never a month**; (3) it is explicitly reactive and reversible — *"laid
+  aside when the temperature rises"*: **not a wardrobe, a thermostat**; (4) with
+  a 1.6 °C seasonal swing there **is no seasonal temperature signal for a garment
+  to track**. ⚠️ The Bayanzi are ~450 km WSW of the Mongo point, same regime and
+  same raffia zone — applying their rule to the Mongo is **INFERRED**, not
+  attested.
+  → **If the game ever wires an added wrap in the basin, wire it to DUSK and to
+  weather, never to a month.**
+- **And the rain does not produce a garment either — a NEGATIVE finding, not an
+  absence of looking:** every source in this scope was searched for a rain cape,
+  rain covering or leaf-as-rainwear; **none.** What the record gives for rain is
+  **shelter** (mat roofs erected over things to be kept dry), never a worn thing.
+- ⚠️⚠️ **"Naked" in these sources is a colonial MEASUREMENT, not a description.**
+  Johnston's clothing chapter is organised as a *decency ladder* (*"in the next
+  stage of costume…"*, *"the germ of breeches"*) — an evolutionary hierarchy with
+  Europe at the top. **What he calls nudity, the period record itself shows to be
+  an all-over camwood-and-palm-oil ground with beadwork over it. The Mongo figure
+  is not "undressed"; the PIGMENT is the dress.** Render the red body ground and
+  the beads, or you will have rendered Johnston's prejudice rather than the
+  Mongo. (Free accuracy win.)
+- ⚠️ **Johnston (1908) is a racial-hierarchy text and must be read through, not
+  from** — the same pages that carry Grenfell's dated observations carry
+  *"Caucasian (Hamitic) blood"* and the Congo pygmy *"leading a life hardly
+  superior to that of a predatory ape"*. **Never let its vocabulary reach the
+  game.** ⚠️ Ward's *Five Years with the Congo Cannibals* (1890): the title is his
+  thesis; treat everything but the incidental material detail as genre.
+- **GAP — the real one:** *there is no period Mongo dress description in this
+  research.* Everything is the ZONE. **The Congo Balolo Mission (founded 1889,
+  working exactly the Lulonga/Maringa Mongo) is the obvious unread body of period
+  material** and the direct fix. Also: a **dated Mongo/Nkundo raffia belt** exists
+  at the Met (acc. 319423; fetch returned HTTP 429) — the cheapest high-value
+  follow-up in this scope.
+
+#### Mbuti (1.4, 28.6 — village at 785 m): the answer is the HUT — and the sources are the worst in this research
+
+- **One good period datum. Stanley, *In Darkest Africa* vol. 2, Avatiko, dated
+  28 October 1888 — PERIOD:** of a man of 4 ft, *"His head-dress was a bonnet of
+  a priestly form… **A broad strip of bark cloth covered his nakedness.**"*
+  **Corroborated and correctly hedged by Johnston:** *"**Some tribes of Pygmies
+  are said to wear no clothing… but this has not characterized those northern
+  sections… whereof the men at least conceal the pudenda with a small piece of
+  bark cloth.**"* The material is right for the zone (Ituri is north/east of the
+  Congo → fig-bast bark cloth), and **Junker gives the period word: "rokko"** —
+  *"the rokko of fig-bark girdled round the waist"*. An oblique but strong
+  indicium that bark cloth was simply *the* obtainable garment of the Ituri:
+  Stanley's own Zanzibari porters, once their trade cloth ran out, *"had been clad
+  in **goat skins and strips of bark-cloth**"*.
+- **Climate — Stanley measured it, in the game's own year, PERIOD:** *"…569 hours
+  of rain… **We shall not be far wrong if we estimate this forest to be the
+  rainiest zone on the earth.** For nine months of the year the winds… descend
+  upon the forest **almost every alternate day** in copious showers"*, and the
+  rains *"lasted **ten or twelve hours at a time**"*.
+- ★ **The reading — INFERRED: the answer is ARCHITECTURAL.** Stanley, PERIOD: the
+  Mbuti *"pitch their **leafy huts**"*, camps are *"low structures of the shape of
+  an oval figure cut lengthways"*; and the material is named — *"cutting
+  **phrynia leaves to roof their huts**"*, *"**Both stalks and leaves are useful
+  in the construction of native huts and camps**"*, the leaves *"from a foot to
+  twenty inches in diameter"*.
+  Indicia: (1) **rain every other day, 10–12 hours at a stretch** — a garment
+  cannot answer this; nothing worn stays dry; (2) the one attested Mbuti garment
+  is a strip of **bark cloth**, the *least* rain-capable thing in the record;
+  (3) the **phrynium leaf hut is period-attested, on the spot, in 1888** — a
+  shingled, hours-to-build shelter. **This IS the rain technology**; (4) no period
+  source describes any Mbuti rain garment. **Negative finding.**
+  → **Nothing on the body changes. The mongulu leaf hut and the fire are the
+  Ituri's answer to weather — a truthful, specific, renderable finding rather
+  than a failure to find one.**
+- The one real seasonal signal is **mobility, not dress**: an Ituri *"honey
+  season, usually around July and August"* — MODERN, and (as §4.1 flags) the
+  source concerns the **Efe**, the Mbuti's neighbours. Mark it.
+- ⚠️⚠️ **THE STANLEY DRESS DATUM COMES FROM TWO CAPTIVES.** *"A couple of pigmies
+  were **brought to me**"*; Bonny *"conscientiously measured him"*. These were
+  people seized, frightened and inspected — Stanley records the man's fear that he
+  would be roasted alive. **Generalising "Mbuti women wore nothing" from one
+  terrified captive is exactly the inference the record cannot bear.** Take the
+  man's bark-cloth strip (independently corroborated by Johnston); **do not take
+  the woman's nudity as Mbuti dress.**
+- ⚠️⚠️ **Stanley's "history of the pigmies" is not ethnography, it is classical
+  fantasy** — Hekataeus, the battle with the storks, the Nassamonians, the
+  Mountains of the Moon, and the conclusion that they are *"the oldest types of
+  primeval man… eternally exiled by their vice"*. His "two species" claim is race
+  typology. **Every interpretive sentence Stanley writes about the Mbuti is
+  unusable; only the measured, incidental observations survive.** And **reject the
+  pan-pygmy fantasy outright**: *"Their kinsmen are known as **Bushmen in Cape
+  Colony**…"* welds the San to the Mbuti as one primeval race — false, and the
+  same move that produced the "Bushmen" label §1 already rejects.
+- ⚠️ Stanley's ethnography is hostile in a **motivated** way: the Mbuti are *"human
+  parasites"* extorting *"turnpike tolls"* — written by a man whose expedition was
+  at that moment seizing their food. And when the captive wears a good bonnet,
+  Stanley's instinct is that *"it was either a gift or **had been stolen**"* — he
+  cannot let a Mbuti simply own a nice thing. **That reflex is the distortion in
+  miniature.**
+- ✅ **One genuinely valuable correction, and it runs FOR the Mbuti.** Stanley's
+  own 1888 account independently attests the forest/farmer entanglement: the Mbuti
+  *"plant their village camps at a distance of from two to three miles around a
+  tribe of agricultural aborigines"* and trade meat, hides, ivory, honey *"for
+  plantains, potatoes, tobacco, spears, knives, and arrows"*. **This means the
+  Mbuti–farmer relationship is PERIOD-attested and does not rest on Turnbull
+  (1961)** — it removes one leg of §4.1's worry, and cuts the same way as the
+  Kalahari Debate does for the San: **the isolated-forest-people image is the
+  distorted one. An Mbuti camp in 1890 should read as entangled with its farming
+  neighbours, not as a timeless wilderness band.**
+
+#### Banda (6.0, 21.5 — village at 550 m): ★ the country burns
+
+- **Dress: GAP, and the period source says why in his own voice.** Junker, the
+  explorer best placed to describe them, reports **not seeing them** — PERIOD:
+  *"**Of the surrounding Banda people I had hitherto seen nothing. Their
+  settlements lay off the route and close to the Woworo, which they crossed, and
+  took refuge in the opposite wilderness on the least alarm.**"*
+  **The reason is the 1890 overlay and it belongs in the game as much as any
+  garment:** Junker's Dar-Banda is a slave-raiding frontier under the
+  Khartoumers; of the neighbouring country — *"The **Krej territory**… had been
+  ravaged to such an extent that **a six days' solitude had been created**."*
+  **The Banda of 1890 are a raided people who melt into the bush at the sight of a
+  column — which is precisely why the explorer literature cannot describe their
+  clothes.**
+- **The best available evidence is the immediate neighbours on the same river, and
+  it is good. Dybowski, *La route du Tchad* (1893; expedition 1891–92) — PERIOD,
+  dated INSIDE the window**, on the **Banziri** (~150 km south): the loincloth is
+  *"**un pagne, souvent en écorce martelée**, parfois aussi en étoffe… **passé
+  entre les jambes et retenu à l'aide d'une ceinture, faite de peau de buffle
+  corroyée, et ornée de bagues de fer ou de cuivre**"*; fashion within it — *"les
+  élégants portent un pagne très grand, flottant entre les jambes"*; and **the
+  hair is the real garment**: *"**Les perles qui ornent les cheveux constituent la
+  principale pièce du costume; le reste n'est que l'accessoire**"* — the beaded
+  coiffure-plate is a **store of value**, cut off and spent *"pour servir à
+  quelque achat ou au paiement d'une dette de jeu"*.
+  ★ **And a genuine dress CHANGE, keyed to ACTIVITY:** *"…recouvre-t-il, **pour
+  les heures de travail**, ce petit édifice **d'une sorte de bonnet fait d'écorce
+  martelée**"*. (Banziri, not Banda — marked.)
+- **Climate: the real seasonal zone.** `climate-1890.md`'s **congo-north** row:
+  rains Jun–Sep (unimodal), peak July, dry Jan–Mar — and at 6.0°N the game's point
+  sits squarely in it. Two additions (MODERN): **the dry season has cold nights**
+  (Bangui, *south* of the point: Dec–Feb *"the coolest temperatures… during the
+  night"*, January minimum ~15 °C); and **the harmattan reaches them** — it
+  *"affects the north of the Central African Republic"* Dec–Mar, and **the game's
+  Banda at 6.0°N lie inside the affected belt**. So Banda country gets the Sahel's
+  signature: dusty haze, hot days, cold nights, Dec–Mar. ⚠️ **§2.6's caution
+  transfers intact: the wind is well attested; nobody's period wrapping is.**
+- ★★ **The reading — INFERRED: the LANDSCAPE changes, and it is set on fire.**
+  Dybowski, PERIOD, 1891–92, at the game's own latitude: *"Au milieu des grandes
+  herbes, des arbres émergent nombreux, mais ils sont lamentablement tristes; **le
+  feu qu'une ou deux fois par an, les indigènes mettent à la steppe, a brûlé leurs
+  écorces et leurs ramilles, et ils sont tout noirs; tout le paysage a un aspect
+  de deuil**; bon nombre de ces grands arbres ne sont plus que des squelettes;
+  d'autres, au contraire, portent des touffes de feuilles, mais çà et là, en des
+  points où les bourgeons n'ont pas été détruits par les flammes."* And the ground
+  truth of moving through it: *"**par un petit chemin dont les indigènes ont
+  abattu les herbes à coups de gaule**"*.
+  Indicia: (1) **deliberate, annual/biannual savanna burning by the inhabitants**,
+  period-attested at the game's latitude, inside the window — a *human*,
+  *scheduled*, *dry-season* act, not a weather effect; (2) its visual result is
+  described precisely and is **renderable**: blackened bark, skeletal trees,
+  scattered surviving leaf-tufts, *"an aspect of mourning"*; (3) the climate
+  supplies the window — burning needs cured grass, i.e. **Jan–Mar**, exactly
+  congo-north's dry season and exactly the harmattan months.
+  → **For the Banda the honest answer is: the PEOPLE do not visibly change with
+  the season — the COUNTRY does, catastrophically and on purpose, once a year.
+  That is a better seasonal mechanic than a cloak, it is period-sourced at the
+  right latitude, and the game already has the systems (ground colour, flora) to
+  show it.** (This is the direct evidence behind TASKS point 144.)
+- ⚠️ **"Banda" in Junker is usually a MAN, not a people** — Degberra's son *Banda*
+  is a district ruler; Dybowski's only "Banda" hits are the chief *Yabanda*.
+  Grepping the name produces false positives in both. (Junker's people-sense usage
+  is *"Dar-Banda"*, from Arabic *dar* = land.)
+- ⚠️ **Do not render the Banda as an untouched savanna village.** A Banda
+  settlement that stands placidly open to an approaching stranger contradicts the
+  one period observation we have of them.
+- ⚠️ Dybowski is a French colonial-expansion agent and *La route du Tchad* is a
+  conquest narrative; his material observations are specific (the coiffure-plates
+  he bought are objects) but his politics are not neutral.
+- **GAP — the largest in this scope: no period description of Banda dress at all.**
+  Maistre (1895) and the Dampierre/Kalck Haut-Oubangui scholarship were not
+  reached.
+
+#### What the game can defensibly show — the equator and the west
+
+| People | What changes with the season |
+| --- | --- |
+| **Fang** | **The garment does not change; the NIGHT does.** In the Jun–Sep dry season: lightly-dressed figures close around fires after sundown (leaves and grass pulled over them as they sleep) and the village thinned out to the farms while the trees are felled and burnt — because Du Chaillu recorded that the equatorial dry-season nights are *"very bleak and cold"*, that the people are *"very lightly dressed"*, and that they answered that cold with **a fire and whatever leaves they could gather, never with a coat**. |
+| **Mongo** | **Nothing — and there is no year to change with:** a **1.6 °C** seasonal swing against **~12 °C** day/night, rain in every month. The one added-wrap the basin's record gives (Johnston's Bayanzi) is triggered by *"days when it is cold and in the evenings"* and *"laid aside when the temperature rises"* — **if ever wired, wire it to DUSK, never to a month.** What the figure should show all year is the **camwood-red body ground and beadwork** the sources mislabel as nudity. |
+| **Mbuti** | **Nothing on the body; the answer to weather is the HUT.** A broad strip of bark cloth year-round (Stanley, Oct 1888), and the Ituri's rain — every other day, 10–12 hours at a time, *"the rainiest zone on the earth"* — met by the **phrynium-leaf hut and the fire**. If anything reads as seasonal it is **movement** (the Jul–Aug honey season; MODERN, Efe-sourced). And the camp should read as **entangled with its farming neighbours** — Stanley himself puts it two to three miles from them, trading. |
+| **Banda** | **The people don't change; the COUNTRY burns.** Keep the beaten-bark pagne on its buffalo-hide belt all year (Banziri-attested, marked), and put the season into the **land**: in the Jan–March dry season under a harmattan haze the standing grass goes and the savanna reads as Dybowski saw it at this latitude — **bark and twigs burnt black, many trees mere skeletons, others carrying scattered leaf-tufts, "the whole landscape with an aspect of mourning"** — with narrow paths beaten through the tall grass, and the settlement itself **wary rather than open**. |
+
+#### Confidence ledger
+
+| People | Dress ~1890 | Seasonal dress change | Confidence |
+| --- | --- | --- | --- |
+| Fang | bark cloth + cat-skin overlay (PERIOD, 1855–59) | **none warranted**; fire + dry-season calendar instead | Medium-good — two period eyewitnesses, one in-window |
+| Mongo | raffia zone; camwood body ground; beads (PERIOD-adjacent, zone only) | **none — argued from a 1.6 °C swing**; the added wrap is diurnal | Climate: high. Dress: **GAP** |
+| Mbuti | broad strip of bark cloth, men (PERIOD, 1888) | **none**; rain answered by the leaf hut | Low-medium — one captive datum, hostile source |
+| Banda | *no period source found*; Banziri: beaten-bark pagne (PERIOD, 1891–92) | **none on the body; annual savanna burning** | Landscape: good. Dress: **GAP** |
+
+**Three unclosed, ranked:** (1) the **Congo Balolo Mission's period records (from
+1889)** — the only body of material written by people resident among the Mongo in
+the game's exact years; (2) **Maistre (1895)** and the Dampierre/Kalck
+Haut-Oubangui scholarship for Banda dress proper; (3) the Met's **dated
+Mongo/Nkundo raffia belt** (acc. 319423).
+
+**Sources:** Du Chaillu, *Explorations and Adventures in Equatorial Africa*
+(1861) · Kingsley, *Travels in West Africa* (1897) · Johnston, *George Grenfell
+and the Congo* vol. 2 (1908) · Ward, *Five Years with the Congo Cannibals* (1890)
+· Stanley, *In Darkest Africa* vol. 2 (1890) · Junker, *Travels in Africa* vol. 3
+· Dybowski, *La route du Tchad* (1893).
