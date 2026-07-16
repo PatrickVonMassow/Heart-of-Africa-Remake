@@ -4474,7 +4474,7 @@ the remaining open points in their numeric order.
   pt. 12. Priority insert: directly after point 122 (it corrects the
   just-shipped 143/144 look before 149 re-verifies the weather).
   (Reported 16.07.2026.)
-  WIP (16.07.2026, 22:52 — session-limit handoff; builds green, 1641 vitest
+  WIP (16.07.2026, 22:43 — session-limit handoff; builds green, 1641 vitest
   green): DONE so far — (a) season.ts SEASON_SLOTS/seasonSlotAt/slotGreenness;
   (b) render/seasonField.ts (150x148 Uint8 field, blurred one-hot slot
   weights r=4 texels, lerped slot greens, updateSeasonField per frame,
