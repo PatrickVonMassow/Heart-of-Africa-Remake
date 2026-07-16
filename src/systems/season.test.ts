@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveWetness, harmattanAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -250,6 +250,68 @@ describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () 
     expect(sunDimFactor(1, 0)).toBe(1)
     expect(sunDimFactor(1, 1)).toBeLessThan(1)
     expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
+  })
+})
+
+describe('floraGreennessAt (the flora asks "how wet for HERE", not "how wet")', () => {
+  const green = (m: number, lat: number, lon: number, elev = 0) =>
+    floraGreennessAt(on(m, 15), lat, lon, START_YEAR, elev)
+
+  it('greens the East African plains FULLY in the long rains — the shipped bug', () => {
+    // The regression this exists for: the tint was driven by the ABSOLUTE
+    // wetness, which is capped at each zone's own peak (east-rift 0.6). The
+    // plains therefore reached ~8% green at the height of their own long rains
+    // and read as straw all year. The Serengeti greens completely; it simply
+    // does so on less water than the Congo.
+    expect(green(4, NAIROBI.lat, NAIROBI.lon)).toBeGreaterThan(0.9) // long rains
+    expect(green(9, NAIROBI.lat, NAIROBI.lon)).toBeLessThan(0.3) // the dry between
+  })
+
+  it('gives every wet-enough zone its full straw-to-green swing across its own year', () => {
+    const swing = (lat: number, lon: number, elev = 0) => {
+      let lo = 1
+      let hi = 0
+      for (let m = 1; m <= 12; m++) {
+        const g = green(m, lat, lon, elev)
+        lo = Math.min(lo, g)
+        hi = Math.max(hi, g)
+      }
+      return hi - lo
+    }
+    expect(swing(KANO.lat, KANO.lon)).toBeGreaterThan(0.8) // Sahel
+    expect(swing(NAIROBI.lat, NAIROBI.lon)).toBeGreaterThan(0.8) // east rift
+    expect(swing(ZAMBEZI.lat, ZAMBEZI.lon)).toBeGreaterThan(0.8) // southern plateau
+    expect(swing(ADDIS.lat, ADDIS.lon, ADDIS.elev)).toBeGreaterThan(0.8) // highlands
+  })
+
+  it('never greens a desert — there is no green there to bleach', () => {
+    // The zone scale still gets a say, as a floor: an arid zone stays neutral
+    // however sharp its own little wet peak is. Cairo must not sprout in
+    // January, when sahara-north's month profile is at its maximum.
+    for (let m = 1; m <= 12; m++) {
+      expect(green(m, CAIRO.lat, CAIRO.lon)).toBeLessThan(0.1)
+      expect(green(m, 27, 5)).toBeLessThan(0.15) // deep sahara-north, profile peak in Jan
+    }
+  })
+
+  it('still tracks the calendar the absolute wetness tracks — same curve, different scale', () => {
+    // The two must never drift: both read the same month profile.
+    for (const [lat, lon] of [[KANO.lat, KANO.lon], [NAIROBI.lat, NAIROBI.lon]]) {
+      let wetPeak = 0
+      let greenPeak = 0
+      let wetPeakM = 0
+      let greenPeakM = 0
+      for (let m = 1; m <= 12; m++) {
+        if (wet(m, lat, lon) > wetPeak) { wetPeak = wet(m, lat, lon); wetPeakM = m }
+        if (green(m, lat, lon) > greenPeak) { greenPeak = green(m, lat, lon); greenPeakM = m }
+      }
+      expect(greenPeakM).toBe(wetPeakM)
+    }
+  })
+
+  it('the debug override still forces it, like the wetness', () => {
+    expect(effectiveGreenness(on(1, 15), CAIRO.lat, CAIRO.lon, START_YEAR, 0, 1)).toBe(1)
+    expect(effectiveGreenness(on(8, 15), KANO.lat, KANO.lon, START_YEAR, 0, 0)).toBe(0)
   })
 })
 

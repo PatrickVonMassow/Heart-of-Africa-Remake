@@ -325,6 +325,23 @@ export function harmattanAt(day: number, lat: number, lon: number, startYear: nu
 }
 
 /**
+ * The zone's own month curve at this day, 0 (its driest) .. 1 (its own peak) —
+ * the shape before the zone's absolute scale is applied. Shared by the absolute
+ * `wetnessAt` and the relative `floraGreennessAt` so the two can never drift.
+ */
+function zoneShapeAt(day: number, zone: ClimateZone, startYear: number): number {
+  const profile = MONTH_PROFILE[zone]
+  // Month positions are their midpoints, so the curve peaks mid-month.
+  const t = (dayOfYear(day, startYear) / 365.25) * 12 - 0.5
+  const i = Math.floor(t)
+  const f = t - i
+  const a = profile[((i % 12) + 12) % 12]
+  const b = profile[((i + 1) % 12 + 12) % 12]
+  const smooth = f * f * (3 - 2 * f) // smoothstep: no kink at the month boundary
+  return a + (b - a) * smooth
+}
+
+/**
  * Wetness at a place and time, 0 (rainless) .. 1 (the wettest the world gets).
  * Interpolated smoothly across the month profile so a season arrives and fades
  * rather than switching on a month boundary.
@@ -421,16 +438,7 @@ export function wetnessAt(
 ): number {
   if (isHyperArid(lat, lon)) return 0
   const zone = climateZoneAt(lat, lon, elevationM)
-  const profile = MONTH_PROFILE[zone]
-  // Month positions are their midpoints, so the curve peaks mid-month.
-  const t = (dayOfYear(day, startYear) / 365.25) * 12 - 0.5
-  const i = Math.floor(t)
-  const f = t - i
-  const a = profile[((i % 12) + 12) % 12]
-  const b = profile[((i + 1) % 12 + 12) % 12]
-  const smooth = f * f * (3 - 2 * f) // smoothstep: no kink at the month boundary
-  const shape = a + (b - a) * smooth
-  let wet = shape * ZONE_WETNESS[zone]
+  let wet = zoneShapeAt(day, zone, startYear) * ZONE_WETNESS[zone]
   // The Sahel's season shortens sharply with latitude: 4-5 months in the south,
   // 1-2 at 16-18N. Squeeze the shape rather than shifting it — the peak stays
   // August everywhere, only the shoulders retreat.
@@ -439,4 +447,52 @@ export function wetnessAt(
     wet *= 1 - north * 0.55
   }
   return Math.min(1, Math.max(0, wet))
+}
+
+/** Below this zone peak a place is too arid to carry green worth bleaching. */
+const GREENING_ZONE_FLOOR = 0.5
+
+/**
+ * How green the flora should read, 0 (straw) .. 1 (lush) — a RELATIVE reading,
+ * unlike `wetnessAt`, and that difference is the whole point.
+ *
+ * `wetnessAt` is deliberately ABSOLUTE so a Saharan trace cannot rain like a
+ * Congo downpour. For the rain and the fog that is right. For the FLORA it is
+ * wrong, and it shipped wrong: because every zone is capped at its own peak
+ * (east-rift 0.6, sahel 0.75), the absolute reading never approached 1 outside
+ * the Congo, so the ground stayed straw all year — the East African plains
+ * reached 8% green at the height of their long rains. But the Serengeti greens
+ * completely in its rains; it simply does so on less water than the Congo. The
+ * honest question for vegetation is "how wet is it here, against what here
+ * gets" — which is the month profile itself, before the zone scale is applied.
+ *
+ * The zone scale still gets a say, as a floor: a desert has no green to bleach,
+ * so an arid zone stays neutral however sharp its own little wet peak is. Cairo
+ * must not sprout in January.
+ */
+export function floraGreennessAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+): number {
+  if (isHyperArid(lat, lon)) return 0
+  const zone = climateZoneAt(lat, lon, elevationM)
+  const shape = zoneShapeAt(day, zone, startYear)
+  const greenable = Math.min(1, ZONE_WETNESS[zone] / GREENING_ZONE_FLOOR)
+  return Math.min(1, Math.max(0, shape * greenable))
+}
+
+/** `floraGreennessAt` with the §21 debug override applied, like `effectiveWetness`. */
+export function effectiveGreenness(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+  override: number | null,
+): number {
+  if (override !== null) return Math.min(1, Math.max(0, override))
+  return floraGreennessAt(day, lat, lon, startYear, elevationM)
 }

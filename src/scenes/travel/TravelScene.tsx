@@ -24,7 +24,7 @@ import {
 } from 'three/tsl'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { balance } from '../../config/balance'
+import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
@@ -32,7 +32,8 @@ import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
-import { CURRENT_WEATHER, sunDimFactor } from '../../systems/season'
+import { CURRENT_WEATHER, effectiveGreenness, sunDimFactor } from '../../systems/season'
+import { elevationAt } from '../../world/geodata'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
@@ -817,8 +818,22 @@ function Vegetation() {
     // half-way point, straw when dry, deepened green in the rains. Strength 0
     // pins it to neutral. Blended slowly like the fog, so a forced season
     // fades in rather than snapping.
+    //
+    // Driven by the RELATIVE greenness, not by CURRENT_WEATHER's absolute
+    // wetness. The absolute reading is capped at each zone's own peak, so
+    // outside the Congo it never approached 1 and the ground stayed straw all
+    // year — the East African plains reached 8% green at the height of their
+    // long rains. The Serengeti greens completely on less water than the Congo;
+    // vegetation asks "how wet for HERE". See floraGreennessAt.
     {
-      const target = 0.5 + (CURRENT_WEATHER.wetness - 0.5) * Math.min(1, Math.max(0, balance.season.weatherStrength))
+      const s = useGame.getState()
+      const lon = s.pos.x / 10
+      const lat = -s.pos.z / 10
+      const green = effectiveGreenness(
+        s.day, lat, lon, START_YEAR, elevationAt(lat, lon),
+        useUi.getState().seasonWetnessOverride,
+      )
+      const target = 0.5 + (green - 0.5) * Math.min(1, Math.max(0, balance.season.weatherStrength))
       SEASON_TINT_U.value += (target - SEASON_TINT_U.value) * 0.02
     }
     // In the far debug zoom the dressing hides (it exists only inside the
