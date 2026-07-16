@@ -2812,6 +2812,64 @@ check('an animal on an open-ocean cell is set back to the nearest land',
 // --- Point 8: whole-continent debug zoom without haze -------------------------
 // design.md §21: the debug-unlocked zoom reaches a view of the whole continent
 // (a coarse far-terrain sheet streams in), and in that debug-only range no
+// --- Point 151: the season belongs to the PLACE, never to the traveller ------
+// The "flying plants" witness: with the real June calendar, the field's value
+// at the user's reported spot (13.4N/31.8E, the Sahel's ITCZ edge) and the
+// slot greens must NOT move while the player travels — the old single uniform
+// lerped toward the player's own greenness every frame, sliding every crown
+// in view with each step.
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+// June of the current game year (debugJumpToMonth is ONE-indexed).
+await page.evaluate(() => window.__game.getState().debugJumpToMonth(6))
+await page.waitForTimeout(4000) // let the lerped slot greens settle
+const fieldWitness = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__game.getState().debugJumpTo(13.4, 31.8)
+  await sleep(800)
+  const read = () => window.__vegetation.seasonTintAt(13.4, 31.8)
+  // Baseline: how much the fixed-spot value drifts over 2 s while the player
+  // STANDS (the slot greens keep lerping toward the June targets — that
+  // calendar tail is legitimate and identical in both phases).
+  const s0 = read()
+  await sleep(2000)
+  const s1 = read()
+  const standDrift = Math.abs(s1 - s0)
+  // Now travel hard across the wetness gradient the bug lived on: with the
+  // old player-position uniform this phase drifted MASSIVELY more than the
+  // standing phase; with the field it must not differ.
+  const m0 = read()
+  for (let i = 0; i < 40; i++) {
+    window.__game.getState().moveTravel(0, -1, 0.05) // northward, toward the desert
+    await sleep(50)
+  }
+  const m1 = read()
+  const moveDrift = Math.abs(m1 - m0)
+  const p = window.__game.getState().pos
+  const moved = Math.hypot(p.x - 31.8 * 10, p.z - -13.4 * 10)
+  return { standDrift, moveDrift, moved }
+})
+check(
+  'the season field does not move when the player does (point 151 — the flying-plants witness)',
+  fieldWitness.moved > 2 &&
+    fieldWitness.moveDrift < fieldWitness.standDrift + 0.006 &&
+    fieldWitness.moveDrift < 0.03,
+  JSON.stringify(fieldWitness),
+)
+// Human-viewable evidence at BOTH reported spots: stable flora in the June/
+// July gradient (123: the Gezira between the Nile arms; 124: the Nile at 18N).
+await page.evaluate(() => window.__game.getState().debugJumpTo(13.4, 31.8))
+await page.waitForTimeout(1500)
+await page.screenshot({ path: `${OUT}123-season-field-gezira-june.png` })
+await page.evaluate(() => window.__game.getState().debugJumpToMonth(7))
+await page.waitForTimeout(3000)
+await page.evaluate(() => window.__game.getState().debugJumpTo(18.1, 33.9))
+await page.waitForTimeout(1500)
+await page.screenshot({ path: `${OUT}124-season-field-nile-july.png` })
+// Restore the calendar for the downstream checks (state hygiene: the later
+// sections set their own months/overrides but must not START skewed).
+await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+await page.waitForTimeout(1500)
+
 // Season weather (design.md §19, point 120c): forcing the rainy season via the
 // debug override must rain visibly (rain streak opacity up) and pull the fog
 // in toward overcast; forcing dry must clear it again. Checked at zoom 1,

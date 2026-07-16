@@ -37,7 +37,7 @@ import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
-import { seasonFieldTintAt, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
+import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
 import {
   updateTrailPoint,
@@ -829,6 +829,11 @@ function Vegetation() {
         const p = useGame.getState().pos
         return seasonFieldTintAt(-p.z / 10, p.x / 10)
       },
+      // Fixed-position field reads for the point-151 witness (via the app
+      // graph — a dynamic import would get a fresh module whose field is
+      // untouched, the HMR trap).
+      seasonTintAt: (lat: number, lon: number) => seasonFieldTintAt(lat, lon),
+      seasonGreens: () => seasonFieldGreens(),
     }
     return () => {
       delete w.__vegetation

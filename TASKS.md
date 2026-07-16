@@ -4429,7 +4429,7 @@ the remaining open points in their numeric order.
   NOT IN SCOPE: the real Closing still runs at the very end over everything; this
   is the second interim pass. (Filed 16.07.2026.)
 
-- [ ] 151. Seasonal flora is anchored to the PLACE, zone borders blend, and
+- [x] 151. Seasonal flora is anchored to the PLACE, zone borders blend, and
   growth sprouts from the ground (user bug, 16.07.2026, two screenshots).
   SYMPTOM: walking/canoeing near the June/July ITCZ edge (13.4N/31.8E Gezira;
   18.1N/33.9E Nile) makes every visible plant slide/"fly" with each step, and
@@ -4474,30 +4474,27 @@ the remaining open points in their numeric order.
   pt. 12. Priority insert: directly after point 122 (it corrects the
   just-shipped 143/144 look before 149 re-verifies the weather).
   (Reported 16.07.2026.)
-  WIP (16.07.2026, 22:43 — session-limit handoff; builds green, 1641 vitest
-  green): DONE so far — (a) season.ts SEASON_SLOTS/seasonSlotAt/slotGreenness;
-  (b) render/seasonField.ts (150x148 Uint8 field, blurred one-hot slot
-  weights r=4 texels, lerped slot greens, updateSeasonField per frame,
-  seasonFieldUV/TintAt/TintNode); (c) seasonTint.ts nodes take a tint-node
-  parameter (PlaceScene default SEASON_TINT_U unchanged) and
-  seasonFoliagePosition gained the SPROUT class (foliage=2 anchored at soil);
-  (d) flora.ts bush/grass/papyrus are class 2, flora.test.ts covers the
-  classes; (e) TravelScene: seasonUV baked per terrain-chunk vertex AND per
-  vegetation instance (InstancedBufferAttribute), terrain + vegetation
-  materials sample the field, the frame drive calls updateSeasonField (the
-  player-pos SEASON_TINT_U drive is REMOVED from travel — the __vegetation
-  .seasonTint dev hook now reads the field at the player).
-  STILL OPEN — (1) pure tests: seasonField.test.ts (slot mapping matches
-  floraGreennessAt at sample points incl. hyper-arid Cairo; a border texel
-  lies strictly between its two zones' greens; override fills every slot;
-  walk-independence is trivial by construction but pin the API), needs
-  setupGeodata; (2) live: enrichments witness — the field/greens do NOT
-  change when the player walks (old uniform did), the 120c season check
-  still passes (it reads the hook), screenshots at BOTH user spots (13.4N/
-  31.8E June, 18.1N/33.9E July) showing stable flora; (3) re-run polish.mjs
-  settlement-season block (PlaceScene path untouched but verify); (4) docs:
-  design.md §19.13 + CLAUDE.md pt. 12; (5) full browser regression + commit
-  as ONE feature commit, then dashboard.
+  DONE (17.07.2026, 00:15): the greenness FIELD replaced the travel tint
+  uniform — render/seasonField.ts (150x148 Uint8 texture over lon -20..55 /
+  lat -36..38; per-texel slot weights = one-hot zone map blurred r=4 texels,
+  built lazily; 15 lerped slot greens follow the calendar each frame) sampled
+  through seasonUV baked per terrain-chunk vertex and per vegetation instance;
+  seasonTint nodes take the tint node as a parameter (PlaceScene keeps its
+  single-value SEASON_TINT_U — one place, one greenness); ground flora is
+  foliage class 2 (bush/grass/papyrus sprout from the soil), crowns keep the
+  bare-branch collapse. Pure: seasonField.test.ts (slot mapping == the
+  floraGreennessAt curve incl. hyper-arid Cairo; a border transect is a
+  GRADIENT — max neighbour step < 35% of the total swing; override floods
+  every slot; strength 0 pins neutral; the greens are a pure function of the
+  calendar) and the flora classes in flora.test.ts. Live: enrichments exit 0
+  incl. the flying-plants WITNESS (fixed-spot field drift while the player
+  travels == the standing calendar-lerp baseline, 0.0039 == 0.0039) and
+  screenshots 123/124 at BOTH reported spots, visually checked (grounded
+  shrubs, no floating); polish exit 0 (the settlement season path). Docs:
+  design.md §19.13, CLAUDE.md pt. 12. Vitest 1649 green, lint/audit clean.
+  ALSO: a UserPromptSubmit hook (scripts/dashboard-reminder-hook.mjs) now
+  injects the dashboard obligation on every user prompt (user mandate after
+  repeated staleness).
 
 - [ ] 152. The swimming traveller floats ON the water — never walks the bed
   (user bug, 16.07.2026, screenshot at Lake Edward).

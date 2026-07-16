@@ -550,7 +550,18 @@ verify suite that proves it.
       rains close the fog, dim the sun and rain visibly while the debug
       zoom stays season-free, the flora/ground bleach to straw and deepen
       to green, and the dry season's wider shore catchment gathers the
-      animals at the remaining water (`scripts/verify/enrichments.mjs`);
+      animals at the remaining water (`scripts/verify/enrichments.mjs`).
+      The season is the PLACE's, never the traveller's (point 151): ground
+      and vegetation sample a spatially smoothed per-position greenness
+      field through baked seasonUV coordinates — zone borders read as
+      ~2-degree gradients (a border texel lies strictly between its
+      sides), ground flora (bush/grass/papyrus, foliage class 2) sprouts
+      from the soil while tree crowns keep the bare-branch collapse, and
+      the field is a pure function of the calendar (all pure-tested in
+      `src/render/seasonField.test.ts` and `src/render/flora.test.ts`);
+      live, walking changes neither the field nor the slot greens (the
+      witness of the point-151 "flying plants" bug) and the flora at the
+      reported spots stands stable (`scripts/verify/enrichments.mjs`);
       the season reaches the people (§19.13, point 142): a transhumant
       village thins in its away season while children and elder remain
       (Maasai July 2 walkers vs April 5, live) and the sedentary Bemba

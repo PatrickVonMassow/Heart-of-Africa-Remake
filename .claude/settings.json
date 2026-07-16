@@ -9,6 +9,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/dashboard-reminder-hook.mjs"
+          }
+        ]
+      }
     ]
   },
   "permissions": {
