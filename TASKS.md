@@ -3795,12 +3795,19 @@ the remaining open points in their numeric order.
   Congo still gets no dry season and the Sahara still never greens.
   THE LEVERS, in measured order of effect — the first is the one the pixel probe
   points at, and it is nearly free:
-  1. ★ **Apply the tint AFTER the albedo multiply, not before.** The terrain does
-     `seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6))`, so the hue is
-     multiplied back toward the baked texture's own colour — this is the measured
-     reason the ground barely shifts. Tinting the COMPOSED colour instead gives
-     the season authority over the final pixel. One line; try it first and
-     re-run the pixel probe before building anything else.
+  1. ⛔ **TRIED AND FAILED — do not retry: "apply the tint after the albedo
+     multiply".** This was my predicted big lever and the pixel probe refuted it.
+     Measured: tinting the composed colour left the Sahel's green-excess swing at
+     +10 (versus +11 tinting the vertex colour) and made the dry end LESS
+     saturated. The reason is now clear and is worth keeping: `albedo.mul(2.6)`
+     pushes the composed colour above 1, so `seasonTintNode`'s luma, its
+     `clamp(0,1)` mask terms and its straw target all operate on out-of-range
+     values and flatten. **The albedo is NOT the bottleneck.** Whatever is
+     compressing the swing is downstream — the 2.6x light multiplier and the
+     filmic tone mapping are the next suspects, and the honest next step is to
+     measure where the range is lost rather than to guess again. The lesson
+     stands regardless: **verify each lever against the PIXEL probe before
+     building on it.**
   2. ★ **Bare branches.** The strongest silhouette signal available: a savanna
      tree that drops its leaves in the dry season and carries a full crown in the
      rains is unmistakable at any zoom, and it is real — Dybowski's burnt trees
