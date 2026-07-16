@@ -793,7 +793,16 @@ verify suite that proves it.
     rule itself pure-tested in `src/scenes/travel/riverBanks.test.ts`; screenshots of the Nile, Victoria Falls and Lake Victoria
     (71-73) show the courses; an idle traveller on a river is swept
     downstream, the drift near a waterfall exceeds the unboosted drift,
-    and being swept consumes time and provisions.
+    and being swept consumes time and provisions. The Nile flood (§19.13,
+    point 138) holds: the flood model is remote-fed and pure-tested (it
+    crests in October while Cairo's local wetness is 0, rises from June,
+    and the source's kiremt is already falling as the crest still rises —
+    `src/systems/season.test.ts`); live, the Aswan reach reads visibly
+    higher in October than in April via `__rivers.surfaceAt`/`floodRise`
+    (read through the app's dev hook, never a dynamic import — HMR hands a
+    fresh module instance whose flood state is untouched), and the ribbon
+    continuity and never-buried invariants are re-asserted AT flood peak
+    (`scripts/verify/enrichments.mjs`, screenshots 117/118).
 22. **Health and afflictions.** The health system of `design.md` §6 is
     implemented: a health pool drained by starvation and the afflictions
     of §6.2 (fever delirium, dehydration with the canteen fill mechanics
