@@ -96,8 +96,11 @@ remaining open points in their numeric order.
 Work order (user override, 2026-07-16, eighth): 147 (verify the whole weather
 system — correct AND visible) goes directly after 144, on the user's
 instruction: by then every weather point that changes the PICTURE has landed
-(120, 137, 143, 144), so it is the sweep over what exists. Order: 137 -> 143 ->
-144 -> 147 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136 -> 122 -> 123 -> rest.
+(120, 137, 143, 144), so it is the sweep over what exists. Then 148, an INTERIM
+CLOSING run, pulled forward because the season was the batch's largest rebuild
+and the Closing steps would otherwise wait behind a dozen more points. Order:
+137 -> 143 -> 144 -> 147 -> 148 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136 ->
+122 -> 123 -> rest.
 
 Work order (user override, 2026-07-16, seventh): 146 (revenge) depends on 125's
 shared outcome helper and its (prey, predator) matrix, so it is built directly
@@ -4156,6 +4159,49 @@ the remaining open points in their numeric order.
   additions where they belong. DOCS: CLAUDE.md §7.1 pt. 12's season bullet gains
   the pixel standard; design.md needs nothing new.
   (Filed 16.07.2026.)
+
+- [ ] 148. An interim Closing run, pulled forward.
+  Wanted (user, 16.07.2026): "Und danach einen eingeschobenen Closing-Durchlauf
+  des Batches. Die Batch ist inzwischen so lange und es gab so große Umbauten, da
+  dauert es sonst zu lange, bis diese Schritte wieder durchgeführt werden."
+  ORDER: directly after 147, i.e. once the whole weather system is built AND
+  verified. That is the right seam: the season rebuilt the climate model, the
+  place scene, the flora tint, the fauna's water behaviour, the dress and two
+  village positions — the largest single rebuild of the batch — and the Closing
+  steps would otherwise wait behind a dozen more points.
+  WHAT TO RUN: the four Closing steps at the bottom of this file, in order, as
+  written — full regression, then the dead-code/stale-doc/stale-comment cleanup
+  in SEPARATE commits (never mixed into feature commits), then the full
+  regression again, then the .md cruft pass with the section numbers preserved.
+  ★ WHAT THIS PASS SPECIFICALLY OWES, because it is the debris of the season
+  rebuild and a later reader will not know it is debris:
+  * **`coldCloaksFor` is deprecated** (`src/systems/dress.ts`) — a shim kept only
+    until its callers moved to `seasonalDressFor`. If the callers have moved by
+    now, it is dead code. Delete it and its tests rather than leaving a second
+    way to ask the same question.
+  * **`CURRENT_WEATHER`** (`src/systems/season.ts`) — a per-frame scratch global
+    written by the travel Climate. Check who still reads it: the flora tint moved
+    off it (it now uses `effectiveGreenness` from the player's own coordinate),
+    and the settlement never used it by design. If only the sun dim is left, say
+    so in its comment or fold it away.
+  * **design.md §19.13 and CLAUDE.md §7.1 pt. 12** grew by accretion across ~15
+    commits in one day — the season bullet, the dress sentence, the exaggeration
+    licence, the settlement paragraph. Read them whole and compact them; they are
+    exactly the "rambling or redundant" the Closing step names.
+  * **`docs/peoples-1890.md` is now ~2,300 lines** with §2's negative findings
+    sitting above §7's deeper pass that overturns several of them (the kanzu THIN
+    -> PERIOD, the Maasai transhumance RETRO-APPLIED -> PERIOD, the Okavango
+    MODERN -> PERIOD, and §2.6's "EVIDENCE ABSENT" now answered for three
+    peoples). A reader hitting §2 first gets the superseded answer. **Do not
+    delete the old findings — they are the record of what was known when. Add
+    forward-pointers at each superseded claim.**
+  * **Screenshots**: 110/111 (settlement season) and 112 (Zulu cloaks) exist;
+    147 will add more. Check `verification/` for shots no criterion references.
+  * **The two moved villages** (somali -> Haud, swahili -> Lamu) touched
+    `geo.ts`; check for comments elsewhere that still describe their old places.
+  NOT IN SCOPE: the real Closing still runs at the end over everything. This is
+  an interim pass over what exists at 147, and it does not tick the batch's own
+  Closing section. (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
