@@ -3810,7 +3810,7 @@ the remaining open points in their numeric order.
   home month via `__placeWalkers`, with screenshots of both.
   SIZE: large — split along the findings, one commit each. (Filed 16.07.2026.)
 
-- [ ] 143. Inside a settlement it never rains, and the ground never bleaches.
+- [x] 143. Inside a settlement it never rains, and the ground never bleaches.
   Reported (user, 16.07.2026): "Innerorts sehe ich als einzige Unterschiede beim
   Durchschalten der Monate, dass sich die Helligkeit ändert und die Bewölkung
   der Skyline. Sollte es da nicht mehr Unterschiede geben?" — Yes. Verified by
@@ -3858,6 +3858,13 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 (its settlement paragraph currently claims sky, light
   and firelight — say rain and flora too) and CLAUDE.md §7.1 pt. 12.
   (Filed 16.07.2026.)
+  DONE (16.07.2026, c1f783d): the season tint extracted to render/seasonTint.ts
+  and shared (prior commit); the settlement ground (createGroundMaterial,
+  place-only) and flora (node materials) now tint from the place's own
+  greenness; PlaceRain is a new eye-height field (near-vertical, 16-unit column,
+  rainAmount-driven) — Cairo dry across all 12 real months, verified. Live in
+  polish.mjs §19.13 (screenshot 114). The debug override still forces a season
+  everywhere (that is its purpose), so the Cairo-dry check uses real months.
 
 - [ ] 144. The plants themselves change: cover AND condition, not just colour.
   Wanted (user, 16.07.2026): "Wenn angebracht, sollte sich der Pflanzenbewuchs
