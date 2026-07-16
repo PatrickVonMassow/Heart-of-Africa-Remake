@@ -3239,6 +3239,27 @@ as-is; only the sequence changes.
   visible where the behaviour is specified rather than buried in a task list.
   No code. (Set 16.07.2026.)
 
+- [ ] 135. The settlement-vicinity check (point 102) fails ~2 of 3 runs — fix
+  the guarantee, not the check. Observed 16.07.2026: 'a settlement vicinity
+  holds region-typical animals after leaving (point 102)' failed twice in three
+  full enrichments runs with {region north, count 5, min 6} — a 2/3 rate is a
+  defect, not a flake. No season-code coupling exists (the wildlife does not
+  read CURRENT_WEATHER yet), and the failing count predates today's features in
+  design: `seedSettlementVicinity` (Wildlife.tsx ~650) tops the presence up to
+  `vicinityMinAnimals` AT SEED TIME (on leaving), but the check counts 2.5 s
+  LATER — an animal that wanders past the 75-unit radius (or is taken by an
+  ambient hunt) in between drops the count below the guaranteed minimum. The
+  guarantee and the assertion measure different moments.
+  FIX in the game, not the test: make the guarantee hold over time — e.g. seed
+  with a small margin inside the ring (place the seeded herd so its wander
+  leash cannot exit the radius within minutes), or re-top-up on a slow tick
+  while the traveller is within the vicinity. Do NOT simply relax the check or
+  retry harder: the acceptance text (CLAUDE §7.1 pt. 12, point 102) promises a
+  never-empty vicinity, and the test should keep meaning that.
+  TESTS: the existing live check stays as is (it is the truth-teller); pure
+  test for whatever leash/margin rule is added. (Filed 16.07.2026 after the
+  third run.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
