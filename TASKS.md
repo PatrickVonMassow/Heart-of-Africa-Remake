@@ -4135,7 +4135,7 @@ the remaining open points in their numeric order.
   DEPENDS ON 125 (its helper and its matrix). Build after it. One atomic commit
   on top. (Filed 16.07.2026.)
 
-- [ ] 147. Verify the whole weather system: correct AND visible.
+- [x] 147. Verify the whole weather system: correct AND visible.
   Wanted (user, 16.07.2026): "Füge nach 144 einen Verifikations-Task ein, der
   prüft, ob alles in Bezug auf Wetter (innerorts und außerorts, Pflanzen, Tiere,
   Kleidung, Darstellung, usw.) zum einen korrekt und zum anderen sichtbar
@@ -4200,6 +4200,12 @@ the remaining open points in their numeric order.
   additions where they belong. DOCS: CLAUDE.md §7.1 pt. 12's season bullet gains
   the pixel standard; design.md needs nothing new.
   (Filed 16.07.2026.)
+  DONE (16.07.2026, 5ad65ec): two permanent checks in enrichments — the
+  per-place zone/wetness sweep (32 places, the bug-class catcher) and the
+  PIXEL-measured savanna-swings-Congo-doesn't on the real calendar (screenshots
+  115/116); the settlement rain/tint/dress/Cairo-dry and the animal catchment
+  were already live in polish/enrichments. The intervening-points re-check
+  (136/122/123/138-142) is point 149's job, once they exist.
 
 - [ ] 148. An interim Closing run, pulled forward.
   Wanted (user, 16.07.2026): "Und danach einen eingeschobenen Closing-Durchlauf
