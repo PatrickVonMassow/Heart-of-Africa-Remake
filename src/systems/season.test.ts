@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, karifAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, karifAt, nileFloodAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -337,6 +337,41 @@ describe('floraGreennessAt (the flora asks "how wet for HERE", not "how wet")', 
   it('the debug override still forces it, like the wetness', () => {
     expect(effectiveGreenness(on(1, 15), CAIRO.lat, CAIRO.lon, START_YEAR, 0, 1)).toBe(1)
     expect(effectiveGreenness(on(8, 15), KANO.lat, KANO.lon, START_YEAR, 0, 0)).toBe(0)
+  })
+})
+
+describe('nileFloodAt (point 138 — the flood is remote-fed, not local rain)', () => {
+  const flood = (m: number) => nileFloodAt(on(m, 15), START_YEAR)
+
+  it('crests at Cairo in OCTOBER while Cairo itself is bone dry — the headline', () => {
+    // The whole point: the water is the Ethiopian kiremt arriving weeks late, so
+    // the river peaks in October at a place that never rains. A build that keyed
+    // the flood on local rain would leave Cairo flat all year.
+    expect(flood(10)).toBeGreaterThan(0.8)
+    expect(wet(10, CAIRO.lat, CAIRO.lon)).toBe(0)
+  })
+
+  it('rises through the summer and falls back by the dry season', () => {
+    expect(flood(4)).toBeLessThan(0.2) // spring: low water
+    expect(flood(6)).toBeGreaterThan(flood(4)) // rising from early June
+    expect(flood(10)).toBeGreaterThan(flood(8)) // the crest is October, not August
+    expect(flood(1)).toBeLessThan(0.2) // back at the bed by January
+  })
+
+  it('lags the source: the highland kiremt peaks BEFORE the Cairo crest', () => {
+    // August kiremt at the source, October crest at Cairo — the lag is the model.
+    const kiremtAug = wet(8, ADDIS.lat, ADDIS.lon, ADDIS.elev)
+    const kiremtOct = wet(10, ADDIS.lat, ADDIS.lon, ADDIS.elev)
+    expect(kiremtAug).toBeGreaterThan(kiremtOct) // source already falling in October
+    expect(flood(10)).toBeGreaterThan(flood(8)) // while the flood is still rising to it
+  })
+
+  it('stays inside 0..1 across the whole 1890-1895 window', () => {
+    for (let day = 0; day < 365 * 6; day += 5) {
+      const f = nileFloodAt(day, START_YEAR)
+      expect(f).toBeGreaterThanOrEqual(0)
+      expect(f).toBeLessThanOrEqual(1)
+    }
   })
 })
 

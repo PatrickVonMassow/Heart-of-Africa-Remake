@@ -509,6 +509,41 @@ export function wetnessAt(
   return Math.min(1, Math.max(0, wet))
 }
 
+// The Nile flood (docs/climate-1890.md, point 138). Unregulated in 1890 (no dam
+// until 1898): it rises from early June and peaks at Cairo in OCTOBER, the most
+// visible cycle in the game and right at the start port.
+//
+// The one thing a naive build gets wrong: the flood is NOT local rain. Cairo is
+// rainless the year round, yet the river there crests in October — because the
+// water is the ETHIOPIAN kiremt (Jun-Sep, the Blue Nile's flood) arriving weeks
+// late. So the flood samples the highland SOURCE at a lagged day, never
+// `wetnessAt` at the river point.
+const NILE_SOURCE = { lat: 11.5, lon: 37.0, elevationM: 2000 } // the Blue Nile highlands
+// Ethiopian kiremt peaks in Jul/Aug; the crest reaches Cairo ~2 months later.
+const NILE_FLOOD_LAG_DAYS = 62
+// Low water below this kiremt wetness; full flood at the source's own peak. The
+// source is normalised against ITS peak (not against 1) because a highland zone
+// tops out at ~0.66, so the flood would otherwise never crest.
+const NILE_FLOOD_FLOOR = 0.05
+const NILE_FLOOD_PEAK = 0.6
+
+/**
+ * The Nile flood level at a day, 0 (low water, at the carved bed) .. 1 (the
+ * October crest). Remote-fed and lagged — see the note above. Pure and
+ * date-only: the flood is the same length of river everywhere on the Nile, so
+ * it takes no coordinate.
+ */
+export function nileFloodAt(day: number, startYear: number): number {
+  const kiremt = wetnessAt(
+    day - NILE_FLOOD_LAG_DAYS,
+    NILE_SOURCE.lat,
+    NILE_SOURCE.lon,
+    startYear,
+    NILE_SOURCE.elevationM,
+  )
+  return Math.min(1, Math.max(0, (kiremt - NILE_FLOOD_FLOOR) / (NILE_FLOOD_PEAK - NILE_FLOOD_FLOOR)))
+}
+
 /** Below this zone peak a place is too arid to carry green worth bleaching. */
 const GREENING_ZONE_FLOOR = 0.5
 
