@@ -3712,7 +3712,7 @@ the remaining open points in their numeric order.
   the behaviour is already correct. The wider-catchment rule reads the sky,
   the delta supplies the water, and the two compose.
 
-- [ ] 140. The harmattan as a season — and its counter-intuitive look.
+- [x] 140. The harmattan as a season — and its counter-intuitive look.
   Wanted (user, 16.07.2026). `docs/climate-1890.md` documents it richly and the
   game has none of it: a grep for "harmattan" finds only the dress module's
   comment. The travel view has a static per-region dust haze (`FOG_PRESETS` in
@@ -3757,6 +3757,14 @@ the remaining open points in their numeric order.
   like the rain does.
   DOCS: design.md §19.13 (the harmattan alongside the rains) and CLAUDE.md §7.1
   pt. 12's season bullet. (Filed 16.07.2026.)
+  DONE (16.07.2026, 8d1e931): harmattanSkyParams (pure, identity at 0, the
+  muted-halo trap asserted); the dome gains a HARMATTAN_DUST_U axis beside the
+  wet overcast (whitens to HARMATTAN_PALE, reddens the disc, mutes the halo, no
+  cloud growth); Climate drives it with the fog (sight lines close harder than
+  rain, 0.55 vs 0.4) and the sun dims modestly; debug zoom stays season-free.
+  The 137 boundary held: the driver already existed (0dc1da1), one driver two
+  consumers. Live: Sahel January dust 0.98 / fogFar 117 vs August 0.00 / 181,
+  screenshot 121.
 
 - [ ] 141. Equatorial ice — and hail, the only white ground low down.
   Wanted (user, 16.07.2026). `docs/climate-1890.md` §(a) records that the

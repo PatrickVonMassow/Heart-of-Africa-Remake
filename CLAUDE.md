@@ -544,6 +544,13 @@ verify suite that proves it.
       zoom stays season-free, the flora/ground bleach to straw and deepen
       to green, and the dry season's wider shore catchment gathers the
       animals at the remaining water (`scripts/verify/enrichments.mjs`);
+      the harmattan (§19.13, point 140) palls the Sahel from late November
+      to mid-March — the dome whitens toward dust (its own axis, not the
+      wet gray), the noon sun reddens, the HALO IS MUTED (the researched,
+      counter-intuitive half, pinned as a pure test in
+      `src/systems/season.test.ts`) and the sight lines close harder than
+      under rain — live-checked in the Sahel across January/August
+      (`scripts/verify/enrichments.mjs`, screenshot 121);
       inside a settlement the season is derived from the PLACE's own
       coordinates and dims the sun and sky light, grays the dome, thickens
       the cloud deck, RAINS (a near-vertical eye-height field, calibrated
