@@ -47,7 +47,43 @@ const METERS_TO_UNITS = 1.35 / 1000
 const MOUNTAIN_M = 1600
 /** Degrees of low-frequency meander applied to biome/region borders (design.md §3). */
 const BIOME_WARP = 3.0
-const SNOW_M = 4300
+
+// Permanent ice (design.md §19.13, point 141): ONLY the three massifs that
+// really carried glaciers in 1890 — Kilimanjaro, Mount Kenya, Rwenzori, all
+// above the ~4,500-4,800 m equilibrium line. The named near misses stay BARE
+// and are the test: Elgon (4,321 m — "the highest African mountain completely
+// free of glaciation", missing the line by <200 m), Ras Dashen (transient
+// Dec-Feb only; Ethiopia's rain is summer, so the high ground is dry when it
+// is cold), Mount Cameroon (occasional dusting, no cap), Emi Koussi (snow
+// about once every seven years). A bare elevation threshold gets Elgon and
+// Ras Dashen wrong, which is exactly what the previous SNOW_M = 4300 did.
+// The ice LINE is per massif, adapted to the DEM: the game's DEM flattens the
+// narrow summits (Mount Kenya reads 4,454 m for a real 5,199; Rwenzori 4,227
+// for 5,109), and all three REAL peaks stand far above the real equilibrium
+// line, so each must actually show its cap. The GATE carries the truth (which
+// massifs had ice); the line only places the cap on the flattened peak. The
+// near misses stay excluded by the gate regardless — Elgon's DEM maximum is
+// 4,018 m and Ras Dashen's 4,114, below every line here anyway.
+const ICE_MASSIFS = [
+  { lat: -3.07, lon: 37.35, radiusDeg: 0.55, lineM: 4450 }, // kilimanjaro (DEM peak 5,203)
+  { lat: -0.15, lon: 37.31, radiusDeg: 0.5, lineM: 4100 }, // mount-kenya (DEM peak 4,454)
+  { lat: 0.39, lon: 29.87, radiusDeg: 0.5, lineM: 3900 }, // rwenzori (DEM peak 4,227)
+] as const
+
+/** The glaciated massif covering a point, or null — the gate AND its ice line. */
+export function iceMassifAt(lat: number, lon: number): { lineM: number } | null {
+  for (const m of ICE_MASSIFS) {
+    const dLat = lat - m.lat
+    const dLon = lon - m.lon
+    if (dLat * dLat + dLon * dLon <= m.radiusDeg * m.radiusDeg) return m
+  }
+  return null
+}
+
+/** Whether a point lies inside one of the three glaciated massifs. */
+export function inIceMassif(lat: number, lon: number): boolean {
+  return iceMassifAt(lat, lon) !== null
+}
 
 // Base palette per terrain type; noise varies brightness per run.
 const PALETTE: Record<TerrainType, [number, number, number]> = {
@@ -234,10 +270,14 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     splat[1] += lush * 0.8
   }
 
-  // Snow caps from real elevation (Kilimandscharo, Kenia, Ruwenzori …).
-  const snowT = sstep(SNOW_M - 400, SNOW_M + 300, elevation)
-  if (snowT > 0) {
-    color = mix(color, SNOW, snowT)
+  // Permanent ice caps (point 141): massif-gated, never a bare threshold —
+  // Ras Dashen is higher than Mount Cameroon and still carries none.
+  const massif = iceMassifAt(lat, lon)
+  if (massif) {
+    const snowT = sstep(massif.lineM - 150, massif.lineM + 250, elevation)
+    if (snowT > 0) {
+      color = mix(color, SNOW, snowT)
+    }
   }
 
   // Smooth shoreline ramp near the sea coast: a gentle beach plain several

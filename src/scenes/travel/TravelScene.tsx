@@ -31,8 +31,9 @@ import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
-import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, okavangoFloodAt, sunDimFactor } from '../../systems/season'
+import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
 import { SEASON_TINT_U, seasonTintNode } from '../../render/seasonTint'
+import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { elevationAt } from '../../world/geodata'
 import { RiversAndLakes } from './Rivers'
@@ -304,7 +305,7 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
 
   // Vertex tint carries biome/region hue; boost recenters the mid-gray
   // detail albedo around 1.0.
-  mat.colorNode = seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6))
+  mat.colorNode = seasonalSnowNode(seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6)))
 
   // Blended detail normal map (top projection).
   let nrm = texture(normalsTex[0], uvTop).rgb.mul(w.x)
@@ -829,6 +830,13 @@ function Vegetation() {
       // the river rise over a moment rather than snap.
       const floodTarget = nileFloodAt(s.day, START_YEAR) * balance.season.nileFloodRise
       NILE_FLOOD.rise += (floodTarget - NILE_FLOOD.rise) * 0.02
+      // Seasonal snow on the two real massifs (point 141): Atlas Nov-Apr,
+      // Drakensberg Jun-Aug. Colour-only; permanent ice is baked in terrain.ts.
+      const strength = Math.min(1, Math.max(0, balance.season.weatherStrength))
+      setSeasonalSnow(
+        seasonalSnowAt(s.day, 'atlas', START_YEAR) * strength,
+        seasonalSnowAt(s.day, 'drakensberg', START_YEAR) * strength,
+      )
     }
     // In the far debug zoom the dressing hides (it exists only inside the
     // chunk rectangle); the far-terrain sheet carries the look out there.

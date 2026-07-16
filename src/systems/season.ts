@@ -470,6 +470,35 @@ export function skyOvercastParams(
   return { grayMix: 0.75 * w, cloudBoost: 0.8 * w }
 }
 
+// Seasonal snow (design.md §19.13, point 141): only where it really occurred —
+// the High Atlas (Nov-Apr, harshest Feb-Mar, bare Jul-Aug) and the Drakensberg
+// (Jun-Aug, the austral winter). Everything else at low altitude is barred:
+// savanna snow is physically impossible, and no settlement qualifies.
+const SEASONAL_SNOW_MASSIFS = {
+  atlas: { lat: 31.06, lon: -7.91, radiusDeg: 0.7, peakDoy: 46, halfWidthDays: 90 },
+  drakensberg: { lat: -29.47, lon: 29.27, radiusDeg: 0.8, peakDoy: 196, halfWidthDays: 55 },
+} as const
+
+export type SnowMassif = keyof typeof SEASONAL_SNOW_MASSIFS
+
+/** The world position and reach of a seasonal-snow massif (for the shader mask). */
+export function snowMassifDef(m: SnowMassif) {
+  return SEASONAL_SNOW_MASSIFS[m]
+}
+
+/**
+ * How deep the season's snow stands on a massif, 0 (bare) .. 1 (deep winter).
+ * Date only — the WHERE (inside the massif, above its line) is the caller's
+ * mask; this is the WHEN. Pure, like the other drivers.
+ */
+export function seasonalSnowAt(day: number, massif: SnowMassif, startYear: number): number {
+  const def = SEASONAL_SNOW_MASSIFS[massif]
+  const doy = dayOfYear(day, startYear)
+  const raw = Math.abs(doy - def.peakDoy)
+  const dist = Math.min(raw, 365 - raw)
+  return Math.max(0, 1 - dist / def.halfWidthDays)
+}
+
 /** The harmattan pall's tone: whitish ochre dust, NOT the wet RAIN_GRAY. */
 export const HARMATTAN_PALE = '#d9cdb2'
 

@@ -2864,6 +2864,63 @@ check(
   await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 }
 
+// Point 141 — the ice of 1890: permanent caps on exactly the three glaciated
+// massifs, the four named near misses BARE (that list IS the test), and
+// seasonal snow whitening the High Atlas in February and gone in July.
+{
+  const ice = await page.evaluate(async () => {
+    const t = await import('/src/world/terrain.ts') // pure static data — instance-safe
+    const seed = window.__game.getState().seed
+    const white = (c) => Math.min(c[0], c[1], c[2]) > 0.75
+    const s = (lat, lon) => t.sampleTerrain(lat, lon, seed)
+    return {
+      kilimanjaro: white(s(-3.07, 37.35).color),
+      kenya: white(s(-0.15, 37.31).color),
+      rwenzori: white(s(0.39, 29.87).color),
+      elgon: white(s(1.12, 34.53).color),
+      rasDashen: white(s(13.24, 38.37).color),
+      cameroon: white(s(4.2, 9.17).color),
+      emiKoussi: white(s(19.87, 18.55).color),
+    }
+  })
+  check(
+    'permanent ice caps the three glaciated massifs and NONE of the near misses (point 141)',
+    ice.kilimanjaro && ice.kenya && ice.rwenzori &&
+      !ice.elgon && !ice.rasDashen && !ice.cameroon && !ice.emiKoussi,
+    JSON.stringify(ice),
+  )
+
+  // Seasonal Atlas snow, measured as the FRACTION of near-white pixels over the
+  // massif crest (a mean over the whole frame dilutes it into sand).
+  await page.evaluate(() => window.__game.getState().debugJumpTo(31.06, -7.91)) // Toubkal
+  await page.waitForTimeout(1500)
+  const whiteFrac = async (month) => {
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.waitForTimeout(2500)
+    const buf = await page.screenshot({ clip: { x: 400, y: 280, width: 560, height: 320 } })
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+    let white = 0
+    const px = info.width * info.height
+    for (let i = 0; i < px; i++) {
+      const r = data[i * info.channels]
+      const g = data[i * info.channels + 1]
+      const b = data[i * info.channels + 2]
+      if (Math.min(r, g, b) > 205) white++
+    }
+    return white / px
+  }
+  const feb = await whiteFrac(2)
+  await page.screenshot({ path: `${OUT}122-atlas-snow-february.png` })
+  console.log('shot 122-atlas-snow-february.png')
+  const jul = await whiteFrac(7)
+  check(
+    'the High Atlas whitens in February and bares in July (seasonal snow, point 141)',
+    feb > jul * 3 && feb > 0.02,
+    `white fraction Feb ${(feb * 100).toFixed(1)}% vs Jul ${(jul * 100).toFixed(1)}%`,
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+}
+
 // Point 147(b) — VISIBLE, and measured in PIXELS rather than the tint uniform:
 // the whole reason this class of check exists. A savanna spot's ground must
 // differ on screen between its driest and wettest month, and a Congo spot —

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
+import { inIceMassif } from '../world/terrain'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
 const on = (month: number, dayOfMonth: number, year = START_YEAR): number =>
@@ -622,5 +623,30 @@ describe('harmattanSkyParams (point 140 — the look, incl. the counter-intuitiv
 
   it('closes the sight lines harder than the rain does — thick dust, <=1km haze', () => {
     expect(harmattanSkyParams(1, 1).rangeFactor).toBeLessThan(seasonFogParams(1, 1).rangeFactor)
+  })
+})
+
+describe('seasonalSnowAt + the ice massifs (point 141 — snow only where it was real)', () => {
+  it('snows the High Atlas in its Nov-Apr window and bares it in summer', () => {
+    expect(seasonalSnowAt(on(2, 15), 'atlas', START_YEAR)).toBeGreaterThan(0.6) // harshest Feb-Mar
+    expect(seasonalSnowAt(on(12, 15), 'atlas', START_YEAR)).toBeGreaterThan(0.2) // the window opens
+    expect(seasonalSnowAt(on(7, 15), 'atlas', START_YEAR)).toBe(0) // bare Jul-Aug
+  })
+
+  it('snows the Drakensberg in the austral winter and never in January', () => {
+    expect(seasonalSnowAt(on(7, 15), 'drakensberg', START_YEAR)).toBeGreaterThan(0.6)
+    expect(seasonalSnowAt(on(1, 15), 'drakensberg', START_YEAR)).toBe(0)
+  })
+
+  it('permanent ice sits ONLY on the three glaciated massifs — the near misses are the test', () => {
+    // The three that really carried glaciers in 1890, at 8-12x today's extent:
+    expect(inIceMassif(-3.07, 37.35)).toBe(true) // Kilimanjaro
+    expect(inIceMassif(-0.15, 37.31)).toBe(true) // Mount Kenya
+    expect(inIceMassif(0.39, 29.87)).toBe(true) // Rwenzori
+    // And the four the research names as BARE, each for its own reason:
+    expect(inIceMassif(1.12, 34.53)).toBe(false) // Elgon — free of glaciation, <200m short
+    expect(inIceMassif(13.24, 38.37)).toBe(false) // Ras Dashen — dry when it is cold
+    expect(inIceMassif(4.2, 9.17)).toBe(false) // Mount Cameroon — occasional dusting only
+    expect(inIceMassif(19.87, 18.55)).toBe(false) // Emi Koussi — snow ~once in seven years
   })
 })
