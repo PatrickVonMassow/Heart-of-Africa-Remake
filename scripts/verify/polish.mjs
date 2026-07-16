@@ -483,6 +483,10 @@ for (const [placeId, shot] of [
 // research found no evidence for stay bare in any month, however cold their
 // own ground gets. See src/systems/dress.ts for the per-people evidence.
 {
+  // NOTE: debugJumpToMonth is ONE-indexed (dayOfMonthJump clamps to 1..12 then
+  // subtracts one; Hud.tsx calls it as i + 1). A zero-based probe lands a month
+  // early and CLAMPS 0 to January — several checks here passed by luck that way,
+  // because June is also austral winter and July is also the Sahel's rains.
   const dressAt = async (placeId, month) => {
     await page.evaluate(() => {
       const g = window.__game.getState()
@@ -492,35 +496,65 @@ for (const [placeId, shot] of [
     await page.evaluate((id) => window.__game.getState().enterPlace(id), placeId)
     await page.waitForFunction(() => !!window.__placeDress, null, { timeout: 30000 })
     await page.waitForTimeout(300)
-    return page.evaluate(() => window.__placeDress?.cloaks ?? null)
+    return page.evaluate(() => window.__placeDress ?? null)
   }
 
-  const zuluWinter = await dressAt('zulu-village', 6) // July — austral winter
+  // Point 137: the six dressed peoples, each at its own village in its own
+  // month, against the fifteen that never dress. The pure mapping is covered in
+  // src/systems/dress.test.ts; this is the live half.
+  const somaliKarif = await dressAt('somali-village', 8) // August — the karif on the Haud
+  await page.screenshot({ path: `${OUT}113-somali-karif-tobe.png` })
+  console.log('shot 113-somali-karif-tobe.png')
+  const somaliJilal = await dressAt('somali-village', 2) // February — jilal, dry and HOT
+  const hausaHarmattan = await dressAt('hausa-village', 1) // January — the harmattan
+  const hausaWet = await dressAt('hausa-village', 8) // August — the rains
+
+  const zuluWinter = await dressAt('zulu-village', 7) // July — austral winter
   await page.screenshot({ path: `${OUT}112-zulu-winter-cloaks.png` })
   console.log('shot 112-zulu-winter-cloaks.png')
-  const zuluSummer = await dressAt('zulu-village', 0) // January — austral summer
-  const maasaiWinter = await dressAt('maasai-village', 6) // the equator has no winter
-  const sanWinter = await dressAt('san-village', 6) // cold ground, but no period evidence
+  const zuluSummer = await dressAt('zulu-village', 1) // January — austral summer
+  const maasaiWinter = await dressAt('maasai-village', 7) // the equator has no winter
+  const sanWinter = await dressAt('san-village', 7) // Passarge's -5C Kalahari mornings
 
   check(
     'the Zulu wear the cold-weather cloak in their winter (Mayr, period source)',
-    Array.isArray(zuluWinter) && zuluWinter.length > 1,
+    Array.isArray(zuluWinter?.cloaks) && zuluWinter.cloaks.length > 1,
     JSON.stringify(zuluWinter),
   )
   check(
     'and shed it in their summer — the cloak is the cold garment, not the dress',
-    zuluSummer === null,
+    zuluSummer?.cloaks == null,
     JSON.stringify(zuluSummer),
   )
   check(
     'the equatorial Maasai never dress for a cold season they do not have',
-    maasaiWinter === null,
+    maasaiWinter?.cloaks == null,
     JSON.stringify(maasaiWinter),
   )
   check(
-    'a people with no period evidence stays bare even on cold ground (San)',
-    sanWinter === null,
+    'the San close the leather cloak in the Kalahari winter (Passarge)',
+    Array.isArray(sanWinter?.cloaks),
     JSON.stringify(sanWinter),
+  )
+  check(
+    'the Somali muffle the tobe over the HEAD in the karif (Swayne, period)',
+    Array.isArray(somaliKarif?.cloaks) && somaliKarif.wear === 'head',
+    JSON.stringify(somaliKarif),
+  )
+  check(
+    'and wear it draped in jilal — the driest season is NOT the cold one',
+    somaliJilal?.cloaks == null,
+    JSON.stringify(somaliJilal),
+  )
+  check(
+    'the Hausa zenne appears in the harmattan and is RANK-gated (Barth)',
+    Array.isArray(hausaHarmattan?.cloaks) && hausaHarmattan.rankOnly === true,
+    JSON.stringify(hausaHarmattan),
+  )
+  check(
+    'and is gone in the rains — the Hausa answer the dust wind, not the calendar',
+    hausaWet?.cloaks == null,
+    JSON.stringify(hausaWet),
   )
 }
 

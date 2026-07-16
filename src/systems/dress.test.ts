@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cloakForCloth, coldCloaksFor, seasonalDressFor } from './dress'
+import { cloakForCloth, coldCloaksFor, seasonalDressFor, wearsByRank } from './dress'
 import { COLD_DRESS_THRESHOLD, coldnessAt, harmattanAt, karifAt } from './season'
 
 // The peoples' coordinates as the world model places them (src/world/geo.ts).
@@ -230,5 +230,28 @@ describe('seasonalDressFor (point 137 — six peoples, and the rest is a finding
     expect(seasonalDressFor('zulu', drivers(JANUARY, -28.4, 31.3, 671))).toBeNull()
     expect(seasonalDressFor('hausa', drivers(227, 12.0, 8.5, 486))).toBeNull()
     expect(seasonalDressFor('somali', drivers(JANUARY, 9.0, 45.0, 964))).toBeNull()
+  })
+})
+
+describe('wearsByRank (point 137d — the cold is a class experience)', () => {
+  const SOUTH_CLOTH = ['#3a5a8a', '#8a4a2a', '#c2b090']
+
+  it('dresses the notable and leaves the rest bare', () => {
+    // Barth: "Only the wealthier amongst them can afford the 'zenne'", while his
+    // schoolboys sat at a pre-dawn fire "with scarcely a rag of a shirt on".
+    expect(wearsByRank(SOUTH_CLOTH[0], SOUTH_CLOTH)).toBe(true)
+    expect(wearsByRank(SOUTH_CLOTH[1], SOUTH_CLOTH)).toBe(false)
+    expect(wearsByRank(SOUTH_CLOTH[2], SOUTH_CLOTH)).toBe(false)
+  })
+
+  it('keeps the proportion a MINORITY — a village of plaids would erase the finding', () => {
+    const worn = SOUTH_CLOTH.filter((c) => wearsByRank(c, SOUTH_CLOTH)).length
+    expect(worn).toBeGreaterThan(0) // somebody has one, or the rule is invisible
+    expect(worn / SOUTH_CLOTH.length).toBeLessThan(0.5)
+  })
+
+  it('is stable per figure and never dresses an off-palette stranger', () => {
+    expect(wearsByRank(SOUTH_CLOTH[0], SOUTH_CLOTH)).toBe(wearsByRank(SOUTH_CLOTH[0], SOUTH_CLOTH))
+    expect(wearsByRank('#123456', SOUTH_CLOTH)).toBe(false)
   })
 })

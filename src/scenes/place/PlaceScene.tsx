@@ -402,6 +402,11 @@ function Villager({
   // §19.13) — the shoulder cloth IS that garment, so it takes the cloak's
   // colour rather than growing a second one. Without it he would stand in
   // summer dress among cloaked villagers.
+  // The elder wears the season's wrap whenever there is one — and ALWAYS, even
+  // where the garment is rank-gated for everyone else: he is the notable. Barth
+  // on the Tuareg, "the principal people wear a red bernus thrown across their
+  // shoulders"; on the Hausa zenne, "only the wealthier amongst them can
+  // afford" it. If anyone in the village owns one, it is this man.
   const shoulder = dress
     ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
     : style.cloth[1 % style.cloth.length]

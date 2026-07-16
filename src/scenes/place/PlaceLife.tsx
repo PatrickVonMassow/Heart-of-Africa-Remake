@@ -12,7 +12,7 @@ import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
 import { buildGoat } from '../../render/fauna'
 import { TESSELLATION } from '../../render/figures'
-import { cloakForCloth } from '../../systems/dress'
+import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, type Collider } from './collision'
@@ -42,27 +42,45 @@ function Figure({
 }) {
   const bodyH = kneel ? 0.55 : 1.0
   const cold = useContext(ColdCloaksContext)
+  // The wrap this figure actually wears — null when the season is off, and null
+  // for most figures when the record gates the garment on RANK. Barth on the
+  // Hausa zenne: "Only the wealthier amongst them can afford" it, while his
+  // schoolboys sat at a pre-dawn fire "with scarcely a rag of a shirt on"; his
+  // Tuareg chief ENVIED the bernus rather than owning one. So a village in the
+  // cold shows a few draped figures among many bare ones — the cold is a class
+  // experience here, and rendering everyone in a plaid would erase the finding.
+  const wrap = cold && (!cold.rankOnly || wearsByRank(cloth, cold.palette))
+    ? cloakForCloth(cold.cloaks, cold.palette, cloth)
+    : null
   return (
     <group scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
       <mesh position={[0, bodyH * 0.5, 0]} castShadow>
         <coneGeometry args={[0.32, bodyH, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={cloth} roughness={0.95} />
       </mesh>
-      {/* The cold-weather cloak is worn OVER the everyday dress (Mayr): a
-          shell around the shoulders, leaving the dress showing below. */}
-      {cold && (
-        <mesh position={[0, bodyH * 0.66, 0]} castShadow>
-          <coneGeometry args={[0.355, bodyH * 0.68, TESSELLATION.figureBody]} />
+      {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
+          the shoulders, leaving the dress showing below. Where the record says
+          the head is muffled in it (the Somali tobe in the karif), the shell
+          rises past the head instead — that is the one head-wear case, and the
+          shape difference IS the finding. */}
+      {wrap && (
+        <mesh position={[0, bodyH * (cold!.wear === 'head' ? 0.82 : 0.66), 0]} castShadow>
+          <coneGeometry
+            args={[0.355, bodyH * (cold!.wear === 'head' ? 1.0 : 0.68), TESSELLATION.figureBody]}
+          />
           <meshStandardMaterial
-            color={cloakForCloth(cold.cloaks, cold.palette, cloth)}
+            color={wrap}
             roughness={0.8} // greased hide sits glossier than the cloth beneath
           />
         </mesh>
       )}
-      <mesh position={[0, bodyH + 0.18, 0]} castShadow>
-        <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
-        <meshStandardMaterial color={skin} roughness={0.85} />
-      </mesh>
+      {/* The head shows unless the wrap is drawn over it. */}
+      {!(wrap && cold!.wear === 'head') && (
+        <mesh position={[0, bodyH + 0.18, 0]} castShadow>
+          <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
+          <meshStandardMaterial color={skin} roughness={0.85} />
+        </mesh>
+      )}
     </group>
   )
 }

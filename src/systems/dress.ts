@@ -181,6 +181,20 @@ export function coldCloaksFor(peopleId: string, coldness: number): readonly stri
 }
 
 /**
+ * Whether THIS figure is one of the few who owns a rank-gated wrap.
+ *
+ * Keyed on the cloth's position in the settlement's palette, like the wrap's
+ * colour: the FIRST cloth in the palette is the notable's. That keeps it
+ * deterministic and stable per figure, and it keeps the proportion right — a
+ * village dresses from three cloths, so roughly a third of the figures carry the
+ * plaid and the rest stand bare at the fire, which is the class split Barth
+ * describes rather than a uniform issue.
+ */
+export function wearsByRank(cloth: string, palette: readonly string[]): boolean {
+  return palette.indexOf(cloth) === 0
+}
+
+/**
  * Pick a figure's cloak deterministically from its everyday cloth, so a village
  * shows Mayr's mid-transition mix rather than a uniform issue — without
  * threading a seed through every life vignette.
