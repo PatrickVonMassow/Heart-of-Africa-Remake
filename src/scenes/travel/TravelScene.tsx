@@ -9,7 +9,6 @@ import * as THREE from 'three/webgpu'
 import {
   attribute,
   float,
-  uniform,
   mix,
   mx_fractal_noise_float,
   normalMap,
@@ -33,6 +32,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, effectiveGreenness, sunDimFactor } from '../../systems/season'
+import { SEASON_TINT_U, seasonTintNode } from '../../render/seasonTint'
 import { elevationAt } from '../../world/geodata'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
@@ -230,32 +230,10 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
  * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
  * normal maps and bi-planar rock on steep slopes.
  */
-// Season tint (design.md §19.13, point 120d), shared by the terrain and the
-// vegetation: 0.5 is the neutral §19.9 look, 0 bleaches greens toward straw,
-// 1 deepens them. A greenness mask keeps sand, rock and trunks out of it —
-// note the obvious g > max(r, b) test misses the savanna acacia outright: its
-// crown is OLIVE (#6e7c2f, r ≈ g), the single most visible tree in the game.
-// Deserts season-correctly stay put on their own: their local wetness is ~0
-// the year round, so the tint never leaves neutral there.
-const SEASON_TINT_U = uniform(0.5)
-function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
-  const greenness = c.g.sub(c.b).mul(2.5).clamp(0, 1).mul(
-    float(1).sub(c.r.sub(c.g).mul(4)).clamp(0, 1),
-  )
-  const luma = c.r.mul(0.35).add(c.g.mul(0.5)).add(c.b.mul(0.15))
-  // Both ends must be REAL recolours, keyed off the luma, and symmetric about
-  // the untouched mid-year `c`. They were not: straw recoloured hard while lush
-  // was a multiplicative nudge (`c * (0.7, 1.08, 0.7)` — eight percent more
-  // green and otherwise a dimming), so the rains changed the scene's BRIGHTNESS
-  // and never its hue. Measured on screen before the fix, the Sahel's ground
-  // went 205,188,89 (dry) -> 178,173,78 (wet): the green excess g-(r+b)/2 moved
-  // 41 -> 45, i.e. not at all. The player saw the sun dim and nothing else.
-  const straw = vec3(luma.mul(1.9), luma.mul(1.55), luma.mul(0.6))
-  const lush = vec3(luma.mul(0.5), luma.mul(1.25), luma.mul(0.45))
-  const dryK = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
-  const lushK = SEASON_TINT_U.mul(2).sub(1).clamp(0, 1)
-  return mix(mix(c, straw, greenness.mul(dryK)), lush, greenness.mul(lushK))
-}
+// The season tint (design.md §19.13) and its uniform now live in
+// render/seasonTint.ts so the settlement scene shares the same curve (point
+// 143). This scene drives SEASON_TINT_U from the traveller's own greenness
+// below; the place scene drives it from the place's coordinate.
 
 // Travel materials are MODULE singletons (point 96): a remounted travel scene
 // must reuse the same material instances, or the renderer builds ~100 fresh
