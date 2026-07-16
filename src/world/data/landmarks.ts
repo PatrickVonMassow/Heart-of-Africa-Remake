@@ -90,8 +90,6 @@ export interface CulturalLandmarkDef {
 // geometry), bounded; a site already clear returns unchanged after one query.
 // Only Meroë is river-side, but the shift is generic so any bank-side field is
 // nudged onto dry ground.
-// Field spread (~0.64°) + rim margin past the calibratable river half-width.
-const LANDMARK_FIELD_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.73
 
 function clearedOfRiversBy(lat: number, lon: number, clearanceDeg: number): { lat: number; lon: number } {
   let a = lat
@@ -130,11 +128,25 @@ const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   { id: 'bandiagara', lon: -3.4, lat: 14.35, kind: 'cliff-dwellings' },
 ]
 
-// Meroë is shifted off the Nile so its whole pyramid field stands on the east
-// bank; every other field is already clear and returns unchanged.
-export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = CULTURAL_LANDMARK_DEFS.map((c) =>
-  c.id === 'meroe' ? { ...c, ...clearedOfRiversBy(c.lat, c.lon, LANDMARK_FIELD_CLEARANCE_DEG) } : c,
-)
+// EVERY cultural landmark clears the (calibratable) river band by its own
+// rendered field radius (point 156): with the point-136 widening, "already
+// clear" stopped being true for anchors that were hand-placed against the
+// scale-true width. The radius is the field spread the world.test rims probe:
+// Meroë's pyramid field reaches ~0.64°, Giza's ~0.32°, the single-building
+// sites ~0.3°.
+const LANDMARK_FIELD_RADIUS_DEG: Record<string, number> = {
+  meroe: 0.73,
+  giza: 0.35,
+}
+const LANDMARK_DEFAULT_RADIUS_DEG = 0.3
+export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = CULTURAL_LANDMARK_DEFS.map((c) => ({
+  ...c,
+  ...clearedOfRiversBy(
+    c.lat,
+    c.lon,
+    RIVER_WIDTH_DEG + (LANDMARK_FIELD_RADIUS_DEG[c.id] ?? LANDMARK_DEFAULT_RADIUS_DEG),
+  ),
+}))
 
 // Natural point-landmarks (design.md §4.4): real natural wonders sighted and
 // journaled like the other landmarks. Okavango is deliberately offset south
@@ -146,9 +158,22 @@ export interface NaturalSiteDef {
   kind: 'crater' | 'volcano' | 'delta' | 'wetland'
 }
 
-export const NATURAL_SITES: NaturalSiteDef[] = [
+// Natural sites clear the widened band too (point 156) — EXCEPT the Okavango,
+// whose identity IS the water (its fan floods by design), and with only a
+// small margin for the Sudd: its reeds may hug the White Nile, but the
+// anchor (and the solid parts of its dressing) must not sit in the channel.
+const NATURAL_SITE_CLEARANCE_DEG: Record<string, number> = {
+  sudd: RIVER_WIDTH_DEG + 0.05,
+  ngorongoro: RIVER_WIDTH_DEG + 0.3,
+  lengai: RIVER_WIDTH_DEG + 0.3,
+}
+const NATURAL_SITE_DEFS: NaturalSiteDef[] = [
   { id: 'ngorongoro', lon: 35.58, lat: -3.16, kind: 'crater' },
   { id: 'lengai', lon: 35.9, lat: -2.76, kind: 'volcano' },
   { id: 'okavango', lon: 22.9, lat: -19.5, kind: 'delta' },
   { id: 'sudd', lon: 30.5, lat: 8.0, kind: 'wetland' },
 ]
+export const NATURAL_SITES: NaturalSiteDef[] = NATURAL_SITE_DEFS.map((n) => {
+  const clearance = NATURAL_SITE_CLEARANCE_DEG[n.id]
+  return clearance === undefined ? n : { ...n, ...clearedOfRiversBy(n.lat, n.lon, clearance) }
+})

@@ -3,13 +3,13 @@
 // no browser. The characteristic bird's-eye screenshots stay a Playwright §7.2
 // proof.
 import { describe, it, expect, beforeAll } from 'vitest'
-import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, placeById } from './geo'
+import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
 import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
 import { LAKES } from './data/lakes'
 import { LAND_POLYGONS } from './data/coastline'
-import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS } from './data/landmarks'
+import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_SITES } from './data/landmarks'
 import { setupGeodata } from '../test/geodata'
 import { densifyRiver } from '../scenes/travel/waterSurface'
 import { balance } from '../config/balance'
@@ -76,9 +76,11 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     }
     const cairo = placeById('cairo')
     expect(giza.lon).toBeLessThan(cairo.lon) // west of the city
-    // Still AT Cairo: the bound grew with point 136 — the widened Nile pushed
-    // Cairo onto its east bank and the Giza field further west of the channel.
-    expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(1.05)
+    // Still AT Cairo: the bound grew with points 136/156 — the widened Nile
+    // holds Cairo's cluster east of the band and clears the Giza field west
+    // of it, so the two anchors sit ~1.1 deg apart across the channel. The
+    // place-scene skyline mounts Giza regardless of this world distance.
+    expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(1.15)
   })
 
   it('the Meroë pyramid field stands wholly on the Nile east bank, not in the river', () => {
@@ -194,6 +196,35 @@ describe('movement boundary (design.md §11)', () => {
 describe('terrain sampling on real geodata', () => {
   it('carves rivers at the calibratable half-width (0.17° base × balance widthFactor)', () => {
     expect(RIVER_WIDTH_DEG).toBeCloseTo(0.17 * balance.river.widthFactor, 9)
+  })
+
+  it.each(ports.map((p) => [p.id, p] as const))(
+    '%s keeps its cluster footprint out of the widened band (point 156)',
+    (_id, p) => {
+      // Ports stay AT the river (§4.2 exemption for closeness) but the
+      // rendered building cluster must not stand IN it — Khartoum at the
+      // White/Blue Nile confluence was the reported case.
+      expect(riverDistance(p.lat, p.lon)).toBeGreaterThanOrEqual(PORT_RIVER_CLEARANCE_DEG - 1e-9)
+    },
+  )
+
+  it('Khartoum sits clear of BOTH widened Nile arms (the reported case)', () => {
+    const khartoum = placeById('khartoum')
+    expect(riverDistance(khartoum.lat, khartoum.lon)).toBeGreaterThanOrEqual(PORT_RIVER_CLEARANCE_DEG - 1e-9)
+    expect(sampleTerrain(khartoum.lat, khartoum.lon, SEED).type).not.toBe('water')
+  })
+
+  it.each(NATURAL_SITES.filter((n) => n.id !== 'okavango').map((n) => [n.id, n] as const))(
+    '%s anchors outside the widened band (point 156 — the Okavango floods by design)',
+    (_id, n) => {
+      expect(riverDistance(n.lat, n.lon)).toBeGreaterThanOrEqual(RIVER_WIDTH_DEG + 0.05 - 1e-9)
+    },
+  )
+
+  it('the elephant graveyard stands clear of the widened band', () => {
+    expect(riverDistance(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)).toBeGreaterThanOrEqual(
+      RIVER_WIDTH_DEG + 0.05 - 1e-9,
+    )
   })
 
   it('the width factor actually widens the sampled water span (point 136)', () => {

@@ -7,6 +7,7 @@
 
 import { RIVERS_DATA, type RiverDef } from './data/rivers'
 import { riverDistanceExact } from './hydro'
+import { RIVER_WIDTH_DEG } from './riverWidth'
 
 /** World units per degree of latitude/longitude (flat equirectangular mapping). */
 export const UNITS_PER_DEGREE = 10
@@ -152,19 +153,31 @@ const PORTS: PlaceDef[] = [
 // Minimum river clearance for villages (design.md §4.2): the river water band
 // reaches ~0.165° from the axis (terrain.ts RIVER_WIDTH_DEG) and the village
 // marker footprint ~0.145° (TravelScene VillageMarker at 10 units/degree), so
-// 0.35° keeps every hut dry with a small margin. Ports are exempt — they sit
-// on coasts and river banks by design (Cairo, Khartoum, Timbuktu).
-export const VILLAGE_RIVER_CLEARANCE_DEG = 0.35
+// The clearances scale with the calibratable river half-width (point 156):
+// with the point-136 widening, fixed margins left Khartoum's building
+// cluster in the confluence. A village keeps its full hut footprint dry;
+// a port stays AT the river by design (§4.2 exemption for closeness) but
+// its rendered cluster must not stand IN the band either — a smaller,
+// footprint-only margin.
+// NOTE: geoIndex's riverDistance saturates at ~0.45° — the village clearance
+// must stay below that cap or the world test cannot confirm it (at the
+// shipped widthFactor 1.6 this is 0.442; a factor past ~1.65 needs the cap
+// raised alongside).
+export const VILLAGE_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.17
+// 0.15: the port cluster (main house ~2.2 world units wide plus annex)
+// reaches ~1.3 units past the anchor — the first 0.1 margin left Khartoum's
+// annex touching the waterline on screen (screenshot 126 caught it).
+export const PORT_RIVER_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.15
 
-// Nudge a village up the river-distance gradient until the clearance holds.
-// Deterministic (pure river geometry, no seed involved) and bounded; a village
+// Nudge a place up the river-distance gradient until the clearance holds.
+// Deterministic (pure river geometry, no seed involved) and bounded; a place
 // already clear returns unchanged after one distance query.
-function clearedOfRivers(lat: number, lon: number): LatLon {
+function clearedOfRivers(lat: number, lon: number, clearance = VILLAGE_RIVER_CLEARANCE_DEG): LatLon {
   let a = lat
   let o = lon
   for (let i = 0; i < 24; i++) {
     const d = riverDistanceExact(a, o, 1)
-    if (d >= VILLAGE_RIVER_CLEARANCE_DEG) break
+    if (d >= clearance) break
     const e = 0.02
     const gLat = riverDistanceExact(a + e, o, 1) - riverDistanceExact(a - e, o, 1)
     const gLon = riverDistanceExact(a, o + e, 1) - riverDistanceExact(a, o - e, 1)
@@ -173,7 +186,7 @@ function clearedOfRivers(lat: number, lon: number): LatLon {
       a += e // flat gradient (dead centre of a channel): fixed nudge, re-aim
       continue
     }
-    const step = Math.min(0.08, VILLAGE_RIVER_CLEARANCE_DEG - d + 0.01)
+    const step = Math.min(0.08, clearance - d + 0.01)
     a += (gLat / gl) * step
     o += (gLon / gl) * step
   }
@@ -225,7 +238,15 @@ const VILLAGES: PlaceDef[] = VILLAGE_HEARTLANDS.map((v) => ({
   ...clearedOfRivers(v.lat, v.lon),
 }))
 
-export const PLACES: PlaceDef[] = [...PORTS, ...VILLAGES]
+// Ports auto-clear too (point 156), by their smaller footprint margin — the
+// hand nudges of point 136 put the three worst anchors on their real banks;
+// this keeps every port's CLUSTER out of however wide the band is calibrated.
+const CLEARED_PORTS: PlaceDef[] = PORTS.map((p) => ({
+  ...p,
+  ...clearedOfRivers(p.lat, p.lon, PORT_RIVER_CLEARANCE_DEG),
+}))
+
+export const PLACES: PlaceDef[] = [...CLEARED_PORTS, ...VILLAGES]
 
 export function placeById(id: string): PlaceDef {
   const p = PLACES.find((p) => p.id === id)

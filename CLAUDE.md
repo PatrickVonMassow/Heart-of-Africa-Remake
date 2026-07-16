@@ -243,7 +243,14 @@ verify suite that proves it.
    capitals — under a fog of war that each explored area clears a window
    through). Every village
    keeps the small minimum river-water clearance of §4.2 (its footprint
-   never reaches into a river; ports are exempt). Verifiable: near
+   never reaches into a river) — the clearances SCALE with the
+   calibratable river width (point 156): ports stay AT the river per the
+   §4.2 exemption but their rendered cluster clears the band by its own
+   smaller footprint margin, and every landmark (cultural fields, natural
+   sites except the flooding Okavango, the elephant graveyard) auto-clears
+   at build time by its field radius — Khartoum at the widened confluence
+   and the Sudd were the reported cases (`src/world/world.test.ts` sweeps
+   all of them; screenshots 126/127). Verifiable: near
    a border, `.region-label` elements name both regions on their sides;
    undiscovered `.map-label` elements read "?", a visited place (Cairo)
    shows its name, and sighting a landmark reveals its name; the opened

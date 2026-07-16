@@ -4602,7 +4602,7 @@ the remaining open points in their numeric order.
   DOCS: CLAUDE.md §7.1 pt. 16 (the spawn-freedom clause). Order: batch end
   per the user. (Reported 16.07.2026.)
 
-- [ ] 156. Settlement footprints stay clear of the widened rivers (Khartoum).
+- [x] 156. Settlement footprints stay clear of the widened rivers (Khartoum).
   Wanted (user, 16.07.2026): since point 136 widened the rivers, some
   settlements read as protruding into the water — Khartoum (at the White/Blue
   Nile confluence, both arms widened) named as the example.
@@ -4640,6 +4640,23 @@ the remaining open points in their numeric order.
   DOCS: CLAUDE.md §7.1 pt. 3 (footprint clause beside the village
   clearance). Order: after 152 (the fresh user bugs in reported order),
   before 123. (Reported 16.07.2026.)
+  DONE (17.07.2026, 01:51): every clearance now scales with RIVER_WIDTH_DEG —
+  villages RIVER_WIDTH+0.17 (0.442, deliberately under geoIndex's 0.45
+  distance cap: a widthFactor past ~1.65 needs the cap raised alongside),
+  ports get their own smaller auto-nudge RIVER_WIDTH+0.15 (the first 0.10 cut
+  left Khartoum's annex touching the waterline ON SCREEN — the screenshot
+  caught what the anchor test could not), EVERY cultural landmark clears by
+  its own field radius (Meroë 0.73, Giza 0.35, default 0.3 — previously only
+  Meroë auto-cleared), natural sites clear except the by-design-flooding
+  Okavango (Sudd small margin: reeds hug the bank, nothing solid in the
+  channel), graveyard swept. world.test sweeps ports (Khartoum explicit,
+  both arms), natural sites and the graveyard — 104 world tests, 1664 vitest
+  total. The "still AT Cairo" Giza bound widened to 1.15 (both anchors
+  cleared apart across the band). Live: full enrichments exit 0; screenshots
+  126 (Khartoum cluster on the bank, quay at the foam line, nothing in the
+  blue) and 127 (Sudd reeds at the west bank, channel free) visually
+  checked. The 151 witness route also hardened (westward across open plain;
+  one run had an obstacle eat the northward leg).
 
 - [ ] 157. A fleeing calf never snags on an obstacle (escape uses deflection).
   Wanted (user, 16.07.2026): during a lion hunt the parent sacrificed itself

@@ -35,6 +35,7 @@ Entering and leaving a settlement happen purely through movement, without a dedi
 - Inside, walking beyond the settlement's walkable edge leaves it and switches back to the bird's-eye view with the field of view around the current position — there is no exit archway and no "leave" key.
 - A settlement just left stays closed to re-entry until the traveller has moved clear of it (a calibratable clearance beyond the enter radius), so leaving never bounces straight back in.
 - A settlement is not auto-entered while the traveller is on a water cell: even with the village-river clearance of §4.2, a riverside village's enter radius can touch the water, and canoeing a river must never drift him in by accident. He enters by stepping onto land.
+- The §4.2 clearances scale with the river width (point 156): however wide the calibratable band is set, a village keeps its full hut footprint dry, a port keeps its rendered cluster out of the band (while still sitting AT the river), and every landmark field clears it by its own radius — only the Okavango's fan stays in the water, because flooding is its identity.
 - Enterable buildings (trade, service and audience buildings) open by walking against their entrance door — the same deliberate opening the inhabitants use, no key press. Only the village elder is addressed with the interaction key.
 
 ### 2.4 Graphics and atmosphere
