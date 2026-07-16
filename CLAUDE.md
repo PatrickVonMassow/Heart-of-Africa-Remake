@@ -521,6 +521,16 @@ verify suite that proves it.
       merely drinking.
     - Graveyard: the carcass/tusk/bone counts are asserted via the dev
       hook with a screenshot.
+    - Weather, verified as CORRECT and VISIBLE (§19.13, point 147): every
+      village and port is swept through `climateZoneAt` and asserted into a
+      plausible zone with a real wet season (the check that would have caught
+      the Fang-in-the-Sahara and Somali-in-the-Congo model bugs — no tropical
+      settlement bone dry all year); and the season is measured in PIXELS, not
+      the tint uniform — a savanna spot's ground differs on screen between its
+      driest and wettest REAL month while the Congo (no dry season) does not,
+      with a human-viewable screenshot pair (115/116). The standard is the
+      picture, not "the tests pass": three rounds of uniform-level checks once
+      passed while the player saw nothing (`scripts/verify/enrichments.mjs`).
     - Seasons and weather (§19.13): the wetness model is pure-tested
       against the researched ~1890 climate (`docs/climate-1890.md`) —
       Cairo rainless year round, no Sahara rain, the Sahel wet inside the

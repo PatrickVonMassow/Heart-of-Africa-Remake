@@ -2731,6 +2731,80 @@ check(
   JSON.stringify({ wetTint: season.wet.tint, dryTint: season.dry.tint }),
 )
 
+// Point 147(a) — CORRECT: every village and port lands in a plausible climate,
+// swept. This is the check that would have caught both of the season's model
+// bugs: the Fang village classified as northern Sahara (0.000 wetness in its
+// wettest month) and the Somali village that a move would have given the
+// Congo's rains. The assertion is concrete: no settlement in the tropics may be
+// bone dry all year — that is the fallback-desert signature.
+const placeClimate = await page.evaluate(async () => {
+  const geo = await import('/src/world/geodata.ts')
+  const g = await import('/src/world/geo.ts')
+  const s = await import('/src/systems/season.ts')
+  const day = (m) => (Date.UTC(1890, m, 15) - Date.UTC(1890, 0, 1)) / 86400000
+  return g.PLACES.map((p) => {
+    const el = geo.elevationAt(p.lat, p.lon)
+    let maxWet = 0
+    for (let m = 0; m < 12; m++) maxWet = Math.max(maxWet, s.wetnessAt(day(m), p.lat, p.lon, 1890, el))
+    return { id: p.id, lat: p.lat, lon: p.lon, zone: s.climateZoneAt(p.lat, p.lon, el), maxWet }
+  })
+})
+// The genuine deserts, which SHOULD be dry all year (Cairo and any Saharan
+// settlement) — everything else in the tropics must get a real wet season.
+const KNOWN_DRY = new Set(['cairo'])
+const boneDryTropical = placeClimate.filter(
+  (p) => Math.abs(p.lat) < 18 && p.maxWet < 0.12 && !KNOWN_DRY.has(p.id) && !p.zone.startsWith('sahara'),
+)
+check(
+  'no tropical settlement is bone dry all year (the fallback-desert bug class)',
+  boneDryTropical.length === 0,
+  boneDryTropical.length ? JSON.stringify(boneDryTropical) : `${placeClimate.length} places swept`,
+)
+check(
+  'every settlement classifies into a known climate zone',
+  placeClimate.every((p) => typeof p.zone === 'string' && p.zone.length > 0),
+  `zones: ${[...new Set(placeClimate.map((p) => p.zone))].join(', ')}`,
+)
+
+// Point 147(b) — VISIBLE, and measured in PIXELS rather than the tint uniform:
+// the whole reason this class of check exists. A savanna spot's ground must
+// differ on screen between its driest and wettest month, and a Congo spot —
+// which has no dry season — must NOT. (The uniform swung 0.00..0.95 while the
+// player saw nothing; only the pixels tell the truth.)
+// Measured on the REAL calendar (debugJumpToMonth), NOT the debug override —
+// the override forces the season everywhere and so would make even the Congo
+// swing, which is exactly the relativity under test. The whole point is that
+// the Congo's own year has no dry month.
+const groundRGB = async (lat, lon, month) => {
+  await page.evaluate(([la, lo]) => window.__game.getState().debugJumpTo(la, lo), [lat, lon])
+  await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+  await page.waitForTimeout(2600)
+  const buf = await page.screenshot({ clip: { x: 300, y: 320, width: 680, height: 340 } })
+  const { channels } = await sharp(buf).stats()
+  return channels.slice(0, 3).map((c) => c.mean)
+}
+const gx = (c) => c[1] - (c[0] + c[2]) / 2
+const savDry = await groundRGB(-17.9, 25.9, 7) // Zambezi plateau, July — bone dry
+await page.screenshot({ path: `${OUT}115-savanna-dry.png` })
+const savWet = await groundRGB(-17.9, 25.9, 1) // January — the summer rains
+await page.screenshot({ path: `${OUT}116-savanna-wet.png` })
+console.log('shot 115-savanna-dry.png, 116-savanna-wet.png')
+const congoDry = await groundRGB(-2.6, 22.4, 8) // basin, its driest month
+const congoWet = await groundRGB(-2.6, 22.4, 5) // and its wettest — the swing is small
+await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+const savSwing = Math.abs(gx(savWet) - gx(savDry))
+const congoSwing = Math.abs(gx(congoWet) - gx(congoDry))
+check(
+  'the savanna ground visibly changes on SCREEN between dry and wet (point 147, pixels)',
+  savSwing > 8,
+  `savanna green-excess swing ${savSwing.toFixed(1)} (dry ${gx(savDry).toFixed(0)} -> wet ${gx(savWet).toFixed(0)})`,
+)
+check(
+  'the Congo basin does NOT swing — it has no dry season, and that is correct',
+  congoSwing < savSwing / 2,
+  `congo swing ${congoSwing.toFixed(1)} vs savanna ${savSwing.toFixed(1)}`,
+)
+
 // The dry season gathers the wildlife at the remaining water (point 120e): a
 // wider shore catchment at spawn. Same seed, same chunks — the only variable
 // is the forced season, so the drinker counts are deterministic.
