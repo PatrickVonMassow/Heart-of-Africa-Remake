@@ -320,7 +320,7 @@ Current and gameplay:
 - Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4).
 - Moving with the current is faster, against it slower; even an idle traveller on a river is carried downstream. The drift covers real distance and therefore consumes time and provisions like any water travel — the current never moves the traveller for free.
 - There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
-- Water can also be crossed without a canoe, but slower, more exposed to the current, and at risk of a crocodile attack (injury or death). Out of the canoe the rifle gets wet and is useless — only a machete reduces the risk; in the canoe it stays dry and works as usual.
+- Water can also be crossed without a canoe, but slower, more exposed to the current, and at risk of a crocodile attack (injury or death). Out of the canoe the rifle gets wet and is useless — only a machete reduces the risk; in the canoe it stays dry and works as usual. Visually the swimmer floats ON the rendered water surface, chest-deep with a slow swim bob (point 152) — never walking the carved bed under the sheet, however deep it lies (Lake Edward's rift bed made the difference plain).
 
 Visual water realism:
 

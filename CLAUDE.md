@@ -834,7 +834,10 @@ verify suite that proves it.
     gap and no river surface is buried, that every lake surface clears its
     interior bed, that the Nile is a single continuous strip, that a long
     driven canoe passage down the Nile stays on water the whole way (the
-    point-136 playability claim), and — pure — that the densified courses
+    point-136 playability claim), that a canoe-less swimmer floats
+    chest-deep ON the lake sheet — never on the carved bed below it
+    (point 152, checked mid-Lake-Edward via `__player`,
+    screenshot 125), and — pure — that the densified courses
     hold the bounded turn angle with every control point anchored
     (`src/scenes/travel/riverSmoothness.test.ts`) while the width factor
     widens the sampled water span (`src/world/world.test.ts`), and that

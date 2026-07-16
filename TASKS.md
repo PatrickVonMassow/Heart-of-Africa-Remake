@@ -3470,6 +3470,13 @@ the remaining open points in their numeric order.
   TESTS: the existing live checks stay as they are (they are the truth-tellers);
   pure tests for whatever leash/margin/exemption rule is added. (Filed
   16.07.2026 after the third run; second case added after the fourth.)
+  MORE CASES of the same class (16./17.07.2026, observed across full runs):
+  (c) the dry-season drinker count (point 120e — dryDrinkers vs wetDrinkers
+  flipped to 2/0, 3/0 on two runs, green on others); (d) the trample-grief
+  charge (point 119 — the parent died charging but the "closed" distance
+  metric came out negative when the elephant walked away faster than the
+  charge). Same rule as (a)/(b): fix in the GAME (deterministic staging or
+  hysteresis), never by loosening the check.
 
 - [x] 136. Rivers: wider, and smoother in their course (playability over scale).
   Wanted (user, 16.07.2026): the rivers are to be made WIDER — explicitly
@@ -4496,7 +4503,7 @@ the remaining open points in their numeric order.
   injects the dashboard obligation on every user prompt (user mandate after
   repeated staleness).
 
-- [ ] 152. The swimming traveller floats ON the water — never walks the bed
+- [x] 152. The swimming traveller floats ON the water — never walks the bed
   (user bug, 16.07.2026, screenshot at Lake Edward).
   SYMPTOM: swimming across Lake Edward, the figure walks the carved rift bed
   far UNDER the lake sheet (readable through the translucent surface).
@@ -4518,6 +4525,20 @@ the remaining open points in their numeric order.
   wording needs it (design.md §11.3 already says water is crossable swimming
   — add the visual float sentence).
   Order: directly after 151. (Reported 16.07.2026.)
+  DONE (17.07.2026, 01:05): the figure lifts to waterSurfaceY − SWIM_IMMERSION
+  (0.35, chest-deep) on any river/lake cell without the canoe, with a slow
+  swim bob replacing the walk bounce; the sea keeps its ~0 plane through the
+  same query. Live check at Lake Edward's data centre: swimming=true, the
+  immersion gap 0.336 within the bob tolerance, and the sheet 2.5 world units
+  above the carved bed — the exact bug case; screenshot 125 visually checked
+  (figure on the sheet, legs submerged). TWO harness findings on the way:
+  the __player dev hook only wrote on canoe/carry/wound FLIPS, so any check
+  that jumped the player read a stale snapshot (now merged every frame —
+  Object.assign keeps the trailer's .drag); and the swim check must jump the
+  player back to the Cairo reach afterwards (its Lake-Edward stay let the
+  vicinity chunks despawn and broke the point-102 check downstream). The
+  roaming 135-class flakes (guard approach, 120e drinkers, 119 closed-metric)
+  are logged in point 135 — the 152 check itself passed on both full runs.
 
 - [ ] 153. Ocean surf only near the coast, and ambient-volume sliders (birdsong).
   Wanted (user, 16.07.2026, "ans Ende vom Batch"): (a) the ocean-surf ambience

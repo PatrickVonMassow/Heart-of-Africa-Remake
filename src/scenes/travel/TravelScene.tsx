@@ -1519,6 +1519,9 @@ const CANOE_SEAT_DROP = 0.28
 // constant places that point just above the water surface, so the surface never
 // shows up through the open hull and floods the canoe (design.md §7).
 const CANOE_HULL_CLEARANCE = 0.29
+// How far the swimming figure hangs under the rendered water surface
+// (point 152, design.md §11.3) — chest-deep: legs submerged, head clear.
+const SWIM_IMMERSION = 0.35
 
 /** The dugout hull + gunwale rim, reused by the ridden and the dragged canoe. */
 function CanoeHull() {
@@ -1630,16 +1633,25 @@ function Player() {
     // detects the ribbon, so a mouth cell misclassified as ocean keeps the
     // lift.
     const refY = Math.max(0, t.height)
-    // Query the surface only while actually riding: the lookup is cheap, but
-    // the common no-canoe walk should not pay it every frame.
-    const surfaceY = canoeing ? (waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0) : 0
+    // Query the surface whenever the traveller is ON water — riding or
+    // swimming (point 152): the swimmer floats on the SAME rendered surface
+    // the canoe rides. Lake Edward made the old terrain-height walk plain:
+    // its sheet spans the lake-wide bedMax high above the carved rift bed,
+    // so the figure walked the bottom, readable through the water.
+    const surfaceY = onWater ? (waterSurfaceY(ll.lat, ll.lon, s.seed, t.height) ?? 0) : 0
     const boatBaseY = surfaceY - refY + CANOE_HULL_CLEARANCE
+    // Chest-deep: the figure hangs this far under the surface while swimming.
+    const swimBaseY = surfaceY - refY - SWIM_IMMERSION
 
     if (inner.current) {
       inner.current.rotation.y = heading.current
       if (canoeing) {
         // Sit into the hull, lifted to the water surface; a slow rock replaces the bob.
         inner.current.position.y = boatBaseY - CANOE_SEAT_DROP + Math.sin(bobTime.current * 1.7) * 0.03
+      } else if (onWater) {
+        // Swimming (design.md §11.3): on the surface, a slow swim bob —
+        // never the walk bounce, and never the bed underneath.
+        inner.current.position.y = swimBaseY + Math.sin(bobTime.current * 2.1) * 0.05
       } else {
         inner.current.position.y = moving ? Math.abs(Math.sin(walkTime.current * 9)) * 0.08 : 0
       }
@@ -1713,9 +1725,26 @@ function Player() {
       if (legs.current) legs.current.visible = !canoeing
       if (woundLight.current) woundLight.current.visible = wounds >= 1
       if (woundSevere.current) woundSevere.current.visible = wounds >= 2
-      if (import.meta.env.DEV) {
-        ;(window as unknown as Record<string, unknown>).__player = { canoeing, carrying, wounds }
-      }
+    }
+    if (import.meta.env.DEV) {
+      // Merged EVERY frame, not inside the change gate above: the gate only
+      // fires when canoe/carry/wound state FLIPS, so a check that jumped the
+      // player (e.g. onto Lake Edward, point 152) read a stale snapshot from
+      // wherever the last flip happened. Object.assign, not replacement —
+      // the drag block earlier in this frame writes __player.drag and a
+      // fresh object every frame would drop it.
+      const w = window as unknown as { __player?: Record<string, unknown> }
+      w.__player = Object.assign(w.__player ?? {}, {
+        canoeing,
+        carrying,
+        wounds,
+        // Point 152: the swim float, checkable — the figure's local lift
+        // and the surface/ground samples it derives from.
+        swimming: onWater && !canoeing,
+        figureLocalY: inner.current?.position.y ?? 0,
+        surfaceY,
+        refY,
+      })
     }
     last.current = { x: s.pos.x, z: s.pos.z }
   })

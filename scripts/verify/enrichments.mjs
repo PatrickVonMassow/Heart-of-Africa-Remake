@@ -592,6 +592,42 @@ if (waterSpot && landSpot) {
   const none = await page.evaluate(() => window.__player)
   check('Canoe: no canoe in the pack, neither ridden nor dragged', none?.canoeing === false && none?.carrying === false, JSON.stringify(none))
 
+  // --- Point 152: the swimmer floats ON the water, never walks the bed -------
+  // Lake Edward is the witness case (user screenshot): its sheet spans the
+  // lake-wide bedMax high above the carved rift bed, so a terrain-height
+  // figure visibly walked the bottom under the water.
+  const swim = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+    const g = window.__game.getState()
+    window.__game.setState({ equipment: { ...g.equipment, canoe: 0 } })
+    // The lake CENTER from the data (pure, import-safe): a border scan once
+    // hit a cell where the coarse __terrainType and the sim's sampleTerrain
+    // disagree (land at height 0.34) and the figure never swam.
+    const lakes = await import('/src/world/data/lakes.ts')
+    const edward = lakes.LAKES.find((l) => l.id === 'edward' || /edward/i.test(l.id))
+    if (!edward) return { found: false }
+    const spot = [edward.center[1], edward.center[0]]
+    g.debugJumpTo(spot[0], spot[1])
+    await sleep(800)
+    return { found: true, spot, player: window.__player }
+  })
+  const swimGap = swim.found
+    ? swim.player.surfaceY - (swim.player.refY + swim.player.figureLocalY)
+    : NaN
+  check(
+    'a swimmer floats chest-deep ON the lake sheet — never on the carved bed (point 152)',
+    swim.found && swim.player.swimming === true &&
+      swim.player.surfaceY - swim.player.refY > 0.2 && // the bed genuinely lies below the sheet here
+      Math.abs(swimGap - 0.35) < 0.12, // immersion, within the swim bob
+    JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
+  )
+  await page.screenshot({ path: `${OUT}125-swim-lake-edward.png` })
+  // State hygiene: the swim check leaves the player mid-Lake-Edward; jump
+  // back to the Cairo reach so the downstream checks (vicinity seeding,
+  // scripted hunts) run over their usual streamed chunks.
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
+  await page.waitForTimeout(800)
+
   // --- Point 136 (the playability claim itself): a long driven canoe passage
   // down the Nile stays on water the whole way. Before the widening, steering
   // along the kinked course kept slipping the traveller onto land.
