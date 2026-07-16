@@ -3239,8 +3239,8 @@ as-is; only the sequence changes.
   visible where the behaviour is specified rather than buried in a task list.
   No code. (Set 16.07.2026.)
 
-- [ ] 135. The settlement-vicinity check (point 102) fails ~2 of 3 runs — fix
-  the guarantee, not the check. Observed 16.07.2026: 'a settlement vicinity
+- [ ] 135. Two wildlife checks promise guaranteed outcomes from a stochastic
+  sim, and fail intermittently — fix the guarantees, not the checks. Observed 16.07.2026: 'a settlement vicinity
   holds region-typical animals after leaving (point 102)' failed twice in three
   full enrichments runs with {region north, count 5, min 6} — a 2/3 rate is a
   defect, not a flake. No season-code coupling exists (the wildlife does not
@@ -3256,9 +3256,26 @@ as-is; only the sequence changes.
   while the traveller is within the vicinity. Do NOT simply relax the check or
   retry harder: the acceptance text (CLAUDE §7.1 pt. 12, point 102) promises a
   never-empty vicinity, and the test should keep meaning that.
-  TESTS: the existing live check stays as is (it is the truth-teller); pure
-  test for whatever leash/margin rule is added. (Filed 16.07.2026 after the
-  third run.)
+  SECOND CASE, same class (observed 16.07.2026): 'a real hunt catches a calf,
+  the parent sacrifices itself and the calf escapes' failed once in four runs
+  with {caughtSeen true, catchEvidenced true, parentDead FALSE, calfDead true,
+  calfEscaped false} — the calf died and the parent never sacrificed. The check
+  places the parent in shielding reach and expects the sacrifice, but the
+  charge has to win a race against the struggle countdown in a live sim; when
+  the parent's path is fouled (terrain, herd-mates, a body-separation shove) it
+  arrives late and the check reads a legitimate-but-unwanted outcome as a
+  failure. NOTE the elimination already done: the season catchment change of
+  point 120e was suspected and CLEARED by inspection — `a.drink` is read in
+  exactly one place (Wildlife.tsx ~1543) and writes only the RENDER position
+  px/pz, never the sim a.x/a.z that the drama and the check both use.
+  FIX likewise in the game: make the sacrifice deterministic once the parent is
+  placed inside its reach (e.g. guarantee the charge cannot be shoved off its
+  line while `child.caught` runs — the body-separation exemption for a charging
+  parent already exists and may simply not cover this path), rather than
+  loosening the assertion.
+  TESTS: the existing live checks stay as they are (they are the truth-tellers);
+  pure tests for whatever leash/margin/exemption rule is added. (Filed
+  16.07.2026 after the third run; second case added after the fourth.)
 
 ## Closing (only after all points)
 
