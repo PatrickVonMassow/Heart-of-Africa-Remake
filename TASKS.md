@@ -3819,7 +3819,7 @@ the remaining open points in their numeric order.
   1890s glacier BREAK-UP animation was the optional depth and is not built
   (the period extent is; recorded as the open nuance).
 
-- [ ] 142. The season reaches the people: work, presence, market, fire.
+- [x] 142. The season reaches the people: work, presence, market, fire.
   Wanted (user, 16.07.2026). This is the richest seam the (a2) research opened
   and the build used none of it — `docs/peoples-1890.md` §3, §4 and §4.9 are
   full of period-sourced seasonal LIFE, while the game's settlements run the
@@ -3859,6 +3859,24 @@ the remaining open points in their numeric order.
   a transhumant village shows fewer inhabitants in its away month than in its
   home month via `__placeWalkers`, with screenshots of both.
   SIZE: large — split along the findings, one commit each. (Filed 16.07.2026.)
+  DONE (16.07.2026, 15b8801 + aa26c90 + 92f1519), split along the findings as
+  ordered:
+  * §4.0.1 "the young men are gone" — presenceAt thins the adult walkers:
+    Maasai in the LOCAL DRY season (the PERIOD Thomson direction), Tuareg on
+    the autumn caravan (window wraps the year end; marked Ahaggar
+    extrapolation), Sahel farmers out at the field huts in the RAINS (Barth,
+    PERIOD — the inverted intuition); children/elder/home vignettes REMAIN.
+    §4.0.5's negative asserted monthly: Bemba and Lunda never thin.
+  * §4.9 the fire image — the village fire burns harder under the place's own
+    cold/harmattan/karif (Tuareg Jan 1.50, Hausa Jan 1.49, Congo basin 1.04),
+    compounding 120g's firelight-carries-further.
+  * §3.1/§4.9 the market season — the stall's grain mound shrinks to a third
+    in the Sahel farmers' hungry RAINS and refills at the October harvest;
+    nobody else is touched, asserted.
+  * §4.0.2 Swayne's period table already governs the Horn (the 137 horn zone).
+  STILL OPEN, recorded not invented: the §4.9 indoor/outdoor NIGHT reading
+  (Parkyns' sleep-outdoors-normally needs a day/night cycle the game does not
+  have) and the fishing seasons (a research GAP even in §3.5).
 
 - [x] 143. Inside a settlement it never rains, and the ground never bleaches.
   Reported (user, 16.07.2026): "Innerorts sehe ich als einzige Unterschiede beim

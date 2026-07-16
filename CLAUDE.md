@@ -544,6 +544,13 @@ verify suite that proves it.
       zoom stays season-free, the flora/ground bleach to straw and deepen
       to green, and the dry season's wider shore catchment gathers the
       animals at the remaining water (`scripts/verify/enrichments.mjs`);
+      the season reaches the people (§19.13, point 142): a transhumant
+      village thins in its away season while children and elder remain
+      (Maasai July 2 walkers vs April 5, live) and the sedentary Bemba
+      never thin (asserted); the village fire burns harder under the
+      place's own cold/harmattan/karif; the Sahel stall's grain shrinks in
+      the hungry rains and refills at the harvest — pure-tested in
+      `src/systems/seasonalLife.test.ts`, live in `scripts/verify/polish.mjs`;
       the ice of 1890 (§19.13, point 141) caps exactly the three glaciated
       massifs while the four named near misses stay bare — the list swept in
       a pure test (`inIceMassif`) AND live over the terrain colours; the
