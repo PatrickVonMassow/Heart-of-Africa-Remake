@@ -198,6 +198,35 @@ export function seasonFogParams(
 /** The overcast tone seasonFogParams' grayMix mixes toward. */
 export const RAIN_GRAY = '#aeb6ba'
 
+/**
+ * Rain intensity from wetness (0..1): drizzle starts past the threshold and
+ * ramps to full — light wet-season air stays rainless, only genuinely wet
+ * periods rain. Pure for the same reason as seasonFogParams.
+ */
+export function rainAmount(wetness: number, strength: number): number {
+  const w = Math.min(1, Math.max(0, wetness)) * Math.min(1, Math.max(0, strength))
+  const t = (w - 0.45) / (1 - 0.45)
+  const c = Math.min(1, Math.max(0, t))
+  return c * c * (3 - 2 * c) // smoothstep above the drizzle threshold
+}
+
+/**
+ * How far the wet season dims the sun (multiplier on the light intensity).
+ * Overcast, not night: at full rain the light drops to ~60%.
+ */
+export function sunDimFactor(wetness: number, strength: number): number {
+  const w = Math.min(1, Math.max(0, wetness)) * Math.min(1, Math.max(0, strength))
+  return 1 - 0.4 * w
+}
+
+/**
+ * This frame's effective weather at the traveller, written by the travel
+ * Climate component and read by the sun and rain — a frame-scratch global in
+ * the mould of Wildlife's LION_STATE, so the lighting does not need a second
+ * wetness derivation of its own.
+ */
+export const CURRENT_WEATHER = { wetness: 0 }
+
 export function wetnessAt(
   day: number,
   lat: number,

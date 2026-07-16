@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, dayOfYear, effectiveWetness, seasonFogParams, wetnessAt } from './season'
+import { climateZoneAt, dayOfYear, effectiveWetness, rainAmount, seasonFogParams, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 
 /** In-game day for a calendar date in the start year (the store counts from 1 Jan 1890). */
@@ -196,6 +196,27 @@ describe('seasonFogParams (point 120c — the wet season closes the sight lines)
   it('scales monotonically with wetness', () => {
     expect(seasonFogParams(0.5, 1).rangeFactor).toBeGreaterThan(seasonFogParams(1, 1).rangeFactor)
     expect(seasonFogParams(0.5, 1).grayMix).toBeLessThan(seasonFogParams(1, 1).grayMix)
+  })
+})
+
+describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () => {
+  it('light wet-season air stays rainless: drizzle starts only past the threshold', () => {
+    expect(rainAmount(0, 1)).toBe(0)
+    expect(rainAmount(0.3, 1)).toBe(0)
+    expect(rainAmount(0.45, 1)).toBe(0)
+    expect(rainAmount(0.7, 1)).toBeGreaterThan(0)
+    expect(rainAmount(1, 1)).toBe(1)
+  })
+
+  it('strength 0 turns the rain off entirely', () => {
+    expect(rainAmount(1, 0)).toBe(0)
+  })
+
+  it('the sun dims to overcast, never to night, and dry is the identity', () => {
+    expect(sunDimFactor(0, 1)).toBe(1)
+    expect(sunDimFactor(1, 0)).toBe(1)
+    expect(sunDimFactor(1, 1)).toBeLessThan(1)
+    expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
   })
 })
 

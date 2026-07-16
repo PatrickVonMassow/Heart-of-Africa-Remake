@@ -6,12 +6,12 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
-import { float, max, mx_fractal_noise_float, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
+import { float, hash, instanceIndex, max, mx_fractal_noise_float, positionLocal, positionWorld, smoothstep, time, uniform, uv, vec3 } from 'three/tsl'
 import { demElevation, demInlandWater } from '../../render/demElevation'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { effectiveWetness, RAIN_GRAY, seasonFogParams } from '../../systems/season'
+import { CURRENT_WEATHER, effectiveWetness, RAIN_GRAY, rainAmount, seasonFogParams } from '../../systems/season'
 import { elevationAt } from '../../world/geodata'
 import type { RegionId } from '../../world/geo'
 
@@ -40,6 +40,47 @@ const FOG_PRESETS: Record<RegionId, FogPreset> = {
 
 const HAZE_LAYERS = 5
 
+// Rain field (design.md §19 seasons, point 120c): thin falling streaks in a
+// column around the traveller. MODULE singletons like the fog (point 96): a
+// fresh material per mount would re-link travel programs on every re-entry.
+const RAIN_COUNT = 900
+const RAIN_RADIUS = 55
+const RAIN_HEIGHT = 42
+const RAIN_FALL_SPEED = 26
+let rainSingleton: { material: THREE.MeshBasicNodeMaterial; opacityU: { value: number } } | null = null
+function getRain() {
+  if (rainSingleton) return rainSingleton
+  const opacityU = uniform(0)
+  const m = new THREE.MeshBasicNodeMaterial()
+  m.transparent = true
+  m.depthWrite = false
+  m.side = THREE.DoubleSide
+  m.fog = false
+  // Per-instance placement from the instance index alone — no matrices, no CPU
+  // per-frame work: a hashed xz offset inside the column and a fall phase that
+  // wraps over the column height.
+  const i = instanceIndex.toFloat()
+  const rx = hash(i.mul(3).add(1)).sub(0.5).mul(RAIN_RADIUS * 2)
+  const rz = hash(i.mul(3).add(2)).sub(0.5).mul(RAIN_RADIUS * 2)
+  const phase = hash(i.mul(3))
+  const fall = phase.mul(RAIN_HEIGHT).sub(time.mul(RAIN_FALL_SPEED)).mod(RAIN_HEIGHT)
+  m.positionNode = positionLocal.add(vec3(rx, fall, rz))
+  m.colorNode = vec3(0.62, 0.68, 0.75)
+  // Fade toward the column edge so no square silhouette shows, and thin the
+  // streaks with the rain amount.
+  const edge = max(rx.abs(), rz.abs()).div(RAIN_RADIUS)
+  m.opacityNode = opacityU.mul(smoothstep(float(1), float(0.55), edge)).mul(0.75)
+  rainSingleton = { material: m, opacityU }
+  return rainSingleton
+}
+let rainGeometrySingleton: THREE.PlaneGeometry | null = null
+function getRainGeometry() {
+  // A slim vertical quad; the second, 90°-rotated instance set crosses it so
+  // the streaks read from every camera yaw.
+  rainGeometrySingleton ??= new THREE.PlaneGeometry(0.06, 1.35)
+  return rainGeometrySingleton
+}
+
 // MODULE singletons (point 96): scene.fog participates in every material's
 // pipeline cache key, so a fresh Fog instance per mount would invalidate and
 // re-link the whole travel program set on re-entry after a place visit.
@@ -49,6 +90,8 @@ const TRAVEL_BACKGROUND = new THREE.Color('#cfe0ea')
 export function Climate() {
   const scene = useThree((s) => s.scene)
   const hazeGroup = useRef<THREE.Group>(null)
+  const rainGroup = useRef<THREE.Group>(null)
+  const rain = getRain()
 
   // Imperative fog so near/far/color can be lerped smoothly per frame.
   useEffect(() => {
@@ -116,11 +159,12 @@ export function Climate() {
       },
       hazeOpacity: () => haze.opacityU.value as number,
       seasonWetness: () => wetness.current,
+      rainOpacity: () => rain.opacityU.value,
     }
     return () => {
       delete w.__climate
     }
-  }, [scene, haze])
+  }, [scene, haze, rain])
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
@@ -148,7 +192,18 @@ export function Climate() {
       useUi.getState().seasonWetnessOverride,
     )
     wetness.current = wet
+    CURRENT_WEATHER.wetness = wet
     const fogSeason = seasonFogParams(wet, balance.season.weatherStrength)
+
+    // Rain follows the traveller and fades out in the debug zoom, like the
+    // haze: a zoomed-out map view full of streaks would read as noise.
+    const rainTarget = rainAmount(wet, balance.season.weatherStrength) * (1 - hazeClear)
+    rain.opacityU.value += (rainTarget - rain.opacityU.value) * k
+    const rg = rainGroup.current
+    if (rg) {
+      rg.visible = rain.opacityU.value > 0.01
+      if (rg.visible) rg.position.set(s.pos.x, 0, s.pos.z)
+    }
 
     const fog = scene.fog as THREE.Fog | null
     if (fog) {
@@ -185,12 +240,28 @@ export function Climate() {
   })
 
   return (
-    <group ref={hazeGroup} visible={false}>
-      {Array.from({ length: HAZE_LAYERS }, (_, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, i * 1.3]} material={haze.material} renderOrder={5}>
-          <planeGeometry args={[95, 95]} />
-        </mesh>
-      ))}
-    </group>
+    <>
+      <group ref={hazeGroup} visible={false}>
+        {Array.from({ length: HAZE_LAYERS }, (_, i) => (
+          <mesh key={i} rotation={[-Math.PI / 2, 0, i * 1.3]} material={haze.material} renderOrder={5}>
+            <planeGeometry args={[95, 95]} />
+          </mesh>
+        ))}
+      </group>
+      <group ref={rainGroup} visible={false}>
+        {/* Tilted like wind-driven rain — and the lean turns face area toward
+            the high bird's-eye camera, where a plumb streak is nearly edge-on
+            and invisible. */}
+        {[0, Math.PI / 2].map((ry) => (
+          <instancedMesh
+            key={ry}
+            args={[getRainGeometry(), rain.material, RAIN_COUNT]}
+            rotation={[0.38, ry, 0]}
+            renderOrder={6}
+            frustumCulled={false}
+          />
+        ))}
+      </group>
+    </>
   )
 }

@@ -2697,6 +2697,34 @@ check('an animal on an open-ocean cell is set back to the nearest land',
 // --- Point 8: whole-continent debug zoom without haze -------------------------
 // design.md §21: the debug-unlocked zoom reaches a view of the whole continent
 // (a coarse far-terrain sheet streams in), and in that debug-only range no
+// Season weather (design.md §19, point 120c): forcing the rainy season via the
+// debug override must rain visibly (rain streak opacity up) and pull the fog
+// in toward overcast; forcing dry must clear it again. Checked at zoom 1,
+// before the zoom section below — the zoomed-out view is deliberately
+// season-free.
+const season = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const read = () => ({
+    wet: window.__climate.seasonWetness(),
+    rain: window.__climate.rainOpacity(),
+    far: window.__climate.fog()?.far ?? 0,
+  })
+  window.__ui.getState().setSeasonWetnessOverride(1)
+  let wet = read()
+  for (let i = 0; i < 40 && wet.rain < 0.4; i++) { await sleep(250); wet = read() }
+  window.__ui.getState().setSeasonWetnessOverride(0)
+  let dry = read()
+  for (let i = 0; i < 60 && dry.rain > 0.1; i++) { await sleep(250); dry = read() }
+  window.__ui.getState().setSeasonWetnessOverride(null)
+  return { wet, dry }
+})
+check(
+  'forcing the rainy season rains and pulls the fog in; dry clears it (point 120c)',
+  season.wet.wet === 1 && season.wet.rain > 0.4 && season.dry.wet === 0 &&
+    season.dry.rain <= 0.1 && season.wet.far < season.dry.far - 20,
+  JSON.stringify(season),
+)
+
 // haze is shown — the fog recedes to the horizon and the ground haze fades.
 const continentZoom = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

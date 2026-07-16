@@ -31,6 +31,7 @@ import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
+import { CURRENT_WEATHER, sunDimFactor } from '../../systems/season'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
@@ -547,10 +548,11 @@ class StableCSMShadowNode extends CSMShadowNode {
   }
 }
 
+const SUN_BASE_INTENSITY = 2.4
 let sunSingleton: { light: THREE.DirectionalLight; target: THREE.Object3D } | null = null
 function getSun() {
   if (sunSingleton) return sunSingleton
-  const light = new THREE.DirectionalLight('#fff1da', 2.4)
+  const light = new THREE.DirectionalLight('#fff1da', SUN_BASE_INTENSITY)
   light.castShadow = true
   light.shadow.mapSize.set(2048, 2048)
   light.shadow.camera.near = 10
@@ -587,6 +589,10 @@ function Sun() {
     const pos = useGame.getState().pos
     light.position.set(pos.x + SUN_DIR[0] * 130, SUN_DIR[1] * 130, pos.z + SUN_DIR[2] * 130)
     target.position.set(pos.x, 0, pos.z)
+    // Overcast dims the sun with the season (design.md §19, point 120c). The
+    // wetness is Climate's per-frame scratch — one derivation for the whole
+    // scene, not a second one here.
+    light.intensity = SUN_BASE_INTENSITY * sunDimFactor(CURRENT_WEATHER.wetness, balance.season.weatherStrength)
   })
   return (
     <>

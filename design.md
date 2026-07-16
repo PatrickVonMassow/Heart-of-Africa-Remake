@@ -600,6 +600,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 ### 19.9 Climate and landscape dressing
 
 - Climate and environmental look: region-typical atmosphere such as heat shimmer in the desert, humid haze in the jungle and clear air in the highlands. Purely visual.
+- **Seasons (see §19.13):** the region look above is the dry-season baseline; the seasonal weather modulates it through the year.
 - Rich, region-typical landscape dressing in the bird's-eye view: beyond the base vegetation, the land is dotted with period-appropriate elements of its region — baobabs, termite mounds, kopjes (granite boulder piles) and occasional dead trees in the savanna, bare trees at the desert edge, papyrus and reed belts along rivers and lake shores. The open land must not read as barren.
 
 ### 19.10 Village and market life (first-person)
@@ -616,6 +617,14 @@ Inhabitants at everyday activities (cooking, weaving, livestock, playing childre
 There is no day/night cycle: game time runs in fast-forward (about five years of expedition over great distances); a real-time daily cycle would create constant switches and needlessly prolong a game.
 
 ---
+
+### 19.13 Seasons and weather
+
+The date drives the seasons, and each place shows the weather that was typical for it at that time of year — grounded in the researched ~1890 climate (`docs/climate-1890.md`), not in a generic wet/dry toggle. The model derives a wetness from the calendar date and the place (latitude, longitude, elevation): the Sahel's single summer rains peaking in August, the double rains of the equator, the Cape's winter rain opposite the plateau, the Ethiopian highlands' kiremt — and Cairo effectively rainless the year round. Deliberately encoded rather than left to intuition: rain does NOT follow the sun's convergence line (the real rainband lags far south of it), East Africa's bimodal calendar is stated outright, and the Sahel reads WET, because 1890 sits inside the 1870–1895 humid period. Snow can exist only where it really occurred (the high summits and the winter Atlas — no settlement qualifies, so no village ever shows snow on the ground; savanna snow is physically impossible).
+
+In the bird's-eye view the wet season closes the sight lines (fog pulls in and grays toward overcast), dims the sunlight to an overcast level, and rains visibly — wind-slanted streaks around the traveller. The dry season is the unchanged §19.9 baseline. The zoomed-out debug view stays season-free like it stays haze-free. Plants, animals and the first-person settlements (sky, light — with the firelight of §19.10 carrying further under the dimmed sun — and the inhabitants' dress per `docs/peoples-1890.md`) follow the season as well; like all of §19 this is ambience and touches no mechanic (whether weather should ever affect movement/health is an OPEN design question, deliberately not invented).
+
+A single balance value scales the whole seasonal look (0 disables it), and the debug menu can force dry season, transition or rainy season for testing (§21).
 
 ## 20. Core Gameplay Loop
 
