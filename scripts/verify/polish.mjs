@@ -620,6 +620,23 @@ for (const [placeId, shot] of [
     maasaiDry < maasaiWet && maasaiDry >= 1,
     `walkers July ${maasaiDry} vs April ${maasaiWet}`,
   )
+  // The warming fire (point 142, the §4.9 fire image): the village fire burns
+  // harder where the place's own season is cold or dust-chilled.
+  const blazeAt = async (placeId, month) => {
+    await page.evaluate(() => { const g = window.__game.getState(); if (g.placeId) g.leavePlace() })
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), placeId)
+    await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
+    return page.evaluate(() => window.__placeSeason().fireBlaze)
+  }
+  const tuaregJan = await blazeAt('tuareg-village', 1) // Ahaggar at 2110 m, Saharan winter
+  const mongoJan = await blazeAt('mongo-village', 1) // the basin has no season
+  check(
+    'the village fire burns harder in a cold season, and not in the seasonless basin (point 142)',
+    tuaregJan > 1.35 && mongoJan < 1.15,
+    `blaze tuareg Jan ${tuaregJan.toFixed(2)} vs mongo Jan ${mongoJan.toFixed(2)}`,
+  )
+
   const bembaJul = await walkersAt('bemba-village', 7)
   const bembaJan = await walkersAt('bemba-village', 1)
   check(

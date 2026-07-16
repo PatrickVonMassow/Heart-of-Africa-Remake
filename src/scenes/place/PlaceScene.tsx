@@ -28,7 +28,7 @@ import { SEASON_TINT_U, seasonTintNode, setSeasonTint } from '../../render/seaso
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { effectiveGreenness, effectiveWetness, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor } from '../../systems/season'
+import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor } from '../../systems/season'
 import { cloakForCloth } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
@@ -864,12 +864,15 @@ function PlaceFlora({
 }
 
 /** Village campfire: stone ring, logs, emissive flame, flickering light. */
-function FirePit({ x, z }: { x: number; z: number }) {
+function FirePit({ x, z, blaze = 1 }: { x: number; z: number; blaze?: number }) {
   const light = useRef<THREE.PointLight>(null)
   useFrame(({ clock }) => {
     if (light.current) {
       const t = clock.elapsedTime
-      light.current.intensity = 14 + Math.sin(t * 9) * 2.5 + Math.sin(t * 23.7) * 1.5
+      // The fire burns harder in the cold months (point 142, the §4.9 "fire
+      // image": warming fires, not just cooking fires) — and 120g already made
+      // its glow carry further under the season's dimmed sun.
+      light.current.intensity = (14 + Math.sin(t * 9) * 2.5 + Math.sin(t * 23.7) * 1.5) * blaze
     }
   })
   return (
@@ -1429,6 +1432,21 @@ export function PlaceScene() {
   // The settlement's cold-weather dress (§19.13). Shared with PlaceLife so the
   // elder and the villagers dress for the same season.
   const dress = useColdCloaks(placeId, style.cloth)
+  // The warming-fire season (point 142): the village fire burns harder when
+  // the place's own season is cold or dust-chilled — the same drivers the
+  // dress reads, and read once per visit for the same reason.
+  const fireBlaze = useMemo(() => {
+    if (!placeId) return 1
+    const place = placeById(placeId)
+    const day = useGame.getState().day
+    const el = elevationAt(place.lat, place.lon)
+    const chill = Math.max(
+      coldnessAt(day, place.lat, place.lon, START_YEAR, el),
+      harmattanAt(day, place.lat, place.lon, START_YEAR),
+      karifAt(day, place.lat, place.lon, START_YEAR, el),
+    )
+    return 1 + 0.5 * Math.min(1, chill)
+  }, [placeId])
   const pathTex = usePathTexture(layout?.paths ?? null)
   const mats = usePlaceMaterials(!!isPort, style, pathTex)
   const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
@@ -1499,6 +1517,7 @@ export function PlaceScene() {
       sky: skyOvercast(),
       rain: rainAmount(placeWetness.current, balance.season.weatherStrength),
       tint: SEASON_TINT_U.value,
+      fireBlaze,
     })
     return () => {
       delete w.__placeSeason
@@ -1507,7 +1526,7 @@ export function PlaceScene() {
       delete w.__placeColliders
       delete w.__placeCamera
     }
-  }, [layout, camera])
+  }, [layout, camera, fireBlaze])
 
   // Focus + mouse-look. On entering a settlement any lingering HUD button is
   // blurred so keyboard input goes straight to the game without an extra click
@@ -1864,7 +1883,7 @@ export function PlaceScene() {
 
       <Fences fences={layout.fences} mats={mats} />
 
-      {!isPort && <FirePit x={-3.5} z={2.5} />}
+      {!isPort && <FirePit x={-3.5} z={2.5} blaze={fireBlaze} />}
 
       <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
