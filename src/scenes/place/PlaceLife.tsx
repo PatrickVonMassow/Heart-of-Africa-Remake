@@ -14,6 +14,10 @@ import { buildGoat } from '../../render/fauna'
 import { TESSELLATION } from '../../render/figures'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
+import { presenceAt } from '../../systems/seasonalLife'
+import { placeById } from '../../world/geo'
+import { useGame } from '../../state/store'
+import { START_YEAR } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, type Collider } from './collision'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
@@ -841,6 +845,19 @@ export function PlaceLife({
   // people has none: see the evidence notes in systems/dress.ts.
   const cloaks = useColdCloaks(placeId, style.cloth)
 
+  // Seasonal presence (point 142, "the young men are gone"): the adult walkers
+  // thin in a people's away season — the Maasai at the dry-season highland
+  // camps (PERIOD), the Tuareg on the autumn caravan, the Sahel farmers out at
+  // the field huts in the rains — while the children, the elder and the home
+  // vignettes REMAIN (the research's shape: "a camp of women, children and
+  // elders"). Sedentary peoples never thin. Read once per visit, like the
+  // dress: time does not advance inside a settlement.
+  const presence = useMemo(() => {
+    const place = placeById(placeId)
+    if (!place?.peopleId) return 1
+    return presenceAt(place.peopleId, useGame.getState().day, START_YEAR)
+  }, [placeId])
+
   if (kind === 'port') {
     return (
       <ColdCloaksContext.Provider value={cloaks}>
@@ -857,7 +874,7 @@ export function PlaceLife({
       <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
       <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
       <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-      <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={5} colliders={colliders} />
+      <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
       {/* Inhabitant/prop interactions (design.md §19). */}
       <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
       <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />

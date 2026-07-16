@@ -599,6 +599,34 @@ for (const [placeId, shot] of [
     hausaWet?.cloaks == null,
     JSON.stringify(hausaWet),
   )
+
+  // Point 142 — "the young men are gone": a transhumant village visibly thins
+  // in its away season while the children and the elder remain. The Maasai
+  // direction is PERIOD (Thomson: up to the highlands in the DRY season).
+  const walkersAt = async (placeId, month) => {
+    await page.evaluate(() => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+    })
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), placeId)
+    await page.waitForFunction(() => !!window.__placeWalkers, null, { timeout: 30000 })
+    return page.evaluate(() => window.__placeWalkers.states.length)
+  }
+  const maasaiDry = await walkersAt('maasai-village', 7) // July: at the highland camps
+  const maasaiWet = await walkersAt('maasai-village', 4) // April: the rains, everyone home
+  check(
+    'the Maasai village thins in the dry season — the young men are gone (point 142)',
+    maasaiDry < maasaiWet && maasaiDry >= 1,
+    `walkers July ${maasaiDry} vs April ${maasaiWet}`,
+  )
+  const bembaJul = await walkersAt('bemba-village', 7)
+  const bembaJan = await walkersAt('bemba-village', 1)
+  check(
+    'the sedentary Bemba never thin — no month empties them (the negative case)',
+    bembaJul === bembaJan,
+    `walkers July ${bembaJul} vs January ${bembaJan}`,
+  )
 }
 
 console.log('console errors:', errors.length)
