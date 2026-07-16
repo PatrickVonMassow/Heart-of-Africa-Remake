@@ -272,11 +272,56 @@ differently, which keeps five-times-the-same-puzzle off the table.
 
 ---
 
-## 5. Gaps and unread sources
+## 4.9 The pre-1910 eyewitness record, settled — the West-African strand
 
-- **Ellis 1887 and the West-African pre-1910 eyewitness base** — a resumed
-  research strand was still in flight when this document was written; its
-  verbatim finds are to be added here. GAP until then.
+The hypothesis is CONFIRMED for the Anglophone record, with page-level reads of
+the period volumes: 19th-century observers recorded THAT the drums speak, and
+misexplained HOW. Nobody joined the two halves before 1900.
+
+- **Bowdich 1819** (PERIOD) comes closest first, on **horns**: chiefs' horn
+  flourishes are "adapted to short sentences, which are always recognised…
+  the King's horns uttered, 'I pass all Kings in the world'" — and "**the words
+  of some of these sentences are almost expressible by the notes of the
+  horns**" (p. 362). He reports; he does not explain.
+- **Ellis 1887** (PERIOD, the era's high-water mark, pp. 326–328): "to a native
+  … **the drum can and does speak, the sounds produced from it forming words,
+  and the whole measure or rhythm a sentence**… The language of the drums is as
+  well understood as that which they use in their daily life." He even records
+  the two drums "pitched a note or two higher" — and then explains everything
+  as **rhythm**: "an entire stranger to the locality can at once translate the
+  rhythm into words." The fact affirmed, the mechanism misattributed.
+- **The tragedy of Christaller** (PERIOD): his Twi grammar (1875) and
+  dictionary (1881) contain a complete **tonal phonology** (~200 tone entries)
+  and rich drum terminology — including the gloss "*kantamanto*, the 'language'
+  of the drum of the chieftain of Aburi" — side by side in one man's books,
+  **never joined**.
+- **Kingsley 1897/99** (PERIOD): names "talking-drums" as a familiar object and
+  confesses defeat — "the attempt to understand which has taken up much of my
+  time, and led me into queer company"; "**it can talk as well as the human
+  tongue**." Wonder without mechanism.
+- **Silent negatives** (PERIOD, checked by full-text grep): Reade 1863, Ellis's
+  own Ewe (1890) and Yoruba (1894) volumes, and Nassau 1904 contain **no**
+  drum-signalling analysis at all.
+- **The mechanism enters via German mission linguistics** on the Duala and Ewe
+  — Betz 1898 (partial, sceptical; ⚠️ read bibliographically only), Westermann
+  1907, Witte 1910 — and enters English with **Rattray 1916**: drum-talking is
+  "an attempt to **imitate by means of two drums (a 'male' and a 'female') set
+  in different keys the exact sound or words of the human voice**", completed
+  in **Rattray 1923**: "the explanation… is afforded by the fact that Ashanti
+  is a **tonic language**." Even then, Rattray notes, the public still believed
+  it worked "on the Morse principle — it is always 'the Morse principle'."
+- Carrington's own verdict on the era (RETRO-APPLIED): a prominent 19th-century
+  linguist collected Duala drum words, compared them with speech, and concluded
+  "these signals have not the slightest resemblance with the spoken language" —
+  **he was holding the tone syllables in his hand and missed it.**
+
+**For the game this hardens §1's conclusion into datable texture:** an 1890
+traveller can *know that* the drums talk (Ellis was in print since 1887), can
+own the two facts that would solve it (Christaller's tone marks; the two-pitch
+drums), and still stand thirty years short of the answer. That is a puzzle the
+player gets to beat the record at.
+
+## 5. Gaps and unread sources
 - Sebeok & Umiker-Sebeok 1976 (the 1,456-page survey **with distribution
   maps**) — not accessible online; the single best next source for the zone
   map.

@@ -43,7 +43,7 @@ export const VILLAGE_PLANS: Record<string, VillagePlanKind> = {
   tuareg: 'scatter',
   berbers: 'ksar',
   nubians: 'riverstrip',
-  bombara: 'compound',
+  bambara: 'compound',
   // West: compound architecture (Hausa gida, Mande lu); Fang street village.
   hausa: 'compound',
   mandinka: 'compound',
@@ -64,7 +64,7 @@ export const VILLAGE_PLANS: Record<string, VillagePlanKind> = {
   zulu: 'ring',
   pedi: 'ring',
   bemba: 'ring',
-  batwa: 'scatter',
+  wayeyi: 'scatter',
   san: 'scatter',
 }
 

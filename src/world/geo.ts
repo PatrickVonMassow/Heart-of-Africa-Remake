@@ -187,12 +187,12 @@ function clearedOfRivers(lat: number, lon: number): LatLon {
 // These are the raw heartland anchors — the exported VILLAGES below shift each
 // off nearby river water per the clearance rule (exported for the world test).
 export const VILLAGE_HEARTLANDS: PlaceDef[] = [
-  // North — Tuareg, Berbers, Nubians, Bombara
+  // North — Tuareg, Berbers, Nubians
   { id: 'tuareg-village', kind: 'village', peopleId: 'tuareg', lat: 23.2, lon: 5.8, region: 'north' },
   { id: 'berber-village', kind: 'village', peopleId: 'berbers', lat: 31.7, lon: -7.2, region: 'north' },
   { id: 'nubian-village', kind: 'village', peopleId: 'nubians', lat: 21.8, lon: 31.6, region: 'north' },
-  { id: 'bombara-village', kind: 'village', peopleId: 'bombara', lat: 17.2, lon: -3.5, region: 'north' },
-  // West — Hausa, Mandingo, Fang
+  { id: 'bambara-village', kind: 'village', peopleId: 'bambara', lat: 13.45, lon: -6.27, region: 'west' },
+  // West — Hausa, Mandinka, Fang, Bambara (moved to its Ségou heartland)
   { id: 'hausa-village', kind: 'village', peopleId: 'hausa', lat: 12.0, lon: 8.5, region: 'west' },
   { id: 'mandinka-village', kind: 'village', peopleId: 'mandinka', lat: 11.5, lon: -9.0, region: 'west' },
   { id: 'fang-village', kind: 'village', peopleId: 'fang', lat: 1.8, lon: 11.5, region: 'west' },
@@ -208,8 +208,8 @@ export const VILLAGE_HEARTLANDS: PlaceDef[] = [
   { id: 'somali-village', kind: 'village', peopleId: 'somali', lat: 5.5, lon: 45.0, region: 'east' },
   { id: 'sidama-village', kind: 'village', peopleId: 'sidama', lat: 6.7, lon: 38.4, region: 'east' },
   { id: 'baganda-village', kind: 'village', peopleId: 'baganda', lat: 0.75, lon: 32.55, region: 'east' },
-  // South — Batwa, Bemba, Bantu, Zulu, Bushmen
-  { id: 'batwa-village', kind: 'village', peopleId: 'batwa', lat: -19.0, lon: 22.5, region: 'south' },
+  // South — Wayeyi, Bemba, Pedi, Zulu, San
+  { id: 'wayeyi-village', kind: 'village', peopleId: 'wayeyi', lat: -19.0, lon: 22.5, region: 'south' },
   { id: 'bemba-village', kind: 'village', peopleId: 'bemba', lat: -12.5, lon: 31.0, region: 'south' },
   { id: 'pedi-village', kind: 'village', peopleId: 'pedi', lat: -24.5, lon: 29.5, region: 'south' },
   { id: 'zulu-village', kind: 'village', peopleId: 'zulu', lat: -28.4, lon: 31.3, region: 'south' },

@@ -3079,7 +3079,16 @@ as-is; only the sequence changes.
   design.md §3.2/§4.5 (the peoples list) — this IS design content, so update it
   in the same commit per CLAUDE §4. One atomic commit. (Decided 15.07.2026.)
 
-- [ ] 132. Put the misplaced villages on their real ground.
+- [x] 132. Put the misplaced villages on their real ground.
+  (Done 16.07.2026: the Bambara village moved to Segou (13.45N 6.27W, west
+  region — north is now three peoples, which the Sahara honestly is); the
+  Okavango village renamed Wayeyi with a new vignette around the mokoro, the
+  fish-traps and the inverted flood pulse; the Nubian vignette now carries the
+  frontier — soldiers on the river road, the Khalifa's dominion beyond, the
+  hunger year — while keeping its saqia waterwheel. Also fixed a leftover from
+  131: the player-visible place NAMES still said "Pygmy Village"/"Bushman
+  Village" etc. in both languages; the keys had been renamed but not the
+  values.)
   Same accuracy principle. Three villages sit on ground that contradicts their
   own vignette (`docs/peoples-1890.md` §1/§1.1). Region membership is design
   (design.md §4.5) and each region's count must survive, so the fix is chosen to
