@@ -811,6 +811,13 @@ verify suite that proves it.
     without successor, and the death-to-successor flow including the day
     penalty and takeover entry; `src/ui/Hud.test.tsx` the recalled-defeat
     overlay without a successor button.
+    TEMPORARY (`design.md` §5.1, user 16.07.2026): the deadline is
+    SUSPENDED in the shipped config (`balance.deadline.enabled` false) —
+    the expedition never ends on time; instead the calendar STOPS at
+    31.12.1895, the end of the game's window, at every day-advancing path.
+    The mechanism stays implemented and tested (the tests enable the flag),
+    so lifting the suspension is a one-value revert. Do not delete the
+    deadline code, and do not "fix" the tests by dropping the flag.
 25. **Trade economy.** `design.md` §8/§9/§10 is implemented:
     shovel-recovered treasure caches (one per region plus a statue site,
     placed anew each run) and the elephant graveyard's limited random

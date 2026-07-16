@@ -101,6 +101,10 @@ export interface BalanceConfig {
   }
   /** Expedition deadline (design.md §5): total days and staged warnings. */
   deadline: {
+    /** TEMPORARY (design.md §5.1): while false the expedition never ends on
+     *  time — the calendar stops at 31.12.1895 instead. Flip to true to get
+     *  the §5 recall and the §18 successor flow back. */
+    enabled: boolean
     days: number
     /** Fractions of the deadline at which the two warnings fire. */
     warning1: number
@@ -315,6 +319,7 @@ export const balance: BalanceConfig = {
     cooldownDays: 5,
   },
   deadline: {
+    enabled: false, // suspended for now (design.md §5.1) — the date stops at 31.12.1895
     days: 1826, // about five years (design.md §5)
     warning1: 0.6,
     warning2: 0.85,

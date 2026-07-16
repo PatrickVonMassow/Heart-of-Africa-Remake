@@ -404,6 +404,24 @@ export function Hud() {
     // current year, for stepping through the seasons (design.md §21.1).
     // PHYSICAL codes, so the row reads 1..0 ß ´ on a German keyboard and
     // 1..0 - = on a US one — the same twelve adjacent keys either way.
+    // + and - step the YEAR inside the game's window 1890..1895 (design.md
+    // §21.1); at either end they simply do nothing. The German layout puts +
+    // right of ´ (BracketRight) and - right of . (Slash); the numpad keys
+    // carry the same signs on every layout.
+    const jumpYear = (delta: number) => {
+      const before = useGame.getState().day
+      useGame.getState().debugJumpYear(delta)
+      const g = useGame.getState()
+      const st = getStrings()
+      // Silent at the window's edge: nothing moved, so say nothing.
+      if (g.day !== before) useGame.getState().setToast(st.formatDateShort(g.day, START_YEAR))
+    }
+    const offYears = [
+      onKeyPress('BracketRight', () => jumpYear(1)),
+      onKeyPress('NumpadAdd', () => jumpYear(1)),
+      onKeyPress('Slash', () => jumpYear(-1)),
+      onKeyPress('NumpadSubtract', () => jumpYear(-1)),
+    ]
     const offMonths = MONTH_KEYS.map((code, i) =>
       onKeyPress(code, () => {
         useGame.getState().debugJumpToMonth(i + 1)
@@ -430,6 +448,7 @@ export function Hud() {
       offF3()
       offF4()
       offMonths.forEach((off) => off())
+      offYears.forEach((off) => off())
       offH()
       offP()
       offC()

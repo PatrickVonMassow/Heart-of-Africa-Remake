@@ -145,6 +145,40 @@ function isNearNorthCoast(lat: number, lon: number): boolean {
   return false
 }
 
+/**
+ * The last in-game day the calendar may reach: 31 December 1895 (design.md
+ * §5.1). TEMPORARY: while the expedition deadline is suspended, the date runs
+ * to the end of the game's window and STOPS there rather than the run ending.
+ */
+export const LAST_YEAR = 1895
+
+/** Days from the start of `startYear` to 31 December of `LAST_YEAR`. */
+export function lastDay(startYear: number): number {
+  return (Date.UTC(LAST_YEAR, 11, 31) - Date.UTC(startYear, 0, 1)) / 86400000
+}
+
+/**
+ * The calendar's ceiling (design.md §5.1): time never runs past 31.12.1895 —
+ * it stands still there. Applied at every place the day advances, so travel,
+ * drift, ferries and events all stop at the same wall.
+ */
+export function clampDay(day: number, startYear: number): number {
+  return Math.min(day, lastDay(startYear))
+}
+
+/**
+ * Debug (design.md §21.1): the in-game day one year later (`+1`) or earlier
+ * (`-1`), keeping the month and day-of-month, clamped to the game's window
+ * 1890..1895. Returns the unchanged day at either end, so the keys simply stop.
+ */
+export function dayOfYearJump(day: number, delta: number, startYear: number): number {
+  const d = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000)
+  const year = d.getUTCFullYear() + delta
+  if (year < startYear || year > LAST_YEAR) return day
+  const jumped = (Date.UTC(year, d.getUTCMonth(), d.getUTCDate()) - Date.UTC(startYear, 0, 1)) / 86400000
+  return clampDay(jumped, startYear)
+}
+
 /** The number row, left to right: on a German keyboard 1..9 0 ß ´ — twelve
  *  adjacent keys for the twelve months (design.md §21.1). Physical `code`s,
  *  so the mapping follows the ROW, not the layout's characters. */

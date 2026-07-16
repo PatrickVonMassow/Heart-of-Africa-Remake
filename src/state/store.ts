@@ -3,7 +3,7 @@
 
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
-import { dayOfMonthJump } from '../systems/season'
+import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
 import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
@@ -276,6 +276,8 @@ export interface GameState {
   debugJumpTo: (lat: number, lon: number) => void
   /** Debug: jump the calendar to a month (1..12) of the CURRENT in-game year (design.md §21.1). */
   debugJumpToMonth: (month: number) => void
+  /** Debug: jump one year forward (+1) or back (-1) inside 1890..1895 (design.md §21.1). */
+  debugJumpYear: (delta: number) => void
 }
 
 // v2: entries are language-neutral TextRefs only (plain-string journal
@@ -659,7 +661,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const dayDelta = step * balance.daysPerUnit * cost
     const foodDelta = dayDelta * balance.foodPerDay
     const newFood = Math.max(0, s.foodDays - foodDelta)
-    const newDay = s.day + dayDelta
+    const newDay = clampDay(s.day + dayDelta, START_YEAR)
 
     const patch: Partial<GameState> = { pos: { x: nx, z: nz }, day: newDay, foodDays: newFood }
 
@@ -786,7 +788,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const driftDist = Math.hypot(nw.x - s.pos.x, nw.z - s.pos.z)
     const cost = hasCanoe ? balance.terrainCost.water / balance.canoeSpeedup : balance.terrainCost.water
     const dayDelta = driftDist * balance.daysPerUnit * cost
-    const newDay = s.day + dayDelta
+    const newDay = clampDay(s.day + dayDelta, START_YEAR)
     set({
       pos: { x: nw.x, z: nw.z },
       day: newDay,
@@ -805,6 +807,10 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (s.defeat || s.victory) return
     const dl = balance.deadline
+    // TEMPORARY (design.md §5.1): with the deadline suspended the expedition
+    // never ends on time — no recall, and no staged warnings for a limit that
+    // is not enforced. The calendar's ceiling (clampDay) stops time instead.
+    if (!dl.enabled) return
     if (day >= dl.days) {
       set({ defeat: 'deadline', journalOpen: false })
       return
@@ -925,7 +931,7 @@ export const useGame = create<GameState>()((set, get) => ({
         return
       }
       case 'sandstorm': {
-        set({ day: s.day + (o.daysLost ?? 0.5) })
+        set({ day: clampDay(s.day + (o.daysLost ?? 0.5), START_YEAR) })
         get().addEntry({ key: 'journal.titles.sandstorm' }, { key: 'journal.sandstorm' })
         return
       }
@@ -1455,7 +1461,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const days = ferryDays(from, dest)
     const p = latLonToWorld(dest.lat, dest.lon)
     // Passage fare includes board; provisions are not consumed (placeholder).
-    set({ money: s.money - cost, day: s.day + days, pos: p })
+    set({ money: s.money - cost, day: clampDay(s.day + days, START_YEAR), pos: p })
     useUi.getState().setDialog(null)
     get().addEntry(
       { key: 'journal.titles.ferry' },
@@ -1989,6 +1995,9 @@ export const useGame = create<GameState>()((set, get) => ({
     const p = latLonToWorld(lat, lon)
     const ex = withExplored(get().explored, lat, lon)
     set({ mode: 'travel', placeId: null, pos: p, region: regionAt(lat, lon), ...(ex ? { explored: ex } : {}) })
+  },
+  debugJumpYear: (delta) => {
+    set({ day: dayOfYearJump(get().day, delta, START_YEAR) })
   },
   debugJumpToMonth: (month) => {
     // Keeps the YEAR (and thus the expedition's progress) and moves only the

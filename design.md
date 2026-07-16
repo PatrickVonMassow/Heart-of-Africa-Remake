@@ -168,6 +168,24 @@ invariants.
 - Time advances through travel and actions; long distances and difficult terrain cost more time.
 - A multi-year deadline, communicated through staged messages: progress/reward on discovery, first warning, second warning, deadline expiry (defeat).
 
+### 5.1 TEMPORARY: the deadline is suspended, the calendar stops at 31.12.1895
+
+**Current state, on the user's instruction (16.07.2026) — not the target state.**
+While the game is developed and its seasons tested, the expedition must not end
+on time: the deadline of §5 is switched OFF (`balance.deadline.enabled`, false
+in the shipped config), so no recall and no staged warnings fire. Instead the
+calendar has a **ceiling**: time runs to **31 December 1895** — the end of the
+game's window — and stands still there. Every path that advances the day
+(travel, river drift, ferry passages, event losses) stops at that same wall, so
+the date can never leave the window whatever the player does.
+
+The mechanism itself is intact and stays tested: `store.expedition.test.ts`
+enables the flag and asserts the §5 warnings, the expiry defeat and the §18
+successor flow exactly as before, so the day the suspension is lifted the
+behaviour returns unchanged. Flipping `deadline.enabled` back to true is the
+whole of the revert.
+
+
 ---
 
 ## 6. Resources and Conditions
@@ -651,6 +669,7 @@ A debug menu opened with F1. All settings take effect immediately on the running
 - **F2** toggles the journal do-not-disturb option (§16).
 - **F3** grants the full loadout: every piece of equipment, all treasure types, 100000 gifts, 100000 dollars and 100000 provisions, full health, a full canteen and no afflictions (fever/dehydration/sun blindness/wounds cleared). The inventory capacity is raised to fit everything, and the extended zoom of §21.4 is unlocked along with it.
 - **F4** toggles the canoe in and out of the pack (for quickly testing water travel and the on-land penalty).
+- **`+` and `-` step the year**, inside the game's window 1890..1895, keeping the month and day; at either end they do nothing (there is no 1889 and no 1896). The numpad's `+`/`-` work too, on any layout.
 - **The number row jumps the months** (for stepping through the seasons of §19.13): the twelve adjacent keys left to right — on a German keyboard `1 2 3 4 5 6 7 8 9 0 ß ´` — jump to January … December of the CURRENT in-game year, landing mid-month. The year is deliberately kept, so stepping the seasons never ends the expedition. Bound to the physical keys of the row, so the same twelve keys work on any layout.
 
 ### 21.2 Tunable values
