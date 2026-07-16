@@ -93,6 +93,12 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, sixth): 145 (three more parental
+sacrifices) goes at the END of the batch, on the user's explicit instruction —
+and its (a) depends on 144 (the burnt-land state) anyway, so the order is
+already forced. 125's new (a2) rides with 125 where it sits; it is an extension
+of that point, not a point of its own.
+
 Work order (user override, 2026-07-16, fifth): 144 (the plants' cover and
 condition follow the season) goes after 143. Together they are the answer to the
 user's repeated, correct report that the months show "nur Änderungen am Regen
@@ -2884,6 +2890,43 @@ the remaining open points in their numeric order.
       balance value (debug-editable), defaulting LOW for the small grazers so
       the existing drama stays the norm (e.g. 0.2) — the giraffe's high value
       lives in point 124.
+  (a2) ★ MORE OF THEM MAY SUCCEED — BUT ONLY WHERE THE ANIMALS MAKE IT PLAUSIBLE
+      (user, 16.07.2026): "Baue außerdem ein, dass mehr Opferungen erfolgreich
+      sein können, also dass ein Elter überlebt, einen Predätor anzugreifen und
+      ihn in die Flucht schlägt. Mache das aber nur, wenn es bei den beteiligten
+      Tierarten plausibel ist, wie bei der Giraffe."
+      So the chance is NOT one number per prey species: it is a matrix over
+      (prey, predator), because both halves decide it. A giraffe kick can kill a
+      lion; an antelope cannot drive one off — but almost anything can see off a
+      cheetah, which is the lightest cat and famously abandons rather than risk
+      injury.
+      * ★ **REUSE THE ORDERING THAT ALREADY EXISTS, do not invent a second
+        one.** §14.1's predator danger order — **cheetah < leopard < hyena <
+        lion** — is already implemented and pure-tested (`src/systems/events.ts`,
+        `src/systems/events.test.ts`, CLAUDE §7.1 pt. 23). The parent's chance
+        runs INVERSELY along it: easiest to drive off a cheetah, hardest a lion.
+        One ordering, two consumers.
+      * **The prey side needs its own defence ranking, and it must be reasoned
+        rather than guessed.** The weapon is the argument: giraffe (a kick that
+        genuinely kills lions — the one the user names) and zebra (a kick that
+        breaks jaws) at the top; wildebeest (horns) and warthog (tusks, and
+        documented seeing off cheetahs) in the middle; the generic antelope at
+        the bottom. Do a short grounding pass before fixing the numbers and
+        record the reasoning next to them — this is animal behaviour, not
+        folklore, and it should not read as invented.
+      * **The result must stay legible as a RULE, not as dice.** A player who
+        sees a giraffe drive off a lion and an antelope die to one should be
+        able to infer why. Prefer a matrix flat enough to read over one tuned to
+        feel fair.
+      * ⚠️ **THE LINE THAT MUST NOT MOVE — this is a RESCUE mechanic, never a
+        grief mechanic.** The §19.8/point-134 carve-out stands: where the calf
+        is ALREADY DEAD, the parent has no defence and no chance at all. The
+        vigil-keeper (121), the trample-throw (119) and the waterfall plunge are
+        not fights — they are grief, and the user chose them deliberately and
+        told me not to re-litigate them. Only the branch where the calf is still
+        ALIVE and the parent attacks to save it may roll. Keeping the two apart
+        is what stops "more sacrifices succeed" from quietly dissolving the
+        emotional register the whole of §19.8 is built on.
   (b) On success: abort the hunt (the predator gives up and leaves, reusing the
       existing leave/abort path — no new predator state), the calf keeps its
       parent, both rejoin the herd. No stain, no carcass.
@@ -2894,10 +2937,19 @@ the remaining open points in their numeric order.
   TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`): the outcome helper
   maps deterministically, the default chance keeps the sacrifice the common case,
   chance 0 always dies (the existing scripted checks must stay green) and chance
-  1 always survives. Live: with the chance forced to 1 a reached predator leaves
-  and both animals live; forced to 0 the existing sacrifice checks still pass.
-  DOCS: design.md §19.8, CLAUDE.md §7.1 pt. 12. One atomic commit.
-  (Reported 15.07.2026.)
+  1 always survives. For (a2): the matrix is ORDERED both ways — for a fixed
+  prey, the chance rises as the predator gets lighter along §14.1's cheetah <
+  leopard < hyena < lion; for a fixed predator, it rises with the prey's
+  defence (giraffe > zebra > wildebeest/warthog > antelope); and the giraffe-vs-
+  lion case the user names reads clearly better than antelope-vs-lion. And the
+  line that must not move, asserted: a parent whose calf is already DEAD has
+  chance ZERO against every predator — the grief branches (119, 121, the
+  waterfall) never roll. Live: with the chance forced to 1 a reached predator
+  leaves and both animals live; forced to 0 the existing sacrifice checks still
+  pass. DOCS: design.md §19.8 (record that the rescue may succeed while grief
+  never does — the two are different mechanics wearing the same silhouette),
+  CLAUDE.md §7.1 pt. 12. SIZE: (a)-(d) is one commit; (a2)'s matrix and its
+  grounding pass may be a second. (Reported 15.07.2026; (a2) added 16.07.2026.)
 
 - [ ] 126. Elephant mourning at the graveyard.
   Wanted (user, 15.07.2026): elephants keep vigil over their dead and touch their
@@ -3873,6 +3925,80 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 and §19.9 (the dressing), CLAUDE.md §7.1 pt. 12.
   ORDER: after 143 (which finishes what 120 claimed), before the 138-142
   additions. (Filed 16.07.2026.)
+
+- [ ] 145. Three more parental sacrifices — a human cause, a lie, and a predator
+  as a parent.
+  Wanted (user, 16.07.2026): I proposed these three after he asked for further
+  ideas, and he accepted all three as ONE point at the END of the batch. Each was
+  chosen because it adds a SHAPE the existing dramas do not have — not because
+  the roster needed padding. (Rejected, and recorded so they are not re-proposed:
+  the dust storm — a parent vanishing into the harmattan pall is not visually
+  legible; the starving mother — not renderable; the rinderpest calf — disease,
+  not sacrifice, and it belongs to point 133; the elephant refusing to leave its
+  dead calf — real and famous, but it is grief without death, and point 126
+  already says so.)
+  (a) ★ THE BURNING GRASS — and the cause is HUMAN. `docs/peoples-1890.md` §7.4
+      delivered this period-sourced while researching dress: Dybowski, at the
+      game's own latitude and inside the window, watched the inhabitants fire the
+      steppe once or twice a year, and describes the result exactly — bark and
+      twigs burnt black, trees as skeletons, scattered surviving leaf-tufts, "the
+      whole landscape with an aspect of mourning". Park saw the same from the
+      Gambia: "the plains and mountains, as far as my eye could reach, variegated
+      with lines of fire". A calf is caught by the fire line; the parent goes in
+      after it.
+      WHY IT IS WORTH BUILDING: every existing drama has a natural cause — lion,
+      waterfall, elephant. This one has a HUMAN cause, without the player doing
+      anything. For a game about a European walking through other people's
+      country and calling it discovery, that is the thematically loaded one.
+      DEPENDS ON point 144 (the plants' cover and condition), which owns the
+      burnt-land state; build (a) after it and consume its state rather than
+      growing a second fire.
+      CARE: the fire is a DRY-SEASON, congo-north/Sahel-zone event (the grass
+      must be cured), so it must be keyed to the season model, not fired
+      anywhere at any date. And the traveller's own safety is a §14 question —
+      do NOT invent a fire event that damages the player; if that is wanted it is
+      a design decision for the user, not a side effect of this point.
+  (b) ★ THE BROKEN WING — the one sacrifice that is a LIE rather than a leap.
+      Ground-nesting birds (lapwing, plover) feign a broken wing, drag themselves
+      conspicuously in front of the predator to lure it away from the nest, and
+      are sometimes taken doing it. This is a genuinely different mechanic from
+      everything in §19.8: not throwing yourself in, but offering your body as
+      bait — with a real chance of getting away with it, which makes it the
+      natural companion to point 125's "the sacrifice may succeed".
+      CLOSES AN OPEN ITEM: CLAUDE §7.1 pt. 12 records "additional new
+      species/birds beyond the existing roster" as open. The roster today is
+      flamingo and vulture only (`src/render/fauna.ts`) — this adds a
+      ground-nesting bird with a nest and young.
+      CARE: the existing bird machinery is the vulture's (spawn beyond the view
+      ring, fly in, land, leave — §19.6). A ground bird is the opposite: it is
+      ALREADY there and must not fly off at the first frame. And the water-edge
+      rules (`waterEdgeRules.ts`) plus the body-separation rules apply to it like
+      any other animal.
+  (c) ★ THE PREDATOR AS A PARENT — a lioness defends her cubs against hyenas.
+      This INVERTS the frame: the lion has been nothing but a threat to the
+      player and to every grazer; here it is a mother, and the same creature
+      reads from the other side for the first time. Both species and the food web
+      already exist.
+      NEEDS: a cub build for the predators — `src/render/fauna.ts` has
+      buildZebraCalf/buildAntelopeCalf/buildWildebeestCalf/buildWarthogCalf but
+      NO cub for lion/cheetah/leopard/hyena. The baby-schema rules are already
+      pure-tested (`src/render/fauna.test.ts`: proportionally larger head,
+      shorter neck/body, leggy stance, no adult ornaments) — follow them.
+      ⚠️ ARCHITECTURE: `LION_STATE` is a single global hunt state and this makes
+      the lion a VICTIM rather than the hunter. That is the sharpest version of
+      the warning points 121(f) and 130 both carry. Decide once who owns the
+      resolution; do not bolt a second predator state onto the side.
+  TESTS: pure (`src/scenes/travel/wildlifeBehavior.test.ts`, `fauna.test.ts`):
+  the fire's season/zone gate (never in the Congo, never in a rainless zone,
+  never in the wet season); the broken-wing lure's target choice and its
+  give-up/resolve path; the predator cubs' baby-schema proportions. Live
+  (`scripts/verify/enrichments.mjs`): each of the three fires once and RESOLVES
+  (the point-118 lesson — never a drive with no exit), with a screenshot of the
+  burnt land. DOCS: design.md §19.8 (all three) and §19.13 (the fire is a
+  season), CLAUDE.md §7.1 pt. 12 — and strike "additional new species/birds" from
+  its OPEN list once (b) and (c) land.
+  SIZE: three separate dramas — one commit each, in the order (a), (b), (c).
+  (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
