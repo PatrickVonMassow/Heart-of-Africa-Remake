@@ -9,6 +9,7 @@ import * as THREE from 'three/webgpu'
 import {
   attribute,
   float,
+  uniform,
   mix,
   mx_fractal_noise_float,
   normalMap,
@@ -228,6 +229,26 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
  * PBR ground textures (scripts/generate-terrain-textures.mjs), with detail
  * normal maps and bi-planar rock on steep slopes.
  */
+// Season tint (design.md §19.13, point 120d), shared by the terrain and the
+// vegetation: 0.5 is the neutral §19.9 look, 0 bleaches greens toward straw,
+// 1 deepens them. A greenness mask keeps sand, rock and trunks out of it —
+// note the obvious g > max(r, b) test misses the savanna acacia outright: its
+// crown is OLIVE (#6e7c2f, r ≈ g), the single most visible tree in the game.
+// Deserts season-correctly stay put on their own: their local wetness is ~0
+// the year round, so the tint never leaves neutral there.
+const SEASON_TINT_U = uniform(0.5)
+function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
+  const greenness = c.g.sub(c.b).mul(2.5).clamp(0, 1).mul(
+    float(1).sub(c.r.sub(c.g).mul(4)).clamp(0, 1),
+  )
+  const luma = c.r.mul(0.35).add(c.g.mul(0.5)).add(c.b.mul(0.15))
+  const straw = vec3(luma.mul(1.9), luma.mul(1.55), luma.mul(0.6))
+  const lush = c.mul(vec3(0.7, 1.08, 0.7))
+  const dryK = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
+  const lushK = SEASON_TINT_U.mul(2).sub(1).clamp(0, 1)
+  return mix(mix(c, straw, greenness.mul(dryK)), lush, greenness.mul(lushK))
+}
+
 // Travel materials are MODULE singletons (point 96): a remounted travel scene
 // must reuse the same material instances, or the renderer builds ~100 fresh
 // programs per visit cycle and the first draw after leavePlace() links them
@@ -295,7 +316,7 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
 
   // Vertex tint carries biome/region hue; boost recenters the mid-gray
   // detail albedo around 1.0.
-  mat.colorNode = vertexColor().mul(albedo.mul(2.6))
+  mat.colorNode = seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6))
 
   // Blended detail normal map (top projection).
   let nrm = texture(normalsTex[0], uvTop).rgb.mul(w.x)
@@ -744,7 +765,14 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
     papyrus: buildPapyrus(),
     kopje: buildKopje(),
   }
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 })
+  // Season tint (design.md §19.13, point 120d): only the FOLIAGE follows the
+  // season — a greenness mask keeps rocks, trunks and termite mounds out of
+  // it. §19.9's colors sit between the seasons: the rains deepen the green,
+  // the dry season bleaches it toward straw.
+  const material = new THREE.MeshStandardNodeMaterial()
+  material.roughness = 0.92
+  material.vertexColors = true
+  material.colorNode = seasonTintNode(vertexColor().rgb)
   const out = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
@@ -777,6 +805,7 @@ function Vegetation() {
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
+      seasonTint: () => SEASON_TINT_U.value,
     }
     return () => {
       delete w.__vegetation
@@ -784,6 +813,14 @@ function Vegetation() {
   }, [])
 
   useFrame(() => {
+    // The foliage follows the season (design.md §19.13): neutral at the
+    // half-way point, straw when dry, deepened green in the rains. Strength 0
+    // pins it to neutral. Blended slowly like the fog, so a forced season
+    // fades in rather than snapping.
+    {
+      const target = 0.5 + (CURRENT_WEATHER.wetness - 0.5) * Math.min(1, Math.max(0, balance.season.weatherStrength))
+      SEASON_TINT_U.value += (target - SEASON_TINT_U.value) * 0.02
+    }
     // In the far debug zoom the dressing hides (it exists only inside the
     // chunk rectangle); the far-terrain sheet carries the look out there.
     const hide = useUi.getState().travelZoom > VEGETATION_HIDE_ZOOM

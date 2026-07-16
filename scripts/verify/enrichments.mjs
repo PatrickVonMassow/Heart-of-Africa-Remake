@@ -2708,13 +2708,14 @@ const season = await page.evaluate(async () => {
     wet: window.__climate.seasonWetness(),
     rain: window.__climate.rainOpacity(),
     far: window.__climate.fog()?.far ?? 0,
+    tint: window.__vegetation.seasonTint(),
   })
   window.__ui.getState().setSeasonWetnessOverride(1)
   let wet = read()
-  for (let i = 0; i < 40 && wet.rain < 0.4; i++) { await sleep(250); wet = read() }
+  for (let i = 0; i < 60 && (wet.rain < 0.4 || wet.tint < 0.85); i++) { await sleep(250); wet = read() }
   window.__ui.getState().setSeasonWetnessOverride(0)
   let dry = read()
-  for (let i = 0; i < 60 && dry.rain > 0.1; i++) { await sleep(250); dry = read() }
+  for (let i = 0; i < 80 && (dry.rain > 0.1 || dry.tint > 0.15); i++) { await sleep(250); dry = read() }
   window.__ui.getState().setSeasonWetnessOverride(null)
   return { wet, dry }
 })
@@ -2723,6 +2724,11 @@ check(
   season.wet.wet === 1 && season.wet.rain > 0.4 && season.dry.wet === 0 &&
     season.dry.rain <= 0.1 && season.wet.far < season.dry.far - 20,
   JSON.stringify(season),
+)
+check(
+  'the land greens in the rains and dries to straw (shared season tint, point 120d)',
+  season.wet.tint > 0.85 && season.dry.tint < 0.15,
+  JSON.stringify({ wetTint: season.wet.tint, dryTint: season.dry.tint }),
 )
 
 // haze is shown — the fog recedes to the horizon and the ground haze fades.
