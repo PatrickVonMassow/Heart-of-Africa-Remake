@@ -93,6 +93,15 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, fifth): 144 (the plants' cover and
+condition follow the season) goes after 143. Together they are the answer to the
+user's repeated, correct report that the months show "nur Änderungen am Regen
+und der Helligkeit": 143 gives the settlement its missing rain and flora, and
+144 replaces a colour tint that MEASURABLY cannot carry the season on its own
+(the terrain multiplies it by the albedo texture) with a change of cover and
+silhouette. Order: 137 -> 143 -> 144 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136
+-> 122 -> 123 -> rest.
+
 Work order (user override, 2026-07-16, fourth): 143 (inside a settlement it
 never rains and the ground never bleaches) is a DEFECT in the shipped point
 120g, found by the user stepping through the months, so it goes ahead of the
@@ -3713,6 +3722,72 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 (its settlement paragraph currently claims sky, light
   and firelight — say rain and flora too) and CLAUDE.md §7.1 pt. 12.
   (Filed 16.07.2026.)
+
+- [ ] 144. The plants themselves change: cover AND condition, not just colour.
+  Wanted (user, 16.07.2026): "Wenn angebracht, sollte sich der Pflanzenbewuchs
+  und der Zustand der Pflanzen auch je nach Jahreszeit ändern." — asked while
+  reporting, correctly and repeatedly, that stepping through the months shows
+  "nur Änderungen am Regen und der Helligkeit".
+  ★ WHY THIS IS THE ANSWER AND THE TINT IS NOT — measured, not assumed. The
+  season tint was fixed twice (relative greenness, then a symmetric wet-end
+  recolour) and the on-screen swing is STILL modest: the Sahel's ground green
+  excess g-(r+b)/2 moves 43 -> 54 across its whole year. The reason is
+  structural and is the finding to build on: the terrain does
+  `seasonTintNode(vertexColor().rgb).mul(albedo.mul(2.6))`
+  (`src/scenes/travel/TravelScene.tsx` ~line 327) — the tinted vertex colour is
+  multiplied by the baked albedo texture, which is itself strongly coloured and
+  pulls the hue back toward its own tone. The vegetation (~line 783) has no such
+  multiply and tints fully, but it is a small fraction of the pixels. **A colour
+  tint alone cannot carry the season. Cover and condition can: fewer and barer
+  plants against more and fuller ones is a silhouette change, and silhouettes
+  read where hue does not.**
+  WHAT "APPROPRIATE" MEANS HERE — the research already answers it, per zone, and
+  this must be honoured rather than applied evenly:
+  * **Savanna/Sahel/plateau: yes, strongly.** The grass genuinely goes and comes.
+    Dybowski, PERIOD, at 5-6N: the inhabitants fire the steppe once or twice a
+    year and the country reads with "bark and twigs burnt black, many trees mere
+    skeletons, others carrying scattered surviving leaf-tufts, the whole
+    landscape with an aspect of mourning" (`docs/peoples-1890.md` §7.4). Park,
+    PERIOD: "Whenever the grass is sufficiently dry, the Negroes set it on fire…
+    the plains and mountains, as far as my eye could reach, variegated with lines
+    of fire."
+  * **Congo basin: no.** Rain every month, a 1.6 °C seasonal temperature swing
+    against a ~12 °C diurnal one — there is no season for the flora to track, and
+    the pixel probe agrees (the basin's dry/wet screen delta is 9, i.e. nothing).
+    Leave it evergreen; that is the accurate answer.
+  * **Desert: no.** Nothing to lose. The greening floor in `floraGreennessAt`
+    already encodes this — reuse it, do not invent a second rule.
+  * **Gabon (the new `atlantic-equatorial` zone): yes** — it has a hard Jun-Sep
+    dry season, which is why the zone exists at all.
+  ANCHORS: `src/render/flora.ts` (the plant builds — `buildAcacia`,
+  `buildPalm`, `buildJungleTree`, `buildBush`); `src/scenes/travel/TravelScene.tsx`
+  (the dressing scatter and its density/species pick, and `seasonTintNode`);
+  `src/systems/season.ts` (`floraGreennessAt` — the driver already exists and is
+  already relative-per-zone, which is exactly what a cover rule needs).
+  CARE:
+  * **Do not respawn the scatter per frame or per month-jump.** The dressing is
+    chunk-bound and seeded; a cover change must be a deterministic function of
+    (seed, season) or the world will boil as the date advances. Prefer scaling or
+    hiding existing instances over regenerating the set.
+  * The bird's-eye collision tests trees and animals (CLAUDE §7.1 pt. 4). If a
+    tree's footprint changes with the season, the collision must follow it — or a
+    traveller will be blocked by a bush that is not there in July.
+  * Point 143 (settlement rain + flora) lands first and lifts the tint into the
+    place scene. Whatever cover rule is built here must work in BOTH views, or
+    the village will be lush while the plain outside it is bare.
+  * The acacia crown is OLIVE (#6e7c2f, r≈g) — the greenness mask was rewritten
+    once because `g > max(r,b)` missed it entirely. Any new mask must be checked
+    against that crown specifically.
+  TESTS: pure — the cover/condition curve per zone across the year (savanna
+  swings, basin does not, desert does not), and its determinism for a fixed
+  (seed, day). Live (`scripts/verify/enrichments.mjs`): the PIXEL probe is the
+  test that matters and it must be permanent — screenshots of one savanna spot in
+  its driest and wettest month, asserting a real on-screen difference, because
+  every uniform-level check so far passed while the player saw nothing. Add the
+  Congo as the negative case: it must NOT swing.
+  DOCS: design.md §19.13 and §19.9 (the dressing), CLAUDE.md §7.1 pt. 12.
+  ORDER: after 143 (which finishes what 120 claimed), before the 138-142
+  additions. (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
