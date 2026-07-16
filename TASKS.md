@@ -2840,7 +2840,7 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.8 (the self-rescue sentence changes — say plainly that a
   long-swept animal drowns) and CLAUDE.md §7.1 pt. 12/21. One atomic commit.
   (Reported 15.07.2026.)
-  DONE (16.07.2026, 22:47): (a) balance.waterDrama {drownSeconds 30,
+  DONE (16.07.2026, 22:32): (a) balance.waterDrama {drownSeconds 30,
   drownFlowThreshold 0.8, dryFlowFactor 0.6, wetFlowFactor 1.8}, debug-editable
   (drownSeconds + wetFlowFactor fields, both languages). (b) pure
   waterStruggleFate over (effective flow, seconds): calm water self-rescues
