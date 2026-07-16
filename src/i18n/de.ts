@@ -351,6 +351,7 @@ export const de: Strings = {
     daysPerUnit: 'Tage pro Wegeinheit',
     canoeSpeedup: 'Kanu-Tempofaktor (Wasser)',
     junglePenalty: 'Malusfaktor Dschungel (ohne Machete)',
+    riverWidthFactor: 'Flussbreiten-Faktor (greift nach Neuladen)',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',

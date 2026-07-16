@@ -592,6 +592,38 @@ if (waterSpot && landSpot) {
   const none = await page.evaluate(() => window.__player)
   check('Canoe: no canoe in the pack, neither ridden nor dragged', none?.canoeing === false && none?.carrying === false, JSON.stringify(none))
 
+  // --- Point 136 (the playability claim itself): a long driven canoe passage
+  // down the Nile stays on water the whole way. Before the widening, steering
+  // along the kinked course kept slipping the traveller onto land.
+  const passage = await page.evaluate(async (spot) => {
+    const hydro = await import('/src/world/hydro.ts')
+    const g = window.__game.getState()
+    window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
+    g.debugJumpTo(spot.lat, spot.lon) // a verified Nile water tile
+    const st = () => window.__game.getState()
+    let onWater = 0
+    let offWater = 0
+    for (let i = 0; i < 240; i++) {
+      const p = st().pos
+      const lat = -p.z / 10
+      const lon = p.x / 10
+      const flow = hydro.riverFlowExact(lat, lon)
+      if (flow.strength <= 0) break // lost the river entirely
+      // moveTravel takes a world-space direction (x east, z south).
+      st().moveTravel(flow.dirLon, -flow.dirLat, 0.03)
+      const q = st().pos
+      const t = window.__terrainType(-q.z / 10, q.x / 10, st().seed)
+      if (t === 'water') onWater++
+      else offWater++
+    }
+    return { onWater, offWater }
+  }, waterSpot)
+  check(
+    'Canoe: a long driven passage down the Nile stays on water the whole way (point 136)',
+    passage.onWater >= 200 && passage.offWater === 0,
+    JSON.stringify(passage),
+  )
+
   // --- Injured figure: a wound shows on the explorer, scaling with severity ----
   // (§7.1.35, design.md §6). __player.wounds mirrors the toggled wound meshes.
   await page.evaluate(() => {
@@ -3088,7 +3120,7 @@ check('entering a settlement out of the debug zoom restores the near plane (no c
 // what stays needs the live store: selecting a place actually teleports there.
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(500)
-// Jump-to dropdown really jumps (Timbuktu at lat 16.77, lon -3).
+// Jump-to dropdown really jumps (Timbuktu at lat 16.95, lon -3).
 const jumped = await page.evaluate(() => {
   const sel = [...document.querySelectorAll('.debug-menu select')].find((s) =>
     [...s.options].some((o) => o.value === 'timbuktu'),
@@ -3102,7 +3134,7 @@ const jumped = await page.evaluate(() => {
 })
 check(
   'Jump-to dropdown teleports to the picked place',
-  jumped !== null && Math.abs(jumped.x - -30) < 1 && Math.abs(jumped.z - -167.7) < 1,
+  jumped !== null && Math.abs(jumped.x - -30) < 1 && Math.abs(jumped.z - -169.5) < 1,
   jumped ? `pos (${jumped.x.toFixed(1)}, ${jumped.z.toFixed(1)})` : 'select not found',
 )
 // The elephant graveyard is offered too and jumps onto it (lat -4.9, lon 36.6).

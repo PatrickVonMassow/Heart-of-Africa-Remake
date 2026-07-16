@@ -5,7 +5,7 @@
 // mirrored here exactly (densified axis samples + SURFACE_LIFT) and the float
 // helper is asserted against it across the channel width.
 import { describe, it, expect, beforeAll } from 'vitest'
-import { sampleTerrain } from '../../world/terrain'
+import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { RIVERS } from '../../world/geo'
 import { LAKES } from '../../world/data/lakes'
 import { lakeIndexAt } from '../../world/hydro'
@@ -16,6 +16,7 @@ import {
   SURFACE_LIFT,
   LAKE_LIFT,
   lakeBedMax,
+  densifyRiver,
 } from './waterSurface'
 
 const SEED = 42
@@ -24,28 +25,28 @@ beforeAll(async () => {
   await setupGeodata()
 })
 
-/** Walk a river's axis like the ribbon build (densified at stepDeg) and call
- *  `probe` with each axis sample and its cross-channel unit perpendicular. */
+/** Walk a river's axis EXACTLY like the ribbon build — the same densifyRiver
+ *  the ribbon and the float index sample (smoothed since point 136; a raw-
+ *  polyline walk would probe chord points the rendered ribbon no longer
+ *  takes) — and call `probe` with each axis sample and its cross-channel
+ *  unit perpendicular. strideDeg coarsens by skipping densified samples. */
 function walkAxis(
   points: Array<[number, number]>,
-  stepDeg: number,
+  strideDeg: number,
   probe: (lat: number, lon: number, pLat: number, pLon: number) => void,
 ) {
-  for (let i = 0; i < points.length - 1; i++) {
-    const [lon0, lat0] = points[i]
-    const [lon1, lat1] = points[i + 1]
-    const steps = Math.max(1, Math.round(Math.hypot(lon1 - lon0, lat1 - lat0) / stepDeg))
-    const len = Math.hypot(lat1 - lat0, lon1 - lon0) || 1
-    const pLat = -(lon1 - lon0) / len
-    const pLon = (lat1 - lat0) / len
-    for (let s = 0; s < steps; s++) {
-      const f = s / steps
-      probe(lat0 + (lat1 - lat0) * f, lon0 + (lon1 - lon0) * f, pLat, pLon)
-    }
+  const pts = densifyRiver(points)
+  const stride = Math.max(1, Math.round(strideDeg / 0.08))
+  for (let i = 0; i + 1 < pts.length; i += stride) {
+    const a = pts[i]
+    const b = pts[i + 1]
+    const len = Math.hypot(b.lat - a.lat, b.lon - a.lon) || 1
+    probe(a.lat, a.lon, -(b.lon - a.lon) / len, (b.lat - a.lat) / len)
   }
 }
 
-const OFFSETS = [-0.14, -0.1, -0.06, 0, 0.06, 0.1, 0.14]
+// Cross-channel probes span the widened (calibratable) half-width.
+const OFFSETS = [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9].map((f) => f * RIVER_WIDTH_DEG)
 
 describe('waterSurfaceY (the canoe float height)', () => {
   it('clears the ribbon surface across the whole Nile channel', () => {
@@ -94,7 +95,7 @@ describe('waterSurfaceY (the canoe float height)', () => {
     for (const river of RIVERS) {
       walkAxis(river.points, 0.3, (lat, lon, pLat, pLon) => {
         const ribbonY = Math.max(-0.05, sampleTerrain(lat, lon, SEED).height + SURFACE_LIFT)
-        for (const off of [-0.1, 0.1]) {
+        for (const off of [-0.6 * RIVER_WIDTH_DEG, 0.6 * RIVER_WIDTH_DEG]) {
           const qLat = lat + pLat * off
           const qLon = lon + pLon * off
           const t = sampleTerrain(qLat, qLon, SEED)

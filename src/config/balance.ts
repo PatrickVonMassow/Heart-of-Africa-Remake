@@ -216,6 +216,17 @@ export interface BalanceConfig {
   }
   /** Touch / tablet controls (design.md §17.5, point 84). Feel only — the
    *  gameplay speeds and sensitivities are unchanged. */
+  /** Rivers (design.md §11.3, point 136). */
+  river: {
+    /**
+     * Widens every river against the strictly-scaled 0.17° base — a deliberate
+     * playability-over-scale trade (user decision): canoe navigation on the
+     * true width was fiddly. Read at build time (terrain sampling, ribbon
+     * geometry, water-edge rules derive from it at init); a debug edit
+     * applies on the next reload.
+     */
+    widthFactor: number
+  }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
@@ -381,6 +392,9 @@ export const balance: BalanceConfig = {
     landmarkMarginDeg: 8, // clearance around Giza / Table Mountain
     vicinityMinAnimals: 6, // region-typical animals guaranteed near a settlement
     vicinityRadius: 75, // ≈ 1.5× the default-zoom view ring (VIEW_AT_ZOOM1·0.5)
+  },
+  river: {
+    widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

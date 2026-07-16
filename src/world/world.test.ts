@@ -11,6 +11,8 @@ import { LAKES } from './data/lakes'
 import { LAND_POLYGONS } from './data/coastline'
 import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS } from './data/landmarks'
 import { setupGeodata } from '../test/geodata'
+import { densifyRiver } from '../scenes/travel/waterSurface'
+import { balance } from '../config/balance'
 
 const SEED = 42
 
@@ -74,7 +76,9 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     }
     const cairo = placeById('cairo')
     expect(giza.lon).toBeLessThan(cairo.lon) // west of the city
-    expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(0.85) // still AT Cairo
+    // Still AT Cairo: the bound grew with point 136 — the widened Nile pushed
+    // Cairo onto its east bank and the Giza field further west of the channel.
+    expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(1.05)
   })
 
   it('the Meroë pyramid field stands wholly on the Nile east bank, not in the river', () => {
@@ -188,8 +192,33 @@ describe('movement boundary (design.md §11)', () => {
 })
 
 describe('terrain sampling on real geodata', () => {
-  it('carves rivers at the fixed half-width (widened for navigability, still clear of settlements)', () => {
-    expect(RIVER_WIDTH_DEG).toBe(0.17)
+  it('carves rivers at the calibratable half-width (0.17° base × balance widthFactor)', () => {
+    expect(RIVER_WIDTH_DEG).toBeCloseTo(0.17 * balance.river.widthFactor, 9)
+  })
+
+  it('the width factor actually widens the sampled water span (point 136)', () => {
+    // Probe a straight mid-Nile desert stretch: walk the densified axis to the
+    // sample nearest lat 23 and scan its cross-channel perpendicular.
+    const nile = RIVERS.find((r) => r.id === 'nile')
+    expect(nile).toBeDefined()
+    const pts = densifyRiver(nile?.points ?? [])
+    let k = 0
+    for (let i = 1; i < pts.length; i++) if (Math.abs(pts[i].lat - 23) < Math.abs(pts[k].lat - 23)) k = i
+    const a = pts[k]
+    const b = pts[k + 1]
+    const len = Math.hypot(b.lat - a.lat, b.lon - a.lon) || 1
+    const pLat = -(b.lon - a.lon) / len
+    const pLon = (b.lat - a.lat) / len
+    for (const off of [-1, 1].map((side) => side * (RIVER_WIDTH_DEG - 0.03))) {
+      // Inside the widened band — beyond the 0.17° base, so a regression to
+      // the unwidened carve fails here.
+      expect(RIVER_WIDTH_DEG - 0.03).toBeGreaterThan(0.17)
+      expect(sampleTerrain(a.lat + pLat * off, a.lon + pLon * off, SEED).type, `off ${off}`).toBe('water')
+    }
+    for (const off of [-1, 1].map((side) => side * (RIVER_WIDTH_DEG + 0.08))) {
+      // Just outside: the band stays bounded, no runaway widening.
+      expect(sampleTerrain(a.lat + pLat * off, a.lon + pLon * off, SEED).type, `off ${off}`).not.toBe('water')
+    }
   })
 
   // Land points with a stable terrain type under the fixed seed.

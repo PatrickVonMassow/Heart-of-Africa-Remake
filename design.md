@@ -325,6 +325,7 @@ Current and gameplay:
 Visual water realism:
 
 - Water follows the map's height profile: rivers lie in beds carved into the local relief, their surface just above the bed along the whole course, reading as one continuous, unbroken ribbon that descends from source to mouth — never sea-level canyons through the highlands, never buried where the ground rises.
+- Width and course (a deliberate inaccuracy, like the §19.8 grief carve-out): rivers render WIDER than strictly to scale — a playability trade (user decision, 16.07.2026), because canoe navigation on the true width kept slipping the traveller onto land mid-passage. The widening is a calibratable balance factor over the 0.17° base half-width, and the carved bed, the rendered ribbon and the settlement clearances all follow the same widened value. The course itself runs SMOOTH: the sparse ~1890 source polylines are interpolated through a centripetal spline shared by the terrain carve, the ribbon and the water mask, so no control point turns in a hard corner and the three can never diverge.
 - A stray point that the biome map misclassifies as sea mid-river is bridged rather than tearing the ribbon; only the true mouth, where the river reaches the sea, ends it.
 - The surface itself is calm (only slight movement, no ocean-style wave field) with a recognizable downstream current (drifting streaks) that visibly accelerates at rapids and waterfalls.
 - Waterfalls (§4.4) are rendered as white cascades with plunge-pool foam and mist; rivers that rise in open land show a spring at their source.

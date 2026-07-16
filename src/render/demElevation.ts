@@ -12,9 +12,11 @@ import { float, texture, vec2 } from 'three/tsl'
 import { LAKES } from '../world/data/lakes'
 import { RIVERS_DATA } from '../world/data/rivers'
 import { getDemMeta, getDemPixels } from '../world/geodata'
+import { catmullRom } from '../world/hydro'
+import { RIVER_WIDTH_DEG } from '../world/terrain'
 
-/** River ribbon half width (world units 0.135°, Rivers.tsx) plus margin. */
-const RIVER_MASK_RADIUS_DEG = 0.22
+/** River ribbon half width (RIVER_WIDTH_DEG, terrain.ts) plus margin. */
+const RIVER_MASK_RADIUS_DEG = RIVER_WIDTH_DEG + 0.05
 
 let cached: THREE.DataTexture | null = null
 
@@ -39,13 +41,19 @@ function bakeWaterMask(mask: Uint8Array, width: number, height: number): void {
   }
   const rTexel = RIVER_MASK_RADIUS_DEG / res
   for (const river of RIVERS_DATA) {
-    for (let i = 0; i < river.points.length - 1; i++) {
-      const [lon0, lat0] = river.points[i]
-      const [lon1, lat1] = river.points[i + 1]
-      const steps = Math.max(1, Math.ceil(Math.hypot(lon1 - lon0, lat1 - lat0) / (res * 0.5)))
+    // Stamp along the same Catmull-Rom curve the ribbon and the carved bed
+    // follow (point 136) — a linear stamp would hug the corners the rendered
+    // river no longer takes.
+    const n = river.points.length
+    for (let i = 0; i < n - 1; i++) {
+      const p0 = river.points[Math.max(0, i - 1)]
+      const p1 = river.points[i]
+      const p2 = river.points[i + 1]
+      const p3 = river.points[Math.min(n - 1, i + 2)]
+      const steps = Math.max(1, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / (res * 0.5)))
       for (let s = 0; s <= steps; s++) {
-        const t = s / steps
-        stamp(toX(lon0 + (lon1 - lon0) * t), toY(lat0 + (lat1 - lat0) * t), rTexel)
+        const [lon, lat] = catmullRom(p0, p1, p2, p3, s / steps)
+        stamp(toX(lon), toY(lat), rTexel)
       }
     }
   }

@@ -27,6 +27,7 @@ const DEFAULTS = {
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
   canoeSpeedup: balance.canoeSpeedup,
+  riverWidthFactor: balance.river.widthFactor,
   canteenCapacity: balance.health.canteenCapacity,
 }
 
@@ -70,6 +71,7 @@ afterEach(() => {
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
+  balance.river.widthFactor = DEFAULTS.riverWidthFactor
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
@@ -130,6 +132,9 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },
+    // Build-time geometry value (point 136): the edit persists in balance and
+    // applies on the next reload — the write-through is what the menu owes.
+    { label: en.debug.riverWidthFactor, read: () => balance.river.widthFactor, value: 2 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {

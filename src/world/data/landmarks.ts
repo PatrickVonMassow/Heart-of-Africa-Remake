@@ -4,6 +4,7 @@
 // only the elephant graveyard is fictional and placed by educated guess.
 
 import { riverDistanceExact } from '../hydro'
+import { RIVER_WIDTH_DEG } from '../terrain'
 
 export interface MountainDef {
   /** Landmark id; display names come from the language files (i18n). */
@@ -89,7 +90,8 @@ export interface CulturalLandmarkDef {
 // geometry), bounded; a site already clear returns unchanged after one query.
 // Only Meroë is river-side, but the shift is generic so any bank-side field is
 // nudged onto dry ground.
-const LANDMARK_FIELD_CLEARANCE_DEG = 0.9
+// Field spread (~0.64°) + rim margin past the calibratable river half-width.
+const LANDMARK_FIELD_CLEARANCE_DEG = RIVER_WIDTH_DEG + 0.73
 
 function clearedOfRiversBy(lat: number, lon: number, clearanceDeg: number): { lat: number; lon: number } {
   let a = lat
@@ -119,7 +121,7 @@ const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   // West of the Nile's rendered band (axis ~31.22 at this latitude, half
   // width 0.17°): the whole FIELD FOOTPRINT (±~0.29° incl. the Sphinx) must
   // stand on the west-bank desert, not in the channel (user report).
-  { id: 'giza', lon: 30.65, lat: 29.98, kind: 'giza-pyramids' },
+  { id: 'giza', lon: 30.59, lat: 29.98, kind: 'giza-pyramids' },
   { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
   { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },
   { id: 'kilwa', lon: 39.51, lat: -8.96, kind: 'coastal-ruins' },

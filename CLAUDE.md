@@ -799,7 +799,12 @@ verify suite that proves it.
     points, a calm surface with a visible current strengthening at rapids
     and falls, five white waterfall cascades with plunge-pool foam,
     springs in open land, flat lake surfaces just above their carved
-    beds), as is the current's effect on movement (§11.3): a passive
+    beds), the §11.3 width/course rule (rivers wider than scale via the
+    calibratable `river.widthFactor` balance value — carved bed, ribbon,
+    water mask and clearances all derive from ONE width; the course
+    interpolated through the shared centripetal spline so no source
+    control point turns in a hard corner), as is the current's effect on
+    movement (§11.3): a passive
     downstream drift every frame, scaled by the nearest river segment's
     downstream direction and boosted near waterfalls (calibratable balance
     values: `currentDrift`, `currentWaterfallBoost`,
@@ -809,7 +814,12 @@ verify suite that proves it.
     Verifiable: `scripts/verify/enrichments.mjs` asserts 5 cascades, at
     least one spring and 8 lake surfaces, that no river has an interior
     gap and no river surface is buried, that every lake surface clears its
-    interior bed, that the Nile is a single continuous strip, and that
+    interior bed, that the Nile is a single continuous strip, that a long
+    driven canoe passage down the Nile stays on water the whole way (the
+    point-136 playability claim), and — pure — that the densified courses
+    hold the bounded turn angle with every control point anchored
+    (`src/scenes/travel/riverSmoothness.test.ts`) while the width factor
+    widens the sampled water span (`src/world/world.test.ts`), and that
     confluence edges are bank-masked (the Nile tributaries report interior
     edges, the masking stays local) via the dev hook — the interior-edge
     rule itself pure-tested in `src/scenes/travel/riverBanks.test.ts`; screenshots of the Nile, Victoria Falls and Lake Victoria

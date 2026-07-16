@@ -352,6 +352,7 @@ export const en: Strings = {
     daysPerUnit: 'Days per travel unit',
     canoeSpeedup: 'Canoe speed factor (water)',
     junglePenalty: 'Jungle penalty factor (no machete)',
+    riverWidthFactor: 'River width factor (applies on reload)',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

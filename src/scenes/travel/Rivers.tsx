@@ -39,7 +39,7 @@ import { WATERFALLS } from '../../world/data/landmarks'
 import { NILE_FLOOD, SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, registerRiverSurfaces, waterSurfaceY } from './waterSurface'
 import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
 
-const HALF_WIDTH = 1.7 // ribbon half width in world units (matches RIVER_WIDTH_DEG)
+const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
 
 interface FallDef {
   x: number

@@ -3451,7 +3451,7 @@ the remaining open points in their numeric order.
   pure tests for whatever leash/margin/exemption rule is added. (Filed
   16.07.2026 after the third run; second case added after the fourth.)
 
-- [ ] 136. Rivers: wider, and smoother in their course (playability over scale).
+- [x] 136. Rivers: wider, and smoother in their course (playability over scale).
   Wanted (user, 16.07.2026): the rivers are to be made WIDER — explicitly
   accepting that this is no longer strictly to scale — because canoe navigation
   is otherwise fiddly and the traveller keeps slipping onto land mid-passage.
@@ -3498,6 +3498,30 @@ the remaining open points in their numeric order.
   DOCS: design.md §11.3 (the width/scale trade-off stated outright, so the
   deliberate inaccuracy is on record like the §19.8 grief carve-out) and
   CLAUDE.md §7.1 pt. 21. (Reported 16.07.2026.)
+  DONE (16.07.2026, 21:00): diagnosis first, as required — the kinks came from
+  the SOURCE polylines (avg ~1.1° between control points, max 3.48°, linearly
+  densified), NOT from the ribbon triangulation; the carved bed had always
+  been spline-smoothed in hydro.ts, so band and bed also disagreed. Fix: ONE
+  shared centripetal Catmull-Rom (Barry-Goldman; uniform overshot into loops
+  at the Nile's Nimule knee and the Sudd east turn — worst per-step kink 109°,
+  centripetal 41°) sampled by the bed, the ribbon densify AND the DEM water
+  mask. Width: balance.river.widthFactor (1.6 over the 0.17° scale base) —
+  bed, ribbon, water-edge rules, DEM mask, current reach (riverFlowExact
+  maxDist was fixed 0.14 < the new half-width) all derive from the ONE
+  RIVER_WIDTH_DEG, now in cycle-free src/world/riverWidth.ts (hydro→terrain→
+  geo→hydro deadlocked at init otherwise); debug-menu field added (applies on
+  reload — geometry is module singletons). Consequences handled: Cairo,
+  Timbuktu and Boma sat inside the widened band and moved to their REAL banks
+  (east, north, north); Giza nudged west + landmark auto-clearance now
+  width-derived; the Meroë fixture reads the shifted anchor. Tests: new
+  riverSmoothness.test.ts (45° kink bound, control points anchored, sampling
+  density), width-span probe in world.test.ts, float/edge fixtures rebased
+  onto the smoothed axis and derived widths. Live: enrichments/flow/polish/
+  settings all exit 0 — incl. the NEW long canoe passage (240/240 steps on
+  water down the Nile) and the Nile-flood invariants re-verified at flood
+  peak on the new geometry (the 138 ribbon re-tune check). Screenshots 71-73
+  retaken and visually checked: wide, smoothly curving courses, cascades on
+  the moved axis.
 
 - [x] 137. Seasonal dress: educated guessing on indicia, instead of one cloak.
   Wanted (user, 16.07.2026): "Wenn die Belege hier so dünn sind, dann mache ein

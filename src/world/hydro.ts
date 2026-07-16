@@ -5,6 +5,7 @@
 // No rasterization → no visible stair-steps on banks and shores.
 
 import { RIVERS_DATA } from './data/rivers'
+import { RIVER_WIDTH_DEG } from './riverWidth'
 import { LAKES } from './data/lakes'
 
 const DENSIFY_STEP = 0.02 // degrees between generated points
@@ -19,19 +20,41 @@ const lakeBuckets = new Map<string, number[]>()
 // Densified closed lake rings for point-in-polygon tests.
 let lakeRings: Array<{ ring: Float64Array; minX: number; minY: number; maxX: number; maxY: number }>
 
-function catmullRom(
+/**
+ * Centripetal Catmull-Rom interpolation (Barry-Goldman) shared by every river
+ * consumer (point 136): the source polylines average ~1.1° between control
+ * points, so LINEAR densification turned every control point into a visible
+ * hard corner. Centripetal (not uniform) parameterization, because the data
+ * mixes short and long segments at real sharp bends (the Nile's Nimule knee,
+ * the Sudd's east turn) where the uniform curve overshoots into loops. The
+ * terrain water cells, the rendered ribbon and the DEM water mask all sample
+ * this one curve, so bed, band and mask cannot diverge.
+ */
+export function catmullRom(
   p0: [number, number],
   p1: [number, number],
   p2: [number, number],
   p3: [number, number],
   t: number,
 ): [number, number] {
-  const t2 = t * t
-  const t3 = t2 * t
-  return [
-    0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
-    0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
-  ]
+  // Knot spacing ~ sqrt of chord length; epsilon guards duplicate points.
+  const knot = (a: [number, number], b: [number, number]) =>
+    Math.max(1e-6, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])))
+  const t0 = 0
+  const t1 = t0 + knot(p0, p1)
+  const t2 = t1 + knot(p1, p2)
+  const t3 = t2 + knot(p2, p3)
+  const u = t1 + t * (t2 - t1)
+  const lerp = (a: [number, number], b: [number, number], ta: number, tb: number): [number, number] => {
+    const f = (u - ta) / (tb - ta)
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
+  }
+  const a1 = lerp(p0, p1, t0, t1)
+  const a2 = lerp(p1, p2, t1, t2)
+  const a3 = lerp(p2, p3, t2, t3)
+  const b1 = lerp(a1, a2, t0, t2)
+  const b2 = lerp(a2, a3, t1, t3)
+  return lerp(b1, b2, t1, t2)
 }
 
 /** Densify a polyline (closed: wraps around) with Catmull-Rom splines. */
@@ -176,7 +199,9 @@ export function lakeShoreDistanceExact(lat: number, lon: number, maxDist = MAX_Q
 export function riverFlowExact(
   lat: number,
   lon: number,
-  maxDist = 0.14,
+  // Reach past the calibratable channel half-width (point 136): a traveller
+  // at the widened bank must still feel the current.
+  maxDist = RIVER_WIDTH_DEG + 0.05,
 ): { dirLat: number; dirLon: number; strength: number } {
   const bx = Math.floor(lon / BUCKET)
   const by = Math.floor(lat / BUCKET)

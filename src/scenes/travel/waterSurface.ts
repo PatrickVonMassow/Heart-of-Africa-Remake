@@ -10,8 +10,8 @@
 
 import { LAKES } from '../../world/data/lakes'
 import { RIVERS_DATA } from '../../world/data/rivers'
-import { lakeIndexAt } from '../../world/hydro'
-import { sampleTerrain } from '../../world/terrain'
+import { catmullRom, lakeIndexAt } from '../../world/hydro'
+import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 
 /** River/lake surfaces sit this far above their carved bed (ribbon lift). */
 export const SURFACE_LIFT = 0.3
@@ -20,31 +20,40 @@ export const LAKE_LIFT = 0.12
 /** Sampling step along a river axis (matches the ribbon build in Rivers.tsx). */
 const STEP_DEG = 0.08
 
-/** Densify a river polyline at STEP_DEG — the exact ribbon sampling. */
+/**
+ * Densify a river polyline at STEP_DEG — the exact ribbon sampling. The
+ * samples follow a Catmull-Rom curve through the control points (point 136):
+ * the source data averages ~1.1° between points, so linear interpolation put
+ * a hard corner at every control point. The curve is hydro.ts' own — the same
+ * one the terrain's water cells are carved along — and passes through every
+ * control point, so the researched course stays anchored.
+ */
 export function densifyRiver(points: Array<[number, number]>): Array<{ lat: number; lon: number }> {
+  const n = points.length
   const out: Array<{ lat: number; lon: number }> = []
-  for (let i = 0; i < points.length - 1; i++) {
-    const [lon0, lat0] = points[i]
-    const [lon1, lat1] = points[i + 1]
-    const steps = Math.max(1, Math.round(Math.hypot(lon1 - lon0, lat1 - lat0) / STEP_DEG))
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[Math.min(n - 1, i + 2)]
+    const steps = Math.max(1, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / STEP_DEG))
     for (let s = 0; s < steps; s++) {
-      const f = s / steps
-      out.push({ lat: lat0 + (lat1 - lat0) * f, lon: lon0 + (lon1 - lon0) * f })
+      const [lon, lat] = catmullRom(p0, p1, p2, p3, s / steps)
+      out.push({ lat, lon })
     }
   }
-  const last = points[points.length - 1]
+  const last = points[n - 1]
   out.push({ lat: last[1], lon: last[0] })
   return out
 }
 
-// A ribbon cross-section reaches HALF_WIDTH (1.7 world units = 0.17°) off its
-// axis; add one sampling step of slack so a point between two axis samples
-// still sees both. Points further away are covered by no ribbon.
-const COVER_RANGE_DEG = 0.17 + STEP_DEG
+// A ribbon cross-section reaches RIVER_WIDTH_DEG off its axis; add one
+// sampling step of slack so a point between two axis samples still sees both.
+const COVER_RANGE_DEG = RIVER_WIDTH_DEG + STEP_DEG
 
 // Per-seed spatial index of every river's axis samples with their ribbon
 // surface height — ~2500 samples once per run, then O(1) frame queries.
-const GRID = 0.25 // ≥ COVER_RANGE_DEG, so ±1 cell covers every query
+const GRID = Math.max(0.25, COVER_RANGE_DEG) // ≥ COVER_RANGE_DEG, so ±1 cell covers every query
 type AxisIndex = Map<string, Array<{ lat: number; lon: number; surf: number; nile: boolean }>>
 const axisIndexCache = new Map<number, AxisIndex>()
 

@@ -52,7 +52,9 @@ describe('inReedBelt (papyrus hugs the waterline)', () => {
 
 describe('drinkWalkDistance (to the bank, never into the channel)', () => {
   it('a river drinker ends short of the waterline (on the bank)', () => {
-    for (const rd of [0.2, 0.25, 0.3, 0.35]) {
+    // Spawn distances derive from the (calibratable) waterline so the fixture
+    // always starts on land, whatever the river width factor (point 136).
+    for (const rd of [WATERLINE + 0.03, WATERLINE + 0.08, WATERLINE + 0.13]) {
       const walk = drinkWalkDistance(rd, 99, false)
       const endAxisDist = rd - walk
       expect(endAxisDist, `rd ${rd}`).toBeGreaterThan(WATERLINE) // still on land
@@ -61,11 +63,11 @@ describe('drinkWalkDistance (to the bank, never into the channel)', () => {
   })
 
   it('a river bather wades a small step past the bank — not mid-channel', () => {
-    for (const rd of [0.2, 0.3]) {
+    for (const rd of [WATERLINE + 0.03, WATERLINE + 0.13]) {
       const walk = drinkWalkDistance(rd, 99, true)
       const endAxisDist = rd - walk
       expect(endAxisDist, `rd ${rd}`).toBeLessThan(WATERLINE) // in the water
-      expect(endAxisDist, `rd ${rd}`).toBeGreaterThan(0.1) // nowhere near the axis
+      expect(endAxisDist, `rd ${rd}`).toBeGreaterThan(WATERLINE / 2) // nowhere near the axis
       expect(endAxisDist).toBeCloseTo(WATERLINE + BANK_GAP_DEG - BATHE_WADE_DEG, 6)
     }
   })

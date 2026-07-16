@@ -272,6 +272,7 @@ export interface Strings {
     daysPerUnit: string
     canoeSpeedup: string
     junglePenalty: string
+    riverWidthFactor: string
     seasonStrength: string
     season: string
     seasonAuto: string

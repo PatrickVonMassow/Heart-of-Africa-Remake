@@ -5,6 +5,7 @@
 // drift) into fast jsdom checks. The scene-driven walk-in/out edges stay in the
 // Playwright E2E.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { balance } from '../config/balance'
 import { totalGifts } from './store'
 import { g, freshGame, withWorld, jumpTo, terrainAt, COORD } from '../test/store'
@@ -177,7 +178,12 @@ describe('landmark discovery bounty (design.md §10)', () => {
   })
 
   it('sighting the Meroë pyramids registers, queues a bounty and journals the pyramids-flavored discovery', () => {
-    jumpTo(16.94, 33.75) // Pyramids of Meroë (a built cultural landmark)
+    // Jump to the SHIFTED anchor (Meroë auto-clears the calibratable river
+    // band, point 136) — a hardcoded raw coordinate drifts out of sighting
+    // range whenever the clearance grows.
+    const meroe = CULTURAL_LANDMARKS.find((c) => c.id === 'meroe')
+    if (!meroe) throw new Error('meroe missing')
+    jumpTo(meroe.lat, meroe.lon)
     expect(g().landmarksSeen).not.toContain('meroe') // '?' until seen
     drive(0, -1, 3)
     expect(g().landmarksSeen).toContain('meroe')

@@ -134,13 +134,13 @@ const PORTS: PlaceDef[] = [
   // west of the White Nile at Khartoum, north bank at Boma).
   // Sizes reflect real ~1890 importance: Cairo, Zanzibar and Cape Town were
   // major cities; Boma and Berbera small stations.
-  { id: 'cairo', kind: 'port', lat: 30.05, lon: 31.45, region: 'north', size: 3 },
+  { id: 'cairo', kind: 'port', lat: 30.05, lon: 31.55, region: 'north', size: 3 },
   { id: 'tangier', kind: 'port', lat: 35.6, lon: -5.75, region: 'north', size: 2 },
   { id: 'khartoum', kind: 'port', lat: 15.5, lon: 32.15, region: 'north', size: 2 },
   { id: 'st-louis', kind: 'port', lat: 15.9, lon: -16.2, region: 'west', size: 2 },
-  { id: 'timbuktu', kind: 'port', lat: 16.77, lon: -3.0, region: 'west', size: 2 },
+  { id: 'timbuktu', kind: 'port', lat: 16.95, lon: -3.0, region: 'west', size: 2 },
   { id: 'lagos', kind: 'port', lat: 6.55, lon: 3.4, region: 'west', size: 2 },
-  { id: 'boma', kind: 'port', lat: -5.65, lon: 13.05, region: 'central', size: 1 },
+  { id: 'boma', kind: 'port', lat: -5.53, lon: 13.05, region: 'central', size: 1 },
   { id: 'berbera', kind: 'port', lat: 10.3, lon: 45.0, region: 'east', size: 1 },
   // Zanzibar lies on its island (data/coastline.ts); it is reached by ferry
   // from any port's travel agency (design.md §10) or by canoe across the
