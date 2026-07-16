@@ -23,7 +23,30 @@ function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): 
   return geo
 }
 
+/**
+ * Mark a part as FOLIAGE (the 'foliage' attribute = 1 on every vertex). The
+ * dry-season collapse (point 144) keys on this baked, PER-PART-UNIFORM signal
+ * — never on the jittered colour: colour varies per vertex by design, and a
+ * position mask derived from it collapsed neighbouring vertices by different
+ * amounts, tearing the crowns into the shards of the 16.07 critical bug. An
+ * attribute set at build time is identical across a part by construction, so
+ * the part moves as one and nothing can tear.
+ */
+function foliage(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const count = geo.attributes.position.count
+  geo.setAttribute('foliage', new THREE.BufferAttribute(new Float32Array(count).fill(1), 1))
+  return geo
+}
+
 function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  // Every part must carry the foliage attribute or mergeGeometries drops it:
+  // unmarked parts (trunks, rocks, nuts) default to 0 = never collapses.
+  for (const p of parts) {
+    if (!p.attributes.foliage) {
+      const count = p.attributes.position.count
+      p.setAttribute('foliage', new THREE.BufferAttribute(new Float32Array(count), 1))
+    }
+  }
   const merged = mergeGeometries(parts, false)
   parts.forEach((p) => p.dispose())
   return merged
@@ -39,11 +62,13 @@ export function buildAcacia(): THREE.BufferGeometry {
   crown.scale(1, 0.3, 1)
   crown.translate(0.1, 1.75, 0)
   tint(crown, '#6e7c2f', 0.14, 12)
+  foliage(crown)
 
   const crown2 = new THREE.SphereGeometry(0.6, 7, 4)
   crown2.scale(1, 0.32, 1)
   crown2.translate(-0.55, 1.45, 0.3)
   tint(crown2, '#5f6e28', 0.14, 13)
+  foliage(crown2)
 
   return merge([trunk, crown, crown2])
 }
@@ -58,14 +83,17 @@ export function buildJungleTree(): THREE.BufferGeometry {
   c1.scale(1, 0.75, 1)
   c1.translate(0, 2.95, 0)
   tint(c1, '#1f5323', 0.16, 22)
+  foliage(c1)
 
   const c2 = new THREE.SphereGeometry(0.85, 7, 5)
   c2.translate(0.75, 2.5, 0.25)
   tint(c2, '#2a6128', 0.16, 23)
+  foliage(c2)
 
   const c3 = new THREE.SphereGeometry(0.7, 7, 5)
   c3.translate(-0.65, 2.65, -0.3)
   tint(c3, '#245a24', 0.16, 24)
+  foliage(c3)
 
   return merge([trunk, c1, c2, c3])
 }
@@ -103,6 +131,7 @@ export function buildPalm(detailed = false): THREE.BufferGeometry {
     frond.rotateY(a)
     frond.translate(topX + Math.sin(a) * len * 0.32, topY + 0.18 - len * 0.1, Math.cos(a) * len * 0.32)
     tint(frond, i % 2 ? '#3f6b2a' : '#4a7a30', 0.12, 41 + i)
+    foliage(frond)
     parts.push(frond)
   }
   // Coconuts on the detailed variant.
@@ -124,10 +153,12 @@ export function buildBush(): THREE.BufferGeometry {
   b1.scale(1, 0.65, 1)
   b1.translate(0, 0.28, 0)
   tint(b1, '#7d7c35', 0.18, 61)
+  foliage(b1)
   const b2 = new THREE.SphereGeometry(0.28, 5, 4)
   b2.scale(1, 0.7, 1)
   b2.translate(0.3, 0.2, 0.15)
   tint(b2, '#8a8340', 0.18, 62)
+  foliage(b2)
   return merge([b1, b2])
 }
 
@@ -137,7 +168,7 @@ export function buildRock(): THREE.BufferGeometry {
   r.scale(1, 0.62, 0.8)
   r.translate(0, 0.24, 0)
   tint(r, '#8a8178', 0.12, 71)
-  return r
+  return merge([r]) // through merge so it carries the (zero) foliage attribute
 }
 
 /** Baobab: massive bottle trunk with a sparse, flat branch crown. ~3 units. */
@@ -161,6 +192,7 @@ export function buildBaobab(): THREE.BufferGeometry {
   crown.scale(1, 0.22, 1)
   crown.translate(0, 2.65, 0)
   tint(crown, '#7a7434', 0.2, 98)
+  foliage(crown)
   parts.push(crown)
   return merge(parts)
 }
@@ -213,11 +245,13 @@ export function buildPapyrus(): THREE.BufferGeometry {
     stem.rotateY(a)
     stem.translate(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08)
     tint(stem, '#5f7c33', 0.15, 121 + i)
+    foliage(stem)
     parts.push(stem)
     const head = new THREE.SphereGeometry(0.11, 5, 4)
     head.scale(1, 0.7, 1)
     head.translate(Math.cos(a) * (0.08 + Math.sin(lean) * 1.1), 1.18, Math.sin(a) * (0.08 + Math.sin(lean) * 1.1))
     tint(head, '#88a04a', 0.18, 131 + i)
+    foliage(head)
     parts.push(head)
   }
   return merge(parts)
@@ -252,6 +286,7 @@ export function buildGrassTuft(): THREE.BufferGeometry {
     blade.rotateY((i / 4) * Math.PI)
     blade.translate((i % 2) * 0.1 - 0.05, 0.2, ((i + 1) % 2) * 0.1 - 0.05)
     tint(blade, '#a89e55', 0.2, 81 + i)
+    foliage(blade)
     parts.push(blade)
   }
   return merge(parts)

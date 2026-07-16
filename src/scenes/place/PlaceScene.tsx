@@ -24,7 +24,7 @@ import {
   vec3,
   vertexColor,
 } from 'three/tsl'
-import { SEASON_TINT_U, seasonTintNode, setSeasonTint } from '../../render/seasonTint'
+import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
@@ -949,6 +949,7 @@ function GroundScatter({
     m.vertexColors = true
     m.roughness = 0.95
     m.colorNode = seasonTintNode(vertexColor().rgb)
+    m.positionNode = seasonFoliagePosition() // baked attribute, point 144 retry
     return m
   }, [])
   const tuftMesh = useRef<THREE.InstancedMesh>(null)
@@ -1473,6 +1474,7 @@ export function PlaceScene() {
     m.vertexColors = true
     m.roughness = 0.9
     m.colorNode = seasonTintNode(vertexColor().rgb)
+    m.positionNode = seasonFoliagePosition() // baked attribute, point 144 retry
     return m
   }, [])
 

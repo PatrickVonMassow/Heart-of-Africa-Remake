@@ -7,7 +7,7 @@
 // frame from their OWN greenness and only ever one renders. It is a uniform,
 // not a fresh material, so it does not trip point 96's program-relink cost.
 
-import { float, mix, uniform, vec3 } from 'three/tsl'
+import { attribute, float, mix, positionLocal, uniform, vec3 } from 'three/tsl'
 import type { vertexColor } from 'three/tsl'
 
 // 0.5 = the untouched mid-year colour, 0 = full straw (dry), 1 = full green
@@ -50,4 +50,30 @@ export function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
   const dryK = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
   const lushK = SEASON_TINT_U.mul(2).sub(1).clamp(0, 1)
   return mix(mix(c, straw, greenness.mul(dryK)), lush, greenness.mul(lushK))
+}
+
+/**
+ * Bare branches, second attempt (point 144): in the dry season the foliage
+ * collapses toward the trunk and settles down onto it, while the trunk stands.
+ *
+ * The first attempt derived the mask from the per-vertex COLOUR — which
+ * jitters by design — so neighbouring vertices of one crown collapsed by
+ * different amounts and the trees tore into the screen-wide shards of the
+ * 16.07 critical bug. This one reads the baked, per-part-uniform, BINARY
+ * `foliage` attribute (flora.ts): every vertex of a part carries the same
+ * value by construction, the part moves as one, and nothing can tear.
+ *
+ * Zone-correctness is free, as before: the collapse scales with the tint
+ * uniform's DRYNESS, which only falls below neutral in a zone that has a dry
+ * season — the Congo's evergreen trees stay full because their uniform never
+ * leaves neutral.
+ */
+export function seasonFoliagePosition() {
+  // Cast: the TSL typings do not carry the attribute's float type through.
+  const leaf = attribute('foliage', 'float') as unknown as ReturnType<typeof float>
+  const dryness = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
+  const collapse = leaf.mul(dryness)
+  const p = positionLocal
+  const shrink = float(1).sub(collapse.mul(0.6))
+  return vec3(p.x.mul(shrink), p.y.sub(collapse.mul(0.22)), p.z.mul(shrink))
 }

@@ -32,7 +32,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
-import { SEASON_TINT_U, seasonTintNode } from '../../render/seasonTint'
+import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { elevationAt } from '../../world/geodata'
@@ -764,6 +764,9 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
   material.roughness = 0.92
   material.vertexColors = true
   material.colorNode = seasonTintNode(vertexColor().rgb)
+  // Bare branches (point 144, second attempt): keyed on the baked per-part
+  // foliage attribute, never the jittered colour — see seasonFoliagePosition.
+  material.positionNode = seasonFoliagePosition()
   const out = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])

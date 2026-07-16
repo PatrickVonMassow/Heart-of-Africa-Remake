@@ -29,6 +29,16 @@ function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): 
 }
 
 function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  // Some landmark builds mix flora parts (papyrus, with the point-144 foliage
+  // attribute) into plain parts — mergeGeometries demands the attribute on all
+  // or none, so fill the plain ones with 0 (= never collapses; the landmark
+  // material carries no positionNode anyway).
+  for (const part of parts) {
+    if (!part.attributes.foliage) {
+      const count = part.attributes.position.count
+      part.setAttribute('foliage', new THREE.BufferAttribute(new Float32Array(count), 1))
+    }
+  }
   const merged = mergeGeometries(parts, false)
   parts.forEach((p) => p.dispose())
   return merged
