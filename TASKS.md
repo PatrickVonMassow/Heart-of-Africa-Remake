@@ -93,6 +93,13 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, ninth): 149 (a SECOND full weather
+verification, like 147) and 150 (a SECOND interim Closing run) go AFTER 123, on
+the user's instruction — the whole system is re-swept and re-cleaned once more
+after the family dramas and the river rebuild, before the batch tail. So the
+tail reads: … -> 123 -> 149 -> 150 -> the remaining numeric points. 149 before
+150 (a Closing follows a green verification).
+
 Work order (user override, 2026-07-16, eighth): 147 (verify the whole weather
 system — correct AND visible) goes directly after 144, on the user's
 instruction: by then every weather point that changes the PICTURE has landed
@@ -3866,7 +3873,7 @@ the remaining open points in their numeric order.
   polish.mjs §19.13 (screenshot 114). The debug override still forces a season
   everywhere (that is its purpose), so the Cairo-dry check uses real months.
 
-- [ ] 144. The plants themselves change: cover AND condition, not just colour.
+- [x] 144. The plants themselves change: cover AND condition, not just colour.
   Wanted (user, 16.07.2026): "Wenn angebracht, sollte sich der Pflanzenbewuchs
   und der Zustand der Pflanzen auch je nach Jahreszeit ändern." — asked while
   reporting, correctly and repeatedly, that stepping through the months shows
@@ -3972,6 +3979,16 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 and §19.9 (the dressing), CLAUDE.md §7.1 pt. 12.
   ORDER: after 143 (which finishes what 120 claimed), before the 138-142
   additions. (Filed 16.07.2026.)
+  DONE (16.07.2026, 09cd768 + fa507fe): the tint pair exaggerated per the kitsch
+  licence (lever 4, Sahel green excess 46->61); and BARE BRANCHES (lever 2, the
+  strongest) — seasonFoliagePosition collapses green foliage vertices toward the
+  trunk as the tint uniform dries, reusing the greenness mask so evergreen zones
+  (Congo, uniform never leaves neutral) never go bare, no per-species rule. The
+  acacia thins to a wisp and the grass flattens in the dry season; the
+  screenshot pair is unmistakable where the tint alone was not. Levers left,
+  deliberately: the wet ground already darkens via the overcast sun-dim; the
+  BURNT LAND (lever 6) belongs to point 145(a), which builds the fire that
+  causes it.
 
 - [ ] 145. Three more parental sacrifices — a human cause, a lie, and a predator
   as a parent.
@@ -4226,6 +4243,56 @@ the remaining open points in their numeric order.
   NOT IN SCOPE: the real Closing still runs at the end over everything. This is
   an interim pass over what exists at 147, and it does not tick the batch's own
   Closing section. (Filed 16.07.2026.)
+
+- [ ] 149. A SECOND full weather verification, after the family dramas.
+  Wanted (user, 16.07.2026): "Füge nach 123 zwei neue Tasks ein: 1. Erneute
+  vollständige Wetter-Verifikation, so wie bei 147."
+  ORDER: after 123 (see the work-order note). By then everything weather has
+  landed AND the family dramas (122, 123) and the rivers (136) have rewritten
+  the world around it, so the whole system is re-swept once more before the
+  batch tail.
+  WHAT TO RUN: exactly point 147's procedure, re-run — its (a)-(g), against the
+  state as it exists after 123. 147 built the checks; this point re-executes
+  them and re-takes the screenshot pairs. The standard is the same and is the
+  point of it: the deliverable is a MEASUREMENT of what reaches the screen (the
+  pixel probe, real dates, no override), not "the tests are green" — with a
+  human able to SEE the difference on the screenshots. If 147's checks have
+  rotted (a coordinate moved, a driver changed, a river reshaped the ground a
+  season reads off), fix the GAME, in the direction design.md §19.13's
+  exaggeration licence allows.
+  ★ SPECIFICALLY re-verify what the intervening points disturb: 136 widened and
+  smoothed the rivers — the dry-season shore catchment (120e) and any water-edge
+  flora must still read; 122/123 added the swollen river and the drying
+  waterhole, which ARE weather states and must show; 138-142 (Nile flood,
+  Okavango, harmattan, ice/hail, seasonal life) each added a visible state — each
+  must still be visible, not merely modelled.
+  DOCS: none new; note the re-run in CLAUDE.md §7.1 pt. 12 only if a check
+  changed. (Filed 16.07.2026.)
+
+- [ ] 150. A SECOND interim Closing run, after the family dramas.
+  Wanted (user, 16.07.2026): "…2. Einen erneuten Closing-Zwischenlauf."
+  ORDER: after 149 (a Closing run should follow a green verification, not
+  precede it). Same seam logic as point 148: a large amount will have been built
+  since 148 (all of 138-142, 136, 122, 123), so the Closing steps are pulled
+  forward again rather than waiting for the batch end.
+  WHAT TO RUN: the four Closing steps at the bottom of this file, in order —
+  full regression, then the dead-code/stale-doc/stale-comment cleanup in
+  SEPARATE commits, then the full regression again, then the .md cruft pass with
+  the section numbers preserved.
+  ★ WHAT THIS PASS SPECIFICALLY OWES (the debris of the points built since 148,
+  which a later reader will not recognise as debris):
+  * whatever the river rebuild (136) left — old width/course constants, comments
+    describing the pre-widening geometry, any waterSurface/riverBanks test that
+    was loosened rather than re-tuned;
+  * the family-drama state added by 122/123/145/146 — check for a shared helper
+    that should have been extracted rather than copied (the §19.8 dramas grew by
+    accretion and are the likeliest place for duplicated resolution logic);
+  * design.md §19.8 and §19.13, which will have grown again;
+  * `docs/peoples-1890.md` — re-check the §2-vs-§7 forward-pointers still hold if
+    148 added them.
+  Do NOT delete superseded findings — add forward-pointers (the 148 rule).
+  NOT IN SCOPE: the real Closing still runs at the very end over everything; this
+  is the second interim pass. (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
