@@ -3492,13 +3492,30 @@ the remaining open points in their numeric order.
   deliberate inaccuracy is on record like the §19.8 grief carve-out) and
   CLAUDE.md §7.1 pt. 21. (Reported 16.07.2026.)
 
-- [ ] 137. Seasonal dress: educated guessing on indicia, instead of one cloak.
+- [x] 137. Seasonal dress: educated guessing on indicia, instead of one cloak.
   Wanted (user, 16.07.2026): "Wenn die Belege hier so dünn sind, dann mache ein
   Educated Guessing, das möglichst gut auf Indizien beruht. Falls notwendig
   führe eine zusätzliche ausführliche Recherche dafür durch… Es soll deutliche
   Unterschiede bzgl. der Kleidung je nach Region und Jahreszeit geben — aber
   nur sofern sie plausibel sind."
   ORDER: NEXT, ahead of 136 (see the work-order note at the top).
+  DONE (16.07.2026): (a) research complete, all four zones in
+  docs/peoples-1890.md §7 (74f1619, 849a96f) — and it INVERTED the question:
+  across seven period observers, not one describes a person putting ON a
+  seasonal garment; the seasonal signal is displaced onto fire, hut, week,
+  class and landscape. (b) all three drivers built and pure-tested: harmattanAt
+  (0dc1da1), the horn zone + karifAt (1d3db99, 92f4a1e-adjacent commits), each
+  deliberately separate from coldnessAt because the sources force it. (c) the
+  dress table: six peoples on evidence — zulu, tuareg, hausa, san, wayeyi,
+  somali — fifteen unchanged for stated reasons (28c25fe). (d) the figures:
+  rank-gating (a minority wears the wrap, the elder always does) and the
+  Somali head-muffle as a SHAPE change (7094aa6, screenshot 113). Two villages
+  moved under the user's licence (somali -> Haud, swahili -> Lamu, 1d3db99),
+  and the research found two model bugs on the way (the Fang desert
+  classification deb4a4c; the Horn falling to the congo fallback). The
+  research's "worn differently" reading beyond the head-muffle (drawn tight
+  etc.) remains as design.md §19.13's open line; the fire/hut/landscape
+  displacement is points 142/144/145's material.
   WHAT THIS REVERSES — read this before touching `src/systems/dress.ts`. Point
   120g shipped a deliberately narrow rule: a cold-weather cloak ONLY for the
   Zulu, because Mayr (1907) is the one PERIOD source among the game's peoples,
