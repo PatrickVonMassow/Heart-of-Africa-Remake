@@ -93,6 +93,12 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
+Work order (user override, 2026-07-16, fourth): 143 (inside a settlement it
+never rains and the ground never bleaches) is a DEFECT in the shipped point
+120g, found by the user stepping through the months, so it goes ahead of the
+138-142 additions: finish what 120 claimed before adding more season. Order:
+137 -> 143 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136 -> 122 -> 123 -> rest.
+
 Work order (user override, 2026-07-16, third): points 138-142 are the season
 findings that were RESEARCHED but never built (the user asked what else had
 been held back; the honest answer was that only the dress was held back for
@@ -3658,6 +3664,55 @@ the remaining open points in their numeric order.
   a transhumant village shows fewer inhabitants in its away month than in its
   home month via `__placeWalkers`, with screenshots of both.
   SIZE: large — split along the findings, one commit each. (Filed 16.07.2026.)
+
+- [ ] 143. Inside a settlement it never rains, and the ground never bleaches.
+  Reported (user, 16.07.2026): "Innerorts sehe ich als einzige Unterschiede beim
+  Durchschalten der Monate, dass sich die Helligkeit ändert und die Bewölkung
+  der Skyline. Sollte es da nicht mehr Unterschiede geben?" — Yes. Verified by
+  grep, and he is right: point 120g shipped only a THIRD of the settlement
+  season.
+  WHAT IS ACTUALLY MISSING (both confirmed absent, not merely faint):
+  * **RAIN.** The rain field lives in `src/scenes/travel/Climate.tsx` alone. A
+    player standing in a village at the peak of its rainy season sees not one
+    drop, while the bird's-eye view of the same coordinate rains. The settlement
+    already KNOWS it is raining — `PlaceScene` computes the wetness from the
+    place's own coordinates and dims the sun by it (point 120g) — so this is a
+    missing renderer, not a missing model.
+  * **The flora/ground season.** The straw/green tint lives in
+    `src/scenes/travel/TravelScene.tsx` (`SEASON_TINT_U` / `seasonTintNode`).
+    The settlement ground and its trees never bleach: they read the same in
+    April and September while the whole continent around them changes.
+  ANCHORS: `src/scenes/travel/Climate.tsx` (the rain field — MODULE singletons
+  per point 96, so lifting it into a shared module must keep that: a fresh
+  material per mount re-links the travel program set); `src/scenes/travel/
+  TravelScene.tsx` (`seasonTintNode`, the greenness mask that survived the
+  acacia-crown bug — reuse it, do not write a second one); `src/scenes/place/
+  PlaceScene.tsx` (`usePlaceMaterials`, and the `placeWetness`/`__placeSeason`
+  block that already has the wetness in hand); `src/render/flora.ts`.
+  CARE:
+  * The settlement wetness must stay derived from the PLACE's own coordinates,
+    never from `CURRENT_WEATHER` — the travel Climate component does not mount
+    here and its reading would be wherever the traveller last stood (the rule
+    §19.13 already states, and the reason it is stated).
+  * The rain column is sized for the bird's-eye camera (RAIN_RADIUS 55,
+    RAIN_HEIGHT 42, streaks tilted 0.38 rad because a plumb streak is nearly
+    edge-on from above). **At eye height in first person none of that holds** —
+    the tilt, the density and the column size all need their own calibration, or
+    the village will look like it is raining sideways.
+  * Ports: Cairo is hyper-arid and must stay bone dry in every month. A rain
+    that fires in Cairo is a bug, and `wetnessAt` already returns 0 there — do
+    not "fix" that by lifting the guard.
+  TESTS: pure — reuse the existing season tests; the greenness/wetness split is
+  already covered (point 143's cause was that the ABSOLUTE wetness drove the
+  flora; use `floraGreennessAt` here from the start). Live
+  (`scripts/verify/polish.mjs`, in the §19.13 block that is LAST in the file on
+  purpose): forcing the rainy season inside a village raises the rain opacity
+  above zero and forcing the dry season clears it, with screenshots of one
+  village in both seasons; and the same village's ground/flora tint differs
+  between the two. Add a Cairo case: rainless in every month.
+  DOCS: design.md §19.13 (its settlement paragraph currently claims sky, light
+  and firelight — say rain and flora too) and CLAUDE.md §7.1 pt. 12.
+  (Filed 16.07.2026.)
 
 ## Closing (only after all points)
 
