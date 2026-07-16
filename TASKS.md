@@ -3766,7 +3766,7 @@ the remaining open points in their numeric order.
   consumers. Live: Sahel January dust 0.98 / fogFar 117 vs August 0.00 / 181,
   screenshot 121.
 
-- [ ] 141. Equatorial ice — and hail, the only white ground low down.
+- [x] 141. Equatorial ice — and hail, the only white ground low down.
   Wanted (user, 16.07.2026). `docs/climate-1890.md` §(a) records that the
   equatorial glaciers stood 8-12x today's extent (Kilimanjaro ~12-20 km² vs
   0.98 today) and — the part that makes it a GAME fact rather than trivia —
@@ -3805,6 +3805,19 @@ the remaining open points in their numeric order.
   rainless zone (no Saharan hail) and stays rare. Live: a screenshot of
   Kilimanjaro carrying its period ice. DOCS: design.md §19.13 + §4.4 (the
   landmark), CLAUDE.md §7.1 pt. 12. (Filed 16.07.2026.)
+  DONE (16.07.2026, 439cea3 + 817a159): the naive global SNOW_M=4300 threshold
+  — which wrongly snowed Elgon and Ras Dashen — replaced by the massif gate
+  (iceMassifAt): only the three glaciated massifs whiten, per-massif ice lines
+  adapted to the DEM's flattened summits (Mount Kenya reads 4,454 m for a real
+  5,199 — the gate carries the truth, the line places the cap), baked into
+  terrain colours so far sheet and map inherit. Seasonal Atlas/Drakensberg snow
+  as a COLOUR-ONLY shader term (the bare-branches lesson), line sinking with
+  winter depth; Toubkal reads 7.5% near-white pixels in February vs 0.0% in
+  July (screenshot 122). Hail: deterministic per (day, 2° cell), only inside
+  rainAmount >= 0.6 storms, ~a handful of days/year; pellets via the rain
+  field's hail uniform, a brief radial ground dusting via the snow node. The
+  1890s glacier BREAK-UP animation was the optional depth and is not built
+  (the period extent is; recorded as the open nuance).
 
 - [ ] 142. The season reaches the people: work, presence, market, fire.
   Wanted (user, 16.07.2026). This is the richest seam the (a2) research opened

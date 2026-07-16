@@ -544,6 +544,14 @@ verify suite that proves it.
       zoom stays season-free, the flora/ground bleach to straw and deepen
       to green, and the dry season's wider shore catchment gathers the
       animals at the remaining water (`scripts/verify/enrichments.mjs`);
+      the ice of 1890 (§19.13, point 141) caps exactly the three glaciated
+      massifs while the four named near misses stay bare — the list swept in
+      a pure test (`inIceMassif`) AND live over the terrain colours; the
+      High Atlas whitens in February and bares in July (pixel-fraction
+      check, screenshot 122); hail fires only inside a heavy storm, never
+      in a rainless zone (swept over the whole window), rarely, and
+      deterministically (`src/systems/season.test.ts`,
+      `scripts/verify/enrichments.mjs`);
       the harmattan (§19.13, point 140) palls the Sahel from late November
       to mid-March — the dome whitens toward dust (its own axis, not the
       wet gray), the noon sun reddens, the HALO IS MUTED (the researched,
