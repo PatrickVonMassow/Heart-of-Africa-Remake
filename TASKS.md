@@ -79,6 +79,14 @@ Work order (user override, 2026-07-14): after point 83, the open points are
 worked in THIS order — 88, 90, 87, 86, 91, 85, 84, 89. The numbering stays
 as-is; only the sequence changes.
 
+Work order (user override, 2026-07-16): after point 120 (seasons), the points
+that BUILD ON it are pulled forward and done next, before the rest of the
+batch — 122 and 123 (the two family dramas keyed on the wet/dry season), with
+136 (wider, smoother rivers) placed BEFORE 122 because 122 and 130 both write
+against the river's geometry. So: 120 → 136 → 122 → 123 → the remaining open
+points in their numeric order. The numbering stays as-is; only the sequence
+changes.
+
 ## Checklist
 
 - [x] 1. Animals sometimes oscillate between two headings ~90° apart (seen while
@@ -2583,23 +2591,27 @@ as-is; only the sequence changes.
         the game window — a cattle-keeping people in 1890-95 is not living a
         normal year. Establish whether to depict this; it is design content, so
         FLAG it for the user rather than deciding it here (CLAUDE §2).
-  (b) Model: derive a season from the in-game date + the region's latitude
+  (b) DONE (15.07.2026, 497e30d) — Model: derive a season from the in-game date + the region's latitude
       (`design.md` §3.2 regions), and from (season, region) a weather state.
       Central, calibratable values in `src/config/balance.ts`, debug-editable
       per CLAUDE §2 (a debug selector to force season/weather for testing).
-  (c) Visuals: region-typical precipitation and sky (rain, harmattan haze,
+  (c) DONE (15.07.2026, 497e30d) — Visuals: region-typical precipitation and sky (rain, harmattan haze,
       summit snow), fitting the §2.7 lighting/§19.9 dressing pipeline; TSL, no
       raw GLSL/WGSL, both renderer backends.
-  (d) Plants: the vegetation and dressing of §19.9 respond — green/lush in the
+  (d) DONE (15.07.2026, 497e30d) — Plants: the vegetation and dressing of §19.9 respond — green/lush in the
       wet season, dry/sparse in the dry season.
-  (e) Animals: the §19.2-§19.8 wildlife responds (e.g. presence/behaviour at
+  (e) DONE (15.07.2026, 497e30d) — Animals: the §19.2-§19.8 wildlife responds (e.g. presence/behaviour at
       water in the dry season). Must not break the existing wildlife
       invariants (streaming, body separation, water-edge rules, the dramas).
-  (f) Gameplay coupling is OPEN and must be decided before implementing: does
+  (f) DECIDED (15.07.2026) — ambience only, recorded in design.md §19.13 with the
+      question left open there. Gameplay coupling is OPEN and must be decided before implementing: does
       weather touch movement/health (§6/§11) or stay pure ambience like the
       rest of §19? Ambience-only is the safer default; flag it as a question
       rather than inventing a mechanic (CLAUDE §2 forbids design invention).
-  (g) INSIDE SETTLEMENTS TOO (user, 15.07.2026) — the weather must not stop at
+  (g) MOSTLY DONE (16.07.2026, 440c1e6) — sky, light and firelight shipped and
+      live-checked (polish.mjs, screenshots 110/111); snow resolved as
+      "nowhere" and recorded in design.md §19.13. STILL OPEN: the dress bullet
+      below. INSIDE SETTLEMENTS TOO (user, 15.07.2026) — the weather must not stop at
       the bird's-eye view. In the first-person settlement scenes (§2.6):
       * the sky/skyline carries the season's weather (the §2.5 panorama and the
         §4.4 skyline landmarks included — e.g. Kilimanjaro's ice per (a));
@@ -3276,6 +3288,54 @@ as-is; only the sequence changes.
   TESTS: the existing live checks stay as they are (they are the truth-tellers);
   pure tests for whatever leash/margin/exemption rule is added. (Filed
   16.07.2026 after the third run; second case added after the fourth.)
+
+- [ ] 136. Rivers: wider, and smoother in their course (playability over scale).
+  Wanted (user, 16.07.2026): the rivers are to be made WIDER — explicitly
+  accepting that this is no longer strictly to scale — because canoe navigation
+  is otherwise fiddly and the traveller keeps slipping onto land mid-passage.
+  And the COURSE is to be made smoother: it currently has many hard kinks that
+  neither look natural nor navigate well.
+  ORDER (user leaves it to me, 16.07.2026): do this BEFORE 122. Point 122 (the
+  swollen river of the rains, and drowning) makes the river a place where
+  animals are swept away and drown, and 130 puts ambush crocodiles in it — both
+  build ON the river's geometry, so widening and smoothing first means they are
+  written against the final shape instead of being re-tuned afterwards. Two
+  separate points, in the order 136 → 122.
+  WHY IT IS TWO PROBLEMS, not one: width and course are set in different
+  places. Establish both anchors before touching anything —
+  `src/world/geodata.ts` (the ~1890 vector courses and the carved bed) and the
+  ribbon build in `src/scenes/travel/waterSurface.ts` — and check whether the
+  kinks come from the SOURCE polyline's vertex spacing (too few points, so the
+  bed turns in hard corners) or from the ribbon's own triangulation. Widening a
+  kinked course only makes the kinks broader; smooth first, then widen.
+  CARE — the invariants that must survive (they are all live-gated already):
+  * the ribbon stays ONE continuous, unbroken strip from source to mouth, with
+    no interior gap and no surface buried under the terrain (CLAUDE §7.1
+    pt. 21, `scripts/verify/enrichments.mjs`);
+  * the canoe float height must still clear the ribbon across EVERY channel,
+    including the cross-sloping and confluence stretches
+    (`src/scenes/travel/waterSurface.test.ts` — widening changes the bed
+    cross-section, so this is the test most likely to catch a mistake);
+  * every village keeps its §4.2 minimum river-water clearance — a wider river
+    may reach into a footprint that used to be clear (`src/world/world.test.ts`
+    checks all 22; ports are exempt);
+  * the confluence bank-masking rule (`src/scenes/travel/riverBanks.test.ts`)
+    and the water-edge rules for drinkers/bathers
+    (`src/scenes/travel/waterEdgeRules.test.ts`) still hold at the new width;
+  * the Red Sea / world-trim hull rules are untouched (`src/world/redSea.test.ts`).
+  WIDTH is a balance value, calibratable and debug-editable per CLAUDE §2 — do
+  not hard-code a new constant in the geometry.
+  TESTS: pure — the smoothed course has no kink above a bounded turn angle
+  between consecutive segments (the direct expression of "no hard kinks"), and
+  the width value actually widens the sampled water span; extend the existing
+  waterSurface/riverBanks/world tests rather than writing parallel ones. Live
+  (`scripts/verify/enrichments.mjs`): the Nile is still a single continuous
+  strip, and a canoe run down a river stays on water over a long passage (the
+  playability claim itself — today's failure mode is drifting onto land).
+  Screenshots 71-73 (Nile, Victoria Falls, Lake Victoria) get re-taken.
+  DOCS: design.md §11.3 (the width/scale trade-off stated outright, so the
+  deliberate inaccuracy is on record like the §19.8 grief carve-out) and
+  CLAUDE.md §7.1 pt. 21. (Reported 16.07.2026.)
 
 ## Closing (only after all points)
 
