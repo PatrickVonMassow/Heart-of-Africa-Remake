@@ -2766,6 +2766,43 @@ check(
   `zones: ${[...new Set(placeClimate.map((p) => p.zone))].join(', ')}`,
 )
 
+// Point 138 — the Nile flood: remote-fed, so it crests in OCTOBER at places
+// where it never rains. Read through the APP's dev hook (__rivers), never a
+// dynamic import: after HMR a URL import gets a FRESH module instance whose
+// NILE_FLOOD is untouched, and reads a rise of 0 at full flood.
+{
+  await page.evaluate(() => window.__game.getState().debugJumpTo(24.09, 32.9)) // the Aswan reach
+  await page.waitForTimeout(1200)
+  const surfAt = async (month) => {
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.waitForTimeout(4500) // the rise blends at 0.02/frame
+    return page.evaluate(() => ({
+      y: window.__rivers.surfaceAt(24.09, 32.9),
+      rise: window.__rivers.floodRise(),
+    }))
+  }
+  const apr = await surfAt(4)
+  await page.screenshot({ path: `${OUT}117-nile-low-april.png` })
+  const oct = await surfAt(10)
+  await page.screenshot({ path: `${OUT}118-nile-flood-october.png` })
+  console.log('shot 117-nile-low-april.png, 118-nile-flood-october.png')
+  check(
+    'the Nile crests in October and sits low in April (point 138, remote-fed)',
+    oct.y !== null && apr.y !== null && oct.y - apr.y > 0.3,
+    `April ${apr.y?.toFixed(3)} (rise ${apr.rise.toFixed(2)}) -> October ${oct.y?.toFixed(3)} (rise ${oct.rise.toFixed(2)})`,
+  )
+  // The flood must not break the ribbon invariants: one continuous strip,
+  // never buried (CLAUDE §7.1 pt. 21) — checked AT FLOOD, not just at low water.
+  const rep = await page.evaluate(() => ({ gaps: window.__rivers.gaps, buried: window.__rivers.buried }))
+  check(
+    'ribbon continuity and never-buried hold at flood peak',
+    rep.gaps === 0 && rep.buried === 0,
+    JSON.stringify(rep),
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+  await page.waitForTimeout(1500)
+}
+
 // Point 147(b) — VISIBLE, and measured in PIXELS rather than the tint uniform:
 // the whole reason this class of check exists. A savanna spot's ground must
 // differ on screen between its driest and wettest month, and a Congo spot —
