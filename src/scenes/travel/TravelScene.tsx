@@ -243,8 +243,15 @@ function seasonTintNode(c: ReturnType<typeof vertexColor>['rgb']) {
     float(1).sub(c.r.sub(c.g).mul(4)).clamp(0, 1),
   )
   const luma = c.r.mul(0.35).add(c.g.mul(0.5)).add(c.b.mul(0.15))
+  // Both ends must be REAL recolours, keyed off the luma, and symmetric about
+  // the untouched mid-year `c`. They were not: straw recoloured hard while lush
+  // was a multiplicative nudge (`c * (0.7, 1.08, 0.7)` — eight percent more
+  // green and otherwise a dimming), so the rains changed the scene's BRIGHTNESS
+  // and never its hue. Measured on screen before the fix, the Sahel's ground
+  // went 205,188,89 (dry) -> 178,173,78 (wet): the green excess g-(r+b)/2 moved
+  // 41 -> 45, i.e. not at all. The player saw the sun dim and nothing else.
   const straw = vec3(luma.mul(1.9), luma.mul(1.55), luma.mul(0.6))
-  const lush = c.mul(vec3(0.7, 1.08, 0.7))
+  const lush = vec3(luma.mul(0.5), luma.mul(1.25), luma.mul(0.45))
   const dryK = float(1).sub(SEASON_TINT_U.mul(2)).clamp(0, 1)
   const lushK = SEASON_TINT_U.mul(2).sub(1).clamp(0, 1)
   return mix(mix(c, straw, greenness.mul(dryK)), lush, greenness.mul(lushK))
