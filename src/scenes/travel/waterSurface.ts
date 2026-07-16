@@ -45,17 +45,29 @@ const COVER_RANGE_DEG = 0.17 + STEP_DEG
 // Per-seed spatial index of every river's axis samples with their ribbon
 // surface height — ~2500 samples once per run, then O(1) frame queries.
 const GRID = 0.25 // ≥ COVER_RANGE_DEG, so ±1 cell covers every query
-type AxisIndex = Map<string, Array<{ lat: number; lon: number; surf: number }>>
+type AxisIndex = Map<string, Array<{ lat: number; lon: number; surf: number; nile: boolean }>>
 const axisIndexCache = new Map<number, AxisIndex>()
 
-function insertAxisSample(grid: AxisIndex, lat: number, lon: number, surf: number) {
+/**
+ * This frame's Nile flood rise in world units (point 138) — a frame-scratch
+ * global in the CURRENT_WEATHER mould, written by the travel scene from
+ * `nileFloodAt(day) * balance.season.nileFloodRise`. Read here by the float
+ * height (the canoe rides the flood) and mirrored into the ribbon material's
+ * uniform by Rivers.tsx — ONE source, so the rendered surface and the floater
+ * can never drift apart. It rises the surface VERTICALLY only: the ribbon
+ * keeps its width, so the flood never reaches ground the low-water river does
+ * not already border (the §4.2 village clearance is untouched by design).
+ */
+export const NILE_FLOOD = { rise: 0 }
+
+function insertAxisSample(grid: AxisIndex, lat: number, lon: number, surf: number, nile: boolean) {
   const key = `${Math.floor(lon / GRID)}:${Math.floor(lat / GRID)}`
   let list = grid.get(key)
   if (!list) {
     list = []
     grid.set(key, list)
   }
-  list.push({ lat, lon, surf })
+  list.push({ lat, lon, surf, nile })
 }
 
 /**
@@ -67,13 +79,13 @@ function insertAxisSample(grid: AxisIndex, lat: number, lon: number, surf: numbe
  */
 export function registerRiverSurfaces(
   seed: number,
-  samples: Array<{ lat: number; lon: number; surf: number }>,
+  samples: Array<{ lat: number; lon: number; surf: number; nile: boolean }>,
 ): void {
   // The travel scene remounts on every settlement visit and re-registers the
   // identical data — the first registration (or a lazy build) wins.
   if (axisIndexCache.has(seed)) return
   const grid: AxisIndex = new Map()
-  for (const s of samples) insertAxisSample(grid, s.lat, s.lon, s.surf)
+  for (const s of samples) insertAxisSample(grid, s.lat, s.lon, s.surf, s.nile)
   axisIndexCache.set(seed, grid)
 }
 
@@ -84,7 +96,7 @@ function axisIndex(seed: number): AxisIndex {
   for (const river of RIVERS_DATA) {
     for (const p of densifyRiver(river.points)) {
       const surf = Math.max(-0.05, sampleTerrain(p.lat, p.lon, seed).height + SURFACE_LIFT)
-      insertAxisSample(grid, p.lat, p.lon, surf)
+      insertAxisSample(grid, p.lat, p.lon, surf, river.id === 'nile')
     }
   }
   axisIndexCache.set(seed, grid)
@@ -106,7 +118,9 @@ function riverSurfaceAt(lat: number, lon: number, seed: number): number | null {
         const eLon = lon - p.lon
         const eLat = lat - p.lat
         if (eLon * eLon + eLat * eLat > rangeSq) continue
-        if (best === null || p.surf > best) best = p.surf
+        // The Nile rides the flood (point 138) — same rise the ribbon renders.
+        const surf = p.nile ? p.surf + NILE_FLOOD.rise : p.surf
+        if (best === null || surf > best) best = surf
       }
     }
   }

@@ -31,8 +31,9 @@ import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
-import { CURRENT_WEATHER, effectiveGreenness, sunDimFactor } from '../../systems/season'
+import { CURRENT_WEATHER, effectiveGreenness, nileFloodAt, sunDimFactor } from '../../systems/season'
 import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode } from '../../render/seasonTint'
+import { NILE_FLOOD } from './waterSurface'
 import { elevationAt } from '../../world/geodata'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
@@ -823,6 +824,11 @@ function Vegetation() {
       )
       const target = 0.5 + (green - 0.5) * Math.min(1, Math.max(0, balance.season.weatherStrength))
       SEASON_TINT_U.value += (target - SEASON_TINT_U.value) * 0.02
+      // The Nile flood (point 138): one CPU source for the ribbon rise and the
+      // canoe float height. Blended like the tint, so a debug month jump makes
+      // the river rise over a moment rather than snap.
+      const floodTarget = nileFloodAt(s.day, START_YEAR) * balance.season.nileFloodRise
+      NILE_FLOOD.rise += (floodTarget - NILE_FLOOD.rise) * 0.02
     }
     // In the far debug zoom the dressing hides (it exists only inside the
     // chunk rectangle); the far-terrain sheet carries the look out there.

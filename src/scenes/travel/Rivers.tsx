@@ -9,6 +9,7 @@
 // Lakes are flat polygon surfaces at their local shore height.
 
 import { useEffect, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import {
   attribute,
@@ -21,6 +22,7 @@ import {
   positionLocal,
   smoothstep,
   time,
+  uniform,
   uv,
   vec3,
 } from 'three/tsl'
@@ -34,7 +36,7 @@ import { WATERFALLS } from '../../world/data/landmarks'
 // The surface heights and the axis sampling are shared with the module the
 // floating canoe reads (waterSurface.ts), so a floater and the rendered
 // surface can never diverge.
-import { SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, registerRiverSurfaces } from './waterSurface'
+import { NILE_FLOOD, SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, registerRiverSurfaces, waterSurfaceY } from './waterSurface'
 import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
 
 const HALF_WIDTH = 1.7 // ribbon half width in world units (matches RIVER_WIDTH_DEG)
@@ -66,11 +68,12 @@ function buildRivers(seed: number): {
   const uvs: number[] = []
   const flows: number[] = []
   const banks: number[] = []
+  const floodK: number[] = [] // 1 on the Nile: its vertices ride the flood uniform
   const indices: number[] = []
   const falls: FallDef[] = []
   const springs: SpringDef[] = []
   const report: Record<string, { strips: number; buried: number; interiorEdges: number }> = {}
-  const axisSamples: Array<{ lat: number; lon: number; surf: number }> = []
+  const axisSamples: Array<{ lat: number; lon: number; surf: number; nile: boolean }> = []
 
   // Phase 1 — densify every axis first: the bank mask below must see ALL
   // rivers' bands, not only the ones built so far (confluences are between
@@ -94,7 +97,7 @@ function buildRivers(seed: number): {
     const surf: number[] = []
     for (let i = 0; i < pts.length; i++) {
       surf.push(Math.max(-0.05, samples[i].height + SURFACE_LIFT))
-      axisSamples.push({ lat: pts[i].lat, lon: pts[i].lon, surf: surf[i] })
+      axisSamples.push({ lat: pts[i].lat, lon: pts[i].lon, surf: surf[i], nile: river.id === 'nile' })
     }
 
     // Flow speed: base current plus local slope; boosted near the river's
@@ -187,6 +190,8 @@ function buildRivers(seed: number): {
       uvs.push(arc, 0, arc, 1)
       const f = flowAt(i)
       flows.push(f, f)
+      const fk = river.id === 'nile' ? 1 : 0
+      floodK.push(fk, fk)
       const bankL = bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
       const bankR = bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
       interiorEdges += (1 - bankL) + (1 - bankR)
@@ -203,6 +208,7 @@ function buildRivers(seed: number): {
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
   geometry.setAttribute('bank', new THREE.BufferAttribute(new Float32Array(banks), 1))
+  geometry.setAttribute('floodK', new THREE.BufferAttribute(new Float32Array(floodK), 1))
   geometry.setIndex(indices)
   // Hand the axis samples to the float-height module: the canoe then floats
   // on literally these ribbon heights, and the frame loop never has to build
@@ -222,6 +228,12 @@ function buildRivers(seed: number): {
 // first draw after leavePlace()).
 let riverMaterialCache: THREE.MeshStandardNodeMaterial | null = null
 let lakeMaterialCache: THREE.MeshStandardNodeMaterial | null = null
+
+// The Nile flood's GPU mirror (point 138): RiversAndLakes copies
+// waterSurface.NILE_FLOOD.rise into this uniform each frame, so the rendered
+// ribbon and the CPU float height read the same rise from one source. A
+// module uniform keeps the material a singleton (point 96 — no re-link).
+const NILE_FLOOD_U = uniform(0)
 function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   if (riverMaterialCache) return riverMaterialCache
   const m = riverMaterialCache = new THREE.MeshStandardNodeMaterial()
@@ -259,7 +271,11 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   // Only slight movement on the surface (design.md §11): a tiny ripple, no
   // wave field.
   const ripple = mx_fractal_noise_float(vec3(u.mul(1.3).sub(time.mul(flow).mul(0.45)), v.mul(3), time.mul(0.1)), 2)
-  m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.035), 0))
+  // The Nile rides its flood (point 138): a vertical rise on its own vertices
+  // (floodK = 1), matching the CPU float height exactly. Vertical ONLY — the
+  // ribbon keeps its width, so the flood cannot reach new ground.
+  const floodRise = (attribute('floodK', 'float') as unknown as ReturnType<typeof float>).mul(NILE_FLOOD_U)
+  m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.035).add(floodRise), 0))
 
   m.opacityNode = float(0.9)
   m.roughnessNode = foam.mul(0.6).add(0.12)
@@ -363,6 +379,12 @@ function getRiversBundle(seed: number) {
 export function RiversAndLakes() {
   const seed = useGame((s) => s.seed)
   const bundle = useMemo(() => getRiversBundle(seed), [seed])
+
+  // Mirror the CPU flood rise into the ribbon uniform each frame (point 138):
+  // one source (waterSurface.NILE_FLOOD), two readers, no drift.
+  useFrame(() => {
+    NILE_FLOOD_U.value = NILE_FLOOD.rise
+  })
   const { geometry, falls, springs, report } = bundle.rivers
   const lakes = bundle.lakes
   const riverMat = useMemo(() => createRiverMaterial(), [])
@@ -380,7 +402,19 @@ export function RiversAndLakes() {
     // lakeInfo: each surface's height vs. its highest interior bed sample —
     // y > bedMax for every lake proves no lake surface is buried (TASKS pt. 11).
     const lakeInfo = lakes.map((l) => ({ y: l.y, bedMax: l.bedMax }))
-    w.__rivers = { falls: falls.length, springs: springs.length, lakes: lakes.length, gaps, buried, report, lakeInfo }
+    w.__rivers = {
+      falls: falls.length, springs: springs.length, lakes: lakes.length, gaps, buried, report, lakeInfo,
+      // Point 138 — read through the APP's module instance. A probe that
+      // dynamic-imports waterSurface.ts by URL can get a FRESH instance after
+      // HMR (?t= cache busting) whose NILE_FLOOD is untouched, and then reads a
+      // rise of 0 while the game is at full flood. Mutable module state must be
+      // read through a dev hook, never through a parallel import.
+      floodRise: () => NILE_FLOOD.rise,
+      surfaceAt: (lat: number, lon: number) => {
+        const s = useGame.getState()
+        return waterSurfaceY(lat, lon, s.seed, sampleTerrain(lat, lon, s.seed).height)
+      },
+    }
     return () => {
       delete w.__rivers
     }

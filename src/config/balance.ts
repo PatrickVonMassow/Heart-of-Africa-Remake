@@ -219,6 +219,8 @@ export interface BalanceConfig {
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
     weatherStrength: number
+    /** How far the Nile's October crest lifts its surface (world units). */
+    nileFloodRise: number
   }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
@@ -382,6 +384,7 @@ export const balance: BalanceConfig = {
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
+    nileFloodRise: 0.55, // the unregulated 1890 flood is dramatic; calibratable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection
