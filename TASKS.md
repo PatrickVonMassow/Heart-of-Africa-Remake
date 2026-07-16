@@ -4409,6 +4409,200 @@ the remaining open points in their numeric order.
   NOT IN SCOPE: the real Closing still runs at the very end over everything; this
   is the second interim pass. (Filed 16.07.2026.)
 
+- [ ] 151. Seasonal flora is anchored to the PLACE, zone borders blend, and
+  growth sprouts from the ground (user bug, 16.07.2026, two screenshots).
+  SYMPTOM: walking/canoeing near the June/July ITCZ edge (13.4N/31.8E Gezira;
+  18.1N/33.9E Nile) makes every visible plant slide/"fly" with each step, and
+  crossing a climate-zone border flips the whole scene's flora state at once.
+  ROOT CAUSE (verified in code): `SEASON_TINT_U` is ONE global uniform lerped
+  per frame toward `effectiveGreenness` at the PLAYER's position
+  (TravelScene ~line 825); `seasonFoliagePosition`/`seasonTintNode` displace
+  and tint EVERY instance from it. Moving across a wetness gradient or a
+  zone-rule boundary therefore animates all plants in view. The user asks for
+  two properties: (1) zone transitions must be spatially GRADUAL, (2) a plant
+  appearing with the season must SPROUT from the ground, not float in.
+  FIX (season field): a small continent-covering greenness field texture
+  sampled per plant/ground position — nothing reads the player position.
+  * src/systems/season.ts: export a stable slot list — index 0 = hyper-arid,
+    then the climate zones in a FIXED order — plus `seasonSlotAt(lat, lon,
+    elevationM)` and a per-slot greenness helper (same curves floraGreennessAt
+    uses; override fills all slots).
+  * src/render/seasonTint.ts: a module DataTexture (Uint8, LinearFilter,
+    fixed lon -20..55 / lat -36..38 bounds, ~0.5° texel) whose STATIC per-texel
+    slot WEIGHTS are one-hot zone maps blurred by a ~1.5-2° kernel (the
+    spatial blend the user asked for — hyper-arid fades too); per frame the
+    14 slot greens (lerped 0.02 as today, weatherStrength applied) fill the
+    texels via the weights. TSL: vegetation/terrain sample it through a baked
+    `seasonUV` attribute (vec2) — InstancedBufferAttribute on the vegetation
+    meshes, BufferAttribute on terrain chunks (both know lat/lon at build).
+    `seasonTintNode`/`seasonFoliagePosition` take the green node as parameter;
+    PlaceScene keeps the single-value SEASON_TINT_U path (one place, one
+    greenness — correct there).
+  * Sprouting (user): the binary 'foliage' attribute becomes a CLASS — 0
+    never-moves, 1 tree crown (bare-branch collapse as today), 2 ground
+    flora (bush, grass tuft, papyrus): anchored at y=0 and scaled toward the
+    ground by dryness, so seasonal appearance reads as sprouting. Still
+    per-part-uniform values only (the 144 shard rule); update
+    src/render/flora.test.ts from binary to the three classes.
+  TESTS: pure — slot mapping (hyper-arid 0, zones stable), field smoothness
+  (a texel between two zones lies strictly between their greens), override
+  fills; flora classes per builder. Live (enrichments): the field/table does
+  NOT change while the player walks (the bug's witness — the old uniform
+  did), and screenshots at BOTH user spots (June Gezira, July Nile) show
+  stable flora; the 115/116 real-month pixel checks must stay green.
+  DOCS: design.md §19.13 (spatial blend + sprout sentence), CLAUDE.md §7.1
+  pt. 12. Priority insert: directly after point 122 (it corrects the
+  just-shipped 143/144 look before 149 re-verifies the weather).
+  (Reported 16.07.2026.)
+
+- [ ] 152. The swimming traveller floats ON the water — never walks the bed
+  (user bug, 16.07.2026, screenshot at Lake Edward).
+  SYMPTOM: swimming across Lake Edward, the figure walks the carved rift bed
+  far UNDER the lake sheet (readable through the translucent surface).
+  ROOT CAUSE (verified): only the canoe lifts to the rendered surface —
+  TravelScene ~1594 queries `waterSurfaceY` ONLY while `canoeing`; the
+  swimming walker keeps terrain height, and Lake Edward's sheet sits at the
+  lake-wide bedMax high above the local bed.
+  FIX: while the traveller is on a river/lake water cell WITHOUT the canoe,
+  lift the figure to the same `waterSurfaceY` minus a small immersion (swim
+  depth, chest-deep ~0.35 — a new calibratable in balance if any tuning is
+  plausible, else a named constant), with the walk-bob replaced by a slow
+  swim bob; on the sea (type 'ocean', nearshore swim) the plane at ~0 is the
+  surface, same lift. The camera/eye and the §6.1 swim hint stay as they are.
+  TESTS: pure if a helper falls out naturally; live (enrichments): place the
+  traveller mid-Lake-Edward and assert the rendered figure group's y sits at
+  lakeSurfaceY − immersion (±0.1) not at the bed (the bug's witness), and a
+  river swim keeps the figure at the ribbon surface; screenshot at Lake
+  Edward. DOCS: CLAUDE.md §7.1 pt. 21 gains the swim-float clause if §11.3
+  wording needs it (design.md §11.3 already says water is crossable swimming
+  — add the visual float sentence).
+  Order: directly after 151. (Reported 16.07.2026.)
+
+- [ ] 153. Ocean surf only near the coast, and ambient-volume sliders (birdsong).
+  Wanted (user, 16.07.2026, "ans Ende vom Batch"): (a) the ocean-surf ambience
+  plays only NEAR the ocean — fading out with distance from the coast and fully
+  OFF beyond a calibratable cutoff (today it is presumably part of the global
+  bed regardless of where the traveller stands); (b) the debug menu lacks
+  per-source volume sliders for the other ambient sounds — at LEAST the
+  birdsong needs one (localized labels, both languages, §21.2 write-through
+  like the existing volume fields).
+  ANCHORS: the ambience mixing lives where `refreshAmbienceVolume` and the
+  §19.1 proximity calls live (src/systems/ or src/scenes/travel audio module —
+  find `ambienceVolume`/`ambientVolume` consumers); coast distance per
+  `coastDistance` (src/world/geoIndex.ts). Fade: volume × smoothstep(cutoff,
+  nearRadius, distance), balance values (cutoff start ~8°? calibrate by ear at
+  the debug speed), updated as the traveller moves.
+  TESTS: pure — the fade curve (full at the shore, 0 at/beyond the cutoff,
+  monotone between) and the new balance fields' debug write-through
+  (`src/ui/DebugMenu.test.tsx`); live (`scripts/verify/settings.mjs`): at a
+  coast the surf gain is >0, far inland (e.g. 15° from any coast) it is
+  EXACTLY 0, and editing the birdsong slider changes that source's gain.
+  DOCS: design.md §19.1 (surf is coastal), CLAUDE.md §7.1 pt. 20 (the single
+  ambience volume gains the per-source sliders — name birdsong).
+  (Reported 16.07.2026.)
+
+- [ ] 154. F3 full loadout also sets the travel speed to 25.
+  Wanted (user, 16.07.2026, "ans Ende der Batch"): the F3 debug shortcut
+  (§21.1 full loadout) additionally sets `balance.travelSpeed` to 25 — the
+  fast test-traversal speed, on top of the existing gear/zoom/health grants.
+  ANCHORS: the F3 handler (search `F3` in src/ui/Hud.tsx or the shortcut
+  module; it already writes gear, gifts, health, canteen, capacity, zoom
+  unlock). Set `balance.travelSpeed = 25` and bump so the debug-menu field
+  shows the new value (same mechanism the menu's own edit uses).
+  TESTS: extend the existing F3 coverage (`src/ui/Hud.test.tsx` pure and/or
+  `scripts/verify/settings.mjs` live — settings already asserts the F3 full
+  loadout): after F3, `balance.travelSpeed` is 25 and the debug menu shows it.
+  DOCS: CLAUDE.md §7.1 pt. 20's F3 clause gains "travel speed 25".
+  (Reported 16.07.2026.)
+
+- [ ] 155. No inhabitant spawns stuck (Tuareg Village pocket).
+  Wanted (user, 16.07.2026, screenshot, "fürs Ende vom Batch"): a villager
+  stood wedged between the market stall's board, a rock and the market hut's
+  curved wall in Tuareg Village — spawned into a pocket it cannot leave.
+  CLAUDE §7.1 pt. 16 already promises "inhabitants never permanently stuck";
+  the layout invariants check door reachability but NOT walker spawn freedom.
+  FIX: (a) spawn placement — a walker spawn candidate is valid only with a
+  clear standing circle (walker radius + margin) AND at least one open
+  escape direction (probe a ring of steps at walker radius against the
+  place's collision set: stall boards and rocks must count, not only
+  buildings — check what the collider list includes; the screenshot pocket
+  was formed BY a stall board and a rock); resample rejected candidates.
+  (b) belt-and-braces runtime unstuck: a walker that could not move for a
+  calibratable window (e.g. 10 s) while having a move target teleport-nudges
+  to the nearest free spot (small, invisible correction — inhabitants only,
+  never the player).
+  TESTS: pure — `src/scenes/place/layout.test.ts` sweep across every place
+  and several seeds: every inhabitant spawn point has the standing circle
+  and an escape direction against the full collider set (incl. stalls and
+  rocks). Live (`scripts/verify/collision.mjs`): observe walkers over a
+  window and assert none stays pinned (zero displacement while unarrived)
+  longer than the unstuck window.
+  DOCS: CLAUDE.md §7.1 pt. 16 (the spawn-freedom clause). Order: batch end
+  per the user. (Reported 16.07.2026.)
+
+- [ ] 156. Settlement footprints stay clear of the widened rivers (Khartoum).
+  Wanted (user, 16.07.2026): since point 136 widened the rivers, some
+  settlements read as protruding into the water — Khartoum (at the White/Blue
+  Nile confluence, both arms widened) named as the example.
+  ROOT CAUSE: geo.ts auto-clears VILLAGE anchors (clearedOfRivers at module
+  load, §4.2) and world.test checks anchor POINTS — but a settlement's
+  bird's-eye FOOTPRINT (the rendered building cluster/panorama circle)
+  extends beyond the anchor, and ports are exempt from the village clearance
+  entirely. The 136 port nudge fixed only the three anchors that sat IN the
+  water (Cairo, Timbuktu, Boma).
+  FIX: extend the build-time clearing to every settlement with a
+  footprint-aware margin — required distance = RIVER_WIDTH_DEG + the place's
+  rendered footprint radius (derive from the same size the bird's-eye
+  cluster uses; find where the travel scene draws the settlement cluster).
+  Ports keep sitting AT the river (§4.2 exemption for closeness) but their
+  buildings must not stand IN it: clear by the footprint, not the village
+  clearance. Re-check the §4.2 riverside rule: the Nubian village must stay
+  riverside on the Nile (world.test pins it).
+  SCOPE EXTENSION (user, same evening): the same holds for LANDMARKS — the
+  Sudd named as the example. Point 136's width-derived clearance auto-clears
+  only Meroë; Giza was nudged by hand; the other cultural landmarks, the
+  natural point-landmark dressings (Sudd papyrus field etc.) and the
+  elephant graveyard were never re-checked against the widened band. Restore
+  the minimum distance for ALL of them: apply the clearedOfRiversBy pattern
+  (width-derived clearance + own footprint) per landmark — EXCEPT features
+  whose identity IS the water (the Okavango delta fan floods by design; the
+  Sudd dressing may hug the bank but no solid dressing stands IN the
+  channel — reuse the §19 solid-dressing water rule where it fits).
+  TESTS: world.test — every place (ports included) keeps
+  riverDistance(anchor) >= RIVER_WIDTH_DEG + footprintDeg(size), Khartoum
+  asserted explicitly; every cultural landmark rim and the graveyard clear
+  the band (the existing rim probes already scale with RIVER_WIDTH_DEG —
+  extend to the unshifted ones); the Sudd's SOLID dressing keeps out of the
+  channel while its reeds may hug it. Live: bird's-eye screenshots of
+  Khartoum and the Sudd clear of the arms (`scripts/verify/enrichments.mjs`).
+  DOCS: CLAUDE.md §7.1 pt. 3 (footprint clause beside the village
+  clearance). Order: after 152 (the fresh user bugs in reported order),
+  before 123. (Reported 16.07.2026.)
+
+- [ ] 157. A fleeing calf never snags on an obstacle (escape uses deflection).
+  Wanted (user, 16.07.2026): during a lion hunt the parent sacrificed itself
+  correctly — but the FREED calf hung in place while "fleeing" (stuck against
+  something, visibly running on the spot).
+  LIKELY CAUSE: the calf's flee/escape step moves along the flee heading
+  without the obstacle deflection other movers use — `deflectedStep`
+  (wildlifeBehavior.ts) exists for coast/walk-off paths, and the bird's-eye
+  collision (§11) pins movers at solid dressing (trees, rocks, termite
+  mounds); a flee vector pointing INTO a collider produces exactly a
+  run-on-the-spot. Check the escape branches: the freed calf after a
+  sacrifice (caught -> undefined), the chase-victim weave, and the generic
+  prey flight — whichever moved this calf.
+  FIX: route the calf's (and generally prey's) flee step through the same
+  deflection/slide used elsewhere (deflectedStep with a collider-aware
+  blocked() — not only ocean), so a blocked heading swings along the
+  obstacle instead of pinning. Keep the §19 rendered-facing turn cap.
+  TESTS: pure — a flee step against a blocking probe deflects and still
+  covers distance (wildlifeBehavior.test.ts, alongside the deflectedStep
+  cases); live — pin a calf's escape line through an injected obstacle and
+  assert real displacement over the escape window
+  (`scripts/verify/enrichments.mjs`). Related: point 135's stochastic
+  guarantees touch the same state machine — coordinate, don't duplicate.
+  Order: batch end (after 155). (Reported 16.07.2026.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
