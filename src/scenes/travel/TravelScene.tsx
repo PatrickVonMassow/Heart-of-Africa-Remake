@@ -32,7 +32,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, effectiveGreenness, sunDimFactor } from '../../systems/season'
-import { SEASON_TINT_U, seasonTintNode } from '../../render/seasonTint'
+import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode } from '../../render/seasonTint'
 import { elevationAt } from '../../world/geodata'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
@@ -759,6 +759,9 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
   material.roughness = 0.92
   material.vertexColors = true
   material.colorNode = seasonTintNode(vertexColor().rgb)
+  // Bare branches in the dry season (point 144): the foliage collapses toward
+  // the trunk while the trunk stays. Evergreen zones never dry, so never bare.
+  material.positionNode = seasonFoliagePosition(vertexColor().rgb)
   const out = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
