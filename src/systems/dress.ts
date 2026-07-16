@@ -171,16 +171,6 @@ export function seasonalDressFor(peopleId: string, d: DressDrivers): SeasonalDre
 }
 
 /**
- * The cold-weather cloaks a people wears at this coldness, or null.
- * @deprecated Superseded by `seasonalDressFor`, which carries the other two
- * drivers and the rank/wear the record actually gives. Kept only until the
- * callers move.
- */
-export function coldCloaksFor(peopleId: string, coldness: number): readonly string[] | null {
-  return seasonalDressFor(peopleId, { coldness, harmattan: 0, karif: 0 })?.cloaks ?? null
-}
-
-/**
  * Whether THIS figure is one of the few who owns a rank-gated wrap.
  *
  * Keyed on the cloth's position in the settlement's palette, like the wrap's

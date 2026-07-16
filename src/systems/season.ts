@@ -481,9 +481,11 @@ export function sunDimFactor(wetness: number, strength: number): number {
 
 /**
  * This frame's effective weather at the traveller, written by the travel
- * Climate component and read by the sun and rain — a frame-scratch global in
- * the mould of Wildlife's LION_STATE, so the lighting does not need a second
- * wetness derivation of its own.
+ * Climate component — a frame-scratch global in the mould of Wildlife's
+ * LION_STATE. Read by the travel sun-dim (TravelScene) and the dry-season shore
+ * catchment (Wildlife). The flora tint no longer reads it: it derives its own
+ * greenness per-zone via `effectiveGreenness` from the player's coordinate,
+ * because the absolute wetness this holds cannot carry a per-zone flora look.
  */
 export const CURRENT_WEATHER = { wetness: 0 }
 

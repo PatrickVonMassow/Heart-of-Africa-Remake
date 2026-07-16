@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cloakForCloth, coldCloaksFor, seasonalDressFor, wearsByRank } from './dress'
+import { cloakForCloth, seasonalDressFor, wearsByRank } from './dress'
 import { COLD_DRESS_THRESHOLD, coldnessAt, harmattanAt, karifAt } from './season'
 
 // The peoples' coordinates as the world model places them (src/world/geo.ts).
@@ -58,17 +58,10 @@ describe('coldnessAt (point 120g — the seasonal swing needs latitude)', () => 
   })
 })
 
-describe('coldCloaksFor (point 120g — evidence-gated, and mostly absent)', () => {
-  it('the Zulu add Mayr\'s cloak in the cold — the one period-sourced case', () => {
-    expect(coldCloaksFor('zulu', 1)).not.toBeNull()
-    expect(coldCloaksFor('zulu', 1)!.length).toBeGreaterThan(1) // Mayr's mid-transition mix
-  })
+// A cold-only driver set, for the peoples whose garment answers coldness.
+const coldOnly = (coldness: number) => ({ coldness, harmattan: 0, karif: 0 })
 
-  it('and shed it in the warmth: the cloak is the cold-weather garment, not the dress', () => {
-    expect(coldCloaksFor('zulu', 0)).toBeNull()
-    expect(coldCloaksFor('zulu', COLD_DRESS_THRESHOLD - 0.01)).toBeNull()
-  })
-
+describe('seasonalDressFor — evidence-gated, and mostly absent (points 120g/137)', () => {
   it('peoples the research found no period evidence for wear nothing extra', () => {
     // The list SHRANK when point 137's deeper pass reached the sources — the
     // Tuareg, Hausa and San are now dressed on period evidence (see the
@@ -88,7 +81,7 @@ describe('coldCloaksFor (point 120g — evidence-gated, and mostly absent)', () 
   })
 
   it('an unknown people is never dressed by guesswork', () => {
-    expect(coldCloaksFor('not-a-people', 1)).toBeNull()
+    expect(seasonalDressFor('not-a-people', coldOnly(1))).toBeNull()
   })
 
   it('the near miss stays bare even where its own ground IS cold', () => {
@@ -100,22 +93,22 @@ describe('coldCloaksFor (point 120g — evidence-gated, and mostly absent)', () 
     // found Passarge; they are now dressed, on evidence.)
     const pediWinter = coldnessAt(JULY, PEDI.lat, PEDI.lon, START, 1000)
     expect(pediWinter).toBeGreaterThan(COLD_DRESS_THRESHOLD)
-    expect(seasonalDressFor('pedi', { coldness: pediWinter, harmattan: 0, karif: 0 })).toBeNull()
+    expect(seasonalDressFor('pedi', coldOnly(pediWinter))).toBeNull()
     // The contrast that makes the point: the San's Kalahari is cold on the same
     // day and they DO dress — because Passarge went and looked, not because
     // their ground is colder. Evidence decides, never the thermometer.
     const sanWinter = coldnessAt(JULY, SAN.lat, SAN.lon, START, 1175)
     expect(sanWinter).toBeGreaterThan(COLD_DRESS_THRESHOLD)
-    expect(seasonalDressFor('san', { coldness: sanWinter, harmattan: 0, karif: 0 })).not.toBeNull()
+    expect(seasonalDressFor('san', coldOnly(sanWinter))).not.toBeNull()
   })
 
   it('the Zulu village actually reaches the threshold in its winter — model and mapping agree', () => {
     // The two halves are useless apart: a cloak nobody ever gets cold enough to
     // wear would pass every test above and never show in the game.
     const winter = coldnessAt(JULY, ZULU.lat, ZULU.lon, START, 100)
-    expect(coldCloaksFor('zulu', winter)).not.toBeNull()
+    expect(seasonalDressFor('zulu', coldOnly(winter))).not.toBeNull()
     const summer = coldnessAt(JANUARY, ZULU.lat, ZULU.lon, START, 100)
-    expect(coldCloaksFor('zulu', summer)).toBeNull()
+    expect(seasonalDressFor('zulu', coldOnly(summer))).toBeNull()
   })
 })
 
@@ -125,14 +118,14 @@ describe('cloakForCloth (point 120g — the village shows a mix, deterministical
   const SOUTH_CLOTH = ['#3a5a8a', '#8a4a2a', '#c2b090']
 
   it('always picks a cloak from the palette', () => {
-    const cloaks = coldCloaksFor('zulu', 1)!
+    const cloaks = seasonalDressFor('zulu', coldOnly(1))!.cloaks
     for (const cloth of [...SOUTH_CLOTH, 'not-in-the-palette', '']) {
       expect(cloaks).toContain(cloakForCloth(cloaks, SOUTH_CLOTH, cloth))
     }
   })
 
   it('is stable for the same cloth — a figure does not reshuffle its cloak per frame', () => {
-    const cloaks = coldCloaksFor('zulu', 1)!
+    const cloaks = seasonalDressFor('zulu', coldOnly(1))!.cloaks
     expect(cloakForCloth(cloaks, SOUTH_CLOTH, '#3a5a8a')).toBe(
       cloakForCloth(cloaks, SOUTH_CLOTH, '#3a5a8a'),
     )
@@ -143,13 +136,13 @@ describe('cloakForCloth (point 120g — the village shows a mix, deterministical
     // these three cloths drew the same cloak, and the greased black hide — the
     // Skin-Zulu, the most characteristic of the three — never appeared in the
     // village at all. Indexing the palette spreads them by construction.
-    const cloaks = coldCloaksFor('zulu', 1)!
+    const cloaks = seasonalDressFor('zulu', coldOnly(1))!.cloaks
     const worn = new Set(SOUTH_CLOTH.map((c) => cloakForCloth(cloaks, SOUTH_CLOTH, c)))
     expect(worn.size).toBe(cloaks.length)
   })
 
   it('falls back to a spread rather than a default when the cloth is off-palette', () => {
-    const cloaks = coldCloaksFor('zulu', 1)!
+    const cloaks = seasonalDressFor('zulu', coldOnly(1))!.cloaks
     const off = ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666']
     const worn = new Set(off.map((c) => cloakForCloth(cloaks, SOUTH_CLOTH, c)))
     expect(worn.size).toBeGreaterThan(1)
