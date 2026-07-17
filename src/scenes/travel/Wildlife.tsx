@@ -762,16 +762,21 @@ function seedSettlementVicinity(
  * deterministic per (seed, water cell), tagged to the traveller's chunk so
  * the group streams out normally.
  */
-let shoreSeedTick = 0
+let shoreSeedClock = 999 // seconds since the last upkeep; start due
 function seedDryShoreDrinkers(
   herds: Record<Species, Animal[]>,
   pos: { x: number; z: number },
   seed: number,
   spawnedChunks: Set<string>,
+  dt: number,
 ): void {
-  // Throttled: the guarantee needs seconds-scale upkeep, not per-frame
-  // re-seeding (point 135 — the per-frame path ballooned the herds).
-  if (shoreSeedTick++ % 120 !== 0) return
+  // Throttled by TIME, not frames: the guarantee needs seconds-scale upkeep
+  // (per-frame re-seeding ballooned the herds, point 135) — and a frame
+  // counter stretched past the verification window whenever the frame rate
+  // dropped under full-regression load.
+  shoreSeedClock += dt
+  if (shoreSeedClock < 2) return
+  shoreSeedClock = 0
   const dryness =
     (1 - CURRENT_WEATHER.wetness) * Math.min(1, Math.max(0, balance.season.weatherStrength))
   if (dryness < 0.6) return
@@ -1078,7 +1083,7 @@ function Herds() {
     // Never leave a settlement's bird's-eye vicinity empty (point 102): top the
     // region-typical presence up to the minimum where the chunk spawn fell short.
     seedSettlementVicinity(herds, pos, seed, spawnedChunks.current)
-    seedDryShoreDrinkers(herds, pos, seed, spawnedChunks.current)
+    seedDryShoreDrinkers(herds, pos, seed, spawnedChunks.current, dt)
     // Render nearest-first so the visible cap keeps the animals closest to the
     // player when a chunk range holds more than an instanced mesh can show.
     for (const sp of SPECIES) {
