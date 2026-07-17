@@ -4910,6 +4910,13 @@ the remaining open points in their numeric order.
   screenshot-number clashes, verify-README current, old width/tint claims
   all gone. Vitest 1669 green, lint clean.
 
+- [x] 161. README mentions the authentic regional climate and dress.
+  Wanted (user, 17.07.2026). DONE (same turn): a feature bullet — every place
+  runs its researched seasonal calendar (humid-period Sahel, harmattan, Nile
+  flood, Okavango inversion, real snow line) and the inhabitants answer it as
+  the period sources describe (six evidence-gated seasonal garments; fire,
+  market and transhumant presence carry the season for the rest).
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

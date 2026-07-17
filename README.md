@@ -43,6 +43,14 @@ every deploy.
 - **Survival.** Provisions, a canteen with a draining water level, and a health
   pool worn down by starvation, fever, dehydration, sun blindness and wounds;
   medicine cures, fresh water and rest restore.
+- **An authentic 1890 climate and its people.** Every place runs its own
+  researched seasonal calendar — the Sahel's humid-period rains, the
+  harmattan's dust pall, the October Nile flood and the Okavango's inverted
+  July flood, snow only on the peaks that really carried it — and the
+  inhabitants answer it as the period sources describe: exactly six peoples
+  put on a documented seasonal garment (rank-gated where the record says so),
+  while for the rest the season shows in the fire, the market and who is
+  away with the herds.
 - **Hazards.** Hidden per-day events while travelling — animal and robber
   attacks, crocodiles, fever, sandstorms, waterfall sweeps — and wandering
   predators (lion, cheetah, leopard, hyena) that attack on contact. Equipment
