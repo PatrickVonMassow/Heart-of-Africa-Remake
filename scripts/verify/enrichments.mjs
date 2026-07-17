@@ -1607,6 +1607,31 @@ check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bather
 // Back to the game defaults (disabling the unlock clamps the zoom to 0.5).
 await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
 
+await page.evaluate(() => {
+  // Synthetic test family (point 135): the drama scenarios used to compete
+  // for the scarce pool of naturally spawned free families and staged into
+  // nothing (or into a family something else had relocated). An injected
+  // pair — built like the collision check's zebra, with the young/parent/
+  // child links the drama passes key on — is deterministic and
+  // pool-independent. Returns a disposer that removes the pair again.
+  window.__makeTestFamily = (x, z) => {
+    const herds = window.__wildlife.herdsRef.current
+    let liveChunk
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+      if (liveChunk) break
+    }
+    const parent = { x: x - 1.5, z, y: 0.2, rot: 0, scale: 1, phase: 0.31, chunk: liveChunk ?? 'fam-test' }
+    const calf = { x, z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, chunk: liveChunk ?? 'fam-test', young: true, parent }
+    parent.child = calf
+    herds.zebra.push(parent, calf)
+    const dispose = () => {
+      herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+    }
+    return { parent, calf, dispose }
+  }
+})
+
 // Return to the herd-dense plains for the predator-guard check below.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.evaluate(() => window.__wildlife.restock())
@@ -1619,13 +1644,13 @@ await page.waitForTimeout(1500)
 // Measuring the parent's distance to the fixed predator point is robust to the
 // calf's own motion (both animals move, so a relative offset would be noisy).
 const guard = await page.evaluate(async () => {
-  const herds = window.__wildlife.herdsRef.current
-  let parent = null, calf = null
-  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
-    for (const a of herds[sp] ?? []) if (a.child && !a.child.dead && !a.dead) { parent = a; calf = a.child; break }
-    if (parent) break
-  }
-  if (!parent) return { found: false }
+  // Synthetic family (point 135): a natural pair rides its herd's roam —
+  // the pair drifted off the fixed predator pin and the approach metric
+  // read the drift, not the guarding.
+  const p0 = window.__game.getState().pos
+  const fam = window.__makeTestFamily(p0.x + 6, p0.z - 5)
+  const parent = fam.parent
+  const calf = fam.calf
   const L = window.__lionHunt.state
   const lx = calf.x + 5, lz = calf.z
   // Start the parent on the far side of the calf: the guard standoff sits 2.2
@@ -1642,6 +1667,7 @@ const guard = await page.evaluate(async () => {
   while (Date.now() - t0 < 2800) { L.lx = lx; L.lz = lz; L.mode = 'chase'; await new Promise((r) => setTimeout(r, 60)) }
   const after = dist()
   L.mode = 'idle'; L.timer = 60
+  fam.dispose()
   return { found: true, before: +before.toFixed(2), after: +after.toFixed(2) }
 })
 check('a parent moves to guard its calf from a predator', guard.found && guard.after < guard.before - 0.05, JSON.stringify(guard))
@@ -2149,30 +2175,6 @@ check('the parent pulls the calf out and both return to the bank alive',
 // next family if the calf never enters the water state (the scripted lion may
 // be hunting exactly that calf, which blocks the fall-in), then follows that
 // one calf to its fate.
-await page.evaluate(() => {
-  // Synthetic test family (point 135): the drama scenarios used to compete
-  // for the scarce pool of naturally spawned free families and staged into
-  // nothing (or into a family something else had relocated). An injected
-  // pair — built like the collision check's zebra, with the young/parent/
-  // child links the drama passes key on — is deterministic and
-  // pool-independent. Returns a disposer that removes the pair again.
-  window.__makeTestFamily = (x, z) => {
-    const herds = window.__wildlife.herdsRef.current
-    let liveChunk
-    for (const sp of Object.keys(herds)) {
-      for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
-      if (liveChunk) break
-    }
-    const parent = { x: x - 1.5, z, y: 0.2, rot: 0, scale: 1, phase: 0.31, chunk: liveChunk ?? 'fam-test' }
-    const calf = { x, z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, chunk: liveChunk ?? 'fam-test', young: true, parent }
-    parent.child = calf
-    herds.zebra.push(parent, calf)
-    const dispose = () => {
-      herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
-    }
-    return { parent, calf, dispose }
-  }
-})
 const runDrownScenario = async () =>
   page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

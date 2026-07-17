@@ -3458,7 +3458,7 @@ the remaining open points in their numeric order.
   visible where the behaviour is specified rather than buried in a task list.
   No code. (Set 16.07.2026.)
 
-- [ ] 135. Two wildlife checks promise guaranteed outcomes from a stochastic
+- [x] 135. Two wildlife checks promise guaranteed outcomes from a stochastic
   sim, and fail intermittently — fix the guarantees, not the checks. Observed 16.07.2026: 'a settlement vicinity
   holds region-typical animals after leaving (point 102)' failed twice in three
   full enrichments runs with {region north, count 5, min 6} — a 2/3 rate is a
@@ -3555,6 +3555,19 @@ the remaining open points in their numeric order.
   never closed on its calf — read how that check stages and what the
   guard-station geometry expects) and the three-consecutive-green gate must
   then pass.
+  DONE (17.07.2026, 07:00): the guard-approach check was the last natural-
+  pool consumer — its pair rode the herd roam off the fixed predator pin, so
+  the approach metric read the drift; it stages on a synthetic family now.
+  THE GATE PASSED: three consecutive full enrichments runs exit 0 (plus
+  vitest 1669, lint and audit clean). Sum of the point: five guarantees now
+  hold IN THE GAME (vicinity margin-ring with pool rotation at the instance
+  cap; width-derived drinker catchment with the rains closing the belt; the
+  dry-shore minimum-drinkers seeder — throttled, bank-counted, tagged after
+  it once ballooned the herds past 450; the mud/drown dramas always resolve
+  on deterministic stages) and four checks measure what the game actually
+  promises (true-target trample metric, cleared collision corridor, settled
+  pixel poll, open-ground pixel spots — the Victoria Falls spot had spray
+  and the dry-season herd in its crop).
   MORE CASES of the same class (16./17.07.2026, observed across full runs):  MORE CASES of the same class (16./17.07.2026, observed across full runs):
   (c) the dry-season drinker count (point 120e — dryDrinkers vs wetDrinkers
   flipped to 2/0, 3/0 on two runs, green on others); (d) the trample-grief
