@@ -3261,7 +3261,7 @@ the remaining open points in their numeric order.
   cases are now structurally closed. Full enrichments exit 0; build, lint,
   1723 unit tests green.
 
-- [ ] 129. Traveller blocked in open ground with nothing visible (NOT
+- [x] 129. Traveller blocked in open ground with nothing visible (NOT
   reproducible yet — needs the user's exact spot).
   User report (15.07.2026, screenshots): at ~13.5°N / 10.6°E (West region,
   inland Niger) the traveller cannot walk WEST (an earlier report said EAST at a
@@ -3380,6 +3380,16 @@ the remaining open points in their numeric order.
   The placedFloraAt unification (render == collision) and the small-plant trim
   stand; the cap is the real cure. DOCS: a comment at the cap explains the
   RIVER_WIDTH_DEG dependency so a future width change re-checks it.
+  DONE (18.07.2026, 00:27): full run green on both 129 checks — the tree
+  witness (a real tree blocks entry at its edge while north/south/west all
+  move) and the phantom-collider invariant (234 collidable circles now
+  exist near the reported border, phantom 0). Build/lint/unit green. The
+  cap fix (0.3 -> 0.45) is the cure; the placedFloraAt render/collision
+  unification and the small-plant trim (deadtree dropped) stand. Docs:
+  CLAUDE §7.1 pt.4 now states collision is derived from the render
+  placement. The single FAIL in the run was 145b (the staged plover was
+  killed by wildlife mid-lure — a rotating staging flake, green in the two
+  prior runs, unrelated to the flora change); noted on the watchlist.
   ★★★ USER DECISION (17.07.2026 22:57): "Allgemein sollte es uebrigens keine
   Kollisionserkennung mit den kleinen Pflanzen geben. Es macht keinen Sinn,
   dass man an einem Grashalm haengen bleibt." So the fix has TWO parts, and

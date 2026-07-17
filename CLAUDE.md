@@ -282,7 +282,11 @@ verify suite that proves it.
    markup, flag in the checkpoint), possession-based item effects incl.
    the canoe ride/drag depiction (§6.1/§7), and the bird's-eye collision
    with trees and animals (§11/§19 — a fast step is caught at the near
-   edge with no tunnelling; small dressing and carcasses stay passable).
+   edge with no tunnelling; small dressing and carcasses stay passable —
+   only the large solid dressing collides, and its collider is DERIVED
+   from the same `placedFloraAt` placement the renderer draws, so an
+   unrendered/suppressed plant can never leave a phantom collider,
+   point 129).
    Verifiable: an automated move on enclosed sea advances the position; a
    move on open ocean is refused with the blocking notice; a move onto a
    mountain without a rope advances (with the warning) while the rope
