@@ -3326,7 +3326,7 @@ the remaining open points in their numeric order.
   observe the next runs, suspect the point-127 guard-speed unification if
   it recurs.
 
-- [ ] 130. Crocodiles: the ambush from the water.
+- [x] 130. Crocodiles: the ambush from the water.
   Wanted (user, 15.07.2026): crocodiles in the regions that suit them, lying
   HIDDEN at first and then bursting out of the water to take prey — with the
   same parent sacrifice/grief scenarios as the other predators, including the
@@ -3401,10 +3401,30 @@ the remaining open points in their numeric order.
   parent under; too-late takes both; LION_STATE never touched), and player
   contact routes predatorContact('crocodile') -> the §14.2 event. Docs
   done: design.md §19.16 + §19.5/§19.8 pointers, CLAUDE.md pt. 12.
-  REMAINING: the live checks in enrichments.mjs (hidden->lunge->catch at a
-  staged drinker, rescue/sacrifice/too-late against the croc, lion-hunt
-  independence, screenshots 129/130 hidden+lunging) and a full-suite green
-  run.
+  DONE (17.07.2026, 19:22): live checks green in a FULL enrichments run
+  (exit 0) — natural spawn at the Zambezi with every crocodile ON a water
+  cell; the staged drama passes all five gates (visible no-teleport lunge,
+  grip through the shared window, drive-off with everyone alive + the croc
+  slinking back, the sacrifice taking the parent under while the calf
+  escapes, too-late taking both) with the scripted lion hunt untouched in
+  every scenario; screenshots 129/130. The check debugging bagged FIVE
+  staging lessons, all recorded in the check comments: (1) the drama stage
+  must be CHUNK-LESS (a zoom restore shrank the ring, despawned the tagged
+  chunk and silently filtered croc+calf out — the rotating
+  crocLunge:false); (2) the calf waits ALONE and the parent joins only at
+  the grip (the young-follow drive dragged a pre-linked calf off its bank
+  stand); (3) the parent parks on the LAND side of the bank vector (parked
+  across the channel the water sweep relocated it mid-charge); (4)
+  too-late needs TIMING not distance (reposition at <0.25 s window rest);
+  (5) rescue retries with per-attempt phase variation (the deterministic
+  roll can land in the 5% band above the 0.95 cap forever at one spot).
+  Also from these runs: the no-standing-in-water check exempts the
+  crocodile, and the 120e count uses the seeder's own drink||shoreSeed
+  semantics (green 4/4 twice) — plus 120e measurement isolation, since the
+  new ambushers REALLY eat the counted drinkers. Two single-run reds to
+  watch (first occurrence, next runs decide): the trample check found no
+  prey herd nearby once, and the stain-normal check saw no stains in the
+  same run.
 
 - [x] 131. Name the peoples correctly, and de-anachronise their vignettes.
   (Done 16.07.2026 for every people that stays put — display names, internal ids,

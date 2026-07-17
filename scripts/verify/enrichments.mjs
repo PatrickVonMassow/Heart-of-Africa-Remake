@@ -3018,6 +3018,205 @@ check(
   JSON.stringify(mourn),
 )
 await page.screenshot({ path: `${OUT}128-elephant-mourning.png` })
+
+// --- Point 130: the crocodile ambush ------------------------------------------
+// (1) Natural placement: after a restock at a water-rich reach, crocodiles
+// exist and every one lies ON a water cell (the pure water-only rule,
+// witnessed live). (2) The drama, staged deterministically on a SYNTHETIC
+// crocodile + family: hidden -> visible lunge -> grip through the shared
+// caught window, then all three endings (drive-off frees the calf, sacrifice
+// takes the parent under, too-late takes both), with the scripted lion hunt
+// untouched throughout. Screenshots 129 (hidden) / 130 (lunge).
+await page.evaluate(() => {
+  window.__game.getState().debugJumpTo(-17.9, 25.9) // the Zambezi reach
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(2)
+  window.__wildlife.restock()
+})
+await page.waitForTimeout(2500)
+await page
+  .waitForFunction(() => (window.__wildlife.herdsRef.current?.crocodile ?? []).some((c) => !c.dead), null, { timeout: 30000 })
+  .catch(() => {})
+const crocSpawn = await page.evaluate(() => {
+  const seed = window.__game.getState().seed
+  const U = 10
+  const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead)
+  return {
+    count: list.length,
+    allOnWater: list.every((c) => window.__terrainType(-c.z / U, c.x / U, seed) === 'water'),
+  }
+})
+check(
+  'crocodiles spawn in a water-rich reach and every one lies ON a water cell (point 130)',
+  crocSpawn.count > 0 && crocSpawn.allOnWater,
+  JSON.stringify(crocSpawn),
+)
+await page.evaluate(() => {
+  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
+})
+await page.screenshot({ path: `${OUT}129-crocodile-hidden.png` })
+
+// The staged drama: one scenario run per ending. A synthetic crocodile on the
+// nearest water cell, a synthetic family whose calf drinks at its bank spot
+// with the cycle phase forced into the standing-at-the-bank window.
+const crocDrama = async (mode, attempt = 0) =>
+  page.evaluate(async (MODE) => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+    const herds = window.__wildlife.herdsRef.current
+    const seed = window.__game.getState().seed
+    const U = 10
+    const p0 = window.__game.getState().pos
+    // A water cell with a LAND neighbour: the crocodile lies in the water,
+    // the drinker stands on the true bank beside it (a spot mid-channel got
+    // relocated by the no-standing-in-water sweep and the staging starved).
+    let water = null
+    let bank = null
+    outer: for (let r = 4; r <= 40 && !water; r += 3) {
+      for (let k = 0; k < 16; k++) {
+        const ang = (k / 16) * Math.PI * 2
+        const x = p0.x + Math.cos(ang) * r
+        const z = p0.z + Math.sin(ang) * r
+        if (window.__terrainType(-z / U, x / U, seed) !== 'water') continue
+        for (let n = 0; n < 8; n++) {
+          const na = (n / 8) * Math.PI * 2
+          const nx = x + Math.cos(na) * 1.8
+          const nz = z + Math.sin(na) * 1.8
+          const nt = window.__terrainType(-nz / U, nx / U, seed)
+          if (nt !== 'water' && nt !== 'ocean') { water = { x, z }; bank = { x: nx, z: nz }; break outer }
+        }
+      }
+    }
+    if (!water || !bank) return { staged: false, noWater: true }
+    // Isolate: the natural crocodiles stand down for the staged scenario.
+    const naturals = herds.crocodile.splice(0)
+    // Chunk-LESS staging (the point-126 lesson): the despawn filter keeps
+    // chunk-less animals, so no zoom restore or ring change can silently
+    // filter the stage out mid-scenario (the rotating crocLunge:false runs
+    // were exactly that — a despawned liveChunk took croc and calf with it).
+    const croc = { x: water.x, z: water.z, y: 0.1, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
+    herds.crocodile.push(croc)
+    const bankX = bank.x
+    const bankZ = bank.z
+    // The calf stands at the bank ALONE first — a pre-linked parent parked
+    // far out dragged it off the stand via the young-follow drive (the
+    // rotating gripped:false runs). The parent joins right after the grip.
+    // The parent's phase varies per attempt: the deterministic defence roll
+    // hashes phase and position, so a spot landing in the 5% band above the
+    // 0.95 cap reads 'taken' forever — the retry shifts the roll.
+    const parent = { x: p0.x - 200, z: p0.z, y: 0.2, rot: 0, scale: 1, phase: 0.4 + (MODE.attempt ?? 0) * 0.13, chunk: undefined }
+    const calf = { x: bankX, z: bankZ, y: 0.2, rot: 0, scale: 0.5, phase: 0, chunk: undefined, young: true }
+    calf.drink = { tx: bankX, tz: bankZ }
+    herds.zebra.push(calf)
+    const pf = window.__balance.parentDefense.predatorFlight
+    const prevPf = pf.crocodile
+    if (MODE.kind === 'rescue') pf.crocodile = 100 // force the drive-off band
+    if (MODE.kind === 'sacrifice' || MODE.kind === 'toolate') pf.crocodile = 0 // force taken
+    const lion = window.__lionHunt.state
+    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false }
+    // Sweep the drink phase so the bank window comes around quickly, watching
+    // the croc for motion and teleports until it grips.
+    let lastX = croc.x
+    let lastZ = croc.z
+    let lastT = Date.now()
+    const t0 = Date.now()
+    while (Date.now() - t0 < 30000) {
+      // Retune the phase every poll: the standing window is 30% of the cycle,
+      // so a fine sweep lands inside it within a couple of seconds. Refresh
+      // the stand itself too — nothing may shed the drink target pre-grip.
+      calf.phase = (calf.phase + 0.1) % 75
+      if (!calf.drink) calf.drink = { tx: bankX, tz: bankZ }
+      if (calf.caught === undefined && Math.hypot(calf.x - bankX, calf.z - bankZ) > 3) { calf.x = bankX; calf.z = bankZ }
+      const step = Math.hypot(croc.x - lastX, croc.z - lastZ)
+      const dtw = (Date.now() - lastT) / 1000
+      if (step > Math.max(2, 20 * dtw)) out.noTeleport = false
+      if (step > 0.05) out.lunged = true
+      lastX = croc.x; lastZ = croc.z; lastT = Date.now()
+      if (calf.caught !== undefined && calf.caughtBy === 'crocodile') {
+        out.gripped = true
+        // Now the parent enters the drama: linked and pushed only here, so
+        // the pre-grip stand was never disturbed by the follow drive.
+        parent.child = calf
+        calf.parent = parent
+        herds.zebra.push(parent)
+        break
+      }
+      await sleep(60)
+    }
+    if (!out.gripped) out.diag = { drink: !!calf.drink, dist: +Math.hypot(calf.x - bankX, calf.z - bankZ).toFixed(1), crocLunge: croc.lunge !== undefined }
+    if (out.gripped && MODE.kind !== 'lunge') {
+      // Park on the LAND side of the bank (the unit vector water -> bank):
+      // a parent parked across the channel got relocated by the water sweep
+      // mid-charge and arrived too late in every scenario.
+      const lx = bank.x - water.x
+      const lz = bank.z - water.z
+      const ll2 = Math.hypot(lx, lz) || 1
+      if (MODE.kind === 'toolate') {
+        // Too-late needs TIMING, not distance (the lion staging's lesson):
+        // wait until the struggle window is nearly spent, then stand the
+        // parent just inside the too-late ring (3.2) but too far to cover
+        // the sacrifice reach (1.3) in the time left.
+        const tw = Date.now()
+        while (Date.now() - tw < 8000 && calf.caught !== undefined && calf.caught > 0.25) await sleep(30)
+        parent.x = calf.x + (lx / ll2) * 3.1
+        parent.z = calf.z + (lz / ll2) * 3.1
+      } else {
+        parent.x = calf.x + (lx / ll2) * 15
+        parent.z = calf.z + (lz / ll2) * 15
+      }
+      const t1 = Date.now()
+      while (Date.now() - t1 < 25000) {
+        if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead) break
+        if (MODE.kind === 'sacrifice' && parent.dead) break
+        if (MODE.kind === 'toolate' && calf.dead) break
+        await sleep(100)
+      }
+      await sleep(600)
+    } else if (out.gripped) {
+      // No parent interferes: the window expires and the kill sinks.
+      const t1 = Date.now()
+      while (Date.now() - t1 < 12000 && !calf.dead) await sleep(150)
+    }
+    out.calfAlive = !calf.dead
+    out.parentAlive = !parent.dead
+    out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
+    out.lionTouched = lion.victim === calf || lion.victim === parent
+    pf.crocodile = prevPf
+    herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+    herds.crocodile = naturals // the staged croc retires, the naturals return
+    out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
+    return out
+  }, { kind: mode, attempt })
+
+const crocLunge = await crocDrama('lunge')
+await page.screenshot({ path: `${OUT}130-crocodile-lunge.png` })
+check(
+  'the hidden crocodile lunges visibly (no teleport) and grips the bank drinker (point 130)',
+  crocLunge.staged && crocLunge.lunged && crocLunge.noTeleport && crocLunge.gripped && !crocLunge.calfAlive && !crocLunge.lionTouched,
+  JSON.stringify(crocLunge),
+)
+let crocRescue = null
+for (let attempt = 0; attempt < 3; attempt++) {
+  crocRescue = await crocDrama('rescue', attempt)
+  if (crocRescue.staged && crocRescue.gripped && crocRescue.calfAlive && crocRescue.parentAlive) break
+}
+check(
+  'a charging parent drives the crocodile off — the calf rises, everyone lives (point 130)',
+  crocRescue.staged && crocRescue.gripped && crocRescue.calfAlive && crocRescue.parentAlive && crocRescue.crocRetreated && !crocRescue.lionTouched,
+  JSON.stringify(crocRescue),
+)
+const crocSac = await crocDrama('sacrifice')
+check(
+  'the sacrifice at the waterline: the crocodile takes the parent, the calf escapes (point 130)',
+  crocSac.staged && crocSac.gripped && !crocSac.parentAlive && crocSac.calfAlive && !crocSac.lionTouched,
+  JSON.stringify(crocSac),
+)
+const crocLate = await crocDrama('toolate')
+check(
+  'too late at the bank: the crocodile takes calf and parent both (point 130)',
+  crocLate.staged && crocLate.gripped && !crocLate.calfAlive && !crocLate.parentAlive && !crocLate.lionTouched,
+  JSON.stringify(crocLate),
+)
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
@@ -3079,7 +3278,9 @@ const inWater = await page.evaluate(async () => {
     let bad = 0
     let seen = 0
     for (const sp of Object.keys(herds)) {
-      if (sp === 'flamingo') continue
+      // Flamingos wade and the crocodile LIVES in the water (design.md
+      // (SS)19.16) - both exempt by design.
+      if (sp === 'flamingo' || sp === 'crocodile') continue
       for (const a of herds[sp]) {
         if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo) continue
         if (a.child && !a.child.dead && a.child.inWater !== undefined) continue
@@ -4016,6 +4217,10 @@ const drinkersAt = async (override, waitFor = 0) => {
   await page.evaluate(() => window.__game.getState().debugJumpTo(-17.9, 25.9)) // the Zambezi
   await page.waitForTimeout(600)
   await page.evaluate(() => window.__wildlife.restock())
+  // Measurement isolation (point 130): a natural crocodile at this reach can
+  // seize the very drinkers this check counts — the gathering guarantee is
+  // what is measured here, so the ambushers stand down.
+  await page.evaluate(() => { window.__wildlife.herdsRef.current.crocodile.length = 0 })
   // Condition-polled: the shore seeder tops the bank up on a 2-second clock
   // and a seeded animal receives its drink target on the NEXT assignment
   // pass — a fixed 2.5 s window read the count one upkeep too early
@@ -4025,7 +4230,10 @@ const drinkersAt = async (override, waitFor = 0) => {
       const h = window.__wildlife.herdsRef.current
       let drink = 0
       for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']) {
-        for (const a of h[sp] ?? []) if (a.drink) drink++
+        // Count like the seeder does (point 135): a drink walk OR the shore
+        // seed tag — a seeded animal that shed its target still stands at
+        // the gathered shore, and the seeder rightly stays satisfied.
+        for (const a of h[sp] ?? []) if (!a.dead && (a.drink || a.shoreSeed)) drink++
       }
       return drink
     })
