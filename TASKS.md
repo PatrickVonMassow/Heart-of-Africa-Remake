@@ -4548,6 +4548,21 @@ the remaining open points in their numeric order.
   Do NOT delete superseded findings — add forward-pointers (the 148 rule).
   NOT IN SCOPE: the real Closing still runs at the very end over everything; this
   is the second interim pass. (Filed 16.07.2026.)
+  WIP (17.07.2026, 08:08): STEP 1 (full regression, npm test) ran — build/
+  lint(after an unused-var fix)/1669 vitest/15 of 18 browser suites green;
+  the three suite fails were triaged: collision's four ejection fails are
+  LOAD flakes of the parallel full run (standalone rerun: 19/19 green —
+  frame-budget class, note for a future 135-style point if it recurs), the
+  single trample-119 fail (charged:false once) is the same rare class, lint
+  was the unused variable. SWEEP commits so far: (A) stale scale-width
+  comments in landmarks.ts refreshed + lint fix (84698fd); (B) the shared
+  drama-death helper takeAnimal extracted over the eight §19.8 kill sites
+  (188357b, subagent-verified: build/lint/1669 green). STILL OPEN: (C) the
+  design.md §19.8/§19.13 growth pass (tighten rambling, forward-pointers not
+  deletions, section numbers preserved); (D) peoples-1890 §2-vs-§7 pointers
+  were checked OK (§8 is additive); then STEP 3 full regression again, and
+  STEP 4 the .md cruft pass — note 158/159 landed mid-Closing and 160 (the
+  design.md relocation) deliberately runs AFTER this point.
 
 - [x] 151. Seasonal flora is anchored to the PLACE, zone borders blend, and
   growth sprouts from the ground (user bug, 16.07.2026, two screenshots).
