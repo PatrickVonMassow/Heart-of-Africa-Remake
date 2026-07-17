@@ -3629,6 +3629,22 @@ the remaining open points in their numeric order.
   DOCS: design.md §16 + the new §19 seasons subsection. One atomic commit — or
   split state/vignettes/carcasses if it grows. (Decided 15.07.2026; the refusal
   reversed 16.07.2026 after actually checking it.)
+  WIP (17.07.2026, 19:34 — split per the spec; STAGE 1 of 3 done): the pure
+  date->phase model lives in src/systems/rinderpest.ts (rinderpestPhase:
+  maasai preDamaged 1890 / struck 1891-92 / aftermath 1893+; sidama struck
+  through 1892 [Kifu Qen] then aftermath; nubians aftermath all window
+  [Sanat Sitta]; zulu/pedi/san clean until the boundary-exact March 1896
+  Zambezi crossing; somali/tuareg NEVER [camels immune, FAO]; bemba/others
+  clean) with 7 pure tests green and a __rinderpest dev hook (registers
+  once the module is imported — stage 2 wires it). REMAINING: stage 2 =
+  phase-aware vignettes for maasai/sidama/nubians (both languages, voice
+  markup, Baumann's verbatim German from peoples-1890.md §5 for the struck
+  text — never back-translate; accuracy guards (d)/(e): no camel-people
+  herd loss, Bemba game depletion only, no dress-change link), store wiring
+  (first-visit vignette picks by phase), villages.test extension, design.md
+  §16 + §19.13 subsection + §19.15 record rows; stage 3 = optional carrion
+  in struck Maasailand (dead wildebeest/buffalo-class dressing via the
+  existing carcass/vulture systems) + live check via the dev hook.
 
 - [ ] 134. The one deliberate inaccuracy: grief unto death stays.
   Standing exception to the accuracy principle, set by the user (16.07.2026):
