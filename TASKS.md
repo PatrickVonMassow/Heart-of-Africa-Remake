@@ -5265,3 +5265,29 @@ the remaining open points in their numeric order.
   no-kill-no-remnant rule — sharpen its wording to name the drive-off exit
   once fixed. (Reported 17.07.2026; queued at the batch end per the
   standing append-and-defer rule.)
+
+- [ ] 163. The opened map covers the inventory bar's SECOND row.
+  User report (17.07.2026, screenshot, deployed build): with enough items to
+  wrap the inventory bar into a second row (the F3 full loadout shows it —
+  treasures wrap), the opened map overlay covers the wrapped row(s): "Die
+  Karte muss in diesem Fall nach oben ruecken."
+  The §7.1 pt. 3 acceptance already promises "the opened map sits
+  bottom-left clear of the inventory bar" — the guarantee holds for one row
+  and breaks on wrap, so this is a regression against existing acceptance,
+  not a new feature.
+  FIX: anchor the map overlay's bottom edge to the TOP of the inventory bar
+  whatever its height — measure the bar (ResizeObserver on `.inventory-bar`
+  or read its offsetHeight when the overlay opens/resizes) and set the
+  overlay's `bottom` to bar height + the existing gap; a pure-CSS anchor
+  (both in one flex column, or `bottom: calc(...)` fed by a CSS variable the
+  bar sets) is also fine — whichever matches the existing HUD structure in
+  `src/ui/MapOverlay.tsx` / `src/ui/Hud.tsx`. The same rule must hold for
+  the town-plan variant inside settlements.
+  TESTS: extend the existing live non-overlap check in
+  `scripts/verify/enrichments.mjs` (the map placement block): press F3 so
+  the bar wraps to two rows, open the map, and assert the map's bounding
+  box does not intersect the inventory bar's box (both variants if cheap);
+  `src/ui/MapOverlay.test.tsx` gets the structural half if the fix
+  introduces one (e.g. the CSS variable/prop present). DOCS: none — §7.1
+  pt. 3's wording already states the guarantee. (Reported 17.07.2026;
+  queued at the batch end per the standing append-and-defer rule.)
