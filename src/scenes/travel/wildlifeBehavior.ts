@@ -333,6 +333,17 @@ export function killFlockMayDescend(
 }
 
 /**
+ * The vigil at a calf's carcass (design.md §19.8, point 121): while a LIVE
+ * vigil-keeper stands within this radius of a carcass, no vulture may LAND on
+ * it — the kill flock keeps circling and the ground scavenger does not commit
+ * to that carcass. Callers pass only LIVE keepers' distances (a dead keeper
+ * guards nothing); with no live keeper they pass Infinity, which never blocks.
+ */
+export function vigilBlocksLanding(keeperDistToCarcass: number, radius = 4): boolean {
+  return keeperDistToCarcass < radius
+}
+
+/**
  * One step of a scripted walk under the land constraint (design.md §19.5,
  * point 83): the predator's walk-off must never enter the open ocean — like
  * every streamed animal, it deflects along the coast instead. Tries the

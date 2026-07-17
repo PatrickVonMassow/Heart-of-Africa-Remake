@@ -20,6 +20,7 @@ import {
   turnToward,
   type FlightState,
   killFlockMayDescend,
+  vigilBlocksLanding,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
 } from './wildlifeBehavior'
@@ -550,6 +551,31 @@ describe('killFlockMayDescend (design.md §19.6 — land once the site is clear)
 
   it('a gone predator frees the site immediately', () => {
     expect(killFlockMayDescend('idle', 0, 0, 0, 0)).toBe(true)
+  })
+})
+
+describe('vigilBlocksLanding (design.md §19.8, point 121 — the keeper drives the vultures off)', () => {
+  it('blocks a landing while the live keeper stands inside the radius', () => {
+    expect(vigilBlocksLanding(0)).toBe(true) // standing right on the carcass
+    expect(vigilBlocksLanding(3.999)).toBe(true) // just inside the default radius
+  })
+
+  it('is boundary-exact: exactly at the radius the landing is free', () => {
+    expect(vigilBlocksLanding(4)).toBe(false)
+    expect(vigilBlocksLanding(4.001)).toBe(false)
+    expect(vigilBlocksLanding(100)).toBe(false)
+  })
+
+  it('honors a custom radius', () => {
+    expect(vigilBlocksLanding(5, 6)).toBe(true)
+    expect(vigilBlocksLanding(6, 6)).toBe(false)
+    expect(vigilBlocksLanding(1, 0.5)).toBe(false)
+  })
+
+  it('a dead keeper never blocks: callers filter dead keepers and pass Infinity with none alive', () => {
+    // The contract (documented on the helper): only LIVE keepers' distances are
+    // passed in; with no live keeper the caller passes Infinity — never a block.
+    expect(vigilBlocksLanding(Infinity)).toBe(false)
   })
 })
 

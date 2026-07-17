@@ -236,6 +236,11 @@ export interface BalanceConfig {
     /** Seconds a mired calf struggles before the mud releases it (no predator came). */
     mireSeconds: number
   }
+  /** The vigil at a calf's carcass (design.md §19.8, point 121). */
+  vigil: {
+    /** Seconds the bereaved parent holds the vigil before rejoining the herd. */
+    seconds: number
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -422,6 +427,9 @@ export const balance: BalanceConfig = {
     mireChancePerBout: 0.35, // per bout ENDING at a dry lake bank — the bank visits are already rare
     mireDrynessThreshold: 0.25, // wetness below this turns the shrinking bank to mud
     mireSeconds: 45, // the mud releases an unfound calf — the drama always resolves
+  },
+  vigil: {
+    seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

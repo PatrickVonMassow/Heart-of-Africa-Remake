@@ -46,6 +46,7 @@ import {
   mireRoll,
   vicinitySeedBounds,
   seasonFlowFactor,
+  vigilBlocksLanding,
   waterStruggleFate,
 } from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
@@ -167,6 +168,14 @@ interface Animal {
    *  it clears at 0 (or when no elephant is left) so a parent can never be
    *  stuck chasing a target that cannot trample it. */
   grief?: number
+  /** The vigil at a calf's carcass (design.md §19.8, point 121): set when a
+   *  predator finished the calf and this parent was alive but too far away to
+   *  charge. It walks to the kill site, stands over the carcass, keeps the
+   *  vultures off, and NEVER flees (a deliberate user decision) — a predator
+   *  that reaches it takes it through the existing hunt path. time accumulates
+   *  until balance.vigil.seconds or until the carcass is gone; then the field
+   *  clears and the parent simply rejoins the herd. */
+  vigil?: { x: number; z: number; carcass: Animal; time: number }
   /** Current playful-hop height (0..1) while a calf gambols (design.md §19);
    *  kept as state so the verification can observe the play. */
   hop?: number
@@ -348,6 +357,8 @@ const CALF_POUNCE_RADIUS = 3
 const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator eating its calf faster than it guards
 const PARENT_SACRIFICE_DIST = 1.3 // parent reaches the predator → sacrifices itself
 const PARENT_TOO_LATE_DIST = 3.2 // parent only this close when the window ends → both eaten
+/** The vigil (point 121): the bereaved parent holds this close to the carcass. */
+const VIGIL_HOLD_DIST = 1.5
 /** The blocking station sits this far from the hunted calf toward the hunter —
  *  beyond the catch reach (CALF_CATCH_DIST), so a closing hunter meets the
  *  shield first. The shield sprints a notch faster than the calf's flee so it
@@ -358,6 +369,21 @@ const PARENT_BLOCK_SPEED = 6
 const PARENT_TAKE_DIST = 1.0
 /** Species whose calves a predator hunt can target (design.md §19). */
 const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog'] as const
+
+/** Distance from the nearest LIVE vigil-keeper to the given carcass point, or
+ *  Infinity with none (point 121) — a dead keeper guards nothing. Feeds
+ *  vigilBlocksLanding for both vulture landing gates (kill flock, scavenger). */
+function nearestVigilKeeperDist(herds: Record<Species, Animal[]>, x: number, z: number): number {
+  let best = Infinity
+  for (const sp of CALF_HUNT_SPECIES) {
+    for (const a of herds[sp]) {
+      if (a.dead || a.vigil === undefined) continue
+      const d = Math.hypot(a.x - x, a.z - z)
+      if (d < best) best = d
+    }
+  }
+  return best
+}
 /** Calf play and water accidents (design.md §19): calves gambol on a per-calf
  *  cycle; a calf that ends up on open water struggles there, its parent wades
  *  in and pulls it back to land, and near a waterfall the current takes any of
@@ -1114,6 +1140,13 @@ function Herds() {
             if (par && !par.dead && Math.hypot(par.x - a.x, par.z - a.z) < PARENT_TOO_LATE_DIST) {
               takeAnimal(par, { stain: true })
               par.child = undefined
+            } else if (par && !par.dead) {
+              // The vigil (design.md §19.8, point 121): a parent that stayed
+              // clear of the kill does not resume grazing — it walks to the
+              // carcass and stands over it (behaviour in the vigil pre-pass).
+              par.vigil = { x: a.x, z: a.z, carcass: a, time: 0 }
+              par.child = undefined
+              a.parent = undefined
             }
           }
         } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
@@ -1385,6 +1418,32 @@ function Herds() {
       }
     }
 
+    // The vigil (design.md §19.8, point 121), over the FULL lists like the
+    // dramas above: the bereaved parent walks to its calf's carcass and holds
+    // there. It ALWAYS resolves (the point-118 lesson): once the carcass is
+    // gone/dissolved or the window runs out, the field clears and the parent
+    // simply resumes normal behaviour — never a drive with no exit.
+    for (const sp of CALF_HUNT_SPECIES) {
+      for (const a of herds[sp]) {
+        if (a.dead || a.vigil === undefined) continue
+        const v = a.vigil
+        v.time += dt
+        const carcassGone =
+          v.carcass.gone === true || (v.carcass.dissolve !== undefined && v.carcass.dissolve <= 0)
+        if (v.time > balance.vigil.seconds || carcassGone) {
+          a.vigil = undefined
+          continue
+        }
+        const dx = v.x - a.x
+        const dz = v.z - a.z
+        const d = Math.hypot(dx, dz)
+        if (d > VIGIL_HOLD_DIST) {
+          a.x += (dx / d) * YOUNG_FOLLOW_SPEED * dt
+          a.z += (dz / d) * YOUNG_FOLLOW_SPEED * dt
+        }
+      }
+    }
+
     // Animal-animal collision (design.md §19): live animals never stand in or
     // walk through one another — each frame every overlapping pair parts, each
     // member resolving its own half of the overlap (a spatial grid keeps the
@@ -1400,6 +1459,7 @@ function Herds() {
         b.rescued !== undefined ||
         b.plungeTo !== undefined ||
         b.trampleTo !== undefined ||
+        b.vigil !== undefined ||
         (b.child !== undefined && !b.child.dead && (b.child.caught !== undefined || b.child.mired !== undefined)) ||
         // The active chase victim and its blocking parent sprint on exact
         // lines; herd-mates shoving them every frame trembled the hunt.
@@ -1477,7 +1537,8 @@ function Herds() {
           // own movement; everyone else must never STAND in water — not in
           // the open sea, and not in a river or lake either (an animal only
           // reaches the water's edge to drink, design.md §19).
-          if (a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo || a.trampleTo) continue
+          if (a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo || a.trampleTo || a.vigil)
+            continue
           if (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined)) continue
           const ll = worldToLatLon(a.x, a.z)
           const ter = sampleTerrain(ll.lat, ll.lon, seed).type
@@ -1606,7 +1667,15 @@ function Herds() {
     {
       const sc = scavenger.current
       const targetValid = (a: Animal | null): a is Animal =>
-        !!a && !!a.dead && !a.lionFed && !a.remnant && !a.gone && (a.dissolve === undefined || a.dissolve > 0)
+        !!a &&
+        !!a.dead &&
+        !a.lionFed &&
+        !a.remnant &&
+        !a.gone &&
+        (a.dissolve === undefined || a.dissolve > 0) &&
+        // The vigil (point 121): a live keeper standing over the carcass keeps
+        // the bird off — an in-flight scavenger releases it and turns away.
+        !vigilBlocksLanding(nearestVigilKeeperDist(herds, a.x, a.z))
       if (!targetValid(sc.target)) {
         sc.target = null
         let bestD = Infinity
@@ -1615,6 +1684,8 @@ function Herds() {
             if (!a.dead || a.lionFed) continue // the on-scene predator eats its own kill
             if (a.remnant) continue // hunt scraps belong to the circling kill flock
             if (a.dissolve !== undefined && a.dissolve <= 0) continue
+            // The vigil (point 121): never commit to a guarded carcass.
+            if (vigilBlocksLanding(nearestVigilKeeperDist(herds, a.x, a.z))) continue
             const d = Math.hypot(a.x - pos.x, a.z - pos.z)
             if (d < bestD) {
               bestD = d
@@ -1814,6 +1885,18 @@ function Herds() {
             pz = a.z
             yaw = Math.atan2(a.trampleTo.x - a.x, a.trampleTo.z - a.z)
             pitch = 0
+            familyHeld = true
+          } else if (a.vigil) {
+            // The vigil (point 121): stand over the fallen calf, facing it
+            // (movement in the pre-pass). familyHeld is load-bearing and the
+            // no-flight is a DELIBERATE user decision (design.md §19.8): the
+            // keeper never flees the predator the carcass draws and never
+            // dodges an elephant — one that reaches it takes it through the
+            // existing hunt path, a sacrifice at the spot where its young fell.
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(a.vigil.x - a.x, a.vigil.z - a.z)
+            pitch = -0.15 // head lowered over the carcass
             familyHeld = true
           } else if (a.young && a.mired !== undefined) {
             // Mired at the drying waterhole (point 123): it struggles in
@@ -2633,7 +2716,10 @@ function Vultures() {
       // stays at the kill site and would keep the distance at zero forever.
       const toRemnant =
         remnant !== null &&
-        killFlockMayDescend(LION_STATE.mode, LION_STATE.lx, LION_STATE.lz, remnant.x, remnant.z)
+        killFlockMayDescend(LION_STATE.mode, LION_STATE.lx, LION_STATE.lz, remnant.x, remnant.z) &&
+        // The vigil (point 121): while a live keeper stands over the kill site
+        // the flock does NOT land — it keeps circling until the vigil ends.
+        !(ACTIVE_HERDS !== null && vigilBlocksLanding(nearestVigilKeeperDist(ACTIVE_HERDS, remnant.x, remnant.z)))
       const f = killFlight.current
       flightStep(
         f,
