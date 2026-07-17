@@ -2713,7 +2713,7 @@ the remaining open points in their numeric order.
   SIZE: this is large — split into several atomic commits along (a2)…(g) rather
   than one, each with its own tests/docs. (Reported 15.07.2026.)
 
-- [ ] 121. Family drama: the vigil at the calf's carcass. The parent that did
+- [x] 121. Family drama: the vigil at the calf's carcass. The parent that did
   not reach the predator in time today simply resumes grazing beside its eaten
   calf. Wanted (user, 15.07.2026): it stays at the carcass, drives the vultures
   off, and — left alone by its herd — is taken there by a later predator: both
@@ -2808,6 +2808,29 @@ the remaining open points in their numeric order.
   testable without it, and splitting keeps the draw's architecture question
   (LION_STATE) from blocking the rest. (Reported 15.07.2026; (f) added
   16.07.2026.)
+  DONE (17.07.2026, 10:27, two commits as the spec allowed): (a)-(e) in
+  e203097 — vigil state set in the caught-resolution when the parent is
+  alive and outside PARENT_TOO_LATE_DIST; walks to the carcass, holds
+  facing it (familyHeld; full drama exemption set); vigilBlocksLanding
+  (pure, boundary-exact) gates BOTH the kill-flock descend and the ground
+  scavenger; never flees (the user's recorded decision); resolves on
+  balance.vigil.seconds (60) or a gone carcass. (f) in 4ef4fc9 — the
+  carcass DRAWS a region-appropriate predator once vigil.time >=
+  balance.vigil.predatorDelay (12, debug-editable, both languages): claimed
+  ONLY from the idle hunt window (121 owns the LION_STATE-claim rule; a
+  running hunt is never clobbered, the idle cooldown is preempted), spawns
+  beyond the zoom-aware view ring (vigilDrawSpawn pure-tested) and takes
+  the keeper through the EXISTING victim catch (already adult-capable;
+  only the thrash pose was young-gated). Two integration finds: the vigil
+  hands over from the eaten carcass to the kill REMNANT (else it ended
+  ~9 s after the kill, before any draw), and the catch clears the vigil so
+  the thrash pose and the flock take over. Live (full suite exit 0): the
+  parent closes to <=2.2 and holds, the carcass survives under the keeper,
+  the drawn predator arrives from 57 units out and takes the standing
+  parent WITHOUT pinning, and with the draw disabled the vigil expires
+  with the parent alive. Staging lesson: the shield/charge/catch race is a
+  photo finish — the check parks the parent at 200 during the chase and
+  repositions to 40 after the catch. Vitest 1683, lint/audit clean.
 
 - [x] 122. Family drama: the swollen river of the rains, and drowning.
   DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the wet
