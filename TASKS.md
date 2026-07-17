@@ -5489,3 +5489,61 @@ the remaining open points in their numeric order.
   amount changes MONOTONICALLY over several steps rather than in one jump.
   DOCS: design.md §19.13. (Reported 17.07.2026; queued at the batch end per
   the standing append-and-defer rule.)
+
+- [ ] 168. Rinderpest carrion not visible at the Maasai village in a struck year.
+  User report (17.07.2026 23:xx, deployed build auto-deploys from main, so the
+  feature IS live): at 15.01.1892 (a STRUCK year), season strength 1, standing
+  at 2.8S/36.7E by the Maasai village, NO carcasses at standard zoom nor fully
+  zoomed in. The point-133 live check PASSES (carrionStruck 9 at 1891), so the
+  spawn logic works — the discrepancy is in-game visibility. SUSPECTS, verify
+  in order:
+  (a) DATE-JUMP DOES NOT RE-STREAM: carrion is decided at chunk-stream time in
+      spawnChunk(day). A player standing at the village who jumps the year to
+      1892 does NOT re-stream the already-spawned chunks, so they keep their
+      pre-jump (living-herd) content. Only NEWLY streamed chunks carry carrion.
+      This is the most likely cause and the user's exact flow. FIX: when the
+      rinderpest phase changes (a debug year jump crossing into/out of struck,
+      or generally on debugJumpYear/Month), restock the wildlife near the
+      player so the local chunks re-evaluate — or make the carrion a
+      per-frame overlay rather than a spawn-time bake.
+  (b) TERRAIN: carrion only spawns on `anchor.type === 'savanna'` chunks. The
+      ground around Mount Meru/Kilimanjaro is highland/volcanic — sweep
+      __terrainType across the village vicinity and confirm enough savanna
+      chunks exist within CARRION_RADIUS_DEG; if the immediate village sits on
+      non-savanna, widen the eligible types or ensure the plains beyond do
+      carry it.
+  (c) ZOOM CULL: at the far debug zoom the wildlife/dressing hides; confirm the
+      carcasses show at the standard and near zooms (the user tried both, so
+      likely not it, but confirm).
+  DIAGNOSE with a probe (suite launch args): jump to 1892, restock, sweep the
+  village vicinity for dead wildebeest/antelope and log terrain types + counts.
+  FIX per finding; add a live check that after a year jump INTO a struck year
+  the local plains show carrion without needing to travel away and back.
+  DOCS: design.md §16 note on the date-jump re-stream if that is the fix.
+  (Reported 17.07.2026; queued at the batch end per append-and-defer.)
+
+- [ ] 169. Too few juveniles — raise the calf-to-adult ratio.
+  User request (17.07.2026 23:xx): "Ist das Anzahlen-Verhaeltnis zwischen
+  erwachsenen Tieren und Jungtieren akkurat? Mir kommt es nach zu wenigen
+  Jungtieren vor. Mehr Jungtiere waeren auch deswegen schoen, weil die
+  Familiendrama-Szenarien dann haeufiger eintreten koennten." CURRENT (verified
+  in code): placeGroup (Wildlife.tsx ~903) creates EXACTLY ONE calf per herd of
+  >= 3 — a 7-strong zebra herd has 1 calf, 6 adults (~14%), and only ONE
+  family unit per herd, so the §19.8 dramas (predation, water, mire, grief)
+  can only ever target that single calf. Real herds run 20-40% juveniles in a
+  good season.
+  FIX: raise the juvenile count per herd to a CALIBRATABLE fraction of herd
+  size (balance value, e.g. balance.family.calfFraction ~0.3, debug-editable
+  per CLAUDE §2/§21) — link EACH calf to a nearby adult as its parent (not all
+  to one), so multiple family units coexist and the dramas fire more often.
+  Keep the calf build (baby schema, scale *0.55) and the MAX_CALF_INSTANCES
+  cap in mind (raise if needed). CARE: the drama code assumes parent.child is
+  one calf and calf.parent one adult — that 1:1 link stays per pair; just make
+  MORE pairs. Verify the existing family-drama live checks still stage (they
+  pick a calf near the player — more calves only helps). The panorama/vicinity
+  seeders and MAX_INSTANCES budgets must absorb the extra young.
+  TESTS: pure — the calf-count helper (fraction of herd size, >=1 for >=3,
+  capped) in wildlifeBehavior.test.ts; live — a spawned savanna herd shows
+  more than one calf, each with its own parent link (enrichments). DOCS:
+  design.md §19.8 (the herd raises SEVERAL young) + CLAUDE §7.1 pt.12/20 (the
+  tunable). (Reported 17.07.2026; queued at the batch end per append-and-defer.)
