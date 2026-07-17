@@ -85,11 +85,11 @@ export interface CulturalLandmarkDef {
 // ~6.4 world units (0.64° at 10 units/°) from its mount and sits on the Nile's
 // east bank, so at its raw coordinate the westernmost tombs stand in the
 // rendered river band (user report). Shift the mount off the nearest river until
-// the WHOLE footprint clears the water: field radius + the river half-width
-// (terrain RIVER_WIDTH_DEG 0.17°) + a small margin. Deterministic (pure river
-// geometry), bounded; a site already clear returns unchanged after one query.
-// Only Meroë is river-side, but the shift is generic so any bank-side field is
-// nudged onto dry ground.
+// the WHOLE footprint clears the water: field radius + the CALIBRATABLE river
+// half-width (terrain RIVER_WIDTH_DEG) + a small margin. Deterministic (pure
+// river geometry), bounded; a site already clear returns unchanged after one
+// query. Since point 156 EVERY cultural landmark and the natural sites run
+// through this shift — the widened rivers reach anchors that used to be clear.
 
 function clearedOfRiversBy(lat: number, lon: number, clearanceDeg: number): { lat: number; lon: number } {
   let a = lat
@@ -116,9 +116,10 @@ const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   { id: 'meroe', lon: 33.75, lat: 16.94, kind: 'pyramids' },
   // Just west of Cairo across the Nile — via the travel-scene panorama the
   // field also stands on the port's first-person horizon (point 82).
-  // West of the Nile's rendered band (axis ~31.22 at this latitude, half
-  // width 0.17°): the whole FIELD FOOTPRINT (±~0.29° incl. the Sphinx) must
-  // stand on the west-bank desert, not in the channel (user report).
+  // West of the Nile's rendered band (axis ~31.22 at this latitude, at the
+  // calibratable RIVER_WIDTH_DEG half-width): the whole FIELD FOOTPRINT
+  // (±~0.29° incl. the Sphinx) must stand on the west-bank desert, not in
+  // the channel (user report; auto-cleared like every field since 156).
   { id: 'giza', lon: 30.59, lat: 29.98, kind: 'giza-pyramids' },
   { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
   { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },

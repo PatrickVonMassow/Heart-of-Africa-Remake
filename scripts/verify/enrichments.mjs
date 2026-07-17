@@ -2179,7 +2179,6 @@ const runDrownScenario = async () =>
   page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     const hydro = await import('/src/world/hydro.ts')
-    const herds = window.__wildlife.herdsRef.current
     const seed = window.__game.getState().seed
     // Strong mid-channel flow on the lower Nile (lat 29..27 holds no falls).
     let spot = null
