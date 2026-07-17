@@ -272,6 +272,14 @@ export interface BalanceConfig {
      *  the common ending; the user asked for sometimes, not often. */
     killFlight: Record<string, number>
   }
+  /** Family rescue drives (design.md §19.8, point 127). */
+  family: {
+    /** Adrenaline burst: a rescuing parent's speed is its ordinary walk (3)
+     *  times this factor — ONE rule for charge, shield, guard and wade.
+     *  Grief drives (vigil walk, trample charge, waterfall plunge) are not
+     *  rescues and stay off it. */
+    rescueBurst: number
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -495,6 +503,12 @@ export const balance: BalanceConfig = {
       hyena: 0.15, // heavy-boned and thick-necked — a kick rarely does more than drive it off
       lion: 0, // STRUCTURALLY ZERO: nothing kills a lion — §19's drama depends on it staying frightening
     },
+  },
+  family: {
+    // Calibratable: ordinary walk (3) × 2 = 6 — clearly faster than roaming,
+    // yet the shield still meets the hunter (6 > 5.6) and the too-late death
+    // stays reachable at its staged distances (point 127's balance guard).
+    rescueBurst: 2,
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

@@ -54,6 +54,9 @@ import {
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
+  rescueSpeed,
+  wadeSpeed,
+  PREY_WALK_SPEED,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -349,7 +352,6 @@ const YOUNG_FOLLOW_RADIUS = 1.8
 const YOUNG_FOLLOW_SPEED = 4.5
 const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
-const GUARD_SPEED = 5.5
 /** Calf predation (design.md §19): while the hunt runs, the parent does not
  *  flee — it holds itself between hunter and calf (BLOCK_*), a living shield
  *  on the escape line; a hunter that reaches the blocking parent (TAKE_DIST)
@@ -372,18 +374,20 @@ const CALF_FLEE_SPEED = 3.8
  *  ~1.9 — wider than the catch distance — so a near-stationary (nursing) calf
  *  could otherwise be orbited forever and never caught. */
 const CALF_POUNCE_RADIUS = 3
-const PARENT_CHARGE_SPEED = 6.5 // a parent rushes the predator eating its calf faster than it guards
 const PARENT_SACRIFICE_DIST = 1.3 // parent reaches the predator → sacrifices itself
 const PARENT_TOO_LATE_DIST = 3.2 // parent only this close when the window ends → both eaten
 /** The vigil (point 121): the bereaved parent holds this close to the carcass. */
 const VIGIL_HOLD_DIST = 1.5
 /** The blocking station sits this far from the hunted calf toward the hunter —
  *  beyond the catch reach (CALF_CATCH_DIST), so a closing hunter meets the
- *  shield first. The shield sprints a notch faster than the calf's flee so it
- *  can hold the moving station, and the hunter takes a blocking parent within
- *  PARENT_TAKE_DIST. */
+ *  shield first. The rescue burst carries the shield faster than the calf's
+ *  flee (so it holds the moving station) and faster than the hunter (so the
+ *  hunter meets the shield), and the hunter takes a blocking parent within
+ *  PARENT_TAKE_DIST. All four rescue drives — charge, shield, guard, wade —
+ *  run at the ONE burst-derived speed (point 127): rescueSpeed(
+ *  balance.family.rescueBurst), computed fresh each frame so the debug edit
+ *  applies live. */
 const PARENT_BLOCK_OFFSET = 1.8
-const PARENT_BLOCK_SPEED = 6
 const PARENT_TAKE_DIST = 1.0
 /** Species whose calves a predator hunt can target (design.md §19). The
  *  giraffe joined with point 124 — its calves are run down by the LION only
@@ -418,13 +422,17 @@ const GAMBOL_ACTIVE = 0.25
 const GAMBOL_SPEED = 2.2
 const GAMBOL_RANGE = 4 // calves only play while this close to the parent
 const CALF_DRIFT_DEG = 0.06 // deg/s downstream drift of a struggling calf
-const WADE_SPEED = 4.2 // parent wading to its calf
 const RESCUE_REACH = 1.2 // parent this close pulls the calf out
-const RETURN_SPEED = 3 // walking back to the rescue entry
+const RETURN_SPEED = PREY_WALK_SPEED // walking back to the rescue entry — the ordinary walk the burst is measured against
 const FALLS_DEATH_RADIUS_DEG = 0.2 // in water this close to a fall = swept over
+// GRIEF, not a rescue (point 127): the plunge after a swept-over calf cannot
+// save it — it stays on its own speed, off the rescue burst.
 const PLUNGE_SPEED = 5.5 // a parent rushing after its swept-over calf
 const PLUNGE_REACH = 1
 const STRUGGLE_SELF_RESCUE = 25 // s after which an unaided calf clambers out
+// GRIEF, not a rescue (point 127): the calf is already dead — this charge
+// saves nobody and stays on its own speed, off the rescue burst. So does the
+// point-121 vigil walk (YOUNG_FOLLOW_SPEED in the vigil pre-pass).
 const TRAMPLE_GRIEF_SPEED = 6.5 // a parent rushing the elephant that trampled its calf
 const TRAMPLE_GRIEF_SECONDS = 12 // grief window; an unresolved charge clears here
 // OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
@@ -1135,6 +1143,9 @@ function Herds() {
 
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.1)
+    // The one burst-derived speed of all four rescue drives (point 127),
+    // read fresh so a debug edit of balance.family.rescueBurst applies live.
+    const RESCUE_SPEED = rescueSpeed(balance.family.rescueBurst)
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
@@ -1243,8 +1254,8 @@ function Herds() {
           const toX = calf.x - a.x
           const toZ = calf.z - a.z
           const d = Math.hypot(toX, toZ) || 1
-          a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
-          a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
+          a.x += (toX / d) * RESCUE_SPEED * dt
+          a.z += (toZ / d) * RESCUE_SPEED * dt
           if (d < PARENT_SACRIFICE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146): ONE
             // roll resolves the charging parent's attack three ways — its
@@ -1318,8 +1329,8 @@ function Herds() {
           const calf = a.child
           const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
           if (h !== null) {
-            a.x += Math.sin(h) * PARENT_BLOCK_SPEED * dt
-            a.z += Math.cos(h) * PARENT_BLOCK_SPEED * dt
+            a.x += Math.sin(h) * RESCUE_SPEED * dt
+            a.z += Math.cos(h) * RESCUE_SPEED * dt
           }
           if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146), same
@@ -1496,8 +1507,18 @@ function Herds() {
             const dz = calf.z - a.z
             const d = Math.hypot(dx, dz)
             if (d > RESCUE_REACH) {
-              a.x += (dx / d) * WADE_SPEED * dt
-              a.z += (dz / d) * WADE_SPEED * dt
+              // The swollen current brakes the wader (points 122/127): in the
+              // water the burst is divided by the season flow factor, so the
+              // rains' drowning drama survives the sprint. On the bank the
+              // parent runs the full burst.
+              const pll = worldToLatLon(a.x, a.z)
+              const bw0 = balance.waterDrama
+              const wspd =
+                sampleTerrain(pll.lat, pll.lon, seed).type === 'water'
+                  ? wadeSpeed(RESCUE_SPEED, seasonFlowFactor(CURRENT_WEATHER.wetness, bw0.dryFlowFactor, bw0.wetFlowFactor))
+                  : RESCUE_SPEED
+              a.x += (dx / d) * wspd * dt
+              a.z += (dz / d) * wspd * dt
             } else {
               calf.rescued = true
               if (!calf.rescueEntry) calf.rescueEntry = findLandNear(calf.x, calf.z, seed)
@@ -1805,10 +1826,20 @@ function Herds() {
           if (Math.hypot(toX, toZ) > 1) st.heading = turnToward(st.heading, Math.atan2(toX, toZ), ELEPHANT_TURN * dt)
         } else {
           st.heading += Math.sin(t * 0.08 + st.phase) * ELEPHANT_HERD_ARC * dt
-          // Steer the herd away from ground it cannot cross (ahead of its centre).
+          // Steer the herd away from ground it cannot cross (ahead of its
+          // centre) — but only while it STANDS on its own biome: a herd whose
+          // vigil ended amid the graveyard's foreign ground sees foreign land
+          // in every direction, and this steer would spin the heading forever
+          // (members walking tiny circles, the herd pinned — the measured
+          // released:false). Standing on foreign ground the escape rule of
+          // elephantStepAllowed lets the members walk, so the roam heading
+          // simply carries the herd out.
+          const cll = worldToLatLon(ccx, ccz)
+          const ct = sampleTerrain(cll.lat, cll.lon, seed).type
           const fll = worldToLatLon(ccx + Math.sin(st.heading) * 9, ccz + Math.cos(st.heading) * 9)
           const ft = sampleTerrain(fll.lat, fll.lon, seed).type
-          if (ft !== 'savanna' && ft !== 'jungle') st.heading += ELEPHANT_TURN * 2 * dt
+          if ((ct === 'savanna' || ct === 'jungle') && ft !== 'savanna' && ft !== 'jungle')
+            st.heading += ELEPHANT_TURN * 2 * dt
         }
         herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
       }
@@ -1846,9 +1877,14 @@ function Herds() {
         }
         // If the ground just ahead cannot be crossed, redirect the desired
         // heading toward the herd (or away) — but still turn only gently.
+        // The ground the elephant itself stands on: standing on foreign land
+        // (e.g. the graveyard's dry ground after a vigil) unlocks any land
+        // step, so the herd can always walk free (point 126).
+        const standLL = worldToLatLon(a.x, a.z)
+        const standT = sampleTerrain(standLL.lat, standLL.lon, seed).type
         const aheadLL = worldToLatLon(a.x + Math.sin(a.heading) * 6, a.z + Math.cos(a.heading) * 6)
         const aheadT = sampleTerrain(aheadLL.lat, aheadLL.lon, seed).type
-        if (!elephantStepAllowed(aheadT, mournInfo !== undefined)) {
+        if (!elephantStepAllowed(aheadT, mournInfo !== undefined, standT)) {
           desired = info ? Math.atan2(info.cx - a.x, info.cz - a.z) : a.heading + Math.PI * 0.6
         }
         let dh = desired - a.heading
@@ -1863,7 +1899,7 @@ function Herds() {
           const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
           const ll = worldToLatLon(nx, nz)
           const ter = sampleTerrain(ll.lat, ll.lon, seed)
-          if (elephantStepAllowed(ter.type, mournInfo !== undefined)) {
+          if (elephantStepAllowed(ter.type, mournInfo !== undefined, standT)) {
             a.x = nx
             a.z = nz
             a.y = Math.max(0.02, ter.height)
@@ -2299,8 +2335,8 @@ function Herds() {
             if (Math.hypot(LION_STATE.lx - calf.x, LION_STATE.lz - calf.z) < GUARD_RADIUS) {
               const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, GUARD_STANDOFF)
               if (h !== null) {
-                a.x += Math.sin(h) * GUARD_SPEED * dt
-                a.z += Math.cos(h) * GUARD_SPEED * dt
+                a.x += Math.sin(h) * RESCUE_SPEED * dt
+                a.z += Math.cos(h) * RESCUE_SPEED * dt
                 yaw = h
               } else {
                 yaw = Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z) // on station: face it down

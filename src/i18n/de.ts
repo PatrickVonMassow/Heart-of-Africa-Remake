@@ -355,6 +355,7 @@ export const de: Strings = {
     drownSeconds: 'Ertrinken: Sekunden in starker Strömung',
     wetFlowFactor: 'Ertrinken: Strömungsfaktor Regenzeit',
     vigilPredatorDelay: 'Totenwache: Sekunden bis ein Räuber kommt',
+    rescueBurst: 'Rettungs-Sprint der Elterntiere (Faktor)',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',

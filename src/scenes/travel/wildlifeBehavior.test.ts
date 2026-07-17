@@ -23,6 +23,9 @@ import {
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
+  rescueSpeed,
+  wadeSpeed,
+  PREY_WALK_SPEED,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -143,10 +146,13 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
 
   it('the shield stays between hunter and calf, and the hunter takes it first', () => {
     // Mini-simulation of the chase contract; the numbers mirror Wildlife.tsx
-    // (HUNT_LION_SPEED 5.6, CALF_FLEE_SPEED 3.8, PARENT_BLOCK_SPEED 6,
+    // (HUNT_LION_SPEED 5.6, CALF_FLEE_SPEED 3.8, the burst-derived shield
+    // speed rescueSpeed(balance.family.rescueBurst) — point 127,
     // PARENT_BLOCK_OFFSET 1.8, PARENT_TAKE_DIST 1.0, CALF_CATCH_DIST 0.9).
     // The parent holding its blocking station must be reached by the hunter
     // (taken in the calf's place) before the hunter ever reaches the calf.
+    const shieldSpeed = rescueSpeed(balance.family.rescueBurst)
+    expect(shieldSpeed).toBeGreaterThan(5.6) // the hunter must be able to meet the shield
     const calf = { x: 0, z: 0 }
     const parent = { x: 1.8, z: 0 }
     const pred = { x: 12, z: 0 }
@@ -168,8 +174,8 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
       calf.z += Math.cos(away) * 3.8 * dt
       const h = blockHeading(parent.x, parent.z, calf.x, calf.z, pred.x, pred.z, 1.8)
       if (h !== null) {
-        parent.x += Math.sin(h) * 6 * dt
-        parent.z += Math.cos(h) * 6 * dt
+        parent.x += Math.sin(h) * shieldSpeed * dt
+        parent.z += Math.cos(h) * shieldSpeed * dt
       }
       samples++
       const dPredParent = Math.hypot(pred.x - parent.x, pred.z - parent.z)
@@ -180,6 +186,41 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
     expect(taken).toBe(true) // the hunter meets the shield…
     expect(caught).toBe(false) // …never the calf
     expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
+  })
+})
+
+describe('rescueSpeed (design.md §19.8, point 127 — the parental adrenaline burst)', () => {
+  it('derives the rescue speed as ordinary walk x burst', () => {
+    expect(rescueSpeed(2, 3)).toBe(6)
+    expect(rescueSpeed(1.5, 3)).toBe(4.5)
+  })
+
+  it('the shipped burst reads as a burst: clearly faster than the ordinary walk', () => {
+    expect(balance.family.rescueBurst).toBeGreaterThan(1)
+    expect(rescueSpeed(balance.family.rescueBurst)).toBeGreaterThan(PREY_WALK_SPEED)
+  })
+
+  it('the shipped burst keeps the drama contracts (the point-127 balance guard)', () => {
+    const v = rescueSpeed(balance.family.rescueBurst)
+    expect(v).toBeGreaterThan(5.6) // the hunter (5.6) still meets the shield it chases
+    expect(v).toBeGreaterThan(3.8) // the shield holds its station against the fleeing calf
+  })
+
+  it('floors at the walk itself: a debug edit can never make a rescue slower than walking', () => {
+    expect(rescueSpeed(0.5, 3)).toBe(3)
+    expect(rescueSpeed(-2, 3)).toBe(3)
+  })
+
+  it('the swollen current brakes the wader: burst / flow factor in the water (point 122 guard)', () => {
+    expect(wadeSpeed(6, 1.8)).toBeCloseTo(6 / 1.8, 6)
+    // The braked wade must stay below the pre-burst 4.2 that let the rains
+    // drown the calf — the drama the burst must not delete.
+    expect(wadeSpeed(rescueSpeed(balance.family.rescueBurst), balance.waterDrama.wetFlowFactor)).toBeLessThan(4.2)
+  })
+
+  it('a tame or dry-season flow never speeds the wader beyond the burst', () => {
+    expect(wadeSpeed(6, 0.6)).toBe(6)
+    expect(wadeSpeed(6, 1)).toBe(6)
   })
 })
 
@@ -652,6 +693,19 @@ describe('elephantStepAllowed (point 126 — mourners cross any land, roamers ke
   it('water and ocean stay refused even for a mourner (the water dramas own that ground)', () => {
     expect(elephantStepAllowed('water', true)).toBe(false)
     expect(elephantStepAllowed('ocean', true)).toBe(false)
+  })
+
+  it('standing on foreign land unlocks any land step — a herd is never pinned where its vigil ended', () => {
+    // Post-vigil on the graveyard's dry ground: no longer mourning, yet free to walk out.
+    expect(elephantStepAllowed('desert', false, 'desert')).toBe(true)
+    expect(elephantStepAllowed('savanna', false, 'desert')).toBe(true)
+    expect(elephantStepAllowed('mountain', false, 'coast')).toBe(true)
+  })
+
+  it('the escape rule never lets a roamer ENTER foreign ground or any water', () => {
+    expect(elephantStepAllowed('desert', false, 'savanna')).toBe(false) // biome rule intact
+    expect(elephantStepAllowed('water', false, 'desert')).toBe(false) // even escaping, never into water
+    expect(elephantStepAllowed('ocean', false, 'coast')).toBe(false)
   })
 })
 

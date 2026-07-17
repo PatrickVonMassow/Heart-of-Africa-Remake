@@ -30,6 +30,7 @@ const DEFAULTS = {
   riverWidthFactor: balance.river.widthFactor,
   canteenCapacity: balance.health.canteenCapacity,
   vigilPredatorDelay: balance.vigil.predatorDelay,
+  rescueBurst: balance.family.rescueBurst,
 }
 
 /** The DebugMenu renders nothing until the UI store's debug flag is open. */
@@ -75,6 +76,7 @@ afterEach(() => {
   balance.river.widthFactor = DEFAULTS.riverWidthFactor
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
+  balance.family.rescueBurst = DEFAULTS.rescueBurst
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
   useUi.getState().setWebglFallback(false)
@@ -139,6 +141,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.riverWidthFactor, read: () => balance.river.widthFactor, value: 2 },
     // The vigil's predator draw delay (design.md §19.8, point 121 (f)).
     { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
+    // The parental rescue burst (design.md §19.8, point 127).
+    { label: en.debug.rescueBurst, read: () => balance.family.rescueBurst, value: 3 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {

@@ -3144,7 +3144,7 @@ the remaining open points in their numeric order.
   rotation. The in-suite "elephant total 0 at the Serengeti" staging gap was
   cured by the restock recipe; the instrumentation stays in the check.
 
-- [ ] 127. A parent runs faster when it rushes to its calf's rescue.
+- [x] 127. A parent runs faster when it rushes to its calf's rescue.
   Wanted (user, 15.07.2026): a parent hurrying to save its young can run faster
   than it otherwise does — the adrenaline burst. Partly there but unowned and
   inconsistent: the rescue drives already use their own speeds
@@ -3178,6 +3178,26 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.8 (name the burst as part of the family drama) and
   CLAUDE.md §7.1 pt. 12/20 (the tunable). One atomic commit.
   (Reported 15.07.2026.)
+  DONE (17.07.2026, 15:50): ONE rule replaces the four constants —
+  rescueSpeed(balance.family.rescueBurst) = ordinary walk (PREY_WALK_SPEED 3)
+  x factor (2) = 6 for charge, shield, guard and wade; floored at the walk;
+  debug-editable in both languages (write-through pinned in
+  DebugMenu.test.tsx). Grief drives (vigil walk, trample charge, waterfall
+  plunge) stay off the burst with do-not-unify comments. The balance guard
+  fired exactly as specified and forced two real derived rules: (1) the
+  faster wade rescued the rains calf — now the swollen current brakes the
+  wader (wadeSpeed = burst / seasonal flow factor; braked 3.33 < the old
+  4.2, so the point-122 drowning stays reachable, pure-tested); (2) the
+  drown staging's park distance rose 180 -> 260 (6 x 30 s made 180 exactly
+  reachable over land). Also fixed while verifying: the herd-level terrain
+  steer spun the heading forever when the herd itself stood on foreign
+  ground (post-vigil at the graveyard — members walked tiny circles), it now
+  fires only from own biome, completing the point-126 escape rule; and the
+  mourn staging pins zoom 2 for its restock (at 0.5 the fixed seed's ~26
+  in-ring chunks roll no elephants — the measured total:0 runs). Shield
+  mini-sim runs on the derived speed; 109 behavior tests, build/lint/1714
+  unit tests green; full enrichments exit 0 (burst measured 5.99, drown
+  drowned:true, mourn released:true) plus settings exit 0.
 
 - [ ] 128. Scavenger vultures still sink into the ground at a carcass.
   User report + screenshot (15.07.2026, deployed build): "Geier clippen immer

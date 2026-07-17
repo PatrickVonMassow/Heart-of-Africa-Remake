@@ -368,6 +368,36 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
   return !mourned && distToTarget < radius
 }
 
+/** Ordinary prey walk speed (units/s) — the unhurried gait (e.g. the walk back
+ *  after a water rescue). The rescue burst is measured against this. */
+export const PREY_WALK_SPEED = 3
+
+/**
+ * The rescue burst (design.md §19.8, point 127): a parent racing to save its
+ * young moves at its ordinary walk times ONE calibratable adrenaline factor
+ * (balance.family.rescueBurst) — the single rule behind all four rescue
+ * drives (charge, shield, guard, wade to a struggling calf), replacing four
+ * hand-set constants. Floored at the walk itself so a debug edit can tune the
+ * burst down but never turn a rescue into a stroll slower than walking.
+ * GRIEF drives are NOT rescues (nobody can be saved) and keep their own
+ * speeds: the trample charge (point 119), the vigil walk (point 121) and the
+ * waterfall plunge — do not "unify" them onto this rule.
+ */
+export function rescueSpeed(burst: number, walk: number = PREY_WALK_SPEED): number {
+  return walk * Math.max(1, burst)
+}
+
+/**
+ * Wading speed in the water (points 122/127): the swollen current that can
+ * drown the calf brakes its rescuer too — in the water the burst speed is
+ * divided by the season flow factor (wet ~1.8), so the rains' drowning drama
+ * stays reachable however hard the parent sprints. A tame or dry-season flow
+ * (factor <= 1) never speeds the wader up beyond the burst.
+ */
+export function wadeSpeed(rescue: number, flowFactor: number): number {
+  return rescue / Math.max(1, flowFactor)
+}
+
 /**
  * Where an elephant may step (point 126): roaming herds keep to their spawn
  * biomes (savanna/jungle), but a MOURNING herd walks to the bones across any
@@ -375,10 +405,15 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
  * mountain texel on the way would never reach the site (the observed failure:
  * relocated mourners standing eternally still one biome border short of the
  * bones). Water stays refused either way — the water dramas own that ground.
+ * An elephant STANDING on foreign land (e.g. the graveyard's dry ground after
+ * its vigil ended) may always step onto land: the biome rule only stops a
+ * roamer from ENTERING foreign ground, never from walking free of it — a
+ * herd must not end pinned where its mourning walk took it.
  */
-export function elephantStepAllowed(terrain: string, mourning: boolean): boolean {
+export function elephantStepAllowed(terrain: string, mourning: boolean, standingOn?: string): boolean {
   if (terrain === 'water' || terrain === 'ocean') return false
   if (mourning) return true
+  if (standingOn !== undefined && standingOn !== 'savanna' && standingOn !== 'jungle') return true
   return terrain === 'savanna' || terrain === 'jungle'
 }
 

@@ -488,7 +488,18 @@ verify suite that proves it.
       the chase (slower than its hunter) instead of standing at its
       parent, and a parent in reach holding itself between hunter and
       calf (living shield) over visible real time until the hunter takes
-      it in the calf's place before any catch. Calf water drama (§19.8):
+      it in the calf's place before any catch. The rescue burst (§19.8,
+      point 127): all four rescue drives (charge, shield, guard, wade)
+      run at ONE burst-derived speed — the ordinary walk times the
+      calibratable `balance.family.rescueBurst` — while the grief drives
+      (vigil walk, trample-throw, waterfall plunge) keep their own
+      speeds, and in the water the wade is braked by the seasonal flow
+      factor (`wadeSpeed`) so the point-122 drowning drama stays
+      reachable; pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts` (derivation, floor,
+      the burst outrunning walk, hunter and fleeing calf) and
+      live-measured in `scripts/verify/enrichments.mjs` (a charging
+      parent's sampled speed clearly beats its walk). Calf water drama (§19.8):
       calves gambol in visible hop-bouts that orbit the parent without
       trembling — the leashed scamper, the clamped body-separation force
       and the blended idle-shuffle offset are pure-tested
@@ -832,7 +843,9 @@ verify suite that proves it.
     gifts/dollars/provisions, full health, full canteen, no afflictions,
     capacity raised to fit, and the extended zoom unlocked — F4 canoe
     toggle); the canteen's consumption
-    rates and capacity are editable (§21.2). Modal windows and full-screen
+    rates and capacity are editable (§21.2), as is the parental rescue
+    burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's
+    write-through pinned in `src/ui/DebugMenu.test.tsx`). Modal windows and full-screen
     overlays always render above the in-scene floating labels (§17.4).
     Verifiable, by suite:
     - `scripts/verify/settings.mjs`: the defaults (including the single

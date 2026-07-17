@@ -249,6 +249,8 @@ export function DebugMenu() {
         onChange={(v) => { balance.waterDrama.wetFlowFactor = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.vigilPredatorDelay} value={balance.vigil.predatorDelay} step={1}
         onChange={(v) => { balance.vigil.predatorDelay = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.rescueBurst} value={balance.family.rescueBurst} step={0.1}
+        onChange={(v) => { balance.family.rescueBurst = Math.max(1, v); bump() }} />
       <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>

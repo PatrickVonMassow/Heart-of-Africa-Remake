@@ -2218,8 +2218,11 @@ const runDrownScenario = async () =>
       // independent of the natural pool. Offset per attempt so a rejected
       // predecessor's spot never stacks bodies.
       const fam = window.__makeTestFamily(spot[1] * U + attempt * 0.4, -spot[0] * U)
-      // Far beyond wading reach for the whole drown window (WADE_SPEED 4.2).
-      fam.parent.x = fam.calf.x - 180
+      // Far beyond reach for the whole drown window: the burst sprints the
+      // land leg at 6 (point 127), so 6 x 30 s = 180 is the reachable bound —
+      // 260 keeps the arrival structurally too late however the water brake
+      // splits the path.
+      fam.parent.x = fam.calf.x - 260
       fam.parent.z = fam.calf.z
       const t0 = Date.now()
       while (Date.now() - t0 < 1500 && fam.calf.inWater === undefined && !fam.calf.dead) await sleep(100)
@@ -2724,6 +2727,60 @@ check(
   JSON.stringify(revenge),
 )
 
+// --- Point 127: the parental rescue burst ------------------------------------
+// A rescuing parent moves at the ONE burst-derived speed (ordinary walk x
+// balance.family.rescueBurst) — measure the charge to a caught calf over a
+// fixed interval and assert it clearly beats the ordinary walk (3).
+const burst = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let liveChunk
+  for (const sp of Object.keys(herds)) {
+    for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+    if (liveChunk) break
+  }
+  const p0 = window.__game.getState().pos
+  const parent = { x: p0.x - 200, z: p0.z + 10, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: liveChunk ?? 'burst-test' }
+  const calf = { x: p0.x + 6, z: p0.z + 10, y: 0.2, rot: 0, scale: 0.5, phase: 0.7, chunk: liveChunk ?? 'burst-test', young: true, parent }
+  parent.child = calf
+  herds.zebra.push(parent, calf)
+  const st = window.__lionHunt.state
+  st.predator = 'hyena'
+  st.mode = 'chase'
+  st.victim = calf
+  st.victimHunt = true
+  st.lx = calf.x + 10
+  st.lz = calf.z + 2
+  st.px = calf.x
+  st.pz = calf.z
+  st.timer = 0
+  const out = { caught: false, speed: 0, walk: 3 }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  out.caught = calf.caught !== undefined && !calf.dead
+  if (out.caught) {
+    // Park the charging parent 20 out and time one second of its charge —
+    // well short of the sacrifice contact, so no outcome roll interferes.
+    parent.x = calf.x - 20
+    parent.z = calf.z
+    await sleep(150)
+    const sx = parent.x
+    const sz = parent.z
+    const s0 = Date.now()
+    await sleep(1000)
+    const dts = (Date.now() - s0) / 1000
+    out.speed = +(Math.hypot(parent.x - sx, parent.z - sz) / dts).toFixed(2)
+  }
+  herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+  if (st.victim === calf || st.victim === parent) { st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false }
+  return out
+})
+check(
+  'a rescuing parent sprints at the burst-derived speed, clearly beyond its walk (point 127)',
+  burst.caught && burst.speed > burst.walk * 1.5,
+  JSON.stringify(burst),
+)
+
 // --- Point 126: elephant mourning at the graveyard ---------------------------
 // A herd whose centre enters the mourn radius walks to the bones, holds
 // there with lowered heads for the window, and moves on. A NATURAL herd is
@@ -2735,10 +2792,16 @@ check(
 // despawn pass does not cull the relocated herd.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
-// Fresh deterministic spawn (the trample check's recipe): a long run leaves
-// the area's chunk bookkeeping in arbitrary states — restock clears and
-// re-streams it.
-await page.evaluate(() => window.__wildlife.restock())
+// Fresh deterministic spawn (the trample check's recipe): restock clears and
+// re-streams the area. The zoom is PINNED WIDE first — the spawn ring scales
+// with it, and at the 0.5 default the fixed seed's ~26 in-ring chunks happen
+// to roll no elephant herd at all (the measured staged:false runs); at zoom 2
+// the ring covers enough chunks that the deterministic rolls always include
+// elephants. Restored to 1 after the relocation jump below.
+await page.evaluate(() => {
+  window.__ui.getState().setTravelZoom(2)
+  window.__wildlife.restock()
+})
 await page.waitForTimeout(2500)
 await page
   .waitForFunction(() => {
@@ -2793,7 +2856,10 @@ const mournStage = await page.evaluate(async () => {
   for (const e of best) e.chunk = undefined
   return { staged: true, size: best.length }
 })
-await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6))
+await page.evaluate(() => {
+  window.__game.getState().debugJumpTo(-4.9, 36.6)
+  window.__ui.getState().setTravelZoom(1)
+})
 await page.waitForTimeout(1200)
 const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await page.evaluate(async ([glat, glon]) => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
