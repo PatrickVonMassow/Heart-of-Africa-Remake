@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   channelDriftStep,
+  drinkCatchment,
   mireFate,
   mireRoll,
+  vicinitySeedBounds,
   seasonFlowFactor,
   waterStruggleFate,
   blockHeading,
@@ -695,5 +697,38 @@ describe('mireRoll / mireFate (design.md §19.8, point 123 — the drying waterh
     expect(mireFate(0, 45)).toBe('mired')
     expect(mireFate(44.99, 45)).toBe('mired')
     expect(mireFate(45, 45)).toBe('released')
+  })
+})
+
+describe('vicinitySeedBounds (point 135a — the guarantee holds from the leave point, over time)', () => {
+  it('counts and places against the margin-shrunk ring', () => {
+    const b = vicinitySeedBounds(75, 14, 6, 10)
+    expect(b.countRadius).toBe(65)
+    expect(b.distMin).toBe(20)
+    // Placement + group spread (6) stays inside the count radius.
+    expect(b.distMax + 6).toBeLessThanOrEqual(b.countRadius)
+    // And the count radius + a few units of observer offset stays inside
+    // the promised radius.
+    expect(b.countRadius + 8).toBeLessThanOrEqual(75 + 0.0001)
+  })
+
+  it('degenerates safely when the margin eats the ring', () => {
+    const b = vicinitySeedBounds(22, 14, 6, 10)
+    expect(b.countRadius).toBeGreaterThanOrEqual(20)
+    expect(b.distMax).toBeGreaterThanOrEqual(b.distMin)
+  })
+})
+
+describe('drinkCatchment (point 135c — the drinking belt survives the widened rivers)', () => {
+  it('nearly closes in the rains, opens wide in the dry — width-independent belt', () => {
+    // The belt (catchment minus half-width) is width-independent.
+    expect(drinkCatchment(0.17, 0) - 0.17).toBeCloseTo(0.06, 9)
+    expect(drinkCatchment(0.272, 0) - 0.272).toBeCloseTo(0.06, 9)
+    // The dry season opens it to 0.43 past the waterline — a strict
+    // superset of the wet belt, so dry drinkers >= wet drinkers by geometry.
+    expect(drinkCatchment(0.272, 1) - 0.272).toBeCloseTo(0.43, 9)
+    expect(drinkCatchment(0.272, 1)).toBeGreaterThan(drinkCatchment(0.272, 0))
+    // Clamped dryness.
+    expect(drinkCatchment(0.272, 2)).toBeCloseTo(drinkCatchment(0.272, 1), 9)
   })
 })

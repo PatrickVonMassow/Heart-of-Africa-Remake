@@ -194,6 +194,9 @@ export interface BalanceConfig {
   }
   /** §2.5 panorama wildlife: distant drifting silhouettes (points 92/94). */
   panoramaWildlife: {
+    /** Dry-season shore guarantee (point 135c): minimum drinkers at the
+     *  nearest water in the traveller's view once the land has dried. */
+    dryShoreMinDrinkers: number
     /** Ring distance beyond the settlement edge: innerRadius + inner..(+spread). */
     ringInner: number
     ringSpread: number
@@ -401,6 +404,7 @@ export const balance: BalanceConfig = {
     idleSwayRate: 0.7,
   },
   panoramaWildlife: {
+    dryShoreMinDrinkers: 4, // the dry season VISIBLY gathers life at the water
     ringInner: 55, // was +14..28: far too close, so the silhouettes loomed
     ringSpread: 30,
     maxApparentAngleDeg: 2.5, // a distant animal subtends only a couple degrees

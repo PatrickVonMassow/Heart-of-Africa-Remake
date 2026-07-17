@@ -3495,7 +3495,29 @@ the remaining open points in their numeric order.
   TESTS: the existing live checks stay as they are (they are the truth-tellers);
   pure tests for whatever leash/margin/exemption rule is added. (Filed
   16.07.2026 after the third run; second case added after the fourth.)
-  MORE CASES of the same class (16./17.07.2026, observed across full runs):
+  WIP (17.07.2026, 04:04 — mid-point safety commit; builds green, 1669
+  vitest green): LANDED so far — (a) vicinitySeedBounds (margin-shrunk
+  count/placement ring, pure-tested) AND pool rotation at the MAX_INSTANCES
+  cap (one full species silently starved the guarantee); (c) drinkCatchment
+  derived from RIVER_WIDTH_DEG (the fixed 0.35 was a hidden scale-width
+  constant; the 136 widening ate the drinking belt) with the rains nearly
+  closing the belt (0.06) and the dry season opening it (0.43), PLUS the
+  seedDryShoreDrinkers guarantee (nearest bank in the view ring holds >=
+  balance.panoramaWildlife.dryShoreMinDrinkers once dryness >= 0.6;
+  bank search without the dry-height bar — the carve-apron lesson) and the
+  120e check now asserts the guarantee (dry >= minDry > wet; wet may be 0 —
+  water stands everywhere in the rains); (d) the trample "closed" metric now
+  measures the elephant the grief ACTUALLY charges (nearest living), not the
+  injected decoy. Release scenario waits for a family. STILL OPEN — five-run
+  stability: runs go green/red alternating with NEW faces: (e) the traveller-
+  collision pair failed 2x ("reached false", minDist ~2.55: the pinned
+  target animal seems to move/dodge away before contact — check how the
+  check pins it and whether a new exemption freed it); (f) the savanna
+  pixel swing read 7.9 (< 8) once — likely the seasonal lerp not fully
+  settled in the 2600 ms window at that machine load, check the wait; (g)
+  verify the bank fix landed the 120e guarantee (>= 4) at the Zambezi. Goal:
+  three consecutive full enrichments runs exit 0 before checking 135 off.
+  MORE CASES of the same class (16./17.07.2026, observed across full runs):  MORE CASES of the same class (16./17.07.2026, observed across full runs):
   (c) the dry-season drinker count (point 120e — dryDrinkers vs wetDrinkers
   flipped to 2/0, 3/0 on two runs, green on others); (d) the trample-grief
   charge (point 119 — the parent died charging but the "closed" distance

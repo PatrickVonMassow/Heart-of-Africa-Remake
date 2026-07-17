@@ -21,7 +21,7 @@ import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
 import { setAnimalCollider } from './wildlifeCollision'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
-import { sampleTerrain } from '../../world/terrain'
+import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { drinkWalkDistance } from './waterEdgeRules'
 import { CURRENT_WEATHER } from '../../systems/season'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
@@ -41,8 +41,10 @@ import {
   deflectedStep,
   type FlightState,
   channelDriftStep,
+  drinkCatchment,
   mireFate,
   mireRoll,
+  vicinitySeedBounds,
   seasonFlowFactor,
   waterStruggleFate,
 } from './wildlifeBehavior'
@@ -621,7 +623,10 @@ function placeGroup(
       // local weather is the spawn's proxy — chunks spawn near the traveller.
       const dryness =
         (1 - CURRENT_WEATHER.wetness) * Math.min(1, Math.max(0, balance.season.weatherStrength))
-      const catchment = 0.35 + 0.25 * dryness
+      // Width-derived (point 135c): the fixed 0.35 base was a hidden
+      // 0.17+0.18 of the scale-true river width — the 136 widening ate the
+      // drinking belt and starved the dry-season gathering.
+      const catchment = drinkCatchment(RIVER_WIDTH_DEG, dryness)
       if (wd > 0.02 && wd < catchment) {
         const e = 0.03
         const gLat =
@@ -686,6 +691,10 @@ function seedSettlementVicinity(
   const radius = balance.panoramaWildlife.vicinityRadius
   const CLEARANCE = 14 // world units clear of the leave point
   const SPREAD = 6
+  // Count/place against a margin-shrunk ring (point 135a): edge loiterers
+  // no longer satisfy the guarantee, and seeds land well inside, so the
+  // count holds from the player's leave point and across wander time.
+  const bounds = vicinitySeedBounds(radius, CLEARANCE, SPREAD, 10)
   for (const place of PLACES) {
     const w = latLonToWorld(place.lat, place.lon)
     if (Math.hypot(w.x - pos.x, w.z - pos.z) > radius + SPAWN_MARGIN) continue
@@ -701,7 +710,7 @@ function seedSettlementVicinity(
     // Count region-typical grazers already within the radius.
     let count = 0
     for (const sp of pool) {
-      for (const a of herds[sp]) if (!a.dead && Math.hypot(a.x - w.x, a.z - w.z) <= radius) count++
+      for (const a of herds[sp]) if (!a.dead && Math.hypot(a.x - w.x, a.z - w.z) <= bounds.countRadius) count++
     }
     if (count >= min) continue
     const deficit = min - count
@@ -709,8 +718,20 @@ function seedSettlementVicinity(
     let h = 0
     for (const c of place.id) h = (h * 31 + c.charCodeAt(0)) | 0
     const rand = mulberry32(((seed ^ h) + 0x102) >>> 0)
-    const species = pool[Math.floor(rand() * pool.length)]
-    if (herds[species].length + deficit > MAX_INSTANCES[species]) continue
+    // Rotate through the pool from a deterministic start until a species has
+    // instance capacity left (point 135a): picking ONE and giving up at its
+    // cap silently starved the guarantee once the test scenarios had filled
+    // that herd — the vicinity stayed one animal short.
+    let species: (typeof pool)[number] | null = null
+    const start = Math.floor(rand() * pool.length)
+    for (let sIdx = 0; sIdx < pool.length; sIdx++) {
+      const cand = pool[(start + sIdx) % pool.length]
+      if (herds[cand].length + deficit <= MAX_INSTANCES[cand]) {
+        species = cand
+        break
+      }
+    }
+    if (!species) continue
     // Search a few deterministic offsets for a land anchor inside the ring,
     // past the clearance — a coastal port may face water on some bearings.
     let ax = 0
@@ -718,7 +739,7 @@ function seedSettlementVicinity(
     let found = false
     for (let k = 0; k < 8 && !found; k++) {
       const dir = rand() * Math.PI * 2
-      const dist = CLEARANCE + SPREAD + rand() * (radius - CLEARANCE - 2 * SPREAD - 8)
+      const dist = bounds.distMin + rand() * Math.max(1, bounds.distMax - bounds.distMin)
       ax = w.x + Math.cos(dir) * dist
       az = w.z + Math.sin(dir) * dist
       const ll = worldToLatLon(ax, az)
@@ -728,6 +749,77 @@ function seedSettlementVicinity(
     if (!found) continue
     placeGroup(herds[species], scx, scz, ax, az, deficit, SPREAD, seed, 0.9, BODY_RADIUS[species], false, undefined, chunkKey)
   }
+}
+
+/**
+ * The dry season gathers life at the remaining water — GUARANTEED (point
+ * 120e, hardened by 135c): once the traveller's local land has dried, the
+ * nearest water in the view ring holds at least `dryShoreMinDrinkers`
+ * drinking animals. The chunk spawn provides them where its hashes happen
+ * to fall near a bank; where they fall short, this tops the shore up —
+ * deterministic per (seed, water cell), tagged to the traveller's chunk so
+ * the group streams out normally.
+ */
+function seedDryShoreDrinkers(
+  herds: Record<Species, Animal[]>,
+  pos: { x: number; z: number },
+  seed: number,
+  spawnedChunks: Set<string>,
+): void {
+  const dryness =
+    (1 - CURRENT_WEATHER.wetness) * Math.min(1, Math.max(0, balance.season.weatherStrength))
+  if (dryness < 0.6) return
+  const min = balance.panoramaWildlife.dryShoreMinDrinkers
+  const RANGE = 40 // world units around the traveller
+  // Find the nearest river/lake bank cell in range (coarse ring probe).
+  const pll = worldToLatLon(pos.x, pos.z)
+  let bank: { x: number; z: number } | null = null
+  let bd = Infinity
+  for (let r = 4; r <= RANGE && !bank; r += 4) {
+    for (let k = 0; k < 12; k++) {
+      const ang = (k / 12) * Math.PI * 2
+      const lat = pll.lat + (Math.cos(ang) * r) / 10
+      const lon = pll.lon + (Math.sin(ang) * r) / 10
+      const wd = Math.min(riverDistance(lat, lon, 0.5), lakeDistance(lat, lon, 0.5))
+      if (wd < RIVER_WIDTH_DEG + 0.1 && wd > RIVER_WIDTH_DEG + 0.01) {
+        const t = sampleTerrain(lat, lon, seed)
+        // No dry-height bar (the findLandNear lesson, point 122): the widened
+        // rivers carve low aprons where nothing clears 0.05 for units around
+        // the bank — a LOW bank is still a bank the animals can stand on.
+        if (t.type !== 'water' && t.type !== 'ocean') {
+          const w = latLonToWorld(lat, lon)
+          const d = Math.hypot(w.x - pos.x, w.z - pos.z)
+          if (d < bd) {
+            bd = d
+            bank = { x: w.x, z: w.z }
+          }
+        }
+      }
+    }
+  }
+  if (!bank) return // no water in reach — nothing to gather at
+  let count = 0
+  for (const sp of SPECIES) {
+    for (const a of herds[sp]) if (!a.dead && a.drink && Math.hypot(a.x - pos.x, a.z - pos.z) <= RANGE + 15) count++
+  }
+  if (count >= min) return
+  const region = regionAt(pll.lat, pll.lon)
+  const pool = REGION_PREY[region]
+  if (!pool || pool.length === 0) return
+  const rand = mulberry32(((seed ^ Math.round(bank.x * 7 + bank.z * 13)) + 0x77) >>> 0)
+  const species = pool[Math.floor(rand() * pool.length)]
+  const deficit = min - count
+  if (herds[species].length + deficit > MAX_INSTANCES[species]) return
+  const cx = Math.floor(pos.x / CHUNK_SIZE)
+  const cz = Math.floor(pos.z / CHUNK_SIZE)
+  const key = `${cx},${cz}`
+  if (!spawnedChunks.has(key)) return
+  // Place the group a short walk inland of the bank: the spawn path then
+  // hands each animal its own drink target at this shore.
+  // 1 unit inland, tight spread: every group member must stay inside the
+  // dry catchment (waterline + 0.43 deg) so the spawn path hands each its
+  // own drink target at this shore.
+  placeGroup(herds[species], cx, cz, bank.x + 1, bank.z + 1, deficit, 1.5, seed, 0.9, BODY_RADIUS[species], false, undefined, key)
 }
 
 // The wildlife InstancedMeshes are MODULE singletons (point 96): fresh
@@ -958,6 +1050,7 @@ function Herds() {
     // Never leave a settlement's bird's-eye vicinity empty (point 102): top the
     // region-typical presence up to the minimum where the chunk spawn fell short.
     seedSettlementVicinity(herds, pos, seed, spawnedChunks.current)
+    seedDryShoreDrinkers(herds, pos, seed, spawnedChunks.current)
     // Render nearest-first so the visible cap keeps the animals closest to the
     // player when a chunk range holds more than an instanced mesh can show.
     for (const sp of SPECIES) {

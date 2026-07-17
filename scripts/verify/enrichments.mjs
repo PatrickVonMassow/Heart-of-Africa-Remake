@@ -1451,10 +1451,25 @@ const trampleGrief = await page.evaluate(async () => {
   let calfDead = false
   for (let i = 0; i < 40 && !calfDead; i++) { await sleep(100); calfDead = calf.dead === true }
   const charged = parent.trampleTo !== undefined // it inherited the grief
-  const d0 = Math.hypot(parent.x - eleph.x, parent.z - eleph.z)
+  // Measure the approach against the elephant the grief ACTUALLY charges —
+  // the nearest living one — not against the injected decoy: with a natural
+  // herd nearby the parent (correctly) went for a different animal and the
+  // decoy-based "closed" metric read negative on a successful trample
+  // (point 135d — a measurement bug, not a sim bug).
+  const target = (() => {
+    let best = null
+    let bd = Infinity
+    for (const e of herds.elephant) {
+      if (e.dead) continue
+      const d = Math.hypot(parent.x - e.x, parent.z - e.z)
+      if (d < bd) { bd = d; best = e }
+    }
+    return best
+  })()
+  const d0 = target ? Math.hypot(parent.x - target.x, parent.z - target.z) : NaN
   let parentDead = false
   for (let i = 0; i < 60 && !parentDead; i++) { await sleep(100); parentDead = parent.dead === true }
-  const d1 = Math.hypot(parent.x - eleph.x, parent.z - eleph.z)
+  const d1 = target ? Math.hypot(parent.x - target.x, parent.z - target.z) : NaN
   const stainsAdded = w.stains.current.length - stains0
   const idx = herds.elephant.indexOf(eleph)
   if (idx >= 0) herds.elephant.splice(idx, 1) // calm the scene for the next check
@@ -2333,6 +2348,7 @@ check(
 )
 // Without a predator, the mud RELEASES (the drama always resolves): shorten
 // the window through the balance hook, then watch the calf come free alive.
+await waitForFamily() // the kill scenario above consumed a family (135 class)
 const release = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
@@ -3289,11 +3305,15 @@ const drinkersAt = async (override) => {
 }
 const dryDrinkers = await drinkersAt(0)
 const wetDrinkers = await drinkersAt(1)
+const minDry = await page.evaluate(() => window.__balance.panoramaWildlife.dryShoreMinDrinkers)
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 check(
   'the dry season draws more animals to the remaining water (point 120e)',
-  dryDrinkers > wetDrinkers && wetDrinkers > 0,
-  JSON.stringify({ dryDrinkers, wetDrinkers }),
+  // The dry shore is GUARANTEED populated (point 135c seeder); the rains
+  // nearly close the drinking belt — water stands everywhere — so the wet
+  // count may legitimately be zero.
+  dryDrinkers >= minDry && dryDrinkers > wetDrinkers,
+  JSON.stringify({ dryDrinkers, wetDrinkers, minDry }),
 )
 
 // haze is shown — the fog recedes to the horizon and the ground haze fades.

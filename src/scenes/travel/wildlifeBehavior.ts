@@ -449,3 +449,45 @@ export function mireRoll(
 export function mireFate(secondsMired: number, mireSeconds: number): 'mired' | 'released' {
   return secondsMired >= mireSeconds ? 'released' : 'mired'
 }
+
+/**
+ * The vicinity-seeding bounds (point 102 hardened by point 135a): the seeder
+ * counts and places against a radius SHRUNK by `margin`, so the guarantee
+ * "at least N region-typical animals within `radius`" keeps holding when
+ * (1) the observer stands a few units off the settlement anchor (the player
+ * measures from the leave point, the seeder from the anchor) and (2) the
+ * seeded animals wander for a while before anyone counts. Animals loitering
+ * at the outer edge no longer satisfy the count, and fresh seeds land well
+ * inside — the per-frame top-up then keeps the pool full against drift.
+ */
+export function vicinitySeedBounds(
+  radius: number,
+  clearance: number,
+  spread: number,
+  margin: number,
+): { countRadius: number; distMin: number; distMax: number } {
+  const countRadius = Math.max(clearance + spread, radius - margin)
+  return {
+    countRadius,
+    distMin: clearance + spread,
+    // Placement + group spread must stay inside the SHRUNK radius.
+    distMax: Math.max(clearance + spread, countRadius - 2 * spread),
+  }
+}
+
+/**
+ * The drinker catchment (design.md §19.13, point 120e, hardened by 135c):
+ * how far from the water's AXIS a spawn may lie and still be given a shore
+ * walk. Derived from the calibratable river half-width — the fixed 0.35 was
+ * a hidden 0.17+0.18 of the scale-true width, and the point-136 widening
+ * swallowed the whole drinking belt (the band between waterline and
+ * catchment shrank toward zero, starving the dry-season gathering).
+ */
+export function drinkCatchment(riverWidthDeg: number, dryness: number): number {
+  const d = Math.min(1, Math.max(0, dryness))
+  // In the rains the belt nearly closes — water stands everywhere, so few
+  // walk to the river (0.06 past the waterline); the dry season opens it
+  // wide (0.43). The strict dry>wet ordering of point 120e follows from the
+  // geometry instead of hanging on spawn-hash luck at one test site.
+  return riverWidthDeg + 0.06 + 0.37 * d
+}
