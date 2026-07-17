@@ -5325,3 +5325,37 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 wording if the rule sharpens. (Reported
   17.07.2026; queued at the batch end per the standing append-and-defer
   rule.)
+
+- [ ] 165. Animals pop into existence in plain sight.
+  User report (17.07.2026): "Es erscheinen immer wieder Tiere ploetzlich vor
+  meinen Augen. Sie sollen nur ausserhalb des Sichtfeldes spawnen." The
+  vulture standard (spawn beyond the zoom-aware view ring, §19.6) already
+  states the rule for flights; the GROUND spawners do not all honour it.
+  AUDIT FIRST (a spawn-audit dev hook: every push into a herd list logs
+  distance-to-player vs the current viewR and the spawner's name; drive
+  around and read the counters) — the suspects, in likelihood order:
+  (a) the GUARANTEE SEEDERS: seedSettlementVicinity places animals within
+      the panorama vicinity radius of a settlement the player just left
+      (близко by design — but it may fire IN VIEW), and seedDryShoreDrinkers
+      tops up the nearest bank inside the view ring on a 2-second clock —
+      both place standing animals where the player can watch them appear.
+  (b) ZOOM-OUT growth: widening the ring spawns the newly covered chunks
+      instantly — in the middle of the freshly visible field.
+  (c) the newer spawn branches ride the same chunk path (crocodile, plover,
+      rinderpest carrion) — covered once the chunk rule is fixed, but the
+      audit should confirm none of them fires inside view on its own.
+  FIX per finding, keeping the acceptance guarantees honest: seeded
+  placements pick spots OUTSIDE the current view ring wherever the
+  guarantee's own radius allows (the dry-shore bank has stretches beyond
+  view; the vicinity ring reaches past viewR at default zoom); where a
+  guarantee genuinely requires an in-view spot, the animal must ENTER
+  instead of popping (walk in from outside the ring — the scripted
+  predators already do this; never a fade hack). Zoom-growth spawns may
+  need a one-frame defer + walk-in or spawn-at-ring placement. The §19
+  no-popping acceptance text then covers ground spawns explicitly.
+  TESTS: pure for whatever placement rule is added (outside-ring pick /
+  walk-in entry); live (enrichments): a driven pass with the audit hook
+  asserting no ground animal APPEARS within the view ring (streaming,
+  seeders and a zoom-out each exercised). DOCS: design.md §19.5/§19.6
+  wording + CLAUDE.md §7.1 pt. 12. (Reported 17.07.2026; queued at the
+  batch end per the standing append-and-defer rule.)
