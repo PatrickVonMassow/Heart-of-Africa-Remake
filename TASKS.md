@@ -4822,6 +4822,29 @@ the remaining open points in their numeric order.
   implemented (fire/presence/market/rank-as-class) and the open
   worn-differently edge.
 
+- [x] 159. An implementation section in docs/climate-1890.md: research -> game.
+  Wanted (user, 17.07.2026): analogous to point 158 — a new section in
+  docs/climate-1890.md describing WHICH research findings reached the game
+  and HOW. STANDING RULE (user, permanent): BOTH implementation sections
+  (peoples-1890 §8 and this one) are kept CURRENT whenever the climate or
+  people rendering changes — recorded in memory.
+  CONTENT: the zone model (climateZoneAt with the researched zones incl. the
+  bug-hunting ones — atlantic-equatorial after the Fang-in-the-Sahara find,
+  horn with Swayne's four seasons), wetness/greenness split, the drivers
+  (harmattan, karif, coldness), Nile flood remote-fed with the 62-day lag,
+  Okavango inversion, ice massifs vs the named near misses, hail, the
+  Sahel's 1870-95 humid period, Cairo hyper-arid, the kitsch licence, the
+  season field (per-position sampling), and how each is verified (pixel
+  pairs, real months). English. (Reported 17.07.2026.)
+  DONE (17.07.2026, 07:57): climate-1890.md §9 — a ten-row finding->game->
+  verification table (zones incl. the two bug-found ones, humid-period
+  Sahel, wetness/greenness split, harmattan with the muted-halo pin, karif,
+  ice massifs vs named near misses, deterministic hail, remote-fed Nile
+  flood, Okavango inversion, the per-position season field), plus the
+  kitsch-licence note and the not-implemented-on-purpose paragraph. The
+  STANDING RULE (both implementation sections stay current with any
+  climate/people rendering change) is recorded in memory.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.

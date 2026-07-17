@@ -344,3 +344,39 @@ and maps onto exactly the (date, lat, lon) signature the model needs.
 - Rwenzori's 1906 extent (6.5 vs 7.5 km²; 20 vs 43 named glaciers) — different
   methods on identical source data.
 - Harmattan wind speed and winter dust-layer depth.
+
+## 9. Research → game: what was implemented, and how (TASKS point 159)
+
+Where the findings above actually reached the game. STANDING RULE (user,
+17.07.2026): this section — and its sibling, peoples-1890.md §8 — is kept
+current whenever the climate or people rendering changes. Code sources of
+truth: `src/systems/season.ts` (the model), `src/render/seasonField.ts` (the
+per-position field), `src/scenes/travel/Climate.tsx` and
+`src/scenes/place/PlaceScene.tsx` (the display); verification lives in
+`src/systems/season.test.ts` and the pixel/live blocks of
+`scripts/verify/enrichments.mjs` and `scripts/verify/polish.mjs`.
+
+| Research finding (§) | In the game | Verified by |
+|---|---|---|
+| Zone geography incl. the traps (§1–§2): the Gabon coast has a HARD Jun–Sep dry season; the Horn runs Swayne's four seasons; Cairo is functionally Saharan | `climateZoneAt` rule boxes with the `atlantic-equatorial` zone (added when a sweep caught the Fang village classified into the Sahara) and the `horn` zone (added when the Somali village fell to the Congo fallback); `isHyperArid` keeps Cairo and the Libyan Desert rainless in every month | every settlement swept into a plausible zone, live; Cairo asserted dry across all 12 REAL months |
+| The Sahel was WET 1870–1895 (§3) | the Sahel month profile carries the humid-period rains inside the game's 1890–1895 window | `season.test.ts` pins the humid-period wetness |
+| Relative greening: the Serengeti greens on less water than the Congo (§4) | the wetness/greenness split — `wetnessAt` (absolute, zone-capped: fog/rain) vs `floraGreennessAt` (relative per zone: flora/ground tint) | the pixel pairs 115/116 measure the SCREEN on real months |
+| The harmattan pall, with the counter-intuitive muted halo (§4) | its own driver `harmattanAt` (Nov–mid-Mar, Sahel band): the dome whitens toward dust on its own axis, the noon sun reddens, the halo is MUTED, sight lines close harder than rain | the halo pin is a pure test; live Sahel Jan/Aug, screenshot 121 |
+| The Somali karif wind (§2/§7 peoples) | `karifAt` (Jul–Sep, Horn, altitude-gated) drives the tobe-over-the-head dress and the harder village fire | pure boundary tests; live dress checks, screenshot 113 |
+| Ice caps exactly three massifs; Elgon, Ras Dashen, Cameroon, Emi Koussi are bare (§5) | per-massif DEM-adapted ice lines (`inIceMassif`), naive global snow line removed; seasonal snow only Atlas (Feb) and Drakensberg (Jul) | the massif list swept pure AND live over terrain colours; Atlas pixel fraction, screenshot 122 |
+| Hail belongs to heavy storms, not to a season (§5) | deterministic `hailAt` — only inside a heavy-rain cell, rare, hashed per day and 2° cell | pure sweep (never in a rainless zone) plus the live radial whitening |
+| The Nile crests at Cairo in October, fed by the kiremt two months upstream (§6) | the flood is REMOTE-FED: keyed on the Ethiopian source with a 62-day lag, never on local rain; the ribbon and the canoe float height read ONE rise | pure: crest in October while Cairo's local wetness is 0; live at Aswan, screenshots 117/118 |
+| The Okavango floods in the LOCAL dry season (§6) | the same lag abstraction, 180 days from the Angolan rains — the delta fan is fullest in July | pure both directions; live fan scale, screenshots 119/120 |
+| Seasons must be of the PLACE (a consequence of all of the above) | the season FIELD: a blurred zone-weight texture sampled per ground vertex and per plant, so zone borders are ~2° gradients and nothing follows the traveller; settlements derive weather from their OWN coordinates | the flying-plants witness (field identical while the player moves); polish settlement blocks |
+
+**The deliberate exaggeration.** design.md §19.13 carries the user's licence:
+the climate states may read a little kitschy so they are legible at a glance —
+the straw/green flora recolour is deliberately stronger than photometric
+reality, because three rounds of uniform-level checks once passed while the
+player saw nothing. The standard since then is the picture: real months,
+pixels, no override.
+
+**What was NOT implemented, on purpose.** The §8 known unknowns stay out of
+the game (nothing invented); §7's further-accuracy options (e.g. measuring
+the village clearance at flood maximum) are recorded as open options in
+design.md, not silently taken.
