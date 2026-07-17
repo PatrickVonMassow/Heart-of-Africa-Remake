@@ -2750,7 +2750,8 @@ await page
     return Math.max(0, ...byHerd.values()) >= 3
   }, null, { timeout: 45000 })
   .catch(() => {})
-const mournStage = await page.evaluate(() => {
+const mournStage = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const byHerd = new Map()
   for (const e of herds.elephant) {
@@ -2761,11 +2762,29 @@ const mournStage = await page.evaluate(() => {
   let best = null
   for (const [, list] of byHerd) if (!best || list.length > best.length) best = list
   if (!best || best.length < 3) {
+    // Diagnostics for the staged:false path: is the streaming loop alive
+    // (spawnedChunks growing after a restock), where is the player, what
+    // did the ring actually spawn?
+    const chunks0 = window.__wildlife.spawnedChunks.current.size
+    let frames = 0
+    const raf = () => { frames++; if (frames < 1000) requestAnimationFrame(raf) }
+    requestAnimationFrame(raf)
+    await sleep(1500)
+    const totals = {}
+    for (const sp of Object.keys(herds)) if (herds[sp].length) totals[sp] = herds[sp].length
+    const st = window.__game.getState()
     return {
       staged: false,
       total: herds.elephant.length,
       tagged: herds.elephant.filter((e) => e.herd !== undefined && !e.dead).length,
       largest: best ? best.length : 0,
+      chunks0,
+      chunks1: window.__wildlife.spawnedChunks.current.size,
+      frames,
+      mode: st.mode,
+      pos: { x: +st.pos.x.toFixed(1), z: +st.pos.z.toFixed(1) },
+      zoom: window.__ui.getState().travelZoom,
+      totals,
     }
   }
   window.__mournHerdId = best[0].herd
@@ -2796,16 +2815,24 @@ const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await p
   }
   const d0 = centre()
   const out = { found: true, d0: +d0.toFixed(1), closed: null, held: null, released: false }
-  // Close on the bones.
+  // Close on the bones. The window covers the arc walk-in at ELEPHANT_SPEED
+  // with the turn-cap detour (the vigil deadline grants twice the straight
+  // line); on success the loop exits early.
   const t0 = Date.now()
   let dMin = d0
-  while (Date.now() - t0 < 40000) {
+  while (Date.now() - t0 < 70000) {
     dMin = Math.min(dMin, centre())
     if (dMin < 9) break
     await sleep(300)
   }
   out.closed = +dMin.toFixed(1)
-  if (dMin >= 9) return out
+  if (dMin >= 9) {
+    // Self-explaining failure: the herd's vigil state and each member's spot.
+    const st = window.__wildlife.herdState?.current?.get(window.__mournHerdId)
+    out.vigil = st ? { mourn: st.mourn !== undefined, mourned: st.mourned === true } : null
+    out.members = best.map((e) => ({ x: +e.x.toFixed(1), z: +e.z.toFixed(1) }))
+    return out
+  }
   // Let the arrival settle (the ring formation and separation still jostle
   // for a few seconds), THEN measure the hold.
   await sleep(6000)

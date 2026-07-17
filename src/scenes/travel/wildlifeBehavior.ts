@@ -369,6 +369,31 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
 }
 
 /**
+ * Where an elephant may step (point 126): roaming herds keep to their spawn
+ * biomes (savanna/jungle), but a MOURNING herd walks to the bones across any
+ * land — the graveyard sits in dry country, and a herd frozen at a desert or
+ * mountain texel on the way would never reach the site (the observed failure:
+ * relocated mourners standing eternally still one biome border short of the
+ * bones). Water stays refused either way — the water dramas own that ground.
+ */
+export function elephantStepAllowed(terrain: string, mourning: boolean): boolean {
+  if (terrain === 'water' || terrain === 'ocean') return false
+  if (mourning) return true
+  return terrain === 'savanna' || terrain === 'jungle'
+}
+
+/**
+ * The vigil's hard deadline (point 126): the hold window plus a walk-in grant
+ * of TWICE the straight-line time — the gentle turn cap arcs the herd in, so
+ * a herd drawn at the radius edge would otherwise spend its whole hold window
+ * still approaching (or turn away before reaching the bones). The deadline
+ * still guarantees the vigil always resolves — never a pinned herd.
+ */
+export function mournDeadline(now: number, distToTarget: number, holdSeconds: number, speed: number): number {
+  return now + holdSeconds + (distToTarget / speed) * 2
+}
+
+/**
  * Where the drawn predator of the vigil enters the stage (point 121 (f)).
  * The vulture standard applies: it spawns BEYOND the zoom-aware view ring and
  * WALKS in, never popping into sight — and it must also land INSIDE the

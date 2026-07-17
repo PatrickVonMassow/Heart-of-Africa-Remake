@@ -52,6 +52,8 @@ import {
   vicinitySeedBounds,
   seasonFlowFactor,
   shouldMourn,
+  mournDeadline,
+  elephantStepAllowed,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -1114,7 +1116,7 @@ function Herds() {
       herdState.current.clear()
       scavenger.current.target = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState }
     return () => {
       delete w.__wildlife
     }
@@ -1792,7 +1794,7 @@ function Herds() {
           st.mourned = true // vigil over — move on; not again until the herd has left the radius
         }
         if (!st.mourn && shouldMourn(tgD, bm.radius, st.mourned === true)) {
-          st.mourn = { x: tgX, z: tgZ, until: t + bm.seconds + tgD / ELEPHANT_SPEED }
+          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(t, tgD, bm.seconds, ELEPHANT_SPEED) }
         }
         if (st.mourned && tgD > bm.radius) st.mourned = undefined
         if (st.mourn) {
@@ -1846,7 +1848,7 @@ function Herds() {
         // heading toward the herd (or away) — but still turn only gently.
         const aheadLL = worldToLatLon(a.x + Math.sin(a.heading) * 6, a.z + Math.cos(a.heading) * 6)
         const aheadT = sampleTerrain(aheadLL.lat, aheadLL.lon, seed).type
-        if (aheadT !== 'savanna' && aheadT !== 'jungle') {
+        if (!elephantStepAllowed(aheadT, mournInfo !== undefined)) {
           desired = info ? Math.atan2(info.cx - a.x, info.cz - a.z) : a.heading + Math.PI * 0.6
         }
         let dh = desired - a.heading
@@ -1861,7 +1863,7 @@ function Herds() {
           const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
           const ll = worldToLatLon(nx, nz)
           const ter = sampleTerrain(ll.lat, ll.lon, seed)
-          if (ter.type === 'savanna' || ter.type === 'jungle') {
+          if (elephantStepAllowed(ter.type, mournInfo !== undefined)) {
             a.x = nx
             a.z = nz
             a.y = Math.max(0.02, ter.height)

@@ -21,6 +21,8 @@ import {
   type FlightState,
   killFlockMayDescend,
   shouldMourn,
+  mournDeadline,
+  elephantStepAllowed,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -629,6 +631,52 @@ describe('shouldMourn (design.md §19.8, point 126 — the herd vigil at the bon
     // The caller clears the latch once the herd has LEFT the radius — a later
     // visit mourns again.
     expect(shouldMourn(24, 25, false)).toBe(true)
+  })
+})
+
+describe('elephantStepAllowed (point 126 — mourners cross any land, roamers keep their biomes)', () => {
+  const ALL = ['ocean', 'coast', 'desert', 'savanna', 'jungle', 'mountain', 'water']
+
+  it('a roaming elephant steps only onto savanna and jungle', () => {
+    for (const t of ALL) {
+      expect(elephantStepAllowed(t, false)).toBe(t === 'savanna' || t === 'jungle')
+    }
+  })
+
+  it('a mourning elephant crosses every LAND type — the graveyard sits in dry country', () => {
+    for (const t of ['coast', 'desert', 'savanna', 'jungle', 'mountain']) {
+      expect(elephantStepAllowed(t, true)).toBe(true)
+    }
+  })
+
+  it('water and ocean stay refused even for a mourner (the water dramas own that ground)', () => {
+    expect(elephantStepAllowed('water', true)).toBe(false)
+    expect(elephantStepAllowed('ocean', true)).toBe(false)
+  })
+})
+
+describe('mournDeadline (point 126 — the vigil hard deadline with the arc walk-in grant)', () => {
+  it('grants the hold window plus TWICE the straight-line walk time', () => {
+    // Herd drawn 20 m out at speed 1.5: 30 s hold + 2 * 20/1.5 s walk-in.
+    expect(mournDeadline(100, 20, 30, 1.5)).toBeCloseTo(100 + 30 + (20 / 1.5) * 2, 6)
+  })
+
+  it('a herd already at the bones gets exactly the hold window', () => {
+    expect(mournDeadline(50, 0, 30, 1.5)).toBe(80)
+  })
+
+  it('the radius-edge draw still holds after the arc approach (the point of the doubling)', () => {
+    // At the default radius 25 the single-time grant (old formula) left an
+    // arc-y approach eating into or past the hold; the doubled grant covers a
+    // detour factor of 2 so the hold window survives in full.
+    const single = 25 / 1.5
+    const deadline = mournDeadline(0, 25, 30, 1.5)
+    expect(deadline).toBeGreaterThan(single * 2) // walk grant alone exceeds any 2x-detour arc
+    expect(deadline - single * 2).toBe(30) // and the full hold window remains on top
+  })
+
+  it('is a hard deadline: finite for every draw distance (no herd ever pinned)', () => {
+    expect(Number.isFinite(mournDeadline(0, 1000, 30, 1.5))).toBe(true)
   })
 })
 
