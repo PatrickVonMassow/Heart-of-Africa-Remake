@@ -47,6 +47,8 @@ import {
   vicinitySeedBounds,
   seasonFlowFactor,
   vigilBlocksLanding,
+  vigilDrawReady,
+  vigilDrawSpawn,
   waterStruggleFate,
 } from './wildlifeBehavior'
 import { WATERFALLS } from '../../world/data/landmarks'
@@ -519,11 +521,11 @@ function leaveHeading(x: number, z: number, px: number, pz: number): number {
  *  a small remnant of the prey stays behind at the site — a carcass scrap the
  *  kill-circling flock then descends on and finishes. */
 const REMNANT_SCALE = 0.35
-function spawnRemnant(s: LionHuntState, seed: number): void {
+function spawnRemnant(s: LionHuntState, seed: number): Animal | null {
   const herds = ACTIVE_HERDS
-  if (!herds) return
+  if (!herds) return null
   const ll = worldToLatLon(s.px, s.pz)
-  herds[s.prey].push({
+  const remnant: Animal = {
     x: s.px,
     z: s.pz,
     y: Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height),
@@ -532,7 +534,9 @@ function spawnRemnant(s: LionHuntState, seed: number): void {
     phase: 0,
     dead: true,
     remnant: true,
-  })
+  }
+  herds[s.prey].push(remnant)
+  return remnant
 }
 
 function emptyHerds(): Record<Species, Animal[]> {
@@ -1836,10 +1840,12 @@ function Herds() {
         // flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
-          if (a.young && a.caught !== undefined && a.caught > 0) {
+          if (a.caught !== undefined && a.caught > 0) {
             // Caught by a predator (resolved in the full-list pre-pass above):
             // thrash in place — no stain or shrink yet — while a parent may
-            // still reach the predator and save it (§19).
+            // still reach the predator and save it (§19). Not young-gated:
+            // the seized vigil-keeper (point 121 (f)) is the one ADULT that
+            // can be caught, and it thrashes like any taken prey.
             px = a.x + Math.sin(t * 13 + a.phase) * 0.14
             pz = a.z + Math.cos(t * 11 + a.phase) * 0.14
             yaw = a.rot + Math.sin(t * 16 + a.phase) * 0.7
@@ -2311,8 +2317,35 @@ function LionHunt() {
       // Idle clears any stale calf-hunt bookkeeping so a re-armed hunt starts clean.
       s.victim = null
       s.victimHunt = false
-      s.timer -= dt
-      if (s.timer > 0) return
+      const herds = ACTIVE_HERDS
+      // The carcass draws a predator to the vigil-keeper (design.md §19.8,
+      // point 121 (f)): the vigil must SUMMON its ending, so the standing
+      // sacrifice reliably plays out instead of quietly expiring. POINT 121
+      // OWNS THE LION_STATE-CLAIM RULE: the single global hunt is claimed
+      // ONLY from idle — this path runs from idle alone, so a running hunt
+      // is never clobbered and a draw simply waits for the next idle window.
+      // It does, however, PREEMPT the idle cooldown timer below: the
+      // post-hunt cooldown (30-60 s) would outlast the vigil window, and the
+      // draw is a scripted guarantee, not a hope on the ambient dice.
+      let vigilKeeper: Animal | null = null
+      if (herds) {
+        let bd = CALF_HUNT_SEEK
+        for (const csp of CALF_HUNT_SPECIES) {
+          for (const k of herds[csp]) {
+            if (k.dead || k.caught !== undefined || k.vigil === undefined) continue
+            if (!vigilDrawReady(k.vigil.time, balance.vigil.predatorDelay)) continue
+            const kd = Math.hypot(k.x - pos.x, k.z - pos.z)
+            if (kd < bd) {
+              bd = kd
+              vigilKeeper = k
+            }
+          }
+        }
+      }
+      if (!vigilKeeper) {
+        s.timer -= dt
+        if (s.timer > 0) return
+      }
       // Sometimes the hunt targets a calf near the PLAYER instead of a generic
       // grazer, so the family drama (struggle → parent charge → sacrifice) plays
       // out on screen rather than far off (design.md §19). Searching around the
@@ -2320,12 +2353,11 @@ function LionHunt() {
       let px: number
       let pz: number
       let ll: { lat: number; lon: number }
-      const herds = ACTIVE_HERDS
       let calf: Animal | null = null
       // The drying waterhole draws the predators (point 123): a MIRED calf
       // in seek range is always the hunt's target — the pair at the last
       // water is genuinely found, not left to the calf-hunt dice.
-      if (herds) {
+      if (!vigilKeeper && herds) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {
@@ -2339,7 +2371,7 @@ function LionHunt() {
           }
         }
       }
-      if (!calf && herds && Math.random() < CALF_HUNT_CHANCE) {
+      if (!vigilKeeper && !calf && herds && Math.random() < CALF_HUNT_CHANCE) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {
@@ -2353,7 +2385,16 @@ function LionHunt() {
           }
         }
       }
-      if (calf) {
+      if (vigilKeeper) {
+        // The drawn hunt takes the standing keeper itself: the existing
+        // victim chase closes on it (it never flees — familyHeld) and the
+        // existing catch/caught-countdown kill it; no second kill path.
+        px = vigilKeeper.x
+        pz = vigilKeeper.z
+        ll = worldToLatLon(px, pz)
+        s.victim = vigilKeeper
+        s.victimHunt = true
+      } else if (calf) {
         px = calf.x
         pz = calf.z
         ll = worldToLatLon(px, pz)
@@ -2390,11 +2431,24 @@ function LionHunt() {
         preyMesh.current.geometry = preyGeo[s.prey]
         preyMesh.current.scale.setScalar(PREY_SCALE[s.prey])
       }
-      // The predator closes in from a random direction, so the chase runs any
-      // which way rather than always toward the same corner.
-      const lionAng = Math.random() * Math.PI * 2
-      s.lx = px + Math.cos(lionAng) * HUNT_LION_APPROACH
-      s.lz = pz + Math.sin(lionAng) * HUNT_LION_APPROACH
+      if (vigilKeeper) {
+        // The drawn predator arrives by the vulture standard (point 121 (f)):
+        // it spawns beyond the zoom-aware view ring — inside the offstage
+        // abort ring — and visibly WALKS in to the keeper, never popping
+        // into sight or finding the carcass already claimed.
+        const spawn = vigilDrawSpawn(
+          px, pz, pos.x, pos.z,
+          VIEW_AT_ZOOM1 * useUi.getState().travelZoom, offstageR, Math.random(),
+        )
+        s.lx = spawn.x
+        s.lz = spawn.z
+      } else {
+        // The predator closes in from a random direction, so the chase runs any
+        // which way rather than always toward the same corner.
+        const lionAng = Math.random() * Math.PI * 2
+        s.lx = px + Math.cos(lionAng) * HUNT_LION_APPROACH
+        s.lz = pz + Math.sin(lionAng) * HUNT_LION_APPROACH
+      }
       s.heading = Math.random() * Math.PI * 2 // per-hunt weave phase
       s.lionHeading = Math.atan2(s.px - s.lx, s.pz - s.lz)
       s.preyHeading = s.lionHeading
@@ -2447,7 +2501,13 @@ function LionHunt() {
         if (d < (v ? CALF_CATCH_DIST : 0.6)) {
           // Caught: a calf begins its struggle (the herds run the outcome); a
           // generic grazer is felled at once.
-          if (v && v.caught === undefined && !v.dead) v.caught = CAUGHT_DURATION
+          if (v && v.caught === undefined && !v.dead) {
+            v.caught = CAUGHT_DURATION
+            // A seized vigil-keeper's watch is over (point 121 (f)): clearing
+            // the field hands its pose to the caught thrash and lets the kill
+            // flock reclaim the calf's remains it was standing off.
+            v.vigil = undefined
+          }
           s.mode = 'feed'
           s.timer = v ? 30 : FEED_DURATION
         }
@@ -2476,7 +2536,25 @@ function LionHunt() {
         if (consumed || s.timer <= 0) {
           // A remnant stays behind only when a kill was actually eaten — a
           // feed that timed out over a rescued calf leaves nothing (§19).
-          if (v.dead) spawnRemnant(s, seed)
+          if (v.dead) {
+            const remains = spawnRemnant(s, seed)
+            // The vigil follows the remains (point 121 (f)): the keeper's
+            // carcass anchor is handed from the consumed victim (dissolve
+            // just hit 0 this frame — atomically before any gone-check can
+            // observe it) to the scrap the predator leaves, otherwise the
+            // vigil ended ~9 s in, long before the next idle window could
+            // draw a predator. The remains persist under the keeper because
+            // the flock may not land while it stands (§19.6 gate), so the
+            // (e) resolve rule is unchanged: remains gone or window over.
+            const keeperHerds = ACTIVE_HERDS
+            if (remains && keeperHerds) {
+              for (const csp of CALF_HUNT_SPECIES) {
+                for (const k of keeperHerds[csp]) {
+                  if (!k.dead && k.vigil !== undefined && k.vigil.carcass === v) k.vigil.carcass = remains
+                }
+              }
+            }
+          }
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
           s.victim = null

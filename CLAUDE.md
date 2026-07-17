@@ -503,7 +503,17 @@ verify suite that proves it.
       current drowns (dead, sinking, never rescued or scavenged) while the
       SAME setup in the dry season still clambers out alive, and a rescuing
       parent that wades a swollen current too long drowns beside its calf
-      (both live in `scripts/verify/enrichments.mjs`); the drying
+      (both live in `scripts/verify/enrichments.mjs`); the vigil at the
+      carcass (point 121): a too-late parent walks to its eaten calf and
+      HOLDS there (pure-tested landing block: no vulture lands, no ground
+      scavenger commits while a live keeper stands within the radius), it
+      flees nothing by recorded user decision, the carcass DRAWS a
+      region-appropriate predator that spawns beyond the view ring (spawn
+      geometry pure-tested) and takes the keeper through the existing hunt
+      kill — the single global hunt is claimed only from idle, never
+      clobbered — and with no predator drawn the vigil expires and the
+      parent rejoins alive (all live in `scripts/verify/enrichments.mjs`);
+      the drying
       waterhole (point 123): a dry-season lake bank can MIRE a calf on a
       bout ending there (pure-tested roll: only at the bank, only under
       the dryness threshold, exact boundaries), the calf struggles in

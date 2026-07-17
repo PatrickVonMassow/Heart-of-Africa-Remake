@@ -29,6 +29,7 @@ const DEFAULTS = {
   canoeSpeedup: balance.canoeSpeedup,
   riverWidthFactor: balance.river.widthFactor,
   canteenCapacity: balance.health.canteenCapacity,
+  vigilPredatorDelay: balance.vigil.predatorDelay,
 }
 
 /** The DebugMenu renders nothing until the UI store's debug flag is open. */
@@ -73,6 +74,7 @@ afterEach(() => {
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.river.widthFactor = DEFAULTS.riverWidthFactor
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
+  balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
   useUi.getState().setWebglFallback(false)
@@ -135,6 +137,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // Build-time geometry value (point 136): the edit persists in balance and
     // applies on the next reload — the write-through is what the menu owes.
     { label: en.debug.riverWidthFactor, read: () => balance.river.widthFactor, value: 2 },
+    // The vigil's predator draw delay (design.md §19.8, point 121 (f)).
+    { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {

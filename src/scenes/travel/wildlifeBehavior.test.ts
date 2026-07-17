@@ -21,6 +21,8 @@ import {
   type FlightState,
   killFlockMayDescend,
   vigilBlocksLanding,
+  vigilDrawReady,
+  vigilDrawSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
 } from './wildlifeBehavior'
@@ -576,6 +578,62 @@ describe('vigilBlocksLanding (design.md §19.8, point 121 — the keeper drives 
     // The contract (documented on the helper): only LIVE keepers' distances are
     // passed in; with no live keeper the caller passes Infinity — never a block.
     expect(vigilBlocksLanding(Infinity)).toBe(false)
+  })
+})
+
+describe('vigilDrawReady (point 121 (f) — the carcass draws a predator after the delay)', () => {
+  it('is not ready before the calibratable delay', () => {
+    expect(vigilDrawReady(0, 12)).toBe(false)
+    expect(vigilDrawReady(11.99, 12)).toBe(false)
+  })
+
+  it('becomes ready exactly at the delay and stays ready after it', () => {
+    expect(vigilDrawReady(12, 12)).toBe(true)
+    expect(vigilDrawReady(59, 12)).toBe(true)
+  })
+
+  it('a zero delay draws immediately (the debug menu may set it)', () => {
+    expect(vigilDrawReady(0, 0)).toBe(true)
+  })
+})
+
+describe('vigilDrawSpawn (point 121 (f) — the drawn predator walks in, never pops in)', () => {
+  // The hunt's stage geometry: view ring 50 (default zoom), offstage abort
+  // ring 80 (view + margin 30), keeper within the 45 m seek range.
+  const VIEW_R = 50
+  const OFFSTAGE_R = 80
+
+  const cases: Array<{ name: string; kx: number; kz: number }> = [
+    { name: 'keeper at the player', kx: 0, kz: 0 },
+    { name: 'keeper 20 m out', kx: 20, kz: 0 },
+    { name: 'keeper at the 45 m seek edge', kx: 27, kz: -36 },
+  ]
+
+  it.each(cases)('spawns beyond the view ring and inside the abort ring ($name)', ({ kx, kz }) => {
+    for (const rand of [0, 0.17, 0.5, 0.83, 0.999]) {
+      const p = vigilDrawSpawn(kx, kz, 0, 0, VIEW_R, OFFSTAGE_R, rand)
+      const fromPlayer = Math.hypot(p.x, p.z)
+      expect(fromPlayer).toBeGreaterThan(VIEW_R) // never pops into sight
+      expect(fromPlayer).toBeLessThan(OFFSTAGE_R) // never aborts on frame one
+    }
+  })
+
+  it('keeps the spec spawn distance from the keeper: view radius + margin', () => {
+    const p = vigilDrawSpawn(20, 0, 0, 0, VIEW_R, OFFSTAGE_R, 0.3)
+    expect(Math.hypot(p.x - 20, p.z)).toBeCloseTo(VIEW_R + 8, 6)
+  })
+
+  it('honors a custom margin', () => {
+    const p = vigilDrawSpawn(0, 0, 0, 0, VIEW_R, OFFSTAGE_R, 0.6, 20)
+    expect(Math.hypot(p.x, p.z)).toBeCloseTo(VIEW_R + 20, 6)
+  })
+
+  it('scales with the zoomed view ring (the ring is zoom-aware like the vulture rule)', () => {
+    const wideView = 200
+    const p = vigilDrawSpawn(30, 10, 0, 0, wideView, wideView + 30, 0.42)
+    const fromPlayer = Math.hypot(p.x, p.z)
+    expect(fromPlayer).toBeGreaterThan(wideView)
+    expect(fromPlayer).toBeLessThan(wideView + 30)
   })
 })
 

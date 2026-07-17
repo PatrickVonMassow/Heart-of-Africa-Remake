@@ -240,6 +240,8 @@ export interface BalanceConfig {
   vigil: {
     /** Seconds the bereaved parent holds the vigil before rejoining the herd. */
     seconds: number
+    /** Seconds of standing vigil after which the carcass draws a predator to the keeper. */
+    predatorDelay: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -430,6 +432,7 @@ export const balance: BalanceConfig = {
   },
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd
+    predatorDelay: 12, // calibratable: vigil seconds until the carcass draws a predator to the keeper
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

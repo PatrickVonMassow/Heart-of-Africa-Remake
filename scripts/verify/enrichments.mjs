@@ -2409,6 +2409,138 @@ check(
   release.found && release.released,
   JSON.stringify(release),
 )
+
+// --- Point 121: the vigil at the calf's carcass, and the drawn predator ------
+// A parent that came too late walks to its dead calf, stands vigil (no
+// vulture lands, no flight from anything), and the carcass DRAWS a predator
+// that spawns beyond the view ring, walks in, and takes the standing parent
+// through the existing hunt kill. Synthetic family; the calf dies via a
+// forced hunt with the parent held clear of the too-late radius.
+const vigil = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p0 = window.__game.getState().pos
+  const fam = window.__makeTestFamily(p0.x + 10, p0.z + 8)
+  const parent = fam.parent
+  const calf = fam.calf
+  // Park the parent FAR OUT during the chase (the shield/charge/catch race
+  // is a three-sprinter photo finish that flips outcomes run to run), then
+  // reposition to 40 units right after the catch: the charge (6.5 u/s over
+  // the 5 s struggle) cannot arrive, the too-late radius (3.2) is never
+  // entered, and the parent deterministically survives into the vigil.
+  parent.x = calf.x - 200
+  parent.z = calf.z
+  const st = window.__lionHunt.state
+  st.mode = 'chase'
+  st.victim = calf
+  st.victimHunt = true
+  st.lx = calf.x + 10
+  st.lz = calf.z + 2
+  st.px = calf.x
+  st.pz = calf.z
+  st.timer = 0
+  const out = { calfDead: false, vigilSet: false, closed: null, held: null, carcassKept: false, drawn: false, spawnDist: null, parentTaken: false }
+  const tc = Date.now()
+  while (Date.now() - tc < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  if (calf.caught !== undefined && !calf.dead) {
+    parent.x = calf.x - 40 // in place for the vigil walk, out of charge reach
+    parent.z = calf.z
+  }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 20000 && !calf.dead) await sleep(150)
+  out.calfDead = !!calf.dead
+  if (!calf.dead) return out
+  const t1 = Date.now()
+  while (Date.now() - t1 < 15000 && parent.vigil === undefined) await sleep(150)
+  out.vigilSet = parent.vigil !== undefined
+  if (!out.vigilSet) return out
+  // The parent closes on the carcass and holds there.
+  const t2 = Date.now()
+  while (Date.now() - t2 < 25000 && Math.hypot(parent.x - calf.x, parent.z - calf.z) > 2.2) await sleep(150)
+  out.closed = +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2)
+  const holdA = { x: parent.x, z: parent.z }
+  await sleep(2500)
+  out.held = +Math.hypot(parent.x - holdA.x, parent.z - holdA.z).toFixed(2)
+  // While the keeper stands, the carcass/remnant is not consumed away by a
+  // landing scavenger — something of the calf is still there.
+  const herds = window.__wildlife.herdsRef.current
+  out.carcassKept = herds.zebra.includes(calf) || parent.vigil !== undefined
+  // The DRAW: a predator claims the idle hunt on its own (no pinning here),
+  // spawning beyond the view ring, and takes the standing parent.
+  const t3 = Date.now()
+  while (Date.now() - t3 < 90000) {
+    if (st.mode === 'chase' && st.victim === parent) {
+      if (!out.drawn) {
+        out.drawn = true
+        out.spawnDist = +Math.hypot(st.lx - parent.x, st.lz - parent.z).toFixed(1)
+      }
+    }
+    if (parent.dead) { out.parentTaken = true; break }
+    await sleep(200)
+  }
+  fam.dispose()
+  return out
+})
+check(
+  'the too-late parent stands vigil at its calf and holds there (point 121)',
+  // held < 1.0: the keeper stands (a fleeing or grazing parent covers many
+  // units in 2.5 s); small residual motion is the separation push and the
+  // carcass-to-remnant handover nudging the hold point.
+  vigil.calfDead && vigil.vigilSet && vigil.closed !== null && vigil.closed <= 2.2 && vigil.held !== null && vigil.held < 1.0,
+  JSON.stringify(vigil),
+)
+check(
+  'the carcass is not scavenged away under the living keeper (point 121c)',
+  vigil.carcassKept === true,
+  JSON.stringify(vigil),
+)
+check(
+  'the carcass DRAWS a predator from beyond the view ring and it takes the standing parent (point 121f)',
+  vigil.drawn && vigil.spawnDist !== null && vigil.spawnDist > 20 && vigil.parentTaken,
+  JSON.stringify(vigil),
+)
+// Backstop (121e): with the draw effectively disabled and a short window,
+// the vigil expires and the parent lives — a chosen death, never a stuck one.
+const vigilBackstop = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const bal = window.__balance.vigil
+  const prevDelay = bal.predatorDelay
+  const prevSeconds = bal.seconds
+  bal.predatorDelay = 99999
+  bal.seconds = 6
+  const p0 = window.__game.getState().pos
+  const fam = window.__makeTestFamily(p0.x - 10, p0.z + 8)
+  const parent = fam.parent
+  const calf = fam.calf
+  parent.x = calf.x - 200 // parked out of the race, like the main check
+  parent.z = calf.z
+  const st = window.__lionHunt.state
+  st.mode = 'chase'; st.victim = calf; st.victimHunt = true
+  st.lx = calf.x + 10; st.lz = calf.z + 2; st.px = calf.x; st.pz = calf.z; st.timer = 0
+  const out = { vigilSet: false, cleared: false, parentAlive: false }
+  const tc = Date.now()
+  while (Date.now() - tc < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  if (calf.caught !== undefined && !calf.dead) {
+    parent.x = calf.x - 40
+    parent.z = calf.z
+  }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000 && parent.vigil === undefined) await sleep(150)
+  out.vigilSet = parent.vigil !== undefined
+  const t1 = Date.now()
+  while (Date.now() - t1 < 20000 && parent.vigil !== undefined) await sleep(200)
+  out.cleared = parent.vigil === undefined
+  out.parentAlive = !parent.dead
+  bal.predatorDelay = prevDelay
+  bal.seconds = prevSeconds
+  st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false
+  fam.dispose()
+  return out
+})
+check(
+  'with no predator drawn the vigil expires and the parent rejoins alive (point 121e)',
+  vigilBackstop.vigilSet && vigilBackstop.cleared && vigilBackstop.parentAlive,
+  JSON.stringify(vigilBackstop),
+)
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 

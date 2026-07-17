@@ -355,6 +355,7 @@ export const en: Strings = {
     riverWidthFactor: 'River width factor (applies on reload)',
     drownSeconds: 'Drowning: seconds in a strong current',
     wetFlowFactor: 'Drowning: wet-season current factor',
+    vigilPredatorDelay: 'Vigil: seconds until a predator is drawn',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

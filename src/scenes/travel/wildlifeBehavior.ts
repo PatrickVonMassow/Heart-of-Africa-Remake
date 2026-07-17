@@ -344,6 +344,62 @@ export function vigilBlocksLanding(keeperDistToCarcass: number, radius = 4): boo
 }
 
 /**
+ * The vigil summons its ending (design.md §19.8, point 121 (f)): the calf's
+ * carcass draws a predator to the standing keeper once the vigil has stood
+ * for the calibratable delay — before that the keeper mourns undisturbed,
+ * after it the next idle hunt window claims it as the scripted target.
+ */
+export function vigilDrawReady(vigilSeconds: number, predatorDelay: number): boolean {
+  return vigilSeconds >= predatorDelay
+}
+
+/**
+ * Where the drawn predator of the vigil enters the stage (point 121 (f)).
+ * The vulture standard applies: it spawns BEYOND the zoom-aware view ring and
+ * WALKS in, never popping into sight — and it must also land INSIDE the
+ * hunt's offstage abort ring around the player, or the chase would abort on
+ * its very first frame. Both rings are player-centred while the spawn circle
+ * (radius viewR + margin) is keeper-centred and the keeper may stand well off
+ * the player, so the bearing is probed: from a random start angle, the first
+ * probe whose player distance clears the view ring and stays inside the
+ * offstage ring wins. The keeper-centred circle always cuts that annulus for
+ * every keeper the draw can pick (seek range < both ring radii), so a valid
+ * probe exists; the probe closest to the annulus middle backstops the
+ * discrete sweep.
+ */
+export function vigilDrawSpawn(
+  keeperX: number,
+  keeperZ: number,
+  playerX: number,
+  playerZ: number,
+  viewR: number,
+  offstageR: number,
+  rand01: number,
+  margin = 8,
+): { x: number; z: number } {
+  const r = viewR + margin
+  const lo = viewR + 2 // clear of the view ring — the arrival is walked, not popped
+  const hi = offstageR - 2 // clear of the abort ring — the chase must survive frame one
+  const mid = (lo + hi) / 2
+  let best = { x: keeperX + r, z: keeperZ }
+  let bestScore = Infinity
+  const PROBES = 24
+  for (let k = 0; k < PROBES; k++) {
+    const ang = rand01 * Math.PI * 2 + (k * Math.PI * 2) / PROBES
+    const x = keeperX + Math.cos(ang) * r
+    const z = keeperZ + Math.sin(ang) * r
+    const d = Math.hypot(x - playerX, z - playerZ)
+    if (d > lo && d < hi) return { x, z }
+    const score = Math.abs(d - mid)
+    if (score < bestScore) {
+      bestScore = score
+      best = { x, z }
+    }
+  }
+  return best
+}
+
+/**
  * One step of a scripted walk under the land constraint (design.md §19.5,
  * point 83): the predator's walk-off must never enter the open ocean — like
  * every streamed animal, it deflects along the coast instead. Tries the

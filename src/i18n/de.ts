@@ -354,6 +354,7 @@ export const de: Strings = {
     riverWidthFactor: 'Flussbreiten-Faktor (greift nach Neuladen)',
     drownSeconds: 'Ertrinken: Sekunden in starker Strömung',
     wetFlowFactor: 'Ertrinken: Strömungsfaktor Regenzeit',
+    vigilPredatorDelay: 'Totenwache: Sekunden bis ein Räuber kommt',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',
