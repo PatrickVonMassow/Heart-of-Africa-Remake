@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   channelDriftStep,
+  mireFate,
+  mireRoll,
   seasonFlowFactor,
   waterStruggleFate,
   blockHeading,
@@ -672,5 +674,26 @@ describe('channelDriftStep (point 122 — the current follows the channel, never
   it('stays put when every candidate is dry (still in the water at its old spot)', () => {
     const none = () => false
     expect(channelDriftStep(3, 4, 1, 1, none)).toEqual({ x: 3, z: 4 })
+  })
+})
+
+describe('mireRoll / mireFate (design.md §19.8, point 123 — the drying waterhole)', () => {
+  it('mires only AT a dry-season bank, and only on the roll', () => {
+    // At the bank, dry, roll under the chance: mired.
+    expect(mireRoll(0.02, 0.05, 0.1, 0.25, 0.35, 0.2)).toBe(true)
+    // Away from the bank: never.
+    expect(mireRoll(0.2, 0.05, 0.1, 0.25, 0.35, 0.0)).toBe(false)
+    // In the rains the bank is firm: never.
+    expect(mireRoll(0.02, 0.05, 0.8, 0.25, 0.35, 0.0)).toBe(false)
+    // Roll over the chance: not this time.
+    expect(mireRoll(0.02, 0.05, 0.1, 0.25, 0.35, 0.9)).toBe(false)
+    // The wetness boundary is exact: AT the threshold the bank is firm.
+    expect(mireRoll(0.02, 0.05, 0.25, 0.25, 0.35, 0.0)).toBe(false)
+  })
+
+  it('the mire always resolves: released exactly at the window', () => {
+    expect(mireFate(0, 45)).toBe('mired')
+    expect(mireFate(44.99, 45)).toBe('mired')
+    expect(mireFate(45, 45)).toBe('released')
   })
 })

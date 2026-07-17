@@ -41,6 +41,8 @@ import {
   deflectedStep,
   type FlightState,
   channelDriftStep,
+  mireFate,
+  mireRoll,
   seasonFlowFactor,
   waterStruggleFate,
 } from './wildlifeBehavior'
@@ -138,6 +140,12 @@ interface Animal {
    *  its own field, NOT inWater: that one carries calf-only pose/behaviour
    *  couplings (facing freeze, dodge exemption, render struggle). */
   wadeTime?: number
+  /** Seconds a calf has been MIRED in a dry-season lake bank (point 123):
+   *  it struggles in place, cannot free itself, and the mud releases it
+   *  only after balance.waterDrama.mireSeconds — unless a predator ends it. */
+  mired?: number
+  /** This calf is currently inside a gambol bout (per-bout mire roll). */
+  bouted?: boolean
   /** Land point to walk back to after a water rescue (where the calf fell in). */
   rescueEntry?: { x: number; z: number }
   /** The parent reached its calf in the water: both walk back to the
@@ -998,9 +1006,15 @@ function Herds() {
           a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
           a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
           if (d < PARENT_SACRIFICE_DIST) {
-            calf.caught = undefined // freed — it rises and flees on its own
-            calf.parent = undefined
-            a.child = undefined
+            // A MIRED calf cannot rise and flee (point 123): the parent's
+            // charge still costs its life, but the mud holds the calf for
+            // the predator — at the waterhole both are taken, through the
+            // existing caught countdown (no new kill path).
+            if (calf.mired === undefined) {
+              calf.caught = undefined // freed — it rises and flees on its own
+              calf.parent = undefined
+              a.child = undefined
+            }
             a.dead = true
             a.lionFed = true
             a.dissolve = CARCASS_DISSOLVE_SECONDS
@@ -1011,6 +1025,9 @@ function Herds() {
           a.child &&
           !a.child.dead &&
           a.child.caught === undefined &&
+          a.child.mired === undefined && // the vigil (point 123) never shields:
+          // the mud holds the calf, the hunt reaches it, and the parent's
+          // charge after the catch costs its life beside it.
           LION_STATE.mode === 'chase' &&
           LION_STATE.victim === a.child
         ) {
@@ -1053,6 +1070,16 @@ function Herds() {
         }
         if (a.young) {
           const isChaseVictim = LION_STATE.mode === 'chase' && LION_STATE.victim === a
+          // The drying waterhole (point 123): a mired calf struggles in
+          // place — no drift, no self-rescue — until a predator ends it or
+          // the mud releases it after the calibratable window (the drama
+          // always resolves, the point-118 lesson).
+          if (a.mired !== undefined && a.caught === undefined) {
+            a.mired += dt
+            if (mireFate(a.mired, balance.waterDrama.mireSeconds) === 'released') {
+              a.mired = undefined
+            }
+          }
           if (a.inWater === undefined && !a.rescued && a.caught === undefined && !isChaseVictim) {
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
@@ -1265,10 +1292,11 @@ function Herds() {
         b.dead ||
         b.caught !== undefined ||
         b.inWater !== undefined ||
+        b.mired !== undefined ||
         b.rescued !== undefined ||
         b.plungeTo !== undefined ||
         b.trampleTo !== undefined ||
-        (b.child !== undefined && !b.child.dead && b.child.caught !== undefined) ||
+        (b.child !== undefined && !b.child.dead && (b.child.caught !== undefined || b.child.mired !== undefined)) ||
         // The active chase victim and its blocking parent sprint on exact
         // lines; herd-mates shoving them every frame trembled the hunt.
         (LION_STATE.mode === 'chase' &&
@@ -1345,8 +1373,8 @@ function Herds() {
           // own movement; everyone else must never STAND in water — not in
           // the open sea, and not in a river or lake either (an animal only
           // reaches the water's edge to drink, design.md §19).
-          if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo || a.trampleTo) continue
-          if (a.child && !a.child.dead && a.child.inWater !== undefined) continue
+          if (a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo || a.trampleTo) continue
+          if (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined)) continue
           const ll = worldToLatLon(a.x, a.z)
           const ter = sampleTerrain(ll.lat, ll.lon, seed).type
           if (ter === 'ocean' || ter === 'water') {
@@ -1683,6 +1711,32 @@ function Herds() {
             yaw = Math.atan2(a.trampleTo.x - a.x, a.trampleTo.z - a.z)
             pitch = 0
             familyHeld = true
+          } else if (a.young && a.mired !== undefined) {
+            // Mired at the drying waterhole (point 123): it struggles in
+            // PLACE — a small shudder, no ground covered, no escape.
+            px = a.x
+            pz = a.z
+            bodyY = a.y + Math.abs(Math.sin(t * 7 + a.phase)) * 0.06
+            yaw = a.face ?? a.rot
+            pitch = 0.2 // head straining up out of the mud
+            familyHeld = true
+          } else if (a.child && !a.child.dead && a.child.mired !== undefined) {
+            // The vigil (point 123): the parent walks to its mired calf and
+            // STANDS beside it while the herd moves on — and does not flee
+            // the predator the last water draws (familyHeld suppresses the
+            // dodge below, like the trample grief).
+            const dxm = a.child.x - a.x
+            const dzm = a.child.z - a.z
+            const dm = Math.hypot(dxm, dzm)
+            if (dm > 1.6) {
+              a.x += (dxm / dm) * YOUNG_FOLLOW_SPEED * dt
+              a.z += (dzm / dm) * YOUNG_FOLLOW_SPEED * dt
+            }
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(dxm, dzm)
+            pitch = -0.15 // head down toward the stuck calf
+            familyHeld = true
           } else if (a.child && !a.child.dead && a.child.inWater !== undefined) {
             // Wading to (or escorting) the calf in the water (pre-pass moves).
             px = a.x
@@ -1736,7 +1790,26 @@ function Herds() {
             const canPlay =
               !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
             const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
+            // The drying waterhole (design.md §19.8, point 123): a bout that
+            // ENDS at a lake bank whose season has dried to mud may stick the
+            // calf — one roll per bout, hashed from the calf's phase and the
+            // bout cycle so it is deterministic per (calf, bout).
+            if (!bout && a.bouted) {
+              a.bouted = undefined
+              const bw = balance.waterDrama
+              const llm = worldToLatLon(a.x, a.z)
+              const bankD = lakeDistance(llm.lat, llm.lon, 0.2)
+              const cycle = Math.floor(t / GAMBOL_PERIOD)
+              const roll = Math.abs(Math.sin(a.phase * 127.1 + cycle * 311.7)) % 1
+              if (
+                mireRoll(bankD, 0.06, CURRENT_WEATHER.wetness, bw.mireDrynessThreshold, bw.mireChancePerBout, roll)
+              ) {
+                a.mired = 0
+                a.hop = undefined
+              }
+            }
             if (bout) {
+              a.bouted = true
               // Playful gambolling (design.md §19): scampering hops around the
               // parent, LEASHED — a homeward pull grows toward the range edge
               // so the scamper orbits the parent instead of crossing the
@@ -1913,7 +1986,9 @@ function Herds() {
         // updates the resting orientation so ending it never yanks the animal
         // back toward its spawn-time facing.
         const thrashing =
-          (a.caught !== undefined && a.caught > 0) || (a.inWater !== undefined && !a.rescued)
+          (a.caught !== undefined && a.caught > 0) ||
+          (a.inWater !== undefined && !a.rescued) ||
+          a.mired !== undefined
         const face = thrashing ? yaw : turnToward(a.face ?? yaw, yaw, FACE_TURN * dt)
         a.face = face
         if (sp !== 'elephant' && !thrashing && yaw !== idleYaw) a.rot = face
@@ -2060,7 +2135,24 @@ function LionHunt() {
       let ll: { lat: number; lon: number }
       const herds = ACTIVE_HERDS
       let calf: Animal | null = null
-      if (herds && Math.random() < CALF_HUNT_CHANCE) {
+      // The drying waterhole draws the predators (point 123): a MIRED calf
+      // in seek range is always the hunt's target — the pair at the last
+      // water is genuinely found, not left to the calf-hunt dice.
+      if (herds) {
+        let bd = CALF_HUNT_SEEK
+        for (const csp of CALF_HUNT_SPECIES) {
+          for (const c of herds[csp]) {
+            if (!c.young || c.dead || c.caught !== undefined || c.mired === undefined || !c.parent || c.parent.dead)
+              continue
+            const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
+            if (cd < bd) {
+              bd = cd
+              calf = c
+            }
+          }
+        }
+      }
+      if (!calf && herds && Math.random() < CALF_HUNT_CHANCE) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {

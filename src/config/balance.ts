@@ -226,6 +226,12 @@ export interface BalanceConfig {
     dryFlowFactor: number
     /** Seasonal multiplier on the drama current at wetness 1 (full rains). */
     wetFlowFactor: number
+    /** Chance per finished gambol bout AT a dry-season lake bank to mire (point 123). */
+    mireChancePerBout: number
+    /** Local wetness below which a lake bank turns to miring mud. */
+    mireDrynessThreshold: number
+    /** Seconds a mired calf struggles before the mud releases it (no predator came). */
+    mireSeconds: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -409,6 +415,9 @@ export const balance: BalanceConfig = {
     drownFlowThreshold: 0.8, // reached only by a wet-amplified or mid-channel flow
     dryFlowFactor: 0.6, // dry-season rivers run tame — self-rescue always wins
     wetFlowFactor: 1.8, // the rains swell the current past the drown threshold
+    mireChancePerBout: 0.35, // per bout ENDING at a dry lake bank — the bank visits are already rare
+    mireDrynessThreshold: 0.25, // wetness below this turns the shrinking bank to mud
+    mireSeconds: 45, // the mud releases an unfound calf — the drama always resolves
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

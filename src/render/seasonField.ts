@@ -29,7 +29,11 @@ const RES = 0.5 // degrees per texel
 export const FIELD_W = Math.round((LON1 - LON0) / RES) // 150
 export const FIELD_H = Math.round((LAT1 - LAT0) / RES) // 148
 const SLOTS = SEASON_SLOTS.length
-const BLUR_RADIUS = 4 // texels (2 degrees) — the zone-border softness
+// Two box passes of r=2 cascade into a triangle kernel whose reach is
+// EXACTLY 2 degrees (4 texels). The first cut (r=4, two passes) reached 4
+// degrees and leaked the southern plateau's summer-rain swing into the Congo
+// basin's pixel check 2.4 degrees from the border — the Congo must not swing.
+const BLUR_RADIUS = 2
 
 const fieldData = new Uint8Array(FIELD_W * FIELD_H)
 fieldData.fill(128) // neutral until the first update

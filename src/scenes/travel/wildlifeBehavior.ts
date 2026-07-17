@@ -423,3 +423,29 @@ export function channelDriftStep(
   }
   return { x, z }
 }
+
+/**
+ * The dry-season mire roll (design.md §19.8, point 123): a gambol bout that
+ * ENDS at a lake bank whose season has dried to mud may stick the calf.
+ * Deterministic over its inputs — the caller passes its own hash roll.
+ */
+export function mireRoll(
+  bankDistDeg: number,
+  bankReachDeg: number,
+  wetness: number,
+  drynessThreshold: number,
+  chance: number,
+  roll: number,
+): boolean {
+  if (bankDistDeg > bankReachDeg) return false // not at the water's edge
+  if (wetness >= drynessThreshold) return false // the bank is firm outside the dry season
+  return roll < chance
+}
+
+/**
+ * The mire always resolves (the point-118 lesson): either a predator ends it
+ * at the waterhole, or after `mireSeconds` the mud releases the calf.
+ */
+export function mireFate(secondsMired: number, mireSeconds: number): 'mired' | 'released' {
+  return secondsMired >= mireSeconds ? 'released' : 'mired'
+}

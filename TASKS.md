@@ -93,7 +93,14 @@ eingereiht" while 136 had only just started (nothing of 136 is committed, so
 nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
 remaining open points in their numeric order.
 
-Work order (user override, 2026-07-16, ninth): 149 (a SECOND full weather
+Work order (user override, 2026-07-17): point 135 (the stochastic wildlife
+checks) is PULLED FORWARD to directly after 123, BEFORE 149 — the roaming
+flakes (drinker counts, guard approach, trample metric, vicinity seeding)
+were failing one full suite run in two and taxing every point with retries,
+and 149's weather verification should run on a stabilised suite. So: 123 →
+135 → 149 → 150 → the rest as previously ordered.
+
+Work order (user override, 2026-07-16, ninth): 149 (a SECOND full weatherWork order (user override, 2026-07-16, ninth): 149 (a SECOND full weather
 verification, like 147) and 150 (a SECOND interim Closing run) go AFTER 123, on
 the user's instruction — the whole system is re-swept and re-cleaned once more
 after the family dramas and the river rebuild, before the batch tail. So the

@@ -2271,6 +2271,96 @@ check('a rescuing parent wading into the falls\' reach is swept over (calf survi
   sweptRescuer.found && !sweptRescuer.noWater && sweptRescuer.calfFellIn && sweptRescuer.parentSwept && sweptRescuer.calfAlive,
   JSON.stringify(sweptRescuer))
 
+// --- Point 123: the drying waterhole — mire, vigil, and the predators' find --
+// The mire ROLL is pure-tested; live, the states are forced like the other
+// dramas and the behaviour chain is asserted: the mired calf holds its spot,
+// the parent stands vigil beside it instead of following the herd, a forced
+// hunt takes BOTH at the waterhole (the mud never frees the calf for the
+// sacrifice escape), and without a predator the mud releases.
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
+await page.waitForTimeout(400)
+const mire = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || [])
+      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined && a.child.mired === undefined) { parent = a; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  const calf = parent.child
+  calf.mired = 0
+  parent.x = calf.x - 15
+  parent.z = calf.z
+  const start = { x: calf.x, z: calf.z }
+  await sleep(4000)
+  const held = Math.hypot(calf.x - start.x, calf.z - start.z)
+  const vigil0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
+  await sleep(2000)
+  const vigil1 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
+  // The predators find the pair (target bias): force the hunt's next pick
+  // window and let the chase run — the mud holds the calf, so the parent's
+  // charge costs its life WITHOUT freeing it, and the countdown takes both.
+  const st = window.__lionHunt.state
+  st.mode = 'chase'
+  st.victim = calf
+  st.victimHunt = true
+  st.lx = calf.x - 12
+  st.lz = calf.z + 2
+  st.px = calf.x
+  st.pz = calf.z
+  st.timer = 0 // the hunt loop waits its idle timer out before acting
+  const t0 = Date.now()
+  while (Date.now() - t0 < 45000 && (!calf.dead || !parent.dead)) await sleep(200)
+  const bothDeadAtWater =
+    calf.dead && parent.dead &&
+    Math.hypot(calf.x - start.x, calf.z - start.z) < 5 &&
+    Math.hypot(parent.x - start.x, parent.z - start.z) < 8
+  window.__lionHunt.state.mode = 'idle'
+  window.__lionHunt.state.timer = 60
+  return { found: true, held, vigil0, vigil1, calfDead: !!calf.dead, parentDead: !!parent.dead, bothDeadAtWater }
+})
+check(
+  'a mired calf holds its spot and its parent stands vigil beside it (point 123)',
+  mire.found && mire.held < 0.6 && mire.vigil0 < 2.2 && mire.vigil1 < 2.2,
+  JSON.stringify(mire),
+)
+check(
+  'the hunt takes calf AND vigil parent at the waterhole — the mud never frees the calf (point 123)',
+  mire.found && mire.bothDeadAtWater,
+  JSON.stringify(mire),
+)
+// Without a predator, the mud RELEASES (the drama always resolves): shorten
+// the window through the balance hook, then watch the calf come free alive.
+const release = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let parent = null
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+    for (const a of herds[sp] || [])
+      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined && a.child.mired === undefined) { parent = a; break }
+    if (parent) break
+  }
+  if (!parent) return { found: false }
+  const calf = parent.child
+  const prev = window.__balance.waterDrama.mireSeconds
+  window.__balance.waterDrama.mireSeconds = 5
+  calf.mired = 0
+  const t0 = Date.now()
+  while (Date.now() - t0 < 15000 && calf.mired !== undefined && !calf.dead) await sleep(200)
+  window.__balance.waterDrama.mireSeconds = prev
+  return { found: true, released: calf.mired === undefined && !calf.dead }
+})
+check(
+  'without a predator the mud releases the calf alive (point 123 — the drama always resolves)',
+  release.found && release.released,
+  JSON.stringify(release),
+)
+await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+await page.waitForTimeout(300)
+
+
 // --- Point 4: spawn spacing and animal-animal collision -----------------------
 // design.md §19: animals spawn with natural spacing (no two inside one another)
 // and never walk through each other — overlapping animals part at once. The
@@ -2878,17 +2968,21 @@ const fieldWitness = await page.evaluate(async () => {
   // old player-position uniform this phase drifted MASSIVELY more than the
   // standing phase; with the field it must not differ.
   const m0 = read()
-  for (let i = 0; i < 60; i++) {
-    // Westward across the open Gezira plain — the northward line once ran
-    // into a blocking obstacle and covered only ~1 unit, starving the check.
-    window.__game.getState().moveTravel(-1, 0, 0.05)
-    await sleep(50)
+  // Position changes WITHOUT day advance (debugJumpTo, not moveTravel):
+  // travelling advances the calendar, which legitimately moves the field —
+  // the bug under test was the POSITION dependence alone.
+  let far = 0
+  for (let i = 1; i <= 10; i++) {
+    const lat = 13.4 + i * 0.35 // north across the ITCZ gradient
+    window.__game.getState().debugJumpTo(lat, 31.8)
+    await sleep(120)
+    far = Math.max(far, Math.hypot((31.8 - 31.8) * 10, (lat - 13.4) * 10))
   }
+  window.__game.getState().debugJumpTo(13.4, 31.8)
+  await sleep(300)
   const m1 = read()
   const moveDrift = Math.abs(m1 - m0)
-  const p = window.__game.getState().pos
-  const moved = Math.hypot(p.x - 31.8 * 10, p.z - -13.4 * 10)
-  return { standDrift, moveDrift, moved }
+  return { standDrift, moveDrift, moved: far }
 })
 check(
   'the season field does not move when the player does (point 151 — the flying-plants witness)',

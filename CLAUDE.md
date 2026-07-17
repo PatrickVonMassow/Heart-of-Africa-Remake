@@ -503,7 +503,15 @@ verify suite that proves it.
       current drowns (dead, sinking, never rescued or scavenged) while the
       SAME setup in the dry season still clambers out alive, and a rescuing
       parent that wades a swollen current too long drowns beside its calf
-      (both live in `scripts/verify/enrichments.mjs`); in the water inside a waterfall's reach a calf is
+      (both live in `scripts/verify/enrichments.mjs`); the drying
+      waterhole (point 123): a dry-season lake bank can MIRE a calf on a
+      bout ending there (pure-tested roll: only at the bank, only under
+      the dryness threshold, exact boundaries), the calf struggles in
+      place, its parent stands vigil beside it and flees no predator, the
+      hunt's target bias finds the pair (a mired calf is always preferred)
+      and takes BOTH — the mud never frees the calf for the sacrifice
+      escape — while an unfound calf is released after the calibratable
+      window (all live in `scripts/verify/enrichments.mjs`); in the water inside a waterfall's reach a calf is
       swept over and dies with its parent plunging after it, and a
       rescuing parent wading into the falls' reach is swept over itself
       while its calf survives. Calf trample grief (§19.8): a calf
