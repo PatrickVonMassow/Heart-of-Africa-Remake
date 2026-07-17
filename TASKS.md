@@ -4484,7 +4484,7 @@ the remaining open points in their numeric order.
   1597, lint clean, polish + enrichments green). design.md §19.13's
   settlement/dress paragraph was already recompacted in the 143 commit.
 
-- [ ] 149. A SECOND full weather verification, after the family dramas.
+- [x] 149. A SECOND full weather verification, after the family dramas.
   Wanted (user, 16.07.2026): "Füge nach 123 zwei neue Tasks ein: 1. Erneute
   vollständige Wetter-Verifikation, so wie bei 147."
   ORDER: after 123 (see the work-order note). By then everything weather has
@@ -4508,6 +4508,21 @@ the remaining open points in their numeric order.
   must still be visible, not merely modelled.
   DOCS: none new; note the re-run in CLAUDE.md §7.1 pt. 12 only if a check
   changed. (Filed 16.07.2026.)
+  DONE (17.07.2026, 07:32): the 147 procedure re-ran on the state after
+  123/135/136/151/152/156 — and its RE-RUNNING is what forced most of
+  point 135: the checks themselves exposed the drinker-belt swallowed by the
+  widened rivers, the Victoria-Falls pixel spot, and the shore-seeder leak,
+  all fixed in the GAME as the licence demands. Final state: THREE full
+  enrichments runs in a row exit 0 (the same runs as 135's gate — they ARE
+  the (a)-(g) re-execution) plus a fresh polish run (43 PASS, settlement
+  season/dress/fire/presence). Human sighting of the re-taken pairs:
+  115/116 (Matabele plateau July straw-bare vs January deep green WITH the
+  point-151 sprouted ground flora and visible rain), 117/118 (Nile low vs
+  October flood, canoe riding the smoothed wide band), 119/120 (Okavango fan
+  full in the LOCAL dry July), 121 (harmattan pall), 122 (Atlas snow),
+  110-114 (settlement rain/dress) unchanged and green in polish. Checks
+  changed only in HOW they measure (135's honest-measurement fixes; the
+  CLAUDE pt. 12 wording names no coordinates, so no doc edit needed).
 
 - [ ] 150. A SECOND interim Closing run, after the family dramas.
   Wanted (user, 16.07.2026): "…2. Einen erneuten Closing-Zwischenlauf."
