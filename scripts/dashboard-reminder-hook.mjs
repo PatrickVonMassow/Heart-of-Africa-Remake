@@ -17,10 +17,17 @@ try {
   // best effort — the reminder itself is the payload
 }
 console.log(
-  '[dashboard-reminder] PFLICHT in diesem Zug: Prüfe, ob das Batch-Dashboard ' +
-  '(scratchpad/hoa-batch-dashboard.html) den JETZT-Zustand zeigt (Now-Block, ' +
-  'Warteschlange nur offene Punkte in Arbeitsreihenfolge, Erledigt, Zuletzt ' +
-  'passiert, Footer-Zeit/-Commit). Wenn irgendetwas veraltet ist: SOFORT ' +
-  'aktualisieren UND per Artifact republishen, bevor andere Arbeit weitergeht.' +
+  '[dashboard-reminder] PFLICHT in diesem Zug, wenn du das Dashboard anfasst: ' +
+  'Lies die GESAMTE Datei scratchpad/hoa-batch-dashboard.html mit dem Read-Tool ' +
+  'und prüfe JEDE Sektion einzeln gegen den Ist-Zustand — nicht nur die, die du ' +
+  'gerade editierst. Checkliste, ALLE müssen stimmen: (1) Now-Block, ' +
+  '(2) »Für dich zu klären« — erledigte Rückfragen RAUS, (3) Zeiten & Aufwand, ' +
+  '(4) »Zuletzt passiert« nur echt Neuestes, (5) Warteschlange nur offene Punkte ' +
+  'in Arbeitsreihenfolge, (6) »Deine gemeldeten Bugs«-Nachlese darf nichts als ' +
+  '»alles erledigt« behaupten, wenn offene Meldungen existieren, (7) Erledigt, ' +
+  '(8) Footer-Zeit (gemessen) + -Commit + Punktzahl. Häufigster Fehler: eine ' +
+  'veraltete Stelle AUSSERHALB der gerade editierten Sektion (z. B. eine längst ' +
+  'geklärte Rückfrage). Bei irgendeiner Abweichung: SOFORT korrigieren UND per ' +
+  'Artifact republishen, bevor andere Arbeit weitergeht.' +
   mtimeNote,
 )
