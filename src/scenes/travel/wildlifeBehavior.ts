@@ -368,6 +368,51 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
   return !mourned && distToTarget < radius
 }
 
+/** The broken-wing lure (design.md §19.8, point 145b): a ground-nesting
+ *  plover, threatened at its nest, does not flee — it LIES. It drags itself
+ *  conspicuously away in front of the threat, wing trailed as if broken,
+ *  luring it from the nest; past a safe distance (or when the act has run
+ *  its time) it "recovers" and flies back. The one sacrifice that is a lie
+ *  rather than a leap — and it can genuinely fail: a predator close at the
+ *  moment of recovery sometimes takes the actor. */
+export const PLOVER_LURE_TRIGGER = 10
+export const PLOVER_LURE_SAFE = 18
+export const PLOVER_LURE_SECONDS = 12
+export const PLOVER_TAKEN_CHANCE = 0.15
+
+/** Whether a threat this close to the nest starts the act. */
+export function ploverShouldLure(threatDistToNest: number, trigger: number = PLOVER_LURE_TRIGGER): boolean {
+  return threatDistToNest < trigger
+}
+
+/** The drag heading: away from the nest, on the side of the threat-nest axis
+ *  the bird chose (deterministic per bird) — conspicuously ACROSS the
+ *  threat's view, never straight away from it. */
+export function ploverLureHeading(nestX: number, nestZ: number, threatX: number, threatZ: number, side: 1 | -1): number {
+  const ax = nestX - threatX
+  const az = nestZ - threatZ
+  const base = Math.atan2(ax, az) // from the threat over the nest
+  return base + (side * Math.PI) / 3 // and off to the chosen side
+}
+
+/** Whether the act ends this frame: the threat has been drawn far enough
+ *  from the nest, or the act has run its time. The drama always resolves
+ *  (the point-118 lesson) — 'return' flies the bird home. */
+export function ploverLureResolve(
+  elapsed: number,
+  threatDistToNest: number,
+  maxSeconds: number = PLOVER_LURE_SECONDS,
+  safeDist: number = PLOVER_LURE_SAFE,
+): 'keep' | 'return' {
+  return elapsed >= maxSeconds || threatDistToNest >= safeDist ? 'return' : 'keep'
+}
+
+/** Sometimes the lie fails: only a PREDATOR near the actor at the recovery
+ *  moment can take it — the traveller never harms a bird. */
+export function ploverTaken(roll: number, predatorNear: boolean, chance: number = PLOVER_TAKEN_CHANCE): boolean {
+  return predatorNear && roll < chance
+}
+
 /** Zones whose cured dry-season grass carries the burning of the steppe
  *  (design.md §19.8/§19.13, point 145a): Dybowski watched the inhabitants
  *  fire it at the congo-north latitude, Park saw the same lines of fire from

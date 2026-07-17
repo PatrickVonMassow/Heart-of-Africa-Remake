@@ -4540,11 +4540,41 @@ the remaining open points in their numeric order.
   screenshot 131 human-checked (the blackened band on the straw Sahel).
   Docs: design.md §19.8 bullet + §19.13 season note. Build/lint/1746 unit
   tests green. NOTE: the 133 carrion check rotated 1->0 in the same run
-  (same dayStruck 393) — diagnosis instrumentation added (zoom/chunks/
-  alive/dead in the failure JSON), watching the next runs. REMAINING: (b)
-  the broken wing (ground-nesting bird + nest, the lure-as-lie mechanic),
-  (c) the lioness defending cubs against hyenas (predator cub builds, the
-  LION_STATE-as-victim architecture decision).
+  (same dayStruck 393) — diagnosis instrumentation added; the follow-up run
+  SOLVED it: the diag (169 chunks spawned, 0 toll) plus the croc counts
+  varying 2-8 across runs prove the BOOT SEED is random per run, so the 6%
+  anchor band left whole rings without toll — and Baumann records ~95% of
+  buffalo/wildebeest dead, so the thin strew was also the less accurate
+  reading. Band widened to 13% with 1-3 per chunk: the mass die-off reads
+  as such and the check meets it under any seed. ALSO WATCHING (single-run
+  reds, first occurrences): 'a parent flees a feeding lion beside its calf'
+  (reversalRate 0.26) in the 145b run; trample/stain and 102-vicinity from
+  earlier runs. (b) WIP (17.07.2026,
+  22:20 — core complete and PROBE-PROVEN, the suite check is the open
+  half): the plover species is in (buildPlover/buildPloverChick, nest+2
+  chicks spawn on savanna at roll band [0.68,0.72), CALF_SPECIES extended,
+  plover excluded from CALF_HUNT_SPECIES so no drama loop touches it), the
+  lure runs on four boundary-tested pure rules (ploverShouldLure/
+  LureHeading/LureResolve/Taken — taken only near a predator, never the
+  traveller) plus a post-act cooldown (25 s alert at the nest — without it
+  the act LOOPED at a standing threat, run-1 finding), render poses
+  (trailed wing drag, low return arc). A one-off probe
+  (scripts/verify/_plover-probe.mjs, needs the SUITE's chromium launch args
+  — a bare launch throttles rAF ~20x and made the sim look broken) proves
+  the full cycle: drag at 1.25/s, resolve at the 12 s window, flight home.
+  OPEN PUZZLES for the next stage, in order: (1) suite run 2 measured
+  lured:true with maxFromNest EXACTLY 0 — reproduce with probe-grade
+  tracing inside the full suite context or instrument the suite check
+  (sample parent.x each poll); (2) 133-carrion read 0 twice even at the
+  widened 13% band — CHECK THE RETURN in the carrion spawn branch: if the
+  bare `return` sits inside the outer roll-band if but outside the
+  rinderpestCarrionActive gate, every savanna chunk in [0.62,0.75) worldwide
+  spawns NOTHING (and eats the plover band [0.68,0.72) too) — likely the
+  real bug for both symptoms; fix = only return when carrion was actually
+  placed, else fall through to the normal species roll; (3) after fixing,
+  rerun full suite; screenshots 131 (done, human-checked) and 132 (pending
+  sight). THEN: (c) the lioness defending cubs against hyenas (predator cub
+  builds, the LION_STATE-as-victim architecture decision).
 
 - [x] 146. Revenge: a strong parent kills a weak predator and walks away.
   Wanted (user, 16.07.2026): "Es soll auch noch eine Rache-Mechanik von Eltern

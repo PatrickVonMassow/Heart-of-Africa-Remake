@@ -63,6 +63,10 @@ import {
   crocodileAllowedAt,
   crocodileLungeReady,
   grassFireEligible,
+  ploverShouldLure,
+  ploverLureHeading,
+  ploverLureResolve,
+  ploverTaken,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -78,6 +82,8 @@ import {
   buildElephant,
   buildCrocodile,
   buildFlamingo,
+  buildPlover,
+  buildPloverChick,
   buildGiraffe,
   buildHyena,
   buildLeopard,
@@ -98,9 +104,9 @@ const CHUNK_SIZE = 24
 // existing scavenger/cull/render machinery works a dead hyena exactly like a
 // dead zebra. Live predators never spawn here — spawnChunk picks species
 // explicitly, and the one live hunter stays the scripted <LionHunt>.
-type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | 'crocodile' | PredatorKind
+type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | 'crocodile' | 'plover' | PredatorKind
 const SPECIES: Species[] = [
-  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo', 'crocodile',
+  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo', 'crocodile', 'plover',
   'lion', 'cheetah', 'leopard', 'hyena',
 ]
 const MAX_INSTANCES: Record<Species, number> = {
@@ -112,6 +118,7 @@ const MAX_INSTANCES: Record<Species, number> = {
   warthog: 80,
   flamingo: 140,
   crocodile: 12,
+  plover: 24,
   // Predator slots hold only revenge carcasses (point 146) — kills are rare
   // and dissolve/cull quickly, so a handful of instances suffices.
   lion: 6,
@@ -122,7 +129,7 @@ const MAX_INSTANCES: Record<Species, number> = {
 /** Juveniles render through their own baby-schema geometry (design.md §19) in
  *  a separate instanced mesh per species; one calf per herd group keeps the
  *  counts small. Flamingos raise no young, predators hold carcasses only. */
-const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog'] as const
+const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'plover'] as const
 const MAX_CALF_INSTANCES = 24
 
 interface Animal {
@@ -224,6 +231,14 @@ interface Animal {
   /** Caught by the grass-fire line (point 145a): seconds of struggle left
    *  before the fire takes it. */
   fireTrapped?: number
+  /** The ground-nester's nest spot (point 145b) — the fixed point it guards
+   *  and returns to. */
+  nest?: { x: number; z: number }
+  /** The running broken-wing act (point 145b). */
+  lure?: { timer: number; heading: number; returning: boolean }
+  /** Seconds until the plover will act again (point 145b): after a lure it
+   *  sits alert at the nest instead of looping the act at a standing threat. */
+  lureCooldown?: number
   /** Which ambusher seized this animal (point 130): routes the shared caught
    *  countdown and the parent's charge to the crocodile instead of the lion
    *  hunt, and the kill sinks (the river takes the body) instead of staining. */
@@ -333,6 +348,7 @@ const HUNT_OFFSTAGE_MARGIN = 30
 const FLEES_LION: Record<Species, boolean> = {
   elephant: false, giraffe: true, zebra: true, wildebeest: true, antelope: true, warthog: true, flamingo: false,
   crocodile: false, // the ambusher fears nothing on its water (point 130)
+  plover: false, // the ground-nester's answer to threat is the lure, not flight (point 145b)
   // Only revenge carcasses live in these lists (point 146) — nothing to flee.
   lion: false, cheetah: false, leopard: false, hyena: false,
 }
@@ -541,6 +557,7 @@ const BODY_RADIUS: Record<Species, number> = {
   warthog: 0.45,
   flamingo: 0.25,
   crocodile: 0.55,
+  plover: 0.12,
   // Predator entries complete the record (point 146); their list members are
   // always dead, and every proximity pass skips carcasses.
   lion: 0.8,
@@ -653,7 +670,7 @@ function spawnRemnant(s: LionHuntState, seed: number): Animal | null {
 
 function emptyHerds(): Record<Species, Animal[]> {
   return {
-    elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [], crocodile: [],
+    elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [], crocodile: [], plover: [],
     lion: [], cheetah: [], leopard: [], hyena: [],
   }
 }
@@ -705,12 +722,16 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   // the plains — dead wildebeest and antelope the vultures and scavengers
   // then work like any carcass. Date-dependent by design: the same chunk in
   // 1890 spawns living herds instead.
-  if (anchor.type === 'savanna' && roll >= 0.62 && roll < 0.68 && MAASAI_VILLAGE) {
+  // Band widened from 6% after live measurement (point 133): with the
+  // per-boot random seed a 6% band left rings with zero toll — and Baumann
+  // records ~95% of the buffalo and wildebeest dead; the plague should read
+  // as the mass die-off it was.
+  if (anchor.type === 'savanna' && roll >= 0.62 && roll < 0.75 && MAASAI_VILLAGE) {
     const distDeg = Math.hypot(ll.lat - MAASAI_VILLAGE.lat, ll.lon - MAASAI_VILLAGE.lon)
     const phase = rinderpestPhaseAtDay('maasai', day, START_YEAR)
     if (rinderpestCarrionActive(phase, distDeg)) {
       const sp2: Species = hash(ccx, ccz, 40, seed) < 0.6 ? 'wildebeest' : 'antelope'
-      const n = 1 + Math.floor(hash(ccx, ccz, 41, seed) * 2)
+      const n = 1 + Math.floor(hash(ccx, ccz, 41, seed) * 3)
       for (let i = 0; i < n && herds[sp2].length < MAX_INSTANCES[sp2]; i++) {
         const x = ax + (hash(ccx, ccz, 42 + i * 2, seed) - 0.5) * 10
         const z = az + (hash(ccx, ccz, 43 + i * 2, seed) - 0.5) * 10
@@ -726,6 +747,30 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
       }
       return
     }
+  }
+
+  // Ground-nesting plovers (design.md §19.8, point 145b): a nest on open
+  // savanna — the parent at its fixed nest spot with two chicks beside it.
+  if (anchor.type === 'savanna' && roll >= 0.68 && roll < 0.72) {
+    if (herds.plover.length + 3 <= MAX_INSTANCES.plover) {
+      const parent: Animal = {
+        x: ax, z: az, y: Math.max(0.02, anchor.height), rot: hash(ccx, ccz, 50, seed) * Math.PI * 2,
+        scale: 1, phase: hash(ccx, ccz, 51, seed), chunk: key,
+        nest: { x: ax, z: az },
+      }
+      herds.plover.push(parent)
+      for (let i = 0; i < 2; i++) {
+        const chick: Animal = {
+          x: ax + (hash(ccx, ccz, 52 + i, seed) - 0.5) * 0.8,
+          z: az + (hash(ccx, ccz, 54 + i, seed) - 0.5) * 0.8,
+          y: Math.max(0.02, anchor.height), rot: hash(ccx, ccz, 56 + i, seed) * Math.PI * 2,
+          scale: 0.9, phase: hash(ccx, ccz, 58 + i, seed), chunk: key,
+          young: true, parent,
+        }
+        herds.plover.push(chick)
+      }
+    }
+    return
   }
 
   let species: Species | null = null
@@ -1078,6 +1123,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     warthog: buildWarthog(),
     flamingo: buildFlamingo(),
     crocodile: buildCrocodile(),
+    plover: buildPlover(),
     // Predator meshes draw only revenge carcasses (point 146).
     lion: buildLion(),
     cheetah: buildCheetah(),
@@ -1088,6 +1134,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     elephant: buildElephant(true),
     giraffe: buildGiraffe(true),
     zebra: buildZebraCalf(),
+    plover: buildPloverChick(),
     wildebeest: buildWildebeestCalf(),
     antelope: buildAntelopeCalf(),
     warthog: buildWarthogCalf(),
@@ -2110,6 +2157,68 @@ function Herds() {
       }
     }
 
+    // The broken-wing lure (design.md §19.8, point 145b): a threat close to
+    // a plover's nest starts the act — the bird drags itself conspicuously
+    // away in front of the threat, wing trailed as if broken; past the safe
+    // distance (or when the act has run its time) it recovers and flies
+    // home. The one sacrifice that is a lie — and near a predator the lie
+    // sometimes fails at the recovery moment.
+    {
+      const lionActive2 = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
+      for (const a of herds.plover) {
+        if (a.dead || !a.nest || a.young) continue
+        const dPlayerNest = Math.hypot(pos.x - a.nest.x, pos.z - a.nest.z)
+        const dLionNest = lionActive2 ? Math.hypot(LION_STATE.lx - a.nest.x, LION_STATE.lz - a.nest.z) : Infinity
+        const threatIsLion = dLionNest < dPlayerNest
+        const tx2 = threatIsLion ? LION_STATE.lx : pos.x
+        const tz2 = threatIsLion ? LION_STATE.lz : pos.z
+        const dThreatNest = Math.min(dPlayerNest, dLionNest)
+        if (!a.lure) {
+          // The act does not loop at a standing threat: after a lure the
+          // bird sits alert at its nest through a cooldown.
+          if (a.lureCooldown !== undefined) {
+            a.lureCooldown -= dt
+            if (a.lureCooldown <= 0) a.lureCooldown = undefined
+          } else if (ploverShouldLure(dThreatNest)) {
+            const side = a.phase < 0.5 ? 1 : -1
+            a.lure = { timer: 0, heading: ploverLureHeading(a.nest.x, a.nest.z, tx2, tz2, side), returning: false }
+          }
+          continue
+        }
+        a.lure.timer += dt
+        if (!a.lure.returning) {
+          // The conspicuous drag: slow, weaving, wing trailed (render pose).
+          a.x += Math.sin(a.lure.heading + Math.sin(clock.elapsedTime * 6 + a.phase * 9) * 0.5) * 1.3 * dt
+          a.z += Math.cos(a.lure.heading + Math.sin(clock.elapsedTime * 6 + a.phase * 9) * 0.5) * 1.3 * dt
+          a.rot = a.lure.heading
+          if (ploverLureResolve(a.lure.timer, dThreatNest) === 'return') {
+            // The recovery moment: near a predator the lie sometimes fails.
+            const dPred = lionActive2 ? Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) : Infinity
+            const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
+            if (ploverTaken(roll, dPred < 3)) {
+              takeAnimal(a, { stain: true })
+              a.lure = undefined
+              continue
+            }
+            a.lure.returning = true
+          }
+        } else {
+          // Fly home in a low arc; the act is over when it lands at the nest.
+          const dx = a.nest.x - a.x
+          const dz = a.nest.z - a.z
+          const d = Math.hypot(dx, dz)
+          if (d < 0.4) {
+            a.lure = undefined
+            a.lureCooldown = 25
+          } else {
+            a.x += (dx / d) * 6 * dt
+            a.z += (dz / d) * 6 * dt
+            a.rot = Math.atan2(dx, dz)
+          }
+        }
+      }
+    }
+
     // Walking into a crocodile routes through the EXISTING §14.2 event
     // (machete always protects, rifle only from the canoe) exactly like the
     // wandering-predator contact — no new attack path (point 130 (e)).
@@ -2456,6 +2565,18 @@ function Herds() {
           wobTarget = 0
           yaw = a.rot
           bodyY = a.y - (a.lunge && !a.lunge.retreat ? 0.02 : 0.24)
+        }
+        // The broken-wing act (point 145b): the luring plover tilts hard onto
+        // one wing and flutters; the return flight lifts it in a low arc.
+        if (sp === 'plover' && a.lure) {
+          wobTarget = 0
+          yaw = a.rot
+          if (a.lure.returning) {
+            bodyY = a.y + 1.2 + Math.sin(clock.elapsedTime * 4 + a.phase) * 0.2
+          } else {
+            pitch = 0.25
+            bodyY = a.y + 0.02
+          }
         }
         // The mourning vigil (design.md §19.8, point 126): an elephant
         // standing at the bones lowers its head to them — the same head-down

@@ -439,6 +439,59 @@ export function buildFlamingo(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** Ground-nesting plover (design.md §19.8, point 145b): a small lapwing-class
+ *  bird that lives ON the ground at its nest — high-contrast head, thin legs.
+ *  Unlike the vulture it never starts in the air. */
+export function buildPlover(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  for (const hx of [-1, 1]) {
+    const leg = new THREE.CylinderGeometry(0.008, 0.008, 0.14, 4)
+    leg.translate(hx * 0.03, 0.07, 0)
+    parts.push(tint(leg, '#c9b48a', 0.08, 201))
+  }
+  const body = new THREE.SphereGeometry(0.09, 7, 5)
+  body.scale(0.9, 0.8, 1.3)
+  body.translate(0, 0.18, 0)
+  parts.push(tint(body, '#b7a888', 0.1, 202))
+  const breast = new THREE.SphereGeometry(0.06, 6, 5)
+  breast.scale(0.9, 0.7, 0.8)
+  breast.translate(0, 0.15, 0.07)
+  parts.push(tint(breast, '#f2ead8', 0.06, 203))
+  const head = new THREE.SphereGeometry(0.045, 6, 5)
+  head.translate(0, 0.29, 0.09)
+  parts.push(tint(head, '#2e2a24', 0.08, 204))
+  const beak = new THREE.ConeGeometry(0.012, 0.05, 4)
+  beak.rotateX(1.7)
+  beak.translate(0, 0.285, 0.15)
+  parts.push(tint(beak, '#3a3230', 0.06, 205))
+  // Folded wings as flat side plates — the broken-wing drag tilts the body,
+  // so the wing silhouette must read from above.
+  for (const hx of [-1, 1]) {
+    const wing = new THREE.BoxGeometry(0.02, 0.05, 0.16)
+    wing.translate(hx * 0.08, 0.19, -0.01)
+    parts.push(tint(wing, '#5a5248', 0.1, 206))
+  }
+  return merge(parts)
+}
+
+/** Plover chick (point 145b): baby schema — rounder, bigger-headed, no wing
+ *  plates yet, downy pale colour. */
+export function buildPloverChick(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  const body = new THREE.SphereGeometry(0.05, 6, 5)
+  body.scale(1, 0.9, 1.1)
+  body.translate(0, 0.06, 0)
+  parts.push(tint(body, '#d8cba8', 0.08, 207))
+  const head = new THREE.SphereGeometry(0.035, 6, 5)
+  head.translate(0, 0.11, 0.03)
+  parts.push(tint(head, '#cfc2a0', 0.08, 208))
+  const beak = new THREE.ConeGeometry(0.008, 0.025, 4)
+  beak.rotateX(1.7)
+  beak.translate(0, 0.108, 0.065)
+  parts.push(tint(beak, '#3a3230', 0.06, 209))
+  return merge(parts)
+}
+
 /** Nile crocodile (design.md §19.16, point 130): a long, low armoured body
  *  with a flat snout, ridged tail and raised eye knobs. Built with the origin
  *  at the waterline in mind — hidden it sinks so only the eye/snout tops

@@ -33,6 +33,10 @@ import {
   crocodileAllowedAt,
   crocodileLungeReady,
   grassFireEligible,
+  ploverShouldLure,
+  ploverLureHeading,
+  ploverLureResolve,
+  ploverTaken,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -193,6 +197,39 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
     expect(taken).toBe(true) // the hunter meets the shield…
     expect(caught).toBe(false) // …never the calf
     expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
+  })
+})
+
+describe('the broken-wing lure (design.md §19.8, point 145b — the sacrifice that is a lie)', () => {
+  it('the act starts only when a threat is close to the NEST', () => {
+    expect(ploverShouldLure(9.9)).toBe(true)
+    expect(ploverShouldLure(10)).toBe(false)
+    expect(ploverShouldLure(50)).toBe(false)
+  })
+
+  it('the drag heading leads away from the nest, off to the chosen side of the threat axis', () => {
+    // Threat south of the nest: the base axis points north; the sides split it.
+    const left = ploverLureHeading(0, 0, 0, -10, 1)
+    const right = ploverLureHeading(0, 0, 0, -10, -1)
+    expect(left).not.toBeCloseTo(right, 5)
+    // Both headings move AWAY from the threat (positive z component).
+    expect(Math.cos(left)).toBeGreaterThan(0)
+    expect(Math.cos(right)).toBeGreaterThan(0)
+  })
+
+  it('the act always resolves: past the safe distance or past its time it returns home', () => {
+    expect(ploverLureResolve(0, 5)).toBe('keep')
+    expect(ploverLureResolve(11.9, 5)).toBe('keep')
+    expect(ploverLureResolve(12, 5)).toBe('return') // the act ran its time
+    expect(ploverLureResolve(0, 18)).toBe('return') // the threat is drawn far enough
+    expect(ploverLureResolve(0, 17.9)).toBe('keep')
+  })
+
+  it('the lie sometimes fails — but only a predator can take the actor, never the traveller', () => {
+    expect(ploverTaken(0.1, true)).toBe(true) // inside the chance band, predator near
+    expect(ploverTaken(0.15, true)).toBe(false) // boundary: at the chance it escapes
+    expect(ploverTaken(0.99, true)).toBe(false)
+    expect(ploverTaken(0.0, false)).toBe(false) // no predator: it always escapes
   })
 })
 

@@ -1506,6 +1506,42 @@ check(
 )
 await page.screenshot({ path: `${OUT}131-burning-grass.png` })
 
+// --- Point 145b: the broken-wing lure -----------------------------------------
+// A plover nest planted beside the traveller: standing close starts the act
+// (the bird drags itself conspicuously away from the nest), and the act
+// always resolves — the bird recovers, flies home and lands at its nest.
+const brokenWing = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const p0 = window.__game.getState().pos
+  const nx = p0.x + 5
+  const nz = p0.z
+  const parent = { x: nx, z: nz, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined, nest: { x: nx, z: nz } }
+  const chick = { x: nx + 0.5, z: nz + 0.3, y: 0.2, rot: 0, scale: 0.9, phase: 0.6, chunk: undefined, young: true, parent }
+  herds.plover.push(parent, chick)
+  const out = { lured: false, maxFromNest: 0, tookOff: false, resolved: false, homeAgain: false }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000) {
+    if (parent.lure) out.lured = true
+    if (parent.lure && parent.lure.returning) out.tookOff = true
+    out.maxFromNest = Math.max(out.maxFromNest, Math.hypot(parent.x - nx, parent.z - nz))
+    if (out.lured && !parent.lure && !parent.dead) {
+      out.resolved = true
+      out.homeAgain = Math.hypot(parent.x - nx, parent.z - nz) < 1
+      break
+    }
+    await sleep(100)
+  }
+  herds.plover = herds.plover.filter((a) => a !== parent && a !== chick)
+  return out
+})
+check(
+  'the plover fakes the broken wing, draws the threat off the nest, and flies home (point 145b)',
+  brokenWing.lured && brokenWing.maxFromNest > 5 && brokenWing.tookOff && brokenWing.resolved && brokenWing.homeAgain,
+  JSON.stringify(brokenWing),
+)
+await page.screenshot({ path: `${OUT}132-broken-wing.png` })
+
 // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
 // A single scavenger cannot keep up with every kill, so carcasses left far off
 // the screen are culled silently; only near (visible) ones linger. Without this
