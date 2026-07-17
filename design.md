@@ -665,6 +665,102 @@ The inhabitants dress for the season, but only where the period record supports 
 
 A single balance value scales the whole seasonal look (0 disables it), and the debug menu can force dry season, transition or rainy season for testing (§21).
 
+### 19.14 Research → game: the climate implementation record
+
+Where the findings of the climate research (`docs/climate-1890.md`) actually
+reached the game. STANDING RULE (user, 17.07.2026): this record — and its
+sibling §19.15 — stays current whenever the climate or people rendering
+changes; the research documents point here. Code sources of truth:
+`src/systems/season.ts` (the model), `src/render/seasonField.ts` (the
+per-position field), `src/scenes/travel/Climate.tsx` and
+`src/scenes/place/PlaceScene.tsx` (the display); verification lives in
+`src/systems/season.test.ts` and the pixel/live blocks of
+`scripts/verify/enrichments.mjs` and `scripts/verify/polish.mjs`.
+
+| Research finding (§) | In the game | Verified by |
+|---|---|---|
+| Zone geography incl. the traps (§1–§2): the Gabon coast has a HARD Jun–Sep dry season; the Horn runs Swayne's four seasons; Cairo is functionally Saharan | `climateZoneAt` rule boxes with the `atlantic-equatorial` zone (added when a sweep caught the Fang village classified into the Sahara) and the `horn` zone (added when the Somali village fell to the Congo fallback); `isHyperArid` keeps Cairo and the Libyan Desert rainless in every month | every settlement swept into a plausible zone, live; Cairo asserted dry across all 12 REAL months |
+| The Sahel was WET 1870–1895 (§3) | the Sahel month profile carries the humid-period rains inside the game's 1890–1895 window | `season.test.ts` pins the humid-period wetness |
+| Relative greening: the Serengeti greens on less water than the Congo (§4) | the wetness/greenness split — `wetnessAt` (absolute, zone-capped: fog/rain) vs `floraGreennessAt` (relative per zone: flora/ground tint) | the pixel pairs 115/116 measure the SCREEN on real months |
+| The harmattan pall, with the counter-intuitive muted halo (§4) | its own driver `harmattanAt` (Nov–mid-Mar, Sahel band): the dome whitens toward dust on its own axis, the noon sun reddens, the halo is MUTED, sight lines close harder than rain | the halo pin is a pure test; live Sahel Jan/Aug, screenshot 121 |
+| The Somali karif wind (§2/§7 peoples) | `karifAt` (Jul–Sep, Horn, altitude-gated) drives the tobe-over-the-head dress and the harder village fire | pure boundary tests; live dress checks, screenshot 113 |
+| Ice caps exactly three massifs; Elgon, Ras Dashen, Cameroon, Emi Koussi are bare (§5) | per-massif DEM-adapted ice lines (`inIceMassif`), naive global snow line removed; seasonal snow only Atlas (Feb) and Drakensberg (Jul) | the massif list swept pure AND live over terrain colours; Atlas pixel fraction, screenshot 122 |
+| Hail belongs to heavy storms, not to a season (§5) | deterministic `hailAt` — only inside a heavy-rain cell, rare, hashed per day and 2° cell | pure sweep (never in a rainless zone) plus the live radial whitening |
+| The Nile crests at Cairo in October, fed by the kiremt two months upstream (§6) | the flood is REMOTE-FED: keyed on the Ethiopian source with a 62-day lag, never on local rain; the ribbon and the canoe float height read ONE rise | pure: crest in October while Cairo's local wetness is 0; live at Aswan, screenshots 117/118 |
+| The Okavango floods in the LOCAL dry season (§6) | the same lag abstraction, 180 days from the Angolan rains — the delta fan is fullest in July | pure both directions; live fan scale, screenshots 119/120 |
+| Seasons must be of the PLACE (a consequence of all of the above) | the season FIELD: a blurred zone-weight texture sampled per ground vertex and per plant, so zone borders are ~2° gradients and nothing follows the traveller; settlements derive weather from their OWN coordinates | the flying-plants witness (field identical while the player moves); polish settlement blocks |
+
+**The deliberate exaggeration.** §19.13 carries the user's licence:
+the climate states may read a little kitschy so they are legible at a glance —
+the straw/green flora recolour is deliberately stronger than photometric
+reality, because three rounds of uniform-level checks once passed while the
+player saw nothing. The standard since then is the picture: real months,
+pixels, no override.
+
+**What was NOT implemented, on purpose.** The known unknowns of
+`docs/climate-1890.md` §8 stay out of the game (nothing invented); the
+further-accuracy options of its §7 (e.g. measuring the village clearance at
+flood maximum) are recorded as open options here, not silently taken.
+
+### 19.15 Research → game: the peoples implementation record
+
+This record states where the findings of the peoples research
+(`docs/peoples-1890.md` §2 and §7) actually reached the game — one row per
+region whose look the game now varies, with the affected settlements and the
+exact rendering. The STANDING RULE of §19.14 applies to this record too: it
+stays current whenever the people rendering changes; the research documents
+point here. The source of truth in code is
+`src/systems/dress.ts` (the rules), `src/systems/season.ts` (the three
+drivers) and `src/scenes/place/` (the figures); the live proof is
+`scripts/verify/polish.mjs` (screenshots 112/113).
+
+| Region | Settlements (alphabetical) | Implemented aspect (the research finding) | In-game rendering | Driver · gate · source |
+|---|---|---|---|---|
+| North — Ahaggar Sahara | Tuareg Village | The wealthier men wear the **bernus** cloak against the freezing caravan nights (Barth's chief envied his; the village sits at 2110 m) | A shoulder cloak on roughly a third of the figures — the settlement palette's first cloth marks the notables — while the rest stand bare at the fire; the elder is always cloaked | `coldnessAt` · rank-gated · Barth (period, seasonality inferred from indicia) |
+| West — Hausa Sahel | Hausa Village | "Only the wealthier amongst them can afford the **zenne** or shawl, thrown over the shoulder like the plaid of the Highlanders" — worn against the harmattan dawn cold, not a calendar | The same notable third gains the shoulder shawl exactly while the harmattan blows (late November to mid-March) and sheds it in the rains | `harmattanAt` · rank-gated · Barth (period, verbatim) |
+| East — Somali Haud | Somali Village | "In cold weather the head is muffled up in it after the fashion of an Algerian 'burnouse'" — the **tobe** drawn over the head in the karif wind | A SHAPE change, not a colour: the figure's head disappears under the drawn-up wrap through the July–September karif | `karifAt` · everyone · Swayne 1895 (period, on this people in the game's own decade) |
+| South — Zululand | Zulu Village | The greased **isipuku** ox-hide cloak, "worn by day in cold weather as a cloak by males and females" | Shoulder cloaks on all figures on cold highveld days | `coldnessAt` · everyone · Mayr 1907 (period, the one unambiguous case) |
+| South — Kalahari | San Village | The **‡nau** skin cloak, closed "über beiden Schultern… unter dem Kinn zusammengeknüpft" in the cold configuration | Shoulder cloaks on cold nights' days — the cold Kalahari IS dressed, one of the two named traps resolved on evidence | `coldnessAt` · everyone · Passarge (period; weather link via Andersson's identical garment class) |
+| South — Okavango | Wayeyi Village | The light **caross** "which they accommodate to the body according to the state of the weather" | Shoulder cloaks following the cold season | `coldnessAt` · everyone · Andersson 1856 (period, verbatim — the only case needing no inference) |
+
+**What the table deliberately leaves out — and why that is a finding.** The
+other sixteen peoples change NOTHING with the season, however cold their
+ground gets: the research found no period evidence of a garment put on
+seasonally, and the two named traps stay resolved as researched — the Pedi
+highveld crosses the cold threshold but is NOT dressed (the famous blanket
+belongs to the Basotho, a people the game lacks: "Lesotho is not Zululand"),
+and the Sahel harmattan wrap beyond the Hausa zenne was ruled EVIDENCE
+ABSENT — do not invent. Where the seasonal claims found were 20th-century
+tourism copy (Tuareg), they were discarded.
+
+**Where the season shows instead of on the body.** The inversion found in
+`docs/peoples-1890.md` §7 — across seven period observers, not one describes
+a person putting ON a seasonal garment; the signal is displaced onto fire,
+hut, week and landscape — is implemented as exactly that displacement (TASKS
+point 142):
+
+- **Fire:** every village fire burns visibly harder under the place's own
+  cold, harmattan or karif (`fireBlaze`, live-checked: the Tuareg January
+  fire at 1.5× against the seasonless Congo basin's 1.04×).
+- **Presence:** the transhumant peoples thin in their away season while the
+  children and the elder remain — Maasai (dry-season herding camps), Tuareg
+  (caravan months), and the Sahel farm peoples Bambara, Hausa and Mandinka
+  (rains in the fields); the sedentary Bemba never thin, and that negative
+  is asserted in the tests.
+- **Market:** the Sahel stall's grain mound shrinks through the hungry rains
+  and refills at the harvest — the best-evidenced finding of
+  `docs/climate-1890.md` §3 (the hungry season is the RAINS, not the dry).
+- **Rank as class experience:** the gate keys on the settlement palette's
+  first cloth, so about a third of the figures carry the plaid while the
+  rest stand bare at the fire — Barth's class split, not a uniform issue.
+
+**The open edge.** The one reading the research allows but the figures
+cannot yet show: a wrap worn DIFFERENTLY in the cold (drawn tight, closed
+under the chin) rather than in greater number — recorded as §19.13's open
+line. And the seasonal DRESS is only for peoples with period evidence;
+everything else here (fire, presence, market) runs for every settlement from
+its own coordinates.
+
 ## 20. Core Gameplay Loop
 
 1. Port city (first-person): buy equipment, gifts, weapons, canteen, rope, canoe, provisions; possibly take a ferry. Entering the port city saves automatically (checkpoint).
