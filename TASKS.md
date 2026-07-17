@@ -3545,7 +3545,7 @@ the remaining open points in their numeric order.
   congo 1.5/24.5; both zone-verified, >=1 deg from any river): the old
   Zambezi spot sat AT Victoria Falls, and the spray plus the dry-season
   herd my own 120e/135c features gather there drowned the ground signal in
-  animal/water pixels (screenshot診 caught it). SEALED a real game leak the
+  animal/water pixels (screenshot 115 caught it). SEALED a real game leak the
   gate exposed: the dry-shore seeder counted player-centred drink-holders
   but placed at the bank — when the group wandered or missed its drink
   roll it re-seeded EVERY frame and ballooned the herds to 450+; now
