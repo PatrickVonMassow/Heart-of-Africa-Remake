@@ -215,6 +215,46 @@ describe('resolveTravelMove (swept tree/animal collision, design.md §19)', () =
     }
   })
 
+  // Point 129 (a): a resting contact against TWO OVERLAPPING circles must
+  // leave every tangential and outward direction free — the single-circle
+  // guarantee above must survive the pair, including the interaction of the
+  // per-obstacle slide with the final pushOutOfCircles de-penetration.
+  it('two overlapping circles: every free direction from a resting contact stays free (sweep)', () => {
+    const R = 0.6
+    const SELF = 0.4
+    const MIND = R + SELF
+    const STEP = 0.3
+    const free = (x: number, z: number, obs: ReadonlyArray<readonly [number, number, number]>) =>
+      obs.every(([ox, oz]) => Math.hypot(x - ox, z - oz) >= MIND - 1e-9)
+    for (const dAB of [0.8, 1.0, 1.19]) {
+      const A: [number, number, number] = [0, 0, R]
+      const B: [number, number, number] = [dAB, 0, R]
+      const obs = [A, B]
+      for (let ai = 0; ai < 48; ai++) {
+        const ang = (ai / 48) * Math.PI * 2
+        const ox = Math.cos(ang) * MIND
+        const oz = Math.sin(ang) * MIND
+        if (!free(ox, oz, obs)) continue // contact point buried in B — not a resting spot
+        // Outward along A's normal, and both tangents.
+        const dirs = [ang, ang + Math.PI / 2, ang - Math.PI / 2]
+        for (const da of dirs) {
+          const tx = ox + Math.cos(da) * STEP
+          const tz = oz + Math.sin(da) * STEP
+          // Only claim freedom when the whole step stays outside both bodies
+          // (sampled densely along the path) — else the clamp is legitimate.
+          let pathFree = true
+          for (let k = 0; k <= 10; k++) {
+            if (!free(ox + (tx - ox) * (k / 10), oz + (tz - oz) * (k / 10), obs)) { pathFree = false; break }
+          }
+          if (!pathFree) continue
+          const p = resolveTravelMove(ox, oz, tx, tz, obs, SELF)
+          expect(p[0]).toBeCloseTo(tx, 5)
+          expect(p[1]).toBeCloseTo(tz, 5)
+        }
+      }
+    }
+  })
+
   // Multi-frame steering simulations — the shape of the real game loop: many
   // small resolved steps in sequence. These would have caught the collision
   // blocker (steering died after first contact) directly.

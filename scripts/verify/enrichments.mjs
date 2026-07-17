@@ -1309,6 +1309,77 @@ check(
   JSON.stringify(animalHit),
 )
 
+// --- Point 129: a tree contact leaves every free direction free ---------------
+// The user's invisible-blocker report (west dead at a spot with nothing
+// visible west) could not be reproduced; hypotheses (a) two-circle resting
+// contact and (c) asymmetric query window are refuted by pure tests and code
+// reading. This live witness pins the guarantee at a REAL tree: drive into
+// it (blocked at the body edge), then prove north, south and west all move.
+const treeHit = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const seed = window.__game.getState().seed
+  const U = 10
+  // Find a collidable tree near the current position with land on all sides.
+  const p0 = window.__game.getState().pos
+  let tree = null
+  outer: for (let dx = -40; dx <= 40 && !tree; dx += 8) {
+    for (let dz = -40; dz <= 40; dz += 8) {
+      for (const [ox, oz, r] of window.__vegetation.obstaclesNear(p0.x + dx, p0.z + dz)) {
+        let landAround = true
+        for (const [ax2, az2] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
+          const t = window.__terrainType(-(oz + az2) / U, (ox + ax2) / U, seed)
+          if (t === 'water' || t === 'ocean') { landAround = false; break }
+        }
+        if (landAround) { tree = { x: ox, z: oz, r }; break outer }
+      }
+    }
+  }
+  if (!tree) return { found: false }
+  // Park due west of it, then drive east into the trunk.
+  window.__game.getState().debugJumpTo(-(tree.z) / U, (tree.x - 3) / U)
+  // Clear other animals off the spot so only the tree can block.
+  const h0 = window.__wildlife.herdsRef.current
+  if (h0) for (const sp of Object.keys(h0)) for (const a of h0[sp]) {
+    if (!a.dead && Math.hypot(a.x - tree.x, a.z - tree.z) < 8) a.z += 25
+  }
+  const out = { found: true, r: tree.r, minDist: Infinity, reached: false, north: 0, south: 0, west: 0 }
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }))
+  const t0 = Date.now()
+  while (Date.now() - t0 < 6000) {
+    const p = window.__game.getState().pos
+    const d = Math.hypot(p.x - tree.x, p.z - tree.z)
+    out.minDist = Math.min(out.minDist, d)
+    if (d < tree.r + 0.8) { out.reached = true; break }
+    await sleep(20)
+  }
+  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
+  // From the resting contact: each free direction must actually move.
+  const drive = async (code, dist, sign, axis) => {
+    const start = window.__game.getState().pos
+    window.dispatchEvent(new KeyboardEvent('keydown', { code }))
+    const t1 = Date.now()
+    let moved = 0
+    while (Date.now() - t1 < 8000) {
+      const p = window.__game.getState().pos
+      moved = sign * (axis === 'x' ? p.x - start.x : p.z - start.z)
+      if (moved > dist) break
+      await sleep(20)
+    }
+    window.dispatchEvent(new KeyboardEvent('keyup', { code }))
+    return moved
+  }
+  out.north = await drive('KeyW', 1.5, -1, 'z') // north = -z
+  out.south = await drive('KeyS', 1.5, 1, 'z')
+  out.west = await drive('KeyA', 1.5, -1, 'x')
+  return out
+})
+check(
+  'a tree contact blocks the entry but leaves north, south and west free (point 129 witness)',
+  treeHit.found && treeHit.reached && treeHit.minDist > treeHit.r + 0.3 &&
+    treeHit.north > 1.5 && treeHit.south > 1.5 && treeHit.west > 1.5,
+  JSON.stringify(treeHit),
+)
+
 // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
 // A single scavenger cannot keep up with every kill, so carcasses left far off
 // the screen are culled silently; only near (visible) ones linger. Without this
@@ -1768,9 +1839,25 @@ const preyVar = await page.evaluate(async () => {
   const preyMismatch = []
   const predMismatch = []
   const webMismatch = []
+  let familyHunts = 0
   const tAll = Date.now()
-  while (prey.length < 16 && Date.now() - tAll < 70000) {
+  while (prey.length < 16 && Date.now() - tAll < 110000) {
     if (await startChase(2500)) {
+      // A family hunt records the victim calf's own species (point 124) — at
+      // a STATIONARY measuring point the calf preference re-picks the same
+      // local family every time, which is real behaviour but not what this
+      // check measures. Variety is the generic food-web pick's property, so
+      // family hunts are counted separately and skipped here.
+      if (s.victimHunt) {
+        familyHunts++
+        // Release the family hunt cleanly so no staged calf stays caught.
+        if (s.victim) { s.victim.caught = undefined; s.victim = null }
+        s.victimHunt = false
+        s.mode = 'idle'
+        s.timer = 0
+        await sleep(60)
+        continue
+      }
       const ll = geo.worldToLatLon(s.px, s.pz)
       const region = geo.regionAt(ll.lat, ll.lon)
       prey.push(s.prey)
@@ -1786,6 +1873,7 @@ const preyVar = await page.evaluate(async () => {
   s.mode = 'idle'; s.timer = 60
   return {
     count: prey.length,
+    familyHunts,
     distinctPrey: [...new Set(prey)],
     distinctPredators: [...new Set(predators)],
     preyMismatch, predMismatch, webMismatch,
@@ -2801,6 +2889,10 @@ await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, {
 // the ring covers enough chunks that the deterministic rolls always include
 // elephants. Restored to 1 after the relocation jump below.
 await page.evaluate(() => {
+  // setTravelZoom clamps to the 0.5 default unless the wheel-zoom debug
+  // unlock is on (design.md §21.4) — without this the pin silently stayed
+  // at 0.5 and the fixed seed's ~26 in-ring chunks rolled no elephants.
+  window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(2)
   window.__wildlife.restock()
 })
@@ -2861,6 +2953,7 @@ const mournStage = await page.evaluate(async () => {
 await page.evaluate(() => {
   window.__game.getState().debugJumpTo(-4.9, 36.6)
   window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setWheelZoomEnabled(false)
 })
 await page.waitForTimeout(1200)
 const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await page.evaluate(async ([glat, glon]) => {
@@ -3918,24 +4011,35 @@ check(
 // The dry season gathers the wildlife at the remaining water (point 120e): a
 // wider shore catchment at spawn. Same seed, same chunks — the only variable
 // is the forced season, so the drinker counts are deterministic.
-const drinkersAt = async (override) => {
+const drinkersAt = async (override, waitFor = 0) => {
   await page.evaluate((o) => window.__ui.getState().setSeasonWetnessOverride(o), override)
   await page.evaluate(() => window.__game.getState().debugJumpTo(-17.9, 25.9)) // the Zambezi
   await page.waitForTimeout(600)
   await page.evaluate(() => window.__wildlife.restock())
-  await page.waitForTimeout(2500)
-  return page.evaluate(() => {
-    const h = window.__wildlife.herdsRef.current
-    let drink = 0
-    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']) {
-      for (const a of h[sp] ?? []) if (a.drink) drink++
-    }
-    return drink
-  })
+  // Condition-polled: the shore seeder tops the bank up on a 2-second clock
+  // and a seeded animal receives its drink target on the NEXT assignment
+  // pass — a fixed 2.5 s window read the count one upkeep too early
+  // (measured 3/4). The wet probe keeps waitFor 0 and reads immediately.
+  const count = () =>
+    page.evaluate(() => {
+      const h = window.__wildlife.herdsRef.current
+      let drink = 0
+      for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']) {
+        for (const a of h[sp] ?? []) if (a.drink) drink++
+      }
+      return drink
+    })
+  const t0 = Date.now()
+  let n = 0
+  do {
+    await page.waitForTimeout(2500)
+    n = await count()
+  } while (n < waitFor && Date.now() - t0 < 20000)
+  return n
 }
-const dryDrinkers = await drinkersAt(0)
-const wetDrinkers = await drinkersAt(1)
 const minDry = await page.evaluate(() => window.__balance.panoramaWildlife.dryShoreMinDrinkers)
+const dryDrinkers = await drinkersAt(0, minDry)
+const wetDrinkers = await drinkersAt(1)
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 check(
   'the dry season draws more animals to the remaining water (point 120e)',

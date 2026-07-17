@@ -3301,6 +3301,30 @@ the remaining open points in their numeric order.
   tangential and outward direction free. Live: walk into a tree and prove all
   three free directions still move. DOCS: CLAUDE.md §7.1 pt. 4 if the rule
   sharpens. (Reported 15.07.2026.)
+  INTERIM (17.07.2026, 17:43 — the point STAYS OPEN awaiting the user's
+  repro): hypotheses (a) and (c) are REFUTED — (a) by a new dense pure sweep
+  (48 contact angles x 3 overlap depths x outward+both tangents against two
+  overlapping circles: every free direction keeps its full step, green on
+  first run), (c) by code reading (the query window is a symmetric
+  absolute-value window of +-4.2 vs a max acting radius of 1.5 — a
+  directional block from outside the set is structurally impossible). A live
+  witness now pins the guarantee in enrichments.mjs: the traveller drives
+  into a real tree (blocked at the body edge, never entering) and then
+  provably moves north, south and west — green across four runs. What
+  remains is (b)-class: only the user's exact walk can say which circle
+  blocked them. Fixed along the way in the same verification runs: the
+  hunt-variety check now counts family hunts separately (the calf preference
+  re-picks the same local family at a stationary measuring point — 51-68
+  family hunts per window — and masked the generic food-web pick's real
+  variety: 5 species once measured cleanly); the mourn staging's zoom pin
+  works only WITH the wheel-zoom debug unlock (setTravelZoom clamps
+  everything to 0.5 without it — this also explains every earlier
+  zoom-0.5-at-"1" rotation across the suite); and the 120e drinker count is
+  condition-polled (the fixed 2.5 s window read one seeder upkeep too
+  early). WATCH: one new single-run failure 'a parent moves to guard its
+  calf' (before 8 / after 7.97, parent stood) — first occurrence ever;
+  observe the next runs, suspect the point-127 guard-speed unification if
+  it recurs.
 
 - [ ] 130. Crocodiles: the ambush from the water.
   Wanted (user, 15.07.2026): crocodiles in the regions that suit them, lying
