@@ -5231,3 +5231,37 @@ the remaining open points in their numeric order.
    additions: compact or restructure sections that have grown rambling or
    redundant, improving structure where it helps. The referenced section
    numbers must be preserved.
+
+- [ ] 162. Vultures come for a family the parent just SAVED (drive-off leaves
+  a phantom meal).
+  User report (17.07.2026, screenshot, deployed build): a parent drove a LION
+  off its calf — the point-124/125 drive-off, calf freed, both alive — "doch
+  dann kamen trotzdem Geier": vultures landed by the LIVING family.
+  SUSPECTED ROOT (from code, verify before fixing): the drive-off resolution
+  in the charge/shield branches ends the hunt by setting `LION_STATE.mode =
+  'leave'` DIRECTLY at the resolution point (Wildlife.tsx, the
+  `outcome !== 'taken'` branches — "the walk-off picks up from the carcass
+  flank like the feed->leave exit does"). The ORDINARY feed->leave exit is
+  also the place that (a) spawns the prey REMNANT (`spawnRemnant`) and (b)
+  keeps the kill flock's want up until the remnant is finished. A drive-off
+  ends a feed WITHOUT a kill, so THREE guarantees must hold and each needs a
+  check: (1) NO remnant is left (the acceptance text already promises "a
+  feed that ends without a kill leaves none" — the direct-leave path may
+  bypass that guard); (2) the kill flock stands DOWN (want drops with the
+  leave; no circling flock lingering over the living family, no descend);
+  (3) the ground scavenger never targets the freed calf's spot (nothing dead
+  lies there — but check whether the caught-then-freed calf ever carried a
+  transient dead/stain state the scavenger latched onto).
+  FIX in the game: route the drive-off exit through (or mirror) the
+  no-kill-feed exit so remnant and flock obey the existing no-kill rule;
+  never a special case per resolution site (charge AND shield AND the
+  giraffe kick all end hunts this way).
+  TESTS: pure — the exit rule (feed ended by drive-off -> no remnant, flock
+  want down) in wildlifeBehavior.test.ts if the rule is extracted, else pin
+  it via the live path. Live (enrichments.mjs): stage the point-124 kick
+  drive-off, then assert for ~10 s that no vulture lands within a radius of
+  the living family, the kill flock's descend stays 0, and no remnant
+  exists at the site. DOCS: CLAUDE.md §7.1 pt. 12 already promises the
+  no-kill-no-remnant rule — sharpen its wording to name the drive-off exit
+  once fixed. (Reported 17.07.2026; queued at the batch end per the
+  standing append-and-defer rule.)
