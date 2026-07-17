@@ -2638,7 +2638,9 @@ check(
 // 0.7) already decides the three-way outcome as 'kill'. The hyena falls as
 // an ordinary carcass the scavengers may work (dead, NOT lionFed), and the
 // unwounded parent simply rejoins — no vigil, it fought.
-const revenge = await page.evaluate(async () => {
+let revenge = null
+for (let attempt = 0; attempt < 3; attempt++) {
+  revenge = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let liveChunk
@@ -2707,6 +2709,10 @@ const revenge = await page.evaluate(async () => {
   if (st.victim === calf || st.victim === parent) { st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false }
   return out
 })
+  // The per-event roll is position-hashed; a staging landing in the 5%
+  // band above the 0.95 cap reads 'driveOff'/'taken' — retry a fresh pair.
+  if (revenge.carcass) break
+}
 check(
   'revenge: the zebra parent kills the hyena, both zebras live, the hunt ends (point 146)',
   revenge.caught && revenge.calfAlive && revenge.parentAlive && revenge.huntEnded && revenge.carcass && revenge.notLionFed,
@@ -2717,6 +2723,94 @@ check(
   revenge.carcass && revenge.scavenged,
   JSON.stringify(revenge),
 )
+
+// --- Point 126: elephant mourning at the graveyard ---------------------------
+// A herd whose centre enters the mourn radius walks to the bones, holds
+// there with lowered heads for the window, and moves on. A NATURAL herd is
+// relocated to the radius edge (its herdState already exists), then the
+// behaviour is measured: closing on the site, holding, releasing.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6))
+await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
+await page
+  .waitForFunction(() => (window.__wildlife.herdsRef.current?.elephant ?? []).filter((e) => !e.dead && e.herd !== undefined).length >= 3, null, { timeout: 30000 })
+  .catch(() => {})
+const mourn = await page.evaluate(async ([glat, glon]) => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const gx = glon * 10
+  const gz = -glat * 10
+  // Pick the largest live herd and move it to the radius edge, keeping its
+  // formation (offset preserved) so cohesion has nothing to fight.
+  const byHerd = new Map()
+  for (const e of herds.elephant) {
+    if (e.dead || e.herd === undefined) continue
+    if (!byHerd.has(e.herd)) byHerd.set(e.herd, [])
+    byHerd.get(e.herd).push(e)
+  }
+  let best = null
+  for (const [, list] of byHerd) if (!best || list.length > best.length) best = list
+  // Poll for a tagged herd: the streamed spawn can take a while to place
+  // one near the graveyard after the jump.
+  const tHerd = Date.now()
+  while ((!best || best.length < 3) && Date.now() - tHerd < 60000) {
+    await sleep(1000)
+    byHerd.clear()
+    for (const e of herds.elephant) {
+      if (e.dead || e.herd === undefined) continue
+      if (!byHerd.has(e.herd)) byHerd.set(e.herd, [])
+      byHerd.get(e.herd).push(e)
+    }
+    best = null
+    for (const [, list] of byHerd) if (!best || list.length > best.length) best = list
+  }
+  if (!best || best.length < 2) return { found: false }
+  const cx = best.reduce((a, e) => a + e.x, 0) / best.length
+  const cz = best.reduce((a, e) => a + e.z, 0) / best.length
+  for (const e of best) {
+    e.x = gx + 20 + (e.x - cx)
+    e.z = gz + (e.z - cz)
+  }
+  const centre = () => {
+    const xs = best.reduce((a, e) => a + e.x, 0) / best.length
+    const zs = best.reduce((a, e) => a + e.z, 0) / best.length
+    return Math.hypot(xs - gx, zs - gz)
+  }
+  const d0 = centre()
+  const out = { found: true, d0: +d0.toFixed(1), closed: null, held: null, released: false }
+  // Close on the bones.
+  const t0 = Date.now()
+  let dMin = d0
+  while (Date.now() - t0 < 40000) {
+    dMin = Math.min(dMin, centre())
+    if (dMin < 9) break
+    await sleep(300)
+  }
+  out.closed = +dMin.toFixed(1)
+  if (dMin >= 9) return out
+  // Let the arrival settle (the ring formation and separation still jostle
+  // for a few seconds), THEN measure the hold.
+  await sleep(6000)
+  const h0 = centre()
+  await sleep(5000)
+  const h1 = centre()
+  out.held = +Math.abs(h1 - h0).toFixed(1)
+  // Release: the herd is not pinned — after the window it ROAMS again.
+  // Elephant roam is slow, so the witness is renewed movement (centre
+  // drift), not a fixed exit distance.
+  const t1 = Date.now()
+  const r0 = centre()
+  while (Date.now() - t1 < 75000) {
+    if (Math.abs(centre() - r0) > 4) { out.released = true; break }
+    await sleep(600)
+  }
+  return out
+}, [-4.9, 36.6])
+check(
+  'an elephant herd mourns at the graveyard — closes on the bones, holds, moves on (point 126)',
+  mourn.found && mourn.closed !== null && mourn.closed < 9 && mourn.held !== null && mourn.held < 3 && mourn.released,
+  JSON.stringify(mourn),
+)
+await page.screenshot({ path: `${OUT}128-elephant-mourning.png` })
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 

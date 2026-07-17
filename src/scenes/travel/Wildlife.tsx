@@ -51,12 +51,13 @@ import {
   type PreyKind,
   vicinitySeedBounds,
   seasonFlowFactor,
+  shouldMourn,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
   waterStruggleFate,
 } from './wildlifeBehavior'
-import { WATERFALLS } from '../../world/data/landmarks'
+import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import {
   buildAntelope,
   buildAntelopeCalf,
@@ -318,6 +319,13 @@ const ELEPHANT_SPEED = 1.5
 const ELEPHANT_TURN = 0.55 // gentle steering only (no sharp turns / strafing)
 const ELEPHANT_HERD_ARC = 0.3 // amplitude of the herd heading's slow S-curve
 const ELEPHANT_COHESION = 6 // steer back toward the herd beyond this radius
+/** The mourning vigil (design.md §19.8, point 126): a herd drawn to the
+ *  graveyard's bones — or a dead herd-mate — walks in on its gentle arcs,
+ *  halts a staggered step short of the target and lowers its heads, then
+ *  moves on (window and draw radius in balance.mourn). */
+const MOURN_STAND_DIST = 2.5 // a mourner halts this close to the bones (staggered per animal)
+const MOURN_TOUCH_DIST = 5 // within this of the target the head lowers to the bones
+const GRAVEYARD_POS = latLonToWorld(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)
 /** Prey dodge an elephant only when it comes this close, and a touch slower
  *  than the elephant, so a head-on herd still tramples them now and then. */
 const PREY_PANIC_RADIUS = 3.2
@@ -999,7 +1007,12 @@ function Herds() {
   // Chunks currently populated in herdsRef (streaming key set).
   const spawnedChunks = useRef(new Set<string>())
   // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
-  const herdState = useRef(new Map<number, { heading: number; phase: number }>())
+  // `mourn` is the running vigil at the bones (point 126) with its hard
+  // deadline; `mourned` the per-visit latch cleared once the herd has left
+  // the draw radius. Both die with the entry when the herd streams out.
+  const herdState = useRef(
+    new Map<number, { heading: number; phase: number; mourn?: { x: number; z: number; until: number }; mourned?: boolean }>(),
+  )
   // Rotating index of the water backstop sweep (open sea AND river/lake
   // water outside the scripted dramas, design.md §19).
   const waterSweep = useRef(0)
@@ -1752,11 +1765,49 @@ function Herds() {
           st = { heading: hash(hid, 0, 7, seed) * Math.PI * 2, phase: hash(hid, 0, 8, seed) * Math.PI * 2 }
           herdState.current.set(hid, st)
         }
-        st.heading += Math.sin(t * 0.08 + st.phase) * ELEPHANT_HERD_ARC * dt
-        // Steer the herd away from ground it cannot cross (ahead of its centre).
-        const fll = worldToLatLon(ccx + Math.sin(st.heading) * 9, ccz + Math.cos(st.heading) * 9)
-        const ft = sampleTerrain(fll.lat, fll.lon, seed).type
-        if (ft !== 'savanna' && ft !== 'jungle') st.heading += ELEPHANT_TURN * 2 * dt
+        // The mourning vigil (design.md §19.8, point 126): the nearest mourn
+        // target is the graveyard's bones or a dead herd-mate — generic over
+        // the target; no path kills an elephant today, but the drowning/mire
+        // dramas may later. A herd whose centre comes inside the draw radius
+        // is drawn in once per visit (the `mourned` latch clears only after
+        // it has left the radius), and the vigil's deadline grants the
+        // walk-in on top of the hold window, so it ALWAYS resolves — never a
+        // herd pinned at the bones (point-118 lesson). A vigil, not a
+        // sacrifice: nothing dies of it.
+        const bm = balance.mourn
+        let tgX = GRAVEYARD_POS.x
+        let tgZ = GRAVEYARD_POS.z
+        let tgD = Math.hypot(tgX - ccx, tgZ - ccz)
+        for (const m of herds.elephant) {
+          if (!m.dead || m.herd !== hid) continue
+          const d = Math.hypot(m.x - ccx, m.z - ccz)
+          if (d < tgD) {
+            tgD = d
+            tgX = m.x
+            tgZ = m.z
+          }
+        }
+        if (st.mourn && t >= st.mourn.until) {
+          st.mourn = undefined
+          st.mourned = true // vigil over — move on; not again until the herd has left the radius
+        }
+        if (!st.mourn && shouldMourn(tgD, bm.radius, st.mourned === true)) {
+          st.mourn = { x: tgX, z: tgZ, until: t + bm.seconds + tgD / ELEPHANT_SPEED }
+        }
+        if (st.mourned && tgD > bm.radius) st.mourned = undefined
+        if (st.mourn) {
+          // Steer the shared heading toward the bones through the same gentle
+          // turn cap as the roam — an arc into the site, never a snap.
+          const toX = st.mourn.x - ccx
+          const toZ = st.mourn.z - ccz
+          if (Math.hypot(toX, toZ) > 1) st.heading = turnToward(st.heading, Math.atan2(toX, toZ), ELEPHANT_TURN * dt)
+        } else {
+          st.heading += Math.sin(t * 0.08 + st.phase) * ELEPHANT_HERD_ARC * dt
+          // Steer the herd away from ground it cannot cross (ahead of its centre).
+          const fll = worldToLatLon(ccx + Math.sin(st.heading) * 9, ccz + Math.cos(st.heading) * 9)
+          const ft = sampleTerrain(fll.lat, fll.lon, seed).type
+          if (ft !== 'savanna' && ft !== 'jungle') st.heading += ELEPHANT_TURN * 2 * dt
+        }
         herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
       }
     }
@@ -1769,9 +1820,22 @@ function Herds() {
         if (a.dead) continue
         if (a.heading === undefined) a.heading = a.rot
         const info = a.herd !== undefined ? herdCentre.get(a.herd) : undefined
+        const mournInfo = a.herd !== undefined ? herdState.current.get(a.herd)?.mourn : undefined
         // Follow the herd heading; steer back toward the centre if drifting off.
         let desired = a.heading
-        if (info) {
+        let mournHold = false
+        if (mournInfo) {
+          // The mourning vigil (point 126): each elephant walks to the bones
+          // on its own arc — the same gentle turn cap as the roam, applied
+          // below, so the approach never snaps — and halts a staggered step
+          // short of them (the herd rings the site instead of piling onto one
+          // point), still turning softly to face the bones while it holds.
+          const toTx = mournInfo.x - a.x
+          const toTz = mournInfo.z - a.z
+          const dT = Math.hypot(toTx, toTz)
+          if (dT > 1e-3) desired = Math.atan2(toTx, toTz)
+          mournHold = dT <= MOURN_STAND_DIST + a.phase * 0.25
+        } else if (info) {
           const toCx = info.cx - a.x
           const toCz = info.cz - a.z
           desired = Math.hypot(toCx, toCz) > ELEPHANT_COHESION ? Math.atan2(toCx, toCz) : info.heading
@@ -1790,16 +1854,20 @@ function Herds() {
         while (dh < -Math.PI) dh += Math.PI * 2
         // Gentle arc only — clamp the per-frame turn (never a sharp turn).
         a.heading += Math.max(-ELEPHANT_TURN * dt, Math.min(ELEPHANT_TURN * dt, dh))
-        const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * dt
-        const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
-        const ll = worldToLatLon(nx, nz)
-        const ter = sampleTerrain(ll.lat, ll.lon, seed)
-        if (ter.type === 'savanna' || ter.type === 'jungle') {
-          a.x = nx
-          a.z = nz
-          a.y = Math.max(0.02, ter.height)
+        // An arrived mourner stands at the bones (point 126) — no step, only
+        // the soft turn above; the vigil's deadline moves it on again.
+        if (!mournHold) {
+          const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * dt
+          const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
+          const ll = worldToLatLon(nx, nz)
+          const ter = sampleTerrain(ll.lat, ll.lon, seed)
+          if (ter.type === 'savanna' || ter.type === 'jungle') {
+            a.x = nx
+            a.z = nz
+            a.y = Math.max(0.02, ter.height)
+          }
+          // Else hold position this frame and keep turning gently next frame.
         }
-        // Else hold position this frame and keep turning gently next frame.
         elephantPos.push([a.x, a.z])
       }
     }
@@ -1953,6 +2021,15 @@ function Herds() {
         let yaw = idleYaw
         let pitch = 0
         let bodyY = a.y
+        // The mourning vigil (design.md §19.8, point 126): an elephant
+        // standing at the bones lowers its head to them — the same head-down
+        // pitch the drink pose uses, with a slow searching sway of the touch.
+        if (sp === 'elephant' && a.herd !== undefined) {
+          const mst = herdState.current.get(a.herd)?.mourn
+          if (mst && Math.hypot(mst.x - a.x, mst.z - a.z) < MOURN_TOUCH_DIST) {
+            pitch = 0.42 + Math.sin(t * 0.6 + a.phase) * 0.06
+          }
+        }
         // Periodic drinking (design.md §19): walk to the shore point, lower
         // the head at the water, walk back. Bathers wade further in and dip
         // their body (a splashing wallow) instead of only lowering the head.

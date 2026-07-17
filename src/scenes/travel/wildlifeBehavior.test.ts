@@ -20,6 +20,7 @@ import {
   turnToward,
   type FlightState,
   killFlockMayDescend,
+  shouldMourn,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -601,6 +602,33 @@ describe('vigilDrawReady (point 121 (f) — the carcass draws a predator after t
 
   it('a zero delay draws immediately (the debug menu may set it)', () => {
     expect(vigilDrawReady(0, 0)).toBe(true)
+  })
+})
+
+describe('shouldMourn (design.md §19.8, point 126 — the herd vigil at the bones)', () => {
+  it('draws an unmourned herd whose centre stands inside the radius', () => {
+    expect(shouldMourn(0, 25, false)).toBe(true) // right on the bones
+    expect(shouldMourn(24.999, 25, false)).toBe(true) // just inside the draw radius
+  })
+
+  it('is boundary-exact: at and beyond the radius it never mourns', () => {
+    expect(shouldMourn(25, 25, false)).toBe(false)
+    expect(shouldMourn(25.001, 25, false)).toBe(false)
+    expect(shouldMourn(1000, 25, false)).toBe(false)
+  })
+
+  it('honors a custom (debug-edited) radius', () => {
+    expect(shouldMourn(5, 6, false)).toBe(true)
+    expect(shouldMourn(6, 6, false)).toBe(false)
+    expect(shouldMourn(1, 0.5, false)).toBe(false)
+  })
+
+  it('an already-mourned herd is never drawn again until the latch resets', () => {
+    expect(shouldMourn(0, 25, true)).toBe(false) // even right on the bones
+    expect(shouldMourn(24, 25, true)).toBe(false)
+    // The caller clears the latch once the herd has LEFT the radius — a later
+    // visit mourns again.
+    expect(shouldMourn(24, 25, false)).toBe(true)
   })
 })
 

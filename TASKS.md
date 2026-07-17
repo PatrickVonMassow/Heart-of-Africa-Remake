@@ -3116,6 +3116,30 @@ the remaining open points in their numeric order.
   heads, and moves on after the window — with a screenshot. DOCS: design.md §19.8
   (+ a pointer from §4.4), CLAUDE.md §7.1 pt. 12. One atomic commit.
   (Reported 15.07.2026.)
+  WIP (17.07.2026, 13:06 — game code COMPLETE and unit-green, the live check
+  is the open half): implemented per spec — per-herd mourn state in
+  herdState { mourn: {x,z,until}, mourned } with a HARD deadline (window +
+  approach time, the 118 lesson) and a once-per-visit latch cleared on
+  leaving the radius; the approach turns through the existing ELEPHANT_TURN
+  clamp (herd heading via turnToward, members through the unchanged clamp
+  line — no snapping, the facing check stays valid); staggered ring
+  arrival; the touch pose lowers heads with the drink pitch + slow search
+  sway inside MOURN_TOUCH_DIST; target is generic (graveyard centre OR a
+  dead herd-mate — no elephant death path); balance.mourn { seconds 30,
+  radius 25 }; pure shouldMourn boundary-tested (1702 vitest). Docs are
+  DONE (design §19.8 bullet + §4.4 pointer, CLAUDE pt. 12). LIVE CHECK
+  learnings so far: one run measured close 8.6/hold — the mechanic works;
+  found:false runs show the GRAVEYARD area spawns few tagged elephant
+  herds. NEXT: stage like the trample check — jump to the Serengeti
+  (-2.2, 34.8), take the largest tagged herd, RETAG each member's chunk to
+  a live chunk near the graveyard, teleport them to the radius edge, then
+  jump the player to the graveyard and measure close/hold(settled)/release
+  (renewed roam drift, not a fixed exit distance); screenshot 128. ALSO
+  seen rotating in these runs (135-class, note): hunt-variety distinctPrey
+  = 1 once (statistics of one run), and the 102 vicinity dipped to 2/6
+  once late in a long run — if it recurs, check whether the point-146
+  predator lists in `herds` disturb the seeder's species iteration or the
+  MAX_INSTANCES rotation.
 
 - [ ] 127. A parent runs faster when it rushes to its calf's rescue.
   Wanted (user, 15.07.2026): a parent hurrying to save its young can run faster

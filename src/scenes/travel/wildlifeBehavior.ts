@@ -356,6 +356,19 @@ export function vigilDrawReady(vigilSeconds: number, predatorDelay: number): boo
 }
 
 /**
+ * The elephants' mourning vigil (design.md §19.8, point 126): a herd whose
+ * centre comes within `radius` of a mourn target — the graveyard's bones or a
+ * dead herd-mate — walks in and holds there. `mourned` is the herd's per-visit
+ * latch: once its vigil has run, the herd is not drawn again until it has LEFT
+ * the radius (the caller clears the latch out of range), so a herd lingering
+ * at the site never loops the vigil forever (point-118 lesson: every drama
+ * resolves). A vigil, not a sacrifice — nothing dies of it.
+ */
+export function shouldMourn(distToTarget: number, radius: number, mourned: boolean): boolean {
+  return !mourned && distToTarget < radius
+}
+
+/**
  * Where the drawn predator of the vigil enters the stage (point 121 (f)).
  * The vulture standard applies: it spawns BEYOND the zoom-aware view ring and
  * WALKS in, never popping into sight — and it must also land INSIDE the

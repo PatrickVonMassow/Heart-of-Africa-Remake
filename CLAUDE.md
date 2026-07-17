@@ -503,7 +503,15 @@ verify suite that proves it.
       current drowns (dead, sinking, never rescued or scavenged) while the
       SAME setup in the dry season still clambers out alive, and a rescuing
       parent that wades a swollen current too long drowns beside its calf
-      (both live in `scripts/verify/enrichments.mjs`); revenge (point
+      (both live in `scripts/verify/enrichments.mjs`); elephant
+      mourning (point 126): a herd entering the graveyard's calibratable
+      radius turns aside in its own gentle arcs (the universal turn cap
+      holds), stands over the bones with lowered searching heads for the
+      window, and moves on — once per visit (pure-tested predicate,
+      boundary-exact; hard deadline so no herd is ever pinned), the same
+      vigil generalised over a dead herd-mate, with the live behaviour
+      (close, hold, release) and screenshot 128 in
+      `scripts/verify/enrichments.mjs`; revenge (point
       146): the outcome helper is THREE-way (taken / driven off / KILLED) —
       killChance <= defendChance swept over every pair, no prey ever kills
       a lion (swept), the antelope kills nothing (swept), a slain predator

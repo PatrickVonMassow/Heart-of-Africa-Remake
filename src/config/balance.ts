@@ -243,6 +243,16 @@ export interface BalanceConfig {
     /** Seconds of standing vigil after which the carcass draws a predator to the keeper. */
     predatorDelay: number
   }
+  /** The elephants' mourning vigil (design.md §19.8, point 126): a herd whose
+   *  centre passes near the graveyard's bones — or a dead herd-mate — walks
+   *  in, lowers its heads over them and holds, then moves on. A vigil, not a
+   *  sacrifice: nothing dies of it. */
+  mourn: {
+    /** Seconds the herd holds at the bones before moving on (the walk-in is granted on top). */
+    seconds: number
+    /** Radius (world units) around the mourn target that draws a passing herd. */
+    radius: number
+  }
   /** The parent's defence (design.md §19.8, points 124/125/146): a parent
    *  ATTACKING the predator over its calf resolves three ways (one roll,
    *  parentAttackOutcome in wildlifeBehavior.ts) — taken, or the hunt driven
@@ -452,6 +462,10 @@ export const balance: BalanceConfig = {
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd
     predatorDelay: 12, // calibratable: vigil seconds until the carcass draws a predator to the keeper
+  },
+  mourn: {
+    seconds: 30, // calibratable: how long the herd holds at the bones before moving on
+    radius: 25, // calibratable: how close a herd's centre must pass for the bones to draw it in
   },
   parentDefense: {
     // Prey side — the weapon is the argument (point 125 grounding pass):
