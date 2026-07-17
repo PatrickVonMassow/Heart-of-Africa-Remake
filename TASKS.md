@@ -5293,9 +5293,12 @@ the remaining open points in their numeric order.
   queued at the batch end per the standing append-and-defer rule.)
 
 - [ ] 164. Plants still jump back and forth while travelling along the Nile.
-  User report (17.07.2026, no screenshot — "zu diesem Zeitpunkt an diesem
-  Punkt" refers to a Nile stretch; the two point-151 spots are the natural
-  repro candidates: 13.4N/31.8E in June and 18.1N/33.9E in July): driving
+  User report (17.07.2026 — "zu diesem Zeitpunkt an diesem Punkt" refers to
+  a Nile stretch; the two point-151 spots are repro candidates: 13.4N/31.8E
+  in June and 18.1N/33.9E in July. SECOND REPORT with screenshot, 17.07.2026
+  22:53: "Auch hier fliegen Pflanzen ein" at 8.6N/21.8E on 13.10.1890 —
+  West region, October, i.e. NOT a Nile spot: the bug is general, three
+  dated coordinates now pin it): driving
   along the Nile, plants still JUMP BACK AND FORTH — "Das soll vermutlich
   eine Interpolation zwischen den Jahreszeiten sein, aber so darf das nicht
   ablaufen." This is the point-151 family (the flying-plants fix landed the
