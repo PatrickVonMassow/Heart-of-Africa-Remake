@@ -2868,7 +2868,7 @@ the remaining open points in their numeric order.
   vitest green, enrichments 165 PASS / exit 0 incl. the two new fate checks
   (rains: drowned, never rescued; dry: clambers out alive).
 
-- [ ] 123. Family drama: the drying waterhole of the dry season.
+- [x] 123. Family drama: the drying waterhole of the dry season.
   DEPENDS ON point 120 (needs the season). Wanted (user, 15.07.2026): in the dry
   season a calf gets mired in the mud of a shrinking waterhole; the parent will
   not leave its side while the herd moves on, and the predators that gather at
@@ -2895,6 +2895,24 @@ the remaining open points in their numeric order.
   pinned predator, both are killed there, and without a predator the mire
   releases. DOCS: design.md §19.8, CLAUDE.md §7.1 pt. 12. One atomic commit.
   (Reported 15.07.2026.)
+  DONE (17.07.2026, 02:36, commit e0a0824): (a) mired state with a per-bout
+  roll — pure mireRoll (only AT a lake bank, only under the dryness
+  threshold, exact boundaries) hashed per (calf, bout cycle); (b) the vigil:
+  the parent walks to and STANDS beside its mired calf (familyHeld, head
+  down), with the full drama exemption set (dodge, water sweep,
+  separation-inDrama, thrash face); (c) the target bias: the hunt ALWAYS
+  prefers a mired calf in seek range over the calf-hunt dice; (d) resolution
+  both ways — the chase SHIELD stands down for a mired calf (the vigil never
+  interposes; the mud holds the calf through the catch, the parent's charge
+  costs its life beside it, the caught countdown takes the calf: no new kill
+  path) and an unfound calf is released after balance.waterDrama.mireSeconds
+  (45, debug-writable); (e) live: vigil distance 1.58 held, both dead at the
+  waterhole under a forced hunt, release alive without one — plus the 151
+  witness rebuilt on debugJumpTo (travel advances the calendar, which
+  legitimately moves the field; only the POSITION dependence was the bug)
+  and the mire scenarios moved BEHIND the falls checks (they consume
+  families the falls checks need). The remaining 102-vicinity 5/6 flake is
+  point 135(a) — next up by the user's decision.
 
 - [ ] 124. Family drama: the giraffe mother's kick.
   Wanted (user, 15.07.2026): the iconic image — a giraffe cow driving a lion off
