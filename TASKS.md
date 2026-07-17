@@ -5286,17 +5286,6 @@ the remaining open points in their numeric order.
   the period sources describe (six evidence-gated seasonal garments; fire,
   market and transhumant presence carry the season for the rest).
 
-## Closing (only after all points)
-
-1. Full regression over the whole state.
-2. Thorough dead-code / stale-doc / stale-comment cleanup — as separate commits,
-   not mixed with feature commits.
-3. Full regression again.
-4. Analyse every .md file for cruft that accreted through the iterative
-   additions: compact or restructure sections that have grown rambling or
-   redundant, improving structure where it helps. The referenced section
-   numbers must be preserved.
-
 - [ ] 162. Vultures come for a family the parent just SAVED (drive-off leaves
   a phantom meal).
   User report (17.07.2026, screenshot, deployed build): a parent drove a LION
@@ -5596,3 +5585,28 @@ the remaining open points in their numeric order.
   unchanged. Live optional. DOCS: design.md §16 (return entries on changed
   situation) + §19.15 note. (Reported 17.07.2026; queued at the batch end per
   append-and-defer.)
+
+## Closing (only after all points)
+
+NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
+section, never after it — this section must stay the LAST thing in the file.
+(It had drifted into the middle because points 162-170 were appended past it;
+moved back to the end here.)
+
+USER-REQUESTED CLOSING RUN (17.07.2026 23:37): the last full closing is long
+ago and cruft has accreted (tonight alone: probe scripts, many new features,
+several docs edits, dashboard churn). Do a FULL closing cycle right AFTER the
+current step (point 129) and BEFORE resuming the feature queue (168/145c/...).
+Going forward, a standalone closing run may also be taken as its own task now
+and then. The cycle:
+1. Full regression over the whole state (build, lint, npm audit, unit layer,
+   ALL browser suites green — not just the changed ones).
+2. Thorough dead-code / stale-doc / stale-comment cleanup — as separate commits,
+   not mixed with feature commits. (Watch: leftover _probe.mjs scripts, unused
+   exports after the 129 collidable-set trim, the deadtree entry's now-dead
+   references, any TODO/OPEN that is resolved.)
+3. Full regression again.
+4. Analyse every .md file for cruft that accreted through the iterative
+   additions: compact or restructure sections that have grown rambling or
+   redundant, improving structure where it helps. The referenced section
+   numbers must be preserved.
