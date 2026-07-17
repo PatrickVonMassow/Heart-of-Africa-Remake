@@ -3358,6 +3358,28 @@ the remaining open points in their numeric order.
   succeeds (no phantom collider), while an IN-SEASON plant still blocks.
   This supersedes the tree/circle framing above: 129 is a
   season-vs-collision desync, not a resolver bug.
+  ★★★ USER DECISION (17.07.2026 22:57): "Allgemein sollte es uebrigens keine
+  Kollisionserkennung mit den kleinen Pflanzen geben. Es macht keinen Sinn,
+  dass man an einem Grashalm haengen bleibt." So the fix has TWO parts, and
+  the first is a clean rule: SMALL PLANTS NEVER COLLIDE. This matches the
+  EXISTING design line ("small dressing and carcasses stay passable", CLAUDE
+  §7.1 pt. 4) — collision is only for genuinely large, solid, ALWAYS-PRESENT
+  dressing. Current COLLIDABLE_FLORA (TravelScene.tsx ~697) already lists only
+  acacia/jungle/palm/baobab/deadtree/kopje (trees + boulders) — grass and
+  bushes are already non-colliding — so the felt "grass blade" snag is a
+  large-dressing collider that lingers after point 144 collapsed its RENDER to
+  near-nothing in the dry season. FIX, two parts: (1) trim/verify the
+  collidable set so nothing SMALL or seasonally-collapsible collides — drop
+  deadtree (r 0.3, reads small and can bare out) and re-audit each entry
+  against "is it a big solid year-round object?"; keep kopje/baobab/big
+  acacia/jungle/palm trunks; (2) for whatever REMAINS collidable, gate the
+  collider by the SAME seasonal presence the renderer uses (one shared
+  present-here-this-date predicate), so a collapsed/absent plant never blocks.
+  Together these guarantee: you never snag on anything you cannot see, and
+  never on anything small. DOCS: design.md §11/§2.6 collision rules +
+  CLAUDE.md §7.1 pt. 4 (sharpen "small dressing stays passable" to name the
+  rule and the seasonal gate). PULL 129 FORWARD as the next active point
+  after 145 — it is now fully diagnosed and load-bearing (blocks traversal).
   Fixed along the way in the same verification runs: the
   hunt-variety check now counts family hunts separately (the calf preference
   re-picks the same local family at a stationary measuring point — 51-68
