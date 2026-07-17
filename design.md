@@ -478,6 +478,8 @@ Events (animal and robber attacks, chiefs' hints, status changes and the like, �
 
 The entries read like the moment they record: the first visit to a village is told through that people's own ~1890 way of life — every village carries its own historically grounded vignette (the indigo-veiled Tuareg, the Hausa dye pits, the Maasai cattle ring, the Swahili coral-stone lanes …), never a shared boilerplate.
 
+The rinderpest years are DATE-DEPENDENT (point 133; research: `docs/peoples-1890.md` §5): the great panzootic 1888–1897 is the game's own window, and the first-visit vignette reads the plague phase of the visit date. A Maasai village met in 1890 shows the pleuropneumonia-thinned herds of a still-standing world; met in 1891–92 it stands in the emutai — devastated but INHABITED (the enkang kept its core), with Baumann's own 1892 words carried verbatim in the German text; met from 1893 it lives in the famine's aftermath, its cattle-loan fabric torn. The Sidama highlands sit inside the Kifu Qen famine through 1892 and in its aftermath after; the Nubian vignette stands in Sanat Sitta's wake for the whole window. Accuracy guards hold throughout: the camel peoples (Somali, Tuareg) lose no herds — camels are immune — the cattle-less Bemba know only game depletion, southern Africa stays clean until the Zambezi crossing of March 1896, and no rinderpest→dress-change link is asserted. The phase itself is the pure `rinderpestPhase` model (§19.13 seasons plumbing pattern), observable via dev hook and steered through the §21.1 date jumps.
+
 ### 16.1 Non-modal journal
 
 - The opened journal does not freeze the game: the character keeps moving in both perspectives while the journal is open and even while an entry is being read aloud — reading and narration never halt travel.
@@ -765,6 +767,19 @@ point 142):
 - **Market:** the Sahel stall's grain mound shrinks through the hungry rains
   and refills at the harvest — the best-evidenced finding of
   `docs/peoples-1890.md` §3.1 (the hungry season is the RAINS, not the dry).
+
+**The rinderpest years (point 133; `docs/peoples-1890.md` §5).** The
+panzootic reaches the game as a date-dependent vignette phase, not a dress
+change: `rinderpestPhase` (src/systems/rinderpest.ts, pure-tested) maps
+people and date to clean/preDamaged/struck/aftermath — Maasai pre-damaged
+1890, struck 1891–92 (the German struck text carries Baumann 1894:31–32
+verbatim), aftermath after; Sidama struck through the Kifu Qen to 1892;
+Nubians in Sanat Sitta's wake all window; Zulu/Pedi/San clean until the
+boundary-exact March 1896; the camel peoples never (FAO immunity); the
+cattle-less Bemba never (tsetse belt — game depletion, a texture). §16
+carries the vignette wiring; no rinderpest→dress link is asserted (evidence
+absent — only the buffalo-hide shield supply collapse is sourced, kept as
+texture).
 - **Rank as class experience:** the gate keys on the settlement palette's
   first cloth, so about a third of the figures carry the plaid while the
   rest stand bare at the fire — Barth's class split, not a uniform issue.

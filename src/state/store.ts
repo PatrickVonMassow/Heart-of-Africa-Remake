@@ -3,6 +3,7 @@
 
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
+import { rinderpestPhaseAtDay } from '../systems/rinderpest'
 import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
 import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
@@ -1234,9 +1235,19 @@ export const useGame = create<GameState>()((set, get) => ({
     } else if (first) {
       // The first visit reads like the place (design.md §16): the entry is
       // people-specific, drawn from the village's ~1890 way of life.
+      // The rinderpest years (design.md §16, point 133): the vignette reads
+      // the PLAGUE PHASE of the visit date — a Maasai village met in 1890 and
+      // one met in 1892 are different worlds.
       get().addEntry(
         { key: 'journal.titles.village', params: { place: id } },
-        { key: 'journal.villageFirstVisit', params: { place: id, people: place.peopleId ?? '' } },
+        {
+          key: 'journal.villageFirstVisit',
+          params: {
+            place: id,
+            people: place.peopleId ?? '',
+            phase: rinderpestPhaseAtDay(place.peopleId ?? '', s.day, START_YEAR),
+          },
+        },
         'event',
         'hut',
       )

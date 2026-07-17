@@ -55,7 +55,14 @@ export function rinderpestPhase(peopleId: string, year: number, month: number): 
   }
 }
 
+/** The phase at an in-game day (the store's calendar unit): thin date glue
+ *  over the pure year/month rule. */
+export function rinderpestPhaseAtDay(peopleId: string, day: number, startYear: number): RinderpestPhase {
+  const d = new Date(Date.UTC(startYear, 0, 1) + Math.floor(day) * 86400000)
+  return rinderpestPhase(peopleId, d.getUTCFullYear(), d.getUTCMonth() + 1)
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
-  ;(window as unknown as Record<string, unknown>).__rinderpest = { rinderpestPhase }
+  ;(window as unknown as Record<string, unknown>).__rinderpest = { rinderpestPhase, rinderpestPhaseAtDay }
 }

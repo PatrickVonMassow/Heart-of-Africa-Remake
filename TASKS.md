@@ -3636,15 +3636,22 @@ the remaining open points in their numeric order.
   [Sanat Sitta]; zulu/pedi/san clean until the boundary-exact March 1896
   Zambezi crossing; somali/tuareg NEVER [camels immune, FAO]; bemba/others
   clean) with 7 pure tests green and a __rinderpest dev hook (registers
-  once the module is imported — stage 2 wires it). REMAINING: stage 2 =
-  phase-aware vignettes for maasai/sidama/nubians (both languages, voice
-  markup, Baumann's verbatim German from peoples-1890.md §5 for the struck
-  text — never back-translate; accuracy guards (d)/(e): no camel-people
-  herd loss, Bemba game depletion only, no dress-change link), store wiring
-  (first-visit vignette picks by phase), villages.test extension, design.md
-  §16 + §19.13 subsection + §19.15 record rows; stage 3 = optional carrion
-  in struck Maasailand (dead wildebeest/buffalo-class dressing via the
-  existing carcass/vulture systems) + live check via the dev hook.
+  once the module is imported — stage 2 wires it). STAGE 2 done (17.07.2026,
+  19:35, next commit): phase-aware vignettes wired — the first-visit entry
+  passes rinderpestPhaseAtDay(people, day) as a param, and the Maasai
+  vignette branches three ways (preDamaged 1890 with the
+  pleuropneumonia-thinned kraals; struck 1891-92 carrying Baumann's German
+  VERBATIM — "Hungergestalten", "vom Honig der Waldbienen", the enkang core
+  holding; aftermath with Waller's torn cattle-loan fabric and desperate
+  raids) while Sidama branches struck/aftermath around the Kifu Qen (enset
+  as the famine store) — both languages, voice markup, tested in
+  villages.test.ts incl. the verbatim-Baumann and no-"wandelnde Skelette"
+  guards; the Nubian text already carried Sanat Sitta (132d). Docs: §16
+  paragraph + §19.15 rinderpest block. REMAINING (stage 3): optional
+  carrion in struck Maasailand (dead wildebeest/buffalo-class via the
+  existing carcass/vulture systems) + a live check via the __rinderpest
+  dev hook (phase observable; date steered via §21.1 jumps) + full-suite
+  green run, then [x].
 
 - [ ] 134. The one deliberate inaccuracy: grief unto death stays.
   Standing exception to the accuracy principle, set by the user (16.07.2026):

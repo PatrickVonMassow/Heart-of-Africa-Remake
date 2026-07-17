@@ -15,6 +15,40 @@ describe('village first-visit entries (per-people vignettes)', () => {
     for (const v of villages) expect(v.peopleId, v.id).toBeTruthy()
   })
 
+  // The rinderpest years (design.md §16, point 133): the Maasai and Sidama
+  // vignettes are phase-aware — each phase reads as its own text, all
+  // markup-clean, and the German struck text carries Baumann's own words.
+  for (const lang of [en, de]) {
+    it(`${lang.lang}: the Maasai vignette changes with the plague phase (three distinct texts)`, () => {
+      const at = (phase: string) =>
+        lang.journal.villageFirstVisit({ place: 'maasai-village', people: 'maasai', phase })
+      const texts = [at('preDamaged'), at('struck'), at('aftermath')]
+      expect(new Set(texts).size).toBe(3)
+      for (const t of texts) {
+        expect(t.length).toBeGreaterThan(80)
+        expect(stripVoiceMarkup(t)).not.toMatch(/[[\]]/)
+      }
+    })
+
+    it(`${lang.lang}: the Sidama vignette reads struck through 1892 and aftermath after`, () => {
+      const at = (phase: string) =>
+        lang.journal.villageFirstVisit({ place: 'sidama-village', people: 'sidama', phase })
+      const texts = [at('struck'), at('aftermath')]
+      expect(new Set(texts).size).toBe(2)
+      for (const t of texts) {
+        expect(t.length).toBeGreaterThan(80)
+        expect(stripVoiceMarkup(t)).not.toMatch(/[[\]]/)
+      }
+    })
+  }
+
+  it('the German struck text carries Baumann verbatim, never a back-translation', () => {
+    const t = de.journal.villageFirstVisit({ place: 'maasai-village', people: 'maasai', phase: 'struck' })
+    expect(t).toContain('Hungergestalten')
+    expect(t).toContain('vom Honig der Waldbienen')
+    expect(t).not.toContain('wandelnde Skelette') // the drifted paraphrase is not his phrase
+  })
+
   for (const lang of [en, de]) {
     it(`${lang.lang}: every village gets its own historically flavored text`, () => {
       const texts = villages.map((v) =>
