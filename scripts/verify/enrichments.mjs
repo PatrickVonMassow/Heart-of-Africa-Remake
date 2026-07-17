@@ -1315,6 +1315,12 @@ check(
 // contact and (c) asymmetric query window are refuted by pure tests and code
 // reading. This live witness pins the guarantee at a REAL tree: drive into
 // it (blocked at the body edge), then prove north, south and west all move.
+// Jump to wooded savanna first (the Serengeti) so a collidable tree is
+// reliably in range — after the earlier checks the player may stand on
+// treeless ground, and the trimmed collidable set (point 129) makes a blind
+// local search miss.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page.waitForTimeout(2500)
 const treeHit = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const seed = window.__game.getState().seed
@@ -1322,8 +1328,8 @@ const treeHit = await page.evaluate(async () => {
   // Find a collidable tree near the current position with land on all sides.
   const p0 = window.__game.getState().pos
   let tree = null
-  outer: for (let dx = -40; dx <= 40 && !tree; dx += 8) {
-    for (let dz = -40; dz <= 40; dz += 8) {
+  outer: for (let dx = -70; dx <= 70 && !tree; dx += 5) {
+    for (let dz = -70; dz <= 70; dz += 5) {
       for (const [ox, oz, r] of window.__vegetation.obstaclesNear(p0.x + dx, p0.z + dz)) {
         let landAround = true
         for (const [ax2, az2] of [[3, 0], [-3, 0], [0, 3], [0, -3]]) {
@@ -1378,6 +1384,39 @@ check(
   treeHit.found && treeHit.reached && treeHit.minDist > treeHit.r + 0.3 &&
     treeHit.north > 1.5 && treeHit.south > 1.5 && treeHit.west > 1.5,
   JSON.stringify(treeHit),
+)
+
+// The phantom-collider invariant (point 129): collision is derived from the
+// SAME placement the renderer draws (placedFloraAt), so NO obstacle circle may
+// sit where nothing is rendered. Sweep a grid around the reported West/Central
+// border spot (7.15N/26.4E) and assert every collidable circle coincides with
+// a drawn flora instance — a suppressed-near-water tree can no longer leave an
+// invisible wall.
+const phantom = await page.evaluate(() => {
+  const U = 10
+  let circles = 0
+  let phantom = 0
+  const samples = []
+  for (let lat = 7.4; lat >= 6.9; lat -= 0.05) {
+    for (let lon = 26.1; lon <= 26.7; lon += 0.05) {
+      const x = lon * U
+      const z = -lat * U
+      const obs = window.__vegetation.obstaclesNear(x, z)
+      const drawn = window.__vegetation.renderedNear ? window.__vegetation.renderedNear(x, z) : null
+      if (!drawn) continue
+      for (const [ox, oz] of obs) {
+        circles++
+        const hit = drawn.some((d) => Math.abs(d.x - ox) < 0.01 && Math.abs(d.z - oz) < 0.01)
+        if (!hit) { phantom++; if (samples.length < 5) samples.push({ ox: +ox.toFixed(1), oz: +oz.toFixed(1) }) }
+      }
+    }
+  }
+  return { circles, phantom, samples }
+})
+check(
+  'no collidable circle exists where the renderer draws nothing — no phantom wall (point 129)',
+  phantom.phantom === 0,
+  JSON.stringify(phantom),
 )
 
 // --- Point 133: the rinderpest years, live ------------------------------------

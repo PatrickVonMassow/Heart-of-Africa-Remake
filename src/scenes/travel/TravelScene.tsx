@@ -699,16 +699,72 @@ const COLLIDABLE_FLORA: Partial<Record<Species, number>> = {
   jungle: 0.5,
   palm: 0.32,
   baobab: 0.7,
-  deadtree: 0.3,
   kopje: 1.0,
 }
 
+interface PlacedFlora {
+  species: Species
+  x: number
+  z: number
+  height: number
+  /** Per-instance hash for rotation AND scale — the collider radius derives
+   *  from the same value, so its circle matches the drawn footprint. */
+  r4: number
+  /** Per-instance roll for the render's non-uniform y-scale. */
+  roll: number
+}
+
 /**
- * Collidable dressing near a point as circles `[x, z, radius]` — the same
- * deterministic chunk placement the Vegetation instances are built from (so
- * collision matches what is drawn), restricted to the player's chunk and its
- * neighbours and the collidable species. The rare instance-cap overflow is
- * ignored (caps are far above the local density), as it is for what renders.
+ * The single flora placement decision (design.md §2.6, point 129): given a
+ * chunk candidate, returns the instance the RENDERER draws there, or null.
+ * Both the Vegetation renderer and `collidableFloraNear` call this, so a plant
+ * that is not drawn (suppressed near water by `solidDressingAllowed`, above the
+ * snow line, or beside a settlement) can never leave a phantom collider —
+ * the invisible-wall bug of point 129, where the collision used different
+ * placement logic than the render. The instance-cap overflow is the only
+ * render-only concern the collider skips.
+ */
+function placedFloraAt(ccx: number, ccz: number, i: number, seed: number): PlacedFlora | null {
+  const rx = hashChunk(ccx, ccz, i * 4, seed)
+  const rz = hashChunk(ccx, ccz, i * 4 + 1, seed)
+  const roll = hashChunk(ccx, ccz, i * 4 + 2, seed)
+  const x = (ccx + rx) * CHUNK_SIZE
+  const z = (ccz + rz) * CHUNK_SIZE
+  const ll = worldToLatLon(x, z)
+  const s = sampleTerrain(ll.lat, ll.lon, seed)
+  if (s.height <= 0.05) return null
+  // The river-distance query cap MUST exceed the reed belt's outer edge
+  // (RIVER_WIDTH_DEG + 0.045) and the solid-dressing clearance
+  // (RIVER_WIDTH_DEG + 0.06). The point-136 river widening pushed
+  // RIVER_WIDTH_DEG to ~0.27, so the old cap of 0.3 landed INSIDE both bands:
+  // far-from-river points read as "in the reed belt" (papyrus everywhere) and
+  // "too close to a channel" (all trees suppressed) — the render went
+  // reed-only and the collider (with its own, uncapped logic) kept phantom
+  // tree circles: the point-129 invisible walls. 0.45 is the module's own
+  // internal cap and clears both bands with headroom.
+  const rd = riverDistance(ll.lat, ll.lon, 0.45)
+  const lsd = lakeDistance(ll.lat, ll.lon, 0.1)
+  const nearWater = s.height > 0.05 && inReedBelt(rd, lsd)
+  const species = pickSpecies(s.type, roll, nearWater)
+  if (!species) return null
+  // The renderer's exact suppression rules, kept in lockstep (point 129):
+  if (species !== 'papyrus' && !solidDressingAllowed(s.type, rd, lsd)) return null
+  if (species === 'rock' && s.type === 'mountain' && s.height > 6.5) return null // snow line
+  for (const p of PLACES) {
+    const w = latLonToWorld(p.lat, p.lon)
+    if (Math.hypot(x - w.x, z - w.z) < 4) return null
+  }
+  const r4 = hashChunk(ccx, ccz, i * 4 + 3, seed)
+  return { species, x, z, height: s.height, r4, roll }
+}
+
+/**
+ * Collidable dressing near a point as circles `[x, z, radius]` — derived from
+ * the SAME placement the renderer draws (`placedFloraAt`), so a suppressed or
+ * unrendered plant never leaves a phantom collider, and restricted to the
+ * player's chunk neighbourhood and the LARGE collidable species only (small or
+ * sparse dressing never blocks — "no getting stuck on a blade of grass",
+ * user decision, point 129).
  */
 function collidableFloraNear(px: number, pz: number, seed: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = []
@@ -720,31 +776,12 @@ function collidableFloraNear(px: number, pz: number, seed: number): Array<[numbe
       const ccx = pcx + dx
       const ccz = pcz + dz
       for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-        const rx = hashChunk(ccx, ccz, i * 4, seed)
-        const rz = hashChunk(ccx, ccz, i * 4 + 1, seed)
-        const x = (ccx + rx) * CHUNK_SIZE
-        const z = (ccz + rz) * CHUNK_SIZE
-        if (Math.abs(x - px) > QUERY + 1.2 || Math.abs(z - pz) > QUERY + 1.2) continue // cheap reject before sampling
-        const ll = worldToLatLon(x, z)
-        const s = sampleTerrain(ll.lat, ll.lon, seed)
-        if (s.height <= 0.05) continue
-        const roll = hashChunk(ccx, ccz, i * 4 + 2, seed)
-        const nearWater =
-          riverDistance(ll.lat, ll.lon, 0.08) < 0.05 || lakeDistance(ll.lat, ll.lon, 0.08) < 0.04
-        const species = pickSpecies(s.type, roll, nearWater)
-        const baseR = species ? COLLIDABLE_FLORA[species] : undefined
+        const placed = placedFloraAt(ccx, ccz, i, seed)
+        if (!placed) continue
+        const baseR = COLLIDABLE_FLORA[placed.species]
         if (baseR === undefined) continue
-        let blocked = false
-        for (const p of PLACES) {
-          const w = latLonToWorld(p.lat, p.lon)
-          if (Math.hypot(x - w.x, z - w.z) < 4) {
-            blocked = true
-            break
-          }
-        }
-        if (blocked) continue
-        const r4 = hashChunk(ccx, ccz, i * 4 + 3, seed)
-        out.push([x, z, baseR * (0.75 + r4 * 0.55)])
+        if (Math.abs(placed.x - px) > QUERY + 1.2 || Math.abs(placed.z - pz) > QUERY + 1.2) continue
+        out.push([placed.x, placed.z, baseR * (0.75 + placed.r4 * 0.55)])
       }
     }
   }
@@ -823,6 +860,22 @@ function Vegetation() {
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
+      // Every flora instance the RENDERER draws near a point (point 129): the
+      // phantom-collider invariant asserts collidableFloraNear is a subset of
+      // this, so a suppressed/unrendered plant can never block.
+      renderedNear: (x: number, z: number) => {
+        const seed = useGame.getState().seed
+        const pcx = Math.floor(x / CHUNK_SIZE)
+        const pcz = Math.floor(z / CHUNK_SIZE)
+        const drawn: Array<{ x: number; z: number; species: Species }> = []
+        for (let dz = -1; dz <= 1; dz++)
+          for (let dx = -1; dx <= 1; dx++)
+            for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
+              const placed = placedFloraAt(pcx + dx, pcz + dz, i, seed)
+              if (placed) drawn.push({ x: placed.x, z: placed.z, species: placed.species })
+            }
+        return drawn
+      },
       // The field's tint at the traveller (point 151) — the scene has no
       // global tint any more; checks read the value where the player stands.
       seasonTint: () => {
@@ -907,46 +960,21 @@ function Vegetation() {
         const ccx = cx + dx
         const ccz = cz + dz
         for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-          const rx = hashChunk(ccx, ccz, i * 4, seed)
-          const rz = hashChunk(ccx, ccz, i * 4 + 1, seed)
-          const roll = hashChunk(ccx, ccz, i * 4 + 2, seed)
-          const x = (ccx + rx) * CHUNK_SIZE
-          const z = (ccz + rz) * CHUNK_SIZE
-          const ll = worldToLatLon(x, z)
-          const s = sampleTerrain(ll.lat, ll.lon, seed)
-          const rd = riverDistance(ll.lat, ll.lon, 0.3)
-          const lsd = lakeDistance(ll.lat, ll.lon, 0.1)
-          // Reed belts hug the waterline (a band around the river's water
-          // edge or the lake shore) — not the mid-channel (design.md §19).
-          const nearWater = s.height > 0.05 && inReedBelt(rd, lsd)
-          const species = pickSpecies(s.type, roll, nearWater)
-          if (!species || s.height <= 0.05) continue
-          // Keep the channels clear (design.md §11/§19): apart from the reed
-          // belts, no dressing inside or hard against river/lake water — a
-          // tree or boulder there reads as standing in the river and its
-          // body/canopy blocks the canoe's way.
-          if (species !== 'papyrus' && !solidDressingAllowed(s.type, rd, lsd)) continue
-          if (species === 'rock' && s.type === 'mountain' && s.height > 6.5) continue // snow line
-          // Keep place surroundings clear so markers stay readable.
-          let blockedByPlace = false
-          for (const p of PLACES) {
-            const w = latLonToWorld(p.lat, p.lon)
-            if (Math.hypot(x - w.x, z - w.z) < 4) {
-              blockedByPlace = true
-              break
-            }
-          }
-          if (blockedByPlace) continue
+          // ONE placement decision shared with collidableFloraNear (point 129):
+          // whatever is not drawn here also carries no collider.
+          const placed = placedFloraAt(ccx, ccz, i, seed)
+          if (!placed) continue
+          const { species, x, z, height, r4, roll } = placed
           const idx = counts[species]
           if (idx >= MAX_INSTANCES[species]) continue
-          const r4 = hashChunk(ccx, ccz, i * 4 + 3, seed)
           quat.setFromAxisAngle(up, r4 * Math.PI * 2)
           const sc = 0.75 + r4 * 0.55
           scl.set(sc, sc * (0.85 + roll * 0.3), sc)
-          mtx.compose(new THREE.Vector3(x, s.height, z), quat, scl)
+          mtx.compose(new THREE.Vector3(x, height, z), quat, scl)
           meshes[species].setMatrixAt(idx, mtx)
           {
             const attr = meshes[species].geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute
+            const ll = worldToLatLon(x, z)
             const [su, svv] = seasonFieldUV(ll.lat, ll.lon)
             attr.setXY(idx, su, svv)
           }

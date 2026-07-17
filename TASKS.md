@@ -3358,6 +3358,28 @@ the remaining open points in their numeric order.
   succeeds (no phantom collider), while an IN-SEASON plant still blocks.
   This supersedes the tree/circle framing above: 129 is a
   season-vs-collision desync, not a resolver bug.
+  ★★★★ THE ACTUAL ROOT CAUSE (18.07.2026, found by a diagnosis probe while
+  verifying the collidableFloraNear/render unification): NOT the season and
+  NOT the collidable set — a DEGENERATE FLORA SYSTEM caused by the point-136
+  river widening. RIVER_WIDTH_DEG = 0.17 x widthFactor(1.6) = ~0.27, so the
+  reed belt is (0.24, 0.317) and solidDressingAllowed suppresses within
+  RIVER_WIDTH_DEG + 0.06 = 0.332 — but the riverDistance QUERY CAP passed by
+  the flora placement was 0.3, which lands INSIDE both bands. A point far from
+  any river therefore returns rd = 0.3 (the cap), read as "in the reed belt"
+  (papyrus placed) AND "too close to a channel" (all trees suppressed). Result
+  since point 136: the RENDERER drew reed-only savanna (acacia/baobab/kopje
+  suppressed), while the OLD collidableFloraNear used its OWN uncapped logic
+  and kept the tree colliders → invisible tree circles across every savanna =
+  the point-129 walls. A diagnosis probe (renderedNear/obstaclesNear dev hooks)
+  showed papyrus 11000+ / trees 0 at every savanna spot. FIX (shipped in this
+  point): raise the flora river-distance query cap from 0.3 to 0.45 (the
+  module's internal max, clearing both bands with headroom) in the now-shared
+  placedFloraAt. Re-probe after the fix: acacia in the thousands, papyrus only
+  near real water, collidable circles 67-155 per savanna area. This ALSO fixes
+  a latent RENDER bug (degenerate reed-savanna since 136), not just collision.
+  The placedFloraAt unification (render == collision) and the small-plant trim
+  stand; the cap is the real cure. DOCS: a comment at the cap explains the
+  RIVER_WIDTH_DEG dependency so a future width change re-checks it.
   ★★★ USER DECISION (17.07.2026 22:57): "Allgemein sollte es uebrigens keine
   Kollisionserkennung mit den kleinen Pflanzen geben. Es macht keinen Sinn,
   dass man an einem Grashalm haengen bleibt." So the fix has TWO parts, and
