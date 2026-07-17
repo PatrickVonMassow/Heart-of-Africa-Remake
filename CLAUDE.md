@@ -503,7 +503,16 @@ verify suite that proves it.
       current drowns (dead, sinking, never rescued or scavenged) while the
       SAME setup in the dry season still clambers out alive, and a rescuing
       parent that wades a swollen current too long drowns beside its calf
-      (both live in `scripts/verify/enrichments.mjs`); the vigil at the
+      (both live in `scripts/verify/enrichments.mjs`); the giraffe kick
+      (point 124): giraffes are lion-only prey in the food web (pure-tested:
+      present in no other predator's list, huntable exactly in their own
+      regions — and the calf-hunt predator pick now filters by the victim's
+      species, so no region-foreign or web-foreign pairing can arise), and a
+      giraffe parent reaching the hunter drives the hunt off with the
+      calibratable `parentDefense` chance (deterministic per-event roll,
+      pure-tested boundary; visible hind-leg kick pose; the lion leaves via
+      the ordinary walk-off) while a failed roll keeps today's sacrifice
+      (live in `scripts/verify/enrichments.mjs`); the vigil at the
       carcass (point 121): a too-late parent walks to its eaten calf and
       HOLDS there (pure-tested landing block: no vulture lands, no ground
       scavenger commits while a live keeper stands within the radius), it

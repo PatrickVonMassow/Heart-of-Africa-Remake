@@ -25,6 +25,9 @@ import {
   vigilDrawSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
+  parentDefends,
+  PREDATOR_PREY,
+  REGION_PREY,
 } from './wildlifeBehavior'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
@@ -814,5 +817,52 @@ describe('drinkCatchment (point 135c — the drinking belt survives the widened 
     expect(drinkCatchment(0.272, 1)).toBeGreaterThan(drinkCatchment(0.272, 0))
     // Clamped dryness.
     expect(drinkCatchment(0.272, 2)).toBeCloseTo(drinkCatchment(0.272, 1), 9)
+  })
+})
+
+describe('the food web (design.md §19.3 — the giraffe joins as LION-ONLY prey, point 124)', () => {
+  it('only the lion takes giraffe; cheetah, leopard and hyena never do', () => {
+    expect(PREDATOR_PREY.lion).toContain('giraffe')
+    expect(PREDATOR_PREY.cheetah).not.toContain('giraffe')
+    expect(PREDATOR_PREY.leopard).not.toContain('giraffe')
+    expect(PREDATOR_PREY.hyena).not.toContain('giraffe')
+  })
+
+  it('giraffe is huntable exactly in the regions its ambient savanna herds live: east and south', () => {
+    const withGiraffe = (Object.keys(REGION_PREY) as Array<keyof typeof REGION_PREY>).filter((r) =>
+      REGION_PREY[r].includes('giraffe'),
+    )
+    expect(withGiraffe.sort()).toEqual(['east', 'south'])
+  })
+
+  it('every region prey pool stays inside some resident predator food web (a victim hunt always finds a fit predator)', () => {
+    // The lion takes every prey kind, so no pool member is unhuntable.
+    for (const pool of Object.values(REGION_PREY)) {
+      for (const p of pool) expect(PREDATOR_PREY.lion).toContain(p)
+    }
+  })
+})
+
+describe('parentDefends (design.md §19.8, point 124 — the defence roll)', () => {
+  const chances = { giraffe: 0.75 }
+
+  it('is boundary-exact: roll < chance defends, roll >= chance is taken', () => {
+    expect(parentDefends('giraffe', 0, chances)).toBe(true)
+    expect(parentDefends('giraffe', 0.7499, chances)).toBe(true)
+    expect(parentDefends('giraffe', 0.75, chances)).toBe(false)
+    expect(parentDefends('giraffe', 1, chances)).toBe(false)
+  })
+
+  it('a species without an entry uses the fallback 0: never defends (the sacrifice stays the norm)', () => {
+    expect(parentDefends('zebra', 0, chances)).toBe(false)
+    expect(parentDefends('antelope', 0.0001, chances)).toBe(false)
+    expect(parentDefends('warthog', 0.999, chances)).toBe(false)
+  })
+
+  it('an explicit fallback applies to unlisted species only (the point-125 shape)', () => {
+    expect(parentDefends('zebra', 0.1, chances, 0.2)).toBe(true)
+    expect(parentDefends('zebra', 0.2, chances, 0.2)).toBe(false)
+    // A listed species keeps its own value over the fallback.
+    expect(parentDefends('giraffe', 0.5, chances, 0.2)).toBe(true)
   })
 })

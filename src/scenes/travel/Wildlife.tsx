@@ -44,6 +44,11 @@ import {
   drinkCatchment,
   mireFate,
   mireRoll,
+  parentDefends,
+  PREDATOR_PREY,
+  REGION_PREY,
+  type PredatorKind,
+  type PreyKind,
   vicinitySeedBounds,
   seasonFlowFactor,
   vigilBlocksLanding,
@@ -195,6 +200,10 @@ interface Animal {
    *  not between two flanking threats, not when a flight starts or ends, not
    *  on any behavior change (design.md §19). */
   face?: number
+  /** Seconds left of the defence-kick pose (design.md §19.8, point 124): set
+   *  when this parent drove the hunt off its calf — it rears and strikes out
+   *  with its hind legs at the departing predator, then settles. */
+  kick?: number
 }
 
 /**
@@ -236,13 +245,11 @@ const LION_STATE: LionHuntState = {
  *  unmount. */
 let ACTIVE_HERDS: Record<Species, Animal[]> | null = null
 
-/** Decorative predators of ~1890 Africa (design.md §19). The lion is the apex
- *  (and the only one that attacks on contact, §14); the others are scenery. */
-type PredatorKind = 'lion' | 'cheetah' | 'leopard' | 'hyena'
-/** Prey a predator hunts (design.md §19): grazers fitting its prey scheme. */
-type PreyKind = 'zebra' | 'wildebeest' | 'antelope' | 'warthog'
-/** Base render scale per prey species (warthog small, wildebeest sturdy). */
-const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antelope: 0.85, warthog: 0.62 }
+/** Base render scale per prey species (warthog small, wildebeest sturdy). The
+ *  giraffe geometry is already giraffe-sized (~3.6 units tall, fauna.ts), so
+ *  its factor matches the ambient herds' 0.9 spawn base — it reads much larger
+ *  than a zebra through the build, not the scale. */
+const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antelope: 0.85, warthog: 0.62, giraffe: 0.95 }
 
 /** Which predators roam each region (~1890 range). Lions everywhere; cheetahs
  *  and hyenas favour the open eastern/southern plains; leopards the wooded
@@ -254,27 +261,9 @@ const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
   west: ['lion', 'leopard'],
   north: ['lion', 'cheetah', 'leopard'],
 }
-/** Food web (design.md §19): each predator's prey scheme. The grazers in turn
- *  feed on the grassland (they graze on open land), so predator → grazer →
- *  plants forms the chain. Lions and hyenas take the big grazers; the cheetah
- *  and leopard take smaller, faster game. */
-const PREDATOR_PREY: Record<PredatorKind, PreyKind[]> = {
-  lion: ['wildebeest', 'zebra', 'antelope', 'warthog'],
-  hyena: ['wildebeest', 'zebra', 'warthog'],
-  cheetah: ['antelope', 'warthog'],
-  leopard: ['antelope', 'warthog'],
-}
-/** Region-appropriate grazers for ~1890 Africa (design.md §19). The eastern and
- *  southern plains hold the great herds; the wooded west/centre and the arid
- *  north offer a narrower range. A hunt's prey is the predator's scheme
- *  intersected with what the region holds. */
-const REGION_PREY: Record<RegionId, PreyKind[]> = {
-  east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
-  south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
-  central: ['antelope', 'warthog', 'zebra'],
-  west: ['antelope', 'warthog', 'zebra'],
-  north: ['antelope', 'warthog'],
-}
+// The food web itself (PREDATOR_PREY, REGION_PREY and the Predator/PreyKind
+// types) lives in wildlifeBehavior.ts so the fit rules — incl. the lion-only
+// giraffe of point 124 — are pure-testable.
 /** Render scale per predator (cheetah/leopard lithe, hyena mid, lion large). */
 const PREDATOR_SCALE: Record<PredatorKind, number> = { lion: 1, cheetah: 0.9, leopard: 0.92, hyena: 0.88 }
 
@@ -369,8 +358,14 @@ const VIGIL_HOLD_DIST = 1.5
 const PARENT_BLOCK_OFFSET = 1.8
 const PARENT_BLOCK_SPEED = 6
 const PARENT_TAKE_DIST = 1.0
-/** Species whose calves a predator hunt can target (design.md §19). */
-const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog'] as const
+/** Species whose calves a predator hunt can target (design.md §19). The
+ *  giraffe joined with point 124 — its calves are run down by the LION only
+ *  (the food web gates the predator pick), and its parent's charge may end in
+ *  the kick instead of the sacrifice. */
+const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe'] as const
+/** Duration of the rendered defence kick (design.md §19.8, point 124): the
+ *  parent that drove the hunt off rears and strikes before settling back. */
+const PARENT_KICK_SECONDS = 0.8
 
 /** Distance from the nearest LIVE vigil-keeper to the given carcass point, or
  *  Infinity with none (point 121) — a dead keeper guards nothing. Feeds
@@ -510,6 +505,14 @@ function findLandNear(x: number, z: number, seed: number): { x: number; z: numbe
 
 /** Walk-off direction after a kill: straight away from the traveller, so the
  *  leave never crosses the view; random when standing on the traveller. */
+/** Region prey pool at a world point (point 124): a victim hunt may only
+ *  target a species the region's own pool holds — the region-fit gate for the
+ *  calf pick, matching the fit the generic hunt applies via REGION_PREY. */
+function regionPreyAt(x: number, z: number): PreyKind[] {
+  const ll = worldToLatLon(x, z)
+  return REGION_PREY[regionAt(ll.lat, ll.lon)] ?? REGION_PREY.east
+}
+
 function leaveHeading(x: number, z: number, px: number, pz: number): number {
   const dx = x - px
   const dz = z - pz
@@ -945,7 +948,13 @@ function getHuntGeos(): HuntGeos {
   if (huntGeoCache) return huntGeoCache
   huntGeoCache = {
     predator: { lion: buildLion(), cheetah: buildCheetah(), leopard: buildLeopard(), hyena: buildHyena() },
-    prey: { zebra: buildZebra(), wildebeest: buildWildebeest(), antelope: buildAntelope(), warthog: buildWarthog() },
+    prey: {
+      zebra: buildZebra(),
+      wildebeest: buildWildebeest(),
+      antelope: buildAntelope(),
+      warthog: buildWarthog(),
+      giraffe: buildGiraffe(),
+    },
   }
   return huntGeoCache
 }
@@ -1132,6 +1141,12 @@ function Herds() {
     for (const sp of CALF_HUNT_SPECIES) {
       for (const a of herds[sp]) {
         if (a.dead) continue
+        // The defence kick's pose window runs down here so it always resolves
+        // (point 124) — the render loop below only draws it.
+        if (a.kick !== undefined) {
+          a.kick -= dt
+          if (a.kick <= 0) a.kick = undefined
+        }
         if (a.caught !== undefined && a.caught > 0) {
           // Caught calf: count down the struggle. Unrescued, the kill completes —
           // and a parent that charged in but only got close (too late) is taken
@@ -1163,17 +1178,40 @@ function Herds() {
           a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
           a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
           if (d < PARENT_SACRIFICE_DIST) {
-            // A MIRED calf cannot rise and flee (point 123): the parent's
-            // charge still costs its life, but the mud holds the calf for
-            // the predator — at the waterhole both are taken, through the
-            // existing caught countdown (no new kill path).
-            if (calf.mired === undefined) {
-              calf.caught = undefined // freed — it rises and flees on its own
-              calf.parent = undefined
-              a.child = undefined
+            // The defence roll (design.md §19.8, point 124): a charging parent
+            // may drive the hunt off instead of dying — the giraffe cow's
+            // kick. Deterministic per event (hashed from phase and position,
+            // like the mire roll — never Math.random in the sim). A MIRED
+            // calf never rolls (point 123): the mud deaths are deliberate.
+            const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
+            if (calf.mired === undefined && parentDefends(sp, roll, balance.parentDefense)) {
+              // Driven off: the calf is freed and rises, the parent LIVES and
+              // strikes (the kick pose below), and the predator leaves through
+              // the existing walk-off — never a despawn in sight.
+              calf.caught = undefined
+              a.kick = PARENT_KICK_SECONDS
+              if (LION_STATE.victim === calf) {
+                LION_STATE.victim = null
+                LION_STATE.mode = 'leave'
+                LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+                // The feeding predator stood at the carcass flank — pick the
+                // walk-off up from there, like the feed→leave exit does.
+                LION_STATE.lx = LION_STATE.px + 0.7
+                LION_STATE.lz = LION_STATE.pz + 0.25
+              }
+            } else {
+              // A MIRED calf cannot rise and flee (point 123): the parent's
+              // charge still costs its life, but the mud holds the calf for
+              // the predator — at the waterhole both are taken, through the
+              // existing caught countdown (no new kill path).
+              if (calf.mired === undefined) {
+                calf.caught = undefined // freed — it rises and flees on its own
+                calf.parent = undefined
+                a.child = undefined
+              }
+              takeAnimal(a, { stain: true })
+              if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
             }
-            takeAnimal(a, { stain: true })
-            if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
           }
         } else if (
           a.child &&
@@ -1196,10 +1234,23 @@ function Herds() {
             a.z += Math.cos(h) * PARENT_BLOCK_SPEED * dt
           }
           if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
-            calf.parent = undefined // freed — it keeps fleeing on its own
-            a.child = undefined
-            takeAnimal(a, { stain: true })
-            LION_STATE.victim = a // the hunt closes out feeding on the parent
+            // The defence roll (design.md §19.8, point 124), same rule as the
+            // charge above: the hunter that reaches the living shield may be
+            // kicked off instead of taking it. Deterministic per event.
+            const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
+            if (parentDefends(sp, roll, balance.parentDefense)) {
+              // Driven off mid-chase: the family stays whole and the hunt
+              // ends — the predator turns and leaves from where it stands.
+              a.kick = PARENT_KICK_SECONDS
+              LION_STATE.victim = null
+              LION_STATE.mode = 'leave'
+              LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+            } else {
+              calf.parent = undefined // freed — it keeps fleeing on its own
+              a.child = undefined
+              takeAnimal(a, { stain: true })
+              LION_STATE.victim = a // the hunt closes out feeding on the parent
+            }
           }
         }
       }
@@ -1851,6 +1902,17 @@ function Herds() {
             yaw = a.rot + Math.sin(t * 16 + a.phase) * 0.7
             pitch = Math.PI / 2.3 // thrown on its side, thrashing
             familyHeld = true
+          } else if (a.kick !== undefined) {
+            // The defence kick (design.md §19.8, point 124): the parent that
+            // drove the hunt off stands its ground, tail to the retreating
+            // predator, and throws its hind legs up in a brief strike — the
+            // front dips (positive pitch), the rear flies, then it settles.
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(a.x - LION_STATE.lx, a.z - LION_STATE.lz)
+            const strike = Math.min(1, Math.max(0, 1 - a.kick / PARENT_KICK_SECONDS))
+            pitch = 0.55 * Math.sin(Math.PI * strike)
+            familyHeld = true
           } else if (a.child && !a.child.dead && a.child.caught !== undefined && a.child.caught > 0) {
             // Charging the predator eating our calf (movement in the pre-pass):
             // face the calf while rushing in.
@@ -2327,6 +2389,10 @@ function LionHunt() {
       // It does, however, PREEMPT the idle cooldown timer below: the
       // post-hunt cooldown (30-60 s) would outlast the vigil window, and the
       // draw is a scripted guarantee, not a hope on the ambient dice.
+      // The hunted species (point 124): recorded with the victim pick so the
+      // predator is drawn from the food web that actually takes it, and
+      // s.prey reports the truth for the region/web fit checks.
+      let victimSpecies: PreyKind | null = null
       let vigilKeeper: Animal | null = null
       if (herds) {
         let bd = CALF_HUNT_SEEK
@@ -2338,6 +2404,7 @@ function LionHunt() {
             if (kd < bd) {
               bd = kd
               vigilKeeper = k
+              victimSpecies = csp
             }
           }
         }
@@ -2363,10 +2430,12 @@ function LionHunt() {
           for (const c of herds[csp]) {
             if (!c.young || c.dead || c.caught !== undefined || c.mired === undefined || !c.parent || c.parent.dead)
               continue
+            if (!regionPreyAt(c.x, c.z).includes(csp)) continue // region fit (point 124)
             const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
             if (cd < bd) {
               bd = cd
               calf = c
+              victimSpecies = csp
             }
           }
         }
@@ -2377,10 +2446,12 @@ function LionHunt() {
           for (const c of herds[csp]) {
             if (!c.young || c.dead || c.caught !== undefined || c.inWater !== undefined || !c.parent || c.parent.dead)
               continue
+            if (!regionPreyAt(c.x, c.z).includes(csp)) continue // region fit (point 124)
             const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
             if (cd < bd) {
               bd = cd
               calf = c
+              victimSpecies = csp
             }
           }
         }
@@ -2418,11 +2489,19 @@ function LionHunt() {
       // region actually holds (design.md §19): predator → grazer → grassland.
       const region = regionAt(ll.lat, ll.lon)
       const predPool = REGION_PREDATORS[region] ?? REGION_PREDATORS.east
-      s.predator = predPool[Math.floor(Math.random() * predPool.length)]
+      // A victim hunt's predator must hold the victim's species in its own
+      // food web (point 124): a giraffe calf is run down by the LION only.
+      // The lion takes every prey kind and roams every region, so the fit
+      // pool is never empty for a huntable species.
+      const vs = victimSpecies
+      const fitPool = vs ? predPool.filter((p) => PREDATOR_PREY[p].includes(vs)) : predPool
+      s.predator = fitPool.length > 0 ? fitPool[Math.floor(Math.random() * fitPool.length)] : 'lion'
       const regionPrey = REGION_PREY[region] ?? REGION_PREY.east
       const preyPool = PREDATOR_PREY[s.predator].filter((p) => regionPrey.includes(p))
       const pool = preyPool.length > 0 ? preyPool : regionPrey
-      s.prey = pool[Math.floor(Math.random() * pool.length)]
+      // The recorded prey species is the truth: the victim's own kind for a
+      // family hunt, a food-web pick for the generic hunt.
+      s.prey = vs ?? pool[Math.floor(Math.random() * pool.length)]
       if (predatorMesh.current) {
         predatorMesh.current.geometry = predatorGeo[s.predator]
         predatorMesh.current.scale.setScalar(PREDATOR_SCALE[s.predator])

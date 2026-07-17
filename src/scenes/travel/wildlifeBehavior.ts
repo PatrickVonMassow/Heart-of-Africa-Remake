@@ -2,6 +2,8 @@
 // of Wildlife.tsx so the direction/geometry maths can be unit-tested without a
 // browser (the RAF-driven behaviour itself is covered by the Playwright suites).
 
+import type { RegionId } from '../../world/geo'
+
 /** Heading convention across the wildlife sim: a heading `h` points in the
  *  direction `(sin h, cos h)` in world (x, z), so `Math.atan2(dx, dz)` yields the
  *  heading toward an offset `(dx, dz)`. */
@@ -557,4 +559,60 @@ export function drinkCatchment(riverWidthDeg: number, dryness: number): number {
   // wide (0.43). The strict dry>wet ordering of point 120e follows from the
   // geometry instead of hanging on spawn-hash luck at one test site.
   return riverWidthDeg + 0.06 + 0.37 * d
+}
+
+// --- The food web (design.md §19.3) ------------------------------------------
+// The predator/prey/region tables live in this pure module so the fit rules
+// are unit-testable without a browser; Wildlife.tsx consumes them for the
+// live hunts.
+
+/** Decorative predators of ~1890 Africa (design.md §19). The lion is the apex
+ *  (and the only one that attacks on contact, §14); the others are scenery. */
+export type PredatorKind = 'lion' | 'cheetah' | 'leopard' | 'hyena'
+/** Prey a predator hunts (design.md §19): grazers fitting its prey scheme. */
+export type PreyKind = 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'giraffe'
+
+/** Food web (design.md §19): each predator's prey scheme. The grazers in turn
+ *  feed on the grassland (they graze on open land), so predator → grazer →
+ *  plants forms the chain. Lions and hyenas take the big grazers; the cheetah
+ *  and leopard take smaller, faster game. The giraffe is LION-ONLY prey
+ *  (point 124): cheetah, leopard and hyena do not take giraffe. */
+export const PREDATOR_PREY: Record<PredatorKind, PreyKind[]> = {
+  lion: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
+  hyena: ['wildebeest', 'zebra', 'warthog'],
+  cheetah: ['antelope', 'warthog'],
+  leopard: ['antelope', 'warthog'],
+}
+/** Region-appropriate grazers for ~1890 Africa (design.md §19). The eastern and
+ *  southern plains hold the great herds; the wooded west/centre and the arid
+ *  north offer a narrower range. A hunt's prey is the predator's scheme
+ *  intersected with what the region holds. Giraffes live on the eastern and
+ *  southern plains — matching their ambient savanna herds — so only there may
+ *  a hunt take one (point 124). */
+export const REGION_PREY: Record<RegionId, PreyKind[]> = {
+  east: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
+  south: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
+  central: ['antelope', 'warthog', 'zebra'],
+  west: ['antelope', 'warthog', 'zebra'],
+  north: ['antelope', 'warthog'],
+}
+
+/**
+ * The parent's defence (design.md §19.8, point 124): does a parent that
+ * reaches the predator over its calf drive the hunt off (true — the calf is
+ * freed, the parent lives, the predator leaves) or is it taken in the calf's
+ * place (false — the sacrifice)? The chance is looked up per species — the
+ * shape point 125 needs to raise the other species later; a species without
+ * an entry uses `fallback` (default 0: never defends, so the sacrifice stays
+ * the norm). Deterministic — the caller passes its own hashed roll, never
+ * Math.random. The roll applies ONLY to the live chase/charge resolutions:
+ * the mire and vigil deaths are deliberate surrenders and never roll.
+ */
+export function parentDefends(
+  species: string,
+  roll: number,
+  chances: Record<string, number>,
+  fallback = 0,
+): boolean {
+  return roll < (chances[species] ?? fallback)
 }

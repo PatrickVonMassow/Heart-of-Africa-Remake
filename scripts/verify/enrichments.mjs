@@ -1738,8 +1738,8 @@ const preyVar = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   // Mirror the maps in Wildlife.tsx (design.md §19).
   const REGION_PREY = {
-    east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
-    south: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    east: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
+    south: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
     central: ['antelope', 'warthog', 'zebra'],
     west: ['antelope', 'warthog', 'zebra'],
     north: ['antelope', 'warthog'],
@@ -1752,7 +1752,7 @@ const preyVar = await page.evaluate(async () => {
     north: ['lion', 'cheetah', 'leopard'],
   }
   const PREDATOR_PREY = {
-    lion: ['wildebeest', 'zebra', 'antelope', 'warthog'],
+    lion: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
     hyena: ['wildebeest', 'zebra', 'warthog'],
     cheetah: ['antelope', 'warthog'],
     leopard: ['antelope', 'warthog'],
@@ -2540,6 +2540,70 @@ check(
   'with no predator drawn the vigil expires and the parent rejoins alive (point 121e)',
   vigilBackstop.vigilSet && vigilBackstop.cleared && vigilBackstop.parentAlive,
   JSON.stringify(vigilBackstop),
+)
+
+// --- Point 124: the giraffe mother's kick ------------------------------------
+// A giraffe parent that reaches the hunter drives the hunt off (visible
+// hind-leg kick, the lion leaves, the calf lives). Forced deterministic via
+// the balance chance: 1 = always defends. The synthetic family is a GIRAFFE
+// pair here — the species carries the defence value.
+const kick = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const bal = window.__balance.parentDefense
+  const prev = bal.giraffe
+  bal.giraffe = 1 // always defends — the mechanic under test, not the dice
+  let liveChunk
+  for (const sp of Object.keys(herds)) {
+    for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+    if (liveChunk) break
+  }
+  const p0 = window.__game.getState().pos
+  // Park the parent out of shield reach during the chase (the shield would
+  // defend BEFORE the catch and the kick never shows), reposition after.
+  const parent = { x: p0.x - 200, z: p0.z - 8, y: 0.2, rot: 0, scale: 0.95, phase: 0.4, chunk: liveChunk ?? 'kick-test' }
+  const calf = { x: p0.x + 8, z: p0.z - 8, y: 0.2, rot: 0, scale: 0.5, phase: 0.8, chunk: liveChunk ?? 'kick-test', young: true, parent }
+  parent.child = calf
+  herds.giraffe.push(parent, calf)
+  const st = window.__lionHunt.state
+  st.mode = 'chase'
+  st.victim = calf
+  st.victimHunt = true
+  st.lx = calf.x + 10
+  st.lz = calf.z + 2
+  st.px = calf.x
+  st.pz = calf.z
+  st.timer = 0
+  const out = { caught: false, kicked: false, calfAlive: false, parentAlive: false, lionLeft: false }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  out.caught = calf.caught !== undefined
+  if (out.caught && !calf.dead) {
+    parent.x = calf.x - 15 // charge reach: 15/6.5 ≈ 2.3 s, well inside the window
+    parent.z = calf.z
+  }
+  // The parent charges, reaches the predator, and the roll — forced to
+  // certainty — drives the hunt off.
+  const t1 = Date.now()
+  while (Date.now() - t1 < 25000) {
+    if (parent.kick !== undefined) out.kicked = true
+    if (st.mode === 'leave' || st.mode === 'idle') { out.lionLeft = true }
+    if (out.kicked && out.lionLeft) break
+    if (calf.dead || parent.dead) break
+    await sleep(120)
+  }
+  await sleep(1500)
+  out.calfAlive = !calf.dead && calf.caught === undefined
+  out.parentAlive = !parent.dead
+  bal.giraffe = prev
+  herds.giraffe = herds.giraffe.filter((a) => a !== parent && a !== calf)
+  if (st.victim === calf || st.victim === parent) { st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false }
+  return out
+})
+check(
+  'the giraffe mother kicks the hunt off — calf freed, parent alive, lion leaves (point 124)',
+  kick.caught && kick.kicked && kick.lionLeft && kick.calfAlive && kick.parentAlive,
+  JSON.stringify(kick),
 )
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)

@@ -243,6 +243,12 @@ export interface BalanceConfig {
     /** Seconds of standing vigil after which the carcass draws a predator to the keeper. */
     predatorDelay: number
   }
+  /** The parent's defence (design.md §19.8, point 124): per-species chance
+   *  that a parent reaching the predator drives the hunt off (both live)
+   *  instead of being taken in the calf's place. Species without an entry
+   *  never defend — the sacrifice stays the norm until point 125 assigns the
+   *  other species their own values. Calibratable. */
+  parentDefense: Record<string, number>
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -433,6 +439,9 @@ export const balance: BalanceConfig = {
   vigil: {
     seconds: 60, // calibratable: how long the parent stands vigil before rejoining the herd
     predatorDelay: 12, // calibratable: vigil seconds until the carcass draws a predator to the keeper
+  },
+  parentDefense: {
+    giraffe: 0.75, // the giraffe cow's kick genuinely drives lions off (point 124)
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

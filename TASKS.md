@@ -2937,7 +2937,7 @@ the remaining open points in their numeric order.
   families the falls checks need). The remaining 102-vicinity 5/6 flake is
   point 135(a) — next up by the user's decision.
 
-- [ ] 124. Family drama: the giraffe mother's kick.
+- [x] 124. Family drama: the giraffe mother's kick.
   Wanted (user, 15.07.2026): the iconic image — a giraffe cow driving a lion off
   her calf with her kicks. Today giraffes are not prey at all: `PreyKind` (~212)
   is zebra/wildebeest/antelope/warthog, so no hunt ever touches a giraffe.
@@ -2965,6 +2965,25 @@ the remaining open points in their numeric order.
   the mother driving the lion off and the calf alive. DOCS: design.md §19.8 (and
   §19.3's food web), CLAUDE.md §7.1 pt. 12. One atomic commit.
   (Reported 15.07.2026.)
+  DONE (17.07.2026, 11:10): giraffe is lion-only prey (PREDATOR_PREY.lion
+  only; REGION_PREY east+south, matching its ambient herds) and joined
+  CALF_HUNT_SPECIES, so every family drama applies. The food-web types
+  moved into wildlifeBehavior.ts as pure exports (browser-free tests), and
+  a REAL hole closed on the way: the calf-hunt predator pick ignored the
+  victim's species (a cheetah could have hunted a giraffe calf) — it now
+  filters the predator pool by PREDATOR_PREY membership and gates the pick
+  by regionPreyAt. The defence: pure parentDefends(species, roll, chances,
+  fallback=0) in the 125 shape — balance.parentDefense = { giraffe: 0.75 },
+  deterministic per-event sin-hash roll, applied in the charge AND shield
+  resolutions (never for mired/vigil — those deaths are deliberate); on
+  success the calf is freed, the parent rears into a 0.8 s hind-leg kick
+  pose and the lion leaves via the ordinary walk-off (victimHunt kept so no
+  phantom carcass). Pure tests: lion-only web, region fit, every region
+  pool lion-coverable, boundary-exact defence roll. Live (full suite exit
+  0): forced-certain defence — caught, kicked, calf alive, parent alive,
+  lion leaves; staging parks the parent at 200 during the chase and
+  repositions to 15 after the catch (the shield would otherwise defend
+  before the catch and hide the kick). Vitest 1689, lint clean.
 
 - [ ] 125. The sacrifice may succeed (variance instead of a script).
   Wanted (user, 15.07.2026): today a parent that reaches the predator ALWAYS
