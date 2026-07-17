@@ -5547,3 +5547,40 @@ the remaining open points in their numeric order.
   more than one calf, each with its own parent link (enrichments). DOCS:
   design.md §19.8 (the herd raises SEVERAL young) + CLAUDE §7.1 pt.12/20 (the
   tunable). (Reported 17.07.2026; queued at the batch end per append-and-defer.)
+
+- [ ] 170. A RETURN journal entry when a village's situation has changed.
+  User request (17.07.2026 23:xx): the village vignette currently fires only on
+  the FIRST visit. "Aendere das dahingehend, dass auch wieder einer kommt, wenn
+  sich im Dorf die Situation veraendert hat. Der neue Eintrag soll dann nur
+  beschreiben, was ich veraendert habe. So in der Art, dass man entsetzt ist,
+  was hier seit dem letzten Besuch anscheinend passiert ist." — a NEW entry on
+  re-entry when the situation changed, describing ONLY the change, in a shocked
+  register.
+  This is the natural companion to point 133: the change that matters today is
+  the RINDERPEST PHASE (rinderpestPhaseAtDay). A traveller who first met the
+  Maasai in 1890 (preDamaged) and returns in 1892 (struck) or 1893 (aftermath)
+  should get a return entry describing what befell the village since — horror
+  at the emptied kraals, the famine figures, the torn cattle-loan fabric.
+  IMPLEMENTATION:
+  (a) Persist per village the LAST-JOURNALED phase (store state, saved with the
+      checkpoint like `visited`). On entering a village that is `visited`, if
+      rinderpestPhaseAtDay now differs from the stored phase, emit a RETURN
+      entry and update the stored phase; else stay silent (no spam).
+  (b) NEW TEXTS (both languages, voice markup, §16): a phase-transition vignette
+      keyed on (people, fromPhase -> toPhase) — at minimum the meaningful
+      Maasai/Sidama transitions (preDamaged->struck, struck->aftermath,
+      preDamaged->aftermath if the player skips years). The text describes only
+      what CHANGED since last time, shocked/somber ([fear]/[somber]),
+      NOT a re-description of the whole village. Reuse Baumann's period register
+      for the Maasai struck transition.
+  (c) Guard: a village with no phase model (the camel peoples, the clean south
+      in-window) never changes, so it never re-fires — only the rinderpest
+      peoples (maasai, sidama; nubians is aftermath all window = no change).
+      Structure it generically so other future "situation" drivers can hook in.
+  TESTS: pure — the "should a return entry fire" predicate (visited &&
+  phase != storedPhase) and the transition-text selection, both languages
+  markup-clean (villages.test.ts / a store test); the store test that a second
+  visit after a phase change adds exactly one return entry and none if
+  unchanged. Live optional. DOCS: design.md §16 (return entries on changed
+  situation) + §19.15 note. (Reported 17.07.2026; queued at the batch end per
+  append-and-defer.)
