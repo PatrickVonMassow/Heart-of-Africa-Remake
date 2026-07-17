@@ -3332,6 +3332,32 @@ the remaining open points in their numeric order.
   list — names the wall in one run; then fix the real cause and add a live
   crossing check at this exact coordinate. This makes 129 ACTIONABLE — pull
   it forward once the current 145 sub-points are done.
+  ★★ ROOT CAUSE, USER-DIAGNOSED (17.07.2026 22:56): "An der Stelle war mal
+  eine Pflanze. Die ist aber durch den Jahreszeitenwechsel nicht mehr dort.
+  Ich bleibe wohl trotzdem noch an ihr haengen." — a plant that VANISHED
+  with the season still COLLIDES. This is the actual bug, and it fits every
+  earlier clue: collidableFloraNear (TravelScene.tsx) builds its obstacle
+  circles from the SAME deterministic chunk placement the vegetation mesh is
+  built from — but points 144 (bare-branch crown collapse) and 151 (ground
+  flora, foliage class 2, sprouting/vanishing with the greenness field) hide
+  or remove the RENDERED plant seasonally WITHOUT gating the collision, so a
+  seasonally-gone plant leaves an invisible collider. It clusters at region/
+  climate-zone borders (the 7.15N West/Central line) because that is exactly
+  where the greenness field crosses the threshold at which class-2 ground
+  flora appears/disappears — so the seasonal presence flips there. THE FIX
+  is now precise: collidableFloraNear must apply the SAME seasonal visibility
+  rule the flora BUILDER/renderer uses — if a plant's foliage is collapsed
+  (144) or its ground-flora instance is absent at this position's greenness
+  (151), it must NOT contribute a collision circle. One shared predicate
+  ('is this plant present here, this date?') feeds BOTH the rendered instance
+  and the collider, so they can never disagree again (the same discipline
+  the point-128 landedBirdY shared-rule used). TESTS: pure — the shared
+  presence predicate (present in-season -> collides; seasonally gone ->
+  no circle) in a flora/collision test; live — at 7.15N/26.4E in the
+  reported season, drive S across the border and assert the crossing
+  succeeds (no phantom collider), while an IN-SEASON plant still blocks.
+  This supersedes the tree/circle framing above: 129 is a
+  season-vs-collision desync, not a resolver bug.
   Fixed along the way in the same verification runs: the
   hunt-variety check now counts family hunts separately (the calf preference
   re-picks the same local family at a stationary measuring point — 51-68
