@@ -3688,7 +3688,7 @@ the remaining open points in their numeric order.
   ACTION: record it in design.md §19.8 in those terms, so the exception is
   visible where the behaviour is specified rather than buried in a task list.
   No code. (Set 16.07.2026.)
-  DONE (17.07.2026, 21:03): design.md §19.8 now carries the exception as its
+  DONE (17.07.2026, 20:59): design.md §19.8 now carries the exception as its
   own bullet — the three drives named as ONE family, the user's German
   ruling quoted verbatim, the realism argument stated (the last-moment bolt
   would be the odd one out), the single-carve-out framing against the
