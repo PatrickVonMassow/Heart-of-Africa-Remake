@@ -3517,6 +3517,27 @@ the remaining open points in their numeric order.
   settled in the 2600 ms window at that machine load, check the wait; (g)
   verify the bank fix landed the 120e guarantee (>= 4) at the Zambezi. Goal:
   three consecutive full enrichments runs exit 0 before checking 135 off.
+  SECOND WIP UPDATE (17.07.2026, 05:22): (e) fixed — the collision check now
+  clears its drive corridor of OTHER animals first (the guarantee seeders can
+  stand a grazer on the line; the traveller then collided, correctly, with
+  the wrong body). (f) fixed — the pixel probes poll the field lerp to
+  SETTLED from the NODE side (an in-page waitForFunction rejected on a
+  transient hook error and the swallowed rejection skipped the wait — the
+  swing collapsed to ~1-2 before this was understood). (g) confirmed — the
+  bank search without the dry bar seeds the Zambezi shore (120e green since).
+  Dry-shore group spread 2.5 (1.5 overlapped zebra bodies at spawn and
+  tripped the §19.5 spacing check once). Stability now: runs alternate 2-of-3
+  green with ROTATING single failures, all of one shape: the family-drama
+  scenarios (122 drown, 123 mire kill/release) COMPETE for a scarce pool of
+  free families and sometimes stage against none (found:false) or against a
+  family whose parent something else relocated (one run: the drowning calf
+  was "rescued" — the 180-unit parent separation did not hold). NEXT STEP
+  (the sustainable fix, do this rather than more poll patches): give the
+  drama scenarios a SYNTHETIC injected family each — parent+calf objects
+  built like the collision check's zebra (young/parent/child links, scale,
+  phase, chunk=liveChunk) — so staging is deterministic and pool-independent;
+  keep the natural-pool paths for the checks that exist to test natural
+  behaviour (gambol, falls). Then re-run the three-consecutive-green gate.
   MORE CASES of the same class (16./17.07.2026, observed across full runs):  MORE CASES of the same class (16./17.07.2026, observed across full runs):
   (c) the dry-season drinker count (point 120e — dryDrinkers vs wetDrinkers
   flipped to 2/0, 3/0 on two runs, green on others); (d) the trample-grief

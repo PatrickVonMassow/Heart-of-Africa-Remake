@@ -819,7 +819,11 @@ function seedDryShoreDrinkers(
   // 1 unit inland, tight spread: every group member must stay inside the
   // dry catchment (waterline + 0.43 deg) so the spawn path hands each its
   // own drink target at this shore.
-  placeGroup(herds[species], cx, cz, bank.x + 1, bank.z + 1, deficit, 1.5, seed, 0.9, BODY_RADIUS[species], false, undefined, key)
+  // Spread 2.5: tight enough that every member stays inside the dry
+  // catchment past the waterline, wide enough that the group spawns with
+  // its body spacing already intact (spread 1.5 overlapped zebra bodies
+  // and tripped the §19.5 spacing check at spawn).
+  placeGroup(herds[species], cx, cz, bank.x + 1, bank.z + 1, deficit, 2.5, seed, 0.9, BODY_RADIUS[species], false, undefined, key)
 }
 
 // The wildlife InstancedMeshes are MODULE singletons (point 96): fresh

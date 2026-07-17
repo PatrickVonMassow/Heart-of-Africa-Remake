@@ -1236,6 +1236,25 @@ const animalHit = await page.evaluate(async () => {
     return undefined
   })()
   const zebra = { x: ax, z: az, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: liveChunk ?? 'collide-test' }
+  // Clear the drive corridor of every OTHER animal (point 135e): the
+  // guarantee seeders (vicinity, dry shore) can stand a grazer on the
+  // straight line to the pinned target, and the traveller then collides —
+  // correctly — with the wrong body and never reaches the test target.
+  {
+    const p0 = window.__game.getState().pos
+    const h0 = window.__wildlife.herdsRef.current
+    if (h0) {
+      for (const sp of Object.keys(h0)) {
+        for (const a of h0[sp]) {
+          if (a === zebra || a.dead) continue
+          const onCorridor =
+            a.x > Math.min(p0.x, ax) - 4 && a.x < Math.max(p0.x, ax) + 4 &&
+            Math.abs(a.z - az) < 6
+          if (onCorridor) a.z += 25 // shove it well off the line
+        }
+      }
+    }
+  }
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' })) // drive east, straight at it
   let minDist = Infinity
   let reached = false // the player got within engaging range at some point
@@ -2352,11 +2371,18 @@ await waitForFamily() // the kill scenario above consumed a family (135 class)
 const release = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
+  // Poll for a family whose calf is FREE of every drama state — the kill
+  // scenario just consumed one and the remaining calves can be mid-state
+  // for a while (point 135 class: waitForFamily alone is not specific enough).
   let parent = null
-  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
-    for (const a of herds[sp] || [])
-      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined && a.child.mired === undefined) { parent = a; break }
-    if (parent) break
+  const tf = Date.now()
+  while (!parent && Date.now() - tf < 12000) {
+    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
+      for (const a of herds[sp] || [])
+        if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined && a.child.mired === undefined) { parent = a; break }
+      if (parent) break
+    }
+    if (!parent) await sleep(300)
   }
   if (!parent) return { found: false }
   const calf = parent.child
@@ -3258,7 +3284,18 @@ check(
 const groundRGB = async (lat, lon, month) => {
   await page.evaluate(([la, lo]) => window.__game.getState().debugJumpTo(la, lo), [lat, lon])
   await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
-  await page.waitForTimeout(2600)
+  // Poll until the field's lerp SETTLES instead of a fixed wait (point
+  // 135f): under full-regression load 2600 ms covers too few frames and the
+  // measured swing lands just under its gate. Node-side loop — an in-page
+  // waitForFunction rejects outright on a transient hook error and a
+  // swallowed rejection skipped the wait entirely (the swing collapsed).
+  for (let settle = 0; settle < 40; settle++) {
+    const a = await page.evaluate(() => window.__vegetation?.seasonTint?.() ?? null)
+    await page.waitForTimeout(300)
+    const b = await page.evaluate(() => window.__vegetation?.seasonTint?.() ?? null)
+    if (a !== null && b !== null && Math.abs(b - a) < 0.002) break
+  }
+  await page.waitForTimeout(400)
   const buf = await page.screenshot({ clip: { x: 300, y: 320, width: 680, height: 340 } })
   const { channels } = await sharp(buf).stats()
   return channels.slice(0, 3).map((c) => c.mean)
