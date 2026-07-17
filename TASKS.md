@@ -3517,7 +3517,7 @@ the remaining open points in their numeric order.
   settled in the 2600 ms window at that machine load, check the wait; (g)
   verify the bank fix landed the 120e guarantee (>= 4) at the Zambezi. Goal:
   three consecutive full enrichments runs exit 0 before checking 135 off.
-  SECOND WIP UPDATE (17.07.2026, 05:22): (e) fixed — the collision check now
+  SECOND WIP UPDATE (17.07.2026, 05:30): (e) fixed — the collision check now
   clears its drive corridor of OTHER animals first (the guarantee seeders can
   stand a grazer on the line; the traveller then collided, correctly, with
   the wrong body). (f) fixed — the pixel probes poll the field lerp to
