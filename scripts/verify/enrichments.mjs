@@ -2729,18 +2729,29 @@ check(
 // there with lowered heads for the window, and moves on. A NATURAL herd is
 // relocated to the radius edge (its herdState already exists), then the
 // behaviour is measured: closing on the site, holding, releasing.
-await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6))
+// Source the herd where elephants reliably spawn (the Serengeti, like the
+// trample check), then move it to the graveyard and follow the player there
+// — retagging each member's chunk to a live graveyard chunk so the jump's
+// despawn pass does not cull the relocated herd.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
+// Fresh deterministic spawn (the trample check's recipe): a long run leaves
+// the area's chunk bookkeeping in arbitrary states — restock clears and
+// re-streams it.
+await page.evaluate(() => window.__wildlife.restock())
+await page.waitForTimeout(2500)
 await page
-  .waitForFunction(() => (window.__wildlife.herdsRef.current?.elephant ?? []).filter((e) => !e.dead && e.herd !== undefined).length >= 3, null, { timeout: 30000 })
+  .waitForFunction(() => {
+    const byHerd = new Map()
+    for (const e of window.__wildlife.herdsRef.current?.elephant ?? []) {
+      if (e.dead || e.herd === undefined) continue
+      byHerd.set(e.herd, (byHerd.get(e.herd) ?? 0) + 1)
+    }
+    return Math.max(0, ...byHerd.values()) >= 3
+  }, null, { timeout: 45000 })
   .catch(() => {})
-const mourn = await page.evaluate(async ([glat, glon]) => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const mournStage = await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
-  const gx = glon * 10
-  const gz = -glat * 10
-  // Pick the largest live herd and move it to the radius edge, keeping its
-  // formation (offset preserved) so cohesion has nothing to fight.
   const byHerd = new Map()
   for (const e of herds.elephant) {
     if (e.dead || e.herd === undefined) continue
@@ -2749,21 +2760,29 @@ const mourn = await page.evaluate(async ([glat, glon]) => {
   }
   let best = null
   for (const [, list] of byHerd) if (!best || list.length > best.length) best = list
-  // Poll for a tagged herd: the streamed spawn can take a while to place
-  // one near the graveyard after the jump.
-  const tHerd = Date.now()
-  while ((!best || best.length < 3) && Date.now() - tHerd < 60000) {
-    await sleep(1000)
-    byHerd.clear()
-    for (const e of herds.elephant) {
-      if (e.dead || e.herd === undefined) continue
-      if (!byHerd.has(e.herd)) byHerd.set(e.herd, [])
-      byHerd.get(e.herd).push(e)
+  if (!best || best.length < 3) {
+    return {
+      staged: false,
+      total: herds.elephant.length,
+      tagged: herds.elephant.filter((e) => e.herd !== undefined && !e.dead).length,
+      largest: best ? best.length : 0,
     }
-    best = null
-    for (const [, list] of byHerd) if (!best || list.length > best.length) best = list
   }
-  if (!best || best.length < 2) return { found: false }
+  window.__mournHerdId = best[0].herd
+  // Untag the herd BEFORE the jump: the despawn filter keeps chunk-less
+  // animals by design, so the relocation jump cannot cull it.
+  for (const e of best) e.chunk = undefined
+  return { staged: true, size: best.length }
+})
+await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6))
+await page.waitForTimeout(1200)
+const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await page.evaluate(async ([glat, glon]) => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const gx = glon * 10
+  const gz = -glat * 10
+  const best = herds.elephant.filter((e) => !e.dead && e.herd === window.__mournHerdId)
+  if (best.length < 2) return { found: false, survivors: best.length, total: herds.elephant.length }
   const cx = best.reduce((a, e) => a + e.x, 0) / best.length
   const cz = best.reduce((a, e) => a + e.z, 0) / best.length
   for (const e of best) {

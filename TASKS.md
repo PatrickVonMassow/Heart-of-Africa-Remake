@@ -3140,6 +3140,23 @@ the remaining open points in their numeric order.
   once late in a long run — if it recurs, check whether the point-146
   predator lists in `herds` disturb the seeder's species iteration or the
   MAX_INSTANCES rotation.
+  SECOND WIP UPDATE (17.07.2026, 13:56): the live-check staging went through
+  four iterations — the final recipe (jump Serengeti -> restock -> wait for
+  a tagged herd >= 3 -> untag its chunks [the despawn filter keeps chunk-less
+  animals by design] -> jump graveyard -> teleport formation to the radius
+  edge) works STANDALONE flawlessly (probe: 5-strong herd staged, 5 survive
+  the jump; one in-suite run measured close 8.6 — the mechanic is sound).
+  BUT in the FULL SUITE the elephant list is EMPTY (total 0) at the
+  Serengeti even after restock + 45 s — and 120e's drinker counts have
+  ALSO sagged (2/0 vs the earlier 5-6) in the same runs. NEXT STEP
+  (bisection, not more staging): find which preceding suite block poisons
+  the spawn — prime suspects are the 146 predator-species lists in
+  SPECIES/herds (a spawn-species roll may now land on predators and yield
+  nothing) and the kick/revenge blocks' state. Verify standalone-vs-suite
+  by running a MINIMAL suite (boot -> the 146 revenge block -> the mourn
+  staging) and by grepping how spawnChunk picks species since 146. The
+  check itself and the retry/diagnostic instrumentation are already in
+  enrichments.mjs; screenshot 128 exists from the earlier partial run.
 
 - [ ] 127. A parent runs faster when it rushes to its calf's rescue.
   Wanted (user, 15.07.2026): a parent hurrying to save its young can run faster
