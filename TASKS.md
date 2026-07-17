@@ -4845,6 +4845,22 @@ the remaining open points in their numeric order.
   STANDING RULE (both implementation sections stay current with any
   climate/people rendering change) is recorded in memory.
 
+- [ ] 160. Move the implementation tables into design.md; docs point to them.
+  Wanted (user, 17.07.2026): the research->game implementation sections just
+  added (peoples-1890.md §8, climate-1890.md §9) belong in design.md — they
+  are game-DESIGN records. Move their content into design.md (sensible
+  spots: near §19.13 for the climate table, near the peoples/settlement
+  sections for the dress table; keep the referenced section numbering
+  intact), and replace the two doc sections with short POINTERS to the
+  design.md locations (keep the §8/§9 headings so existing references hold).
+  The STANDING RULE moves with them: design.md's implementation tables stay
+  current with any climate/people rendering change (memory updated).
+  TIMING (user): only AFTER the point-150 Closing run completes, to avoid
+  conflicts. THEN: re-check ALL documents for currency, consistency and
+  redundancy (a fresh pass over design.md, CLAUDE.md, TASKS.md, docs/*.md —
+  stale cross-references, duplicated content, contradictions).
+  (Reported 17.07.2026.)
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
