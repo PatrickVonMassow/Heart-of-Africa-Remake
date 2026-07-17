@@ -605,6 +605,10 @@ export const REGION_PREY: Record<RegionId, PreyKind[]> = {
 export interface DefenseWeights {
   preyWeapon: Record<string, number>
   predatorFlight: Record<string, number>
+  /** Per-predator fragility under a strong parent's strike (point 146):
+   *  scales the KILL outcome of parentAttackOutcome. The lion ships 0 —
+   *  nothing kills a lion. */
+  killFlight: Record<string, number>
 }
 
 /**
@@ -638,4 +642,41 @@ export function parentDefends(
   weights: DefenseWeights,
 ): boolean {
   return roll < defendChance(prey, predator, weights)
+}
+
+/**
+ * The revenge chance (design.md §19.8, point 146): how likely a parent's
+ * strike KILLS the predator outright instead of merely driving it off. Same
+ * factor model as defendChance, at a higher bar: the (weapon − 0.5) gate
+ * encodes "a RELATIVELY STRONG parent" — the antelope (0.25) kills nothing,
+ * by construction — and killFlight the predator's fragility (the lion ships
+ * 0: nothing kills a lion). Structurally killChance ≤ defendChance for every
+ * pair: (w − 0.5)⁺ ≤ w, and the shipped killFlight never exceeds
+ * predatorFlight (swept in the pure test).
+ */
+export function killChance(prey: string, predator: string, weights: DefenseWeights): number {
+  const weapon = weights.preyWeapon[prey]
+  const fragility = weights.killFlight[predator]
+  if (weapon === undefined || fragility === undefined) return 0
+  return Math.min(Math.max(Math.max(0, weapon - 0.5) * fragility, 0), 0.95)
+}
+
+/** Three-way resolution of one parent attack (design.md §19.8, points
+ *  124/125/146). ONE roll decides, bands nested low to high: below killChance
+ *  the predator dies where it stands ('kill'), below defendChance it is
+ *  driven off ('driveOff'), else the parent is taken in the calf's place
+ *  ('taken'). killChance ≤ defendChance holds for every pair, so the bands
+ *  never invert. Only a parent that ATTACKS ever calls this — the surrender
+ *  branches (vigil-keeper, trample-throw, waterfall plunge, mired calf)
+ *  remain chance-zero by construction and never roll. */
+export type ParentAttackOutcome = 'taken' | 'driveOff' | 'kill'
+export function parentAttackOutcome(
+  prey: string,
+  predator: string,
+  roll: number,
+  weights: DefenseWeights,
+): ParentAttackOutcome {
+  if (roll < killChance(prey, predator, weights)) return 'kill'
+  if (roll < defendChance(prey, predator, weights)) return 'driveOff'
+  return 'taken'
 }

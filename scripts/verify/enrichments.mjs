@@ -2631,6 +2631,92 @@ check(
   kick.caught && kick.kicked && kick.lionLeft && kick.calfAlive && kick.parentAlive,
   JSON.stringify(kick),
 )
+
+// --- Point 146: revenge — a zebra parent kills the hyena and walks away ------
+// Same staging and phase-forced ~0 roll as the kick check: with the roll at
+// ~0 the natural zebra-vs-hyena KILL chance (0.075, below the drive-off
+// 0.7) already decides the three-way outcome as 'kill'. The hyena falls as
+// an ordinary carcass the scavengers may work (dead, NOT lionFed), and the
+// unwounded parent simply rejoins — no vigil, it fought.
+const revenge = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  let liveChunk
+  for (const sp of Object.keys(herds)) {
+    for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+    if (liveChunk) break
+  }
+  const p0 = window.__game.getState().pos
+  const parent = { x: p0.x - 200, z: p0.z + 12, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: liveChunk ?? 'revenge-test' }
+  const calf = { x: p0.x + 8, z: p0.z + 12, y: 0.2, rot: 0, scale: 0.5, phase: 0.8, chunk: liveChunk ?? 'revenge-test', young: true, parent }
+  parent.child = calf
+  herds.zebra.push(parent, calf)
+  const st = window.__lionHunt.state
+  st.predator = 'hyena' // a real pairing: the hyena hunts zebra, and a zebra can kill one
+  st.mode = 'chase'
+  st.victim = calf
+  st.victimHunt = true
+  st.lx = calf.x + 10
+  st.lz = calf.z + 2
+  st.px = calf.x
+  st.pz = calf.z
+  st.timer = 0
+  // Force the KILL band over the whole roll range: the staging's fixed hash
+  // roll landed in the drive-off band (0.075..0.7) — raising killFlight
+  // pushes killChance to the 0.95 cap, so the same deterministic roll now
+  // reads 'kill'. Restored below.
+  const kf = window.__balance.parentDefense.killFlight
+  const prevKf = kf.hyena
+  kf.hyena = 100
+  const out = { caught: false, calfAlive: false, parentAlive: false, huntEnded: false, carcass: false, notLionFed: false, scavenged: false }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  out.caught = calf.caught !== undefined
+  if (out.caught && !calf.dead) {
+    parent.x = calf.x - 15
+    parent.z = calf.z
+  }
+  const t1 = Date.now()
+  let corpse = null
+  while (Date.now() - t1 < 25000) {
+    corpse = (herds.hyena ?? []).find((h) => h.dead) ?? null
+    if (corpse && calf.caught === undefined) break
+    if (calf.dead || parent.dead) break
+    await sleep(150)
+  }
+  out.calfAlive = !calf.dead && calf.caught === undefined
+  out.parentAlive = !parent.dead
+  out.huntEnded = st.mode === 'idle' || st.mode === 'leave'
+  out.carcass = corpse !== null
+  out.notLionFed = corpse !== null && corpse.lionFed !== true
+  // The scavenger system may work it: within a window, the ground scavenger
+  // binds to it or its dissolve starts falling.
+  if (corpse) {
+    const d0 = corpse.dissolve
+    const t2 = Date.now()
+    while (Date.now() - t2 < 25000) {
+      const bound = window.__wildlife.scavenger.current.target === corpse
+      if (bound || (corpse.dissolve !== undefined && d0 !== undefined && corpse.dissolve < d0)) { out.scavenged = true; break }
+      await sleep(300)
+    }
+  }
+  kf.hyena = prevKf
+  herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+  if (corpse) herds.hyena = herds.hyena.filter((a) => a !== corpse)
+  if (window.__wildlife.scavenger.current.target === corpse) window.__wildlife.scavenger.current.target = null
+  if (st.victim === calf || st.victim === parent) { st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false }
+  return out
+})
+check(
+  'revenge: the zebra parent kills the hyena, both zebras live, the hunt ends (point 146)',
+  revenge.caught && revenge.calfAlive && revenge.parentAlive && revenge.huntEnded && revenge.carcass && revenge.notLionFed,
+  JSON.stringify(revenge),
+)
+check(
+  'the slain predator is an ordinary carcass the scavengers work (point 146c)',
+  revenge.carcass && revenge.scavenged,
+  JSON.stringify(revenge),
+)
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 

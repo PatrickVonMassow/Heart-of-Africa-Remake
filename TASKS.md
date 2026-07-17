@@ -4353,7 +4353,7 @@ the remaining open points in their numeric order.
   SIZE: three separate dramas — one commit each, in the order (a), (b), (c).
   (Filed 16.07.2026.)
 
-- [ ] 146. Revenge: a strong parent kills a weak predator and walks away.
+- [x] 146. Revenge: a strong parent kills a weak predator and walks away.
   Wanted (user, 16.07.2026): "Es soll auch noch eine Rache-Mechanik von Eltern
   geben. Ein relativ starkes Eltern-Beutetier soll, wenn es nach dem Tod seines
   Jungen einen relativ schwachen Prädator angreift, manchmal nicht von diesem
@@ -4422,6 +4422,25 @@ the remaining open points in their numeric order.
   (the three states named — surrender / rescue / revenge — since that trio is
   now the section's actual grammar), CLAUDE.md §7.1 pt. 12.
   DEPENDS ON 125 (its helper and its matrix). Build after it. One atomic commit
+  DONE (17.07.2026, 12:20): the outcome helper is THREE-way —
+  parentAttackOutcome resolves one deterministic roll against killChance =
+  clamp((preyWeapon − 0.5)⁺ × killFlight, 0, 0.95) then defendChance:
+  killFlight { cheetah 0.5, leopard 0.25, hyena 0.15, lion 0 — STRUCTURALLY
+  zero, nothing kills a lion } with grounding comments; the (weapon − 0.5)
+  gate makes the antelope kill nothing by construction. Swept pure tests:
+  kill <= driveOff over every pair, lion invulnerable, antelope harmless,
+  giraffe/zebra can kill a cheetah (1698 vitest). On a kill the hunt ends
+  through the idle retire (121's claim rule — resolution points own the
+  state), the predator mesh swaps in place for a herd carcass (herds gained
+  predator species lists; dead, dissolve, NOT lionFed so the ordinary
+  scavenger path works it — no food-web gate needed: scavenging never
+  species-gated), and the unwounded parent rejoins with no vigil (kill and
+  vigil are structurally exclusive: both roll sites require a living calf).
+  Live (full suite exit 0): the zebra parent kills the hyena (kill band
+  forced over the staging's fixed roll), both zebras live, the hunt ends,
+  the hyena lies as an ordinary carcass and the scavenger binds to it —
+  the game's first vulture-eaten predator. Docs: design §19.8 names the
+  section's actual grammar (surrender / rescue / revenge).
   on top. (Filed 16.07.2026.)
 
 - [x] 147. Verify the whole weather system: correct AND visible.

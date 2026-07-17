@@ -503,7 +503,14 @@ verify suite that proves it.
       current drowns (dead, sinking, never rescued or scavenged) while the
       SAME setup in the dry season still clambers out alive, and a rescuing
       parent that wades a swollen current too long drowns beside its calf
-      (both live in `scripts/verify/enrichments.mjs`); the defence matrix
+      (both live in `scripts/verify/enrichments.mjs`); revenge (point
+      146): the outcome helper is THREE-way (taken / driven off / KILLED) —
+      killChance <= defendChance swept over every pair, no prey ever kills
+      a lion (swept), the antelope kills nothing (swept), a slain predator
+      enters the ordinary carcass system (dead, not lionFed, worked by the
+      scavengers like any zebra) while the unwounded parent rejoins its
+      herd with no vigil (kill and vigil are structurally exclusive);
+      the defence matrix
       (point 125): the parent-reaches-predator outcome is the product of
       prey weapon and predator flight-willingness (pure-tested: strictly
       ordered along §14.1's danger order for every prey AND along the

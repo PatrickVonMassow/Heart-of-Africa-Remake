@@ -243,18 +243,24 @@ export interface BalanceConfig {
     /** Seconds of standing vigil after which the carcass draws a predator to the keeper. */
     predatorDelay: number
   }
-  /** The parent's defence (design.md §19.8, points 124/125): the chance that
-   *  a parent ATTACKING the predator over its calf drives the hunt off is
-   *  preyWeapon[prey] × predatorFlight[predator], capped at 0.95
-   *  (defendChance in wildlifeBehavior.ts). A species missing on either side
-   *  never defends. Grief surrenders (vigil, trample-throw, waterfall plunge,
-   *  mired calf) never roll at all. Calibratable. */
+  /** The parent's defence (design.md §19.8, points 124/125/146): a parent
+   *  ATTACKING the predator over its calf resolves three ways (one roll,
+   *  parentAttackOutcome in wildlifeBehavior.ts) — taken, or the hunt driven
+   *  off at preyWeapon[prey] × predatorFlight[predator] (capped 0.95), or the
+   *  predator KILLED outright at max(0, preyWeapon − 0.5) × killFlight
+   *  (capped 0.95; always ≤ the drive-off chance). A species missing on
+   *  either side never defends. Grief surrenders (vigil, trample-throw,
+   *  waterfall plunge, mired calf) never roll at all. Calibratable. */
   parentDefense: {
     /** Per-prey weapon strength, reasoned from the animal's real armament. */
     preyWeapon: Record<string, number>
     /** Per-predator readiness to abandon a contested kill — INVERSE to §14.1's
      *  danger order cheetah < leopard < hyena < lion (src/systems/events.ts). */
     predatorFlight: Record<string, number>
+    /** Per-predator fragility under a strong parent's strike (point 146):
+     *  the kill factor of the revenge outcome. Kept LOW — being eaten stays
+     *  the common ending; the user asked for sometimes, not often. */
+    killFlight: Record<string, number>
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -463,6 +469,17 @@ export const balance: BalanceConfig = {
       leopard: 0.85, // solitary — an injury means starving, so it yields to real resistance
       hyena: 0.7, // bold in the clan, but a lone hunter breaks off under a strong defence
       lion: 0.5, // the apex rarely yields; even the giraffe's kick only sometimes deters it
+    },
+    // Kill side (point 146) — how fragile the predator is under a genuinely
+    // strong parent's strike. The (preyWeapon − 0.5) gate in killChance
+    // encodes "a RELATIVELY STRONG parent": the antelope (0.25) kills
+    // nothing, by construction. Values kept low (register: sometimes, not
+    // often — being eaten stays the common ending).
+    killFlight: {
+      cheetah: 0.5, // light and famously fragile — a giraffe's or zebra's kick genuinely kills it
+      leopard: 0.25, // sturdier than the cheetah; a lucky strike can still break it
+      hyena: 0.15, // heavy-boned and thick-necked — a kick rarely does more than drive it off
+      lion: 0, // STRUCTURALLY ZERO: nothing kills a lion — §19's drama depends on it staying frightening
     },
   },
   river: {

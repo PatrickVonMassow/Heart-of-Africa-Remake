@@ -44,7 +44,7 @@ import {
   drinkCatchment,
   mireFate,
   mireRoll,
-  parentDefends,
+  parentAttackOutcome,
   PREDATOR_PREY,
   REGION_PREY,
   type PredatorKind,
@@ -78,8 +78,16 @@ import {
 
 const CHUNK_SIZE = 24
 
-type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo'
-const SPECIES: Species[] = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo']
+// The predator kinds are herd species too (point 146): a predator KILLED by
+// an avenging parent becomes an ordinary carcass in the herd lists, so the
+// existing scavenger/cull/render machinery works a dead hyena exactly like a
+// dead zebra. Live predators never spawn here — spawnChunk picks species
+// explicitly, and the one live hunter stays the scripted <LionHunt>.
+type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | PredatorKind
+const SPECIES: Species[] = [
+  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo',
+  'lion', 'cheetah', 'leopard', 'hyena',
+]
 const MAX_INSTANCES: Record<Species, number> = {
   elephant: 60,
   giraffe: 60,
@@ -88,11 +96,17 @@ const MAX_INSTANCES: Record<Species, number> = {
   antelope: 120,
   warthog: 80,
   flamingo: 140,
+  // Predator slots hold only revenge carcasses (point 146) — kills are rare
+  // and dissolve/cull quickly, so a handful of instances suffices.
+  lion: 6,
+  cheetah: 6,
+  leopard: 6,
+  hyena: 6,
 }
 /** Juveniles render through their own baby-schema geometry (design.md §19) in
  *  a separate instanced mesh per species; one calf per herd group keeps the
- *  counts small. Flamingos raise no young. */
-const CALF_SPECIES: Exclude<Species, 'flamingo'>[] = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog']
+ *  counts small. Flamingos raise no young, predators hold carcasses only. */
+const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog'] as const
 const MAX_CALF_INSTANCES = 24
 
 interface Animal {
@@ -287,6 +301,8 @@ const HUNT_OFFSTAGE_MARGIN = 30
 /** Species that flee from a hunting or feeding lion. */
 const FLEES_LION: Record<Species, boolean> = {
   elephant: false, giraffe: true, zebra: true, wildebeest: true, antelope: true, warthog: true, flamingo: false,
+  // Only revenge carcasses live in these lists (point 146) — nothing to flee.
+  lion: false, cheetah: false, leopard: false, hyena: false,
 }
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
@@ -439,6 +455,12 @@ const BODY_RADIUS: Record<Species, number> = {
   antelope: 0.6,
   warthog: 0.45,
   flamingo: 0.25,
+  // Predator entries complete the record (point 146); their list members are
+  // always dead, and every proximity pass skips carcasses.
+  lion: 0.8,
+  cheetah: 0.55,
+  leopard: 0.55,
+  hyena: 0.6,
 }
 /** Grid cell size for the runtime separation pass (≥ 2·max body radius). */
 const SEPARATION_CELL = 4
@@ -544,7 +566,10 @@ function spawnRemnant(s: LionHuntState, seed: number): Animal | null {
 }
 
 function emptyHerds(): Record<Species, Animal[]> {
-  return { elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [] }
+  return {
+    elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [],
+    lion: [], cheetah: [], leopard: [], hyena: [],
+  }
 }
 
 /** Populate one chunk's deterministic herd/flock into the shared herd arrays,
@@ -900,6 +925,11 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     antelope: buildAntelope(),
     warthog: buildWarthog(),
     flamingo: buildFlamingo(),
+    // Predator meshes draw only revenge carcasses (point 146).
+    lion: buildLion(),
+    cheetah: buildCheetah(),
+    leopard: buildLeopard(),
+    hyena: buildHyena(),
   }
   const calfGeometries: Record<(typeof CALF_SPECIES)[number], THREE.BufferGeometry> = {
     elephant: buildElephant(true),
@@ -1032,6 +1062,28 @@ function Herds() {
     a.dissolve = CARCASS_DISSOLVE_SECONDS
     if (opts.sink) a.inWater = 0
     if (opts.stain) pushStain(a.x, a.z)
+  }
+
+  // Revenge (design.md §19.8, point 146): a strong parent's strike kills a
+  // weak predator outright. The predator drops where it stands as an ORDINARY
+  // herd carcass — lionFed stays false so the ground scavenger works it like
+  // any trampled grazer (no stain: the kick breaks, it does not open a kill).
+  const slayPredator = (kind: PredatorKind, x: number, z: number, rot: number) => {
+    const h = herdsRef.current
+    if (!h) return
+    const ll = worldToLatLon(x, z)
+    h[kind].push({
+      x,
+      z,
+      y: Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height),
+      rot,
+      scale: PREDATOR_SCALE[kind],
+      phase: 0,
+      dead: true,
+      dissolve: CARCASS_DISSOLVE_SECONDS,
+      lionFed: false,
+      chunk: `${Math.floor(x / CHUNK_SIZE)},${Math.floor(z / CHUNK_SIZE)}`,
+    })
   }
 
   // Dev hook for the headless verification (CLAUDE.md §7.2). `restock` empties
@@ -1179,29 +1231,46 @@ function Herds() {
           a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
           a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
           if (d < PARENT_SACRIFICE_DIST) {
-            // The defence roll (design.md §19.8, points 124/125): a charging
-            // parent may drive the hunt off instead of dying — its weapon
-            // against THIS hunter's readiness to yield (defendChance, keyed
-            // on the actual hunt predator). Deterministic per event (hashed
-            // from phase and position, like the mire roll — never Math.random
-            // in the sim). A MIRED calf never rolls (point 123): the charge
-            // into the mud is a SURRENDER, not an attack — the point-125
-            // line — so it stays chance-zero by construction.
+            // The defence roll (design.md §19.8, points 124/125/146): ONE
+            // roll resolves the charging parent's attack three ways — its
+            // weapon against THIS hunter's readiness to yield (driveOff) or
+            // fragility (kill). Deterministic per event (hashed from phase
+            // and position, like the mire roll — never Math.random in the
+            // sim). A MIRED calf never rolls (point 123): the charge into
+            // the mud is a SURRENDER, not an attack — the point-125 line —
+            // so it stays chance-zero by construction.
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
-            if (calf.mired === undefined && parentDefends(sp, LION_STATE.predator, roll, balance.parentDefense)) {
-              // Driven off: the calf is freed and rises, the parent LIVES and
-              // strikes (the kick pose below), and the predator leaves through
-              // the existing walk-off — never a despawn in sight.
+            const outcome =
+              calf.mired === undefined
+                ? parentAttackOutcome(sp, LION_STATE.predator, roll, balance.parentDefense)
+                : 'taken'
+            if (outcome !== 'taken') {
+              // Driven off or killed: the calf is freed and rises, the parent
+              // LIVES unwounded, strikes (the kick pose below) and simply
+              // resumes herd behaviour — an attacker never stands vigil.
               calf.caught = undefined
               a.kick = PARENT_KICK_SECONDS
               if (LION_STATE.victim === calf) {
                 LION_STATE.victim = null
-                LION_STATE.mode = 'leave'
-                LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
-                // The feeding predator stood at the carcass flank — pick the
-                // walk-off up from there, like the feed→leave exit does.
-                LION_STATE.lx = LION_STATE.px + 0.7
-                LION_STATE.lz = LION_STATE.pz + 0.25
+                if (outcome === 'kill') {
+                  // Revenge (point 146): the strike kills the predator where
+                  // it fed — at the carcass flank. The hunt ends AT this
+                  // resolution point (the point-121 claim rule allows that):
+                  // straight to idle, which hides the scripted predator mesh
+                  // — the carcass pushed into the herds replaces it in place,
+                  // so nothing pops. No walk-off: the predator is dead.
+                  slayPredator(LION_STATE.predator, LION_STATE.px + 0.7, LION_STATE.pz + 0.25, Math.atan2(-0.7, -0.25))
+                  LION_STATE.victimHunt = false
+                  LION_STATE.mode = 'idle'
+                  LION_STATE.timer = 30 + Math.random() * 30
+                } else {
+                  LION_STATE.mode = 'leave'
+                  LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+                  // The feeding predator stood at the carcass flank — pick the
+                  // walk-off up from there, like the feed→leave exit does.
+                  LION_STATE.lx = LION_STATE.px + 0.7
+                  LION_STATE.lz = LION_STATE.pz + 0.25
+                }
               }
             } else {
               // A MIRED calf cannot rise and flee (point 123): the parent's
@@ -1238,18 +1307,30 @@ function Herds() {
             a.z += Math.cos(h) * PARENT_BLOCK_SPEED * dt
           }
           if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
-            // The defence roll (design.md §19.8, points 124/125), same rule
-            // as the charge above: the shield ATTACKS on contact, so it rolls
-            // (the point-125 line) — the hunter that reaches it may be kicked
-            // off instead of taking it. Deterministic per event.
+            // The defence roll (design.md §19.8, points 124/125/146), same
+            // rule as the charge above: the shield ATTACKS on contact, so it
+            // rolls (the point-125 line) — the hunter that reaches it may be
+            // kicked off, or killed outright. Deterministic per event.
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
-            if (parentDefends(sp, LION_STATE.predator, roll, balance.parentDefense)) {
-              // Driven off mid-chase: the family stays whole and the hunt
-              // ends — the predator turns and leaves from where it stands.
+            const outcome = parentAttackOutcome(sp, LION_STATE.predator, roll, balance.parentDefense)
+            if (outcome !== 'taken') {
+              // Driven off or killed mid-chase: the family stays whole, the
+              // parent lives unwounded and the hunt ends at this resolution
+              // point (the point-121 claim rule).
               a.kick = PARENT_KICK_SECONDS
               LION_STATE.victim = null
-              LION_STATE.mode = 'leave'
-              LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+              if (outcome === 'kill') {
+                // Revenge (point 146): the hunter drops where it stands and
+                // becomes an ordinary herd carcass; straight to idle hides
+                // the scripted mesh in the same frame — no walk-off.
+                slayPredator(LION_STATE.predator, LION_STATE.lx, LION_STATE.lz, LION_STATE.lionHeading)
+                LION_STATE.victimHunt = false
+                LION_STATE.mode = 'idle'
+                LION_STATE.timer = 30 + Math.random() * 30
+              } else {
+                LION_STATE.mode = 'leave'
+                LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+              }
             } else {
               calf.parent = undefined // freed — it keeps fleeing on its own
               a.child = undefined

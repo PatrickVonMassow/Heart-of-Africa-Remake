@@ -26,10 +26,13 @@ import {
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
   defendChance,
+  killChance,
+  parentAttackOutcome,
   parentDefends,
   PREDATOR_PREY,
   REGION_PREY,
 } from './wildlifeBehavior'
+import { balance } from '../../config/balance'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -850,6 +853,7 @@ describe('defendChance / parentDefends (design.md §19.8, points 124/125 — the
   const weights = {
     preyWeapon: { giraffe: 1.5, zebra: 1.0, wildebeest: 0.7, warthog: 0.7, antelope: 0.25 },
     predatorFlight: { cheetah: 1.0, leopard: 0.85, hyena: 0.7, lion: 0.5 },
+    killFlight: { cheetah: 0.5, leopard: 0.25, hyena: 0.15, lion: 0 },
   }
   const CAP = 0.95
   // Ascending defence chance: predators along the INVERSE of §14.1's danger
@@ -926,5 +930,60 @@ describe('defendChance / parentDefends (design.md §19.8, points 124/125 — the
     expect(parentDefends('giraffe', 'lion', 1, weights)).toBe(false)
     expect(parentDefends('antelope', 'lion', 0.1249, weights)).toBe(true)
     expect(parentDefends('antelope', 'lion', 0.125, weights)).toBe(false)
+  })
+})
+
+describe('killChance / parentAttackOutcome (design.md §19.8, point 146 — revenge)', () => {
+  // Swept against the SHIPPED balance, not a local mirror: a recalibration
+  // that lets revenge outgrow the drive-off — or touch the lion — fails here.
+  const shipped = balance.parentDefense
+  const PREYS = Object.keys(shipped.preyWeapon)
+  const PREDATORS = Object.keys(shipped.predatorFlight)
+
+  it('maps deterministically with boundary-exact rolls (one roll, nested bands)', () => {
+    // giraffe vs cheetah: killChance = (1.5 − 0.5) × 0.5 = 0.5,
+    // defendChance = 0.95 (capped raw 1.5 × 1.0).
+    expect(killChance('giraffe', 'cheetah', shipped)).toBeCloseTo(0.5, 10)
+    expect(parentAttackOutcome('giraffe', 'cheetah', 0, shipped)).toBe('kill')
+    expect(parentAttackOutcome('giraffe', 'cheetah', 0.4999, shipped)).toBe('kill')
+    expect(parentAttackOutcome('giraffe', 'cheetah', 0.5, shipped)).toBe('driveOff')
+    expect(parentAttackOutcome('giraffe', 'cheetah', 0.9499, shipped)).toBe('driveOff')
+    expect(parentAttackOutcome('giraffe', 'cheetah', 0.95, shipped)).toBe('taken')
+    expect(parentAttackOutcome('giraffe', 'cheetah', 1, shipped)).toBe('taken')
+    // giraffe vs lion: killChance 0 — a roll of 0 is a drive-off, never a kill.
+    expect(parentAttackOutcome('giraffe', 'lion', 0, shipped)).toBe('driveOff')
+    expect(parentAttackOutcome('giraffe', 'lion', 0.7499, shipped)).toBe('driveOff')
+    expect(parentAttackOutcome('giraffe', 'lion', 0.75, shipped)).toBe('taken')
+  })
+
+  it('killing is harder than driving off: killChance <= defendChance for EVERY pair (swept)', () => {
+    for (const prey of PREYS) {
+      for (const predator of PREDATORS) {
+        expect(killChance(prey, predator, shipped)).toBeLessThanOrEqual(
+          defendChance(prey, predator, shipped),
+        )
+      }
+    }
+  })
+
+  it('nothing kills a lion — killChance 0 for every prey (swept)', () => {
+    for (const prey of PREYS) {
+      expect(killChance(prey, 'lion', shipped)).toBe(0)
+      expect(parentAttackOutcome(prey, 'lion', 0, shipped)).not.toBe('kill')
+    }
+  })
+
+  it('the antelope kills nothing — the (weapon − 0.5) gate, swept over every predator', () => {
+    for (const predator of PREDATORS) {
+      expect(killChance('antelope', predator, shipped)).toBe(0)
+      expect(parentAttackOutcome('antelope', predator, 0, shipped)).not.toBe('kill')
+    }
+  })
+
+  it('a giraffe and a zebra CAN kill a cheetah (chance > 0), and a missing species cannot', () => {
+    expect(killChance('giraffe', 'cheetah', shipped)).toBeGreaterThan(0)
+    expect(killChance('zebra', 'cheetah', shipped)).toBeGreaterThan(0)
+    expect(killChance('elephant', 'cheetah', shipped)).toBe(0)
+    expect(killChance('giraffe', 'crocodile', shipped)).toBe(0)
   })
 })
