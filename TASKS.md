@@ -4508,7 +4508,7 @@ the remaining open points in their numeric order.
   must still be visible, not merely modelled.
   DOCS: none new; note the re-run in CLAUDE.md §7.1 pt. 12 only if a check
   changed. (Filed 16.07.2026.)
-  DONE (17.07.2026, 07:32): the 147 procedure re-ran on the state after
+  DONE (17.07.2026, 07:10): the 147 procedure re-ran on the state after
   123/135/136/151/152/156 — and its RE-RUNNING is what forced most of
   point 135: the checks themselves exposed the drinker-belt swallowed by the
   widened rivers, the Victoria-Falls pixel spot, and the shore-seeder leak,
