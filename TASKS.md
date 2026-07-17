@@ -4548,7 +4548,7 @@ the remaining open points in their numeric order.
   Do NOT delete superseded findings — add forward-pointers (the 148 rule).
   NOT IN SCOPE: the real Closing still runs at the very end over everything; this
   is the second interim pass. (Filed 16.07.2026.)
-  WIP (17.07.2026, 08:08): STEP 1 (full regression, npm test) ran — build/
+  WIP (17.07.2026, 08:00): STEP 1 (full regression, npm test) ran — build/
   lint(after an unused-var fix)/1669 vitest/15 of 18 browser suites green;
   the three suite fails were triaged: collision's four ejection fails are
   LOAD flakes of the parallel full run (standalone rerun: 19/19 green —
