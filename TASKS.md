@@ -4879,7 +4879,7 @@ the remaining open points in their numeric order.
   STANDING RULE (both implementation sections stay current with any
   climate/people rendering change) is recorded in memory.
 
-- [ ] 160. Move the implementation tables into design.md; docs point to them.
+- [x] 160. Move the implementation tables into design.md; docs point to them.
   Wanted (user, 17.07.2026): the research->game implementation sections just
   added (peoples-1890.md §8, climate-1890.md §9) belong in design.md — they
   are game-DESIGN records. Move their content into design.md (sensible
@@ -4894,6 +4894,21 @@ the remaining open points in their numeric order.
   redundancy (a fresh pass over design.md, CLAUDE.md, TASKS.md, docs/*.md —
   stale cross-references, duplicated content, contradictions).
   (Reported 17.07.2026.)
+  DONE (17.07.2026, 09:09): relocation — design.md §19.14 (climate record)
+  and §19.15 (peoples record) carry the full tables with the standing
+  keep-current rule; peoples-1890 §8 / climate-1890 §9 are pointers
+  (5fe7045). Then the full doc audit (read-only agent over design/CLAUDE/
+  README/docs/*/verify-README) found seven issues, all fixed: the general
+  store still SOLD the removed map item (design §9 table); CLAUDE pt 25's
+  eight-vs-seven landmark count reconciled (Giza mounts as Cairo's skyline);
+  two miscited research sections in the new records (hungry season ->
+  peoples §3.1, wet Sahel -> climate §1.1) plus the karif row's notation;
+  README presented the suspended deadline as active; and the six-people
+  dress mapping was enumerated in full THREE times — §19.15 is now the only
+  full source, design §19.13 and CLAUDE pt 12 point to it with every
+  testable condition kept. Clean bill elsewhere: no encoding artifacts, no
+  screenshot-number clashes, verify-README current, old width/tint claims
+  all gone. Vitest 1669 green, lint clean.
 
 ## Closing (only after all points)
 

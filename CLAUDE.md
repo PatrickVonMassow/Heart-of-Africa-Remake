@@ -609,11 +609,11 @@ verify suite that proves it.
       `__placeSeason`/`__placeDress` in `scripts/verify/polish.mjs`
       (screenshots 110/111/114). The inhabitants' seasonal dress is
       evidence-gated per `docs/peoples-1890.md` §7: SIX peoples change on
-      their own driver — the Zulu isipuku (cold), the rank-gated Tuareg
-      bernus (cold) and Hausa zenne (harmattan), the San ‡nau (cold), the
-      Wayeyi caross (cold) and the Somali tobe drawn over the head (karif)
-      — while the other sixteen stay bare however cold their ground gets,
-      the cold being a class experience where it is felt at all. The
+      their own driver — the three drivers being cold, harmattan and
+      karif, two of the six gated by rank — while the other sixteen stay
+      bare however cold their ground gets, the cold being a class
+      experience where it is felt at all; the per-people garment mapping
+      lives in `design.md` §19.15. The
       per-people mapping, the three drivers, the rank gate and the two
       named traps (the San's cold Kalahari IS dressed on Passarge's
       evidence; the Pedi highveld crosses the threshold and is NOT, the
@@ -988,8 +988,9 @@ verify suite that proves it.
     has a localized name and a dedicated discovery flavor in both
     languages, that the sighting entry's heading names the site
     (kind-shaped, markup-free) and that a dug find heads with the
-    treasure's name (§10); `scripts/verify/enrichments.mjs` that all seven cultural
-    landmarks (`__culturalLandmarks`) and all four natural sites
+    treasure's name (§10); `scripts/verify/enrichments.mjs` that all seven travel-map
+    cultural landmarks (`__culturalLandmarks` — Giza is the eighth of §4.4
+    but mounts as Cairo's skyline, pt. 15) and all four natural sites
     (`__naturalSites`) mount in the scene, render a non-black frame at
     their coordinates and reveal their label on sighting (screenshots 91,
     94, 95).

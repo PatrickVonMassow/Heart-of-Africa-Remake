@@ -46,8 +46,10 @@ every deploy.
 - **Hazards.** Hidden per-day events while travelling — animal and robber
   attacks, crocodiles, fever, sandstorms, waterfall sweeps — and wandering
   predators (lion, cheetah, leopard, hyena) that attack on contact. Equipment
-  protects by mere possession; a multi-year deadline and a successor on death
-  keep the expedition finite.
+  protects by mere possession; a successor takes over on death, and the
+  multi-year deadline designed to keep the expedition finite is temporarily
+  suspended in the shipped exploration preset (the calendar stops at the end
+  of 1895).
 - **Journal.** A chronicle that grows automatically with events and stores
   decoded hints, language-neutrally, re-rendered in the selected language.
   Entries are written into the book stroke by stroke by an animated hand that
