@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { rinderpestPhase } from './rinderpest'
+import { CARRION_RADIUS_DEG, rinderpestCarrionActive, rinderpestPhase, rinderpestPhaseAtDay } from './rinderpest'
 
 // The date table of point 133 (research: docs/peoples-1890.md §5): the game's
 // window IS the panzootic, and the phase is a pure function of people + date.
@@ -42,6 +42,22 @@ describe('rinderpestPhase (design.md §16/§19.13, point 133)', () => {
         expect(rinderpestPhase(p, y, 6)).toBe('clean')
       }
     }
+  })
+
+  it('the day glue maps the calendar day to the same phases', () => {
+    // 1890 start (day 0) vs mid-1891 (day ~540) from START_YEAR 1890.
+    expect(rinderpestPhaseAtDay('maasai', 0, 1890)).toBe('preDamaged')
+    expect(rinderpestPhaseAtDay('maasai', 540, 1890)).toBe('struck')
+    expect(rinderpestPhaseAtDay('zulu', 540, 1890)).toBe('clean')
+  })
+
+  it('carrion dresses only STRUCK Maasailand, boundary-exact on the radius', () => {
+    expect(rinderpestCarrionActive('struck', 1.0)).toBe(true)
+    expect(rinderpestCarrionActive('struck', CARRION_RADIUS_DEG)).toBe(true)
+    expect(rinderpestCarrionActive('struck', CARRION_RADIUS_DEG + 0.01)).toBe(false)
+    expect(rinderpestCarrionActive('preDamaged', 1.0)).toBe(false) // 1890: living herds, no plague toll yet
+    expect(rinderpestCarrionActive('aftermath', 1.0)).toBe(false) // the bones are gone with the years
+    expect(rinderpestCarrionActive('clean', 1.0)).toBe(false)
   })
 
   it('the cattle-less Bemba and every unlisted people carry no phase', () => {

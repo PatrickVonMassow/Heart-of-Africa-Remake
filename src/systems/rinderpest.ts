@@ -55,6 +55,20 @@ export function rinderpestPhase(peopleId: string, year: number, month: number): 
   }
 }
 
+/** Radius (degrees) around the Maasai village within which the struck years
+ *  strew the plague's wildlife toll across the plains. */
+export const CARRION_RADIUS_DEG = 2.5
+
+/**
+ * Whether rinderpest carrion dresses a spot (point 133 stage 3): only while
+ * Maasailand is STRUCK, and only within its radius — Baumann recorded the
+ * plague striking "nicht nur Rinder, sondern auch Büffel, Gnus und
+ * Antilopen". Pure over phase and distance.
+ */
+export function rinderpestCarrionActive(phase: RinderpestPhase, distDeg: number, radiusDeg: number = CARRION_RADIUS_DEG): boolean {
+  return phase === 'struck' && distDeg <= radiusDeg
+}
+
 /** The phase at an in-game day (the store's calendar unit): thin date glue
  *  over the pure year/month rule. */
 export function rinderpestPhaseAtDay(peopleId: string, day: number, startYear: number): RinderpestPhase {

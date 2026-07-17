@@ -68,6 +68,8 @@ import {
   waterStruggleFate,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
+import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
+import { START_YEAR } from '../../config/balance'
 import {
   buildAntelope,
   buildAntelopeCalf,
@@ -215,6 +217,9 @@ interface Animal {
    *  slinking back home. Its own state — the scripted LION hunt is never
    *  touched by an ambush. */
   lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  /** Spawned dead as rinderpest toll (point 133) — lets the verify count the
+   *  plague's own carrion apart from ordinary hunt/trample deaths. */
+  plague?: true
   /** Which ambusher seized this animal (point 130): routes the shared caught
    *  countdown and the parent's charge to the crocodile instead of the lion
    *  hunt, and the kill sinks (the river takes the body) instead of staining. */
@@ -614,7 +619,9 @@ function emptyHerds(): Record<Species, Animal[]> {
 
 /** Populate one chunk's deterministic herd/flock into the shared herd arrays,
  *  tagging each animal with its chunk key so it can be streamed out later. */
-function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, seed: number): void {
+const MAASAI_VILLAGE = PLACES.find((p) => p.id === 'maasai-village')
+
+function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, seed: number, day: number): void {
   const key = `${ccx},${ccz}`
   const roll = hash(ccx, ccz, 0, seed)
   const ax = (ccx + hash(ccx, ccz, 1, seed)) * CHUNK_SIZE
@@ -650,6 +657,34 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
       }
     }
     return
+  }
+
+  // The rinderpest carrion (design.md §16/§19.15, point 133): while
+  // Maasailand stands STRUCK (1891-92), the plague's wildlife toll lies on
+  // the plains — dead wildebeest and antelope the vultures and scavengers
+  // then work like any carcass. Date-dependent by design: the same chunk in
+  // 1890 spawns living herds instead.
+  if (anchor.type === 'savanna' && roll >= 0.62 && roll < 0.68 && MAASAI_VILLAGE) {
+    const distDeg = Math.hypot(ll.lat - MAASAI_VILLAGE.lat, ll.lon - MAASAI_VILLAGE.lon)
+    const phase = rinderpestPhaseAtDay('maasai', day, START_YEAR)
+    if (rinderpestCarrionActive(phase, distDeg)) {
+      const sp2: Species = hash(ccx, ccz, 40, seed) < 0.6 ? 'wildebeest' : 'antelope'
+      const n = 1 + Math.floor(hash(ccx, ccz, 41, seed) * 2)
+      for (let i = 0; i < n && herds[sp2].length < MAX_INSTANCES[sp2]; i++) {
+        const x = ax + (hash(ccx, ccz, 42 + i * 2, seed) - 0.5) * 10
+        const z = az + (hash(ccx, ccz, 43 + i * 2, seed) - 0.5) * 10
+        const cll = worldToLatLon(x, z)
+        const ct = sampleTerrain(cll.lat, cll.lon, seed)
+        if (ct.type !== 'savanna') continue
+        herds[sp2].push({
+          x, z, y: Math.max(0.02, ct.height), rot: hash(ccx, ccz, 46 + i, seed) * Math.PI * 2,
+          scale: 0.9 + hash(ccx, ccz, 47 + i, seed) * 0.2, phase: hash(ccx, ccz, 48 + i, seed), chunk: key,
+          dead: true,
+          plague: true,
+        })
+      }
+      return
+    }
   }
 
   let species: Species | null = null
@@ -1230,7 +1265,7 @@ function Herds() {
         const chx = (ccx + 0.5) * CHUNK_SIZE
         const chz = (ccz + 0.5) * CHUNK_SIZE
         if (Math.hypot(chx - pos.x, chz - pos.z) > spawnR) continue
-        spawnChunk(herds, ccx, ccz, seed)
+        spawnChunk(herds, ccx, ccz, seed, useGame.getState().day)
         spawnedChunks.current.add(key)
       }
     }

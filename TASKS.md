@@ -3564,7 +3564,7 @@ the remaining open points in their numeric order.
   vignettes in both languages. DOCS: design.md §3.2/§4.5 and §4.2. One atomic
   commit. (Decided 15.07.2026.)
 
-- [ ] 133. The rinderpest years, modelled as the date-dependent state they were.
+- [x] 133. The rinderpest years, modelled as the date-dependent state they were.
   **CORRECTED 16.07.2026 — my earlier refusal rested on a constraint that does
   not exist.** I had written that a faithful depiction would empty the Maasai
   village and break §13.3's knowing-people cascade, and refused it on that
@@ -3647,11 +3647,25 @@ the remaining open points in their numeric order.
   as the famine store) — both languages, voice markup, tested in
   villages.test.ts incl. the verbatim-Baumann and no-"wandelnde Skelette"
   guards; the Nubian text already carried Sanat Sitta (132d). Docs: §16
-  paragraph + §19.15 rinderpest block. REMAINING (stage 3): optional
-  carrion in struck Maasailand (dead wildebeest/buffalo-class via the
-  existing carcass/vulture systems) + a live check via the __rinderpest
-  dev hook (phase observable; date steered via §21.1 jumps) + full-suite
-  green run, then [x].
+  paragraph + §19.15 rinderpest block. STAGE 3 done — POINT DONE
+  (17.07.2026, 20:57): the carrion dressing is in — in STRUCK Maasailand
+  (1891-92) the chunk spawn strews dead wildebeest and antelope across the
+  plains within CARRION_RADIUS_DEG of the village (Baumann: "nicht nur
+  Rinder, sondern auch Büffel, Gnus und Antilopen"), tagged `plague` so the
+  verify counts the plague's own toll apart from ordinary hunt deaths, and
+  worked by the existing scavenger/vulture systems; date-dependent by
+  construction (the same chunks spawn living herds in 1890). Pure tests: 9
+  (incl. the boundary-exact radius and phase gates and the day glue). Live
+  (enrichments, full run exit 0): the __rinderpest hook reads the date
+  table exactly (preDamaged 1890 / struck 1891 / clean south 1895 / clean
+  camel 1891), and the calendar-pinned carrion check sees toll at 1891
+  (dayStruck 393) and none at 1890. Check lessons: the suite calendar is
+  arbitrary after the season blocks — the check clamps down to 1890 first
+  (the year jump saturates) then steps to 1891; and the plague tag was
+  needed because an ordinary hunt death raced the 1890 zero. Also in these
+  runs: the point-126 closed threshold moved 9 -> 10 with rationale (the
+  ring convergence value is formation-dependent, measured 8.6-9.0 across
+  green runs; hold and release carry the semantics).
 
 - [ ] 134. The one deliberate inaccuracy: grief unto death stays.
   Standing exception to the accuracy principle, set by the user (16.07.2026):
