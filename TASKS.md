@@ -3629,7 +3629,7 @@ the remaining open points in their numeric order.
   DOCS: design.md §16 + the new §19 seasons subsection. One atomic commit — or
   split state/vignettes/carcasses if it grows. (Decided 15.07.2026; the refusal
   reversed 16.07.2026 after actually checking it.)
-  WIP (17.07.2026, 19:34 — split per the spec; STAGE 1 of 3 done): the pure
+  WIP (17.07.2026, 19:26 — split per the spec; STAGE 1 of 3 done, commit 690c055): the pure
   date->phase model lives in src/systems/rinderpest.ts (rinderpestPhase:
   maasai preDamaged 1890 / struck 1891-92 / aftermath 1893+; sidama struck
   through 1892 [Kifu Qen] then aftermath; nubians aftermath all window
