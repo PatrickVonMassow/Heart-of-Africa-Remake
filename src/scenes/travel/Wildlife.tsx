@@ -977,6 +977,18 @@ function Herds() {
     stains.current.push({ x, y: Math.max(0.02, heightAt(x, z)), z, nx, ny, nz })
   }
 
+  // The one death the §19.8 dramas share (Closing pass): the resolution
+  // logic grew by accretion across eight sites — this is its single
+  // spelling. sink: a water victim sinks (no scavenger lands on open
+  // water); stain: a land kill marks the ground.
+  const takeAnimal = (a: Animal, opts: { sink?: boolean; stain?: boolean } = {}) => {
+    a.dead = true
+    a.lionFed = true
+    a.dissolve = CARCASS_DISSOLVE_SECONDS
+    if (opts.sink) a.inWater = 0
+    if (opts.stain) pushStain(a.x, a.z)
+  }
+
   // Dev hook for the headless verification (CLAUDE.md §7.2). `restock` empties
   // every herd in place AND forgets the spawned chunks, so the next frame
   // re-streams the area deterministically — the harness needs it after a test
@@ -1092,16 +1104,10 @@ function Herds() {
           a.caught -= dt
           if (a.caught <= 0) {
             a.caught = undefined
-            a.dead = true
-            a.lionFed = true
-            a.dissolve = CARCASS_DISSOLVE_SECONDS
-            pushStain(a.x, a.z)
+            takeAnimal(a, { stain: true })
             const par = a.parent
             if (par && !par.dead && Math.hypot(par.x - a.x, par.z - a.z) < PARENT_TOO_LATE_DIST) {
-              par.dead = true
-              par.lionFed = true
-              par.dissolve = CARCASS_DISSOLVE_SECONDS
-              pushStain(par.x, par.z)
+              takeAnimal(par, { stain: true })
               par.child = undefined
             }
           }
@@ -1124,10 +1130,7 @@ function Herds() {
               calf.parent = undefined
               a.child = undefined
             }
-            a.dead = true
-            a.lionFed = true
-            a.dissolve = CARCASS_DISSOLVE_SECONDS
-            pushStain(a.x, a.z)
+            takeAnimal(a, { stain: true })
             if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
           }
         } else if (
@@ -1153,10 +1156,7 @@ function Herds() {
           if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
             calf.parent = undefined // freed — it keeps fleeing on its own
             a.child = undefined
-            a.dead = true
-            a.lionFed = true
-            a.dissolve = CARCASS_DISSOLVE_SECONDS
-            pushStain(a.x, a.z)
+            takeAnimal(a, { stain: true })
             LION_STATE.victim = a // the hunt closes out feeding on the parent
           }
         }
@@ -1207,9 +1207,7 @@ function Herds() {
             const fd = fallsDistanceDeg(ll.lat, ll.lon)
             if (fd < FALLS_DEATH_RADIUS_DEG) {
               // Swept over the fall: the calf dies, its parent plunges after it.
-              a.dead = true
-              a.lionFed = true // the river takes it — it sinks, nothing scavenges
-              a.dissolve = CARCASS_DISSOLVE_SECONDS
+              takeAnimal(a) // the river takes it — it sinks, nothing scavenges
               const par = a.parent
               a.parent = undefined
               if (par && !par.dead) {
@@ -1256,9 +1254,7 @@ function Herds() {
               bw.drownFlowThreshold,
             )
             if (fate === 'drowned') {
-              a.dead = true
-              a.lionFed = true // the river takes it — it sinks, nothing scavenges
-              a.dissolve = CARCASS_DISSOLVE_SECONDS
+              takeAnimal(a) // the river takes it — it sinks, nothing scavenges
               const par = a.parent
               a.parent = undefined
               if (par) par.child = undefined
@@ -1294,10 +1290,7 @@ function Herds() {
           a.x += (dx / d) * PLUNGE_SPEED * dt
           a.z += (dz / d) * PLUNGE_SPEED * dt
           if (d < PLUNGE_REACH) {
-            a.dead = true
-            a.lionFed = true
-            a.inWater = 0 // sinks in the plunge pool like its calf
-            a.dissolve = CARCASS_DISSOLVE_SECONDS
+            takeAnimal(a, { sink: true }) // sinks in the plunge pool like its calf
           }
         } else if (a.child && !a.child.dead && a.child.inWater !== undefined) {
           const calf = a.child
@@ -1335,10 +1328,7 @@ function Herds() {
                   bw.drownFlowThreshold,
                 ) === 'drowned'
               if (swept || drowned) {
-                a.dead = true
-                a.lionFed = true
-                a.inWater = 0
-                a.dissolve = CARCASS_DISSOLVE_SECONDS
+                takeAnimal(a, { sink: true })
                 calf.parent = undefined
                 a.child = undefined
               }
