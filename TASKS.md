@@ -3312,7 +3312,27 @@ the remaining open points in their numeric order.
   into a real tree (blocked at the body edge, never entering) and then
   provably moves north, south and west — green across four runs. What
   remains is (b)-class: only the user's exact walk can say which circle
-  blocked them. Fixed along the way in the same verification runs: the
+  blocked them.
+  ★ THE EXACT REPRO ARRIVED (user, 17.07.2026 22:51/22:52, two screenshots):
+  at 7.2N/26.4E the traveller cannot walk SOUTH; from the other side at
+  7.1N/26.4E cannot walk NORTH. So there is an invisible EAST-WEST WALL at
+  ~7.15N / 26.4E, blocking crossing in BOTH directions — and it sits EXACTLY
+  on the WEST/CENTRAL region border (both screenshots show WEST above and
+  CENTRAL below the player). This is no longer a tree/circle case: a two-way,
+  latitude-locked wall on a region boundary points at the REGION-BORDER
+  machinery, not collidableFloraNear. NEW PRIME SUSPECTS, in order: (1) a
+  border-coincident RIVER or carved water band — a water cell would block N/S
+  crossing while E/W along it stays open; verify with __terrainType sweeps
+  across 7.0..7.3N at lon 26.4E plus riverDistance/lakeDistance; (2) a border
+  collider or region-label-anchor geometry pushed into the walkable field;
+  (3) the movement-boundary / world-trim rule (design §11.2/§3.1)
+  mis-clamping an interior latitude. PLAN: a one-off probe (SUITE launch
+  args) that jumps to 7.2N/26.4E, samples terrain type + river/lake distance
+  along a N-S line through 7.15N, and drives S logging the blocking obstacle
+  list — names the wall in one run; then fix the real cause and add a live
+  crossing check at this exact coordinate. This makes 129 ACTIONABLE — pull
+  it forward once the current 145 sub-points are done.
+  Fixed along the way in the same verification runs: the
   hunt-variety check now counts family hunts separately (the calf preference
   re-picks the same local family at a stationary measuring point — 51-68
   family hunts per window — and masked the generic food-web pick's real
@@ -5394,3 +5414,33 @@ the remaining open points in their numeric order.
   weather audio). DOCS: design.md §19.13 + CLAUDE.md §7.1 pt. 12. (Filed
   17.07.2026; queued at the batch end per the standing append-and-defer
   rule.)
+
+- [ ] 167. Rain snaps on at a climate-zone border instead of easing in.
+  User report (17.07.2026 22:54, screenshot at 5.0N/25.4E walking south into
+  the Central/Congo zone): "Der Regen setzt etwas zu ploetzlich ein, wenn man
+  in eine andere Klimazone laeuft." Point 151 smoothed the GREENNESS field
+  across zone borders (~2-degree gradient via the blurred zone-weight
+  texture), but the RAIN and its weather look are still keyed to the discrete
+  zone: `climateZoneAt` returns ONE zone, so the wetness/rain amount steps at
+  the border and the rain streaks pop on within a stride.
+  FIX in the game: the displayed weather must interpolate across the border
+  like the greenness does. Either (a) sample effective wetness through the
+  SAME spatially-smoothed field the season/greenness uses (reuse the blurred
+  zone-weight sampling — one smoothing source for ground AND weather, so they
+  can never disagree at a border), or (b) blend the per-zone wetness of the
+  neighbouring zones by the same border weight. The rain amount, fog, sun dim
+  and overcast (`rainAmount`/`seasonFogParams`/`skyOvercastParams`) then all
+  ramp over the ~2-degree band. Keep it a pure function of position+date
+  (the 151 witness: walking must not itself change the field).
+  CARE: this is the DISPLAY smoothing only — the underlying per-zone climate
+  model (docs/climate-1890.md, the researched wet seasons) stays exact; a
+  border is a gradient in what's DRAWN, not a rewrite of either zone's
+  climate. And the settlement (§19.13 place weather) reads its own single
+  coordinate, so it is unaffected — this is the bird's-eye traversal case.
+  TESTS: pure — the effective-wetness sampler returns a value strictly
+  between the two zones' wetness at a border texel and equals each zone's
+  wetness deep inside it (like the seasonField border test); live
+  (enrichments) — walk a N-S line across this border and assert the rain
+  amount changes MONOTONICALLY over several steps rather than in one jump.
+  DOCS: design.md §19.13. (Reported 17.07.2026; queued at the batch end per
+  the standing append-and-defer rule.)
