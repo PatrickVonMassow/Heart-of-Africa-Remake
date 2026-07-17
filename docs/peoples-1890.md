@@ -2331,3 +2331,58 @@ Mongo/Nkundo raffia belt** (acc. 319423).
 and the Congo* vol. 2 (1908) · Ward, *Five Years with the Congo Cannibals* (1890)
 · Stanley, *In Darkest Africa* vol. 2 (1890) · Junker, *Travels in Africa* vol. 3
 · Dybowski, *La route du Tchad* (1893).
+
+## 8. Research → game: what was implemented, and how (TASKS point 158)
+
+This section records where the findings of §2 and §7 actually reached the
+game — one row per region whose look the game now varies, with the affected
+settlements and the exact rendering. The source of truth in code is
+`src/systems/dress.ts` (the rules), `src/systems/season.ts` (the three
+drivers) and `src/scenes/place/` (the figures); the live proof is
+`scripts/verify/polish.mjs` (screenshots 112/113).
+
+| Region | Settlements (alphabetical) | Implemented aspect (the research finding) | In-game rendering | Driver · gate · source |
+|---|---|---|---|---|
+| North — Ahaggar Sahara | Tuareg Village | The wealthier men wear the **bernus** cloak against the freezing caravan nights (Barth's chief envied his; the village sits at 2110 m) | A shoulder cloak on roughly a third of the figures — the settlement palette's first cloth marks the notables — while the rest stand bare at the fire; the elder is always cloaked | `coldnessAt` · rank-gated · Barth (period, seasonality inferred from indicia) |
+| West — Hausa Sahel | Hausa Village | "Only the wealthier amongst them can afford the **zenne** or shawl, thrown over the shoulder like the plaid of the Highlanders" — worn against the harmattan dawn cold, not a calendar | The same notable third gains the shoulder shawl exactly while the harmattan blows (late November to mid-March) and sheds it in the rains | `harmattanAt` · rank-gated · Barth (period, verbatim) |
+| East — Somali Haud | Somali Village | "In cold weather the head is muffled up in it after the fashion of an Algerian 'burnouse'" — the **tobe** drawn over the head in the karif wind | A SHAPE change, not a colour: the figure's head disappears under the drawn-up wrap through the July–September karif | `karifAt` · everyone · Swayne 1895 (period, on this people in the game's own decade) |
+| South — Zululand | Zulu Village | The greased **isipuku** ox-hide cloak, "worn by day in cold weather as a cloak by males and females" | Shoulder cloaks on all figures on cold highveld days | `coldnessAt` · everyone · Mayr 1907 (period, the one unambiguous case) |
+| South — Kalahari | San Village | The **‡nau** skin cloak, closed "über beiden Schultern… unter dem Kinn zusammengeknüpft" in the cold configuration | Shoulder cloaks on cold nights' days — the cold Kalahari IS dressed, one of the two named traps resolved on evidence | `coldnessAt` · everyone · Passarge (period; weather link via Andersson's identical garment class) |
+| South — Okavango | Wayeyi Village | The light **caross** "which they accommodate to the body according to the state of the weather" | Shoulder cloaks following the cold season | `coldnessAt` · everyone · Andersson 1856 (period, verbatim — the only case needing no inference) |
+
+**What the table deliberately leaves out — and why that is a finding.** The
+other sixteen peoples change NOTHING with the season, however cold their
+ground gets: the research found no period evidence of a garment put on
+seasonally, and the two named traps stay resolved as researched — the Pedi
+highveld crosses the cold threshold but is NOT dressed (the famous blanket
+belongs to the Basotho, a people the game lacks: "Lesotho is not Zululand"),
+and the Sahel harmattan wrap beyond the Hausa zenne was ruled EVIDENCE
+ABSENT — do not invent. Where the seasonal claims found were 20th-century
+tourism copy (Tuareg), they were discarded.
+
+**Where the season shows instead of on the body.** The §7 inversion — across
+seven period observers, not one describes a person putting ON a seasonal
+garment; the signal is displaced onto fire, hut, week and landscape — is
+implemented as exactly that displacement (TASKS point 142):
+
+- **Fire:** every village fire burns visibly harder under the place's own
+  cold, harmattan or karif (`fireBlaze`, live-checked: the Tuareg January
+  fire at 1.5× against the seasonless Congo basin's 1.04×).
+- **Presence:** the transhumant peoples thin in their away season while the
+  children and the elder remain — Maasai (dry-season herding camps), Tuareg
+  (caravan months), and the Sahel farm peoples Bambara, Hausa and Mandinka
+  (rains in the fields); the sedentary Bemba never thin, and that negative
+  is asserted in the tests.
+- **Market:** the Sahel stall's grain mound shrinks through the hungry rains
+  and refills at the harvest — the best-evidenced §3 finding (the hungry
+  season is the RAINS, not the dry).
+- **Rank as class experience:** the gate keys on the settlement palette's
+  first cloth, so about a third of the figures carry the plaid while the
+  rest stand bare at the fire — Barth's class split, not a uniform issue.
+
+**The open edge.** The one reading the research allows but the figures
+cannot yet show: a wrap worn DIFFERENTLY in the cold (drawn tight, closed
+under the chin) rather than in greater number — recorded as design.md
+§19.13's open line. And the seasonal DRESS is only for peoples with period
+evidence; everything else here (fire, presence, market) runs for every
+settlement from its own coordinates.

@@ -4795,6 +4795,33 @@ the remaining open points in their numeric order.
   guarantees touch the same state machine — coordinate, don't duplicate.
   Order: batch end (after 155). (Reported 16.07.2026.)
 
+- [x] 158. An implementation table in docs/peoples-1890.md: research -> game.
+  Wanted (user, 17.07.2026, "parallel zur Batch"): a NEW SECTION in
+  docs/peoples-1890.md with a TABLE recording what the research led to in the
+  game. Columns: (1) region — one row per region distinguished in appearance;
+  (2) the affected settlements, alphabetical within each row; (3) which
+  aspects were implemented (e.g. "men wearing a ... during summer");
+  (4) how the game renders it (e.g. "a cylindric ... on their heads");
+  further columns where sensible (e.g. the driver and the evidence source).
+  Plus, after the table, whatever else about the research-to-game translation
+  is worth recording (the rank gate, the sixteen deliberately unchanged
+  peoples, the displacement of the seasonal signal onto fire/market/presence,
+  the evidence-gating rule).
+  SOURCE OF TRUTH: src/systems/dress.ts (SEASONAL_DRESS: zulu isipuku,
+  rank-gated tuareg bernus and hausa zenne, san ‡nau, wayeyi caross, somali
+  tobe over the head), the drivers (coldnessAt/harmattanAt/karifAt), points
+  137/142 DONE notes, and §7 of the doc itself. English, like the whole doc.
+  ORDER: user asked for it PARALLEL to the batch — worked immediately
+  alongside point 150. (Reported 17.07.2026.)
+  DONE (17.07.2026, 07:49): §8 added — a six-row table (one per
+  region/people the game dresses seasonally: Tuareg bernus, Hausa zenne,
+  Somali tobe-over-the-head, Zulu isipuku, San ‡nau, Wayeyi caross) with
+  settlements, the research finding, the exact in-game rendering and a
+  driver·gate·source column; followed by the deliberate-omission finding
+  (sixteen peoples unchanged, the two named traps), the §7 displacement as
+  implemented (fire/presence/market/rank-as-class) and the open
+  worn-differently edge.
+
 ## Closing (only after all points)
 
 1. Full regression over the whole state.
