@@ -148,6 +148,8 @@ interface Animal {
   mired?: number
   /** This calf is currently inside a gambol bout (per-bout mire roll). */
   bouted?: boolean
+  /** Seeded by the dry-shore guarantee (point 135) — counted by tag. */
+  shoreSeed?: boolean
   /** Land point to walk back to after a water rescue (where the calf fell in). */
   rescueEntry?: { x: number; z: number }
   /** The parent reached its calf in the water: both walk back to the
@@ -760,12 +762,16 @@ function seedSettlementVicinity(
  * deterministic per (seed, water cell), tagged to the traveller's chunk so
  * the group streams out normally.
  */
+let shoreSeedTick = 0
 function seedDryShoreDrinkers(
   herds: Record<Species, Animal[]>,
   pos: { x: number; z: number },
   seed: number,
   spawnedChunks: Set<string>,
 ): void {
+  // Throttled: the guarantee needs seconds-scale upkeep, not per-frame
+  // re-seeding (point 135 — the per-frame path ballooned the herds).
+  if (shoreSeedTick++ % 120 !== 0) return
   const dryness =
     (1 - CURRENT_WEATHER.wetness) * Math.min(1, Math.max(0, balance.season.weatherStrength))
   if (dryness < 0.6) return
@@ -798,9 +804,17 @@ function seedDryShoreDrinkers(
     }
   }
   if (!bank) return // no water in reach — nothing to gather at
+  // Count at the BANK, and count the seeder's own animals by tag whether or
+  // not their spawn roll handed them a drink walk: counting player-centred
+  // drink-holders re-seeded EVERY frame while the placed group wandered or
+  // missed its drink target — the herd ballooned to hundreds (point 135).
   let count = 0
   for (const sp of SPECIES) {
-    for (const a of herds[sp]) if (!a.dead && a.drink && Math.hypot(a.x - pos.x, a.z - pos.z) <= RANGE + 15) count++
+    for (const a of herds[sp]) {
+      if (a.dead) continue
+      if (!a.drink && !a.shoreSeed) continue
+      if (Math.hypot(a.x - bank.x, a.z - bank.z) <= RANGE) count++
+    }
   }
   if (count >= min) return
   const region = regionAt(pll.lat, pll.lon)
@@ -816,14 +830,12 @@ function seedDryShoreDrinkers(
   if (!spawnedChunks.has(key)) return
   // Place the group a short walk inland of the bank: the spawn path then
   // hands each animal its own drink target at this shore.
-  // 1 unit inland, tight spread: every group member must stay inside the
-  // dry catchment (waterline + 0.43 deg) so the spawn path hands each its
-  // own drink target at this shore.
-  // Spread 2.5: tight enough that every member stays inside the dry
-  // catchment past the waterline, wide enough that the group spawns with
-  // its body spacing already intact (spread 1.5 overlapped zebra bodies
-  // and tripped the §19.5 spacing check at spawn).
+  // 1 unit inland at spread 2.5: inside the dry catchment (each member gets
+  // its drink walk) with body spacing intact at spawn. Tag the seeded so the
+  // count above sees them even after they wander or shed the drink target.
+  const before = herds[species].length
   placeGroup(herds[species], cx, cz, bank.x + 1, bank.z + 1, deficit, 2.5, seed, 0.9, BODY_RADIUS[species], false, undefined, key)
+  for (let i = before; i < herds[species].length; i++) herds[species][i].shoreSeed = true
 }
 
 // The wildlife InstancedMeshes are MODULE singletons (point 96): fresh

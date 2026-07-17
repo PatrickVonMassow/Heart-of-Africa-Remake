@@ -2149,6 +2149,30 @@ check('the parent pulls the calf out and both return to the bank alive',
 // next family if the calf never enters the water state (the scripted lion may
 // be hunting exactly that calf, which blocks the fall-in), then follows that
 // one calf to its fate.
+await page.evaluate(() => {
+  // Synthetic test family (point 135): the drama scenarios used to compete
+  // for the scarce pool of naturally spawned free families and staged into
+  // nothing (or into a family something else had relocated). An injected
+  // pair — built like the collision check's zebra, with the young/parent/
+  // child links the drama passes key on — is deterministic and
+  // pool-independent. Returns a disposer that removes the pair again.
+  window.__makeTestFamily = (x, z) => {
+    const herds = window.__wildlife.herdsRef.current
+    let liveChunk
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+      if (liveChunk) break
+    }
+    const parent = { x: x - 1.5, z, y: 0.2, rot: 0, scale: 1, phase: 0.31, chunk: liveChunk ?? 'fam-test' }
+    const calf = { x, z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, chunk: liveChunk ?? 'fam-test', young: true, parent }
+    parent.child = calf
+    herds.zebra.push(parent, calf)
+    const dispose = () => {
+      herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+    }
+    return { parent, calf, dispose }
+  }
+})
 const runDrownScenario = async () =>
   page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -2164,31 +2188,29 @@ const runDrownScenario = async () =>
       }
     }
     if (!spot) return { noSpot: true }
-    const families = []
-    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
-      for (const a of herds[sp] || [])
-        if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined)
-          families.push(a)
-    }
     const U = 10
     let calf = null
+    let disposeKeep = null
     let tries = 0
-    for (const parent of families.slice(0, 8)) {
+    for (let attempt = 0; attempt < 6 && !calf; attempt++) {
       tries++
-      const c = parent.child
-      // Slightly offset per attempt: a rejected predecessor still stands at
-      // the spot, and stacking candidates trips the body separation.
-      c.x = spot[1] * U + (tries - 1) * 0.4
-      c.z = -spot[0] * U
+      // Synthetic family per attempt (point 135): deterministic staging,
+      // independent of the natural pool. Offset per attempt so a rejected
+      // predecessor's spot never stacks bodies.
+      const fam = window.__makeTestFamily(spot[1] * U + attempt * 0.4, -spot[0] * U)
       // Far beyond wading reach for the whole drown window (WADE_SPEED 4.2).
-      parent.x = c.x - 180
-      parent.z = c.z
+      fam.parent.x = fam.calf.x - 180
+      fam.parent.z = fam.calf.z
       const t0 = Date.now()
-      while (Date.now() - t0 < 1500 && c.inWater === undefined && !c.dead) await sleep(100)
-      if (c.inWater !== undefined) { calf = c; break }
-      // Never entered the water state (the water sweep can win the race when
-      // the calf is the lion's current victim or mid-catch — states the drama
-      // entry excludes but the sweep does not): try the next family.
+      while (Date.now() - t0 < 1500 && fam.calf.inWater === undefined && !fam.calf.dead) await sleep(100)
+      if (fam.calf.inWater !== undefined) {
+        calf = fam.calf
+        disposeKeep = fam.dispose
+      } else {
+        // Never entered the water state (the water sweep can win the race
+        // while e.g. the lion targets it): remove and try a fresh pair.
+        fam.dispose()
+      }
     }
     if (!calf) return { staged: false, tries }
     const out = { staged: true, tries, drowned: false, rescued: false, out: false, lionFed: false }
@@ -2199,6 +2221,7 @@ const runDrownScenario = async () =>
       if (calf.inWater === undefined && !calf.dead) { out.out = true; break }
       await sleep(150)
     }
+    if (disposeKeep) disposeKeep()
     return out
   })
 // (a) Forced rains: the current holds the calf under until it drowns.
@@ -2315,15 +2338,11 @@ await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
 await page.waitForTimeout(400)
 const mire = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  const herds = window.__wildlife.herdsRef.current
-  let parent = null
-  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
-    for (const a of herds[sp] || [])
-      if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined && a.child.mired === undefined) { parent = a; break }
-    if (parent) break
-  }
-  if (!parent) return { found: false }
-  const calf = parent.child
+  const p0 = window.__game.getState().pos
+  // Synthetic family (point 135): deterministic, pool-independent staging.
+  const fam = window.__makeTestFamily(p0.x + 8, p0.z + 6)
+  const parent = fam.parent
+  const calf = fam.calf
   calf.mired = 0
   parent.x = calf.x - 15
   parent.z = calf.z
@@ -2353,6 +2372,7 @@ const mire = await page.evaluate(async () => {
     Math.hypot(parent.x - start.x, parent.z - start.z) < 8
   window.__lionHunt.state.mode = 'idle'
   window.__lionHunt.state.timer = 60
+  fam.dispose()
   return { found: true, held, vigil0, vigil1, calfDead: !!calf.dead, parentDead: !!parent.dead, bothDeadAtWater }
 })
 check(
@@ -2367,32 +2387,21 @@ check(
 )
 // Without a predator, the mud RELEASES (the drama always resolves): shorten
 // the window through the balance hook, then watch the calf come free alive.
-await waitForFamily() // the kill scenario above consumed a family (135 class)
 const release = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  const herds = window.__wildlife.herdsRef.current
-  // Poll for a family whose calf is FREE of every drama state — the kill
-  // scenario just consumed one and the remaining calves can be mid-state
-  // for a while (point 135 class: waitForFamily alone is not specific enough).
-  let parent = null
-  const tf = Date.now()
-  while (!parent && Date.now() - tf < 12000) {
-    for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
-      for (const a of herds[sp] || [])
-        if (a.child && !a.child.dead && !a.dead && a.child.inWater === undefined && a.child.caught === undefined && a.child.mired === undefined) { parent = a; break }
-      if (parent) break
-    }
-    if (!parent) await sleep(300)
-  }
-  if (!parent) return { found: false }
-  const calf = parent.child
+  const p0 = window.__game.getState().pos
+  // Synthetic family (point 135): deterministic, pool-independent staging.
+  const fam = window.__makeTestFamily(p0.x - 8, p0.z + 6)
+  const calf = fam.calf
   const prev = window.__balance.waterDrama.mireSeconds
   window.__balance.waterDrama.mireSeconds = 5
   calf.mired = 0
   const t0 = Date.now()
   while (Date.now() - t0 < 15000 && calf.mired !== undefined && !calf.dead) await sleep(200)
   window.__balance.waterDrama.mireSeconds = prev
-  return { found: true, released: calf.mired === undefined && !calf.dead }
+  const released = calf.mired === undefined && !calf.dead
+  fam.dispose()
+  return { found: true, released }
 })
 check(
   'without a predator the mud releases the calf alive (point 123 — the drama always resolves)',
@@ -3301,13 +3310,17 @@ const groundRGB = async (lat, lon, month) => {
   return channels.slice(0, 3).map((c) => c.mean)
 }
 const gx = (c) => c[1] - (c[0] + c[2]) / 2
-const savDry = await groundRGB(-17.9, 25.9, 7) // Zambezi plateau, July — bone dry
+// Open ground with NO water in frame (point 135f): the old Zambezi spot sat
+// at Victoria Falls — spray and river crossed the measured crop, and the
+// dry-season gathering (the very features of 120e/135c) parked a herd in it,
+// drowning the ground's green-excess signal in animal and water pixels.
+const savDry = await groundRGB(-20.0, 27.8, 7) // Matabele plateau, July — bone dry
 await page.screenshot({ path: `${OUT}115-savanna-dry.png` })
-const savWet = await groundRGB(-17.9, 25.9, 1) // January — the summer rains
+const savWet = await groundRGB(-20.0, 27.8, 1) // January — the summer rains
 await page.screenshot({ path: `${OUT}116-savanna-wet.png` })
 console.log('shot 115-savanna-dry.png, 116-savanna-wet.png')
-const congoDry = await groundRGB(-2.6, 22.4, 8) // basin, its driest month
-const congoWet = await groundRGB(-2.6, 22.4, 5) // and its wettest — the swing is small
+const congoDry = await groundRGB(1.5, 24.5, 8) // basin, its driest month
+const congoWet = await groundRGB(1.5, 24.5, 5) // and its wettest — the swing is small
 await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 const savSwing = Math.abs(gx(savWet) - gx(savDry))
 const congoSwing = Math.abs(gx(congoWet) - gx(congoDry))

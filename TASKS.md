@@ -3538,6 +3538,23 @@ the remaining open points in their numeric order.
   phase, chunk=liveChunk) — so staging is deterministic and pool-independent;
   keep the natural-pool paths for the checks that exist to test natural
   behaviour (gambol, falls). Then re-run the three-consecutive-green gate.
+  THIRD WIP UPDATE (17.07.2026, 06:30): synthetic families LANDED for the
+  drown and both mire scenarios (window.__makeTestFamily with disposer;
+  offset retries for the sweep race) — those scenarios have not failed
+  since. Pixel probes MOVED to open ground (savanna -20.0/27.8 Matabele,
+  congo 1.5/24.5; both zone-verified, >=1 deg from any river): the old
+  Zambezi spot sat AT Victoria Falls, and the spray plus the dry-season
+  herd my own 120e/135c features gather there drowned the ground signal in
+  animal/water pixels (screenshot診 caught it). SEALED a real game leak the
+  gate exposed: the dry-shore seeder counted player-centred drink-holders
+  but placed at the bank — when the group wandered or missed its drink
+  roll it re-seeded EVERY frame and ballooned the herds to 450+; now
+  throttled (~2 s), counted AT the bank, and the seeded are tagged
+  (shoreSeed) so wandering never uncounts them. REMAINING before checkoff:
+  the guard-approach check flaked twice (before 8 -> after 8.15: the parent
+  never closed on its calf — read how that check stages and what the
+  guard-station geometry expects) and the three-consecutive-green gate must
+  then pass.
   MORE CASES of the same class (16./17.07.2026, observed across full runs):  MORE CASES of the same class (16./17.07.2026, observed across full runs):
   (c) the dry-season drinker count (point 120e — dryDrinkers vs wetDrinkers
   flipped to 2/0, 3/0 on two runs, green on others); (d) the trample-grief
