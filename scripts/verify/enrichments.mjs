@@ -1425,6 +1425,24 @@ const rinderpest = await page.evaluate(async () => {
     await sleep(500)
   }
   out.dayStruck = Math.round(window.__game.getState().day)
+  // Failure diagnosis: what did the ring actually spawn, and at what zoom?
+  {
+    const h = window.__wildlife.herdsRef.current
+    let alive = 0
+    let deadAny = 0
+    for (const sp of ['wildebeest', 'antelope']) {
+      for (const a of h[sp] ?? []) {
+        if (a.dead) deadAny++
+        else alive++
+      }
+    }
+    out.diag = {
+      zoom: window.__ui.getState().travelZoom,
+      chunks: window.__wildlife.spawnedChunks.current.size,
+      alive,
+      deadAny,
+    }
+  }
   // (b) back to 1890: the same plains spawn living herds, no plague toll.
   window.__game.getState().debugJumpYear(-1)
   await sleep(200)
@@ -1446,6 +1464,47 @@ check(
   rinderpest.carrionStruck > 0 && rinderpest.carrionPre === 0,
   JSON.stringify(rinderpest),
 )
+
+// --- Point 145a: the burning grass --------------------------------------------
+// In the Sahel dry season a fire line walks the savanna; a calf in its path
+// is caught and the parent goes in after it (a point-134 surrender). Staged:
+// jump to the Sahel, force the dry season, plant a chunk-less family in the
+// line's path, ignite via the dev hook, and require catch, both deaths and
+// the resolve into the smouldering band. Screenshot 131.
+const grassFire = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__game.getState().debugJumpTo(13.5, 5.0) // Sahel savanna
+  window.__ui.getState().setSeasonWetnessOverride(0)
+  await sleep(400)
+  const herds = window.__wildlife.herdsRef.current
+  const p0 = window.__game.getState().pos
+  const parent = { x: p0.x + 6, z: p0.z + 26, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
+  const calf = { x: p0.x + 6, z: p0.z + 14, y: 0.2, rot: 0, scale: 0.5, phase: 0.7, chunk: undefined, young: true, parent }
+  parent.child = calf
+  herds.zebra.push(parent, calf)
+  // Ignite south of the calf, burning due north over it (heading 0 = +z).
+  window.__wildlife.igniteFire(p0.x + 6, p0.z + 4, 0)
+  const f = window.__wildlife.fire
+  const out = { trapped: false, calfDead: false, parentDead: false, resolved: false, bandSeen: false }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 40000) {
+    if (calf.fireTrapped !== undefined) out.trapped = true
+    if (calf.dead) out.calfDead = true
+    if (parent.dead) out.parentDead = true
+    if (f.mode === 'smoulder') { out.resolved = true; out.bandSeen = true; break }
+    await sleep(100)
+  }
+  // Cleanup: the staged family retires; the fire resolves on its own clock.
+  herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+  window.__ui.getState().setSeasonWetnessOverride(null)
+  return out
+})
+check(
+  'the burning grass catches the calf, takes the following parent, and burns out (point 145a)',
+  grassFire.trapped && grassFire.calfDead && grassFire.parentDead && grassFire.resolved,
+  JSON.stringify(grassFire),
+)
+await page.screenshot({ path: `${OUT}131-burning-grass.png` })
 
 // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
 // A single scavenger cannot keep up with every kill, so carcasses left far off

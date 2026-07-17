@@ -626,6 +626,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - The drying waterhole (point 123, documented dry-season behaviour): in the dry season a shrinking lake bank turns to mud, and a gambol bout that ends there can mire a calf — it struggles in place, cannot free itself, and does not drift. Its parent will not leave: it stands vigil beside the stuck calf while the herd moves on, and it does not flee the predators the last water draws. A hunt that finds the pair takes the calf AND the vigil parent at the waterhole — the mud never frees the calf for the sacrifice escape. If no predator comes, the mud releases the calf after a calibratable window: the drama always resolves.
 - The crocodile's ambush at the bank (§19.16) feeds the same family grammar: the seized victim struggles through the same window, the parent's charge rolls the same defence, and the sacrifice and too-late endings hold at the waterline.
 - The same grief drives a parent whose calf is trampled underfoot by an elephant (§19.4): it does not dodge the herd like ordinary prey but throws itself before the elephant's moving feet — not the spot where its calf fell — and is trampled too, dying beside its young. Unlike the living shield against a hunter, this saves nobody: the calf is already dead and both are lost. Should the herd be gone before the parent arrives, the grief passes and it rejoins its own.
+- The burning grass (point 145a) — and the cause is HUMAN. In the cured dry-season grass of the Sahel and congo-north belts the inhabitants fire the steppe, as Dybowski watched at the game's own latitude and Park saw from the Gambia ("the plains and mountains … variegated with lines of fire"): a fire line walks downwind across the savanna, leaving a blackened band that smoulders and fades. A calf standing in the line's path is caught by it and struggles; the parent goes in after it — a surrender of the grief family below, at its own pace, never the rescue burst. Every other drama in §19.8 has a natural cause — lion, river, elephant; this one alone is set by human hands, without the player doing anything. The fire is strictly seasonal (never the Congo, never a rainless zone, never the rains — the pure gate is tested) and it never touches the traveller: any player-facing fire would be a §14 design decision, deliberately not invented here.
 - THE ONE DELIBERATE INACCURACY (point 134 — standing user exception, 16.07.2026: "Die Elterntiere sollen sich nach wie vor freiwillig wie gehabt ohne Wehr in den Tod stürzen, wenn ihre Jungtiere gestorben sind."): the three grief-unto-death drives — the waterfall plunge, the trample-throw and the carcass vigil — are ONE family, and they stay. Real ungulates bolt from a charging predator; the game's bereaved parents do not, on purpose: this is §19.8's established emotional grammar, and an animal that fled at the last moment would be the odd one out among the three, not the realistic one. Everything else in this world — climate, peoples, dress, the panzootic, village placement — is to be as accurate as the research allows; this is the single carve-out (see also the licence note in §19.13), recorded here where the behaviour is specified so nobody later "corrects" it toward realism. In code the exception is structural: the surrender branches never roll the §19.8 defence, by construction and comment.
 
 ### 19.16 The crocodile — the ambush from the water
@@ -768,6 +769,13 @@ point 142):
 - **Market:** the Sahel stall's grain mound shrinks through the hungry rains
   and refills at the harvest — the best-evidenced finding of
   `docs/peoples-1890.md` §3.1 (the hungry season is the RAINS, not the dry).
+
+**The burning of the steppe (point 145a; `docs/peoples-1890.md` §7.4).** The
+grass fire is a season phenomenon before it is a drama: it exists only where
+the grass has CURED — the Sahel and congo-north belts in their dry season
+(`grassFireEligible`, pure-tested: never the Congo, never a rainless desert,
+never the rains) — and its blackened band is the landscape Dybowski described,
+"the whole landscape with an aspect of mourning".
 
 **The rinderpest years (point 133; `docs/peoples-1890.md` §5).** The
 panzootic reaches the game as a date-dependent vignette phase, not a dress

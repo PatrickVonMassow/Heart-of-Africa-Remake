@@ -4528,6 +4528,23 @@ the remaining open points in their numeric order.
   its OPEN list once (b) and (c) land.
   SIZE: three separate dramas — one commit each, in the order (a), (b), (c).
   (Filed 16.07.2026.)
+  (a) DONE (17.07.2026, 21:23): the burning grass is in — pure gate
+  grassFireEligible (sahel/congo-north, dry only; never Congo, never a
+  rainless desert, never the rains; tested), FIRE_STATE walks a flame line
+  downwind over cured savanna leaving a blackened smoulder band that fades,
+  a calf in the path is caught by the line (fireTrapped struggle, then the
+  burn-mark death), the parent goes in after it at grief pace (a point-134
+  surrender — no roll, no rescue burst), the fire always resolves (point
+  118) and never touches the traveller. Dev hook fire/igniteFire; live
+  check green on first run (trapped/calfDead/parentDead/resolved) with
+  screenshot 131 human-checked (the blackened band on the straw Sahel).
+  Docs: design.md §19.8 bullet + §19.13 season note. Build/lint/1746 unit
+  tests green. NOTE: the 133 carrion check rotated 1->0 in the same run
+  (same dayStruck 393) — diagnosis instrumentation added (zoom/chunks/
+  alive/dead in the failure JSON), watching the next runs. REMAINING: (b)
+  the broken wing (ground-nesting bird + nest, the lure-as-lie mechanic),
+  (c) the lioness defending cubs against hyenas (predator cub builds, the
+  LION_STATE-as-victim architecture decision).
 
 - [x] 146. Revenge: a strong parent kills a weak predator and walks away.
   Wanted (user, 16.07.2026): "Es soll auch noch eine Rache-Mechanik von Eltern

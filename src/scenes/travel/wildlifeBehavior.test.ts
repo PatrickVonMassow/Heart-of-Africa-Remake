@@ -32,6 +32,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  grassFireEligible,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -192,6 +193,23 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
     expect(taken).toBe(true) // the hunter meets the shield…
     expect(caught).toBe(false) // …never the calf
     expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
+  })
+})
+
+describe('grassFireEligible (design.md §19.8/§19.13, point 145a — the burning of the steppe)', () => {
+  it('burns only in the cured-grass zones, dry season only', () => {
+    expect(grassFireEligible('sahel', 0.0)).toBe(true)
+    expect(grassFireEligible('congo-north', 0.1)).toBe(true)
+    expect(grassFireEligible('sahel', 0.15)).toBe(false) // the rains wet the grass
+    expect(grassFireEligible('sahel', 0.8)).toBe(false)
+  })
+
+  it('never in the Congo (no cured grass), never in a rainless desert (no grass at all)', () => {
+    expect(grassFireEligible('congo', 0.0)).toBe(false)
+    expect(grassFireEligible('atlantic-equatorial', 0.0)).toBe(false)
+    expect(grassFireEligible('sahara-north', 0.0)).toBe(false)
+    expect(grassFireEligible('sahara-south', 0.0)).toBe(false)
+    expect(grassFireEligible('mediterranean', 0.0)).toBe(false)
   })
 })
 

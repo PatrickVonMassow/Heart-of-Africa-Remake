@@ -368,6 +368,22 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
   return !mourned && distToTarget < radius
 }
 
+/** Zones whose cured dry-season grass carries the burning of the steppe
+ *  (design.md §19.8/§19.13, point 145a): Dybowski watched the inhabitants
+ *  fire it at the congo-north latitude, Park saw the same lines of fire from
+ *  the Gambia (Sahel). The Congo proper never cures (rain every month) and a
+ *  rainless zone grows no grass to burn — both stay out by construction. */
+export const GRASS_FIRE_ZONES = ['sahel', 'congo-north']
+
+/**
+ * Whether the grass fire may burn here and now (point 145a): a cured-grass
+ * zone in the DRY season only — never the Congo, never a rainless desert,
+ * never the rains. Pure over zone and local wetness.
+ */
+export function grassFireEligible(zone: string, wetness: number): boolean {
+  return GRASS_FIRE_ZONES.includes(zone) && wetness < 0.15
+}
+
 /**
  * The crocodile's home water (design.md §19.16, point 130): ~1890 the Nile
  * crocodile (with its western kin) lived in every major African river system

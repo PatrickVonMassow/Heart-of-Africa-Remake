@@ -23,7 +23,7 @@ import { setAnimalCollider } from './wildlifeCollision'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { drinkWalkDistance } from './waterEdgeRules'
-import { CURRENT_WEATHER } from '../../systems/season'
+import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
@@ -62,6 +62,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  grassFireEligible,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -220,6 +221,9 @@ interface Animal {
   /** Spawned dead as rinderpest toll (point 133) — lets the verify count the
    *  plague's own carrion apart from ordinary hunt/trample deaths. */
   plague?: true
+  /** Caught by the grass-fire line (point 145a): seconds of struggle left
+   *  before the fire takes it. */
+  fireTrapped?: number
   /** Which ambusher seized this animal (point 130): routes the shared caught
    *  countdown and the parent's charge to the crocodile instead of the lion
    *  hunt, and the kill sinks (the river takes the body) instead of staining. */
@@ -357,6 +361,43 @@ const GRAVEYARD_POS = latLonToWorld(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.l
  *  written by the Wildlife frame and folded into the Vultures component's
  *  `clearance` dev hook so the verify metric covers BOTH vulture systems. */
 const SCAV_CLEARANCE = { v: Infinity }
+
+/** The burning of the steppe (design.md §19.8/§19.13, point 145a): in the
+ *  cured dry-season grass of the Sahel and congo-north belts the inhabitants
+ *  fire the land — Dybowski watched it at the game's own latitude, Park saw
+ *  the lines of fire from the Gambia. A fire line walks downwind leaving a
+ *  blackened band; a calf standing in its path is caught by the line, and
+ *  the parent goes in after it — a SURRENDER of the point-134 family (grief
+ *  pace, never the rescue burst, no defence roll). The fire never touches
+ *  the traveller (any player effect would be a §14 design decision). */
+const FIRE_STATE = {
+  mode: 'idle' as 'idle' | 'burning' | 'smoulder',
+  x: 0,
+  z: 0,
+  heading: 0,
+  front: 2,
+  timer: 90, // first ignition chance ~a minute and a half in
+  victim: null as Animal | null,
+  keeper: null as Animal | null,
+}
+const FIRE_FRONT_SPEED = 1.4
+const FIRE_MAX_FRONT = 45
+const FIRE_HALF_WIDTH = 6
+const FIRE_SMOULDER_SECONDS = 90 // the blackened band lingers, then fades
+const FIRE_COOLDOWN_SECONDS = 300
+const FIRE_TRAP_SECONDS = 3
+// GRIEF, not a rescue (point 134): the parent walks into the fire after its
+// calf — its own pace, off the rescue burst, and it never rolls a defence.
+const FIRE_PLUNGE_SPEED = 5.5
+const FIRE_FLAME_COUNT = 14
+const fireFlameGeo = new THREE.PlaneGeometry(1.0, 1.4)
+const fireFlameMat = new THREE.MeshBasicMaterial({
+  color: '#ff7a1e', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false,
+})
+const fireBandGeo = new THREE.PlaneGeometry(1, 1)
+const fireBandMat = new THREE.MeshBasicMaterial({
+  color: '#181008', transparent: true, opacity: 0.8, depthWrite: false,
+})
 /** Prey dodge an elephant only when it comes this close, and a touch slower
  *  than the elephant, so a head-on herd still tramples them now and then. */
 const PREY_PANIC_RADIUS = 3.2
@@ -1155,6 +1196,8 @@ function Herds() {
   const vpos = useMemo(() => new THREE.Vector3(), [])
   const vscl = useMemo(() => new THREE.Vector3(), [])
   const stainMesh = useRef<THREE.InstancedMesh>(pool.stain)
+  const fireFlames = useRef<THREE.InstancedMesh>(null)
+  const fireBand = useRef<THREE.Mesh>(null)
   // Each stain lies in the local slope plane (position + ground normal): a
   // horizontal disc on a hillside got wedges swallowed by the ground and read
   // as a Pac-Man (design.md §19).
@@ -1218,7 +1261,16 @@ function Herds() {
       herdState.current.clear()
       scavenger.current.target = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState }
+    const igniteFire = (x: number, z: number, heading: number) => {
+      FIRE_STATE.mode = 'burning'
+      FIRE_STATE.x = x
+      FIRE_STATE.z = z
+      FIRE_STATE.heading = heading
+      FIRE_STATE.front = 2
+      FIRE_STATE.victim = null
+      FIRE_STATE.keeper = null
+    }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, igniteFire }
     return () => {
       delete w.__wildlife
     }
@@ -1934,6 +1986,130 @@ function Herds() {
       }
     }
 
+    // The burning of the steppe (design.md §19.8/§19.13, point 145a).
+    {
+      const f = FIRE_STATE
+      if (f.mode === 'idle') {
+        f.timer -= dt
+        if (f.timer <= 0) {
+          f.timer = FIRE_COOLDOWN_SECONDS
+          // Ignite ahead of the traveller where the pure gate allows: cured
+          // savanna grass in a fire zone, dry season only.
+          const ang = hash(Math.round(pos.x), Math.round(pos.z), 5, seed) * Math.PI * 2
+          const ix = pos.x + Math.sin(ang) * 45
+          const iz = pos.z + Math.cos(ang) * 45
+          const ill = worldToLatLon(ix, iz)
+          const ter = sampleTerrain(ill.lat, ill.lon, seed)
+          const zone = climateZoneAt(ill.lat, ill.lon, ter.elevation)
+          if (ter.type === 'savanna' && grassFireEligible(zone, CURRENT_WEATHER.wetness)) {
+            f.mode = 'burning'
+            f.x = ix
+            f.z = iz
+            f.heading = hash(Math.round(ix), Math.round(iz), 6, seed) * Math.PI * 2
+            f.front = 2
+            f.victim = null
+            f.keeper = null
+          }
+        }
+      } else if (f.mode === 'burning') {
+        f.front += FIRE_FRONT_SPEED * dt
+        if (!f.victim) {
+          // A calf standing just ahead of the line is caught by it.
+          outer: for (const sp of CALF_HUNT_SPECIES) {
+            for (const a of herds[sp]) {
+              if (a.dead || !a.young || a.caught !== undefined || a.fireTrapped !== undefined || a.inWater !== undefined || a.mired !== undefined) continue
+              const rx = a.x - f.x
+              const rz = a.z - f.z
+              const along = rx * Math.sin(f.heading) + rz * Math.cos(f.heading)
+              const across = Math.abs(rx * Math.cos(f.heading) - rz * Math.sin(f.heading))
+              if (across < FIRE_HALF_WIDTH && along > f.front - 1 && along < f.front + 2.5) {
+                a.fireTrapped = FIRE_TRAP_SECONDS
+                f.victim = a
+                const par = a.parent
+                if (par && !par.dead) f.keeper = par
+                break outer
+              }
+            }
+          }
+        }
+        if (f.victim && !f.victim.dead && f.victim.fireTrapped !== undefined) {
+          f.victim.fireTrapped -= dt
+          if (f.victim.fireTrapped <= 0) {
+            f.victim.fireTrapped = undefined
+            takeAnimal(f.victim, { stain: true }) // the burn mark where it fell
+          }
+        }
+        // The parent goes in after it — surrender, alive or already lost.
+        if (f.keeper && !f.keeper.dead && f.victim) {
+          const dx = f.victim.x - f.keeper.x
+          const dz = f.victim.z - f.keeper.z
+          const d = Math.hypot(dx, dz) || 1
+          f.keeper.x += (dx / d) * FIRE_PLUNGE_SPEED * dt
+          f.keeper.z += (dz / d) * FIRE_PLUNGE_SPEED * dt
+          if (d < 1.2) {
+            takeAnimal(f.keeper, { stain: true })
+            f.keeper = null
+          }
+        }
+        if (f.front >= FIRE_MAX_FRONT) {
+          // The line burns out: the drama ALWAYS resolves (point 118) — a
+          // still-struggling calf is released singed, an unarrived keeper's
+          // grief passes and it rejoins its herd.
+          if (f.victim && !f.victim.dead && f.victim.fireTrapped !== undefined) f.victim.fireTrapped = undefined
+          f.victim = null
+          f.keeper = null
+          f.mode = 'smoulder'
+          f.timer = FIRE_SMOULDER_SECONDS
+        }
+      } else {
+        f.timer -= dt
+        if (f.timer <= 0) {
+          f.mode = 'idle'
+          f.timer = FIRE_COOLDOWN_SECONDS
+        }
+      }
+      // Render the line and the blackened band behind it.
+      const flames = fireFlames.current
+      const band = fireBand.current
+      if (flames) {
+        flames.visible = f.mode === 'burning'
+        if (flames.visible) {
+          const fx = f.x + Math.sin(f.heading) * f.front
+          const fz = f.z + Math.cos(f.heading) * f.front
+          for (let i = 0; i < FIRE_FLAME_COUNT; i++) {
+            const off = ((i / (FIRE_FLAME_COUNT - 1)) * 2 - 1) * FIRE_HALF_WIDTH
+            const x = fx + Math.cos(f.heading) * off
+            const z = fz - Math.sin(f.heading) * off
+            const ll2 = worldToLatLon(x, z)
+            const g = Math.max(0.02, sampleTerrain(ll2.lat, ll2.lon, seed).height)
+            const flick = 0.75 + Math.abs(Math.sin(clock.elapsedTime * 9 + i * 1.7)) * 0.5
+            vpos.set(x, g + 0.7 * flick, z)
+            euler.set(0, f.heading + Math.PI / 2, 0)
+            quat.setFromEuler(euler)
+            vscl.set(0.9, flick, 1)
+            mtx.compose(vpos, quat, vscl)
+            flames.setMatrixAt(i, mtx)
+          }
+          flames.count = FIRE_FLAME_COUNT
+          flames.instanceMatrix.needsUpdate = true
+        }
+      }
+      if (band) {
+        band.visible = f.mode !== 'idle'
+        if (band.visible) {
+          const mid = f.front / 2
+          const mx = f.x + Math.sin(f.heading) * mid
+          const mz = f.z + Math.cos(f.heading) * mid
+          const ll3 = worldToLatLon(mx, mz)
+          const g = Math.max(0.02, sampleTerrain(ll3.lat, ll3.lon, seed).height)
+          band.position.set(mx, g + 0.06, mz)
+          band.rotation.set(-Math.PI / 2, 0, -f.heading)
+          band.scale.set(FIRE_HALF_WIDTH * 2, f.front, 1)
+          fireBandMat.opacity = f.mode === 'smoulder' ? 0.8 * (f.timer / FIRE_SMOULDER_SECONDS) : 0.8
+        }
+      }
+    }
+
     // Walking into a crocodile routes through the EXISTING §14.2 event
     // (machete always protects, rifle only from the canoe) exactly like the
     // wandering-predator contact — no new attack path (point 130 (e)).
@@ -2320,8 +2496,9 @@ function Herds() {
         // flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
-          if (a.caught !== undefined && a.caught > 0) {
-            // Caught by a predator (resolved in the full-list pre-pass above):
+          if ((a.caught !== undefined && a.caught > 0) || a.fireTrapped !== undefined) {
+            // Caught by a predator (resolved in the full-list pre-pass above)
+            // — or by the grass-fire line (point 145a), same thrash:
             // thrash in place — no stain or shrink yet — while a parent may
             // still reach the predator and save it (§19). Not young-gated:
             // the seized vigil-keeper (point 121 (f)) is the one ADULT that
@@ -2742,6 +2919,8 @@ function Herds() {
         <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
       ))}
       <primitive object={pool.stain} dispose={null} />
+      <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_COUNT]} visible={false} frustumCulled={false} />
+      <mesh ref={fireBand} geometry={fireBandGeo} material={fireBandMat} visible={false} frustumCulled={false} />
       <group ref={scavengeGroup} visible={false}>
         {[0, 1, 2].map((i) => (
           <mesh key={i} geometry={vultureGeo} material={material} dispose={null} />
