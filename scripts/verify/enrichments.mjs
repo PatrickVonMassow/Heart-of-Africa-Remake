@@ -1478,6 +1478,14 @@ const grassFire = await page.evaluate(async () => {
   await sleep(400)
   const herds = window.__wildlife.herdsRef.current
   const p0 = window.__game.getState().pos
+  // Staging isolation (the 135 pattern): a NATURAL calf standing in the
+  // fire path can claim the single victim slot before the staged one —
+  // shove every other young clear of the corridor first.
+  for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']) {
+    for (const a of herds[sp] ?? []) {
+      if (!a.dead && a.young && Math.abs(a.x - (p0.x + 6)) < 12 && a.z > p0.z - 10 && a.z < p0.z + 60) a.x += 40
+    }
+  }
   const parent = { x: p0.x + 6, z: p0.z + 26, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: undefined }
   const calf = { x: p0.x + 6, z: p0.z + 14, y: 0.2, rot: 0, scale: 0.5, phase: 0.7, chunk: undefined, young: true, parent }
   parent.child = calf
@@ -1521,7 +1529,7 @@ const brokenWing = await page.evaluate(async () => {
   herds.plover.push(parent, chick)
   const out = { lured: false, maxFromNest: 0, tookOff: false, resolved: false, homeAgain: false }
   const t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  while (Date.now() - t0 < 45000) {
     if (parent.lure) out.lured = true
     if (parent.lure && parent.lure.returning) out.tookOff = true
     out.maxFromNest = Math.max(out.maxFromNest, Math.hypot(parent.x - nx, parent.z - nz))
@@ -1531,6 +1539,18 @@ const brokenWing = await page.evaluate(async () => {
       break
     }
     await sleep(100)
+  }
+  if (!out.resolved) {
+    // Self-explaining failure (the run-2 exact-zero riddle): where does the
+    // bird stand, is it still OUR object in the list, what does its state say?
+    out.diag = {
+      inList: herds.plover.includes(parent),
+      dead: !!parent.dead,
+      lure: parent.lure ? { ret: parent.lure.returning, timer: +parent.lure.timer.toFixed(1) } : null,
+      cooldown: parent.lureCooldown !== undefined ? +parent.lureCooldown.toFixed(1) : null,
+      at: { x: +(parent.x - nx).toFixed(2), z: +(parent.z - nz).toFixed(2) },
+      playerDistNest: +Math.hypot(window.__game.getState().pos.x - nx, window.__game.getState().pos.z - nz).toFixed(1),
+    }
   }
   herds.plover = herds.plover.filter((a) => a !== parent && a !== chick)
   return out

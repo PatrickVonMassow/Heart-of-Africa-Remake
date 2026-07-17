@@ -4569,9 +4569,8 @@ the remaining open points in their numeric order.
   as such and the check meets it under any seed. ALSO WATCHING (single-run
   reds, first occurrences): 'a parent flees a feeding lion beside its calf'
   (reversalRate 0.26) in the 145b run; trample/stain and 102-vicinity from
-  earlier runs. (b) WIP (17.07.2026,
-  22:20 — core complete and PROBE-PROVEN, the suite check is the open
-  half): the plover species is in (buildPlover/buildPloverChick, nest+2
+  earlier runs. (b) DONE (17.07.2026, 22:55 — green full run: plover
+  lured 14.6/took off/resolved/home; carrion 9; fire green): the plover species is in (buildPlover/buildPloverChick, nest+2
   chicks spawn on savanna at roll band [0.68,0.72), CALF_SPECIES extended,
   plover excluded from CALF_HUNT_SPECIES so no drama loop touches it), the
   lure runs on four boundary-tested pure rules (ploverShouldLure/
@@ -4582,18 +4581,16 @@ the remaining open points in their numeric order.
   (scripts/verify/_plover-probe.mjs, needs the SUITE's chromium launch args
   — a bare launch throttles rAF ~20x and made the sim look broken) proves
   the full cycle: drag at 1.25/s, resolve at the 12 s window, flight home.
-  OPEN PUZZLES for the next stage, in order: (1) suite run 2 measured
-  lured:true with maxFromNest EXACTLY 0 — reproduce with probe-grade
-  tracing inside the full suite context or instrument the suite check
-  (sample parent.x each poll); (2) 133-carrion read 0 twice even at the
-  widened 13% band — CHECK THE RETURN in the carrion spawn branch: if the
-  bare `return` sits inside the outer roll-band if but outside the
-  rinderpestCarrionActive gate, every savanna chunk in [0.62,0.75) worldwide
-  spawns NOTHING (and eats the plover band [0.68,0.72) too) — likely the
-  real bug for both symptoms; fix = only return when carrion was actually
-  placed, else fall through to the normal species roll; (3) after fixing,
-  rerun full suite; screenshots 131 (done, human-checked) and 132 (pending
-  sight). THEN: (c) the lioness defending cubs against hyenas (predator cub
+  BOTH puzzles solved: (1) the run-2 exact-zero was a
+  standing-threat loop (the act re-fired the instant it landed while the
+  traveller stood near) — a 25 s post-act cooldown (lureCooldown) sits the
+  bird alert at its nest, and the probe (suite launch args — a bare launch
+  throttles rAF ~20x) proved the full cycle; (2) the carrion-zero was
+  GEOMETRY, not the return: the 2.5-degree radius covered ~9 of the 169
+  ring chunks, so a per-boot random seed could miss them all — CARRION_
+  RADIUS_DEG raised to 6 (Maasailand, not the village; carrion now reads 9)
+  and the fire-staging isolates the corridor (a natural calf claimed the
+  victim slot). Screenshots 131/132 both human-checked. THEN: (c) the lioness defending cubs against hyenas (predator cub
   builds, the LION_STATE-as-victim architecture decision).
 
 - [x] 146. Revenge: a strong parent kills a weak predator and walks away.

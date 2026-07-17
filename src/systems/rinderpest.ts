@@ -56,8 +56,10 @@ export function rinderpestPhase(peopleId: string, year: number, month: number): 
 }
 
 /** Radius (degrees) around the Maasai village within which the struck years
- *  strew the plague's wildlife toll across the plains. */
-export const CARRION_RADIUS_DEG = 2.5
+ *  strew the plague's wildlife toll across the plains. Sized to MAASAILAND,
+ *  not the village: the emutai swept the whole plateau, and the small first
+ *  value (2.5) covered so few spawn chunks that whole boots showed no toll. */
+export const CARRION_RADIUS_DEG = 6
 
 /**
  * Whether rinderpest carrion dresses a spot (point 133 stage 3): only while

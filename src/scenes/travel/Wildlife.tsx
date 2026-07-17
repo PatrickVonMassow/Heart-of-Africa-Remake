@@ -722,11 +722,14 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   // the plains — dead wildebeest and antelope the vultures and scavengers
   // then work like any carcass. Date-dependent by design: the same chunk in
   // 1890 spawns living herds instead.
-  // Band widened from 6% after live measurement (point 133): with the
-  // per-boot random seed a 6% band left rings with zero toll — and Baumann
-  // records ~95% of the buffalo and wildebeest dead; the plague should read
-  // as the mass die-off it was.
-  if (anchor.type === 'savanna' && roll >= 0.62 && roll < 0.75 && MAASAI_VILLAGE) {
+  // Calibrated twice against live measurement (point 133): the 2.5-degree
+  // carrion radius covers only ~25 world units around the village, so a
+  // narrow roll band left whole boots without visible toll. In the STRUCK
+  // core the plague now claims half the savanna chunks — their living herds
+  // give way to carcasses, which is what ~95% of the buffalo and wildebeest
+  // dead (Baumann) actually looked like. Outside the radius or the struck
+  // years the branch falls through and the normal herds spawn.
+  if (anchor.type === 'savanna' && roll < 0.5 && MAASAI_VILLAGE) {
     const distDeg = Math.hypot(ll.lat - MAASAI_VILLAGE.lat, ll.lon - MAASAI_VILLAGE.lon)
     const phase = rinderpestPhaseAtDay('maasai', day, START_YEAR)
     if (rinderpestCarrionActive(phase, distDeg)) {
