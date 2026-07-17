@@ -5359,3 +5359,35 @@ the remaining open points in their numeric order.
   seeders and a zoom-out each exercised). DOCS: design.md §19.5/§19.6
   wording + CLAUDE.md §7.1 pt. 12. (Reported 17.07.2026; queued at the
   batch end per the standing append-and-defer rule.)
+
+- [ ] 166. Thunderstorms: lightning WITH thunder, as a pair.
+  User question/wish (17.07.2026, screenshot at 10.0N/26.0E in the August
+  rains): "Hat das Wetter hier Gewitter mit Blitzen? Dann sollte es auch
+  einen Donner dazu geben." AUDIT ANSWER (code, 17.07.2026): the game has NO
+  lightning today — §19.13 weather carries rain streaks, fog, overcast and
+  the hailstorm (`hailAt`, gated to heavy storms); what the screenshot shows
+  are the tilted rain/hail streaks. So this is a NEW FEATURE point: build
+  the thunderstorm as a Blitz+Donner PAIR, never a silent flash.
+  (a) GATE like the hail (the researched §19.13 pattern): lightning exists
+      only inside a HEAVY STORM in a zone whose season carries real storms —
+      reuse the hail precondition (real rain required, so a rainless zone
+      can never flash), rare and deterministic (no Math.random in the sim;
+      hash on day+place like the hail roll).
+  (b) FLASH: a short (<300 ms) backend-neutral brightening — sky dome and
+      ambient light pulse (the §2.7 pipeline's existing uniforms; no new
+      light source, no screen-space hack), visible in both the bird's-eye
+      and settlement views under the same place-weather rule.
+  (c) THUNDER: a rumble sample under the single ambience volume (§20),
+      DELAYED after its flash by a distance-plausible 1-4 s (hash-derived
+      per strike), so the pair reads as weather, not a sound effect. Respect
+      the ambience volume 0 => silent.
+  (d) The traveller is never harmed (any gameplay lightning would be a §14
+      design decision — deliberately not invented, like the fire rule).
+  TESTS: pure — the gate (only in heavy storm, never rainless, never dry
+  season; sweep like the hail tests in `src/systems/season.test.ts`) and
+  the flash/delay parameter derivation; live — force the storm, measure the
+  screen brightness pulse and assert the delayed audio node fires
+  (`scripts/verify/enrichments.mjs` or `settings.mjs`, whichever owns
+  weather audio). DOCS: design.md §19.13 + CLAUDE.md §7.1 pt. 12. (Filed
+  17.07.2026; queued at the batch end per the standing append-and-defer
+  rule.)
