@@ -5291,3 +5291,37 @@ the remaining open points in their numeric order.
   introduces one (e.g. the CSS variable/prop present). DOCS: none — §7.1
   pt. 3's wording already states the guarantee. (Reported 17.07.2026;
   queued at the batch end per the standing append-and-defer rule.)
+
+- [ ] 164. Plants still jump back and forth while travelling along the Nile.
+  User report (17.07.2026, no screenshot — "zu diesem Zeitpunkt an diesem
+  Punkt" refers to a Nile stretch; the two point-151 spots are the natural
+  repro candidates: 13.4N/31.8E in June and 18.1N/33.9E in July): driving
+  along the Nile, plants still JUMP BACK AND FORTH — "Das soll vermutlich
+  eine Interpolation zwischen den Jahreszeiten sein, aber so darf das nicht
+  ablaufen." This is the point-151 family (the flying-plants fix landed the
+  per-position season field and ground-sprouting), but the jumping now
+  happens WHILE MOVING, so the remaining suspects are movement-coupled:
+  (a) CHUNK STREAMING restarts: flora chunks rebuilding as the traveller
+      moves may replay the class-2 sprout animation on every rebuild — each
+      re-entered chunk sprouts anew, reading as plants popping up/down while
+      driving. Check whether the sprout progress is keyed to absolute
+      calendar/plant identity (stable) or to chunk-build time (replays).
+  (b) MISSING HYSTERESIS at the foliage visibility threshold: near the
+      greenness value where ground flora appears/disappears, tiny sampling
+      differences (per chunk rebuild or per LOD) toggle instances on/off —
+      a band (appear at g>0.55, vanish at g<0.45) would stop the flicker.
+  (c) seasonUV DISCRETISATION per chunk: if neighbouring chunks quantise the
+      field differently, the same spot's flora state flips at chunk borders
+      as they stream.
+  DIAGNOSE FIRST with a probe (the 145b lesson: one-off probe with the
+  SUITE's chromium launch args, NOT a bare launch): drive the 151 spots in
+  June/July, track a fixed set of flora instances (position + visibility +
+  scale) across chunk rebuilds, and identify which of (a)-(c) actually
+  fires. FIX in the game accordingly (stable sprout keying / hysteresis
+  band / consistent quantisation); pure-test the rule that fixes it
+  (seasonField/flora tests exist for the 151 half). Live: extend the
+  point-151 stability check (enrichments) with a DRIVEN pass — walk the
+  stretch and assert no tracked instance toggles visibility more than once.
+  DOCS: design.md §19.13 wording if the rule sharpens. (Reported
+  17.07.2026; queued at the batch end per the standing append-and-defer
+  rule.)
