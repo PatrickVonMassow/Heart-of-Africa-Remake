@@ -5497,15 +5497,27 @@ the remaining open points in their numeric order.
   zoomed in. The point-133 live check PASSES (carrionStruck 9 at 1891), so the
   spawn logic works — the discrepancy is in-game visibility. SUSPECTS, verify
   in order:
-  (a) DATE-JUMP DOES NOT RE-STREAM: carrion is decided at chunk-stream time in
-      spawnChunk(day). A player standing at the village who jumps the year to
-      1892 does NOT re-stream the already-spawned chunks, so they keep their
-      pre-jump (living-herd) content. Only NEWLY streamed chunks carry carrion.
-      This is the most likely cause and the user's exact flow. FIX: when the
-      rinderpest phase changes (a debug year jump crossing into/out of struck,
-      or generally on debugJumpYear/Month), restock the wildlife near the
-      player so the local chunks re-evaluate — or make the carrion a
-      per-frame overlay rather than a spawn-time bake.
+  ★ HYPOTHESIS (a) DISPROVEN by the user (17.07.2026 23:16): they walked far
+  NORTH to 20.8N and back to the village at 31.12.1891 (a struck year, so the
+  chunks re-streamed fresh) — still NO carcasses. So it is not a re-stream
+  issue. ★ REAL CAUSE, now clear: the point-133 live check passes only because
+  it forces ZOOM 2 (a large stream ring) + restock and finds 9 carcasses
+  spread over MANY chunks near -2.5/36.4; at the user's STANDARD zoom (0.5)
+  the view ring is small, few chunks stream near the (rocky, Kilimanjaro/Meru-
+  adjacent) village, and the carrion is doubly probabilistic (roll < 0.5 AND
+  each carcass offset must re-sample as savanna — the rocky neighbours fail
+  it), so 0 show. This is a "test passes, player sees nothing" case (the
+  weather-uniform lesson): the STANDARD is the picture, not the green check.
+  FIX: GUARANTEE visible carrion at normal zoom near a struck village — seed a
+  minimum count of plague carcasses within the settlement vicinity when the
+  place is in the struck phase (mirror the point-102 seedSettlementVicinity /
+  point-135 dry-shore guarantee: a calibratable minimum within
+  panoramaVicinityRadius, placed on the nearest savanna the player can see,
+  deterministic). The chunk-spawn carrion stays as the ambient spread; the
+  vicinity guarantee is what the player actually SEES. And re-point the live
+  check to the USER's conditions (standard zoom, at the village, fresh) so it
+  can never again pass while the picture is empty. PRIORITY: right after 129 —
+  this is a shipped feature (133) that does not show in normal play.
   (b) TERRAIN: carrion only spawns on `anchor.type === 'savanna'` chunks. The
       ground around Mount Meru/Kilimanjaro is highland/volcanic — sweep
       __terrainType across the village vicinity and confirm enough savanna
