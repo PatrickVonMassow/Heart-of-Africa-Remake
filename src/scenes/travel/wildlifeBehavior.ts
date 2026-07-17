@@ -597,22 +597,45 @@ export const REGION_PREY: Record<RegionId, PreyKind[]> = {
   north: ['antelope', 'warthog'],
 }
 
+/** The two halves of the defence matrix (design.md §19.8, point 125): the
+ *  prey's weapon strength and the predator's readiness to abandon a contested
+ *  kill. The predator side runs INVERSELY along §14.1's tested danger order
+ *  cheetah < leopard < hyena < lion (src/systems/events.ts — one ordering,
+ *  two consumers). */
+export interface DefenseWeights {
+  preyWeapon: Record<string, number>
+  predatorFlight: Record<string, number>
+}
+
 /**
- * The parent's defence (design.md §19.8, point 124): does a parent that
- * reaches the predator over its calf drive the hunt off (true — the calf is
- * freed, the parent lives, the predator leaves) or is it taken in the calf's
- * place (false — the sacrifice)? The chance is looked up per species — the
- * shape point 125 needs to raise the other species later; a species without
- * an entry uses `fallback` (default 0: never defends, so the sacrifice stays
- * the norm). Deterministic — the caller passes its own hashed roll, never
- * Math.random. The roll applies ONLY to the live chase/charge resolutions:
- * the mire and vigil deaths are deliberate surrenders and never roll.
+ * The parent's defence chance (design.md §19.8, points 124/125): how likely a
+ * parent that reaches the predator over its calf drives the hunt off (both
+ * live) instead of being taken in the calf's place. Not one number per prey —
+ * a factor model over (prey, predator), legible as a RULE rather than dice:
+ * weapon × flight, capped at 0.95 (no defence is a certainty). A species
+ * missing on either side never defends — the sacrifice stays the norm.
+ *
+ * THE LINE (point 125): only a parent that ATTACKS ever consults this — the
+ * charge and shield rescues (and point 146's future revenge). A parent that
+ * SURRENDERS never rolls: the vigil-keeper (121d), the trample-throw (119),
+ * the waterfall plunge and the mired-calf charge (123) are chance-zero by
+ * construction — they never call this helper.
  */
+export function defendChance(prey: string, predator: string, weights: DefenseWeights): number {
+  const weapon = weights.preyWeapon[prey]
+  const flight = weights.predatorFlight[predator]
+  if (weapon === undefined || flight === undefined) return 0
+  return Math.min(Math.max(weapon * flight, 0), 0.95)
+}
+
+/** Resolves one attack: true — the parent drives this predator off (the calf
+ *  is freed, the parent lives, the hunt leaves); false — the sacrifice.
+ *  Deterministic — the caller passes its own hashed roll, never Math.random. */
 export function parentDefends(
-  species: string,
+  prey: string,
+  predator: string,
   roll: number,
-  chances: Record<string, number>,
-  fallback = 0,
+  weights: DefenseWeights,
 ): boolean {
-  return roll < (chances[species] ?? fallback)
+  return roll < defendChance(prey, predator, weights)
 }

@@ -503,7 +503,16 @@ verify suite that proves it.
       current drowns (dead, sinking, never rescued or scavenged) while the
       SAME setup in the dry season still clambers out alive, and a rescuing
       parent that wades a swollen current too long drowns beside its calf
-      (both live in `scripts/verify/enrichments.mjs`); the giraffe kick
+      (both live in `scripts/verify/enrichments.mjs`); the defence matrix
+      (point 125): the parent-reaches-predator outcome is the product of
+      prey weapon and predator flight-willingness (pure-tested: strictly
+      ordered along §14.1's danger order for every prey AND along the
+      reasoned weapon ranking for every predator, capped 0.95, missing
+      species never defend, giraffe-vs-lion 0.75 clearly above
+      antelope-vs-lion 0.125), applied at the charge AND shield
+      resolutions with the hunt's actual predator — and the surrender
+      branches (vigil, trample grief, waterfall plunge, mired) never roll,
+      by construction and comment; the giraffe kick
       (point 124): giraffes are lion-only prey in the food web (pure-tested:
       present in no other predator's list, huntable exactly in their own
       regions — and the calf-hunt predator pick now filters by the victim's

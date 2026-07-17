@@ -200,9 +200,10 @@ interface Animal {
    *  not between two flanking threats, not when a flight starts or ends, not
    *  on any behavior change (design.md §19). */
   face?: number
-  /** Seconds left of the defence-kick pose (design.md §19.8, point 124): set
-   *  when this parent drove the hunt off its calf — it rears and strikes out
-   *  with its hind legs at the departing predator, then settles. */
+  /** Seconds left of the defence-strike pose (design.md §19.8, points
+   *  124/125): set for EVERY successful defence, whatever the species and
+   *  weapon — the parent rears and strikes out at the departing predator,
+   *  then settles. The field keeps its 124 name. */
   kick?: number
 }
 
@@ -363,8 +364,8 @@ const PARENT_TAKE_DIST = 1.0
  *  (the food web gates the predator pick), and its parent's charge may end in
  *  the kick instead of the sacrifice. */
 const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe'] as const
-/** Duration of the rendered defence kick (design.md §19.8, point 124): the
- *  parent that drove the hunt off rears and strikes before settling back. */
+/** Duration of the rendered defence strike (design.md §19.8, points 124/125):
+ *  any parent that drove the hunt off rears and strikes before settling. */
 const PARENT_KICK_SECONDS = 0.8
 
 /** Distance from the nearest LIVE vigil-keeper to the given carcass point, or
@@ -1178,13 +1179,16 @@ function Herds() {
           a.x += (toX / d) * PARENT_CHARGE_SPEED * dt
           a.z += (toZ / d) * PARENT_CHARGE_SPEED * dt
           if (d < PARENT_SACRIFICE_DIST) {
-            // The defence roll (design.md §19.8, point 124): a charging parent
-            // may drive the hunt off instead of dying — the giraffe cow's
-            // kick. Deterministic per event (hashed from phase and position,
-            // like the mire roll — never Math.random in the sim). A MIRED
-            // calf never rolls (point 123): the mud deaths are deliberate.
+            // The defence roll (design.md §19.8, points 124/125): a charging
+            // parent may drive the hunt off instead of dying — its weapon
+            // against THIS hunter's readiness to yield (defendChance, keyed
+            // on the actual hunt predator). Deterministic per event (hashed
+            // from phase and position, like the mire roll — never Math.random
+            // in the sim). A MIRED calf never rolls (point 123): the charge
+            // into the mud is a SURRENDER, not an attack — the point-125
+            // line — so it stays chance-zero by construction.
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
-            if (calf.mired === undefined && parentDefends(sp, roll, balance.parentDefense)) {
+            if (calf.mired === undefined && parentDefends(sp, LION_STATE.predator, roll, balance.parentDefense)) {
               // Driven off: the calf is freed and rises, the parent LIVES and
               // strikes (the kick pose below), and the predator leaves through
               // the existing walk-off — never a despawn in sight.
@@ -1234,11 +1238,12 @@ function Herds() {
             a.z += Math.cos(h) * PARENT_BLOCK_SPEED * dt
           }
           if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
-            // The defence roll (design.md §19.8, point 124), same rule as the
-            // charge above: the hunter that reaches the living shield may be
-            // kicked off instead of taking it. Deterministic per event.
+            // The defence roll (design.md §19.8, points 124/125), same rule
+            // as the charge above: the shield ATTACKS on contact, so it rolls
+            // (the point-125 line) — the hunter that reaches it may be kicked
+            // off instead of taking it. Deterministic per event.
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
-            if (parentDefends(sp, roll, balance.parentDefense)) {
+            if (parentDefends(sp, LION_STATE.predator, roll, balance.parentDefense)) {
               // Driven off mid-chase: the family stays whole and the hunt
               // ends — the predator turns and leaves from where it stands.
               a.kick = PARENT_KICK_SECONDS
@@ -1377,6 +1382,8 @@ function Herds() {
           }
         } else if (a.plungeTo) {
           // Our calf went over the fall: plunge after it (design.md §19).
+          // A SURRENDER, not an attack (point 125): the plunge never rolls
+          // the defence — the parent gives itself to the water.
           const dx = a.plungeTo.x - a.x
           const dz = a.plungeTo.z - a.z
           const d = Math.hypot(dx, dz) || 1
@@ -1449,6 +1456,8 @@ function Herds() {
     // lets itself be trampled too. It runs at the LIVE elephant, not the death
     // spot — the herd walks on. No kill here: the trample check in the render
     // loop takes the arriving parent, which is the whole point (one code path).
+    // A SURRENDER, not an attack (point 125): the grief charge never rolls
+    // the defence — it goes under the feet by choice (points 119/134).
     // Every species but the elephant raises calves that can be trampled.
     for (const sp of SPECIES) {
       if (sp === 'elephant') continue
@@ -1478,6 +1487,8 @@ function Herds() {
     // there. It ALWAYS resolves (the point-118 lesson): once the carcass is
     // gone/dissolved or the window runs out, the field clears and the parent
     // simply resumes normal behaviour — never a drive with no exit.
+    // A SURRENDER, not an attack (point 125): a keeper seized by the drawn
+    // predator (121 (f)) stands and is taken — it never rolls the defence.
     for (const sp of CALF_HUNT_SPECIES) {
       for (const a of herds[sp]) {
         if (a.dead || a.vigil === undefined) continue
@@ -1903,10 +1914,10 @@ function Herds() {
             pitch = Math.PI / 2.3 // thrown on its side, thrashing
             familyHeld = true
           } else if (a.kick !== undefined) {
-            // The defence kick (design.md §19.8, point 124): the parent that
-            // drove the hunt off stands its ground, tail to the retreating
-            // predator, and throws its hind legs up in a brief strike — the
-            // front dips (positive pitch), the rear flies, then it settles.
+            // The defence strike (design.md §19.8, points 124/125): every
+            // parent that drove the hunt off stands its ground, tail to the
+            // retreating predator, and throws its hind legs up in a brief
+            // strike — front dips (positive pitch), rear flies, then settles.
             px = a.x
             pz = a.z
             yaw = Math.atan2(a.x - LION_STATE.lx, a.z - LION_STATE.lz)

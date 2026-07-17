@@ -25,6 +25,7 @@ import {
   vigilDrawSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
+  defendChance,
   parentDefends,
   PREDATOR_PREY,
   REGION_PREY,
@@ -843,26 +844,87 @@ describe('the food web (design.md §19.3 — the giraffe joins as LION-ONLY prey
   })
 })
 
-describe('parentDefends (design.md §19.8, point 124 — the defence roll)', () => {
-  const chances = { giraffe: 0.75 }
+describe('defendChance / parentDefends (design.md §19.8, points 124/125 — the defence matrix)', () => {
+  // The shipped balance weights (src/config/balance.ts) — asserted here so a
+  // recalibration that breaks the LEGIBLE RULE (ordered both ways) fails fast.
+  const weights = {
+    preyWeapon: { giraffe: 1.5, zebra: 1.0, wildebeest: 0.7, warthog: 0.7, antelope: 0.25 },
+    predatorFlight: { cheetah: 1.0, leopard: 0.85, hyena: 0.7, lion: 0.5 },
+  }
+  const CAP = 0.95
+  // Ascending defence chance: predators along the INVERSE of §14.1's danger
+  // order (src/systems/events.ts), prey along their weapon strength.
+  const PREDATORS_ASC = ['lion', 'hyena', 'leopard', 'cheetah'] as const
+  const PREY_ASC = ['antelope', 'wildebeest', 'warthog', 'zebra', 'giraffe'] as const
+  /** Strictly rising, except where both sides already sit at the 0.95 cap
+   *  (the giraffe/zebra top pairings) or the equality is explicitly allowed
+   *  (wildebeest == warthog: horns vs tusks, both mid-tier). */
+  const expectRise = (lo: number, hi: number, equalOk = false) => {
+    if (lo === CAP && hi === CAP) return
+    if (equalOk) expect(hi).toBeGreaterThanOrEqual(lo)
+    else expect(hi).toBeGreaterThan(lo)
+  }
 
-  it('is boundary-exact: roll < chance defends, roll >= chance is taken', () => {
-    expect(parentDefends('giraffe', 0, chances)).toBe(true)
-    expect(parentDefends('giraffe', 0.7499, chances)).toBe(true)
-    expect(parentDefends('giraffe', 0.75, chances)).toBe(false)
-    expect(parentDefends('giraffe', 1, chances)).toBe(false)
+  it('for each prey the chance rises as the predator gets lighter (inverse §14.1 danger order)', () => {
+    for (const prey of PREY_ASC) {
+      for (let i = 1; i < PREDATORS_ASC.length; i++) {
+        expectRise(
+          defendChance(prey, PREDATORS_ASC[i - 1], weights),
+          defendChance(prey, PREDATORS_ASC[i], weights),
+        )
+      }
+    }
   })
 
-  it('a species without an entry uses the fallback 0: never defends (the sacrifice stays the norm)', () => {
-    expect(parentDefends('zebra', 0, chances)).toBe(false)
-    expect(parentDefends('antelope', 0.0001, chances)).toBe(false)
-    expect(parentDefends('warthog', 0.999, chances)).toBe(false)
+  it('for each predator the chance rises with the prey defence (wildebeest == warthog allowed)', () => {
+    for (const predator of PREDATORS_ASC) {
+      for (let i = 1; i < PREY_ASC.length; i++) {
+        const equalOk = PREY_ASC[i - 1] === 'wildebeest' && PREY_ASC[i] === 'warthog'
+        expectRise(
+          defendChance(PREY_ASC[i - 1], predator, weights),
+          defendChance(PREY_ASC[i], predator, weights),
+          equalOk,
+        )
+      }
+    }
   })
 
-  it('an explicit fallback applies to unlisted species only (the point-125 shape)', () => {
-    expect(parentDefends('zebra', 0.1, chances, 0.2)).toBe(true)
-    expect(parentDefends('zebra', 0.2, chances, 0.2)).toBe(false)
-    // A listed species keeps its own value over the fallback.
-    expect(parentDefends('giraffe', 0.5, chances, 0.2)).toBe(true)
+  it('every pairing stays a probability within [0, 0.95]', () => {
+    for (const prey of PREY_ASC) {
+      for (const predator of PREDATORS_ASC) {
+        const c = defendChance(prey, predator, weights)
+        expect(c).toBeGreaterThanOrEqual(0)
+        expect(c).toBeLessThanOrEqual(CAP)
+      }
+    }
+  })
+
+  it('giraffe-vs-lion keeps the shipped point-124 value and reads clearly better than antelope-vs-lion', () => {
+    expect(defendChance('giraffe', 'lion', weights)).toBeCloseTo(0.75, 10)
+    expect(defendChance('antelope', 'lion', weights)).toBeCloseTo(0.125, 10)
+    // Legible as a rule: the giraffe's kick is several times the antelope's luck.
+    expect(defendChance('giraffe', 'lion', weights)).toBeGreaterThan(4 * defendChance('antelope', 'lion', weights))
+  })
+
+  it('the product caps at 0.95 — no defence is a certainty (giraffe-vs-cheetah)', () => {
+    expect(defendChance('giraffe', 'cheetah', weights)).toBe(0.95) // raw 1.5 × 1.0
+    expect(parentDefends('giraffe', 'cheetah', 0.9499, weights)).toBe(true)
+    expect(parentDefends('giraffe', 'cheetah', 0.95, weights)).toBe(false)
+  })
+
+  it('a species missing on either side has chance 0 and never defends', () => {
+    expect(defendChance('elephant', 'lion', weights)).toBe(0)
+    expect(defendChance('giraffe', 'crocodile', weights)).toBe(0)
+    expect(parentDefends('elephant', 'lion', 0, weights)).toBe(false)
+    expect(parentDefends('giraffe', 'crocodile', 0, weights)).toBe(false)
+  })
+
+  it('is boundary-exact at forced roll extremes: roll < chance defends, roll >= chance is taken', () => {
+    expect(parentDefends('giraffe', 'lion', 0, weights)).toBe(true)
+    expect(parentDefends('giraffe', 'lion', 0.7499, weights)).toBe(true)
+    expect(parentDefends('giraffe', 'lion', 0.75, weights)).toBe(false)
+    expect(parentDefends('giraffe', 'lion', 1, weights)).toBe(false)
+    expect(parentDefends('antelope', 'lion', 0.1249, weights)).toBe(true)
+    expect(parentDefends('antelope', 'lion', 0.125, weights)).toBe(false)
   })
 })

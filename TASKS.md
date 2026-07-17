@@ -2985,7 +2985,7 @@ the remaining open points in their numeric order.
   repositions to 15 after the catch (the shield would otherwise defend
   before the catch and hide the kick). Vitest 1689, lint clean.
 
-- [ ] 125. The sacrifice may succeed (variance instead of a script).
+- [x] 125. The sacrifice may succeed (variance instead of a script).
   Wanted (user, 15.07.2026): today a parent that reaches the predator ALWAYS
   dies — the shield take (~994), the charge sacrifice (~967) and the too-late
   death (~950) are deterministic. Give the drama variance: sometimes the parent
@@ -3067,6 +3067,26 @@ the remaining open points in their numeric order.
   never does — the two are different mechanics wearing the same silhouette),
   CLAUDE.md §7.1 pt. 12. SIZE: (a)-(d) is one commit; (a2)'s matrix and its
   grounding pass may be a second. (Reported 15.07.2026; (a2) added 16.07.2026.)
+  DONE (17.07.2026, 11:38, one commit — 124 had already laid the (a)/(c)/(d)
+  groundwork): the chance is a FACTOR MODEL, defendChance = clamp(preyWeapon
+  × predatorFlight, 0, 0.95) — both required orderings are structural, not
+  tuned: predatorFlight runs inversely along §14.1's tested danger order
+  (cheetah 1.0 > leopard 0.85 > hyena 0.7 > lion 0.5, referencing
+  events.ts), preyWeapon carries the reasoned weapon ranking with grounding
+  comments (giraffe 1.5 — the kick genuinely kills lions; zebra 1.0 —
+  jaw-breaking kick; wildebeest/warthog 0.7 — horns/tusks, warthogs
+  documented driving cheetahs off; antelope 0.25 — no weapon). Giraffe-vs-
+  lion lands exactly on 124's shipped 0.75; antelope-vs-lion 0.125. Applied
+  at charge AND shield with LION_STATE.predator; missing species (elephant,
+  crocodile) never defend. THE LINE is code-marked at all four surrender
+  branches (mired charge, waterfall plunge, trample grief, vigil): a
+  surrendering parent never rolls; an attacking one rolls whether the calf
+  lives (rescue) or is dead (146, revenge — the helper is ready for it).
+  Pure tests: both orderings strict (cap-equality allowed), extremes, cap,
+  missing-species zero (1693 vitest). The four roll-dependent live
+  scenarios were migrated to the new balance shape (chance-0 forcing via
+  empty weapon map; the kick test forces the hash roll and pins the lion),
+  full suite exit 0.
 
 - [ ] 126. Elephant mourning at the graveyard.
   Wanted (user, 15.07.2026): elephants keep vigil over their dead and touch their

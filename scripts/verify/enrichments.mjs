@@ -1864,12 +1864,19 @@ const sacrifice = await page.evaluate(async () => {
     if (parent) break
   }
   if (!parent) return { found: false }
+  // Point 125 gave attacking parents a real defence chance; this check is
+  // about the SACRIFICE branch, so force the roll unwinnable (no prey
+  // weapons → chance 0) for the scenario and restore after.
+  const pd = window.__balance.parentDefense
+  const prevWeapons = pd.preyWeapon
+  pd.preyWeapon = {}
   calf.caught = 5
   calf.x = parent.x + 5; calf.z = parent.z // pinned 5 units off; the parent must run to it
   const d0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
   await sleep(400)
   const dCharged = Math.hypot(parent.x - calf.x, parent.z - calf.z)
   await sleep(1800) // let the charge reach the predator
+  pd.preyWeapon = prevWeapons
   return {
     found: true, d0: +d0.toFixed(2), dCharged: +dCharged.toFixed(2),
     parentDead: !!parent.dead, parentLionFed: !!parent.lionFed,
@@ -1944,6 +1951,11 @@ const e2e = await page.evaluate(async () => {
     }
   }
   if (!parent) return { found: false }
+  // The SACRIFICE is under test (point 125): force the defence roll
+  // unwinnable for the scenario and restore after.
+  const pd = window.__balance.parentDefense
+  const prevWeapons = pd.preyWeapon
+  pd.preyWeapon = {}
   // Park the parent 22 units off: too far to shield the calf mid-chase
   // (the lion pounces from 1.5 within a beat), close enough that its charge
   // crosses the distance well inside the 5 s struggle window.
@@ -1963,6 +1975,7 @@ const e2e = await page.evaluate(async () => {
     await sleep(50)
   }
   s.mode = 'idle'; s.timer = 60; s.victim = null; s.victimHunt = false
+  pd.preyWeapon = prevWeapons
   const calfEscaped = !calf.dead && calf.caught === undefined && calf.parent === undefined
   // The struggle window can resolve within 1-2 frames when the parent nurses
   // right beside the calf, so 50ms polling may miss `caught` — but the
@@ -1994,6 +2007,11 @@ const choreo = await page.evaluate(async () => {
     if (parent) break
   }
   if (!parent) return { found: false }
+  // The shield TAKE is under test (point 125): force the defence roll
+  // unwinnable for the scenario and restore after.
+  const pd = window.__balance.parentDefense
+  const prevWeapons = pd.preyWeapon
+  pd.preyWeapon = {}
   // Relocate the family beside the player so the chase stays well inside the
   // 90-unit hunt-abort radius regardless of where this seed spawned it. The
   // choreography itself (flee, charge, sacrifice) is live behaviour from here on.
@@ -2039,6 +2057,7 @@ const choreo = await page.evaluate(async () => {
     calfFreed: calf.caught === undefined && calf.parent === undefined && !calf.dead,
   }
   s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
+  pd.preyWeapon = prevWeapons
   return out
 })
 check('the hunted calf flees the chase instead of standing at its parent',
@@ -2545,14 +2564,13 @@ check(
 // --- Point 124: the giraffe mother's kick ------------------------------------
 // A giraffe parent that reaches the hunter drives the hunt off (visible
 // hind-leg kick, the lion leaves, the calf lives). Forced deterministic via
-// the balance chance: 1 = always defends. The synthetic family is a GIRAFFE
-// pair here — the species carries the defence value.
+// the hashed ROLL, not the chance: point 125 caps the defence chance at 0.95,
+// so the certainty is forced by choosing the parent's phase such that the
+// sin-hash roll lands at ~0 — far below the natural giraffe-vs-lion 0.75.
+// The synthetic family is a GIRAFFE pair — the species carries the weapon.
 const kick = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
-  const bal = window.__balance.parentDefense
-  const prev = bal.giraffe
-  bal.giraffe = 1 // always defends — the mechanic under test, not the dice
   let liveChunk
   for (const sp of Object.keys(herds)) {
     for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
@@ -2566,6 +2584,7 @@ const kick = await page.evaluate(async () => {
   parent.child = calf
   herds.giraffe.push(parent, calf)
   const st = window.__lionHunt.state
+  st.predator = 'lion' // the giraffe is lion-only prey (point 124); the roll is keyed on the hunt predator (point 125)
   st.mode = 'chase'
   st.victim = calf
   st.victimHunt = true
@@ -2579,11 +2598,19 @@ const kick = await page.evaluate(async () => {
   while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
   out.caught = calf.caught !== undefined
   if (out.caught && !calf.dead) {
-    parent.x = calf.x - 15 // charge reach: 15/6.5 ≈ 2.3 s, well inside the window
+    // Deterministic resolution (point 125): place the parent exactly on the
+    // calf — the charge step degenerates to zero (d falls to the `|| 1`
+    // guard, still inside PARENT_SACRIFICE_DIST 1.3), so the roll resolves
+    // at these exact coordinates — and choose its phase so the sin-hash
+    // roll |sin(phase*127.1 + x*311.7 + z*74.7)| lands at ~0, far below
+    // the natural giraffe-vs-lion chance of 0.75.
+    parent.x = calf.x
     parent.z = calf.z
+    const base = parent.x * 311.7 + parent.z * 74.7
+    parent.phase = (Math.round(base / Math.PI) * Math.PI - base) / 127.1
   }
-  // The parent charges, reaches the predator, and the roll — forced to
-  // certainty — drives the hunt off.
+  // The parent stands at contact; the roll — forced to ~0 — drives the
+  // hunt off.
   const t1 = Date.now()
   while (Date.now() - t1 < 25000) {
     if (parent.kick !== undefined) out.kicked = true
@@ -2595,7 +2622,6 @@ const kick = await page.evaluate(async () => {
   await sleep(1500)
   out.calfAlive = !calf.dead && calf.caught === undefined
   out.parentAlive = !parent.dead
-  bal.giraffe = prev
   herds.giraffe = herds.giraffe.filter((a) => a !== parent && a !== calf)
   if (st.victim === calf || st.victim === parent) { st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false }
   return out

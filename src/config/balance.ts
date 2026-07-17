@@ -243,12 +243,19 @@ export interface BalanceConfig {
     /** Seconds of standing vigil after which the carcass draws a predator to the keeper. */
     predatorDelay: number
   }
-  /** The parent's defence (design.md §19.8, point 124): per-species chance
-   *  that a parent reaching the predator drives the hunt off (both live)
-   *  instead of being taken in the calf's place. Species without an entry
-   *  never defend — the sacrifice stays the norm until point 125 assigns the
-   *  other species their own values. Calibratable. */
-  parentDefense: Record<string, number>
+  /** The parent's defence (design.md §19.8, points 124/125): the chance that
+   *  a parent ATTACKING the predator over its calf drives the hunt off is
+   *  preyWeapon[prey] × predatorFlight[predator], capped at 0.95
+   *  (defendChance in wildlifeBehavior.ts). A species missing on either side
+   *  never defends. Grief surrenders (vigil, trample-throw, waterfall plunge,
+   *  mired calf) never roll at all. Calibratable. */
+  parentDefense: {
+    /** Per-prey weapon strength, reasoned from the animal's real armament. */
+    preyWeapon: Record<string, number>
+    /** Per-predator readiness to abandon a contested kill — INVERSE to §14.1's
+     *  danger order cheetah < leopard < hyena < lion (src/systems/events.ts). */
+    predatorFlight: Record<string, number>
+  }
   /** Rivers (design.md §11.3, point 136). */
   river: {
     /**
@@ -441,7 +448,22 @@ export const balance: BalanceConfig = {
     predatorDelay: 12, // calibratable: vigil seconds until the carcass draws a predator to the keeper
   },
   parentDefense: {
-    giraffe: 0.75, // the giraffe cow's kick genuinely drives lions off (point 124)
+    // Prey side — the weapon is the argument (point 125 grounding pass):
+    preyWeapon: {
+      giraffe: 1.5, // a cow's kick genuinely kills lions — the user's named case; ×0.5 (lion) = the 0.75 point 124 shipped
+      zebra: 1.0, // the kick breaks predator jaws; stallions are recorded maiming pursuers
+      wildebeest: 0.7, // horns and bulk: bulls gore and toss the lighter cats
+      warthog: 0.7, // tusks: warthogs are documented driving cheetahs off their own kills
+      antelope: 0.25, // the generic antelope has no weapon — hooves and luck
+    },
+    // Predator side — readiness to abandon, INVERSE to §14.1's tested danger
+    // order cheetah < leopard < hyena < lion (src/systems/events.ts):
+    predatorFlight: {
+      cheetah: 1.0, // the lightest cat famously abandons rather than risk any injury
+      leopard: 0.85, // solitary — an injury means starving, so it yields to real resistance
+      hyena: 0.7, // bold in the clan, but a lone hunter breaks off under a strong defence
+      lion: 0.5, // the apex rarely yields; even the giraffe's kick only sometimes deters it
+    },
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
