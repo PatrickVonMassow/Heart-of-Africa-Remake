@@ -248,7 +248,7 @@ export interface GameState {
   debugTriggerMountainFall: () => void
   /** Walking into a wandering predator triggers its attack (design.md §14/§19):
    *  every bird's-eye predator (lion, cheetah, leopard, hyena), not only the lion. */
-  predatorContact: (predator: 'lion' | 'cheetah' | 'leopard' | 'hyena') => void
+  predatorContact: (predator: 'lion' | 'cheetah' | 'leopard' | 'hyena' | 'crocodile') => void
   useMedicine: () => void
   /** A successor continues from the last checkpoint (design.md §18). */
   successorTakeOver: () => boolean
@@ -1006,6 +1006,7 @@ export const useGame = create<GameState>()((set, get) => ({
       predator === 'cheetah' ? 'cheetahAttack'
       : predator === 'leopard' ? 'leopardAttack'
       : predator === 'hyena' ? 'hyenaAttack'
+      : predator === 'crocodile' ? 'crocodileAttack' // §14.2 rules: machete always, rifle only from the canoe
       : 'lionAttack'
     const cur = worldToLatLon(s.pos.x, s.pos.z)
     const here = sampleTerrain(cur.lat, cur.lon, s.seed)

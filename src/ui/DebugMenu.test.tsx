@@ -31,6 +31,7 @@ const DEFAULTS = {
   canteenCapacity: balance.health.canteenCapacity,
   vigilPredatorDelay: balance.vigil.predatorDelay,
   rescueBurst: balance.family.rescueBurst,
+  crocStrikeRadius: balance.crocodile.strikeRadius,
 }
 
 /** The DebugMenu renders nothing until the UI store's debug flag is open. */
@@ -77,6 +78,7 @@ afterEach(() => {
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   balance.family.rescueBurst = DEFAULTS.rescueBurst
+  balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
   useUi.getState().setWebglFallback(false)
@@ -143,6 +145,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
     // The parental rescue burst (design.md §19.8, point 127).
     { label: en.debug.rescueBurst, read: () => balance.family.rescueBurst, value: 3 },
+    // The crocodile's bank strike radius (design.md §19.16, point 130).
+    { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {

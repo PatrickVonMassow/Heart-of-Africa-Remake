@@ -251,6 +251,8 @@ export function DebugMenu() {
         onChange={(v) => { balance.vigil.predatorDelay = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.rescueBurst} value={balance.family.rescueBurst} step={0.1}
         onChange={(v) => { balance.family.rescueBurst = Math.max(1, v); bump() }} />
+      <NumberField label={t.debug.crocStrikeRadius} value={balance.crocodile.strikeRadius} step={0.5}
+        onChange={(v) => { balance.crocodile.strikeRadius = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>

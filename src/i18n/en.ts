@@ -357,6 +357,7 @@ export const en: Strings = {
     wetFlowFactor: 'Drowning: wet-season current factor',
     vigilPredatorDelay: 'Vigil: seconds until a predator is drawn',
     rescueBurst: 'Parent rescue burst (factor)',
+    crocStrikeRadius: 'Crocodile: bank strike radius',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

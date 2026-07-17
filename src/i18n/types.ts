@@ -277,6 +277,7 @@ export interface Strings {
     wetFlowFactor: string
     vigilPredatorDelay: string
     rescueBurst: string
+    crocStrikeRadius: string
     seasonStrength: string
     season: string
     seasonAuto: string

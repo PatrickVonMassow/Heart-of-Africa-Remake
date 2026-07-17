@@ -59,6 +59,9 @@ import {
   PREY_WALK_SPEED,
   landedBirdY,
   landedBirdClearance,
+  CROCODILE_REGIONS,
+  crocodileAllowedAt,
+  crocodileLungeReady,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -70,6 +73,7 @@ import {
   buildAntelopeCalf,
   buildCheetah,
   buildElephant,
+  buildCrocodile,
   buildFlamingo,
   buildGiraffe,
   buildHyena,
@@ -91,9 +95,9 @@ const CHUNK_SIZE = 24
 // existing scavenger/cull/render machinery works a dead hyena exactly like a
 // dead zebra. Live predators never spawn here — spawnChunk picks species
 // explicitly, and the one live hunter stays the scripted <LionHunt>.
-type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | PredatorKind
+type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | 'crocodile' | PredatorKind
 const SPECIES: Species[] = [
-  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo',
+  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo', 'crocodile',
   'lion', 'cheetah', 'leopard', 'hyena',
 ]
 const MAX_INSTANCES: Record<Species, number> = {
@@ -104,6 +108,7 @@ const MAX_INSTANCES: Record<Species, number> = {
   antelope: 120,
   warthog: 80,
   flamingo: 140,
+  crocodile: 12,
   // Predator slots hold only revenge carcasses (point 146) — kills are rare
   // and dissolve/cull quickly, so a handful of instances suffices.
   lion: 6,
@@ -205,6 +210,15 @@ interface Animal {
    *  until balance.vigil.seconds or until the carcass is gone; then the field
    *  clears and the parent simply rejoins the herd. */
   vigil?: { x: number; z: number; carcass: Animal; time: number }
+  /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
+   *  absent = hidden at its spot; set = lunging at / gripping a victim or
+   *  slinking back home. Its own state — the scripted LION hunt is never
+   *  touched by an ambush. */
+  lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  /** Which ambusher seized this animal (point 130): routes the shared caught
+   *  countdown and the parent's charge to the crocodile instead of the lion
+   *  hunt, and the kill sinks (the river takes the body) instead of staining. */
+  caughtBy?: 'crocodile'
   /** Current playful-hop height (0..1) while a calf gambols (design.md §19);
    *  kept as state so the verification can observe the play. */
   hop?: number
@@ -309,6 +323,7 @@ const HUNT_OFFSTAGE_MARGIN = 30
 /** Species that flee from a hunting or feeding lion. */
 const FLEES_LION: Record<Species, boolean> = {
   elephant: false, giraffe: true, zebra: true, wildebeest: true, antelope: true, warthog: true, flamingo: false,
+  crocodile: false, // the ambusher fears nothing on its water (point 130)
   // Only revenge carcasses live in these lists (point 146) — nothing to flee.
   lion: false, cheetah: false, leopard: false, hyena: false,
 }
@@ -479,6 +494,7 @@ const BODY_RADIUS: Record<Species, number> = {
   antelope: 0.6,
   warthog: 0.45,
   flamingo: 0.25,
+  crocodile: 0.55,
   // Predator entries complete the record (point 146); their list members are
   // always dead, and every proximity pass skips carcasses.
   lion: 0.8,
@@ -591,7 +607,7 @@ function spawnRemnant(s: LionHuntState, seed: number): Animal | null {
 
 function emptyHerds(): Record<Species, Animal[]> {
   return {
-    elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [],
+    elephant: [], giraffe: [], zebra: [], wildebeest: [], antelope: [], warthog: [], flamingo: [], crocodile: [],
     lion: [], cheetah: [], leopard: [], hyena: [],
   }
 }
@@ -610,6 +626,29 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   const lakeD = lakeDistance(ll.lat, ll.lon, 1)
   if (lakeD < 0.42 && roll < 0.7) {
     placeGroup(herds.flamingo, ccx, ccz, ax, az, 8 + Math.floor(roll * 10), 3.5, seed, 1.4, BODY_RADIUS.flamingo, true, undefined, key)
+    return
+  }
+
+  // Crocodiles lie in the rivers and lakes themselves (design.md §19.16,
+  // point 130): a water anchor in crocodile country seeds one or two hidden
+  // ambushers ON water cells — never on land, never in the ocean.
+  if (anchor.type === 'water' && roll < 0.5) {
+    const region = regionAt(ll.lat, ll.lon)
+    if ((CROCODILE_REGIONS as readonly string[]).includes(region)) {
+      const n = 1 + Math.floor(hash(ccx, ccz, 3, seed) * 2)
+      for (let i = 0; i < n; i++) {
+        if (herds.crocodile.length >= MAX_INSTANCES.crocodile) break
+        const x = ax + (hash(ccx, ccz, 30 + i * 2, seed) - 0.5) * 8
+        const z = az + (hash(ccx, ccz, 31 + i * 2, seed) - 0.5) * 8
+        const cll = worldToLatLon(x, z)
+        const ct = sampleTerrain(cll.lat, cll.lon, seed)
+        if (!crocodileAllowedAt(ct.type)) continue
+        herds.crocodile.push({
+          x, z, y: ct.height, rot: hash(ccx, ccz, 34 + i, seed) * Math.PI * 2,
+          scale: 0.9 + hash(ccx, ccz, 35 + i, seed) * 0.3, phase: hash(ccx, ccz, 36 + i, seed), chunk: key,
+        })
+      }
+    }
     return
   }
 
@@ -962,6 +1001,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     antelope: buildAntelope(),
     warthog: buildWarthog(),
     flamingo: buildFlamingo(),
+    crocodile: buildCrocodile(),
     // Predator meshes draw only revenge carcasses (point 146).
     lion: buildLion(),
     cheetah: buildCheetah(),
@@ -1252,10 +1292,13 @@ function Herds() {
           a.caught -= dt
           if (a.caught <= 0) {
             a.caught = undefined
-            takeAnimal(a, { stain: true })
+            // A crocodile drags its kill under — the river takes the body
+            // (design.md §19.16); land predators leave the stained carcass.
+            const croc = a.caughtBy === 'crocodile'
+            takeAnimal(a, croc ? { sink: true } : { stain: true })
             const par = a.parent
             if (par && !par.dead && Math.hypot(par.x - a.x, par.z - a.z) < PARENT_TOO_LATE_DIST) {
-              takeAnimal(par, { stain: true })
+              takeAnimal(par, croc ? { sink: true } : { stain: true })
               par.child = undefined
             } else if (par && !par.dead) {
               // The vigil (design.md §19.8, point 121): a parent that stayed
@@ -1287,7 +1330,7 @@ function Herds() {
             const roll = Math.abs(Math.sin(a.phase * 127.1 + a.x * 311.7 + a.z * 74.7)) % 1
             const outcome =
               calf.mired === undefined
-                ? parentAttackOutcome(sp, LION_STATE.predator, roll, balance.parentDefense)
+                ? parentAttackOutcome(sp, calf.caughtBy ?? LION_STATE.predator, roll, balance.parentDefense)
                 : 'taken'
             if (outcome !== 'taken') {
               // Driven off or killed: the calf is freed and rises, the parent
@@ -1295,7 +1338,15 @@ function Herds() {
               // resumes herd behaviour — an attacker never stands vigil.
               calf.caught = undefined
               a.kick = PARENT_KICK_SECONDS
-              if (LION_STATE.victim === calf) {
+              if (calf.caughtBy === 'crocodile') {
+                // Driven off the seized calf (point 130): the crocodile lets
+                // go and slinks back to its water. Kill is structurally
+                // impossible (killFlight.crocodile = 0) — nothing breaks the
+                // armoured ambusher.
+                const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
+                if (cc && cc.lunge) cc.lunge.retreat = true
+                calf.caughtBy = undefined
+              } else if (LION_STATE.victim === calf) {
                 LION_STATE.victim = null
                 if (outcome === 'kill') {
                   // Revenge (point 146): the strike kills the predator where
@@ -1327,8 +1378,17 @@ function Herds() {
                 calf.parent = undefined
                 a.child = undefined
               }
-              takeAnimal(a, { stain: true })
-              if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
+              if (calf.caughtBy === 'crocodile') {
+                // The sacrifice at the waterline (point 130): the crocodile
+                // takes the charging parent under in the calf's place.
+                takeAnimal(a, { sink: true })
+                const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
+                if (cc && cc.lunge) cc.lunge.retreat = true
+                calf.caughtBy = undefined
+              } else {
+                takeAnimal(a, { stain: true })
+                if (LION_STATE.victim === calf) LION_STATE.victim = a // the predator feeds on the parent now
+              }
             }
           }
         } else if (
@@ -1729,9 +1789,10 @@ function Herds() {
     {
       const phase = waterSweep.current++ % 7
       for (const sp of SPECIES) {
-        // Flamingos are shoreline waders — standing in shallow water is their
-        // design (§19); everyone else is set back to land.
-        if (sp === 'flamingo') continue
+        // Flamingos are shoreline waders and the crocodile's home IS the
+        // water (design.md §19.16) — both stand exempt; everyone else is set
+        // back to land.
+        if (sp === 'flamingo' || sp === 'crocodile') continue
         const list = herds[sp]
         for (let i = phase; i < list.length; i += 7) {
           const a = list[i]
@@ -1757,6 +1818,96 @@ function Herds() {
             // is turn-capped separately (FACE_TURN).
             a.dodgeHeading = undefined
           }
+        }
+      }
+    }
+
+    // The crocodile ambush (design.md §19.16, point 130): hidden in its
+    // water, it lunges only at a bank visitor inside the strike radius,
+    // grips its victim through the EXISTING §19.8 struggle window (a parent
+    // has those seconds to save it) and the kill sinks — the river takes the
+    // body. Per-crocodile state; the single scripted lion hunt is untouched.
+    {
+      const bc = balance.crocodile
+      for (const c of herds.crocodile) {
+        if (c.dead) continue
+        if (!c.lunge) {
+          // Hidden: wait for a drinker standing at a bank inside the radius.
+          for (const sp of CALF_HUNT_SPECIES) {
+            for (const a of herds[sp]) {
+              if (a.dead || !a.drink || a.caught !== undefined || a.inWater !== undefined || a.mired !== undefined) continue
+              const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
+              const atBank = cycle > 0.1 && cycle < 0.4 // rendered standing at the water
+              const d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
+              if (crocodileLungeReady(d, atBank, bc.strikeRadius)) {
+                c.lunge = { victim: a, timer: 0, homeX: c.x, homeZ: c.z, gripped: false }
+                break
+              }
+            }
+            if (c.lunge) break
+          }
+        } else if (
+          c.lunge.retreat ||
+          c.lunge.victim === null ||
+          c.lunge.victim.dead ||
+          c.lunge.victim.gone === true ||
+          (c.lunge.gripped && c.lunge.victim.caught === undefined)
+        ) {
+          // Meal taken, victim freed or moment passed: slink back and submerge.
+          const dx = c.lunge.homeX - c.x
+          const dz = c.lunge.homeZ - c.z
+          const d = Math.hypot(dx, dz)
+          if (d < 0.3) c.lunge = undefined
+          else {
+            c.x += (dx / d) * Math.min(d, bc.lungeSpeed * 0.3 * dt)
+            c.z += (dz / d) * Math.min(d, bc.lungeSpeed * 0.3 * dt)
+            c.rot = Math.atan2(dx, dz)
+          }
+        } else if (!c.lunge.gripped) {
+          // The burst: fast, short and visible — never a teleport.
+          c.lunge.timer += dt
+          const v = c.lunge.victim
+          const tx = v.drink ? v.drink.tx : v.x
+          const tz = v.drink ? v.drink.tz : v.z
+          const dx = tx - c.x
+          const dz = tz - c.z
+          const d = Math.hypot(dx, dz)
+          if (c.lunge.timer > 4) {
+            c.lunge.retreat = true // the moment passed — back under
+          } else if (d < 0.9) {
+            // Seized AT the waterline: the victim struggles there through the
+            // shared window while a parent may still charge in and save it.
+            v.x = tx
+            v.z = tz
+            v.drink = undefined
+            v.caught = CAUGHT_DURATION
+            v.caughtBy = 'crocodile'
+            c.lunge.gripped = true
+          } else {
+            c.x += (dx / d) * bc.lungeSpeed * dt
+            c.z += (dz / d) * bc.lungeSpeed * dt
+            c.rot = Math.atan2(dx, dz)
+          }
+        } else {
+          // Gripping: hold at the struggling victim while the window runs.
+          const v = c.lunge.victim
+          if (v.caught !== undefined) {
+            c.x = v.x - Math.sin(c.rot) * 0.6
+            c.z = v.z - Math.cos(c.rot) * 0.6
+          }
+        }
+      }
+    }
+
+    // Walking into a crocodile routes through the EXISTING §14.2 event
+    // (machete always protects, rifle only from the canoe) exactly like the
+    // wandering-predator contact — no new attack path (point 130 (e)).
+    {
+      for (const c of herds.crocodile) {
+        if (c.dead) continue
+        if (Math.hypot(c.x - pos.x, c.z - pos.z) < 1.6) {
+          useGame.getState().predatorContact('crocodile')
+          break
         }
       }
     }
@@ -2088,6 +2239,13 @@ function Herds() {
         let yaw = idleYaw
         let pitch = 0
         let bodyY = a.y
+        // The crocodile (design.md §19.16): submerged to the eye knobs while
+        // hidden, riding fully out on the lunge; it never idle-shuffles.
+        if (sp === 'crocodile') {
+          wobTarget = 0
+          yaw = a.rot
+          bodyY = a.y - (a.lunge && !a.lunge.retreat ? 0.02 : 0.24)
+        }
         // The mourning vigil (design.md §19.8, point 126): an elephant
         // standing at the bones lowers its head to them — the same head-down
         // pitch the drink pose uses, with a slow searching sway of the touch.

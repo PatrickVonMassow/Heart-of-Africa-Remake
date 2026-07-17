@@ -368,6 +368,33 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
   return !mourned && distToTarget < radius
 }
 
+/**
+ * The crocodile's home water (design.md §19.16, point 130): ~1890 the Nile
+ * crocodile (with its western kin) lived in every major African river system
+ * and lake — the Nile through Egypt and Sudan, the Niger and Senegal, the
+ * Congo basin, the eastern lakes and the Zambezi south. Every region carries
+ * such water, so the region list is complete; the REAL restriction is the
+ * water itself — a crocodile exists only IN river/lake water, never on land
+ * ground and never in the waterless desert (which has no water cells).
+ */
+export const CROCODILE_REGIONS = ['north', 'west', 'central', 'east', 'south'] as const
+
+/** Where a crocodile may exist (point 130): river/lake water only — its home
+ *  (the §19.5 no-standing-in-water rule exempts it like the flamingos), and
+ *  never the open ocean. */
+export function crocodileAllowedAt(terrain: string): boolean {
+  return terrain === 'water'
+}
+
+/**
+ * The ambush trigger (point 130): a hidden crocodile bursts out only when a
+ * shore visitor stands at the bank inside the strike radius — it waits, it
+ * never roams or chases across open land.
+ */
+export function crocodileLungeReady(distToPrey: number, preyAtBank: boolean, strikeRadius: number): boolean {
+  return preyAtBank && distToPrey <= strikeRadius
+}
+
 /** A landed vulture's hover above its own ground (point 128): clears the
  *  body sphere's ~0.096 reach below the group origin (buildVulture,
  *  src/render/fauna.ts) with margin, so the pecking body never clips. */

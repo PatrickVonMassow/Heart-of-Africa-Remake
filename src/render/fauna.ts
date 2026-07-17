@@ -439,6 +439,46 @@ export function buildFlamingo(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** Nile crocodile (design.md §19.16, point 130): a long, low armoured body
+ *  with a flat snout, ridged tail and raised eye knobs. Built with the origin
+ *  at the waterline in mind — hidden it sinks so only the eye/snout tops
+ *  break the surface, lunging it rides fully out. */
+export function buildCrocodile(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  const body = new THREE.SphereGeometry(0.3, 8, 6)
+  body.scale(1.05, 0.55, 2.6)
+  body.translate(0, 0.16, 0)
+  parts.push(tint(body, '#4d5b3f', 0.1, 191))
+  // Flat snout forward of the head, with a slight taper.
+  const snout = new THREE.BoxGeometry(0.26, 0.12, 0.55)
+  snout.translate(0, 0.14, 0.95)
+  parts.push(tint(snout, '#46543a', 0.08, 192))
+  // Raised eye knobs — the only thing visible when it lies submerged.
+  for (const hx of [-1, 1]) {
+    const eye = new THREE.SphereGeometry(0.05, 6, 5)
+    eye.translate(hx * 0.09, 0.28, 0.62)
+    parts.push(tint(eye, '#39452f', 0.06, 193))
+  }
+  // Ridged tail tapering behind.
+  const tail = new THREE.ConeGeometry(0.16, 1.1, 6)
+  tail.rotateX(Math.PI / 2 + 0.06)
+  tail.scale(1, 0.55, 1)
+  tail.translate(0, 0.14, -1.25)
+  parts.push(tint(tail, '#46543a', 0.1, 194))
+  const ridge = new THREE.BoxGeometry(0.06, 0.08, 1.6)
+  ridge.translate(0, 0.34, -0.2)
+  parts.push(tint(ridge, '#39452f', 0.1, 195))
+  // Short splayed legs.
+  for (const hx of [-1, 1]) {
+    for (const hz of [0.45, -0.55]) {
+      const leg = new THREE.BoxGeometry(0.12, 0.14, 0.16)
+      leg.translate(hx * 0.3, 0.07, hz)
+      parts.push(tint(leg, '#46543a', 0.08, 196))
+    }
+  }
+  return merge(parts)
+}
+
 /** Vulture with spread wings, meant to circle overhead (design.md §19). */
 export function buildVulture(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []

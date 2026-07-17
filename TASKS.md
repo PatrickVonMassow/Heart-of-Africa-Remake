@@ -3385,6 +3385,26 @@ the remaining open points in their numeric order.
   §19.8 pointer) and CLAUDE.md §7.1 pt. 12 (new verifiable conditions; narrow
   the open item to the species still missing). Split into atomic commits along
   (a)…(e) if it grows. (Reported 15.07.2026.)
+  WIP (17.07.2026, 18:06 — core COMPLETE, the live checks are the open
+  half): (a)-(e) all implemented and unit-green (1730). Species `crocodile`
+  in SPECIES/MAX(12)/BODY_RADIUS with buildCrocodile (low armoured body,
+  eye knobs, ridged tail); spawnChunk seeds 1-2 on water anchors in
+  crocodile country (pure rules CROCODILE_REGIONS/crocodileAllowedAt —
+  water-only — and crocodileLungeReady, all tested incl. the
+  nothing-kills-a-crocodile sweep); §19.5 backstop exempts it like the
+  flamingos. Behaviour: per-crocodile `lunge` state (hidden -> burst at a
+  bank drinker inside balance.crocodile.strikeRadius [debug-editable] ->
+  grip sets victim.caught + caughtBy='crocodile' -> retreat), the SHARED
+  caught countdown resolves it (kill SINKS — the river keeps the body),
+  the charge resolution rolls parentAttackOutcome against `caughtBy`
+  (drive-off frees the calf and the croc slinks back; sacrifice takes the
+  parent under; too-late takes both; LION_STATE never touched), and player
+  contact routes predatorContact('crocodile') -> the §14.2 event. Docs
+  done: design.md §19.16 + §19.5/§19.8 pointers, CLAUDE.md pt. 12.
+  REMAINING: the live checks in enrichments.mjs (hidden->lunge->catch at a
+  staged drinker, rescue/sacrifice/too-late against the croc, lion-hunt
+  independence, screenshots 129/130 hidden+lunging) and a full-suite green
+  run.
 
 - [x] 131. Name the peoples correctly, and de-anachronise their vignettes.
   (Done 16.07.2026 for every people that stays put — display names, internal ids,

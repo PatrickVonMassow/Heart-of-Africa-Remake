@@ -682,9 +682,24 @@ verify suite that proves it.
       `src/systems/dress.test.ts`; the live half is `__placeDress` in
       `scripts/verify/polish.mjs` (screenshots 112/113).
 
+    - The crocodile ambush (§19.16, point 130): crocodiles exist only ON
+      river/lake water in every region's home systems (pure-tested:
+      water-only placement, the five-region list, the boundary-exact lunge
+      trigger, and that NOTHING kills a crocodile — structurally zero like
+      the lion — while a strong parent can drive it off); hidden it sinks
+      to the eye knobs, the lunge is a visible burst, the seized victim
+      struggles through the SHARED §19.8 window (rescue, sacrifice and
+      too-late all resolve against the crocodile via `caughtBy`, never
+      touching the scripted lion hunt), a kill sinks (the river keeps the
+      body — no bank carcass, no vulture), the strike radius is
+      debug-editable, and walking into one routes through the unchanged
+      §14.2 event. Live checks and screenshots pending in
+      `scripts/verify/enrichments.mjs` (hidden -> lunge -> catch, the
+      three family endings, lion-hunt independence).
     OPEN: tree-climbing-to-flee and additional new species/birds beyond
     the existing roster and the added calves remain to be implemented (§9
-    open items); the one seasonal-dress reading the research allows but the
+    open items — the crocodile of §19.16 now covers part of the
+    new-species item); the one seasonal-dress reading the research allows but the
     figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather
     than in greater number (§19.13).
 13. **Real geodata.** The real-geodata terrain rendering of `design.md`

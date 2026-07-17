@@ -29,6 +29,9 @@ import {
   landedBirdY,
   landedBirdClearance,
   LANDED_BIRD_HOVER,
+  CROCODILE_REGIONS,
+  crocodileAllowedAt,
+  crocodileLungeReady,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -189,6 +192,43 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
     expect(taken).toBe(true) // the hunter meets the shield…
     expect(caught).toBe(false) // …never the calf
     expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
+  })
+})
+
+describe('crocodile placement and ambush trigger (design.md §19.16, point 130)', () => {
+  it('a crocodile exists only in river/lake water — never on any land type or the ocean', () => {
+    expect(crocodileAllowedAt('water')).toBe(true)
+    for (const t of ['ocean', 'coast', 'desert', 'savanna', 'jungle', 'mountain']) {
+      expect(crocodileAllowedAt(t)).toBe(false)
+    }
+  })
+
+  it('every region carries crocodile water ~1890 — the region list is complete', () => {
+    // The Nile (north/east), Niger and Senegal (west), Congo (central), the
+    // eastern lakes and the Zambezi south: all five regions hold home rivers.
+    expect([...CROCODILE_REGIONS].sort()).toEqual(['central', 'east', 'north', 'south', 'west'])
+  })
+
+  it('the lunge fires only on a bank visitor inside the strike radius', () => {
+    expect(crocodileLungeReady(4, true, 5)).toBe(true)
+    expect(crocodileLungeReady(5, true, 5)).toBe(true) // boundary inclusive
+    expect(crocodileLungeReady(5.01, true, 5)).toBe(false)
+    expect(crocodileLungeReady(2, false, 5)).toBe(false) // nobody at the bank — it waits
+  })
+
+  it('nothing ever kills a crocodile: killChance is structurally zero for every prey (like the lion)', () => {
+    for (const prey of Object.keys(balance.parentDefense.preyWeapon)) {
+      for (const roll of [0, 0.001, 0.5, 0.999]) {
+        expect(parentAttackOutcome(prey, 'crocodile', roll, balance.parentDefense)).not.toBe('kill')
+      }
+    }
+  })
+
+  it('a strong parent can still drive a crocodile off its victim — kill <= driveOff holds', () => {
+    const pd = balance.parentDefense
+    expect(pd.predatorFlight.crocodile).toBeGreaterThan(0)
+    expect(defendChance('giraffe', 'crocodile', pd)).toBeGreaterThan(defendChance('antelope', 'crocodile', pd))
+    expect(killChance('giraffe', 'crocodile', pd)).toBe(0)
   })
 })
 

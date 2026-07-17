@@ -272,6 +272,13 @@ export interface BalanceConfig {
      *  the common ending; the user asked for sometimes, not often. */
     killFlight: Record<string, number>
   }
+  /** The crocodile ambush (design.md §19.16, point 130). */
+  crocodile: {
+    /** Bank visitors inside this radius of a hidden crocodile trigger the lunge. */
+    strikeRadius: number
+    /** Speed of the lunge burst (units/s) — visible motion, never a teleport. */
+    lungeSpeed: number
+  }
   /** Family rescue drives (design.md §19.8, point 127). */
   family: {
     /** Adrenaline burst: a rescuing parent's speed is its ordinary walk (3)
@@ -491,6 +498,7 @@ export const balance: BalanceConfig = {
       leopard: 0.85, // solitary — an injury means starving, so it yields to real resistance
       hyena: 0.7, // bold in the clan, but a lone hunter breaks off under a strong defence
       lion: 0.5, // the apex rarely yields; even the giraffe's kick only sometimes deters it
+      crocodile: 0.35, // a locked bite rarely lets go — yet buffalo and elephants are recorded driving crocodiles off a seized victim (point 130)
     },
     // Kill side (point 146) — how fragile the predator is under a genuinely
     // strong parent's strike. The (preyWeapon − 0.5) gate in killChance
@@ -502,6 +510,7 @@ export const balance: BalanceConfig = {
       leopard: 0.25, // sturdier than the cheetah; a lucky strike can still break it
       hyena: 0.15, // heavy-boned and thick-necked — a kick rarely does more than drive it off
       lion: 0, // STRUCTURALLY ZERO: nothing kills a lion — §19's drama depends on it staying frightening
+      crocodile: 0, // STRUCTURALLY ZERO: no hoof or horn breaks the armoured crocodile — drive-off is the only defence (point 130)
     },
   },
   family: {
@@ -509,6 +518,10 @@ export const balance: BalanceConfig = {
     // yet the shield still meets the hunter (6 > 5.6) and the too-late death
     // stays reachable at its staged distances (point 127's balance guard).
     rescueBurst: 2,
+  },
+  crocodile: {
+    strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
+    lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
