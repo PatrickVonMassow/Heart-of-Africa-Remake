@@ -3667,7 +3667,7 @@ the remaining open points in their numeric order.
   ring convergence value is formation-dependent, measured 8.6-9.0 across
   green runs; hold and release carry the semantics).
 
-- [ ] 134. The one deliberate inaccuracy: grief unto death stays.
+- [x] 134. The one deliberate inaccuracy: grief unto death stays.
   Standing exception to the accuracy principle, set by the user (16.07.2026):
   **"Die Elterntiere sollen sich nach wie vor freiwillig wie gehabt ohne Wehr in
   den Tod stürzen, wenn ihre Jungtiere gestorben sind."**
@@ -3688,6 +3688,13 @@ the remaining open points in their numeric order.
   ACTION: record it in design.md §19.8 in those terms, so the exception is
   visible where the behaviour is specified rather than buried in a task list.
   No code. (Set 16.07.2026.)
+  DONE (17.07.2026, 21:03): design.md §19.8 now carries the exception as its
+  own bullet — the three drives named as ONE family, the user's German
+  ruling quoted verbatim, the realism argument stated (the last-moment bolt
+  would be the odd one out), the single-carve-out framing against the
+  accuracy principle, and the structural note that the surrender branches
+  never roll the defence. The previous scattered carve-out sentence on the
+  trample bullet folded into it. Docs-only, no code.
 
 - [x] 135. Two wildlife checks promise guaranteed outcomes from a stochastic
   sim, and fail intermittently — fix the guarantees, not the checks. Observed 16.07.2026: 'a settlement vicinity
