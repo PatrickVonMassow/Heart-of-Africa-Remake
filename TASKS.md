@@ -4524,7 +4524,7 @@ the remaining open points in their numeric order.
   changed only in HOW they measure (135's honest-measurement fixes; the
   CLAUDE pt. 12 wording names no coordinates, so no doc edit needed).
 
-- [ ] 150. A SECOND interim Closing run, after the family dramas.
+- [x] 150. A SECOND interim Closing run, after the family dramas.
   Wanted (user, 16.07.2026): "…2. Einen erneuten Closing-Zwischenlauf."
   ORDER: after 149 (a Closing run should follow a green verification, not
   precede it). Same seam logic as point 148: a large amount will have been built
@@ -4563,6 +4563,25 @@ the remaining open points in their numeric order.
   were checked OK (§8 is additive); then STEP 3 full regression again, and
   STEP 4 the .md cruft pass — note 158/159 landed mid-Closing and 160 (the
   design.md relocation) deliberately runs AFTER this point.
+  DONE (17.07.2026, 08:49): all four steps ran. STEP 1 regression: 15/18
+  suites green, triaged (collision = load flake, standalone 19/19; lint =
+  one unused var). SWEEPS in separate commits: (A) stale scale-width
+  comments (84698fd); (B) the shared drama-death helper takeAnimal over the
+  eight §19.8 kill sites (188357b); (C) design.md §19.8/§19.13 tightened in
+  place — defence bullets merged, the weather paragraph split topically,
+  the duplicated snow gloss now defers to the researched ice paragraph
+  whose Drakensberg entry it had silently truncated, and the grief
+  carve-out is marked as the user decision IN §19.8 itself (e567a29);
+  (D) peoples-1890 §2-vs-§7 pointers verified intact (§8/§9 additive).
+  STEP 3 regression: 17/18 — the single fail exposed one more REAL find,
+  the shore seeder's frame throttle stretching past the check window under
+  load (now a seconds clock, a87a203; standalone re-run green). STEP 4: the
+  .md growth since 148 lived almost entirely in design.md §19.8/§19.13
+  (covered by C); CLAUDE.md §7.1 is deliberately untouched (binding
+  acceptance anchors — the end-of-batch Closing re-checks it), TASKS.md is
+  the living log. NOTE for later: the parallel full run remains load-
+  sensitive for frame-budget checks (collision ejection windows) — a
+  future 135-style point if it recurs.
 
 - [x] 151. Seasonal flora is anchored to the PLACE, zone borders blend, and
   growth sprouts from the ground (user bug, 16.07.2026, two screenshots).
