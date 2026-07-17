@@ -3199,7 +3199,7 @@ the remaining open points in their numeric order.
   unit tests green; full enrichments exit 0 (burst measured 5.99, drown
   drowned:true, mourn released:true) plus settings exit 0.
 
-- [ ] 128. Scavenger vultures still sink into the ground at a carcass.
+- [x] 128. Scavenger vultures still sink into the ground at a carcass.
   User report + screenshot (15.07.2026, deployed build): "Geier clippen immer
   noch in den Boden rein" — a bird feeding at a carcass is half inside the
   terrain. "Still" is the key word: the suite has a green check for exactly this
@@ -3239,6 +3239,27 @@ the remaining open points in their numeric order.
   and tighten the tolerance — it currently passes anything above -0.05, i.e. it
   tolerates a 5 cm sink; a landed bird should never be below its own ground at
   all. DOCS: design.md §19.6, CLAUDE.md §7.1 pt. 12. (Reported 15.07.2026.)
+  DONE (17.07.2026, 16:47): the remaining sinner differed slightly from the
+  spec's snapshot — the scavenger HAD gained a per-bird lift meanwhile, but
+  hovered at 0.05 while the vulture body reaches ~0.096 below origin, so a
+  lifted bird still clipped ~5 cm into rising ground. ONE shared rule now
+  (landedBirdY/landedBirdClearance + LANDED_BIRD_HOVER 0.15 in
+  wildlifeBehavior.ts): positive-only slope lift onto the bird's own ground,
+  hover clearing the pecking body — used by the kill flock AND the
+  scavenger; clearance metric folds both systems (SCAV_CLEARANCE ->
+  __vultures.clearance); tolerance tightened from > -0.05 to strictly > 0;
+  new live check stages a scavenger meal on the steepest nearby rise (new
+  __terrainHeight dev hook; measured 0.15-0.16 at a 2.2 rise), pure tests
+  sweep flat/rising/falling and pin the hover above the body reach. Fixed
+  along the way (both live-check-caught, structural): a SOLO elephant at a
+  biome border froze forever (its blocked-redirect aimed at its own herd
+  centre, atan2(0,0) = due north — it now keeps turning; the measured
+  centreMoved 0.63 roam failures), and the point-120e shore seeder picked
+  ONE species deterministically and gave up silently at its instance cap —
+  it now rotates through the region pool like the vicinity seeder (135a
+  pattern; dryDrinkers back to 4/4). All three long-rotating 135-watchlist
+  cases are now structurally closed. Full enrichments exit 0; build, lint,
+  1723 unit tests green.
 
 - [ ] 129. Traveller blocked in open ground with nothing visible (NOT
   reproducible yet — needs the user's exact spot).

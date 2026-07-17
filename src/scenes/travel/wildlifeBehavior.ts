@@ -368,6 +368,31 @@ export function shouldMourn(distToTarget: number, radius: number, mourned: boole
   return !mourned && distToTarget < radius
 }
 
+/** A landed vulture's hover above its own ground (point 128): clears the
+ *  body sphere's ~0.096 reach below the group origin (buildVulture,
+ *  src/render/fauna.ts) with margin, so the pecking body never clips. */
+export const LANDED_BIRD_HOVER = 0.15
+
+/**
+ * Local y of a landed bird over its flock's base point so it stands ON ITS
+ * OWN ground (point 128): the terrain under the bird lifts it — positive
+ * only, falling ground never pulls a bird down — the hover keeps the pecking
+ * body clear, the hop is the feeding bounce. ONE rule shared by the kill
+ * flock and the ground scavenger, so the two systems cannot drift apart
+ * again (the scavenger's old inline copy hovered at 0.05, below the body's
+ * own reach — the user's sunken bird on rising ground).
+ */
+export function landedBirdY(groupBaseY: number, groundUnderBird: number, hop: number): number {
+  const lift = Math.max(0, Math.max(0, groundUnderBird) - groupBaseY)
+  return lift + LANDED_BIRD_HOVER + hop
+}
+
+/** That bird's clearance above its own ground — the verify hook's metric,
+ *  by construction never below LANDED_BIRD_HOVER. */
+export function landedBirdClearance(groupBaseY: number, groundUnderBird: number, hop: number): number {
+  return groupBaseY + landedBirdY(groupBaseY, groundUnderBird, hop) - Math.max(0, groundUnderBird)
+}
+
 /** Ordinary prey walk speed (units/s) — the unhurried gait (e.g. the walk back
  *  after a water rescue). The rescue burst is measured against this. */
 export const PREY_WALK_SPEED = 3

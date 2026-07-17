@@ -472,7 +472,14 @@ verify suite that proves it.
       on and finishes — the ground scavenger never takes a flocked kill's
       scrap (and a feed that ends without a kill leaves none); carcasses
       left far off-screen are culled while a visible one is kept (kills
-      stay bounded and never stall the frame loop).
+      stay bounded and never stall the frame loop); a landed bird stands
+      on ITS OWN ground (point 128) — one shared rule (`landedBirdY`,
+      positive-only slope lift plus a hover clearing the pecking body)
+      for the kill flock AND the lone ground scavenger, pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`, with the clearance
+      metric covering both systems and gated strictly above zero — incl.
+      a staged scavenger meal on the steepest nearby rise
+      (`scripts/verify/enrichments.mjs`).
     - Calves and family life: herds raise young that keep close to a
       parent — rendered through their own baby-schema build
       (proportionally larger head, shorter neck/body, leggy stance, no

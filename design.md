@@ -597,7 +597,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 ### 19.6 Vultures and carcasses
 
 - Vultures gather and circle above a lion kill.
-- A carcass the predator did not eat — a trampled animal, any other death — is not left lying forever: a vulture flies in, lands and feeds, and the carcass shrinks away the same way a lion kill dissolves. Feeding birds stand ON the ground under their own feet — flocks sit on the local terrain height and each landed bird lifts with the slope beside the carcass, so no vulture ever sinks into rising ground.
+- A carcass the predator did not eat — a trampled animal, any other death — is not left lying forever: a vulture flies in, lands and feeds, and the carcass shrinks away the same way a lion kill dissolves. Feeding birds stand ON the ground under their own feet — ONE shared rule for the kill flock and the lone ground scavenger (point 128): each landed bird lifts with the slope beside the carcass onto its own ground, hovering high enough to clear its pecking body, so no vulture ever sinks into rising ground; falling ground never pulls a bird down.
 - No vulture ever pops into or out of the picture: every flight — lone scavenger and flocks alike — appears beyond the visible surroundings (however far the current zoom reaches), flies in, and once its reason has passed flies off and vanishes only well outside the view again.
 - If the character is in poor health (§6), vultures circle above and follow them for a while — an atmospheric signal without its own mechanics.
 

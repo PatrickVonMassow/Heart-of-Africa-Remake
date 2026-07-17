@@ -2237,8 +2237,10 @@ const runDrownScenario = async () =>
     }
     if (!calf) return { staged: false, tries }
     const out = { staged: true, tries, drowned: false, rescued: false, out: false, lionFed: false }
+    // 65 s: the 260-unit park means a dry-season parent arrives ~43 s in, and
+    // rescue + walk-back must still fit (the drown branch breaks early).
     const t1 = Date.now()
-    while (Date.now() - t1 < 45000) {
+    while (Date.now() - t1 < 65000) {
       if (calf.rescued) out.rescued = true
       if (calf.dead) { out.drowned = true; out.lionFed = !!calf.lionFed; break }
       if (calf.inWater === undefined && !calf.dead) { out.out = true; break }
@@ -3430,8 +3432,71 @@ check('the circling kill flock descends on the remnant and finishes it (scavenge
 check('the flock lands while the predator is still walking off in sight',
   remnant.modeAtDescend === 'leave', `mode at descend: ${remnant.modeAtDescend}`)
 check('no landed vulture sinks into the terrain while feeding',
-  typeof remnant.minClearance === 'number' && remnant.minClearance > -0.05,
+  typeof remnant.minClearance === 'number' && remnant.minClearance > 0,
   `min clearance ${remnant.minClearance}`)
+
+// --- Point 128: the ground scavenger on sloped ground -------------------------
+// The user's sunken bird was the SCAVENGER's (the lone bird at a non-flock
+// carcass) — the old check measured only the kill flock. Stage a carcass on
+// the steepest nearby rise and require the (now shared) per-bird clearance,
+// folded into __vultures.clearance, to stay positive while it feeds.
+const scavSlope = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const p0 = window.__game.getState().pos
+  const U = 10
+  // Find the steepest walkable spot within ~30 units of the player: max
+  // height rise across a 1.2-unit span (the scavenger birds' scatter radius).
+  let best = null
+  for (let dx = -30; dx <= 30; dx += 3) {
+    for (let dz = -30; dz <= 30; dz += 3) {
+      const lat = -(p0.z + dz) / U
+      const lon = (p0.x + dx) / U
+      if (window.__terrainType(lat, lon, seed) !== 'savanna') continue
+      const h0 = window.__terrainHeight(lat, lon, seed)
+      let rise = 0
+      for (const [ox, oz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]]) {
+        const h1 = window.__terrainHeight(-(p0.z + dz + oz) / U, (p0.x + dx + ox) / U, seed)
+        rise = Math.max(rise, h1 - h0)
+      }
+      if (!best || rise > best.rise) best = { x: p0.x + dx, z: p0.z + dz, rise, h0 }
+    }
+  }
+  if (!best) return { found: false }
+  // A dead non-flock carcass there: the lone scavenger's kind of meal.
+  const carcass = {
+    x: best.x, z: best.z, y: Math.max(0.02, best.h0), rot: 0, scale: 1, phase: 0.2,
+    chunk: undefined, dead: true,
+  }
+  herds.zebra.push(carcass)
+  const sc = window.__wildlife.scavenger.current
+  const out = { found: true, rise: +best.rise.toFixed(2), landed: false, minClear: Infinity }
+  const t0 = Date.now()
+  while (Date.now() - t0 < 40000) {
+    if (sc.target === carcass && sc.landed) {
+      out.landed = true
+      // Sample the folded clearance over ~3 s of feeding.
+      const t1 = Date.now()
+      while (Date.now() - t1 < 3000) {
+        const c = window.__vultures?.clearance?.current
+        if (typeof c === 'number' && Number.isFinite(c)) out.minClear = Math.min(out.minClear, c)
+        await sleep(100)
+      }
+      break
+    }
+    await sleep(200)
+  }
+  herds.zebra = herds.zebra.filter((a) => a !== carcass)
+  if (sc.target === carcass) { sc.target = null; sc.landed = false }
+  out.minClear = Number.isFinite(out.minClear) ? +out.minClear.toFixed(3) : null
+  return out
+})
+check(
+  'the lone scavenger feeding on a slope keeps every bird above its own ground (point 128)',
+  scavSlope.found && scavSlope.landed && scavSlope.minClear !== null && scavSlope.minClear > 0,
+  JSON.stringify(scavSlope),
+)
 
 const noRemnant = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

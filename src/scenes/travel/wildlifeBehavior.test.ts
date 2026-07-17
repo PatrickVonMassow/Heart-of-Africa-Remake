@@ -26,6 +26,9 @@ import {
   rescueSpeed,
   wadeSpeed,
   PREY_WALK_SPEED,
+  landedBirdY,
+  landedBirdClearance,
+  LANDED_BIRD_HOVER,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -186,6 +189,35 @@ describe('blockHeading (design.md §19 — the parent shields its hunted calf)',
     expect(taken).toBe(true) // the hunter meets the shield…
     expect(caught).toBe(false) // …never the calf
     expect(betweenSamples / samples).toBeGreaterThan(0.8) // the shield held its line
+  })
+})
+
+describe('landedBirdY / landedBirdClearance (point 128 — a landed vulture stands on its own ground)', () => {
+  it('flat ground lifts nothing: the bird rests at hover + hop over the base', () => {
+    expect(landedBirdY(2, 2, 0)).toBe(LANDED_BIRD_HOVER)
+    expect(landedBirdY(2, 2, 0.1)).toBeCloseTo(LANDED_BIRD_HOVER + 0.1, 9)
+  })
+
+  it('rising ground lifts by exactly the rise', () => {
+    expect(landedBirdY(2, 2.7, 0)).toBeCloseTo(0.7 + LANDED_BIRD_HOVER, 9)
+    expect(landedBirdY(0, 1.5, 0)).toBeCloseTo(1.5 + LANDED_BIRD_HOVER, 9)
+  })
+
+  it('falling ground never pulls a bird DOWN (positive-only)', () => {
+    expect(landedBirdY(2, 1.2, 0)).toBe(LANDED_BIRD_HOVER)
+    expect(landedBirdY(2, -5, 0)).toBe(LANDED_BIRD_HOVER)
+  })
+
+  it('the hover clears the vulture body sphere reach (~0.096 below origin, buildVulture)', () => {
+    expect(LANDED_BIRD_HOVER).toBeGreaterThan(0.096)
+  })
+
+  it('the clearance above the bird OWN ground is never below the hover — on any slope', () => {
+    for (const base of [0, 0.5, 2, 7]) {
+      for (const ground of [0, 0.2, base - 0.4, base, base + 0.3, base + 1.8]) {
+        expect(landedBirdClearance(base, ground, 0)).toBeGreaterThanOrEqual(LANDED_BIRD_HOVER - 1e-9)
+      }
+    }
   })
 })
 

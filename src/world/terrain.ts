@@ -427,9 +427,12 @@ export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolea
   return coastlineDistanceDeg(lat, lon) > balance.oceanSwimMarginDeg
 }
 
-// Dev hook for the headless verification (CLAUDE.md §7.2): terrain type at a
-// coordinate, so tests can locate a jungle/mountain/water tile.
+// Dev hooks for the headless verification (CLAUDE.md §7.2): terrain type and
+// height at a coordinate, so tests can locate a jungle/mountain/water tile —
+// or a slope (the point-128 landed-vulture check).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__terrainType = (lat: number, lon: number, seed: number) =>
     sampleTerrain(lat, lon, seed).type
+  ;(window as unknown as Record<string, unknown>).__terrainHeight = (lat: number, lon: number, seed: number) =>
+    sampleTerrain(lat, lon, seed).height
 }

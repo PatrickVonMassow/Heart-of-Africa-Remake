@@ -57,6 +57,8 @@ import {
   rescueSpeed,
   wadeSpeed,
   PREY_WALK_SPEED,
+  landedBirdY,
+  landedBirdClearance,
   vigilBlocksLanding,
   vigilDrawReady,
   vigilDrawSpawn,
@@ -331,6 +333,10 @@ const ELEPHANT_COHESION = 6 // steer back toward the herd beyond this radius
 const MOURN_STAND_DIST = 2.5 // a mourner halts this close to the bones (staggered per animal)
 const MOURN_TOUCH_DIST = 5 // within this of the target the head lowers to the bones
 const GRAVEYARD_POS = latLonToWorld(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)
+/** The ground scavenger's landed-bird clearance this frame (point 128),
+ *  written by the Wildlife frame and folded into the Vultures component's
+ *  `clearance` dev hook so the verify metric covers BOTH vulture systems. */
+const SCAV_CLEARANCE = { v: Infinity }
 /** Prey dodge an elephant only when it comes this close, and a touch slower
  *  than the elephant, so a head-on herd still tramples them now and then. */
 const PREY_PANIC_RADIUS = 3.2
@@ -903,9 +909,22 @@ function seedDryShoreDrinkers(
   const pool = REGION_PREY[region]
   if (!pool || pool.length === 0) return
   const rand = mulberry32(((seed ^ Math.round(bank.x * 7 + bank.z * 13)) + 0x77) >>> 0)
-  const species = pool[Math.floor(rand() * pool.length)]
   const deficit = min - count
-  if (herds[species].length + deficit > MAX_INSTANCES[species]) return
+  // Rotate through the pool from a deterministic start until a species has
+  // instance capacity left (the point-135a rotation the vicinity seeder
+  // already runs): picking ONE and giving up at its cap starved the
+  // guarantee whenever the fixed seed's pick happened to be a full herd —
+  // the measured dryDrinkers 2/4 runs.
+  let species: (typeof pool)[number] | null = null
+  const start = Math.floor(rand() * pool.length)
+  for (let sIdx = 0; sIdx < pool.length; sIdx++) {
+    const cand = pool[(start + sIdx) % pool.length]
+    if (herds[cand].length + deficit <= MAX_INSTANCES[cand]) {
+      species = cand
+      break
+    }
+  }
+  if (!species) return
   const cx = Math.floor(pos.x / CHUNK_SIZE)
   const cz = Math.floor(pos.z / CHUNK_SIZE)
   const key = `${cx},${cz}`
@@ -1885,7 +1904,14 @@ function Herds() {
         const aheadLL = worldToLatLon(a.x + Math.sin(a.heading) * 6, a.z + Math.cos(a.heading) * 6)
         const aheadT = sampleTerrain(aheadLL.lat, aheadLL.lon, seed).type
         if (!elephantStepAllowed(aheadT, mournInfo !== undefined, standT)) {
-          desired = info ? Math.atan2(info.cx - a.x, info.cz - a.z) : a.heading + Math.PI * 0.6
+          // Redirect toward the herd — unless the centre IS this animal (a
+          // solo elephant, or one standing on the centre): atan2(0,0) would
+          // pin `desired` due north forever, freezing it at a biome border
+          // (the measured centreMoved 0.63 roam failures). Keep turning
+          // instead until a crossable direction comes around.
+          const dcx = info ? info.cx - a.x : 0
+          const dcz = info ? info.cz - a.z : 0
+          desired = info && Math.hypot(dcx, dcz) > 0.5 ? Math.atan2(dcx, dcz) : a.heading + Math.PI * 0.6
         }
         let dh = desired - a.heading
         while (dh > Math.PI) dh -= Math.PI * 2
@@ -1961,6 +1987,7 @@ function Herds() {
         dt,
       )
       sc.landed = sc.mode === 'active' && target !== null
+      SCAV_CLEARANCE.v = Infinity
       if (sg) {
         sg.visible = sc.mode !== 'idle'
         if (sc.mode !== 'idle') {
@@ -1987,12 +2014,14 @@ function Herds() {
               const r = 0.5 + i * 0.35
               const bx = Math.cos(ph) * r
               const bz = Math.sin(ph) * r
-              // Positive-only hop so the body never dips below the group, a
-              // gentler peck, and a slope lift: on rising ground beside the
-              // carcass the bird stands on ITS ground, not the carcass point.
+              // The shared landed-bird rule (point 128): each bird stands on
+              // ITS OWN ground beside the carcass — positive-only lift, the
+              // hover clearing the pecking body, the hop as feeding bounce.
               const bll = worldToLatLon(sc.x + bx, sc.z + bz)
-              const lift = Math.max(0, Math.max(0, sampleTerrain(bll.lat, bll.lon, seed).height) - sc.y)
-              bird.position.set(bx, lift + 0.05 + Math.abs(Math.sin(t * 3 + ph)) * 0.1, bz)
+              const bg = Math.max(0, sampleTerrain(bll.lat, bll.lon, seed).height)
+              const hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
+              bird.position.set(bx, landedBirdY(sc.y, bg, hop), bz)
+              SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearance(sc.y, bg, hop))
               bird.rotation.set(0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3, ph, 0) // heads pecking down
             } else {
               const a2 = t * 0.6 + ph
@@ -3116,8 +3145,11 @@ function Vultures() {
         Math.min(1, killDescend.current + (consuming ? dt / 1.4 : -dt / 1.4)),
       )
       killGroup.current.visible = f.mode !== 'idle'
+      // The clearance metric covers BOTH vulture systems (point 128): the
+      // kill flock measured below, the ground scavenger folded in from the
+      // Wildlife frame via SCAV_CLEARANCE.
       let killMinClear = Infinity
-      clearance.current = Infinity
+      clearance.current = SCAV_CLEARANCE.v
       if (f.mode !== 'idle') {
         const kll = worldToLatLon(f.x, f.z)
         const killGroundY = Math.max(0, sampleTerrain(kll.lat, kll.lon, s.seed).height)
@@ -3139,13 +3171,14 @@ function Vultures() {
             const lr = 0.5 + i * 0.35
             const lx = Math.cos(phase) * lr
             const lz = Math.sin(phase) * lr
-            // Positive-only hop, lifted by the slope under the bird so no
-            // body ever sinks into rising ground beside the remnant.
+            // The shared landed-bird rule (point 128): positive-only lift
+            // onto the bird's own ground, hover past the pecking body, hop.
             const bll = worldToLatLon(f.x + lx, f.z + lz)
-            const lift = Math.max(0, Math.max(0, sampleTerrain(bll.lat, bll.lon, s.seed).height) - killGroundY)
-            const ly = lift + 0.15 + Math.abs(Math.sin(t * 3 + phase)) * 0.12
+            const bg = Math.max(0, sampleTerrain(bll.lat, bll.lon, s.seed).height)
+            const hop = Math.abs(Math.sin(t * 3 + phase)) * 0.12
+            const ly = landedBirdY(killGroundY, bg, hop)
             bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
-            if (dsc > 0.6) killMinClear = Math.min(killMinClear, ly - lift)
+            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearance(killGroundY, bg, hop))
             if (dsc > 0.6) {
               bird.rotation.set(0.6 + Math.sin(t * 4 + phase) * 0.3, phase, 0) // pecking down
             } else {
@@ -3154,7 +3187,7 @@ function Vultures() {
             bird.scale.setScalar(1.6)
           })
         }
-        clearance.current = killMinClear
+        clearance.current = Math.min(killMinClear, SCAV_CLEARANCE.v)
       }
     }
   })
