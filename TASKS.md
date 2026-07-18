@@ -6139,9 +6139,27 @@ the remaining open points in their numeric order.
   the rain-closing render fog are fully kept. Headless-verified on WebGL2: a
   weather-on drive rebuilds 8 -> 0 (weather-off 50 -> 2); new movement-bounded
   rebuild check + the 171 no-pop check green; enrichments 199/0, Vitest 1925,
-  build/lint clean. STILL OPEN pending the USER's WebGPU confirmation that the
-  crowns are now stable. If it still jumps, the collapse itself needs a
-  WebGPU-stable redo (split crown geometry / instance-matrix collapse).
+  build/lint clean.
+  ATTEMPT 2 USER WebGPU RE-TEST (19.07.2026): the streaming POP-IN is FIXED (the
+  trees no longer fly in) — the fog-decouple holds. But TWO issues remain: the
+  landscape changes ABRUPTLY while driving, and crowns sometimes hang FREE in the
+  air (screenshot). Both point at the dry-season collapse itself, now applied at
+  the movement-rebuild moments rather than per frame (the baked seasonTint jumps to
+  the drifted season value at a rebuild → the collapse is applied abruptly/racily).
+  DIAGNOSTIC STEP (19.07.2026, user chose "Diagnose-Schalter zuerst"): a debug
+  toggle isolates the cause before any bigger refactor. New `SEASON_COLLAPSE_U`
+  uniform (seasonTint.ts) multiplies the `dryness` inside `seasonFoliagePosition`,
+  so at 0 the crown collapse AND the ground sprout vanish (flora keeps its full
+  positionLocal shape; the season COLOUR is untouched). Driven each frame from the
+  new `ui.seasonCollapseEnabled` (default on) in the travel + place season blocks;
+  DebugMenu checkbox `t.debug.foliageCollapse` (de/en), same class as the point-111
+  `groundDebugFlat`. Pure tests: seasonTint.test (uniform 1→0 gate), ui.test
+  (default + setter), DebugMenu.test (checkbox write-through). Vitest 1927, build +
+  lint clean. NEXT: user tests with the toggle OFF — if the abrupt change AND the
+  floating crowns both stop, the collapse is the sole cause → decide a WebGPU-stable
+  redo (keep the effect: split crown geometry / instance-matrix collapse) vs shipping
+  it off; if the abrupt change PERSISTS with the collapse off, it is the streaming
+  buffer re-upload, a separate fix. PAUSE competing browser runs during that test.
 
 - [ ] 176. The dry-season drink catchment is silently capped at 0.45° (found by
   the point-173 analysis). CONFIRMED bug: `riverDistance`/`lakeDistance`

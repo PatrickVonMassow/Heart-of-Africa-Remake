@@ -24,7 +24,7 @@ import {
   vec3,
   vertexColor,
 } from 'three/tsl'
-import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonTint } from '../../render/seasonTint'
+import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
@@ -1658,6 +1658,8 @@ export function PlaceScene() {
         elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,
       )
       setSeasonTint(green, balance.season.weatherStrength)
+      // Debug gate (point 175): live-toggles the dry-season flora deformation.
+      setSeasonCollapse(useUi.getState().seasonCollapseEnabled)
       const k = Math.min(1, dt * 0.8)
       // The fog carries the overcast onto the §2.5 backdrop, which is otherwise
       // lit by the preset alone and would stay sunny behind a rained-out village.

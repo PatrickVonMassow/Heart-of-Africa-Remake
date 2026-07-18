@@ -21,6 +21,20 @@ export function setSeasonTint(greenness: number, strength: number) {
   SEASON_TINT_U.value = 0.5 + (g - 0.5) * s
 }
 
+// Debug diagnostic (point 175): gates the dry-season flora DEFORMATION — the
+// crown bare-branch collapse AND the ground-flora sprout — live via a uniform,
+// so it toggles without a program relink (the point 96 rule). 1 = on (default),
+// 0 = off (the flora keeps its full positionLocal shape; the season COLOUR is
+// untouched). Its purpose is to isolate whether this per-instance vertex
+// deformation is the cause of a WebGPU-only flora jump — the deformation and
+// the season colour can then be judged apart.
+export const SEASON_COLLAPSE_U = uniform(1)
+
+/** Debug: enable/disable the dry-season flora deformation (point 175). */
+export function setSeasonCollapse(on: boolean) {
+  SEASON_COLLAPSE_U.value = on ? 1 : 0
+}
+
 /**
  * Recolour a base colour toward straw (dry) or deep green (lush), leaving
  * everything that is not foliage alone.
@@ -78,7 +92,10 @@ export function seasonFoliagePosition(
 ) {
   // Cast: the TSL typings do not carry the attribute's float type through.
   const leaf = attribute('foliage', 'float') as unknown as ReturnType<typeof float>
-  const dryness = float(1).sub(tint.mul(2)).clamp(0, 1)
+  // Both the crown collapse and the ground sprout derive from `dryness`, so the
+  // debug gate multiplies it once here: SEASON_COLLAPSE_U 0 -> dryness 0 ->
+  // shrink/sprout 1 and no y-drop, i.e. the flora keeps its full shape (point 175).
+  const dryness = float(1).sub(tint.mul(2)).clamp(0, 1).mul(SEASON_COLLAPSE_U)
   // Two foliage classes (both per-part-uniform, the 144 shard rule):
   // 1 = a tree crown — bare branches: it shrinks toward the trunk and
   //     settles down onto it, the trunk stands (the 144 look, unchanged);

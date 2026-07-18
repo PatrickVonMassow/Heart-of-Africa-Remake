@@ -125,6 +125,7 @@ export function DebugMenu() {
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
+  const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -354,6 +355,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={groundDebugFlat}
           onChange={(e) => useUi.getState().setGroundDebugFlat(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.foliageCollapse}</span>
+        <input
+          type="checkbox"
+          checked={seasonCollapseEnabled}
+          onChange={(e) => useUi.getState().setSeasonCollapseEnabled(e.target.checked)}
         />
       </label>
       <label>

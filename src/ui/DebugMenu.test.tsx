@@ -102,6 +102,7 @@ afterEach(() => {
   useUi.getState().setWebglFallback(false)
   useUi.getState().setShadowsEnabled(true)
   useUi.getState().setGroundDebugFlat(false)
+  useUi.getState().setSeasonCollapseEnabled(true)
   useUi.getState().setWheelZoomEnabled(false)
   useUi.getState().setJournalDnd(false)
   if (useUi.getState().debugOpen) useUi.getState().toggleDebug()
@@ -237,6 +238,13 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(flat.checked).toBe(false)
     fireEvent.click(flat)
     expect(useUi.getState().groundDebugFlat).toBe(true)
+
+    // Point 175 diagnostic: the dry-season foliage collapse defaults on and
+    // toggles off through the store (isolates the WebGPU flora deformation).
+    const foliage = screen.getByText(en.debug.foliageCollapse).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(foliage.checked).toBe(true)
+    fireEvent.click(foliage)
+    expect(useUi.getState().seasonCollapseEnabled).toBe(false)
 
     const wheel = screen.getByText(en.debug.wheelZoom).closest('label')?.querySelector('input') as HTMLInputElement
     expect(wheel.checked).toBe(false)

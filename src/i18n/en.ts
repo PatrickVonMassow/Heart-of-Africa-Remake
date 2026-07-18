@@ -390,6 +390,7 @@ export const en: Strings = {
     shadowMapHalf: 'Half-resolution shadows',
     shadows: 'Sun shadows',
     flatGround: 'Flat ground (debug)',
+    foliageCollapse: 'Dry-season foliage collapse (debug)',
     health: 'Health',
     wheelZoom: "Allow zooming out beyond default (bird's-eye)",
     journalDnd: "Don't interrupt with journal entries (F2)",

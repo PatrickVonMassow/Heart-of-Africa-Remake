@@ -32,7 +32,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
-import { seasonFoliagePosition, seasonTintNode } from '../../render/seasonTint'
+import { seasonFoliagePosition, seasonTintNode, setSeasonCollapse } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
@@ -941,6 +941,8 @@ function Vegetation() {
         useUi.getState().seasonWetnessOverride,
         Math.min(1, Math.max(0, balance.season.weatherStrength)),
       )
+      // Debug gate (point 175): live-toggles the dry-season flora deformation.
+      setSeasonCollapse(useUi.getState().seasonCollapseEnabled)
       // The Nile flood (point 138): one CPU source for the ribbon rise and the
       // canoe float height. Blended like the tint, so a debug month jump makes
       // the river rise over a moment rather than snap.

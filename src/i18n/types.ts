@@ -307,6 +307,8 @@ export interface Strings {
     shadowMapHalf: string
     shadows: string
     flatGround: string
+    /** Debug toggle for the dry-season flora deformation (point 175), default on. */
+    foliageCollapse: string
     health: string
     wheelZoom: string
     journalDnd: string

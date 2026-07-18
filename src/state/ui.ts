@@ -70,6 +70,11 @@ interface UiState {
    *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
    *  patch. Default off. */
   groundDebugFlat: boolean
+  /** Debug diagnosis (point 175): the dry-season flora deformation (crown
+   *  bare-branch collapse + ground-flora sprout). Default on; toggling it off
+   *  keeps the flora at its full shape (the season colour stays) to isolate
+   *  whether that per-instance vertex deformation causes a WebGPU-only jump. */
+  seasonCollapseEnabled: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -91,6 +96,7 @@ interface UiState {
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
+  setSeasonCollapseEnabled: (enabled: boolean) => void
 }
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
@@ -116,6 +122,7 @@ export const useUi = create<UiState>()((set) => ({
   shadowMapHalf: false,
   shadowsEnabled: true,
   groundDebugFlat: false,
+  seasonCollapseEnabled: true,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -148,6 +155,7 @@ export const useUi = create<UiState>()((set) => ({
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
+  setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
 }))
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

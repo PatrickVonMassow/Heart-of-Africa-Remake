@@ -389,6 +389,7 @@ export const de: Strings = {
     shadowMapHalf: 'Schatten in halber Auflösung',
     shadows: 'Sonnenschatten',
     flatGround: 'Flacher Boden (Debug)',
+    foliageCollapse: 'Trockenzeit-Laubkollaps (Debug)',
     health: 'Gesundheit',
     wheelZoom: 'Weiter rauszoomen erlauben (Vogelperspektive)',
     journalDnd: 'Nicht durch Tagebuch unterbrechen (F2)',

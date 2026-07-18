@@ -12,7 +12,7 @@ beforeEach(() => {
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
     traaEnabled: true, touchActive: false, ssaoEnabled: true, shadowMapHalf: false,
-    shadowsEnabled: true, groundDebugFlat: false,
+    shadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
   })
 })
 
@@ -107,5 +107,8 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
     expect(u().groundDebugFlat).toBe(false) // default off
     u().setGroundDebugFlat(true)
     expect(u().groundDebugFlat).toBe(true)
+    expect(u().seasonCollapseEnabled).toBe(true) // default on (point 175 diagnostic)
+    u().setSeasonCollapseEnabled(false)
+    expect(u().seasonCollapseEnabled).toBe(false)
   })
 })
