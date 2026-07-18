@@ -110,6 +110,12 @@ describe('seasonalDressFor — evidence-gated, and mostly absent (points 120g/13
     const summer = coldnessAt(JANUARY, ZULU.lat, ZULU.lon, START, 100)
     expect(seasonalDressFor('zulu', coldOnly(summer))).toBeNull()
   })
+
+  it('the cold threshold is inclusive: exactly at it dresses, a hair below does not', () => {
+    // The gate is `strength < COLD_DRESS_THRESHOLD` → null, so === threshold dresses.
+    expect(seasonalDressFor('zulu', coldOnly(COLD_DRESS_THRESHOLD))).not.toBeNull()
+    expect(seasonalDressFor('zulu', coldOnly(COLD_DRESS_THRESHOLD - 1e-9))).toBeNull()
+  })
 })
 
 describe('cloakForCloth (point 120g — the village shows a mix, deterministically)', () => {

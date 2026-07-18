@@ -109,6 +109,12 @@ describe('strafeRollTarget (sign + clamp)', () => {
     expect(strafeRollTarget(100, 8, MAX)).toBeCloseTo(MAX, 6)
     expect(strafeRollTarget(-100, 8, MAX)).toBeCloseTo(-MAX, 6)
   })
+
+  it('a zero or negative reference speed rolls flat, never NaN/Infinity', () => {
+    // refSpeed <= 0 would divide by zero; the guard returns 0 instead.
+    expect(strafeRollTarget(5, 0, MAX)).toBe(0)
+    expect(strafeRollTarget(5, -1, MAX)).toBe(0)
+  })
 })
 
 describe('easeToward + idleSway', () => {
@@ -116,6 +122,12 @@ describe('easeToward + idleSway', () => {
     let r = 0.05
     for (let i = 0; i < 300; i++) r = easeToward(r, 0, 0.1, 1 / 60)
     expect(Math.abs(r)).toBeLessThan(1e-3)
+  })
+
+  it('a zero (or negative) time constant snaps instantly instead of easing', () => {
+    // smoothK(tau<=0) = 1, so one step lands exactly on the target.
+    expect(easeToward(0.05, 1, 0, 1 / 60)).toBe(1)
+    expect(easeSpeed(0, 10, 0, 0, 1 / 60)).toBe(10)
   })
 
   it('idleSway stays tiny (well under a centimetre)', () => {

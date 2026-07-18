@@ -12,6 +12,12 @@ describe('stickVector', () => {
     expect(stickVector(5, 0, R, DZ)).toEqual({ x: 0, y: 0 })
   })
 
+  it('the dead-zone edge itself is still dead (inclusive), just past it is not', () => {
+    // len === DZ is caught by the `<=` guard.
+    expect(stickVector(DZ, 0, R, DZ)).toEqual({ x: 0, y: 0 })
+    expect(stickVector(DZ + 0.001, 0, R, DZ).x).toBeGreaterThan(0)
+  })
+
   it('drags up = forward (y positive), down = backward', () => {
     const up = stickVector(0, -R, R, DZ) // screen −y
     expect(up.y).toBeCloseTo(1, 6)
