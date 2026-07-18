@@ -5458,7 +5458,7 @@ the remaining open points in their numeric order.
   pt. 3's wording already states the guarantee. (Reported 17.07.2026;
   queued at the batch end per the standing append-and-defer rule.)
 
-- [ ] 164. Plants still jump back and forth while travelling along the Nile.
+- [x] 164. Plants still jump back and forth while travelling along the Nile.
   User report (17.07.2026 — "zu diesem Zeitpunkt an diesem Punkt" refers to
   a Nile stretch; the two point-151 spots are repro candidates: 13.4N/31.8E
   in June and 18.1N/33.9E in July. SECOND REPORT with screenshot, 17.07.2026
@@ -5494,6 +5494,30 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13 wording if the rule sharpens. (Reported
   17.07.2026; queued at the batch end per the standing append-and-defer
   rule.)
+  DONE (18.07.2026, 07:40 — user pulled it up): a three-round probe
+  (scripts/verify/_flora-probe.mjs, suite launch args, then removed)
+  DISPROVED both leading suspects: (a) the MAX_INSTANCES cap — NO species
+  overflows at any of the three reported spots (bush 521<1800, jungle
+  739<2600); (c)/season — the per-position field converges MONOTONICALLY
+  after a jump, never oscillating. The real cause was the STREAMING: the
+  dressing rebuilt a FIXED ±6-chunk neighbourhood on every chunk crossing,
+  so its square edge popped — toggles binned by distance were [<40:0,
+  <80:0, <120:0, <160:46, <400:200] with maxDrawnDist 227, i.e. ZERO within
+  120 units and all popping at the 120-227 edge, which sits IN VIEW at a
+  wide zoom (viewR = 100xzoom). FIX (mirrors the wildlife streaming): a new
+  pure module src/scenes/travel/floraStreaming.ts — floraSpawnRadius (viewR
+  + 30 margin, a CIRCLE beyond the view so the edge is off-screen),
+  floraChunkRange (bounded), floraInSpawnCircle (per-plant circular filter),
+  floraShouldRebuild (rebuild only past a 16-unit hysteresis step or a zoom
+  change, so a back-and-forth no longer re-pops). TravelScene consumes them;
+  VEGETATION_HIDE_ZOOM 3->2.5 keeps viewR under the capped radius. Re-probe
+  after the fix: in-view toggles = 0 at zoom 0.5/1/2 (was 46+200 in-range at
+  zoom 2). Pure test floraStreaming.test.ts (8: edge beyond view even after
+  a full hysteresis drift, the circular filter, the hysteresis dead-band,
+  bounded range); live: the point-151 witness now extended with a DRIVEN
+  pass (enrichments) — drive back and forth at zoom 2, zero in-view bush
+  toggles across rebuilds. tsc/lint/build/1812 unit green. Docs: design.md
+  §2.5 dressing note, CLAUDE.md §7.1 pt.12 (the 151 clause gains 164).
 
 - [ ] 165. Animals pop into existence in plain sight.
   User report (17.07.2026): "Es erscheinen immer wieder Tiere ploetzlich vor

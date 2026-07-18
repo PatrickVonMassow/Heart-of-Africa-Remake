@@ -47,6 +47,7 @@ import {
   type TrailPoint,
 } from './canoeDrag'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
+import { floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -83,11 +84,14 @@ import { collidableAnimalsNear } from './wildlifeCollision'
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 
 const CHUNK_SIZE = 24 // world units
-const CHUNK_RADIUS = 6 // chunks kept around the player in each direction
+const CHUNK_RADIUS = 6 // chunks kept around the player in each direction (terrain LOD)
+// Flora streaming rules (point 164) live in floraStreaming.ts so they are
+// unit-testable; the render loop below consumes them.
 // Beyond this debug-zoom factor the chunk-bound dressing (trees, rocks …)
-// hides: it only ever covers the chunk rectangle, which would read as a
-// dark dressed island on the far-terrain sheet (design.md §21.4).
-const VEGETATION_HIDE_ZOOM = 3
+// hides: it only ever covers a bounded radius, which would read as a dark
+// dressed island on the far-terrain sheet (design.md §21.4). Kept at/below
+// what FLORA_RANGE_MAX covers so the streaming edge never enters view.
+const VEGETATION_HIDE_ZOOM = 2.5
 const CAMERA_OFFSET = { y: 42, z: 24 }
 const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 
@@ -844,11 +848,11 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
 function Vegetation() {
   const seed = useGame((s) => s.seed)
   const meshes = getVegetationMeshes()
-  const lastCenter = useRef<string | null>(null)
+  const lastBuild = useRef<{ x: number; z: number; zoom: number } | null>(null)
   const hiddenRef = useRef(false)
 
   useEffect(() => {
-    lastCenter.current = null // force rebuild on new run
+    lastBuild.current = null // force rebuild on new run
   }, [seed])
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
@@ -887,11 +891,21 @@ function Vegetation() {
       // untouched, the HMR trap).
       seasonTintAt: (lat: number, lon: number) => seasonFieldTintAt(lat, lon),
       seasonGreens: () => seasonFieldGreens(),
+      // The (x,z) of every instance the mesh is DRAWING for a species right now
+      // (point 164): the driven-stability check diffs this across chunk crosses
+      // — an in-view plant that disappears and reappears would be the jump.
+      drawnTranslations: (species: Species) => {
+        const m = meshes[species]
+        const arr = m.instanceMatrix.array as Float32Array
+        const out: Array<[number, number]> = []
+        for (let k = 0; k < m.count; k++) out.push([arr[k * 16 + 12], arr[k * 16 + 14]])
+        return out
+      },
     }
     return () => {
       delete w.__vegetation
     }
-  }, [])
+  }, [meshes])
 
   useFrame(() => {
     // The foliage follows the season (design.md §19.13): neutral at the
@@ -929,9 +943,10 @@ function Vegetation() {
         seasonalSnowAt(s.day, 'drakensberg', START_YEAR) * strength,
       )
     }
-    // In the far debug zoom the dressing hides (it exists only inside the
-    // chunk rectangle); the far-terrain sheet carries the look out there.
-    const hide = useUi.getState().travelZoom > VEGETATION_HIDE_ZOOM
+    // In the far debug zoom the dressing hides (bounded radius); the
+    // far-terrain sheet carries the look out there.
+    const zoom = useUi.getState().travelZoom
+    const hide = zoom > VEGETATION_HIDE_ZOOM
     if (hide !== hiddenRef.current) {
       hiddenRef.current = hide
       for (const sp of SPECIES) {
@@ -940,11 +955,16 @@ function Vegetation() {
     }
     if (hide) return
     const pos = useGame.getState().pos
+    // Zoom-aware streaming with a rebuild hysteresis (point 164): the drawn edge
+    // is a circle at viewR + margin (always beyond the view), and a rebuild
+    // fires only once the player has moved the hysteresis step or the zoom
+    // changed — so a back-and-forth across a chunk boundary no longer re-pops.
+    if (!floraShouldRebuild(pos, lastBuild.current, zoom)) return
+    lastBuild.current = { x: pos.x, z: pos.z, zoom }
+    const spawnR = floraSpawnRadius(zoom)
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
-    const center = chunkKey(cx, cz)
-    if (center === lastCenter.current) return
-    lastCenter.current = center
+    const rC = floraChunkRange(zoom, CHUNK_SIZE)
 
     const counts: Record<Species, number> = {
       acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0,
@@ -955,8 +975,8 @@ function Vegetation() {
     const up = new THREE.Vector3(0, 1, 0)
     const scl = new THREE.Vector3()
 
-    for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
-      for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
+    for (let dz = -rC; dz <= rC; dz++) {
+      for (let dx = -rC; dx <= rC; dx++) {
         const ccx = cx + dx
         const ccz = cz + dz
         for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
@@ -965,6 +985,9 @@ function Vegetation() {
           const placed = placedFloraAt(ccx, ccz, i, seed)
           if (!placed) continue
           const { species, x, z, height, r4, roll } = placed
+          // Circular streaming edge at viewR + margin (point 164): a plant
+          // beyond it is not drawn, so the edge sits just outside the view.
+          if (!floraInSpawnCircle(x, z, pos.x, pos.z, spawnR)) continue
           const idx = counts[species]
           if (idx >= MAX_INSTANCES[species]) continue
           quat.setFromAxisAngle(up, r4 * Math.PI * 2)

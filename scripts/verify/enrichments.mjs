@@ -4305,6 +4305,48 @@ check(
     fieldWitness.moveDrift < 0.03,
   JSON.stringify(fieldWitness),
 )
+// Point 164: the DRIVEN pass. The dressing streamed over a fixed neighbourhood
+// popped its edge in and out while driving, worst at a wide zoom. Drive back
+// and forth across chunk boundaries at zoom 2 (steps > the rebuild hysteresis,
+// so rebuilds fire) and assert NO plant inside the view (viewR = 100 x zoom)
+// toggles out of the drawn set — the pop is now a circle beyond the view.
+const drivenFlora = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__game.getState().debugJumpTo(8.6, 21.8) // the dense West dressing
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(2)
+  await sleep(600)
+  const viewR = 100 * 2
+  const key = (x, z) => `${Math.round(x)},${Math.round(z)}`
+  let inViewToggles = 0
+  let rebuilds = 0
+  let prev = null
+  let prevCount = -1
+  const p0 = window.__game.getState().pos
+  for (let k = 0; k <= 16; k++) {
+    const phase = k <= 8 ? k : 16 - k
+    window.__game.setState({ pos: { x: p0.x + phase * 20, z: p0.z } }) // 20 > hysteresis 16
+    await sleep(150)
+    const pos = window.__game.getState().pos
+    const drawn = window.__vegetation.drawnTranslations('bush')
+    if (drawn.length !== prevCount) rebuilds++
+    prevCount = drawn.length
+    const cur = new Map(drawn.map(([x, z]) => [key(x, z), [x, z]]))
+    if (prev) {
+      for (const [kk, [px, pz]] of prev) {
+        if (!cur.has(kk) && Math.hypot(px - pos.x, pz - pos.z) < viewR) inViewToggles++
+      }
+    }
+    prev = cur
+  }
+  window.__ui.getState().setTravelZoom(0.5)
+  return { inViewToggles, rebuilds }
+})
+check(
+  'no in-view plant toggles while driving back and forth (point 164)',
+  drivenFlora.inViewToggles === 0 && drivenFlora.rebuilds > 1,
+  JSON.stringify(drivenFlora),
+)
 // Human-viewable evidence at BOTH reported spots: stable flora in the June/
 // July gradient (123: the Gezira between the Nile arms; 124: the Nile at 18N).
 await page.evaluate(() => window.__game.getState().debugJumpTo(13.4, 31.8))
