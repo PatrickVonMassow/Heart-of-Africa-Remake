@@ -621,6 +621,28 @@ export function deflectedStep(
 }
 
 /**
+ * The flee step for a calf being run down by a land hunt (design.md §19.8,
+ * point 157). It heads directly away from the hunter, then routes through
+ * deflectedStep so a coast or river bank turns it aside instead of pinning it
+ * (the old raw step ran straight into the water and stuck). A dead-end
+ * (moved:false) leaves the calf in place for the catch to resolve — the "always
+ * resolves" rule. `dist` stays CALF_FLEE_SPEED*dt (slower than the hunter, so
+ * the chase still ends); the caller passes the water/ocean `blocked` predicate.
+ */
+export function calfFleeStep(
+  cx: number,
+  cz: number,
+  hunterX: number,
+  hunterZ: number,
+  dist: number,
+  blocked: (x: number, z: number) => boolean,
+  lookahead = 0.8,
+): { x: number; z: number; heading: number; moved: boolean } {
+  const away = Math.atan2(cx - hunterX, cz - hunterZ)
+  return deflectedStep(cx, cz, away, dist, blocked, lookahead)
+}
+
+/**
  * Seasonal multiplier on the river current for the §19.8 water drama
  * (point 122): the rains swell the rivers, the dry season tames them. Linear
  * between the two calibratable factors over the local wetness (0..1).

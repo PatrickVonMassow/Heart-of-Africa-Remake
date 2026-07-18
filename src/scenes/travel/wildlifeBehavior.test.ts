@@ -44,6 +44,7 @@ import {
   vigilDrawSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
+  calfFleeStep,
   defendChance,
   killChance,
   parentAttackOutcome,
@@ -954,6 +955,39 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     expect(r.moved).toBe(true)
     // It did NOT step straight into the pocket column.
     expect(Math.abs(r.heading)).toBeGreaterThan(0.01)
+  })
+})
+
+describe('calfFleeStep (design.md §19.8, point 157 — a run-down calf steers around the water)', () => {
+  it('runs directly away from the hunter while the way is clear', () => {
+    // Hunter at the origin, calf due east: it should keep fleeing straight east.
+    const r = calfFleeStep(3, 0, 0, 0, 1, () => false)
+    expect(r.moved).toBe(true)
+    expect(r.heading).toBeCloseTo(Math.PI / 2) // atan2(cx-hx, cz-hz) = east
+    expect(r.x).toBeCloseTo(4)
+    expect(r.z).toBeCloseTo(0)
+  })
+
+  it('flees on the diagonal away from a corner hunter', () => {
+    const r = calfFleeStep(2, 2, 0, 0, 1, () => false)
+    expect(r.moved).toBe(true)
+    expect(r.heading).toBeCloseTo(Math.PI / 4) // away from the SW hunter
+  })
+
+  it('deflects around water on the escape line instead of pinning', () => {
+    // Water east of x = 3.5; the straight-away flight (east) runs into it.
+    const blocked = (x: number, _z: number) => x > 3.5
+    const r = calfFleeStep(3, 0, 0, 0, 1, blocked)
+    expect(r.moved).toBe(true)
+    expect(blocked(r.x, r.z)).toBe(false) // it landed on dry ground
+    expect(Math.abs(r.heading - Math.PI / 2)).toBeGreaterThan(0.01) // it turned off straight-east
+  })
+
+  it('stands (moved:false) when cornered against water, leaving the catch to resolve it', () => {
+    const r = calfFleeStep(3, 0, 0, 0, 1, () => true)
+    expect(r.moved).toBe(false)
+    expect(r.x).toBe(3)
+    expect(r.z).toBe(0)
   })
 })
 

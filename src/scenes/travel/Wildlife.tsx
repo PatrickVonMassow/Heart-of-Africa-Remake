@@ -42,6 +42,7 @@ import {
   pickOffscreenLandAnchor,
   calvesForGroup,
   deflectedStep,
+  calfFleeStep,
   type FlightState,
   channelDriftStep,
   drinkCatchment,
@@ -2810,12 +2811,23 @@ function Herds() {
             // This calf is the one being run down (design.md §19): it bolts
             // instead of standing at its parent, but slower than its hunter, so
             // the chase is visible in the open before the catch.
-            const h = Math.atan2(a.x - LION_STATE.lx, a.z - LION_STATE.lz)
-            a.x += Math.sin(h) * CALF_FLEE_SPEED * dt
-            a.z += Math.cos(h) * CALF_FLEE_SPEED * dt
+            // Steer around a coast or river the way every other mover does
+            // (point 157): the old raw step ran straight into the water and
+            // pinned the calf. calfFleeStep heads away from the hunter and fans
+            // out to a way around; a dead-end (moved:false) leaves the calf where
+            // it is and the catch resolves it — the §19.8 "always resolves" rule.
+            // Speed and the slower-than-hunter property are unchanged.
+            const fleeBlocked = (nx: number, nz: number) => {
+              const ll = worldToLatLon(nx, nz)
+              const ty = sampleTerrain(ll.lat, ll.lon, seed).type
+              return ty === 'ocean' || ty === 'water'
+            }
+            const fleeStep = calfFleeStep(a.x, a.z, LION_STATE.lx, LION_STATE.lz, CALF_FLEE_SPEED * dt, fleeBlocked)
+            a.x = fleeStep.x
+            a.z = fleeStep.z
             px = a.x
             pz = a.z
-            yaw = h
+            yaw = fleeStep.heading
             pitch = 0
             familyHeld = true
           } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase' && LION_STATE.victim === a.child) {

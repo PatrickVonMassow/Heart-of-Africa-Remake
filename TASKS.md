@@ -5307,7 +5307,7 @@ the remaining open points in their numeric order.
   checked. The 151 witness route also hardened (westward across open plain;
   one run had an obstacle eat the northward leg).
 
-- [ ] 157. A fleeing calf never snags on an obstacle (escape uses deflection).
+- [x] 157. A fleeing calf never snags on an obstacle (escape uses deflection).
   Wanted (user, 16.07.2026): during a lion hunt the parent sacrificed itself
   correctly — but the FREED calf hung in place while "fleeing" (stuck against
   something, visibly running on the spot).
@@ -5330,6 +5330,21 @@ the remaining open points in their numeric order.
   (`scripts/verify/enrichments.mjs`). Related: point 135's stochastic
   guarantees touch the same state machine — coordinate, don't duplicate.
   Order: batch end (after 155). (Reported 16.07.2026.)
+  DONE 18.07.2026: the pin was the water-backstop yo-yo — the raw flee step ran
+  the chased calf straight onto a water cell, the whole-herd backstop teleported
+  it back to land, and next frame it ran onto the water again ("running on the
+  spot"). The chase-victim flee (Wildlife.tsx, `a.young && chase && victim===a`)
+  now routes through the new pure `calfFleeStep` → `deflectedStep` with a local
+  ocean/water `blocked` predicate, so it steers along the bank; a dead-end leaves
+  the catch to resolve it (the §19.8 always-resolves rule). Speed and the
+  slower-than-hunter property are unchanged, so the chase still ends. Scoped to
+  the fleeing CALF (the parent charge/shield raw steps noted as a possible
+  sibling, not expanded). Pure test (straight-away, diagonal, deflect, cornered)
+  in `wildlifeBehavior.test.ts`; 1828 Vitest green; enrichments green bar the
+  known rotating staging flakes (165 cleared on retry; 145a is a watchlist flake
+  — natural-hunt/timing interference at the staged calf, proven isolated from
+  this change: the fire uses FIRE_STATE, not the LION_STATE chase branch touched
+  here). CLAUDE §7.1 pt.12 updated. (145a staging stability → point 173.)
 
 - [x] 158. An implementation table in docs/peoples-1890.md: research -> game.
   Wanted (user, 17.07.2026, "parallel zur Batch"): a NEW SECTION in

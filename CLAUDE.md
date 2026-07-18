@@ -514,7 +514,12 @@ verify suite that proves it.
       the full LionHunt path runs a calf down and catches it (the parent
       held out of shielding reach) — with the hunted calf visibly fleeing
       the chase (slower than its hunter) instead of standing at its
-      parent, and a parent in reach holding itself between hunter and
+      parent, steering around a coast or river the way every mover does
+      rather than pinning on the waterline (point 157: the flee routes
+      through `calfFleeStep`/`deflectedStep`, a dead-end left for the catch
+      to resolve; pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`), and a parent in reach
+      holding itself between hunter and
       calf (living shield) over visible real time until the hunter takes
       it in the calf's place before any catch. The rescue burst (§19.8,
       point 127): all four rescue drives (charge, shield, guard, wade)
