@@ -5122,7 +5122,7 @@ the remaining open points in their numeric order.
   roaming 135-class flakes (guard approach, 120e drinkers, 119 closed-metric)
   are logged in point 135 — the 152 check itself passed on both full runs.
 
-- [ ] 153. Ocean surf only near the coast, and ambient-volume sliders (birdsong).
+- [x] 153. Ocean surf only near the coast, and ambient-volume sliders (birdsong).
   Wanted (user, 16.07.2026, "ans Ende vom Batch"): (a) the ocean-surf ambience
   plays only NEAR the ocean — fading out with distance from the coast and fully
   OFF beyond a calibratable cutoff (today it is presumably part of the global
@@ -5144,6 +5144,24 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.1 (surf is coastal), CLAUDE.md §7.1 pt. 20 (the single
   ambience volume gains the per-source sliders — name birdsong).
   (Reported 16.07.2026.)
+  DONE (18.07.2026, ~06:05): (a) the surf bed was a flat port-only layer
+  (`port ? 0.22 : 0`); now it fades with the coast distance through a pure
+  `coastSurfGain(dist, nearRadius, cutoff)` (full within nearRadius, EXACTLY 0
+  at/beyond cutoff, smoothstep between — pure-tested in
+  `src/systems/ambience.test.ts`). The ambience controller computes the
+  distance to the nearest coast each sync (`coastDistance`, the place's own
+  coordinates in a settlement, the traveller's on the map) and feeds it via a
+  new `setAmbienceCoast`; the surf layer target AND its gust wobble both scale
+  by the coast proximity (the wobble too — else a faint swell leaked inland
+  past the silenced target, a real audible bug the target-only test would miss;
+  verified via a `surfWobble` hook). Balance: `surf.nearRadius` 0.4°,
+  `surf.cutoff` 3° (debug-editable). (b) `balance.birdsongVolume` (default 1)
+  scales the birds layer; a localized debug slider (de/en) writes through with
+  `refreshAmbienceVolume`. Live (`scripts/verify/settings.mjs`): surf >0 at the
+  shore, EXACTLY 0 far inland, the gust silent inland too, and the birdsong
+  slider scaling the birds gain (full→half→0). Pure fade + DebugMenu
+  write-through (three fields) tested; tsc/lint/build/1762 unit green. Docs:
+  design.md §19.1, CLAUDE.md §7.1 pt.20 + its settings.mjs verify clause.
 
 - [x] 154. F3 full loadout also sets the travel speed to 25.
   Wanted (user, 16.07.2026, "ans Ende der Batch"): the F3 debug shortcut

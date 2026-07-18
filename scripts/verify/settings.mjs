@@ -317,6 +317,41 @@ check('ambience engine starts on demand', aniSound.started === true, '')
 check('a nearby animal raises its proximity call', aniSound.prox > 0.5 && aniSound.near > aniSound.baseline + 0.02, JSON.stringify(aniSound))
 check('the animal call fades once the player moves away', aniSound.gone < 0.1, JSON.stringify(aniSound))
 
+// --- Point 153: coastal surf fade + per-source birdsong slider ---------------
+// Read the layer TARGETS synchronously (no await) so the 700 ms ambience
+// controller cannot overwrite the forced coast/scene mid-check. Surf follows
+// the coast proximity; birdsong scales with its own volume slider.
+const surf153 = await page.evaluate(() => {
+  window.__balance.ambienceVolume = 0.5
+  const a = window.__ambience
+  a.setCoast(1) // at the shore
+  const atCoast = a.layerTarget('surf')
+  const wobbleCoast = a.surfWobble()
+  a.setCoast(0) // far inland (coastSurfGain(15°) === 0)
+  const inland = a.layerTarget('surf')
+  const wobbleInland = a.surfWobble()
+  // Birdsong: force a central-region travel scene so the birds are audible,
+  // then scale the per-source volume and re-apply.
+  a.setScene({ region: 'central', mode: 'travel', placeKind: null, nearVillage: false })
+  const birdsFull = a.layerTarget('birds')
+  window.__balance.birdsongVolume = 0.5
+  a.refresh()
+  const birdsHalf = a.layerTarget('birds')
+  window.__balance.birdsongVolume = 0
+  a.refresh()
+  const birdsOff = a.layerTarget('birds')
+  window.__balance.birdsongVolume = 1
+  a.refresh()
+  return { atCoast, inland, birdsFull, birdsHalf, birdsOff, wobbleCoast, wobbleInland }
+})
+check('surf plays at the coast and is exactly 0 far inland (point 153)',
+  surf153.atCoast > 0 && surf153.inland === 0, JSON.stringify(surf153))
+check('the surf gust also fades to silence inland (no leak past the target)',
+  surf153.wobbleCoast > 0 && surf153.wobbleInland === 0, JSON.stringify(surf153))
+check('the birdsong slider scales that source gain (point 153)',
+  surf153.birdsFull > 0 && surf153.birdsHalf > 0 && surf153.birdsHalf < surf153.birdsFull && surf153.birdsOff === 0,
+  JSON.stringify(surf153))
+
 // --- TRAA toggle (design.md §2.7; CLAUDE.md §7.1 pt. 32) ----------------------
 // TRAA is the default; toggling rebuilds the post pipeline (velocity MRT,
 // MSAA off ↔ MSAA on). Headless this exercises the WebGL 2 fallback only —

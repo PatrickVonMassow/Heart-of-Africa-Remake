@@ -21,6 +21,21 @@ interface Layer {
 
 const FADE = 1.6 // seconds
 
+/** Coastal surf fade (point 153, design.md §19.1): the surf bed's gain by the
+ *  distance (in degrees) to the nearest coast — full (1) within `nearRadius`,
+ *  silent (0) at/beyond `cutoff`, a smooth monotone fall between. Pure, so the
+ *  curve is unit-tested; the caller multiplies it into the surf layer target. */
+export function coastSurfGain(coastDist: number, nearRadius: number, cutoff: number): number {
+  if (coastDist <= nearRadius) return 1
+  if (coastDist >= cutoff) return 0
+  const t = (coastDist - nearRadius) / (cutoff - nearRadius) // 0 at the shore edge, 1 at the cutoff
+  const s = t * t * (3 - 2 * t) // smoothstep
+  return 1 - s
+}
+/** Base surf loudness at the shore (before the coast fade and the ambience
+ *  volume) — the old port-only 0.22 is now the near-coast value. */
+const SURF_BASE = 0.26
+
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 // Two sub-buses under the master so footsteps and every other ambient sound can
@@ -84,7 +99,15 @@ function noiseBed(name: string, filterType: BiquadFilterType, freq: number, q = 
 // Gust/swell LFOs add gain on top of the layer targets, so they are a
 // loudness source of their own; their depth is scaled by the single
 // configurable ambience volume (design.md §21) and re-applied on changes.
-const wobbles: Array<{ gain: GainNode; baseDepth: number }> = []
+// The surf gust is ALSO scaled by the coast proximity (point 153): its depth
+// must fall to 0 inland too, or a faint swell would leak past the silenced
+// surf target — the layer target alone would read 0 while the ear still heard it.
+const wobbles: Array<{ name: string; gain: GainNode; baseDepth: number }> = []
+/** The extra scale a wobble carries beyond the ambience volume (the surf gust
+ *  follows the coast fade; everything else is 1). */
+function wobbleExtra(name: string): number {
+  return name === 'surf' ? coastProx : 1
+}
 
 /** Slow amplitude wobble on a layer (wind gusts, crowd swell). */
 function wobble(name: string, rate: number, depth: number) {
@@ -93,11 +116,11 @@ function wobble(name: string, rate: number, depth: number) {
   const lfo = ctx.createOscillator()
   lfo.frequency.value = rate
   const lfoGain = ctx.createGain()
-  lfoGain.gain.value = depth * balance.ambienceVolume
+  lfoGain.gain.value = depth * balance.ambienceVolume * wobbleExtra(name)
   lfo.connect(lfoGain)
   lfoGain.connect(l.gain.gain)
   lfo.start()
-  wobbles.push({ gain: lfoGain, baseDepth: depth })
+  wobbles.push({ name, gain: lfoGain, baseDepth: depth })
 }
 
 function envOsc(
@@ -243,6 +266,12 @@ function emitFlock(dest: GainNode) {
   }
 }
 
+// Coast proximity (point 153): 0 = far inland (no surf), 1 = at the shore, set
+// by the ambience controller from the distance to the nearest coast. Re-applied
+// on a move and on a volume change so the surf fades as the traveller leaves the
+// sea. Its curve (coastSurfGain) is computed by the caller and clamped here.
+let coastProx = 0
+
 // Nearby-animal proximity (0 = none/far, 1 = right beside the player), set each
 // frame by the travel scene; re-applied on a volume change (design.md §19/§21).
 const animalProx: Record<'elephant' | 'lion' | 'grazer' | 'flock', number> = {
@@ -260,6 +289,17 @@ function applyAnimalTargets() {
   setTarget('aniLion', inPlace ? 0 : animalProx.lion * 0.7 * vol)
   setTarget('aniGrazer', inPlace ? 0 : animalProx.grazer * 0.5 * vol)
   setTarget('aniFlock', inPlace ? 0 : animalProx.flock * 0.45 * vol)
+}
+
+/** Surf gain from the coast proximity (point 153): the shore bed scaled by the
+ *  coast fade and the single ambience volume. Called from applyScene and on a
+ *  coast-proximity change. */
+function applySurfTarget() {
+  if (!ctx) return
+  setTarget('surf', SURF_BASE * coastProx * balance.ambienceVolume)
+  // The surf gust follows the same coast fade, or it would swell inland where
+  // the bed itself is silent.
+  for (const w of wobbles) if (w.name === 'surf') w.gain.gain.value = w.baseDepth * balance.ambienceVolume * coastProx
 }
 
 function buildGraph() {
@@ -321,10 +361,14 @@ function applyScene() {
   // (design.md §21; default 0.1).
   const noise = balance.ambienceVolume
   setTarget('wind', (inPlace ? 0.1 : windByRegion[region]) * noise)
-  setTarget('surf', (port ? 0.22 : 0) * noise)
+  // Surf is coastal (point 153): the coast fade drives it in both travel and
+  // port, so an inland-ish port hears less of it and travel near the sea hears
+  // it at all — no longer a flat port-only bed.
+  applySurfTarget()
   setTarget('murmur', (port ? 0.3 : 0) * noise)
   setTarget('insects', !port && (region === 'west' || region === 'south' || region === 'east') ? (inPlace ? 0.12 : 0.2) : 0)
-  setTarget('birds', !port && region === 'central' ? (inPlace ? 0.25 : 0.4) : 0)
+  // Birdsong carries its own per-source volume (point 153).
+  setTarget('birds', (!port && region === 'central' ? (inPlace ? 0.25 : 0.4) : 0) * balance.birdsongVolume)
   setTarget('drums', village ? 0.5 : nearVillage ? 0.18 : 0)
   setTarget('music', inPlace ? 0.16 : 0.1)
   applyAnimalTargets()
@@ -376,6 +420,16 @@ export function setAmbienceAnimals(next: Record<'elephant' | 'lion' | 'grazer' |
   if (changed && ctx) applyAnimalTargets()
 }
 
+/** Report the traveller's coast proximity (point 153): 0 far inland, 1 at the
+ *  shore — the surf fades with it. Called from the ambience controller each
+ *  sync with coastSurfGain(distance). */
+export function setAmbienceCoast(prox: number) {
+  const v = Math.max(0, Math.min(1, prox))
+  if (Math.abs(v - coastProx) < 0.02) return
+  coastProx = v
+  if (ctx) applySurfTarget()
+}
+
 /** Start the engine on the first user gesture; safe to call repeatedly. */
 export function startAmbience() {
   if (started) {
@@ -394,7 +448,7 @@ export function startAmbience() {
 export function refreshAmbienceVolume() {
   if (!ctx) return
   applyScene()
-  for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume
+  for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
   if (footstepBus) footstepBus.gain.value = balance.footstepVolume
 }
@@ -417,5 +471,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     started: () => started,
     layerTarget: (name: string) => layers[name]?.target ?? 0,
     animalProx: () => ({ ...animalProx }),
+    setCoast: (prox: number) => setAmbienceCoast(prox),
+    coastProx: () => coastProx,
+    setScene: (next: AmbienceScene) => setAmbienceScene(next),
+    refresh: () => refreshAmbienceVolume(),
+    surfWobble: () => wobbles.find((w) => w.name === 'surf')?.gain.gain.value ?? 0,
   }
 }

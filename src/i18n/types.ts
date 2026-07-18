@@ -262,6 +262,9 @@ export interface Strings {
     ambienceVolume: string
     footstepVolume: string
     ambientVolume: string
+    birdsongVolume: string
+    surfNearRadius: string
+    surfCutoff: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

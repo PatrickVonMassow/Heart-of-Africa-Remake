@@ -564,6 +564,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 
 - Regional soundscape and dynamic music: distinct sound worlds per region (savanna insects and vastness, jungle with birds and monkeys, desert wind, drums near villages). Changes on region transitions and on perspective switches.
 - On top of the regional bed, nearby wildlife is heard for what it is: an animal in the bird's-eye view near the traveller sounds its own call — an elephant trumpets, a hunting lion roars, grazers bark and snort, a wading flamingo flock chatters — growing louder as the player draws close and fading once it is left behind. These proximity calls count as ambience and are scaled by the single ambience volume along with the rest of the soundscape.
+- The ocean surf is coastal, not a global bed: its loudness fades with the distance to the nearest coast — full within a near radius of the shore, silent at and beyond a calibratable cutoff, smooth between — so it is heard along the sea and in seaside ports but falls away as the traveller moves inland (both radius and cutoff are debug-editable balance values, §21). Beyond the single master ambience volume, individual sources can be turned down on their own through per-source volume sliders in the debug menu — at minimum the birdsong has one (§21).
 
 ### 19.2 Living wildlife and streaming
 

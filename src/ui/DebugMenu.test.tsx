@@ -26,6 +26,9 @@ const DEFAULTS = {
   ambienceVolume: balance.ambienceVolume,
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
+  birdsongVolume: balance.birdsongVolume,
+  surfNearRadius: balance.surf.nearRadius,
+  surfCutoff: balance.surf.cutoff,
   canoeSpeedup: balance.canoeSpeedup,
   riverWidthFactor: balance.river.widthFactor,
   canteenCapacity: balance.health.canteenCapacity,
@@ -73,6 +76,9 @@ afterEach(() => {
   balance.ambienceVolume = DEFAULTS.ambienceVolume
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
+  balance.birdsongVolume = DEFAULTS.birdsongVolume
+  balance.surf.nearRadius = DEFAULTS.surfNearRadius
+  balance.surf.cutoff = DEFAULTS.surfCutoff
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.river.widthFactor = DEFAULTS.riverWidthFactor
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
@@ -135,6 +141,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.ambienceVolume, read: () => balance.ambienceVolume, value: 0.5 },
     { label: en.debug.footstepVolume, read: () => balance.footstepVolume, value: 3 },
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
+    // Per-source birdsong volume and the coastal surf fade bounds (point 153).
+    { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
+    { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
+    { label: en.debug.surfCutoff, read: () => balance.surf.cutoff, value: 5 },
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },

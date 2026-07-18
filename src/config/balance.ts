@@ -25,6 +25,18 @@ export interface BalanceConfig {
    *  interaction chime/"ding-dong") under the master ambience volume (user
    *  request: half as loud as before). */
   ambientVolume: number
+  /** Per-source multiplier on the birdsong voice (point 153): a debug-editable
+   *  slider over the single ambience volume, so the birds can be turned down on
+   *  their own. 1 = the design gain, 0 = silent. */
+  birdsongVolume: number
+  /** Coastal surf fade (point 153, design.md §19.1): the ocean-surf bed is only
+   *  audible near the coast — full within `nearRadius`, silent at/beyond
+   *  `cutoff`, smooth between, keyed on the distance to the nearest coast in
+   *  degrees. Calibratable by ear at the debug travel speed. */
+  surf: {
+    nearRadius: number
+    cutoff: number
+  }
   /** In-game days that pass per world unit traveled on the map. */
   daysPerUnit: number
   /** Provisions consumed per in-game day (1.0 = one day's ration). */
@@ -359,6 +371,8 @@ export const balance: BalanceConfig = {
   ambienceVolume: 0.1,
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
+  birdsongVolume: 1, // per-source birdsong slider (point 153); 1 = design gain
+  surf: { nearRadius: 0.4, cutoff: 3 }, // surf full within 0.4° of the coast, silent beyond 3° (point 153, calibratable)
   daysPerUnit: 0.2,
   foodPerDay: 0, // demo start preset (point 104): no hunger by default; debug-editable
   foodUnitDays: 28, // one purchased food unit lasts four weeks (user calibration)

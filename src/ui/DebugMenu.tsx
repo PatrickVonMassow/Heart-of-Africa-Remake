@@ -219,6 +219,15 @@ export function DebugMenu() {
           set('ambientVolume', Math.max(0, v))
           refreshAmbienceVolume()
         }} />
+      <NumberField label={t.debug.birdsongVolume} value={balance.birdsongVolume} step={0.1}
+        onChange={(v) => {
+          set('birdsongVolume', Math.max(0, v))
+          refreshAmbienceVolume()
+        }} />
+      <NumberField label={t.debug.surfNearRadius} value={balance.surf.nearRadius} step={0.1}
+        onChange={(v) => { balance.surf.nearRadius = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.surfCutoff} value={balance.surf.cutoff} step={0.5}
+        onChange={(v) => { balance.surf.cutoff = Math.max(0.1, v); bump() }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.canteenDrain} value={balance.health.canteenDrainPerDay} step={0.1}

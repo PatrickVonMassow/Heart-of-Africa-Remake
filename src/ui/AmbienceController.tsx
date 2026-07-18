@@ -4,8 +4,10 @@
 
 import { useEffect } from 'react'
 import { useGame } from '../state/store'
-import { PLACES, latLonToWorld, placeById } from '../world/geo'
-import { setAmbienceScene, startAmbience } from '../systems/ambience'
+import { PLACES, latLonToWorld, placeById, worldToLatLon } from '../world/geo'
+import { coastSurfGain, setAmbienceCoast, setAmbienceScene, startAmbience } from '../systems/ambience'
+import { coastDistance } from '../world/geoIndex'
+import { balance } from '../config/balance'
 
 const DRUM_RADIUS = 18 // world units within which village drums are audible
 
@@ -35,6 +37,12 @@ export function AmbienceController() {
         placeKind: place?.kind ?? null,
         nearVillage,
       })
+      // Coastal surf (point 153): fade the surf bed with the distance to the
+      // nearest coast — the place's own coordinates in a settlement, the
+      // traveller's position on the map.
+      const ll = place ? { lat: place.lat, lon: place.lon } : worldToLatLon(s.pos.x, s.pos.z)
+      const dist = coastDistance(ll.lat, ll.lon, balance.surf.cutoff + 1)
+      setAmbienceCoast(coastSurfGain(dist, balance.surf.nearRadius, balance.surf.cutoff))
     }
     sync()
     const iv = setInterval(sync, 700)

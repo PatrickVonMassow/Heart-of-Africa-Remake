@@ -860,7 +860,13 @@ verify suite that proves it.
     forward speed (a diagonal is never faster than straight; `design.md`
     §2.2), the first-person eye height is 1.5 m, a single ambience volume
     (default 0.1) scales the whole soundscape incl. the §19.1 proximity
-    calls (a nearby animal's own call rises and fades with distance), the
+    calls (a nearby animal's own call rises and fades with distance); the
+    ocean surf is COASTAL (point 153): its gain fades with the distance to
+    the nearest coast — full within a calibratable near radius, exactly 0 at
+    and beyond a calibratable cutoff (`balance.surf.nearRadius`/`cutoff`) —
+    so it is heard at the sea and in seaside ports but silent inland, and
+    per-source volume sliders sit over the master volume (at least
+    `balance.birdsongVolume` for the birdsong), all debug-editable; the
     overland travel speed defaults to 5.6 (calibrated calm), and the
     terrain relief items are tunable as factors (§11/§21.2). All of these
     are adjustable at runtime in the debug menu (§21) in both languages.
@@ -899,7 +905,12 @@ verify suite that proves it.
       does not toggle while a debug field is focused; `design.md` §17.5),
       the working debug-menu controls in both languages, a nearby
       animal's proximity call rising and fading once the player leaves,
-      the lion-feed depiction (pt. 12), and the first-person walk feel
+      the coastal surf fade (point 153): the surf layer gain is >0 at the
+      shore and EXACTLY 0 far inland, and the birdsong slider scales that
+      source's gain (the fade curve `coastSurfGain` pure-tested in
+      `src/systems/ambience.test.ts`, the birdsong/surf-bound debug
+      write-through in `src/ui/DebugMenu.test.tsx`); the lion-feed
+      depiction (pt. 12), and the first-person walk feel
       (point 97): while holding forward the camera y bobs off the 1.5 m
       eye height and settles back to it at rest, and a footstep fires with
       a surface class (`window.__walkFeel`). The walk-feel math — velocity
