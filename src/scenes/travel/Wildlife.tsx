@@ -40,6 +40,7 @@ import {
   turnToward,
   killFlockMayDescend,
   pickOffscreenLandAnchor,
+  calvesForGroup,
   deflectedStep,
   type FlightState,
   channelDriftStep,
@@ -135,7 +136,10 @@ const MAX_INSTANCES: Record<Species, number> = {
  *  counts small. Flamingos raise no young; the lion joins for its cub (the
  *  lioness-vs-hyena drama, point 145c), the other predators hold carcasses only. */
 const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'plover', 'lion'] as const
-const MAX_CALF_INSTANCES = 24
+// Per-species calf render budget. Raised for point 169 (a fraction of each herd
+// group is now calves, so several groups in view can hold more than the old
+// one-per-group), still a small buffer.
+const MAX_CALF_INSTANCES = 48
 
 interface Animal {
   x: number
@@ -950,19 +954,27 @@ function placeGroup(
     }
     list.push(animal)
   }
-  // Family life (design.md §19): a herd of at least three raises a juvenile that
-  // keeps close to a parent and nurses; the parent guards it against predators.
-  // Flamingos (shoreline flocks) are excluded. Counted over the animals actually
-  // placed (spots on water are skipped above), so the parent/calf link can never
-  // reach back into an earlier group's animals.
-  if (!shoreline && list.length - placedStart >= 3) {
-    const parent = list[placedStart]
-    const calf = list[list.length - 1]
-    if (parent && calf && parent !== calf) {
-      calf.young = true
-      calf.parent = parent
-      calf.scale *= 0.55 // a small juvenile
-      parent.child = calf
+  // Family life (design.md §19): a herd of at least three raises juveniles that
+  // keep close to a parent and nurse; the parent guards them against predators.
+  // A calibratable fraction of the group are calves now (point 169), each linked
+  // to its OWN distinct parent — the LAST k placed become calves of the FIRST k
+  // placed, and k ≤ floor(n/2) keeps those index ranges from overlapping (so a
+  // parent is never its own calf and the .child relation stays 1:1). Flamingos
+  // (shoreline flocks) are excluded. Counted over the animals actually placed
+  // (water spots are skipped above), so the links never reach into an earlier
+  // group's animals.
+  if (!shoreline) {
+    const n = list.length - placedStart
+    const k = calvesForGroup(n, balance.family.calfFraction)
+    for (let i = 0; i < k; i++) {
+      const parent = list[placedStart + i]
+      const calf = list[list.length - 1 - i]
+      if (parent && calf && parent !== calf) {
+        calf.young = true
+        calf.parent = parent
+        calf.scale *= 0.55 // a small juvenile
+        parent.child = calf
+      }
     }
   }
 }

@@ -500,7 +500,13 @@ verify suite that proves it.
       (proportionally larger head, shorter neck/body, leggy stance, no
       adult ornaments; pure-tested in `src/render/fauna.test.ts`,
       live-checked via the calf meshes) — and a parent moves to interpose
-      between an approaching predator and its calf. Calf predation
+      between an approaching predator and its calf. A CALIBRATABLE FRACTION
+      of each herd group are calves (point 169, `balance.family.calfFraction`,
+      debug-editable), each linked to its own distinct parent — count =
+      clamp(round(fraction·n), 1, floor(n/2)), pure-tested via
+      `calvesForGroup` in `src/scenes/travel/wildlifeBehavior.test.ts` and
+      live-verified (a higher fraction yields strictly more juveniles) in
+      `scripts/verify/enrichments.mjs`. Calf predation
       (§19.8): a caught calf struggles alive (no stain or shrink) for a
       few seconds before the kill, a parent that reaches the predator is
       eaten in the calf's place while the calf escapes, a parent that

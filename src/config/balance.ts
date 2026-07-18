@@ -302,6 +302,11 @@ export interface BalanceConfig {
      *  Grief drives (vigil walk, trample charge, waterfall plunge) are not
      *  rescues and stay off it. */
     rescueBurst: number
+    /** Fraction of a herd group raised as calves (design.md §19, point 169):
+     *  a group of N gets clamp(round(fraction·N), 1, floor(N/2)) calves, each
+     *  linked to its own parent — so the family dramas happen more often.
+     *  Calibratable/debug-editable. */
+    calfFraction: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -538,6 +543,10 @@ export const balance: BalanceConfig = {
     // yet the shield still meets the hunter (6 > 5.6) and the too-late death
     // stays reachable at its staged distances (point 127's balance guard).
     rescueBurst: 2,
+    // Calibratable (point 169): ~a quarter of each herd group is calves, so a
+    // group of 8 raises 2 and a group of 4 raises 1 (floor(N/2) caps it so every
+    // calf keeps its own distinct parent). Was effectively one calf per group.
+    calfFraction: 0.25,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

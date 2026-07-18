@@ -754,6 +754,18 @@ export function pickOffscreenLandAnchor(
 }
 
 /**
+ * How many calves a herd group of `n` raises (design.md §19, point 169): a
+ * calibratable fraction of the group size, but at least 1 (a herd of three or
+ * more always raises a juvenile) and at most floor(n/2) so every calf can be
+ * linked to its OWN distinct parent (the .child relation is 1:1). A group below
+ * the family-life threshold of 3 raises none.
+ */
+export function calvesForGroup(n: number, fraction: number): number {
+  if (n < 3) return 0
+  return Math.max(1, Math.min(Math.floor(n / 2), Math.round(fraction * n)))
+}
+
+/**
  * The drinker catchment (design.md §19.13, point 120e, hardened by 135c):
  * how far from the water's AXIS a spawn may lie and still be given a shore
  * walk. Derived from the calibratable river half-width — the fixed 0.35 was

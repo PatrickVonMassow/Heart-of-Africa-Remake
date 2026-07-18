@@ -35,6 +35,7 @@ const DEFAULTS = {
   canteenCapacity: balance.health.canteenCapacity,
   vigilPredatorDelay: balance.vigil.predatorDelay,
   rescueBurst: balance.family.rescueBurst,
+  calfFraction: balance.family.calfFraction,
   crocStrikeRadius: balance.crocodile.strikeRadius,
 }
 
@@ -86,6 +87,7 @@ afterEach(() => {
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   balance.family.rescueBurst = DEFAULTS.rescueBurst
+  balance.family.calfFraction = DEFAULTS.calfFraction
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
@@ -159,6 +161,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
     // The parental rescue burst (design.md §19.8, point 127).
     { label: en.debug.rescueBurst, read: () => balance.family.rescueBurst, value: 3 },
+    // The juvenile fraction per herd (design.md §19, point 169).
+    { label: en.debug.calfFraction, read: () => balance.family.calfFraction, value: 0.4 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
   ]

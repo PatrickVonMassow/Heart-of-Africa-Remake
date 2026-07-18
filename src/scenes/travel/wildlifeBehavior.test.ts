@@ -6,6 +6,7 @@ import {
   mireRoll,
   vicinitySeedBounds,
   pickOffscreenLandAnchor,
+  calvesForGroup,
   seasonFlowFactor,
   waterStruggleFate,
   blockHeading,
@@ -1092,6 +1093,31 @@ describe('pickOffscreenLandAnchor (point 165 — a seeded guarantee never pops i
   it('returns null when no candidate is land', () => {
     const cands = [[0, 0], [10, 0]] as const
     expect(pickOffscreenLandAnchor(cands, () => false, () => false)).toBeNull()
+  })
+})
+
+describe('calvesForGroup (point 169 — a calibratable fraction of the herd, distinct parents)', () => {
+  it('raises none below the family-life threshold of three', () => {
+    expect(calvesForGroup(0, 0.25)).toBe(0)
+    expect(calvesForGroup(2, 0.9)).toBe(0)
+  })
+
+  it('scales with the fraction and the group size', () => {
+    expect(calvesForGroup(8, 0.25)).toBe(2) // round(2) = 2
+    expect(calvesForGroup(12, 0.25)).toBe(3) // round(3) = 3
+    expect(calvesForGroup(20, 0.25)).toBe(5)
+  })
+
+  it('never exceeds floor(n/2), so every calf keeps its own distinct parent', () => {
+    // floor(n/2) parents are available; the count may never outrun them.
+    for (const n of [3, 4, 5, 6, 7, 8, 20, 40]) {
+      expect(calvesForGroup(n, 1)).toBe(Math.floor(n / 2)) // fraction 1 → capped at floor(n/2)
+    }
+  })
+
+  it('always raises at least one juvenile for a group of three or more', () => {
+    expect(calvesForGroup(3, 0)).toBe(1) // fraction 0 still floors at 1 (herds raise young)
+    expect(calvesForGroup(10, 0.01)).toBe(1)
   })
 })
 

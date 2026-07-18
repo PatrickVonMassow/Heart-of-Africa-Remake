@@ -5760,7 +5760,7 @@ the remaining open points in their numeric order.
   committed 031d4e6. The run's other FAILs (118/calf-charge) were rotating
   family-staging flakes, different each run, unrelated to this change.
 
-- [ ] 169. Too few juveniles — raise the calf-to-adult ratio.
+- [x] 169. Too few juveniles — raise the calf-to-adult ratio.
   User request (17.07.2026 23:xx): "Ist das Anzahlen-Verhaeltnis zwischen
   erwachsenen Tieren und Jungtieren akkurat? Mir kommt es nach zu wenigen
   Jungtieren vor. Mehr Jungtiere waeren auch deswegen schoen, weil die
@@ -5785,6 +5785,15 @@ the remaining open points in their numeric order.
   more than one calf, each with its own parent link (enrichments). DOCS:
   design.md §19.8 (the herd raises SEVERAL young) + CLAUDE §7.1 pt.12/20 (the
   tunable). (Reported 17.07.2026; queued at the batch end per append-and-defer.)
+  DONE 18.07.2026: `balance.family.calfFraction` (0.25, debug-editable) drives
+  `calvesForGroup(n, fraction) = n<3 ? 0 : clamp(round(fraction·n), 1, floor(n/2))`;
+  the K last-placed members of each herd group become calves, each linked 1:1 to
+  one of the first K adults as its parent (so the 1:1 drama invariant holds while
+  more pairs coexist). MAX_CALF_INSTANCES 24→48 to absorb the extra young.
+  DebugMenu field + i18n (de/en). Pure test (count + distinct parents) in
+  `wildlifeBehavior.test.ts`; live more-juveniles check in enrichments (a higher
+  fraction yields strictly more juveniles). design.md §19.8 + CLAUDE §7.1 pt.12.
+  1828 Vitest + enrichments 197/0 green.
 
 - [ ] 170. A RETURN journal entry when a village's situation has changed.
   User request (17.07.2026 23:xx): the village vignette currently fires only on

@@ -1199,6 +1199,34 @@ const noPop = await page.evaluate(async () => {
 })
 check('no ground animal appears inside the rendered frame while driving (point 165)', noPop.pops === 0, JSON.stringify(noPop))
 
+// Point 169: a herd raises a calibratable FRACTION of its group as calves (was
+// one per group). Same seed/groups, two fractions: a higher calfFraction must
+// yield strictly more juveniles, and at least one at the low end (herds always
+// raise young). Deterministic — restock re-runs the seeded spawn.
+const moreCalves = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__game.getState().debugJumpTo(-2.5, 34.0) // Serengeti savanna herds
+  await sleep(400)
+  const countYoung = () => {
+    let young = 0
+    const h = window.__wildlife.herdsRef.current
+    for (const sp of Object.keys(h)) for (const a of h[sp]) if (!a.dead && a.young) young++
+    return young
+  }
+  const prev = window.__balance.family.calfFraction
+  window.__balance.family.calfFraction = 0.05
+  window.__wildlife.restock(); await sleep(500)
+  const few = countYoung()
+  window.__balance.family.calfFraction = 0.6
+  window.__wildlife.restock(); await sleep(500)
+  const many = countYoung()
+  window.__balance.family.calfFraction = prev
+  window.__wildlife.restock()
+  return { few, many }
+})
+check('a higher calfFraction raises more juveniles (point 169)',
+  moreCalves.many > moreCalves.few && moreCalves.few >= 1, JSON.stringify(moreCalves))
+
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
 // flies in, lands and consumes it, dissolving it as a lion kill does.
