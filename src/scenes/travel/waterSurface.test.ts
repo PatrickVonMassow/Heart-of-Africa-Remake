@@ -17,6 +17,7 @@ import {
   LAKE_LIFT,
   lakeBedMax,
   densifyRiver,
+  registerRiverSurfaces,
 } from './waterSurface'
 
 const SEED = 42
@@ -139,5 +140,18 @@ describe('waterSurfaceY (the canoe float height)', () => {
   it('keeps the lift constants in the documented relation', () => {
     expect(SURFACE_LIFT).toBeCloseTo(0.3)
     expect(LAKE_LIFT).toBeCloseTo(0.12)
+  })
+})
+
+describe('registerRiverSurfaces (the travel scene remount, first registration wins)', () => {
+  it('a re-registration for the same seed is ignored, so a remount cannot swap in different data', () => {
+    const seed = 918273 // a seed no other test in this file touches
+    registerRiverSurfaces(seed, [{ lat: 10, lon: 10, surf: 5, nile: false }])
+    // The travel scene remounts on every settlement visit and re-registers
+    // the identical build — but here with DIFFERENT data, to prove it is
+    // ignored rather than overwriting the first registration.
+    registerRiverSurfaces(seed, [{ lat: 10, lon: 10, surf: 99, nile: false }])
+    const y = waterSurfaceY(10, 10, seed, -100) // a very low local height so it never dominates
+    expect(y).toBeCloseTo(5, 6)
   })
 })

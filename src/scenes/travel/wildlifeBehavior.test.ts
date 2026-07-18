@@ -63,6 +63,24 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
     expect(fleeHeading(0, 0, [], 3)).toBeNull()
   })
 
+  it('the radius bound is exact: exactly at the radius is out of range, a hair inside is in (point 173)', () => {
+    // Threat straight ahead at distance exactly 3 (== radius): `d >= radius`
+    // excludes it, so no threat is in range.
+    expect(fleeHeading(0, 0, [[0, 3]], 3)).toBeNull()
+    // The same threat a hair closer must be in range.
+    expect(fleeHeading(0, 0, [[0, 3 - 1e-6]], 3)).not.toBeNull()
+  })
+
+  it('a coincident threat (d < 1e-4) is skipped, while d === 1e-4 itself counts', () => {
+    // Exactly on top of the animal: skipped (division by ~0 avoided) — with
+    // no other threat in range, the result is null.
+    expect(fleeHeading(0, 0, [[0, 0]], 3)).toBeNull()
+    expect(fleeHeading(0, 0, [[0, 5e-5]], 3)).toBeNull()
+    // At exactly the 1e-4 cutoff the threat is NOT skipped (`d < 1e-4` is
+    // strict), so it must be picked up as a valid, in-range threat.
+    expect(fleeHeading(0, 0, [[0, 1e-4]], 3)).not.toBeNull()
+  })
+
   it('flees directly away from a single threat', () => {
     // Threat ahead at +z; the animal should flee toward -z (heading π).
     const h = fleeHeading(0, 0, [[0, 2]], 3)
@@ -379,6 +397,17 @@ describe('griefTarget (design.md §19 — the parent charges the elephant that t
 
   it('returns null when every elephant is dead', () => {
     expect(griefTarget(0, 0, [{ x: 1, z: 1, dead: true }, { x: 5, z: 5, dead: true }])).toBeNull()
+  })
+
+  it('breaks an exact distance tie by taking the first element (point 173 hardening)', () => {
+    // Both at distance 5 from the origin — a strict "<" comparison means the
+    // FIRST one encountered keeps the pick, never the later tied one.
+    const first = { x: 3, z: 4 }
+    const second = { x: 4, z: 3 }
+    expect(griefTarget(0, 0, [first, second])).toEqual(first)
+    // Reversed order: the (now-first) second element wins instead — proving
+    // the result really tracks list order, not some other tiebreak.
+    expect(griefTarget(0, 0, [second, first])).toEqual(second)
   })
 
   it('the charge reaches the trampling feet well inside the grief window', () => {
@@ -920,6 +949,24 @@ describe('vigilDrawSpawn (point 121 (f) — the drawn predator walks in, never p
     expect(fromPlayer).toBeGreaterThan(wideView)
     expect(fromPlayer).toBeLessThan(wideView + 30)
   })
+
+  it('an empty annulus (lo > hi) falls back to the closest-score probe — finite, never NaN', () => {
+    // view ring 50 -> lo = 52; abort ring 53 -> hi = 51: lo > hi, so no probe
+    // can ever satisfy `d > lo && d < hi`, forcing every call through the
+    // score-based fallback for the whole 24-probe sweep.
+    const p = vigilDrawSpawn(10, -5, 0, 0, 50, 53, 0.42)
+    expect(Number.isFinite(p.x)).toBe(true)
+    expect(Number.isFinite(p.z)).toBe(true)
+    // Every candidate (and the initial fallback default) sits exactly at the
+    // keeper-centred spawn distance, whichever one the score picks.
+    expect(Math.hypot(p.x - 10, p.z - (-5))).toBeCloseTo(58, 6) // viewR + default margin
+  })
+
+  it('the empty-annulus fallback is deterministic for a given rand01', () => {
+    const p1 = vigilDrawSpawn(10, -5, 0, 0, 50, 53, 0.42)
+    const p2 = vigilDrawSpawn(10, -5, 0, 0, 50, 53, 0.42)
+    expect(p1).toEqual(p2)
+  })
 })
 
 describe('deflectedStep (scripted walks obey the land constraint, point 83)', () => {
@@ -1093,6 +1140,14 @@ describe('mireRoll / mireFate (design.md §19.8, point 123 — the drying waterh
     expect(mireRoll(0.02, 0.05, 0.1, 0.25, 0.35, 0.9)).toBe(false)
     // The wetness boundary is exact: AT the threshold the bank is firm.
     expect(mireRoll(0.02, 0.05, 0.25, 0.25, 0.35, 0.0)).toBe(false)
+  })
+
+  it('the bank-reach boundary is inclusive: bankDistDeg === bankReachDeg still counts as AT the bank', () => {
+    // The guard is `bankDistDeg > bankReachDeg` (strict), so equality is NOT
+    // excluded — a bout landing exactly on the reach edge still may mire.
+    expect(mireRoll(0.05, 0.05, 0.1, 0.25, 0.35, 0.2)).toBe(true)
+    // A hair beyond the reach IS excluded.
+    expect(mireRoll(0.05 + 1e-9, 0.05, 0.1, 0.25, 0.35, 0.2)).toBe(false)
   })
 
   it('the mire always resolves: released exactly at the window', () => {

@@ -51,6 +51,16 @@ describe('directionToU (direction-true, tan-corrected)', () => {
     expect(u).toBeCloseTo(0.125 + Math.tan(a) / 8)
     expect(u).not.toBeCloseTo(0.125 + 0.0625, 3)
   })
+
+  it('the degenerate zero direction (0,0) resolves to a finite u in [0,1), never NaN', () => {
+    const u = directionToU(0, 0)
+    expect(Number.isFinite(u)).toBe(true)
+    expect(u).toBeGreaterThanOrEqual(0)
+    expect(u).toBeLessThan(1)
+    // atan2(+0, -0) is +π (IEEE 754) — the same branch as due south — so the
+    // degenerate direction lands deterministically on the south sector centre.
+    expect(u).toBeCloseTo(directionToU(0, 1), 9)
+  })
 })
 
 describe('bandHeightAt', () => {

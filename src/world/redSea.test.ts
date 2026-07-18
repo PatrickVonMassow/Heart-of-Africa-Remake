@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import sharp from 'sharp'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { isNortheastOfBoundary, trimToGameWorld } from './redSea'
+import { isNortheastOfBoundary, trimToGameWorld, NORTHEAST_BOUNDARY } from './redSea'
 import { sampleTerrain, isBlocked } from './terrain'
 import { elevationAt, landFractionAt } from './geodata'
 import { balance } from '../config/balance'
@@ -36,6 +36,62 @@ describe('isNortheastOfBoundary', () => {
     expect(isNortheastOfBoundary(34, 15)).toBe(false) // Mediterranean
     expect(isNortheastOfBoundary(11.6, 43.2)).toBe(false) // Gulf of Tadjoura (African bay)
     expect(isNortheastOfBoundary(10.6, 45.0)).toBe(false) // Berbera nearshore strip
+  })
+})
+
+describe('isNortheastOfBoundary — exact boundary/prefilter edges (point 173 hardening)', () => {
+  // Reference computation WITHOUT the cheap box prefilter, built from the
+  // real exported polyline — used to prove the prefilter's threshold is
+  // exactly where the code says (strict '<'), not an off-by-one.
+  function fullNoBoxPrefilter(lat: number, lon: number): boolean {
+    let bestD = Infinity
+    let bestCross = 0
+    for (let i = 0; i < NORTHEAST_BOUNDARY.length - 1; i++) {
+      const [ax, ay] = NORTHEAST_BOUNDARY[i]
+      const [bx, by] = NORTHEAST_BOUNDARY[i + 1]
+      const dx = bx - ax
+      const dy = by - ay
+      const t = Math.max(0, Math.min(1, ((lon - ax) * dx + (lat - ay) * dy) / (dx * dx + dy * dy)))
+      const px = lon - (ax + dx * t)
+      const py = lat - (ay + dy * t)
+      const d = px * px + py * py
+      if (d < bestD) {
+        bestD = d
+        bestCross = dx * (lat - ay) - dy * (lon - ax)
+      }
+    }
+    return bestCross >= 0
+  }
+
+  it('a point exactly ON the polyline (bestCross === 0, not a rounded near-zero) reads as northeast', () => {
+    // Any boundary vertex sits exactly on its own adjoining segment: the
+    // closest-segment cross product is exactly 0 by construction (lat-ay and
+    // lon-ax are literal 0 there), so bestCross >= 0 must hold at the ===.
+    for (const [lon, lat] of [NORTHEAST_BOUNDARY[10], NORTHEAST_BOUNDARY[20]]) {
+      expect(isNortheastOfBoundary(lat, lon)).toBe(true)
+    }
+  })
+
+  it('the lon prefilter is a strict "<": exactly at the box the real geometry still decides', () => {
+    // At lat 39.5 the true (unfiltered) classification stays "northeast" down
+    // to and including lon 30.5 — the cheap box must not cut it off early.
+    expect(fullNoBoxPrefilter(39.5, 30.5)).toBe(true)
+    expect(isNortheastOfBoundary(39.5, 30.5)).toBe(true)
+    // One hair west of the box: the prefilter forces false even though the
+    // real geometry alone would still say true — proving the threshold sits
+    // exactly at BOX_LON_MIN with a strict '<', not '<='.
+    expect(fullNoBoxPrefilter(39.5, 30.499999)).toBe(true)
+    expect(isNortheastOfBoundary(39.5, 30.499999)).toBe(false)
+  })
+
+  it('the lat prefilter edge (BOX_LAT_MIN) is inclusive, matching the full computation there', () => {
+    // At lat exactly 9.5 the box does not short-circuit: the result always
+    // matches the unfiltered geometry (here uniformly false, since the whole
+    // boundary polyline sits north of lat ~10.8 — this pins that the box
+    // reproduces the real answer at its own edge rather than a hard-coded one).
+    for (const lon of [35, 45, 60]) {
+      expect(isNortheastOfBoundary(9.5, lon)).toBe(fullNoBoxPrefilter(9.5, lon))
+    }
   })
 })
 

@@ -1,7 +1,7 @@
 // Real-DEM samplers (design.md §3 "Real geodata and terrain rendering"):
 // bilinear elevation, land mask, coast distance and the dataset metadata. Needs
 // the real dem.png, loaded once into jsdom via setupGeodata().
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, vi } from 'vitest'
 import { elevationAt, landFractionAt, coastDistanceAt, getDemMeta } from './geodata'
 import { setupGeodata } from '../test/geodata'
 
@@ -61,5 +61,24 @@ describe('getDemMeta', () => {
     expect(m.lonMax).toBeGreaterThan(0)
     expect(m.latMin).toBeLessThan(0)
     expect(m.latMax).toBeGreaterThan(0)
+  })
+})
+
+describe('samplers before loadGeodata() resolves (point 173 hardening)', () => {
+  it('elevationAt/landFractionAt/coastDistanceAt all return 0 on a fresh, unloaded module instance', async () => {
+    // This file's top-level module (statically imported above) is already
+    // loaded via the beforeAll setupGeodata() — so the "not loaded" branch is
+    // exercised on an ISOLATED module instance instead: resetModules() clears
+    // the registry, and a fresh dynamic import gets its own pixels/meta state
+    // (still null), untouched by the already-loaded static import.
+    vi.resetModules()
+    const fresh = await import('./geodata')
+    expect(fresh.elevationAt(0, 0)).toBe(0)
+    expect(fresh.landFractionAt(0, 0)).toBe(0)
+    expect(fresh.coastDistanceAt(0, 0)).toBe(0)
+    // Also away from the dataset bbox — both branches (not-loaded, out-of-bbox)
+    // agree on 0 for elevationAt, but not-loaded must win over the -4000
+    // deep-ocean fallback the loaded module would give there.
+    expect(fresh.elevationAt(0, -60)).toBe(0)
   })
 })

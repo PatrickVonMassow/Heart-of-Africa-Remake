@@ -3,6 +3,7 @@
 // spline index is built at module load from data/{rivers,lakes}.ts, no DEM.
 import { describe, it, expect } from 'vitest'
 import {
+  catmullRom,
   lakeContains,
   lakeShoreDistanceExact,
   riverDistanceExact,
@@ -78,6 +79,43 @@ describe('riverFlowExact (design.md §11)', () => {
     // segment direction must share the sign of the first authored step.
     const expLat = nile.points[1][1] - nile.points[0][1]
     expect(Math.sign(f.dirLat)).toBe(Math.sign(expLat))
+  })
+})
+
+describe('catmullRom (point 136 — the shared densification curve)', () => {
+  it('stays finite when the two inner control points coincide (p1 === p2)', () => {
+    // A degenerate knot spacing (guarded to 1e-6) must not blow up the curve
+    // into NaN or Infinity, for any t across the segment.
+    const p0: [number, number] = [0, 0]
+    const p1: [number, number] = [5, 5]
+    const p2: [number, number] = [5, 5]
+    const p3: [number, number] = [10, 3]
+    for (const t of [0, 0.001, 0.25, 0.5, 0.75, 0.999, 1]) {
+      const [x, y] = catmullRom(p0, p1, p2, p3, t)
+      expect(Number.isFinite(x), `t=${t}`).toBe(true)
+      expect(Number.isFinite(y), `t=${t}`).toBe(true)
+    }
+  })
+
+  it('the degenerate segment stays anchored near the coincident point rather than flying off', () => {
+    const p0: [number, number] = [0, 0]
+    const p1: [number, number] = [5, 5]
+    const p2: [number, number] = [5, 5]
+    const p3: [number, number] = [10, 3]
+    const [x, y] = catmullRom(p0, p1, p2, p3, 0.5)
+    expect(Math.hypot(x - 5, y - 5)).toBeLessThan(1) // no wild overshoot
+  })
+
+  it('is doubly degenerate (p0 === p1 === p2) without producing NaN', () => {
+    const p0: [number, number] = [2, 2]
+    const p1: [number, number] = [2, 2]
+    const p2: [number, number] = [2, 2]
+    const p3: [number, number] = [8, -1]
+    for (const t of [0, 0.5, 1]) {
+      const [x, y] = catmullRom(p0, p1, p2, p3, t)
+      expect(Number.isFinite(x), `t=${t}`).toBe(true)
+      expect(Number.isFinite(y), `t=${t}`).toBe(true)
+    }
   })
 })
 

@@ -54,6 +54,15 @@ describe('floraInSpawnCircle (points 164/171 — the circular edge)', () => {
     // A plant right at the fog far is still drawn (fogFar < spawnR).
     expect(floraInSpawnCircle(200, 0, 0, 0, spawnR)).toBe(true)
   })
+
+  it('is boundary-exact at the spawn radius itself (<=, not <)', () => {
+    const spawnR = floraSpawnRadius(200) // 230
+    expect(floraInSpawnCircle(spawnR, 0, 0, 0, spawnR)).toBe(true) // exactly on the edge
+    expect(floraInSpawnCircle(spawnR + 0.0001, 0, 0, 0, spawnR)).toBe(false) // a hair beyond
+    // Off-axis: the same boundary exactness holds for a diagonal offset.
+    const diag = spawnR / Math.SQRT2
+    expect(floraInSpawnCircle(diag, diag, 0, 0, spawnR)).toBe(true)
+  })
 })
 
 describe('floraShouldRebuild (point 164 — hysteresis kills the back-and-forth)', () => {

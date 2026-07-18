@@ -36,6 +36,27 @@ describe('regionAt banding (design.md §3)', () => {
     expect(regionAt(0, 20)).toBe('central') // Congo basin
     expect(regionAt(10, -10)).toBe('west') // West Africa
   })
+
+  it('is boundary-exact at every threshold (point 173 hardening)', () => {
+    // lat 17 alone crosses into north, west of lon 25.
+    expect(regionAt(17, 0)).toBe('north')
+    expect(regionAt(16.999, 0)).not.toBe('north') // just south: not yet north
+    // East of lon 25 the north band starts lower, at lat 14.5.
+    expect(regionAt(14.5, 25)).toBe('north')
+    expect(regionAt(14.499, 25)).not.toBe('north')
+    expect(regionAt(14.5, 24.999)).not.toBe('north') // lon just short of 25
+    // South plateau at exactly lat -12.
+    expect(regionAt(-12, 0)).toBe('south')
+    expect(regionAt(-11.999, 0)).not.toBe('south')
+    // East region at exactly lon 31.5 (lat kept > 7.5 so the fallback below
+    // 31.5 lands unambiguously in west, not central's lon>=12/lat<=7.5 rule).
+    expect(regionAt(10, 31.5)).toBe('east')
+    expect(regionAt(10, 31.499)).toBe('west')
+    // Central requires BOTH lon >= 12 and lat <= 7.5.
+    expect(regionAt(7.5, 12)).toBe('central')
+    expect(regionAt(7.5001, 12)).not.toBe('central') // just south of the lat cap
+    expect(regionAt(7.5, 11.999)).not.toBe('central') // just west of the lon cap
+  })
 })
 
 describe('culture/value matrix (design.md §8)', () => {

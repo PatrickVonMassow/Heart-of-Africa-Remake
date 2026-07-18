@@ -7,6 +7,7 @@ import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_D
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
 import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
+import { landFractionAt } from './geodata'
 import { LAKES } from './data/lakes'
 import { LAND_POLYGONS } from './data/coastline'
 import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_SITES } from './data/landmarks'
@@ -284,6 +285,26 @@ describe('cell classification and coast distance', () => {
 
   it('caps the coast distance at maxDist', () => {
     expect(coastDistance(24, 15, 0.5)).toBeLessThanOrEqual(0.5)
+  })
+
+  it('cellAt is boundary-exact at the landFractionAt < 0.5 threshold (point 173 hardening)', () => {
+    // Binary-search a real coastal transect (Nile delta into the
+    // Mediterranean) for the point where landFractionAt crosses 0.5, then
+    // confirm cellAt flips from OCEAN to non-OCEAN exactly there — the
+    // documented "< 0.5" contract (not "<= 0.5").
+    let landSide = 31.0 // land: south of the delta coast
+    let seaSide = 31.6 // sea: Mediterranean, north of the delta
+    expect(landFractionAt(landSide, 30.5)).toBeGreaterThanOrEqual(0.5)
+    expect(landFractionAt(seaSide, 30.5)).toBeLessThan(0.5)
+    for (let i = 0; i < 40; i++) {
+      const mid = (landSide + seaSide) / 2
+      if (landFractionAt(mid, 30.5) >= 0.5) landSide = mid
+      else seaSide = mid
+    }
+    expect(landFractionAt(landSide, 30.5)).toBeGreaterThanOrEqual(0.5)
+    expect(cellAt(landSide, 30.5)).not.toBe(CELL_OCEAN)
+    expect(landFractionAt(seaSide, 30.5)).toBeLessThan(0.5)
+    expect(cellAt(seaSide, 30.5)).toBe(CELL_OCEAN)
   })
 })
 

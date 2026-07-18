@@ -34,6 +34,17 @@ describe('solidDressingAllowed (trees/boulders keep the channel clear)', () => {
     expect(solidDressingAllowed('savanna', 1, 0.04)).toBe(false)
     expect(solidDressingAllowed('savanna', 1, 0.06)).toBe(true)
   })
+
+  it('the channel-clearance edge is exact (point 173 hardening): < blocks, === allows', () => {
+    const edge = RIVER_WIDTH_DEG + CHANNEL_CLEARANCE_DEG
+    expect(solidDressingAllowed('savanna', edge, 1)).toBe(true) // exactly at the edge: clear
+    expect(solidDressingAllowed('savanna', edge - 1e-9, 1)).toBe(false) // a hair short: blocked
+  })
+
+  it('the lake shore edge is exact: exactly 0.05 is allowed, a hair under it is blocked', () => {
+    expect(solidDressingAllowed('savanna', 1, 0.05)).toBe(true)
+    expect(solidDressingAllowed('savanna', 1, 0.05 - 1e-9)).toBe(false)
+  })
 })
 
 describe('inReedBelt (papyrus hugs the waterline)', () => {
@@ -47,6 +58,20 @@ describe('inReedBelt (papyrus hugs the waterline)', () => {
   it('accepts the lake shore band', () => {
     expect(inReedBelt(1, 0.02)).toBe(true)
     expect(inReedBelt(1, 0.1)).toBe(false)
+  })
+
+  it('the river band edges are exact (point 173 hardening): > inner, < outer', () => {
+    const inner = RIVER_WIDTH_DEG - 0.03
+    const outer = RIVER_WIDTH_DEG + 0.045
+    expect(inReedBelt(inner, 1)).toBe(false) // exactly at the inner edge: not yet inside
+    expect(inReedBelt(inner + 1e-9, 1)).toBe(true) // a hair past it: inside
+    expect(inReedBelt(outer, 1)).toBe(false) // exactly at the outer edge: no longer inside
+    expect(inReedBelt(outer - 1e-9, 1)).toBe(true) // a hair short of it: inside
+  })
+
+  it('the lake shore edge is exact: at 0.04 it is out, a hair under it is in', () => {
+    expect(inReedBelt(1, 0.04)).toBe(false)
+    expect(inReedBelt(1, 0.04 - 1e-9)).toBe(true)
   })
 })
 

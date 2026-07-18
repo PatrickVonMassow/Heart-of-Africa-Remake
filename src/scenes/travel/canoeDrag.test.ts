@@ -215,6 +215,16 @@ describe('canoeDragPose (terrain-lying hull)', () => {
     }
   })
 
+  it('clamps a negative groundAtTrail to 0 — a deep pit poses identically to flat ground (point 173)', () => {
+    // Only groundAtTrail feeds Math.max(0, ·); groundLeft/Right are unclamped
+    // and unrelated to this rule, so they are held fixed (but non-trivial) to
+    // isolate the clamp.
+    const atZero = canoeDragPose(0, 0, 5, T, 0, 3, 3)
+    for (const g of [-1e-6, -0.5, -100]) {
+      expect(canoeDragPose(0, 0, 5, T, g, 3, 3)).toEqual(atZero)
+    }
+  })
+
   it('yaws the hull toward the trail point', () => {
     const east = canoeDragPose(0, 0, 5, { x: CANOE_TRAIL_FAR, z: 0 }, 5, 5, 5)
     expect(east.centreX).toBeGreaterThan(0)

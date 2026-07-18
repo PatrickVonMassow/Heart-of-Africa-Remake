@@ -56,3 +56,28 @@ describe('edgeIsInterior (confluence bank masking)', () => {
     expect(edgeIsInterior(5.02, 20.02, 'solo', 0, buildBankIndex(loop), BAND)).toBe(true)
   })
 })
+
+describe('edgeIsInterior boundary exactness (point 173 hardening)', () => {
+  // A single foreign-river sample at the origin, so the probe distance is
+  // controlled precisely (no neighbouring samples to muddy the closest pick).
+  const oneSample = (riverId: string, index: number) =>
+    buildBankIndex([{ riverId, index, lat: 0, lon: 0 }])
+
+  it('the band distance is exact: AT bandDeg is not interior, a hair inside it is', () => {
+    const idx = oneSample('other', 0)
+    // Probe due north of the sample at exactly bandDeg — not "< bandDeg".
+    expect(edgeIsInterior(0.1, 0, 'self', 999, idx, 0.1)).toBe(false)
+    expect(edgeIsInterior(0.1 - 1e-6, 0, 'self', 999, idx, 0.1)).toBe(true)
+  })
+
+  it('the self-arc exclusion is exact: |i-self|===12 is excluded, 13 counts', () => {
+    // Same riverId as the query, probe right on the sample (distance 0, well
+    // inside any positive band) — only the index gap decides.
+    const idxAt = (sampleIndex: number) => oneSample('r', sampleIndex)
+    expect(edgeIsInterior(0, 0, 'r', 88, idxAt(100), 0.1)).toBe(false) // |100-88| = 12: excluded
+    expect(edgeIsInterior(0, 0, 'r', 87, idxAt(100), 0.1)).toBe(true) // |100-87| = 13: counts
+    // The exclusion is symmetric (index above or below self).
+    expect(edgeIsInterior(0, 0, 'r', 112, idxAt(100), 0.1)).toBe(false) // |100-112| = 12
+    expect(edgeIsInterior(0, 0, 'r', 113, idxAt(100), 0.1)).toBe(true) // |100-113| = 13
+  })
+})
