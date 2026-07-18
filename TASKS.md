@@ -6094,6 +6094,37 @@ the remaining open points in their numeric order.
   the collapse: bake the crown-collapse HEIGHT per instance too (drop the field
   read from the vertex stage entirely). (Follow-up to 171.)
 
+- [ ] 176. The dry-season drink catchment is silently capped at 0.45° (found by
+  the point-173 analysis). CONFIRMED bug: `riverDistance`/`lakeDistance`
+  (`src/world/geoIndex.ts:29,34`) clamp their `maxDist` via `Math.min(maxDist,
+  0.45)`, and `hydro.ts` caps at `MAX_QUERY = 0.45` too — so every caller asking
+  for a wider radius silently gets 0.45. The drink-to-the-bank behaviour
+  (`Wildlife.tsx` ~921-941) computes a water-distance GRADIENT with probes at
+  maxDist 0.6, but `drinkCatchment(RIVER_WIDTH_DEG, dryness)` reaches ~0.70 in
+  full dry season (RIVER_WIDTH_DEG = 0.17 × river.widthFactor 1.6 = 0.272; +0.06
+  +0.37). An animal whose TRUE water distance is in the 0.45-0.70 band reads
+  `wd = 0.45` (so it counts as "in catchment", `wd < catchment`), but BOTH
+  gradient probes also read 0.45 → `gLat = gLon = 0` → `gl < 1e-4` → it never
+  walks to the bank. So the dry-season "wider catchment gathers the wildlife at
+  the remaining water" (§19.13, point 120e/135c) only actually works out to ~0.45,
+  not the intended ~0.70 — point 135c widened the belt but the query cap still
+  clips it (a sibling of the point-129/136 river-width interaction).
+  WHY DEFERRED (not fixed in 173): raising the cap is not a one-liner. The 0.45
+  ceiling is a GLOBAL hydro-query perf limit used everywhere (terrain gen,
+  collision, clearances, flow), so raising it risks slowing every river/lake
+  distance query across the game. The fix needs a PERF-aware design — either a
+  targeted wider cap only for the drink queries, or a measured global raise — and
+  a full re-run of the point-135/147 dry-season live checks (LARGE regression) to
+  confirm the gathering reaches farther without a frame-budget hit.
+  FIX SKETCH (verify before building): raise `MAX_QUERY`/the geoIndex clamp to
+  cover `drinkCatchment(RIVER_WIDTH_DEG, 1)` + the 0.03 probe step (~0.75), OR add
+  a drink-specific wider query; measure the query cost at the cap; re-verify the
+  dry-season gather live (enrichments) and that nothing else regresses. TESTS:
+  pure — a geoIndex/geo test pinning the honoured radius once the cap is chosen
+  (currently `riverDistance(lat,lon,0.6)` === `riverDistance(lat,lon,0.45)`); live
+  — an animal at ~0.6° from water walks toward the bank in the forced dry season.
+  (Found 18.07.2026 by the point-173 subsystem analysis; queued at the batch end.)
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
