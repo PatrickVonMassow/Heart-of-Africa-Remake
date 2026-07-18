@@ -5554,6 +5554,28 @@ the remaining open points in their numeric order.
   the local plains show carrion without needing to travel away and back.
   DOCS: design.md §16 note on the date-jump re-stream if that is the fix.
   (Reported 17.07.2026; queued at the batch end per append-and-defer.)
+  ATTEMPT 1 REVERTED (18.07.2026, 02:23): a per-frame seedStruckVillageCarrion
+  (mirroring seedSettlementVicinity) placed 0 carcasses at the village AND
+  broke 11 other checks — REVERTED to keep the suite green. TWO lessons for
+  the redo: (1) INVASIVE FRAME SEEDER vs THE TEST SUITE — the seeder fires
+  for any struck village within vicinityRadius (75) of the player on the
+  current date; the Serengeti family-check spot (-2.2/34.8) is only ~20 world
+  units from the Maasai village (-2.5/36.8), INSIDE that radius, so when an
+  earlier check (133 jumps to 1891, the reverted 168 check to 1892) leaves
+  the calendar on a struck year, the seeder floods the Serengeti
+  wildebeest/antelope with carcasses and the family-pair checks fail ("no
+  pair"). (2) IT STILL PLACED 0 AT THE VILLAGE — unresolved: likely the
+  village chunk is not yet in spawnedChunks at the standard-zoom measurement
+  right after restock, so the `spawnedChunks.has(chunkKey)` gate skips it.
+  SAFE REDO — prefer the LEAST invasive option: instead of a per-frame
+  seeder, raise the carrion at CHUNK-STREAM time when the chunk lies within a
+  struck village's radius — force at least one carcass per eligible savanna
+  chunk (bounded, per-chunk, cannot flood), so standard-zoom streaming shows
+  it without a separate seeder. If a seeder IS needed, it MUST be throttled
+  (a seconds-clock like seedDryShoreDrinkers) and every date-jumping live
+  check MUST reset the calendar afterward so a struck date never leaks into
+  later checks. DIAGNOSE the 0-at-village first with a dev hook (is the
+  village chunk spawned? is the branch reached?) before re-implementing.
 
 - [ ] 169. Too few juveniles — raise the calf-to-adult ratio.
   User request (17.07.2026 23:xx): "Ist das Anzahlen-Verhaeltnis zwischen
