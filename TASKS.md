@@ -5596,7 +5596,7 @@ the remaining open points in their numeric order.
   17.07.2026; queued at the batch end per the standing append-and-defer
   rule.)
 
-- [ ] 167. Rain snaps on at a climate-zone border instead of easing in.
+- [x] 167. Rain snaps on at a climate-zone border instead of easing in.
   User report (17.07.2026 22:54, screenshot at 5.0N/25.4E walking south into
   the Central/Congo zone): "Der Regen setzt etwas zu ploetzlich ein, wenn man
   in eine andere Klimazone laeuft." Point 151 smoothed the GREENNESS field
