@@ -66,4 +66,37 @@ describe('bakeMaterial', () => {
       expect(mean).toBeLessThan(160)
     })
   }
+
+  // The ground terrain fields (sand/grass/rock/forest) share bakeMaterial's
+  // core with SURFACE_MATERIALS but were never run through it (point 173).
+  // Unlike SURFACE_MATERIALS, these are NOT doubled onto a region tint at
+  // runtime — generate-terrain-textures.mjs writes them straight out as the
+  // final ground look (sand pale, forest canopy dark) — so the mid-128
+  // contract does not apply here; instead pin the general byte-range and
+  // genuine per-pixel variation (catches a degenerate/flat/NaN bake).
+  for (const [name, mat] of Object.entries(TERRAIN_MATERIALS)) {
+    it(`${name} (terrain): normal map holds normalised vectors with positive z`, () => {
+      const { normal } = bakeMaterial(mat, BAKE_SIZE)
+      for (let i = 0; i < BAKE_SIZE * BAKE_SIZE; i++) {
+        const nx = (normal[i * 3] / 255) * 2 - 1
+        const ny = (normal[i * 3 + 1] / 255) * 2 - 1
+        const nz = (normal[i * 3 + 2] / 255) * 2 - 1
+        expect(nz).toBeGreaterThan(0)
+        expect(Math.hypot(nx, ny, nz)).toBeCloseTo(1, 1)
+      }
+    })
+
+    it(`${name} (terrain): albedo stays a valid byte range with real per-pixel variation`, () => {
+      const { albedo } = bakeMaterial(mat, BAKE_SIZE)
+      let min = 255
+      let max = 0
+      for (let i = 0; i < albedo.length; i++) {
+        expect(albedo[i]).toBeGreaterThanOrEqual(0)
+        expect(albedo[i]).toBeLessThanOrEqual(255)
+        if (albedo[i] < min) min = albedo[i]
+        if (albedo[i] > max) max = albedo[i]
+      }
+      expect(max - min).toBeGreaterThan(10) // not a flat/degenerate fill
+    })
+  }
 })

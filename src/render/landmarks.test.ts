@@ -16,6 +16,7 @@ import {
   buildCrater,
   buildVolcano,
   buildDelta,
+  buildDeltaWater,
   buildWetland,
   buildTableMountain,
 } from './landmarks'
@@ -32,6 +33,7 @@ const BUILDERS = {
   buildCrater,
   buildVolcano,
   buildDelta,
+  buildDeltaWater,
   buildWetland,
   buildTableMountain,
 }

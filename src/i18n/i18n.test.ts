@@ -97,6 +97,29 @@ function shapePaths(node: unknown, prefix: string, out: Map<string, string>): vo
   } else out.set(prefix, typeof node)
 }
 
+// Every string leaf anywhere in a dictionary (not just MAP_PATHS' record
+// maps, covered separately in parity.test.ts) — dotted path -> value.
+function collectStringLeaves(node: unknown, prefix: string, out: Map<string, string>): void {
+  if (typeof node === 'string') out.set(prefix, node)
+  else if (Array.isArray(node)) {
+    node.forEach((v, i) => collectStringLeaves(v, `${prefix}[${i}]`, out))
+  } else if (node && typeof node === 'object') {
+    for (const [k, v] of Object.entries(node)) collectStringLeaves(v, prefix ? `${prefix}.${k}` : k, out)
+  }
+}
+
+describe('no string leaf is empty, anywhere in the dictionary (design.md §17, point 173)', () => {
+  it.each(['de', 'en'] as const)('%s: every string leaf has content', (lang) => {
+    const leaves = new Map<string, string>()
+    collectStringLeaves(DICTIONARIES[lang], '', leaves)
+    // Guards the walk itself against a no-op traversal.
+    expect(leaves.size).toBeGreaterThan(100)
+    for (const [path, v] of leaves) {
+      expect(v.length, `${lang}.${path} is empty`).toBeGreaterThan(0)
+    }
+  })
+})
+
 describe('language parity (design.md §17: further languages only need a new file)', () => {
   it('de and en expose the exact same keys with the same shapes', () => {
     const dep = new Map<string, string>()
@@ -130,6 +153,13 @@ describe('format functions (design.md §17)', () => {
     expect(en.formatLatLon(-6.16, 39.3)).toMatch(/6/)
     expect(en.formatDecimal(1.25)).toMatch(/1[.,]\d/)
     expect(de.formatDecimal(1.25)).toMatch(/1[.,]\d/)
+  })
+
+  it('formatLatLon at the origin reads North/East, the >=0 convention (point 173)', () => {
+    expect(en.formatLatLon(0, 0)).toContain('North')
+    expect(en.formatLatLon(0, 0)).toContain('East')
+    expect(de.formatLatLon(0, 0)).toContain('Nord')
+    expect(de.formatLatLon(0, 0)).toContain('Ost')
   })
 
   it('provisionsWeeks weaves the passed value into both languages', () => {

@@ -48,7 +48,9 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
   })
 
   it('trees split trunk from crown: both classes present, nothing sprouts', () => {
-    for (const build of [buildAcacia, buildJungleTree, buildBaobab, () => buildPalm(false)]) {
+    // buildPalm(true) is the taller "detailed" variant (point 173): it still
+    // carries the same trunk/crown split as the default palm, not a third class.
+    for (const build of [buildAcacia, buildJungleTree, buildBaobab, () => buildPalm(false), () => buildPalm(true)]) {
       const { ones, twos, total } = foliageOf(build())
       expect(ones).toBeGreaterThan(0) // there is foliage to collapse
       expect(ones).toBeLessThan(total) // and a trunk that never moves

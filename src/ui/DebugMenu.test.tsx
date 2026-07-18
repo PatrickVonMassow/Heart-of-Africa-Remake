@@ -37,6 +37,10 @@ const DEFAULTS = {
   rescueBurst: balance.family.rescueBurst,
   calfFraction: balance.family.calfFraction,
   crocStrikeRadius: balance.crocodile.strikeRadius,
+  placeStrafeFactor: balance.placeStrafeFactor,
+  inventoryCapacity: balance.inventoryCapacity,
+  randomEventsEnabled: balance.randomEventsEnabled,
+  showHiddenObjects: balance.showHiddenObjects,
 }
 
 /** The DebugMenu renders nothing until the UI store's debug flag is open. */
@@ -89,9 +93,17 @@ afterEach(() => {
   balance.family.rescueBurst = DEFAULTS.rescueBurst
   balance.family.calfFraction = DEFAULTS.calfFraction
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
+  balance.placeStrafeFactor = DEFAULTS.placeStrafeFactor
+  balance.inventoryCapacity = DEFAULTS.inventoryCapacity
+  balance.randomEventsEnabled = DEFAULTS.randomEventsEnabled
+  balance.showHiddenObjects = DEFAULTS.showHiddenObjects
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
   useUi.getState().setWebglFallback(false)
+  useUi.getState().setShadowsEnabled(true)
+  useUi.getState().setGroundDebugFlat(false)
+  useUi.getState().setWheelZoomEnabled(false)
+  useUi.getState().setJournalDnd(false)
   if (useUi.getState().debugOpen) useUi.getState().toggleDebug()
 })
 
@@ -172,6 +184,69 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     const input = numberField(label)
     fireEvent.change(input, { target: { value: String(value) } })
     expect(read()).toBe(value)
+  })
+})
+
+describe('DebugMenu numeric clamps (design.md §21, point 173)', () => {
+  it('clamps a negative strafe/backward factor to zero', () => {
+    render(<DebugMenu />)
+    const input = numberField(en.debug.strafeFactor)
+    fireEvent.change(input, { target: { value: '-5' } })
+    expect(balance.placeStrafeFactor).toBe(0)
+  })
+
+  it('rounds the inventory capacity and floors it at 1 (the only rounding field)', () => {
+    render(<DebugMenu />)
+    const input = numberField(en.debug.inventoryCapacity)
+    fireEvent.change(input, { target: { value: '3.7' } })
+    expect(balance.inventoryCapacity).toBe(4)
+    fireEvent.change(input, { target: { value: '-5' } })
+    expect(balance.inventoryCapacity).toBe(1)
+  })
+})
+
+describe('DebugMenu remaining boolean toggles write through (design.md §21, point 173)', () => {
+  it('random events and hidden objects (balance singleton) toggle on click', () => {
+    render(<DebugMenu />)
+    // freshGame() (beforeEach) forces randomEventsEnabled true for the store
+    // suites' survival mechanics — reflect that starting state, then toggle
+    // both ways.
+    const events = screen.getByText(en.debug.randomEvents).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(events.checked).toBe(true)
+    fireEvent.click(events)
+    expect(balance.randomEventsEnabled).toBe(false)
+    fireEvent.click(events)
+    expect(balance.randomEventsEnabled).toBe(true)
+
+    const hidden = screen.getByText(en.debug.showHidden).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(hidden.checked).toBe(false)
+    fireEvent.click(hidden)
+    expect(balance.showHiddenObjects).toBe(true)
+    fireEvent.click(hidden)
+    expect(balance.showHiddenObjects).toBe(false)
+  })
+
+  it('shadows, flat ground, wheel zoom and journal do-not-disturb (UI store) toggle on click', () => {
+    render(<DebugMenu />)
+    const shadows = screen.getByText(en.debug.shadows).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(shadows.checked).toBe(true)
+    fireEvent.click(shadows)
+    expect(useUi.getState().shadowsEnabled).toBe(false)
+
+    const flat = screen.getByText(en.debug.flatGround).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(flat.checked).toBe(false)
+    fireEvent.click(flat)
+    expect(useUi.getState().groundDebugFlat).toBe(true)
+
+    const wheel = screen.getByText(en.debug.wheelZoom).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(wheel.checked).toBe(false)
+    fireEvent.click(wheel)
+    expect(useUi.getState().wheelZoomEnabled).toBe(true)
+
+    const dnd = screen.getByText(en.debug.journalDnd).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(dnd.checked).toBe(false)
+    fireEvent.click(dnd)
+    expect(useUi.getState().journalDnd).toBe(true)
   })
 })
 
@@ -336,6 +411,16 @@ describe('DebugMenu jump-to covers every named map point (design.md §21.3, poin
     fireEvent.change(jumpSelect(), { target: { value: 'kilimanjaro' } })
     const k = MOUNTAINS.find((m) => m.id === 'kilimanjaro')!
     const expected = latLonToWorld(k.lat, k.lon)
+    const pos = useGame.getState().pos
+    expect(pos.x).toBeCloseTo(expected.x, 4)
+    expect(pos.z).toBeCloseTo(expected.z, 4)
+  })
+
+  it('jumps to the grave, resolved at pick time from the per-run placeholder (point 173)', () => {
+    render(<DebugMenu />)
+    fireEvent.change(jumpSelect(), { target: { value: '#grave' } })
+    const grave = useGame.getState().graveLatLon
+    const expected = latLonToWorld(grave.lat, grave.lon)
     const pos = useGame.getState().pos
     expect(pos.x).toBeCloseTo(expected.x, 4)
     expect(pos.z).toBeCloseTo(expected.z, 4)

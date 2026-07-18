@@ -6,6 +6,7 @@ import { describe, expect, it, beforeAll } from 'vitest'
 import {
   FIELD_H,
   FIELD_W,
+  SEASON_FIELD_TEX,
   seasonFieldGreens,
   seasonFieldTintAt,
   seasonFieldUV,
@@ -68,6 +69,28 @@ describe('the greenness field (point 151)', () => {
     expect(v).toBeLessThan(0.6)
   })
 
+  it('seasonFieldUV clamps far out-of-bounds positions to the texture edges', () => {
+    // LAT0=-36, LON0=-20, LAT1=38, LON1=55 (module-private extents, mirrored
+    // here): 20 degrees past either corner still clamps into [0,1].
+    expect(seasonFieldUV(-56, -40)).toEqual([0, 0])
+    expect(seasonFieldUV(58, 75)).toEqual([1, 1])
+  })
+
+  it('uploads the texture only when a texel actually changes (point 175)', () => {
+    // three.js Texture#needsUpdate is a write-only setter that bumps
+    // `.version` when set true — reading `.needsUpdate` back is always
+    // `undefined`, so `.version` is the observable re-upload signal.
+    // Snap (blend=1) so re-running the SAME calendar day is a genuine no-op:
+    // the baseline call may itself change bytes, so prime it first.
+    updateSeasonField(AUG, START_YEAR, null, 1, 1)
+    const v0 = SEASON_FIELD_TEX.version
+    updateSeasonField(AUG, START_YEAR, null, 1, 1)
+    expect(SEASON_FIELD_TEX.version).toBe(v0) // identical day: no re-upload
+    // A different calendar day moves at least one 8-bit texel -> re-upload.
+    updateSeasonField(JAN, START_YEAR, null, 1, 1)
+    expect(SEASON_FIELD_TEX.version).toBeGreaterThan(v0)
+  })
+
   it('a zone border reads as a GRADIENT: the between-texel lies between its sides', () => {
     // blend 1 snaps the lerp so the assertion sees the calendar values.
     updateSeasonField(AUG, START_YEAR, null, 1, 1)
@@ -104,6 +127,11 @@ describe('the greenness field (point 151)', () => {
     const mid = samples[Math.floor(samples.length / 2)]
     expect(mid).toBeGreaterThan(Math.min(first, last))
     expect(mid).toBeLessThan(Math.max(first, last))
+  })
+
+  it('smoothedWetnessAt clamps an out-of-range override before returning it', () => {
+    expect(smoothedWetnessAt(AUG, 13.4, 31.8, START_YEAR, 1.5)).toBe(1)
+    expect(smoothedWetnessAt(AUG, 13.4, 31.8, START_YEAR, -0.2)).toBe(0)
   })
 
   it('smoothedWetnessAt honours the debug override and is season-free at strength (pure position+day)', () => {

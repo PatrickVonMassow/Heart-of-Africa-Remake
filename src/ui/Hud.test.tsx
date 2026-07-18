@@ -398,6 +398,51 @@ describe('inventory bar sorts alphabetically by localized name (point 104)', () 
 })
 
 
+describe('FpsCounter (design.md §21, point 173)', () => {
+  it('renders nothing while fpsVisible is off', () => {
+    useUi.setState({ fpsVisible: false })
+    render(<Hud />)
+    expect(document.querySelector('.fps-counter')).not.toBeInTheDocument()
+  })
+
+  it('shows the localized fps format while visible', () => {
+    useUi.setState({ fpsVisible: true })
+    render(<Hud />)
+    const el = document.querySelector('.fps-counter')
+    expect(el).toBeInTheDocument()
+    // Before the first rAF sample resolves, the counter reads its initial 0.
+    expect(el?.textContent).toBe(en.hud.fps(0))
+  })
+})
+
+describe('HealthBar wound badges and fraction clamp (design.md §17.1, point 173)', () => {
+  const fill = () => document.querySelector('.health-bar-fill') as HTMLElement | null
+  const hueOf = (el: HTMLElement) => Number(el.getAttribute('data-hue'))
+
+  it('shows the light-wound badge for wounds === 1 (only wounds:2 was exercised before)', () => {
+    useGame.setState({ afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 1 } })
+    render(<Hud />)
+    const badges = [...document.querySelectorAll('.affliction-badge')].map((e) => e.textContent)
+    expect(badges).toEqual([en.health.woundsLight])
+  })
+
+  it('clamps health above max to a full green bar', () => {
+    useGame.setState({ health: balance.health.max * 5 })
+    render(<Hud />)
+    const f = fill()!
+    expect(f.style.width).toBe('100%')
+    expect(hueOf(f)).toBe(120)
+  })
+
+  it('clamps negative health to an empty red bar', () => {
+    useGame.setState({ health: -50 })
+    render(<Hud />)
+    const f = fill()!
+    expect(f.style.width).toBe('0%')
+    expect(hueOf(f)).toBe(0)
+  })
+})
+
 describe('month keys (design.md §21.1 — stepping the seasons)', () => {
   it('binds the twelve adjacent keys of the number row, in month order', () => {
     // PHYSICAL codes: the row reads 1..0 ß ´ on a German keyboard and 1..0 - =

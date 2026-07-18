@@ -9,6 +9,7 @@ import { StatusBar } from './StatusBar'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
+import { useUi } from '../state/ui'
 import { freshGame, withWorld, jumpTo, terrainAt, g, COORD } from '../test/store'
 
 withWorld()
@@ -16,9 +17,11 @@ withWorld()
 beforeEach(() => {
   freshGame()
   useLocale.getState().setLang('en')
+  useUi.setState({ dialog: null })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
+  useUi.setState({ dialog: null })
 })
 
 describe('StatusBar localization and symbols (design.md §17.1)', () => {
@@ -73,5 +76,30 @@ describe('movement-penalty hint (design.md §11/§17)', () => {
     g().enterPlace('cairo')
     render(<StatusBar />)
     expect(document.querySelector('.movement-penalty')).not.toBeInTheDocument()
+  })
+
+  it('hides the hint while a dialog is open, even mid-travel on penalized terrain (point 173)', () => {
+    jumpTo(...COORD.jungle)
+    expect(terrainAt(...COORD.jungle)).toBe('jungle')
+    useUi.setState({ dialog: { kind: 'bazaar' } })
+    render(<StatusBar />)
+    expect(document.querySelector('.movement-penalty')).not.toBeInTheDocument()
+  })
+})
+
+describe('region stat place-name suffix (design.md §17.1, point 173)', () => {
+  it('appends "· <place>" once inside a settlement', () => {
+    g().enterPlace('cairo')
+    render(<StatusBar />)
+    const stat = screen.getByTitle(en.status.region)
+    expect(stat.textContent).toBe(`${en.regions[g().region]} · ${en.places.cairo}`)
+  })
+
+  it('shows only the region name while travelling (no place suffix)', () => {
+    g().leavePlace() // freshGame starts the traveller inside Cairo (design.md §5)
+    render(<StatusBar />)
+    const stat = screen.getByTitle(en.status.region)
+    expect(stat.textContent).toBe(en.regions[g().region])
+    expect(stat.textContent).not.toContain('·')
   })
 })

@@ -12,6 +12,7 @@ import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, g, useGame } from '../test/store'
 import { PLACES } from '../world/geo'
+import { balance } from '../config/balance'
 
 beforeEach(() => {
   freshGame()
@@ -244,5 +245,24 @@ describe('audience dialog (design.md §8/§12)', () => {
     useGame.setState({ unspecificGiven: { 'nubian-village': true } })
     rerender(<Dialogs />)
     expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.chiefDone)
+  })
+
+  it('reaches moodHigh exactly at the goodwillForHint boundary, not just past it (point 173)', () => {
+    g().enterPlace('nubian-village')
+    useUi.getState().setDialog({ kind: 'audience' })
+    useGame.setState({ goodwill: { 'nubian-village': balance.goodwillForHint } })
+    render(<Dialogs />)
+    expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.moodHigh)
+  })
+})
+
+describe('camp dialog — village cache (design.md §6/§12, point 173)', () => {
+  it('renders the village-cache title and hint (only the free-camp scope was exercised before)', () => {
+    g().enterPlace('nubian-village')
+    useGame.setState({ honoredFriend: { north: true } })
+    g().openVillageCamp()
+    render(<Dialogs />)
+    expect(document.querySelector('.dialog h3')?.textContent).toBe(en.dialogs.villageCampTitle)
+    expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.villageCampHint)
   })
 })
