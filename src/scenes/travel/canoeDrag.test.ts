@@ -136,6 +136,17 @@ describe('updateTrailPoint (trailer following)', () => {
       expect(Math.hypot(t.x, t.z)).toBeGreaterThan(0.4) // still dragged behind, not on the boots
     })
 
+    it('with water on every side even at the shortest rope, the hull rests on the player tile', () => {
+      // A razor-thin peninsula: no rotation and no shortening ever clears the
+      // water. The hull must fall back onto the player's OWN tile (dry by
+      // definition while dragging) rather than being left afloat at the far
+      // trail point — the invariant is that the hull never pierces the sheet.
+      const allWater = () => true
+      const t = updateTrailPoint(0, 0, { x: 0, z: -CANOE_TRAIL_FAR }, 0, [], allWater)
+      expect(t.x).toBe(0)
+      expect(t.z).toBe(0) // the player position, not the far water point (0, -FAR)
+    })
+
     it('without water contact the predicate changes nothing', () => {
       const dry = () => false
       let a: TrailPoint | null = null

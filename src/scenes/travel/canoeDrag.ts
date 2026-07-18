@@ -94,9 +94,18 @@ export function updateTrailPoint(
         if (!isWater(cx, cz)) {
           tx = cx
           tz = cz
+          found = true
           break
         }
       }
+    }
+    if (!found) {
+      // Water on every side even at the shortest rope (a razor-thin peninsula):
+      // rest the hull on the player's OWN tile — the player stands on land while
+      // dragging, so this is the one point guaranteed dry, and the invariant "a
+      // dragged hull never pierces the water surface" holds by construction.
+      tx = px
+      tz = pz
     }
   }
   return { x: tx, z: tz }
