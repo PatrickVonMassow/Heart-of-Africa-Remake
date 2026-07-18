@@ -14,6 +14,7 @@ import { g, freshGame, withWorld, jumpTo, useGame, TEST_SEED } from '../test/sto
 import { totalGifts, VILLAGE_TRADE_GOODS, usedInventory } from './store'
 import { generateTreasureSites } from '../systems/economy'
 import { useUi } from './ui'
+import { getStrings } from '../i18n'
 
 withWorld()
 
@@ -208,6 +209,29 @@ describe('elephant graveyard ivory (design.md §4.4)', () => {
     expect(g().toast).toBeTruthy()
     expect(g().treasures.ivory - before).toBe(2) // unchanged
   })
+
+  it('an already-full pack refuses the dig with the inventory-full toast', () => {
+    g().debugAddEquipment('shovel')
+    jumpTo(-4.9, 36.6)
+    useGame.setState({ graveyardIvoryLeft: 100 })
+    balance.inventoryCapacity = usedInventory(g()) // exactly full: no free space
+    g().setToast(null)
+    const before = g().treasures.ivory
+    g().dig()
+    expect(g().treasures.ivory).toBe(before) // nothing gained
+    expect(g().toast).toBe(getStrings().toasts.inventoryFull)
+  })
+
+  it('clamps the haul by the free pack space, not only by the remaining supply', () => {
+    g().debugAddEquipment('shovel')
+    jumpTo(-4.9, 36.6)
+    balance.economy.graveyardIvoryPerDig = { min: 9, max: 9 } // force a big roll
+    useGame.setState({ graveyardIvoryLeft: 100 }) // plenty remains — space is the binding limit
+    balance.inventoryCapacity = usedInventory(g()) + 2 // room for only 2 more
+    const before = g().treasures.ivory
+    g().dig()
+    expect(g().treasures.ivory - before).toBe(2) // clamped by space, not the rolled 9
+  })
 })
 
 describe('buried treasure caches (design.md §8/§18)', () => {
@@ -225,6 +249,22 @@ describe('buried treasure caches (design.md §8/§18)', () => {
     expect(g().treasures.statue).toBe(1)
     expect(g().treasureSites.find((s) => s.treasure === 'statue')?.dug).toBe(true)
     expect(journalKeys()).toContain('journal.treasureFound')
+  })
+
+  it('refuses to dig a buried cache with a full pack, leaving the site undug', () => {
+    useGame.setState({ treasureSites: generateTreasureSites(TEST_SEED) })
+    const site = g().treasureSites.find((s) => s.treasure === 'statue')
+    expect(site).toBeDefined()
+    if (!site) return
+    useGame.setState({ graveLatLon: { lat: site.lat + 20, lon: site.lon + 20 } })
+    g().debugAddEquipment('shovel')
+    jumpTo(site.lat, site.lon)
+    balance.inventoryCapacity = usedInventory(g()) // exactly full: no room for the find
+    g().setToast(null)
+    g().dig()
+    expect(g().treasures.statue).toBe(0)
+    expect(g().treasureSites.find((s) => s.treasure === 'statue')?.dug).toBe(false)
+    expect(g().toast).toBe(getStrings().toasts.inventoryFull)
   })
 })
 

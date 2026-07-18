@@ -44,6 +44,23 @@ describe('presenceAt (point 142 — "the young men are gone", and who never leav
   })
 })
 
+describe('presenceAt exact away-window boundaries (point 142)', () => {
+  it('the Maasai window is inclusive at both ends: doy 152 in, 151 out; doy 273 in, 274 out', () => {
+    // on(6, 2) = doy 152 (cumulative Jun 1 = doy 151), on(10, 1) = doy 273.
+    expect(presenceAt('maasai', on(6, 2), START_YEAR)).toBeLessThan(1) // doy 152: in
+    expect(presenceAt('maasai', on(6, 1), START_YEAR)).toBe(1) // doy 151: out
+    expect(presenceAt('maasai', on(10, 1), START_YEAR)).toBeLessThan(1) // doy 273: in
+    expect(presenceAt('maasai', on(10, 2), START_YEAR)).toBe(1) // doy 274: out
+  })
+
+  it('the Tuareg wrap-around window is inclusive at doy 274 and doy 59, out just past either', () => {
+    expect(presenceAt('tuareg', on(10, 2), START_YEAR)).toBeLessThan(1) // doy 274: in
+    expect(presenceAt('tuareg', on(10, 1), START_YEAR)).toBe(1) // doy 273: out
+    expect(presenceAt('tuareg', on(3, 1), START_YEAR)).toBeLessThan(1) // doy 59: in
+    expect(presenceAt('tuareg', on(3, 2), START_YEAR)).toBe(1) // doy 60: out
+  })
+})
+
 describe('marketPlentyAt (point 142 — the hungry season IS the rainy season)', () => {
   it('thins the Sahel stalls in the rains and refills them after the harvest', () => {
     for (const p of ['hausa', 'bambara', 'mandinka']) {
@@ -57,6 +74,15 @@ describe('marketPlentyAt (point 142 — the hungry season IS the rainy season)',
     for (let m = 1; m <= 12; m++) {
       expect(marketPlentyAt('maasai', on(m, 15), START_YEAR)).toBe(1)
       expect(marketPlentyAt('bemba', on(m, 15), START_YEAR)).toBe(1)
+    }
+  })
+
+  it('the hungry window is inclusive at doy 152 and 273, full again just outside either edge', () => {
+    for (const p of ['hausa', 'bambara', 'mandinka']) {
+      expect(marketPlentyAt(p, on(6, 2), START_YEAR)).toBeLessThan(1) // doy 152: in
+      expect(marketPlentyAt(p, on(6, 1), START_YEAR)).toBe(1) // doy 151: out
+      expect(marketPlentyAt(p, on(10, 1), START_YEAR)).toBeLessThan(1) // doy 273: in
+      expect(marketPlentyAt(p, on(10, 2), START_YEAR)).toBe(1) // doy 274: out
     }
   })
 })

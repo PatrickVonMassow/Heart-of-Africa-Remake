@@ -7,10 +7,12 @@
 // Playwright E2E.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
-import { totalGifts } from './store'
+import { totalGifts, usedInventory } from './store'
 import { g, freshGame, withWorld, jumpTo, useGame } from '../test/store'
 
 withWorld()
+
+const DEFAULT_CAPACITY = balance.inventoryCapacity
 
 beforeEach(() => {
   freshGame()
@@ -18,6 +20,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   balance.randomEventsEnabled = true
+  balance.inventoryCapacity = DEFAULT_CAPACITY
   vi.restoreAllMocks()
 })
 
@@ -121,6 +124,32 @@ describe('Honored Friend (design.md §12)', () => {
     expect(g().afflictions.wounds).toBe(0)
   })
 
+  it('withholds a second rescue inside the cooldown window, then allows one again past it', () => {
+    useGame.setState({ honoredFriend: { north: true } })
+    jumpTo(NUBIAN_LAT, NUBIAN_LON)
+    g().debugSet({ health: 20, foodDays: 1 })
+    g().debugSetAffliction('wounds', 2)
+    g().moveTravel(0, -1, 0.05) // first rescue fires
+    const firstAidDay = g().lastFriendAidDay
+    expect(journalKeys().filter((k) => k === 'journal.friendAid').length).toBe(1)
+    expect(g().afflictions.wounds).toBe(0)
+
+    // Re-degrade right away, well inside the 10-day cooldown: aid is withheld.
+    g().debugSet({ health: 20, foodDays: 1 })
+    g().debugSetAffliction('wounds', 2)
+    g().moveTravel(0, -1, 0.05)
+    expect(journalKeys().filter((k) => k === 'journal.friendAid').length).toBe(1) // no second rescue
+    expect(g().afflictions.wounds).toBe(2) // untouched — the aid never fired
+    expect(g().lastFriendAidDay).toBe(firstAidDay) // the cooldown clock did not move
+
+    // Past the cooldown window the rescue fires again.
+    g().debugSet({ day: g().day + balance.reputation.friendAidCooldownDays + 1, health: 20, foodDays: 1 })
+    g().debugSetAffliction('wounds', 2)
+    g().moveTravel(0, -1, 0.05)
+    expect(journalKeys().filter((k) => k === 'journal.friendAid').length).toBe(2)
+    expect(g().afflictions.wounds).toBe(0)
+  })
+
   it("hands out free provisions and medicine in the region's villages", () => {
     useGame.setState({ honoredFriend: { north: true } })
     g().debugSet({ foodDays: 2 })
@@ -152,6 +181,21 @@ describe("robbing a chief's hut (design.md §12)", () => {
     expect(g().regionRobbed.north).toBe(true)
     expect(g().honoredFriend.north).toBe(false)
     expect(g().friendForfeited.north).toBe(true)
+  })
+
+  it('clamps the looted gifts to the free pack space, not the flat robberyGifts amount', () => {
+    g().leavePlace()
+    g().enterPlace('tuareg-village')
+    g().debugAddEquipment('rifle')
+    balance.inventoryCapacity = usedInventory(g()) + 5 // room for only 5 more items
+    expect(balance.reputation.robberyGifts).toBeGreaterThan(5) // the flat haul would overflow it
+
+    const gifts0 = totalGifts(g().gifts)
+    g().robVillage()
+    const gained = totalGifts(g().gifts) - gifts0
+
+    expect(gained).toBe(5) // clamped to the free space
+    expect(gained).toBeLessThan(balance.reputation.robberyGifts)
   })
 
   it('permanently shuns the region so no talks open and the friendship cannot be re-earned', () => {

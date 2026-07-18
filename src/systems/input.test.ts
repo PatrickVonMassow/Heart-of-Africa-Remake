@@ -4,7 +4,19 @@
 // and requestAnimationFrame, so it stays in the Playwright suite
 // (scripts/verify/gamepad.mjs) rather than being simulated here.
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { onKeyPress, moveAxes } from './input'
+import {
+  onKeyPress,
+  moveAxes,
+  setTouchStick,
+  touchMove,
+  addTouchLook,
+  consumeTouchLook,
+  addTouchPinch,
+  consumeTouchPinch,
+  onTouchEngage,
+  isTouchEngaged,
+  dispatchSyntheticKey,
+} from './input'
 
 const press = (code: string) => window.dispatchEvent(new KeyboardEvent('keydown', { code }))
 const release = (code: string) => window.dispatchEvent(new KeyboardEvent('keyup', { code }))
@@ -69,5 +81,69 @@ describe('moveAxes (design.md §17)', () => {
     expect(moveAxes()).toEqual({ x: 0, y: 0 })
     release('ArrowUp')
     release('ArrowDown')
+  })
+})
+
+// Touch state (design.md §17.5, point 84): the overlay writes it, the scenes
+// consume it — plain module state, no DOM/RAF involved, so it is jsdom-safe.
+describe('touch stick and look/pinch accumulators (design.md §17.5)', () => {
+  it('setTouchStick/touchMove round-trip the virtual-stick axes', () => {
+    expect(touchMove()).toEqual({ x: 0, y: 0 })
+    setTouchStick(0.5, -0.3)
+    expect(touchMove()).toEqual({ x: 0.5, y: -0.3 })
+    setTouchStick(0, 0) // leave it neutral for later tests
+  })
+
+  it('addTouchLook accumulates deltas; consumeTouchLook reads them and resets to zero', () => {
+    addTouchLook(3, -2)
+    addTouchLook(1, 1)
+    expect(consumeTouchLook()).toEqual({ dx: 4, dy: -1 })
+    expect(consumeTouchLook()).toEqual({ dx: 0, dy: 0 }) // already consumed
+  })
+
+  it('addTouchPinch folds multiplicatively; consumeTouchPinch reads it and resets to the identity', () => {
+    addTouchPinch(0.5)
+    addTouchPinch(2)
+    expect(consumeTouchPinch()).toBeCloseTo(1, 9) // 0.5 * 2
+    expect(consumeTouchPinch()).toBe(1) // reset to the identity ratio
+  })
+})
+
+describe('dispatchSyntheticKey (design.md §17.5: gamepad/touch share the keyboard pipeline)', () => {
+  it('re-enters the pipeline as an ordinary keydown, reaching onKeyPress handlers', () => {
+    const cb = vi.fn()
+    const off = onKeyPress('KeyE', cb)
+    dispatchSyntheticKey('KeyE')
+    expect(cb).toHaveBeenCalledTimes(1)
+    off()
+  })
+})
+
+// The engagement latch never disarms (by design), so these cases must run in
+// this order within the file: "not yet engaged" has to be observed before any
+// touchstart is dispatched anywhere below.
+describe('touch engagement latch (design.md §17.5, point 84 — deliberate-input guard)', () => {
+  it('starts unengaged and defers a registered callback', () => {
+    expect(isTouchEngaged()).toBe(false)
+    const cb = vi.fn()
+    onTouchEngage(cb)
+    expect(cb).not.toHaveBeenCalled()
+  })
+
+  it('arms on the first touchstart, firing every pending callback exactly once', () => {
+    const cb = vi.fn()
+    const unsub = onTouchEngage(cb)
+    window.dispatchEvent(new Event('touchstart'))
+    expect(isTouchEngaged()).toBe(true)
+    expect(cb).toHaveBeenCalledTimes(1)
+    unsub() // already fired; unsubscribe is a no-op past engagement
+  })
+
+  it('fires a callback registered after engagement immediately, and a later touch changes nothing', () => {
+    const cb = vi.fn()
+    onTouchEngage(cb)
+    expect(cb).toHaveBeenCalledTimes(1) // already armed -> fires synchronously
+    window.dispatchEvent(new Event('touchstart')) // a second touch is not the arming one
+    expect(isTouchEngaged()).toBe(true)
   })
 })

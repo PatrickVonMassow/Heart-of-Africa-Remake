@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, skyOvercastParams, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, sunDimFactor, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -686,5 +686,43 @@ describe('hailAt (point 141b — the only defensible white ground at low altitud
         hailAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372),
       )
     }
+  })
+})
+
+describe('slotWetness (point 167 — the season-field slot must agree with wetnessAt exactly)', () => {
+  const congoSlot = SEASON_SLOTS.indexOf('congo')
+  const sahelSlot = SEASON_SLOTS.indexOf('sahel')
+
+  it('slot 0 (hyper-arid) is always 0, whatever the day', () => {
+    for (const day of [on(1, 15), on(6, 15), on(10, 15)]) {
+      expect(slotWetness(day, 0, START_YEAR, 0)).toBe(0)
+    }
+  })
+
+  it('an out-of-range slot (99, and a negative one) is 0', () => {
+    expect(slotWetness(on(8, 15), 99, START_YEAR, 0)).toBe(0)
+    expect(slotWetness(on(8, 15), -1, START_YEAR, 0)).toBe(0)
+  })
+
+  it('matches wetnessAt exactly for an ordinary zone across the whole year', () => {
+    for (let m = 1; m <= 12; m++) {
+      const day = on(m, 15)
+      expect(slotWetness(day, congoSlot, START_YEAR, CONGO.lat)).toBeCloseTo(
+        wetnessAt(day, CONGO.lat, CONGO.lon, START_YEAR, 0),
+        9,
+      )
+    }
+  })
+
+  it('applies the same Sahel latitude squeeze as wetnessAt (the peak shortens northward)', () => {
+    const day = on(8, 15) // August, the Sahel's peak month
+    const south = slotWetness(day, sahelSlot, START_YEAR, 12) // near 11N: near-full
+    const north = slotWetness(day, sahelSlot, START_YEAR, 18) // 18N: squeezed hardest
+    expect(north).toBeLessThan(south)
+    // And it matches wetnessAt exactly at the same latitude (lon 5 sits in the sahel band at 15N).
+    expect(slotWetness(day, sahelSlot, START_YEAR, 15)).toBeCloseTo(
+      wetnessAt(day, 15, 5, START_YEAR, 0),
+      9,
+    )
   })
 })

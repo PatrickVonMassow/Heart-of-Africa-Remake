@@ -171,6 +171,59 @@ describe('resolveEvent crocodileAttack fatal band (design.md §14)', () => {
   })
 })
 
+describe('eventChance/resolveEvent sunblindness (design.md §14/§6)', () => {
+  it('only fires in the desert; savanna stays at zero risk', () => {
+    expect(eventChance('sunblindness', ctx({ terrain: 'desert' }))).toBeGreaterThan(0)
+    expect(eventChance('sunblindness', ctx({ terrain: 'desert' }))).toBe(balance.events.sunblindness)
+    expect(eventChance('sunblindness', ctx({ terrain: 'savanna' }))).toBe(0)
+  })
+
+  it('resolves unconditionally to afflicted, regardless of the roll', () => {
+    expect(resolveEvent('sunblindness', ctx({ terrain: 'desert' }), () => 0.5).result).toBe('afflicted')
+    expect(resolveEvent('sunblindness', ctx({ terrain: 'desert' }), () => 0).result).toBe('afflicted')
+    expect(resolveEvent('sunblindness', ctx({ terrain: 'desert' }), () => 0.999).result).toBe('afflicted')
+  })
+})
+
+describe('crocodileAttack: a canoe alone beats a machete alone (design.md §14/§7)', () => {
+  it('canoe factor 0.4 is lower risk than the machete factor 0.6', () => {
+    const water = { terrain: 'water', inWater: true } as const
+    const canoeAlone = eventChance('crocodileAttack', ctx({ ...water, equipment: { canoe: 1 } }))
+    const macheteAlone = eventChance('crocodileAttack', ctx({ ...water, equipment: { machete: 1 } }))
+    expect(canoeAlone).toBeLessThan(macheteAlone)
+    expect(canoeAlone).toBeCloseTo(balance.events.crocodile * 0.4, 9)
+    expect(macheteAlone).toBeCloseTo(balance.events.crocodile * 0.6, 9)
+  })
+})
+
+describe('resolveAttack: friend protection combined with a weapon (design.md §12/§7/§14)', () => {
+  it('caps even an armed, low-roll "defended" outcome down to a rescued escape', () => {
+    // Bare weapon + a low roll normally reads as an active defense.
+    const armedAlone = resolveEvent('lionAttack', ctx({ equipment: { rifle: 1 } }), () => 0.1)
+    expect(armedAlone.result).toBe('defended')
+    // The same roll and weapon near a friend region: the natives' rescue takes
+    // over and the result reads as an escape instead, not a defense.
+    const armedWithFriends = resolveEvent(
+      'lionAttack',
+      ctx({ equipment: { rifle: 1 }, protectedByFriends: true }),
+      () => 0.1,
+    )
+    expect(armedWithFriends.result).toBe('escaped')
+    expect(armedWithFriends.rescued).toBe(true)
+  })
+
+  it('the 0.45 roll boundary: just under is the escape band, exactly at it is not', () => {
+    // Bare hands (p=1): roll < 0.45 -> escaped; roll === 0.45 falls into the
+    // next (fatal) band since the comparison is strict less-than.
+    expect(resolveEvent('lionAttack', ctx(), () => 0.449999).result).toBe('escaped')
+    expect(resolveEvent('lionAttack', ctx(), () => 0.45).result).toBe('fatal')
+    // Under friend protection the same boundary roll is capped to light, not fatal.
+    const rescued = resolveEvent('lionAttack', ctx({ protectedByFriends: true }), () => 0.45)
+    expect(rescued.result).toBe('light')
+    expect(rescued.rescued).toBe(true)
+  })
+})
+
 describe('eventChance terrain gates (design.md §14)', () => {
   it.each(['savanna', 'jungle', 'desert'])('a snake can strike on %s land', (terrain) => {
     expect(eventChance('snakeBite', ctx({ terrain }))).toBeGreaterThan(0)
