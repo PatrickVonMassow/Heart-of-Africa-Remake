@@ -828,7 +828,10 @@ export const useGame = create<GameState>()((set, get) => ({
   successorTakeOver: () => {
     if (!get().loadCheckpoint()) return false
     const s = get()
-    const day = s.day + balance.deadline.successorDayPenalty
+    // Clamp the resumed date at the calendar ceiling like every other
+    // day-advancing path (§5.1, point 24): a successor taking over near the end
+    // of the game window must not push the day past 31.12.1895.
+    const day = clampDay(s.day + balance.deadline.successorDayPenalty, START_YEAR)
     // Warnings already passed at the resumed date stay silent.
     const dl = balance.deadline
     const warned = day >= dl.days * dl.warning2 ? 2 : day >= dl.days * dl.warning1 ? 1 : 0

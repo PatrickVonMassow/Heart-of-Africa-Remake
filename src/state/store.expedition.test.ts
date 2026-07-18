@@ -153,6 +153,23 @@ describe('the suspended deadline and the calendar ceiling (design.md §5.1)', ()
     expect(clampDay(last, START_YEAR)).toBe(last)
     expect(clampDay(10, START_YEAR)).toBe(10) // inside the window: untouched
   })
+
+  it('clamps a successor resuming near the ceiling (the takeover advances the day too)', () => {
+    // Checkpoint five days short of the wall, then die in the field. The 30-day
+    // successor penalty would carry the resumed date ~25 days PAST 31.12.1895 if
+    // it were not clamped like every other day-advancing path.
+    const last = lastDay(START_YEAR)
+    g().debugSet({ day: last - 5 })
+    g().enterPlace('cairo') // a port entry saves the checkpoint
+    g().leavePlace()
+    g().debugSet({ health: 2 })
+    g().debugSetAffliction('wounds', 2)
+    g().tickHealth(5, 'savanna', COORD.savanna[0], COORD.savanna[1])
+    expect(g().defeat).toBe('death')
+    expect(g().successorTakeOver()).toBe(true)
+    expect(g().day).toBe(last)
+    expect(new Date(Date.UTC(START_YEAR, 0, 1) + g().day * 86400000).getUTCFullYear()).toBe(1895)
+  })
 })
 
 describe('debugJumpYear (design.md §21.1 — the + and - keys)', () => {
