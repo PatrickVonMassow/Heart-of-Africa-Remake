@@ -27,11 +27,15 @@ console.log(
   'voraussichtliche Endzeit, ausgeklappt Status/Details; KEIN »gerade fertig«, ' +
   '»als nächstes«, »diese Nacht fertig«. ' +
   '(2) »Von dir zu klären« — Karten, eingeklappt nur Titel. ' +
-  '(3) »Warteschlange« in Arbeitsreihenfolge — eingeklappt nur Titel, KEINE Hinweise ' +
-  'wie »neu«/»hochgezogen«. ' +
+  '(3) »Warteschlange« in Arbeitsreihenfolge — eingeklappt Titel + rechts im Header ' +
+  'die geschätzte Task-Dauer (»~2 h«; das ~ genügt, kein »geschätzt« davor; nach ' +
+  'jedem Vorarbeit-Schritt an einem Task dessen Schätzung aktualisieren), ' +
+  'KEINE Hinweise wie »neu«/»hochgezogen«. ' +
   '(4) »Erledigt« — eingeklappt Titel + Startzeit + Endzeit. ' +
   'Keine weiteren Sektionen (kein »Zeiten & Aufwand«, »Zuletzt passiert«, »gemeldete ' +
-  'Bugs«). Mobil-Hochformat muss gut aussehen. Empfiehlst du dringend eine ' +
+  'Bugs«). Was schon im eingeklappten Header steht, NICHT zusätzlich in den ausgeklappten ' +
+  'Details wiederholen (z. B. Start/Endzeit der aktuellen-Arbeit-Karte nur im Header). ' +
+  'Mobil-Hochformat muss gut aussehen. Empfiehlst du dringend eine ' +
   'Strukturänderung, schreibe sie als Karte in »Von dir zu klären«. ' +
   'Bei JEDER Änderung: die GANZE Datei lesen, jede Sektion gegen den Ist-Zustand ' +
   'prüfen (topaktuell, konsistent, redundanzfrei), dann per Artifact republishen.' +
