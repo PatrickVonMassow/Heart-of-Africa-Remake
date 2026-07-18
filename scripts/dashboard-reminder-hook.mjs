@@ -25,7 +25,9 @@ console.log(
   'Karte (nur die aktuelle-Arbeit-Karte offen): ' +
   '(1) »Woran ich gerade arbeite« — eine Karte, eingeklappt Titel + Startzeit + ' +
   'voraussichtliche Endzeit, ausgeklappt Status/Details; KEIN »gerade fertig«, ' +
-  '»als nächstes«, »diese Nacht fertig«. ' +
+  '»als nächstes«, »diese Nacht fertig«. Die Karte muss IMMER zeigen, was du ' +
+  'GERADE tust — auch Wartezeit-Vorarbeit (welche Folge-Punkte du gerade ' +
+  'vorbereitest), nie so wirken, als würdest du nur warten/idlen. ' +
   '(2) »Von dir zu klären« — Karten, eingeklappt nur Titel. ' +
   '(3) »Warteschlange« in Arbeitsreihenfolge — eingeklappt Titel + rechts im Header ' +
   'die geschätzte Task-Dauer (»~2 h«; das ~ genügt, kein »geschätzt« davor; nach ' +
