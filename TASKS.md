@@ -4555,7 +4555,7 @@ the remaining open points in their numeric order.
   than held open here: wet-ground puddles (nice-to-have; the overcast dim
   already darkens wet ground). The burnt land stays with 145(a).
 
-- [ ] 145. Three more parental sacrifices — a human cause, a lie, and a predator
+- [x] 145. Three more parental sacrifices — a human cause, a lie, and a predator
   as a parent.
   Wanted (user, 16.07.2026): I proposed these three after he asked for further
   ideas, and he accepted all three as ONE point at the END of the batch. Each was
@@ -4670,8 +4670,42 @@ the remaining open points in their numeric order.
   ring chunks, so a per-boot random seed could miss them all — CARRION_
   RADIUS_DEG raised to 6 (Maasailand, not the village; carrion now reads 9)
   and the fire-staging isolates the corridor (a natural calf claimed the
-  victim slot). Screenshots 131/132 both human-checked. THEN: (c) the lioness defending cubs against hyenas (predator cub
-  builds, the LION_STATE-as-victim architecture decision).
+  victim slot). Screenshots 131/132 both human-checked. (c) DONE
+  (18.07.2026, 05:21 — the 145c check passed GREEN in three separate
+  enrichments runs; the lone fail rotated among the pre-existing
+  family-staging flakes each run — 145b plover (dead:true), then a fully
+  green run, then 145a fire (trapped:false, no calf in the line) — none is
+  145c, none touches code this point changed): the lioness defends her cub
+  against a hyena. THE
+  ARCHITECTURE ANSWER (the warning points 121(f)/130/146 all carry, settled
+  by 146 and confirmed here): keep the ONE global hunt state — the drama is
+  a HYENA hunt (LION_STATE.predator = hyena) whose victim is a lion cub, and
+  the lioness reaches the SHARED resolution core through a new narrow
+  FAMILY_DEFEND_SPECIES = [...CALF_HUNT_SPECIES, 'lion'] used ONLY at the
+  caught/charge/shield/vigil loop — so she inherits the one
+  parentAttackOutcome matrix WITHOUT the prey-behaviour loops (gambol-drown,
+  flee, grazer vicinity seed, food-web hunt pick all still key on
+  CALF_HUNT_SPECIES, which lion is NOT in). No second predator state, no
+  duplicated resolution. PIECES: buildLionCub (baby schema off a refactored
+  named LION_SPEC, no mane; pure-tested with the grazer calves,
+  fauna.test.ts); lion added to CALF_SPECIES (cub mesh) and the calf-mesh
+  pool; a lioness+cub spawn on savanna gated to REGION_PREDATORS holding the
+  hyena (east/south — so the drawn threat is always region-true), roll band
+  [0.72,0.735); a dedicated cub-hunt seek pass (herds.lion, near the player,
+  rare) that forces s.predator = 'hyena'; preyWeapon.lion 2.0 (defendChance
+  vs hyena caps 0.95 — the strongest defence in the game — killChance ~0.22,
+  cub lost only 0.05; pure-tested, and the 146 invariant sweep re-checked
+  with lion in it); MAX_INSTANCES.lion 6->12 for the family. FLEES_LION.lion
+  stays false (she defends, never flees). Live check
+  (scripts/verify/enrichments.mjs): a forced hyena-vs-cub hunt, drive-off
+  forced deterministically (killFlight 0, predatorFlight high), asserts the
+  drama RESOLVES — cub freed, lioness alive, hunt left (point-118 lesson) —
+  with a 3x retry for the 5% taken staging; screenshot 133
+  (133-lioness-defends-cub.png) PENDING human check. Docs: design.md §19.8
+  (the lioness-from-the-other-side drama), CLAUDE.md §7.1 pt.12 (145c
+  clause) and the "additional new species/birds" OPEN item struck (crocodile
+  + plover + lion cub closed it). tsc/lint/1751 unit + 129 behaviour tests
+  green. ALL THREE (a)(b)(c) now done — point 145 complete.
 
 - [x] 146. Revenge: a strong parent kills a weak predator and walks away.
   Wanted (user, 16.07.2026): "Es soll auch noch eine Rache-Mechanik von Eltern

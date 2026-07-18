@@ -490,6 +490,7 @@ export const balance: BalanceConfig = {
       wildebeest: 0.7, // horns and bulk: bulls gore and toss the lighter cats
       warthog: 0.7, // tusks: warthogs are documented driving cheetahs off their own kills
       antelope: 0.25, // the generic antelope has no weapon — hooves and luck
+      lion: 2.0, // the lioness defending her cubs (point 145c): claws and bulk dominate a lone hyena — ×0.7 (hyena flight) caps defendChance at 0.95, killChance ~0.22
     },
     // Predator side — readiness to abandon, INVERSE to §14.1's tested danger
     // order cheetah < leopard < hyena < lion (src/systems/events.ts):

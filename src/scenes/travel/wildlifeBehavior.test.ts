@@ -1244,3 +1244,35 @@ describe('killChance / parentAttackOutcome (design.md §19.8, point 146 — reve
     expect(killChance('giraffe', 'crocodile', shipped)).toBe(0)
   })
 })
+
+describe('the lioness defends her cub against a hyena (design.md §19.8, point 145c)', () => {
+  const shipped = balance.parentDefense
+
+  it('the lioness routs a lone hyena: defendChance caps at 0.95', () => {
+    // preyWeapon.lion 2.0 × predatorFlight.hyena 0.7 = 1.4, capped at 0.95 —
+    // the strongest defence in the game: a mother lion dominates a hyena.
+    expect(defendChance('lion', 'hyena', shipped)).toBe(0.95)
+  })
+
+  it('she can kill it, but driving off is far more common (register: sometimes, not often)', () => {
+    // killChance = (2.0 − 0.5) × killFlight.hyena 0.15 = 0.225 — real, but well
+    // below the 0.95 drive-off, so the hyena usually just flees.
+    expect(killChance('lion', 'hyena', shipped)).toBeCloseTo(0.225, 10)
+    expect(killChance('lion', 'hyena', shipped)).toBeLessThan(defendChance('lion', 'hyena', shipped))
+  })
+
+  it('the three-way outcome is boundary-exact: kill < 0.225 <= driveOff < 0.95 <= taken', () => {
+    expect(parentAttackOutcome('lion', 'hyena', 0, shipped)).toBe('kill')
+    expect(parentAttackOutcome('lion', 'hyena', 0.2249, shipped)).toBe('kill')
+    expect(parentAttackOutcome('lion', 'hyena', 0.225, shipped)).toBe('driveOff')
+    expect(parentAttackOutcome('lion', 'hyena', 0.9499, shipped)).toBe('driveOff')
+    expect(parentAttackOutcome('lion', 'hyena', 0.95, shipped)).toBe('taken')
+    expect(parentAttackOutcome('lion', 'hyena', 1, shipped)).toBe('taken')
+  })
+
+  it('the cub is rarely lost: the taken band is only the top 5%', () => {
+    // 1 − defendChance = 0.05 — a poignant but uncommon ending (the lioness
+    // stands vigil), consistent with the mother routing the threat.
+    expect(1 - defendChance('lion', 'hyena', shipped)).toBeCloseTo(0.05, 10)
+  })
+})

@@ -3080,6 +3080,129 @@ check(
   JSON.stringify(revenge),
 )
 
+// --- Point 145c: the lioness defends her cub against a hyena ------------------
+// The apex predator read from the other side: a lion family (lioness + cub) in
+// herds.lion, and the ONE hunt state forced to a hyena chasing the cub. The
+// lioness reaches the shared resolution core through FAMILY_DEFEND_SPECIES —
+// not the prey loops — and routs the hyena (drive-off forced deterministically:
+// killFlight 0, predatorFlight high, so any roll below the 0.95 cap drives off).
+// The drama must RESOLVE (the point-118 lesson): cub freed, lioness alive, hunt
+// left. A staging roll in the 5% taken band retries a fresh pair.
+let cubDefence = null
+for (let attempt = 0; attempt < 3; attempt++) {
+  cubDefence = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+    const herds = window.__wildlife.herdsRef.current
+    let liveChunk
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+      if (liveChunk) break
+    }
+    const p0 = window.__game.getState().pos
+    const lioness = { x: p0.x + 6, z: p0.z + 12, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: liveChunk ?? 'cub-test', __cubTest: true }
+    const cub = { x: p0.x + 8, z: p0.z + 12, y: 0.2, rot: 0, scale: 0.55, phase: 0.8, chunk: liveChunk ?? 'cub-test', young: true, parent: lioness, __cubTest: true }
+    lioness.child = cub
+    herds.lion.push(lioness, cub)
+    const isLionCub = cub.young === true && herds.lion.includes(cub)
+    const st = window.__lionHunt.state
+    st.predator = 'hyena'
+    st.mode = 'chase'
+    st.victim = cub
+    st.victimHunt = true
+    st.lx = cub.x + 10
+    st.lz = cub.z + 2
+    st.px = cub.x
+    st.pz = cub.z
+    st.timer = 0
+    // Force the DRIVE-OFF band over the whole roll range: no kill, defence at
+    // the cap. Restored below.
+    const pd = window.__balance.parentDefense
+    const prevKf = pd.killFlight.hyena
+    const prevFl = pd.predatorFlight.hyena
+    pd.killFlight.hyena = 0
+    pd.predatorFlight.hyena = 100
+    const out = { isLionCub, resolved: false, cubAlive: false, lionessAlive: false, huntLeft: false, mode: '' }
+    const t0 = Date.now()
+    while (Date.now() - t0 < 30000) {
+      if (st.mode === 'leave' || st.mode === 'idle') break
+      if (cub.dead || lioness.dead) break
+      await sleep(120)
+    }
+    out.mode = st.mode
+    out.cubAlive = !cub.dead && cub.caught === undefined
+    out.lionessAlive = !lioness.dead
+    out.huntLeft = st.mode === 'leave' || st.mode === 'idle'
+    // A drive-off resolution: the mother routs the hyena, the cub lives.
+    out.resolved = out.huntLeft && out.cubAlive && out.lionessAlive
+    pd.killFlight.hyena = prevKf
+    pd.predatorFlight.hyena = prevFl
+    return out
+  })
+  if (cubDefence.resolved) break
+  // A staging that fell in the 5% taken band: clean up the injected pair and
+  // the hunt state before a fresh attempt.
+  await page.evaluate(() => {
+    const herds = window.__wildlife.herdsRef.current
+    herds.lion = herds.lion.filter((a) => !a.__cubTest)
+    const st = window.__lionHunt.state
+    st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false
+  })
+}
+check(
+  'the lioness routs the hyena and her cub lives — the drama resolves (point 145c)',
+  cubDefence.isLionCub && cubDefence.resolved,
+  JSON.stringify(cubDefence),
+)
+// A human-check tableau of the drama itself (not the dispersed aftermath): a
+// fresh family centred on the camera, the hyena closing, captured MID-shield so
+// the lioness stands between hunter and cub. The journal is cleared and the
+// bird's-eye pulled to the default close zoom first.
+await page.evaluate(() => {
+  window.__game.getState().setJournalOpen(false)
+  window.__ui.getState().setTravelZoom(0.5)
+  const herds = window.__wildlife.herdsRef.current
+  herds.lion = herds.lion.filter((a) => !a.__cubTest) // clear the assert's pair
+  let liveChunk
+  for (const sp of Object.keys(herds)) {
+    for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+    if (liveChunk) break
+  }
+  const p0 = window.__game.getState().pos
+  // Framed on the camera (centred on the player): lioness and cub together, the
+  // hyena a few units off, closing from the side.
+  const lioness = { x: p0.x - 1, z: p0.z + 2, y: 0.2, rot: 0, scale: 1, phase: 0.4, chunk: liveChunk ?? 'cub-shot', __cubShot: true }
+  const cub = { x: p0.x + 1, z: p0.z + 2, y: 0.2, rot: 0, scale: 0.55, phase: 0.8, chunk: liveChunk ?? 'cub-shot', young: true, parent: lioness, __cubShot: true }
+  lioness.child = cub
+  herds.lion.push(lioness, cub)
+  const pd = window.__balance.parentDefense
+  window.__cubShotPrev = { kf: pd.killFlight.hyena, fl: pd.predatorFlight.hyena }
+  pd.killFlight.hyena = 0
+  pd.predatorFlight.hyena = 100 // drive-off only — no kill mid-frame
+  const st = window.__lionHunt.state
+  st.predator = 'hyena'
+  st.mode = 'chase'
+  st.victim = cub
+  st.victimHunt = true
+  st.lx = cub.x + 7
+  st.lz = cub.z + 4
+  st.px = cub.x
+  st.pz = cub.z
+  st.timer = 0
+})
+// Let the hyena close and the lioness take up the shield, but capture before
+// the drive-off scatters them.
+await page.waitForTimeout(1600)
+await page.screenshot({ path: `${OUT}133-lioness-defends-cub.png` })
+console.log('shot 133-lioness-defends-cub.png')
+await page.evaluate(() => {
+  const herds = window.__wildlife.herdsRef.current
+  herds.lion = herds.lion.filter((a) => !a.__cubShot && !a.__cubTest)
+  const pd = window.__balance.parentDefense
+  if (window.__cubShotPrev) { pd.killFlight.hyena = window.__cubShotPrev.kf; pd.predatorFlight.hyena = window.__cubShotPrev.fl }
+  const st = window.__lionHunt.state
+  st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false
+})
+
 // --- Point 127: the parental rescue burst ------------------------------------
 // A rescuing parent moves at the ONE burst-derived speed (ordinary walk x
 // balance.family.rescueBurst) — measure the charge to a caught calf over a

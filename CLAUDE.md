@@ -540,6 +540,18 @@ verify suite that proves it.
       enters the ordinary carcass system (dead, not lionFed, worked by the
       scavengers like any zebra) while the unwounded parent rejoins its
       herd with no vigil (kill and vigil are structurally exclusive);
+      the lioness defends her cub (point 145c): the apex predator read from
+      the other side — a lioness with a cub is seeded on savanna only where
+      hyenas roam, and a hyena hunt on the cub resolves through the ONE
+      shared core (FAMILY_DEFEND_SPECIES reaches the lioness without the prey
+      loops; no second hunt state — the points 121(f)/130/146 architecture
+      line) and the ONE parentAttackOutcome matrix, with preyWeapon.lion 2.0
+      capping defendChance-vs-hyena at 0.95 (she routs it, sometimes kills it
+      ~0.22, rarely loses the cub 0.05 — pure-tested) and the cub built on the
+      baby schema (`buildLionCub`, pure-tested with the grazer calves); live
+      (`scripts/verify/enrichments.mjs`) a forced hyena-vs-cub hunt drives off
+      and the drama RESOLVES — cub freed, lioness alive, hunt left (screenshot
+      133);
       the defence matrix
       (point 125): the parent-reaches-predator outcome is the product of
       prey weapon and predator flight-willingness (pure-tested: strictly
@@ -700,12 +712,13 @@ verify suite that proves it.
       §14.2 event. Live checks and screenshots pending in
       `scripts/verify/enrichments.mjs` (hidden -> lunge -> catch, the
       three family endings, lion-hunt independence).
-    OPEN: tree-climbing-to-flee and additional new species/birds beyond
-    the existing roster and the added calves remain to be implemented (§9
-    open items — the crocodile of §19.16 now covers part of the
-    new-species item); the one seasonal-dress reading the research allows but the
+    OPEN: tree-climbing-to-flee remains to be implemented (§9 open item);
+    and the one seasonal-dress reading the research allows but the
     figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather
-    than in greater number (§19.13).
+    than in greater number (§19.13). (The former "additional new
+    species/birds" item is now CLOSED: point 130's crocodile, point 145b's
+    ground-nesting plover with its chicks and point 145c's lion cub joined
+    the roster beyond the original fauna and the grazer calves.)
 13. **Real geodata.** The real-geodata terrain rendering of `design.md`
     §3.3 is implemented (DEM relief, ~1890 vector coasts/rivers/lakes
     without raster steps, biome-based PBR splatting, domain-warped

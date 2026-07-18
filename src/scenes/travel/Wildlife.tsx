@@ -88,6 +88,7 @@ import {
   buildHyena,
   buildLeopard,
   buildLion,
+  buildLionCub,
   buildVulture,
   buildWarthog,
   buildWarthogCalf,
@@ -119,17 +120,19 @@ const MAX_INSTANCES: Record<Species, number> = {
   flamingo: 140,
   crocodile: 12,
   plover: 24,
-  // Predator slots hold only revenge carcasses (point 146) — kills are rare
-  // and dissolve/cull quickly, so a handful of instances suffices.
-  lion: 6,
+  // Lion slots hold a lioness-and-cub family (point 145c) plus revenge
+  // carcasses (point 146); the other predators hold only carcasses — kills are
+  // rare and dissolve/cull quickly, so a handful of instances suffices.
+  lion: 12,
   cheetah: 6,
   leopard: 6,
   hyena: 6,
 }
 /** Juveniles render through their own baby-schema geometry (design.md §19) in
  *  a separate instanced mesh per species; one calf per herd group keeps the
- *  counts small. Flamingos raise no young, predators hold carcasses only. */
-const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'plover'] as const
+ *  counts small. Flamingos raise no young; the lion joins for its cub (the
+ *  lioness-vs-hyena drama, point 145c), the other predators hold carcasses only. */
+const CALF_SPECIES = ['elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'plover', 'lion'] as const
 const MAX_CALF_INSTANCES = 24
 
 interface Animal {
@@ -349,7 +352,8 @@ const FLEES_LION: Record<Species, boolean> = {
   elephant: false, giraffe: true, zebra: true, wildebeest: true, antelope: true, warthog: true, flamingo: false,
   crocodile: false, // the ambusher fears nothing on its water (point 130)
   plover: false, // the ground-nester's answer to threat is the lure, not flight (point 145b)
-  // Only revenge carcasses live in these lists (point 146) — nothing to flee.
+  // The lioness defends her cub rather than fleeing (point 145c); the other
+  // predator lists hold only revenge carcasses (point 146) — nothing to flee.
   lion: false, cheetah: false, leopard: false, hyena: false,
 }
 const TRAMPLE_RADIUS = 1.5
@@ -477,6 +481,16 @@ const PARENT_TAKE_DIST = 1.0
  *  (the food web gates the predator pick), and its parent's charge may end in
  *  the kick instead of the sacrifice. */
 const CALF_HUNT_SPECIES = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe'] as const
+/** Species whose parent can defend its young through the SHARED resolution core
+ *  (caught countdown → charge/shield → drive-off/kill/taken, and the vigil) —
+ *  the grazers PLUS the lion (point 145c): a lioness defends her cub against a
+ *  hyena hunt exactly through that one path. The lion is deliberately NOT a
+ *  CALF_HUNT_SPECIES, so the prey-behaviour loops (gambol into water, flee, the
+ *  grazer vicinity seed, the food-web hunt pick) never touch it — only the
+ *  resolution core reaches the lioness, invoking the one parentAttackOutcome
+ *  matrix against the one LION_STATE hunt (predator = hyena). No second hunt
+ *  state (the points 121(f)/130/146 architecture line). */
+const FAMILY_DEFEND_SPECIES = [...CALF_HUNT_SPECIES, 'lion'] as const
 /** Duration of the rendered defence strike (design.md §19.8, points 124/125):
  *  any parent that drove the hunt off rears and strikes before settling. */
 const PARENT_KICK_SECONDS = 0.8
@@ -780,6 +794,32 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
         }
         herds.plover.push(chick)
       }
+    }
+    return
+  }
+
+  // A lioness with her cub (design.md §19.8, point 145c): the apex predator
+  // read from the other side — a mother. Seeded on open savanna only where a
+  // hyena hunt is possible (REGION_PREDATORS holds the hyena — the eastern and
+  // southern plains), so the drawn threat is always region-true. The lioness
+  // carries .child; the cub is her defended young — the shared resolution core
+  // (FAMILY_DEFEND_SPECIES) runs the hyena hunt, shield and sacrifice on them.
+  if (anchor.type === 'savanna' && roll >= 0.72 && roll < 0.735) {
+    const region = regionAt(ll.lat, ll.lon)
+    if (REGION_PREDATORS[region]?.includes('hyena') && herds.lion.length + 2 <= MAX_INSTANCES.lion) {
+      const lioness: Animal = {
+        x: ax, z: az, y: Math.max(0.02, anchor.height), rot: hash(ccx, ccz, 60, seed) * Math.PI * 2,
+        scale: 1, phase: hash(ccx, ccz, 61, seed), chunk: key,
+      }
+      const cub: Animal = {
+        x: ax + (hash(ccx, ccz, 62, seed) - 0.5) * 1.6,
+        z: az + (hash(ccx, ccz, 63, seed) - 0.5) * 1.6,
+        y: Math.max(0.02, anchor.height), rot: hash(ccx, ccz, 64, seed) * Math.PI * 2,
+        scale: 0.55, phase: hash(ccx, ccz, 65, seed), chunk: key,
+        young: true, parent: lioness,
+      }
+      lioness.child = cub
+      herds.lion.push(lioness, cub)
     }
     return
   }
@@ -1149,6 +1189,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     wildebeest: buildWildebeestCalf(),
     antelope: buildAntelopeCalf(),
     warthog: buildWarthogCalf(),
+    lion: buildLionCub(),
   }
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
   const adult = {} as Record<Species, THREE.InstancedMesh>
@@ -1421,7 +1462,9 @@ function Herds() {
     // parent's rescue charge always resolve, even when a herd exceeds the
     // instance cap and the family straddles the rendered boundary. The render
     // loop below only poses these animals; the state transitions happen here.
-    for (const sp of CALF_HUNT_SPECIES) {
+    // FAMILY_DEFEND_SPECIES, not CALF_HUNT_SPECIES: the lioness reaches this
+    // shared core for her cub (point 145c) without joining the prey loops.
+    for (const sp of FAMILY_DEFEND_SPECIES) {
       for (const a of herds[sp]) {
         if (a.dead) continue
         // The defence kick's pose window runs down here so it always resolves
@@ -3161,6 +3204,10 @@ function LionHunt() {
       let pz: number
       let ll: { lat: number; lon: number }
       let calf: Animal | null = null
+      // A lion cub as the victim (point 145c): the predator is forced to hyena
+      // below, and the lioness defends through the shared core — not a
+      // food-web pick (a lion is no grazer, so victimSpecies stays null).
+      let cubHunt = false
       // The drying waterhole draws the predators (point 123): a MIRED calf
       // in seek range is always the hunt's target — the pair at the last
       // water is genuinely found, not left to the calf-hunt dice.
@@ -3193,6 +3240,22 @@ function LionHunt() {
               calf = c
               victimSpecies = csp
             }
+          }
+        }
+      }
+      // A hyena hunts a lion cub (design.md §19.8, point 145c). The lion family
+      // is outside the food-web prey pools, so it is sought directly here; the
+      // lioness (its .parent) defends through the same shared core. Found only
+      // when no grazer calf was — the drama is a rare apex-family scene.
+      if (!vigilKeeper && !calf && herds && Math.random() < CALF_HUNT_CHANCE) {
+        let bd = CALF_HUNT_SEEK
+        for (const c of herds.lion) {
+          if (!c.young || c.dead || c.caught !== undefined || !c.parent || c.parent.dead) continue
+          const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
+          if (cd < bd) {
+            bd = cd
+            calf = c
+            cubHunt = true
           }
         }
       }
@@ -3242,6 +3305,11 @@ function LionHunt() {
       // The recorded prey species is the truth: the victim's own kind for a
       // family hunt, a food-web pick for the generic hunt.
       s.prey = vs ?? pool[Math.floor(Math.random() * pool.length)]
+      // The lion-cub hunt is always a hyena's (point 145c): the lioness would
+      // rout any lighter cat, so only the bold hyena makes the threat read —
+      // and it only spawns where hyenas roam. The scripted prey mesh stays
+      // hidden through the victim hunt, so s.prey's value is cosmetic here.
+      if (cubHunt) s.predator = 'hyena'
       if (predatorMesh.current) {
         predatorMesh.current.geometry = predatorGeo[s.predator]
         predatorMesh.current.scale.setScalar(PREDATOR_SCALE[s.predator])

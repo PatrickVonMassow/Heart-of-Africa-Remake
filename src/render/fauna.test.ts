@@ -10,6 +10,8 @@ import {
   buildAntelopeCalf,
   buildElephant,
   buildGiraffe,
+  buildLion,
+  buildLionCub,
   buildWarthog,
   buildWarthogCalf,
   buildWildebeest,
@@ -69,6 +71,9 @@ describe('calf geometries (design.md §19 — juveniles read as young)', () => {
     ['warthog', buildWarthog(), buildWarthogCalf()],
     ['elephant', buildElephant(), buildElephant(true)],
     ['giraffe', buildGiraffe(), buildGiraffe(true)],
+    // The predator cub (point 145c): a lion cub reads as young by the same
+    // schema, and drops the adult mane and tail.
+    ['lion', buildLion(), buildLionCub()],
   ]
 
   it('every calf is shorter nose-to-tail than its adult (at build scale)', () => {

@@ -327,19 +327,21 @@ export function buildWarthogCalf(): THREE.BufferGeometry {
   return merge(buildQuadruped(calfProportions(WARTHOG_SPEC)))
 }
 
+const LION_SPEC: QuadrupedSpec = {
+  bodyLen: 1.4,
+  bodyR: 0.42,
+  legH: 0.6,
+  legR: 0.09,
+  neckLen: 0.4,
+  neckTilt: 0.85,
+  headSize: 0.22,
+  bodyColor: '#b6905a',
+  seed: 141,
+}
+
 /** Lion, ~1.3 units tall, with mane. */
 export function buildLion(): THREE.BufferGeometry {
-  const parts = buildQuadruped({
-    bodyLen: 1.4,
-    bodyR: 0.42,
-    legH: 0.6,
-    legR: 0.09,
-    neckLen: 0.4,
-    neckTilt: 0.85,
-    headSize: 0.22,
-    bodyColor: '#b6905a',
-    seed: 141,
-  })
+  const parts = buildQuadruped(LION_SPEC)
   const mane = new THREE.SphereGeometry(0.42, 8, 6)
   mane.scale(1, 1, 0.85)
   mane.translate(0, 1.25, 0.85)
@@ -349,6 +351,13 @@ export function buildLion(): THREE.BufferGeometry {
   tail.translate(0, 1.1, -1.0)
   parts.push(tint(tail, '#b6905a', 0.1, 143))
   return merge(parts)
+}
+
+/** Lion cub: baby schema (proportionally larger head, shorter neck/body, leggy
+ *  stance) and none of the adult ornaments — no mane yet (design.md §19.8,
+ *  point 145c). The defended young of the lioness-vs-hyena drama. */
+export function buildLionCub(): THREE.BufferGeometry {
+  return merge(buildQuadruped(calfProportions(LION_SPEC)))
 }
 
 /** Slender quadruped predator with a long low tail (cheetah/leopard base). */
