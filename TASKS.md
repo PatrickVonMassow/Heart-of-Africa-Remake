@@ -5515,7 +5515,7 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.13. (Reported 17.07.2026; queued at the batch end per
   the standing append-and-defer rule.)
 
-- [ ] 168. Rinderpest carrion not visible at the Maasai village in a struck year.
+- [x] 168. Rinderpest carrion not visible at the Maasai village in a struck year.
   User report (17.07.2026 23:xx, deployed build auto-deploys from main, so the
   feature IS live): at 15.01.1892 (a STRUCK year), season strength 1, standing
   at 2.8S/36.7E by the Maasai village, NO carcasses at standard zoom nor fully
@@ -5580,6 +5580,21 @@ the remaining open points in their numeric order.
   check MUST reset the calendar afterward so a struck date never leaks into
   later checks. DIAGNOSE the 0-at-village first with a dev hook (is the
   village chunk spawned? is the branch reached?) before re-implementing.
+  DONE (18.07.2026, 03:44 — attempt 2, safe): the carrion CHUNK branch (the
+  suite-safe mechanism, unlike the reverted frame seeder) now fires on ANY
+  land within the struck village radius, not only a savanna anchor — the
+  rocky Maasai village has few savanna chunks in the small standard-zoom
+  view ring, so the savanna gate left the player with nothing while the
+  wide-zoom check saw far-out savanna. roll<0.5 still leaves living herds on
+  the other near chunks (family dramas stage), and it fires only at struck
+  dates. The live check (SINGLE evaluate, like 133 — a three-evaluate split
+  had lost window.__wildlife to a remount, the chunks:-1/totalPlague:0 red
+  herring) proves it at the USER's conditions: standard zoom 0.5, near the
+  village, 1892 -> 17 carcasses in view (totalPlague 19, 27 chunks), and it
+  resets the year to 1890 afterward (calendar hygiene) so no struck date
+  leaks into later checks (no cascade). Docs: design.md §16. Code+docs
+  committed 031d4e6. The run's other FAILs (118/calf-charge) were rotating
+  family-staging flakes, different each run, unrelated to this change.
 
 - [ ] 169. Too few juveniles — raise the calf-to-adult ratio.
   User request (17.07.2026 23:xx): "Ist das Anzahlen-Verhaeltnis zwischen
