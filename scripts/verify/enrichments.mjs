@@ -1504,6 +1504,48 @@ check(
   JSON.stringify(rinderpest),
 )
 
+// Point 168: at the USER's conditions — STANDARD zoom in a struck year near
+// the Maasai village — the carrion must be VISIBLE without travelling away.
+// Done in ONE evaluate like the point-133 check (a split into jump/wait/count
+// evaluates lost window.__wildlife to a remount between them). Jump to the
+// same reliable spot the 133 check uses (-2.5/36.4), pin 1892, restock, and
+// count carcasses in the standard-zoom view around the ACTUAL player pos.
+const carrionVicinity = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__ui.getState().setWheelZoomEnabled(false)
+  window.__ui.getState().setTravelZoom(0.5)
+  window.__game.getState().debugJumpTo(-2.5, 36.4)
+  for (let i = 0; i < 8; i++) window.__game.getState().debugJumpYear(-1)
+  window.__game.getState().debugJumpYear(1); window.__game.getState().debugJumpYear(1) // -> 1892
+  await sleep(400)
+  window.__wildlife.restock()
+  const p0 = window.__game.getState().pos
+  const viewR = 55
+  let carcasses = 0
+  const t0 = Date.now()
+  while (Date.now() - t0 < 25000) {
+    const h = window.__wildlife.herdsRef.current
+    carcasses = 0
+    for (const sp of ['wildebeest', 'antelope'])
+      for (const a of h[sp] ?? []) if (a.dead && a.plague && Math.hypot(a.x - p0.x, a.z - p0.z) <= viewR) carcasses++
+    if (carcasses >= 3) break
+    await sleep(500)
+  }
+  const day = Math.round(window.__game.getState().day)
+  const phase = window.__rinderpest.rinderpestPhaseAtDay('maasai', day, 1890)
+  let totalPlague = 0
+  const h = window.__wildlife.herdsRef.current
+  for (const sp of ['wildebeest', 'antelope']) for (const a of h[sp] ?? []) if (a.dead && a.plague) totalPlague++
+  return { carcasses, phase, zoom: window.__ui.getState().travelZoom, day, totalPlague, chunks: window.__wildlife.spawnedChunks.current.size }
+})
+// Calendar hygiene: back to 1890 so no struck date leaks into later checks.
+await page.evaluate(() => { for (let i = 0; i < 8; i++) window.__game.getState().debugJumpYear(-1) })
+check(
+  'a struck village shows carrion in view at standard zoom, no travel needed (point 168)',
+  carrionVicinity.phase === 'struck' && carrionVicinity.carcasses >= 3,
+  JSON.stringify(carrionVicinity),
+)
+
 // --- Point 145a: the burning grass --------------------------------------------
 // In the Sahel dry season a fire line walks the savanna; a calf in its path
 // is caught and the parent goes in after it (a point-134 surrender). Staged:

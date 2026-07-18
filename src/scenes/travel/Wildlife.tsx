@@ -722,14 +722,22 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   // the plains — dead wildebeest and antelope the vultures and scavengers
   // then work like any carcass. Date-dependent by design: the same chunk in
   // 1890 spawns living herds instead.
-  // Calibrated twice against live measurement (point 133): the 2.5-degree
-  // carrion radius covers only ~25 world units around the village, so a
-  // narrow roll band left whole boots without visible toll. In the STRUCK
-  // core the plague now claims half the savanna chunks — their living herds
-  // give way to carcasses, which is what ~95% of the buffalo and wildebeest
-  // dead (Baumann) actually looked like. Outside the radius or the struck
-  // years the branch falls through and the normal herds spawn.
-  if (anchor.type === 'savanna' && roll < 0.5 && MAASAI_VILLAGE) {
+  // Rinderpest carrion near a STRUCK village on ANY land (point 133, widened
+  // for point 168): the toll fires for any land chunk within the struck
+  // radius — not only savanna. The Maasai village sits by Kilimanjaro/Meru,
+  // so gating on a savanna ANCHOR left the standard-zoom player at the rocky
+  // village with nothing (few savanna chunks stream in the small view ring);
+  // the wide-zoom check saw plenty only because it streamed far-out savanna.
+  // roll < 0.5 keeps living herds on the OTHER near-village chunks (so the
+  // family dramas still stage), and the branch fires only at struck dates, so
+  // ordinary play (and every check that ends at 1890) is untouched.
+  if (
+    anchor.type !== 'ocean' &&
+    anchor.type !== 'water' &&
+    anchor.height > 0.05 &&
+    roll < 0.5 &&
+    MAASAI_VILLAGE
+  ) {
     const distDeg = Math.hypot(ll.lat - MAASAI_VILLAGE.lat, ll.lon - MAASAI_VILLAGE.lon)
     const phase = rinderpestPhaseAtDay('maasai', day, START_YEAR)
     if (rinderpestCarrionActive(phase, distDeg)) {
@@ -740,7 +748,7 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
         const z = az + (hash(ccx, ccz, 43 + i * 2, seed) - 0.5) * 10
         const cll = worldToLatLon(x, z)
         const ct = sampleTerrain(cll.lat, cll.lon, seed)
-        if (ct.type !== 'savanna') continue
+        if (ct.type === 'ocean' || ct.type === 'water' || ct.height <= 0.05) continue
         herds[sp2].push({
           x, z, y: Math.max(0.02, ct.height), rot: hash(ccx, ccz, 46 + i, seed) * Math.PI * 2,
           scale: 0.9 + hash(ccx, ccz, 47 + i, seed) * 0.2, phase: hash(ccx, ccz, 48 + i, seed), chunk: key,

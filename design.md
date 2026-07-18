@@ -789,7 +789,13 @@ boundary-exact March 1896; the camel peoples never (FAO immunity); the
 cattle-less Bemba never (tsetse belt — game depletion, a texture). §16
 carries the vignette wiring; no rinderpest→dress link is asserted (evidence
 absent — only the buffalo-hide shield supply collapse is sourced, kept as
-texture).
+texture). The wildlife toll (Baumann: "nicht nur Rinder, sondern auch
+Büffel, Gnus und Antilopen") lies on the ground in the STRUCK years: within
+the struck village's radius the chunk spawn seeds dead wildebeest and
+antelope on ANY nearby land — not only savanna, so the rocky Maasailand
+(Kilimanjaro/Meru) shows it too — worked by the ordinary scavenger/vulture
+systems, and visible at the standard bird's-eye zoom (point 168) without
+travelling out to wider country.
 - **Rank as class experience:** the gate keys on the settlement palette's
   first cloth, so about a third of the figures carry the plaid while the
   rest stand bare at the fire — Barth's class split, not a uniform issue.
