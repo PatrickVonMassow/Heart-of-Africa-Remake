@@ -6011,7 +6011,7 @@ the remaining open points in their numeric order.
   conditions (non-debug zoom 0.25–0.5) and judge "in view" by projecting to the
   frame, never a computed radius.
 
-- [ ] 173. Post-162 quality push: closing run, then a thorough code analysis with
+- [x] 173. Post-162 quality push: closing run, then a thorough code analysis with
   many new tests, and the small/large browser-regression tiers.
   (User order 18.07.2026, inserted in the work order AFTER 162; v0.2 (174) is
   tagged after this, and 163/166/170 run AFTER v0.2 — user's explicit ordering.)
@@ -6038,6 +6038,27 @@ the remaining open points in their numeric order.
   DELIVERABLE: a hardened, high-assured-quality state ready to tag as v0.2 (174).
   DOCS: `scripts/verify/README.md` (the tiers + the new scenarios), CLAUDE.md §5
   (the small/large commands) + §7.2.
+  DONE 18.07.2026:
+  (d) TIERS: run-all.mjs gained SMALL (docs/i18n/flow/health/events/collision/voice
+      — the fast, low-flake everyday gate) and LARGE (every suite + preview), wired
+      as `npm run test:small`/`test:large` (bare `npm test` = LARGE), documented in
+      README, scripts/verify/README.md and CLAUDE.md §5 (9e920f3).
+  (b) ANALYSIS: three subsystem sweeps (systems/state, travel/world, render/ui/i18n)
+      found ~52 test gaps AND three real bugs — all confirmed against the code:
+      B3 successorTakeOver did not clamp the resumed day to 31.12.1895 (fb386c4),
+      B2 a water-surrounded dragged canoe could return a water point (e8596b3), and
+      B1 the dry-season drink catchment is silently capped at 0.45° vs the intended
+      0.70° — deferred as point 176 (a global-cap raise needs a perf-aware round).
+  (c) NEW TESTS: ~90 new Vitest tests across the three areas (my walk-feel/touch/
+      dress batch 4ef17d2, then 72650a9 / 0824734 / 5f1ba8b), each self-verified by
+      its writer and independently re-run; full Vitest 1925 green.
+  (a) CLOSING: npm audit 0 CVEs; the dead-code/.md audit was clean (no stray probe
+      scripts, no stale TODO/OPEN beyond the documented open items, §7.1 numbering
+      1..32 intact, README deadline/suite text correct); the LARGE regression ran
+      build+lint+unit + all 14 browser suites + preview — everything green except
+      the rotating enrichments family-staging flakes, which a clean retry passed
+      fully (198/0), confirming they are timing flakes, not regressions. Their
+      deterministic stabilisation is filed as point 177.
 
 - [ ] 174. Tag the demo build v0.2 and publish /v0.2/.
   (User order 18.07.2026, immediately after 173; then 163/166/170.) Once 173 has
@@ -6124,6 +6145,31 @@ the remaining open points in their numeric order.
   (currently `riverDistance(lat,lon,0.6)` === `riverDistance(lat,lon,0.45)`); live
   — an animal at ~0.6° from water walks toward the bank in the forced dry season.
   (Found 18.07.2026 by the point-173 subsystem analysis; queued at the batch end.)
+
+- [ ] 177. Make the enrichments family-drama / seeder staging DETERMINISTIC so the
+  LARGE regression stops flaking. The point-173 closing run showed the recurring
+  pain plainly: the LARGE run and its retries each failed a DIFFERENT rotating
+  subset of the `scripts/verify/enrichments.mjs` staging checks (seen: 118 the
+  parent-orbit-vs-flee, 165 the vicinity-seeder pop, 145a the burning-grass catch,
+  the parent charge/sacrifice pair, 126 the graveyard mourning) — then a clean
+  retry passed ALL 198 with zero fails. So these are TEST-INFRASTRUCTURE flakes
+  (the synthetic-family + forced-hunt staging is timing-sensitive and occasionally
+  fails to establish, taking its dependent checks down together), NOT product bugs:
+  the underlying behaviour is pure-tested green and passes live on a clean run.
+  But "retry until green" is not a real gate. WHAT TO DO (verify each against the
+  current harness): (a) find why the staging intermittently fails to establish —
+  likely the synthetic family or the forced LION_STATE not being fully seeded
+  before the measurement window, or a natural hunt/animal claiming the single
+  victim/hunt slot first (the checks already shove natural young clear — extend
+  that to natural PREDATORS and the hunt slot); (b) make each family-drama check
+  wait on an explicit "staged" precondition (parent+calf+hunt in the intended
+  state) before it starts measuring, with a clear FAIL message if staging never
+  established (so a genuine break is distinguishable from a flake); (c) where a
+  metric is load-sensitive (the collision-ejection and frame-budget checks — see
+  point 150's note), settle the scene deterministically rather than on a wall
+  clock. GOAL: three consecutive clean LARGE runs with zero retries. Until then the
+  SMALL tier stays the reliable everyday gate (it excludes enrichments by design).
+  (Found 18.07.2026 in the point-173 closing run; queued at the batch end.)
 
 ## Closing (only after all points)
 

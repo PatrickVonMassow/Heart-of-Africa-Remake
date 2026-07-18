@@ -103,7 +103,8 @@ npm run preview    # serve the production build locally
 npm run lint       # oxlint (zero errors/warnings required)
 npm audit          # zero known vulnerabilities required
 npm run test:unit  # fast Vitest layer (jsdom): logic, store, HUD components
-npm test           # full headless regression (boots dev + preview servers)
+npm run test:small # everyday gate: Vitest + the core browser suites (no preview)
+npm test           # full (LARGE) headless regression: every suite + preview
 ```
 
 The game starts in English by default; German can be selected at runtime via
