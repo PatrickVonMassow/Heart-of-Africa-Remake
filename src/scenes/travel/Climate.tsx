@@ -13,9 +13,9 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setSkyHarmattan, setSkyOvercast } from '../../render/skyOvercast'
 import { setHail } from '../../render/seasonalSnow'
+import { smoothedWetnessAt } from '../../render/seasonField'
 import {
   CURRENT_WEATHER,
-  effectiveWetness,
   HARMATTAN_PALE,
   hailAt,
   harmattanAt,
@@ -205,8 +205,12 @@ export function Climate() {
     // haze-free: clearView already lerps the fog to the horizon regardless.
     const lon = s.pos.x / 10
     const lat = -s.pos.z / 10
-    const wet = effectiveWetness(
-      s.day, lat, lon, START_YEAR, elevationAt(lat, lon),
+    // Point 167: the traversal weather samples the SPATIALLY-SMOOTHED wetness
+    // (the same blurred zone-weight field the greenness uses), so rain/fog/dim
+    // ramp across a climate-zone border instead of snapping on within a stride.
+    // The discrete effectiveWetness (one climateZoneAt zone) stepped at borders.
+    const wet = smoothedWetnessAt(
+      s.day, lat, lon, START_YEAR,
       useUi.getState().seasonWetnessOverride,
     )
     wetness.current = wet

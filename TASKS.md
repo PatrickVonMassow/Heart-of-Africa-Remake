@@ -5625,6 +5625,25 @@ the remaining open points in their numeric order.
   amount changes MONOTONICALLY over several steps rather than in one jump.
   DOCS: design.md §19.13. (Reported 17.07.2026; queued at the batch end per
   the standing append-and-defer rule.)
+  DONE (18.07.2026, ~09:45): the cause was exactly as spec'd — the travel
+  weather read `effectiveWetness` → `wetnessAt` → the DISCRETE `climateZoneAt`
+  (one zone), so wetness stepped at a border and the rain snapped on within a
+  stride. Fix (option a — one smoothing source for ground AND weather): a new
+  `slotWetness(day, slot, startYear, lat)` in season.ts (each season-field
+  slot's absolute wetness = its zone shape × ZONE_WETNESS, the Sahel latitude
+  squeeze applied smoothly from lat), and `smoothedWetnessAt(day, lat, lon,
+  startYear, override)` in seasonField.ts that blends slotWetness through the
+  EXACT SAME blurred zone-weight map the point-151 greenness field uses — so a
+  border texel reads strictly between its two zones and deep inside a zone
+  equals the discrete `wetnessAt`. Climate.tsx (the bird's-eye traversal) now
+  samples smoothedWetnessAt for rain/fog/sun-dim/overcast; the settlement path
+  keeps the discrete per-coordinate wetnessAt (one point, unaffected). Pure:
+  seasonField.test.ts — deep-inside equals the discrete value, a N-S Sahel→
+  Sahara walk fades as a gradient (maxStep < half the swing), a mid sample
+  strictly between the ends, override + purity. Live: enrichments walks 12→22N
+  along 0°E in August and asserts the traversal wetness fades as a gradient,
+  not a snap. Display smoothing only — the researched per-zone model stays
+  exact. tsc/lint/build/1814 unit green. Docs: design.md §19.13.
 
 - [x] 168. Rinderpest carrion not visible at the Maasai village in a struck year.
   User report (17.07.2026 23:xx, deployed build auto-deploys from main, so the

@@ -763,3 +763,22 @@ export function slotGreenness(day: number, slot: number, startYear: number, over
   const greenable = Math.min(1, ZONE_WETNESS[zone] / GREENING_ZONE_FLOOR)
   return Math.min(1, Math.max(0, shape * greenable))
 }
+
+/**
+ * This day's ABSOLUTE wetness per season-field slot (point 167): the same value
+ * `wetnessAt` produces for the slot's zone — its shape × the zone's wetness —
+ * so the smoothed weather field (smoothedWetnessAt) and the discrete model agree
+ * deep inside a zone. Slot 0 (hyper-arid) is 0. The Sahel latitude squeeze is
+ * applied here from `lat` (a smooth function of latitude, so it introduces no
+ * edge of its own), keeping the researched model exact under the display blend.
+ */
+export function slotWetness(day: number, slot: number, startYear: number, lat: number): number {
+  if (slot <= 0 || slot >= SEASON_SLOTS.length) return 0
+  const zone = SEASON_SLOTS[slot] as ClimateZone
+  let wet = zoneShapeAt(day, zone, startYear) * ZONE_WETNESS[zone]
+  if (zone === 'sahel') {
+    const north = Math.min(1, Math.max(0, (lat - 11) / 7))
+    wet *= 1 - north * 0.55
+  }
+  return Math.min(1, Math.max(0, wet))
+}

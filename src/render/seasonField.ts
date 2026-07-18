@@ -17,7 +17,7 @@
 
 import * as THREE from 'three/webgpu'
 import { attribute, float, texture, vec2 } from 'three/tsl'
-import { SEASON_SLOTS, seasonSlotAt, slotGreenness } from '../systems/season'
+import { SEASON_SLOTS, seasonSlotAt, slotGreenness, slotWetness } from '../systems/season'
 import { elevationAt } from '../world/geodata'
 
 // Continent bounds (generous past the world trim) and texel size.
@@ -148,6 +148,36 @@ export function seasonFieldTintAt(lat: number, lon: number): number {
   const x = Math.min(FIELD_W - 1, Math.max(0, Math.round(u * FIELD_W - 0.5)))
   const y = Math.min(FIELD_H - 1, Math.max(0, Math.round(v * FIELD_H - 0.5)))
   return fieldData[y * FIELD_W + x] / 255
+}
+
+/**
+ * Spatially-smoothed WETNESS at a position (design.md §19.13, point 167): the
+ * displayed weather (rain, fog, sun dim, overcast) must ramp across a climate
+ * zone border like the greenness does, not step. This blends each slot's
+ * absolute wetness through the EXACT SAME blurred zone-weight map the greenness
+ * field uses — so ground and weather can never disagree at a border — instead
+ * of `wetnessAt`'s single discrete `climateZoneAt` zone. A border texel reads
+ * strictly between its two zones; deep inside a zone it equals that zone's
+ * wetness. Pure function of position + day (the point-151 rule: walking never
+ * changes the field). The underlying per-zone climate model stays exact; this
+ * is DISPLAY smoothing only.
+ */
+export function smoothedWetnessAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  override: number | null,
+): number {
+  if (override !== null) return Math.min(1, Math.max(0, override))
+  if (!weights) weights = buildWeights()
+  const [u, v] = seasonFieldUV(lat, lon)
+  const x = Math.min(FIELD_W - 1, Math.max(0, Math.round(u * FIELD_W - 0.5)))
+  const y = Math.min(FIELD_H - 1, Math.max(0, Math.round(v * FIELD_H - 0.5)))
+  const base = (y * FIELD_W + x) * SLOTS
+  let wet = 0
+  for (let i = 0; i < SLOTS; i++) wet += weights[base + i] * slotWetness(day, i, startYear, lat)
+  return Math.min(1, Math.max(0, wet))
 }
 
 /** The current lerped slot greens (checks/dev hooks). */

@@ -9,9 +9,10 @@ import {
   seasonFieldGreens,
   seasonFieldTintAt,
   seasonFieldUV,
+  smoothedWetnessAt,
   updateSeasonField,
 } from './seasonField'
-import { SEASON_SLOTS, seasonSlotAt, slotGreenness, floraGreennessAt } from '../systems/season'
+import { SEASON_SLOTS, seasonSlotAt, slotGreenness, floraGreennessAt, wetnessAt } from '../systems/season'
 import { elevationAt } from '../world/geodata'
 import { setupGeodata } from '../test/geodata'
 
@@ -81,6 +82,35 @@ describe('the greenness field (point 151)', () => {
     let maxStep = 0
     for (let i = 1; i < samples.length; i++) maxStep = Math.max(maxStep, Math.abs(samples[i] - samples[i - 1]))
     expect(maxStep).toBeLessThan(total * 0.35) // spread over >= ~3 samples, no cliff
+  })
+
+  it('smoothedWetnessAt ramps across a zone border (point 167 — rain no longer snaps on)', () => {
+    // Deep inside a zone it equals the discrete wetnessAt (the blur weight is
+    // ~1 there): deep Sahel rains in August, deep Sahara bone dry.
+    const dSahel = wetnessAt(AUG, 13, 0, START_YEAR, elevationAt(13, 0))
+    expect(smoothedWetnessAt(AUG, 13, 0, START_YEAR, null)).toBeCloseTo(dSahel, 1)
+    expect(smoothedWetnessAt(AUG, 24, 0, START_YEAR, null)).toBeCloseTo(0, 1) // deep Sahara
+    // Across the Sahel -> Sahara border along 0°E: the wetness must fade as a
+    // GRADIENT, no single step covering most of the swing (the user's "zu
+    // plötzlich"), and a mid sample lies strictly between the deep-zone ends.
+    const samples: number[] = []
+    for (let lat = 12; lat <= 24; lat += 0.5) samples.push(smoothedWetnessAt(AUG, lat, 0, START_YEAR, null))
+    const first = samples[0]
+    const last = samples[samples.length - 1]
+    expect(Math.abs(first - last)).toBeGreaterThan(0.05) // the border genuinely changes the weather
+    let maxStep = 0
+    for (let i = 1; i < samples.length; i++) maxStep = Math.max(maxStep, Math.abs(samples[i] - samples[i - 1]))
+    expect(maxStep).toBeLessThan(Math.abs(first - last) * 0.5) // spread over several samples, no cliff
+    const mid = samples[Math.floor(samples.length / 2)]
+    expect(mid).toBeGreaterThan(Math.min(first, last))
+    expect(mid).toBeLessThan(Math.max(first, last))
+  })
+
+  it('smoothedWetnessAt honours the debug override and is season-free at strength (pure position+day)', () => {
+    expect(smoothedWetnessAt(AUG, 13.4, 31.8, START_YEAR, 1)).toBe(1)
+    expect(smoothedWetnessAt(AUG, 13.4, 31.8, START_YEAR, 0)).toBe(0)
+    // Pure function of position+day: the same args give the same value.
+    expect(smoothedWetnessAt(AUG, 5, 25.4, START_YEAR, null)).toBe(smoothedWetnessAt(AUG, 5, 25.4, START_YEAR, null))
   })
 
   it('the override floods the whole field wet and dry', () => {

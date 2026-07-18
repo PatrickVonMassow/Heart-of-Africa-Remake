@@ -4347,6 +4347,33 @@ check(
   drivenFlora.inViewToggles === 0 && drivenFlora.rebuilds > 1,
   JSON.stringify(drivenFlora),
 )
+
+// Point 167: the rain no longer snaps on at a climate-zone border. Walk a N-S
+// line across the Sahel -> Sahara border along 0°E in August and read the
+// traversal wetness at each step: it must fade as a GRADIENT (no single step
+// covering most of the swing), not jump on within a stride like the old
+// discrete climateZoneAt did.
+await page.evaluate(() => window.__game.getState().debugJumpToMonth(8))
+await page.waitForTimeout(2500) // let the season field settle to August
+const rainBorder = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const wets = []
+  for (let lat = 12; lat <= 22; lat += 1) {
+    window.__game.getState().debugJumpTo(lat, 0) // lon 0°E, walking north
+    await sleep(260) // a frame or two for the weather to update at the new spot
+    wets.push(Number(window.__climate.seasonWetness().toFixed(4)))
+  }
+  const total = Math.abs(wets[0] - wets[wets.length - 1])
+  let maxStep = 0
+  for (let i = 1; i < wets.length; i++) maxStep = Math.max(maxStep, Math.abs(wets[i] - wets[i - 1]))
+  return { wets, total, maxStep }
+})
+check(
+  'the traversal rain fades as a gradient across a zone border, not a snap (point 167)',
+  rainBorder.total > 0.05 && rainBorder.maxStep < rainBorder.total * 0.55,
+  JSON.stringify(rainBorder),
+)
+
 // Human-viewable evidence at BOTH reported spots: stable flora in the June/
 // July gradient (123: the Gezira between the Nile arms; 124: the Nile at 18N).
 await page.evaluate(() => window.__game.getState().debugJumpTo(13.4, 31.8))
