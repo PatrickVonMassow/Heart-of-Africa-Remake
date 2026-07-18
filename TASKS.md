@@ -6033,7 +6033,21 @@ the remaining open points in their numeric order.
   elaborately asks (tags-only-on-request memory). The v0.2 content is exactly what
   173 produced — do NOT fold in 163/166/170 (they come after the tag).
 
-- [x] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
+- [ ] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
+  REOPENED 18.07.2026: the shipped fix (5421e46, baked per-instance seasonTint +
+  upload-only-on-change guard) did NOT resolve it — the user re-tested on WebGPU
+  (JumpingTrees3.mp4) and the trees still jump while driving. Deeper diagnosis:
+  the flora's WORLD positions are PROVEN STABLE (the nearest trees measure
+  identical frame to frame; only their distance changes as the player drives) —
+  so the jump is a pure WebGPU RENDER effect, NOT a position/streaming change and
+  NOT the season texture. On WebGL 2 (headless, no WebGPU adapter) the scene is
+  stable and the effect does not reproduce; TRAA off and weatherStrength 0 both
+  leave the (WebGL 2) scene unchanged, so neither is confirmed as the cause there.
+  Cause must be isolated on the user's WebGPU hardware — asked the user to report
+  which debug toggle (TRAA off / weatherStrength 0 / neither) stops the jump, then
+  build the real fix from that. Do NOT revert 5421e46 (it is a legitimate
+  reduction of per-frame texture uploads, harmless). Original report and the
+  prior (insufficient) attempt are kept below.
   User report (18.07.2026, with a video, JumpingTrees.mp4): after 171 the trees
   STILL "springen herum" while driving, at the DEFAULT zoom and at normal speed;
   the positions shift and plants appear mid-frame. "Das direkt als naechstes
@@ -6054,14 +6068,15 @@ the remaining open points in their numeric order.
   (`seasonFieldTintAttrNode`); a baked float never samples the moving texture, so
   it is stable on both backends (the ground keeps its per-vertex seasonUV sample).
   (b) updateSeasonField re-uploads the texture only when a texel actually changed.
-  DONE 18.07.2026: pure season/flora tests + full 1828 Vitest + enrichments 197/0
-  (incl. the 151-stability and 171-no-pop checks) green on WebGL2; build + lint
-  clean. design.md §19.13 table + CLAUDE §7.1 pt.12 updated (the vegetation reads
-  the baked attribute, not the texture). WebGL2 CANNOT show the WebGPU jitter, so
-  this ships for a MANUAL USER WebGPU check (webgpu-untestable-headless memory): if
-  the crowns still hop, the fallback is to bake the crown-collapse height per
-  instance too (drop the field read from the vertex stage entirely). (Follow-up to
-  171; done immediately per the user's "direkt als naechstes".)
+  PRIOR ATTEMPT (18.07.2026, 5421e46 — INSUFFICIENT, see the reopen note above):
+  pure season/flora tests + full 1828 Vitest + enrichments 197/0 (incl. the
+  151-stability and 171-no-pop checks) green on WebGL2; build + lint clean.
+  design.md §19.13 table + CLAUDE §7.1 pt.12 updated (the vegetation reads the
+  baked attribute, not the texture). WebGL2 CANNOT show the WebGPU jitter, so it
+  shipped for a MANUAL USER WebGPU check (webgpu-untestable-headless memory) — the
+  user's re-test showed it still hops. Named fallback if the diagnosis points at
+  the collapse: bake the crown-collapse HEIGHT per instance too (drop the field
+  read from the vertex stage entirely). (Follow-up to 171.)
 
 ## Closing (only after all points)
 
