@@ -807,13 +807,24 @@ verify suite that proves it.
     ground). Rectangular buildings collide as oriented boxes (exact
     corners, no gaps), and the clearance keeps the camera's near plane out
     of every wall — pressing against a building must never show its
-    inside. Verifiable: an automated run steers the player character
-    against building walls and corners and proves it keeps positive
-    clearance; an observed inhabitant transitions walk → inside at its
-    dwelling and out again; interaction with all functional buildings
-    remains possible; every dwelling door (port and village) has a
-    collision-free standpoint inside the walkable area; the application
-    runs without console errors (`scripts/verify/collision.mjs`).
+    inside. No inhabitant spawns or walks into a pocket it cannot leave
+    (point 155): every walker errand target is validated to have a clear
+    standing circle AND an open escape direction against the FULL collider
+    set (stall boards, rocks and props included, not only buildings) and
+    nudged to the nearest free spot otherwise, and a walker physically
+    pinned past a calibratable window (`balance.walkerUnstuckSeconds`,
+    debug-editable) is teleport-nudged to free ground — inhabitants only, a
+    small invisible correction, never the player. Verifiable: an automated
+    run steers the player character against building walls and corners and
+    proves it keeps positive clearance; an observed inhabitant transitions
+    walk → inside at its dwelling and out again; interaction with all
+    functional buildings remains possible; every dwelling door (port and
+    village) has a collision-free standpoint inside the walkable area; the
+    spawn-freedom helpers (`spawnPointFree`/`nudgeToFree`) are pure-tested
+    (`src/scenes/place/collision.test.ts`) and every place's errand points
+    sweep spawn-free across seeds (`src/scenes/place/layout.test.ts`); live,
+    no walker stays pinned past the window (`scripts/verify/collision.mjs`);
+    the application runs without console errors (`scripts/verify/collision.mjs`).
 17. **Localization.** The game is fully playable in English as well as
     German per `design.md` §17.7 (all player-visible text from the
     language files, runtime language switch defaulting to English,

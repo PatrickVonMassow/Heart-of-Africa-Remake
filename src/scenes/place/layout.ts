@@ -8,7 +8,7 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxCollider, type Collider } from './collision'
+import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import type { BuildingType } from '../../state/ui'
 
@@ -753,6 +753,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push({ x: VILLAGE_SPOTS.well[0], z: VILLAGE_SPOTS.well[1], r: 0.75 })
   } else {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
+  }
+
+  // Every errand target a walker heads for must sit on free ground it can also
+  // LEAVE (point 155): a jitter (or a stall/rock beside it) can drop a point
+  // into a pocket. Nudge any such point to the nearest usable spot against the
+  // full collider set, so no inhabitant walks into a wedge it cannot escape.
+  for (let i = 0; i < errands.length; i++) {
+    errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
   }
 
   return { radius, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }

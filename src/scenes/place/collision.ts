@@ -123,3 +123,79 @@ export function resolveMove(
   }
   return [px, pz]
 }
+
+// --- Spawn freedom (point 155) ----------------------------------------------
+// The default collision radius of a settlement inhabitant. Shared so the
+// layout builder and PlaceLife validate spawn/errand points against the SAME
+// footprint the walkers move with.
+export const WALKER_RADIUS = 0.3
+/** Directions probed for an escape / spiral samples on the innermost ring. */
+const ESCAPE_DIRECTIONS = 12
+
+/** True if a mover circle of `radius` at (x,z) overlaps this collider. */
+function overlaps(c: Collider, x: number, z: number, radius: number): boolean {
+  const [nx, nz] = pushOut(c, x, z, radius)
+  return nx !== x || nz !== z
+}
+
+/** The standing circle is clear: no collider overlaps a mover of `radius`
+ *  standing at (x,z) — it fits there (point 155). */
+export function standingClear(colliders: Collider[], x: number, z: number, radius: number): boolean {
+  for (const c of colliders) if (overlaps(c, x, z, radius)) return false
+  return true
+}
+
+/** At least one step of length `step` off (x,z) lands on clear ground: the
+ *  spot is not a fully enclosed pocket the mover cannot leave (point 155). */
+export function hasEscapeDirection(
+  colliders: Collider[],
+  x: number,
+  z: number,
+  radius: number,
+  step: number,
+): boolean {
+  for (let i = 0; i < ESCAPE_DIRECTIONS; i++) {
+    const a = (i / ESCAPE_DIRECTIONS) * Math.PI * 2
+    if (standingClear(colliders, x + Math.cos(a) * step, z + Math.sin(a) * step, radius)) return true
+  }
+  return false
+}
+
+/** A spawn/target point is usable only if the mover FITS there AND can LEAVE
+ *  (point 155): a clear standing circle plus one open escape direction against
+ *  the full collider set — stall boards and rocks included. */
+export function spawnPointFree(
+  colliders: Collider[],
+  x: number,
+  z: number,
+  radius: number,
+  step: number = radius * 2,
+): boolean {
+  return standingClear(colliders, x, z, radius) && hasEscapeDirection(colliders, x, z, radius, step)
+}
+
+/** Nearest usable spawn point to (x,z): if it is already free, keep it;
+ *  otherwise spiral outward over rings (deterministic ring/angle order) until
+ *  one is free (point 155). Falls back to the original point if none is found
+ *  within `maxRings` — the caller is no worse off than before. */
+export function nudgeToFree(
+  colliders: Collider[],
+  x: number,
+  z: number,
+  radius: number,
+  step: number = radius * 2,
+  maxRings = 12,
+): [number, number] {
+  if (spawnPointFree(colliders, x, z, radius, step)) return [x, z]
+  for (let ring = 1; ring <= maxRings; ring++) {
+    const rr = ring * step
+    const n = ESCAPE_DIRECTIONS * ring // denser sampling on the larger rings
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2
+      const px = x + Math.cos(a) * rr
+      const pz = z + Math.sin(a) * rr
+      if (spawnPointFree(colliders, px, pz, radius, step)) return [px, pz]
+    }
+  }
+  return [x, z]
+}

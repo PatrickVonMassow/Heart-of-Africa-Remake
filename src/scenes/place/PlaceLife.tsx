@@ -17,13 +17,13 @@ import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
-import { START_YEAR } from '../../config/balance'
+import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
-import { resolveMove, type Collider } from './collision'
+import { resolveMove, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
-const NPC_RADIUS = 0.3
+const NPC_RADIUS = WALKER_RADIUS
 
 /**
  * The cold-weather cloaks this settlement's people wear today (design.md
@@ -604,6 +604,10 @@ interface WalkerState {
   yaw: number
   /** Seconds of blocked movement; skips the waypoint when it grows. */
   stuck: number
+  /** Seconds physically pinned (no real movement while walking); triggers the
+   *  teleport-nudge to free ground when it exceeds the calibratable window
+   *  (point 155). */
+  pinned: number
 }
 
 /**
@@ -653,6 +657,7 @@ function Walkers({
       z: d.home.z,
       yaw: 0,
       stuck: 0,
+      pinned: 0,
     }))
   }
   const refs = useRef<Array<THREE.Group | null>>([])
@@ -712,6 +717,8 @@ function Walkers({
         s.timer = 7 + Math.random() * 14
         return
       }
+      const oldX = s.x
+      const oldZ = s.z
       const dx = target[0] - s.x
       const dz = target[1] - s.z
       const d = Math.hypot(dx, dz)
@@ -745,6 +752,23 @@ function Walkers({
         } else {
           s.stuck = 0
         }
+      }
+      // Belt-and-braces unstuck (point 155): the waypoint-skip above frees most
+      // blocks, but a walker wedged in a pocket keeps cycling waypoints while
+      // physically pinned. When it has not actually moved for the calibratable
+      // window, teleport-nudge it to the nearest free spot — inhabitants only,
+      // a small invisible correction, never the player.
+      if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
+        s.pinned += dt
+        if (s.pinned > balance.walkerUnstuckSeconds) {
+          const [fx, fz] = nudgeToFree(colliders, s.x, s.z, NPC_RADIUS)
+          s.x = fx
+          s.z = fz
+          s.pinned = 0
+          s.stuck = 0
+        }
+      } else {
+        s.pinned = 0
       }
       g.position.set(s.x, Math.abs(Math.sin(t * 6.5 + i * 2)) * 0.05, s.z)
       g.rotation.y = s.yaw

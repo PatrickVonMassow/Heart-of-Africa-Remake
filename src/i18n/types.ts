@@ -258,6 +258,7 @@ export interface Strings {
     travelSpeed: string
     walkSpeed: string
     strafeFactor: string
+    walkerUnstuck: string
     mouseSensitivity: string
     ambienceVolume: string
     footstepVolume: string

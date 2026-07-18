@@ -338,6 +338,7 @@ export const de: Strings = {
     travelSpeed: 'Tempo außerorts',
     walkSpeed: 'Tempo innerorts',
     strafeFactor: 'Seitwärts/Rückwärts-Faktor',
+    walkerUnstuck: 'Bewohner-Entklemmung (s)',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     ambienceVolume: 'Ambiente-Lautstärke',
     footstepVolume: 'Schritt-Lautstärke',

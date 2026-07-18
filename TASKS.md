@@ -5187,7 +5187,7 @@ the remaining open points in their numeric order.
   F3 clause names it, and Hud.test.tsx asserts F3 sets travelSpeed to 25.
   Build/lint/1751 unit green.
 
-- [ ] 155. No inhabitant spawns stuck (Tuareg Village pocket).
+- [x] 155. No inhabitant spawns stuck (Tuareg Village pocket).
   Wanted (user, 16.07.2026, screenshot, "fürs Ende vom Batch"): a villager
   stood wedged between the market stall's board, a rock and the market hut's
   curved wall in Tuareg Village — spawned into a pocket it cannot leave.
@@ -5211,6 +5211,24 @@ the remaining open points in their numeric order.
   longer than the unstuck window.
   DOCS: CLAUDE.md §7.1 pt. 16 (the spawn-freedom clause). Order: batch end
   per the user. (Reported 16.07.2026.)
+  DONE (18.07.2026, 06:44): the collider set already includes stalls (r1.35)
+  and rocks (r0.35+); the gap was that jittered errand targets could land in a
+  pocket and the walker's existing "stuck" only skipped the waypoint, never
+  un-wedged the physically pinned body. (a) pure spawn-freedom helpers in
+  collision.ts — standingClear (the mover fits), hasEscapeDirection (>=1 of 12
+  ring steps lands clear), spawnPointFree (both), nudgeToFree (spiral to the
+  nearest usable spot); the layout builder now nudges EVERY errand point to a
+  spawn-free spot against the full collider set (WALKER_RADIUS shared). (b)
+  belt-and-braces: a Walker that has not physically moved (frameMove <
+  step*0.1) while in 'walk' mode for balance.walkerUnstuckSeconds (default 4,
+  debug-editable, de/en) is teleport-nudged via nudgeToFree — inhabitants
+  only, never the player. Pure: collision.test.ts (9, incl. an enclosed
+  tight-ring pocket that spawnPointFree rejects and nudgeToFree escapes) and
+  the layout.test.ts sweep (every place x 3 seeds: all errand points
+  spawn-free). Live (collision.mjs): over a window > the unstuck deadline no
+  walker's pinned time exceeds it and the walkers do move (non-vacuous) — 20
+  pass 0 fail. DebugMenu write-through for the new field. tsc/lint/build/1804
+  unit green. Docs: CLAUDE §7.1 pt.16, design.md §2.6.
 
 - [x] 156. Settlement footprints stay clear of the widened rivers (Khartoum).
   Wanted (user, 16.07.2026): since point 136 widened the rivers, some

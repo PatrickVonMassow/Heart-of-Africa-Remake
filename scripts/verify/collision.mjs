@@ -336,6 +336,38 @@ check(
   walkerResult.ok ? `entered at ${walkerResult.dist.toFixed(2)} from home center` : 'no walk→inside transition observed',
 )
 
+// No inhabitant stays pinned (point 155): observe every walker over a window
+// longer than the unstuck deadline. A walker in 'walk' mode (not lingering)
+// that stops moving is teleport-nudged free before its pinned timer passes the
+// calibratable window — so no walker's pinned time ever exceeds it, and the
+// walkers do actually move (the check is not vacuous).
+const pinResult = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const win = window.__balance.walkerUnstuckSeconds
+  const w = window.__placeWalkers
+  if (!w) return { ok: false, reason: 'no __placeWalkers' }
+  let maxPinned = 0
+  let anyMoved = false
+  const last = w.states.map((s) => ({ x: s.x, z: s.z }))
+  const t0 = Date.now()
+  // Watch for the window + a generous margin so a would-be pin has time to pass it.
+  while (Date.now() - t0 < (win + 5) * 1000) {
+    for (let i = 0; i < w.states.length; i++) {
+      const s = w.states[i]
+      if (s.pinned > maxPinned) maxPinned = s.pinned
+      if (Math.hypot(s.x - last[i].x, s.z - last[i].z) > 0.2) anyMoved = true
+      last[i] = { x: s.x, z: s.z }
+    }
+    await sleep(150)
+  }
+  return { ok: true, maxPinned, anyMoved, win, n: w.states.length }
+})
+check(
+  'Village: no inhabitant stays pinned past the unstuck window (point 155)',
+  pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
+  JSON.stringify(pinResult),
+)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

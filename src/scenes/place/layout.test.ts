@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { buildLayout, type PlaceLayout, type Interactive, type DwellingDef } from './layout'
+import { spawnPointFree, WALKER_RADIUS } from './collision'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES } from '../../world/geo'
 import { VILLAGE_PLANS } from './regionStyles'
@@ -261,4 +262,26 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
     expect(cairo.radius).toBeGreaterThan(boma.radius)
     expect(cairo.dwellings.length).toBeGreaterThan(boma.dwellings.length)
   })
+})
+
+// Spawn freedom (point 155): the villager wedged in a Tuareg pocket had walked
+// to an errand point a jitter dropped between a stall board, a rock and a hut
+// wall. Every errand target must sit on free ground the walker can also LEAVE —
+// swept across every place and several seeds against the FULL collider set
+// (stalls, rocks and props included, not only buildings).
+describe('inhabitant spawn/errand freedom (point 155)', () => {
+  it.each(PLACES.map((p) => [p.id] as const))(
+    '%s: every errand point has a clear standing circle and an escape direction',
+    (id) => {
+      for (const s of SEEDS) {
+        const layout = buildLayout(id, s)
+        for (const [ex, ez] of layout.errands) {
+          expect(
+            spawnPointFree(layout.colliders, ex, ez, WALKER_RADIUS),
+            `${id} seed ${s}: errand (${ex.toFixed(2)}, ${ez.toFixed(2)}) is wedged`,
+          ).toBe(true)
+        }
+      }
+    },
+  )
 })

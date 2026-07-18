@@ -13,6 +13,10 @@ export interface BalanceConfig {
   placeWalkSpeed: number
   /** Speed factor for strafing and walking backward inside places (design.md §2). */
   placeStrafeFactor: number
+  /** Seconds an inhabitant may be physically pinned (no real movement while it
+   *  has a walk target) before it is teleport-nudged to the nearest free spot
+   *  (point 155) — a small invisible correction, inhabitants only. */
+  walkerUnstuckSeconds: number
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
   /** Single ambience volume: the noise beds (wind/surf/murmur), their gust/swell
@@ -367,6 +371,7 @@ export const balance: BalanceConfig = {
   travelSpeed: 5.6, // reduced 30% from 8 for a calmer overland pace
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
+  walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
   mouseSensitivity: 0.0011,
   ambienceVolume: 0.1,
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)

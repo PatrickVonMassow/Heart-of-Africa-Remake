@@ -339,6 +339,7 @@ export const en: Strings = {
     travelSpeed: 'Travel speed (overland)',
     walkSpeed: 'Walk speed (in places)',
     strafeFactor: 'Strafe/backward factor',
+    walkerUnstuck: 'Inhabitant unstuck (s)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     ambienceVolume: 'Ambience volume',
     footstepVolume: 'Footstep volume',

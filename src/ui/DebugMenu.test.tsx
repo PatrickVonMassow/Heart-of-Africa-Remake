@@ -26,6 +26,7 @@ const DEFAULTS = {
   ambienceVolume: balance.ambienceVolume,
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
+  walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
@@ -76,6 +77,7 @@ afterEach(() => {
   balance.ambienceVolume = DEFAULTS.ambienceVolume
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
+  balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
@@ -141,6 +143,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.ambienceVolume, read: () => balance.ambienceVolume, value: 0.5 },
     { label: en.debug.footstepVolume, read: () => balance.footstepVolume, value: 3 },
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
+    // The inhabitant unstuck window (point 155).
+    { label: en.debug.walkerUnstuck, read: () => balance.walkerUnstuckSeconds, value: 8 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
