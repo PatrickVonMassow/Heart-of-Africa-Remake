@@ -6061,8 +6061,14 @@ the remaining open points in their numeric order.
       deterministic stabilisation is filed as point 177.
 
 - [ ] 174. Tag the demo build v0.2 and publish /v0.2/.
-  (User order 18.07.2026, immediately after 173; then 163/166/170.) Once 173 has
-  left a high-assured-quality state, tag `v0.2` at that HEAD and serve it at
+  GATE (user, 19.07.2026): do NOT tag v0.2 until (a) point 175 (the jumping
+  trees) is FIXED and the user has CONFIRMED it on WebGPU, AND (b) a full closing
+  run has passed clean AFTER that fix. So the order is: 175 fix -> user verifies
+  -> closing cycle (Vitest + LARGE regression, dead-code/.md audit, lint/CVE
+  clean) -> THEN tag v0.2 at that verified HEAD. v0.2 must ship neither the tree
+  bug nor any regression the closing catches.
+  (User order 18.07.2026, immediately after 173; then 163/166/170.) Once the
+  above gate is met, tag `v0.2` at that HEAD and serve it at
   https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/ — mirror how
   /v0.1/ and /poc/ are wired (the `.github/workflows` Pages build + the tag /
   deploy trigger; a tag push may not trigger the deploy, so use the same mechanism
