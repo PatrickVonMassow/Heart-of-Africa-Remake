@@ -121,6 +121,11 @@ shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
 would otherwise be written twice. 125 keeps its place in the numeric tail.
 
+Work order (user override, 2026-07-18, eighth): point 164's fix did not hold —
+the plants still fly in — so the user filed 171 (only change flora outside the
+view) to run DIRECTLY AFTER the current task 167. So the remaining tail runs
+167 → 171 → 169 → 157 → 162 → 163 → 165 → 166 → 170.
+
 Work order (user override, 2026-07-18, seventh): the user pulled three points
 to the front of the remaining tail — 164 (plants jump while driving), then 167
 (rain snaps at the zone border), then 169 (more juveniles), right after the
@@ -5758,6 +5763,59 @@ the remaining open points in their numeric order.
   unchanged. Live optional. DOCS: design.md §16 (return entries on changed
   situation) + §19.15 note. (Reported 17.07.2026; queued at the batch end per
   append-and-defer.)
+
+- [ ] 171. Plants STILL fly in while driving — only ever change flora outside
+  the view, never a pop or snap in sight. Runs DIRECTLY AFTER 167 (user order,
+  18.07.2026).
+  User report (18.07.2026, screenshot at 11.0°N/29.6°E, West, 24.05.1890,
+  moving): "Die Pflanzen fliegen weiterhin ein … Sie kommen von unten links und
+  bewegen sich nach oben rechts." So point 164 did NOT fix it. WHY 164 FELL
+  SHORT: 164 moved the flora streaming edge to a circle at `floraSpawnRadius =
+  FLORA_VIEW_AT_ZOOM1(100) × zoom + 30`, and the probe declared "0 in-view
+  toggles" using viewR = 100×zoom as "the view". But that view radius is an
+  ASSUMPTION (borrowed from the wildlife ring), and the REAL bird's-eye camera
+  sees FURTHER than 100×zoom on the ground — so the streaming edge still sits
+  inside the actual frustum and pops there. The probe measured against the
+  wrong radius and passed while the player still sees it (the same "the test
+  measured the machine, not the picture" trap as the season bugs — the standard
+  is the PICTURE).
+  USER'S DESIGN DIRECTION (binding, quote): "Wenn Pflanzen hinzukommen oder sich
+  verändern, muss das in einer Weise dargestellt werden, die natürlich aussieht
+  — z. B. dass die Pflanzen oder andere Ambient-Elemente sichtbar wachsen oder
+  verdorren. Am einfachsten ist es für Änderungen außerhalb des Sichbereichs
+  (plus Reserve). Da können sie einfach durch die für die neue Zeit passende
+  ersetzt werden." Two rules:
+  (a) ADD/REMOVE (streaming) and any SEASON SWAP happen ONLY outside the visible
+      area + a reserve margin, where the player cannot see the change — there a
+      plant may simply appear/vanish/be replaced with the time-appropriate one.
+  (b) Anything that MUST change WITHIN view changes SMOOTHLY over time — visibly
+      grows or withers — never snaps. (The season SPROUT scale already lerps via
+      the field, so in-view seasonal change is gradual; the offender is the
+      streaming add/remove reaching into view.)
+  FIX:
+  1. MEASURE the real view first (do not assume). Add a probe/dev hook that
+     reports the ground radius the camera actually covers at a given zoom (the
+     max on-screen distance of a drawn element, or project the frustum corners
+     to the ground plane) — the fog far plane / far-sheet sizing already knows
+     this geometry; reuse it. Then set the flora spawn radius to THAT measured
+     radius + a reserve (a chunk or two), zoom-aware, so the streaming edge is
+     always beyond the real frustum. Keep 164's rebuild hysteresis.
+  2. Because a decisive move (or a zoom-out) can still bring a not-yet-populated
+     ring into view in one step, guarantee the newly-visible area is already
+     populated: either grow the reserve so a single hysteresis step cannot
+     expose bare ground, or defer the reveal (spawn the ring while still outside
+     view, one step ahead). No fade hacks.
+  3. Season swaps (if any placement ever becomes season-dependent — today
+     placedFloraAt is season-independent, so this is future-proofing): only swap
+     a plant's species/presence while it is outside view + reserve.
+  VERIFY BY THE PICTURE (the 147/151 lesson, do not repeat 164's mistake): a
+  driven screenshot pass (enrichments) at a WIDE zoom that captures frames while
+  moving and asserts no plant instance appears at a screen position inside the
+  frame interior (only at/za beyond the frame edge) — i.e. measure against the
+  ACTUAL rendered frame, not a guessed viewR. Pure-test the measured-radius →
+  spawn-radius rule. DOCS: design.md §2.5 (correct the point-164 wording:
+  streaming edge beyond the MEASURED view, not 100×zoom), CLAUDE.md §7.1 pt.12.
+  (Reported 18.07.2026; user-ordered directly after 167.)
 
 ## Closing (only after all points)
 
