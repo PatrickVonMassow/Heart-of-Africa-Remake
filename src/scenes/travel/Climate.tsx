@@ -99,7 +99,9 @@ function getRainGeometry() {
 // MODULE singletons (point 96): scene.fog participates in every material's
 // pipeline cache key, so a fresh Fog instance per mount would invalidate and
 // re-link the whole travel program set on re-entry after a place visit.
-const TRAVEL_FOG = new THREE.Fog('#cfe0ea', 95, 260)
+// Exported so the flora streaming can size its spawn circle to the fog far —
+// the definitive visible limit, beyond which nothing renders (point 171).
+export const TRAVEL_FOG = new THREE.Fog('#cfe0ea', 95, 260)
 const TRAVEL_BACKGROUND = new THREE.Color('#cfe0ea')
 
 export function Climate() {

@@ -47,7 +47,7 @@ import {
   type TrailPoint,
 } from './canoeDrag'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
-import { floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
+import { chunkOffsetsByDistance, floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -77,7 +77,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
-import { Climate } from './Climate'
+import { Climate, TRAVEL_FOG } from './Climate'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
@@ -848,8 +848,12 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
 function Vegetation() {
   const seed = useGame((s) => s.seed)
   const meshes = getVegetationMeshes()
-  const lastBuild = useRef<{ x: number; z: number; zoom: number } | null>(null)
+  const lastBuild = useRef<{ x: number; z: number; fogFar: number } | null>(null)
   const hiddenRef = useRef(false)
+  // Counts actual streaming rebuilds (point 171): a real rebuild signal for the
+  // verify — the drawn COUNT is buffer-saturated and stable at a wide zoom, so
+  // it cannot tell whether the flora followed the player.
+  const rebuildCountRef = useRef(0)
 
   useEffect(() => {
     lastBuild.current = null // force rebuild on new run
@@ -861,6 +865,7 @@ function Vegetation() {
     const w = window as unknown as Record<string, unknown>
     w.__vegetation = {
       visible: () => !hiddenRef.current,
+      rebuilds: () => rebuildCountRef.current,
       // The collidable dressing the traveller is actually tested against, so a
       // blocked step can be traced to the circle that blocks it.
       obstaclesNear: (x: number, z: number) => collidableFloraNear(x, z, useGame.getState().seed),
@@ -955,16 +960,20 @@ function Vegetation() {
     }
     if (hide) return
     const pos = useGame.getState().pos
-    // Zoom-aware streaming with a rebuild hysteresis (point 164): the drawn edge
-    // is a circle at viewR + margin (always beyond the view), and a rebuild
-    // fires only once the player has moved the hysteresis step or the zoom
-    // changed — so a back-and-forth across a chunk boundary no longer re-pops.
-    if (!floraShouldRebuild(pos, lastBuild.current, zoom)) return
-    lastBuild.current = { x: pos.x, z: pos.z, zoom }
-    const spawnR = floraSpawnRadius(zoom)
+    // Streaming with a rebuild hysteresis (points 164 + 171): the drawn edge is
+    // a circle sized to the FOG far — the definitive visible limit — plus a
+    // reserve, so it always sits in dense fog beyond anything the player can
+    // see. A rebuild fires only once the player has moved the hysteresis step
+    // or the fog far changed (a new region), so a back-and-forth across a chunk
+    // boundary no longer re-pops.
+    const fogFar = TRAVEL_FOG.far
+    if (!floraShouldRebuild(pos, lastBuild.current, fogFar)) return
+    lastBuild.current = { x: pos.x, z: pos.z, fogFar }
+    rebuildCountRef.current++
+    const spawnR = floraSpawnRadius(fogFar)
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
-    const rC = floraChunkRange(zoom, CHUNK_SIZE)
+    const rC = floraChunkRange(fogFar, CHUNK_SIZE)
 
     const counts: Record<Species, number> = {
       acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0,
@@ -975,34 +984,35 @@ function Vegetation() {
     const up = new THREE.Vector3(0, 1, 0)
     const scl = new THREE.Vector3()
 
-    for (let dz = -rC; dz <= rC; dz++) {
-      for (let dx = -rC; dx <= rC; dx++) {
-        const ccx = cx + dx
-        const ccz = cz + dz
-        for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-          // ONE placement decision shared with collidableFloraNear (point 129):
-          // whatever is not drawn here also carries no collider.
-          const placed = placedFloraAt(ccx, ccz, i, seed)
-          if (!placed) continue
-          const { species, x, z, height, r4, roll } = placed
-          // Circular streaming edge at viewR + margin (point 164): a plant
-          // beyond it is not drawn, so the edge sits just outside the view.
-          if (!floraInSpawnCircle(x, z, pos.x, pos.z, spawnR)) continue
-          const idx = counts[species]
-          if (idx >= MAX_INSTANCES[species]) continue
-          quat.setFromAxisAngle(up, r4 * Math.PI * 2)
-          const sc = 0.75 + r4 * 0.55
-          scl.set(sc, sc * (0.85 + roll * 0.3), sc)
-          mtx.compose(new THREE.Vector3(x, height, z), quat, scl)
-          meshes[species].setMatrixAt(idx, mtx)
-          {
-            const attr = meshes[species].geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute
-            const ll = worldToLatLon(x, z)
-            const [su, svv] = seasonFieldUV(ll.lat, ll.lon)
-            attr.setXY(idx, su, svv)
-          }
-          counts[species] = idx + 1
+    // Nearest-chunk-first (point 171): when a species' instance buffer fills,
+    // the plants dropped are the FARTHEST ones, so the drawn edge stays a fogged
+    // circle instead of a ragged, chunk-order boundary that would fray in view.
+    for (const [dx, dz] of chunkOffsetsByDistance(rC)) {
+      const ccx = cx + dx
+      const ccz = cz + dz
+      for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
+        // ONE placement decision shared with collidableFloraNear (point 129):
+        // whatever is not drawn here also carries no collider.
+        const placed = placedFloraAt(ccx, ccz, i, seed)
+        if (!placed) continue
+        const { species, x, z, height, r4, roll } = placed
+        // Circular streaming edge at fog far + margin (points 164/171): a plant
+        // beyond it is not drawn, so the edge sits in the fog, out of sight.
+        if (!floraInSpawnCircle(x, z, pos.x, pos.z, spawnR)) continue
+        const idx = counts[species]
+        if (idx >= MAX_INSTANCES[species]) continue
+        quat.setFromAxisAngle(up, r4 * Math.PI * 2)
+        const sc = 0.75 + r4 * 0.55
+        scl.set(sc, sc * (0.85 + roll * 0.3), sc)
+        mtx.compose(new THREE.Vector3(x, height, z), quat, scl)
+        meshes[species].setMatrixAt(idx, mtx)
+        {
+          const attr = meshes[species].geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute
+          const ll = worldToLatLon(x, z)
+          const [su, svv] = seasonFieldUV(ll.lat, ll.lon)
+          attr.setXY(idx, su, svv)
         }
+        counts[species] = idx + 1
       }
     }
 
@@ -1933,6 +1943,55 @@ export function TravelScene() {
     return () => {
       camera.near = 0.1
       camera.updateProjectionMatrix()
+    }
+  }, [camera])
+
+  // Dev hook (point 171): the REAL ground radius the camera covers, by casting
+  // the frustum corners/edges to the y=0 plane and taking the farthest hit from
+  // the player. This is the measured view radius the flora streaming must clear
+  // — not the assumed 100×zoom that let point 164's check pass while plants
+  // still popped in sight.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    const ray = new THREE.Raycaster()
+    const CORNERS: Array<[number, number]> = [
+      [-1, -1], [1, -1], [-1, 1], [1, 1], [0, 1], [0, -1], [-1, 0], [1, 0],
+    ]
+    const proj = new THREE.Vector3()
+    w.__camera = {
+      groundViewRadius: () => {
+        const p = useGame.getState().pos
+        let maxD = 0
+        for (const [nx, ny] of CORNERS) {
+          ray.setFromCamera(new THREE.Vector2(nx, ny), camera)
+          const dy = ray.ray.direction.y
+          if (dy >= -1e-6) continue // ray points at or above the horizon
+          const t = -ray.ray.origin.y / dy
+          if (t <= 0 || !isFinite(t)) continue
+          const gx = ray.ray.origin.x + ray.ray.direction.x * t
+          const gz = ray.ray.origin.z + ray.ray.direction.z * t
+          maxD = Math.max(maxD, Math.hypot(gx - p.x, gz - p.z))
+        }
+        return maxD
+      },
+      // Project a ground point (x, y, z) to NDC — the PICTURE-truthful test of
+      // what the player sees (point 171): a plant is on screen iff both NDC
+      // components are within [-1, 1] and it is in front of the camera (z<1).
+      // The real visible extent is the frustum, not the fog far (which clearView
+      // pushes to the horizon at a wide zoom), so a pop must be judged on screen,
+      // never against a computed radius.
+      ndc: (x: number, z: number, y = 0) => {
+        proj.set(x, y, z).project(camera)
+        return { x: proj.x, y: proj.y, z: proj.z }
+      },
+      onScreen: (x: number, z: number, y = 0) => {
+        proj.set(x, y, z).project(camera)
+        return proj.z < 1 && Math.abs(proj.x) <= 1 && Math.abs(proj.y) <= 1
+      },
+    }
+    return () => {
+      delete w.__camera
     }
   }, [camera])
 

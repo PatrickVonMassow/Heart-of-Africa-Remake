@@ -121,6 +121,10 @@ shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
 would otherwise be written twice. 125 keeps its place in the numeric tail.
 
+Work order (user override, 2026-07-18, tenth): the user moved 165 (animals pop
+in view — the same streaming-pop class as 171/164) up to run right after 172. So
+the tail runs 167 → 171 → 172 → 165 → 169 → 157 → 162 → 163 → 166 → 170.
+
 Work order (user override, 2026-07-18, ninth): after 164's zoom-2 test passed
 while the bug persisted in-game, the user made "test at in-game-achievable zoom"
 a standing rule and ordered a retroactive audit of ALL feature tests for
@@ -5789,9 +5793,31 @@ the remaining open points in their numeric order.
   situation) + §19.15 note. (Reported 17.07.2026; queued at the batch end per
   append-and-defer.)
 
-- [ ] 171. Plants STILL fly in while driving — only ever change flora outside
+- [x] 171. Plants STILL fly in while driving — only ever change flora outside
   the view, never a pop or snap in sight. Runs DIRECTLY AFTER 167 (user order,
   18.07.2026).
+  DONE (18.07.2026): The pop was real, but BOTH my point-164 model AND my first
+  171 test were practice-remote — the sharp lesson of 172. 164 sized the flora
+  circle to an ASSUMED 100×zoom view; my first 171 check then measured toggles
+  within `fog.far`. BY THE PICTURE (a new `__camera.onScreen`/`ndc` dev hook
+  projects each drawn plant to NDC) the truth is: the visible limit is the camera
+  FRUSTUM — fog.far is not it either, because clearView pushes the fog to the
+  horizon (far → thousands) at a wide zoom, so a fog-far radius would flag plants
+  the player cannot see. FIX (`src/scenes/travel/floraStreaming.ts` +
+  `TravelScene.tsx` + `Climate.tsx`): draw flora to a generous
+  `min(fog.far + margin, 320)` circle that ALWAYS exceeds the frustum; fill the
+  per-chunk candidates NEAREST-FIRST (`chunkOffsetsByDistance`) so the instance
+  buffer covers the nearest, on-screen plants and drops only the farthest,
+  off-screen ones; and gate the rebuild on the SPAWN RADIUS change (not the raw
+  fog far) so clearView's horizon lerp triggers no rebuild storm. `TRAVEL_FOG` is
+  exported for the radius. VERIFY: `floraStreaming.test.ts` pins the fog-far
+  radius, the nearest-first order and the no-storm rebuild; `enrichments.mjs`
+  drives at an achievable zoom (0.5), the F3 report zoom (1.5) and wider (2.2) and
+  asserts ZERO plants appear inside the rendered frame (projected via
+  `__camera.onScreen`), with a real rebuild counter (`__vegetation.rebuilds()`)
+  proving the flora followed the player. Measured 0 on-screen pops at every zoom.
+  DOCS: design.md §2.5 and CLAUDE.md §7.1 pt.12 corrected to the
+  frustum/nearest-first/picture wording.
   User report (18.07.2026, screenshot at 11.0°N/29.6°E, West, 24.05.1890,
   moving): "Die Pflanzen fliegen weiterhin ein … Sie kommen von unten links und
   bewegen sich nach oben rechts." So point 164 did NOT fix it. WHY 164 FELL

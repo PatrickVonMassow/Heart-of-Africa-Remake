@@ -654,16 +654,25 @@ verify suite that proves it.
       live, walking changes neither the field nor the slot greens (the
       witness of the point-151 "flying plants" bug) and the flora at the
       reported spots stands stable (`scripts/verify/enrichments.mjs`); and
-      the dressing no longer JUMPS while driving (point 164): a probe traced
-      the remaining jump to the streaming, not the season — the flora
+      the dressing no longer JUMPS while driving (points 164 + 171): a probe
+      traced the remaining jump to the streaming, not the season — the flora
       rebuilt a fixed neighbourhood on every chunk crossing, so its edge
-      popped, worst at a wide zoom where it sat in view. It now streams
-      zoom-aware like the wildlife — every plant within a CIRCLE of viewR +
-      margin is drawn (edge always beyond the view) and a rebuild fires only
-      past a hysteresis step (a back-and-forth no longer re-pops), the rules
-      pure-tested in `src/scenes/travel/floraStreaming.test.ts` and a driven
-      pass asserting zero in-view toggles across chunk crosses in
-      `scripts/verify/enrichments.mjs`;
+      popped. 164 moved the edge to a CIRCLE, but sized it to an ASSUMED view
+      of 100×zoom and still popped at a wide zoom; 171 found by the PICTURE
+      that the real visible limit is the camera FRUSTUM (the fog is pushed to
+      the horizon at a wide zoom, so fog.far is not it either), and now draws
+      the circle to a generous fog.far + margin CAPPED radius that always
+      exceeds the frustum, so the edge sits beyond the rendered frame at any
+      zoom — with the per-chunk fill running NEAREST-FIRST so the instance
+      buffer covers the nearest, on-screen plants first and drops only the
+      farthest, off-screen ones, and a rebuild firing only past a hysteresis
+      step (a back-and-forth no longer re-pops; the rebuild compares the SPAWN
+      RADIUS not the raw fog far, so clearView's horizon lerp triggers no
+      storm). The rules are pure-tested in
+      `src/scenes/travel/floraStreaming.test.ts`, and a driven pass PROJECTS
+      each plant to the screen and asserts ZERO appear inside the frame while
+      driving at an ACHIEVABLE zoom (0.5), the F3 report zoom (1.5) and wider
+      (2.2) in `scripts/verify/enrichments.mjs`;
       the season reaches the people (§19.13, point 142): a transhumant
       village thins in its away season while children and elder remain
       (Maasai July 2 walkers vs April 5, live) and the sedentary Bemba

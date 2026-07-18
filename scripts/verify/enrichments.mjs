@@ -4305,46 +4305,53 @@ check(
     fieldWitness.moveDrift < 0.03,
   JSON.stringify(fieldWitness),
 )
-// Point 164: the DRIVEN pass. The dressing streamed over a fixed neighbourhood
-// popped its edge in and out while driving, worst at a wide zoom. Drive back
-// and forth across chunk boundaries at zoom 2 (steps > the rebuild hysteresis,
-// so rebuilds fire) and assert NO plant inside the view (viewR = 100 x zoom)
-// toggles out of the drawn set — the pop is now a circle beyond the view.
+// Points 164 + 171: the DRIVEN pass, judged BY THE PICTURE. A plant must never
+// appear inside the rendered frame while driving — it may only stream in beyond
+// the frame edge. The real visible limit is the camera FRUSTUM, not the fog far
+// (clearView pushes the fog to the horizon at a wide zoom, so a fog-far radius
+// would falsely flag plants the player cannot see — the point-172 trap this very
+// check fell into first). So each drawn plant is PROJECTED to NDC and a "pop" is
+// a plant that is on screen now but was not in the drawn set last frame. Driven
+// at an ACHIEVABLE zoom (0.5), the F3 report zoom (1.5) and wider (2.2), across
+// chunk boundaries (steps > the rebuild hysteresis so rebuilds fire).
 const drivenFlora = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   window.__game.getState().debugJumpTo(8.6, 21.8) // the dense West dressing
   window.__ui.getState().setWheelZoomEnabled(true)
-  window.__ui.getState().setTravelZoom(2)
-  await sleep(600)
-  const viewR = 100 * 2
   const key = (x, z) => `${Math.round(x)},${Math.round(z)}`
-  let inViewToggles = 0
-  let rebuilds = 0
-  let prev = null
-  let prevCount = -1
-  const p0 = window.__game.getState().pos
-  for (let k = 0; k <= 16; k++) {
-    const phase = k <= 8 ? k : 16 - k
-    window.__game.setState({ pos: { x: p0.x + phase * 20, z: p0.z } }) // 20 > hysteresis 16
-    await sleep(150)
-    const pos = window.__game.getState().pos
-    const drawn = window.__vegetation.drawnTranslations('bush')
-    if (drawn.length !== prevCount) rebuilds++
-    prevCount = drawn.length
-    const cur = new Map(drawn.map(([x, z]) => [key(x, z), [x, z]]))
-    if (prev) {
-      for (const [kk, [px, pz]] of prev) {
-        if (!cur.has(kk) && Math.hypot(px - pos.x, pz - pos.z) < viewR) inViewToggles++
+  const species = ['bush', 'acacia', 'deadtree', 'termite', 'jungle', 'papyrus', 'palm', 'rock', 'baobab', 'kopje']
+  const runs = {}
+  for (const zoom of [0.5, 1.5, 2.2]) {
+    window.__ui.getState().setTravelZoom(zoom)
+    await sleep(2400) // let the follow camera lerp settle before projecting
+    let onScreenPops = 0
+    let prev = {}
+    const p0 = window.__game.getState().pos
+    const rebuilds0 = window.__vegetation.rebuilds() // real rebuild counter (count is saturated at a wide zoom)
+    for (let k = 0; k <= 12; k++) {
+      window.__game.setState({ pos: { x: p0.x + k * 18, z: p0.z - k * 18 } }) // NE, > hysteresis 16
+      await sleep(420) // let the follow camera catch up before projecting
+      for (const sp of species) {
+        const cur = new Set()
+        for (const [x, z] of window.__vegetation.drawnTranslations(sp)) {
+          const kk = key(x, z)
+          cur.add(kk)
+          // A plant on screen NOW that was not drawn last frame popped in view.
+          if (window.__camera.onScreen(x, z) && prev[sp] && !prev[sp].has(kk)) onScreenPops++
+        }
+        prev[sp] = cur
       }
     }
-    prev = cur
+    runs[zoom] = { onScreenPops, rebuilds: window.__vegetation.rebuilds() - rebuilds0 }
   }
   window.__ui.getState().setTravelZoom(0.5)
-  return { inViewToggles, rebuilds }
+  return runs
 })
 check(
-  'no in-view plant toggles while driving back and forth (point 164)',
-  drivenFlora.inViewToggles === 0 && drivenFlora.rebuilds > 1,
+  'no plant appears inside the rendered frame while driving, at achievable, F3 and wide zoom (points 164/171)',
+  drivenFlora['0.5'].onScreenPops === 0 && drivenFlora['0.5'].rebuilds > 1 &&
+    drivenFlora['1.5'].onScreenPops === 0 && drivenFlora['1.5'].rebuilds > 1 &&
+    drivenFlora['2.2'].onScreenPops === 0 && drivenFlora['2.2'].rebuilds > 1,
   JSON.stringify(drivenFlora),
 )
 
