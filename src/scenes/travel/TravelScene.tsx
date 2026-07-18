@@ -37,7 +37,7 @@ import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
-import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
+import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
 import {
   updateTrailPoint,
@@ -821,20 +821,25 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
   material.roughness = 0.92
   material.vertexColors = true
   // Season by the PLANT's own position (point 151): tint and collapse sample
-  // the greenness field through the per-instance seasonUV — the old global
-  // uniform followed the player and made every crown in view slide while
-  // walking a wetness gradient.
-  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintNode())
+  // the greenness field through a per-instance seasonTint the CPU BAKES at each
+  // rebuild (point 175). The vegetation must NOT sample the field texture in its
+  // vertex stage: over a texture re-uploaded every frame that sample raced the
+  // draw on the WebGPU backend and jittered the crown collapse, so the crowns
+  // hopped (the rocks, foliage class 0, never collapse and stayed put — the tell).
+  // A baked float is stable on both backends. (An earlier player-position uniform
+  // made every crown slide while walking a wetness gradient — point 151; the
+  // per-instance value fixed that and this keeps it, now backend-safe too.)
+  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintAttrNode())
   // Bare branches (point 144, second attempt): keyed on the baked per-part
   // foliage attribute, never the jittered colour — see seasonFoliagePosition.
-  material.positionNode = seasonFoliagePosition(seasonFieldTintNode())
+  material.positionNode = seasonFoliagePosition(seasonFieldTintAttrNode())
   const out = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
-    // One field coordinate per instance, written where the matrices are.
+    // One baked field-tint value per instance, written where the matrices are.
     mesh.geometry.setAttribute(
-      'seasonUV',
-      new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES[sp] * 2), 2),
+      'seasonTint',
+      new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES[sp]), 1),
     )
     mesh.castShadow = true
     mesh.receiveShadow = true
@@ -1008,10 +1013,12 @@ function Vegetation() {
         mtx.compose(new THREE.Vector3(x, height, z), quat, scl)
         meshes[species].setMatrixAt(idx, mtx)
         {
-          const attr = meshes[species].geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute
+          // Bake THIS instance's field tint at placement (point 175): the shader
+          // reads the baked value, never the per-frame texture, so the crown
+          // collapse cannot jitter on WebGPU. Refreshed on every rebuild.
+          const attr = meshes[species].geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute
           const ll = worldToLatLon(x, z)
-          const [su, svv] = seasonFieldUV(ll.lat, ll.lon)
-          attr.setXY(idx, su, svv)
+          attr.setX(idx, seasonFieldTintAt(ll.lat, ll.lon))
         }
         counts[species] = idx + 1
       }
@@ -1021,7 +1028,7 @@ function Vegetation() {
       const mesh = meshes[sp]
       mesh.count = counts[sp]
       mesh.instanceMatrix.needsUpdate = true
-      ;(mesh.geometry.getAttribute('seasonUV') as THREE.InstancedBufferAttribute).needsUpdate = true
+      ;(mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).needsUpdate = true
     }
   })
 

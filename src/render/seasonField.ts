@@ -126,12 +126,28 @@ export function updateSeasonField(
     greens[i] = greensSeeded ? greens[i] + (target - greens[i]) * blend : target
   }
   greensSeeded = true
+  // Rewrite the texture, but flag it for RE-UPLOAD only when a texel actually
+  // changed (point 175). This runs every frame; at a normal pace the calendar
+  // advances so slowly that the 8-bit field is byte-identical frame to frame, so
+  // the old unconditional `needsUpdate = true` re-uploaded the SAME data every
+  // frame. On the WebGPU backend that per-frame re-upload of a texture SAMPLED in
+  // the vegetation VERTEX stage (through the per-instance seasonUV) races the
+  // draw, so the crown-collapse tint it reads jitters and the crowns hop about
+  // (the rocks, foliage class 0, never collapse and stayed still — the tell). The
+  // ground samples the same field per-VERTEX and did not visibly jitter, but this
+  // upload-only-on-change is correct for it too. WebGL 2 is unaffected either way;
+  // this needs a manual WebGPU check (headless has no WebGPU adapter).
+  let changed = false
   for (let t = 0; t < FIELD_W * FIELD_H; t++) {
     let g = 0
     for (let i = 0; i < SLOTS; i++) g += weights[t * SLOTS + i] * greens[i]
-    fieldData[t] = Math.round(255 * Math.min(1, Math.max(0, 0.5 + (g - 0.5) * s)))
+    const v = Math.round(255 * Math.min(1, Math.max(0, 0.5 + (g - 0.5) * s)))
+    if (fieldData[t] !== v) {
+      fieldData[t] = v
+      changed = true
+    }
   }
-  SEASON_FIELD_TEX.needsUpdate = true
+  if (changed) SEASON_FIELD_TEX.needsUpdate = true
 }
 
 /** The baked per-vertex/per-instance texture coordinate for a position. */
@@ -185,9 +201,23 @@ export function seasonFieldGreens(): number[] {
   return [...greens]
 }
 
-/** TSL: the field's tint value sampled through the baked 'seasonUV'. */
+/** TSL: the field's tint value sampled through the baked 'seasonUV'. Used by the
+ *  GROUND, which samples per-VERTEX and is stable on both backends. */
 export function seasonFieldTintNode(): ReturnType<typeof float> {
   const uv = attribute('seasonUV', 'vec2') as unknown as ReturnType<typeof vec2>
   // Cast: the TSL typings do not thread the swizzled float type through.
   return texture(SEASON_FIELD_TEX, uv).r as unknown as ReturnType<typeof float>
+}
+
+/** TSL: the field's tint value read straight from a per-INSTANCE 'seasonTint'
+ *  float attribute the CPU bakes at each rebuild (point 175). The vegetation uses
+ *  THIS instead of sampling the texture in its vertex stage: a texture sampled in
+ *  the vertex stage through a per-instance UV, over a texture re-uploaded every
+ *  frame, jittered the crown collapse on the WebGPU backend and made the crowns
+ *  hop. A baked float is read once per instance and never samples the moving
+ *  texture, so it is stable on both backends. The tint tracks the calendar as of
+ *  the last rebuild (every hysteresis step of travel) — imperceptible against the
+ *  season's day-scale drift. */
+export function seasonFieldTintAttrNode(): ReturnType<typeof float> {
+  return attribute('seasonTint', 'float') as unknown as ReturnType<typeof float>
 }

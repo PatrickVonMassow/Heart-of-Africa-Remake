@@ -661,8 +661,16 @@ verify suite that proves it.
       to green, and the dry season's wider shore catchment gathers the
       animals at the remaining water (`scripts/verify/enrichments.mjs`).
       The season is the PLACE's, never the traveller's (point 151): ground
-      and vegetation sample a spatially smoothed per-position greenness
-      field through baked seasonUV coordinates — zone borders read as
+      and vegetation read a spatially smoothed per-position greenness
+      field — the ground samples it per VERTEX through baked seasonUV
+      texture coordinates, the vegetation reads a per-INSTANCE seasonTint
+      the CPU BAKES at each rebuild (point 175: sampling that field texture
+      in the flora's vertex stage, over a texture re-uploaded every frame,
+      raced the draw on the WebGPU backend and made the crowns jitter while
+      driving; a baked float never samples the moving texture and is stable
+      on both backends, and the texture now re-uploads only when a texel
+      changed — needs a manual WebGPU check as headless has no adapter) —
+      zone borders read as
       ~2-degree gradients (a border texel lies strictly between its
       sides), ground flora (bush/grass/papyrus, foliage class 2) sprouts
       from the soil while tree crowns keep the bare-branch collapse, and

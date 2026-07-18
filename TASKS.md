@@ -6018,6 +6018,36 @@ the remaining open points in their numeric order.
   elaborately asks (tags-only-on-request memory). The v0.2 content is exactly what
   173 produced — do NOT fold in 163/166/170 (they come after the tag).
 
+- [x] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
+  User report (18.07.2026, with a video, JumpingTrees.mp4): after 171 the trees
+  STILL "springen herum" while driving, at the DEFAULT zoom and at normal speed;
+  the positions shift and plants appear mid-frame. "Das direkt als naechstes
+  fixen. Bitte dieses Mal sehr gruendlich analysieren, damit der Fix wirklich
+  sicher das Problem behebt."
+  ROOT CAUSE (found from the video, not reproducible headless): the debug menu in
+  it reads "Renderer: WebGPU" — the user runs WebGPU, the headless verify runs
+  WebGL2 (no WebGPU adapter headless), so no probe ever reproduced it. In the
+  video only the CROWNS (the season foliage collapse via positionNode) jitter; the
+  ROCKS (foliage class 0, no collapse) stay still — the tell. The flora sampled the
+  season-field TEXTURE in its VERTEX stage (through the per-instance seasonUV) over
+  a texture re-uploaded every frame (`SEASON_FIELD_TEX.needsUpdate = true`
+  unconditionally in updateSeasonField, called per frame); on WebGPU that per-frame
+  re-upload races the draw, so the sampled collapse tint flickers and the crowns
+  hop.
+  FIX: (a) the flora no longer samples the texture — the CPU BAKES each instance's
+  field tint into a new per-instance `seasonTint` float attribute at rebuild
+  (`seasonFieldTintAttrNode`); a baked float never samples the moving texture, so
+  it is stable on both backends (the ground keeps its per-vertex seasonUV sample).
+  (b) updateSeasonField re-uploads the texture only when a texel actually changed.
+  DONE 18.07.2026: pure season/flora tests + full 1828 Vitest + enrichments 197/0
+  (incl. the 151-stability and 171-no-pop checks) green on WebGL2; build + lint
+  clean. design.md §19.13 table + CLAUDE §7.1 pt.12 updated (the vegetation reads
+  the baked attribute, not the texture). WebGL2 CANNOT show the WebGPU jitter, so
+  this ships for a MANUAL USER WebGPU check (webgpu-untestable-headless memory): if
+  the crowns still hop, the fallback is to bake the crown-collapse height per
+  instance too (drop the field read from the vertex stage entirely). (Follow-up to
+  171; done immediately per the user's "direkt als naechstes".)
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
