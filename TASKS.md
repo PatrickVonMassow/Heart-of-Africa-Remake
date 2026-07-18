@@ -121,6 +121,12 @@ shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
 would otherwise be written twice. 125 keeps its place in the numeric tail.
 
+Work order (user override, 2026-07-18, seventh): the user pulled three points
+to the front of the remaining tail — 164 (plants jump while driving), then 167
+(rain snaps at the zone border), then 169 (more juveniles), right after the
+point in progress when asked (155). So the tail runs 155 → 164 → 167 → 169 →
+157 → 162 → 163 → 165 → 166 → 170. The other points keep their relative order.
+
 Work order (user override, 2026-07-16, sixth): 145 (three more parental
 sacrifices) goes at the END of the batch, on the user's explicit instruction —
 and its (a) depends on 144 (the burnt-land state) anyway, so the order is
