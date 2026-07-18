@@ -5875,7 +5875,7 @@ the remaining open points in their numeric order.
   zoom, not 100×zoom), CLAUDE.md §7.1 pt.12.
   (Reported 18.07.2026; user-ordered directly after 167.)
 
-- [ ] 172. Retroactive audit: do all feature tests test PRACTICE-REALISTICALLY?
+- [x] 172. Retroactive audit: do all feature tests test PRACTICE-REALISTICALLY?
   User order (18.07.2026, after 164's zoom-2 test passed while the bug persisted
   in-game): "evaluiere rückwirkend für alle bestehenden Tests aller Features, ob
   die von ähnlichen Problemen betroffen sind und deswegen praxisfern testen."
@@ -5907,6 +5907,39 @@ the remaining open points in their numeric order.
   output is the fixes themselves plus the findings list. DOCS: CLAUDE.md §7.2
   (a line that verification must use in-game-achievable conditions, zoom
   included). (Reported 18.07.2026; user-ordered after 171.)
+  DONE (18.07.2026): Swept every browser suite and the zoom/view-dependent pure
+  tests. FINDINGS:
+  • FIXED (as 171): the flora streaming test — assumed 100×zoom view at debug
+    zoom 2 → now projects each plant to the real frame (`__camera.onScreen`) and
+    drives at 0.5/1.5/2.2. The `__camera.onScreen`/`ndc` dev hook it added is the
+    standing tool for every "is it in view" assertion (a projection, never a
+    guessed radius).
+  • REAL BUG FOUND, deferred to 165: migrating the point-168 carrion-in-view check
+    (`viewR = 55`) to `__camera.onScreen` FAILED — 0 of 13 plague carcasses project
+    inside the frame at zoom 0.5 (`{carcasses:0, struck, totalPlague:13,
+    chunks:27}`). The carrion spawns in the small 100×zoom ring, mostly OUTSIDE the
+    frame, so "visible without travelling" is weak at the achievable zoom — the
+    SAME under-sized-view bug as 165. Left at `viewR = 55` with an OPEN comment
+    (suite stays green, no red test for a not-yet-built fix); 165 re-bases the
+    wildlife spawn ring on the frustum and migrates this to `__camera.onScreen`.
+    The audit did its job: a passing test hid a real visibility gap.
+  • DOCUMENTED, fixed with 165: the wildlife staging checks stand at DEBUG zoom 2
+    (1444 rinderpest carrion, 3282 elephant mourning — "the fixed seed's ~26 in-ring
+    chunks rolled no elephants" at 0.5, 3422 crocodile, 3789 vulture spawn) ONLY
+    because the 100×zoom spawn ring is too small at 0.5. 165 re-bases the ring, then
+    they move to 0.5 + `__camera.onScreen`.
+  • LEGIT debug-zoom-FEATURE checks (kept, labelled): 1132/1144 zoom 3 (zoom-out
+    despawn), 4750 zoom 99 (whole-continent), 4818 zoom 12 (far sheet + near-plane
+    restore) — these test the wide zoom ITSELF.
+  • CLEAN: the pure-test season overrides are the debug-override FEATURE under test
+    (§21), not a forced unreachable state; realistic-behaviour assertions use
+    `override=null` (no wetness=1-outside-the-Congo masquerade, the 147 lesson). The
+    enrichments numeric-radius loops (846/3464/4231/4132/1260) are SEARCH radii, not
+    visibility asserts. Other suites don't force an unreachable zoom for a general
+    behaviour (only polish sets a zoom; it uses the realistic 0.25/0.5).
+  DOCS: CLAUDE.md §7.2 gained a line that verification must use in-game-achievable
+  conditions (non-debug zoom 0.25–0.5) and judge "in view" by projecting to the
+  frame, never a computed radius.
 
 ## Closing (only after all points)
 

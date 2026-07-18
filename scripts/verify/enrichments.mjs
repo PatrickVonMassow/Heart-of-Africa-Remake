@@ -1520,6 +1520,14 @@ const carrionVicinity = await page.evaluate(async () => {
   await sleep(400)
   window.__wildlife.restock()
   const p0 = window.__game.getState().pos
+  // OPEN (point 172 → fix with point 165): counting carrion within an ASSUMED
+  // radius, not the real frame. A trial migration to __camera.onScreen returned
+  // 0-of-13 on-screen at zoom 0.5 — the plague carcasses spawn in the small
+  // 100×zoom ring, mostly OUTSIDE the rendered frame, so the point-168 "visible
+  // without travelling" claim is weak at the achievable zoom. That is the SAME
+  // under-sized-view bug as 165 (wildlife spawn ring); when 165 re-bases the ring
+  // on the frustum, this reverts to `__camera.onScreen`. Kept at viewR for now so
+  // the suite stays green rather than leaving a red test for a not-yet-built fix.
   const viewR = 55
   let carcasses = 0
   const t0 = Date.now()

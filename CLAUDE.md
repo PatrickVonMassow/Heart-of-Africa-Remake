@@ -1283,6 +1283,15 @@ After completion and after every major system:
 - Store screenshots of each core view (bird's-eye view, port city,
   village/chief's hut, opened journal) and check them against the criteria
   of §7.1.
+- **Test at in-game-achievable conditions (point 172).** A verification must
+  exercise a feature at a state the player can actually reach — for the
+  bird's-eye zoom that is the NON-DEBUG range 0.25–0.5 (default 0.5), never a
+  debug-only wide zoom, unless the check specifically tests the debug wide-zoom
+  feature. Judge "is it in view" by PROJECTING the point to the rendered frame
+  (`__camera.onScreen`/`ndc`), never by an assumed radius (100×zoom, fog.far, a
+  hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
+  so no radius stands in for the picture. A green assertion against a computed
+  radius can hide a real bug the player sees (points 164/171/172).
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 
