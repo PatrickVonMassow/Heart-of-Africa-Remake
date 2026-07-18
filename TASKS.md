@@ -6155,11 +6155,47 @@ the remaining open points in their numeric order.
   DebugMenu checkbox `t.debug.foliageCollapse` (de/en), same class as the point-111
   `groundDebugFlat`. Pure tests: seasonTint.test (uniform 1→0 gate), ui.test
   (default + setter), DebugMenu.test (checkbox write-through). Vitest 1927, build +
-  lint clean. NEXT: user tests with the toggle OFF — if the abrupt change AND the
-  floating crowns both stop, the collapse is the sole cause → decide a WebGPU-stable
-  redo (keep the effect: split crown geometry / instance-matrix collapse) vs shipping
-  it off; if the abrupt change PERSISTS with the collapse off, it is the streaming
-  buffer re-upload, a separate fix. PAUSE competing browser runs during that test.
+  lint clean.
+  DIAGNOSIS CONFIRMED (19.07.2026, user WebGPU test with the toggle OFF): "Mit
+  Kollaps AUS alles ruhig" — with the collapse gated off BOTH remaining issues
+  vanish. So the dry-season crown collapse (the per-instance seasonTint read in the
+  positionNode) is the SOLE cause; the streaming buffer re-upload is exonerated.
+  USER DECISION (19.07.2026): "WebGPU-stabil neu bauen" — KEEP the bare-branch
+  effect, rebuild the collapse stable. (Option B, shipping the toggle off, was
+  offered and declined.)
+  DESIGN for the stable rebuild (analysed, NOT yet implemented — paused at the
+  user's request 19.07.2026 to power down; resume here):
+  * ROOT: the collapse is a positionNode reading the CUSTOM per-instance
+    `seasonTint` InstancedBufferAttribute in the vertex stage; that custom-attribute
+    read races its rebuild re-upload on WebGPU. The instanceMatrix is re-uploaded at
+    the SAME rebuilds yet positions never jitter — so the instanceMatrix (core
+    transform path) is the WebGPU-stable per-instance channel to carry the collapse.
+  * PLAN: split each tree species' geometry into CROWN (foliage attribute == 1) and
+    REST (foliage 0, the trunk) — a `splitFoliage(geometry)` helper in flora.ts
+    (mind indexed vs non-indexed; the flora build fns are in src/render/flora.ts).
+    Two InstancedMeshes per tree species: the trunk mesh's instance matrix = the
+    plant matrix; the crown mesh's = plantMatrix × collapseLocal, where collapseLocal
+    = Translate(0,-collapse*0.22,0) × Scale(shrink,1,shrink), shrink = 1-collapse*0.6,
+    collapse = dryness at the plant's position (the SAME per-position field value the
+    tint bake already reads via seasonFieldTintAt → dryness). This is EXACTLY the
+    current seasonFoliagePosition crown maths, moved onto the matrix. GROUND flora
+    (foliage == 2: bush, papyrus) sprout is a UNIFORM scale from y=0, so fold
+    `sprout = 1-dryness*0.85` straight into that plant's single instance matrix (no
+    split needed). Static species (foliage 0: rock, termite, kopje, deadtree) keep
+    one plain mesh.
+  * The collapse recomputes at each rebuild only (same cadence as the current tint
+    bake — no per-frame matrix churn), and the season drift per 16-unit rebuild is
+    tiny, so no visible step. Remove positionNode's attribute dependency; the season
+    COLOUR stays a per-vertex recolour keyed on the seasonTint attribute (colorNode)
+    — its re-upload race is imperceptible (only the POSITION jitter was ever seen),
+    so leave the colour path as is. KEEP the point-175 diagnostic toggle
+    (SEASON_COLLAPSE_U): it should now gate the matrix-borne collapse (collapse=0 →
+    identity crown matrix) so the switch still works.
+  * TESTS: pure `splitFoliage` (crown vertices separated, counts add up), the
+    collapseLocal matrix maths (a dry crown shrinks x/z and drops y, a wet crown is
+    identity), the ground sprout scale; live WebGPU check is the USER's (headless has
+    no adapter). Docs: design.md §2.5/§19.13 note the matrix-borne collapse; CLAUDE
+    §7.1 pt.12. PAUSE competing browser runs during the user's WebGPU verification.
 
 - [ ] 176. The dry-season drink catchment is silently capped at 0.45° (found by
   the point-173 analysis). CONFIRMED bug: `riverDistance`/`lakeDistance`
