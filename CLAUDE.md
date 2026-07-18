@@ -141,8 +141,17 @@ npm run dev            # dev server (usually http://localhost:5173)
 npm run build          # production build (must pass without errors)
 npm run preview        # check the production build locally
 npm run test:unit      # fast Vitest layer (jsdom): logic, store, HUD components
-npm test               # full regression: build + lint + vitest, then browser suites
+npm run test:small     # build + lint + vitest, then the SMALL everyday browser gate
+npm run test:large     # full regression (build + lint + vitest + EVERY browser suite + preview)
+npm test               # == test:large (the full LARGE regression)
 ```
+
+The browser regression splits into two tiers (§7.2 / point 173): a
+SMALL everyday gate (`npm run test:small` — the fast, low-flake core suites) and
+the LARGE set (`npm test` / `npm run test:large` — every suite plus the prod
+preview). Per change, pick Vitest-only / Vitest+SMALL / Vitest+LARGE at your
+discretion; the **closing cycle (§7.2) always runs Vitest+LARGE**. The suite→tier
+map lives in `scripts/verify/run-all.mjs` and `scripts/verify/README.md`.
 
 The TypeScript build must pass without errors. `npm run build` is part of
 acceptance (§7).

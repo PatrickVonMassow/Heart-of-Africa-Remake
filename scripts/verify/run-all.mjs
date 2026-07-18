@@ -2,8 +2,11 @@
 // headless verify suite against it, then builds and runs the production-preview
 // smoke test. Exits non-zero if any suite fails or logs a console error.
 //
-//   npm test            # the whole regression
+//   npm test            # the whole (LARGE) regression
+//   npm run test:small  # Vitest + the SMALL everyday browser gate (no preview)
+//   npm run test:large  # Vitest + every browser suite + preview (== npm test)
 //   npm test -- flow    # only the named suite(s), dev server managed for you
+// See the SMALL_SUITES note below for the tier split (point 173).
 //
 // Requires the dev dependencies installed (Playwright + Chromium).
 import { spawn, spawnSync } from 'node:child_process'
@@ -42,8 +45,27 @@ const DEV_SUITES = [
   'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments',
 ]
 
-const filter = process.argv.slice(2)
-const pick = (list) => (filter.length ? list.filter((s) => filter.includes(s)) : list)
+// Regression tiers (point 173). The browser suites split into a SMALL everyday
+// gate — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core
+// loop, health/events/collision, TTS) — and the LARGE set, which is EVERY suite
+// (adds the heavier scene/geometry/screenshot suites and the wildlife-staging
+// ones that carry the rotating family flakes). Pick per task:
+//   npm run test:small   # Vitest + the small browser gate (no prod preview)
+//   npm run test:large   # Vitest + every browser suite + preview  (== npm test)
+//   npm test             # the full LARGE regression (default)
+//   npm test -- flow …   # just the named suite(s); dev server managed, no preflight
+// The closing cycle ALWAYS runs LARGE. Keep SMALL a strict subset of DEV_SUITES.
+const SMALL_SUITES = ['docs', 'i18n', 'flow', 'health', 'events', 'collision', 'voice']
+
+const args = process.argv.slice(2)
+const tier = args.includes('small') ? 'small' : args.includes('large') ? 'large' : null
+// Suite-name filters are the args minus the tier tokens.
+const filter = args.filter((a) => a !== 'small' && a !== 'large')
+// A "full" run does the preflight (build + lint + unit): the default (no args)
+// or an explicit tier. Bare suite-name args skip the preflight (quick single run).
+const fullRun = tier !== null || filter.length === 0
+const tierSuites = tier === 'small' ? SMALL_SUITES : DEV_SUITES
+const pick = (list) => (filter.length ? list.filter((s) => filter.includes(s)) : tierSuites)
 
 function waitForServer(url, timeoutMs) {
   const start = Date.now()
@@ -127,7 +149,7 @@ const results = []
 // Preflight: type-check + production build and lint must be clean before the
 // suites run (CLAUDE.md §7.2). Folding these into `npm test` means a feature's
 // whole verification is one already-allowed command.
-if (!filter.length || filter.includes('build')) {
+if (fullRun || filter.includes('build')) {
   console.log('# type-check + production build…')
   const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const buildOk = build.status === 0
@@ -139,7 +161,7 @@ if (!filter.length || filter.includes('build')) {
   }
   results.push(buildOk)
 }
-if (!filter.length || filter.includes('lint')) {
+if (fullRun || filter.includes('lint')) {
   console.log('# lint (oxlint)…')
   const lint = spawnSync('npx oxlint', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const out = (lint.stdout ?? '') + (lint.stderr ?? '')
@@ -153,7 +175,7 @@ if (!filter.length || filter.includes('lint')) {
 // carry the bulk of the coverage. Type-checked first (esbuild strips types at
 // runtime, so tsc guards the test files), then run. Fail fast — no point
 // driving the slow browser suites if the deterministic layer is red.
-if (!filter.length || filter.includes('unit')) {
+if (fullRun || filter.includes('unit')) {
   console.log('# unit + component tests (vitest, jsdom)…')
   const root = join(HERE, '..', '..')
   const tc = spawnSync('npx tsc -p tsconfig.vitest.json --noEmit', { cwd: root, shell: true, encoding: 'utf8' })
@@ -193,7 +215,10 @@ try {
 }
 
 // Production-preview smoke test (unless a filter excludes it).
-if (!filter.length || filter.includes('preview')) {
+// The prod-preview smoke test runs in the LARGE/default regression, not the SMALL
+// gate (the `build` step already type-checks and builds; SMALL trades the extra
+// prod-runtime smoke for speed).
+if ((fullRun && tier !== 'small') || filter.includes('preview')) {
   console.log('# building for the production-preview smoke test…')
   const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, stdio: 'inherit' })
   if (build.status !== 0) {

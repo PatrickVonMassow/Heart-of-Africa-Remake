@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "typecheck:test": "tsc -p tsconfig.vitest.json --noEmit",
     "test:e2e": "node scripts/verify/run-all.mjs",
+    "test:small": "node scripts/verify/run-all.mjs small",
+    "test:large": "node scripts/verify/run-all.mjs large",
     "test": "node scripts/verify/run-all.mjs"
   },
   "dependencies": {

@@ -19,14 +19,31 @@ need a real browser stay in Playwright.
 npm run test:unit     # fast Vitest layer only (jsdom)
 npm run test:watch    # Vitest in watch mode
 npm run typecheck:test # tsc over the test files
-npm test              # full regression: build + lint + test-types + vitest, then the browser suites + preview
+npm test              # full (LARGE) regression: build + lint + test-types + vitest, then EVERY browser suite + preview
+npm run test:small    # build + lint + vitest, then the SMALL everyday browser gate (no preview)
+npm run test:large    # == npm test (explicit LARGE)
 npm test -- unit      # just the vitest stage, via the full runner
 npm test -- flow      # just the named browser suite(s) (dev server managed for you)
 ```
 
 `npm test` (`scripts/verify/run-all.mjs`) runs, in order: type-check + build →
-lint → **vitest (fail-fast)** → the reduced Playwright suites against the dev
+lint → **vitest (fail-fast)** → the Playwright browser suites against the dev
 server → the production-preview smoke test.
+
+### Regression tiers (point 173)
+
+The browser suites split into two selectable tiers, so a change can be gated at
+the right cost (the regression-tiers rule: per task, pick Vitest-only /
+Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
+
+| Tier | Command | Browser suites | Preview |
+|------|---------|----------------|---------|
+| **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 14** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings`) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+
+Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
+of `DEV_SUITES` in `run-all.mjs`; keep it that way. New heavy or flaky browser
+scenarios join LARGE only (they must not slow or flake the everyday gate).
 
 ## Adding tests for a new feature (do this every time)
 
