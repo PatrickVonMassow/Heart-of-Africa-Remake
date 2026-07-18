@@ -5111,7 +5111,7 @@ the remaining open points in their numeric order.
   ambience volume gains the per-source sliders — name birdsong).
   (Reported 16.07.2026.)
 
-- [ ] 154. F3 full loadout also sets the travel speed to 25.
+- [x] 154. F3 full loadout also sets the travel speed to 25.
   Wanted (user, 16.07.2026, "ans Ende der Batch"): the F3 debug shortcut
   (§21.1 full loadout) additionally sets `balance.travelSpeed` to 25 — the
   fast test-traversal speed, on top of the existing gear/zoom/health grants.
@@ -5124,6 +5124,10 @@ the remaining open points in their numeric order.
   loadout): after F3, `balance.travelSpeed` is 25 and the debug menu shows it.
   DOCS: CLAUDE.md §7.1 pt. 20's F3 clause gains "travel speed 25".
   (Reported 16.07.2026.)
+  DONE (18.07.2026, 02:27): debugFullLoadout now sets balance.travelSpeed = 25
+  before bumpBalance (so the debug-menu field shows it), CLAUDE §7.1 pt.20's
+  F3 clause names it, and Hud.test.tsx asserts F3 sets travelSpeed to 25.
+  Build/lint/1751 unit green.
 
 - [ ] 155. No inhabitant spawns stuck (Tuareg Village pocket).
   Wanted (user, 16.07.2026, screenshot, "fürs Ende vom Batch"): a villager

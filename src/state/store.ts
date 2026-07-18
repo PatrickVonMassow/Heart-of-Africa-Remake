@@ -1968,6 +1968,9 @@ export const useGame = create<GameState>()((set, get) => ({
       treasures,
       toast: getStrings().toasts.debugLoadout,
     })
+    // F3 also sets the fast test-traversal speed (design.md §21.1, point 154);
+    // bumpBalance below refreshes the debug-menu field to the new value.
+    balance.travelSpeed = 25
     get().bumpBalance()
   },
 

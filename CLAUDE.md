@@ -867,7 +867,8 @@ verify suite that proves it.
     do-not-disturb option (§16.2; also F2); the §21.1 shortcuts hold (F1
     menu, F2 do-not-disturb, F3 full loadout — all gear/treasures, 100000
     gifts/dollars/provisions, full health, full canteen, no afflictions,
-    capacity raised to fit, and the extended zoom unlocked — F4 canoe
+    capacity raised to fit, the extended zoom unlocked, and the travel
+    speed set to 25 for fast test traversal (point 154) — F4 canoe
     toggle); the canteen's consumption
     rates and capacity are editable (§21.2), as is the parental rescue
     burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's

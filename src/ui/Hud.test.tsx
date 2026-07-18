@@ -331,6 +331,13 @@ describe('F3 unlocks the extended zoom alongside the loadout (design.md §21.1)'
     expect(useUi.getState().wheelZoomEnabled).toBe(true)
     expect(g().money).toBe(100000)
   })
+
+  it('also sets the fast test-traversal travel speed to 25 (point 154)', () => {
+    balance.travelSpeed = 5.6
+    render(<Hud />)
+    fireEvent.keyDown(window, { code: 'F3' })
+    expect(balance.travelSpeed).toBe(25)
+  })
 })
 
 describe('Touch controls mount only with ui.touchActive (design.md §17.5, point 84)', () => {
