@@ -39,6 +39,7 @@ import {
   separationPush,
   turnToward,
   killFlockMayDescend,
+  killFlockActive,
   pickOffscreenLandAnchor,
   calvesForGroup,
   deflectedStep,
@@ -3697,7 +3698,6 @@ function Vultures() {
     // finishes it: the birds that circled the kill take the scrap, no new
     // scavenger flies in for it.
     if (killGroup.current) {
-      const feeding = LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
       let remnant: Animal | null = null
       if (ACTIVE_HERDS) {
         outer: for (const sp of SPECIES) {
@@ -3722,7 +3722,12 @@ function Vultures() {
       const f = killFlight.current
       flightStep(
         f,
-        feeding || remnant !== null,
+        // Present while the predator FEEDS, and afterwards only if a real kill
+        // left a scrap (point 162): a drive-off sends the hunt to 'leave' with no
+        // remnant, and the old `mode === 'leave'` keying flew the flock in over a
+        // kill that never happened. The feed->leave descent rides on the remnant,
+        // not on 'leave', so it is unchanged. killFlockActive is pure-tested.
+        killFlockActive(LION_STATE.mode, remnant !== null),
         toRemnant && remnant ? remnant.x : LION_STATE.px,
         toRemnant && remnant ? remnant.z : LION_STATE.pz,
         s.pos.x,

@@ -22,6 +22,7 @@ import {
   turnToward,
   type FlightState,
   killFlockMayDescend,
+  killFlockActive,
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
@@ -734,6 +735,23 @@ describe('killFlockMayDescend (design.md §19.6 — land once the site is clear)
 
   it('a gone predator frees the site immediately', () => {
     expect(killFlockMayDescend('idle', 0, 0, 0, 0)).toBe(true)
+  })
+})
+
+describe('killFlockActive (design.md §19.6, point 162 — no flock over a drive-off)', () => {
+  it('circles while the predator feeds, remnant or not', () => {
+    expect(killFlockActive('feed', false)).toBe(true)
+    expect(killFlockActive('feed', true)).toBe(true)
+  })
+
+  it('during the walk-off it stays only for a real kill (a remnant)', () => {
+    expect(killFlockActive('leave', true)).toBe(true) // feed->leave: a scrap to finish
+    expect(killFlockActive('leave', false)).toBe(false) // DRIVE-OFF: no kill, no flock
+  })
+
+  it('a drive-off / no-kill idle draws no flock, but a leftover scrap does', () => {
+    expect(killFlockActive('idle', false)).toBe(false)
+    expect(killFlockActive('idle', true)).toBe(true)
   })
 })
 

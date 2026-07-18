@@ -315,6 +315,19 @@ export function leashedGambolDir(
 }
 
 
+/**
+ * Whether the kill flock is present at all (design.md §19.6, point 162): it
+ * circles while the predator FEEDS, and it stays on afterwards only if a real
+ * kill left a scrap to finish (a remnant). It must NOT persist through the
+ * predator's walk-off on its own: a DRIVE-OFF (the parent saves its calf, no
+ * kill) sends the hunt to 'leave' with no remnant, and keying the flock on
+ * 'leave' flew it in over a kill that never happened (user report). So the
+ * walk-off keeps the flock only when `hasRemnant`.
+ */
+export function killFlockActive(predatorMode: string, hasRemnant: boolean): boolean {
+  return predatorMode === 'feed' || hasRemnant
+}
+
 /** The circling kill flock may land once the predator no longer guards the
  *  site: never during the feed, and during the walk-off only after it has
  *  moved this far from the remnant — not only once it despawned beyond the

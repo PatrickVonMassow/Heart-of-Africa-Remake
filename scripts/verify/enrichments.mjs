@@ -3947,6 +3947,44 @@ check('the kill flock flies in from beyond the view ring and settles over the ki
 check('when the kill scene ends the flock flies off and despawns well outside the view',
   killFlock.outSeen && killFlock.hideDist !== null && killFlock.hideDist > 130, JSON.stringify(killFlock))
 
+// Point 162: a DRIVE-OFF (the parent repels the predator, no kill) sends the
+// hunt to 'leave' with NO remnant — the gathered flock must fly OFF, never land
+// over a kill that never happened. The flock is keyed on 'feed' or a real
+// remnant (killFlockActive), never on 'leave' alone.
+const driveOffNoFlock = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const p = () => window.__game.getState().pos
+  const L = window.__lionHunt.state
+  const f = window.__vultures.killFlight.current
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(1)
+  const herds = window.__wildlife.herdsRef.current
+  const purge = () => { for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead) }
+  purge() // no remnant anywhere
+  // Gather the flock with a feed (as the chase would), then drive off.
+  f.mode = 'idle'
+  L.victim = null; L.victimHunt = false
+  L.px = p().x + 8; L.pz = p().z; L.lx = L.px + 0.7; L.lz = L.pz + 0.25
+  L.mode = 'feed'; L.timer = 90
+  let t0 = Date.now()
+  while (Date.now() - t0 < 40000 && f.mode !== 'active') await sleep(50)
+  const gathered = f.mode === 'active'
+  // Drive-off: predator repelled, walks clear, NO kill/remnant left behind.
+  purge()
+  L.mode = 'leave'
+  L.lx = p().x + 40; L.lz = p().z // cleared well past the descend distance
+  let leftAgain = false
+  t0 = Date.now()
+  while (Date.now() - t0 < 15000) {
+    if (f.mode === 'out' || f.mode === 'idle') { leftAgain = true; break }
+    await sleep(60)
+  }
+  L.mode = 'idle'; L.timer = 99999
+  return { gathered, leftAgain, finalMode: f.mode }
+})
+check('a drive-off leaves no kill, so the gathered flock flies off instead of landing (point 162)',
+  driveOffNoFlock.gathered && driveOffNoFlock.leftAgain, JSON.stringify(driveOffNoFlock))
+
 // --- Point 6: the predator never despawns in view (zoom-aware) ----------------
 // design.md §19: after the meal the predator trots off and leaves the stage
 // only well beyond the visible surroundings; a chase that strays aborts past

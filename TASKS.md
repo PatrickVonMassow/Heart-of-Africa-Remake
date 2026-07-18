@@ -5434,7 +5434,7 @@ the remaining open points in their numeric order.
   the period sources describe (six evidence-gated seasonal garments; fire,
   market and transhumant presence carry the season for the rest).
 
-- [ ] 162. Vultures come for a family the parent just SAVED (drive-off leaves
+- [x] 162. Vultures come for a family the parent just SAVED (drive-off leaves
   a phantom meal).
   User report (17.07.2026, screenshot, deployed build): a parent drove a LION
   off its calf — the point-124/125 drive-off, calf freed, both alive — "doch
@@ -5467,6 +5467,22 @@ the remaining open points in their numeric order.
   no-kill-no-remnant rule — sharpen its wording to name the drive-off exit
   once fixed. (Reported 17.07.2026; queued at the batch end per the
   standing append-and-defer rule.)
+  DONE 18.07.2026: the root was (2) — the kill-flock's presence flag keyed on
+  the predator's mode being 'feed' OR 'leave', so a drive-off (mode -> 'leave',
+  no kill) kept the gathered flock active and it flew in over a phantom meal.
+  Guarantees (1) and (3) were already correct and left unchanged: spawnRemnant
+  runs only in the feed+dead branch (a drive-off spawns no remnant), and the
+  freed calf is alive so the ground scavenger's !dead guard already excludes it.
+  Extracted the flag as the pure `killFlockActive(mode, hasRemnant) = mode ===
+  'feed' || hasRemnant` (wildlifeBehavior.ts) and use it inline at the flock's
+  flightStep; during 'leave' the flock now stays only for a real remnant, so the
+  feed->leave descent (which rode on the remnant) is unchanged. Pure test (6
+  cases: feed/leave/idle x remnant) + a live enrichments drive-off check (gather
+  the flock, then leave with no remnant -> it flies off, never lands). CLAUDE
+  §7.1 pt.12 sharpened to name the drive-off. 1828 Vitest; enrichments green bar
+  the unrelated rotating 165 staging flake (pops:1, ground-animal seeder, not
+  the flock — 145a passed this run). Verify: `wildlifeBehavior.test.ts`,
+  `scripts/verify/enrichments.mjs`.
 
 - [ ] 163. The opened map covers the inventory bar's SECOND row.
   User report (17.07.2026, screenshot, deployed build): with enough items to

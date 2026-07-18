@@ -485,7 +485,13 @@ verify suite that proves it.
       same in/out pattern; a finished hunt leaves a small prey remnant at
       the kill site which the ALREADY CIRCLING kill flock then descends
       on and finishes — the ground scavenger never takes a flocked kill's
-      scrap (and a feed that ends without a kill leaves none); carcasses
+      scrap (and a feed that ends without a kill leaves none); a DRIVE-OFF
+      (the parent repels the predator, no kill) draws NO flock — the flock
+      is keyed on the feed or a real remnant, never on the predator's
+      walk-off alone, so the birds never land over a rescue that killed
+      nothing (point 162, `killFlockActive` pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`, live drive-off check in
+      `scripts/verify/enrichments.mjs`); carcasses
       left far off-screen are culled while a visible one is kept (kills
       stay bounded and never stall the frame loop); a landed bird stands
       on ITS OWN ground (point 128) — one shared rule (`landedBirdY`,
