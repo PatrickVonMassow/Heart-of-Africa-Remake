@@ -6120,6 +6120,28 @@ the remaining open points in their numeric order.
   user's re-test showed it still hops. Named fallback if the diagnosis points at
   the collapse: bake the crown-collapse HEIGHT per instance too (drop the field
   read from the vertex stage entirely). (Follow-up to 171.)
+  DIAGNOSIS (19.07.2026, user WebGPU toggles): TRAA off does NOT stop it;
+  weatherStrength 0 DOES. So the jump is the dry-season crown COLLAPSE
+  (seasonFoliagePosition), which is unstable on WebGPU while active. A headless
+  probe then found the trigger: the RENDERED fog far (TRAVEL_FOG.far) is lerped
+  toward the season target every frame and never settles, so `floraShouldRebuild`
+  (keyed on it) fired several times a second — each rebuild re-uploaded the
+  per-instance `seasonTint` buffer, and on WebGPU that upload races the vertex
+  stage reading the tint for the collapse -> the crowns jitter. weatherStrength 0
+  (a uniform tint) makes a racy read harmless, which is why it "stopped" the jump.
+  ATTEMPT 2 (19.07.2026, user chose "keep the effect, make it stable"): decouple
+  the flora spawn radius from the season. New `FLORA_FOG.far` (floraStreaming.ts),
+  set each frame by Climate to `preset.far + (12000-preset.far)*clearView` — the
+  ZOOM/region far only, NOT the season (= the dry-season MAX far, so it always
+  covers the rendered fog). Constant at a steady zoom, so the flora rebuilds ONLY
+  on movement, never on the season fog drift -> the seasonTint buffer is not
+  re-uploaded while driving -> no WebGPU race. The bare-branch collapse (144) and
+  the rain-closing render fog are fully kept. Headless-verified on WebGL2: a
+  weather-on drive rebuilds 8 -> 0 (weather-off 50 -> 2); new movement-bounded
+  rebuild check + the 171 no-pop check green; enrichments 199/0, Vitest 1925,
+  build/lint clean. STILL OPEN pending the USER's WebGPU confirmation that the
+  crowns are now stable. If it still jumps, the collapse itself needs a
+  WebGPU-stable redo (split crown geometry / instance-matrix collapse).
 
 - [ ] 176. The dry-season drink catchment is silently capped at 0.45° (found by
   the point-173 analysis). CONFIRMED bug: `riverDistance`/`lakeDistance`

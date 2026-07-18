@@ -47,7 +47,7 @@ import {
   type TrailPoint,
 } from './canoeDrag'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
-import { chunkOffsetsByDistance, floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
+import { chunkOffsetsByDistance, FLORA_FOG, floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
@@ -77,7 +77,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
-import { Climate, TRAVEL_FOG } from './Climate'
+import { Climate } from './Climate'
 import { setFrameVisibilityTest } from './frameVisibility'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
@@ -967,12 +967,14 @@ function Vegetation() {
     if (hide) return
     const pos = useGame.getState().pos
     // Streaming with a rebuild hysteresis (points 164 + 171): the drawn edge is
-    // a circle sized to the FOG far — the definitive visible limit — plus a
-    // reserve, so it always sits in dense fog beyond anything the player can
-    // see. A rebuild fires only once the player has moved the hysteresis step
-    // or the fog far changed (a new region), so a back-and-forth across a chunk
-    // boundary no longer re-pops.
-    const fogFar = TRAVEL_FOG.far
+    // a circle sized to the SEASON-FREE fog far (point 175: FLORA_FOG, not the
+    // per-frame-lerped TRAVEL_FOG) — the dry-season max visible limit plus a
+    // reserve, so it always sits in dense fog beyond anything the player can see.
+    // A rebuild fires only once the player has moved the hysteresis step or the
+    // ZOOM/region changed the far, NOT on the season's per-frame fog drift — that
+    // per-frame rebuild re-uploaded the seasonTint buffer and raced the crown
+    // collapse on WebGPU ("jumping trees").
+    const fogFar = FLORA_FOG.far
     if (!floraShouldRebuild(pos, lastBuild.current, fogFar)) return
     lastBuild.current = { x: pos.x, z: pos.z, fogFar }
     rebuildCountRef.current++

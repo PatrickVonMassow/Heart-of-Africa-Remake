@@ -4473,6 +4473,36 @@ check(
   JSON.stringify(drivenFlora),
 )
 
+// Point 175: the flora rebuild must be MOVEMENT-bounded, not season-driven. The
+// rendered fog far is lerped toward the season target every frame (rain closes it
+// in) and never settles, but the flora sizes its spawn circle to the SEASON-FREE
+// FLORA_FOG.far, so driving with the weather ON must not rebuild more often than
+// the movement hysteresis (FLORA_REBUILD_STEP 16) dictates. The old per-frame
+// season rebuild re-uploaded the seasonTint buffer and raced the crown collapse
+// on WebGPU ("jumping trees"); weatherStrength 0 (a uniform tint) hid it. The
+// visual is WebGPU-only, but the rebuild rate — the cause — is measurable here.
+const floraSeasonRebuild = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.__game.getState().debugJumpTo(5.5, 27.7) // Central jungle, wet in the rains
+  window.__balance.season.weatherStrength = 1
+  window.__ui.getState().setTravelZoom(0.5)
+  await sleep(2500) // let the render fog lerp settle toward its season target
+  const pos0 = { ...window.__game.getState().pos }
+  const r0 = window.__vegetation.rebuilds()
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' }))
+  await sleep(3000)
+  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' }))
+  const pos1 = window.__game.getState().pos
+  const rebuilds = window.__vegetation.rebuilds() - r0
+  const dist = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
+  return { rebuilds, dist: +dist.toFixed(1), bound: Math.ceil(dist / 16) + 2, renderFogFar: window.__climate?.fog?.()?.far ?? null }
+})
+check(
+  'the flora rebuild is movement-bounded, not season-driven, while driving with weather on (point 175)',
+  floraSeasonRebuild.rebuilds <= floraSeasonRebuild.bound,
+  JSON.stringify(floraSeasonRebuild),
+)
+
 // Point 167: the rain no longer snaps on at a climate-zone border. Walk a N-S
 // line across the Sahel -> Sahara border along 0°E in August and read the
 // traversal wetness at each step: it must fade as a GRADIENT (no single step

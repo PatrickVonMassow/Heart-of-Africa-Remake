@@ -34,6 +34,22 @@ export const FLORA_REBUILD_STEP = 16
  *  (⌈320/24⌉ + 1 = 15) so the capped edge still reaches the fog. */
 export const FLORA_RANGE_MAX = 15
 
+/**
+ * The SEASON-FREE fog far the flora sizes its spawn circle to (point 175).
+ * Climate sets it each frame to the region base far extended only by the ZOOM's
+ * clearView — NOT the season. The RENDERED fog far (TRAVEL_FOG.far) is lerped
+ * every frame toward the season target (rain closes it in) and never settles, so
+ * a flora rebuild keyed on it fired several times a second, re-uploading the
+ * per-instance seasonTint buffer each time; on WebGPU that upload races the
+ * vertex stage reading the tint for the crown collapse and the crowns jitter
+ * ("jumping trees") — weatherStrength 0 (a uniform tint) hid it. This far is
+ * CONSTANT at a steady zoom, so no season-driven rebuild. It equals the
+ * DRY-SEASON MAX far (seasonFogParams rangeFactor peaks at 1), so the circle
+ * always covers at least the rendered fog: rain just draws a few extra, fully-
+ * fogged plants. A module singleton, like TRAVEL_FOG, to stay off the render
+ * program's pipeline cache key (point 96). */
+export const FLORA_FOG = { far: 260 }
+
 /** The radius (world units) out to which flora is drawn — the fog-limited
  *  visible extent plus a reserve, so the circular streaming edge is always
  *  beyond the visible ground and its pop stays in the fog. Zoom-independent:

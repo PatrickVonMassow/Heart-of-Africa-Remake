@@ -13,6 +13,7 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setSkyHarmattan, setSkyOvercast } from '../../render/skyOvercast'
 import { setHail } from '../../render/seasonalSnow'
+import { FLORA_FOG } from './floraStreaming'
 import { smoothedWetnessAt } from '../../render/seasonField'
 import {
   CURRENT_WEATHER,
@@ -199,6 +200,11 @@ export function Climate() {
     const zoom = useUi.getState().travelZoom
     const clearView = Math.min(1, Math.max(0, (zoom - 1) / 0.6))
     const hazeClear = Math.min(1, Math.max(0, (zoom - 1) / 0.25))
+    // The flora's season-free spawn far (point 175): the region base far extended
+    // only by the zoom's clearView, NOT the season. Constant at a steady zoom, so
+    // the flora no longer rebuilds several times a second on the season's per-frame
+    // fog drift — the trigger of the WebGPU crown jitter. See FLORA_FOG.
+    FLORA_FOG.far = preset.far + (12000 - preset.far) * clearView
 
     // Season (design.md §19, point 120): the wet season closes the sight lines
     // and grays the light toward overcast — derived from the in-game date and
