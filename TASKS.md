@@ -121,6 +121,12 @@ shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
 would otherwise be written twice. 125 keeps its place in the numeric tail.
 
+Work order (user override, 2026-07-18, ninth): after 164's zoom-2 test passed
+while the bug persisted in-game, the user made "test at in-game-achievable zoom"
+a standing rule and ordered a retroactive audit of ALL feature tests for
+practice-remote testing — filed as 172, to run right after 171. So the tail runs
+167 → 171 → 172 → 169 → 157 → 162 → 163 → 165 → 166 → 170.
+
 Work order (user override, 2026-07-18, eighth): point 164's fix did not hold —
 the plants still fly in — so the user filed 171 (only change flora outside the
 view) to run DIRECTLY AFTER the current task 167. So the remaining tail runs
@@ -5808,14 +5814,54 @@ the remaining open points in their numeric order.
   3. Season swaps (if any placement ever becomes season-dependent — today
      placedFloraAt is season-independent, so this is future-proofing): only swap
      a plant's species/presence while it is outside view + reserve.
+  TEST AT REALISTIC ZOOM (user standing rule, 18.07.2026 — see point 172): it
+  must work at the zoom levels the player can ACTUALLY reach, at minimum the
+  NON-DEBUG range 0.25–0.5 (setTravelZoom clamps to [0.25, DEFAULT 0.5] unless
+  the debug zoom-out checkbox / F3 is on). 164 tested at zoom 2, which is
+  debug-only — practice-remote. The baseline check is the non-debug range; wider
+  debug zooms are extras only.
   VERIFY BY THE PICTURE (the 147/151 lesson, do not repeat 164's mistake): a
-  driven screenshot pass (enrichments) at a WIDE zoom that captures frames while
-  moving and asserts no plant instance appears at a screen position inside the
-  frame interior (only at/za beyond the frame edge) — i.e. measure against the
-  ACTUAL rendered frame, not a guessed viewR. Pure-test the measured-radius →
-  spawn-radius rule. DOCS: design.md §2.5 (correct the point-164 wording:
-  streaming edge beyond the MEASURED view, not 100×zoom), CLAUDE.md §7.1 pt.12.
+  driven screenshot pass (enrichments) at the achievable zoom that captures
+  frames while moving and asserts no plant instance appears at a screen position
+  inside the frame interior (only at/beyond the frame edge) — i.e. measure
+  against the ACTUAL rendered frame, not a guessed viewR. Pure-test the
+  measured-radius → spawn-radius rule. DOCS: design.md §2.5 (correct the
+  point-164 wording: streaming edge beyond the MEASURED view at the achievable
+  zoom, not 100×zoom), CLAUDE.md §7.1 pt.12.
   (Reported 18.07.2026; user-ordered directly after 167.)
+
+- [ ] 172. Retroactive audit: do all feature tests test PRACTICE-REALISTICALLY?
+  User order (18.07.2026, after 164's zoom-2 test passed while the bug persisted
+  in-game): "evaluiere rückwirkend für alle bestehenden Tests aller Features, ob
+  die von ähnlichen Problemen betroffen sind und deswegen praxisfern testen."
+  THE LEAD OFFENDER, made a standing rule: testing at an UNREALISTIC (debug-only)
+  zoom instead of the in-game-achievable one. The non-debug zoom is clamped to
+  0.25–0.5 (default 0.5); only the debug checkbox / F3 unlocks 0.5–16. A test
+  that only exercises a wide debug zoom (or assumes `100 × zoom` as the view
+  radius rather than measuring the real frustum) can pass while the player still
+  sees the bug (164). The standard is the PICTURE at a realistic setup.
+  SCOPE — sweep every browser suite (scripts/verify/*.mjs) and the zoom/view-
+  dependent pure tests, and for EACH check ask:
+  (a) does it force a zoom the player cannot reach without debug (setTravelZoom
+      to >0.5, or setWheelZoomEnabled(true) purely to widen)? If the behaviour it
+      checks must also hold at the non-debug range, add or move the assertion to
+      0.25–0.5. (Legit exceptions: checks that are SPECIFICALLY about the debug
+      wide-zoom feature — the zoom gate, the far-sheet at the cap, whole-continent
+      view — those stay, but must be labelled as debug-zoom checks.)
+  (b) does it assume a view/despawn radius (100×zoom, a hard-coded distance)
+      instead of the real camera coverage? Flag for a measured radius.
+  (c) more broadly, does it force a state the game cannot actually produce
+      (the 147 lesson: wetness=1 outside the Congo; an override the real climate
+      never reaches), so it measures a world the game cannot reach?
+  DELIVERABLE: a written findings list (in this point's DONE note) of every
+  practice-remote test found, each either fixed to a realistic setup (and the
+  real behaviour re-verified there — the picture, not just a green assertion) or,
+  if genuinely a debug-feature check, labelled as such. No silent pass: if a
+  fixed test now FAILS at the realistic zoom, that is a real bug — file it.
+  ORDER: after 171 (which is the first instance being fixed). TESTS: the audit's
+  output is the fixes themselves plus the findings list. DOCS: CLAUDE.md §7.2
+  (a line that verification must use in-game-achievable conditions, zoom
+  included). (Reported 18.07.2026; user-ordered after 171.)
 
 ## Closing (only after all points)
 
