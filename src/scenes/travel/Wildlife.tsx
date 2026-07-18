@@ -20,6 +20,7 @@ import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
 import { setAnimalCollider } from './wildlifeCollision'
+import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { drinkWalkDistance } from './waterEdgeRules'
@@ -38,6 +39,7 @@ import {
   separationPush,
   turnToward,
   killFlockMayDescend,
+  pickOffscreenLandAnchor,
   deflectedStep,
   type FlightState,
   channelDriftStep,
@@ -1028,21 +1030,29 @@ function seedSettlementVicinity(
       }
     }
     if (!species) continue
-    // Search a few deterministic offsets for a land anchor inside the ring,
-    // past the clearance — a coastal port may face water on some bearings.
-    let ax = 0
-    let az = 0
-    let found = false
-    for (let k = 0; k < 8 && !found; k++) {
+    // Deterministic offset candidates inside the ring, past the clearance — a
+    // coastal port may face water on some bearings. Pick one OUTSIDE the frame
+    // (point 165) so the seeded group never pops into view; the vicinity radius
+    // reaches past the frame at the default zoom, so an off-screen land spot
+    // almost always exists (on-screen land is the fallback).
+    const candidates: Array<readonly [number, number]> = []
+    for (let k = 0; k < 14; k++) {
       const dir = rand() * Math.PI * 2
       const dist = bounds.distMin + rand() * Math.max(1, bounds.distMax - bounds.distMin)
-      ax = w.x + Math.cos(dir) * dist
-      az = w.z + Math.sin(dir) * dist
-      const ll = worldToLatLon(ax, az)
-      const s = sampleTerrain(ll.lat, ll.lon, seed)
-      if (s.type !== 'ocean' && s.type !== 'water' && s.height > 0.05) found = true
+      candidates.push([w.x + Math.cos(dir) * dist, w.z + Math.sin(dir) * dist])
     }
-    if (!found) continue
+    const anchor = pickOffscreenLandAnchor(
+      candidates,
+      (x, z) => {
+        const ll = worldToLatLon(x, z)
+        const s = sampleTerrain(ll.lat, ll.lon, seed)
+        return s.type !== 'ocean' && s.type !== 'water' && s.height > 0.05
+      },
+      isOnScreen,
+    )
+    if (!anchor) continue
+    const ax = anchor[0]
+    const az = anchor[1]
     placeGroup(herds[species], scx, scz, ax, az, deficit, SPREAD, seed, 0.9, BODY_RADIUS[species], false, undefined, chunkKey)
   }
 }

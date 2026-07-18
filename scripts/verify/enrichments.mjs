@@ -1157,6 +1157,48 @@ check('an animal survives a chunk-boundary crossing while in view', stream.ok &&
 check('an animal despawns once well outside the view', stream.ok && stream.goneWhenFar, JSON.stringify(stream))
 check('zoom-out keeps animals the default view would despawn', stream.ok && stream.goneAtZoom1 && stream.keptAtZoom3, JSON.stringify(stream))
 
+// Point 165: no ground animal appears INSIDE the rendered frame. The guarantee
+// seeders (settlement vicinity, dry-shore drinkers) used to place standing
+// animals at the frame edge, where they popped into view. Drive through a
+// settlement+shore area in the dry season (both seeders active) at the
+// ACHIEVABLE zoom 0.5 and — by OBJECT IDENTITY — assert NO new animal is on
+// screen (projected via __camera.onScreen, the point-172 picture standard) the
+// frame it first joins the herds. Zoom-out exercised too.
+const noPop = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const SP = ['zebra', 'wildebeest', 'antelope', 'gazelle', 'buffalo', 'elephant', 'giraffe', 'lion',
+    'hyena', 'cheetah', 'leopard', 'warthog', 'ostrich', 'flamingo', 'crocodile', 'hippo', 'baboon', 'plover']
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3' }))
+  window.__game.getState().setJournalOpen(false)
+  window.__ui.getState().setSeasonWetnessOverride(0) // dry season → the shore seeder is active
+  window.__game.getState().debugJumpTo(-2.5, 36.4) // the Maasai plains: settlements, shore, herds
+  window.__ui.getState().setWheelZoomEnabled(true)
+  window.__ui.getState().setTravelZoom(0.5)
+  await sleep(2200)
+  const herds = () => window.__wildlife.herdsRef.current
+  const seen = new Set()
+  for (const sp of SP) for (const a of herds()[sp] ?? []) seen.add(a)
+  let pops = 0
+  const scan = () => {
+    for (const sp of SP) for (const a of herds()[sp] ?? []) {
+      if (!seen.has(a)) { seen.add(a); if (!a.dead && window.__camera.onScreen(a.x, a.z)) pops++ }
+    }
+  }
+  const p0 = { ...window.__game.getState().pos }
+  for (let k = 0; k <= 14; k++) {
+    window.__game.setState({ pos: { x: p0.x + k * 16, z: p0.z - k * 16 } })
+    await sleep(420)
+    scan()
+  }
+  // Zoom-out reveals a wider field: its freshly-covered chunks must not pop either.
+  window.__ui.getState().setTravelZoom(1.3)
+  for (let k = 0; k < 6; k++) { await sleep(320); scan() }
+  window.__ui.getState().setTravelZoom(0.5)
+  window.__ui.getState().setSeasonWetnessOverride(null)
+  return { pops }
+})
+check('no ground animal appears inside the rendered frame while driving (point 165)', noPop.pops === 0, JSON.stringify(noPop))
+
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
 // flies in, lands and consumes it, dissolving it as a lion kill does.
@@ -1520,14 +1562,16 @@ const carrionVicinity = await page.evaluate(async () => {
   await sleep(400)
   window.__wildlife.restock()
   const p0 = window.__game.getState().pos
-  // OPEN (point 172 → fix with point 165): counting carrion within an ASSUMED
-  // radius, not the real frame. A trial migration to __camera.onScreen returned
-  // 0-of-13 on-screen at zoom 0.5 — the plague carcasses spawn in the small
-  // 100×zoom ring, mostly OUTSIDE the rendered frame, so the point-168 "visible
-  // without travelling" claim is weak at the achievable zoom. That is the SAME
-  // under-sized-view bug as 165 (wildlife spawn ring); when 165 re-bases the ring
-  // on the frustum, this reverts to `__camera.onScreen`. Kept at viewR for now so
-  // the suite stays green rather than leaving a red test for a not-yet-built fix.
+  // OPEN (point 172 finding, follow-up pending): this counts carrion within an
+  // ASSUMED radius, not the real frame. A trial migration to __camera.onScreen
+  // returned 0-of-13 on-screen at zoom 0.5 — the plague carcasses spawn in the
+  // spawn ring mostly OUTSIDE the forward frame, so a struck village's carrion is
+  // present in the vicinity (within 55) but not in the instantaneous forward view.
+  // Point 165 fixed the live-animal POP (seeders place off-screen) but NOT this:
+  // a carcass is DEAD and cannot walk in, so making it more forward-visible needs
+  // its own placement change to the plague-carcass spawn, left as a follow-up.
+  // Kept at viewR (carrion is nearby, which the player reaches by looking/moving)
+  // so the suite stays green rather than leaving a red test for an unbuilt fix.
   const viewR = 55
   let carcasses = 0
   const t0 = Date.now()

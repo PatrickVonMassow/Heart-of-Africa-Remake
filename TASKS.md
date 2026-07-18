@@ -121,6 +121,12 @@ shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
 would otherwise be written twice. 125 keeps its place in the numeric tail.
 
+Work order (user override, 2026-07-18, eleventh): the user inserted a post-162
+quality push (173: closing run + thorough code analysis + many new tests +
+small/large regression tiers) and then a demo tag (174: v0.2 at /v0.2/) DIRECTLY
+after 162 — and, by his explicit choice, 163/166/170 run AFTER the v0.2 tag. So
+the tail runs 165 → 169 → 157 → 162 → 173 → 174 (v0.2) → 163 → 166 → 170.
+
 Work order (user override, 2026-07-18, tenth): the user moved 165 (animals pop
 in view — the same streaming-pop class as 171/164) up to run right after 172. So
 the tail runs 167 → 171 → 172 → 165 → 169 → 157 → 162 → 163 → 166 → 170.
@@ -5534,7 +5540,7 @@ the remaining open points in their numeric order.
   toggles across rebuilds. tsc/lint/build/1812 unit green. Docs: design.md
   §2.5 dressing note, CLAUDE.md §7.1 pt.12 (the 151 clause gains 164).
 
-- [ ] 165. Animals pop into existence in plain sight.
+- [x] 165. Animals pop into existence in plain sight.
   User report (17.07.2026): "Es erscheinen immer wieder Tiere ploetzlich vor
   meinen Augen. Sie sollen nur ausserhalb des Sichtfeldes spawnen." The
   vulture standard (spawn beyond the zoom-aware view ring, §19.6) already
@@ -5567,6 +5573,30 @@ the remaining open points in their numeric order.
   seeders and a zoom-out each exercised). DOCS: design.md §19.5/§19.6
   wording + CLAUDE.md §7.1 pt. 12. (Reported 17.07.2026; queued at the
   batch end per the standing append-and-defer rule.)
+  DONE (18.07.2026): AUDIT FIRST, by the PICTURE. A one-off spawn-audit probe
+  drove the Maasai plains (settlements + shore, dry season) and — by OBJECT
+  IDENTITY — flagged every animal that appeared ON SCREEN (projected via the
+  point-171 `__camera.onScreen`, NOT the 100×zoom viewR — the 172 lesson). It
+  caught 5 plain-antelope pops at the ACHIEVABLE zoom 0.5 (0 at 1.5), and they
+  were INTERMITTENT: the guarantee-seeders place at distMin=20..distMax=53 from
+  the settlement, i.e. right at the ~40 frame EDGE, and camera-lerp jitter flipped
+  them across it. FIX: a shared `isOnScreen(x,z)` singleton
+  (`src/scenes/travel/frameVisibility.ts`) that TravelScene installs every mount
+  from the LIVE bird's-eye camera (projecting to NDC with a 0.18 edge margin);
+  `seedSettlementVicinity` now picks an off-screen land spot via the pure
+  `pickOffscreenLandAnchor` (prefers off-screen land, falls back to on-screen land,
+  else null), and `seedDryShoreDrinkers` only seeds a bank while it is off-screen
+  (so it scrolls into view already populated). The main chunk stream already
+  spawns beyond the frame (0 pops at 1.5 confirmed), so the range cap needed no
+  change. VERIFY: `pickOffscreenLandAnchor` pure-tested (4 cases) in
+  `wildlifeBehavior.test.ts`; a driven `enrichments.mjs` pass at 0.5 (plus a
+  zoom-out) asserts 0 animals appear inside the frame — two post-fix probe runs
+  read 0 where the pre-fix run read 5. DOCS: design.md §2.5/§19.6, CLAUDE.md
+  §7.1 pt.12. OPEN (deferred here, filed under this point's spirit): the 172
+  carrion-visibility finding (0 of 13 plague carcasses in the frame at 0.5) is a
+  SEPARATE concern — carrion is DEAD and cannot walk in; making a struck village's
+  carrion more forward-visible at 0.5 is left as a follow-up, the enrichments
+  carrion check still counts within viewR with an OPEN note.
 
 - [ ] 166. Thunderstorms: lightning WITH thunder, as a pair.
   User question/wish (17.07.2026, screenshot at 10.0N/26.0E in the August
@@ -5940,6 +5970,44 @@ the remaining open points in their numeric order.
   DOCS: CLAUDE.md §7.2 gained a line that verification must use in-game-achievable
   conditions (non-debug zoom 0.25–0.5) and judge "in view" by projecting to the
   frame, never a computed radius.
+
+- [ ] 173. Post-162 quality push: closing run, then a thorough code analysis with
+  many new tests, and the small/large browser-regression tiers.
+  (User order 18.07.2026, inserted in the work order AFTER 162; v0.2 (174) is
+  tagged after this, and 163/166/170 run AFTER v0.2 — user's explicit ordering.)
+  (a) CLOSING RUN FIRST: the full closing cycle (see the "## Closing" section
+      below) — Vitest + the LARGE browser regression, the dead-code / stale-doc /
+      .md audit, lint + npm audit clean.
+  (b) THOROUGH CODE ANALYSIS: go through the codebase spot by spot, follow every
+      logic path, and flag anywhere something COULD be wrong — edge cases,
+      unhandled states, silent caps/truncation, ordering assumptions, off-by-one,
+      race/timing, untested branches. Not a skim: every non-trivial function is
+      reasoned through, its assumptions checked against the callers.
+  (c) NEW TESTS: turn the analysis into MANY new tests for previously-untested
+      aspects — Vitest where assertable without a browser, browser scenarios where
+      it needs the scene/geometry/CSS/audio. The new browser scenarios join the
+      LARGE regression set.
+  (d) REGRESSION TIERS (infra): split the browser regression into SMALL and LARGE.
+      SMALL = the important, already-well-covered suites (the everyday gate). LARGE
+      = everything + the new scenarios from (c). Wire both as selectable (npm
+      scripts and/or run-all.mjs flags — e.g. `npm run test:small` /
+      `npm run test:large`, or run-all args), documented in
+      `scripts/verify/README.md`. Standing rule (regression-tiers memory): per task
+      I pick Vitest-only / Vitest+small / Vitest+large at my discretion; the
+      CLOSING cycle ALWAYS runs Vitest+large.
+  DELIVERABLE: a hardened, high-assured-quality state ready to tag as v0.2 (174).
+  DOCS: `scripts/verify/README.md` (the tiers + the new scenarios), CLAUDE.md §5
+  (the small/large commands) + §7.2.
+
+- [ ] 174. Tag the demo build v0.2 and publish /v0.2/.
+  (User order 18.07.2026, immediately after 173; then 163/166/170.) Once 173 has
+  left a high-assured-quality state, tag `v0.2` at that HEAD and serve it at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/ — mirror how
+  /v0.1/ and /poc/ are wired (the `.github/workflows` Pages build + the tag /
+  deploy trigger; a tag push may not trigger the deploy, so use the same mechanism
+  v0.1 used). Then FREEZE it: never re-point or change v0.2 unless the user
+  elaborately asks (tags-only-on-request memory). The v0.2 content is exactly what
+  173 produced — do NOT fold in 163/166/170 (they come after the tag).
 
 ## Closing (only after all points)
 

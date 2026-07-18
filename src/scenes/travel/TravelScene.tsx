@@ -78,6 +78,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
 import { Climate, TRAVEL_FOG } from './Climate'
+import { setFrameVisibilityTest } from './frameVisibility'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
@@ -1944,6 +1945,22 @@ export function TravelScene() {
       camera.near = 0.1
       camera.updateProjectionMatrix()
     }
+  }, [camera])
+
+  // Install the shared frame-visibility test (point 165): the wildlife
+  // guarantee-seeders read it to place animals OUTSIDE the rendered frame so
+  // nothing pops into view. Projects a ground point via the LIVE camera to NDC
+  // (the real frustum, not an assumed 100×zoom radius — the point-172 lesson),
+  // with an edge margin so a borderline placement that camera jitter would flip
+  // into view counts as on-screen too. Production, not a dev hook.
+  useEffect(() => {
+    const v = new THREE.Vector3()
+    const MARGIN = 0.18 // NDC edge band also treated as on-screen
+    setFrameVisibilityTest((x, z) => {
+      v.set(x, 0, z).project(camera)
+      return v.z < 1 && Math.abs(v.x) <= 1 + MARGIN && Math.abs(v.y) <= 1 + MARGIN
+    })
+    return () => setFrameVisibilityTest(null)
   }, [camera])
 
   // Dev hook (point 171): the REAL ground radius the camera covers, by casting

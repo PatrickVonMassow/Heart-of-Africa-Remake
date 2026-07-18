@@ -465,7 +465,18 @@ verify suite that proves it.
       settlement is seeded up to `panoramaVicinityMinAnimals` — verified
       in `scripts/verify/enrichments.mjs` (after leaving Cairo, at least
       the minimum region-typical grazers stand within the radius via
-      `__wildlife`, deterministic under the fixed seed).
+      `__wildlife`, deterministic under the fixed seed). No GROUND animal
+      pops into view (point 165): the guarantee-seeders placed standing
+      animals at the frame edge where they popped; they now place OUTSIDE
+      the rendered frame, projecting each candidate through the live camera
+      (the true frustum, not an assumed 100×zoom radius — the point-172
+      lesson) via a shared `isOnScreen` the travel scene installs — the
+      vicinity seeder prefers an off-screen land spot (`pickOffscreenLandAnchor`,
+      pure-tested in `src/scenes/travel/wildlifeBehavior.test.ts`), the
+      dry-shore seeder only seeds a bank while it is off-screen; a driven
+      pass at the ACHIEVABLE zoom 0.5 (plus a zoom-out) asserts NO animal
+      appears inside the frame — projected via `__camera.onScreen` — the
+      frame it joins the herds (`scripts/verify/enrichments.mjs`).
     - Vultures, remnants and carcass bounds: a non-lion (trampled)
       carcass draws a vulture that lands and consumes it until it is
       removed — the vulture spawning beyond the zoom-aware view ring and

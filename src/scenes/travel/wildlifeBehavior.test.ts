@@ -5,6 +5,7 @@ import {
   mireFate,
   mireRoll,
   vicinitySeedBounds,
+  pickOffscreenLandAnchor,
   seasonFlowFactor,
   waterStruggleFate,
   blockHeading,
@@ -1064,6 +1065,33 @@ describe('vicinitySeedBounds (point 135a — the guarantee holds from the leave 
     const b = vicinitySeedBounds(22, 14, 6, 10)
     expect(b.countRadius).toBeGreaterThanOrEqual(20)
     expect(b.distMax).toBeGreaterThanOrEqual(b.distMin)
+  })
+})
+
+describe('pickOffscreenLandAnchor (point 165 — a seeded guarantee never pops into view)', () => {
+  const anyLand = () => true
+  it('prefers an off-screen land candidate over on-screen ones', () => {
+    const cands = [[0, 0], [10, 0], [20, 0]] as const
+    // The first two project inside the frame; the third is off-screen.
+    const onScreen = (x: number) => x < 15
+    expect(pickOffscreenLandAnchor(cands, anyLand, (x) => onScreen(x))).toEqual([20, 0])
+  })
+
+  it('falls back to the first on-screen land candidate when none is off-screen', () => {
+    const cands = [[0, 0], [10, 0]] as const
+    expect(pickOffscreenLandAnchor(cands, anyLand, () => true)).toEqual([0, 0])
+  })
+
+  it('skips water candidates and takes the off-screen LAND one', () => {
+    const cands = [[0, 0], [10, 0], [20, 0]] as const
+    const isLand = (x: number) => x !== 10 // 10 is water
+    const onScreen = (x: number) => x < 15 // 0 on-screen, 20 off-screen
+    expect(pickOffscreenLandAnchor(cands, (x) => isLand(x), (x) => onScreen(x))).toEqual([20, 0])
+  })
+
+  it('returns null when no candidate is land', () => {
+    const cands = [[0, 0], [10, 0]] as const
+    expect(pickOffscreenLandAnchor(cands, () => false, () => false)).toBeNull()
   })
 })
 
