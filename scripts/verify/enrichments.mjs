@@ -3536,10 +3536,16 @@ await page
 const crocSpawn = await page.evaluate(() => {
   const seed = window.__game.getState().seed
   const U = 10
-  const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead)
+  // Assert the PLACEMENT rule (point 130: a crocodile LIES on water) on the
+  // hidden/idle ones. A LUNGING crocodile is mid-strike from its water toward a
+  // bank victim, so it is expected off the water for those seconds — excluding it
+  // keeps the check deterministic (point 177) without weakening the spawn rule.
+  const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead && c.lunge === undefined)
+  const offWater = list.filter((c) => window.__terrainType(-c.z / U, c.x / U, seed) !== 'water')
   return {
     count: list.length,
-    allOnWater: list.every((c) => window.__terrainType(-c.z / U, c.x / U, seed) === 'water'),
+    allOnWater: offWater.length === 0,
+    offWater: offWater.slice(0, 4).map((c) => ({ x: +c.x.toFixed(1), z: +c.z.toFixed(1), type: window.__terrainType(-c.z / U, c.x / U, seed) })),
   }
 })
 check(
