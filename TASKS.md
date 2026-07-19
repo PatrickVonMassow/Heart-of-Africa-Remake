@@ -6570,17 +6570,15 @@ the remaining open points in their numeric order.
   __ttsForceWasm hook (CLAUDE §3): with a real WebGPU device present, decide
   whether the voice suite still forces WASM (the render-WebGPU vs onnxruntime-
   WebGPU GPU-process contention, point 117) or exercises the WebGPU voice path.
-  TIER DESIGN (user 19.07.2026, ADOPTED — clarified: do NOT expand small's test
-  count). SMALL keeps EXACTLY the current small-tier suite set (point 173's fast
-  low-flake subset), unchanged in WHICH suites, but runs it on WEBGPU instead of
-  WebGL2, PLUS one WebGL2 SMOKE test (init + a render screenshot + one core flow,
-  so a grossly broken fallback is caught). LARGE runs ALL browser suites TWICE —
-  once on WebGPU and once on WebGL2 — plus the prod preview. Vitest stays the fast
-  backend-independent inner loop. So small's test COUNT is unchanged; only its
-  backend flips (+ the WebGL2 smoke). Depends on 177's determinism and on the
-  suites proving green AND flake-free on WebGPU; measure the per-launch cold-load
-  cost. Updates CLAUDE §5, scripts/verify/run-all.mjs and scripts/verify/README.md
-  (each tier gains a backend dimension, the suite→tier map is unchanged).
+  TIER DESIGN (user 19.07.2026): SMALL runs the current small-tier suite set (point
+  173's fast low-flake subset — same suites, same count) on WEBGPU, plus one WebGL2
+  SMOKE test (init + a render screenshot + one core flow, so a grossly broken
+  fallback is caught). LARGE runs ALL browser suites on BOTH backends — once on
+  WebGPU, once on WebGL2 — plus the prod preview. Vitest stays the fast
+  backend-independent inner loop. Prerequisites: 177's determinism landed and the
+  suites proven green AND flake-free on WebGPU; measure the per-launch cold-load
+  cost. Updates CLAUDE §5, scripts/verify/run-all.mjs and scripts/verify/README.md;
+  the suite→tier map is unchanged — each tier gains a backend dimension.
   ACCEPTANCE: (1) the invariant suite (Pillar 1) exists, covers I1-I7 across the
   WHOLE standard-mode zoom range (0.25-0.5, both ends, NEVER a debug zoom — the
   user's binding 19.07.2026 addition specifically for 184), and is GREEN across at
