@@ -6255,9 +6255,18 @@ the remaining open points in their numeric order.
   targeted wider cap only for the drink queries, or a measured global raise — and
   a full re-run of the point-135/147 dry-season live checks (LARGE regression) to
   confirm the gathering reaches farther without a frame-budget hit.
-  FIX SKETCH (verify before building): raise `MAX_QUERY`/the geoIndex clamp to
-  cover `drinkCatchment(RIVER_WIDTH_DEG, 1)` + the 0.03 probe step (~0.75), OR add
-  a drink-specific wider query; measure the query cost at the cap; re-verify the
+  FIX (surgical — read-only prep 19.07.2026 confirmed this avoids the global perf
+  risk): the block is TWO layered caps — geoIndex.ts clamps `maxDist` via
+  `Math.min(maxDist, 0.45)`, AND hydro.ts's `bucketDistance` searches only the 3×3
+  bucket neighbourhood (±1, BUCKET = 0.5°), so it resolves reliably ONLY to ~0.5°
+  REGARDLESS of `maxDist`. A larger maxDist alone therefore does NOTHING — the
+  SEARCH NEIGHBOURHOOD must widen too. Add a `range` param to `bucketDistance`
+  (default 1 = today's 3×3; range 2 = 5×5 reaches ~1.0°) threaded through
+  `riverDistanceExact`/`lakeShoreDistanceExact`, lift the geoIndex `Math.min` clamp
+  on that path, and call the DRINK-catchment gradient (Wildlife.tsx ~921-941) with
+  range 2 + maxDist ~0.75 while EVERY other caller keeps range 1 / 0.45 — no global
+  change. The extra cost is 25 vs 9 buckets, only for the drink query, only in the
+  dry season (bounded, local); measure it anyway; re-verify the point-135
   dry-season gather live (enrichments) and that nothing else regresses. TESTS:
   pure — a geoIndex/geo test pinning the honoured radius once the cap is chosen
   (currently `riverDistance(lat,lon,0.6)` === `riverDistance(lat,lon,0.45)`); live
