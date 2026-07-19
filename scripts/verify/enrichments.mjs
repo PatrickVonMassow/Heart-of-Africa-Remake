@@ -1204,19 +1204,29 @@ const noPop = await page.evaluate(async () => {
       if (!seen.has(a)) { seen.add(a); if (!a.dead && window.__camera.onScreen(a.x, a.z)) pops++ }
     }
   }
+  // Scan EVERY frame for a sim-window after each move (point 177/165): an animal
+  // must be judged the FRAME it joins the herds, at THAT frame's camera. Scanning
+  // once after the camera settled counted a seeded-off-screen animal that the
+  // still-lerping camera later swept into view as a pop; per-frame scanning judges
+  // each animal against the same frustum the seeder used, and a later camera
+  // reveal never re-counts it (it is already in `seen`).
+  const scanFrames = (simSecs) => new Promise((resolve) => {
+    const s0 = window.__wildlife.simTime()
+    const tick = () => {
+      scan()
+      if (window.__wildlife.simTime() - s0 < simSecs) requestAnimationFrame(tick)
+      else resolve()
+    }
+    requestAnimationFrame(tick)
+  })
   const p0 = { ...window.__game.getState().pos }
   for (let k = 0; k <= 14; k++) {
     window.__game.setState({ pos: { x: p0.x + k * 16, z: p0.z - k * 16 } })
-    // Wait for the fixed-rate (0.12/frame, not dt-scaled) camera lerp to catch up
-    // before scanning (point 177/165): a wall-clock sleep leaves the camera
-    // mid-lerp under load, and a still-moving camera reveals a just-seeded
-    // off-screen animal = a false pop. settled() is frame-count-true.
-    await window.__pollSim(5, () => window.__camera.settled(), 12000)
-    scan()
+    await scanFrames(3)
   }
   // Zoom-out reveals a wider field: its freshly-covered chunks must not pop either.
   window.__ui.getState().setTravelZoom(1.3)
-  for (let k = 0; k < 6; k++) { await window.__pollSim(5, () => window.__camera.settled(), 12000); scan() }
+  for (let k = 0; k < 6; k++) await scanFrames(3)
   window.__ui.getState().setTravelZoom(0.5)
   window.__ui.getState().setSeasonWetnessOverride(null)
   return { pops }
