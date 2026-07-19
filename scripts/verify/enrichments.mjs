@@ -1219,14 +1219,21 @@ const noPop = await page.evaluate(async () => {
     }
     requestAnimationFrame(tick)
   })
-  const p0 = { ...window.__game.getState().pos }
-  for (let k = 0; k <= 14; k++) {
-    window.__game.setState({ pos: { x: p0.x + k * 16, z: p0.z - k * 16 } })
-    await scanFrames(3)
-  }
+  // Drive CONTINUOUSLY (held key) at a bounded speed, NOT by teleporting: a
+  // teleport's big camera lerp sweeps normally-streamed off-screen animals into
+  // view, which the per-frame scan then wrongly counts (pops the player never
+  // sees — this made a teleport scan read 16). Continuous movement keeps the
+  // camera glued to the player (small lag), so the per-frame scan counts only an
+  // animal truly on-screen the frame it joins — a real seeder placement.
+  const prevSpeed = window.__balance.travelSpeed // restore below — must not leak to later checks (e.g. 129)
+  window.__balance.travelSpeed = 6 // F3 set 25 (too fast); bound the drive to the seeded area
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' }))
+  await scanFrames(9)
   // Zoom-out reveals a wider field: its freshly-covered chunks must not pop either.
   window.__ui.getState().setTravelZoom(1.3)
-  for (let k = 0; k < 6; k++) await scanFrames(3)
+  await scanFrames(5)
+  window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' }))
+  window.__balance.travelSpeed = prevSpeed
   window.__ui.getState().setTravelZoom(0.5)
   window.__ui.getState().setSeasonWetnessOverride(null)
   return { pops }
