@@ -121,6 +121,15 @@ shared outcome helper and its (prey, predator) matrix, so it is built directly
 AFTER 125 rather than at the end — it extends that helper to a third outcome and
 would otherwise be written twice. 125 keeps its place in the numeric tail.
 
+Work order (user override, 2026-07-19, twelfth): after the 173 quality push the
+user reported the jumping/floating trees (175), which was fixed and WebGPU-confirmed
+by him. He then moved the two deferred debt points 177 (staging determinism) and
+176 (drink-catchment cap) AHEAD of the closing check and the v0.2 tag ("Verschiebe
+die Punkte 177 und 176 hinter den aktuellen — also noch vor dem Abschluss-Check und
+dem 0.2er-Tag"). So the tail now runs 173 → 175 → 177 → 176 → closing → 174 (v0.2)
+→ 163 → 166 → 170. (177 before 176: a deterministic staging harness stabilises the
+ground that 176's live drought re-verification and the closing regression stand on.)
+
 Work order (user override, 2026-07-18, eleventh): the user inserted a post-162
 quality push (173: closing run + thorough code analysis + many new tests +
 small/large regression tiers) and then a demo tag (174: v0.2 at /v0.2/) DIRECTLY
@@ -6076,7 +6085,7 @@ the remaining open points in their numeric order.
   elaborately asks (tags-only-on-request memory). The v0.2 content is exactly what
   173 produced — do NOT fold in 163/166/170 (they come after the tag).
 
-- [ ] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
+- [x] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
   REOPENED 18.07.2026: the shipped fix (5421e46, baked per-instance seasonTint +
   upload-only-on-change guard) did NOT resolve it — the user re-tested on WebGPU
   (JumpingTrees3.mp4) and the trees still jump while driving. Deeper diagnosis:
