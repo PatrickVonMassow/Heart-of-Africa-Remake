@@ -11,6 +11,7 @@ import {
   buildRock,
   buildTermiteMound,
   buildBaobab,
+  splitFoliage,
 } from './flora'
 import type * as THREE from 'three/webgpu'
 
@@ -68,6 +69,34 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
     for (const build of [buildRock, buildTermiteMound, buildDeadTree, buildKopje]) {
       const g = foliageOf(build())
       expect(g.ones + g.twos).toBe(0) // dead wood and stone never collapse
+    }
+  })
+})
+
+describe('splitFoliage — crown/trunk split for the matrix-borne collapse (point 175)', () => {
+  it('splits a tree into an all-crown part and a no-crown remainder, conserving every triangle', () => {
+    for (const build of [buildAcacia, buildJungleTree, buildBaobab, () => buildPalm(false)]) {
+      const geo = build()
+      // The flora geometries are indexed (mergeGeometries of primitives); the
+      // split is non-indexed, so its total vertex count equals the source's
+      // index count — no triangle lost or duplicated.
+      const srcVerts = geo.index ? geo.index.count : geo.attributes.position.count
+      const { base, crown } = splitFoliage(geo)
+      const bc = base.attributes.position.count
+      const cc = crown.attributes.position.count
+      expect(bc + cc).toBe(srcVerts)
+      expect(cc).toBeGreaterThan(0) // there is a crown to collapse
+      expect(bc).toBeGreaterThan(0) // and a trunk that stays put
+      // Every crown vertex is foliage class 1; the remainder carries none.
+      for (const v of crown.attributes.foliage.array as Float32Array) expect(v).toBe(1)
+      for (const v of base.attributes.foliage.array as Float32Array) expect(v).not.toBe(1)
+      // Both parts keep the attributes the shared material needs.
+      for (const g of [base, crown]) {
+        expect(g.attributes.position).toBeDefined()
+        expect(g.attributes.normal).toBeDefined()
+        expect(g.attributes.color).toBeDefined()
+        expect(g.attributes.color.count).toBe(g.attributes.position.count)
+      }
     }
   })
 })

@@ -35,6 +35,40 @@ export function setSeasonCollapse(on: boolean) {
   SEASON_COLLAPSE_U.value = on ? 1 : 0
 }
 
+// CPU mirrors of the seasonFoliagePosition maths (point 175). The travel scene
+// bakes the dry-season deformation into its INSTANCE MATRICES on the CPU — the
+// WebGPU-stable transform path — rather than the per-instance-attribute
+// positionNode below, which raced its rebuild re-upload on WebGPU. These three
+// are the SAME formulas as the shader branch, kept in lock-step (pure-tested):
+// a change here must change seasonFoliagePosition identically.
+
+/** dryness from a season-field tint (0.5 neutral, 0 dry): 1 - tint*2, clamped. */
+export function drynessFromTint(tint: number): number {
+  return Math.min(1, Math.max(0, 1 - tint * 2))
+}
+
+/**
+ * Crown collapse for the travel crown mesh's instance matrix: the crown shrinks
+ * in x/z toward the trunk axis and drops in y (bare branches, point 144). Mirror
+ * of seasonFoliagePosition's crown branch (crownK = 1): shrink = 1-dryness*0.6,
+ * drop = dryness*0.22. Fold into the matrix as Scale(shrink,1,shrink) then a
+ * y-translation of -drop.
+ */
+export function crownCollapse(dryness: number): { shrink: number; drop: number } {
+  const d = Math.min(1, Math.max(0, dryness))
+  return { shrink: 1 - d * 0.6, drop: d * 0.22 }
+}
+
+/**
+ * Ground-flora sprout scale for foliage class 2 (bush, papyrus): a uniform
+ * withdraw toward the soil, folded into the plant matrix scale. Mirror of
+ * seasonFoliagePosition's sprout (sproutK = 1): 1 - dryness*0.85.
+ */
+export function groundSprout(dryness: number): number {
+  const d = Math.min(1, Math.max(0, dryness))
+  return 1 - d * 0.85
+}
+
 /**
  * Recolour a base colour toward straw (dry) or deep green (lush), leaving
  * everything that is not foliage alone.

@@ -55,6 +55,51 @@ function merge(parts: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return merged
 }
 
+/**
+ * Split a merged flora geometry into its CROWN (foliage attribute == 1) and the
+ * REST (foliage != 1: trunk, branches, props). In the travel scene the
+ * dry-season crown collapse (point 144) then rides the crown mesh's own INSTANCE
+ * MATRIX (point 175) instead of a per-instance vertex-shader attribute — the
+ * latter races its rebuild re-upload on WebGPU and jittered the crowns. `foliage`
+ * is per-part-uniform (set once per merged part), so every triangle belongs to
+ * one part and is assigned by its first vertex's value. Returns non-indexed
+ * geometries carrying position / normal / color / foliage.
+ */
+export function splitFoliage(geo: THREE.BufferGeometry): {
+  base: THREE.BufferGeometry
+  crown: THREE.BufferGeometry
+} {
+  const src = geo.index ? geo.toNonIndexed() : geo
+  const pos = src.attributes.position.array
+  const nrm = src.attributes.normal.array
+  const col = src.attributes.color.array
+  const fol = src.attributes.foliage.array
+  const base = { p: [] as number[], n: [] as number[], c: [] as number[], f: [] as number[] }
+  const crown = { p: [] as number[], n: [] as number[], c: [] as number[], f: [] as number[] }
+  const triCount = pos.length / 9 // 3 verts * 3 components
+  for (let t = 0; t < triCount; t++) {
+    // Per-part-uniform foliage: the whole triangle shares its first vertex's class.
+    const dst = fol[t * 3] === 1 ? crown : base
+    for (let k = 0; k < 3; k++) {
+      const vi = t * 3 + k
+      dst.p.push(pos[vi * 3], pos[vi * 3 + 1], pos[vi * 3 + 2])
+      dst.n.push(nrm[vi * 3], nrm[vi * 3 + 1], nrm[vi * 3 + 2])
+      dst.c.push(col[vi * 3], col[vi * 3 + 1], col[vi * 3 + 2])
+      dst.f.push(fol[vi])
+    }
+  }
+  if (geo.index) src.dispose()
+  const build = (d: typeof base): THREE.BufferGeometry => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(d.p), 3))
+    g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(d.n), 3))
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(d.c), 3))
+    g.setAttribute('foliage', new THREE.BufferAttribute(new Float32Array(d.f), 1))
+    return g
+  }
+  return { base: build(base), crown: build(crown) }
+}
+
 /** Umbrella-crowned savanna tree. Height ~2.2 units, origin at the ground. */
 export function buildAcacia(): THREE.BufferGeometry {
   const trunk = new THREE.CylinderGeometry(0.07, 0.16, 1.5, 6)

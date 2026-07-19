@@ -6196,6 +6196,30 @@ the remaining open points in their numeric order.
     identity), the ground sprout scale; live WebGPU check is the USER's (headless has
     no adapter). Docs: design.md §2.5/§19.13 note the matrix-borne collapse; CLAUDE
     §7.1 pt.12. PAUSE competing browser runs during the user's WebGPU verification.
+  IMPLEMENTED (19.07.2026, user said "weiter"): the crown/trunk split is built to
+  the design above. `splitFoliage` (flora.ts) partitions a merged geometry into
+  crown (foliage==1) and the rest by each triangle's first-vertex foliage. The
+  travel scene (TravelScene.tsx) now builds a second crown InstancedMesh per
+  CROWN_SPECIES (acacia/jungle/palm/baobab) whose per-instance matrix = plant ×
+  collapseLocal (Scale(shrink,1,shrink) then y-drop); GROUND_SPECIES (bush/papyrus)
+  fold the sprout scale into the plant matrix; the positionNode is gone (only the
+  colour keys on the seasonTint attribute now). The CPU collapse maths live in
+  seasonTint.ts as `drynessFromTint`/`crownCollapse`/`groundSprout`, pure-tested to
+  mirror seasonFoliagePosition exactly. The debug toggle now gates the CPU dryness
+  (flipping it forces a re-bake). PlaceScene is UNCHANGED: it is stationary and
+  reads the SEASON_TINT_U uniform (no per-instance re-upload), so its positionNode
+  collapse does not race — it keeps seasonFoliagePosition + SEASON_COLLAPSE_U.
+  VERIFIED (WebGL2, what headless can prove): pure tests green (splitFoliage
+  partition + count conservation, the three collapse-maths mirrors), build + lint
+  clean, full fast Vitest 1931. enrichments FLORA checks green (196 pass) — the
+  split does not break streaming/positions/phantom-collider; the 3 fails were the
+  documented load-sensitive wildlife/family-staging flakes (165 pop, 145a burning
+  grass, shore bathers), structurally unreachable from a flora-only change.
+  STILL OPEN: the USER's WebGPU visual check — do the crowns stand still while
+  driving AND is the bare-branch dry-season look intact? If yes, close 175 and
+  proceed to the closing + v0.2. If the crowns still jump, the matrix path is not
+  the fix and this needs rethinking (unlikely — the matrix is re-uploaded at the
+  same rebuilds today without position jitter).
 
 - [ ] 176. The dry-season drink catchment is silently capped at 0.45° (found by
   the point-173 analysis). CONFIRMED bug: `riverDistance`/`lakeDistance`

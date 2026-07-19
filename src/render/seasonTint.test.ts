@@ -3,7 +3,7 @@
 // recolour curves (seasonTintNode/seasonFoliagePosition) are TSL node graphs
 // exercised live in the running scene, not unit-testable without a renderer.
 import { describe, expect, it } from 'vitest'
-import { setSeasonCollapse, setSeasonTint, SEASON_COLLAPSE_U, SEASON_TINT_U } from './seasonTint'
+import { crownCollapse, drynessFromTint, groundSprout, setSeasonCollapse, setSeasonTint, SEASON_COLLAPSE_U, SEASON_TINT_U } from './seasonTint'
 
 describe('setSeasonTint (design.md §19.13)', () => {
   it('clamps an out-of-range greenness to 0 before mixing at full strength', () => {
@@ -33,5 +33,33 @@ describe('setSeasonCollapse — dry-season flora deformation gate (point 175)', 
     expect(SEASON_COLLAPSE_U.value).toBe(0)
     setSeasonCollapse(true)
     expect(SEASON_COLLAPSE_U.value).toBe(1)
+  })
+})
+
+// The travel scene bakes the deformation into its instance matrices on the CPU
+// (point 175); these mirror seasonFoliagePosition's maths and must stay in
+// lock-step with the shader branch above.
+describe('CPU collapse mirrors of seasonFoliagePosition (point 175)', () => {
+  it('drynessFromTint = clamp(1 - tint*2): 0.5 neutral -> 0, 0 -> 1, clamps both ends', () => {
+    expect(drynessFromTint(0.5)).toBe(0) // neutral mid-year, no collapse
+    expect(drynessFromTint(0)).toBe(1) // full straw, full collapse
+    expect(drynessFromTint(1)).toBe(0) // full green, clamped at 0
+    expect(drynessFromTint(0.25)).toBeCloseTo(0.5)
+  })
+
+  it('crownCollapse: shrink = 1 - dryness*0.6, drop = dryness*0.22, clamped', () => {
+    expect(crownCollapse(0).shrink).toBeCloseTo(1) // wet: identity crown
+    expect(crownCollapse(0).drop).toBeCloseTo(0)
+    expect(crownCollapse(1).shrink).toBeCloseTo(0.4) // dry: full collapse
+    expect(crownCollapse(1).drop).toBeCloseTo(0.22)
+    expect(crownCollapse(0.5).shrink).toBeCloseTo(0.7)
+    expect(crownCollapse(0.5).drop).toBeCloseTo(0.11)
+    expect(crownCollapse(2).drop).toBeCloseTo(0.22) // dryness clamps to 1
+  })
+
+  it('groundSprout: 1 - dryness*0.85, clamped', () => {
+    expect(groundSprout(0)).toBeCloseTo(1) // wet: full height
+    expect(groundSprout(1)).toBeCloseTo(0.15) // dry: withdrawn toward the soil
+    expect(groundSprout(-1)).toBeCloseTo(1) // clamped
   })
 })

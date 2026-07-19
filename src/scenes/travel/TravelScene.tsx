@@ -32,7 +32,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
-import { seasonFoliagePosition, seasonTintNode, setSeasonCollapse } from '../../render/seasonTint'
+import { crownCollapse, drynessFromTint, groundSprout, seasonTintNode } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
@@ -64,6 +64,7 @@ import {
   buildPapyrus,
   buildRock,
   buildTermiteMound,
+  splitFoliage,
 } from '../../render/flora'
 import { buildElephant } from '../../render/fauna'
 import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurches, buildCoastalRuins,
@@ -664,6 +665,13 @@ const MAX_INSTANCES: Record<Species, number> = {
   kopje: 300,
 }
 const CANDIDATES_PER_CHUNK = 22
+// The dry-season deformation is baked into the INSTANCE MATRICES (point 175), not
+// a per-instance vertex-shader attribute (which raced on WebGPU). CROWN species
+// split into a trunk mesh (plain matrix) + a crown mesh whose matrix carries the
+// bare-branch collapse; GROUND species (foliage class 2) fold the sprout scale
+// into their single plant matrix; the rest never deform.
+const CROWN_SPECIES: ReadonlySet<Species> = new Set<Species>(['acacia', 'jungle', 'palm', 'baobab'])
+const GROUND_SPECIES: ReadonlySet<Species> = new Set<Species>(['bush', 'papyrus'])
 
 /**
  * Species choice per terrain type; roll decides density. Region/period
@@ -798,8 +806,15 @@ function collidableFloraNear(px: number, pz: number, seed: number): Array<[numbe
 // node whose generated uniform name differs, so every remount produced
 // byte-new shader sources for the whole dressing set and re-linked them
 // synchronously after leavePlace().
-let vegetationMeshCache: Record<Species, THREE.InstancedMesh> | null = null
-function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
+// The base mesh per species (trunk/props for crown species, the whole plant
+// otherwise) plus a crown mesh for the CROWN_SPECIES whose instance matrix bears
+// the dry-season collapse (point 175).
+interface VegetationMeshes {
+  base: Record<Species, THREE.InstancedMesh>
+  crown: Partial<Record<Species, THREE.InstancedMesh>>
+}
+let vegetationMeshCache: VegetationMeshes | null = null
+function getVegetationMeshes(): VegetationMeshes {
   if (vegetationMeshCache) return vegetationMeshCache
   const geometries: Record<Species, THREE.BufferGeometry> = {
     acacia: buildAcacia(),
@@ -820,35 +835,40 @@ function getVegetationMeshes(): Record<Species, THREE.InstancedMesh> {
   const material = new THREE.MeshStandardNodeMaterial()
   material.roughness = 0.92
   material.vertexColors = true
-  // Season by the PLANT's own position (point 151): tint and collapse sample
-  // the greenness field through a per-instance seasonTint the CPU BAKES at each
-  // rebuild (point 175). The vegetation must NOT sample the field texture in its
-  // vertex stage: over a texture re-uploaded every frame that sample raced the
-  // draw on the WebGPU backend and jittered the crown collapse, so the crowns
-  // hopped (the rocks, foliage class 0, never collapse and stayed put — the tell).
-  // A baked float is stable on both backends. (An earlier player-position uniform
-  // made every crown slide while walking a wetness gradient — point 151; the
-  // per-instance value fixed that and this keeps it, now backend-safe too.)
+  // Season COLOUR by the PLANT's own position (point 151): a per-instance
+  // seasonTint the CPU bakes at each rebuild, recoloured per vertex here. The
+  // dry-season DEFORMATION is NOT a positionNode any more (point 175): reading
+  // that per-instance attribute in the vertex stage raced its rebuild re-upload
+  // on the WebGPU backend and jittered the crowns. The collapse now rides the
+  // crown mesh's INSTANCE MATRIX (the stable transform path); only the colour,
+  // whose per-instance re-upload race is imperceptible, still keys on the attribute.
   material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintAttrNode())
-  // Bare branches (point 144, second attempt): keyed on the baked per-part
-  // foliage attribute, never the jittered colour — see seasonFoliagePosition.
-  material.positionNode = seasonFoliagePosition(seasonFieldTintAttrNode())
-  const out = {} as Record<Species, THREE.InstancedMesh>
-  for (const sp of SPECIES) {
-    const mesh = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
+  const base = {} as Record<Species, THREE.InstancedMesh>
+  const crown: Partial<Record<Species, THREE.InstancedMesh>> = {}
+  const makeMesh = (geo: THREE.BufferGeometry, cap: number): THREE.InstancedMesh => {
+    const mesh = new THREE.InstancedMesh(geo, material, cap)
     // One baked field-tint value per instance, written where the matrices are.
-    mesh.geometry.setAttribute(
-      'seasonTint',
-      new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES[sp]), 1),
-    )
+    mesh.geometry.setAttribute('seasonTint', new THREE.InstancedBufferAttribute(new Float32Array(cap), 1))
     mesh.castShadow = true
     mesh.receiveShadow = true
     mesh.frustumCulled = false
     mesh.count = 0
-    out[sp] = mesh
+    return mesh
   }
-  vegetationMeshCache = out
-  return out
+  for (const sp of SPECIES) {
+    const cap = MAX_INSTANCES[sp]
+    if (CROWN_SPECIES.has(sp)) {
+      // Trunk stays put; the crown rides its own collapse matrix (point 175).
+      const parts = splitFoliage(geometries[sp])
+      geometries[sp].dispose()
+      base[sp] = makeMesh(parts.base, cap)
+      crown[sp] = makeMesh(parts.crown, cap)
+    } else {
+      base[sp] = makeMesh(geometries[sp], cap)
+    }
+  }
+  vegetationMeshCache = { base, crown }
+  return vegetationMeshCache
 }
 
 function Vegetation() {
@@ -860,6 +880,9 @@ function Vegetation() {
   // verify — the drawn COUNT is buffer-saturated and stable at a wide zoom, so
   // it cannot tell whether the flora followed the player.
   const rebuildCountRef = useRef(0)
+  // The dry-season deformation is baked into the matrices at each rebuild
+  // (point 175), so flipping the debug collapse toggle forces one re-bake.
+  const lastCollapseRef = useRef(true)
 
   useEffect(() => {
     lastBuild.current = null // force rebuild on new run
@@ -906,7 +929,7 @@ function Vegetation() {
       // (point 164): the driven-stability check diffs this across chunk crosses
       // — an in-view plant that disappears and reappears would be the jump.
       drawnTranslations: (species: Species) => {
-        const m = meshes[species]
+        const m = meshes.base[species]
         const arr = m.instanceMatrix.array as Float32Array
         const out: Array<[number, number]> = []
         for (let k = 0; k < m.count; k++) out.push([arr[k * 16 + 12], arr[k * 16 + 14]])
@@ -941,8 +964,6 @@ function Vegetation() {
         useUi.getState().seasonWetnessOverride,
         Math.min(1, Math.max(0, balance.season.weatherStrength)),
       )
-      // Debug gate (point 175): live-toggles the dry-season flora deformation.
-      setSeasonCollapse(useUi.getState().seasonCollapseEnabled)
       // The Nile flood (point 138): one CPU source for the ribbon rise and the
       // canoe float height. Blended like the tint, so a debug month jump makes
       // the river rise over a moment rather than snap.
@@ -963,11 +984,19 @@ function Vegetation() {
     if (hide !== hiddenRef.current) {
       hiddenRef.current = hide
       for (const sp of SPECIES) {
-        meshes[sp].visible = !hide
+        meshes.base[sp].visible = !hide
+        const cm = meshes.crown[sp]
+        if (cm) cm.visible = !hide
       }
     }
     if (hide) return
     const pos = useGame.getState().pos
+    // Flipping the collapse toggle (point 175) re-bakes the matrices next tick.
+    const collapseEnabled = useUi.getState().seasonCollapseEnabled
+    if (collapseEnabled !== lastCollapseRef.current) {
+      lastCollapseRef.current = collapseEnabled
+      lastBuild.current = null
+    }
     // Streaming with a rebuild hysteresis (points 164 + 171): the drawn edge is
     // a circle sized to the SEASON-FREE fog far (point 175: FLORA_FOG, not the
     // per-frame-lerped TRAVEL_FOG) — the dry-season max visible limit plus a
@@ -990,9 +1019,12 @@ function Vegetation() {
       baobab: 0, termite: 0, deadtree: 0, papyrus: 0, kopje: 0,
     }
     const mtx = new THREE.Matrix4()
+    const crownMtx = new THREE.Matrix4()
+    const crownLocal = new THREE.Matrix4()
     const quat = new THREE.Quaternion()
     const up = new THREE.Vector3(0, 1, 0)
     const scl = new THREE.Vector3()
+    const posV = new THREE.Vector3()
 
     // Nearest-chunk-first (point 171): when a species' instance buffer fills,
     // the plants dropped are the FARTHEST ones, so the drawn edge stays a fogged
@@ -1011,35 +1043,58 @@ function Vegetation() {
         if (!floraInSpawnCircle(x, z, pos.x, pos.z, spawnR)) continue
         const idx = counts[species]
         if (idx >= MAX_INSTANCES[species]) continue
+        // This plant's own dry-season state (points 151/175): its field tint
+        // drives both the baked colour (below) and — on the CPU here, never a
+        // vertex-shader attribute — the matrix-borne deformation, gated by the
+        // debug toggle. dryness 0 leaves the plant at its full shape.
+        const ll = worldToLatLon(x, z)
+        const tintV = seasonFieldTintAt(ll.lat, ll.lon)
+        const dryness = collapseEnabled ? drynessFromTint(tintV) : 0
         quat.setFromAxisAngle(up, r4 * Math.PI * 2)
         const sc = 0.75 + r4 * 0.55
-        scl.set(sc, sc * (0.85 + roll * 0.3), sc)
-        mtx.compose(new THREE.Vector3(x, height, z), quat, scl)
-        meshes[species].setMatrixAt(idx, mtx)
-        {
-          // Bake THIS instance's field tint at placement (point 175): the shader
-          // reads the baked value, never the per-frame texture, so the crown
-          // collapse cannot jitter on WebGPU. Refreshed on every rebuild.
-          const attr = meshes[species].geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute
-          const ll = worldToLatLon(x, z)
-          attr.setX(idx, seasonFieldTintAt(ll.lat, ll.lon))
+        const yf = 0.85 + roll * 0.3
+        // Ground flora (bush/papyrus, foliage class 2) sprouts from the soil: its
+        // whole matrix scale withdraws toward the base in the dry season.
+        const sprout = GROUND_SPECIES.has(species) ? groundSprout(dryness) : 1
+        scl.set(sc * sprout, sc * yf * sprout, sc * sprout)
+        posV.set(x, height, z)
+        mtx.compose(posV, quat, scl)
+        const baseMesh = meshes.base[species]
+        baseMesh.setMatrixAt(idx, mtx)
+        ;(baseMesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).setX(idx, tintV)
+        const crownMesh = meshes.crown[species]
+        if (crownMesh) {
+          // Bare branches (point 144) via the matrix (point 175): the crown
+          // shrinks x/z toward the trunk axis and drops in y — Scale(shrink,1,
+          // shrink) then a y-drop in the plant's local frame, i.e. plant × collapse.
+          const { shrink, drop } = crownCollapse(dryness)
+          crownLocal.makeScale(shrink, 1, shrink)
+          crownLocal.elements[13] = -drop
+          crownMtx.multiplyMatrices(mtx, crownLocal)
+          crownMesh.setMatrixAt(idx, crownMtx)
+          ;(crownMesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).setX(idx, tintV)
         }
         counts[species] = idx + 1
       }
     }
 
     for (const sp of SPECIES) {
-      const mesh = meshes[sp]
-      mesh.count = counts[sp]
-      mesh.instanceMatrix.needsUpdate = true
-      ;(mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).needsUpdate = true
+      for (const mesh of [meshes.base[sp], meshes.crown[sp]]) {
+        if (!mesh) continue
+        mesh.count = counts[sp]
+        mesh.instanceMatrix.needsUpdate = true
+        ;(mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).needsUpdate = true
+      }
     }
   })
 
   return (
     <>
       {SPECIES.map((sp) => (
-        <primitive key={sp} object={meshes[sp]} dispose={null} />
+        <primitive key={sp} object={meshes.base[sp]} dispose={null} />
+      ))}
+      {SPECIES.filter((sp) => meshes.crown[sp]).map((sp) => (
+        <primitive key={`${sp}-crown`} object={meshes.crown[sp]!} dispose={null} />
       ))}
     </>
   )
