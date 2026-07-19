@@ -865,6 +865,13 @@ export interface DefenseWeights {
    *  scales the KILL outcome of parentAttackOutcome. The lion ships 0 —
    *  nothing kills a lion. */
   killFlight: Record<string, number>
+  /** TEST-ONLY (point 177): when set, parentAttackOutcome returns this outcome
+   *  regardless of the roll. The roll is hashed on the attacker's phase/position
+   *  at resolution time, which drifts with the frame count (variable under load),
+   *  so the 146/145c verifications used to RETRY until the roll landed a kill/
+   *  drive-off; forcing the outcome makes that single attempt deterministic.
+   *  Never set in normal play. */
+  forceOutcome?: ParentAttackOutcome
 }
 
 /**
@@ -932,6 +939,7 @@ export function parentAttackOutcome(
   roll: number,
   weights: DefenseWeights,
 ): ParentAttackOutcome {
+  if (weights.forceOutcome) return weights.forceOutcome // test-only determinism (point 177)
   if (roll < killChance(prey, predator, weights)) return 'kill'
   if (roll < defendChance(prey, predator, weights)) return 'driveOff'
   return 'taken'

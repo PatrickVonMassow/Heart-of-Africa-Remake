@@ -1374,6 +1374,19 @@ describe('killChance / parentAttackOutcome (design.md §19.8, point 146 — reve
     expect(parentAttackOutcome('giraffe', 'lion', 0.75, shipped)).toBe('taken')
   })
 
+  it('forceOutcome (test-only) short-circuits the roll (point 177 determinism)', () => {
+    // The 146/145c verifications set this so a single attempt lands the outcome
+    // under test regardless of the resolution-position-hashed roll — replacing a
+    // retry-until-success loop. It never overrides in normal play (undefined).
+    for (const roll of [0, 0.5, 0.96, 1]) {
+      expect(parentAttackOutcome('antelope', 'hyena', roll, { ...shipped, forceOutcome: 'kill' })).toBe('kill')
+      expect(parentAttackOutcome('giraffe', 'lion', roll, { ...shipped, forceOutcome: 'driveOff' })).toBe('driveOff')
+    }
+    // Absent (shipped) it never forces: a roll of 1 is still 'taken'.
+    expect(shipped.forceOutcome).toBeUndefined()
+    expect(parentAttackOutcome('giraffe', 'cheetah', 1, shipped)).toBe('taken')
+  })
+
   it('killing is harder than driving off: killChance <= defendChance for EVERY pair (swept)', () => {
     for (const prey of PREYS) {
       for (const predator of PREDATORS) {

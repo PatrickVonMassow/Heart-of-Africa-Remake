@@ -3103,9 +3103,7 @@ check(
 // 0.7) already decides the three-way outcome as 'kill'. The hyena falls as
 // an ordinary carcass the scavengers may work (dead, NOT lionFed), and the
 // unwounded parent simply rejoins — no vigil, it fought.
-let revenge = null
-for (let attempt = 0; attempt < 3; attempt++) {
-  revenge = await page.evaluate(async () => {
+const revenge = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let liveChunk
@@ -3128,13 +3126,12 @@ for (let attempt = 0; attempt < 3; attempt++) {
   st.px = calf.x
   st.pz = calf.z
   st.timer = 0
-  // Force the KILL band over the whole roll range: the staging's fixed hash
-  // roll landed in the drive-off band (0.075..0.7) — raising killFlight
-  // pushes killChance to the 0.95 cap, so the same deterministic roll now
-  // reads 'kill'. Restored below.
-  const kf = window.__balance.parentDefense.killFlight
-  const prevKf = kf.hyena
-  kf.hyena = 100
+  // Force the kill deterministically (point 177): the resolution roll is hashed
+  // on the parent's drifting phase/position, so even raising killFlight to the
+  // 0.95 cap left a 5% band that needed a retry-until-kill loop. forceOutcome
+  // short-circuits the roll for the test; restored below.
+  const pd = window.__balance.parentDefense
+  pd.forceOutcome = 'kill'
   const out = { caught: false, calfAlive: false, parentAlive: false, huntEnded: false, carcass: false, notLionFed: false, scavenged: false }
   const t0 = Date.now()
   while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
@@ -3167,17 +3164,13 @@ for (let attempt = 0; attempt < 3; attempt++) {
       await sleep(300)
     }
   }
-  kf.hyena = prevKf
+  pd.forceOutcome = undefined
   herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
   if (corpse) herds.hyena = herds.hyena.filter((a) => a !== corpse)
   if (window.__wildlife.scavenger.current.target === corpse) window.__wildlife.scavenger.current.target = null
   if (st.victim === calf || st.victim === parent) { st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false }
   return out
 })
-  // The per-event roll is position-hashed; a staging landing in the 5%
-  // band above the 0.95 cap reads 'driveOff'/'taken' — retry a fresh pair.
-  if (revenge.carcass) break
-}
 check(
   'revenge: the zebra parent kills the hyena, both zebras live, the hunt ends (point 146)',
   revenge.caught && revenge.calfAlive && revenge.parentAlive && revenge.huntEnded && revenge.carcass && revenge.notLionFed,
@@ -3197,9 +3190,7 @@ check(
 // killFlight 0, predatorFlight high, so any roll below the 0.95 cap drives off).
 // The drama must RESOLVE (the point-118 lesson): cub freed, lioness alive, hunt
 // left. A staging roll in the 5% taken band retries a fresh pair.
-let cubDefence = null
-for (let attempt = 0; attempt < 3; attempt++) {
-  cubDefence = await page.evaluate(async () => {
+const cubDefence = await page.evaluate(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     const herds = window.__wildlife.herdsRef.current
     let liveChunk
@@ -3223,13 +3214,12 @@ for (let attempt = 0; attempt < 3; attempt++) {
     st.px = cub.x
     st.pz = cub.z
     st.timer = 0
-    // Force the DRIVE-OFF band over the whole roll range: no kill, defence at
-    // the cap. Restored below.
+    // Force the drive-off deterministically (point 177): the resolution roll
+    // drifts with the parent's phase/position, so pinning the defence band still
+    // left a 5% taken band that needed a retry-until-resolved loop. forceOutcome
+    // short-circuits the roll for the test; restored below.
     const pd = window.__balance.parentDefense
-    const prevKf = pd.killFlight.hyena
-    const prevFl = pd.predatorFlight.hyena
-    pd.killFlight.hyena = 0
-    pd.predatorFlight.hyena = 100
+    pd.forceOutcome = 'driveOff'
     const out = { isLionCub, resolved: false, cubAlive: false, lionessAlive: false, huntLeft: false, mode: '' }
     const t0 = Date.now()
     while (Date.now() - t0 < 30000) {
@@ -3243,20 +3233,9 @@ for (let attempt = 0; attempt < 3; attempt++) {
     out.huntLeft = st.mode === 'leave' || st.mode === 'idle'
     // A drive-off resolution: the mother routs the hyena, the cub lives.
     out.resolved = out.huntLeft && out.cubAlive && out.lionessAlive
-    pd.killFlight.hyena = prevKf
-    pd.predatorFlight.hyena = prevFl
+    pd.forceOutcome = undefined
     return out
   })
-  if (cubDefence.resolved) break
-  // A staging that fell in the 5% taken band: clean up the injected pair and
-  // the hunt state before a fresh attempt.
-  await page.evaluate(() => {
-    const herds = window.__wildlife.herdsRef.current
-    herds.lion = herds.lion.filter((a) => !a.__cubTest)
-    const st = window.__lionHunt.state
-    st.mode = 'idle'; st.timer = 60; st.victim = null; st.victimHunt = false
-  })
-}
 check(
   'the lioness routs the hyena and her cub lives — the drama resolves (point 145c)',
   cubDefence.isLionCub && cubDefence.resolved,
