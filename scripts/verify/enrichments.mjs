@@ -3590,7 +3590,12 @@ const crocDrama = async (mode, attempt = 0) =>
     // the croc for motion and teleports until it grips.
     let lastX = croc.x
     let lastZ = croc.z
-    let lastT = Date.now()
+    // point 177: gauge the lunge step against SIM time (clamped to 0.1/frame),
+    // not wall-clock. Under load a wall-dt threshold falsely flagged the burst
+    // (a slow frame widened dtw while the croc still advanced only lungeSpeed·
+    // 0.1); a real teleport (a chunk relocation) jumps far more than any
+    // lungeSpeed·dt, so a sim-time bound separates the two on both cadences.
+    let lastSimT = window.__wildlife.simTime()
     await window.__pollSim(30, () => {
       // Retune the phase every poll: the standing window is 30% of the cycle,
       // so a fine sweep lands inside it within a couple of seconds. Refresh
@@ -3599,10 +3604,13 @@ const crocDrama = async (mode, attempt = 0) =>
       if (!calf.drink) calf.drink = { tx: bankX, tz: bankZ }
       if (calf.caught === undefined && Math.hypot(calf.x - bankX, calf.z - bankZ) > 3) { calf.x = bankX; calf.z = bankZ }
       const step = Math.hypot(croc.x - lastX, croc.z - lastZ)
-      const dtw = (Date.now() - lastT) / 1000
-      if (step > Math.max(2, 20 * dtw)) out.noTeleport = false
+      const nowSim = window.__wildlife.simTime()
+      const dts = Math.max(nowSim - lastSimT, 1 / 60)
+      // 20 > lungeSpeed (12): the burst always fits under 2 + 20·dts, a
+      // relocation never does — dt-robust because dts is the clamped sim step.
+      if (step > 2 + 20 * dts) out.noTeleport = false
       if (step > 0.05) out.lunged = true
-      lastX = croc.x; lastZ = croc.z; lastT = Date.now()
+      lastX = croc.x; lastZ = croc.z; lastSimT = nowSim
       if (calf.caught !== undefined && calf.caughtBy === 'crocodile') {
         out.gripped = true
         // Now the parent enters the drama: linked and pushed only here, so
