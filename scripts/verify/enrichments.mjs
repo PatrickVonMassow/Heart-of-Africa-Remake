@@ -767,28 +767,37 @@ await page.evaluate(() => {
 })
 
 // --- Elephant trampling (§7.1.12) --------------------------------------------
-// Jump to open savanna so herds exist, then ring a victim with elephants.
-// Poll for a prey herd instead of a fixed sleep: under full-regression load
-// the streaming takes far longer than usual to fill the plains.
+// Jump to open savanna, then ring a victim with elephants. Deterministic staging
+// (point 177): the natural streaming spawn is NOT guaranteed to fill the plains
+// under full-regression load, so the check no longer HOPES a prey herd appears —
+// it injects a victim below if none did. Only wait for the herd store to build.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page
-  .waitForFunction(
-    () => {
-      const h = window.__wildlife?.herdsRef?.current
-      return !!h && ['zebra', 'antelope', 'giraffe'].some((sp) => (h[sp] ?? []).some((a) => !a.dead))
-    },
-    null,
-    { timeout: 25000 },
-  )
+  .waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 25000 })
   .catch(() => {})
 await page.waitForTimeout(600)
 const trample = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w?.herdsRef?.current
   if (!herds) return { ok: false, why: 'no herds built' }
-  const victimSpecies = ['zebra', 'antelope', 'giraffe'].find((sp) => herds[sp].length > 0)
-  if (!victimSpecies) return { ok: false, why: 'no prey herd nearby' }
-  const victim = herds[victimSpecies][0]
+  let victimSpecies = ['zebra', 'antelope', 'giraffe'].find((sp) => herds[sp].length > 0)
+  let victim
+  if (victimSpecies) {
+    victim = herds[victimSpecies][0]
+  } else {
+    // Inject a plain zebra at the player's spot (point 177) rather than hoping
+    // the streaming spawned one. The ring below — its [0,0] elephant sits ON the
+    // victim — tramples it at once, exactly as it would a natural prey animal.
+    const terr = await import('/src/world/terrain.ts')
+    const geo = await import('/src/world/geo.ts')
+    const seed = window.__game.getState().seed
+    const pos = window.__game.getState().pos
+    const ll = geo.worldToLatLon(pos.x, pos.z)
+    const y = terr.sampleTerrain(ll.lat, ll.lon, seed).height
+    victim = { x: pos.x, z: pos.z, y, rot: 0, scale: 1, phase: 0 }
+    herds.zebra.push(victim)
+    victimSpecies = 'zebra'
+  }
   // Ring of elephants around the victim: the wander offsets (±4.5) keep at
   // least one of them within trampling range at any time.
   for (const [dx, dz] of [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3], [4.5, 4.5], [-4.5, -4.5]]) {
