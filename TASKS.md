@@ -6233,8 +6233,17 @@ the remaining open points in their numeric order.
   the fix and this needs rethinking (unlikely — the matrix is re-uploaded at the
   same rebuilds today without position jitter).
 
-- [ ] 176. The dry-season drink catchment is silently capped at 0.45° (found by
-  the point-173 analysis). CONFIRMED bug: `riverDistance`/`lakeDistance`
+- [x] 176. The dry-season drink catchment is silently capped at 0.45° (found by
+  the point-173 analysis). DONE 20.07.2026: a `range` param threaded through
+  geoIndex riverDistance/lakeDistance -> hydro riverDistanceExact/
+  lakeShoreDistanceExact -> bucketDistance (default 1 = the 3x3 / 0.45deg reach,
+  every existing caller unchanged); the drink-catchment query alone uses range 2
+  (5x5, ~0.9deg, clamp 0.9) with a catchment-sized maxDist, and only when the
+  catchment exceeds 0.45 (the wet season keeps range 1) — no global perf change.
+  Pure test (hydro.test.ts): the 5x5 search is a superset of the 3x3 and resolves
+  water in the 0.45-0.85deg band where the 3x3 saturates. Build + lint + 1933
+  vitest + enrichments 200/0 (the point-135 dry-season drink checks pass live with
+  the fix). Commit 7bb44ca. CONFIRMED bug: `riverDistance`/`lakeDistance`
   (`src/world/geoIndex.ts:29,34`) clamp their `maxDist` via `Math.min(maxDist,
   0.45)`, and `hydro.ts` caps at `MAX_QUERY = 0.45` too — so every caller asking
   for a wider radius silently gets 0.45. The drink-to-the-bank behaviour
