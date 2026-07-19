@@ -5157,9 +5157,16 @@ await page
 await page.waitForTimeout(600)
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
-await page.waitForTimeout(2500)
-const vicinity = await page.evaluate(() => {
-  const pos = window.__game.getState().pos
+// point 177: wait on the SIM clock for the per-frame vicinity top-up to
+// establish the guarantee, not a fixed wall wait. The old waitForTimeout(2500)
+// flaked: the seeder maintains the minimum within countRadius of the settlement
+// ANCHOR, but this check counts within radius of the LEAVE point (offset from
+// the anchor), so over a variable amount of drift some seeded grazers wander to
+// the anchor's far side and leave the leave-point radius — idle (more sim time
+// inside a fixed 2500ms) drifted more and dropped the count to 3. Poll until the
+// top-up has populated the player's vicinity to the minimum (the state the
+// player sees on leaving); a real seeder failure exhausts the budget and fails.
+const vicinity = await page.evaluate(async () => {
   const region = window.__game.getState().region
   const pool = {
     east: ['wildebeest', 'zebra', 'antelope', 'warthog'],
@@ -5168,16 +5175,21 @@ const vicinity = await page.evaluate(() => {
     west: ['antelope', 'warthog', 'zebra'],
     north: ['antelope', 'warthog'],
   }[region] ?? []
-  const herds = window.__wildlife.herdsRef.current ?? {}
   const radius = window.__balance.panoramaWildlife.vicinityRadius
   const min = window.__balance.panoramaWildlife.vicinityMinAnimals
-  let count = 0
-  for (const sp of pool) for (const a of herds[sp] ?? []) if (!a.dead && Math.hypot(a.x - pos.x, a.z - pos.z) <= radius) count++
-  return { region, count, radius, min }
+  const countNow = () => {
+    const pos = window.__game.getState().pos
+    const herds = window.__wildlife.herdsRef.current ?? {}
+    let c = 0
+    for (const sp of pool) for (const a of herds[sp] ?? []) if (!a.dead && Math.hypot(a.x - pos.x, a.z - pos.z) <= radius) c++
+    return c
+  }
+  const ok = await window.__pollSim(6, () => countNow() >= min)
+  return { region, count: countNow(), radius, min, ok }
 })
 check(
   'a settlement vicinity holds region-typical animals after leaving (point 102)',
-  vicinity.count >= vicinity.min,
+  vicinity.ok,
   JSON.stringify(vicinity),
 )
 
