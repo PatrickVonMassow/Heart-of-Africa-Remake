@@ -6286,6 +6286,70 @@ the remaining open points in their numeric order.
   SMALL tier stays the reliable everyday gate (it excludes enrichments by design).
   (Found 18.07.2026 in the point-173 closing run; queued at the batch end.)
 
+- [ ] 178. Vultures POP IN already-landed on the carcass instead of flying in.
+  User report (19.07.2026, playing on WebGPU): "Eben sind die Geier plötzlich
+  erschienen — bereits an der Beute gelandet. Ich konnte sie nicht einfliegen
+  sehen." The rule (design.md §19.6, acceptance CLAUDE §7.1 pt.12): a non-lion
+  (trampled) carcass DRAWS a vulture that spawns BEYOND the zoom-aware view ring
+  and flies in (no popping in); the kill-circling flock the same. So the vulture
+  appearing already on the carcass is a bug — the same "pops into the frame"
+  CLASS as points 165/171/172 (the ground animals / flora).
+  DIAGNOSE FIRST (the 165/172 lesson — judge BY THE PICTURE, not a radius): a
+  one-way probe with the SUITE launch args, at an ACHIEVABLE zoom (0.25-0.5),
+  stages a trampled carcass (the dev hooks force a non-lion carcass; see the
+  scavenge/vulture checks in scripts/verify/enrichments.mjs), and PROJECTS the
+  vulture's position the frame it first joins/first becomes visible to the screen
+  via `__camera.onScreen`/`ndc` — does it read on-screen at spawn? Likely root
+  (the exact 164/171/172 trap): the vulture spawn ring is sized to an ASSUMED
+  view (e.g. a `viewR`/fog-far/100×zoom radius), not the real camera FRUSTUM, so
+  at the player's zoom it spawns inside the frame. Fix: spawn the vulture (and the
+  kill-flock birds) off the ACTUAL frustum via the shared `isOnScreen`/frame
+  projection the travel scene installs (as point 165's seeders now do), then fly
+  in. Find the vulture spawn in src/scenes/travel/Wildlife.tsx (the scavenger /
+  vulture / kill-flock spawn geometry — grep vulture/scavenger/killFlock/flight).
+  Also possible (secondary): a WebGPU-only first-frame reveal like point 175 — if
+  the projection shows it correctly off-screen headless, hand a manual WebGPU
+  check to the user (webgpu-untestable-headless).
+  TEST-GAP TO CLOSE (point 172): the existing vulture-fly-in checks
+  (vulFlight/killFlock in enrichments.mjs) apparently pass while the player sees a
+  pop — audit them; the fly-in assertion must PROJECT the bird to the screen at
+  the join frame and assert OFF-screen (like the point-165 per-frame join scan),
+  not test a computed radius. Verifiable: at zoom 0.25-0.5 the vulture is
+  off-screen the frame it spawns (projected), then flies in; pure geometry test of
+  the spawn-beyond-frustum rule. Docs: design.md §19.6, CLAUDE §7.1 pt.12.
+  (Reported while play-testing 19.07.2026; queued at the batch end.)
+
+- [ ] 179. A lion runs THROUGH a calf and its shielding parent without catching
+  or eating either. User report (19.07.2026, playing on WebGPU): "Eben ist ein
+  Löwe auf ein Junges zugerannt, ein erwachsenes Tier ist dazwischen gelaufen —
+  vermutlich der Elter, der sein Junges beschützt. Der Löwe ist dann aber einfach
+  sowohl durch den Elter als auch durch das Junge hindurchgelaufen — niemand wurde
+  gefressen." So the shield DID fire (the parent interposed, good — §19.8), but the
+  hunt's CATCH/resolution never triggered: the lion should catch the calf, OR take
+  the shielding parent in its place (parentAttackOutcome), OR be driven off — never
+  pass through with no resolution.
+  LIKELY ROOT (diagnose first): TUNNELLING. The catch and the parent-take are
+  per-frame distance checks (lion within a catch radius of the victim / within
+  PARENT_TAKE_DIST of the parent). A fast lion under a LARGE dt step (dt is clamped
+  to 0.1, and headless/WebGPU load pushes toward that clamp) moves far enough in one
+  frame to be OUTSIDE the catch zone both before AND after the step, so it never
+  registers — the exact class as the point-4 bird's-eye collision ("a fast step is
+  caught at the near edge with no tunnelling"). Find the catch + take resolution in
+  src/scenes/travel/Wildlife.tsx (grep caught/PARENT_TAKE_DIST/catchDist in the
+  LionHunt loop, ~line 3188+) and make it SWEPT: test whether the lion's movement
+  SEGMENT this frame crossed the catch/take radius, not just its endpoint (mirror
+  the swept obstacle resolve already pure-tested in src/systems/movement.test.ts).
+  DIAGNOSE with a probe at a large forced dt (or the natural headless dt): stage a
+  LionHunt on a calf with a parent parked to shield, and assert the drama RESOLVES
+  (calf caught, or parent taken, or driven off) rather than the lion passing
+  through — reproduce the pass-through first, then fix. Secondary hypotheses if the
+  sweep is already there: the shield holds the parent just outside PARENT_TAKE_DIST
+  (a standoff-vs-take gap), or the hunt aborts mid-pass (mode→leave) before
+  resolving. Verifiable: pure test of the swept catch/take (a one-frame overshoot
+  still catches); live, a staged fast chase resolves and never passes through.
+  Docs: design.md §19.8, CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026;
+  queued at the batch end.)
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
