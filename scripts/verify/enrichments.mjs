@@ -1873,9 +1873,17 @@ const guardFlee = await page.evaluate(async () => {
   s.mode = 'feed'; s.victim = decoy; s.timer = 60
   s.lx = calf.x + 2; s.lz = calf.z + 1; s.px = s.lx; s.pz = s.lz // lion feeding ~2 from the calf
   const dStart = Math.hypot(parent.x - s.lx, parent.z - s.lz)
+  // Sample the parent's step every 0.15 SIM-seconds over 3 sim-seconds (point
+  // 177): sampling on wall-time under load shrinks the per-sample movement below
+  // the 0.02 threshold, undercounting samples and starving the flee distance;
+  // a sim-time cadence keeps each sample's displacement load-independent.
   let last = null, lastStep = null, flips = 0, samples = 0
-  for (let i = 0; i < 20; i++) {
-    await sleep(150)
+  let nextSample = window.__simTime()
+  const s0 = window.__simTime(), t0 = Date.now()
+  while (window.__simTime() - s0 < 3 && Date.now() - t0 < 15000) {
+    await sleep(50)
+    if (window.__simTime() < nextSample) continue
+    nextSample = window.__simTime() + 0.15
     if (last) {
       const dx = parent.x - last.x, dz = parent.z - last.z
       if (Math.hypot(dx, dz) > 0.02) { if (lastStep && dx * lastStep.dx + dz * lastStep.dz < 0) flips++; lastStep = { dx, dz }; samples++ }
@@ -2316,7 +2324,6 @@ check('after the struggle window the calf is killed (stain + carcass)',
 // the calf is freed and escapes.
 await pinFamily(-2.6, 35.1)
 const sacrifice = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let parent = null, calf = null
   for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
@@ -2333,9 +2340,9 @@ const sacrifice = await page.evaluate(async () => {
   calf.caught = 5
   calf.x = parent.x + 5; calf.z = parent.z // pinned 5 units off; the parent must run to it
   const d0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
-  await sleep(400)
+  await window.__sleepSim(0.4) // sim-time (point 177) so the charge start is load-independent
   const dCharged = Math.hypot(parent.x - calf.x, parent.z - calf.z)
-  await sleep(1800) // let the charge reach the predator
+  await window.__sleepSim(1.8) // let the charge reach the predator (sim-time)
   pd.preyWeapon = prevWeapons
   return {
     found: true, d0: +d0.toFixed(2), dCharged: +dCharged.toFixed(2),
