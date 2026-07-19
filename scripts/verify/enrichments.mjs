@@ -2359,7 +2359,6 @@ check('the parent sacrifices itself and the calf gets up and escapes',
 // (3) A parent that only got close by the time the window ends is eaten too.
 await pinFamily(-3.0, 34.5)
 const bothDie = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let parent = null, calf = null
   for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
@@ -2369,7 +2368,7 @@ const bothDie = await page.evaluate(async () => {
   if (!parent) return { found: false }
   calf.x = parent.x + 2.8; calf.z = parent.z // close, but the window shuts before the parent reaches
   calf.caught = 0.03
-  await sleep(500)
+  await window.__sleepSim(0.5) // sim-time (point 177)
   return { found: true, calfDead: !!calf.dead, parentDead: !!parent.dead, bothLionFed: !!calf.lionFed && !!parent.lionFed }
 })
 check('a parent that arrives too late is eaten alongside the calf (both die)',
@@ -2378,7 +2377,6 @@ check('a parent that arrives too late is eaten alongside the calf (both die)',
 // (4) A calf caught with no parent in reach dies alone; the parent survives.
 await pinFamily(-2.0, 35.4)
 const onlyCalf = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let parent = null, calf = null
   for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
@@ -2388,7 +2386,7 @@ const onlyCalf = await page.evaluate(async () => {
   if (!parent) return { found: false }
   calf.x = parent.x + 20; calf.z = parent.z // parent far off — cannot reach in time
   calf.caught = 0.03
-  await sleep(500)
+  await window.__sleepSim(0.5) // sim-time (point 177)
   return { found: true, calfDead: !!calf.dead, parentDead: !!parent.dead }
 })
 check('a calf caught with no parent near dies alone (parent survives)',
@@ -2403,7 +2401,6 @@ check('a calf caught with no parent near dies alone (parent survives)',
 // station before the catch — the struggle window still saves the calf.
 await pinFamily(-2.8, 35.3)
 const e2e = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   // Pick the family nearest the player: the herd arrays accumulate far-off
   // animals across the earlier scenarios, and a chase farther than 90 units
@@ -2435,12 +2432,10 @@ const e2e = await page.evaluate(async () => {
   s.lionHeading = Math.atan2(calf.x - s.lx, calf.z - s.lz)
   s.mode = 'chase'
   let caughtSeen = false
-  const t0 = Date.now()
-  while (Date.now() - t0 < 12000) {
+  await window.__pollSim(12, () => {
     if (calf.caught !== undefined) caughtSeen = true
-    if (parent.dead || calf.dead) break
-    await sleep(50)
-  }
+    return parent.dead || calf.dead
+  }, 40000)
   s.mode = 'idle'; s.timer = 60; s.victim = null; s.victimHunt = false
   pd.preyWeapon = prevWeapons
   const calfEscaped = !calf.dead && calf.caught === undefined && calf.parent === undefined
@@ -2465,7 +2460,6 @@ check('a real hunt catches a calf, the parent sacrifices itself and the calf esc
 // blocking parent in the calf's place, before any catch.
 await pinFamily(-2.4, 34.6)
 const choreo = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const p = window.__game.getState().pos
   let parent = null, calf = null
@@ -2484,7 +2478,7 @@ const choreo = await page.evaluate(async () => {
   // choreography itself (flee, charge, sacrifice) is live behaviour from here on.
   calf.x = p.x + 14; calf.z = p.z
   parent.x = p.x + 15.8; parent.z = p.z
-  await sleep(300) // settle: the calf nurses beside its parent
+  await window.__sleepSim(0.3) // settle: the calf nurses beside its parent (sim-time, point 177)
   const s = window.__lionHunt.state
   s.predator = 'lion'
   s.victim = calf; s.victimHunt = true
@@ -2499,19 +2493,19 @@ const choreo = await page.evaluate(async () => {
   let samples = 0
   let tParentDead = 0
   const t0 = Date.now()
-  while (Date.now() - t0 < 45000) {
+  await window.__pollSim(45, () => {
     calfMoved = Math.max(calfMoved, Math.hypot(calf.x - calf0.x, calf.z - calf0.z))
     if (calf.caught !== undefined) caughtSeen = true
-    if (parent.dead) { tParentDead = Date.now(); break }
-    if (calf.dead || s.mode === 'idle') break
+    if (parent.dead) { tParentDead = Date.now(); return true }
+    if (calf.dead || s.mode === 'idle') return true
     // The shield holds its line: the parent sits closer to the hunter than the
     // calf does, and stays near the calf.
     samples++
     const dLP = Math.hypot(s.lx - parent.x, s.lz - parent.z)
     const dLC = Math.hypot(s.lx - calf.x, s.lz - calf.z)
     if (dLP < dLC && Math.hypot(parent.x - calf.x, parent.z - calf.z) < 5) betweenSamples++
-    await sleep(50)
-  }
+    return false
+  }, 140000)
   const out = {
     found: true,
     calfMoved: +calfMoved.toFixed(2),
