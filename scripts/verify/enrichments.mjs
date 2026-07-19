@@ -1157,6 +1157,26 @@ check('an animal survives a chunk-boundary crossing while in view', stream.ok &&
 check('an animal despawns once well outside the view', stream.ok && stream.goneWhenFar, JSON.stringify(stream))
 check('zoom-out keeps animals the default view would despawn', stream.ok && stream.goneAtZoom1 && stream.keptAtZoom3, JSON.stringify(stream))
 
+// Deterministic drama polling (point 177): budget in SIM-seconds (from
+// __wildlife.simTime, accumulated from the clamped dt) instead of wall-clock, so a
+// headless-load fps drop cannot time a drama out early. A generous wall cap still
+// fails a genuinely stuck sim (0 fps) rather than hanging. Installed here, before
+// the first check that uses it (165); every later page.evaluate sees it on window.
+await page.evaluate(() => {
+  window.__simTime = () => window.__wildlife?.simTime?.() ?? 0
+  window.__pollSim = async (simBudget, doneFn, wallCapMs) => {
+    const s0 = window.__simTime()
+    const t0 = Date.now()
+    const cap = wallCapMs ?? simBudget * 3000 + 20000
+    while (window.__simTime() - s0 < simBudget && Date.now() - t0 < cap) {
+      if (doneFn()) return true
+      await new Promise((r) => setTimeout(r, 80))
+    }
+    return doneFn()
+  }
+  window.__sleepSim = (simSecs, wallCapMs) => window.__pollSim(simSecs, () => false, wallCapMs)
+})
+
 // Point 165: no ground animal appears INSIDE the rendered frame. The guarantee
 // seeders (settlement vicinity, dry-shore drinkers) used to place standing
 // animals at the frame edge, where they popped into view. Drive through a
@@ -1230,26 +1250,6 @@ const moreCalves = await page.evaluate(async () => {
 })
 check('a higher calfFraction raises more juveniles (point 169)',
   moreCalves.many > moreCalves.few && moreCalves.few >= 1, JSON.stringify(moreCalves))
-
-// Deterministic drama polling (point 177): budget in SIM-seconds (from
-// __wildlife.simTime, accumulated from the clamped dt) instead of wall-clock, so a
-// headless-load fps drop cannot time a drama out early. A generous wall cap still
-// fails a genuinely stuck sim (0 fps) rather than hanging. Installed once here,
-// before the first drama poll; every subsequent page.evaluate sees it on window.
-await page.evaluate(() => {
-  window.__simTime = () => window.__wildlife?.simTime?.() ?? 0
-  window.__pollSim = async (simBudget, doneFn, wallCapMs) => {
-    const s0 = window.__simTime()
-    const t0 = Date.now()
-    const cap = wallCapMs ?? simBudget * 3000 + 20000
-    while (window.__simTime() - s0 < simBudget && Date.now() - t0 < cap) {
-      if (doneFn()) return true
-      await new Promise((r) => setTimeout(r, 80))
-    }
-    return doneFn()
-  }
-  window.__sleepSim = (simSecs, wallCapMs) => window.__pollSim(simSecs, () => false, wallCapMs)
-})
 
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
@@ -2007,20 +2007,19 @@ for (const spot of shoreSpots) {
   if (!inTravel) continue
   await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
-  const gotDrinkers = await page
-    .waitForFunction(
-      () => {
-        const h = window.__wildlife?.herdsRef?.current
-        if (!h) return false
-        let d = 0
-        for (const sp of Object.keys(h)) d += h[sp].filter((a) => a.drink && !a.dead).length
-        return d >= 1 // any drinker lets this shore contribute to the aggregate
-      },
-      null,
-      { timeout: 8000 },
-    )
-    .then(() => true)
-    .catch(() => false)
+  // Budget the drinker-staging wait in SIM-time (point 177): a wall-clock 8s let
+  // too few spots stage drinkers under load, thinning the aggregate below a
+  // reliable bather sample (the bathe flag itself is a deterministic per-chunk
+  // hash, not a runtime roll — so a full drinker sample is all that is needed).
+  const gotDrinkers = await page.evaluate(() =>
+    window.__pollSim(8, () => {
+      const h = window.__wildlife?.herdsRef?.current
+      if (!h) return false
+      let d = 0
+      for (const sp of Object.keys(h)) d += h[sp].filter((a) => a.drink && !a.dead).length
+      return d >= 1 // any drinker lets this shore contribute to the aggregate
+    }, 25000),
+  )
   if (gotDrinkers) {
     const here = await page.evaluate(() => {
       const h = window.__wildlife?.herdsRef?.current
@@ -3393,16 +3392,19 @@ await page.evaluate(() => {
   window.__wildlife.restock()
 })
 await page.waitForTimeout(2500)
-await page
-  .waitForFunction(() => {
+// Give the ring's elephant herd sim-time to stream to >=3 (point 177): a
+// wall-clock wait let the frame-based streaming fall short under load, so the
+// staged:false path fired and the check failed on staging alone.
+await page.evaluate(() =>
+  window.__pollSim(30, () => {
     const byHerd = new Map()
     for (const e of window.__wildlife.herdsRef.current?.elephant ?? []) {
       if (e.dead || e.herd === undefined) continue
       byHerd.set(e.herd, (byHerd.get(e.herd) ?? 0) + 1)
     }
     return Math.max(0, ...byHerd.values()) >= 3
-  }, null, { timeout: 45000 })
-  .catch(() => {})
+  }, 90000),
+)
 const mournStage = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
@@ -3453,7 +3455,6 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(1200)
 const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await page.evaluate(async ([glat, glon]) => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const gx = glon * 10
   const gz = -glat * 10
@@ -3475,13 +3476,11 @@ const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await p
   // Close on the bones. The window covers the arc walk-in at ELEPHANT_SPEED
   // with the turn-cap detour (the vigil deadline grants twice the straight
   // line); on success the loop exits early.
-  const t0 = Date.now()
   let dMin = d0
-  while (Date.now() - t0 < 70000) {
+  await window.__pollSim(70, () => {
     dMin = Math.min(dMin, centre())
-    if (dMin < 9) break
-    await sleep(300)
-  }
+    return dMin < 9
+  }, 210000)
   out.closed = +dMin.toFixed(1)
   if (dMin >= 9) {
     // Self-explaining failure: the herd's vigil state and each member's spot.
@@ -3492,20 +3491,19 @@ const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await p
   }
   // Let the arrival settle (the ring formation and separation still jostle
   // for a few seconds), THEN measure the hold.
-  await sleep(6000)
+  await window.__sleepSim(6)
   const h0 = centre()
-  await sleep(5000)
+  await window.__sleepSim(5)
   const h1 = centre()
   out.held = +Math.abs(h1 - h0).toFixed(1)
   // Release: the herd is not pinned — after the window it ROAMS again.
   // Elephant roam is slow, so the witness is renewed movement (centre
   // drift), not a fixed exit distance.
-  const t1 = Date.now()
   const r0 = centre()
-  while (Date.now() - t1 < 75000) {
-    if (Math.abs(centre() - r0) > 4) { out.released = true; break }
-    await sleep(600)
-  }
+  await window.__pollSim(75, () => {
+    if (Math.abs(centre() - r0) > 4) { out.released = true; return true }
+    return false
+  }, 225000)
   return out
 }, [-4.9, 36.6])
 check(
