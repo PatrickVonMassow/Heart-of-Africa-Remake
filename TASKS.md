@@ -6070,20 +6070,23 @@ the remaining open points in their numeric order.
       deterministic stabilisation is filed as point 177.
 
 - [ ] 174. Tag the demo build v0.2 and publish /v0.2/.
-  GATE (user, 19.07.2026): do NOT tag v0.2 until (a) point 175 (the jumping
-  trees) is FIXED and the user has CONFIRMED it on WebGPU, AND (b) a full closing
-  run has passed clean AFTER that fix. So the order is: 175 fix -> user verifies
-  -> closing cycle (Vitest + LARGE regression, dead-code/.md audit, lint/CVE
-  clean) -> THEN tag v0.2 at that verified HEAD. v0.2 must ship neither the tree
-  bug nor any regression the closing catches.
-  (User order 18.07.2026, immediately after 173; then 163/166/170.) Once the
-  above gate is met, tag `v0.2` at that HEAD and serve it at
+  GATE (user, 19.07.2026): tag v0.2 only after ALL of these are green — 175 (the
+  jumping trees, user-confirmed on WebGPU), 177 (deterministic suite), 176 (drought
+  drink-reach cap), the play-test bugs 178/179/180/181/183, 184 (the pre-tag
+  hardening pass), AND a final closing run (Vitest + LARGE regression, dead-code/.md
+  audit, lint/CVE clean) at that verified HEAD. v0.2 must ship none of those bugs
+  nor any regression the closing catches.
+  FINAL TAG HELD FOR THE USER (default, user away 19.07.2026): the tag + /v0.2/
+  publish is the one irreversible, outward-facing step — do ALL the work up to it,
+  then report "ready to tag" and WAIT for the user's go, unless the user has
+  explicitly authorized auto-tagging. When authorized / on the user's return: tag
+  `v0.2` at that HEAD and serve it at
   https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/ — mirror how
-  /v0.1/ and /poc/ are wired (the `.github/workflows` Pages build + the tag /
-  deploy trigger; a tag push may not trigger the deploy, so use the same mechanism
-  v0.1 used). Then FREEZE it: never re-point or change v0.2 unless the user
-  elaborately asks (tags-only-on-request memory). The v0.2 content is exactly what
-  173 produced — do NOT fold in 163/166/170 (they come after the tag).
+  /v0.1/ and /poc/ are wired (the `.github/workflows` Pages build + the tag/deploy
+  trigger; a tag push may not trigger the deploy, so use the same mechanism v0.1
+  used). Then FREEZE it: never re-point or change v0.2 unless the user elaborately
+  asks (tags-only-on-request memory). The v0.2 content is the 175/177/176/178-183/
+  184-closed, closing-verified HEAD; 182 and 163/166/170 come AFTER the tag.
 
 - [x] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
   REOPENED 18.07.2026: the shipped fix (5421e46, baked per-instance seasonTint +
