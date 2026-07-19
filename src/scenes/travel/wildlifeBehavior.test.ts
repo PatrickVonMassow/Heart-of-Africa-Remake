@@ -528,6 +528,26 @@ describe('flightStep (design.md §19 — vultures fly in and off, never pop)', (
     expect(Math.hypot(s.x, s.z)).toBeCloseTo(100 + FLIGHT_SPAWN_OUT, 6)
   })
 
+  it('pushes the spawn OFF the rendered frame when a frustum predicate is given (point 178)', () => {
+    // The assumed ring underestimates the tilted bird's-eye frustum's ground
+    // reach; with an on-screen predicate the spawn is pushed out in ring steps
+    // until it clears the frame, so the bird flies in instead of popping in.
+    // Here the frame reaches 200 units while the ring is only 100 (viewR).
+    const s = mk()
+    const isOff = (x: number, z: number) => Math.hypot(x, z) > 200
+    flightStep(s, true, 30, 0, 0, 0, 100, 16, 1 / 60, 0.6, isOff)
+    expect(s.mode).toBe('in')
+    expect(isOff(s.x, s.z)).toBe(true) // spawned beyond the frame
+  })
+
+  it('keeps the ring spawn when the predicate already reports off-screen (no camera)', () => {
+    // isOnScreen defaults to "everything off-screen" with no travel camera, so
+    // the ring point is already clear and the spawn is not pushed further.
+    const s = mk()
+    flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60, 0.6, () => true)
+    expect(s.x).toBeCloseTo(100 + FLIGHT_SPAWN_OUT, 6)
+  })
+
   it('flies in, arrives (active), and stays while wanted', () => {
     const s = mk()
     flightStep(s, true, 10, 0, 0, 0, 100, 16, 1 / 60)

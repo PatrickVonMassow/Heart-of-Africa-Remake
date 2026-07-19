@@ -2553,6 +2553,8 @@ function Herds() {
         viewR,
         VULTURE_SCAVENGE_SPEED,
         dt,
+        0.6,
+        (x, z) => !isOnScreen(x, z), // spawn OFF the rendered frame, fly in (point 178)
       )
       sc.landed = sc.mode === 'active' && target !== null
       SCAV_CLEARANCE.v = Infinity
@@ -3697,7 +3699,7 @@ function Vultures() {
     if (group.current) {
       const poor = healthState(s.health) === 'poor' && s.mode === 'travel'
       const f = playerFlight.current
-      flightStep(f, poor, s.pos.x, s.pos.z, s.pos.x, s.pos.z, viewR, VULTURE_FLY_SPEED, dt, 2)
+      flightStep(f, poor, s.pos.x, s.pos.z, s.pos.x, s.pos.z, viewR, VULTURE_FLY_SPEED, dt, 2, (x, z) => !isOnScreen(x, z))
       if (f.mode === 'active') {
         // Track the traveller while circling overhead.
         f.x += (s.pos.x - f.x) * Math.min(1, dt * 2)
@@ -3755,6 +3757,7 @@ function Vultures() {
         VULTURE_FLY_SPEED,
         dt,
         2,
+        (x, z) => !isOnScreen(x, z), // spawn OFF the rendered frame, fly in (point 178)
       )
       const consuming =
         toRemnant &&

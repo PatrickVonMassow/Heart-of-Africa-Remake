@@ -199,6 +199,7 @@ export function flightStep(
   speed: number,
   dt: number,
   reach = 0.6,
+  isOffscreen?: (x: number, z: number) => boolean,
 ): FlightState {
   if (s.mode === 'idle') {
     if (!want) return s
@@ -212,8 +213,21 @@ export function flightStep(
       dx /= d
       dz /= d
     }
-    s.x = px + dx * (viewR + FLIGHT_SPAWN_OUT)
-    s.z = pz + dz * (viewR + FLIGHT_SPAWN_OUT)
+    // Spawn beyond the view and fly IN — never pop into frame (point 178). The
+    // assumed ring (viewR) underestimates the tilted bird's-eye frustum's ground
+    // reach (the point-165/172/183 lesson), so with a frustum predicate push the
+    // spawn outward in ring steps until the point is genuinely OFF the rendered
+    // frame. Without one (no travel camera mounted) the ring alone is used.
+    let out = viewR + FLIGHT_SPAWN_OUT
+    s.x = px + dx * out
+    s.z = pz + dz * out
+    if (isOffscreen) {
+      for (let k = 0; k < 12 && !isOffscreen(s.x, s.z); k++) {
+        out += FLIGHT_SPAWN_OUT
+        s.x = px + dx * out
+        s.z = pz + dz * out
+      }
+    }
     s.mode = 'in'
     return s
   }
