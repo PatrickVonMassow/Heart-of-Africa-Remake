@@ -6350,6 +6350,110 @@ the remaining open points in their numeric order.
   Docs: design.md §19.8, CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026;
   queued at the batch end.)
 
+- [ ] 180. An elephant herd WEDGES itself against a lake shore and no member can
+  move. User report + screenshot (19.07.2026, playing on WebGPU, West region): a
+  cluster of elephants jammed together at the water's edge, all stuck. The §19.5
+  body separation ("an animal placed onto another parts from it within moments")
+  and the water backstop ("an animal on a water cell is set back to the nearest
+  land") and the §19.4 herd cohesion (elephants roam CLUSTERED) together deadlock:
+  each elephant is boxed in by herd-mates on the land side and the water on the
+  other, so the separation push has no free direction and the backstop keeps
+  shoving it off the water — a stalemate. Same "physically pinned, no escape
+  direction" CLASS as point 155 (inhabitants), which added spawnPointFree /
+  hasEscapeDirection / nudgeToFree + a stuck-window teleport nudge — but that was
+  for SETTLEMENT walkers, not the travel-scene wildlife herds.
+  DIAGNOSE FIRST: stage/drive an elephant herd up against a lake shore (or reproduce
+  from the report's West-region spot) and detect the deadlock (herd centre stops,
+  members' inter-frame movement ~0 for a window while a predator/roam target is
+  set). Find the elephant herd movement + body-separation + water backstop in
+  src/scenes/travel/Wildlife.tsx (grep ELEPHANT/separation/backstop/nearestLand /
+  the herd roam-cohesion). FIX candidates (pick per the diagnosis): (a) when an
+  animal is pinned for a calibratable window, nudge it to the nearest free land
+  (the point-155 pattern, wildlife-side); (b) relax the herd-cohesion pull when the
+  separation force is saturated so the herd can spread ALONG the shore instead of
+  piling into the corner; (c) let the separation resolve TANGENTIALLY to the water
+  edge (slide along the bank) rather than only normal-away. Ensure the elephant
+  trample (§19.8) stays possible and no fix lets an elephant stand IN the water.
+  Verifiable: pure test that a jammed cluster resolves (every member gains an
+  escape direction within the window); live, a herd driven into a shore corner
+  spreads out and keeps moving rather than locking. Docs: design.md §19.4/§19.5,
+  CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
+
+- [ ] 181. Panorama/skyline wildlife silhouettes sometimes FLOAT with their feet
+  far above the ground instead of standing on the visible horizon line. User
+  report + screenshot (19.07.2026, WebGPU, Cairo first-person view): a quadruped
+  silhouette hangs in the sky well above the haze horizon, its legs dangling in
+  mid-air. This violates the point 31 / design.md 2.5 acceptance ("standing on the
+  VISIBLE horizon line rather than a monument looming"; "sits on the band's horizon
+  line, |y - visibleY| bounded") and point 92/94 (far, small, hazed, at/above the
+  ground plane). The pure math is in src/scenes/place/panoramaWildlife.test.ts and
+  the placement in the place scene (grep panoramaWildlife / visibleY / horizon in
+  src/scenes/place/*). DIAGNOSE FIRST (the 145b/129 lesson): the point-31 live
+  check asserts |y - visibleY| bounded WITH a capture active - reproduce Cairo
+  specifically (it carries the Giza SKYLINE landmark, point 82/102, plus the
+  panorama-wildlife azimuth-exclusion around it, point 102), and sample the
+  rendered silhouette FOOT y vs the horizon visibleY with AND without a capture and
+  alongside the Giza skyline. Likely causes to check: (a) the silhouette's vertical
+  ORIGIN is its centre, so it is anchored by centre-y to the horizon and floats by
+  its half-height when a taller species/scale is picked; (b) visibleY (the band's
+  rendered horizon line) is computed wrong when a skyline landmark or a specific
+  capture is present, so the anchor sits too high; (c) a per-species foot offset is
+  dropped for some species. FIX: anchor the silhouette's FEET (not its centre) to
+  visibleY, accounting for the mesh's vertical origin and scale, so |footY -
+  visibleY| stays bounded for every species/scale, with and without a capture and
+  with the Giza skyline present; keep the point-102 azimuth exclusion intact.
+  Verifiable: extend src/scenes/place/panoramaWildlife.test.ts to pin the foot
+  anchor across species/scales; extend the point-31 live check
+  (scripts/verify/polish.mjs) to assert |footY - visibleY| bounded in Cairo (Giza
+  skyline) and a no-capture settlement, with a screenshot. Docs: design.md 2.5,
+  CLAUDE 7.1 pt.31. (Reported while play-testing 19.07.2026; queued at the batch end.)
+
+- [ ] 182. Extend the bird's-eye ZOOM-IN range to 0.125 (from the current 0.25
+  floor). User decision 19.07.2026: standard-mode zoom-in should reach 0.125x
+  (closer than today's 0.25x hard minimum). ONLY the zoom-IN floor moves; the
+  zoom-OUT behaviour is unchanged (still clamped to the 0.5 default without the
+  debug unlock, up to 16x with it). Change the hard minimum in the setTravelZoom
+  clamp in src/state/ui.ts from 0.25 to 0.125. Update src/state/ui.test.ts: the
+  "hard minimum" case (setTravelZoom(0.1) currently expects 0.25) becomes
+  setTravelZoom below 0.125 -> 0.125, and 0.2 now stays 0.2 (zoom-in allowed).
+  Docs to update in the SAME commit: design.md §21.4 (the "0.25x-16x" range becomes
+  "0.125x-16x"); CLAUDE.md §7.1 pt.20 ("always active (0.25x-16x)" -> "(0.125x-16x)")
+  and §7.2 self-verification (the "NON-DEBUG range 0.25-0.5" note becomes
+  "0.125-0.5", default still 0.5); the memory note test-realistic-zoom (same range
+  text). NOTE for point 172: the "is it in view" probes use the FARTHEST-out
+  non-debug zoom (0.5) as the hard case — that upper bound is unchanged, so those
+  probes need no new zoom value; 0.125 only lets the player see LESS (never more),
+  so it cannot newly expose an off-screen-spawn bug. Verifiable: src/state/ui.test.ts
+  pins the 0.125 hard minimum and a zoomed-in value between 0.125 and 0.5 surviving
+  unclamped. Docs: design.md §21.4, CLAUDE §7.1 pt.20 / §7.2. (Zoom-in change
+  requested 19.07.2026 during play-testing; queued at the batch end.)
+
+- [ ] 183. Animals STILL pop directly into the rendered frame while driving -
+  reported along the Nile. User report (19.07.2026, WebGPU, driving a canoe down
+  the Nile): grazers/river fauna appeared mid-screen instead of entering from
+  beyond the view. This is a RECURRENCE of the point 165/172 class (ground-animal
+  pop-in). Points 165/171/172 gated the guarantee SEEDERS (the vicinity seeder via
+  pickOffscreenLandAnchor, the dry-shore seeder) and the flora streaming through a
+  frustum-projected isOnScreen, but the ORDINARY streaming spawn - a newly entered
+  chunk's region-typical animals, and the river/shore fauna (flamingos, crocodiles,
+  drinkers) seeded along a water corridor - may still place INSIDE the live camera
+  frustum during continuous driving, which the near-a-settlement point-165 check
+  never exercised. DIAGNOSE FIRST (the 145b/129 lesson, with the SUITE chromium
+  launch args - a bare launch throttles rAF and hides the sim): drive a CONTINUOUS
+  pass along the Nile (KeyW with a raised travelSpeed, restored after) at the
+  ACHIEVABLE zoom 0.5, the F3 report zoom 1.5 and wider 2.2, and project EVERY
+  newly-spawned animal to the frame via __camera.onScreen each frame - assert zero
+  appear inside the frustum the frame they spawn. Find which spawn path pops (grep
+  the chunk spawn / streamIn / region-seed / water-anchor seeding in
+  src/scenes/travel/Wildlife.tsx) and route it through the SAME off-screen rule the
+  seeders use (isOnScreen / an off-screen anchor, point 165) - judge by PROJECTION,
+  never an assumed radius (point 172: fog.far / 100×zoom is not the frustum). Keep
+  the body-separation and streaming despawn intact. Verifiable: a driven Nile-corridor
+  pass in scripts/verify/enrichments.mjs asserts NO animal is projected inside the
+  frame the frame it joins, at zoom 0.5 / 1.5 / 2.2, with a screenshot; extend the
+  pure isOnScreen coverage if a new spawn path is gated. Docs: design.md §19.2/§2.5,
+  CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
