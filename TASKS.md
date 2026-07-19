@@ -6570,6 +6570,17 @@ the remaining open points in their numeric order.
   __ttsForceWasm hook (CLAUDE §3): with a real WebGPU device present, decide
   whether the voice suite still forces WASM (the render-WebGPU vs onnxruntime-
   WebGPU GPU-process contention, point 117) or exercises the WebGPU voice path.
+  TIER DESIGN (user 19.07.2026, ADOPTED) — reorganise the browser tiers by BACKEND
+  COVERAGE, not suite subset: SMALL = EVERY browser suite once on WebGPU (the
+  shipping primary) PLUS a WebGL2 SMOKE subset (init + a render screenshot + one
+  core flow, so a grossly broken fallback is caught); LARGE = EVERY suite on BOTH
+  backends (WebGPU and WebGL2) plus the prod preview. Vitest stays the fast,
+  backend-independent inner loop. Depends on 177's determinism landing first (so
+  all suites are safe in the everyday gate) and on the suite proving green AND
+  flake-free on WebGPU; if SMALL proves too slow (the per-launch WebGPU cold-load),
+  add a still-smaller core-WebGPU quick option, but start here and MEASURE. Updates
+  CLAUDE §5 and scripts/verify/run-all.mjs (the small/large maps become backend
+  maps) and scripts/verify/README.md.
   ACCEPTANCE: (1) the invariant suite (Pillar 1) exists, covers I1-I7 across the
   WHOLE standard-mode zoom range (0.25-0.5, both ends, NEVER a debug zoom — the
   user's binding 19.07.2026 addition specifically for 184), and is GREEN across at
