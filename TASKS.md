@@ -6570,17 +6570,17 @@ the remaining open points in their numeric order.
   __ttsForceWasm hook (CLAUDE §3): with a real WebGPU device present, decide
   whether the voice suite still forces WASM (the render-WebGPU vs onnxruntime-
   WebGPU GPU-process contention, point 117) or exercises the WebGPU voice path.
-  TIER DESIGN (user 19.07.2026, ADOPTED) — reorganise the browser tiers by BACKEND
-  COVERAGE, not suite subset: SMALL = EVERY browser suite once on WebGPU (the
-  shipping primary) PLUS a WebGL2 SMOKE subset (init + a render screenshot + one
-  core flow, so a grossly broken fallback is caught); LARGE = EVERY suite on BOTH
-  backends (WebGPU and WebGL2) plus the prod preview. Vitest stays the fast,
-  backend-independent inner loop. Depends on 177's determinism landing first (so
-  all suites are safe in the everyday gate) and on the suite proving green AND
-  flake-free on WebGPU; if SMALL proves too slow (the per-launch WebGPU cold-load),
-  add a still-smaller core-WebGPU quick option, but start here and MEASURE. Updates
-  CLAUDE §5 and scripts/verify/run-all.mjs (the small/large maps become backend
-  maps) and scripts/verify/README.md.
+  TIER DESIGN (user 19.07.2026, ADOPTED — clarified: do NOT expand small's test
+  count). SMALL keeps EXACTLY the current small-tier suite set (point 173's fast
+  low-flake subset), unchanged in WHICH suites, but runs it on WEBGPU instead of
+  WebGL2, PLUS one WebGL2 SMOKE test (init + a render screenshot + one core flow,
+  so a grossly broken fallback is caught). LARGE runs ALL browser suites TWICE —
+  once on WebGPU and once on WebGL2 — plus the prod preview. Vitest stays the fast
+  backend-independent inner loop. So small's test COUNT is unchanged; only its
+  backend flips (+ the WebGL2 smoke). Depends on 177's determinism and on the
+  suites proving green AND flake-free on WebGPU; measure the per-launch cold-load
+  cost. Updates CLAUDE §5, scripts/verify/run-all.mjs and scripts/verify/README.md
+  (each tier gains a backend dimension, the suite→tier map is unchanged).
   ACCEPTANCE: (1) the invariant suite (Pillar 1) exists, covers I1-I7 across the
   WHOLE standard-mode zoom range (0.25-0.5, both ends, NEVER a debug zoom — the
   user's binding 19.07.2026 addition specifically for 184), and is GREEN across at
@@ -6596,6 +6596,46 @@ the remaining open points in their numeric order.
   line for the new invariant suite and updates the CLAUDE 5/7.2 test architecture;
   the 172/177 disciplines. (Requested 19.07.2026 — "be significantly more
   thorough"; gates v0.2 together with 178-183.)
+
+- [ ] 185. Ground-scavenger vultures FLOAT ~0.5 above the carcass (double vertical
+  lift). Found by the point-184 calibration audit (CONFIRMED, 19.07.2026).
+  Wildlife.tsx:2559: the landed scavenger group origin is pre-lifted to
+  target.y+0.5, then each bird's local y ALSO goes through landedBirdY
+  (wildlifeBehavior.ts:486), which adds its own ground-lift + hover — a DOUBLE
+  lift, so pecking vultures hover ~0.5 above the carcass they eat. The kill flock
+  does it correctly (killGroup at killGroundY, then landedBirdY(killGroundY,...)),
+  proving the intended pattern. FIX: drop the legacy +0.5 group pre-lift so the
+  scavenger uses ONLY the shared landedBirdY rule (the point-128 unification
+  intent). Verify: the landedBird clearance metric + a live scavenger-on-flat-
+  ground check that the body sits ON the carcass (foot-anchored). Docs: CLAUDE §7.1
+  pt.12. (184 audit finding; this is the point-181/128 class the play-test also hit.)
+
+- [ ] 186. The crocodile 'gripped' lunge has NO hard deadline — a streamed-out or
+  vanished victim can pin the crocodile forever (a drama that never resolves).
+  Found by the point-184 calibration audit (plausible, 19.07.2026). Unlike the
+  other §19.8 dramas (each with a deadline — TRAMPLE_GRIEF_SECONDS, vigil.seconds,
+  drown/mireSeconds, the lunge timer>4 pre-grip), the crocodile's POST-grip state
+  resolves only via the victim's caught-countdown; if the victim is removed
+  mid-grip, the crocodile stays gripped with no timeout. Violates the §19.8 "every
+  started drama always resolves" rule (invariant I4 of point 184). FIX: give the
+  gripped lunge a hard deadline that releases the crocodile if the victim vanishes
+  or the window elapses. Verify: pure test (gripped state expires) + the point-184
+  I4 invariant. Docs: design.md §19.16, CLAUDE §7.1 pt.12. (184 audit finding.)
+
+- 184 AUDIT NOTES (calibration probe wf_7309c0d4, 19.07.2026): (a) point 179's ROOT
+  CAUSE is now confirmed at the code level — the lion calf-catch and the shield
+  parent-take are per-frame POINT checks, not SWEPT, so a big clamped-dt step
+  passes through without a catch; fix 179 by making the catch/contact SWEPT (like
+  the player's resolveTravelMove in movement.ts). (b) The player->predator attack
+  contact (§19.3) is the SAME non-swept point-check (radius 2) and tunnels at high
+  travel speed — fix it in the same 179 pass. (c) The calibration's THIRD sweep
+  (streaming/visibility, the 183 class) FAILED on the StructuredOutput schema (5
+  retries) and returned nothing — re-run it cleanly as part of 184's Pillar-2
+  audit (it is the highest-value class). (d) Low-severity fragilities to fold into
+  184: the panorama-wildlife anchor is a hard-coded horizonY constant (self-
+  consistent today, but 181's float is likely WebGPU-specific — verify on the new
+  WebGPU lane), and landedBirdY's 0.15 hover ignores the 1.5-1.6 render scale (a
+  sub-cm sink).
 
 ## Closing (only after all points)
 
