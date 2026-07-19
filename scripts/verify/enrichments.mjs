@@ -3536,16 +3536,18 @@ await page
 const crocSpawn = await page.evaluate(() => {
   const seed = window.__game.getState().seed
   const U = 10
-  // Assert the PLACEMENT rule (point 130: a crocodile LIES on water) on the
-  // hidden/idle ones. A LUNGING crocodile is mid-strike from its water toward a
-  // bank victim, so it is expected off the water for those seconds — excluding it
-  // keeps the check deterministic (point 177) without weakening the spawn rule.
-  const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead && c.lunge === undefined)
-  const offWater = list.filter((c) => window.__terrainType(-c.z / U, c.x / U, seed) !== 'water')
+  // Assert the PLACEMENT rule (point 130: a crocodile LIES on water) at each
+  // crocodile's WATER HOME. A lunging crocodile is mid-strike over the bank, so
+  // check its lunge home (homeX/homeZ, where it lay) rather than its transient
+  // strike position — deterministic regardless of lunge timing (point 177), and
+  // without a count:0 when the only crocodile present happens to be lunging.
+  const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead)
+  const home = (c) => (c.lunge ? { x: c.lunge.homeX, z: c.lunge.homeZ } : { x: c.x, z: c.z })
+  const offWater = list.filter((c) => { const p = home(c); return window.__terrainType(-p.z / U, p.x / U, seed) !== 'water' })
   return {
     count: list.length,
     allOnWater: offWater.length === 0,
-    offWater: offWater.slice(0, 4).map((c) => ({ x: +c.x.toFixed(1), z: +c.z.toFixed(1), type: window.__terrainType(-c.z / U, c.x / U, seed) })),
+    offWater: offWater.slice(0, 4).map((c) => { const p = home(c); return { x: +p.x.toFixed(1), z: +p.z.toFixed(1), t: window.__terrainType(-p.z / U, p.x / U, seed) } }),
   }
 })
 check(
@@ -3742,25 +3744,30 @@ const spacing = await page.evaluate(async () => {
     const all = []
     for (const sp of Object.keys(RAD)) {
       for (const a of herds[sp] ?? []) {
-        if (a.dead || a.caught !== undefined || a.inWater !== undefined || a.rescued !== undefined) continue
+        // Free-spacing applies to freely-streamed animals only. A drama-locked or
+        // purposefully-walking one (caught/water/rescued/mired/vigil/trample/
+        // plunge/drink) holds its spot by its drama, not the separation force —
+        // pinFamily above stages exactly such animals, so exclude them all.
+        if (a.dead || a.caught !== undefined || a.inWater !== undefined || a.rescued !== undefined ||
+            a.mired || a.trampleTo || a.plungeTo || a.vigil || a.drink) continue
         if (a.chunk === undefined) continue // only real streamed animals
         all.push({ x: a.x, z: a.z, r: RAD[sp] * a.scale, sp })
       }
     }
-    let worst = Infinity
+    let worst = Infinity, pair = null
     for (let i = 0; i < all.length; i++) {
       for (let j = i + 1; j < all.length; j++) {
         const A = all[i], B = all[j]
         if ((A.sp === 'elephant') !== (B.sp === 'elephant')) continue // trample pair exempt
         const minD = A.r + B.r
-        const d = Math.hypot(A.x - B.x, A.z - B.z)
-        worst = Math.min(worst, d / minD)
+        const ratio = Math.hypot(A.x - B.x, A.z - B.z) / minD
+        if (ratio < worst) { worst = ratio; pair = A.sp + '/' + B.sp }
       }
     }
-    return { animals: all.length, worst: +worst.toFixed(3) }
+    return { animals: all.length, worst: +worst.toFixed(3), pair }
   }
   let s = sample()
-  await window.__pollSim(8, () => {
+  await window.__pollSim(15, () => {
     s = sample()
     return s.animals > 5 && s.worst >= 0.7
   })
