@@ -25,14 +25,23 @@ export function coastDistance(lat: number, lon: number, maxDist = 4): number {
   return Math.min(maxDist, coastDistanceAt(lat, lon))
 }
 
-/** Exact distance to the nearest river centerline in degrees, capped. */
-export function riverDistance(lat: number, lon: number, maxDist = 4): number {
-  return riverDistanceExact(lat, lon, Math.min(maxDist, 0.45))
+// The reliably-resolvable radius grows with the bucket-search `range`: 3x3
+// (range 1) resolves ~0.45deg, 5x5 (range 2) ~0.9deg. The clamp reflects that so
+// a caller cannot ask for more than the neighbourhood can actually see. Default
+// range 1 keeps every existing caller at exactly 0.45 (point 176).
+const resolvableRadius = (range: number): number => 0.45 * range
+
+/** Exact distance to the nearest river centerline in degrees, capped. `range`
+ *  widens the bucket search (default 1 = 3x3; 2 = 5x5, for the dry-season drink
+ *  catchment, point 176). */
+export function riverDistance(lat: number, lon: number, maxDist = 4, range = 1): number {
+  return riverDistanceExact(lat, lon, Math.min(maxDist, resolvableRadius(range)), range)
 }
 
-/** Exact distance to the nearest lake shoreline in degrees, capped. */
-export function lakeDistance(lat: number, lon: number, maxDist = 4): number {
-  return lakeShoreDistanceExact(lat, lon, Math.min(maxDist, 0.45))
+/** Exact distance to the nearest lake shoreline in degrees, capped (see
+ *  riverDistance for `range`). */
+export function lakeDistance(lat: number, lon: number, maxDist = 4, range = 1): number {
+  return lakeShoreDistanceExact(lat, lon, Math.min(maxDist, resolvableRadius(range)), range)
 }
 
 /** Downstream river flow at a point (design.md §11): unit direction in (lat,

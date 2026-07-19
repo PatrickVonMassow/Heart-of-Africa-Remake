@@ -50,6 +50,33 @@ describe('riverDistanceExact (design.md §3)', () => {
     // A point far from every river resolves to exactly the cap.
     expect(riverDistanceExact(24, 15, 0.1)).toBeLessThanOrEqual(0.1 + 1e-9)
   })
+
+  it('range 2 (5x5) resolves water in the dry-season drink band, range 1 saturates (point 176)', () => {
+    // The default 3x3 bucket search resolves reliably only to ~0.45deg; the
+    // dry-season drink catchment reaches ~0.70deg, so its gradient collapsed for
+    // animals 0.45-0.70 from water (both probes read the cap → zero gradient →
+    // they never walked to the bank). range 2 searches 5x5 (~0.9deg). Sweep
+    // around a Nile vertex: the 5x5 search is always a superset of the 3x3, and
+    // somewhere in the 0.45-0.85deg band the 5x5 resolves the river while the
+    // 3x3 saturates at its cap.
+    let widened = false
+    let sampled = false
+    for (let a = 0; a < 16; a++) {
+      const dx = Math.cos((a / 16) * Math.PI * 2)
+      const dz = Math.sin((a / 16) * Math.PI * 2)
+      for (let d = 0.48; d <= 0.85; d += 0.02) {
+        const lat = nileLat + dz * d
+        const lon = nileLon + dx * d
+        const r1 = riverDistanceExact(lat, lon, 1.0, 1)
+        const r2 = riverDistanceExact(lat, lon, 1.0, 2)
+        expect(r2).toBeLessThanOrEqual(r1 + 1e-9) // 5x5 is a superset search of 3x3
+        sampled = true
+        if (r2 > 0.45 && r2 < 0.9 && r2 < r1 - 0.05) widened = true // 5x5 resolved past the 3x3 reach
+      }
+    }
+    expect(sampled).toBe(true)
+    expect(widened).toBe(true)
+  })
 })
 
 describe('riverFlowExact (design.md §11)', () => {

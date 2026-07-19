@@ -918,9 +918,6 @@ function placeGroup(
     // Animals near water periodically walk to the shore and drink
     // (design.md §19); the shore point follows the water-distance gradient.
     if (!shoreline) {
-      const rd = riverDistance(ll.lat, ll.lon, 0.5)
-      const ld = lakeDistance(ll.lat, ll.lon, 0.5)
-      const wd = Math.min(ld, rd)
       // The dry season widens the catchment (design.md §19.13, point 120e):
       // as the land dries, animals walk to the water from farther out, so the
       // remaining rivers and lakes visibly gather the wildlife. The traveller's
@@ -931,14 +928,26 @@ function placeGroup(
       // 0.17+0.18 of the scale-true river width — the 136 widening ate the
       // drinking belt and starved the dry-season gathering.
       const catchment = drinkCatchment(RIVER_WIDTH_DEG, dryness)
+      // The dry-season catchment can exceed the default 3x3 bucket reach
+      // (~0.45deg); only then widen the water-distance search to 5x5 (range 2,
+      // ~0.9deg) and the query radius, so the gradient does not COLLAPSE for
+      // animals 0.45-0.70 from water — both probes would otherwise read the
+      // saturated 0.45 and gLat=gLon=0, and they never walk to the bank
+      // (point 176). The wet season keeps the cheaper range 1.
+      const wideWater = catchment > 0.45
+      const qr = wideWater ? 2 : 1
+      const qd = wideWater ? catchment + 0.06 : 0.5
+      const rd = riverDistance(ll.lat, ll.lon, qd, qr)
+      const ld = lakeDistance(ll.lat, ll.lon, qd, qr)
+      const wd = Math.min(ld, rd)
       if (wd > 0.02 && wd < catchment) {
         const e = 0.03
         const gLat =
-          Math.min(lakeDistance(ll.lat + e, ll.lon, 0.6), riverDistance(ll.lat + e, ll.lon, 0.6)) -
-          Math.min(lakeDistance(ll.lat - e, ll.lon, 0.6), riverDistance(ll.lat - e, ll.lon, 0.6))
+          Math.min(lakeDistance(ll.lat + e, ll.lon, qd, qr), riverDistance(ll.lat + e, ll.lon, qd, qr)) -
+          Math.min(lakeDistance(ll.lat - e, ll.lon, qd, qr), riverDistance(ll.lat - e, ll.lon, qd, qr))
         const gLon =
-          Math.min(lakeDistance(ll.lat, ll.lon + e, 0.6), riverDistance(ll.lat, ll.lon + e, 0.6)) -
-          Math.min(lakeDistance(ll.lat, ll.lon - e, 0.6), riverDistance(ll.lat, ll.lon - e, 0.6))
+          Math.min(lakeDistance(ll.lat, ll.lon + e, qd, qr), riverDistance(ll.lat, ll.lon + e, qd, qr)) -
+          Math.min(lakeDistance(ll.lat, ll.lon - e, qd, qr), riverDistance(ll.lat, ll.lon - e, qd, qr))
         const gl = Math.hypot(gLat, gLon)
         if (gl > 1e-4) {
           // Walk down the gradient only to the BANK, never into the channel;

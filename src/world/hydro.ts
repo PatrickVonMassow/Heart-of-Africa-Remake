@@ -161,12 +161,13 @@ function bucketDistance(
   segs: Float64Array,
   buckets: Map<string, number[]>,
   maxDist: number,
+  range: number,
 ): number {
   const bx = Math.floor(lon / BUCKET)
   const by = Math.floor(lat / BUCKET)
   let best = maxDist * maxDist
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  for (let dy = -range; dy <= range; dy++) {
+    for (let dx = -range; dx <= range; dx++) {
       const list = buckets.get(bucketKey(bx + dx, by + dy))
       if (!list) continue
       for (const idx of list) {
@@ -178,15 +179,19 @@ function bucketDistance(
   return Math.sqrt(best)
 }
 
-/** Exact distance (degrees) to the nearest river centerline, capped. */
-export function riverDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY): number {
-  return bucketDistance(lon, lat, riverSegs, riverBuckets, maxDist)
+/** Exact distance (degrees) to the nearest river centerline, capped.
+ *  `range` is the bucket-neighbourhood half-width searched (default 1 = 3x3,
+ *  reliable to ~0.45deg; 2 = 5x5, reliable to ~1.0deg — the dry-season drink
+ *  catchment needs the wider reach, point 176). */
+export function riverDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY, range = 1): number {
+  return bucketDistance(lon, lat, riverSegs, riverBuckets, maxDist, range)
 }
 
 
-/** Exact distance (degrees) to the nearest lake shoreline, capped. */
-export function lakeShoreDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY): number {
-  return bucketDistance(lon, lat, lakeSegs, lakeBuckets, maxDist)
+/** Exact distance (degrees) to the nearest lake shoreline, capped (see
+ *  riverDistanceExact for `range`). */
+export function lakeShoreDistanceExact(lat: number, lon: number, maxDist = MAX_QUERY, range = 1): number {
+  return bucketDistance(lon, lat, lakeSegs, lakeBuckets, maxDist, range)
 }
 
 /**
