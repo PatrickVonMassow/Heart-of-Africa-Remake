@@ -1277,7 +1277,6 @@ const scavenge = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w.herdsRef.current
   const sp5 = ['zebra', 'antelope', 'giraffe', 'elephant', 'flamingo']
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   // Clear any leftover carcasses so the scavenger targets ours.
   for (const sp of sp5) herds[sp] = herds[sp].filter((a) => !a.dead)
   w.scavenger.current.target = null
@@ -1288,22 +1287,19 @@ const scavenge = await page.evaluate(async () => {
   let dissolveStarted = false
   // The scavenger now flies in from beyond the view ring (design.md §19), so
   // the approach itself takes several seconds before it can land.
-  const deadline = Date.now() + 30000
-  while (Date.now() < deadline) {
+  await window.__pollSim(30, () => {
     const sc = w.scavenger.current
     if (sc.target === carcass && sc.landed) landed = true
     if (typeof carcass.dissolve === 'number' && carcass.dissolve < 9) dissolveStarted = true
-    if (landed && dissolveStarted) break
-    await sleep(120)
-  }
+    return landed && dissolveStarted
+  })
   // Fast-forward the consumption and confirm the carcass is removed.
   carcass.dissolve = 0.02
   let removed = false
-  const d2 = Date.now() + 4000
-  while (Date.now() < d2) {
-    if (!herds.zebra.includes(carcass)) { removed = true; break }
-    await sleep(100)
-  }
+  await window.__pollSim(4, () => {
+    if (!herds.zebra.includes(carcass)) { removed = true; return true }
+    return false
+  })
   return { landed, dissolveStarted, removed }
 })
 check('a scavenger flies in and lands on a non-lion carcass', scavenge.landed, JSON.stringify(scavenge))
@@ -1433,7 +1429,6 @@ check(
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.waitForTimeout(2500)
 const treeHit = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const seed = window.__game.getState().seed
   const U = 10
   // Find a collidable tree near the current position with land on all sides.
@@ -1461,27 +1456,28 @@ const treeHit = await page.evaluate(async () => {
   }
   const out = { found: true, r: tree.r, minDist: Infinity, reached: false, north: 0, south: 0, west: 0 }
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }))
-  const t0 = Date.now()
-  while (Date.now() - t0 < 6000) {
+  // Sim-budget the approach (point 177): a wall-clock drive under load rests the
+  // player at a slightly different spot against the tree, and from some spots the
+  // northward drive below reads blocked — a deterministic sim-time approach fixes
+  // the resting position.
+  await window.__pollSim(6, () => {
     const p = window.__game.getState().pos
     const d = Math.hypot(p.x - tree.x, p.z - tree.z)
     out.minDist = Math.min(out.minDist, d)
-    if (d < tree.r + 0.8) { out.reached = true; break }
-    await sleep(20)
-  }
+    if (d < tree.r + 0.8) { out.reached = true; return true }
+    return false
+  }, 20000)
   window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
   // From the resting contact: each free direction must actually move.
   const drive = async (code, dist, sign, axis) => {
     const start = window.__game.getState().pos
     window.dispatchEvent(new KeyboardEvent('keydown', { code }))
-    const t1 = Date.now()
     let moved = 0
-    while (Date.now() - t1 < 8000) {
+    await window.__pollSim(8, () => {
       const p = window.__game.getState().pos
       moved = sign * (axis === 'x' ? p.x - start.x : p.z - start.z)
-      if (moved > dist) break
-      await sleep(20)
-    }
+      return moved > dist
+    }, 25000)
     window.dispatchEvent(new KeyboardEvent('keyup', { code }))
     return moved
   }
@@ -1568,12 +1564,10 @@ const rinderpest = await page.evaluate(async () => {
   window.__game.getState().debugJumpYear(1)
   await sleep(200)
   window.__wildlife.restock()
-  const t0 = Date.now()
-  while (Date.now() - t0 < 15000) {
+  await window.__pollSim(15, () => {
     out.carrionStruck = countDead()
-    if (out.carrionStruck > 0) break
-    await sleep(500)
-  }
+    return out.carrionStruck > 0
+  })
   out.dayStruck = Math.round(window.__game.getState().day)
   // Failure diagnosis: what did the ring actually spawn, and at what zoom?
   {
@@ -1643,15 +1637,13 @@ const carrionVicinity = await page.evaluate(async () => {
   // so the suite stays green rather than leaving a red test for an unbuilt fix.
   const viewR = 55
   let carcasses = 0
-  const t0 = Date.now()
-  while (Date.now() - t0 < 25000) {
+  await window.__pollSim(25, () => {
     const h = window.__wildlife.herdsRef.current
     carcasses = 0
     for (const sp of ['wildebeest', 'antelope'])
       for (const a of h[sp] ?? []) if (a.dead && a.plague && Math.hypot(a.x - p0.x, a.z - p0.z) <= viewR) carcasses++
-    if (carcasses >= 3) break
-    await sleep(500)
-  }
+    return carcasses >= 3
+  })
   const day = Math.round(window.__game.getState().day)
   const phase = window.__rinderpest.rinderpestPhaseAtDay('maasai', day, 1890)
   let totalPlague = 0
@@ -1830,7 +1822,6 @@ check('herds raise young that keep close to a parent (nursing)', familyLife.youn
 // back and forth between frames (the old play/follow boundary ping-pong).
 // Track any hopping calf's position; count per-sample direction reversals.
 const calfJitter = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
   let samples = 0
@@ -1838,8 +1829,7 @@ const calfJitter = await page.evaluate(async () => {
   let tracked = null
   let last = null
   let lastStep = null
-  const deadline = Date.now() + 20000
-  while (Date.now() < deadline && samples < 40) {
+  await window.__pollSim(20, () => {
     if (!tracked || tracked.dead || tracked.hop === undefined) {
       tracked = null
       for (const sp of SP) {
@@ -1862,8 +1852,8 @@ const calfJitter = await page.evaluate(async () => {
       }
       last = { x: tracked.x, z: tracked.z }
     }
-    await sleep(80)
-  }
+    return samples >= 40
+  })
   return { samples, flips }
 })
 check(
@@ -2130,24 +2120,35 @@ const guard = await page.evaluate(async () => {
   const parent = fam.parent
   const calf = fam.calf
   const L = window.__lionHunt.state
-  const lx = calf.x + 5, lz = calf.z
+  // Predator pinned 4 (was 5) from the calf — WELL inside the guard trigger range
+  // so it reliably fires, but NOT set as the hunt victim: victim = calf triggers
+  // the parent's FLEE branch instead (it ran 15 units away, before 8 / after 23.7),
+  // not the guard. The guard keys on a predator near the calf, not on victimHunt.
+  const lx = calf.x + 4, lz = calf.z
   // Start the parent on the far side of the calf: the guard standoff sits 2.2
   // from the calf toward the predator, so a parent that happens to stand right
   // at the pin point would correctly move AWAY to it — seed a deterministic
   // approach instead.
   parent.x = calf.x - 3
   parent.z = calf.z
-  // Register the threat explicitly (point 177): with only mode/lx set, the guard
-  // trigger sat at its range boundary and fired only some runs (a rare trigger
-  // miss, parent barely moving); victim = calf makes the calf the known target so
-  // the parent reliably interposes. The predator stays PINNED (it never advances),
-  // so the calf is not actually caught.
-  L.mode = 'chase'; L.victim = calf; L.victimHunt = true; L.lx = lx; L.lz = lz; L.px = calf.x; L.pz = calf.z
+  L.mode = 'chase'; L.lx = lx; L.lz = lz; L.px = calf.x; L.pz = calf.z
   const dist = () => Math.hypot(parent.x - lx, parent.z - lz)
   const before = dist()
-  // Re-pin the predator as the fixed threat over a SIM-time window (not wall-clock,
-  // point 177) so the guard has its full duration to close regardless of load.
-  await window.__pollSim(6, () => { L.lx = lx; L.lz = lz; L.mode = 'chase'; L.victim = calf; return false }, 20000)
+  // Re-pin the threat EVERY frame (not every 80ms) over a sim-window so
+  // LION_STATE.mode never flips off 'chase' between polls — a victimless chase
+  // aborts on its own, and the guard branch (Wildlife.tsx: mode === 'chase' AND
+  // predator within GUARD_RADIUS of the calf) then skips for those frames, so the
+  // parent guarded only some runs. Continuous re-pinning keeps it firing (point 177).
+  await new Promise((resolve) => {
+    const s0 = window.__wildlife.simTime()
+    const t0 = Date.now()
+    const tick = () => {
+      L.lx = lx; L.lz = lz; L.mode = 'chase'
+      if (window.__wildlife.simTime() - s0 < 6 && Date.now() - t0 < 20000) requestAnimationFrame(tick)
+      else resolve()
+    }
+    requestAnimationFrame(tick)
+  })
   const after = dist()
   L.mode = 'idle'; L.timer = 60
   fam.dispose()
@@ -2572,7 +2573,6 @@ check('the hunter takes the blocking parent in the calf\'s place before any catc
 // (1) Gambol: some calf breaks into a hop-bout (hop state + real movement).
 await pinFamily(-2.2, 34.8)
 const play = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const calves = []
   for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog']) {
@@ -2582,17 +2582,15 @@ const play = await page.evaluate(async () => {
   const start = calves.map((c) => ({ x: c.x, z: c.z }))
   let hopped = 0
   let movedWhileHopping = 0
-  const t0 = Date.now()
-  while (Date.now() - t0 < 25000) {
+  await window.__pollSim(25, () => {
     calves.forEach((c, i) => {
       if (c.hop !== undefined && c.hop > 0.3) {
         hopped++
         if (Math.hypot(c.x - start[i].x, c.z - start[i].z) > 0.4) movedWhileHopping++
       }
     })
-    if (hopped > 3 && movedWhileHopping > 0) break
-    await sleep(120)
-  }
+    return hopped > 3 && movedWhileHopping > 0
+  })
   return { found: true, calves: calves.length, hopped, movedWhileHopping }
 })
 check('calves gambol in playful hop-bouts (hop state + movement)',
@@ -2620,7 +2618,6 @@ await waitForFamily()
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
 await page.waitForTimeout(400)
 const rescue = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const T = window.__terrainType
@@ -2655,8 +2652,7 @@ const rescue = await page.evaluate(async () => {
   parent.x = landLL[1] * U - 5; parent.z = -landLL[0] * U
   const out = { found: true, fellIn: false, parentApproached: false, rescued: false, backOnLand: false, bothAlive: false }
   let d0 = null
-  const t0 = Date.now()
-  while (Date.now() - t0 < 45000) {
+  await window.__pollSim(45, () => {
     if (calf.inWater !== undefined) out.fellIn = true
     const d = Math.hypot(parent.x - calf.x, parent.z - calf.z)
     if (d0 === null) d0 = d
@@ -2665,10 +2661,10 @@ const rescue = await page.evaluate(async () => {
     if (out.rescued && calf.inWater === undefined && !calf.dead) {
       out.backOnLand = true
       out.bothAlive = !calf.dead && !parent.dead
-      break
+      return true
     }
-    await sleep(100)
-  }
+    return false
+  })
   out.state = { inWater: calf.inWater, rescued: !!calf.rescued, calfDead: !!calf.dead, parentDead: !!parent.dead }
   return out
 })
@@ -2689,7 +2685,6 @@ check('the parent pulls the calf out and both return to the bank alive',
 // one calf to its fate.
 const runDrownScenario = async () =>
   page.evaluate(async () => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     const hydro = await import('/src/world/hydro.ts')
     const seed = window.__game.getState().seed
     // Strong mid-channel flow on the lower Nile (lat 29..27 holds no falls).
@@ -2717,8 +2712,7 @@ const runDrownScenario = async () =>
       // splits the path.
       fam.parent.x = fam.calf.x - 260
       fam.parent.z = fam.calf.z
-      const t0 = Date.now()
-      while (Date.now() - t0 < 1500 && fam.calf.inWater === undefined && !fam.calf.dead) await sleep(100)
+      await window.__pollSim(1.5, () => fam.calf.inWater !== undefined || fam.calf.dead, 25000)
       if (fam.calf.inWater !== undefined) {
         calf = fam.calf
         disposeKeep = fam.dispose
@@ -2732,13 +2726,12 @@ const runDrownScenario = async () =>
     const out = { staged: true, tries, drowned: false, rescued: false, out: false, lionFed: false }
     // 65 s: the 260-unit park means a dry-season parent arrives ~43 s in, and
     // rescue + walk-back must still fit (the drown branch breaks early).
-    const t1 = Date.now()
-    while (Date.now() - t1 < 65000) {
+    await window.__pollSim(65, () => {
       if (calf.rescued) out.rescued = true
-      if (calf.dead) { out.drowned = true; out.lionFed = !!calf.lionFed; break }
-      if (calf.inWater === undefined && !calf.dead) { out.out = true; break }
-      await sleep(150)
-    }
+      if (calf.dead) { out.drowned = true; out.lionFed = !!calf.lionFed; return true }
+      if (calf.inWater === undefined && !calf.dead) { out.out = true; return true }
+      return false
+    })
     if (disposeKeep) disposeKeep()
     return out
   })
@@ -2764,7 +2757,6 @@ await page.waitForTimeout(300)
 // plains — the drama resolves in the full-list pre-pass wherever it happens.
 await waitForFamily()
 const plunge = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const T = window.__terrainType
@@ -2787,13 +2779,12 @@ const plunge = await page.evaluate(async () => {
   calf.x = waterLL[1] * U; calf.z = -waterLL[0] * U
   parent.x = calf.x + 6; parent.z = calf.z + 2
   const out = { found: true, calfSwept: false, parentGotPlunge: false, parentPlunged: false }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 25000) {
+  await window.__pollSim(25, () => {
     if (calf.dead) out.calfSwept = true
     if (parent.plungeTo) out.parentGotPlunge = true
-    if (parent.dead) { out.parentPlunged = true; break }
-    await sleep(80)
-  }
+    if (parent.dead) { out.parentPlunged = true; return true }
+    return false
+  })
   return out
 })
 check('a calf in the water at a waterfall is swept over and dies',
@@ -2805,7 +2796,6 @@ check('the parent plunges after its swept-over calf and dies with it',
 // the calf (outside the reach) survives and struggles on.
 await waitForFamily()
 const sweptRescuer = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const T = window.__terrainType
@@ -2833,12 +2823,11 @@ const sweptRescuer = await page.evaluate(async () => {
   calf.x = calfLL[1] * U; calf.z = -calfLL[0] * U
   parent.x = parentLL[1] * U; parent.z = -parentLL[0] * U
   const out = { found: true, calfFellIn: false, parentSwept: false, calfAlive: false }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 20000) {
+  await window.__pollSim(20, () => {
     if (calf.inWater !== undefined) out.calfFellIn = true
-    if (parent.dead) { out.parentSwept = true; break }
-    await sleep(80)
-  }
+    if (parent.dead) { out.parentSwept = true; return true }
+    return false
+  })
   out.calfAlive = !calf.dead
   return out
 })
@@ -2855,7 +2844,6 @@ check('a rescuing parent wading into the falls\' reach is swept over (calf survi
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
 await page.waitForTimeout(400)
 const mire = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p0 = window.__game.getState().pos
   // Synthetic family (point 135): deterministic, pool-independent staging.
   const fam = window.__makeTestFamily(p0.x + 8, p0.z + 6)
@@ -2865,10 +2853,10 @@ const mire = await page.evaluate(async () => {
   parent.x = calf.x - 15
   parent.z = calf.z
   const start = { x: calf.x, z: calf.z }
-  await sleep(4000)
+  await window.__sleepSim(4)
   const held = Math.hypot(calf.x - start.x, calf.z - start.z)
   const vigil0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
-  await sleep(2000)
+  await window.__sleepSim(2)
   const vigil1 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
   // The predators find the pair (target bias): force the hunt's next pick
   // window and let the chase run — the mud holds the calf, so the parent's
@@ -2882,8 +2870,7 @@ const mire = await page.evaluate(async () => {
   st.px = calf.x
   st.pz = calf.z
   st.timer = 0 // the hunt loop waits its idle timer out before acting
-  const t0 = Date.now()
-  while (Date.now() - t0 < 45000 && (!calf.dead || !parent.dead)) await sleep(200)
+  await window.__pollSim(45, () => calf.dead && parent.dead, 155000)
   const bothDeadAtWater =
     calf.dead && parent.dead &&
     Math.hypot(calf.x - start.x, calf.z - start.z) < 5 &&
@@ -2906,7 +2893,6 @@ check(
 // Without a predator, the mud RELEASES (the drama always resolves): shorten
 // the window through the balance hook, then watch the calf come free alive.
 const release = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p0 = window.__game.getState().pos
   // Synthetic family (point 135): deterministic, pool-independent staging.
   const fam = window.__makeTestFamily(p0.x - 8, p0.z + 6)
@@ -2914,8 +2900,7 @@ const release = await page.evaluate(async () => {
   const prev = window.__balance.waterDrama.mireSeconds
   window.__balance.waterDrama.mireSeconds = 5
   calf.mired = 0
-  const t0 = Date.now()
-  while (Date.now() - t0 < 15000 && calf.mired !== undefined && !calf.dead) await sleep(200)
+  await window.__pollSim(15, () => calf.mired === undefined || calf.dead, 65000)
   window.__balance.waterDrama.mireSeconds = prev
   const released = calf.mired === undefined && !calf.dead
   fam.dispose()
@@ -2934,7 +2919,6 @@ check(
 // through the existing hunt kill. Synthetic family; the calf dies via a
 // forced hunt with the parent held clear of the too-late radius.
 const vigil = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p0 = window.__game.getState().pos
   const fam = window.__makeTestFamily(p0.x + 10, p0.z + 8)
   const parent = fam.parent
@@ -2956,26 +2940,22 @@ const vigil = await page.evaluate(async () => {
   st.pz = calf.z
   st.timer = 0
   const out = { calfDead: false, vigilSet: false, closed: null, held: null, carcassKept: false, drawn: false, spawnDist: null, parentTaken: false }
-  const tc = Date.now()
-  while (Date.now() - tc < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
   if (calf.caught !== undefined && !calf.dead) {
     parent.x = calf.x - 40 // in place for the vigil walk, out of charge reach
     parent.z = calf.z
   }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 20000 && !calf.dead) await sleep(150)
+  await window.__pollSim(20, () => calf.dead, 80000)
   out.calfDead = !!calf.dead
   if (!calf.dead) return out
-  const t1 = Date.now()
-  while (Date.now() - t1 < 15000 && parent.vigil === undefined) await sleep(150)
+  await window.__pollSim(15, () => parent.vigil !== undefined, 65000)
   out.vigilSet = parent.vigil !== undefined
   if (!out.vigilSet) return out
   // The parent closes on the carcass and holds there.
-  const t2 = Date.now()
-  while (Date.now() - t2 < 25000 && Math.hypot(parent.x - calf.x, parent.z - calf.z) > 2.2) await sleep(150)
+  await window.__pollSim(25, () => Math.hypot(parent.x - calf.x, parent.z - calf.z) <= 2.2, 95000)
   out.closed = +Math.hypot(parent.x - calf.x, parent.z - calf.z).toFixed(2)
   const holdA = { x: parent.x, z: parent.z }
-  await sleep(2500)
+  await window.__sleepSim(2.5)
   out.held = +Math.hypot(parent.x - holdA.x, parent.z - holdA.z).toFixed(2)
   // While the keeper stands, the carcass/remnant is not consumed away by a
   // landing scavenger — something of the calf is still there.
@@ -2983,17 +2963,16 @@ const vigil = await page.evaluate(async () => {
   out.carcassKept = herds.zebra.includes(calf) || parent.vigil !== undefined
   // The DRAW: a predator claims the idle hunt on its own (no pinning here),
   // spawning beyond the view ring, and takes the standing parent.
-  const t3 = Date.now()
-  while (Date.now() - t3 < 90000) {
+  await window.__pollSim(90, () => {
     if (st.mode === 'chase' && st.victim === parent) {
       if (!out.drawn) {
         out.drawn = true
         out.spawnDist = +Math.hypot(st.lx - parent.x, st.lz - parent.z).toFixed(1)
       }
     }
-    if (parent.dead) { out.parentTaken = true; break }
-    await sleep(200)
-  }
+    if (parent.dead) { out.parentTaken = true; return true }
+    return false
+  })
   fam.dispose()
   return out
 })
@@ -3018,7 +2997,6 @@ check(
 // Backstop (121e): with the draw effectively disabled and a short window,
 // the vigil expires and the parent lives — a chosen death, never a stuck one.
 const vigilBackstop = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const bal = window.__balance.vigil
   const prevDelay = bal.predatorDelay
   const prevSeconds = bal.seconds
@@ -3034,17 +3012,14 @@ const vigilBackstop = await page.evaluate(async () => {
   st.mode = 'chase'; st.victim = calf; st.victimHunt = true
   st.lx = calf.x + 10; st.lz = calf.z + 2; st.px = calf.x; st.pz = calf.z; st.timer = 0
   const out = { vigilSet: false, cleared: false, parentAlive: false }
-  const tc = Date.now()
-  while (Date.now() - tc < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
   if (calf.caught !== undefined && !calf.dead) {
     parent.x = calf.x - 40
     parent.z = calf.z
   }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 30000 && parent.vigil === undefined) await sleep(150)
+  await window.__pollSim(30, () => parent.vigil !== undefined, 110000)
   out.vigilSet = parent.vigil !== undefined
-  const t1 = Date.now()
-  while (Date.now() - t1 < 20000 && parent.vigil !== undefined) await sleep(200)
+  await window.__pollSim(20, () => parent.vigil === undefined, 80000)
   out.cleared = parent.vigil === undefined
   out.parentAlive = !parent.dead
   bal.predatorDelay = prevDelay
@@ -3067,7 +3042,6 @@ check(
 // sin-hash roll lands at ~0 — far below the natural giraffe-vs-lion 0.75.
 // The synthetic family is a GIRAFFE pair — the species carries the weapon.
 const kick = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let liveChunk
   for (const sp of Object.keys(herds)) {
@@ -3092,8 +3066,7 @@ const kick = await page.evaluate(async () => {
   st.pz = calf.z
   st.timer = 0
   const out = { caught: false, kicked: false, calfAlive: false, parentAlive: false, lionLeft: false }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
   out.caught = calf.caught !== undefined
   if (out.caught && !calf.dead) {
     // Deterministic resolution (point 125): place the parent exactly on the
@@ -3109,15 +3082,14 @@ const kick = await page.evaluate(async () => {
   }
   // The parent stands at contact; the roll — forced to ~0 — drives the
   // hunt off.
-  const t1 = Date.now()
-  while (Date.now() - t1 < 25000) {
+  await window.__pollSim(25, () => {
     if (parent.kick !== undefined) out.kicked = true
     if (st.mode === 'leave' || st.mode === 'idle') { out.lionLeft = true }
-    if (out.kicked && out.lionLeft) break
-    if (calf.dead || parent.dead) break
-    await sleep(120)
-  }
-  await sleep(1500)
+    if (out.kicked && out.lionLeft) return true
+    if (calf.dead || parent.dead) return true
+    return false
+  })
+  await window.__sleepSim(1.5)
   out.calfAlive = !calf.dead && calf.caught === undefined
   out.parentAlive = !parent.dead
   herds.giraffe = herds.giraffe.filter((a) => a !== parent && a !== calf)
@@ -3137,7 +3109,6 @@ check(
 // an ordinary carcass the scavengers may work (dead, NOT lionFed), and the
 // unwounded parent simply rejoins — no vigil, it fought.
 const revenge = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let liveChunk
   for (const sp of Object.keys(herds)) {
@@ -3166,21 +3137,19 @@ const revenge = await page.evaluate(async () => {
   const pd = window.__balance.parentDefense
   pd.forceOutcome = 'kill'
   const out = { caught: false, calfAlive: false, parentAlive: false, huntEnded: false, carcass: false, notLionFed: false, scavenged: false }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
   out.caught = calf.caught !== undefined
   if (out.caught && !calf.dead) {
     parent.x = calf.x - 15
     parent.z = calf.z
   }
-  const t1 = Date.now()
   let corpse = null
-  while (Date.now() - t1 < 25000) {
+  await window.__pollSim(25, () => {
     corpse = (herds.hyena ?? []).find((h) => h.dead) ?? null
-    if (corpse && calf.caught === undefined) break
-    if (calf.dead || parent.dead) break
-    await sleep(150)
-  }
+    if (corpse && calf.caught === undefined) return true
+    if (calf.dead || parent.dead) return true
+    return false
+  })
   out.calfAlive = !calf.dead && calf.caught === undefined
   out.parentAlive = !parent.dead
   out.huntEnded = st.mode === 'idle' || st.mode === 'leave'
@@ -3190,12 +3159,11 @@ const revenge = await page.evaluate(async () => {
   // binds to it or its dissolve starts falling.
   if (corpse) {
     const d0 = corpse.dissolve
-    const t2 = Date.now()
-    while (Date.now() - t2 < 25000) {
+    await window.__pollSim(25, () => {
       const bound = window.__wildlife.scavenger.current.target === corpse
-      if (bound || (corpse.dissolve !== undefined && d0 !== undefined && corpse.dissolve < d0)) { out.scavenged = true; break }
-      await sleep(300)
-    }
+      if (bound || (corpse.dissolve !== undefined && d0 !== undefined && corpse.dissolve < d0)) { out.scavenged = true; return true }
+      return false
+    })
   }
   pd.forceOutcome = undefined
   herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
@@ -3224,7 +3192,6 @@ check(
 // The drama must RESOLVE (the point-118 lesson): cub freed, lioness alive, hunt
 // left. A staging roll in the 5% taken band retries a fresh pair.
 const cubDefence = await page.evaluate(async () => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     const herds = window.__wildlife.herdsRef.current
     let liveChunk
     for (const sp of Object.keys(herds)) {
@@ -3254,12 +3221,11 @@ const cubDefence = await page.evaluate(async () => {
     const pd = window.__balance.parentDefense
     pd.forceOutcome = 'driveOff'
     const out = { isLionCub, resolved: false, cubAlive: false, lionessAlive: false, huntLeft: false, mode: '' }
-    const t0 = Date.now()
-    while (Date.now() - t0 < 30000) {
-      if (st.mode === 'leave' || st.mode === 'idle') break
-      if (cub.dead || lioness.dead) break
-      await sleep(120)
-    }
+    await window.__pollSim(30, () => {
+      if (st.mode === 'leave' || st.mode === 'idle') return true
+      if (cub.dead || lioness.dead) return true
+      return false
+    })
     out.mode = st.mode
     out.cubAlive = !cub.dead && cub.caught === undefined
     out.lionessAlive = !lioness.dead
@@ -3329,7 +3295,6 @@ await page.evaluate(() => {
 // balance.family.rescueBurst) — measure the charge to a caught calf over a
 // fixed interval and assert it clearly beats the ordinary walk (3).
 const burst = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   let liveChunk
   for (const sp of Object.keys(herds)) {
@@ -3352,20 +3317,19 @@ const burst = await page.evaluate(async () => {
   st.pz = calf.z
   st.timer = 0
   const out = { caught: false, speed: 0, walk: 3 }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 30000 && calf.caught === undefined && !calf.dead) await sleep(100)
+  await window.__pollSim(30, () => calf.caught !== undefined || calf.dead, 110000)
   out.caught = calf.caught !== undefined && !calf.dead
   if (out.caught) {
     // Park the charging parent 20 out and time one second of its charge —
     // well short of the sacrifice contact, so no outcome roll interferes.
     parent.x = calf.x - 20
     parent.z = calf.z
-    await sleep(150)
+    await window.__sleepSim(0.15)
     const sx = parent.x
     const sz = parent.z
-    const s0 = Date.now()
-    await sleep(1000)
-    const dts = (Date.now() - s0) / 1000
+    const s0 = window.__simTime()
+    await window.__sleepSim(1)
+    const dts = window.__simTime() - s0
     out.speed = +(Math.hypot(parent.x - sx, parent.z - sz) / dts).toFixed(2)
   }
   herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
@@ -3571,7 +3535,6 @@ await page.screenshot({ path: `${OUT}129-crocodile-hidden.png` })
 // with the cycle phase forced into the standing-at-the-bank window.
 const crocDrama = async (mode, attempt = 0) =>
   page.evaluate(async (MODE) => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
     const herds = window.__wildlife.herdsRef.current
     const seed = window.__game.getState().seed
     const U = 10
@@ -3628,8 +3591,7 @@ const crocDrama = async (mode, attempt = 0) =>
     let lastX = croc.x
     let lastZ = croc.z
     let lastT = Date.now()
-    const t0 = Date.now()
-    while (Date.now() - t0 < 30000) {
+    await window.__pollSim(30, () => {
       // Retune the phase every poll: the standing window is 30% of the cycle,
       // so a fine sweep lands inside it within a couple of seconds. Refresh
       // the stand itself too — nothing may shed the drink target pre-grip.
@@ -3648,10 +3610,10 @@ const crocDrama = async (mode, attempt = 0) =>
         parent.child = calf
         calf.parent = parent
         herds.zebra.push(parent)
-        break
+        return true
       }
-      await sleep(60)
-    }
+      return false
+    })
     if (!out.gripped) out.diag = { drink: !!calf.drink, dist: +Math.hypot(calf.x - bankX, calf.z - bankZ).toFixed(1), crocLunge: croc.lunge !== undefined }
     if (out.gripped && MODE.kind !== 'lunge') {
       // Park on the LAND side of the bank (the unit vector water -> bank):
@@ -3665,26 +3627,23 @@ const crocDrama = async (mode, attempt = 0) =>
         // wait until the struggle window is nearly spent, then stand the
         // parent just inside the too-late ring (3.2) but too far to cover
         // the sacrifice reach (1.3) in the time left.
-        const tw = Date.now()
-        while (Date.now() - tw < 8000 && calf.caught !== undefined && calf.caught > 0.25) await sleep(30)
+        await window.__pollSim(8, () => calf.caught === undefined || calf.caught <= 0.25, 44000)
         parent.x = calf.x + (lx / ll2) * 3.1
         parent.z = calf.z + (lz / ll2) * 3.1
       } else {
         parent.x = calf.x + (lx / ll2) * 15
         parent.z = calf.z + (lz / ll2) * 15
       }
-      const t1 = Date.now()
-      while (Date.now() - t1 < 25000) {
-        if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead) break
-        if (MODE.kind === 'sacrifice' && parent.dead) break
-        if (MODE.kind === 'toolate' && calf.dead) break
-        await sleep(100)
-      }
-      await sleep(600)
+      await window.__pollSim(25, () => {
+        if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead) return true
+        if (MODE.kind === 'sacrifice' && parent.dead) return true
+        if (MODE.kind === 'toolate' && calf.dead) return true
+        return false
+      })
+      await window.__sleepSim(0.6)
     } else if (out.gripped) {
       // No parent interferes: the window expires and the kill sinks.
-      const t1 = Date.now()
-      while (Date.now() - t1 < 12000 && !calf.dead) await sleep(150)
+      await window.__pollSim(12, () => calf.dead, 56000)
     }
     out.calfAlive = !calf.dead
     out.parentAlive = !parent.dead
@@ -3740,7 +3699,6 @@ await pinFamily(-2.9, 34.2)
 // has run a few frames — under load that takes visibly longer, so poll until
 // the spacing holds instead of sampling a single instant.
 const spacing = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const RAD = { elephant: 1.3, giraffe: 0.9, zebra: 0.7, wildebeest: 0.75, antelope: 0.6, warthog: 0.45, flamingo: 0.25 }
   const sample = () => {
     const herds = window.__wildlife.herdsRef.current
@@ -3765,11 +3723,10 @@ const spacing = await page.evaluate(async () => {
     return { animals: all.length, worst: +worst.toFixed(3) }
   }
   let s = sample()
-  const deadline = Date.now() + 8000
-  while (Date.now() < deadline && !(s.animals > 5 && s.worst >= 0.7)) {
-    await sleep(200)
+  await window.__pollSim(8, () => {
     s = sample()
-  }
+    return s.animals > 5 && s.worst >= 0.7
+  })
   return s
 })
 check('spawned animals keep body spacing (no two inside one another)',
@@ -3780,7 +3737,6 @@ check('spawned animals keep body spacing (no two inside one another)',
 // backstop sweep. Flamingos are shoreline waders and exempt. Poll until the
 // sweep (1/7 of the animals per frame) has settled everyone.
 const inWater = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const seed = window.__game.getState().seed
   const count = () => {
     const herds = window.__wildlife.herdsRef.current
@@ -3803,17 +3759,15 @@ const inWater = await page.evaluate(async () => {
     return { bad, seen }
   }
   let r = count()
-  const deadline = Date.now() + 6000
-  while (Date.now() < deadline && r.bad > 0) {
-    await sleep(250)
+  await window.__pollSim(6, () => {
     r = count()
-  }
+    return r.bad === 0
+  })
   return r
 })
 check('no animal stands in river/lake water (banks only)', inWater.seen > 10 && inWater.bad === 0, JSON.stringify(inWater))
 
 const parting = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   // Two live grazers of the same species, neither in a scripted drama.
   let a = null, b = null, sp = null
@@ -3829,13 +3783,11 @@ const parting = await page.evaluate(async () => {
   // Drop B onto A: they must part instead of standing inside one another.
   b.x = a.x
   b.z = a.z
-  const t0 = Date.now()
   let d = 0
-  while (Date.now() - t0 < 8000) {
+  await window.__pollSim(8, () => {
     d = Math.hypot(a.x - b.x, a.z - b.z)
-    if (d >= minD * 0.9) break
-    await sleep(80)
-  }
+    return d >= minD * 0.9
+  })
   return { found: true, sp, minD: +minD.toFixed(2), d: +d.toFixed(2), parted: d >= minD * 0.9 }
 })
 check('an animal placed onto another parts from it (no walking through)',
@@ -3847,7 +3799,6 @@ check('an animal placed onto another parts from it (no walking through)',
 // flies off and despawns only well outside the view. The kill flock flies the
 // same pattern.
 const vulFlight = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const w = window.__wildlife
   const herds = w.herdsRef.current
   const p = () => window.__game.getState().pos
@@ -3866,32 +3817,29 @@ const vulFlight = await page.evaluate(async () => {
   sc.target = null
   sc.mode = 'idle'
   const out = { spawnDist: null, landed: false, outSeen: false, hideDist: null }
-  let t0 = Date.now()
-  while (Date.now() - t0 < 60000) {
+  await window.__pollSim(60, () => {
     herds.elephant.length = 0 // no tramples: the injected carcass stays the nearest target
     if (sc.target === carcass && sc.mode === 'in') {
       out.spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
-      break
+      return true
     }
-    await sleep(40)
-  }
-  t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+    return false
+  })
+  await window.__pollSim(30, () => {
     herds.elephant.length = 0
-    if (sc.landed) { out.landed = true; break }
-    await sleep(100)
-  }
+    if (sc.landed) { out.landed = true; return true }
+    return false
+  })
   carcass.dissolve = 0.02 // fast-forward the meal; the carcass is removed
-  t0 = Date.now()
   let lastOut = null
-  while (Date.now() - t0 < 30000) {
+  await window.__pollSim(30, () => {
     if (sc.mode === 'out') {
       out.outSeen = true
       lastOut = Math.hypot(sc.x - p().x, sc.z - p().z)
     }
-    if (out.outSeen && sc.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); break }
-    await sleep(60)
-  }
+    if (out.outSeen && sc.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); return true }
+    return false
+  })
   return out
 })
 check('the scavenger spawns beyond the view ring and flies in (no popping in)',
@@ -3917,15 +3865,14 @@ const vulZoom = await page.evaluate(async () => {
   sc.target = null
   sc.mode = 'idle'
   let spawnDist = null
-  const t0 = Date.now()
-  while (Date.now() - t0 < 60000) {
+  await window.__pollSim(60, () => {
     herds.elephant.length = 0 // zoom 2 streams in fresh elephants — no tramples
     if (sc.target === carcass && sc.mode === 'in') {
       spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
-      break
+      return true
     }
-    await sleep(40)
-  }
+    return false
+  })
   // Clean up: consume the carcass and reset the zoom.
   carcass.dissolve = 0.01
   await sleep(200)
@@ -3940,7 +3887,6 @@ check('a wider zoom pushes the vulture spawn ring proportionally out',
 
 // The kill-circling flock flies in and off the same way (no popping).
 const killFlock = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   const f = window.__vultures.killFlight.current
@@ -3962,24 +3908,22 @@ const killFlock = await page.evaluate(async () => {
   L.mode = 'feed'
   L.timer = 90
   const out = { spawnDist: null, arrived: false, outSeen: false, hideDist: null }
-  let t0 = Date.now()
-  while (Date.now() - t0 < 60000) {
+  await window.__pollSim(60, () => {
     if (f.mode === 'in' && out.spawnDist === null) out.spawnDist = +Math.hypot(f.x - p().x, f.z - p().z).toFixed(1)
-    if (f.mode === 'active') { out.arrived = true; break }
-    await sleep(50)
-  }
+    if (f.mode === 'active') { out.arrived = true; return true }
+    return false
+  })
   L.mode = 'idle'
   L.timer = 99999
-  t0 = Date.now()
   let lastOut = null
-  while (Date.now() - t0 < 30000) {
+  await window.__pollSim(30, () => {
     if (f.mode === 'out') {
       out.outSeen = true
       lastOut = Math.hypot(f.x - p().x, f.z - p().z)
     }
-    if (out.outSeen && f.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); break }
-    await sleep(60)
-  }
+    if (out.outSeen && f.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); return true }
+    return false
+  })
   return out
 })
 check('the kill flock flies in from beyond the view ring and settles over the kill',
@@ -3992,7 +3936,6 @@ check('when the kill scene ends the flock flies off and despawns well outside th
 // over a kill that never happened. The flock is keyed on 'feed' or a real
 // remnant (killFlockActive), never on 'leave' alone.
 const driveOffNoFlock = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   const f = window.__vultures.killFlight.current
@@ -4006,19 +3949,17 @@ const driveOffNoFlock = await page.evaluate(async () => {
   L.victim = null; L.victimHunt = false
   L.px = p().x + 8; L.pz = p().z; L.lx = L.px + 0.7; L.lz = L.pz + 0.25
   L.mode = 'feed'; L.timer = 90
-  let t0 = Date.now()
-  while (Date.now() - t0 < 40000 && f.mode !== 'active') await sleep(50)
+  await window.__pollSim(40, () => f.mode === 'active', 140000)
   const gathered = f.mode === 'active'
   // Drive-off: predator repelled, walks clear, NO kill/remnant left behind.
   purge()
   L.mode = 'leave'
   L.lx = p().x + 40; L.lz = p().z // cleared well past the descend distance
   let leftAgain = false
-  t0 = Date.now()
-  while (Date.now() - t0 < 15000) {
-    if (f.mode === 'out' || f.mode === 'idle') { leftAgain = true; break }
-    await sleep(60)
-  }
+  await window.__pollSim(15, () => {
+    if (f.mode === 'out' || f.mode === 'idle') { leftAgain = true; return true }
+    return false
+  })
   L.mode = 'idle'; L.timer = 99999
   return { gathered, leftAgain, finalMode: f.mode }
 })
@@ -4030,7 +3971,6 @@ check('a drive-off leaves no kill, so the gathered flock flies off instead of la
 // only well beyond the visible surroundings; a chase that strays aborts past
 // the same ring — nothing vanishes in sight.
 const leaveOffstage = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   // Calibrated at zoom 1 (default is the closer 0.5).
@@ -4045,15 +3985,14 @@ const leaveOffstage = await page.evaluate(async () => {
   L.mode = 'feed'
   L.timer = 0.1 // carcass done at once → leave
   const out = { sawLeave: false, hideDist: null }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 45000) {
+  await window.__pollSim(45, () => {
     if (L.mode === 'leave') out.sawLeave = true
     if (out.sawLeave && L.mode === 'idle') {
       out.hideDist = +Math.hypot(L.lx - p().x, L.lz - p().z).toFixed(1)
-      break
+      return true
     }
-    await sleep(80)
-  }
+    return false
+  })
   L.mode = 'idle'
   L.timer = 99999
   return out
@@ -4063,7 +4002,6 @@ check('after the meal the predator walks off and despawns only outside the view'
   JSON.stringify(leaveOffstage))
 
 const chaseAbort = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   // Calibrated at zoom 1 (default is the closer 0.5).
@@ -4079,14 +4017,13 @@ const chaseAbort = await page.evaluate(async () => {
   L.lionHeading = Math.atan2(L.px - L.lx, L.pz - L.lz)
   L.preyHeading = L.lionHeading
   let abortDist = null
-  const t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  await window.__pollSim(30, () => {
     if (L.mode !== 'chase') {
       abortDist = +Math.hypot(L.lx - p().x, L.lz - p().z).toFixed(1)
-      break
+      return true
     }
-    await sleep(60)
-  }
+    return false
+  })
   L.mode = 'idle'
   L.timer = 99999
   return { abortDist }
@@ -4123,13 +4060,13 @@ const coastLeave = await page.evaluate(async () => {
   L.mode = 'leave'
   const start = { x: L.lx, z: L.lz }
   const out = { ok: true, everOcean: false, samples: 0, moved: 0 }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 8000 && L.mode === 'leave') {
+  await window.__pollSim(8, () => {
+    if (L.mode !== 'leave') return true
     if (window.__terrainType(-L.lz / 10, L.lx / 10, seed) === 'ocean') out.everOcean = true
     out.samples++
     out.moved = Math.hypot(L.lx - start.x, L.lz - start.z)
-    await sleep(80)
-  }
+    return false
+  })
   L.mode = 'idle'
   L.timer = 99999
   if (before.lat !== null) g.debugJumpTo(before.lat, before.lon) // leave the world as found
@@ -4147,7 +4084,6 @@ await page.evaluate(() => {
 
 // Zoom-aware ring: at a narrower zoom the stage edge sits closer in.
 const leaveZoom = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   window.__ui.getState().setTravelZoom(0.5) // view ring 50 → offstage past 80
@@ -4160,14 +4096,13 @@ const leaveZoom = await page.evaluate(async () => {
   L.mode = 'feed'
   L.timer = 0.1
   let hideDist = null
-  const t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  await window.__pollSim(30, () => {
     if (L.mode === 'idle') {
       hideDist = +Math.hypot(L.lx - p().x, L.lz - p().z).toFixed(1)
-      break
+      return true
     }
-    await sleep(60)
-  }
+    return false
+  })
   L.mode = 'idle'
   L.timer = 99999
   window.__ui.getState().setTravelZoom(1)
@@ -4218,12 +4153,10 @@ const remnant = await page.evaluate(async () => {
     scavengerUninvolved: true,
   }
   let rem = null
-  let t0 = Date.now()
-  while (Date.now() - t0 < 10000) {
+  await window.__pollSim(10, () => {
     rem = herds.zebra.find((a) => a.dead && Math.hypot(a.x - L.px, a.z - L.pz) < 1.5)
-    if (rem) break
-    await sleep(60)
-  }
+    return !!rem
+  })
   if (!rem) { L.mode = 'idle'; L.timer = 99999; return out }
   out.remnantFound = true
   out.small = rem.scale < 0.6
@@ -4231,8 +4164,7 @@ const remnant = await page.evaluate(async () => {
   // site, descend blend at the ground) — while the ground scavenger never
   // takes it as a target.
   const kf = () => window.__vultures.killFlight.current
-  t0 = Date.now()
-  while (Date.now() - t0 < 45000) {
+  await window.__pollSim(45, () => {
     if (sc.target === rem) out.scavengerUninvolved = false
     const f = kf()
     // The flock must start its descent while the predator is still walking
@@ -4242,9 +4174,9 @@ const remnant = await page.evaluate(async () => {
       f.mode === 'active' &&
       Math.hypot(f.x - rem.x, f.z - rem.z) < 2.5 &&
       window.__vultures.killDescend.current > 0.7
-    ) { out.flockLanded = true; break }
-    await sleep(100)
-  }
+    ) { out.flockLanded = true; return true }
+    return false
+  })
   // While the flock feeds, no landed bird may sink into the terrain: the dev
   // hook reports the frame's minimum bird clearance above its own ground.
   if (out.flockLanded) {
@@ -4255,13 +4187,12 @@ const remnant = await page.evaluate(async () => {
       await sleep(100)
     }
   }
-  t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  await window.__pollSim(30, () => {
     if (sc.target === rem) out.scavengerUninvolved = false
     if (out.flockLanded && rem.dissolve !== undefined) rem.dissolve = Math.min(rem.dissolve, 0.02) // fast-forward the meal
-    if (!herds.zebra.includes(rem)) { out.consumed = true; break }
-    await sleep(100)
-  }
+    if (!herds.zebra.includes(rem)) { out.consumed = true; return true }
+    return false
+  })
   L.mode = 'idle'
   L.timer = 99999
   return out
@@ -4282,7 +4213,6 @@ check('no landed vulture sinks into the terrain while feeding',
 // the steepest nearby rise and require the (now shared) per-bird clearance,
 // folded into __vultures.clearance, to stay positive while it feeds.
 const scavSlope = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const p0 = window.__game.getState().pos
@@ -4313,20 +4243,15 @@ const scavSlope = await page.evaluate(async () => {
   herds.zebra.push(carcass)
   const sc = window.__wildlife.scavenger.current
   const out = { found: true, rise: +best.rise.toFixed(2), landed: false, minClear: Infinity }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 40000) {
-    if (sc.target === carcass && sc.landed) {
-      out.landed = true
-      // Sample the folded clearance over ~3 s of feeding.
-      const t1 = Date.now()
-      while (Date.now() - t1 < 3000) {
-        const c = window.__vultures?.clearance?.current
-        if (typeof c === 'number' && Number.isFinite(c)) out.minClear = Math.min(out.minClear, c)
-        await sleep(100)
-      }
-      break
-    }
-    await sleep(200)
+  const landed = await window.__pollSim(40, () => sc.target === carcass && sc.landed)
+  if (landed) {
+    out.landed = true
+    // Sample the folded clearance over ~3 s of feeding.
+    await window.__pollSim(3, () => {
+      const c = window.__vultures?.clearance?.current
+      if (typeof c === 'number' && Number.isFinite(c)) out.minClear = Math.min(out.minClear, c)
+      return false
+    })
   }
   herds.zebra = herds.zebra.filter((a) => a !== carcass)
   if (sc.target === carcass) { sc.target = null; sc.landed = false }
@@ -4340,7 +4265,6 @@ check(
 )
 
 const noRemnant = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const L = window.__lionHunt.state
   let calf = null
@@ -4360,7 +4284,7 @@ const noRemnant = await page.evaluate(async () => {
   L.lz = calf.z + 0.25
   L.mode = 'feed'
   L.timer = 0.3
-  await sleep(2500)
+  await window.__sleepSim(2.5)
   const out = { found: true, deadBefore, deadAfter: countDead(), calfAlive: !calf.dead, mode: L.mode }
   L.mode = 'idle'
   L.timer = 99999
@@ -4379,7 +4303,6 @@ await page.evaluate(() => window.__game.getState().debugJumpTo(4.9, 6.1))
 await page.waitForFunction(() => window.__wildlife && window.__game.getState().mode === 'travel', null, { timeout: 15000 })
 await page.waitForTimeout(600)
 const oceanBackstop = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const T = window.__terrainType
@@ -4397,12 +4320,11 @@ const oceanBackstop = await page.evaluate(async () => {
   const zebra = { x: sea[1] * 10, z: -sea[0] * 10, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: 'inject-p15' }
   herds.zebra.push(zebra)
   let rescuedToLand = false
-  const t0 = Date.now()
-  while (Date.now() - t0 < 15000) {
+  await window.__pollSim(15, () => {
     const ll = { lat: -zebra.z / 10, lon: zebra.x / 10 }
-    if (T(ll.lat, ll.lon, seed) !== 'ocean') { rescuedToLand = true; break }
-    await sleep(120)
-  }
+    if (T(ll.lat, ll.lon, seed) !== 'ocean') { rescuedToLand = true; return true }
+    return false
+  })
   const endType = T(-zebra.z / 10, zebra.x / 10, seed)
   herds.zebra = herds.zebra.filter((a) => a !== zebra)
   return { found: true, rescuedToLand, endType }
