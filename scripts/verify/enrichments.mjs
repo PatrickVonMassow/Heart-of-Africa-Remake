@@ -2137,12 +2137,17 @@ const guard = await page.evaluate(async () => {
   // approach instead.
   parent.x = calf.x - 3
   parent.z = calf.z
-  L.mode = 'chase'; L.lx = lx; L.lz = lz; L.px = calf.x; L.pz = calf.z
+  // Register the threat explicitly (point 177): with only mode/lx set, the guard
+  // trigger sat at its range boundary and fired only some runs (a rare trigger
+  // miss, parent barely moving); victim = calf makes the calf the known target so
+  // the parent reliably interposes. The predator stays PINNED (it never advances),
+  // so the calf is not actually caught.
+  L.mode = 'chase'; L.victim = calf; L.victimHunt = true; L.lx = lx; L.lz = lz; L.px = calf.x; L.pz = calf.z
   const dist = () => Math.hypot(parent.x - lx, parent.z - lz)
   const before = dist()
-  // Keep re-pinning the predator so it stays the fixed threat while frames run.
-  const t0 = Date.now()
-  while (Date.now() - t0 < 2800) { L.lx = lx; L.lz = lz; L.mode = 'chase'; await new Promise((r) => setTimeout(r, 60)) }
+  // Re-pin the predator as the fixed threat over a SIM-time window (not wall-clock,
+  // point 177) so the guard has its full duration to close regardless of load.
+  await window.__pollSim(6, () => { L.lx = lx; L.lz = lz; L.mode = 'chase'; L.victim = calf; return false }, 20000)
   const after = dist()
   L.mode = 'idle'; L.timer = 60
   fam.dispose()
