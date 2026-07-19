@@ -935,6 +935,29 @@ function Vegetation() {
         for (let k = 0; k < m.count; k++) out.push([arr[k * 16 + 12], arr[k * 16 + 14]])
         return out
       },
+      // The matrix-borne crown collapse (point 175): the x-scale ratio crown/base
+      // per drawn instance equals `shrink` (1 - dryness*0.6). min < 1 means the
+      // crown is collapsed (dry), ~1 means full (wet). Confirms the collapse is
+      // actually applied to the crown mesh — headless can prove the wiring even
+      // though the WebGPU jitter it fixes cannot be reproduced. null when the
+      // species has no crown mesh or nothing is drawn.
+      crownCollapse: (species: Species): { min: number; max: number; count: number } | null => {
+        const cm = meshes.crown[species]
+        const bm = meshes.base[species]
+        if (!cm || cm.count === 0) return null
+        const c = cm.instanceMatrix.array as Float32Array
+        const b = bm.instanceMatrix.array as Float32Array
+        let min = Infinity
+        let max = -Infinity
+        for (let k = 0; k < cm.count; k++) {
+          const cx = Math.hypot(c[k * 16], c[k * 16 + 1], c[k * 16 + 2])
+          const bx = Math.hypot(b[k * 16], b[k * 16 + 1], b[k * 16 + 2])
+          const r = bx > 0 ? cx / bx : 1
+          if (r < min) min = r
+          if (r > max) max = r
+        }
+        return { min, max, count: cm.count }
+      },
     }
     return () => {
       delete w.__vegetation

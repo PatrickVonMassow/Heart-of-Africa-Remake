@@ -684,21 +684,28 @@ verify suite that proves it.
       and vegetation read a spatially smoothed per-position greenness
       field — the ground samples it per VERTEX through baked seasonUV
       texture coordinates, the vegetation reads a per-INSTANCE seasonTint
-      the CPU BAKES at each rebuild (point 175: sampling that field texture
-      in the flora's vertex stage, over a texture re-uploaded every frame,
-      raced the draw on the WebGPU backend and made the crowns jitter while
-      driving; a baked float never samples the moving texture and is stable
-      on both backends, and the texture now re-uploads only when a texel
-      changed — needs a manual WebGPU check as headless has no adapter) —
+      the CPU BAKES at each rebuild for its COLOUR, while the dry-season crown
+      COLLAPSE rides the crown mesh's own INSTANCE MATRIX (point 175: reading a
+      per-instance attribute in the flora's vertex stage raced its rebuild
+      re-upload on the WebGPU backend and made the crowns jitter and float while
+      driving; the instance matrix is the stable transform path — re-uploaded at
+      the same rebuilds without position jitter — so the crown geometry is split
+      from the trunk (`splitFoliage`) and its matrix carries the collapse,
+      leaving only the imperceptibly-racing colour on the attribute; the CPU
+      collapse/sprout maths mirror the shader in `seasonTint.ts`) —
       zone borders read as
       ~2-degree gradients (a border texel lies strictly between its
       sides), ground flora (bush/grass/papyrus, foliage class 2) sprouts
       from the soil while tree crowns keep the bare-branch collapse, and
       the field is a pure function of the calendar (all pure-tested in
-      `src/render/seasonField.test.ts` and `src/render/flora.test.ts`);
+      `src/render/seasonField.test.ts`, `src/render/flora.test.ts` and the
+      collapse maths in `src/render/seasonTint.test.ts`);
       live, walking changes neither the field nor the slot greens (the
-      witness of the point-151 "flying plants" bug) and the flora at the
-      reported spots stands stable (`scripts/verify/enrichments.mjs`); and
+      witness of the point-151 "flying plants" bug), the flora at the
+      reported spots stands stable, and the dry-season crown collapse actually
+      applies on the crown matrix with the debug toggle gating it — the WebGPU
+      jitter it replaced is not reproducible headless, but the collapse wiring is
+      (`__vegetation.crownCollapse`, `scripts/verify/enrichments.mjs`); and
       the dressing no longer JUMPS while driving (points 164 + 171): a probe
       traced the remaining jump to the streaming, not the season — the flora
       rebuilt a fixed neighbourhood on every chunk crossing, so its edge

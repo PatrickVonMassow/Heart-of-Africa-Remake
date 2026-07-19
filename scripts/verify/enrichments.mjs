@@ -4503,6 +4503,43 @@ check(
   JSON.stringify(floraSeasonRebuild),
 )
 
+// Point 175: the collapse must still APPLY after moving it off the racy
+// positionNode onto the crown INSTANCE MATRIX — the effect was previously only
+// pure-tested, so a wiring break would pass unseen. On the Serengeti acacia
+// savanna, force a dry season and drive to bake: the crown mesh's x-scale ratio
+// to its trunk mesh must shrink (min < 1 = the crowns collapse); with the debug
+// toggle OFF the crowns stay full (ratio 1). The WebGPU jitter this replaced is
+// not reproducible headless, but the collapse itself is.
+const crownCollapse = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const drive = async () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' }))
+    await sleep(1600)
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' }))
+    await sleep(600)
+  }
+  window.__game.getState().debugJumpTo(-3.2, 34.2) // Serengeti acacia savanna (no village to auto-enter)
+  window.__balance.season.weatherStrength = 1
+  window.__ui.getState().setTravelZoom(0.5)
+  await sleep(1500)
+  window.__ui.getState().setSeasonCollapseEnabled(true)
+  window.__ui.getState().setSeasonWetnessOverride(0) // force dry
+  await sleep(2500) // let the season field converge to dry before the bake
+  await drive()
+  const dry = window.__vegetation.crownCollapse('acacia')
+  window.__ui.getState().setSeasonCollapseEnabled(false) // the toggle gates the collapse
+  await drive()
+  const off = window.__vegetation.crownCollapse('acacia')
+  window.__ui.getState().setSeasonCollapseEnabled(true)
+  window.__ui.getState().setSeasonWetnessOverride(null)
+  return { dry, off }
+})
+check(
+  'the dry-season crown collapse applies on the instance matrix and the toggle gates it (point 175)',
+  !!crownCollapse.dry && crownCollapse.dry.min < 0.75 && !!crownCollapse.off && crownCollapse.off.min > 0.98,
+  JSON.stringify(crownCollapse),
+)
+
 // Point 167: the rain no longer snaps on at a climate-zone border. Walk a N-S
 // line across the Sahel -> Sahara border along 0°E in August and read the
 // traversal wetness at each step: it must fade as a GRADIENT (no single step
