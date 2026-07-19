@@ -6533,19 +6533,53 @@ the remaining open points in their numeric order.
   instead of projection/sim-clock. Each confirmed finding is fixed and covered by a
   Pillar-1 invariant or a pure test; a non-trivial one may become its own TASKS
   point + atomic commit; small ones fixed inline. LOG every finding.
-  PILLAR 3 — a MANUAL WEBGPU CHECKLIST (docs/webgpu-manual-check.md): headless has
-  no WebGPU adapter, so truly WebGPU-only visual bugs (shader jitter like 175, some
-  temporal pop/float) CANNOT be caught headless. Enumerate the concrete route,
-  zoom, season and dramas to drive and watch on real WebGPU hardware and what a
-  pass looks like, so the human layer is a STRUCTURED pass, not chance.
+  PILLAR 3 — an AUTOMATED WEBGPU LANE (the headless-WebGPU breakthrough,
+  19.07.2026 — this replaces the old "manual checklist because headless can't do
+  WebGPU"). PROVEN: WebGPU IS testable headless AND autonomously — launch SYSTEM
+  Chrome (Playwright channel:'chrome') with --headless=new + --enable-unsafe-webgpu
+  + --enable-gpu and navigate to a localhost (SECURE-CONTEXT) page; the game then
+  runs on the REAL WebGPU backend (measured: __renderer.backend.isWebGPUBackend =
+  true, webglFallback = false, a correct ~548 KB scene screenshot, ZERO console
+  errors, on the NVIDIA GPU, no window). The old belief was a Playwright
+  BUNDLED-Chromium limitation (its headless requestDevice fails), not a principle.
+  BUILD a WebGPU LANE into the verify harness — a launcher switch: bundled-chromium
+  / WebGL2 (as today) PLUS system-Chrome / WebGPU — and run the Pillar-1 invariant
+  harness AND the acceptance screenshots on the WebGPU backend, ASSERTING the
+  backend really is WebGPU (isWebGPUBackend, never a silent fallback). This catches
+  the WebGPU-ONLY classes autonomously: the point-175 crown jitter, the reverted
+  TRAA/SSR black-screen (pt.32), any backend-specific race. Keep the WebGL2 lane
+  too (the game ships both). This is the FIRST step of 184 — Pillars 1-2 gain their
+  real teeth once the invariants run on the actual WebGPU backend the player uses;
+  and as the lane's own proof, try to REPRODUCE point 175's jitter headless on it.
+  A tiny manual note remains only for what even the WebGPU lane cannot see (a
+  subjective look call). Caveat: needs a real GPU + Chrome (present on the user's
+  machine); flag if a GPU-less CI would fall back.
+  DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
+  WebGPU the PRIMARY/default browser-regression lane — it matches what the player
+  runs and catches the WebGPU-only class across the WHOLE suite, not just a special
+  test. THREE conditions before flipping the default: (a) KEEP a WebGL2 lane — the
+  game ships the WebGL2 fallback for WebGPU-less hardware (CLAUDE §3), so it must
+  not go untested (at least a smoke subset every run, the full suite periodically);
+  (b) VALIDATE DETERMINISM FIRST — a backend switch shifts every check's render/RAF
+  timing profile (incl. the ~15 s WebGPU cold-load stall, App.tsx), and since 177
+  is entirely about timing determinism, confirm all ~200 checks stay green AND
+  flake-free on WebGPU across several runs before defaulting, or a new flake source
+  replaces the old; (c) MEASURE THE COST — the per-launch WebGPU cold-load slows
+  the regression; quantify it and, if steep, keep the fast WebGL2 lane for the
+  quick everyday gate and run WebGPU on the LARGE tier. Also revisit the
+  __ttsForceWasm hook (CLAUDE §3): with a real WebGPU device present, decide
+  whether the voice suite still forces WASM (the render-WebGPU vs onnxruntime-
+  WebGPU GPU-process contention, point 117) or exercises the WebGPU voice path.
   ACCEPTANCE: (1) the invariant suite (Pillar 1) exists, covers I1-I7 across the
   WHOLE standard-mode zoom range (0.25-0.5, both ends, NEVER a debug zoom — the
   user's binding 19.07.2026 addition specifically for 184), and is GREEN across at
   least THREE consecutive LARGE runs with NO rotating flakes (sim-clock/projection
   throughout); (2) every audit finding (Pillar 2) is fixed
   and regression-covered; (3) the full LARGE regression is green 3x flake-free; (4)
-  the WebGPU checklist (Pillar 3) is written and handed to the user, naming exactly
-  what only a manual WebGPU pass can confirm; (5) a written summary of what was
+  the WebGPU lane (Pillar 3) runs the invariant harness AND the acceptance
+  screenshots on the REAL WebGPU backend (isWebGPUBackend asserted, no silent
+  fallback) and is green, with any residual manual-only item named; (5) a written
+  summary of what was
   audited, found, fixed and the residual risk. Only THEN the final closing run,
   then the v0.2 tag (174). Docs: quality/process point; adds a CLAUDE 7.1 verifiable
   line for the new invariant suite and updates the CLAUDE 5/7.2 test architecture;
