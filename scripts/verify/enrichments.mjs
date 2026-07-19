@@ -1187,12 +1187,16 @@ const noPop = await page.evaluate(async () => {
   const p0 = { ...window.__game.getState().pos }
   for (let k = 0; k <= 14; k++) {
     window.__game.setState({ pos: { x: p0.x + k * 16, z: p0.z - k * 16 } })
-    await sleep(420)
+    // Wait for the fixed-rate (0.12/frame, not dt-scaled) camera lerp to catch up
+    // before scanning (point 177/165): a wall-clock sleep leaves the camera
+    // mid-lerp under load, and a still-moving camera reveals a just-seeded
+    // off-screen animal = a false pop. settled() is frame-count-true.
+    await window.__pollSim(5, () => window.__camera.settled(), 12000)
     scan()
   }
   // Zoom-out reveals a wider field: its freshly-covered chunks must not pop either.
   window.__ui.getState().setTravelZoom(1.3)
-  for (let k = 0; k < 6; k++) { await sleep(320); scan() }
+  for (let k = 0; k < 6; k++) { await window.__pollSim(5, () => window.__camera.settled(), 12000); scan() }
   window.__ui.getState().setTravelZoom(0.5)
   window.__ui.getState().setSeasonWetnessOverride(null)
   return { pops }
@@ -1226,6 +1230,26 @@ const moreCalves = await page.evaluate(async () => {
 })
 check('a higher calfFraction raises more juveniles (point 169)',
   moreCalves.many > moreCalves.few && moreCalves.few >= 1, JSON.stringify(moreCalves))
+
+// Deterministic drama polling (point 177): budget in SIM-seconds (from
+// __wildlife.simTime, accumulated from the clamped dt) instead of wall-clock, so a
+// headless-load fps drop cannot time a drama out early. A generous wall cap still
+// fails a genuinely stuck sim (0 fps) rather than hanging. Installed once here,
+// before the first drama poll; every subsequent page.evaluate sees it on window.
+await page.evaluate(() => {
+  window.__simTime = () => window.__wildlife?.simTime?.() ?? 0
+  window.__pollSim = async (simBudget, doneFn, wallCapMs) => {
+    const s0 = window.__simTime()
+    const t0 = Date.now()
+    const cap = wallCapMs ?? simBudget * 3000 + 20000
+    while (window.__simTime() - s0 < simBudget && Date.now() - t0 < cap) {
+      if (doneFn()) return true
+      await new Promise((r) => setTimeout(r, 80))
+    }
+    return doneFn()
+  }
+  window.__sleepSim = (simSecs, wallCapMs) => window.__pollSim(simSecs, () => false, wallCapMs)
+})
 
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
@@ -1655,14 +1679,19 @@ const grassFire = await page.evaluate(async () => {
   window.__wildlife.igniteFire(p0.x + 6, p0.z + 4, 0)
   const f = window.__wildlife.fire
   const out = { trapped: false, calfDead: false, parentDead: false, resolved: false, bandSeen: false }
-  const t0 = Date.now()
-  while (Date.now() - t0 < 40000) {
+  await window.__pollSim(40, () => {
+    // Staging fix (point 177): hold the calf in the fire front's narrow catch
+    // band until it is caught — its young-animal gambol/idle drift otherwise
+    // slides it out of the band, so the fire smoulders without ever trapping it
+    // (the observed resolved-but-not-trapped flake), and a stray natural calf
+    // could claim the single victim slot from outside the shoved corridor.
+    if (calf.fireTrapped === undefined && !calf.dead) { calf.x = p0.x + 6; calf.z = p0.z + 14 }
     if (calf.fireTrapped !== undefined) out.trapped = true
     if (calf.dead) out.calfDead = true
     if (parent.dead) out.parentDead = true
-    if (f.mode === 'smoulder') { out.resolved = true; out.bandSeen = true; break }
-    await sleep(100)
-  }
+    if (f.mode === 'smoulder') { out.resolved = true; out.bandSeen = true; return true }
+    return false
+  })
   // Cleanup: the staged family retires; the fire resolves on its own clock.
   herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
   window.__ui.getState().setSeasonWetnessOverride(null)
