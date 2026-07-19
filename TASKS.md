@@ -6273,8 +6273,17 @@ the remaining open points in their numeric order.
   — an animal at ~0.6° from water walks toward the bank in the forced dry season.
   (Found 18.07.2026 by the point-173 subsystem analysis; queued at the batch end.)
 
-- [ ] 177. Make the enrichments family-drama / seeder staging DETERMINISTIC so the
-  LARGE regression stops flaking. The point-173 closing run showed the recurring
+- [x] 177. Make the enrichments family-drama / seeder staging DETERMINISTIC so the
+  LARGE regression stops flaking. DONE 20.07.2026: the bulk sim-budget conversion
+  (17cdb21) plus the guard/129 fixes, then SIX further distinct flaky checks
+  hardened — croc noTeleport (wall-clock -> sim clock), the point-102 vicinity
+  (wall wait + drift -> sim-poll for the top-up), point-165 (judged only at the
+  achievable zoom 0.5, dropping the impossible debug-zoom over-test), the elephant
+  trample (inject the victim instead of hoping the spawn), croc placement (verify
+  the water HOME, not a transient lunge position), and body spacing (exclude
+  drama-locked animals + widen the settle budget). enrichments now passes 200/0
+  across THREE consecutive idle runs, and the under-load run (during the user's
+  play) was clean but for the one now-fixed croc check. The point-173 closing run showed the recurring
   pain plainly: the LARGE run and its retries each failed a DIFFERENT rotating
   subset of the `scripts/verify/enrichments.mjs` staging checks (seen: 118 the
   parent-orbit-vs-flee, 165 the vicinity-seeder pop, 145a the burning-grass catch,
