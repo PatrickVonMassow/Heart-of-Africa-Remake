@@ -1272,6 +1272,12 @@ function Herds() {
   const pool = getWildlifeMeshes()
   const meshRefs = useRef<Partial<Record<Species, THREE.InstancedMesh>>>(pool.adult)
   const herdsRef = useRef<Record<Species, Animal[]> | null>(null)
+  // Accumulated SIM time (sum of the clamped dt) and frame count, exposed for the
+  // verification (point 177): the sim advances in clamped dt (max 0.1/frame), so
+  // under headless load wall-time outruns sim-time — drama checks that budget in
+  // sim-time via these stay deterministic where a wall-clock budget would flake.
+  const simTimeRef = useRef(0)
+  const frameCountRef = useRef(0)
   // Chunks currently populated in herdsRef (streaming key set).
   const spawnedChunks = useRef(new Set<string>())
   // Shared per-herd roaming state (heading + arc phase), keyed by herd id.
@@ -1393,7 +1399,7 @@ function Herds() {
       FIRE_STATE.victim = null
       FIRE_STATE.keeper = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, igniteFire }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, igniteFire, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
     return () => {
       delete w.__wildlife
     }
@@ -1412,6 +1418,10 @@ function Herds() {
 
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.1)
+    // Accumulate the SIM clock (point 177): drama verifications budget in these
+    // sim-seconds so they stay deterministic when headless load drops the fps.
+    simTimeRef.current += dt
+    frameCountRef.current++
     // The one burst-derived speed of all four rescue drives (point 127),
     // read fresh so a debug edit of balance.family.rescueBurst applies live.
     const RESCUE_SPEED = rescueSpeed(balance.family.rescueBurst)

@@ -2095,6 +2095,20 @@ export function TravelScene() {
         proj.set(x, y, z).project(camera)
         return proj.z < 1 && Math.abs(proj.x) <= 1 && Math.abs(proj.y) <= 1
       },
+      // True once the bird's-eye camera has caught up to its lerp target (point
+      // 177/165): the camera eases toward (pos.x, .y*zoom, pos.z + .z*zoom) at a
+      // fixed 0.12/frame — NOT dt-scaled — so its settle is frame-count-bound. A
+      // teleport-then-fixed-sleep verification revealed just-seeded off-screen
+      // animals purely by the still-moving camera under load; polling this before
+      // scanning removes that reveal-by-camera-motion false pop.
+      settled: () => {
+        const p = useGame.getState().pos
+        const zoom = useUi.getState().travelZoom
+        return (
+          Math.abs(camera.position.x - p.x) < 0.5 &&
+          Math.abs(camera.position.z - (p.z + CAMERA_OFFSET.z * zoom)) < 0.5
+        )
+      },
     }
     return () => {
       delete w.__camera
