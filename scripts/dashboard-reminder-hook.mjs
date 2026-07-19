@@ -4,6 +4,21 @@
 // context for the assistant.
 import fs from 'node:fs'
 
+// Surface the current Europe/Berlin time on EVERY user prompt so the reply can
+// lead with an accurate timestamp (the chat-timestamp rule) without a separate
+// Node call — the missing-timestamp failure mode was skipping that call under
+// flow in long multi-tool turns (user complaint 19.07.2026). This hook script is
+// re-executed each turn, so the time is always current in context.
+const nowBerlin = new Intl.DateTimeFormat('de-DE', {
+  dateStyle: 'short',
+  timeStyle: 'short',
+  timeZone: 'Europe/Berlin',
+}).format(new Date())
+console.log(
+  '[timestamp] PFLICHT: Beginne JEDE an den Nutzer gerichtete Antwort mit diesem ' +
+  `Zeitstempel — aktuelle Zeit (Europe/Berlin): ${nowBerlin}.`,
+)
+
 let mtimeNote = ''
 try {
   const path = process.env.CLAUDE_SCRATCHPAD_DIR
