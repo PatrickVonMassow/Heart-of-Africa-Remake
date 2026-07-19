@@ -6475,6 +6475,15 @@ the remaining open points in their numeric order.
   180 elephants wedge at a shore; 181 skyline fauna float; 183 animals pop into the
   frame while driving) DESPITE point 173's quality push. Runs AFTER the individual
   fixes 178-183 and hunts what remains.
+  EXECUTION (user-approved 19.07.2026): run 184 with ULTRACODE (multi-agent
+  Workflow orchestration) on OPUS 4.8, effort HIGH — xhigh for the design/audit
+  phase (the invariant-harness architecture and the five-class sweeps), high for
+  implementation; trivial mechanical sub-stages (the WebGL2 smoke scaffold, blunt
+  test skeletons) may drop to a cheaper model / low effort via per-agent override.
+  The audit sweeps and the adversarial finding-verification are the reasoning heart
+  — keep those on Opus 4.8. First step is the WebGPU lane (Pillar 3); it may be
+  pulled forward if needed to verify a play-test fix (e.g. 181's likely
+  WebGPU-specific float).
   WHY 173 DID NOT CATCH THESE — the gap 184 must close: 173 hunted PURE-LOGIC test
   gaps and added ~90 VITEST tests. Vitest runs in jsdom — no 3D scene, no camera,
   no RAF wildlife, no rendering — so it is STRUCTURALLY BLIND to this whole class
