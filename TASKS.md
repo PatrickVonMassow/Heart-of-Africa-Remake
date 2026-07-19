@@ -6450,9 +6450,72 @@ the remaining open points in their numeric order.
   never an assumed radius (point 172: fog.far / 100×zoom is not the frustum). Keep
   the body-separation and streaming despawn intact. Verifiable: a driven Nile-corridor
   pass in scripts/verify/enrichments.mjs asserts NO animal is projected inside the
-  frame the frame it joins, at zoom 0.5 / 1.5 / 2.2, with a screenshot; extend the
-  pure isOnScreen coverage if a new spawn path is gated. Docs: design.md §19.2/§2.5,
+  frame the frame it joins, at the ACHIEVABLE zoom 0.5, with a screenshot; extend the
+  pure isOnScreen coverage if a new spawn path is gated. DIAGNOSTIC NOTE
+  (19.07.2026): the point-165 Maasai driven check at 0.5 is CLEAN (0 pops) — its
+  intermittent failures were ALL at a DEBUG zoom 1.3, where the frustum covers a
+  settlement's whole vicinity ring so the point-102 never-empty seeder must place
+  on-screen (an inherent wide-zoom limitation, NOT this bug and not fixable without
+  dropping that guarantee). So 183 must reproduce on the NILE CORRIDOR AWAY FROM
+  SETTLEMENTS at 0.5, isolating the ordinary chunk spawn and the river/shore fauna
+  (flamingos, crocodiles, drinkers) from the vicinity seeder; test only at the
+  achievable zoom (0.25-0.5), never a debug wide zoom (point 172). If no pop
+  reproduces at achievable zoom anywhere, ASK the user whether they were debug
+  zoomed-out on the Nile (that would make 183 the inherent seeder limitation, to be
+  closed as documented rather than fixed). Docs: design.md §19.2/§2.5,
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
+
+- [ ] 184. PRE-TAG HARDENING: a systematic audit of elementary functionality for
+  more bugs of the 178-183 class, add stable practice-oriented tests, and reach a
+  HIGH-CONFIDENCE bug-free state BEFORE the final closing run and the v0.2 tag.
+  User decision 19.07.2026: play-testing on WebGPU surfaced a cluster of
+  elementary-functionality bugs the headless suite missed (178 vultures pop in
+  already landed; 179 a lion tunnels through parent + calf and eats nobody; 180
+  an elephant herd wedges at a lake shore; 181 skyline fauna float above the
+  ground; 183 animals pop into the frame while driving). Before tagging v0.2 the
+  codebase must be audited for the REST of this kind and secured with tests. This
+  point runs AFTER the individual fixes 178-183 and searches for what remains.
+  RECURRING FAILURE CLASSES to sweep (confirm each against the CODE, never
+  speculate — the 145b/129 diagnose-first discipline):
+  (A) Streaming/visibility judged by an ASSUMED RADIUS instead of the TRUE camera
+  frustum (the 183/172/164/171 class). Audit EVERY spawn/despawn/seed/stream path
+  (wildlife chunk spawn, the vicinity + dry-shore seeders, flora, panorama
+  wildlife, vultures, the scripted-predator offstage ring, kill flocks) for a
+  viewR / fog.far / 100×zoom / hard-coded-distance gate that does NOT match the
+  projected frustum (isOnScreen / __camera.onScreen).
+  (B) Body-separation / collision / stuck-forever (the 180/155/16 class). Every
+  point an animal, inhabitant or the player can wedge or pin — against water,
+  terrain corners, buildings, props, other bodies, settlement edges — must resolve
+  (an escape direction always exists, or a bounded unstuck nudge fires).
+  (C) Vertical placement / anchoring (the 181/128 class). Every figure /
+  silhouette / landed bird / prop / dragged hull anchored to ground or horizon
+  uses FEET (not centre) with the correct slope/scale lift, and stays anchored
+  with and without a capture / skyline landmark.
+  (D) Drama resolution / dt-tunneling (the 179 class). Every predator catch,
+  parent charge/shield/guard, crocodile lunge and swept-obstacle resolve must not
+  tunnel through its target under a big clamped dt, and every drama must always
+  resolve (no pinned / re-stuck state).
+  (E) Test-measurement hygiene (the 172/177 class). Audit ALL of
+  scripts/verify/*.mjs for live checks that judge "in view" by a radius/distance
+  instead of projecting to the frame (__camera.onScreen/ndc), or that wait/bound
+  by WALL-CLOCK instead of the sim clock (__pollSim/__sleepSim/simTime) — these
+  hide real bugs (like 183) and rotate as flakes (like 102/118/130).
+  METHOD: run the audit as several parallel subsystem sweeps (the point-173
+  analysis pattern), each reading its area and reporting confirmed findings with
+  the code evidence. For each confirmed finding: fix it and add a STABLE,
+  practice-oriented test on the right layer — Vitest pure where the logic allows,
+  Playwright PROJECTED-TO-FRAME / SIM-CLOCK where a browser is genuinely needed
+  (never a new radius/wall-clock check). A non-trivial finding may become its own
+  TASKS point + atomic commit; small ones are fixed inline. LOG every finding.
+  ACCEPTANCE: the full LARGE regression (npm test) green across at least THREE
+  consecutive runs with NO rotating flakes (determinism proven); the new tests
+  cover classes (A)-(E); a written summary lists what was audited, what was found
+  and fixed, and the residual risk. Only THEN the final closing run, then the v0.2
+  tag (174). NOTE: WebGPU-only visual bugs stay headless-invisible (memory
+  webgpu-untestable-headless) — the summary must name which classes can only be
+  confirmed by a manual WebGPU pass, so the user can spot-check those. Docs:
+  quality/process point; CLAUDE §7.2 and the 172/177 disciplines. (Requested
+  19.07.2026; gates v0.2 together with 178-183.)
 
 ## Closing (only after all points)
 
