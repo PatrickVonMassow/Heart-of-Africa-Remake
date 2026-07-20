@@ -6770,6 +6770,30 @@ the remaining open points in their numeric order.
   (iii) wire run-all.mjs's tiers over the backend dimension; (iv) flip the default per
   conditions a-c. The lane itself is comprehensively PROVEN; the rest is the systematic
   grind — fresh focus.
+  PROGRESS 3 (20.07.2026, commits 4c41447 + 2b16df0): ALL 12 DEV SUITES converted to
+  the lane (settings/enrichments/flow/collision/events/health/polish/voice/i18n/
+  gamepad/handwriting/touch — only preview, the prod-build suite, is left). webgl green
+  across all (the default is unchanged). On WebGPU: settings/enrichments/flow/events/
+  health/i18n GREEN; the timing-class catches fixed via the poll pattern were the feed,
+  the 7 collision ejections and the vulture-circling check. The remaining WebGPU
+  catches are ALL the SAME timing class and now clearly a SYSTEMATIC rework rather than
+  one-offs: (a) the input-driven suites gamepad (5)/touch (3)/voice (1)/handwriting
+  read moved 0.00 / yaw 0.00 / hang because synthetic input -> render-loop movement is
+  not processed in a fixed wall-clock window on the slower/colder WebGPU headless
+  cadence — every such check must POLL for the movement/yaw/interaction to happen; (b)
+  the collision operable chief-hut door (latch re-arm — a naive fixed-settle bump
+  traded it for a webgl walker-drift flake, so it needs a latch-aware/walker-robust
+  poll); (c) the polish "direct enter falls back" capture reads active true and STAYS
+  true past a 15 s poll — a DEEPER, non-timing WebGPU finding (a panorama capture
+  persists on a direct place->place enter on WebGPU where WebGL2 falls back), to be
+  investigated (real capture-caching difference vs a test-ordering artifact). NEXT
+  (the flagship's core, fresh/deliberate — ideally the Ultracode workflow the user
+  approved for 184): (1) systematically poll-ify the input/RAF checks + the operable
+  rework; (2) investigate the polish capture finding; (3) convert preview + wire the
+  run-all tiers over the backend dimension + flip the default; (4) Pillar 1 (the
+  continuous-invariant harness) and Pillar 2 (the audit sweeps) — still untouched, the
+  bulk of 184's original scope. The WebGPU lane (Pillar 3's foundation) is DONE and
+  PROVEN; what remains is the methodical determinism rework + Pillars 1-2.
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
