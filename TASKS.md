@@ -7348,7 +7348,37 @@ the remaining open points in their numeric order.
   BACKEND AXIS: run the whole sweep on BOTH WebGL2 AND the real WebGPU (the
   system-Chrome lane) — some visual bugs are WebGPU-ONLY (175 crown jitter, 181
   silhouette float) and never show on the headless WebGL2 path the first pass
-  used. This is the honest answer to "why did a minute of walking beat
+  used.
+  FULL DIMENSION SET (thought through 20.07.2026 — the sweep varies ALL of these,
+  sampled intelligently, not the full cross product):
+   1. LOCATION (biome, named place, coast, river bank, lake, landmark, graveyard).
+   2. SITUATION/EVENT (each drama: hunt/rescue/sacrifice/crocodile/trample/vigil;
+      drink & bathe; the weather events: flood, fire, hail, lightning).
+   3. MONTH (season/weather + the transitions between them).
+   4. YEAR 1890-1895 (rinderpest years, the deadline stages, the flood cycle).
+   5. BACKEND (WebGL2 + real WebGPU).
+   6. MOVEMENT (static vs a driven filmstrip — the movement/streaming bugs).
+   7. ZOOM — the big one: the pop-in / streaming / far-sheet / haze / flora-edge
+      class is ZOOM-DEPENDENT (164/171/172/183). Sample the achievable 0.25 & 0.5
+      AND the unlocked wide debug zooms up to the whole-continent view; a bug at a
+      wide zoom is invisible at 0.5 and vice versa.
+   8. SCENE/PERSPECTIVE — the other big one: everything so far is the bird's-eye
+      TRAVEL scene, but the FIRST-PERSON SETTLEMENTS are a whole scene with their
+      own classes (walker stuck 155/198, collision/clipping into walls 16, dense
+      building fabric, inhabitants using dwellings, the §2.5 panorama + its
+      wildlife 181, the skyline landmarks). Sweep each port + a sample of villages:
+      walk around inside, press against walls, watch the inhabitants and the
+      panorama. Also the bird's-eye ⇄ settlement TRANSITION.
+   9. PLAYER STATE — the rendered traveller changes: canoe RIDDEN on water vs
+      DRAGGED on land, the wound on the figure by severity, swimming chest-deep,
+      the item-in-use glow, afflictions. Sweep the canoe on water AND land, a
+      wounded figure, a swim.
+   10. TIME OF DAY / SUN — if the sky/sun varies within a day (verify), sweep the
+      lighting extremes; else note it is fixed.
+   11. TRAVEL DIRECTION / CAMERA HEADING — the panorama capture is bearing-
+      dependent (82/99); drive several headings.
+  The two most important additions are ZOOM (7) and the SETTLEMENT scene (8) —
+  neither was in the first pass, and both hide whole bug families. This is the honest answer to "why did a minute of walking beat
   the hardening"; A/B/D/E are the cheap automated first pass under it.
   MORE INVARIANT CLASSES (derived by thinking through what else can look wrong —
   the cheap automated complements to the visual sweep):
