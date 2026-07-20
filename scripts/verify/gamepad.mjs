@@ -1,7 +1,7 @@
 // Headless verification for CLAUDE.md §7.1.30 (gamepad controls and the
 // position query, design.md §17). A virtual gamepad is injected by
 // overriding navigator.getGamepads. Dev server only.
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 let failures = 0
@@ -10,7 +10,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('console', (m) => {

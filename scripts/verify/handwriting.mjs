@@ -2,7 +2,7 @@
 // design.md §16): a new entry is written visibly by a hand, the hand shows
 // the wound level, wounded entries keep blood traces, a click finishes the
 // entry, and do-not-disturb writes silently. Dev server only.
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import { installTtsCache } from './ttsCache.mjs'
 
@@ -14,7 +14,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // TTS assets from the local point-88 cache: adding an entry auto-narrates,
 // and a cold CDN model download stalls the reveal start past the check's

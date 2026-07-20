@@ -6,13 +6,13 @@
 // language switch driven through the live UI and the five localization
 // screenshots (54-58) that are the §7.2 acceptance evidence, plus the
 // console-error gate. Dev server only (dev hooks).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('console', (m) => {

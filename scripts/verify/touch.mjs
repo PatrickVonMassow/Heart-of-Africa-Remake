@@ -2,7 +2,7 @@
 // design.md §17.5, point 84). A touch-capable context is used and real touch
 // events are driven through CDP so pointer capture and multi-touch behave like
 // hardware. Dev server only.
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 let failures = 0
@@ -11,7 +11,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 // A phone-shaped, touch-enabled viewport (design.md §17.5): the safe-area/compact
 // HUD path and the deliberate-input guard only matter with real touch.
 const context = await browser.newContext({ viewport: { width: 430, height: 850 }, hasTouch: true, isMobile: true })

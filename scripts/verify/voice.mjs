@@ -11,7 +11,7 @@
 // WebGPU adapter, and WASM is what stays live (on Chromium hardware the engine
 // runs the faster WebGPU path, whose cold load the game pre-warms; point 117).
 // Dev server only (dev hooks).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { fileURLToPath } from 'node:url'
 
@@ -23,7 +23,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // TTS assets come from the local cache (point 88): first run records, later
 // runs replay strictly offline-from-CDN.
