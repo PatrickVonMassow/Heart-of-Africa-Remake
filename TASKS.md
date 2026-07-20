@@ -7252,6 +7252,47 @@ the remaining open points in their numeric order.
   spread-wing / mid-peck pose. Part of the point-196 ground-anchor group but
   filed on its own as a direct user report.
 
+- [ ] 203. EXTEND 184 — a SYSTEMATIC visual + liveness bug-finder (user request
+  20.07.2026: "Bugs wie die … sollten leicht für dich zu finden sein … Kannst
+  du 184 dahingehend erweitern, dass es selbst viel mehr Bugs in der Richtung
+  findet?"). ROOT CAUSE of the miss: the invariant harness checks POSITIONS
+  (I1 pop-in / I5 ocean / I6 interpenetration), but the whole recurring class
+  the user keeps stumbling on is either RENDERED-GEOMETRY-vs-terrain (187 croc
+  submerged, 202 vultures clipping, 190 Lake Edward floating, 185 scavenger,
+  196 drinkers) or LIVENESS (188 predator pacing, 201 calf stuck, 193 idle
+  standoff, 191 foreign family) — neither systematically swept. THREE additions,
+  all cost-light (NO agent fan-out — pure/live checks + me inspecting
+  screenshots in the main loop; the point-200 token concern applies):
+  (A) ANCHORING INVARIANT — the highest-value one. A render hook exposes, per
+  rendered animal/bird/prop each frame, its world (x,z), the LOWEST point of its
+  POSED+SCALED mesh (bounding-box min-y after the live pitch/roll/scale — for a
+  bird that means the pecking head and the spread wing tips), and a support
+  point. A driven sweep over all regions asserts for every rendered thing: its
+  lowest point is NOT below the sampled ground at its footprint (no clip — sample
+  under the wing/limb EXTENTS, not just the centre), it is NOT far above the
+  ground with nothing under it (no float), and a water-dweller sits at the
+  rendered water SURFACE (no submerge/hover). This single check catches
+  187/202/190/185/196 and their future recurrences.
+  (B) LIVENESS INVARIANT — the deferred I3/I4 generalised. Over a long driven +
+  staged observation, track each actor's position and state; flag any actor in a
+  LIVE state (a hunt mode, a leave, a chase-victim, a caught, a finished feed)
+  whose position is FROZEN (variance ~0) or OSCILLATING (paces a short segment)
+  past a calibratable deadline, and any predator within touch range of LIVE prey
+  where for a window neither engages nor flees. Catches 188/201/193 and kin.
+  (C) VISUAL SCREENSHOT SWEEP + INSPECTION — the catch-all for what the
+  invariants do not anticipate, done the way the USER finds them but
+  exhaustively: drive to a diverse set of spots and STAGE each drama (hunt,
+  rescue, crocodile, trample, drink, flood, each biome/season), screenshot each,
+  and VISUALLY inspect every image for anomalies (buried / floating / overlapping
+  / mis-posed / wrong-looking things). Each anomaly → verify against the code →
+  file a real one as its own point + fix. Keep a checklist of scenes so the sweep
+  is repeatable and grows.
+  BUILD ORDER: (A) first (it retro-catches the most and is cheap), then (B), then
+  (C) as a standing pre-closing pass. Run the whole finder BEFORE the final
+  closing so the batch of finds is fixed in one push. Each real find is its own
+  atomic point/commit. Docs: CLAUDE §7.2 gains the anchoring + liveness invariant
+  suites; this is the pillar the harness was missing.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
