@@ -7496,6 +7496,68 @@ the remaining open points in their numeric order.
   model-diverse pass is welcome (a Fable lens on "does this cohere") within the
   point-200 token limits.
 
+- [ ] 206. Tree foliage renders NEAR-BLACK — found by the point-203 visual sweep
+  (both backends) and confirmed a bug by the user 20.07.2026. Tree crowns read as
+  near-black silhouettes even on their sunlit tops, instead of lit dark green; the
+  GROUND beside them lights correctly, so it is the foliage material/shading, not
+  the scene light. DIAGNOSE FIRST: the crown material (src/render/flora.ts + the
+  travel-scene flora mesh/material) — is its base albedo far too dark, is it
+  UNLIT / not receiving the sun+IBL the ground gets (wrong material node, missing
+  or flipped normals on the crown geometry, the point-175 split-foliage crown),
+  or does the dry-season/season tint pull it toward black? Compare a crown's
+  sunlit-side luminance against the lit ground. FIX per diagnosis: the foliage
+  must receive the sky/sun light with a mid dark-green albedo that reads as
+  foliage, not a silhouette (likely a material-node or normals fix on the crown,
+  possibly interacting with the point-175 seasonTint on the crown matrix). VERIFY:
+  a pixel/luminance check that a tree-crown sample is clearly above a near-black
+  threshold on the sunlit side (add to enrichments or the settings render check),
+  plus a screenshot; re-run the 203 sweep and see lit foliage on both backends.
+  DOCS: none. (The first real bug the point-203 finder surfaced.)
+  DIAGNOSIS UPDATE (20.07.2026): the crown ALBEDO is ruled out — the tint colours
+  are proper greens (acacia #6e7c2f, jungle #1f5323/#2a6128, palm #3f6b2a, baobab
+  #7a7434), not black; the material is a lit MeshStandardNodeMaterial. So the near-
+  black is a LIGHTING/NORMAL failure: prime suspects are the point-175 splitFoliage
+  crown geometry (are the normals copied/valid?) and the crown INSTANCE-MATRIX
+  collapse (a non-uniform scale on the instance matrix squashes the shading
+  normals unless the normal matrix is corrected) — the ground, un-split and
+  un-collapsed, lights fine. Confirm which, then fix the crown normals / lighting.
+- [ ] 207. ADDITIONAL FINDING METHODS that complement the existing audits (Pillar
+  2 code, 203 visual/behaviour, 205 plausibility) and together lift coverage
+  sharply (user request 20.07.2026). The existing net is designed-scenario
+  invariants + an inspected visual sweep + static review; these orthogonal METHODS
+  raise sensitivity a lot:
+   (i) IN-GAME INVARIANT ASSERTIONS — the biggest force-multiplier. Instrument the
+     game code with DEV-MODE assertions that fire the MOMENT a rule breaks,
+     ANYWHERE (no animal rendered below its ground; no NaN/Infinity position;
+     every started drama carries a deadline; a lake sheet never below its bed;
+     herd counts within bounds; nothing on impassable ocean). One __assert channel
+     to the console → every test run AND every manual play session becomes a
+     detector, not just where a test happens to look. Turns silent corruption
+     loud. DO THIS FIRST — it multiplies every other test's and the user's own
+     play's sensitivity at once.
+   (ii) GOLDEN-IMAGE DIFFERENTIAL — cheap automated visual regression: bake a
+     baseline of the 203 sweep frames; future runs DIFF against them and flag any
+     unintended pixel change. A no-inspection alarm that a fix did not break the
+     look elsewhere; complements the inspection-heavy sweep.
+   (iii) PROPERTY FUZZING + DISTRIBUTION CHECKS — random-sample the state space
+     (positions, months, states) and run the cheap invariants on thousands of
+     random states (edge cases the designed grid misses); over a long run collect
+     distributions (hunt directions, calf ratios, drama outcomes, spawn counts)
+     and assert they are not degenerate (the 135/169 variety class).
+   (iv) SOAK / ENDURANCE — fast-forward a LONG sim run with the invariants +
+     assertions live, watching for leaks, herd ballooning, drama accumulation,
+     slowdown, drift (bugs that only surface after long play, e.g. the 186 pin).
+   (v) METAMORPHIC RELATIONS — checks needing no golden reference: a round trip
+     A→B→A returns to the same state; the same scene at two zooms shows the same
+     animals; month X and X+12 look the same; leave-and-re-enter is stable.
+   (vi) AUTOMATED PLAYER-JOURNEY across seeds/strategies — extend the one E2E flow
+     to many, asserting the goal stays reachable, the hint cascade always leads
+     there, no softlock, the deadline beatable.
+   (vii) CONSOLE/TELEMETRY MINING — scan every run's console for warnings / NaN /
+     shader-recompile / dropped-frame / THREE-deprecation noise, fail on new ones.
+  BUILD ORDER: (i) then (ii) first (highest leverage), the rest layer in over the
+  finder. These join 203/204/205 as the pre-tag quality framework.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
