@@ -58,3 +58,15 @@ console.log(
   'prüfen (topaktuell, konsistent, redundanzfrei), dann per Artifact republishen.' +
   mtimeNote,
 )
+
+// Repeat the timestamp obligation LAST — the final line of hook output sits closest
+// to where the reply is generated, so it is the most salient (the top line alone kept
+// getting drowned by the long dashboard reminder and skipped, user complaint
+// 20.07.2026: "Warum sind die Timestamps schon wieder weg"). Unmissable banner.
+console.log(
+  '\n============================================================\n' +
+  `>>> WICHTIGSTE REGEL — die ERSTE ZEILE deiner Antwort an den Nutzer MUSS dieser\n` +
+  `>>> Zeitstempel sein: "${nowBerlin}".  JEDE Antwort, ausnahmslos.\n` +
+  `>>> Beginnt deine Antwort nicht damit, ist sie falsch formatiert — hol es sofort nach.\n` +
+  '============================================================',
+)
