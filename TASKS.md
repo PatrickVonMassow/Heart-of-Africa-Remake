@@ -7116,7 +7116,16 @@ the remaining open points in their numeric order.
   scoped). DOCS: design.md §19.5 (the water discipline paragraph) + CLAUDE §7.1
   pt.12 (the bodies-and-boundaries bullet) rewritten to the new target state in
   the SAME commit.
-- [ ] 193. Predator and prey stand IDLE next to each other — no kill, no flight
+- [x] 193. DONE 21.07.2026: in the 'leave' mode (the visible predator walking
+  off after feeding) the prey-flee gate read the lion as INACTIVE — herds
+  grazed unmoved beside a lion on open ground, the reported standoff. 'leave'
+  now counts as active for the prey: herds part around the walk-off path and
+  calves hold their play until the predator is truly gone (the vigil keeper's
+  familyHeld exemption and the victim-gated drama paths are untouched).
+  enrichments 206/0, build+lint+1950 vitest green. Residual standoff cases (a
+  stuck hunt state) are exactly what the point-203 liveness invariant (B) will
+  sweep for systematically.
+  ORIGINAL: Predator and prey stand IDLE next to each other — no kill, no flight
   (user play-test 20.07.2026, screenshot 19.02.1891: an adult predator and a
   small prey ~1 body apart on open savanna, both stationary). Suspects
   (DIAGNOSE FIRST, probe at the staged state): (i) a hunt that ended

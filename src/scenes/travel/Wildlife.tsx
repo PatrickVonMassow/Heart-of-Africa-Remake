@@ -2408,7 +2408,13 @@ function Herds() {
     }
 
     const t = clock.elapsedTime
-    const lionActive = LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed'
+    // Point 193: 'leave' counts as ACTIVE for the prey — the walking-off
+    // predator is still a visible lion on the field, and prey grazing calmly
+    // beside it read as a broken standoff (the user report: predator and prey
+    // standing idle next to each other). Herds part around the leave path and
+    // calves hold their play until it is truly gone.
+    const lionActive =
+      LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed' || LION_STATE.mode === 'leave'
 
     // Elephants roam as herds (design.md §19): each herd shares a heading that
     // curves in slow arcs; its members keep together (cohesion) and only ever
