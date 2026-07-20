@@ -6521,8 +6521,18 @@ the remaining open points in their numeric order.
   unclamped. Docs: design.md §21.4, CLAUDE §7.1 pt.20 / §7.2. (Zoom-in change
   requested 19.07.2026 during play-testing; queued at the batch end.)
 
-- [ ] 183. Animals STILL pop directly into the rendered frame while driving -
-  reported along the Nile. User report (19.07.2026, WebGPU, driving a canoe down
+- [x] 183. Animals STILL pop directly into the rendered frame while driving -
+  reported along the Nile. DONE 20.07.2026 (commit fac76e8): the reproduced
+  achievable-zoom pop (the point-165 driven check caught land grazers at 0.5) was the
+  vicinity seeder's ON-SCREEN FALLBACK near water — pickOffscreenLandAnchor now
+  returns null instead of an on-screen land candidate, so the seeder DEFERS the frame
+  and the moving camera exposes off-screen land next frame (the never-empty guarantee
+  holds: vicinityRadius 75 > the 0.5 frame). Verified: enrichments 3x 201/0 with
+  point-165 reliably green AND point-102 (never-empty) still green. The water-fauna
+  spawnChunk path (crocs/flamingos) has NO live repro — the point-165 check scans
+  those species too and is green — so its systematic Nile-corridor verification folds
+  into 184's continuous-invariant harness (which drives every region).
+  User report (19.07.2026, WebGPU, driving a canoe down
   the Nile): grazers/river fauna appeared mid-screen instead of entering from
   beyond the view. This is a RECURRENCE of the point 165/172 class (ground-animal
   pop-in). Points 165/171/172 gated the guarantee SEEDERS (the vicinity seeder via
@@ -6765,8 +6775,14 @@ the remaining open points in their numeric order.
   the 172/177 disciplines. (Requested 19.07.2026 — "be significantly more
   thorough"; gates v0.2 together with 178-183.)
 
-- [ ] 185. Ground-scavenger vultures FLOAT ~0.5 above the carcass (double vertical
-  lift). Found by the point-184 calibration audit (CONFIRMED, 19.07.2026).
+- [x] 185. Ground-scavenger vultures FLOAT ~0.5 above the carcass (double vertical
+  lift). DONE 20.07.2026 (commit fa080ee): replaced the legacy target.y+0.5 group
+  pre-lift with the sampled ground under the carcass (exactly the kill flock's
+  killGroundY), so only the shared landedBirdY hover (~0.15) remains. A new
+  flat-ground enrichments check gates the clearance from ABOVE (<= 0.35) — the
+  steep-slope check could not catch the double lift (an uphill bird's positive-only
+  lift saturates the +0.5). Verified: build + lint + 1937 vitest + enrichments 3x
+  201/0. Found by the point-184 calibration audit (CONFIRMED, 19.07.2026).
   Wildlife.tsx:2559: the landed scavenger group origin is pre-lifted to
   target.y+0.5, then each bird's local y ALSO goes through landedBirdY
   (wildlifeBehavior.ts:486), which adds its own ground-lift + hover — a DOUBLE
