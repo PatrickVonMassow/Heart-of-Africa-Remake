@@ -6406,8 +6406,24 @@ the remaining open points in their numeric order.
   queued at the batch end.)
 
 - [ ] 180. An elephant herd WEDGES itself against a lake shore and no member can
-  move. User report + screenshot (19.07.2026, playing on WebGPU, West region): a
-  cluster of elephants jammed together at the water's edge, all stuck. The §19.5
+  move. DIAGNOSED 20.07.2026 (from the code, repro probe still to run): the
+  deadlock is a force trap at the shore. (a) Each elephant's roam STEP is gated
+  against water (Wildlife.tsx ~2506 elephantStepAllowed), so they do not walk in;
+  but when the ground ahead is water the individual redirect (~2492) turns toward
+  the HERD CENTRE, which sits AT the crowded shore — no tangential escape along the
+  bank. (b) The body-separation pass (~2018) sets a.x/a.z WITHOUT the water gate, so
+  it can push an elephant onto a water cell; the rotating water backstop (~2050)
+  then TELEPORTS it back to findLandNear — the nearest land, i.e. straight back to
+  the same shore edge. (c) Cohesion (~2471) keeps pulling members to the centre.
+  Net: members oscillate/pile at the bank, the herd centre never leaves, nobody
+  moves. FIX DIRECTION: in the individual redirect (~2492), when the ahead ground
+  is uncrossable, pick a crossable direction ALONG the shore via the existing pure
+  deflectedStep (as the scripted walk-off does) instead of blindly toward the
+  centre; consider a bounded jam-unstuck nudge (the point-155 pattern, wildlife
+  side) for a member pinned past a window. Keep the elephant trample (§19.8)
+  possible and never let one stand IN water. Repro probe FIRST (drive/stage a herd
+  into a shore corner, assert the centre keeps moving), then the fix + a pure test
+  (a wedged member gains a crossable escape) + a live check. The §19.5
   body separation ("an animal placed onto another parts from it within moments")
   and the water backstop ("an animal on a water cell is set back to the nearest
   land") and the §19.4 herd cohesion (elephants roam CLUSTERED) together deadlock:
