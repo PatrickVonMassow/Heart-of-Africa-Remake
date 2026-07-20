@@ -6961,7 +6961,12 @@ the remaining open points in their numeric order.
   WebGPU lane), and landedBirdY's 0.15 hover ignores the 1.5-1.6 render scale (a
   sub-cm sink).
 
-- [ ] 187. The crocodile is SUBMERGED below the rendered water surface — the
+- [x] 187. DONE 20.07.2026: the spawn now anchors y to
+  waterSurfaceY(lat,lon,seed,bed) (fallback bed+0.3), the drama staging reads
+  __rivers.surfaceAt, and a new live check asserts every natural crocodile sits
+  within 0.15 of the rendered surface (never the bed). enrichments 203/0 with
+  screenshots 129/130 re-shot; build+lint+1938 vitest green.
+  ORIGINAL: The crocodile is SUBMERGED below the rendered water surface — the
   eye-knob ambush is invisible. Found+confirmed by the 184 Pillar-2 audit (both
   models flagged it, Opus-verified). The seed anchors the crocodile's y to the
   carved BED (`herds.crocodile.push({ ..., y: ct.height })`, Wildlife.tsx ~736)

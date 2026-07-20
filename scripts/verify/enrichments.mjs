@@ -3554,16 +3554,31 @@ const crocSpawn = await page.evaluate(() => {
   const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead)
   const home = (c) => (c.lunge ? { x: c.lunge.homeX, z: c.lunge.homeZ } : { x: c.x, z: c.z })
   const offWater = list.filter((c) => { const p = home(c); return window.__terrainType(-p.z / U, p.x / U, seed) !== 'water' })
+  // Point 187: every crocodile is anchored to the RENDERED water surface at its
+  // home (|y - surface| small), never to the carved bed ~0.3+ below it — the
+  // hidden pose offsets from y so only the eye knobs break the water.
+  const offSurface = list.filter((c) => {
+    const p = home(c)
+    const ws = window.__rivers?.surfaceAt(-p.z / U, p.x / U)
+    return ws != null && Math.abs(c.y - ws) > 0.15
+  })
   return {
     count: list.length,
     allOnWater: offWater.length === 0,
+    allAtSurface: offSurface.length === 0,
     offWater: offWater.slice(0, 4).map((c) => { const p = home(c); return { x: +p.x.toFixed(1), z: +p.z.toFixed(1), t: window.__terrainType(-p.z / U, p.x / U, seed) } }),
+    offSurface: offSurface.slice(0, 4).map((c) => { const p = home(c); return { y: +c.y.toFixed(2), ws: +(window.__rivers?.surfaceAt(-p.z / U, p.x / U) ?? -9).toFixed(2) } }),
   }
 })
 check(
   'crocodiles spawn in a water-rich reach and every one lies ON a water cell (point 130)',
   crocSpawn.count > 0 && crocSpawn.allOnWater,
   JSON.stringify(crocSpawn),
+)
+check(
+  'every crocodile is anchored to the rendered water surface, not the carved bed (point 187)',
+  crocSpawn.count > 0 && crocSpawn.allAtSurface,
+  JSON.stringify({ count: crocSpawn.count, offSurface: crocSpawn.offSurface }),
 )
 await page.evaluate(() => {
   window.__ui.getState().setTravelZoom(1)
@@ -3607,7 +3622,10 @@ const crocDrama = async (mode, attempt = 0) =>
     // chunk-less animals, so no zoom restore or ring change can silently
     // filter the stage out mid-scenario (the rotating crocLunge:false runs
     // were exactly that — a despawned liveChunk took croc and calf with it).
-    const croc = { x: water.x, z: water.z, y: 0.1, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
+    // Stage the croc at the RENDERED water surface (point 187) so the hidden
+    // pose shows the eye knobs breaking the water on the screenshots too.
+    const stageWs = window.__rivers?.surfaceAt(-water.z / U, water.x / U)
+    const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
     herds.crocodile.push(croc)
     const bankX = bank.x
     const bankZ = bank.z

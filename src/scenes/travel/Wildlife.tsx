@@ -23,6 +23,7 @@ import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
+import { waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
@@ -732,8 +733,14 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
         const cll = worldToLatLon(x, z)
         const ct = sampleTerrain(cll.lat, cll.lon, seed)
         if (!crocodileAllowedAt(ct.type)) continue
+        // Anchor to the RENDERED water surface, not the carved bed (point 187 —
+        // the point-152 class): the hidden pose offsets from a.y so only the eye
+        // knobs break the surface; anchored to the bed the whole crocodile sat
+        // ~SURFACE_LIFT below the ribbon (deeper on lakes). Fallback: bed + 0.3
+        // (the river SURFACE_LIFT) should waterSurfaceY miss on an edge texel.
+        const cws = waterSurfaceY(cll.lat, cll.lon, seed, ct.height)
         herds.crocodile.push({
-          x, z, y: ct.height, rot: hash(ccx, ccz, 34 + i, seed) * Math.PI * 2,
+          x, z, y: cws ?? ct.height + 0.3, rot: hash(ccx, ccz, 34 + i, seed) * Math.PI * 2,
           scale: 0.9 + hash(ccx, ccz, 35 + i, seed) * 0.3, phase: hash(ccx, ccz, 36 + i, seed), chunk: key,
         })
       }
