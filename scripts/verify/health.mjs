@@ -7,7 +7,7 @@
 // browser: the RAF-driven vultures that circle at poor condition
 // (window.__vultures), the remains-report screenshot (§7.2 evidence) and the
 // console-error gate. Dev server only (dev hooks).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -18,7 +18,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('console', (m) => {
@@ -53,8 +53,13 @@ await page.waitForTimeout(1200)
 
 // --- Vultures at poor condition (design.md §19) --------------------------------
 await g(() => window.__game.getState().debugSet({ health: 20 }))
-await page.waitForTimeout(600)
-const vultures = await g(() => window.__vultures?.player.current?.visible)
+// Poll for the RAF-driven vultures to mount and turn visible (up to a generous
+// window) rather than a fixed wait — they need more frames on the WebGPU backend's
+// slower/colder headless cadence (point 184, the same timing class as the lion feed).
+const vultures = await page
+  .waitForFunction(() => window.__vultures?.player.current?.visible === true, null, { timeout: 15000 })
+  .then(() => true)
+  .catch(() => false)
 check('vultures circle at poor condition', vultures === true, '')
 await g(() => window.__game.getState().debugSet({ health: 90 }))
 

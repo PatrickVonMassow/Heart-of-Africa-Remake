@@ -7,7 +7,7 @@
 // via the RAF-driven window.__lionHunt scene and confirming that touching a
 // lion — and a hyena — triggers that predator's attack, plus the console-error
 // gate. Dev server only (dev hooks).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 let failures = 0
@@ -16,7 +16,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('console', (m) => {

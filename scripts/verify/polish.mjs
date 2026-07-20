@@ -1,6 +1,6 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
-import { chromium } from 'playwright'
+import { launchVerifyBrowser } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -12,7 +12,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('console', (m) => {
