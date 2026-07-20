@@ -6750,6 +6750,26 @@ the remaining open points in their numeric order.
   sim-clock the sampling), convert the other suites the same way, wire run-all.mjs's
   tiers over the backend dimension, then flip the default per conditions a-c. This is
   the flagship's determinism work — continue with fresh focus, not rushed.
+  PROGRESS 2 (20.07.2026): the feed catch CLASSIFIED as TIMING and fixed WebGPU-robust
+  (poll for the depiction; commit a10607f) — settings 30/0 on BOTH backends. Then the
+  four biggest/most-diverse suites are on the lane: settings (first-person), enrichments
+  (wildlife — 202/0 on WebGPU FIRST TRY, the point-177 sim-clock already hardens it,
+  commit 7d48fb6), flow (core loop — 32/0 on WebGPU) and collision (settlement, commit
+  6a12035). collision surfaced 8 more timing-class catches: 7 EJECTIONS (push from a
+  collider centre to the surface) starved by a fixed pushFrames on the slower WebGPU
+  frames — fixed with a poll-based pushUntilClear (webgl 20/0, webgpu ejections pass).
+  The PATTERN is now clear and repeatable: render-loop-driven behaviour read via a
+  fixed wall-clock window fails on WebGPU's colder/slower headless frames; the fix is
+  always to POLL for the behaviour (never a bigger fixed wait — a naive settle bump to
+  fix the 8th catch, the chief-hut door LATCH re-arm, let a walker drift onto a door
+  standpoint and flaked webgl, so it was reverted). OPEN Pillar-3 items: (i) the
+  collision operable check needs a proper latch-aware / walker-robust poll rework so
+  the chief-hut door opens on WebGPU without perturbing webgl (currently webgpu 19/20);
+  (ii) convert the remaining 9 suites (events/health/voice/i18n/polish/gamepad/
+  handwriting/touch/preview) applying the same poll pattern to any timing-class catch;
+  (iii) wire run-all.mjs's tiers over the backend dimension; (iv) flip the default per
+  conditions a-c. The lane itself is comprehensively PROVEN; the rest is the systematic
+  grind — fresh focus.
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
