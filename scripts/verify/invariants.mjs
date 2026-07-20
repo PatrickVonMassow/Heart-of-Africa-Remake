@@ -6,10 +6,18 @@
 // hardest reachable view, point 172) on whichever backend VERIFY_GL selects, so the
 // WebGPU-only class is hunted on the real backend the player uses.
 //
-// v1 covers I1 (NO POP-IN): no animal may appear INSIDE the rendered frame the frame
-// it first joins the herds — the class the user hit repeatedly (points 165/183). The
-// other invariants (I3 no-wedge, I4 drama-resolves, I5 no-blocked-water, I6 no body
-// interpenetration, I7 no predator tunnelling) are layered on next.
+// It covers the invariants with an UNAMBIGUOUS driven test: I1 (NO POP-IN — no animal
+// may appear INSIDE the rendered frame the frame it first joins the herds, the class
+// the user hit repeatedly, points 165/183) and I5 (no living animal on an impassable
+// OCEAN cell — the §19.5 open-ocean backstop). Deliberately NOT layered in here:
+//  - I3 wedge / I4 drama-resolves / I7 predator tunnelling are EVENT-driven and rarely
+//    fire under a moving-player drive; the enrichments suite STAGES them explicitly,
+//    which is the right place for them.
+//  - I6 interpenetration has no clean driven threshold: the game PACKS herds tightly
+//    and leaves predators UNRENDERED (point 146), so a distance bar flags intended
+//    clustering — "too close" needs the engine's own separation equilibrium, which the
+//    enrichments §19.5 body-spacing spot check already owns (tried here and reverted).
+//  - I2 floating needs a rendered-y hook the data model does not expose.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
