@@ -1587,7 +1587,23 @@ function NaturalSites() {
         const w = latLonToWorld(n.lat, n.lon)
         const y = Math.max(0.2, sampleTerrain(n.lat, n.lon, seed).height)
         // Seeded per-run, per-site yaw so orientation varies between playthroughs.
-        const yaw = mulberry32((seed ^ (0x85ebca6b * (i + 1))) >>> 0)() * Math.PI * 2
+        let yaw = mulberry32((seed ^ (0x85ebca6b * (i + 1))) >>> 0)() * Math.PI * 2
+        if (n.id === 'sudd') {
+          // The marsh reaches TOWARD its river (point 189): the build's +z axis
+          // is the riverward tongue, so aim it at the nearest channel sample —
+          // a random yaw left the swamp reading as a pond detached from the
+          // White Nile (the user report). Probe a small ring for the direction.
+          let best = Infinity
+          for (let k = 0; k < 16; k++) {
+            const ang = (k / 16) * Math.PI * 2
+            const pll = worldToLatLon(w.x + Math.sin(ang) * 3, w.z + Math.cos(ang) * 3)
+            const rd = riverDistance(pll.lat, pll.lon, 1.2)
+            if (rd < best) {
+              best = rd
+              yaw = ang
+            }
+          }
+        }
         return { id: n.id, kind: n.kind, x: w.x, z: w.z, y, yaw }
       }),
     [seed],

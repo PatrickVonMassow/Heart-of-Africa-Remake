@@ -411,22 +411,45 @@ export function buildDeltaWater(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Sudd: a broad even papyrus flat over a shallow blue disc — vast and
- *  uniform, distinct from the delta's braiding. */
+/** Sudd (point 189): a broad, LOBED marsh reaching toward the river (+z is the
+ *  riverward axis — the scene orients it at the White Nile), not the detached
+ *  circular pond the first build read as. Overlapping irregular shallow sheets
+ *  form the swamp water; dense papyrus belts crowd the lobe edges so the flat
+ *  reads as reed marsh, distinct from the Okavango's braiding. */
 export function buildWetland(): THREE.BufferGeometry {
   const rand = mulberry32(5200)
   const parts: THREE.BufferGeometry[] = []
-  const water = new THREE.CylinderGeometry(2.1, 2.1, 0.05, 18)
-  water.translate(0, 0.03, 0)
-  parts.push(tint(water, '#54808f', 0.04, 5200))
-  // A dense, even papyrus cover.
-  for (let i = 0; i < 12; i++) {
+  // Water lobes: jittered ellipses marching along the riverward axis, so the
+  // marsh visually joins the channel instead of floating beside it.
+  // Scaled to stay inside the shared travel-marker footprint (< 6 units, the
+  // landmark family cap) while still the broadest site of the family.
+  const F = 0.82
+  const lobes: Array<[number, number, number, number]> = [
+    // [x, z, radius, squash]
+    [0, -1.6 * F, 1.7 * F, 0.8],
+    [-1.1 * F, -0.2 * F, 1.5 * F, 0.7],
+    [1.2 * F, -0.4 * F, 1.4 * F, 0.75],
+    [-0.5 * F, 1.2 * F, 1.6 * F, 0.7],
+    [0.9 * F, 1.8 * F, 1.5 * F, 0.65],
+    [0.1 * F, 3.0 * F, 1.35 * F, 0.6], // the riverward tongue — its reeds hug the bank
+  ]
+  lobes.forEach(([x, z, r, squash], i) => {
+    const sheet = new THREE.CylinderGeometry(r, r, 0.05, 14)
+    sheet.scale(1, 1, squash)
+    sheet.rotateY(rand() * Math.PI)
+    sheet.translate(x, 0.025 + (i % 3) * 0.006, z)
+    parts.push(tint(sheet, i % 2 ? '#54808f' : '#4f7f86', 0.05, 5200 + i))
+  })
+  // Dense papyrus belts at the lobe edges (the §19.9 reed rule): clumped, not
+  // an even scatter — the clumps are what read as reed marsh from the air.
+  for (let i = 0; i < 26; i++) {
+    const lobe = lobes[i % lobes.length]
     const a = rand() * Math.PI * 2
-    const r = 0.3 + rand() * 1.6
+    const edge = lobe[2] * (0.75 + rand() * 0.35)
     const t = buildPapyrus()
-    const sc = 0.45 + rand() * 0.15
+    const sc = 0.4 + rand() * 0.2
     t.scale(sc, sc, sc)
-    t.translate(Math.cos(a) * r, 0.02, Math.sin(a) * r)
+    t.translate(lobe[0] + Math.cos(a) * edge, 0.02, lobe[1] + Math.sin(a) * edge * lobe[3])
     parts.push(t)
   }
   return merge(parts)

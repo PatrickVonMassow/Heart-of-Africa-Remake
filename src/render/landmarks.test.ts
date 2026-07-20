@@ -120,6 +120,24 @@ describe('landmark builders', () => {
     geo.dispose()
   })
 
+  it('the Sudd reads as a lobed marsh reaching along its riverward axis (point 189)', () => {
+    const geo = buildWetland()
+    geo.computeBoundingBox()
+    const b = geo.boundingBox
+    expect(b).toBeTruthy()
+    if (!b) return
+    // Elongated along +z (the riverward tongue the scene aims at the channel),
+    // clearly wider than the old 4.2-unit detached pond disc — while staying
+    // inside the shared < 6-unit travel-marker footprint of the family.
+    expect(b.max.z - b.min.z).toBeGreaterThan(5)
+    expect(b.max.x - b.min.x).toBeGreaterThan(4.2)
+    expect(b.max.z).toBeGreaterThan(2.6) // the tongue actually reaches riverward
+    // Marsh, not pond: a dense papyrus cover (each papyrus adds many vertices —
+    // the count is far above the six flat sheets alone).
+    expect(geo.attributes.position.count).toBeGreaterThan(2000)
+    geo.dispose()
+  })
+
   it('Table Mountain reads as a broad flat-topped massif', () => {
     const geo = buildTableMountain()
     geo.computeBoundingBox()

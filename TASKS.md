@@ -7012,7 +7012,19 @@ the remaining open points in their numeric order.
   asserting the predator's distance from the kill site grows monotonically past
   the ring (no oscillation) — plus the existing walk-off checks stay green.
   DOCS: CLAUDE §7.1 pt.12 streaming bullet (the walk-off clause).
-- [ ] 189. The Sudd reads as a small detached water BLOB beside the White Nile
+- [x] 189. DONE 20.07.2026: buildWetland rebuilt as a LOBED marsh — six
+  overlapping irregular shallow sheets with dense papyrus belts at the lobe
+  edges (26 clumps, §19.9 reed rule), elongated along a riverward +z tongue,
+  scaled to stay the broadest site inside the < 6-unit travel-marker family
+  cap; and the scene now ORIENTS the Sudd toward the nearest channel (a 16-way
+  riverDistance probe replaces the random yaw), so the marsh joins the White
+  Nile instead of floating beside it. New pure geometry test (extent/tongue/
+  papyrus density); screenshot confirms "reed marsh at the river". During the
+  visual pass the brown strips nearby were identified as the INTENDED region-
+  border dashes (§3.1) — a correctly rejected false alarm. enrichments 205/1
+  (the 1 fail is the unrelated rotating point-102 vicinity flake → point 200);
+  build+lint+1946 vitest green.
+  ORIGINAL: The Sudd reads as a small detached water BLOB beside the White Nile
   instead of a broad marsh (user play-test 20.07.2026, screenshot: a tiny blue
   patch with flower tufts west of the river). The §4.4 natural site mounts, but
   its depiction does not read as the vast §19.13 swamp. DIAGNOSE: how the Sudd
