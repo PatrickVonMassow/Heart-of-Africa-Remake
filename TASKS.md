@@ -6734,6 +6734,22 @@ the remaining open points in their numeric order.
   over the backend dimension per the TIER DESIGN below and set VERIFY_GL. Do NOT hand-edit
   15 files ad hoc at the end of a session — this is Pillar 3's structured job (validate
   WebGPU-headless holds under FULL-suite load + determinism first, per conditions a-c).
+  PROGRESS (20.07.2026, commit 4cc4049): step (1) DONE — scripts/verify/_browser.mjs
+  built with launchVerifyBrowser (VERIFY_GL webgpu=system-Chrome+--headless=new /
+  webgl=bundled+ANGLE, default webgl during roll-in) + assertBackend (throws on a
+  silent fallback via __renderer.backend.isWebGPUBackend). Step (2) STARTED — settings.mjs
+  is the first converted suite and the lane is PROVEN END-TO-END: settings runs the FULL
+  suite on the REAL WebGPU backend under system Chrome (webgl default 30/0 unchanged;
+  VERIFY_GL=webgpu ran with assertBackend confirming WebGPU — no silent fallback). FIRST
+  CATCH (the lane's value shown immediately): under WebGPU the 5 lion-feed checks fail
+  with ALL-ZERO animation values (head pitch 0, prey-side 0, stain scale 1.0) — the
+  render loop is still cold in the checks' wall-clock window (WebGPU shader compile), a
+  TEST-ROBUSTNESS gap (the point-177 sim-clock discipline not yet applied to settings'
+  feeding block), NOT a game bug (the feed plays on real WebGPU hardware). REMAINING:
+  make the timing-sensitive checks WebGPU-robust (wait for the render loop to warm /
+  sim-clock the sampling), convert the other suites the same way, wire run-all.mjs's
+  tiers over the backend dimension, then flip the default per conditions a-c. This is
+  the flagship's determinism work — continue with fresh focus, not rushed.
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
