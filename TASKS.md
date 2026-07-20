@@ -7460,6 +7460,42 @@ the remaining open points in their numeric order.
   throws if a suite silently falls back. DOCS: CLAUDE §7.2 + scripts/verify/
   README (the backend coverage policy).
 
+- [ ] 205. A WORLD & FUNCTIONALITY PLAUSIBILITY AUDIT — a THIRD audit kind beyond
+  code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
+  functionality make SENSE and COHERE, not just work? (user request 20.07.2026:
+  there may be systems that work but are pointless, useless, or run counter to
+  others.) For EACH system/feature — walk design.md's feature list AND the §7.1
+  acceptance systems — ask:
+   (1) PURPOSE: does it make sense in-world (~1890 Africa) AND as a mechanic, and
+       would a player grasp why it exists?
+   (2) USE: does it actually affect the game loop, or is it dead weight nobody
+       engages — a building you enter for nothing, an item never needed, a stat
+       shown but never decisive, a mechanic with no consequence?
+   (3) COHERENCE: does it CONTRADICT or undercut another system — one rewards what
+       another punishes, two overlapping mechanics that only confuse, a shortcut
+       that trivialises a challenge?
+   (4) SETTING FIT: consistent with the researched ~1890 world + design.md intent
+       (no anachronism; plausible geography, ecology, economy)?
+   (5) WORTH: does it earn its complexity, or add surface without depth?
+  WORLD PLAUSIBILITY specifically: the ECOLOGY (every predator has prey and every
+  prey a plausible predator in its own region; the herds/dramas are ecologically
+  sensible), the ECONOMY (trade is meaningful — goods have a use, prices force
+  decisions, the ferry/bazaar/village-barter each have a reason, the money-vs-gifts
+  split coheres), EXPLORATION (each region/landmark has a reason to visit; the goal
+  is reachable, motivated, and the hint cascade truly leads there), SURVIVAL
+  (provisions/health/afflictions create real decisions, not noise), and the
+  CROSS-SYSTEM loop (exploration → language → hints → goal; reputation → access;
+  economy → equipment → capability) actually holds together.
+  METHOD: system-by-system + the cross-system matrix, and PLAY the loop end to end
+  asking "why am I doing this / does it matter". OUTPUT: unlike the mechanical
+  audits, most findings here are DESIGN JUDGMENTS — design.md is authoritative and
+  design changes are the USER's call — so each is written up and DISCUSSED WITH THE
+  USER, not autonomously "fixed". Only clear OBJECTIVE incoherences (a predator
+  with no prey in a region, an item with literally no effect, two directly
+  contradictory rules) get filed as points; the rest are a design conversation. A
+  model-diverse pass is welcome (a Fable lens on "does this cohere") within the
+  point-200 token limits.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this

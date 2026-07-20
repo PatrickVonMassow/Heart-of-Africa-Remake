@@ -64,6 +64,8 @@ for (const [name, lat, lon, month] of SPOTS) {
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' })))
   for (let f = 0; f < 4; f++) {
     await page.waitForTimeout(1800) // wall-clock cadence — a capture, not an assertion
+    // Keep the journal from covering the scene — region-discovery entries reopen it.
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     const file = `${OUT}${name}-f${f}.png`
     await page.screenshot({ path: file })
     console.log(`SHOT ${name} f${f}`)
