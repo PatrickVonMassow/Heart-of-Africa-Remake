@@ -287,12 +287,6 @@ interface LionHuntState {
   mode: 'idle' | 'chase' | 'feed' | 'leave'
   lx: number
   lz: number
-  /** Lion's PRE-move position from the last chase frame — the start of the
-   *  swept-catch segment used by the shield-take resolution (point 179), so a
-   *  big clamped-dt step cannot carry the hunter THROUGH the interposing parent
-   *  without registering contact. */
-  plx: number
-  plz: number
   px: number
   pz: number
   timer: number
@@ -315,7 +309,7 @@ interface LionHuntState {
   victimHunt: boolean
 }
 const LION_STATE: LionHuntState = {
-  mode: 'idle', lx: 0, lz: 0, plx: 0, plz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
+  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
   predator: 'lion', prey: 'zebra', victim: null, victimHunt: false,
 }
 
@@ -1649,10 +1643,16 @@ function Herds() {
             a.x += Math.sin(h) * RESCUE_SPEED * dt
             a.z += Math.cos(h) * RESCUE_SPEED * dt
           }
-          // SWEPT (point 179): the hunter's MOVE SEGMENT vs the interposing
+          // SWEPT (point 179): the hunter's last MOVE SEGMENT vs the interposing
           // parent, not its current point — a big clamped-dt step must not carry
-          // it THROUGH the living shield without registering contact.
-          if (segPointDist(LION_STATE.plx, LION_STATE.plz, LION_STATE.lx, LION_STATE.lz, a.x, a.z) < PARENT_TAKE_DIST) {
+          // it THROUGH the living shield without registering contact. The segment
+          // is reconstructed from the lion's heading + speed (robust — no stored
+          // prev-position that a directly-staged hunt could leave stale, which
+          // fired the take a frame too early before the calf could flee).
+          const lmv = HUNT_LION_SPEED * dt
+          const lpx = LION_STATE.lx - Math.sin(LION_STATE.lionHeading) * lmv
+          const lpz = LION_STATE.lz - Math.cos(LION_STATE.lionHeading) * lmv
+          if (segPointDist(lpx, lpz, LION_STATE.lx, LION_STATE.lz, a.x, a.z) < PARENT_TAKE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146), same
             // rule as the charge above: the shield ATTACKS on contact, so it
             // rolls (the point-125 line) — the hunter that reaches it may be
@@ -3451,8 +3451,6 @@ function LionHunt() {
         }
         const lx0 = s.lx
         const lz0 = s.lz
-        s.plx = lx0 // pre-move endpoint for the shield-take's swept check (point 179)
-        s.plz = lz0
         s.lx += Math.sin(s.lionHeading) * HUNT_LION_SPEED * dt
         s.lz += Math.cos(s.lionHeading) * HUNT_LION_SPEED * dt
         // SWEPT catch (point 179): test the lion's MOVE SEGMENT against the prey,
