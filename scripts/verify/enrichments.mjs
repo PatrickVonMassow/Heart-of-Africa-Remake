@@ -3643,7 +3643,15 @@ const crocDrama = async (mode, attempt = 0) =>
     const prevPf = pf.crocodile
     if (MODE.kind === 'rescue') pf.crocodile = 100 // force the drive-off band
     if (MODE.kind === 'sacrifice' || MODE.kind === 'toolate') pf.crocodile = 0 // force taken
+    // Park the scripted lion hunt for the staged scenario (point 194): the two
+    // systems never claim the same animal, so an idle-parked hunt cannot pick
+    // the staged calf and the lionTouched assertion then verifies the CROC drama
+    // itself never sets lion.victim.
     const lion = window.__lionHunt.state
+    lion.mode = 'idle'
+    lion.timer = 9999
+    lion.victim = null
+    lion.victimHunt = false
     const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false }
     // Sweep the drink phase so the bank window comes around quickly, watching
     // the croc for motion and teleports until it grips.

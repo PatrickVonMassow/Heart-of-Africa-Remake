@@ -7098,7 +7098,14 @@ the remaining open points in their numeric order.
   a predator beside prey and asserting the standoff resolves within a bounded
   sim window. DOCS: CLAUDE §7.1 pt.12 if the dodge rule wording changes.
 
-- [ ] 194. The scripted lion hunt and the crocodile ambush can CLAIM EACH
+- [x] 194. DONE 20.07.2026: the chase→feed close-out now aborts into the
+  ordinary walk-off when the victim was caught by the crocodile (v.caughtBy),
+  never feeding on the sinking kill; the crocodile victim scan skips
+  LION_STATE.victim; and the enrichments croc staging parks the scripted hunt so
+  the point-130 rescue's lionTouched asserts clean. build+lint+1941 vitest green;
+  enrichments' croc suite green (the 2 fails in the proof run were the unrelated
+  rotating point-118/126 staging flakes → point 200).
+  ORIGINAL: The scripted lion hunt and the crocodile ambush can CLAIM EACH
   OTHER'S victim — the §19.16 independence promise ("never touching the
   scripted lion hunt") is violated at two seams. Found by the 184 Pillar-2
   audit (inline-verified against the code 20.07.2026):

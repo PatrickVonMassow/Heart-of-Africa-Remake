@@ -2106,7 +2106,9 @@ function Herds() {
           // Hidden: wait for a drinker standing at a bank inside the radius.
           for (const sp of CALF_HUNT_SPECIES) {
             for (const a of herds[sp]) {
-              if (a.dead || !a.drink || a.caught !== undefined || a.inWater !== undefined || a.mired !== undefined) continue
+              // Skip the lion's active chase victim (point 194): the two systems
+              // never claim the same animal (§19.16) — the lion is already on it.
+              if (a.dead || !a.drink || a.caught !== undefined || a.inWater !== undefined || a.mired !== undefined || a === LION_STATE.victim) continue
               const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
               const atBank = cycle > 0.1 && cycle < 0.4 // rendered standing at the water
               const d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
@@ -3470,8 +3472,22 @@ function LionHunt() {
         // Calf hunt: chase the actual fleeing calf (drawn by the herds). If it
         // died some other way before we reached it, just close out into feed.
         if (v.dead || v.caught !== undefined) {
-          s.mode = 'feed'
-          s.timer = 30
+          if (v.caughtBy === 'crocodile') {
+            // The crocodile stole the chase victim (point 194): §19.16 keeps the
+            // two systems apart — the lion never feeds on a croc kill (it sinks).
+            // Abort into the ordinary walk-off, never feed on the sinking prey.
+            s.mode = 'leave'
+            s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
+            s.leaveHeading = undefined
+            s.leaveT = 0
+            s.victim = null
+            s.victimHunt = false
+            s.lx = s.px + 0.7
+            s.lz = s.pz + 0.25
+          } else {
+            s.mode = 'feed'
+            s.timer = 30
+          }
         } else {
           s.px = v.x
           s.pz = v.z
