@@ -116,7 +116,11 @@ console.log('shot 82-handwriting-blood.png')
 // click: it is the page's first user gesture and would otherwise start the
 // deferred initial narration (TTS model download).
 await page.evaluate(() => window.__ui.getState().setJournalDnd(true))
-await page.locator('.journal .entry.writing').click()
+// Wait for the RAF-driven writing entry to appear, then force-click it to finish —
+// on the WebGPU backend's slower headless cadence it starts later and keeps animating,
+// so a bare .click() hangs on the actionability/stability wait until the default
+// timeout (point 184). force skips stability, the timeout+catch prevent the hang.
+await page.locator('.journal .entry.writing').click({ force: true, timeout: 15000 }).catch(() => {})
 await page.waitForTimeout(200)
 await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
 const clicked = await page.evaluate(() => ({
