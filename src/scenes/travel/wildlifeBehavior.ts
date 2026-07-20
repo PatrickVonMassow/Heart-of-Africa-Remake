@@ -188,6 +188,27 @@ export interface FlightState {
  *   a new want while still out turns it back inbound (retarget, no respawn)
  * Mutates and returns `s`.
  */
+/** Distance from point (px,pz) to the segment (ax,az)-(bx,bz). The SWEPT
+ *  predator catch (point 179): a big clamped-dt step or a tangential pass must
+ *  not carry a hunter THROUGH its target without registering the catch — the
+ *  point distance at the frame's pre-move position misses it, the segment does
+ *  not (the user report: the lion ran through parent AND calf, eating nobody). */
+export function segPointDist(
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+  px: number,
+  pz: number,
+): number {
+  const dx = bx - ax
+  const dz = bz - az
+  const len2 = dx * dx + dz * dz
+  let tt = len2 === 0 ? 0 : ((px - ax) * dx + (pz - az) * dz) / len2
+  tt = tt < 0 ? 0 : tt > 1 ? 1 : tt
+  return Math.hypot(px - (ax + tt * dx), pz - (az + tt * dz))
+}
+
 export function flightStep(
   s: FlightState,
   want: boolean,

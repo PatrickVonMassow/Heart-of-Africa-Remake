@@ -33,6 +33,7 @@ import {
   griefTarget,
   fleeHeading,
   flightStep,
+  segPointDist,
   gambolState,
   groundNormal,
   leashedGambolDir,
@@ -286,6 +287,12 @@ interface LionHuntState {
   mode: 'idle' | 'chase' | 'feed' | 'leave'
   lx: number
   lz: number
+  /** Lion's PRE-move position from the last chase frame — the start of the
+   *  swept-catch segment used by the shield-take resolution (point 179), so a
+   *  big clamped-dt step cannot carry the hunter THROUGH the interposing parent
+   *  without registering contact. */
+  plx: number
+  plz: number
   px: number
   pz: number
   timer: number
@@ -308,7 +315,7 @@ interface LionHuntState {
   victimHunt: boolean
 }
 const LION_STATE: LionHuntState = {
-  mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
+  mode: 'idle', lx: 0, lz: 0, plx: 0, plz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
   predator: 'lion', prey: 'zebra', victim: null, victimHunt: false,
 }
 
@@ -1642,7 +1649,10 @@ function Herds() {
             a.x += Math.sin(h) * RESCUE_SPEED * dt
             a.z += Math.cos(h) * RESCUE_SPEED * dt
           }
-          if (Math.hypot(LION_STATE.lx - a.x, LION_STATE.lz - a.z) < PARENT_TAKE_DIST) {
+          // SWEPT (point 179): the hunter's MOVE SEGMENT vs the interposing
+          // parent, not its current point — a big clamped-dt step must not carry
+          // it THROUGH the living shield without registering contact.
+          if (segPointDist(LION_STATE.plx, LION_STATE.plz, LION_STATE.lx, LION_STATE.lz, a.x, a.z) < PARENT_TAKE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146), same
             // rule as the charge above: the shield ATTACKS on contact, so it
             // rolls (the point-125 line) — the hunter that reaches it may be
@@ -3439,9 +3449,18 @@ function LionHunt() {
           while (dh < -Math.PI) dh += Math.PI * 2
           s.lionHeading += Math.max(-HUNT_LION_TURN * dt, Math.min(HUNT_LION_TURN * dt, dh))
         }
+        const lx0 = s.lx
+        const lz0 = s.lz
+        s.plx = lx0 // pre-move endpoint for the shield-take's swept check (point 179)
+        s.plz = lz0
         s.lx += Math.sin(s.lionHeading) * HUNT_LION_SPEED * dt
         s.lz += Math.cos(s.lionHeading) * HUNT_LION_SPEED * dt
-        if (d < (v ? CALF_CATCH_DIST : 0.6)) {
+        // SWEPT catch (point 179): test the lion's MOVE SEGMENT against the prey,
+        // not the pre-move point distance `d` — a big clamped-dt step or a
+        // tangential pass would otherwise carry the lion THROUGH the calf without
+        // ever sampling within the catch radius (the user report: it ran through
+        // parent and calf and ate nobody).
+        if (segPointDist(lx0, lz0, s.lx, s.lz, s.px, s.pz) < (v ? CALF_CATCH_DIST : 0.6)) {
           // Caught: a calf begins its struggle (the herds run the outcome); a
           // generic grazer is felled at once.
           if (v && v.caught === undefined && !v.dead) {

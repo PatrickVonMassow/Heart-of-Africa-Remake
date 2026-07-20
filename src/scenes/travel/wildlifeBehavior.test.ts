@@ -14,6 +14,7 @@ import {
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
   flightStep,
+  segPointDist,
   gambolState,
   griefTarget,
   groundNormal,
@@ -507,6 +508,23 @@ describe('separationPush (design.md §19 — animal body separation)', () => {
       if (Math.abs(bx - ax) >= 1.4) break
     }
     expect(Math.abs(bx - ax)).toBeGreaterThanOrEqual(1.4 - 1e-6)
+  })
+})
+
+describe('segPointDist (point 179 — the swept predator catch)', () => {
+  it('is ~0 for a point on the segment and clamps beyond the endpoints', () => {
+    expect(segPointDist(0, 0, 10, 0, 5, 0)).toBeCloseTo(0, 6)
+    expect(segPointDist(0, 0, 10, 0, 12, 0)).toBeCloseTo(2, 6)
+    expect(segPointDist(0, 0, 10, 0, -3, 0)).toBeCloseTo(3, 6)
+  })
+
+  it('catches a target the hunter SWEEPS through when both endpoints are far (tunnelling)', () => {
+    // Hunter moves (-2,0) -> (2,0) past a calf at (0, 0.5): the move segment
+    // passes 0.5 from it (a catch within radius 0.9), while the point distance at
+    // EITHER endpoint is ~2.06 — the old per-frame point check tunnelled through.
+    expect(segPointDist(-2, 0, 2, 0, 0, 0.5)).toBeCloseTo(0.5, 6)
+    expect(Math.hypot(2, 0.5)).toBeGreaterThan(0.9) // the endpoint point-check misses
+    expect(Math.hypot(-2, 0.5)).toBeGreaterThan(0.9)
   })
 })
 
