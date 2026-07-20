@@ -7311,10 +7311,43 @@ the remaining open points in their numeric order.
   desert, the season is the PLACE's not the traveller's). Pixel-diff based, a
   small fixed scene set. Retro-catches the whole "passes numerically, invisible
   on screen" family.
-  BUILD ORDER: (A) first (it retro-catches the most and is cheap), then (B),
-  then (D), then (E), then (C) as a standing pre-closing pass. Across A/B/D/E
-  this finder would have caught ~30 of the past ~40 emergent-scene reports
-  without the user ever seeing them. Run the whole finder BEFORE the final
+  (C) IS THE PRIMARY NET, NOT A FALLBACK (user insight 20.07.2026: "Es kann nicht
+  sein, dass ich eine Minute zufällig drauf los laufe und mir direkt mehrere Bugs
+  ins Auge springen, obwohl du gerade eine aufwändige Härtung vorgenommen hast").
+  The invariants only find what I THOUGHT to check; the game is visual + emergent,
+  so the reliable net is to LOOK at it the way the user does — but exhaustively.
+  Make (C) a DENSE, standing, repeatable sweep: a grid of locations (each biome,
+  each named place + landmark, coasts, river banks, lakes, the graveyard) × a set
+  of staged situations (each drama, drink/bathe, flood, fire, each season/weather)
+  — drive/stage, screenshot, and I VISUALLY inspect every frame for anything that
+  looks off, logging each anomaly. Aim for the coverage a human would need hours
+  of play to hit. This is the honest answer to "why did a minute of walking beat
+  the hardening"; A/B/D/E are the cheap automated first pass under it.
+  MORE INVARIANT CLASSES (derived by thinking through what else can look wrong —
+  the cheap automated complements to the visual sweep):
+   - (F) FACING/ORIENTATION: a moving animal's rendered facing tracks its
+     velocity (no walking backwards/sideways); a figure/sign/door faces a sane
+     direction (doors already checked — extend to animals + props).
+   - (G) SCALE/PROPORTION: every rendered thing is within its species/type size
+     band; a calf is smaller than its parent; no giant/tiny outlier; a landmark's
+     apparent size is plausible.
+   - (H) STATIC-OBJECT OVERLAP: no two solid statics interpenetrate (buildings,
+     rocks, large flora, props, landmark meshes) and no label overlaps a monument
+     — the I6 idea applied to the non-animal scene.
+   - (I) MATERIAL/COLOUR: no pure-black or magenta (missing-texture) pixels where
+     geometry renders; no z-fight flicker on a static camera (temporal diff);
+     colour plausible per biome (no snow in the desert, no bone-dry tropics).
+   - (K) WATER CONTINUITY/FLOW: rivers stay one unbroken descending ribbon (no
+     gap, no uphill run, flow direction matches the descent) — extend the pt-21
+     checks with a monotonic-descent + flow-direction assertion.
+   - (N) TELEPORT/FROZEN: no rendered thing jumps > a threshold in one frame (the
+     179/183 tunneling/pop class, generalised); a MOVING animal's animation phase
+     advances (no frozen T-pose).
+  BUILD ORDER: (A) first (retro-catches the most, cheap), then (B), (D), (E), the
+  cheap extras (F/G/H/I/K/N) as they fit, and (C) the dense visual sweep as the
+  standing pre-closing pass — run the WHOLE finder before the final closing.
+  Across all classes this would have caught the great majority of the past
+  emergent-scene reports without the user ever seeing them. Run the whole finder BEFORE the final
   closing so the batch of finds is fixed in one push. Each real find is its own
   atomic point/commit. Docs: CLAUDE §7.2 gains the anchoring + liveness invariant
   suites; this is the pillar the harness was missing.
