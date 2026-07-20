@@ -84,16 +84,20 @@ const drivePopIn = (stop) =>
     const seen = new Set()
     for (const sp of SP) for (const a of herds[sp] ?? []) seen.add(a)
     const pops = []
+    const oceanViols = []
+    const seedNum = window.__game.getState().seed
+    const U = 10
+    let frame = 0
     await driveFor(12, () => {
       const pos = window.__game.getState().pos
       for (const sp of SP)
         for (const a of herds[sp] ?? []) {
           if (seen.has(a)) continue
           seen.add(a)
+          // I1: a NEW animal must not appear inside the frame. Tag the spawn path so
+          // a finding can be traced (shoreSeed = the dry-shore guarantee, chunk = the
+          // ordinary/vicinity spawn, young = a calf, drink = a shore visitor).
           if (!a.dead && window.__camera.onScreen(a.x, a.z)) {
-            // Tag the spawn path so a real finding can be traced (shoreSeed = the
-            // dry-shore guarantee, chunk = ordinary/vicinity chunk spawn, young =
-            // a calf, drink = a shore visitor).
             pops.push({
               region: stop.name,
               sp,
@@ -105,23 +109,42 @@ const drivePopIn = (stop) =>
             })
           }
         }
+      // I5 (throttled ~1/3 s): no living animal may stand on an OCEAN cell (the
+      // impassable sea) — the §19.5 open-ocean backstop must catch every stray. A
+      // STATE check, so a periodic sample suffices (and keeps the frame loop light).
+      if (frame++ % 10 === 0) {
+        for (const sp of SP)
+          for (const a of herds[sp] ?? []) {
+            if (a.dead) continue
+            if (window.__terrainType(-a.z / U, a.x / U, seedNum) === 'ocean') {
+              oceanViols.push({ region: stop.name, sp, x: +a.x.toFixed(0), z: +a.z.toFixed(0) })
+            }
+          }
+      }
     })
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' }))
     window.__balance.travelSpeed = prevSpeed
     window.__ui.getState().setSeasonWetnessOverride(null)
-    return pops
+    return { pops, oceanViols }
   }, stop)
 
 const allPops = []
+const allOcean = []
 for (const stop of ROUTE) {
-  const pops = await drivePopIn(stop)
+  const { pops, oceanViols } = await drivePopIn(stop)
   allPops.push(...pops)
-  console.log(`  route ${stop.name}: ${pops.length} pop(s)`)
+  allOcean.push(...oceanViols)
+  console.log(`  route ${stop.name}: ${pops.length} pop(s), ${oceanViols.length} ocean`)
 }
 check(
   'I1 no pop-in: no animal appears inside the frame the frame it joins, across the driven route (point 184 Pillar 1)',
   allPops.length === 0,
   JSON.stringify(allPops.slice(0, 15)),
+)
+check(
+  'I5 no animal on the impassable ocean, across the driven route (point 184 Pillar 1)',
+  allOcean.length === 0,
+  JSON.stringify(allOcean.slice(0, 15)),
 )
 
 console.log('console errors:', errors.length)
