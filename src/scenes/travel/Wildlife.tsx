@@ -2482,14 +2482,28 @@ function Herds() {
         const aheadLL = worldToLatLon(a.x + Math.sin(a.heading) * 6, a.z + Math.cos(a.heading) * 6)
         const aheadT = sampleTerrain(aheadLL.lat, aheadLL.lon, seed).type
         if (!elephantStepAllowed(aheadT, mournInfo !== undefined, standT)) {
-          // Redirect toward the herd — unless the centre IS this animal (a
-          // solo elephant, or one standing on the centre): atan2(0,0) would
-          // pin `desired` due north forever, freezing it at a biome border
-          // (the measured centreMoved 0.63 roam failures). Keep turning
-          // instead until a crossable direction comes around.
-          const dcx = info ? info.cx - a.x : 0
-          const dcz = info ? info.cz - a.z : 0
-          desired = info && Math.hypot(dcx, dcz) > 0.5 ? Math.atan2(dcx, dcz) : a.heading + Math.PI * 0.6
+          // The ground ahead is uncrossable (a shore/water edge). DEFLECT ALONG it
+          // to the nearest crossable heading (point 180) instead of only turning
+          // toward the herd centre: at a lake shore the centre sits AT the crowded
+          // water's edge, so that turn gave no tangential escape and the members
+          // wedged — separation shoves some onto a water cell, the backstop snaps
+          // them straight back to the same bank, cohesion re-crowds them. deflected-
+          // Step sweeps +/-90 deg for a heading whose step AND lookahead are dry.
+          const blockedStep = (bx: number, bz: number): boolean => {
+            const bll = worldToLatLon(bx, bz)
+            return !elephantStepAllowed(sampleTerrain(bll.lat, bll.lon, seed).type, mournInfo !== undefined, standT)
+          }
+          const def = deflectedStep(a.x, a.z, a.heading, ELEPHANT_SPEED * dt, blockedStep, 6)
+          if (def.moved) {
+            desired = def.heading
+          } else {
+            // Fully boxed in — keep the herd redirect / turn until a way opens.
+            // (info being this animal itself: atan2(0,0) would pin `desired` due
+            // north forever, freezing it at a border, so keep turning instead.)
+            const dcx = info ? info.cx - a.x : 0
+            const dcz = info ? info.cz - a.z : 0
+            desired = info && Math.hypot(dcx, dcz) > 0.5 ? Math.atan2(dcx, dcz) : a.heading + Math.PI * 0.6
+          }
         }
         let dh = desired - a.heading
         while (dh > Math.PI) dh -= Math.PI * 2
