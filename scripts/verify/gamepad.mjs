@@ -38,13 +38,6 @@ await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
 })
 
-const pressButton = async (index) => {
-  await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: true, touched: true, value: 1 }), index)
-  await page.waitForTimeout(150)
-  await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: false, touched: false, value: 0 }), index)
-  await page.waitForTimeout(150)
-}
-
 // Hold a stick until the render loop produces the expected result, then centre it —
 // the loop reads the axes each frame, and a fixed wait yields too few frames on the
 // slower/colder WebGPU headless cadence (point 184). Polling for the check's OWN

@@ -57,6 +57,17 @@ const DEV_SUITES = [
 // The closing cycle ALWAYS runs LARGE. Keep SMALL a strict subset of DEV_SUITES.
 const SMALL_SUITES = ['docs', 'i18n', 'flow', 'health', 'events', 'collision', 'voice']
 
+// Backend dimension (point 184 Pillar 3). VERIFY_GL selects the renderer the suites
+// launch (mirrored from _browser.mjs; default webgl, propagated to each suite via the
+// inherited env). The LARGE regression covers both backends by invoking twice
+// (VERIFY_GL=webgl, then VERIFY_GL=webgpu). Two suites are WebGL2-ONLY (user decision,
+// 20.07.2026): headless WebGPU under system Chrome cannot drive touch's CDP touch
+// events nor voice's TTS speak-state, and BOTH were verified to render correctly on the
+// WebGL2 path — so a webgpu invocation SKIPS them rather than false-failing on a harness
+// limitation. Everything else runs on whichever backend VERIFY_GL selects.
+const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
+const WEBGL_ONLY_SUITES = ['touch', 'voice']
+
 const args = process.argv.slice(2)
 const tier = args.includes('small') ? 'small' : args.includes('large') ? 'large' : null
 // Suite-name filters are the args minus the tier tokens.
@@ -205,10 +216,20 @@ if (fullRun || filter.includes('unit')) {
 
 let dev
 try {
-  if (pick(DEV_SUITES).length > 0) {
+  // On WebGPU, drop the WebGL2-only suites (logged so the skip is explicit, never a
+  // silent gap) — the rest run on the selected backend.
+  const devPick = pick(DEV_SUITES).filter(
+    (s) => !(VERIFY_GL === 'webgpu' && WEBGL_ONLY_SUITES.includes(s)),
+  )
+  for (const s of pick(DEV_SUITES)) {
+    if (VERIFY_GL === 'webgpu' && WEBGL_ONLY_SUITES.includes(s)) {
+      console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — not run on WebGPU, point 184)`)
+    }
+  }
+  if (devPick.length > 0) {
     const server = await launchServer('npm run dev', 'dev', join(HERE, '..', '..'))
     dev = server.child
-    for (const s of pick(DEV_SUITES)) results.push(runSuite(s, server.base))
+    for (const s of devPick) results.push(runSuite(s, server.base))
   }
 } finally {
   killTree(dev)
