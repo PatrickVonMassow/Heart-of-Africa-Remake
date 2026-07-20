@@ -7069,6 +7069,32 @@ the remaining open points in their numeric order.
   a predator beside prey and asserting the standoff resolves within a bounded
   sim window. DOCS: CLAUDE §7.1 pt.12 if the dodge rule wording changes.
 
+- [ ] 194. The scripted lion hunt and the crocodile ambush can CLAIM EACH
+  OTHER'S victim — the §19.16 independence promise ("never touching the
+  scripted lion hunt") is violated at two seams. Found by the 184 Pillar-2
+  audit (inline-verified against the code 20.07.2026):
+  (a) the chase→feed close-out (Wildlife.tsx ~3454) flips the hunt into 'feed'
+  whenever `v.caught !== undefined` WITHOUT checking `v.caughtBy` — if the
+  crocodile seizes the lion's current chase victim, the lion snaps into feeding
+  on the crocodile's still-struggling prey (whose kill then SINKS, leaving the
+  lion feeding on nothing);
+  (b) the hunt's victim pick and the crocodile's victim scan do not exclude
+  each other's claims — the hunt can pick a croc-seized calf (the observed
+  enrichments `lionTouched:true` flake in the point-130 rescue staging is this
+  seam: the natural hunt claimed the staged croc calf), and the croc scan's
+  exclusion list (dead/caught/inWater/mired) should also skip the ACTIVE chase
+  victim so the §19.16 line holds in both directions.
+  FIX: (a) close out into 'feed' only when the victim is dead or caught by the
+  HUNT itself; a croc-caught victim ABORTS the chase into the ordinary leave/
+  walk-off (retarget per the strayed-chase rule); (b) the hunt victim pick
+  skips `caught !== undefined` animals; the croc scan skips
+  `LION_STATE.victim`. VERIFY: pure tests for both exclusions (a croc-caught
+  victim never yields feed mode; the pick/scan skip rules); the enrichments
+  crocodile suite (lunge/rescue/sacrifice/toolate/vanish) stays green and the
+  point-130 rescue staging no longer needs to tolerate a lion claim —
+  `lionTouched` asserts clean without retries. DOCS: CLAUDE §7.1 pt.12 §19.16
+  bullet already promises this; no wording change needed.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
