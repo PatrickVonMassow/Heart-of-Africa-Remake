@@ -1214,7 +1214,7 @@ describe('vicinitySeedBounds (point 135a — the guarantee holds from the leave 
   })
 })
 
-describe('pickOffscreenLandAnchor (point 165 — a seeded guarantee never pops into view)', () => {
+describe('pickOffscreenLandAnchor (points 165/183 — a seeded guarantee never pops into view; defers when it cannot place off-screen)', () => {
   const anyLand = () => true
   it('prefers an off-screen land candidate over on-screen ones', () => {
     const cands = [[0, 0], [10, 0], [20, 0]] as const
@@ -1223,9 +1223,9 @@ describe('pickOffscreenLandAnchor (point 165 — a seeded guarantee never pops i
     expect(pickOffscreenLandAnchor(cands, anyLand, (x) => onScreen(x))).toEqual([20, 0])
   })
 
-  it('falls back to the first on-screen land candidate when none is off-screen', () => {
+  it('returns null when only on-screen land exists, so the seeder defers instead of popping (point 183)', () => {
     const cands = [[0, 0], [10, 0]] as const
-    expect(pickOffscreenLandAnchor(cands, anyLand, () => true)).toEqual([0, 0])
+    expect(pickOffscreenLandAnchor(cands, anyLand, () => true)).toBeNull()
   })
 
   it('skips water candidates and takes the off-screen LAND one', () => {

@@ -801,26 +801,26 @@ export function vicinitySeedBounds(
 }
 
 /**
- * Pick a placement anchor from deterministic candidates, PREFERRING one OUTSIDE
- * the rendered frame (design.md §19.5/§19.6, point 165 — a guarantee-seeded
+ * Pick a placement anchor from deterministic candidates that is OUTSIDE the
+ * rendered frame (design.md §19.5/§19.6, points 165/183 — a guarantee-seeded
  * group must never pop into view; the user report: "sie sollen nur außerhalb des
- * Sichtfeldes spawnen"). Returns the first off-screen LAND candidate; failing
- * that the first ON-SCREEN land candidate (a fallback — a rare edge appearance
- * beats a starved acceptance guarantee); failing that null (no land at all). The
- * caller supplies the land and on-screen predicates, so this stays pure.
+ * Sichtfeldes spawnen"). Returns the first off-screen LAND candidate, else null.
+ * There is deliberately NO on-screen fallback: near water the off-screen
+ * candidates can all be river/lake, and the old on-screen-land fallback POPPED a
+ * herd into view mid-drive (point 183 — the user's Nile report). On null the
+ * caller DEFERS (skips this frame and retries next frame, when the moving camera
+ * exposes off-screen land) instead of placing on-screen. The caller supplies the
+ * land and on-screen predicates, so this stays pure.
  */
 export function pickOffscreenLandAnchor(
   candidates: ReadonlyArray<readonly [number, number]>,
   isLand: (x: number, z: number) => boolean,
   onScreen: (x: number, z: number) => boolean,
 ): readonly [number, number] | null {
-  let fallback: readonly [number, number] | null = null
   for (const c of candidates) {
-    if (!isLand(c[0], c[1])) continue
-    if (!onScreen(c[0], c[1])) return c // off-screen land — the best spot
-    if (!fallback) fallback = c // on-screen land — remember as a fallback
+    if (isLand(c[0], c[1]) && !onScreen(c[0], c[1])) return c // off-screen land — the only spot
   }
-  return fallback
+  return null // no off-screen land — the caller defers (point 183), never pops on-screen
 }
 
 /**
