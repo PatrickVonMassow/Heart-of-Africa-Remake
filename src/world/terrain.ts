@@ -8,10 +8,11 @@
 import { regionAt } from './geo'
 import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
 import { elevationAt, landFractionAt } from './geodata'
-import { lakeContains } from './hydro'
+import { lakeContains, lakeIndexAt } from './hydro'
 import { fbm2 } from './noise'
 import { isNortheastOfBoundary } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
+import { LAKES } from './data/lakes'
 import { balance } from '../config/balance'
 
 export type TerrainType =
@@ -143,6 +144,56 @@ function normalizeSplat(s: SplatWeights): SplatWeights {
  * Sample terrain at geographic coordinates. `seed` controls the per-run
  * procedural appearance; geography itself is fixed real data.
  */
+/** Nearest lake by centroid — for the shore BLEND band just outside a polygon,
+ *  where lakeIndexAt is already -1 (point 190). The lakes sit far apart, so the
+ *  centroid pick is unambiguous. */
+function nearestLakeIndex(lat: number, lon: number): number {
+  let best = -1
+  let bd = Infinity
+  for (let li = 0; li < LAKES.length; li++) {
+    const c = LAKES[li].center
+    const d = Math.hypot(c[0] - lon, c[1] - lat)
+    if (d < bd) {
+      bd = d
+      best = li
+    }
+  }
+  return best
+}
+
+/** Per-lake BASIN LEVEL (point 190): the lowest shore ground on a ring pushed
+ *  0.5 deg outside the polygon — far enough out that the samples lie beyond the
+ *  0.3-deg lake carve band, so this never recurses into its own blend. A lake
+ *  bed is levelled by its water: the interior blends to (level − drop), which
+ *  puts the rendered sheet (bedMax + LAKE_LIFT) slightly BELOW the lowest shore
+ *  at every lake by construction — the fix for the floating Lake Edward. */
+const basinLevelCache = new Map<string, number>()
+function lakeBasinLevel(li: number, seed: number): number {
+  const key = `${li}|${seed}`
+  const hit = basinLevelCache.get(key)
+  if (hit !== undefined) return hit
+  // Re-entrancy sentinel: a ring sample can graze ANOTHER edge of the same
+  // snaking polygon and land back in the blend band — the nested call then
+  // reads Infinity (bed clamps to no-op) instead of recursing forever.
+  basinLevelCache.set(key, Infinity)
+  const lake = LAKES[li]
+  const cx = lake.points.reduce((s, p) => s + p[0], 0) / lake.points.length
+  const cy = lake.points.reduce((s, p) => s + p[1], 0) / lake.points.length
+  let lo = Infinity
+  for (const [plon, plat] of lake.points) {
+    const dx = plon - cx
+    const dy = plat - cy
+    const n = Math.hypot(dx, dy) || 1
+    const olat = plat + (dy / n) * 0.5
+    const olon = plon + (dx / n) * 0.5
+    if (lakeIndexAt(olat, olon) >= 0) continue // still inside a lake — skip
+    lo = Math.min(lo, sampleTerrain(olat, olon, seed).height)
+  }
+  if (!Number.isFinite(lo)) lo = 0.3 // degenerate polygon: a safe lowland level
+  basinLevelCache.set(key, lo)
+  return lo
+}
+
 export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
   const land = landFractionAt(lat, lon)
   const elevation = elevationAt(lat, lon)
@@ -300,14 +351,32 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // distance to the shoreline/centerline, so the waterline is the smooth
   // 0-contour — no per-vertex steps along banks (design.md §3).
   const lakeD = lakeDistance(lat, lon, 1)
-  // Rivers and lakes carve their bed *relative to the local relief*, so the
-  // water follows the map's height profile (design.md §2/§11) instead of
-  // cutting sea-level canyons through the highlands. The visible surfaces
-  // are separate meshes laid into these beds (scenes/travel/Rivers.tsx).
+  // RIVERS carve their bed *relative to the local relief*, so the water
+  // follows the map's height profile (design.md §2/§11) instead of cutting
+  // sea-level canyons through the highlands. LAKES are different (point 190):
+  // a lake bed is levelled by its WATER — the old relative carve kept the rift
+  // slope in the bed, so the max-bed sheet stood metres over the low shores
+  // (the user's floating Lake Edward). Inside a lake the height now blends to
+  // a flat per-lake BASIN LEVEL (lowest shore ground − drop), which puts the
+  // sheet (bedMax + LAKE_LIFT) slightly BELOW its lowest shore at every lake
+  // by construction. The visible surfaces are separate meshes laid into these
+  // beds (scenes/travel/Rivers.tsx).
   let carve = 0
+  let lakeDrop = 0 // applied directly here; carve below is river-only
   if (lakeD < 0.3 || lakeContains(lat, lon)) {
-    const sd = lakeContains(lat, lon) ? -lakeD : lakeD // signed: negative inside
-    carve = Math.max(carve, sstep(0.28, -0.12, sd) * 0.6)
+    const inside = lakeContains(lat, lon)
+    const sd = inside ? -lakeD : lakeD // signed: negative inside
+    const w = sstep(0.28, -0.12, sd)
+    if (w > 0) {
+      const li = inside ? lakeIndexAt(lat, lon) : nearestLakeIndex(lat, lon)
+      if (li >= 0) {
+        const bed = lakeBasinLevel(li, seed) - 0.35
+        // Never RAISE relief onto the level (a spot already below stays).
+        const flat = Math.min(height, bed)
+        lakeDrop = (height - flat) * w
+        height -= lakeDrop
+      }
+    }
     if (sd < -0.005) type = 'water'
   }
   const riverS = riverD - RIVER_WIDTH_DEG
@@ -319,7 +388,7 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   if (type === 'water') {
     // Sandy bank fading into water-blue with channel depth; the river/lake
     // surface meshes above add the actual water.
-    const depth = sstep(0.1, 0.5, carve)
+    const depth = sstep(0.1, 0.5, Math.max(carve, lakeDrop))
     color = mix(mix(biomeColor('coast', detail), color, 0.4), PALETTE.water, depth)
     splat[0] += 1.5
   }

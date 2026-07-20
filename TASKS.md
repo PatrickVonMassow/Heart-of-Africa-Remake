@@ -7036,7 +7036,21 @@ the remaining open points in their numeric order.
   existing Sudd clearance/screenshot checks (127) re-shot and eyeballed — the
   marsh must touch the river band, not float beside it; world.test.ts clearances
   hold. DOCS: none (§4.4 already describes the Sudd as a swamp).
-- [ ] 190. Lake Edward's sheet FLOATS partly in the air (user play-test
+- [x] 190. DONE 21.07.2026 — ROOT-CAUSED past the single lake: the relative
+  lake carve kept the RIFT SLOPE in every lake bed, so the max-bed sheet stood
+  up to 2.3 units over the low shores (Edward 2.29; the generalising sweep
+  found the same class at Nyasa 1.40 and Albert 1.09). Fix: lake interiors now
+  blend to a flat per-lake BASIN LEVEL (the lowest shore ground on a ring
+  0.5 deg outside the polygon, − 0.35 drop, re-entrancy-guarded cache;
+  rivers keep their relative carve) — the sheet lands near or below every
+  shore BY CONSTRUCTION: measured overhangs after the fix ≤ 0.35 across all 8
+  lakes, with the ORIGINAL geographically accurate polygons untouched (the
+  probe-driven trims were reverted — accuracy wins). New permanent world.test
+  sweep (all 8 lakes, per-vertex shore overhang < 0.5). Verified: 1947 vitest
+  green (all clearance/type suites hold on the new terrain), enrichments 206/0
+  (lake sheets, the point-152 swim at mid-Lake-Edward, ribbon continuity,
+  crocodiles, Okavango flood).
+  ORIGINAL: Lake Edward's sheet FLOATS partly in the air (user play-test
   20.07.2026, screenshot): the flat lake surface takes the height of the
   adjacent mountain shore, so its edge hangs over the lower ground beside it.
   USER-SUGGESTED FIX: SHIFT the lake slightly into the depression it belongs in

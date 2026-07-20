@@ -155,6 +155,46 @@ describe('hydrology geometry', () => {
       expect(cellAt(l.center[1], l.center[0]), `${l.id}`).toBe(CELL_LAKE)
     }
   })
+
+  it('no lake sheet stands tall over its own shore (point 190 — the basin-level carve)', () => {
+    // The rendered sheet is max(interior bed) + LAKE_LIFT (0.12). With the
+    // basin-level carve the interior blends to (lowest shore ground − 0.35),
+    // so the sheet sits near or below every shore. The OLD relative carve kept
+    // the rift slope in the bed and floated Lake Edward 2.3 units over its
+    // south shore (the user report); this sweeps ALL lakes so the fix
+    // generalises. Tolerance 0.5: the blend keeps a little edge relief, the
+    // worst measured overhang after the fix is 0.35 (Albert).
+    for (let li = 0; li < LAKES.length; li++) {
+      const lake = LAKES[li]
+      // bedMax over a 9x9 interior grid (the sheet rule from waterSurface.ts).
+      let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity
+      for (const [lon, lat] of lake.points) {
+        minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon)
+        minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat)
+      }
+      let bedMax = -Infinity
+      for (let i = 1; i < 9; i++) for (let j = 1; j < 9; j++) {
+        const lon = minLon + ((maxLon - minLon) * i) / 9
+        const lat = minLat + ((maxLat - minLat) * j) / 9
+        if (!lakeContains(lat, lon)) continue
+        bedMax = Math.max(bedMax, sampleTerrain(lat, lon, SEED).height)
+      }
+      if (bedMax === -Infinity) continue
+      const sheet = Math.max(-0.05, bedMax + 0.12)
+      // Shore ground just outside each vertex (pushed 0.06 deg outward).
+      const cx = lake.points.reduce((s, p) => s + p[0], 0) / lake.points.length
+      const cy = lake.points.reduce((s, p) => s + p[1], 0) / lake.points.length
+      for (const [lon, lat] of lake.points) {
+        const dx = lon - cx, dy = lat - cy
+        const n = Math.hypot(dx, dy) || 1
+        const olat = lat + (dy / n) * 0.06
+        const olon = lon + (dx / n) * 0.06
+        if (lakeContains(olat, olon)) continue
+        const shore = Math.max(0, sampleTerrain(olat, olon, SEED).height)
+        expect(sheet - shore, `${lake.id} sheet overhang at (${olat.toFixed(2)}, ${olon.toFixed(2)})`).toBeLessThan(0.5)
+      }
+    }
+  })
 })
 
 describe('grave search area (store samples lat 24..27.5, lon 29..33)', () => {
