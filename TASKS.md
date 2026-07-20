@@ -6675,6 +6675,21 @@ the remaining open points in their numeric order.
   A tiny manual note remains only for what even the WebGPU lane cannot see (a
   subjective look call). Caveat: needs a real GPU + Chrome (present on the user's
   machine); flag if a GPU-less CI would fall back.
+  BUILD NOTE (scoped 20.07.2026, from the harness): all ~15 verify suites currently
+  launch their OWN browser with the identical line `const browser = await
+  chromium.launch({ args: ['--enable-unsafe-webgpu','--use-angle=d3d11','--enable-gpu']
+  })` — Playwright's BUNDLED Chromium, which silently runs WebGL2 headless despite the
+  flags. So the lane is a small, mechanical refactor: (1) add scripts/verify/_browser.mjs
+  exporting `launchVerifyBrowser()` that reads an env switch (e.g. VERIFY_GL) — 'webgpu'
+  -> `chromium.launch({ channel:'chrome', args:['--headless=new','--enable-unsafe-webgpu',
+  '--enable-gpu'] })`, 'webgl' -> today's bundled line — plus `assertBackend(page,'webgpu')`
+  reading `window.__renderer.backend.isWebGPUBackend` and THROWING on a silent fallback
+  (the guardrail); (2) replace each suite's launch line with the helper and call
+  assertBackend right after the game first loads (after the initial waitForFunction
+  (window.__game)); (3) in run-all.mjs (launchServer is at ~line 102) loop the suite runs
+  over the backend dimension per the TIER DESIGN below and set VERIFY_GL. Do NOT hand-edit
+  15 files ad hoc at the end of a session — this is Pillar 3's structured job (validate
+  WebGPU-headless holds under FULL-suite load + determinism first, per conditions a-c).
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
