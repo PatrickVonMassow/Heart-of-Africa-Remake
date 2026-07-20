@@ -4,13 +4,13 @@
 // __placePlayer, __placeLayout are DEV-only). UI text is asserted in German,
 // the default game language; journal entries are asserted by their
 // language-neutral keys (design.md §17).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 const errors = []
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
@@ -76,6 +76,10 @@ async function closeDialog() {
 await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.evaluate(() => localStorage.clear())
 await page.reload({ waitUntil: 'networkidle' })
+// Point 184 (Pillar 3): confirm the requested backend actually initialised — throws
+// on a silent WebGL2 fallback under VERIFY_GL=webgpu (the lane's guardrail).
+await page.waitForFunction(() => window.__game && window.__renderer, null, { timeout: 60000 })
+await assertBackend(page)
 await page.waitForTimeout(3500)
 // The flow is asserted against German labels; the default is English (par.17).
 await page.evaluate(() => window.__setLang('de'))

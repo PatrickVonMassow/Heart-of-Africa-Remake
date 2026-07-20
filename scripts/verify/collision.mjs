@@ -5,7 +5,7 @@
 // object, feed a few input frames, and assert it is ejected to the object's
 // surface and never penetrates. Reachability of paths/accesses is verified
 // geometrically. Dev server only (dev hooks).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
@@ -18,7 +18,7 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 // Shared helpers for both collider shapes (circle and oriented box).
 await page.addInitScript(() => {
@@ -49,6 +49,10 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
+// Point 184 (Pillar 3): confirm the requested backend actually initialised — throws
+// on a silent WebGL2 fallback under VERIFY_GL=webgpu (the lane's guardrail).
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page)
 await page.waitForTimeout(5000)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
@@ -76,6 +80,23 @@ async function pushFrames(n = 12) {
   await page.waitForTimeout(120)
 }
 
+/** Hold forward until the resolver has ejected the player clear of every collider
+ *  (or a generous window). Pushing from a collider CENTRE to its surface takes many
+ *  render frames, and a fixed frame count starves on the WebGPU backend's slower/
+ *  colder headless cadence (point 184) — so poll for the clearance instead of
+ *  counting frames. Re-affirms the held key each tick. */
+async function pushUntilClear(maxMs = 15000) {
+  const t0 = Date.now()
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  while (Date.now() - t0 < maxMs) {
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+    await page.waitForTimeout(80)
+    if ((await clearance()) >= -0.03) break
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+  await page.waitForTimeout(120)
+}
+
 /**
  * Place the player exactly on a collider center, aimed outward, and feed
  * input frames; the resolver must push it out to (near) the surface.
@@ -97,7 +118,7 @@ async function ejectTest(sceneLabel, pick) {
     check(`${sceneLabel}: eject target found`, false, `pick matched nothing: ${pick}`)
     return
   }
-  await pushFrames(14)
+  await pushUntilClear()
   const cl = await clearance()
   const end = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
   const outDist = Math.hypot(end.x - info.cx, end.z - info.cz)
@@ -258,7 +279,7 @@ for (let corner = 0; corner < 4; corner++) {
     p.z = c.z - sin * lx + cos * lz
     p.yaw = 0
   }, corner)
-  await pushFrames(8)
+  await pushUntilClear()
   const cl = await clearance()
   check(`Port: ejected from building corner ${corner + 1}/4`, cl >= -0.03, `clearance ${cl.toFixed(3)}`)
 }
