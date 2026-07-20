@@ -6558,25 +6558,31 @@ the remaining open points in their numeric order.
   river/shore fauna placing on-screen mid-river — NOT the debug seeder limitation;
   it must be reproduced away from settlements at 0.5 and fixed by gating that spawn
   path through the frustum-projected isOnScreen rule the seeders use.
-  STATIC ROOT CAUSE (20.07.2026, from the code, not yet repro'd live): the ordinary
-  chunk spawn (Wildlife.tsx ~1450-1463) fires a chunk when its CENTRE is within
-  spawnR = viewR + SPAWN_MARGIN = 100*zoom + 18 (= 68 at zoom 0.5), and spawnChunk
-  scatters that chunk's animals across CHUNK_SIZE=24, so a just-entered chunk ahead
-  drops animals at ~56-80 from the player. But the tilted bird's-eye frustum reaches
-  FARTHER ahead on the ground than viewR — the smoking gun is DESPAWN_MARGIN=60
-  (despawnR=110 at 0.5), set >3x SPAWN_MARGIN precisely to keep animals alive until
-  they are well off-screen, i.e. the frustum's ahead-reach is ~110, not 68. So a
-  chunk spawns at 68 INSIDE the ~110 frustum-ahead and its animals pop on-screen
-  while driving — the exact 165/171/172 viewR-vs-frustum class, left untreated for
-  the ORDINARY spawn (165 gated only the supplemental vicinity/dry-shore seeders).
-  FIX: size the chunk spawnR to EXCEED the frustum's ahead-reach at each zoom (point
-  171's flora pattern — a projection-checked / fog-far-capped radius that always
-  clears the frustum, NOT viewR + a small margin), so chunks always spawn off-screen
-  ahead and enter the frame by driving; keep the despawn and a nearest-first fill so
-  density and perf hold. The river/shore fauna (flamingo/croc/drinker) seeded along
-  the water corridor shares the same spawn pass and is fixed with it. The fix and its
-  driven-Nile verification (0.5/1.5/2.2) are the perf-sensitive part — execute with
-  fresh focus, not rushed. Docs:
+  STATIC DIAGNOSIS (20.07.2026, from the code + the point-165 data — NOT yet repro'd
+  live; the earlier "frustum-ahead ~110 from DESPAWN_MARGIN" inference is CORRECTED
+  below): the water-anchored river/shore fauna — flamingos (Wildlife.tsx ~716) and
+  hidden crocodiles (~728-734) — are placed INSIDE spawnChunk (~705), the ORDINARY
+  chunk spawn, which fires a chunk when its CENTRE is within spawnR = viewR + 18 = 68
+  at zoom 0.5. spawnChunk is NOT routed through the point-165 off-screen seeders —
+  those gated only the SEPARATE vicinity/dry-shore UPKEEP seeders, never spawnChunk
+  itself. CORRECTION from the live evidence: the point-165 driven check drives the
+  Maasai plains at 0.5 and finds 0 pops, so spawnR=68 DOES clear the frustum for the
+  general (sparse-water) case — the frustum-ahead at 0.5 is NOT the ~110 an earlier
+  note inferred from DESPAWN_MARGIN (that margin is just generous despawn hysteresis,
+  not the frustum reach). So 183 is NOT the generic land-grazer chunk spawn; it is
+  specific to the WATER-DENSE NILE, where nearly every chunk carries a water anchor,
+  so flamingos/crocs spawn on nearly every chunk — either a DENSITY effect (many
+  water spawns, some landing near the frustum edge) or the water-anchor position
+  sitting closer to the player than the chunk centre. LIVE REPRO REQUIRED to pin the
+  exact mechanism (the 145b/129 rule): drive a Nile stretch AWAY from settlements at
+  0.5, scan every frame for on-screen NEW spawns via __camera.onScreen, and TAG each
+  by species (flamingo/croc = water fauna vs grazer = land) to identify the path.
+  FIX (once the path is confirmed live): route spawnChunk's placement — at least the
+  water-anchored fauna — through the same frustum-projected isOnScreen off-screen
+  rule the point-165 seeders use (defer an on-screen placement to a later frame, or
+  place at an off-screen water point), keeping density/perf (the water fauna is a
+  small fraction). This is the perf-sensitive fresh-focus part; verify with the
+  driven-Nile check at 0.5/1.5/2.2. Docs:
   design.md §19.2/§2.5,
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
