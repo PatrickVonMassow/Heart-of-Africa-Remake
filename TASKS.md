@@ -6946,6 +6946,129 @@ the remaining open points in their numeric order.
   WebGPU lane), and landedBirdY's 0.15 hover ignores the 1.5-1.6 render scale (a
   sub-cm sink).
 
+- [ ] 187. The crocodile is SUBMERGED below the rendered water surface — the
+  eye-knob ambush is invisible. Found+confirmed by the 184 Pillar-2 audit (both
+  models flagged it, Opus-verified). The seed anchors the crocodile's y to the
+  carved BED (`herds.crocodile.push({ ..., y: ct.height })`, Wildlife.tsx ~736)
+  and the hidden render offsets from that (`bodyY = a.y - 0.24`, ~2716), but a
+  river ribbon renders at bed + SURFACE_LIFT (0.3, waterSurface.ts:17) — so the
+  eye knobs (local +0.28) sit ~0.26 BELOW the surface; on a lake (sheet at
+  lakeBedMax + LAKE_LIFT) it is buried far deeper. This is the point-152
+  bed-vs-surface class; the swimmer/canoe already read `waterSurfaceY` — the
+  crocodile is the last water-dweller still reading the bed.
+  FIX: base the crocodile's y on `waterSurfaceY(lat, lon, seed, ct.height)` at
+  seed time (import already exists in the scene layer), keeping the -0.24/-0.02
+  hidden/lunge offsets so hidden = knobs just breaking the surface, lunge = body
+  riding out. VERIFY: pure test pinning knob-above-surface for a river AND a
+  lake case (mirror the point-152 numbers); the live enrichments crocodile checks
+  (129/130 screenshots) must still pass — re-shoot 129 so the knobs are actually
+  visible on the water. DOCS: none needed beyond the §19.16 wording (already
+  says "sinks to the eye knobs" — the code now actually does it).
+- [ ] 188. A predator that finished feeding near the OCEAN coast paces up and
+  down along the waterline and never leaves (user play-test 20.07.2026, Cairo
+  coast, screenshot). The §19.4 walk-off deflects along the coast
+  (`deflectedStep`) but at a coastal pocket the deflection oscillates — the
+  leave target lies seaward, each frame flips the tangent choice, the predator
+  shuttles on the beach and is never removed (it must reach beyond the view
+  ring to despawn). DIAGNOSE FIRST with a probe at the Cairo coordinates (the
+  145b/129 lesson: suite launch args, drive the scripted feed, watch the leave
+  phase heading/position series). FIX DIRECTION (confirm by probe): make the
+  walk-off target LAND-AWARE — pick the leave direction with the longest clear
+  LAND corridor (sample a fan of headings, prefer inland over seaward) instead
+  of a fixed/seaward heading, and keep the tangent choice STABLE across frames
+  (persist the chosen side, the point-121f dodge-side lesson) so the deflection
+  cannot flip-flop; a predator still blocked past a calibratable deadline
+  re-aims inland. VERIFY: pure test for the land-corridor heading pick and the
+  sticky tangent; live enrichments check staging a feed at a coastal pocket and
+  asserting the predator's distance from the kill site grows monotonically past
+  the ring (no oscillation) — plus the existing walk-off checks stay green.
+  DOCS: CLAUDE §7.1 pt.12 streaming bullet (the walk-off clause).
+- [ ] 189. The Sudd reads as a small detached water BLOB beside the White Nile
+  instead of a broad marsh (user play-test 20.07.2026, screenshot: a tiny blue
+  patch with flower tufts west of the river). The §4.4 natural site mounts, but
+  its depiction does not read as the vast §19.13 swamp. DIAGNOSE: how the Sudd
+  site renders its water fan (`__naturalSites`, the delta/marsh water meshes)
+  and why the patch sits offset from the channel. FIX DIRECTION: widen the marsh
+  into a low, river-HUGGING fan (several overlapping sheets or a wider polygon
+  anchored ON the channel, reed belts at its edges per the §19.9 water-edge
+  rules), sized so it reads at the default zoom; keep the label. VERIFY: the
+  existing Sudd clearance/screenshot checks (127) re-shot and eyeballed — the
+  marsh must touch the river band, not float beside it; world.test.ts clearances
+  hold. DOCS: none (§4.4 already describes the Sudd as a swamp).
+- [ ] 190. Lake Edward's sheet FLOATS partly in the air (user play-test
+  20.07.2026, screenshot): the flat lake surface takes the height of the
+  adjacent mountain shore, so its edge hangs over the lower ground beside it.
+  USER-SUGGESTED FIX: SHIFT the lake slightly into the depression it belongs in
+  (the rift trough beside the ridge). Run the village-move conflict checklist
+  analog for lakes (river endpoints that reference the lake, clearances,
+  region/climate anchors, the swim/point-152 checks that sample mid-lake).
+  ALTERNATIVE if the DEM has no depression there: lower the sheet by deriving
+  its height from a SHORE-percentile of the bed instead of the max. DIAGNOSE
+  FIRST: sample the DEM around Lake Edward's polygon and compare the sheet
+  height against the surrounding terrain; pick shift vs derivation by what the
+  data shows. VERIFY: the point-125 swim check (screenshot 125) still floats the
+  swimmer ON the sheet; a new pure/live assertion that no lake-sheet EDGE
+  vertex stands more than a small tolerance above the terrain beside it —
+  swept over all 8 lakes so the fix generalises. DOCS: none.
+- [ ] 191. During a calf hunt, a SECOND (uninvolved) parent+calf pair appeared
+  to RUN AFTER the predator chasing its victim until the catch (user play-test
+  20.07.2026, screenshot). Expected (§19.8): only the VICTIM's own parent
+  reacts (charge/shield); every other family flees AWAY or ignores the hunt.
+  DIAGNOSE FIRST: check the charge/rescue trigger — does it gate on
+  `parent.child === victim` (or the victim's own `parent` link) at EVERY entry
+  point (charge, shield, guard, wade), or can proximity alone pull a foreign
+  parent toward the hunter? Also check the dodge steering: a fleeing pair whose
+  escape heading is computed FROM the predator can end up steering behind it
+  when the predator overtakes — the sticky dodge side may need a re-check
+  against the predator's current bearing. FIX per diagnosis; keep the one-hunt
+  architecture. VERIFY: pure test that a non-victim family's step during an
+  active hunt always INCREASES its distance to the hunter (or at least never
+  tracks it); live staging with two families where only the victim's parent
+  engages. DOCS: none (§19.8 already says the parent).
+- [ ] 192. WATER-RULE REVISION (user clarification 20.07.2026): "no animals in
+  water" was implemented too strictly. TARGET STATE: animals do NOT spawn in
+  water and do NOT idle/stand in water by default (unchanged); ocean stays
+  hard-forbidden (unchanged, I5); BUT animals MAY purposefully CROSS a
+  river/lake (swim to the far bank, §19.5 movement discipline applies) and MAY
+  FLEE INTO water to escape a predator or an elephant trample — predators do
+  not follow into deep water (the escape works, matching real waterhole
+  behaviour), the §19.16 crocodile threat still applies to whatever stands in
+  its strike radius. IMPLEMENTATION: (a) the river/lake water-setback backstop
+  exempts an animal in a CROSSING or FLEE state (state flag, cleared on
+  reaching land; the ocean backstop stays absolute); (b) crossing: the roam/
+  walk step may enter a channel when the far bank is within a calibratable
+  swim distance — swim pose (body lowered, slowed by the seasonal flow factor
+  like the wade), exit on the far bank; (c) flee-into-water: the §19.8 flee
+  steering and the generic prey dodge may choose a water heading when the
+  land corridors are worse (predator between prey and land), the predator's
+  chase BALKS at the waterline (existing behaviour) and the hunt aborts/
+  retargets per the existing strayed-chase rule; (d) the drowning dramas
+  (point 122) keep their season gate — a flee into a swollen current can still
+  end badly, that is the drama, not a bug. TESTS: pure (backstop exemptions,
+  crossing step, flee-heading pick, predator balk), live (a staged flee into
+  water escapes the hunt; a crossing herd reaches the far bank; idle animals
+  still never stand in water — the §19.5 checks stay green with the exemptions
+  scoped). DOCS: design.md §19.5 (the water discipline paragraph) + CLAUDE §7.1
+  pt.12 (the bodies-and-boundaries bullet) rewritten to the new target state in
+  the SAME commit.
+- [ ] 193. Predator and prey stand IDLE next to each other — no kill, no flight
+  (user play-test 20.07.2026, screenshot 19.02.1891: an adult predator and a
+  small prey ~1 body apart on open savanna, both stationary). Suspects
+  (DIAGNOSE FIRST, probe at the staged state): (i) a hunt that ended
+  (caught/abort) but left the predator in a non-leave mode standing at the
+  prey while the prey's flee gate (`chase && victim === a`) no longer fires;
+  (ii) the point-179 swept-catch change leaving a caught-but-uncounted state;
+  (iii) a revenge carcass/lion mis-read (unrendered lion made visible?); (iv)
+  the proximity-dodge dead zone: prey dodges only a MOVING/close elephant-class
+  threat and ignores a stationary predator, while the predator only engages via
+  the scripted hunt — two idle actors. FIX per diagnosis: an idle predator
+  within touch range of live prey must either engage (if the hunt slot is free)
+  or leave (walk-off), never stand; prey must treat a predator inside its dodge
+  ring like a close threat even when stationary. VERIFY: pure test for the
+  engage-or-leave rule and the stationary-predator dodge; live staging pinning
+  a predator beside prey and asserting the standoff resolves within a bounded
+  sim window. DOCS: CLAUDE §7.1 pt.12 if the dodge rule wording changes.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
