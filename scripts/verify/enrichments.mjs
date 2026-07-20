@@ -12,7 +12,7 @@
 // the drei <Html> map/region labels, real layout geometry (getBoundingClientRect
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
-import { chromium } from 'playwright'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -71,7 +71,7 @@ const waitForFamily = (timeout = 30000) =>
     .then(() => true)
     .catch(() => false)
 
-const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
 page.on('console', (m) => {
@@ -83,6 +83,10 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
+// Point 184 (Pillar 3): confirm the requested backend actually initialised — throws
+// on a silent WebGL2 fallback under VERIFY_GL=webgpu (the lane's guardrail).
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page)
 // The game starts inside Cairo: wait for the place scene's layout hook
 // instead of a fixed sleep (load-dependent under the full regression).
 await page.waitForFunction(() => !!window.__placeLayout, null, { timeout: 60000 }).catch(() => {})
