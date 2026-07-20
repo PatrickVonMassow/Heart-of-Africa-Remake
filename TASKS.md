@@ -7279,6 +7279,10 @@ the remaining open points in their numeric order.
   whose position is FROZEN (variance ~0) or OSCILLATING (paces a short segment)
   past a calibratable deadline, and any predator within touch range of LIVE prey
   where for a window neither engages nor flees. Catches 188/201/193 and kin.
+  Extend (A) to STATIC water bodies too: every lake sheet / marsh fan sits at or
+  just above its own bed and no edge vertex hangs over the lower neighbouring
+  terrain (retro-catches 190 Lake Edward, 189 Sudd) — the same geometry-vs-terrain
+  idea applied to the placed water, swept over all 8 lakes + the natural sites.
   (C) VISUAL SCREENSHOT SWEEP + INSPECTION — the catch-all for what the
   invariants do not anticipate, done the way the USER finds them but
   exhaustively: drive to a diverse set of spots and STAGE each drama (hunt,
@@ -7287,8 +7291,30 @@ the remaining open points in their numeric order.
   / mis-posed / wrong-looking things). Each anomaly → verify against the code →
   file a real one as its own point + fix. Keep a checklist of scenes so the sweep
   is repeatable and grows.
-  BUILD ORDER: (A) first (it retro-catches the most and is cheap), then (B), then
-  (C) as a standing pre-closing pass. Run the whole finder BEFORE the final
+  (D) CROSS-SYSTEM / TARGETING SANITY — the class where a reaction or event fires
+  for the WRONG actor or situation (derived from the past reports 162 a flock
+  descends on a family the parent just SAVED, 168 carrion not shown when it
+  should be, 191 a foreign family chases the hunter, 194 the lion claims the
+  crocodile's prey). Invariant: every emergent system OWNS a unique actor (no two
+  claim one — the 194 seam), and every reaction is KEYED to its correct trigger
+  (only the victim's OWN parent charges/shields; a kill-flock forms only over a
+  real feed or remnant; a scavenger commits only to an unowned carcass). Track,
+  each frame, the (system → actor) map and the (reaction → trigger) link across a
+  driven + staged run and assert no shared claim and no mismatched reaction.
+  (E) VISIBLE-EFFECT / "the picture, not the uniform" — the point-147 lesson made
+  a standing check (three rounds of uniform-level checks once passed while the
+  player saw NOTHING; also 143 rain inside a settlement, 144 plants change,
+  164/167 season/rain transitions): for each state toggle (season month, rain,
+  flood, harmattan, fire, dress, dry-season bleach) assert the RENDERED frame
+  changes measurably in PIXELS between the two states at a spot that should show
+  it, AND that the state does NOT leak where it must not (no rain in a rainless
+  desert, the season is the PLACE's not the traveller's). Pixel-diff based, a
+  small fixed scene set. Retro-catches the whole "passes numerically, invisible
+  on screen" family.
+  BUILD ORDER: (A) first (it retro-catches the most and is cheap), then (B),
+  then (D), then (E), then (C) as a standing pre-closing pass. Across A/B/D/E
+  this finder would have caught ~30 of the past ~40 emergent-scene reports
+  without the user ever seeing them. Run the whole finder BEFORE the final
   closing so the batch of finds is fixed in one push. Each real find is its own
   atomic point/commit. Docs: CLAUDE §7.2 gains the anchoring + liveness invariant
   suites; this is the pillar the harness was missing.
