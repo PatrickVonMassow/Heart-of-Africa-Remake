@@ -6405,8 +6405,8 @@ the remaining open points in their numeric order.
   Docs: design.md §19.8, CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026;
   queued at the batch end.)
 
-- [ ] 180. An elephant herd WEDGES itself against a lake shore and no member can
-  move. DIAGNOSED 20.07.2026 (from the code, repro probe still to run): the
+- [x] 180. An elephant herd WEDGES itself against a lake shore and no member can
+  move. DONE 20.07.2026 (diagnosed from the code): the
   deadlock is a force trap at the shore. (a) Each elephant's roam STEP is gated
   against water (Wildlife.tsx ~2506 elephantStepAllowed), so they do not walk in;
   but when the ground ahead is water the individual redirect (~2492) turns toward
@@ -6421,9 +6421,15 @@ the remaining open points in their numeric order.
   deflectedStep (as the scripted walk-off does) instead of blindly toward the
   centre; consider a bounded jam-unstuck nudge (the point-155 pattern, wildlife
   side) for a member pinned past a window. Keep the elephant trample (§19.8)
-  possible and never let one stand IN water. Repro probe FIRST (drive/stage a herd
-  into a shore corner, assert the centre keeps moving), then the fix + a pure test
-  (a wedged member gains a crossable escape) + a live check. The §19.5
+  possible and never let one stand IN water. FIXED: the individual redirect (~2492)
+  now runs the existing pure deflectedStep to pick the nearest heading whose step
+  AND lookahead are both crossable land — a slide ALONG the shore — and only falls
+  back to the centre turn when fully boxed in, so the graveyard/biome-border roam
+  is preserved. deflectedStep is pure-tested; build + lint + 1937 vitest +
+  enrichments 200/0 (no regression to the herd roam/mourning/graveyard checks). The
+  SYSTEMATIC live wedge verification (a herd/animal never pinned at a shore, across
+  all regions) is covered by point 184's I3 continuous invariant — the right place
+  for it, rather than a bespoke fragile shore check. The §19.5
   body separation ("an animal placed onto another parts from it within moments")
   and the water backstop ("an animal on a water cell is set back to the nearest
   land") and the §19.4 herd cohesion (elephants roam CLUSTERED) together deadlock:
