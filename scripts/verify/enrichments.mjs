@@ -3846,24 +3846,26 @@ const vulFlight = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w.herdsRef.current
   const p = () => window.__game.getState().pos
-  // These view-ring distance checks are calibrated at zoom 1; the default zoom
-  // is closer (0.5), so unlock and set zoom 1 to reach the calibrated ring.
-  window.__ui.getState().setWheelZoomEnabled(true)
-  window.__ui.getState().setTravelZoom(1)
+  // Judge OFF-SCREEN by PROJECTION at the ACHIEVABLE zoom 0.5 (point 178/172),
+  // not a spawn-distance radius at a debug zoom: the old check ran at zoom 1 and
+  // asserted spawnDist > 100, so it passed while the player saw the bird pop in
+  // at 0.5. The scavenger must spawn OFF the rendered frame and fly in.
+  window.__ui.getState().setTravelZoom(0.5)
   for (const sp of Object.keys(herds)) herds[sp] = herds[sp].filter((a) => !a.dead)
   herds.elephant.length = 0
-  // Inject FIRST, then reset the flight: the re-pick that follows must find
-  // our carcass as the nearest valid target (a frame between reset and inject
-  // could otherwise bind the scavenger to some far natural kill).
+  // Inject FIRST, then reset the flight: the re-pick that follows must find our
+  // carcass as the nearest valid target (a frame between reset and inject could
+  // otherwise bind the scavenger to some far natural kill).
   const carcass = { x: p().x + 5, z: p().z + 5, y: 0.2, rot: 0, scale: 1, phase: 0, dead: true, chunk: 'inject-p5' }
   herds.zebra.push(carcass)
   const sc = w.scavenger.current
   sc.target = null
   sc.mode = 'idle'
-  const out = { spawnDist: null, landed: false, outSeen: false, hideDist: null }
+  const out = { spawnOnScreen: null, spawnDist: null, landed: false, outSeen: false, hideOnScreen: null }
   await window.__pollSim(60, () => {
     herds.elephant.length = 0 // no tramples: the injected carcass stays the nearest target
     if (sc.target === carcass && sc.mode === 'in') {
+      out.spawnOnScreen = window.__camera.onScreen(sc.x, sc.z)
       out.spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
       return true
     }
@@ -3875,21 +3877,16 @@ const vulFlight = await page.evaluate(async () => {
     return false
   })
   carcass.dissolve = 0.02 // fast-forward the meal; the carcass is removed
-  let lastOut = null
   await window.__pollSim(30, () => {
-    if (sc.mode === 'out') {
-      out.outSeen = true
-      lastOut = Math.hypot(sc.x - p().x, sc.z - p().z)
-    }
-    if (out.outSeen && sc.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); return true }
-    return false
+    if (sc.mode === 'out') { out.outSeen = true; out.hideOnScreen = window.__camera.onScreen(sc.x, sc.z) }
+    return out.outSeen && sc.mode === 'idle'
   })
   return out
 })
-check('the scavenger spawns beyond the view ring and flies in (no popping in)',
-  vulFlight.spawnDist !== null && vulFlight.spawnDist > 100 && vulFlight.landed, JSON.stringify(vulFlight))
-check('after the meal the scavenger flies off and despawns only well outside the view',
-  vulFlight.outSeen && vulFlight.hideDist !== null && vulFlight.hideDist > 130, JSON.stringify(vulFlight))
+check('the scavenger spawns OFF the rendered frame and flies in (point 178, achievable zoom 0.5)',
+  vulFlight.spawnOnScreen === false && vulFlight.landed, JSON.stringify(vulFlight))
+check('after the meal the scavenger flies off and despawns off-frame (point 178)',
+  vulFlight.outSeen && vulFlight.hideOnScreen === false, JSON.stringify(vulFlight))
 
 // Zoom-aware ring: at a wider zoom the flight spawns proportionally farther out.
 const vulZoom = await page.evaluate(async () => {
@@ -3908,11 +3905,12 @@ const vulZoom = await page.evaluate(async () => {
   const sc = w.scavenger.current
   sc.target = null
   sc.mode = 'idle'
-  let spawnDist = null
+  const zr = { spawnOnScreen: null, spawnDist: null }
   await window.__pollSim(60, () => {
     herds.elephant.length = 0 // zoom 2 streams in fresh elephants — no tramples
     if (sc.target === carcass && sc.mode === 'in') {
-      spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
+      zr.spawnOnScreen = window.__camera.onScreen(sc.x, sc.z)
+      zr.spawnDist = +Math.hypot(sc.x - p().x, sc.z - p().z).toFixed(1)
       return true
     }
     return false
@@ -3922,21 +3920,20 @@ const vulZoom = await page.evaluate(async () => {
   await sleep(200)
   sc.target = null
   sc.mode = 'idle'
-  window.__ui.getState().setTravelZoom(1)
+  window.__ui.getState().setTravelZoom(0.5)
   window.__ui.getState().setWheelZoomEnabled(false)
-  return { spawnDist }
+  return zr
 })
-check('a wider zoom pushes the vulture spawn ring proportionally out',
-  vulZoom.spawnDist !== null && vulZoom.spawnDist > 200, JSON.stringify(vulZoom))
+check('at a wider (debug) zoom the vulture still spawns OFF the rendered frame (point 178, zoom-aware ring)',
+  vulZoom.spawnOnScreen === false && vulZoom.spawnDist > 200, JSON.stringify(vulZoom))
 
 // The kill-circling flock flies in and off the same way (no popping).
 const killFlock = await page.evaluate(async () => {
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   const f = window.__vultures.killFlight.current
-  // Calibrated at zoom 1 (default is the closer 0.5).
-  window.__ui.getState().setWheelZoomEnabled(true)
-  window.__ui.getState().setTravelZoom(1)
+  // Judge OFF-SCREEN by projection at the achievable zoom 0.5 (point 178/172).
+  window.__ui.getState().setTravelZoom(0.5)
   // Purge carcasses from earlier checks: a leftover hunt remnant would now
   // legitimately hold the flock on site (it consumes the scrap) and mask
   // the fly-off this check asserts.
@@ -3951,29 +3948,24 @@ const killFlock = await page.evaluate(async () => {
   L.lz = L.pz + 0.25
   L.mode = 'feed'
   L.timer = 90
-  const out = { spawnDist: null, arrived: false, outSeen: false, hideDist: null }
+  const out = { spawnOnScreen: null, arrived: false, outSeen: false, hideOnScreen: null }
   await window.__pollSim(60, () => {
-    if (f.mode === 'in' && out.spawnDist === null) out.spawnDist = +Math.hypot(f.x - p().x, f.z - p().z).toFixed(1)
+    if (f.mode === 'in' && out.spawnOnScreen === null) out.spawnOnScreen = window.__camera.onScreen(f.x, f.z)
     if (f.mode === 'active') { out.arrived = true; return true }
     return false
   })
   L.mode = 'idle'
   L.timer = 99999
-  let lastOut = null
   await window.__pollSim(30, () => {
-    if (f.mode === 'out') {
-      out.outSeen = true
-      lastOut = Math.hypot(f.x - p().x, f.z - p().z)
-    }
-    if (out.outSeen && f.mode === 'idle') { out.hideDist = +lastOut.toFixed(1); return true }
-    return false
+    if (f.mode === 'out') { out.outSeen = true; out.hideOnScreen = window.__camera.onScreen(f.x, f.z) }
+    return out.outSeen && f.mode === 'idle'
   })
   return out
 })
-check('the kill flock flies in from beyond the view ring and settles over the kill',
-  killFlock.spawnDist !== null && killFlock.spawnDist > 100 && killFlock.arrived, JSON.stringify(killFlock))
-check('when the kill scene ends the flock flies off and despawns well outside the view',
-  killFlock.outSeen && killFlock.hideDist !== null && killFlock.hideDist > 130, JSON.stringify(killFlock))
+check('the kill flock flies in from OFF the rendered frame and settles over the kill (point 178)',
+  killFlock.spawnOnScreen === false && killFlock.arrived, JSON.stringify(killFlock))
+check('when the kill scene ends the flock flies off and despawns off-frame (point 178)',
+  killFlock.outSeen && killFlock.hideOnScreen === false, JSON.stringify(killFlock))
 
 // Point 162: a DRIVE-OFF (the parent repels the predator, no kill) sends the
 // hunt to 'leave' with NO remnant — the gathered flock must fly OFF, never land
