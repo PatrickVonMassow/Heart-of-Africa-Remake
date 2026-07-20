@@ -235,24 +235,41 @@ await page.evaluate(() => {
   s.mode = 'feed'
   s.timer = 15
 })
-await page.waitForTimeout(800)
-const feedA = await page.evaluate(() => {
-  const h = window.__lionHunt
-  return {
-    lionVisible: h.lion.current?.visible,
-    preyVisible: h.prey.current?.visible,
-    stainVisible: h.stain.current?.visible,
-    headPitch: h.lion.current?.rotation.x,
-    preyOnSide: h.prey.current?.rotation.z,
-    stainScale: h.stain.current?.scale.x,
-  }
-})
-// The head bobs on a ~2 s sine, so two samples can land symmetric around a
-// peak and tie — sample a short series and assert the swing instead.
-const pitches = [feedA.headPitch]
-for (let i = 0; i < 5; i++) {
+// Wait for the render loop to ACTUALLY apply the forced feed — the meshes turn
+// visible and take their pose. A fixed wall wait was too short under the WebGPU
+// backend's cold shader compile: the point-184 lane surfaced the feed reading
+// all-zero because the loop had not yet drawn a feed frame. Poll for the depiction
+// (a real failure to depict exhausts the window), then sample a series — WebGPU
+// frames are sparser headless, and the head bobs on a ~2 s sine, so keep the
+// most-lowered sample and assert the swing across the series.
+await page
+  .waitForFunction(
+    () => {
+      const h = window.__lionHunt
+      return h?.lion.current?.visible === true && h?.prey.current?.visible === true
+    },
+    null,
+    { timeout: 20000 },
+  )
+  .catch(() => {})
+const pitches = []
+let feedA = null
+for (let i = 0; i < 10; i++) {
+  const s = await page.evaluate(() => {
+    const h = window.__lionHunt
+    return {
+      lionVisible: h.lion.current?.visible,
+      preyVisible: h.prey.current?.visible,
+      stainVisible: h.stain.current?.visible,
+      headPitch: h.lion.current?.rotation.x,
+      preyOnSide: h.prey.current?.rotation.z,
+      stainScale: h.stain.current?.scale.x,
+    }
+  })
+  pitches.push(s.headPitch ?? 0)
+  // Keep the frame with the head most clearly lowered (the sine peak).
+  if (!feedA || (s.headPitch ?? 0) > (feedA.headPitch ?? 0)) feedA = s
   await page.waitForTimeout(300)
-  pitches.push(await page.evaluate(() => window.__lionHunt.lion.current?.rotation.x))
 }
 const pitchSwing = Math.max(...pitches) - Math.min(...pitches)
 check('feeding: lion and carcass visible', feedA.lionVisible === true && feedA.preyVisible === true, '')
