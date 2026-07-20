@@ -6582,7 +6582,35 @@ the remaining open points in their numeric order.
   rule the point-165 seeders use (defer an on-screen placement to a later frame, or
   place at an off-screen water point), keeping density/perf (the water fauna is a
   small fraction). This is the perf-sensitive fresh-focus part; verify with the
-  driven-Nile check at 0.5/1.5/2.2. Docs:
+  driven-Nile check at 0.5/1.5/2.2.
+  LIVE REPRO CONFIRMED (20.07.2026) — this SUPERSEDES the two static hypotheses
+  above: the point-165 driven check at zoom 0.5 on the Maasai plains INTERMITTENTLY
+  (~1 run in 5) catches 2 LAND warthogs popping (dist 21-24, ndc upper-left near the
+  far plane). dist 21-24 is well INSIDE spawnR=68, NOT at the chunk-spawn boundary,
+  so it is NOT the ordinary chunk spawn (fires at 68) and NOT the water fauna (crocs/
+  flamingos, not grazers). It is the VICINITY SEEDER (seedSettlementVicinity,
+  Wildlife.tsx ~1006, places at distMin..distMax ~20-53 of a settlement): its
+  pickOffscreenLandAnchor (wildlifeBehavior.ts:812) prefers an OFF-SCREEN land
+  candidate but FALLS BACK to the first ON-SCREEN land candidate when none is
+  off-screen — which happens near WATER (the Nile/lakes), where the off-screen
+  candidates (behind/beside the camera) are water, leaving only on-screen LAND. So
+  the user's Nile pop is the vicinity seeder near the Nubian village on the Nile:
+  off-screen = water -> on-screen-land fallback -> the grazers pop. THE FIX IS CLEAN,
+  NOT perf-sensitive: make the seeder DEFER (skip this frame) when there is no
+  off-screen land, retrying next frame as the player drives on (off-screen land
+  reappears as the geometry shifts), instead of placing on-screen. pickOffscreen-
+  LandAnchor has exactly ONE caller (the vicinity seeder, which already handles a
+  null via `continue`), so drop its on-screen fallback (return null) and update its
+  one pure test. POINT-102 RISK to verify: the never-empty check (enrichments ~5236)
+  fills the vicinity at a STATIONARY leave point; vicinityRadius=75 > the 0.5 frame
+  (~50) and the 14 candidates span all directions, so off-screen land should exist
+  there and the fill should still happen — but CONFIRM point-102 stays green after
+  the change, and if it breaks, velocity-gate the defer (fill when just-left/
+  stationary, defer only while driving). Verify point-165 goes reliably green over
+  several runs AND point-102 stays green. (The water-fauna spawnChunk path above
+  remains a SEPARATE possible pop with no live repro yet — leave it for a driven-Nile
+  check; the achievable-zoom bug the user hit is THIS vicinity-seeder fallback.)
+  Docs:
   design.md §19.2/§2.5,
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
