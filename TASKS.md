@@ -6698,6 +6698,13 @@ the remaining open points in their numeric order.
   instead of projection/sim-clock. Each confirmed finding is fixed and covered by a
   Pillar-1 invariant or a pure test; a non-trivial one may become its own TASKS
   point + atomic commit; small ones fixed inline. LOG every finding.
+  MODEL MIX (user decision, 20.07.2026): run the audit sweeps with a MIX of Opus 4.8
+  AND Fable 5 agents (Workflow `opts.model: 'opus'` / `'fable'`) — NOT for a proven
+  Fable capability edge (unverified, its name hints at a different specialisation) but
+  for MODEL DIVERSITY: the code was written mostly by Opus, so a different-model auditor
+  carries different blind spots and catches what the author-model is systematically
+  blind to. Distribute the five sweeps (A-E) across both models; where budget allows,
+  double-cover a sweep with one agent of each so the two lenses overlap on the same area.
   PILLAR 3 — an AUTOMATED WEBGPU LANE (the headless-WebGPU breakthrough,
   19.07.2026 — this replaces the old "manual checklist because headless can't do
   WebGPU"). PROVEN: WebGPU IS testable headless AND autonomously — launch SYSTEM
