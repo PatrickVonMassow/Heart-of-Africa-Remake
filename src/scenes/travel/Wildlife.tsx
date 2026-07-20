@@ -2485,6 +2485,13 @@ function Herds() {
         herdCentre.set(hid, { cx: ccx, cz: ccz, heading: st.heading })
       }
     }
+    // Shared water/ocean blocked-step predicate for the deflected flight steps
+    // (points 201/197 — the same shape the calf flee uses).
+    const waterBlockedAt = (nx: number, nz: number) => {
+      const ll = worldToLatLon(nx, nz)
+      const ty = sampleTerrain(ll.lat, ll.lon, seed).type
+      return ty === 'ocean' || ty === 'water'
+    }
     const elephantPos: Array<[number, number]> = []
     {
       const list = herds.elephant
@@ -3072,12 +3079,21 @@ function Herds() {
           const d = Math.hypot(dx, dz)
           if (d < FLEE_RADIUS && d > 0.01) {
             const urgency = (FLEE_RADIUS - d) / FLEE_RADIUS
-            a.x += (dx / d) * FLEE_SPEED * urgency * dt
-            a.z += (dz / d) * FLEE_SPEED * urgency * dt
+            // Water-deflected flight (points 201/197): the raw radial step ran a
+            // fleeing animal straight onto a water cell where the §19.5 backstop
+            // teleported it back — an on-the-spot pin at the bank (the user's
+            // calf standing at the waterline while its parent was taken). Steer
+            // along the bank instead; a genuine dead-end stands (the drama or
+            // the walk-on resolves it). Point 192 will later allow choosing the
+            // water on purpose — this only swaps the blocked predicate then.
+            const fleeH = Math.atan2(dx, dz)
+            const fleeStep = deflectedStep(a.x, a.z, fleeH, FLEE_SPEED * urgency * dt, waterBlockedAt, 0.8)
+            a.x = fleeStep.x
+            a.z = fleeStep.z
             px = a.x
             pz = a.z
             wobTarget = 0.3
-            yaw = Math.atan2(dx, dz) // face away while fleeing
+            yaw = fleeStep.moved ? fleeStep.heading : fleeH // face the escape line
             pitch = 0
           }
         }
@@ -3095,8 +3111,12 @@ function Herds() {
           if (target !== null) {
             a.dodgeHeading =
               a.dodgeHeading === undefined ? target : turnToward(a.dodgeHeading, target, PREY_DODGE_TURN * dt)
-            a.x += Math.sin(a.dodgeHeading) * PREY_PANIC_SPEED * dt
-            a.z += Math.cos(a.dodgeHeading) * PREY_PANIC_SPEED * dt
+            // Deflect the dart along a bank instead of into the water (points
+            // 201/197): the raw step ran the dodge onto a water cell where the
+            // backstop teleported it back — a vibrating pin at the waterline.
+            const dodgeStep = deflectedStep(a.x, a.z, a.dodgeHeading, PREY_PANIC_SPEED * dt, waterBlockedAt, 0.8)
+            a.x = dodgeStep.x
+            a.z = dodgeStep.z
             px = a.x
             pz = a.z
             wobTarget = 0

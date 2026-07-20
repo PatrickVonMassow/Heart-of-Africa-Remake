@@ -7168,8 +7168,9 @@ the remaining open points in their numeric order.
   scan derives its trigger from the drink-cycle CLOCK and the static drink
   TARGET, never the victim's actual position (~2091/2092 — it can lunge at an
   animal that wandered off); the flee/dodge/guard steps move raw with no
-  water/terrain deflection (~3048 — coordinate with point 192's water-flee
-  design, the 157 deflect pattern); the river/lake water backstop does not
+  water/terrain deflection (~3048 — the FLEE and DODGE steps are DONE via point
+  201, 20.07.2026; the charge/shield/guard steps remain — coordinate with point
+  192's water-flee design, the 157 deflect pattern); the river/lake water backstop does not
   exempt a CAUGHT animal (~2056 — it can teleport a croc-gripped victim out of
   the grip: the point-186 vanish class from the other side); the croc seize
   does not clear v.vigil (~2136 — a seized vigil keeper keeps both states); the
@@ -7214,7 +7215,18 @@ the remaining open points in their numeric order.
   the systematic version of the one-off de-flakes done so far (some findings
   may already be partly fixed, e.g. settings 277: verify against HEAD first).
 
-- [ ] 201. The fleeing calf gets STUCK while its parent sacrifices itself and
+- [x] 201. DONE 20.07.2026: the generic FLEE step (radial away from an active
+  lion) and the elephant DODGE step both moved RAW — onto a water cell, where
+  the §19.5 backstop teleported the animal back each frame: an on-the-spot pin
+  at the bank, exactly the freed calf standing at the waterline while the lion
+  ate its parent. Both steps now route through deflectedStep with the shared
+  water/ocean predicate (the point-157 pattern; the point-192 water-flee will
+  later just swap the predicate). New live check stages the squeeze (feeding
+  lion inland, prey at the bank, escape pointing into the water) and asserts
+  real ground covered along the bank, never a pin and never standing on water.
+  This also closes the ~3048 raw-step finding inside the point-197 group.
+  enrichments 206/0, build+lint+1945 vitest green.
+  ORIGINAL: The fleeing calf gets STUCK while its parent sacrifices itself and
   is eaten (user play-test 20.07.2026). Point 157 already routes the chase
   victim's flee through calfFleeStep→deflectedStep and leaves a dead-end for
   the CATCH to resolve — but in the SACRIFICE ending the catch resolves on the

@@ -3787,6 +3787,72 @@ check(
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
+// --- Point 201: a fleeing animal at a bank escapes ALONG it, never pins ------
+// The user report: a freed calf stood pinned at the waterline while the lion ate
+// its parent — the raw radial flee step ran onto the water cell and the §19.5
+// backstop teleported it back, a vibrating stand-still. The flee now routes
+// through the water-deflected step, so prey squeezed against the bank (lion
+// inland, water behind) must still COVER GROUND along the bank.
+const bankFlee = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const U = 10
+  const p0 = window.__game.getState().pos
+  // A water cell with a land bank beside it (the croc staging's search shape).
+  let water = null
+  let bank = null
+  outer: for (let r = 4; r <= 40 && !water; r += 3) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2
+      const x = p0.x + Math.cos(ang) * r
+      const z = p0.z + Math.sin(ang) * r
+      if (window.__terrainType(-z / U, x / U, seed) !== 'water') continue
+      for (let n = 0; n < 8; n++) {
+        const na = (n / 8) * Math.PI * 2
+        const nx = x + Math.cos(na) * 1.8
+        const nz = z + Math.sin(na) * 1.8
+        const nt = window.__terrainType(-nz / U, nx / U, seed)
+        if (nt !== 'water' && nt !== 'ocean') { water = { x, z }; bank = { x: nx, z: nz }; break outer }
+      }
+    }
+  }
+  if (!water || !bank) return { staged: false }
+  // Prey at the bank; the FEEDING lion a few units INLAND of it, so the radial
+  // escape points into the water — the exact squeeze that used to pin.
+  const lx = bank.x + (bank.x - water.x) * 3
+  const lz = bank.z + (bank.z - water.z) * 3
+  const prey = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 1, phase: 0.2, chunk: undefined }
+  herds.zebra.push(prey)
+  const s = window.__lionHunt.state
+  const prev = { mode: s.mode, timer: s.timer, lx: s.lx, lz: s.lz }
+  s.mode = 'feed'
+  s.timer = 90
+  s.victim = null
+  s.victimHunt = false
+  s.lx = lx
+  s.lz = lz
+  const start = { x: prey.x, z: prey.z }
+  let path = 0
+  let last = { x: prey.x, z: prey.z }
+  let onWater = false
+  await window.__pollSim(8, () => {
+    path += Math.hypot(prey.x - last.x, prey.z - last.z)
+    last = { x: prey.x, z: prey.z }
+    if (window.__terrainType(-prey.z / U, prey.x / U, seed) === 'water') onWater = true
+    return false
+  }, 40000)
+  const net = Math.hypot(prey.x - start.x, prey.z - start.z)
+  s.mode = prev.mode === 'idle' ? 'idle' : 'idle'
+  s.timer = 9999
+  herds.zebra = herds.zebra.filter((a) => a !== prey)
+  return { staged: true, path: +path.toFixed(1), net: +net.toFixed(1), onWater }
+})
+check(
+  'prey squeezed against a bank flees ALONG it — real ground covered, never a waterline pin (point 201)',
+  bankFlee.staged && bankFlee.net > 2 && !bankFlee.onWater,
+  JSON.stringify(bankFlee),
+)
+
 // --- Point 188: the coastal walk-off resolves --------------------------------
 // A predator that finished feeding at a coast pocket must actually LEAVE — the
 // old radial re-aim shuttled it on the beach forever (the user's Cairo report).
