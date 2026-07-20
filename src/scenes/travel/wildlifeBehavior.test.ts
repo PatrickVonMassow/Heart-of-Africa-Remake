@@ -47,6 +47,7 @@ import {
   vigilDrawSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
+  escapeCorridorHeading,
   calfFleeStep,
   defendChance,
   killChance,
@@ -1068,6 +1069,37 @@ describe('deflectedStep (scripted walks obey the land constraint, point 83)', ()
     expect(r.moved).toBe(true)
     // It did NOT step straight into the pocket column.
     expect(Math.abs(r.heading)).toBeGreaterThan(0.01)
+  })
+})
+
+describe('escapeCorridorHeading (point 188 — the walk-off picks a land corridor, not the seaward radial)', () => {
+  const wrap = (d: number) => Math.atan2(Math.sin(d), Math.cos(d))
+
+  it('open country leaves along the radial (the outward bias decides ties)', () => {
+    const h = escapeCorridorHeading(0, 0, 0.7, () => false)
+    expect(Math.abs(wrap(h - 0.7))).toBeLessThan(1e-9)
+  })
+
+  it('a seaward radial loses to a long land corridor (the Cairo coast pocket)', () => {
+    // Ocean fills x > 4 (a short seaward stub); the radial points +x (east,
+    // heading pi/2 in the sin/cos convention). Land runs forever elsewhere.
+    const blocked = (x: number) => x > 4
+    const h = escapeCorridorHeading(0, 0, Math.PI / 2, blocked)
+    // The pick is NOT the seaward radial: its corridor is a 2-4 unit stub.
+    expect(Math.abs(wrap(h - Math.PI / 2))).toBeGreaterThan(Math.PI / 5)
+    // And the picked corridor is actually clear for the full probe reach.
+    for (let sIdx = 1; sIdx <= 12; sIdx++) {
+      expect(blocked(Math.sin(h) * 2 * sIdx)).toBe(false)
+    }
+  })
+
+  it('of two clear corridors the more outward one wins', () => {
+    // Ocean blocks the radial (+z) beyond 2; both +x and -x are clear, but the
+    // radial tilts slightly toward +x — the outward weight breaks the tie.
+    const blocked = (x: number, z: number) => z > 2 && Math.abs(x) < 6
+    const radial = 0.15 // ~+z, tilted a whisker toward +x
+    const h = escapeCorridorHeading(0, 0, radial, blocked)
+    expect(Math.sin(h)).toBeGreaterThan(0) // picked the +x side, matching the tilt
   })
 })
 

@@ -269,6 +269,8 @@ export function DebugMenu() {
         onChange={(v) => { balance.crocodile.strikeRadius = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocGripSeconds} value={balance.crocodile.gripSeconds} step={0.5}
         onChange={(v) => { balance.crocodile.gripSeconds = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.huntLeaveOvertime} value={balance.hunt.leaveOvertimeSeconds} step={5}
+        onChange={(v) => { balance.hunt.leaveOvertimeSeconds = Math.max(5, v); bump() }} />
       <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>

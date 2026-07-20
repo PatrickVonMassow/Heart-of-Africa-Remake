@@ -468,7 +468,15 @@ verify suite that proves it.
       it, and a wider zoom keeps animals the default view would have
       dropped) — with the scripted predator obeying the same ring: after
       feeding it walks off and is removed only beyond it, and a strayed
-      chase aborts the same way. A settlement's bird's-eye vicinity is
+      chase aborts the same way. The walk-off is COAST-SAFE (point 188): it
+      holds a sticky escape-corridor heading (longest clear land corridor,
+      outward-biased — never the raw seaward radial that shuttled it on the
+      beach), and past the calibratable `balance.hunt.leaveOvertimeSeconds` a
+      still-ringbound predator retires the moment it is OFF the rendered
+      frame (frustum-projected, never a radius) — so a coast pocket can
+      never pin it pacing forever; a staged coastal leave resolving is gated
+      in `scripts/verify/enrichments.mjs`, the corridor pick pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts`. A settlement's bird's-eye vicinity is
       never empty (point 102): where the normal spawn falls short, the
       region-typical presence within `panoramaVicinityRadius` of a
       settlement is seeded up to `panoramaVicinityMinAnimals` — verified

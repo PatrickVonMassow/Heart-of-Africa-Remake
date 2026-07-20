@@ -363,6 +363,7 @@ export const de: Strings = {
     calfFraction: 'Jungtier-Anteil je Herde',
     crocStrikeRadius: 'Krokodil: Angriffsradius am Ufer',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
+    huntLeaveOvertime: 'Jagd: Abzugs-Überzeit (s)',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',

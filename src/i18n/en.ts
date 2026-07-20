@@ -364,6 +364,7 @@ export const en: Strings = {
     calfFraction: 'Juvenile fraction per herd',
     crocStrikeRadius: 'Crocodile: bank strike radius',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
+    huntLeaveOvertime: 'Hunt: walk-off overtime (s)',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

@@ -284,6 +284,7 @@ export interface Strings {
     calfFraction: string
     crocStrikeRadius: string
     crocGripSeconds: string
+    huntLeaveOvertime: string
     seasonStrength: string
     season: string
     seasonAuto: string

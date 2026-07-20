@@ -302,6 +302,14 @@ export interface BalanceConfig {
      *  kill is never cut short. */
     gripSeconds: number
   }
+  /** The scripted hunt (design.md §19.3). */
+  hunt: {
+    /** Walk-off overtime (point 188): a leaving predator still inside the view
+     *  ring after this many seconds retires as soon as it is OFF the rendered
+     *  frame — a coast pocket can never pin it pacing forever, while "never
+     *  despawns in sight" holds via the frustum projection. */
+    leaveOvertimeSeconds: number
+  }
   /** Family rescue drives (design.md §19.8, point 127). */
   family: {
     /** Adrenaline burst: a rescuing parent's speed is its ordinary walk (3)
@@ -559,6 +567,9 @@ export const balance: BalanceConfig = {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
+  },
+  hunt: {
+    leaveOvertimeSeconds: 45, // calibratable: walk-off overtime before an off-frame retire (point 188) — generous vs the ~20 s a clear walk-off needs
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

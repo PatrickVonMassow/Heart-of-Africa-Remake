@@ -45,6 +45,7 @@ import {
   pickOffscreenLandAnchor,
   calvesForGroup,
   deflectedStep,
+  escapeCorridorHeading,
   calfFleeStep,
   type FlightState,
   channelDriftStep,
@@ -309,6 +310,12 @@ interface LionHuntState {
   /** True for the whole lifetime of a calf hunt (chase→feed→leave), so the
    *  scripted prey/stain meshes stay hidden — the herds draw the victim instead. */
   victimHunt: boolean
+  /** Sticky escape-corridor course of the leave phase (point 188); undefined
+   *  until picked, re-derived only when the held corridor closes. */
+  leaveHeading?: number
+  /** Sim-seconds spent in the leave phase (point 188): past the calibratable
+   *  overtime a still-ringbound predator retires the moment it is off-frame. */
+  leaveT?: number
 }
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
@@ -1613,6 +1620,8 @@ function Herds() {
                 } else {
                   LION_STATE.mode = 'leave'
                   LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+                  LION_STATE.leaveHeading = undefined // fresh corridor pick (point 188)
+                  LION_STATE.leaveT = 0
                   // The feeding predator stood at the carcass flank — pick the
                   // walk-off up from there, like the feed→leave exit does.
                   LION_STATE.lx = LION_STATE.px + 0.7
@@ -1695,6 +1704,8 @@ function Herds() {
               } else {
                 LION_STATE.mode = 'leave'
                 LION_STATE.heading = leaveHeading(LION_STATE.lx, LION_STATE.lz, pos.x, pos.z)
+                LION_STATE.leaveHeading = undefined // fresh corridor pick (point 188)
+                LION_STATE.leaveT = 0
               }
             } else {
               calf.parent = undefined // freed — it keeps fleeing on its own
@@ -3564,6 +3575,8 @@ function LionHunt() {
           }
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
+          s.leaveHeading = undefined // fresh corridor pick per leave (point 188)
+          s.leaveT = 0
           s.victim = null
           s.lx = s.px + 0.7
           s.lz = s.pz + 0.25
@@ -3593,11 +3606,18 @@ function LionHunt() {
         const ll = worldToLatLon(nx, nz)
         return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
       }
-      // Steer toward the radial escape under a turn cap: an instant flip
-      // back to the radial after an inland detour re-entered the same coast
-      // pocket every other frame (an oscillating stand-still).
+      // Sticky escape corridor (point 188): the every-frame radial re-aim
+      // shuttled the predator at a coast pocket — the radial points seaward,
+      // the per-step deflection along the beach, and the turn cap dragged the
+      // course back each frame. Pick the heading with the longest clear LAND
+      // corridor (outward-biased) and HOLD it; re-derive only when the held
+      // corridor closes just ahead.
       const radial = leaveHeading(s.lx, s.lz, pos.x, pos.z)
-      s.heading = turnToward(s.heading, radial, 1.8 * dt)
+      const aheadBlocked = (h: number, d: number) => oceanAt(s.lx + Math.sin(h) * d, s.lz + Math.cos(h) * d)
+      if (s.leaveHeading === undefined || aheadBlocked(s.leaveHeading, 1.2) || aheadBlocked(s.leaveHeading, 2.4)) {
+        s.leaveHeading = escapeCorridorHeading(s.lx, s.lz, radial, oceanAt)
+      }
+      s.heading = turnToward(s.heading, s.leaveHeading, 1.8 * dt)
       if (oceanAt(s.lx, s.lz)) {
         // Standing IN water (a stale or scripted mishap): wade toward the
         // nearest dry probe first; the land rule takes over on the shore.
@@ -3618,9 +3638,18 @@ function LionHunt() {
         s.lz = leaveStep.z
         if (leaveStep.moved) s.heading = leaveStep.heading
       }
-      if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR) {
+      // Overtime backstop (point 188 — the audit found leave was the ONE drama
+      // with no deadline): past the calibratable overtime a predator still
+      // inside the ring retires the moment its spot is OFF the rendered frame,
+      // so a coast pocket can never pin it forever while §19's "never despawns
+      // in sight" still holds via the projection (never a radius).
+      s.leaveT = (s.leaveT ?? 0) + dt
+      const leaveOvertime = s.leaveT > balance.hunt.leaveOvertimeSeconds && !isOnScreen(s.lx, s.lz)
+      if (Math.hypot(s.lx - pos.x, s.lz - pos.z) > offstageR || leaveOvertime) {
         s.mode = 'idle'
         s.timer = 30 + Math.random() * 30
+        s.leaveHeading = undefined
+        s.leaveT = 0
       }
     }
 

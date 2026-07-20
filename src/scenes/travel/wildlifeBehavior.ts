@@ -681,6 +681,49 @@ export function deflectedStep(
 }
 
 /**
+ * Escape-corridor heading for the predator walk-off (point 188). The old leave
+ * course re-aimed at the pure RADIAL (away from the traveller) every frame; at a
+ * coast pocket the radial points seaward, the per-step coast deflection points
+ * along the beach, and the turn cap dragged the course back each frame — the
+ * predator shuttled on the shoreline forever (the user's Cairo report). Instead
+ * the leave phase PICKS its heading by corridor: sample `candidates` directions,
+ * probe each in `stepLen` strides until `blocked` (ocean) or `maxSteps`, and
+ * score = clear land distance + outwardWeight·cos(delta to the radial). The
+ * longest clear LAND corridor wins, ties broken toward outward — so an inland
+ * detour beats a short seaward stub, while open country still leaves radially.
+ * The caller STICKS to the returned heading until its corridor closes (re-pick
+ * on blocked-ahead only), so the choice cannot flip-flop between two flanking
+ * corridors.
+ */
+export function escapeCorridorHeading(
+  x: number,
+  z: number,
+  radial: number,
+  blocked: (x: number, z: number) => boolean,
+  stepLen = 2,
+  maxSteps = 12,
+  candidates = 16,
+  outwardWeight = 8,
+): number {
+  let best = radial
+  let bestScore = -Infinity
+  for (let k = 0; k < candidates; k++) {
+    const h = radial + (k / candidates) * Math.PI * 2
+    let clear = 0
+    for (let sIdx = 1; sIdx <= maxSteps; sIdx++) {
+      if (blocked(x + Math.sin(h) * stepLen * sIdx, z + Math.cos(h) * stepLen * sIdx)) break
+      clear += stepLen
+    }
+    const score = clear + Math.cos(h - radial) * outwardWeight
+    if (score > bestScore) {
+      bestScore = score
+      best = h
+    }
+  }
+  return best
+}
+
+/**
  * The flee step for a calf being run down by a land hunt (design.md §19.8,
  * point 157). It heads directly away from the hunter, then routes through
  * deflectedStep so a coast or river bank turns it aside instead of pinning it

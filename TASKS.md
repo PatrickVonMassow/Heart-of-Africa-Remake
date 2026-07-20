@@ -6984,7 +6984,16 @@ the remaining open points in their numeric order.
   (129/130 screenshots) must still pass — re-shoot 129 so the knobs are actually
   visible on the water. DOCS: none needed beyond the §19.16 wording (already
   says "sinks to the eye knobs" — the code now actually does it).
-- [ ] 188. A predator that finished feeding near the OCEAN coast paces up and
+- [x] 188. DONE 20.07.2026: the leave phase now holds a sticky
+  escapeCorridorHeading (longest clear LAND corridor, outward-biased — pure,
+  3 tests) instead of re-aiming the seaward radial every frame, and past
+  balance.hunt.leaveOvertimeSeconds (45, debug-editable, i18n de/en) a
+  still-ringbound predator retires the moment it is off the rendered frame
+  (isOnScreen). CLAUDE §7.1 pt.12 updated; a staged coastal leave resolving is
+  gated live (enrichments). build+lint+1941 vitest green; enrichments 203/1
+  (the 1 fail is the unrelated rotating point-119 trample-grief staging flake,
+  cleared on retry — folded into point 200).
+  ORIGINAL: A predator that finished feeding near the OCEAN coast paces up and
   down along the waterline and never leaves (user play-test 20.07.2026, Cairo
   coast, screenshot). The §19.4 walk-off deflects along the coast
   (`deflectedStep`) but at a coastal pocket the deflection oscillates — the
@@ -7197,6 +7206,51 @@ the remaining open points in their numeric order.
   fold the result into the final-closing 3× flake-free gate — this point IS
   the systematic version of the one-off de-flakes done so far (some findings
   may already be partly fixed, e.g. settings 277: verify against HEAD first).
+
+- [ ] 201. The fleeing calf gets STUCK while its parent sacrifices itself and
+  is eaten (user play-test 20.07.2026). Point 157 already routes the chase
+  victim's flee through calfFleeStep→deflectedStep and leaves a dead-end for
+  the CATCH to resolve — but in the SACRIFICE ending the catch resolves on the
+  PARENT, so a calf that reached a dead-end (river bank / coast corner) while
+  fleeing is never caught and never freed to move on — it stands pinned at the
+  waterline (the screenshot: North, a river bank). DIAGNOSE FIRST (probe at a
+  staged sacrifice with the calf steered onto a bank): once the parent is taken
+  and `calf.parent`/`LION_STATE.victim` clear, what drives the calf? FIX
+  DIRECTION: when the sacrifice frees the calf (parent taken, calf survives),
+  the calf must RESUME ordinary fleeing/roaming with the water-deflected step —
+  clear any chase-victim leash and dead-end hold so it walks off the bank; if it
+  is genuinely boxed on a spit, the generic water-flee of point 192 (allowed to
+  cross) resolves it. VERIFY: pure test that a freed calf on a bank produces a
+  moving step (not moved:false forever); live staging of the sacrifice ending
+  with the calf on a bank, asserting it leaves the waterline within a bounded
+  window. Coordinate with 192 (water-crossing) and 157.
+- [ ] 202. Vultures still CLIP into the ground (user play-test 20.07.2026,
+  screenshot: a vulture half-sunk in the riverbank sand). Point 185 fixed the
+  ground SCAVENGER's double-lift and point 128/185 the landedBirdY hover, but a
+  vulture still intersects the terrain — likely (DIAGNOSE FIRST) one of: the
+  DESCENDING/landing interpolation passing through the ground before the landed
+  clamp engages; a vulture landed on a SLOPED bank where landedBirdY's
+  positive-only lift under-corrects; or the circling/feeding bird sampling a
+  stale ground height as it moves. Probe the vulture y against the sampled
+  ground across its whole flight→descend→land→feed cycle (not just the settled
+  landed frame) at a riverbank spot. FIX per diagnosis: clamp the RENDERED
+  vulture y to at least the sampled ground + the body clearance at EVERY phase
+  (descend included), using the per-position ground sample (the point-185
+  killGroundY pattern) rather than a spawn-time height. CRUCIAL (user
+  clarification 20.07.2026): the clearance must cover the FULL WING SPAN and the
+  FEEDING MOTION, not just the body centre — a landed/feeding vulture spreads its
+  wings and the wing TIPS reach well beyond the body radius, and the peck/bob
+  feed animation dips the head/front DOWN; on a slope or as the bird rotates a
+  wing tip or the pecking head punches through the ground while the centre still
+  clears. So derive the lift from the LOWEST point of the wing/head geometry
+  across the feed animation and the body tilt (wing half-span × roll/pitch plus
+  the feed-bob amplitude), sampling the ground under the wing EXTENTS, not only
+  under the centre. VERIFY: extend the enrichments landed-bird clearance check to
+  sample the DESCEND phase, a sloped bank, AND the wing-tip / lowest-feed-pose
+  extents (the whole bird stays above ground through the feed cycle), gated
+  strictly above zero; pure-test the wing-aware clearance on a slope with a
+  spread-wing / mid-peck pose. Part of the point-196 ground-anchor group but
+  filed on its own as a direct user report.
 
 ## Closing (only after all points)
 

@@ -3779,6 +3779,55 @@ check(
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
+// --- Point 188: the coastal walk-off resolves --------------------------------
+// A predator that finished feeding at a coast pocket must actually LEAVE — the
+// old radial re-aim shuttled it on the beach forever (the user's Cairo report).
+// Stage: place the leave phase at the waterline with the seaward radial (the
+// player inland-west of it), then poll the sim until the hunt retires — via the
+// escape corridor or, past the calibratable overtime, the off-frame backstop.
+const coastRetire = await page.evaluate(async () => {
+  const seed = window.__game.getState().seed
+  const U = 10
+  window.__game.getState().debugJumpTo(27.2, 33.5) // the African Red Sea coast
+  window.__ui.getState().setTravelZoom(0.5)
+  await new Promise((r) => setTimeout(r, 1200)) // let the jump settle
+  const p0 = window.__game.getState().pos
+  // Walk east from the player to the first ocean cell; the pocket is 2 inland.
+  let shore = null
+  for (let d = 2; d <= 120; d += 2) {
+    if (window.__terrainType(-p0.z / U, (p0.x + d) / U, seed) === 'ocean') { shore = d; break }
+  }
+  if (shore === null) return { staged: false }
+  const s = window.__lionHunt.state
+  s.mode = 'leave'
+  s.victim = null
+  s.victimHunt = false
+  s.lx = p0.x + shore - 2
+  s.lz = p0.z
+  s.leaveHeading = undefined
+  s.leaveT = 0
+  const start = { x: s.lx, z: s.lz }
+  const t0 = window.__wildlife.simTime()
+  let resolved = false
+  // Budget: a clear walk-off needs ~20-25 sim-s at zoom 0.5; the overtime
+  // backstop caps a boxed-in pocket at leaveOvertimeSeconds + a margin.
+  const budget = window.__balance.hunt.leaveOvertimeSeconds + 40
+  while (window.__wildlife.simTime() - t0 < budget) {
+    if (s.mode === 'idle') { resolved = true; break }
+    await new Promise((r) => setTimeout(r, 150))
+  }
+  return {
+    staged: true,
+    resolved,
+    simUsed: +(window.__wildlife.simTime() - t0).toFixed(1),
+    movedFromStart: +Math.hypot(s.lx - start.x, s.lz - start.z).toFixed(1),
+  }
+})
+check(
+  'a predator leaving at an ocean coast retires instead of pacing the beach forever (point 188)',
+  coastRetire.staged && coastRetire.resolved,
+  JSON.stringify(coastRetire),
+)
 
 // --- Point 4: spawn spacing and animal-animal collision -----------------------
 // design.md §19: animals spawn with natural spacing (no two inside one another)
