@@ -6794,6 +6794,27 @@ the remaining open points in their numeric order.
   continuous-invariant harness) and Pillar 2 (the audit sweeps) — still untouched, the
   bulk of 184's original scope. The WebGPU lane (Pillar 3's foundation) is DONE and
   PROVEN; what remains is the methodical determinism rework + Pillars 1-2.
+  PROGRESS 4 (20.07.2026, commits 83f7682 + b45ade8): the SIMPLE timing class is now
+  fixed and its poll pattern proven — gamepad's 5 input checks (stick/yaw/journal/
+  interact) were poll-ified with two reusable helpers, holdAxesUntil (hold a stick and
+  poll the check's own condition, then centre) and pulseButtonUntil (pulse a button on
+  clean edges until its effect lands), and gamepad is now 9/0 on BOTH backends;
+  handwriting's WebGPU HANG (a bare .entry.writing click waiting on actionability) was
+  removed with a force+timeout+catch click (now 9/1, was a hang). But the OTHER input/
+  RAF suites turned out to be DEEPER, system-Chrome-specific findings, NOT the simple
+  timing class (a poll fix for touch made it WORSE and was reverted): (a) touch — the
+  CDP Input.dispatchTouchEvent injection produces NO movement at all under system
+  Chrome + WebGPU (holding the finger through a 15 s poll still read moved 0.0), so it
+  is a CDP-touch/system-Chrome incompatibility, not frame starvation; (b) voice — the
+  Kokoro TTS never reaches the speaking state under system-Chrome-WebGPU, so its
+  300000 ms speak-state waits hang the suite; (c) handwriting's click-to-finish still
+  fails (9/10); plus the earlier (d) collision operable chief-hut latch (19/20) and (e)
+  polish capture-persistence. These five are genuine investigations (system-Chrome CDP/
+  TTS quirks vs real issues), NOT quick polls — do them deliberately, not rushed. So
+  the honest 184 state: Pillar 3's lane + the tractable timing-class rework are DONE;
+  the deeper findings (a-e), preview + the tier wiring + default flip, and Pillars 1
+  (invariant harness) and 2 (Ultracode audit) — the bulk of 184's original scope —
+  remain, best as a fresh/deliberate effort.
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
