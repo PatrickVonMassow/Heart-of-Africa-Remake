@@ -6557,7 +6557,26 @@ the remaining open points in their numeric order.
   genuine achievable-zoom spawn bug — the ordinary chunk spawn and/or the
   river/shore fauna placing on-screen mid-river — NOT the debug seeder limitation;
   it must be reproduced away from settlements at 0.5 and fixed by gating that spawn
-  path through the frustum-projected isOnScreen rule the seeders use. Docs:
+  path through the frustum-projected isOnScreen rule the seeders use.
+  STATIC ROOT CAUSE (20.07.2026, from the code, not yet repro'd live): the ordinary
+  chunk spawn (Wildlife.tsx ~1450-1463) fires a chunk when its CENTRE is within
+  spawnR = viewR + SPAWN_MARGIN = 100*zoom + 18 (= 68 at zoom 0.5), and spawnChunk
+  scatters that chunk's animals across CHUNK_SIZE=24, so a just-entered chunk ahead
+  drops animals at ~56-80 from the player. But the tilted bird's-eye frustum reaches
+  FARTHER ahead on the ground than viewR — the smoking gun is DESPAWN_MARGIN=60
+  (despawnR=110 at 0.5), set >3x SPAWN_MARGIN precisely to keep animals alive until
+  they are well off-screen, i.e. the frustum's ahead-reach is ~110, not 68. So a
+  chunk spawns at 68 INSIDE the ~110 frustum-ahead and its animals pop on-screen
+  while driving — the exact 165/171/172 viewR-vs-frustum class, left untreated for
+  the ORDINARY spawn (165 gated only the supplemental vicinity/dry-shore seeders).
+  FIX: size the chunk spawnR to EXCEED the frustum's ahead-reach at each zoom (point
+  171's flora pattern — a projection-checked / fog-far-capped radius that always
+  clears the frustum, NOT viewR + a small margin), so chunks always spawn off-screen
+  ahead and enter the frame by driving; keep the despawn and a nearest-first fill so
+  density and perf hold. The river/shore fauna (flamingo/croc/drinker) seeded along
+  the water corridor shares the same spawn pass and is fixed with it. The fix and its
+  driven-Nile verification (0.5/1.5/2.2) are the perf-sensitive part — execute with
+  fresh focus, not rushed. Docs:
   design.md §19.2/§2.5,
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
