@@ -1430,8 +1430,10 @@ describe('killChance / parentAttackOutcome (design.md §19.8, point 146 — reve
       expect(parentAttackOutcome('antelope', 'hyena', roll, { ...shipped, forceOutcome: 'kill' })).toBe('kill')
       expect(parentAttackOutcome('giraffe', 'lion', roll, { ...shipped, forceOutcome: 'driveOff' })).toBe('driveOff')
     }
-    // Absent (shipped) it never forces: a roll of 1 is still 'taken'.
-    expect(shipped.forceOutcome).toBeUndefined()
+    // Absent (shipped) it never forces: a roll of 1 is still 'taken'. The shipped
+    // balance's type has no forceOutcome (it is a test-only extension of the weights
+    // param), so read it through a cast to assert it never leaked into the config.
+    expect((shipped as { forceOutcome?: unknown }).forceOutcome).toBeUndefined()
     expect(parentAttackOutcome('giraffe', 'cheetah', 1, shipped)).toBe('taken')
   })
 
