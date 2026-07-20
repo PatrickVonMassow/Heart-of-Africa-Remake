@@ -541,6 +541,68 @@ export function landedBirdClearance(groupBaseY: number, groundUnderBird: number,
   return groupBaseY + landedBirdY(groupBaseY, groundUnderBird, hop) - Math.max(0, groundUnderBird)
 }
 
+/**
+ * The LOWEST point of a landed bird's POSED geometry below its origin (point
+ * 202): the peck/bob feed animation pitches the bird forward, dipping the HEAD
+ * (local y 0.03, z 0.24 in fauna.ts) below the origin — at a full peck it
+ * reaches deeper than the body sphere's bottom (0.096) that the flat
+ * LANDED_BIRD_HOVER was sized for, so a feeding vulture clipped through the
+ * ground (the user report; the wing tips ride high, the head is the deep end).
+ * Scales with the render scale.
+ */
+export function landedBirdLowestDepth(pitch: number, scale: number): number {
+  const head = 0.24 * Math.sin(pitch) - 0.03 * Math.cos(pitch)
+  return Math.max(0.096, head) * scale
+}
+
+/** Ground-sample offsets under a landed bird's EXTENTS — centre, both wing tips
+ *  (local x ±1.15·scale) and the pecking head (local z 0.24·scale) — rotated by
+ *  the bird's yaw, so a slope rising under a spread wing or under the head is
+ *  seen by the lift (point 202). */
+export function birdExtentOffsets(yaw: number, scale: number): [number, number][] {
+  const local: [number, number][] = [
+    [0, 0],
+    [1.15 * scale, 0],
+    [-1.15 * scale, 0],
+    [0, 0.24 * scale],
+  ]
+  const c = Math.cos(yaw)
+  const s = Math.sin(yaw)
+  return local.map(([x, z]) => [x * c + z * s, -x * s + z * c])
+}
+
+/** Pose-aware landed-bird y (point 202): the point-128 positive-only lift onto
+ *  the HIGHEST ground under the bird's extents, plus a clearance derived from
+ *  the posed geometry's lowest point (never the flat hover), plus the hop. */
+export function landedBirdYPosed(
+  groupBaseY: number,
+  maxGroundUnder: number,
+  hop: number,
+  pitch: number,
+  scale: number,
+): number {
+  const lift = Math.max(0, Math.max(0, maxGroundUnder) - groupBaseY)
+  return lift + landedBirdLowestDepth(pitch, scale) + 0.06 + hop
+}
+
+/** The posed bird's LOWEST-POINT clearance above its own highest ground — the
+ *  verify metric; by construction never below the 0.06 margin, and a group
+ *  pre-lift bug (the point-185 double lift) still blows past any upper cap. */
+export function landedBirdClearancePosed(
+  groupBaseY: number,
+  maxGroundUnder: number,
+  hop: number,
+  pitch: number,
+  scale: number,
+): number {
+  return (
+    groupBaseY +
+    landedBirdYPosed(groupBaseY, maxGroundUnder, hop, pitch, scale) -
+    landedBirdLowestDepth(pitch, scale) -
+    Math.max(0, maxGroundUnder)
+  )
+}
+
 /** Ordinary prey walk speed (units/s) — the unhurried gait (e.g. the walk back
  *  after a water rescue). The rescue burst is measured against this. */
 export const PREY_WALK_SPEED = 3

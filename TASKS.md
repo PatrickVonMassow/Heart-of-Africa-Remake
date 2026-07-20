@@ -7231,7 +7231,17 @@ the remaining open points in their numeric order.
   moving step (not moved:false forever); live staging of the sacrifice ending
   with the calf on a bank, asserting it leaves the waterline within a bounded
   window. Coordinate with 192 (water-crossing) and 157.
-- [ ] 202. Vultures still CLIP into the ground (user play-test 20.07.2026,
+- [x] 202. DONE 20.07.2026: landed birds now derive their height from the POSED
+  geometry's lowest point (the pecking head reaches ~0.21-0.27 below the origin
+  at the render scales — far past the flat 0.15 hover) and lift onto the HIGHEST
+  ground under their EXTENTS (both wing tips + head, rotated with the yaw), in
+  both systems (ground scavenger + kill flock) via the new pure
+  landedBirdLowestDepth/birdExtentOffsets/landedBirdYPosed/
+  landedBirdClearancePosed — the verify metric is now the lowest-POINT clearance
+  and the point-185 double-lift cap still trips. 4 new pure tests; enrichments
+  205/0 (the steep-rise + flat gates run on the posed metric);
+  build+lint+1945 vitest green.
+  ORIGINAL: Vultures still CLIP into the ground (user play-test 20.07.2026,
   screenshot: a vulture half-sunk in the riverbank sand). Point 185 fixed the
   ground SCAVENGER's double-lift and point 128/185 the landedBirdY hover, but a
   vulture still intersects the terrain — likely (DIAGNOSE FIRST) one of: the

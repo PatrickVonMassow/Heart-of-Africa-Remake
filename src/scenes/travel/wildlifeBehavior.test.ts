@@ -32,6 +32,10 @@ import {
   PREY_WALK_SPEED,
   landedBirdY,
   landedBirdClearance,
+  landedBirdLowestDepth,
+  landedBirdYPosed,
+  landedBirdClearancePosed,
+  birdExtentOffsets,
   LANDED_BIRD_HOVER,
   CROCODILE_REGIONS,
   crocodileAllowedAt,
@@ -347,6 +351,45 @@ describe('landedBirdY / landedBirdClearance (point 128 — a landed vulture stan
         expect(landedBirdClearance(base, ground, 0)).toBeGreaterThanOrEqual(LANDED_BIRD_HOVER - 1e-9)
       }
     }
+  })
+})
+
+describe('posed landed-bird clearance (point 202 — the wing span and the feeding motion count)', () => {
+  it('the lowest point is the body bottom at rest and the dipped HEAD at a full peck', () => {
+    // Pitch 0: no head dip — the body sphere bottom (0.096·scale) is lowest.
+    expect(landedBirdLowestDepth(0, 1)).toBeCloseTo(0.096, 9)
+    // Full flock peck (0.9 rad) at the 1.6 render scale: the head reaches ~0.27
+    // below the origin — far past the flat 0.15 hover that caused the clipping.
+    const full = landedBirdLowestDepth(0.9, 1.6)
+    expect(full).toBeGreaterThan(0.25)
+    expect(full).toBeGreaterThan(landedBirdLowestDepth(0.45, 1.6))
+  })
+
+  it('the posed y keeps the LOWEST point a margin above flat ground through the whole peck', () => {
+    for (const pitch of [0, 0.45, 0.75, 0.9]) {
+      for (const scale of [1.5, 1.6]) {
+        const y = landedBirdYPosed(2, 2, 0, pitch, scale)
+        const lowestWorld = 2 + y - landedBirdLowestDepth(pitch, scale)
+        expect(lowestWorld - 2).toBeCloseTo(0.06, 9) // exactly the margin above ground
+      }
+    }
+  })
+
+  it('ground rising under a WING lifts the whole bird (extent max, never below the margin)', () => {
+    for (const ground of [2, 2.4, 3.1]) {
+      expect(landedBirdClearancePosed(2, ground, 0, 0.9, 1.6)).toBeGreaterThanOrEqual(0.06 - 1e-9)
+    }
+    // A point-185-style +0.5 group pre-lift bug still reads as a blown cap.
+    expect(landedBirdClearancePosed(2.5, 2, 0, 0.45, 1.5)).toBeGreaterThan(0.5)
+  })
+
+  it('birdExtentOffsets rotates the wing tips and head with the yaw', () => {
+    const at0 = birdExtentOffsets(0, 1)
+    expect(at0[1][0]).toBeCloseTo(1.15, 9) // +x wing tip
+    expect(at0[3][1]).toBeCloseTo(0.24, 9) // head forward on z
+    const at90 = birdExtentOffsets(Math.PI / 2, 1)
+    expect(Math.abs(at90[1][0])).toBeLessThan(1e-9) // tip swung onto the z axis
+    expect(Math.abs(at90[1][1])).toBeCloseTo(1.15, 9)
   })
 })
 

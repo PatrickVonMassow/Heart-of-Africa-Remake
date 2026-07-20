@@ -65,8 +65,9 @@ import {
   rescueSpeed,
   wadeSpeed,
   PREY_WALK_SPEED,
-  landedBirdY,
-  landedBirdClearance,
+  landedBirdYPosed,
+  landedBirdClearancePosed,
+  birdExtentOffsets,
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
@@ -2654,15 +2655,21 @@ function Herds() {
               const r = 0.5 + i * 0.35
               const bx = Math.cos(ph) * r
               const bz = Math.sin(ph) * r
-              // The shared landed-bird rule (point 128): each bird stands on
-              // ITS OWN ground beside the carcass — positive-only lift, the
-              // hover clearing the pecking body, the hop as feeding bounce.
-              const bll = worldToLatLon(sc.x + bx, sc.z + bz)
-              const bg = Math.max(0, sampleTerrain(bll.lat, bll.lon, seed).height)
+              // The shared landed-bird rule (points 128 + 202): positive-only
+              // lift onto the HIGHEST ground under the bird's EXTENTS (wing
+              // tips + pecking head, not just the centre), clearance from the
+              // POSED lowest point (the dipped head reaches deeper than the
+              // flat hover covered — the user's ground-clipping report).
+              const pitch = 0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3
+              let bg = 0
+              for (const [ox, oz] of birdExtentOffsets(ph, 1.5)) {
+                const bll = worldToLatLon(sc.x + bx + ox, sc.z + bz + oz)
+                bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, seed).height)
+              }
               const hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
-              bird.position.set(bx, landedBirdY(sc.y, bg, hop), bz)
-              SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearance(sc.y, bg, hop))
-              bird.rotation.set(0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3, ph, 0) // heads pecking down
+              bird.position.set(bx, landedBirdYPosed(sc.y, bg, hop, pitch, 1.5), bz)
+              SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, 1.5))
+              bird.rotation.set(pitch, ph, 0) // heads pecking down
             } else {
               const a2 = t * 0.6 + ph
               bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
@@ -3913,16 +3920,21 @@ function Vultures() {
             const lr = 0.5 + i * 0.35
             const lx = Math.cos(phase) * lr
             const lz = Math.sin(phase) * lr
-            // The shared landed-bird rule (point 128): positive-only lift
-            // onto the bird's own ground, hover past the pecking body, hop.
-            const bll = worldToLatLon(f.x + lx, f.z + lz)
-            const bg = Math.max(0, sampleTerrain(bll.lat, bll.lon, s.seed).height)
+            // The shared landed-bird rule (points 128 + 202): positive-only
+            // lift onto the highest ground under the bird's EXTENTS, with the
+            // clearance derived from the POSED lowest point (dipped head).
+            const kPitch = 0.6 + Math.sin(t * 4 + phase) * 0.3
+            let bg = 0
+            for (const [ox, oz] of birdExtentOffsets(phase, 1.6)) {
+              const bll = worldToLatLon(f.x + lx + ox, f.z + lz + oz)
+              bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, s.seed).height)
+            }
             const hop = Math.abs(Math.sin(t * 3 + phase)) * 0.12
-            const ly = landedBirdY(killGroundY, bg, hop)
+            const ly = landedBirdYPosed(killGroundY, bg, hop, kPitch, 1.6)
             bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
-            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearance(killGroundY, bg, hop))
+            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, 1.6))
             if (dsc > 0.6) {
-              bird.rotation.set(0.6 + Math.sin(t * 4 + phase) * 0.3, phase, 0) // pecking down
+              bird.rotation.set(kPitch, phase, 0) // pecking down
             } else {
               bird.rotation.set(0, -a - Math.PI / 2, 0.25) // still banking
             }
