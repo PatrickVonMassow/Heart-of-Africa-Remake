@@ -1131,6 +1131,14 @@ function seedDryShoreDrinkers(
         // the bank — a LOW bank is still a bank the animals can stand on.
         if (t.type !== 'water' && t.type !== 'ocean') {
           const w = latLonToWorld(lat, lon)
+          // Only a bank whose drinking group would land OFF the rendered frame
+          // (point 184, Pillar 1: the invariant harness caught the dry-shore seeder
+          // popping a drinking herd into view near water — the point-183 class, a
+          // DIFFERENT seeder). Seed at the nearest OFF-screen bank so the drinkers
+          // drift in; the moving camera exposes one next upkeep, and the ordinary
+          // chunk spawn still bases the shore. isOnScreen defaults off-screen with no
+          // travel camera, so a camera-less context still seeds normally.
+          if (isOnScreen(w.x + 1, w.z + 1)) continue
           const d = Math.hypot(w.x - pos.x, w.z - pos.z)
           if (d < bd) {
             bd = d
