@@ -45,6 +45,35 @@ const pressButton = async (index) => {
   await page.waitForTimeout(150)
 }
 
+// Hold a stick until the render loop produces the expected result, then centre it —
+// the loop reads the axes each frame, and a fixed wait yields too few frames on the
+// slower/colder WebGPU headless cadence (point 184). Polling for the check's OWN
+// condition is safe: a timeout is a real failure, never a false pass. `cond` runs in
+// the page with `base` as its argument.
+const holdAxesUntil = async (axes, cond, base, timeout = 15000) => {
+  await page.evaluate((a) => (window.__pad.axes = a), axes)
+  const ok = await page.waitForFunction(cond, base, { timeout }).then(() => true).catch(() => false)
+  await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+  return ok
+}
+
+// Pulse a button (clean press/release edges) until its effect lands — a single 150 ms
+// tap can fall between two rAF ticks on the slower WebGPU cadence (point 184). Stops
+// on the first pulse that satisfies `cond` (evaluated in the page), so a toggle is
+// never over-driven.
+const pulseButtonUntil = async (index, cond, timeout = 15000) => {
+  const t0 = Date.now()
+  let ok = await page.evaluate(cond).catch(() => false)
+  while (!ok && Date.now() - t0 < timeout) {
+    await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: true, touched: true, value: 1 }), index)
+    await page.waitForTimeout(120)
+    await page.evaluate((i) => (window.__pad.buttons[i] = { pressed: false, touched: false, value: 0 }), index)
+    await page.waitForTimeout(120)
+    ok = await page.evaluate(cond).catch(() => false)
+  }
+  return ok
+}
+
 // --- Idle axis drift must not steer (worn pads, wheels, flight sticks) -------------
 // Below the engagement threshold nothing may move before a deliberate input.
 await page.evaluate(() => (window.__pad.axes = [0.35, 0.35, 0.4, 0]))
@@ -55,26 +84,26 @@ await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
 
 // --- Right stick turns the first-person view (in Cairo at start) -------------------
 const yaw0 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
-await page.evaluate(() => (window.__pad.axes = [0, 0, 1, 0]))
-await page.waitForTimeout(700)
-await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+const turned = await holdAxesUntil([0, 0, 1, 0], (y0) => Math.abs((window.__placePlayer?.yaw ?? 0) - y0) > 0.2, yaw0)
 const yaw1 = await page.evaluate(() => window.__placePlayer?.yaw ?? 0)
-check('right stick turns the first-person view', Math.abs(yaw1 - yaw0) > 0.2, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
+check('right stick turns the first-person view', turned, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
 
 // --- Left stick walks in the settlement ----------------------------------------------
 const pos0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-await page.evaluate(() => (window.__pad.axes = [0, -1, 0, 0]))
-await page.waitForTimeout(700)
-await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+const walkedOk = await holdAxesUntil(
+  [0, -1, 0, 0],
+  (p0) => Math.hypot(window.__placePlayer.x - p0.x, window.__placePlayer.z - p0.z) > 1,
+  pos0,
+)
 const pos1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
 const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
-check('left stick walks the character (first-person)', walked > 1, `moved ${walked.toFixed(1)} m`)
+check('left stick walks the character (first-person)', walkedOk, `moved ${walked.toFixed(1)} m`)
 
 // --- Y opens the journal, B closes it ---------------------------------------------------
-await pressButton(3) // Y → Tab
+await pulseButtonUntil(3, () => window.__game.getState().journalOpen === true) // Y → Tab (open)
 let journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
 check('Y toggles the journal', journalOpen === true, '')
-await pressButton(1) // B → Escape
+await pulseButtonUntil(1, () => window.__game.getState().journalOpen === false) // B → Escape (close)
 journalOpen = await page.evaluate(() => window.__game.getState().journalOpen)
 check('B closes the journal again', journalOpen === false, '')
 
@@ -82,12 +111,14 @@ check('B closes the journal again', journalOpen === false, '')
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1200)
 const tpos0 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
-await page.evaluate(() => (window.__pad.axes = [0, 1, 0, 0])) // stick down = south
-await page.waitForTimeout(700)
-await page.evaluate(() => (window.__pad.axes = [0, 0, 0, 0]))
+const travelledOk = await holdAxesUntil(
+  [0, 1, 0, 0], // stick down = south
+  (p0) => Math.hypot(window.__game.getState().pos.x - p0.x, window.__game.getState().pos.z - p0.z) > 0.5,
+  tpos0,
+)
 const tpos1 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
 const travelled = Math.hypot(tpos1.x - tpos0.x, tpos1.z - tpos0.z)
-check("left stick travels in the bird's-eye view", travelled > 0.5, `moved ${travelled.toFixed(2)} units`)
+check("left stick travels in the bird's-eye view", travelledOk, `moved ${travelled.toFixed(2)} units`)
 
 // --- A interacts (E): addresses the elder in a village -----------------------------------------
 // Places are entered by walking now (design.md §2), so A no longer "enters":
@@ -106,7 +137,7 @@ await page.evaluate(() => {
   p.z = el.pos[1] + 2
 })
 await page.waitForTimeout(500)
-await pressButton(0) // A → KeyE → talk to the elder
+await pulseButtonUntil(0, () => window.__game.getState().languagesLearned.north === true) // A → KeyE → talk
 const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
 check('A interacts: the elder is addressed (language lesson)', talked === true, '')
 
