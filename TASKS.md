@@ -6316,7 +6316,21 @@ the remaining open points in their numeric order.
   SMALL tier stays the reliable everyday gate (it excludes enrichments by design).
   (Found 18.07.2026 in the point-173 closing run; queued at the batch end.)
 
-- [ ] 178. Vultures POP IN already-landed on the carcass instead of flying in.
+- [x] 178. Vultures POP IN already-landed on the carcass instead of flying in.
+  DONE 20.07.2026: flightStep spawned the bird at viewR + FLIGHT_SPAWN_OUT (the
+  assumed ring), and viewR underestimates the tilted frustum's ground reach (the
+  165/172/183 lesson) so the spawn fell inside the frame. flightStep now takes an
+  off-screen predicate; the three vulture callers (ground scavenger, kill flock,
+  poor-health player vultures) pass the shared frustum-projected isOnScreen
+  (negated), so the spawn is pushed out until off-frame, then flies in. Pure-tested
+  (wildlifeBehavior.test.ts) + the three enrichments vulture checks REWRITTEN from a
+  debug-zoom/radius test (a 172 cluster: zoom 1/2, spawnDist>100/200) to achievable
+  0.5 + __camera.onScreen projection; they pass. Build+lint+1935 vitest green.
+  Commits (flightStep) + the check rewrite. NOTE: the same-run point-165 driven
+  check caught 2 zebras on-screen at 0.5 (the real point-183 streaming pop, a
+  distinct spawn path — confirms 183 at achievable zoom), and point-130's croc
+  drive-off flaked on lionTouched (a rare croc-drama staging residual) — both
+  independent of this vulture fix.
   User report (19.07.2026, playing on WebGPU): "Eben sind die Geier plötzlich
   erschienen — bereits an der Beute gelandet. Ich konnte sie nicht einfliegen
   sehen." The rule (design.md §19.6, acceptance CLAUDE §7.1 pt.12): a non-lion
