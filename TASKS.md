@@ -6457,8 +6457,24 @@ the remaining open points in their numeric order.
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
 - [ ] 181. Panorama/skyline wildlife silhouettes sometimes FLOAT with their feet
-  far above the ground instead of standing on the visible horizon line. User
-  report + screenshot (19.07.2026, WebGPU, Cairo first-person view): a quadruped
+  far above the ground instead of standing on the visible horizon line. DIAGNOSED
+  20.07.2026 — LOGIC IS CORRECT, so this is WebGPU-specific and needs the WebGPU
+  lane to reproduce: the anchor (PlaceScene.tsx ~1136-1160) with a capture active
+  places the group at horizonY = EYE_HEIGHT - sinkEpsilon plus a <=0.12 bob, the
+  fauna geometry origin is at the feet (fauna.ts), the group scale scales about
+  that foot origin, and the band's v-mapping (~1275) puts the horizon at EYE_HEIGHT
+  by construction — all backend-neutral TSL, so |footY - visibleY| is bounded and
+  the point-184 audit (class C) independently ruled out centre-anchoring and a
+  wrong visibleY. The WebGL2 headless render shows it correct (the point-31 live
+  gate passes), so the float cannot be reproduced there. NEXT (needs the WebGPU
+  lane, 184 Pillar 3): reproduce on real WebGPU (system-Chrome headless=new) via
+  the travel->Cairo->panorama flow, screenshot the silhouettes vs the rendered
+  horizon; if it floats, the likely cause is the hard-coded EYE_HEIGHT anchor
+  drifting from the actually-rendered band horizon on that backend (the audit's
+  noted fragility) or a specific species/scale whose origin is not exactly at the
+  feet — fix by deriving the anchor from the rendered horizon and/or the offending
+  mesh. BLOCKED on the WebGPU lane; do 183 and build the lane first.
+  User report + screenshot (19.07.2026, WebGPU, Cairo first-person view): a quadruped
   silhouette hangs in the sky well above the haze horizon, its legs dangling in
   mid-air. This violates the point 31 / design.md 2.5 acceptance ("standing on the
   VISIBLE horizon line rather than a monument looming"; "sits on the band's horizon
