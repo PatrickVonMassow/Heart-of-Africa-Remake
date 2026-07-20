@@ -7325,10 +7325,30 @@ the remaining open points in their numeric order.
   so the reliable net is to LOOK at it the way the user does — but exhaustively.
   Make (C) a DENSE, standing, repeatable sweep: a grid of locations (each biome,
   each named place + landmark, coasts, river banks, lakes, the graveyard) × a set
-  of staged situations (each drama, drink/bathe, flood, fire, each season/weather)
-  — drive/stage, screenshot, and I VISUALLY inspect every frame for anything that
-  looks off, logging each anomaly. Aim for the coverage a human would need hours
-  of play to hit. This is the honest answer to "why did a minute of walking beat
+  of staged situations (each drama, drink/bathe, flood, fire, each season/weather).
+  CRITICAL (user 20.07.2026): a jump to a spot is only the POSITIONING — most bugs
+  appear only while MOVING and OVER TIME (pop-in, plants jumping, the predator
+  pacing, the calf snagging while it flees, streaming/edge artefacts). So at each
+  spot DRIVE (hold a walk, and also a longer traverse across the region) and
+  capture a FILMSTRIP of frames along the path, and LET the emergent dramas play
+  out — capture a temporal SEQUENCE over several seconds, not one static shot. The
+  static shot serves only the anchoring class; the driven filmstrip + the drama
+  sequence are what catch the movement/emergent bugs. I VISUALLY inspect every
+  frame (and the frame-to-frame deltas) for anything that looks off, logging each
+  anomaly. Aim for the coverage a human would need hours of play to hit.
+  TIME AXIS (user 20.07.2026): the sweep also varies the CALENDAR — MONTHS and
+  YEARS (1890-1895) — and checks the weather/season effects AND THEIR TRANSITIONS
+  are correct at the right place: harmattan Sahel Jan-Mar vs Aug, Atlas snow Feb
+  vs Jul, the Nile flood crest Oct vs low Apr (at Aswan), the Okavango flood in
+  the local-dry Jul vs Jan, equatorial ice, hail only in a heavy storm, the
+  rinderpest years vs a clear year, the dry-season bleach vs the wet green, and
+  the border-easing of rain (167). Sample intelligently — each feature at its
+  PEAK month and an OFF month at its OWN location, plus a couple of stepped
+  transitions to see the ease-in — not the full month×place cross product.
+  BACKEND AXIS: run the whole sweep on BOTH WebGL2 AND the real WebGPU (the
+  system-Chrome lane) — some visual bugs are WebGPU-ONLY (175 crown jitter, 181
+  silhouette float) and never show on the headless WebGL2 path the first pass
+  used. This is the honest answer to "why did a minute of walking beat
   the hardening"; A/B/D/E are the cheap automated first pass under it.
   MORE INVARIANT CLASSES (derived by thinking through what else can look wrong —
   the cheap automated complements to the visual sweep):
