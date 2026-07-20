@@ -121,7 +121,12 @@ await page.evaluate(() => window.__ui.getState().setJournalDnd(true))
 // so a bare .click() hangs on the actionability/stability wait until the default
 // timeout (point 184). force skips stability, the timeout+catch prevent the hang.
 await page.locator('.journal .entry.writing').click({ force: true, timeout: 15000 }).catch(() => {})
-await page.waitForTimeout(200)
+// Poll for the click-to-finish to clear the writing state rather than a fixed wait —
+// the finish is applied in the render loop and lags on the slower WebGPU headless
+// cadence (point 184, the same timing class); a real failure exhausts the window.
+await page
+  .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 15000 })
+  .catch(() => {})
 await page.evaluate(() => window.__ui.getState().setJournalDnd(false))
 const clicked = await page.evaluate(() => ({
   writing: document.querySelectorAll('.journal .entry.writing').length,
