@@ -7378,7 +7378,33 @@ the remaining open points in their numeric order.
    11. TRAVEL DIRECTION / CAMERA HEADING — the panorama capture is bearing-
       dependent (82/99); drive several headings.
   The two most important additions are ZOOM (7) and the SETTLEMENT scene (8) —
-  neither was in the first pass, and both hide whole bug families. This is the honest answer to "why did a minute of walking beat
+  neither was in the first pass, and both hide whole bug families.
+  SAMPLING METHOD (user 20.07.2026 — the dimensions span a huge space that can
+  only be grazed; a principled sample beats a sparse grid). Three ideas combined:
+   • SPLIT BY COST. The automated invariants (A/B/D/E/F-N) are CHEAP (pass/fail,
+     no human) — run them on a DENSE sample (many location×time×zoom points, even
+     thousands). The VISUAL inspection (C) is EXPENSIVE (my eyes) — sample it
+     SPARSELY but smartly, and reserve extra visual budget for wherever an
+     invariant already flags something. This alone reallocates most of the space
+     to the cheap axis.
+   • TARGETED for CAUSALLY-LOCATED effects. Weather/season/flood/dress/rinderpest
+     do not need a cross product — each effect lives at KNOWN coordinates. Drive
+     the effect→coordinate map from docs/climate-1890.md and design.md §19.13:
+     each effect at its PEAK month + an OFF month + one stepped TRANSITION, at its
+     OWN place. Exact and complete for that family, ~40 cases, no combinatorics.
+   • PAIRWISE (2-wise) COVERING ARRAY for the GENERIC dimensions (location,
+     movement, zoom, backend, scene, player-state, heading). Empirically the large
+     majority of bugs are triggered by ONE factor or the interaction of TWO — a
+     covering array that hits every PAIR of dimension-values needs only ~dozens of
+     cases (generate with IPOG/AETG-style greedy), not the full product, yet
+     catches all 1- and 2-factor interactions. Generate the array in the finder.
+   • RISK-WEIGHTED + ADAPTIVE on top. Over-sample the known-hot regions (coasts,
+     water edges, the dramas, the exact user-reported spots) and the
+     recently-CHANGED code; and DENSIFY around any anomaly a pass turns up (an
+     invariant flag or a visual hunch) — a second, finer sample in that slice.
+   NET: dense-cheap invariants + a pairwise+targeted+risk visual sample (~100-150
+   inspected scenarios) + adaptive follow-up — good coverage at a feasible cost,
+   instead of a false-comfort sparse grid. This is the honest answer to "why did a minute of walking beat
   the hardening"; A/B/D/E are the cheap automated first pass under it.
   MORE INVARIANT CLASSES (derived by thinking through what else can look wrong —
   the cheap automated complements to the visual sweep):

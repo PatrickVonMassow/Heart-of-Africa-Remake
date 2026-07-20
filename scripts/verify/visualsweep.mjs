@@ -1,10 +1,12 @@
-// Point 203 (C) — the VISUAL SWEEP, the primary bug-finding net: drive/jump to a
-// dense, diverse set of spots at the ACHIEVABLE zoom, let the scene settle, and
-// screenshot each so the frames can be VISUALLY inspected for anomalies (buried /
-// floating / submerged / overlapping / mis-posed / wrong-looking things) — the way
-// a player finds them, but exhaustively. This script only CAPTURES; the inspection
-// is done by reading the images. Saves to SWEEP_OUT (default: a sweep/ folder next
-// to the run). Not a pass/fail suite — it prints where it wrote each shot.
+// Point 203 (C) — the VISUAL SWEEP, the primary bug-finding net. A jump only
+// POSITIONS; most bugs appear while MOVING and OVER TIME, so at each spot this
+// DRIVES (holds a walk) and captures a FILMSTRIP of frames along the path, and
+// lets the emergent scene run — so the frames can be VISUALLY inspected for
+// anomalies the way a player finds them, but exhaustively. It also varies the
+// CALENDAR for the weather-bearing spots. This script only CAPTURES; the finding
+// is the inspection of the images. Not a pass/fail suite.
+//
+// Env: BASE_URL (dev/preview server), SWEEP_OUT (folder), VERIFY_GL (webgl|webgpu).
 import { launchVerifyBrowser } from './_browser.mjs'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -13,25 +15,19 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = process.env.SWEEP_OUT ?? fileURLToPath(new URL('../../verification/sweep/', import.meta.url))
 fs.mkdirSync(OUT, { recursive: true })
 
-// (name, lat, lon) — the reported trouble spots + one of each biome + the landmarks
-// and water bodies. Grows over time (203 keeps a checklist).
+// (name, lat, lon, month) — month optional (0-11) to probe a season. A spot with
+// wildlife/water/coast to exercise the movement + anchoring + drama classes.
 const SPOTS = [
-  ['cairo-port-coast', 30.05, 31.25],
-  ['red-sea-coast', 27.2, 33.5],
-  ['nile-delta', 30.9, 31.1],
-  ['nile-corridor', 25.6, 32.6],
-  ['sudd-marsh', 8.0, 30.6],
-  ['lake-edward', -0.35, 29.6],
-  ['lake-victoria', -1.0, 33.0],
   ['maasai-savanna', -2.5, 36.4],
-  ['kilimanjaro', -3.07, 37.35],
+  ['cairo-coast', 30.05, 31.25],
+  ['nile-bank', 25.6, 32.6],
+  ['zambezi-bank', -16.5, 26.5],
   ['congo-jungle', 0.4, 22.5],
-  ['sahel', 14.0, 2.0],
-  ['zambezi', -16.5, 26.5],
-  ['victoria-falls', -17.9, 25.85],
-  ['okavango', -19.3, 22.9],
-  ['west-guinea-coast', 7.5, -6.0],
-  ['cape-south-coast', -34.0, 20.0],
+  ['lake-edward', -0.35, 29.6],
+  ['sahel-harmattan', 14.0, 2.0, 0], // January — harmattan pall
+  ['sahel-wet', 14.0, 2.0, 7], // August — wet
+  ['aswan-flood', 24.1, 32.9, 9], // October — Nile flood crest
+  ['okavango-dryflood', -19.3, 22.9, 6], // July — dry-season flood
 ]
 
 const browser = await launchVerifyBrowser()
@@ -50,24 +46,33 @@ await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)
   window.__balance.randomEventsEnabled = false
 })
-await page.waitForTimeout(2500)
+await page.waitForTimeout(2000)
 
-for (const [name, lat, lon] of SPOTS) {
+for (const [name, lat, lon, month] of SPOTS) {
   await page.evaluate(
-    ([la, lo]) => {
+    ([la, lo, mo]) => {
       window.__game.getState().debugJumpTo(la, lo)
       window.__ui.getState().setTravelZoom(0.5)
+      if (mo != null && window.__ui.getState().setDebugMonth) window.__ui.getState().setDebugMonth(mo)
     },
-    [lat, lon],
+    [lat, lon, month],
   )
-  // Let the jump lerp finish and wildlife/flora stream in.
-  await page.waitForTimeout(4500)
-  const file = `${OUT}${name}.png`
-  await page.screenshot({ path: file })
-  console.log(`SHOT ${name} (${lat}, ${lon}) -> ${file}`)
+  await page.waitForTimeout(2500) // settle the jump lerp + let wildlife stream in
+  // Drive a filmstrip: hold forward and grab a frame every ~2 sim-seconds so the
+  // movement/streaming/emergent bugs (pop-in, jumping flora, pacing, snagging)
+  // show up between frames.
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', key: 'w' })))
+  for (let f = 0; f < 4; f++) {
+    await page.waitForTimeout(1800) // wall-clock cadence — a capture, not an assertion
+    const file = `${OUT}${name}-f${f}.png`
+    await page.screenshot({ path: file })
+    console.log(`SHOT ${name} f${f}`)
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' })))
+  if (month != null) await page.evaluate(() => window.__ui.getState().setDebugMonth && window.__ui.getState().setDebugMonth(null))
 }
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 200))
 await browser.close()
-console.log(`SWEEP DONE — ${SPOTS.length} shots in ${OUT}`)
+console.log(`SWEEP DONE — ${SPOTS.length} spots x 4 frames in ${OUT}`)
