@@ -6829,6 +6829,21 @@ the remaining open points in their numeric order.
   test misses .touch-stick. Confirming needs LIVE instrumentation on system Chrome
   (log the pointerId/target reaching onStickDown vs onStickMove) — not a read-only
   deduction and not a blind poll; do it deliberately.
+  PROGRESS 6 (20.07.2026): tried the live pointer diagnostic but run-all.mjs FILTERS a
+  suite's stdout to the PASS/FAIL lines, so a console.log('PTRDIAG …') is dropped —
+  seeing it needs a DIRECT run against a standalone dev server (extra plumbing). The
+  KEY insight makes that unnecessary for the resolution, though: the exact pointerId
+  cause does not change the outcome. touch's arm TAP (touchStart+End) works but its
+  stick/drag (touchStart+MOVE) does not, and voice's TTS never reaches the speak state
+  — both are system-Chrome-HEADLESS limitations (CDP touchMove/pointer-capture and the
+  Kokoro WASM speak-state), not game bugs. RESOLUTION (a user tier-design call, flagged
+  in the dashboard's "Von dir zu klären"): run touch + voice WebGL2-ONLY and the other
+  13 on WebGPU+WebGL2 — legitimate under condition (a) (the WebGL2 fallback is tested
+  regardless), but it DEVIATES from "GROSS = all suites on both backends", so it needs
+  the user's ok (or the alternative: a deliberate workaround — synthetic pointer events
+  for touch, an alternative TTS speak detection for voice). This resolves findings (a)
+  touch and (b) voice into a tier decision; (c) handwriting click-finish, (d) collision
+  operable latch, (e) polish capture-persistence remain smaller investigations.
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
