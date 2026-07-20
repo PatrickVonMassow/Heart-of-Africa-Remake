@@ -884,13 +884,19 @@ const herdTest = await page.evaluate(async () => {
   // endpoint: the amble curves in arcs (and headless RAF is throttled), so a
   // net start→end distance can be small even though the herd clearly roamed.
   let maxCentreDisp = 0
-  for (let k = 0; k < 44; k++) {
+  // Poll on the SIM clock, not a fixed wall-clock window (point 177): headless RAF
+  // throttling yields too few sim-frames in a fixed wall time, so the amble can fall
+  // short of the 1.5 threshold though it is really roaming (the rotating flake seen at
+  // centreMoved 0.63). Sample spread/heading each tick and run until the centre has
+  // CLEARLY roamed, or a generous sim-time cap — a genuine no-roam still fails.
+  const simStart = window.__wildlife.simTime()
+  for (let k = 0; k < 240 && maxCentreDisp <= 2.0 && window.__wildlife.simTime() - simStart < 12; k++) {
     let maxd = 0
     for (const a of members) for (const b of members) maxd = Math.max(maxd, Math.hypot(a.x - b.x, a.z - b.z))
     spreads.push(maxd)
     headingSnaps.push(members.map((m) => m.heading ?? 0))
     maxCentreDisp = Math.max(maxCentreDisp, Math.hypot(mean(members, 'x') - c0.x, mean(members, 'z') - c0.z))
-    await sleep(180)
+    await sleep(120)
   }
   const cF = { x: mean(members, 'x'), z: mean(members, 'z') }
   const centreMoved = Math.max(maxCentreDisp, Math.hypot(cF.x - c0.x, cF.z - c0.z))
@@ -3687,6 +3693,13 @@ const crocDrama = async (mode, attempt = 0) =>
         parent.x = calf.x + (lx / ll2) * 15
         parent.z = calf.z + (lz / ll2) * 15
       }
+      // Force the drive-off deterministically (point 177): the rescue relies on the
+      // parentAttackOutcome roll (zebra vs crocodile), whose natural chance sometimes
+      // left the parent 'taken' across all three retries under load. The game reads
+      // balance.parentDefense as the weights, so a forceOutcome there pins the outcome
+      // while the parentAlive assertion below still verifies the drive-off keeps it
+      // alive (no masking). Cleared in the cleanup.
+      if (MODE.kind === 'rescue') window.__balance.parentDefense.forceOutcome = 'driveOff'
       await window.__pollSim(25, () => {
         if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead) return true
         if (MODE.kind === 'sacrifice' && parent.dead) return true
@@ -3702,6 +3715,7 @@ const crocDrama = async (mode, attempt = 0) =>
     out.parentAlive = !parent.dead
     out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
     out.lionTouched = lion.victim === calf || lion.victim === parent
+    window.__balance.parentDefense.forceOutcome = undefined // clear the forced rescue outcome
     pf.crocodile = prevPf
     herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
     herds.crocodile = naturals // the staged croc retires, the naturals return
