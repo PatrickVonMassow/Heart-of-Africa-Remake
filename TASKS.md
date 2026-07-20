@@ -7065,7 +7065,17 @@ the remaining open points in their numeric order.
   swimmer ON the sheet; a new pure/live assertion that no lake-sheet EDGE
   vertex stands more than a small tolerance above the terrain beside it —
   swept over all 8 lakes so the fix generalises. DOCS: none.
-- [ ] 191. During a calf hunt, a SECOND (uninvolved) parent+calf pair appeared
+- [x] 191. DONE 21.07.2026: the cause was a LEAPFROG FEEDBACK — the passive
+  guard branch (any parent whose calf a CHASING lion nears) stationed the
+  parent lion-side of its calf, the calf follows its parent, so the station
+  crept after the sprinting hunter and the whole pair tracked the hunt to the
+  kill. New pure guardEngagement (closest-approach memory + release-on-recede
+  slack 0.8, reset out of radius and between hunts): a passing hunter is
+  guarded only WHILE IT CLOSES IN, never followed. 3 pure tests; the
+  victim-gated charge/shield paths untouched (all staged dramas green).
+  enrichments 206/0, build+lint+1950 vitest green. (A dedicated two-family
+  live staging joins the point-200 hardening pass.)
+  ORIGINAL: During a calf hunt, a SECOND (uninvolved) parent+calf pair appeared
   to RUN AFTER the predator chasing its victim until the catch (user play-test
   20.07.2026, screenshot). Expected (§19.8): only the VICTIM's own parent
   reacts (charge/shield); every other family flees AWAY or ignores the hunt.

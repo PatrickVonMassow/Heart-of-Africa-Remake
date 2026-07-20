@@ -52,6 +52,7 @@ import {
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
   escapeCorridorHeading,
+  guardEngagement,
   calfFleeStep,
   defendChance,
   killChance,
@@ -351,6 +352,38 @@ describe('landedBirdY / landedBirdClearance (point 128 — a landed vulture stan
         expect(landedBirdClearance(base, ground, 0)).toBeGreaterThanOrEqual(LANDED_BIRD_HOVER - 1e-9)
       }
     }
+  })
+})
+
+describe('guardEngagement (point 191 — a passing hunt is guarded only while it closes in)', () => {
+  it('engages while the lion closes on the calf inside the radius', () => {
+    let min: number | null = null
+    for (const d of [11, 9, 7, 5]) {
+      const r = guardEngagement(d, min, 12)
+      expect(r.engaged).toBe(true)
+      min = r.minSeen
+    }
+  })
+
+  it('releases once the lion has receded past the slack — the pair never follows the hunt', () => {
+    let min: number | null = null
+    // Approach to closest 5, then recede: engaged until 5 + 0.8 is exceeded.
+    for (const d of [9, 6, 5]) min = guardEngagement(d, min, 12).minSeen
+    expect(guardEngagement(5.6, min, 12).engaged).toBe(true) // within slack
+    min = guardEngagement(5.6, min, 12).minSeen
+    const receded = guardEngagement(6.2, min, 12)
+    expect(receded.engaged).toBe(false) // past minSeen + 0.8 — released
+    // And it STAYS released as the lion runs off (no re-engage on recede).
+    expect(guardEngagement(9, receded.minSeen, 12).engaged).toBe(false)
+  })
+
+  it('resets outside the radius, so the NEXT approach engages fresh', () => {
+    let min: number | null = null
+    for (const d of [9, 4]) min = guardEngagement(d, min, 12).minSeen
+    const out = guardEngagement(13, min, 12)
+    expect(out.engaged).toBe(false)
+    expect(out.minSeen).toBeNull()
+    expect(guardEngagement(10, out.minSeen, 12).engaged).toBe(true) // fresh hunt closes in
   })
 })
 

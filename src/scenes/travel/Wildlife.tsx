@@ -31,6 +31,7 @@ import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import {
   blockHeading,
+  guardEngagement,
   griefTarget,
   fleeHeading,
   flightStep,
@@ -236,6 +237,10 @@ interface Animal {
    *  until balance.vigil.seconds or until the carcass is gone; then the field
    *  clears and the parent simply rejoins the herd. */
   vigil?: { x: number; z: number; carcass: Animal; time: number }
+  /** Closest lion-to-calf approach seen by this guarding parent (point 191):
+   *  feeds guardEngagement's release-on-recede, so a PASSING hunt is guarded
+   *  only while it closes in — never leapfrog-followed to the kill. */
+  guardMinD?: number
   /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
@@ -3035,6 +3040,10 @@ function Herds() {
               pitch = -0.22 // nurse: head up toward the parent's flank
             }
             familyHeld = true
+          } else if (a.child && !a.child.dead && LION_STATE.mode !== 'chase') {
+            // No active chase: clear the guard's closest-approach memory so the
+            // NEXT hunt starts fresh (a stale low min would mute the guard).
+            if (a.guardMinD !== undefined) a.guardMinD = undefined
           } else if (a.child && !a.child.dead && LION_STATE.mode === 'chase') {
             // A parent guards its calf only against a HUNTING (chasing) lion that
             // comes near — not a lion FEEDING on other prey nearby (point 118): a
@@ -3046,7 +3055,14 @@ function Herds() {
             // GUARD_STANDOFF), whose hold-zone stops the parent re-chasing every
             // micro-move of the lion (the old per-frame retarget oscillated).
             const calf = a.child
-            if (Math.hypot(LION_STATE.lx - calf.x, LION_STATE.lz - calf.z) < GUARD_RADIUS) {
+            // Release-on-recede (point 191): the passive radius gate kept the
+            // parent stationed lion-side while the hunt merely PASSED — and the
+            // calf follows its parent, so the pair leapfrogged after the hunter
+            // to the kill. Guard only while the lion CLOSES on this calf.
+            const gd = Math.hypot(LION_STATE.lx - calf.x, LION_STATE.lz - calf.z)
+            const eng = guardEngagement(gd, a.guardMinD ?? null, GUARD_RADIUS)
+            a.guardMinD = eng.minSeen ?? undefined
+            if (eng.engaged) {
               const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, GUARD_STANDOFF)
               if (h !== null) {
                 a.x += Math.sin(h) * RESCUE_SPEED * dt

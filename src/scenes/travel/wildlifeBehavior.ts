@@ -83,6 +83,27 @@ export function blockHeading(
 }
 
 /**
+ * Guard engagement with release-on-recede (point 191). The passive gate
+ * ("chasing lion within GUARD_RADIUS of my calf") kept a parent stationed on
+ * the lion side of its calf while the hunter merely PASSED — and because the
+ * calf follows its parent, the pair leapfrogged after the hunt to the kill
+ * (the user's "foreign family chases the predator"). The guard now tracks the
+ * closest approach seen (minSeen) and RELEASES once the lion has receded
+ * `releaseSlack` past it — a passing hunter is guarded against only while it
+ * closes in. Returns the updated minSeen (null = out of radius, reset).
+ */
+export function guardEngagement(
+  d: number,
+  minSeen: number | null,
+  radius: number,
+  releaseSlack = 0.8,
+): { engaged: boolean; minSeen: number | null } {
+  if (d >= radius) return { engaged: false, minSeen: null }
+  const min = minSeen === null ? d : Math.min(minSeen, d)
+  return { engaged: d <= min + releaseSlack, minSeen: min }
+}
+
+/**
  * Target for a parent whose calf was trampled (design.md §19): it throws itself
  * before the feet of the nearest LIVING elephant and lets itself be trampled
  * too. Returns that elephant's position, or `null` when none is left — the
