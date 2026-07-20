@@ -6815,6 +6815,20 @@ the remaining open points in their numeric order.
   the deeper findings (a-e), preview + the tier wiring + default flip, and Pillars 1
   (invariant harness) and 2 (Ultracode audit) — the bulk of 184's original scope —
   remain, best as a fresh/deliberate effort.
+  PROGRESS 5 (20.07.2026, commit 50ea09d): preview (the prod-build suite) routed
+  through launchVerifyBrowser too — ALL 15 verify suites now use the shared lane
+  launcher; the webgl default is byte-identical so the normal regression is unchanged
+  (preview has no DEV __renderer, so no assertBackend — its WebGPU validation goes with
+  the tier wiring). READ-ONLY PREP for the touch finding (a): the virtual stick
+  (src/ui/TouchControls.tsx) drives movement through POINTER events — onStickDown does
+  setPointerCapture(pointerId) and records the origin, onStickMove fires setTouchStick
+  ONLY when `stickPointer.current === e.pointerId`. So the likely reason CDP touch
+  produces no movement under system-Chrome-WebGPU is a pointer-synthesis difference:
+  the touchStart/touchMove may synthesise INCONSISTENT pointerIds (so onStickMove's id
+  guard rejects the move), or setPointerCapture rejects the synthetic id, or the hit
+  test misses .touch-stick. Confirming needs LIVE instrumentation on system Chrome
+  (log the pointerId/target reaching onStickDown vs onStickMove) — not a read-only
+  deduction and not a blind poll; do it deliberately.
   DIRECTION (user 19.07.2026, "run all browser regression on WebGPU?"): make
   WebGPU the PRIMARY/default browser-regression lane — it matches what the player
   runs and catches the WebGPU-only class across the WHOLE suite, not just a special
