@@ -7496,7 +7496,17 @@ the remaining open points in their numeric order.
   model-diverse pass is welcome (a Fable lens on "does this cohere") within the
   point-200 token limits.
 
-- [ ] 206. Tree foliage renders NEAR-BLACK — found by the point-203 visual sweep
+- [x] 206. DONE 20.07.2026: the flora material now carries the brightness lift
+  the ground always had (×1.9 on the colorNode, a step below the ground's ×2.6
+  so crowns stay darker than grass) — in BOTH scenes (travel flora material +
+  the settlement flora material, which had the same gap). Before/after frames
+  show lit green crowns instead of black silhouettes in savanna, lakeside and
+  jungle; a new pixel check gates the jungle crop's green-lit fraction (>60%,
+  measured 77% after vs ~50% before). enrichments 205/0, polish 43/0,
+  build+lint+1941 vitest green. Also hardened the sweep tool: real month API
+  (debugJumpToMonth — the first pin was a silent no-op) + journal
+  do-not-disturb during capture.
+  ORIGINAL: Tree foliage renders NEAR-BLACK — found by the point-203 visual sweep
   (both backends) and confirmed a bug by the user 20.07.2026. Tree crowns read as
   near-black silhouettes even on their sunlit tops, instead of lit dark green; the
   GROUND beside them lights correctly, so it is the foliage material/shading, not

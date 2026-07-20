@@ -5028,6 +5028,45 @@ check(
   `congo swing ${congoSwing.toFixed(1)} vs savanna ${savSwing.toFixed(1)}`,
 )
 
+// Point 206 — tree crowns must read as LIT FOLIAGE, not near-black silhouettes
+// (the first find of the point-203 visual sweep, user-confirmed): the flora
+// material now carries the brightness lift the ground always had. Measured in
+// PIXELS (the point-147 standard): at the fixed jungle spot the central crop —
+// densely crowned at this zoom — must be clearly green-dominant-and-lit. Before
+// the lift the crown pixels fell under the 55-brightness bar (~50% green frac);
+// after it they clear it (~77%). Clear air (wetness override) keeps fog out of
+// the measurement; the deterministic jump/zoom keeps the frame comparable.
+{
+  await page.evaluate(() => {
+    window.__game.getState().debugJumpTo(0.4, 22.5)
+    window.__ui.getState().setTravelZoom(0.5)
+    window.__ui.getState().setSeasonWetnessOverride(0)
+    window.__game.getState().setJournalOpen(false)
+  })
+  await page.waitForTimeout(3500)
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  const litBuf = await page.screenshot()
+  const { data: litD, info: litI } = await sharp(litBuf)
+    .extract({ left: 360, top: 240, width: 720, height: 420 })
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  let litGreen = 0
+  const litPx = litI.width * litI.height
+  for (let i = 0; i < litPx; i++) {
+    const r = litD[i * litI.channels]
+    const g = litD[i * litI.channels + 1]
+    const b = litD[i * litI.channels + 2]
+    if (g > r && g >= b && Math.max(r, g, b) > 55) litGreen++
+  }
+  const litFrac = litGreen / litPx
+  check(
+    'jungle tree crowns read as lit green foliage, not near-black silhouettes (point 206, pixels)',
+    litFrac > 0.6,
+    `green-lit fraction ${(litFrac * 100).toFixed(1)}% (near-black crowns scored ~50%)`,
+  )
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+}
+
 // The dry season gathers the wildlife at the remaining water (point 120e): a
 // wider shore catchment at spawn. Same seed, same chunks — the only variable
 // is the forced season, so the drinker counts are deterministic.

@@ -842,7 +842,13 @@ function getVegetationMeshes(): VegetationMeshes {
   // on the WebGPU backend and jittered the crowns. The collapse now rides the
   // crown mesh's INSTANCE MATRIX (the stable transform path); only the colour,
   // whose per-instance re-upload race is imperceptible, still keys on the attribute.
-  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintAttrNode())
+  // Brightness lift (point 206): the GROUND multiplies its albedo by 2.6 (line
+  // ~329) but the flora never got the matching lift, and the crown greens are
+  // intrinsically dark (~6-18% luminance) — under the filmic tone mapping the
+  // trees read as NEAR-BLACK silhouettes even on their sunlit tops (the first
+  // find of the point-203 visual sweep, user-confirmed a bug). 1.9 keeps the
+  // crowns a step darker than the boosted ground so they still read as foliage.
+  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintAttrNode()).mul(1.9)
   const base = {} as Record<Species, THREE.InstancedMesh>
   const crown: Partial<Record<Species, THREE.InstancedMesh>> = {}
   const makeMesh = (geo: THREE.BufferGeometry, cap: number): THREE.InstancedMesh => {

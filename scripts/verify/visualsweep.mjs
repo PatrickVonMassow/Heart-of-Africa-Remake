@@ -43,6 +43,9 @@ await page.waitForFunction(() => window.__game && window.__ui, null, { timeout: 
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await page.evaluate(() => {
   window.__ui.getState().setWheelZoomEnabled(true)
+  // Do-not-disturb keeps discovery entries from re-opening the journal over the
+  // frames (closing per shot lost the race against mid-drive discoveries).
+  window.__ui.getState().setJournalDnd(true)
   window.__game.getState().setJournalOpen(false)
   window.__balance.randomEventsEnabled = false
 })
@@ -53,7 +56,8 @@ for (const [name, lat, lon, month] of SPOTS) {
     ([la, lo, mo]) => {
       window.__game.getState().debugJumpTo(la, lo)
       window.__ui.getState().setTravelZoom(0.5)
-      if (mo != null && window.__ui.getState().setDebugMonth) window.__ui.getState().setDebugMonth(mo)
+      // The real month API (the first sweep's setDebugMonth was a silent no-op).
+      if (mo != null) window.__game.getState().debugJumpToMonth(mo)
     },
     [lat, lon, month],
   )

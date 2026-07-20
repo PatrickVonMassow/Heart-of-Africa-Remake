@@ -1473,7 +1473,9 @@ export function PlaceScene() {
     const m = new THREE.MeshStandardNodeMaterial()
     m.vertexColors = true
     m.roughness = 0.9
-    m.colorNode = seasonTintNode(vertexColor().rgb)
+    // Same brightness lift as the travel flora (point 206): without it the
+    // settlement trees read as near-black silhouettes at eye height too.
+    m.colorNode = seasonTintNode(vertexColor().rgb).mul(1.9)
     m.positionNode = seasonFoliagePosition() // baked attribute, point 144 retry
     return m
   }, [])
