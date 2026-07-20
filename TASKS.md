@@ -6891,6 +6891,21 @@ the remaining open points in their numeric order.
   line for the new invariant suite and updates the CLAUDE 5/7.2 test architecture;
   the 172/177 disciplines. (Requested 19.07.2026 — "be significantly more
   thorough"; gates v0.2 together with 178-183.)
+  PILLAR-2 FINDING LOG (read phase complete, harvested 20.07.2026; full "why"
+  texts in the workflow journal wf_716721d3-a95). 51 deduped findings; the
+  agent-verify phase was stopped on the user's token concern — each finding is
+  verified INLINE at fix time instead. Disposition: 3 filed individually
+  (Wildlife 736 → 187 croc-under-surface; Wildlife 3454 → 194 claim-steal;
+  Wildlife 3614 → 188 leave-no-deadline, matches the user's ocean-pacing
+  report); game-code groups → 195 (radius-not-frustum spawn/despawn: Wildlife
+  3441, 3386, 1462+1465, 1084, 3432 + wildlifeBehavior 628, 282), 196
+  (bed/ground-anchor depictions: Wildlife 2806, 2751, 2282, 913), 197
+  (drama-state exclusions/gating: Wildlife 2091+2092, 3048, 2056, 2136, 1978,
+  3340), 198 (PlaceLife 764 nudge failure), 199 (canoeDrag 152 pitch-clamp
+  drift); the 26 verify-SCRIPT robustness findings (wall-clock/radius in
+  enrichments 753, 928, 946, 969, 1058, 1092, 1141, 1146, 1292, 1671+1690,
+  1973, 2375, 3027, 4071, 4102, 4182, 4544, 4611, 4756, 5335; polish 270;
+  settings 183, 277; flow 242; voice 56; touch 75) → 200.
 
 - [x] 185. Ground-scavenger vultures FLOAT ~0.5 above the carcass (double vertical
   lift). DONE 20.07.2026 (commit fa080ee): replaced the legacy target.y+0.5 group
@@ -7094,6 +7109,89 @@ the remaining open points in their numeric order.
   point-130 rescue staging no longer needs to tolerate a lion claim —
   `lionTouched` asserts clean without retries. DOCS: CLAUDE §7.1 pt.12 §19.16
   bullet already promises this; no wording change needed.
+
+- [ ] 195. RADIUS-NOT-FRUSTUM sweep over the remaining wildlife spawn/despawn
+  paths (Pillar-2 group; the points-165/171/172/183 class, finding list in the
+  184 log). Suspect sites: the calf-hunt predator spawn (Wildlife ~3441,
+  hard-coded 15-unit approach, visible the same frame — a predator can POP into
+  view next to the hunted calf), the generic-hunt placement ring (~3386,
+  25-45-unit "within view" ring), the vigil-draw predator spawn (~3432 +
+  wildlifeBehavior 628, viewR annulus with no frustum test), the flightStep
+  OUT-mode despawn (wildlifeBehavior 282, raw viewR+40 — a bird can despawn in
+  view at a wide zoom), the vicinity seeder's per-MEMBER placement (~1084, only
+  the group anchor is projected; scattered members ±6 units can land on-screen),
+  and the chunk-streaming coverage cap (~1462/1465, 100×zoom assumed radius +
+  SPAWN_RANGE_MAX — at the unlocked wide zoom animals visibly miss/despawn
+  inside the frame; flora fixed this in point 171, wildlife did not). For EACH:
+  verify inline at the achievable zoom (and the unlocked wide zoom where the
+  feature exists), fix via isOnScreen/frustum projection or an off-screen
+  iteration (the existing patterns), pure-test the changed rule, and extend the
+  I1 invariant drive if it can catch the class. One commit per coherent fix or
+  one for the sweep if small. DOCS: CLAUDE §7.1 pt.12 bullets where wording
+  changes.
+- [ ] 196. BED-VS-SURFACE / GROUND-ANCHOR sweep over the remaining water and
+  slope depictions (Pillar-2 group; the points-128/152/185/187 class, list in
+  the 184 log): the §19.8 water-drama poses measure from the carved bed, not
+  the rendered surface (Wildlife ~2806 — a drowning calf reads too deep); the
+  drink/bathe cycle renders the animal at the bank target while bodyY keeps the
+  SPAWN-spot ground height (~2751 — floating/sunken drinkers when the dry-season
+  catchment sends them far); the grass-fire scorch plane is anchored at its
+  midpoint height only (~2282 — floats/clips on sloped ground); the flamingo is
+  pinned to a fixed y=0.02 ignoring the water sheet (~913 — buried/floating on
+  elevated lakes). Verify each inline (some may be visually negligible — judge
+  by the picture), fix via waterSurfaceY/per-position ground sampling, pure-test
+  the changed anchors, re-shoot the affected screenshots. Coordinate 2806 with
+  point 122's drama tuning and 913 with point 187's croc fix (same module).
+- [ ] 197. DRAMA-STATE EXCLUSION/GATING sweep (Pillar-2 group; the seams
+  BETWEEN systems, sibling of 194 — list in the 184 log): the crocodile victim
+  scan derives its trigger from the drink-cycle CLOCK and the static drink
+  TARGET, never the victim's actual position (~2091/2092 — it can lunge at an
+  animal that wandered off); the flee/dodge/guard steps move raw with no
+  water/terrain deflection (~3048 — coordinate with point 192's water-flee
+  design, the 157 deflect pattern); the river/lake water backstop does not
+  exempt a CAUGHT animal (~2056 — it can teleport a croc-gripped victim out of
+  the grip: the point-186 vanish class from the other side); the croc seize
+  does not clear v.vigil (~2136 — a seized vigil keeper keeps both states); the
+  collision inDrama predicate exempts a parent whose child is caught/mired but
+  NOT one whose child is inWater (~1978, asymmetry with the backstop); the
+  grass fire and the hunt can claim the same calf concurrently (~3340, the 194
+  claim-seam pattern). Verify each inline, fix with the mutual-exclusion
+  pattern 194 establishes, pure-test every exclusion, keep the §19.8
+  every-drama-resolves invariant. One commit per coherent fix.
+- [ ] 198. A pinned settlement walker can stay pinned FOREVER when no free spot
+  exists near its errand point: nudgeToFree returns the ORIGINAL point when its
+  12-ring search finds nothing (collision.ts ~200) and the PlaceLife caller
+  resets `s.pinned = 0` unconditionally (~764) — the point-155 "teleport-nudged
+  to free ground" promise silently no-ops and the unstuck window never fires
+  again (Pillar-2 finding, list in the 184 log). FIX: only reset the pinned
+  counter when the nudge actually MOVED the walker (or found a validated free
+  spot); when the search fails, escalate — widen the search once, else retire
+  the errand and pick a new target (the existing errand validation path).
+  VERIFY: pure test for the nudge-failure branch (unchanged point → counter not
+  reset → escalation fires); the collision suite's no-pinned-walker check stays
+  green across seeds. DOCS: none (the point-155 wording already promises it).
+- [ ] 199. The dragged canoe's centre slides when the pitch clamp binds
+  (canoeDrag.ts ~152, Pillar-2 finding): centreY keeps tracking the raw far-end
+  ground height while the pitch is clamped, so on a steep trail the
+  reconstructed near end drifts off the grip line. Verify inline whether the
+  drift is visible in play (steep slopes only); if yes, recompute centreY FROM
+  the clamped pitch (near end pinned to the grip, centre derived), pure-test in
+  canoeDrag.test.ts alongside the existing pose matrix; if visually negligible
+  at real slopes, log as rejected with the measured bound. DOCS: none.
+- [ ] 200. VERIFY-SCRIPT ROBUSTNESS pass — fix the 26 wall-clock/radius
+  findings in the test scripts (Pillar-2 group E; exact list in the 184 log:
+  20 in enrichments, plus polish 270, settings 183/277, flow 242, voice 56,
+  touch 75). Two patterns, both established: (1) render-loop behaviours polled
+  on the SIM clock (__pollSim/__sleepSim/simTime) or on the check's OWN
+  condition — never a fixed wall wait (the point-177 class; the elephant-roam
+  and lion-feed flakes were exactly this); (2) "in view / beyond the ring"
+  judged by __camera.onScreen/ndc projection — never an assumed radius (the
+  point-172 class), with checks that TEST a radius-feature keeping the radius
+  but saying so. Work file-by-file, run each touched suite after its change
+  (both backends for the WebGPU-lane suites; touch/voice webgl-only), and
+  fold the result into the final-closing 3× flake-free gate — this point IS
+  the systematic version of the one-off de-flakes done so far (some findings
+  may already be partly fixed, e.g. settings 277: verify against HEAD first).
 
 ## Closing (only after all points)
 
