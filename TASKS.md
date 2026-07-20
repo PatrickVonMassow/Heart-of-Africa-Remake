@@ -6363,8 +6363,19 @@ the remaining open points in their numeric order.
   the spawn-beyond-frustum rule. Docs: design.md §19.6, CLAUDE §7.1 pt.12.
   (Reported while play-testing 19.07.2026; queued at the batch end.)
 
-- [ ] 179. A lion runs THROUGH a calf and its shielding parent without catching
-  or eating either. User report (19.07.2026, playing on WebGPU): "Eben ist ein
+- [x] 179. A lion runs THROUGH a calf and its shielding parent without catching
+  or eating either. DONE 20.07.2026: the calf-catch and the shield-take were
+  per-frame POINT checks against the pre-move distance, so a big clamped-dt step
+  or a tangential pass carried the lion through the target (audit-confirmed root
+  cause). New pure segPointDist (point-to-segment distance); the calf-catch tests
+  the lion's in-loop move segment vs the prey, and the shield-take tests a segment
+  reconstructed from the lion's heading + speed + dt vs the interposing parent
+  (reconstructed, not a stored prev-position, which a directly-staged hunt left
+  stale and fired the take a frame too early before the calf could flee — caught
+  by the live shield checks and fixed). Pure-tested incl. the tunnelling case;
+  build + lint + 1937 vitest + enrichments 200/0. OPEN (minor): the player->predator
+  contact (§19.3) is a non-swept radius-2 point check that tunnels only at the F3
+  debug travel speed 25, not the achievable 5.6 — a debug-only follow-up. User report (19.07.2026, playing on WebGPU): "Eben ist ein
   Löwe auf ein Junges zugerannt, ein erwachsenes Tier ist dazwischen gelaufen —
   vermutlich der Elter, der sein Junges beschützt. Der Löwe ist dann aber einfach
   sowohl durch den Elter als auch durch das Junge hindurchgelaufen — niemand wurde
