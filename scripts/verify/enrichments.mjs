@@ -4300,6 +4300,68 @@ check(
   JSON.stringify(scavSlope),
 )
 
+// Point 185: on FLAT ground the flock must sit ON the carcass — only the shared
+// landedBirdY hover (~0.15) plus the feeding hop, NOT the old +0.5 group pre-lift
+// that DOUBLED the lift and floated the birds ~0.5 above the meal. The steep-slope
+// check above cannot catch it: an uphill bird's positive-only lift saturates the
+// +0.5, so both the buggy and fixed clearances read ~0.15 there. On the flat the
+// double-lift shows as ~0.65 vs the fixed ~0.15, so an UPPER bound catches it.
+const scavFlat = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const p0 = window.__game.getState().pos
+  const U = 10
+  // The FLATTEST walkable savanna spot near the player (min height swing across
+  // the birds' scatter radius), so the clearance reflects only the hover.
+  let best = null
+  for (let dx = -30; dx <= 30; dx += 3) {
+    for (let dz = -30; dz <= 30; dz += 3) {
+      const lat = -(p0.z + dz) / U
+      const lon = (p0.x + dx) / U
+      if (window.__terrainType(lat, lon, seed) !== 'savanna') continue
+      const h0 = window.__terrainHeight(lat, lon, seed)
+      let swing = 0
+      for (const [ox, oz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2], [2.4, 0], [-2.4, 0], [0, 2.4], [0, -2.4]]) {
+        const h1 = window.__terrainHeight(-(p0.z + dz + oz) / U, (p0.x + dx + ox) / U, seed)
+        swing = Math.max(swing, Math.abs(h1 - h0))
+      }
+      if (!best || swing < best.swing) best = { x: p0.x + dx, z: p0.z + dz, swing, h0 }
+    }
+  }
+  if (!best) return { found: false }
+  const carcass = {
+    x: best.x, z: best.z, y: Math.max(0.02, best.h0), rot: 0, scale: 1, phase: 0.2,
+    chunk: undefined, dead: true,
+  }
+  herds.zebra.push(carcass)
+  const sc = window.__wildlife.scavenger.current
+  const out = { found: true, swing: +best.swing.toFixed(3), landed: false, minClear: Infinity, maxClear: 0 }
+  const landed = await window.__pollSim(40, () => sc.target === carcass && sc.landed)
+  if (landed) {
+    out.landed = true
+    await window.__pollSim(3, () => {
+      const c = window.__vultures?.clearance?.current
+      if (typeof c === 'number' && Number.isFinite(c)) {
+        out.minClear = Math.min(out.minClear, c)
+        out.maxClear = Math.max(out.maxClear, c)
+      }
+      return false
+    })
+  }
+  herds.zebra = herds.zebra.filter((a) => a !== carcass)
+  if (sc.target === carcass) { sc.target = null; sc.landed = false }
+  out.minClear = Number.isFinite(out.minClear) ? +out.minClear.toFixed(3) : null
+  out.maxClear = +out.maxClear.toFixed(3)
+  return out
+})
+check(
+  'the lone scavenger sits ON the carcass on flat ground, not floating ~0.5 above it (point 185)',
+  // hover 0.15 + hop <=0.1 + margin; the old double-lift read ~0.65, well above.
+  scavFlat.found && scavFlat.landed && scavFlat.minClear !== null &&
+    scavFlat.minClear > 0 && scavFlat.maxClear <= 0.35,
+  JSON.stringify(scavFlat),
+)
+
 const noRemnant = await page.evaluate(async () => {
   const herds = window.__wildlife.herdsRef.current
   const L = window.__lionHunt.state

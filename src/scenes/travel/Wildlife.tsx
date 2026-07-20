@@ -1056,9 +1056,12 @@ function seedSettlementVicinity(
     if (!species) continue
     // Deterministic offset candidates inside the ring, past the clearance — a
     // coastal port may face water on some bearings. Pick one OUTSIDE the frame
-    // (point 165) so the seeded group never pops into view; the vicinity radius
-    // reaches past the frame at the default zoom, so an off-screen land spot
-    // almost always exists (on-screen land is the fallback).
+    // (points 165/183) so the seeded group never pops into view; the vicinity
+    // radius reaches past the frame at the default zoom, so an off-screen land
+    // spot almost always exists. When none does (near water, all off-screen
+    // candidates are river/lake), DEFER — the null below skips this settlement
+    // this frame and the moving camera exposes off-screen land next frame —
+    // rather than popping a herd into view (point 183, the user's Nile report).
     const candidates: Array<readonly [number, number]> = []
     for (let k = 0; k < 14; k++) {
       const dir = rand() * Math.PI * 2
@@ -2588,10 +2591,13 @@ function Herds() {
           if (sc.landed && target) {
             sc.x = target.x
             sc.z = target.z
-            // Stand clear of the ground: the pecking head tilts well below the
-            // group origin, so keep the group high enough that it never clips
-            // into the terrain (design.md §19).
-            sc.y = target.y + 0.5
+            // Group origin ON the carcass ground (point 185) — exactly the kill
+            // flock's killGroundY. The shared landedBirdY rule below lifts each
+            // bird to its OWN sampled ground and adds LANDED_BIRD_HOVER to clear
+            // the pecking body; the old +0.5 group pre-lift DOUBLED that clearance
+            // and floated the flock ~0.5 above the carcass it feeds on.
+            const scll = worldToLatLon(sc.x, sc.z)
+            sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
             if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
             target.dissolve -= dt
           } else if (target && sc.mode === 'in') {
