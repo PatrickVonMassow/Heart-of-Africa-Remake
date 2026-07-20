@@ -7435,6 +7435,31 @@ the remaining open points in their numeric order.
   atomic point/commit. Docs: CLAUDE §7.2 gains the anchoring + liveness invariant
   suites; this is the pillar the harness was missing.
 
+- [ ] 204. Make WebGPU coverage UNIVERSAL where it is possible (user request
+  20.07.2026, from the sweep-on-WebGL2 gap: "Analysiere alle Tests daraufhin,
+  dass — wo immer möglich — auch WebGPU abgedeckt ist"). ANALYSIS (done
+  20.07.2026): the Vitest layer (1941) is jsdom / pure logic → backend-agnostic,
+  correct as is. Of the browser suites, the pure-DATA ones (docs, world, i18n,
+  and dev-hook-only checks) read files/state, not pixels → WebGPU adds little.
+  The RENDER/PIXEL suites are where WebGPU-specific bugs hide (175 crown jitter,
+  181 float): enrichments has 49 pixel/screenshot assertions, polish 19,
+  settings 14, plus health/handwriting/collision/flow/events/gamepad — these
+  MUST be covered on real WebGPU. They already CAN (backend-selectable via
+  _browser.mjs), but two GAPS: (i) only 6 suites call `assertBackend`, so the
+  rest could SILENTLY fall back to WebGL2 under VERIFY_GL=webgpu without the
+  guardrail noticing — add assertBackend to EVERY render-dependent suite; (ii)
+  the WebGPU pass is run by hand, not standard — wire the closing/LARGE to run
+  the render suites on BOTH backends (touch/voice stay WebGL2-only, the one
+  genuine headless exception, already handled by the tier skip). FIX: (a)
+  assertBackend in every render suite (a one-line guard each, right after the
+  renderer wait); (b) the run-all LARGE tier invokes the render suites on webgl
+  AND webgpu (extend the point-184 tier wiring); (c) resolve the two open WebGPU
+  reds (collision 19/20 "d", polish 42/43 "e") so the webgpu pass is actually
+  green; (d) the point-203 finder runs on both backends. VERIFY: a webgpu LARGE
+  pass is green (modulo the documented touch/voice skip) and assertBackend
+  throws if a suite silently falls back. DOCS: CLAUDE §7.2 + scripts/verify/
+  README (the backend coverage policy).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
