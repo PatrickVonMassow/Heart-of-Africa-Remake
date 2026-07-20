@@ -363,6 +363,7 @@ export const en: Strings = {
     rescueBurst: 'Parent rescue burst (factor)',
     calfFraction: 'Juvenile fraction per herd',
     crocStrikeRadius: 'Crocodile: bank strike radius',
+    crocGripSeconds: 'Crocodile: grip deadline (s)',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

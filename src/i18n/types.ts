@@ -283,6 +283,7 @@ export interface Strings {
     rescueBurst: string
     calfFraction: string
     crocStrikeRadius: string
+    crocGripSeconds: string
     seasonStrength: string
     season: string
     seasonAuto: string

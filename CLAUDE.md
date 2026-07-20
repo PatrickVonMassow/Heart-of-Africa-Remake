@@ -780,9 +780,15 @@ verify suite that proves it.
       touching the scripted lion hunt), a kill sinks (the river keeps the
       body — no bank carcass, no vulture), the strike radius is
       debug-editable, and walking into one routes through the unchanged
-      §14.2 event. Live checks and screenshots pending in
-      `scripts/verify/enrichments.mjs` (hidden -> lunge -> catch, the
-      three family endings, lion-hunt independence).
+      §14.2 event. The gripped lunge carries a HARD RELEASE DEADLINE
+      (`balance.crocodile.gripSeconds`, debug-editable, above the ~5 s
+      struggle window) so a victim that VANISHES mid-grip (streamed out,
+      taken by another system) never pins the crocodile — the §19.8
+      "every started drama resolves" rule / invariant I4 (point 186,
+      pure-tested via `crocodileGripExpired`). Live in
+      `scripts/verify/enrichments.mjs`: hidden -> lunge -> catch, the
+      three family endings, the vanish -> deadline release, and lion-hunt
+      independence, with screenshots 129/130.
     OPEN: tree-climbing-to-flee remains to be implemented (§9 open item);
     and the one seasonal-dress reading the research allows but the
     figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather

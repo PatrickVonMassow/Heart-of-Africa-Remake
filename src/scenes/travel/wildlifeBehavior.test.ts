@@ -36,6 +36,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileGripExpired,
   grassFireEligible,
   ploverShouldLure,
   ploverLureHeading,
@@ -292,6 +293,15 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
     expect(crocodileLungeReady(5, true, 5)).toBe(true) // boundary inclusive
     expect(crocodileLungeReady(5.01, true, 5)).toBe(false)
     expect(crocodileLungeReady(2, false, 5)).toBe(false) // nobody at the bank — it waits
+  })
+
+  it('the gripped lunge expires after gripSeconds so a vanished victim never pins it (point 186)', () => {
+    expect(crocodileGripExpired(4, 8)).toBe(false) // mid-grip, well within the window
+    expect(crocodileGripExpired(8, 8)).toBe(false) // boundary: not yet expired
+    expect(crocodileGripExpired(8.01, 8)).toBe(true) // past the window — release the crocodile
+    // Above the ~5 s caught window, so a normal kill (which ends via the victim's
+    // caught-countdown) is never cut short by the deadline.
+    expect(crocodileGripExpired(5, 8)).toBe(false)
   })
 
   it('nothing ever kills a crocodile: killChance is structurally zero for every prey (like the lion)', () => {

@@ -639,6 +639,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - Hidden, it lies submerged with only the eye knobs and snout tip above the surface — nearly invisible, and never mistakable for a floating carcass. It waits; it does not roam.
 - The ambush: an animal that comes to the bank to drink (the §19.7 shore visit) inside the calibratable strike radius triggers the lunge — a fast, short, VISIBLE burst out of the water, never a teleport. A missed lunge slinks back under and the wait resumes.
 - The drama reuses §19.8's grammar without a second copy: the seized victim struggles through the SAME few-seconds window at the waterline, a charging parent that arrives in time is taken in its place (the calf escapes), one that only got close is taken alongside it, and the parent's attack rolls the same legible defence — a strong parent can drive the crocodile off its victim, but NOTHING kills the armoured ambusher (structurally, like the lion). A crocodile kill leaves no carcass on the bank: it drags the body under, and the river keeps it — no vulture ever lands for it.
+- The seizure ALWAYS resolves (the §19.8 rule): the grip carries a hard release deadline beyond the victim's struggle window, so a victim that vanishes mid-grip — streamed out of view, or taken by another system — can never pin the crocodile; it lets go and submerges.
 - The traveller who walks into a crocodile is attacked through the §14.2 event rules unchanged: the machete always protects, the rifle only from the canoe.
 
 ### 19.9 Climate and landscape dressing

@@ -68,6 +68,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileGripExpired,
   grassFireEligible,
   ploverShouldLure,
   ploverLureHeading,
@@ -2127,17 +2128,28 @@ function Herds() {
             v.caught = CAUGHT_DURATION
             v.caughtBy = 'crocodile'
             c.lunge.gripped = true
+            c.lunge.timer = 0 // restart the clock for the grip's hard deadline (point 186)
           } else {
             c.x += (dx / d) * bc.lungeSpeed * dt
             c.z += (dz / d) * bc.lungeSpeed * dt
             c.rot = Math.atan2(dx, dz)
           }
         } else {
-          // Gripping: hold at the struggling victim while the window runs.
-          const v = c.lunge.victim
-          if (v.caught !== undefined) {
-            c.x = v.x - Math.sin(c.rot) * 0.6
-            c.z = v.z - Math.cos(c.rot) * 0.6
+          // Gripping: hold at the struggling victim while the window runs. A hard
+          // deadline (point 186) releases the crocodile once the grip outlasts
+          // gripSeconds: a victim that VANISHES mid-grip (streamed out in a chunk
+          // despawn, taken by another system) freezes its caught-countdown, and
+          // without this cap the crocodile would stay gripped forever — violating
+          // the §19.8 "every started drama resolves" rule (invariant I4).
+          c.lunge.timer += dt
+          if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
+            c.lunge.retreat = true
+          } else {
+            const v = c.lunge.victim
+            if (v.caught !== undefined) {
+              c.x = v.x - Math.sin(c.rot) * 0.6
+              c.z = v.z - Math.cos(c.rot) * 0.6
+            }
           }
         }
       }

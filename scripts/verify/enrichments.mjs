@@ -3654,7 +3654,17 @@ const crocDrama = async (mode, attempt = 0) =>
       return false
     })
     if (!out.gripped) out.diag = { drink: !!calf.drink, dist: +Math.hypot(calf.x - bankX, calf.z - bankZ).toFixed(1), crocLunge: croc.lunge !== undefined }
-    if (out.gripped && MODE.kind !== 'lunge') {
+    if (out.gripped && MODE.kind === 'vanish') {
+      // Point 186: the gripped victim VANISHES mid-grip — spliced from the herds
+      // WITHOUT its gone flag (a chunk despawn or another system can remove it so),
+      // which freezes its caught-countdown. Only the grip's HARD DEADLINE can release
+      // the crocodile now; without it the §19.8 drama would never resolve (I4).
+      herds.zebra = herds.zebra.filter((a) => a !== calf && a !== parent)
+      const grip0 = window.__wildlife.simTime()
+      await window.__pollSim(window.__balance.crocodile.gripSeconds + 4, () =>
+        croc.lunge === undefined || croc.lunge.retreat === true)
+      out.releaseSim = +(window.__wildlife.simTime() - grip0).toFixed(1)
+    } else if (out.gripped && MODE.kind !== 'lunge') {
       // Park on the LAND side of the bank (the unit vector water -> bank):
       // a parent parked across the channel got relocated by the water sweep
       // mid-charge and arrived too late in every scenario.
@@ -3723,6 +3733,12 @@ check(
   'too late at the bank: the crocodile takes calf and parent both (point 130)',
   crocLate.staged && crocLate.gripped && !crocLate.calfAlive && !crocLate.parentAlive && !crocLate.lionTouched,
   JSON.stringify(crocLate),
+)
+const crocVanish = await crocDrama('vanish')
+check(
+  'a crocodile whose gripped victim vanishes releases on the hard deadline, never pinned forever (point 186)',
+  crocVanish.staged && crocVanish.gripped && crocVanish.crocRetreated,
+  JSON.stringify(crocVanish),
 )
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)

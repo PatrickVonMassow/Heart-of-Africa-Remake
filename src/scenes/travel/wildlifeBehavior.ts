@@ -504,6 +504,18 @@ export function crocodileLungeReady(distToPrey: number, preyAtBank: boolean, str
   return preyAtBank && distToPrey <= strikeRadius
 }
 
+/**
+ * The gripped lunge's hard deadline (point 186): the grip normally ends when the
+ * victim's caught-countdown runs out, but a victim REMOVED mid-grip (streamed out
+ * in a chunk despawn, taken by another system) freezes that countdown and would pin
+ * the crocodile forever. So the grip also expires after gripSeconds of held time,
+ * releasing the crocodile no matter what — the §19.8 "every started drama resolves"
+ * rule (invariant I4). Pure over the accumulated grip time so it is unit-testable.
+ */
+export function crocodileGripExpired(gripHeldSeconds: number, gripSeconds: number): boolean {
+  return gripHeldSeconds > gripSeconds
+}
+
 /** A landed vulture's hover above its own ground (point 128): clears the
  *  body sphere's ~0.096 reach below the group origin (buildVulture,
  *  src/render/fauna.ts) with margin, so the pecking body never clips. */

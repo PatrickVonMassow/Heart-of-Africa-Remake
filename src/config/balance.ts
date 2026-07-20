@@ -294,6 +294,13 @@ export interface BalanceConfig {
     strikeRadius: number
     /** Speed of the lunge burst (units/s) — visible motion, never a teleport. */
     lungeSpeed: number
+    /** Hard cap on the gripped hold (s, point 186): the grip normally ends with the
+     *  victim's caught-countdown, but a victim that VANISHES mid-grip (streamed out
+     *  in a chunk despawn, taken by another system) would freeze it forever, so the
+     *  crocodile releases and submerges after this window no matter what — the §19.8
+     *  "every started drama resolves" rule. Above the ~5 s caught window so a normal
+     *  kill is never cut short. */
+    gripSeconds: number
   }
   /** Family rescue drives (design.md §19.8, point 127). */
   family: {
@@ -551,6 +558,7 @@ export const balance: BalanceConfig = {
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
+    gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)

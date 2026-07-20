@@ -6794,9 +6794,17 @@ the remaining open points in their numeric order.
   ground check that the body sits ON the carcass (foot-anchored). Docs: CLAUDE §7.1
   pt.12. (184 audit finding; this is the point-181/128 class the play-test also hit.)
 
-- [ ] 186. The crocodile 'gripped' lunge has NO hard deadline — a streamed-out or
+- [x] 186. The crocodile 'gripped' lunge has NO hard deadline — a streamed-out or
   vanished victim can pin the crocodile forever (a drama that never resolves).
-  Found by the point-184 calibration audit (plausible, 19.07.2026). Unlike the
+  DONE 20.07.2026: added balance.crocodile.gripSeconds (8, > the ~5 s caught window,
+  debug-editable) and a pure crocodileGripExpired; the grip now resets its timer at
+  grip start and, in the hold state, releases the crocodile (retreat) once the timer
+  passes gripSeconds — so a victim spliced out mid-grip (its caught-countdown frozen)
+  can never pin it. Pure-tested (crocodileGripExpired) + a live enrichments 'vanish'
+  scenario (grip, splice the victim WITHOUT gone, assert the croc retreats within the
+  deadline). Verified: build + lint + 1938 vitest + enrichments 202/0. Docs updated
+  (design.md §19.16, CLAUDE §7.1 pt.12). Found by the point-184 calibration audit.
+  Original finding (plausible, 19.07.2026): Unlike the
   other §19.8 dramas (each with a deadline — TRAMPLE_GRIEF_SECONDS, vigil.seconds,
   drown/mireSeconds, the lunge timer>4 pre-grip), the crocodile's POST-grip state
   resolves only via the victim's caught-countdown; if the victim is removed

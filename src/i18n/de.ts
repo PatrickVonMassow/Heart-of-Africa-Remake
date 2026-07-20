@@ -362,6 +362,7 @@ export const de: Strings = {
     rescueBurst: 'Rettungs-Sprint der Elterntiere (Faktor)',
     calfFraction: 'Jungtier-Anteil je Herde',
     crocStrikeRadius: 'Krokodil: Angriffsradius am Ufer',
+    crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',
