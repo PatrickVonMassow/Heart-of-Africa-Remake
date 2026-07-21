@@ -8110,7 +8110,7 @@ the remaining open points in their numeric order.
   anchoring tripwire (which caught this) is the live regression guard for the
   class, per its design. Found by the 203/207i finder.
 
-- [ ] 213. CROSS-BROWSER FUNCTIONAL SMOKE (user request 21.07.2026). The
+- [x] 213. CROSS-BROWSER FUNCTIONAL SMOKE (user request 21.07.2026). The
   regression runs on Chromium (Playwright-Chromium for WebGL2 + system Chrome for
   the WebGPU lane) — that covers all Chromium browsers (Chrome/Edge/Brave) but
   NOT Firefox (Gecko) or Safari (WebKit). A SHORT functional smoke on those two
@@ -8128,6 +8128,17 @@ the remaining open points in their numeric order.
   runner without them never breaks. REMAINING: run it green on both engines and
   fix any Gecko/WebKit-only issue found; the maximale-qs.md pass runs it at
   `thorough`. DOCS: scripts/verify/README.md + maximale-qs.md note the tiered smoke.
+  DONE (21.07.2026): green at standard depth on Firefox + WebKit desktop AND
+  mobile (WebKit≈iOS + Chromium≈Android touch-layer arming + mobile preset,
+  points 84/30). The smoke immediately earned its keep — it caught three real
+  issues: a smoke bug (the move check ran in the port 'place' mode; fixed
+  95d02a2) and TWO genuine WebKit/Safari robustness bugs that would hit iOS
+  users, both fixed in d6692ed: createImageBitmap(Blob, options) is rejected by
+  WebKit (the DEM/terrain never loaded on Safari) — now falls back to an <img>
+  decode; and a geodata load cancelled mid-fetch leaked an unhandled "Load
+  failed" rejection out of boot() — now caught. Wired: minimal on the SMALL
+  gate, standard on LARGE/default, thorough via CROSSBROWSER_DEPTH in
+  maximale-qs; graceful skip when the engines are absent.
 
 ## Closing (only after all points)
 
