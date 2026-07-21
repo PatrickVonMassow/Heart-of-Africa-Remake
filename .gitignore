@@ -32,5 +32,5 @@ scripts/.tile-cache
 # Batch coordination state (scripts/batch-lock.mjs): runtime lock + pause marker
 .claude/batch-lock.json
 .claude/batch-paused
-.claude/batch-dashboard.html
+.batch-dashboard.html
 .claude/dashboard-state.json
