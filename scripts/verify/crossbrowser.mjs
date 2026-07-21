@@ -88,6 +88,11 @@ for (const [label, engine] of [['firefox', firefox], ['webkit', webkit]]) {
       check(label, 'a sized WebGL canvas is on screen', !!canvas && canvas.w > 100 && canvas.h > 100, JSON.stringify(canvas))
       const moved = await page.evaluate(async () => {
         const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+        // The game boots inside the starting port (mode 'place'), where
+        // moveTravel is a no-op — jump to open land first so the bird's-eye
+        // move actually exercises the travel path (open Serengeti).
+        window.__game.getState().debugJumpTo(-2.5, 34.8)
+        await sleep(200)
         const p0 = { ...window.__game.getState().pos }
         for (let i = 0; i < 10; i++) {
           window.__game.getState().moveTravel(1, 0, 0.05)
