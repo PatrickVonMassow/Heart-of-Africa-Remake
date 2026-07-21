@@ -26,6 +26,21 @@
           {
             "type": "command",
             "command": "node scripts/dashboard-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/prep-guard.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/prep-arm-hook.mjs"
           }
         ]
       }
