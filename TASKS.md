@@ -7694,6 +7694,82 @@ the remaining open points in their numeric order.
   BUILD ORDER: (i) then (ii) first (highest leverage), the rest layer in over the
   finder. These join 203/204/205 as the pre-tag quality framework.
 
+- [ ] 208. WORLD-COHERENCE FIXES from the point-205 plausibility audit (user
+  21.07.2026: fix A2, A3, A4, A5, A7, B3; A1/A6/B1/B2/B4/B5/B6 are accepted as-is
+  for now — the current state is debug-only and the hint/treasure/reputation
+  design is still to be done). PRIORITY: the NEXT queue item, right after point
+  195 and before 197. Correct at own discretion; one atomic commit per coherent
+  fix (or one for the group if small). Each fix updates design.md/CLAUDE.md where
+  it touches design content and adds/updates tests.
+  A2 — AMBIENT WILDLIFE MATCHES THE REGION POOLS. The chunk spawner
+  (`spawnChunk`, Wildlife.tsx ~739) places giraffe/zebra/wildebeest herds on ANY
+  savanna cell with NO region check, while the hunt/vicinity/food-web rules
+  region-gate the same species (`REGION_PREY`, `regionPreyAt`) — so a giraffe is
+  at once "typical scenery" in the North/West and "region-foreign" to every other
+  rule. FIX: gate the ambient savanna-herd species pick by the cell's region
+  (`regionAt`) against `REGION_PREY` (or a region-typical ambient pool), so the
+  visible herds match the researched pools. Also REMOVE zebra from
+  `REGION_PREY.west` and `.central` (wildlifeBehavior.ts ~1076 — no zebra in West
+  Africa/the Congo basin in 1890; keep each region's prey non-empty with the
+  species that DO occur) and correct the now-false comment at wildlifeBehavior.ts
+  ~1070. TEST: a pure test that every ambient-spawn species for a region is in
+  that region's pool; the world/enrichments herd checks stay green.
+  A3 — EVENT PREDATORS MATCH THE RENDERED ROSTER. `eventChance` gates
+  cheetah/hyena attacks by TERRAIN ("savanna", events.ts ~80/87) while
+  `REGION_PREDATORS` bars them from West/Central — so the journal can report a
+  hyena attack where the world has no hyenas. FIX: gate the predator-attack
+  events by the region's `REGION_PREDATORS` roster (thread the region/coords into
+  `eventChance` or filter the predator pick), so only a predator that actually
+  roams the region can attack there. (Accuracy note: real spotted hyenas were
+  common across the 1890 West/Sahel; EXPANDING the wildlife roster to match is a
+  larger ecology change left as a design item — this fix removes the CONTRADICTION
+  by making events follow the rendered world.) TEST: events.test.ts asserts no
+  region-foreign predator event fires; the existing event tests stay green.
+  A4 — SALT WATER IS NOT FRESH WATER. `tickHealth` `canDrink` includes terrain
+  'ocean' (store.ts ~1051), so swimming the coastal sea refills the canteen and
+  cures desert thirst — sanctioned by design.md §6.1 ("swimmable sea") but
+  factually wrong and it trivialises the desert-water mechanic near any coast.
+  FIX: remove 'ocean' from `canDrink` (only river/lake fresh water refills/cures);
+  swimming stays allowed, it just no longer quenches. DOCS: design.md §6.1 drop
+  "swimmable sea" from the fresh-water list. TEST: store.health.test.ts — drinking
+  at the sea no longer refills; a fresh-water refill still works.
+  A5 — PROTECTION RULES MATCH THE DESIGN TEXT. (a) SNAKES: design.md §14.1 lumps
+  snakes into "a rifle or machete lowers the risk" but `eventChance('snakeBite')`
+  applies no `weaponProtection`. Resolve by ALIGNING design.md §14.1 — a snakebite
+  is not weapon-mitigated (realistic) — rather than adding fake protection. (b)
+  CROCODILE: design.md §11.3/§14.2 says "the machete ALWAYS helps against
+  crocodiles" but in the canoe the machete changes nothing about the attack CHANCE
+  (events.ts ~98: `hasCanoe ? 0.4 : hasMachete ? 0.6 : 1`). FIX so the machete
+  ALWAYS lowers the croc attack chance (machete-in-canoe strictly below canoe
+  alone), matching "always helps", while the rifle stays canoe-only per §14.2.
+  TEST: events.test.ts pins the snake (no weapon effect) and the croc chance
+  ordering (machete-in-canoe < canoe-alone < unarmed). DOCS: design.md §14.1/§14.2.
+  A7 — A ROBBERY NEVER SILENTLY ORPHANS THE GOAL. Only the North (latitude) and
+  East (longitude) chiefs carry the tomb coordinates (`hintRaw`); `robVillage`
+  permanently blocks all gifts/talks in the region (`regionRobbed`), so robbing
+  North or East BEFORE learning its coordinate leaves blind digging as the only
+  path — and the confirmation warns only generically. FIX (bounded, no
+  hint-system redesign — that is deferred to the user's design pass): make the
+  robbery confirmation REGION-AWARE — when the region still holds a tomb
+  coordinate the player has not yet learned, the confirmation explicitly warns
+  that this act may put the goal out of reach (localized, both languages). TEST:
+  store.reputation.test.ts / a UI test asserts the load-bearing warning appears
+  for an un-learned coordinate region and not otherwise. DOCS: design.md §12 if
+  wording changes.
+  B3 — RECORD THE HOMAGE LAYER AS A DELIBERATE CARVE-OUT. The value matrix (ivory
+  revered West / neutral East / rejected South), the $ currency, Khartoum as a
+  welcoming 1890 port (the Mahdiyya held it 1885–98), and the §13.2 glossary are
+  inherited from the 1985 original and fixed by design.md, but — unlike
+  climate/peoples/dress/communication — are not marked as accuracy carve-outs.
+  FIX (DOCUMENTATION ONLY, no code): add an explicit note in design.md (near
+  §8/§14 and §13) that these are deliberate homage carve-outs from the original
+  game, held despite the ~1890 accuracy standard, exactly like the §19.8 grief and
+  §19.13 exaggeration carve-outs — "so nobody later 'corrects' them" (§13.2's
+  glossary is doubly a placeholder under the §13.4 redesign).
+  ACCEPTANCE: build+lint+audit clean, unit + affected browser suites green; the
+  six fixes verifiable per their tests; design.md/CLAUDE.md updated where noted;
+  no regression in the wildlife/event/health/reputation suites.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
