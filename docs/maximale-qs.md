@@ -11,27 +11,60 @@ at most a *single* background subagent for model-diverse audit (Fable vs. the
 author) whose findings are always harvested and verified inline. See the memory
 `workflows-token-budget`.
 
-Run the phases in order. Each real finding becomes its own atomic TASKS point +
-commit (append at the end of the queue, per `new-tasks-append-and-defer`). Fix
-everything found, then the closing (Phase 8) must pass clean before a tag.
+Run the phases **in the order below**. Each real finding becomes its own atomic
+TASKS point + commit (append at the end of the queue, per
+`new-tasks-append-and-defer`). Fix everything found; the final closing (Phase 8)
+must pass clean before any tag.
+
+## Why this order
+
+- **Coherence first (Phase 1), because it can REBUILD the game.** The
+  world/functionality audit produces design changes and objective fixes; running
+  the expensive detection (bug-finder, visual sweep, fuzzing, soak) before the
+  rebuild would test a state that is about to change, and the golden-image
+  baseline would be baked stale. So the coherence pass — and the fixes it agrees
+  with the user — come first, and *every other phase then tests the rebuilt
+  state* (user decision 21.07.2026).
+- **Baseline next (Phase 2):** cheaply confirm the rebuild left the tree green
+  before investing in deep detection.
+- **Invariants armed early (Phase 3):** they are a force multiplier — once armed,
+  every later automated phase AND every manual play session becomes a detector,
+  so arm/extend them before the heavy detection phases.
+- **WebGPU infrastructure before the sweeps (Phase 4):** some bugs are
+  WebGPU-only (crown jitter, silhouette float), so the two-backend wiring must be
+  in place before the visual sweep and the closing, or those phases silently miss
+  a whole class.
+- **Code audit before the finder (Phase 5):** a fresh-model read of the rebuilt
+  code surfaces bugs the automated finder is not shaped to catch; fixing them
+  first means the finder and sweep validate a cleaner state.
+- **Finder, then the extra methods (Phases 6–7):** the finder is the primary net;
+  the golden-image baseline (7 ii) can only be baked once the game is
+  coherence- and finder-stable, so the differential/fuzz/soak methods layer on
+  after it.
+- **Closing last (Phase 8):** the full 3×-flake-free regression on both backends
+  proves the fully-fixed state, immediately before the tag.
 
 ---
 
-## Phase 1 — Baseline regression
+## Phase 1 — World & functionality coherence audit (FIRST — may rebuild the game)
+- A model-diverse (Fable-lens) read of design.md + the §7.1 systems: does each
+  system have a PURPOSE, real USE in the loop, COHERENCE with the others,
+  SETTING FIT (~1890 accuracy), and WORTH? Plus world plausibility (ecology,
+  economy, exploration, survival, cross-system loop).
+- **Design judgments are the USER's call** — write them up and DISCUSS; only
+  clear objective incoherences (a predator with no prey, an item with no effect,
+  two contradictory rules) are filed as fix-points.
+- Apply the agreed objective fixes and user-decided design changes now (the
+  point-208 style of work), updating design.md/CLAUDE.md. **This is where the
+  game may be rebuilt**; everything below tests the rebuilt state. Extend the
+  in-game invariant set (Phase 3) for any system this rebuild changes.
+
+## Phase 2 — Baseline regression (confirm the rebuild is green)
 - `npm run build`, `npm run lint` (oxlint, zero errors/warnings), `npm audit`
   (zero CVEs), `npm run test:unit` (the fast Vitest layer) — all green.
-- Run the LARGE browser regression (`npm test`) once to establish the baseline.
-  Record any rotating staging flakes separately (they are not findings; a clean
-  single retry confirms them).
-
-## Phase 2 — Code audit with model diversity
-- Sweep the subsystems (systems/state, travel/world, render/ui/i18n) for test
-  gaps AND real bugs, reading the code against the design.
-- Mix in a **different model than the recent author** for a blind pass (e.g. a
-  single Fable subagent when the batch runs on Opus, or vice versa) — fresh
-  blind spots find more (memory `audit-with-model-diversity`). ONE agent,
-  harvested and every finding re-verified inline before it is filed.
-- File each confirmed bug as its own point; add the missing tests.
+- Run the LARGE browser regression (`npm test`) once to establish the baseline
+  for the rebuilt state. Record any rotating staging flakes separately (they are
+  not findings; a clean single retry confirms them).
 
 ## Phase 3 — In-game invariant assertions (the force multiplier, 207 i)
 - Ensure the dev-only `devAssert` channel is armed and its invariants current:
@@ -41,9 +74,26 @@ everything found, then the closing (Phase 8) must pass clean before a tag.
   counts bounded, nothing standing on impassable ocean.
 - A violation fires `console.error` → every suite's console-error gate fails, so
   every run and every manual play session becomes a detector. Extend the
-  invariant set opportunistically as systems change.
+  invariant set for any system the Phase-1 rebuild changed.
 
-## Phase 4 — The systematic bug-finder (203)
+## Phase 4 — WebGPU coverage universal (infrastructure for the sweeps, 204)
+- Every render/pixel suite calls `assertBackend` so it cannot silently fall back
+  to WebGL2 under `VERIFY_GL=webgpu`.
+- Wire the LARGE tier to run the render suites on BOTH backends (WebGL2 and the
+  real system-Chrome WebGPU lane); touch/voice stay WebGL2-only (the documented
+  headless exception). Resolve any WebGPU-only reds. In place now so the visual
+  sweep (Phase 6) and the closing (Phase 8) genuinely cover both backends.
+
+## Phase 5 — Code audit with model diversity
+- Sweep the subsystems (systems/state, travel/world, render/ui/i18n) of the
+  rebuilt code for test gaps AND real bugs, reading it against the design.
+- Mix in a **different model than the recent author** for a blind pass (e.g. a
+  single Fable subagent when the batch runs on Opus, or vice versa) — fresh
+  blind spots find more (memory `audit-with-model-diversity`). ONE agent,
+  harvested and every finding re-verified inline before it is filed.
+- File each confirmed bug as its own point; add the missing tests.
+
+## Phase 6 — The systematic bug-finder (203)
 Cheap automated classes first, then the visual sweep:
 - **(A) Anchoring** — rendered body vs. terrain at its own anchor (buried/
   floating), incl. posed wing/limb extents and water-surface occupants; static
@@ -74,9 +124,10 @@ Cheap automated classes first, then the visual sweep:
   Judge "in view" by projecting to the frame (`__camera.onScreen`/`ndc`), never
   an assumed radius (memory `test-realistic-zoom`).
 
-## Phase 5 — Additional finding methods (207 ii–vii)
-- **(ii) Golden-image differential** — diff the sweep frames against a baked
-  baseline; flag unintended pixel changes.
+## Phase 7 — Additional finding methods (207 ii–vii)
+- **(ii) Golden-image differential** — bake the baseline of the sweep frames NOW
+  (the game is coherence- and finder-stable); future runs diff against it and
+  flag unintended pixel changes.
 - **(iii) Property fuzzing + distribution checks** — thousands of random states
   through the cheap invariants; assert distributions (hunt directions, calf
   ratios, outcomes, spawn counts) are not degenerate.
@@ -89,22 +140,6 @@ Cheap automated classes first, then the visual sweep:
   reachable, the hint cascade leads there, no softlock, the deadline beatable.
 - **(vii) Console/telemetry mining** — scan every run's console for warnings /
   NaN / shader-recompile / dropped-frame / deprecation noise; fail on new ones.
-
-## Phase 6 — WebGPU coverage universal (204)
-- Every render/pixel suite calls `assertBackend` so it cannot silently fall back
-  to WebGL2 under `VERIFY_GL=webgpu`.
-- Run the render suites on BOTH backends (WebGL2 and the real system-Chrome
-  WebGPU lane); touch/voice stay WebGL2-only (the documented headless
-  exception). Resolve any WebGPU-only reds.
-
-## Phase 7 — World & functionality plausibility audit (205)
-- A model-diverse (Fable-lens) read of design.md + the §7.1 systems: does each
-  system have a PURPOSE, real USE in the loop, COHERENCE with the others,
-  SETTING FIT (~1890 accuracy), and WORTH? Plus world plausibility (ecology,
-  economy, exploration, survival, cross-system loop).
-- **Design judgments are the USER's call** — write them up and DISCUSS; only
-  clear objective incoherences (a predator with no prey, an item with no effect,
-  two contradictory rules) are filed as fix-points.
 
 ## Phase 8 — Final closing
 - Fix every finding from Phases 1–7 (each its own commit, pushed).
