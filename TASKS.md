@@ -7920,6 +7920,24 @@ the remaining open points in their numeric order.
   acceptance point keeps its land/sea verdict. DOCS: design.md §3.3 / CLAUDE §7.1
   pt.13 note the coast smoothing. (The dark "starry" sea in the shot is the water
   surface shader at night, a separate matter — this point is only the stepping.)
+  PROBE + FINDING (21.07.2026): option (b) domain-warp alone is INSUFFICIENT.
+  Warping the coords fed to `landFractionAt` (a dedicated small COAST_WARP, tried
+  both low-freq 2.1/amp 0.06 deg and high-freq 12/amp 0.06 deg) kept every
+  redSea.test.ts + world.test.ts verdict green (130 tests) but the rendered
+  Cairo/Suez staircase barely softened — the high-freq warp only jittered the
+  step EDGES, the big blocky steps remained. DIAGNOSIS why: the shoreline is where
+  the terrain HEIGHT (driven by `shoreT = sstep(land)`, i.e. the binary-derived
+  land fraction) crosses the water plane, and the travel terrain MESH renders that
+  contour at its VERTEX spacing (~2-3 texels) — so a smoother mask is re-quantized
+  to blocky steps by the mesh, not by the mask. The warp shifts the boundary but
+  cannot add sub-vertex detail the mesh can't carry. REAL LEVER (next focused
+  attempt): option (a) — derive the near-field land fraction from a SIGNED DISTANCE
+  to the vector coastline (`LAND_POLYGONS`, already imported in terrain.ts) so the
+  height contour is smooth independent of the raster/mesh grid (the pt.13 ideal);
+  and/or raise the coast mesh resolution where the shoreline crosses. This is a
+  focused rendering effort, not a one-shot tune — do it with the same driven
+  Cairo/Suez before/after captures. (WIP domain-warp experiment reverted, not
+  committed.)
 
 - [ ] 210. A spurious SEA-ARM juts into the coast EAST of Cairo — remove it (or
   adjust the ocean beside it) so the continent has ONE clean, continuous sea edge
