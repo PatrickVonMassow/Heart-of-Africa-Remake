@@ -1834,8 +1834,9 @@ await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.evaluate(() => window.__wildlife.restock())
 await waitForHerds()
 // A calf keeps close to its parent only after a few spawn+follow frames; give
-// the family behaviours a moment to settle once the herds are present.
-await page.waitForTimeout(2000)
+// the family behaviours a moment to settle once the herds are present (point
+// 200: sim-clock, so a slow frame rate under load cannot cut the settle short).
+await page.evaluate(() => window.__sleepSim(2))
 const familyLife = await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']
@@ -2138,7 +2139,7 @@ await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
 await page.evaluate(() => window.__wildlife.restock())
 await waitForHerds()
 await waitForFamily()
-await page.waitForTimeout(1500)
+await page.evaluate(() => window.__sleepSim(1.5)) // point 200: sim-clock settle
 
 // Parent defends its calf: inject a predator at a fixed point near a calf; a
 // guarding parent moves toward that point (to interpose), a fleeing one away.
@@ -2248,7 +2249,7 @@ check('the fleeing prey weaves side to side (zigzag)', hunt.signChanges >= 2 && 
 // Several predators roam (lion, cheetah, leopard, hyena), each region-fitting,
 // and each takes prey from its own food web (predator → grazer → grassland).
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-await page.waitForTimeout(1000)
+await page.evaluate(() => window.__sleepSim(1)) // point 200: sim-clock settle
 const preyVar = await page.evaluate(async () => {
   const geo = await import('/src/world/geo.ts')
   const s = window.__lionHunt.state
@@ -2347,7 +2348,7 @@ const pinFamily = async (lat, lon) => {
   await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
   await waitForFamily()
-  await page.waitForTimeout(2200) // let calves settle beside their parents
+  await page.evaluate(() => window.__sleepSim(2.2)) // let calves settle (point 200: sim-clock)
   await page.evaluate(() => {
     const s = window.__lionHunt.state
     s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
