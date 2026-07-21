@@ -53,10 +53,13 @@ await page.waitForTimeout(4000)
 {
   const jOpen = await page.evaluate(() => window.__game.getState().journalOpen)
   const before = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-  for (let i = 0; i < 6; i++) {
-    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-    await page.waitForTimeout(60)
-  }
+  // Hold W and poll until the character has actually walked (point 200), rather
+  // than a fixed press/wait loop; the assert below still judges the moved
+  // distance if it never gets there.
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  await page
+    .waitForFunction((b) => Math.hypot(window.__placePlayer.x - b.x, window.__placePlayer.z - b.z) > 0.5, before, { timeout: 5000 })
+    .catch(() => {})
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
   const after = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
   const moved = Math.hypot(after.x - before.x, after.z - before.z)

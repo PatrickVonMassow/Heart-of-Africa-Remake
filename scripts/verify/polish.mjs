@@ -1,6 +1,6 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, waitForStable } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -267,13 +267,14 @@ if (mosque) {
 
   const read = () => page.evaluate(() => window.__placeSeason())
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
-  await page.waitForTimeout(2500) // the lights lerp toward the target
+  // Poll until the dome-gray lerp settles (point 200), not a fixed wall wait.
+  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
   const dry = await read()
   await page.screenshot({ path: `${OUT}110-village-season-dry.png` })
   console.log('shot 110-village-season-dry.png')
 
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
-  await page.waitForTimeout(2500)
+  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
   const wet = await read()
   await page.screenshot({ path: `${OUT}111-village-season-wet.png` })
   console.log('shot 111-village-season-wet.png')

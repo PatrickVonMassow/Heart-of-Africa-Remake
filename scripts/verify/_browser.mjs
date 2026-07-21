@@ -51,3 +51,21 @@ export async function assertBackend(page) {
   }
   return info
 }
+
+/** Wait until a numeric page reading STOPS changing, then return it (point 200):
+ *  a lerp/settle takes a variable number of frames under load, so a fixed wall
+ *  wait either flakes (too short) or wastes time (too long). `readFn` is a page
+ *  arrow returning a number; the poll returns once two successive reads settleMs
+ *  apart differ by <= eps, or at the timeout (the caller's assert then judges the
+ *  settled value). */
+export async function waitForStable(page, readFn, { eps = 1e-3, settleMs = 200, timeout = 8000 } = {}) {
+  const start = Date.now()
+  let prev = await page.evaluate(readFn)
+  while (Date.now() - start < timeout) {
+    await page.waitForTimeout(settleMs)
+    const cur = await page.evaluate(readFn)
+    if (typeof cur === 'number' && typeof prev === 'number' && Math.abs(cur - prev) <= eps) return cur
+    prev = cur
+  }
+  return prev
+}

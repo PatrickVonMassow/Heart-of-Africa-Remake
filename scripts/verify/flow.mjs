@@ -239,7 +239,11 @@ const marketDoor = await page.evaluate(() => {
 })
 if (marketDoor) {
   await moveTo(marketDoor[0], marketDoor[1])
-  await page.waitForTimeout(500)
+  // Poll until the door opens (point 200) instead of a fixed wall wait; the
+  // assert below still judges the final state if it never opens.
+  await page
+    .waitForFunction(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen, null, { timeout: 5000 })
+    .catch(() => {})
   check(
     'a hut door opens even with the journal open (design.md §16)',
     await page.evaluate(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen),

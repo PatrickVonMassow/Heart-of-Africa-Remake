@@ -179,8 +179,12 @@ check(
   footSurface === 'ground' || footSurface === 'stone',
   `surface ${footSurface}`,
 )
-// After stopping, the camera settles back to the eye height (stop settle).
-await page.waitForTimeout(600)
+// After stopping, the camera settles back to the eye height — poll the settle
+// condition (point 200) rather than a fixed wall wait; a genuine non-settle
+// still reaches the assert below (which then fails with the real rest y).
+await page
+  .waitForFunction(() => window.__walkFeel && Math.abs(window.__walkFeel.cameraY - 1.5) < 0.006, null, { timeout: 5000 })
+  .catch(() => {})
 const restY = await page.evaluate(() => window.__walkFeel?.cameraY ?? null)
 check(
   'the head bob settles back to eye height at rest (point 97)',

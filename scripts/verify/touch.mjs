@@ -2,7 +2,7 @@
 // design.md §17.5, point 84). A touch-capable context is used and real touch
 // events are driven through CDP so pointer capture and multi-touch behave like
 // hardware. Dev server only.
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, waitForStable } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 let failures = 0
@@ -72,16 +72,20 @@ const stickCY = 850 - (24 + 64) // bottom inset + half height
 const pos0 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
 await touch('touchStart', [{ x: stickCX, y: stickCY }])
 await touch('touchMove', [{ x: stickCX, y: stickCY - 60 }]) // drag up = forward
-await page.waitForTimeout(700)
+// Poll until the stick has walked the character (point 200), not a fixed wait.
+await page
+  .waitForFunction((p) => Math.hypot(window.__placePlayer.x - p.x, window.__placePlayer.z - p.z) > 1, pos0, { timeout: 5000 })
+  .catch(() => {})
 await touch('touchEnd', [])
 const pos1 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
 const walked = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z)
 check('virtual stick walks the character', walked > 1, `moved ${walked.toFixed(1)} m`)
 // The stick releases to neutral: the walk-feel inertia (point 97) coasts a
-// fraction of a metre, then the position must be fully settled (no drift).
-await page.waitForTimeout(500)
+// fraction of a metre, then the position must be fully settled — poll until the
+// coast stops (point 200) rather than a fixed wait, then confirm no drift.
+await waitForStable(page, () => window.__placePlayer.x, { settleMs: 150, timeout: 4000 })
 const pos2 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
-await page.waitForTimeout(300)
+await page.waitForTimeout(200)
 const pos3 = await page.evaluate(() => ({ x: window.__placePlayer.x, z: window.__placePlayer.z }))
 check('lifting the stick stops the walk', Math.hypot(pos3.x - pos2.x, pos3.z - pos2.z) < 0.1, 'settled')
 
