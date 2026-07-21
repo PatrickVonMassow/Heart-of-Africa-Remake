@@ -9,6 +9,7 @@ import {
   nudgeToFree,
   spawnPointFree,
   standingClear,
+  tryNudgeToFree,
   WALKER_RADIUS,
   type Collider,
 } from './collision'
@@ -85,5 +86,35 @@ describe('nudgeToFree (point 155 — relocate to the nearest usable spot)', () =
     const box = [boxCollider(0, 0, 1.5, 1.5, 0)]
     const [x, z] = nudgeToFree(box, 0, 0, R)
     expect(spawnPointFree(box, x, z, R)).toBe(true)
+  })
+})
+
+describe('tryNudgeToFree (point 198 — report whether a free spot was actually found)', () => {
+  it('reports found=true for an already-free point and keeps it', () => {
+    const r = tryNudgeToFree([], 2, 3, R)
+    expect(r.found).toBe(true)
+    expect(r.pos).toEqual([2, 3])
+  })
+
+  it('reports found=true and a usable spot when it can escape a pocket', () => {
+    const pocket = tightRing()
+    const r = tryNudgeToFree(pocket, 0, 0, R)
+    expect(r.found).toBe(true)
+    expect(spawnPointFree(pocket, r.pos[0], r.pos[1], R)).toBe(true)
+  })
+
+  it('reports found=false and falls back to the original when no free spot exists in range', () => {
+    // A wide solid box swallows every ring the spiral can reach: no free spot,
+    // so the caller must NOT treat the (unchanged) position as a relocation.
+    const wall = [boxCollider(0, 0, 20, 20, 0)]
+    const r = tryNudgeToFree(wall, 0, 0, R)
+    expect(r.found).toBe(false)
+    expect(r.pos).toEqual([0, 0])
+  })
+
+  it('reports found=false when the search is given no rings and the point is blocked', () => {
+    const r = tryNudgeToFree([{ x: 0, z: 0, r: 1 }], 0, 0, R, undefined, 0)
+    expect(r.found).toBe(false)
+    expect(r.pos).toEqual([0, 0])
   })
 })

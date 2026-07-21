@@ -174,10 +174,38 @@ export function spawnPointFree(
   return standingClear(colliders, x, z, radius) && hasEscapeDirection(colliders, x, z, radius, step)
 }
 
-/** Nearest usable spawn point to (x,z): if it is already free, keep it;
- *  otherwise spiral outward over rings (deterministic ring/angle order) until
- *  one is free (point 155). Falls back to the original point if none is found
- *  within `maxRings` — the caller is no worse off than before. */
+/** Nearest usable spawn point to (x,z), with whether one was actually FOUND
+ *  (point 198): if the point is already free, keep it; otherwise spiral outward
+ *  over rings (deterministic ring/angle order) until one is free (point 155).
+ *  When none is found within `maxRings`, `found` is false and the position falls
+ *  back to the original — so a caller can tell "relocated / already free" from
+ *  "gave up" instead of resetting an unstuck counter over a walker that never
+ *  moved (the pinned-forever bug). */
+export function tryNudgeToFree(
+  colliders: Collider[],
+  x: number,
+  z: number,
+  radius: number,
+  step: number = radius * 2,
+  maxRings = 12,
+): { pos: [number, number]; found: boolean } {
+  if (spawnPointFree(colliders, x, z, radius, step)) return { pos: [x, z], found: true }
+  for (let ring = 1; ring <= maxRings; ring++) {
+    const rr = ring * step
+    const n = ESCAPE_DIRECTIONS * ring // denser sampling on the larger rings
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2
+      const px = x + Math.cos(a) * rr
+      const pz = z + Math.sin(a) * rr
+      if (spawnPointFree(colliders, px, pz, radius, step)) return { pos: [px, pz], found: true }
+    }
+  }
+  return { pos: [x, z], found: false }
+}
+
+/** Nearest usable spawn point to (x,z), position only (point 155). Thin wrapper
+ *  over `tryNudgeToFree` for callers that only need the point (the layout
+ *  builder). Falls back to the original point if none is found. */
 export function nudgeToFree(
   colliders: Collider[],
   x: number,
@@ -186,16 +214,5 @@ export function nudgeToFree(
   step: number = radius * 2,
   maxRings = 12,
 ): [number, number] {
-  if (spawnPointFree(colliders, x, z, radius, step)) return [x, z]
-  for (let ring = 1; ring <= maxRings; ring++) {
-    const rr = ring * step
-    const n = ESCAPE_DIRECTIONS * ring // denser sampling on the larger rings
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2
-      const px = x + Math.cos(a) * rr
-      const pz = z + Math.sin(a) * rr
-      if (spawnPointFree(colliders, px, pz, radius, step)) return [px, pz]
-    }
-  }
-  return [x, z]
+  return tryNudgeToFree(colliders, x, z, radius, step, maxRings).pos
 }

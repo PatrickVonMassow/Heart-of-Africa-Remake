@@ -7298,7 +7298,18 @@ the remaining open points in their numeric order.
   claim-seam pattern). Verify each inline, fix with the mutual-exclusion
   pattern 194 establishes, pure-test every exclusion, keep the §19.8
   every-drama-resolves invariant. One commit per coherent fix.
-- [ ] 198. A pinned settlement walker can stay pinned FOREVER when no free spot
+- [x] 198. DONE 21.07.2026 — a pinned settlement walker can no longer stay pinned
+  forever. `nudgeToFree` returned the ORIGINAL point when its ring search found
+  nothing while the PlaceLife caller reset `s.pinned = 0` unconditionally, so a
+  walker with no free spot nearby never unstuck. New pure `tryNudgeToFree` reports
+  `{ pos, found }`; `nudgeToFree` is now a thin wrapper (layout builder + old
+  tests unchanged). The caller escalates: try the ring search, WIDEN it once (24
+  rings), and if there is still no free spot RETIRE the errand (`s.seg++`, a new
+  target) — the counter resets only on real progress (relocated or retargeted),
+  never on a silent no-op. Inhabitants only, never the player. Pure tests for the
+  found/not-found branches (already-free, escapes-a-pocket, walled-in, no-rings);
+  build+lint clean, 1980 unit green, collision suite 20/0/0.
+  ORIGINAL: A pinned settlement walker can stay pinned FOREVER when no free spot
   exists near its errand point: nudgeToFree returns the ORIGINAL point when its
   12-ring search finds nothing (collision.ts ~200) and the PlaceLife caller
   resets `s.pinned = 0` unconditionally (~764) — the point-155 "teleport-nudged

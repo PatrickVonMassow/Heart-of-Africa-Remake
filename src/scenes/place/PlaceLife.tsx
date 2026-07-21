@@ -19,7 +19,7 @@ import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
-import { resolveMove, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { resolveMove, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
@@ -761,9 +761,20 @@ function Walkers({
       if (Math.hypot(s.x - oldX, s.z - oldZ) < step * 0.1) {
         s.pinned += dt
         if (s.pinned > balance.walkerUnstuckSeconds) {
-          const [fx, fz] = nudgeToFree(colliders, s.x, s.z, NPC_RADIUS)
-          s.x = fx
-          s.z = fz
+          // Escalate rather than silently no-op (point 198): the nudge used to
+          // return the ORIGINAL point when its search found nothing while the
+          // caller reset the counter anyway, so a walker with no free spot
+          // nearby stayed pinned forever. Try the ring search, WIDEN it once,
+          // and if there is still no free spot, RETIRE the errand (advance to a
+          // new target) — a stuck walker always makes progress now.
+          const near = tryNudgeToFree(colliders, s.x, s.z, NPC_RADIUS)
+          const r = near.found ? near : tryNudgeToFree(colliders, s.x, s.z, NPC_RADIUS, undefined, 24)
+          if (r.found) {
+            s.x = r.pos[0]
+            s.z = r.pos[1]
+          } else {
+            s.seg++ // no reachable free spot here — pick a new errand target
+          }
           s.pinned = 0
           s.stuck = 0
         }
