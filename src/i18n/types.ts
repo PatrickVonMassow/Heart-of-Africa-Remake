@@ -212,6 +212,7 @@ export interface Strings {
     robConfirm: string
     robConfirmYes: string
     robCancel: string
+    robOrphansGoal: string
     /** Bazaar (design.md §10): bid flow on offered treasures. */
     bazaarGreeting: string
     bazaarSell: string

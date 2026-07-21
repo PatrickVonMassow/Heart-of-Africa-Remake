@@ -11,6 +11,7 @@ const ctx = (over: Partial<EventContext> = {}): EventContext => ({
   nearWaterfall: false,
   wetland: false,
   protectedByFriends: false,
+  regionPredators: ['lion', 'cheetah', 'hyena', 'leopard'], // an east/south roster by default
   equipment: {},
   ...over,
 })
@@ -236,5 +237,54 @@ describe('eventChance terrain gates (design.md §14)', () => {
   it('the leopard also hunts the jungle, not only the savanna', () => {
     expect(eventChance('leopardAttack', ctx({ terrain: 'jungle' }))).toBeGreaterThan(0)
     expect(eventChance('leopardAttack', ctx({ terrain: 'savanna' }))).toBeGreaterThan(0)
+  })
+})
+
+describe('predator events fire only where the species roams (point 208 A3)', () => {
+  it('a hyena never attacks in a region whose roster holds no hyena', () => {
+    // West/Central roster = lion, leopard (no hyena/cheetah).
+    const west = { regionPredators: ['lion', 'leopard'] as const }
+    expect(eventChance('hyenaAttack', ctx(west))).toBe(0)
+    expect(eventChance('cheetahAttack', ctx(west))).toBe(0)
+    // The predators that DO roam there still fire.
+    expect(eventChance('lionAttack', ctx(west))).toBeGreaterThan(0)
+    expect(eventChance('leopardAttack', ctx(west))).toBeGreaterThan(0)
+  })
+
+  it('an empty roster suppresses every predator attack', () => {
+    const none = { regionPredators: [] as string[] }
+    for (const k of ['lionAttack', 'cheetahAttack', 'leopardAttack', 'hyenaAttack'] as const) {
+      expect(eventChance(k, ctx(none))).toBe(0)
+    }
+  })
+
+  it('the east/south roster fires all four cats on the savanna', () => {
+    for (const k of ['lionAttack', 'cheetahAttack', 'leopardAttack', 'hyenaAttack'] as const) {
+      expect(eventChance(k, ctx())).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('protection rules match the design text (point 208 A5)', () => {
+  it('a snakebite is not lowered by any carried weapon', () => {
+    const bare = eventChance('snakeBite', ctx())
+    expect(eventChance('snakeBite', ctx({ equipment: { machete: 1 } }))).toBe(bare)
+    expect(eventChance('snakeBite', ctx({ equipment: { rifle: 1 } }))).toBe(bare)
+    expect(bare).toBeGreaterThan(0)
+  })
+
+  it('the machete always lowers the crocodile chance, even from the canoe', () => {
+    const water = { terrain: 'water', inWater: true } as const
+    const unarmed = eventChance('crocodileAttack', ctx({ ...water }))
+    const macheteSwim = eventChance('crocodileAttack', ctx({ ...water, equipment: { machete: 1 } }))
+    const canoeOnly = eventChance('crocodileAttack', ctx({ ...water, equipment: { canoe: 1 } }))
+    const macheteCanoe = eventChance('crocodileAttack', ctx({ ...water, equipment: { canoe: 1, machete: 1 } }))
+    const rifleCanoe = eventChance('crocodileAttack', ctx({ ...water, equipment: { canoe: 1, rifle: 1 } }))
+    // The machete helps whether swimming or in the canoe; canoe-with-machete is
+    // strictly safer than the canoe alone; the rifle (canoe only) is safest.
+    expect(macheteSwim).toBeLessThan(unarmed)
+    expect(canoeOnly).toBeLessThan(macheteSwim)
+    expect(macheteCanoe).toBeLessThan(canoeOnly)
+    expect(rifleCanoe).toBeLessThan(macheteCanoe)
   })
 })

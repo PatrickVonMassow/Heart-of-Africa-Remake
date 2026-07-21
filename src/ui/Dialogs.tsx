@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import {
-  EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, totalGifts,
+  EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, robWouldOrphanGoal, totalGifts,
   useGame, VILLAGE_TRADE_GOODS,
   type EquipmentId, type ItemBag, type ItemKind,
 } from '../state/store'
@@ -142,6 +142,12 @@ function AudienceDialog() {
         {confirmingRob && (
           <div className="rob-confirm">
             <p className="flavor danger-text">{t.dialogs.robConfirm}</p>
+            {robWouldOrphanGoal({ hintsGiven }, place.region) && (
+              // Point 208 A7: this region alone can teach a tomb coordinate the
+              // traveller has not learned yet — robbing it forfeits that for
+              // good and may put the goal out of reach.
+              <p className="flavor danger-text">{t.dialogs.robOrphansGoal}</p>
+            )}
             <div className="actions">
               <button className="hud-button danger" onClick={robVillage}>{t.dialogs.robConfirmYes}</button>
               <button className="hud-button" onClick={() => setConfirmingRob(false)}>{t.dialogs.robCancel}</button>

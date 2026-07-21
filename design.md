@@ -195,7 +195,7 @@ whole of the revert.
 
 - Currency: \$ (means of payment in the port cities). Starting capital \$250. Used for: equipment, provisions, ferries, gifts; income through sales and discovery bounties.
 - Provisions (food): consumed per time step; can be bought. The POC ships a relaxed exploration preset (user calibration 15.07.2026): the default consumption rate is ZERO — provisions do not drain unless the rate is raised in the debug menu (§21.2); the mechanic itself stays fully implemented.
-- Water: the canteen holds a fill level (a percentage). It refills to full at fresh water (river, lake, swimmable sea), drains on land — faster in the desert — and, once empty, thirst builds and then health drops. In the relaxed exploration preset both drain rates default to ZERO (debug-editable, §21.2); the thirst mechanics stay fully implemented. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
+- Water: the canteen holds a fill level (a percentage). It refills to full at FRESH water (river, lake) only — salt water is not drinkable, so the sea never refills it or quenches thirst even where the coast is swimmable (point 208 A4) — drains on land — faster in the desert — and, once empty, thirst builds and then health drops. In the relaxed exploration preset both drain rates default to ZERO (debug-editable, §21.2); the thirst mechanics stay fully implemented. The inventory bar shows the fill and warns as it runs low (glowing yellow and blinking below a third, red below 5 %, still blinking when empty). It protects against dehydration in the desert only while it still holds water.
 - Gifts: trade goods for chiefs; they create goodwill and unlock hints. They are also the means of payment in the native villages (money has no value there).
 - A new expedition sets out fully equipped (relaxed exploration preset): one each of shovel, rope, machete, rifle, medicine and a FULL canteen; only the canoe remains a purchase. Starting capital stays \$250 and the start stays Cairo 1890 (fixed values). The inventory bar lists gear alphabetically by the localized item name (re-sorting on a language switch), treasures after gear.
 - Item effects are possession-based: a piece of equipment in the inventory acts on its own — there is no "taking an object in hand". What is carried (§7) decides terrain mobility (§11), protection in events (§14) and treasure recovery; consumables and tools are used by clicking them in the inventory bar (medicine cures, the shovel digs). The map is NOT an inventory item: it is always available from its own button in the bottom-right button row (left of the journal button, §17.4) and the M key, opening the exploration overview — inside a settlement the place plan (§7/§19.11).
@@ -252,6 +252,18 @@ Core principle: the value of an object depends on region/culture. What a region 
 | East | Emeralds | Copper |
 
 A visibly carried valuable triggers a positive or negative reaction depending on the region.
+
+**A DELIBERATE HOMAGE CARVE-OUT (point 208 B3).** This value matrix, the `$`
+currency, Khartoum standing as a welcoming ~1890 port (in reality the Mahdiyya
+held it 1885–98 and the city lay abandoned in favour of Omdurman), and the §13.2
+regional-direction glossary are inherited from the 1985 original game and are
+FIXED here on purpose. They are not held to the ~1890 accuracy standard that
+governs the climate, peoples, dress, ecology and panzootic — the game keeps them
+as a homage to its ancestor. This is the third deliberate carve-out from the
+accuracy principle, alongside the §19.8 grief and the §19.13 exaggeration;
+recorded here so nobody later "corrects" it toward historical accuracy. (§13.2's
+glossary is doubly provisional — it is also the placeholder under review in
+§13.4.)
 
 ---
 
@@ -404,10 +416,10 @@ Hidden triggering per time step/region/condition.
 
 ### 14.1 Event kinds
 
-- Wild-animal attacks (lions, cheetahs, leopards, hyenas and snakes): an attack can injure or kill. Danger order: lion (most likely to kill) > hyena > leopard > cheetah (rarely presses an attack home). A rifle or machete in the pack lowers the risk, the rifle more. The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into a wandering predator in the bird's-eye view (§19) directly triggers that predator's attack (same outcome rules and protection).
+- Wild-animal attacks (lions, cheetahs, leopards, hyenas and snakes): an attack can injure or kill. Danger order: lion (most likely to kill) > hyena > leopard > cheetah (rarely presses an attack home). Against the stalking predators a rifle or machete in the pack lowers the risk, the rifle more; a SNAKEBITE strikes from cover and is not mitigated by a carried weapon (point 208 A5). A predator only attacks where its species actually roams the region (point 208 A3). The chronicle reports the outcome in sentences like "I was attacked by lions.", "I escaped.", "I used the rifle." or "I was lightly injured.". Beyond the hidden roll, walking into a wandering predator in the bird's-eye view (§19) directly triggers that predator's attack (same outcome rules and protection).
 - Robber attacks: can injure and steal inventory items. As with animal attacks, a machete lowers the risk, a rifle more so.
 - Protection through "Honored Friend": near the villages of a region where you hold this status, the natives rush to help during animal and robber attacks; you can then at most be lightly injured (§12).
-- Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. Against crocodiles only a machete helps out of the canoe; the rifle works from the canoe alone (§11.3).
+- Crocodile attacks in water: moving through water, a crocodile may attack and injure or eat you. The machete ALWAYS helps against a crocodile — out of the canoe AND from it (machete-in-canoe is strictly safer than the canoe alone, point 208 A5) — while the rifle works from the canoe alone (§11.3).
 - Current at waterfalls: near waterfalls the strong current can sweep the character over — with injuries and the loss of a large part of the inventory (§11).
 - Illness/fever (climate/region dependent) → affliction (§6).
 - Fever delirium → temporarily uncontrolled movement.

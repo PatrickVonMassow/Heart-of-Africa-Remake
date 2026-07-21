@@ -288,6 +288,8 @@ export const de: Strings = {
       'Dieses Dorf mit vorgehaltenem Gewehr ausrauben? Das verfeindet die ganze Region für immer — keine Audienzen, Hinweise oder Hilfe mehr, und ein etwaiger Status als "Geehrter Freund" ist unwiederbringlich verloren.',
     robConfirmYes: 'Ja, ausrauben',
     robCancel: 'Nein, ablassen',
+    robOrphansGoal:
+      'Achtung: Nur diese Region kann dir noch eine Richtung zum Grab lehren, die du noch nicht kennst. Raubst du sie aus, ist dieses Wissen für immer verloren — das Grab könnte unauffindbar werden.',
     bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab — oder nimm selbst ein Stück mit heim."',
     bazaarSell: 'Einen Fund anbieten:',
     bazaarBuy: 'Zum Verkauf:',

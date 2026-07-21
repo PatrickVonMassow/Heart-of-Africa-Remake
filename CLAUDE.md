@@ -462,7 +462,13 @@ verify suite that proves it.
       one kind of prey and every hunted species fits the region's pool;
       more than one kind of predator hunts and every predator/prey
       pairing fits the region and the predator's food web; prey flee a
-      predator smoothly without teleporting (no single-frame jump).
+      predator smoothly without teleporting (no single-frame jump). The
+      AMBIENT herds match the region too (point 208 A2): the visible
+      grazer seeded on a savanna cell is drawn from that region's
+      `REGION_PREY` pool, so no giraffe/zebra/wildebeest stands as
+      "scenery" where every other rule calls it foreign — pure-tested via
+      `ambientSavannaSpecies` in
+      `src/scenes/travel/wildlifeBehavior.test.ts`.
     - Streaming: the zoom-aware despawn holds (an animal survives a
       tile-boundary crossing while in view, despawns once well outside
       it, and a wider zoom keeps animals the default view would have
@@ -1103,7 +1109,8 @@ verify suite that proves it.
     debug menu, which also toggles afflictions for testing. Verifiable:
     `src/state/store.health.test.ts` asserts defaults, dehydration
     onset/recovery, the canteen fill draining away from water, emptying
-    into thirst then health loss, and refilling at fresh water,
+    into thirst then health loss, and refilling at FRESH water only — the
+    salt sea neither refills it nor clears thirst (point 208 A4) —
     regeneration, fever drain and medicine cure, the staged natural wound
     healing (light heals fed, severe eases to light, starving blocks it)
     and the death/successor flow; `src/ui/Hud.test.tsx` the sun-blindness
@@ -1132,7 +1139,11 @@ verify suite that proves it.
     `src/systems/events.test.ts` asserts the reduced rates, the
     protection ordering (pure functions), deterministic outcome mapping
     and the plains-predator danger order (cheetah < leopard < hyena <
-    lion) with the lion's wider fatal band;
+    lion) with the lion's wider fatal band; that a predator event fires
+    only where that species roams the region (point 208 A3 — no hyena
+    attack in a hyena-less region) and that the protection rules match the
+    text (point 208 A5 — a snakebite is not weapon-mitigated; the machete
+    always lowers the crocodile chance, even from the canoe);
     `src/state/store.events.test.ts` the consequences of each trigger, a
     fatal attack, autonomous firing while travelling, silence when
     disabled, and the canoe-aware water warning firing — once — without
@@ -1221,7 +1232,10 @@ verify suite that proves it.
     (exactly once), the capped attack outcomes with rescue entries, the
     near-death aid, the free village supplies, the rich
     money/gifts/provisions haul, and the permanent robbery consequences
-    including the forfeited friendship; `src/ui/Dialogs.test.tsx` the
+    including the forfeited friendship, and the goal-orphan warning
+    predicate (point 208 A7 — `robWouldOrphanGoal` fires for a
+    coordinate-bearing region, North or East, whose hint is not yet
+    learned, and clears once it is); `src/ui/Dialogs.test.tsx` the
     confirmation gate on the Rob button.
 27. **Camps (item caches).** The camps of `design.md` §6.3 are
     implemented: free camps pitched (or reopened nearby) with C in the

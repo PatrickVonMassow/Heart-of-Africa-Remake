@@ -22,7 +22,7 @@ import { setAmbienceAnimals } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
-import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
+import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance } from './waterEdgeRules'
@@ -52,9 +52,11 @@ import {
   calfFleeStep,
   type FlightState,
   channelDriftStep,
+  ambientSavannaSpecies,
   drinkCatchment,
   mireFate,
   mireRoll,
+  REGION_PREDATORS,
   parentAttackOutcome,
   PREDATOR_PREY,
   REGION_PREY,
@@ -352,16 +354,8 @@ let ACTIVE_HERDS: Record<Species, Animal[]> | null = null
  *  than a zebra through the build, not the scale. */
 const PREY_SCALE: Record<PreyKind, number> = { zebra: 1, wildebeest: 1.05, antelope: 0.85, warthog: 0.62, giraffe: 0.95 }
 
-/** Which predators roam each region (~1890 range). Lions everywhere; cheetahs
- *  and hyenas favour the open eastern/southern plains; leopards the wooded
- *  west/centre; the arid north holds lion, cheetah and leopard. */
-const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
-  east: ['lion', 'cheetah', 'hyena', 'leopard'],
-  south: ['lion', 'cheetah', 'hyena', 'leopard'],
-  central: ['lion', 'leopard'],
-  west: ['lion', 'leopard'],
-  north: ['lion', 'cheetah', 'leopard'],
-}
+// REGION_PREDATORS now lives in wildlifeBehavior.ts (point 208 A3) so the
+// random-event system shares the same roster; imported above.
 // The food web itself (PREDATOR_PREY, REGION_PREY and the Predator/PreyKind
 // types) lives in wildlifeBehavior.ts so the fit rules — incl. the lion-only
 // giraffe of point 124 — are pure-testable.
@@ -881,13 +875,11 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
   let species: Species | null = null
   let count = 0
   if (anchor.type === 'savanna') {
-    if (roll < 0.12) species = 'elephant'
-    else if (roll < 0.2) species = 'giraffe'
-    else if (roll < 0.32) species = 'zebra'
-    else if (roll < 0.44) species = 'wildebeest'
-    else if (roll < 0.55) species = 'antelope'
-    else if (roll < 0.62) species = 'warthog'
-    count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : species === 'warthog' ? 4 : 7
+    // The ambient grazer herd is drawn from the region's own pool (point 208
+    // A2): the old fixed roll bands placed giraffe/zebra/wildebeest on ANY
+    // savanna, contradicting the hunt/vicinity rules that region-gate them.
+    species = ambientSavannaSpecies(regionAt(ll.lat, ll.lon), roll)
+    if (species) count = species === 'elephant' ? 5 : species === 'giraffe' ? 3 : species === 'warthog' ? 4 : 7
   } else if (anchor.type === 'jungle') {
     if (roll < 0.06) {
       species = 'elephant'

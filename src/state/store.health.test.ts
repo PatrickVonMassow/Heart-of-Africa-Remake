@@ -103,6 +103,21 @@ describe('canteen and dehydration (design.md §6)', () => {
     expect(countKey('journal.dehydrationOn')).toBe(before)
   })
 
+  it('the salt sea does not refill the canteen or clear thirst (point 208 A4)', () => {
+    // Far offshore Atlantic (no fresh water in reach): salt water is not
+    // drinkable, so swimming the sea neither refills the canteen nor quenches.
+    const [lat, lon] = [0, -20]
+    g().debugAddEquipment('canteen')
+    useGame.setState({ canteenFill: 0.5, dryDays: 0, health: 100, foodDays: 300 })
+    g().tickHealth(0.1, 'ocean', lat, lon)
+    expect(g().canteenFill).toBeLessThan(0.5) // it drained, it was not refilled to full
+
+    // Without a canteen the sea offers no relief, so thirst builds there.
+    useGame.setState({ equipment: {}, canteenFill: 0, dryDays: 0, health: 100, foodDays: 300 })
+    tick('ocean', lat, lon, 2, 0.1)
+    expect(g().dryDays).toBeGreaterThan(0)
+  })
+
   it('fresh water refills the canteen to full', () => {
     g().debugAddEquipment('canteen')
     useGame.setState({ canteenFill: 0.2, dryDays: 3 })

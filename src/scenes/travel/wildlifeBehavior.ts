@@ -1075,15 +1075,48 @@ export const PREDATOR_PREY: Record<PredatorKind, PreyKind[]> = {
 /** Region-appropriate grazers for ~1890 Africa (design.md §19). The eastern and
  *  southern plains hold the great herds; the wooded west/centre and the arid
  *  north offer a narrower range. A hunt's prey is the predator's scheme
- *  intersected with what the region holds. Giraffes live on the eastern and
- *  southern plains — matching their ambient savanna herds — so only there may
- *  a hunt take one (point 124). */
+ *  intersected with what the region holds, AND the ambient savanna herds are
+ *  drawn from this SAME pool (point 208 A2: the visible herds must match the
+ *  researched ranges, not appear anywhere savanna). Zebra and wildebeest are
+ *  East/South plains species — absent from the West African/Congo savanna in
+ *  1890 — and giraffes keep to the eastern and southern plains, so only there
+ *  may a hunt take one (point 124). */
 export const REGION_PREY: Record<RegionId, PreyKind[]> = {
   east: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
   south: ['wildebeest', 'zebra', 'antelope', 'warthog', 'giraffe'],
-  central: ['antelope', 'warthog', 'zebra'],
-  west: ['antelope', 'warthog', 'zebra'],
+  central: ['antelope', 'warthog'],
+  west: ['antelope', 'warthog'],
   north: ['antelope', 'warthog'],
+}
+
+/** Which predators roam each region (~1890 range, design.md §19). Lions
+ *  everywhere; cheetahs and hyenas favour the open eastern/southern plains;
+ *  leopards the wooded west/centre; the arid north holds lion, cheetah and
+ *  leopard. Shared (point 208 A3) so the random-event system gates a predator
+ *  attack by the SAME roster the rendered world uses — a hyena never attacks in
+ *  a region that holds no hyenas. */
+export const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
+  east: ['lion', 'cheetah', 'hyena', 'leopard'],
+  south: ['lion', 'cheetah', 'hyena', 'leopard'],
+  central: ['lion', 'leopard'],
+  west: ['lion', 'leopard'],
+  north: ['lion', 'cheetah', 'leopard'],
+}
+
+/** The ambient savanna herd a chunk seeds (point 208 A2): elephants roam every
+ *  savanna broadly, but grazer herds are drawn from the region's own
+ *  `REGION_PREY` pool so the visible world matches the hunt/vicinity/food-web
+ *  rules (a giraffe or zebra never stands as "scenery" in a region that every
+ *  other rule calls foreign). Returns null outside the herd-roll band. The roll
+ *  bands preserve the prior herd density; only the SPECIES pick is region-gated. */
+export function ambientSavannaSpecies(region: RegionId, roll: number): 'elephant' | PreyKind | null {
+  if (roll < 0.12) return 'elephant'
+  if (roll < 0.62) {
+    const pool = REGION_PREY[region] ?? REGION_PREY.east
+    const t = (roll - 0.12) / (0.62 - 0.12)
+    return pool[Math.min(pool.length - 1, Math.floor(t * pool.length))]
+  }
+  return null
 }
 
 /** The two halves of the defence matrix (design.md §19.8, point 125): the

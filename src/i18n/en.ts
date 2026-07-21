@@ -289,6 +289,8 @@ export const en: Strings = {
       'Rob this village at rifle point? This antagonizes the whole region for good — no more audiences, hints or aid, and any "Honored Friend" standing is lost forever.',
     robConfirmYes: 'Yes, rob them',
     robCancel: 'No, stand down',
+    robOrphansGoal:
+      'Beware: only this region can still teach you a bearing to the tomb that you have not yet learned. Rob it, and that knowledge is lost for good — the grave may become impossible to find.',
     bazaarGreeting: '"Treasures, effendi! Show me what the wilderness yielded — or take a piece home yourself."',
     bazaarSell: 'Offer a find:',
     bazaarBuy: 'For sale:',

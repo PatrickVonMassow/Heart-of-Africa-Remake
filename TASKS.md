@@ -7722,7 +7722,32 @@ the remaining open points in their numeric order.
   BUILD ORDER: (i) then (ii) first (highest leverage), the rest layer in over the
   finder. These join 203/204/205 as the pre-tag quality framework.
 
-- [ ] 208. WORLD-COHERENCE FIXES from the point-205 plausibility audit (user
+- [x] 208. DONE 21.07.2026 — all six agreed world-coherence fixes shipped.
+  A2: the ambient savanna herd is now drawn from the region's own `REGION_PREY`
+  pool via the pure `ambientSavannaSpecies` (no giraffe/zebra/wildebeest as
+  "scenery" in a region every other rule calls foreign), and zebra was removed
+  from `REGION_PREY.west`/`.central` (no zebra in West Africa/the Congo in 1890).
+  A3: `REGION_PREDATORS` moved to the pure wildlifeBehavior module and threaded
+  into the event context, so a predator attack fires only where that species
+  roams (no hyena attack in a hyena-less region). A4: `canDrink` no longer counts
+  'ocean' — salt water neither refills the canteen nor clears thirst. A5: the
+  design text now matches the code (a snakebite is not weapon-mitigated) and the
+  crocodile machete always lowers the attack chance, even from the canoe. A7: a
+  new pure `robWouldOrphanGoal` + a region-aware confirmation line warn when
+  robbing a coordinate-bearing region (North/East) whose hint is not yet learned.
+  B3: design.md §8 records the homage layer (value matrix, $, Khartoum, §13.2
+  glossary) as a deliberate accuracy carve-out, alongside the §19.8/§19.13 ones.
+  New pure tests (ambientSavannaSpecies, region-gated events, snake/croc
+  protection, sea-drink, robWouldOrphanGoal); design.md/CLAUDE.md updated.
+  Verified: tsc+build+lint+audit clean, 1973 unit green, events/flow green,
+  enrichments 207/0/0 on a clean run. NOTE: three enrichments runs each surfaced
+  a DIFFERENT single intermittent (168/186/102 staging flakes on run 1; a rare
+  one-frame floating-wildebeest tripwire hit on run 2; run 3 fully clean) — all
+  low-frequency, none reproducible; the rotating staging flakes belong to point
+  200, and the intermittent float is logged for the point-203 finder to chase
+  with a repro (A2 seeds more wildebeest in east/south, raising exposure to a
+  pre-existing rare anchoring edge rather than creating one).
+  ORIGINAL: WORLD-COHERENCE FIXES from the point-205 plausibility audit (user
   21.07.2026: fix A2, A3, A4, A5, A7, B3; A1/A6/B1/B2/B4/B5/B6 are accepted as-is
   for now — the current state is debug-only and the hint/treasure/reputation
   design is still to be done). PRIORITY: the NEXT queue item, right after point

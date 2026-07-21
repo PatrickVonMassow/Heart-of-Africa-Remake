@@ -38,6 +38,10 @@ export interface EventContext {
   /** Near a village of a region with "Honored Friend" status (§12): the
    * natives rush to help — at most a light injury results. */
   protectedByFriends: boolean
+  /** The predators that roam the current region (point 208 A3): a predator
+   * attack fires only where that species actually lives, so the journal never
+   * reports a hyena in a region whose rendered world holds none. */
+  regionPredators: readonly string[]
   equipment: Partial<Record<EquipmentId, number>>
 }
 
@@ -73,18 +77,26 @@ export function eventChance(kind: EventKind, ctx: EventContext): number {
   const r = balance.events
   switch (kind) {
     case 'lionAttack':
-      return ctx.terrain === 'savanna' && !ctx.inWater ? r.animalAttack * 0.5 * weaponProtection(ctx) : 0
+      return ctx.terrain === 'savanna' && !ctx.inWater && ctx.regionPredators.includes('lion')
+        ? r.animalAttack * 0.5 * weaponProtection(ctx)
+        : 0
     case 'cheetahAttack':
       // Cheetahs of the open plains: timid toward people, so the rarest and
-      // least dangerous of the cats (design.md §14/§19).
-      return ctx.terrain === 'savanna' && !ctx.inWater ? r.animalAttack * 0.15 * weaponProtection(ctx) : 0
+      // least dangerous of the cats (design.md §14/§19). Only where they roam
+      // (point 208 A3).
+      return ctx.terrain === 'savanna' && !ctx.inWater && ctx.regionPredators.includes('cheetah')
+        ? r.animalAttack * 0.15 * weaponProtection(ctx)
+        : 0
     case 'leopardAttack':
-      return (ctx.terrain === 'savanna' || ctx.terrain === 'jungle') && !ctx.inWater
+      return (ctx.terrain === 'savanna' || ctx.terrain === 'jungle') && !ctx.inWater && ctx.regionPredators.includes('leopard')
         ? r.animalAttack * 0.3 * weaponProtection(ctx)
         : 0
     case 'hyenaAttack':
-      // Spotted hyenas of the plains: bolder than the cats, a real threat.
-      return ctx.terrain === 'savanna' && !ctx.inWater ? r.animalAttack * 0.35 * weaponProtection(ctx) : 0
+      // Spotted hyenas of the plains: bolder than the cats, a real threat —
+      // only in the regions whose rendered world holds them (point 208 A3).
+      return ctx.terrain === 'savanna' && !ctx.inWater && ctx.regionPredators.includes('hyena')
+        ? r.animalAttack * 0.35 * weaponProtection(ctx)
+        : 0
     case 'snakeBite':
       return !ctx.inWater && (ctx.terrain === 'savanna' || ctx.terrain === 'jungle' || ctx.terrain === 'desert')
         ? r.animalAttack * 0.2
@@ -94,12 +106,16 @@ export function eventChance(kind: EventKind, ctx: EventContext): number {
     case 'crocodileAttack': {
       if (!ctx.inWater) return 0
       // Crocodiles strike swimmers; a canoe keeps the traveller out of reach.
-      // The machete always helps in the water; the rifle only from the canoe.
+      // The machete ALWAYS helps against a crocodile — including from the canoe
+      // (point 208 A5, design.md §14.2): machete-in-canoe is strictly safer than
+      // the canoe alone. The rifle only works from the canoe (otherwise wet).
       const hasCanoe = (ctx.equipment.canoe ?? 0) > 0
-      if (hasCanoe && (ctx.equipment.rifle ?? 0) > 0) return r.crocodile * 0.2
       const hasMachete = (ctx.equipment.machete ?? 0) > 0
-      const factor = hasCanoe ? 0.4 : hasMachete ? 0.6 : 1
-      return r.crocodile * factor
+      if (hasCanoe) {
+        if ((ctx.equipment.rifle ?? 0) > 0) return r.crocodile * 0.2
+        return r.crocodile * (hasMachete ? 0.3 : 0.4)
+      }
+      return r.crocodile * (hasMachete ? 0.6 : 1)
     }
     case 'fever':
       return ctx.wetland && !ctx.inWater ? r.fever : 0

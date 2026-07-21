@@ -7,7 +7,7 @@
 // Playwright E2E.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
-import { totalGifts, usedInventory } from './store'
+import { totalGifts, usedInventory, robWouldOrphanGoal, TOMB_COORDINATE_REGIONS } from './store'
 import { g, freshGame, withWorld, jumpTo, useGame } from '../test/store'
 
 withWorld()
@@ -218,5 +218,27 @@ describe("robbing a chief's hut (design.md §12)", () => {
       g().giveGift('gold')
     }
     expect(g().honoredFriend.north).not.toBe(true)
+  })
+})
+
+describe('a robbery warns when it would orphan the goal (point 208 A7)', () => {
+  it('flags a coordinate-bearing region whose hint is not yet learned', () => {
+    // North (latitude) and East (longitude) are the only coordinate-bearing
+    // regions; before their hint is learned, robbing them can orphan the goal.
+    expect(TOMB_COORDINATE_REGIONS).toEqual(['north', 'east'])
+    expect(robWouldOrphanGoal({ hintsGiven: {} }, 'north')).toBe(true)
+    expect(robWouldOrphanGoal({ hintsGiven: {} }, 'east')).toBe(true)
+  })
+
+  it('does not flag the flavour-only regions', () => {
+    for (const region of ['west', 'central', 'south'] as const) {
+      expect(robWouldOrphanGoal({ hintsGiven: {} }, region)).toBe(false)
+    }
+  })
+
+  it('stops flagging once that region’s hint is in the journal (it deciphers retroactively)', () => {
+    expect(robWouldOrphanGoal({ hintsGiven: { north: true } }, 'north')).toBe(false)
+    // East is still unlearned, so it still warns.
+    expect(robWouldOrphanGoal({ hintsGiven: { north: true } }, 'east')).toBe(true)
   })
 })

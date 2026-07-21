@@ -50,6 +50,7 @@ import {
   ploverTaken,
   vigilBlocksLanding,
   vigilDrawReady,
+  ambientSavannaSpecies,
   offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
@@ -1657,5 +1658,48 @@ describe('water-sheet standing anchors (point 196)', () => {
 
   it('the wader never sinks below the world floor', () => {
     expect(waderStandY(-0.5, null)).toBeCloseTo(0.02, 10)
+  })
+})
+
+describe('ambientSavannaSpecies (point 208 A2 — visible herds match the region pool)', () => {
+  const regions = ['east', 'south', 'central', 'west', 'north'] as const
+
+  it('never seeds a grazer a region does not hold (swept over the roll range)', () => {
+    for (const region of regions) {
+      const pool = REGION_PREY[region]
+      for (let r = 0; r < 1; r += 0.001) {
+        const s = ambientSavannaSpecies(region, r)
+        if (s === null || s === 'elephant') continue
+        expect(pool).toContain(s) // the grazer is always in the region's own pool
+      }
+    }
+  })
+
+  it('keeps zebra, wildebeest and giraffe out of the west, central and north', () => {
+    for (const region of ['west', 'central', 'north'] as const) {
+      for (let r = 0; r < 1; r += 0.001) {
+        const s = ambientSavannaSpecies(region, r)
+        expect(s).not.toBe('zebra')
+        expect(s).not.toBe('wildebeest')
+        expect(s).not.toBe('giraffe')
+      }
+    }
+  })
+
+  it('roams elephants on every savanna and leaves the high band empty', () => {
+    for (const region of regions) {
+      expect(ambientSavannaSpecies(region, 0.05)).toBe('elephant')
+      expect(ambientSavannaSpecies(region, 0.9)).toBeNull()
+    }
+  })
+
+  it('still offers the east its full plains variety', () => {
+    const seen = new Set<string>()
+    for (let r = 0.12; r < 0.62; r += 0.005) {
+      const s = ambientSavannaSpecies('east', r)
+      if (s && s !== 'elephant') seen.add(s)
+    }
+    // Every east grazer appears across the band (no collapse to one species).
+    for (const g of REGION_PREY.east) expect(seen.has(g)).toBe(true)
   })
 })

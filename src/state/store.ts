@@ -12,6 +12,7 @@ import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
 import { lakeDistance, riverDistance, riverFlow } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
+import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
 import { movementPenalty } from '../systems/movement'
 import {
   LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
@@ -498,7 +499,10 @@ function buildEventContext(
   const nearWaterfall = WATERFALLS.some((w) => Math.hypot(w.lat - lat, w.lon - lon) < 0.35)
   const wetland = terrain === 'jungle' || riverDistance(lat, lon, 0.2) < 0.12
   const protectedByFriends = nearestFriendVillage(lat, lon, s.honoredFriend) !== null
-  return { terrain, inWater, nearWaterfall, wetland, protectedByFriends, equipment: s.equipment }
+  // The current region's predator roster (point 208 A3): the event system fires
+  // a predator attack only where that species actually roams.
+  const regionPredators = REGION_PREDATORS[regionAt(lat, lon)] ?? []
+  return { terrain, inWater, nearWaterfall, wetland, protectedByFriends, regionPredators, equipment: s.equipment }
 }
 
 let nextEntryId = 2
@@ -510,6 +514,21 @@ function newSeed(): number {
     if (p !== null && /^\d+$/.test(p)) return Number(p) >>> 0
   }
   return Math.floor(Math.random() * 0xffffffff)
+}
+
+/** The two regions whose knowing chief reveals a USABLE tomb coordinate
+ *  (design.md §13: the North teaches the latitude, the East the longitude —
+ *  en.ts hintDecoded; the other regions give only flavour). Robbing one of
+ *  these before its hint is learned is the only path that can orphan the goal,
+ *  since a robbery blocks the region's audiences for good (point 208 A7). */
+export const TOMB_COORDINATE_REGIONS: RegionId[] = ['north', 'east']
+
+/** Would robbing this region put the tomb out of reach (point 208 A7)? True only
+ *  for a coordinate-bearing region whose hint the traveller has NOT yet learned —
+ *  a robbery then forfeits the audience that alone could reveal it. Once the raw
+ *  hint is in the journal it deciphers retroactively, so the goal is safe. */
+export function robWouldOrphanGoal(s: Pick<GameState, 'hintsGiven'>, region: RegionId): boolean {
+  return TOMB_COORDINATE_REGIONS.includes(region) && s.hintsGiven[region] !== true
 }
 
 /** Carried item count against the inventory capacity (design.md §6). */
@@ -1048,9 +1067,12 @@ export const useGame = create<GameState>()((set, get) => ({
     // toggles it. Without a canteen there is no reserve, so thirst builds
     // whenever fresh water is out of reach.
     const hasCanteen = (s.equipment.canteen ?? 0) > 0
+    // Only FRESH water quenches (point 208 A4): salt water is not drinkable, so
+    // the sea — even the swimmable coastal band — never refills the canteen or
+    // cures desert thirst (design.md §6.1). Swimming stays allowed; it just does
+    // not quench.
     const canDrink =
       terrain === 'water' ||
-      terrain === 'ocean' ||
       riverDistance(lat, lon, 0.25) < 0.08 ||
       lakeDistance(lat, lon, 0.25) < 0.08
     let canteenFill = s.canteenFill
