@@ -1305,7 +1305,7 @@ check('a higher calfFraction raises more juveniles (point 169)',
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
 // flies in, lands and consumes it, dissolving it as a lion kill does.
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
-await page.waitForTimeout(1600)
+await page.evaluate(() => window.__sleepSim(1.6)) // point 200: sim-clock settle
 const scavenge = await page.evaluate(async () => {
   const w = window.__wildlife
   const herds = w.herdsRef.current
@@ -2650,7 +2650,7 @@ await waitForFamily()
 // The rescue is the CALM-water behaviour — pin the season dry so the austral
 // rains can never swell the drama current under this check (point 122).
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
-await page.waitForTimeout(400)
+await page.evaluate(() => window.__sleepSim(0.4)) // point 200: sim-clock settle
 const rescue = await page.evaluate(async () => {
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
