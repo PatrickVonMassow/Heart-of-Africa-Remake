@@ -7896,6 +7896,41 @@ the remaining open points in their numeric order.
   pt.13 note the coast smoothing. (The dark "starry" sea in the shot is the water
   surface shader at night, a separate matter — this point is only the stepping.)
 
+- [ ] 210. A spurious SEA-ARM juts into the coast EAST of Cairo — remove it (or
+  adjust the ocean beside it) so the continent has ONE clean, continuous sea edge
+  as close to the real ~1890 shape as possible (user report 21.07.2026, screenshot
+  at Cairo: a broad dark inlet pokes west into the eastern desert). The user's read
+  is right: it is a leftover of the Red-Sea / Suez trim that set the NE continent
+  boundary (redSea.ts). §7.1 pt.4 already forbids exactly this ("no trimmed texel
+  borders kept land outside the Suez isthmus gate — no ocean scrap juts into the
+  coast"), so one slipped past redSea.test.ts. This is a SHAPE/DATA defect (a wrong
+  land/sea verdict), distinct from point 209 (the coast RENDER stepping) — but the
+  SAME Cairo-coast area, so do them in one coast pass. GEOGRAPHY: the
+  `NORTHEAST_BOUNDARY` polyline runs the Suez isthmus at ~32.4–32.7°E (redSea.ts
+  ~18); Cairo sits at ~30.05°N/31.24°E. In 1890 the isthmus east of the delta was
+  LAND (the Suez Canal existed from 1869 but is a thin waterway, not a broad arm),
+  and the real sea edges there are the Mediterranean (north of the delta) and the
+  Gulf of Suez (SE) — so a broad sea inlet in the eastern desert is wrong.
+  DIAGNOSE FIRST (probe the land/sea mask east of Cairo, ~29.5–31.5°N /
+  32–33.5°E): find the arm's exact extent and its cause — is it real DEM sea
+  (a low the ocean flood-filled, e.g. the Bitter Lakes / Lake Timsah reading as
+  sea), or a trim STAMP wedge where `isNortheastOfBoundary` + the boundary
+  polyline cut into the kept coast? FIX per the cause: (a) if a trim/boundary
+  wedge, adjust the `NORTHEAST_BOUNDARY` control points near [32.4,31.45]…
+  [32.7,29.75] so the line hugs the real African Gulf-of-Suez / isthmus shore with
+  no re-entrant, giving a continuous edge; or (b) if a spurious flooded inland
+  patch, fill it to land (a targeted mask correction / an extra land seed) so the
+  isthmus reads continuous, leaving the genuine Gulf of Suez and Mediterranean as
+  the sea edges. Keep every redSea.test.ts acceptance verdict intact (mid Red Sea,
+  Sinai, Arabia, Gulf of Aden = blocked ocean; the Nile delta and the African Red
+  Sea coast = walkable land; no land route rounds the Red Sea). VERIFY: a driven
+  screenshot at the Cairo start shows a single clean continent edge with no inlet;
+  a pure test in redSea.test.ts that the arm's probed coordinates now read the
+  correct class (land, or a clean sea boundary) AND that the existing acceptance
+  points are unchanged. DOCS: design.md §3.1/§11.2 + CLAUDE §7.1 pt.4 if the
+  boundary wording changes. Coordinate with point 209 (same coast) — a shared
+  before/after Cairo screenshot proves both.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
