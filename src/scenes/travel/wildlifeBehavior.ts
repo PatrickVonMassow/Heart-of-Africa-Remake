@@ -584,6 +584,30 @@ export function landedBirdY(groupBaseY: number, groundUnderBird: number, hop: nu
   return lift + LANDED_BIRD_HOVER + hop
 }
 
+/**
+ * Standing height anchored to the rendered water sheet (point 196): every
+ * water occupant (a struggling calf, a wading parent, a bathing drinker)
+ * measures its body from the SURFACE, dipped by its own depth — never from
+ * the carved bed, which sits far below the sheet mid-channel. `surface` is
+ * the resolved waterSurfaceY sample; a missed edge texel falls back to the
+ * bed plus the ribbon's nominal lift.
+ */
+export function sheetAnchorY(surface: number | null, bedHeight: number, dip: number): number {
+  return (surface ?? bedHeight + 0.3) - dip
+}
+
+/**
+ * A shoreline wader's standing height (point 196): legs in the shallow sheet
+ * (a fixed wade depth below the surface), but never below its own bed — on
+ * the shallow edge it simply stands on the bottom. The flat 0.02 this
+ * replaces buried whole flocks on elevated lakes and floated them over low
+ * banks.
+ */
+export function waderStandY(bedHeight: number, surface: number | null): number {
+  const bed = Math.max(0.02, bedHeight)
+  return Math.max(bed, sheetAnchorY(surface, bedHeight, 0.25))
+}
+
 /** That bird's clearance above its own ground — the verify hook's metric,
  *  by construction never below LANDED_BIRD_HOVER. */
 export function landedBirdClearance(groupBaseY: number, groundUnderBird: number, hop: number): number {

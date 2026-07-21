@@ -66,7 +66,9 @@ import {
   mournDeadline,
   elephantStepAllowed,
   rescueSpeed,
+  sheetAnchorY,
   wadeSpeed,
+  waderStandY,
   PREY_WALK_SPEED,
   landedBirdYPosed,
   landedBirdClearancePosed,
@@ -452,6 +454,7 @@ const fireFlameGeo = new THREE.PlaneGeometry(1.0, 1.4)
 const fireFlameMat = new THREE.MeshBasicMaterial({
   color: '#ff7a1e', transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false,
 })
+const FIRE_BAND_SEGMENTS = 16 // terrain-following scorch strip (point 196)
 const fireBandGeo = new THREE.PlaneGeometry(1, 1)
 const fireBandMat = new THREE.MeshBasicMaterial({
   color: '#181008', transparent: true, opacity: 0.8, depthWrite: false,
@@ -946,7 +949,14 @@ function placeGroup(
     const animal: Animal = {
       x,
       z,
-      y: shoreline ? 0.02 : Math.max(0.02, s.height),
+      // A shoreline wader stands in ITS OWN shallow water (point 196): legs in
+      // the rendered sheet, clamped to the local bed — the flat 0.02 buried
+      // whole flocks on elevated lakes and floated them over low banks.
+      y: shoreline
+        ? s.type === 'water'
+          ? waderStandY(s.height, waterSurfaceY(ll.lat, ll.lon, seed, s.height))
+          : Math.max(0.02, s.height)
+        : Math.max(0.02, s.height),
       rot: r3 * Math.PI * 2,
       scale: sc,
       phase: r1 * Math.PI * 2,
@@ -1384,7 +1394,7 @@ function Herds() {
   const vscl = useMemo(() => new THREE.Vector3(), [])
   const stainMesh = useRef<THREE.InstancedMesh>(pool.stain)
   const fireFlames = useRef<THREE.InstancedMesh>(null)
-  const fireBand = useRef<THREE.Mesh>(null)
+  const fireBand = useRef<THREE.InstancedMesh>(null)
   // Each stain lies in the local slope plane (position + ground normal): a
   // horizontal disc on a hillside got wedges swallowed by the ground and read
   // as a Pac-Man (design.md §19).
@@ -1779,7 +1789,9 @@ function Herds() {
               // point; otherwise probe for the nearest bank.
               a.inWater = 0
               a.hop = undefined
-              a.y = Math.max(0.02, ter.height)
+              // Struggle AT the rendered sheet (point 196): the pose dips from
+              // a.y, and the carved bed sits far below the surface mid-channel.
+              a.y = sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, ter.height), ter.height, 0.05)
               if (!a.rescueEntry) a.rescueEntry = findLandNear(a.x, a.z, seed)
             }
           }
@@ -1824,7 +1836,8 @@ function Herds() {
               a.x = moved.x
               a.z = moved.z
               const nll = worldToLatLon(a.x, a.z)
-              a.y = Math.max(0.02, sampleTerrain(nll.lat, nll.lon, seed).height)
+              const nh = sampleTerrain(nll.lat, nll.lon, seed).height
+              a.y = sheetAnchorY(waterSurfaceY(nll.lat, nll.lon, seed, nh), nh, 0.05)
             }
             // Calm water lets an unaided calf clamber out exhausted; a swollen
             // current holds it under until it drowns (design.md §19.8).
@@ -1856,6 +1869,8 @@ function Herds() {
             }
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
+            // Wade out chest-deep ON the sheet (point 196), never along the bed.
+            if (ter.type === 'water') a.y = sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, ter.height), ter.height, 0.32)
             if (ter.type !== 'water' || d <= 0.3) {
               // Back on the bank: shake off and rejoin the herd.
               a.inWater = undefined
@@ -1907,7 +1922,8 @@ function Herds() {
             const ll = worldToLatLon(a.x, a.z)
             const ter = sampleTerrain(ll.lat, ll.lon, seed)
             if (ter.type === 'water') {
-              a.y = Math.max(0.02, ter.height)
+              // Chest-deep on the rendered sheet (point 196), like a crossing.
+              a.y = sheetAnchorY(waterSurfaceY(ll.lat, ll.lon, seed, ter.height), ter.height, 0.32)
               a.wadeTime = (a.wadeTime ?? 0) + dt
               const bw = balance.waterDrama
               const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
@@ -2377,14 +2393,25 @@ function Herds() {
       if (band) {
         band.visible = f.mode !== 'idle'
         if (band.visible) {
-          const mid = f.front / 2
-          const mx = f.x + Math.sin(f.heading) * mid
-          const mz = f.z + Math.cos(f.heading) * mid
-          const ll3 = worldToLatLon(mx, mz)
-          const g = Math.max(0.02, sampleTerrain(ll3.lat, ll3.lon, seed).height)
-          band.position.set(mx, g + 0.06, mz)
-          band.rotation.set(-Math.PI / 2, 0, -f.heading)
-          band.scale.set(FIRE_HALF_WIDTH * 2, f.front, 1)
+          // Terrain-following strip (point 196): one long plane at the midpoint
+          // height clipped into rising ground and floated over falling ground —
+          // each segment sits at its own sampled ground height instead.
+          const segLen = f.front / FIRE_BAND_SEGMENTS
+          for (let i = 0; i < FIRE_BAND_SEGMENTS; i++) {
+            const along = (i + 0.5) * segLen
+            const sx = f.x + Math.sin(f.heading) * along
+            const sz = f.z + Math.cos(f.heading) * along
+            const ll3 = worldToLatLon(sx, sz)
+            const g = Math.max(0.02, sampleTerrain(ll3.lat, ll3.lon, seed).height)
+            vpos.set(sx, g + 0.06, sz)
+            euler.set(-Math.PI / 2, 0, -f.heading, 'XYZ')
+            quat.setFromEuler(euler)
+            vscl.set(FIRE_HALF_WIDTH * 2, segLen * 1.08, 1) // slight overlap hides the steps
+            mtx.compose(vpos, quat, vscl)
+            band.setMatrixAt(i, mtx)
+          }
+          band.count = FIRE_BAND_SEGMENTS
+          band.instanceMatrix.needsUpdate = true
           fireBandMat.opacity = f.mode === 'smoulder' ? 0.8 * (f.timer / FIRE_SMOULDER_SECONDS) : 0.8
         }
       }
@@ -2873,9 +2900,22 @@ function Herds() {
             const toZ = a.drink.tz - pz
             px += toX * k
             pz += toZ * k
+            // Stand on the ground under the RENDERED spot (point 196): bodyY
+            // kept the spawn-spot ground, so a lower/higher bank floated or
+            // buried the drinker — and an endpoint lerp buried it under any
+            // ridge on the way, so sample per frame. Over the water's edge a
+            // bather rides the sheet chest-deep.
+            {
+              const dll = worldToLatLon(px, pz)
+              const dter = sampleTerrain(dll.lat, dll.lon, seed)
+              bodyY =
+                dter.type === 'water'
+                  ? sheetAnchorY(waterSurfaceY(dll.lat, dll.lon, seed, dter.height), dter.height, 0.32)
+                  : Math.max(0.02, dter.height)
+            }
             if (k > 0.04) yaw = Math.atan2(toX, toZ) + (cycle >= 0.38 ? Math.PI : 0)
             if (cycle >= 0.12 && cycle < 0.38) {
-              if (a.bathe) bodyY = a.y - 0.35 + Math.sin(t * 3 + a.phase) * 0.05 // wallow/splash
+              if (a.bathe) bodyY += Math.sin(t * 3 + a.phase) * 0.05 // wallow/splash
               else pitch = 0.42 + Math.sin(t * 1.4 + a.phase) * 0.08
             }
           }
@@ -2925,7 +2965,7 @@ function Herds() {
               a.y = Math.max(0.02, ct2.height)
             } else if (!onLand) {
               const ws2 = waterSurfaceY(cll2.lat, cll2.lon, seed, ct2.height)
-              a.y = (ws2 ?? ct2.height + 0.3) - 0.32 // chest-deep on the sheet
+              a.y = sheetAnchorY(ws2, ct2.height, 0.32) // chest-deep on the sheet
             } else {
               a.y = Math.max(0.02, ct2.height) // wading out over the bank
             }
@@ -3034,10 +3074,8 @@ function Herds() {
             px = a.x
             pz = a.z
             yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
-            {
-              const llw = worldToLatLon(a.x, a.z)
-              if (sampleTerrain(llw.lat, llw.lon, seed).type === 'water') bodyY = a.y - 0.25
-            }
+            // In the water a.y already rides the sheet chest-deep (point 196)
+            // — an extra dip here read the wader half a body too low.
             pitch = 0.15
             familyHeld = true
           } else if (a.young && LION_STATE.mode === 'chase' && LION_STATE.victim === a) {
@@ -3315,6 +3353,13 @@ function Herds() {
             a.dodgeHeading = undefined
           }
         }
+        // The LOGICAL render spot (point 196): the anchoring assert judges the
+        // body here, BEFORE the cosmetic shuffle below — for an idle animal
+        // that is its anchor, for a drinker the slid bank spot, never the
+        // sub-unit shuffle wobble (which on a slope would sample ~0.9 higher
+        // ground and false-fire a burial the player never sees).
+        const anchorX = px
+        const anchorZ = pz
         // Apply the blended idle-shuffle offset (never a hard on/off switch:
         // the amplitude fades between the behaviours' targets over ~0.4 s).
         if (sp !== 'elephant') {
@@ -3382,16 +3427,18 @@ function Herds() {
         // ride the water rules instead and are skipped. Tolerances are generous
         // — this is a tripwire for the buried/floating CLASS (187/190/202/185),
         // not a pixel gate; a violation fails any suite via the assert channel.
-        // (a.drink is exempt UNTIL point 196 fixes the drink render's stale
-        // bodyY — the tripwire would rightly fire on that known bug today. The
+        // (Judged at the RENDERED spot px/pz: the drink/bathe slide renders
+        // away from the anchor and — since point 196 — carries the bank
+        // target's own height, so drinkers are asserted like everyone else;
+        // a bather mid-slide stands over a water cell, which is skipped. The
         // drama locks mirror the WATER-SWEEP's exemptions exactly: those
         // animals are never re-anchored there, so asserting them would flag
         // the dramas' own scripted poses, not a real burial.)
         if ((aIdx + ASSERT_TICK) % 13 === 0 && !a.dead && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
             a.crossing === undefined && a.inWater === undefined && a.caught === undefined && a.mired === undefined &&
-            a.drink === undefined && !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
+            !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
             a.fireTrapped === undefined && LION_STATE.victim !== a) {
-          const gll = worldToLatLon(a.x, a.z)
+          const gll = worldToLatLon(anchorX, anchorZ)
           const gt = sampleTerrain(gll.lat, gll.lon, seed)
           if (gt.type !== 'water' && gt.type !== 'ocean') {
             const ground = Math.max(0, gt.height)
@@ -3400,7 +3447,7 @@ function Herds() {
               'animal-buried',
               () =>
                 `${sp} bodyY=${bodyY.toFixed(2)} ground=${ground.toFixed(2)} y=${a.y.toFixed(2)} ` +
-                `young=${!!a.young} bathe=${!!a.bathe} dodge=${a.dodgeHeading !== undefined} hop=${a.hop !== undefined} ` +
+                `young=${!!a.young} bathe=${!!a.bathe} drink=${!!a.drink} dodge=${a.dodgeHeading !== undefined} hop=${a.hop !== undefined} ` +
                 `chunk=${a.chunk ?? 'none'} shoreSeed=${!!a.shoreSeed} parent=${!!a.parent} child=${!!a.child} ` +
                 `dPlayer=${Math.hypot(a.x - pos.x, a.z - pos.z).toFixed(0)}`,
             )
@@ -3465,7 +3512,7 @@ function Herds() {
       ))}
       <primitive object={pool.stain} dispose={null} />
       <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_COUNT]} visible={false} frustumCulled={false} />
-      <mesh ref={fireBand} geometry={fireBandGeo} material={fireBandMat} visible={false} frustumCulled={false} />
+      <instancedMesh ref={fireBand} args={[fireBandGeo, fireBandMat, FIRE_BAND_SEGMENTS]} visible={false} frustumCulled={false} />
       <group ref={scavengeGroup} visible={false}>
         {[0, 1, 2].map((i) => (
           <mesh key={i} geometry={vultureGeo} material={material} dispose={null} />

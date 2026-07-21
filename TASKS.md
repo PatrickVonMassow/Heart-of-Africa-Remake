@@ -7212,19 +7212,32 @@ the remaining open points in their numeric order.
   I1 invariant drive if it can catch the class. One commit per coherent fix or
   one for the sweep if small. DOCS: CLAUDE §7.1 pt.12 bullets where wording
   changes.
-- [ ] 196. BED-VS-SURFACE / GROUND-ANCHOR sweep over the remaining water and
-  slope depictions (Pillar-2 group; the points-128/152/185/187 class, list in
-  the 184 log): the §19.8 water-drama poses measure from the carved bed, not
-  the rendered surface (Wildlife ~2806 — a drowning calf reads too deep); the
-  drink/bathe cycle renders the animal at the bank target while bodyY keeps the
-  SPAWN-spot ground height (~2751 — floating/sunken drinkers when the dry-season
-  catchment sends them far); the grass-fire scorch plane is anchored at its
-  midpoint height only (~2282 — floats/clips on sloped ground); the flamingo is
-  pinned to a fixed y=0.02 ignoring the water sheet (~913 — buried/floating on
-  elevated lakes). Verify each inline (some may be visually negligible — judge
-  by the picture), fix via waterSurfaceY/per-position ground sampling, pure-test
-  the changed anchors, re-shoot the affected screenshots. Coordinate 2806 with
-  point 122's drama tuning and 913 with point 187's croc fix (same module).
+- [x] 196. DONE 21.07.2026 — the BED-VS-SURFACE / GROUND-ANCHOR sweep over the
+  remaining water and slope depictions (Pillar-2 group; the points-128/152/185/187
+  class). All four sites fixed, each routed through a shared pure anchor so the
+  render and the tests agree: (a) the §19.8 water-drama poses (a fallen-in calf,
+  its downstream drift, the wading/escorting parent, a rescued calf clambering
+  out) now stand chest-deep ON the rendered sheet via `sheetAnchorY` — the carved
+  bed sits a full channel depth below the surface mid-channel, so they read too
+  deep before; the render-side extra dip on the wading parent was removed (it
+  double-counted the depth now that a.y rides the sheet). (b) The drink/bathe
+  cycle samples the ground UNDER the rendered spot every frame (an endpoint lerp
+  buried the drinker under any ridge on the way to the bank), riding the sheet
+  chest-deep over the water's edge for a bather. (c) The grass-fire scorch band
+  is now a terrain-following strip of `FIRE_BAND_SEGMENTS` instanced quads, each
+  at its own sampled ground height (the single midpoint-height plane clipped into
+  rising ground and floated over falling ground). (d) Flamingos stand via
+  `waderStandY` — legs in their own shallow sheet, clamped to the local bed —
+  instead of a flat y=0.02 that buried whole flocks on elevated lakes. Also
+  SHARPENED the point-203(A) tripwire: it now judges the LOGICAL render spot
+  (the pre-idle-shuffle position — the cosmetic ±0.8 shuffle would sample ~0.9
+  higher ground on a slope and false-fire) and the drink exemption is LIFTED, so
+  drinkers are policed like everyone else. Two new pure tests (`sheetAnchorY`,
+  `waderStandY` in wildlifeBehavior.test.ts); build+lint+audit clean, unit green,
+  enrichments 207 pass / 0 fail / 0 console-errors with the tripwire armed.
+  (Original site notes for the record: Wildlife ~2806 drowning calf too deep;
+  ~2751 floating/sunken drinkers under a far dry-season catchment; ~2282 scorch
+  plane on slopes; ~913 flamingo fixed y on elevated lakes.)
 - [ ] 197. DRAMA-STATE EXCLUSION/GATING sweep (Pillar-2 group; the seams
   BETWEEN systems, sibling of 194 — list in the 184 log): the crocodile victim
   scan derives its trigger from the drink-cycle CLOCK and the static drink

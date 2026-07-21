@@ -28,7 +28,9 @@ import {
   mournDeadline,
   elephantStepAllowed,
   rescueSpeed,
+  sheetAnchorY,
   wadeSpeed,
+  waderStandY,
   PREY_WALK_SPEED,
   landedBirdY,
   landedBirdClearance,
@@ -1634,5 +1636,30 @@ describe('the lioness defends her cub against a hyena (design.md §19.8, point 1
     // 1 − defendChance = 0.05 — a poignant but uncommon ending (the lioness
     // stands vigil), consistent with the mother routing the threat.
     expect(1 - defendChance('lion', 'hyena', shipped)).toBeCloseTo(0.05, 10)
+  })
+})
+
+describe('water-sheet standing anchors (point 196)', () => {
+  it('sheetAnchorY measures from the rendered surface, dipped by the body depth', () => {
+    // Bed 1.0 far below a 2.0 sheet: a chest-deep wader stands at 1.68 —
+    // anchoring to the bed instead read it a full channel depth too low.
+    expect(sheetAnchorY(2.0, 1.0, 0.32)).toBeCloseTo(1.68, 10)
+    // The struggling calf's shallow dip.
+    expect(sheetAnchorY(2.0, 1.0, 0.05)).toBeCloseTo(1.95, 10)
+  })
+
+  it('a missed edge texel falls back to the bed plus the nominal ribbon lift', () => {
+    expect(sheetAnchorY(null, 1.0, 0.05)).toBeCloseTo(1.25, 10)
+  })
+
+  it('a wader stands legs-in-the-sheet over deep water but on the bottom at the shallow edge', () => {
+    // Deep spot on an elevated lake: surface 2.0, bed 1.0 -> wade depth 0.25.
+    expect(waderStandY(1.0, 2.0)).toBeCloseTo(1.75, 10)
+    // Shallow edge: the bed is above the wade depth -> stand on the bottom.
+    expect(waderStandY(1.9, 2.0)).toBeCloseTo(1.9, 10)
+  })
+
+  it('the wader never sinks below the world floor', () => {
+    expect(waderStandY(-0.5, null)).toBeCloseTo(0.02, 10)
   })
 })
