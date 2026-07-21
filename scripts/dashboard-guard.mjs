@@ -109,6 +109,24 @@ try {
     )
   }
 
+  // (3) Completeness: EVERY open, non-deferred TASKS point must be visible on the
+  // dashboard — in the Warteschlange or named in the now-card. (Missing 200/184/205
+  // slipped past because the guard only checked freshness + no-stale-queue before.)
+  // The now-card's OWN point (taken from its TITLE, not incidental mentions in
+  // the status text — "the point-200 class" falsely covered 200 before) is
+  // exempt; every OTHER open point must be in the Warteschlange.
+  const nowStart = html.indexOf('Woran ich gerade arbeite')
+  const nowTitleM = nowStart >= 0 ? html.slice(nowStart).match(/class="t">\s*(\d+)/) : null
+  const nowPoint = nowTitleM ? Number(nowTitleM[1]) : -1
+  const missing = open.filter((n) => n !== nowPoint && !queued.has(n))
+  if (missing.length) {
+    block(
+      `BATCH DASHBOARD INCOMPLETE: open TASKS point(s) ${missing.join(', ')} appear in NEITHER the ` +
+        'Warteschlange nor the now-card. Add every open point to the dashboard (an ongoing/umbrella ' +
+        'point still gets a queue card), republish, then re-run --synced.',
+    )
+  }
+
   allow()
 } catch (e) {
   console.error(`dashboard-guard error (allowing stop): ${e && e.message}`)

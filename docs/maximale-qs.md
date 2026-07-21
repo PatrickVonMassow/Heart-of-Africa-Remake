@@ -156,6 +156,11 @@ Cheap automated classes first, then the visual sweep:
 - Full regression again: build + lint + audit + Vitest + the LARGE browser set
   on BOTH backends, **3× flake-free** (a single retry may clear a rotating
   staging flake; a persistent fail is a real regression).
+- **Cross-browser & mobile smoke at `thorough` depth** (point 213): the
+  `crossbrowser.mjs` functional smoke on Firefox + WebKit (desktop) AND the touch
+  layer on WebKit-iOS + Chromium-Android (mobile/tablet) — NEVER the whole suite
+  per engine (that multiplies the runtime by the engine count), only the tiered
+  core-flow subset. Skips gracefully if the engines are not installed.
 
 ## Phase 9 — Tag & publish the demo (only on an explicit "new demo" instruction)
 - Increment the trailing version digit (v0.2 → v0.3, etc.).

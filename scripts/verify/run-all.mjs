@@ -155,6 +155,51 @@ function runSuite(name, baseUrl) {
   return ok
 }
 
+// Auto-retry a failed BROWSER suite once (point 200 — general flake resilience).
+// The suites drive a real-time RAF simulation whose staging can miss its window
+// under full-regression load, and each run tends to surface a DIFFERENT rare
+// intermittent — so a single retry almost always clears a rotating flake, while
+// a REAL failure fails BOTH runs and is still reported. A retry is made LOUD, not
+// silent: a "PASSED ON RETRY" line flags the suite for investigation, so a
+// genuine INTERMITTENT bug (one that flaked, like the buried-drinker) is surfaced
+// rather than masked. The root-cause fix stays the point-200 sim-clock/condition
+// polling; this only stops one transient from failing the whole regression.
+const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
+function runSuiteWithRetry(name, baseUrl) {
+  if (!RETRY_ENABLED) return runSuite(name, baseUrl) // strict mode (closing's flake-free gate)
+  if (runSuite(name, baseUrl)) return true
+  console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
+  if (runSuite(name, baseUrl)) {
+    console.log(`⚠ PASSED ON RETRY  ${name} — it flaked once; INVESTIGATE if it recurs (could be a real intermittent)`)
+    return true
+  }
+  console.log(`FAIL (twice)  ${name} — a real failure, not a flake`)
+  return false
+}
+
+// Cross-browser functional smoke (point 213): a SHORT check on Firefox + WebKit
+// whose DEPTH scales with the tier (minimal/standard/thorough) — never the whole
+// suite per engine. Graceful: exit 0 if the engines aren't installed. Surfaces the
+// per-engine backend (WebGPU vs WebGL2 fallback).
+function runCrossBrowser(baseUrl, depth) {
+  const res = spawnSync(process.execPath, [join(HERE, 'crossbrowser.mjs')], {
+    encoding: 'utf8',
+    env: { ...process.env, BASE_URL: baseUrl, CROSSBROWSER_DEPTH: depth },
+  })
+  const out = (res.stdout ?? '') + (res.stderr ?? '')
+  const pass = (out.match(/^PASS/gm) ?? []).length
+  const fail = (out.match(/^FAIL/gm) ?? []).length
+  const skip = (out.match(/^SKIP/gm) ?? []).length
+  const ok = res.status === 0
+  console.log(`${ok ? 'PASS' : 'FAIL'}  crossbrowser  ${pass} pass, ${fail} fail, ${skip} skip (${depth}, exit ${res.status})`)
+  // Always surface the per-engine backend + any skips; on failure also the FAILs.
+  for (const line of out.split('\n')) {
+    if (/backend:|^SKIP/.test(line)) console.log('      ' + line.trim())
+    else if (!ok && /^FAIL/.test(line)) console.log('      ' + line.trim())
+  }
+  return ok
+}
+
 const results = []
 
 // Preflight: type-check + production build and lint must be clean before the
@@ -226,10 +271,20 @@ try {
       console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — not run on WebGPU, point 184)`)
     }
   }
-  if (devPick.length > 0) {
+  // Cross-browser smoke (point 213): on a FULL tier/default run (not a bare
+  // single-suite filter) or when asked by name; depth scales with the tier
+  // (minimal for SMALL, standard for LARGE/default). Run once, on the WebGL2
+  // Chromium lane only — it covers the OTHER engines, so re-running it on the
+  // WebGPU lane would be redundant.
+  const wantCross = (fullRun || filter.includes('crossbrowser')) && VERIFY_GL !== 'webgpu'
+  if (devPick.length > 0 || wantCross) {
     const server = await launchServer('npm run dev', 'dev', join(HERE, '..', '..'))
     dev = server.child
-    for (const s of devPick) results.push(runSuite(s, server.base))
+    for (const s of devPick) results.push(runSuiteWithRetry(s, server.base))
+    if (wantCross) {
+      const depth = process.env.CROSSBROWSER_DEPTH ?? (tier === 'small' ? 'minimal' : 'standard')
+      results.push(runCrossBrowser(server.base, depth))
+    }
   }
 } finally {
   killTree(dev)
@@ -250,7 +305,7 @@ if ((fullRun && tier !== 'small') || filter.includes('preview')) {
     try {
       const server = await launchServer('npm run preview', 'preview', join(HERE, '..', '..'))
       preview = server.child
-      results.push(runSuite('preview', server.base))
+      results.push(runSuiteWithRetry('preview', server.base))
     } finally {
       killTree(preview)
     }
