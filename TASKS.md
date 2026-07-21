@@ -7863,6 +7863,39 @@ the remaining open points in their numeric order.
   six fixes verifiable per their tests; design.md/CLAUDE.md updated where noted;
   no regression in the wildlife/event/health/reputation suites.
 
+- [ ] 209. The SEA COASTLINE renders as an ugly STAIRCASE at the close bird's-eye
+  zoom (user report 21.07.2026, screenshot at Cairo: the sand↔sea boundary steps
+  in axis-aligned blocks). DIAGNOSED: the waterline is the 0.5-contour of a 1-BIT
+  land/sea mask read from the DEM's blue channel, bilinearly interpolated
+  (`landFractionAt`, geodata.ts ~121 — each texel is 0 or 1, ~2.8 km wide) and
+  sharpened by `sstep(0.32, 0.68, land)` in sampleTerrain (terrain.ts ~205). A
+  bilinearly-interpolated BINARY mask can only cross 0.5 along the texel grid, so
+  the coast is a staircase at the DEM texel size; the elevation is smooth (16-bit)
+  but the land/sea CLASSIFICATION is not, and — unlike the biome/region borders,
+  which ARE domain-warped (terrain.ts ~225 BIOME_WARP) — the coast sample is
+  deliberately NOT warped ("the raw lat/lon still drive … coasts", ~224), so the
+  raster grid shows through. It is invisible far out (many texels per pixel) but
+  glaring at the closest zoom the game starts at. This is the §7.1 pt.11/13
+  "smooth coasts without raster steps" goal breaking down at close range.
+  FIX (pick per a probe): (a) DERIVE the near-field land fraction from a SIGNED
+  DISTANCE to the vector coastline (`LAND_POLYGONS`, already imported in
+  terrain.ts) rather than the raster mask — smooth at any zoom, the pt.13 ideal;
+  or (b) DOMAIN-WARP the coast sample like the biome borders (perturb the lat/lon
+  fed to `landFractionAt`/`coastDistanceAt` with the low-frequency noise), turning
+  the grid staircase into a natural meander — cheaper, and consistent with the
+  existing warp; or (c) widen `landFractionAt` to a higher-order (bicubic) sample
+  plus a sub-texel noise dither. Prefer (b) unless a probe shows the vector
+  distance (a) is affordable per-vertex. Keep the Red-Sea/Mediterranean/trim
+  rules (redSea.test.ts) intact — warp the SHAPE, never move the land/sea verdict
+  at the acceptance coordinates. VERIFY: a driven screenshot at the start zoom
+  (0.5) at Cairo shows a smooth coast (human-viewable), and a pure test that the
+  coastline is sub-texel smooth — sample the land fraction across a fine transect
+  over the shore and assert the 0.5-crossing is not quantized to the texel grid
+  (its position varies continuously along the coast), while every redSea.test.ts
+  acceptance point keeps its land/sea verdict. DOCS: design.md §3.3 / CLAUDE §7.1
+  pt.13 note the coast smoothing. (The dark "starry" sea in the shot is the water
+  surface shader at night, a separate matter — this point is only the stepping.)
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
