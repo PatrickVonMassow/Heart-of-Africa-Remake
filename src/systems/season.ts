@@ -529,6 +529,48 @@ export function hailAt(
   return roll < HAIL_CHANCE ? storm : 0
 }
 
+const THUNDERSTORM_CHANCE = 0.35 // of heavy-storm days carry a thunderstorm
+/**
+ * Whether a THUNDERSTORM stands over this place today (design.md §19.13,
+ * point 166), 0 or the storm's strength. Like hail it fires ONLY inside
+ * genuinely heavy wet-season rain (the storm is the precondition, so a rainless
+ * or dry-season zone can never thunder), on a fraction of such days, keyed
+ * deterministically on the date and a ~2° cell. Thunder accompanies heavy
+ * tropical rain more often than hail, so the chance is higher — but it is still
+ * a MINORITY of heavy days, and the individual lightning FLASHES with their
+ * delayed THUNDER are timed at runtime; this is only the per-day gate. A salt
+ * distinct from hail's keeps the two from always coinciding.
+ */
+export function thunderstormAt(
+  day: number,
+  lat: number,
+  lon: number,
+  startYear: number,
+  elevationM: number,
+): number {
+  const wet = wetnessAt(day, lat, lon, startYear, elevationM)
+  const storm = rainAmount(wet, 1)
+  if (storm < 0.6) return 0
+  const cellX = Math.floor(lon / 2)
+  const cellY = Math.floor(lat / 2)
+  let h = (Math.floor(day) * 2654435761 + cellX * 40503 + cellY * 1300481) | 0
+  h = Math.imul(h ^ (h >>> 15), 2246822519)
+  const roll = ((h ^ (h >>> 13)) >>> 0) / 4294967296
+  return roll < THUNDERSTORM_CHANCE ? storm : 0
+}
+
+/**
+ * The thunder lag after a lightning flash (design.md §19.13, point 166): a
+ * distance-plausible 1–4 s, derived deterministically per strike (no Math.random
+ * in the sim) so a reload agrees. `strikeSeed` is any integer that varies per
+ * strike (e.g. the strike count).
+ */
+export function thunderDelaySeconds(strikeSeed: number): number {
+  const h = Math.imul(strikeSeed ^ 0x9e3779b9, 2246822519)
+  const r = ((h ^ (h >>> 16)) >>> 0) / 4294967296
+  return 1 + r * 3
+}
+
 /** The harmattan pall's tone: whitish ochre dust, NOT the wet RAIN_GRAY. */
 export const HARMATTAN_PALE = '#d9cdb2'
 

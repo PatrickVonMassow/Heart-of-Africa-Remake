@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, sunDimFactor, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, sunDimFactor, thunderstormAt, thunderDelaySeconds, wetnessAt } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -686,6 +686,62 @@ describe('hailAt (point 141b — the only defensible white ground at low altitud
         hailAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372),
       )
     }
+  })
+})
+
+describe('thunderstormAt (point 166 — lightning+thunder only in a heavy storm)', () => {
+  it('never thunders where it never storms — Cairo and the deep Sahara stay clear all window', () => {
+    for (let day = 0; day < 365 * 6; day += 1) {
+      expect(thunderstormAt(day, CAIRO.lat, CAIRO.lon, START_YEAR, 20)).toBe(0)
+      expect(thunderstormAt(day, 25, 10, START_YEAR, 300)).toBe(0)
+    }
+  })
+
+  it('fires only inside a genuinely heavy storm, and stays a minority of days', () => {
+    let stormDays = 0
+    for (let day = 0; day < 365; day++) {
+      const t = thunderstormAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372)
+      if (t > 0) {
+        stormDays++
+        expect(rainAmount(wet2(day, CONGO.lat, CONGO.lon, 372), 1)).toBeGreaterThanOrEqual(0.6)
+      }
+    }
+    expect(stormDays).toBeGreaterThan(0) // it does happen in the wettest zone
+    expect(stormDays).toBeLessThan(200) // but never every day — a minority of the year
+  })
+
+  it('is more frequent than hail in the same wet zone (thunder rides most heavy rain)', () => {
+    let thunder = 0
+    let hail = 0
+    for (let day = 0; day < 365 * 2; day++) {
+      if (thunderstormAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372) > 0) thunder++
+      if (hailAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372) > 0) hail++
+    }
+    expect(thunder).toBeGreaterThan(hail)
+  })
+
+  it('is deterministic — the same day and place always agree', () => {
+    for (const day of [200, 210, 220]) {
+      expect(thunderstormAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372)).toBe(
+        thunderstormAt(day, CONGO.lat, CONGO.lon, START_YEAR, 372),
+      )
+    }
+  })
+})
+
+describe('thunderDelaySeconds (point 166 — the flash-to-thunder lag)', () => {
+  it('always lands in the distance-plausible 1–4 s band', () => {
+    for (let i = 0; i < 500; i++) {
+      const d = thunderDelaySeconds(i)
+      expect(d).toBeGreaterThanOrEqual(1)
+      expect(d).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('is deterministic per strike but varies across strikes', () => {
+    expect(thunderDelaySeconds(7)).toBe(thunderDelaySeconds(7))
+    const spread = new Set([0, 1, 2, 3, 4, 5, 6, 7].map((i) => thunderDelaySeconds(i).toFixed(2)))
+    expect(spread.size).toBeGreaterThan(4) // not a constant
   })
 })
 
