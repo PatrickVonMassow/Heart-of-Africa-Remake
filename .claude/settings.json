@@ -19,6 +19,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/dashboard-guard.mjs"
+          }
+        ]
+      }
     ]
   },
   "permissions": {
