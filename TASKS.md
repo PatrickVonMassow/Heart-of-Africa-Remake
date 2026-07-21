@@ -7266,7 +7266,22 @@ the remaining open points in their numeric order.
   (Original site notes for the record: Wildlife ~2806 drowning calf too deep;
   ~2751 floating/sunken drinkers under a far dry-season catchment; ~2282 scorch
   plane on slopes; ~913 flamingo fixed y on elevated lakes.)
-- [ ] 197. DRAMA-STATE EXCLUSION/GATING sweep (Pillar-2 group; the seams
+- [x] 197. DONE 21.07.2026 — the DRAMA-STATE EXCLUSION/GATING sweep (the seams
+  BETWEEN emergent systems, sibling of 194). A shared pure predicate
+  `claimedByAnotherDrama` (caught / in-water / mired / crossing / fire-trapped /
+  the lion's chase victim) now gates BOTH fresh-victim scans so two dramas never
+  fight over one actor: the crocodile lunge scan (which also skips a fleeing/
+  dodging drinker whose stale drink TARGET merely sits near the croc — it is
+  rendered away at its flight, not at the bank — and a vigil keeper) and the
+  grass-fire calf-catch. The hunt's calf picks now skip a fire-trapped or
+  crossing calf (the reverse claim). The collision `inDrama` predicate gained the
+  child-in-water case (a parent wading to a drowning calf was shoved by herd-mates
+  — the backstop already exempted it, the collision list did not) plus crossing
+  and fire-trapped for parity. The caught-in-water backstop exemption and the
+  croc-seize-vs-vigil case were already covered (points 192/186). Pure test for
+  `claimedByAnotherDrama` (free vs. every owned state, zero-timer counts as
+  owned); build+lint clean, 1976 unit green, enrichments 207/0/0 first try (the
+  dramas are not over-excluded). ORIGINAL: DRAMA-STATE EXCLUSION/GATING sweep (Pillar-2 group; the seams
   BETWEEN systems, sibling of 194 — list in the 184 log): the crocodile victim
   scan derives its trigger from the drink-cycle CLOCK and the static drink
   TARGET, never the victim's actual position (~2091/2092 — it can lunge at an

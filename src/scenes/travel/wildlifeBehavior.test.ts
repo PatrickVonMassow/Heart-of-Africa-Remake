@@ -51,6 +51,7 @@ import {
   vigilBlocksLanding,
   vigilDrawReady,
   ambientSavannaSpecies,
+  claimedByAnotherDrama,
   offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
@@ -1701,5 +1702,28 @@ describe('ambientSavannaSpecies (point 208 A2 — visible herds match the region
     }
     // Every east grazer appears across the band (no collapse to one species).
     for (const g of REGION_PREY.east) expect(seen.has(g)).toBe(true)
+  })
+})
+
+describe('claimedByAnotherDrama (point 197 — one actor per emergent drama)', () => {
+  const base = { isLionVictim: false }
+
+  it('is false for a free animal', () => {
+    expect(claimedByAnotherDrama(base)).toBe(false)
+  })
+
+  it('is true for every already-owned state', () => {
+    expect(claimedByAnotherDrama({ ...base, caught: 0 })).toBe(true)
+    expect(claimedByAnotherDrama({ ...base, inWater: 1.2 })).toBe(true)
+    expect(claimedByAnotherDrama({ ...base, mired: 0 })).toBe(true)
+    expect(claimedByAnotherDrama({ ...base, crossing: { tx: 0, tz: 0, time: 0 } })).toBe(true)
+    expect(claimedByAnotherDrama({ ...base, fireTrapped: 3 })).toBe(true)
+    expect(claimedByAnotherDrama({ ...base, isLionVictim: true })).toBe(true)
+  })
+
+  it('treats a zero timer as owned (the drama just started)', () => {
+    // caught/mired/fireTrapped use `!== undefined`, so a 0 counter still counts.
+    expect(claimedByAnotherDrama({ ...base, caught: 0 })).toBe(true)
+    expect(claimedByAnotherDrama({ ...base, fireTrapped: 0 })).toBe(true)
   })
 })

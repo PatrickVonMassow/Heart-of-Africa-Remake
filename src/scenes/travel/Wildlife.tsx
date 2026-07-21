@@ -53,6 +53,7 @@ import {
   type FlightState,
   channelDriftStep,
   ambientSavannaSpecies,
+  claimedByAnotherDrama,
   drinkCatchment,
   mireFate,
   mireRoll,
@@ -2057,7 +2058,13 @@ function Herds() {
         b.plungeTo !== undefined ||
         b.trampleTo !== undefined ||
         b.vigil !== undefined ||
-        (b.child !== undefined && !b.child.dead && (b.child.caught !== undefined || b.child.mired !== undefined)) ||
+        b.crossing !== undefined ||
+        b.fireTrapped !== undefined ||
+        // A parent wading to a calf in the water is mid-drama too (point 197):
+        // the backstop already exempts a child-inWater/mired parent, so the
+        // collision push must match — the old list dropped the inWater case.
+        (b.child !== undefined && !b.child.dead &&
+          (b.child.caught !== undefined || b.child.mired !== undefined || b.child.inWater !== undefined)) ||
         // The active chase victim and its blocking parent sprint on exact
         // lines; herd-mates shoving them every frame trembled the hunt.
         (LION_STATE.mode === 'chase' &&
@@ -2211,9 +2218,18 @@ function Herds() {
           // Hidden: wait for a drinker standing at a bank inside the radius.
           for (const sp of CALF_HUNT_SPECIES) {
             for (const a of herds[sp]) {
-              // Skip the lion's active chase victim (point 194): the two systems
-              // never claim the same animal (§19.16) — the lion is already on it.
-              if (a.dead || !a.drink || a.caught !== undefined || a.inWater !== undefined || a.mired !== undefined || a === LION_STATE.victim) continue
+              // Skip any animal already owned by another drama or not actually
+              // standing at the bank (point 197, the 194 seam pattern): the lion's
+              // chase victim (§19.16 — the two systems never claim one animal), a
+              // fleeing/dodging drinker whose stale drink target still sits near
+              // the croc (it is rendered away at its flight, not at the water), a
+              // crossing/vigil/fire-trapped animal. The croc lunges only at an
+              // animal genuinely drinking at the bank.
+              if (
+                a.dead || !a.drink || a.dodgeHeading !== undefined || a.vigil !== undefined ||
+                claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })
+              )
+                continue
               const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
               const atBank = cycle > 0.1 && cycle < 0.4 // rendered standing at the water
               const d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
@@ -2322,7 +2338,10 @@ function Herds() {
           // A calf standing just ahead of the line is caught by it.
           outer: for (const sp of CALF_HUNT_SPECIES) {
             for (const a of herds[sp]) {
-              if (a.dead || !a.young || a.caught !== undefined || a.fireTrapped !== undefined || a.inWater !== undefined || a.mired !== undefined) continue
+              // The fire never claims a calf another drama already owns (point
+              // 197, the 194 seam): the lion's chase victim, a crossing calf.
+              if (a.dead || !a.young || claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim }))
+                continue
               const rx = a.x - f.x
               const rz = a.z - f.z
               const along = rx * Math.sin(f.heading) + rz * Math.cos(f.heading)
@@ -3647,6 +3666,7 @@ function LionHunt() {
           for (const c of herds[csp]) {
             if (!c.young || c.dead || c.caught !== undefined || c.mired === undefined || !c.parent || c.parent.dead)
               continue
+            if (c.fireTrapped !== undefined) continue // the fire already claims it (point 197)
             if (!regionPreyAt(c.x, c.z).includes(csp)) continue // region fit (point 124)
             const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
             if (cd < bd) {
@@ -3663,6 +3683,7 @@ function LionHunt() {
           for (const c of herds[csp]) {
             if (!c.young || c.dead || c.caught !== undefined || c.inWater !== undefined || !c.parent || c.parent.dead)
               continue
+            if (c.fireTrapped !== undefined || c.crossing !== undefined) continue // owned by the fire / a crossing (point 197)
             if (!regionPreyAt(c.x, c.z).includes(csp)) continue // region fit (point 124)
             const cd = Math.hypot(c.x - pos.x, c.z - pos.z)
             if (cd < bd) {

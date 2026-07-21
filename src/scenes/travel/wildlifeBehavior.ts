@@ -1089,6 +1089,31 @@ export const REGION_PREY: Record<RegionId, PreyKind[]> = {
   north: ['antelope', 'warthog'],
 }
 
+/** Is this animal already OWNED by another emergent drama (point 197, the 194
+ *  seam pattern)? A fresh-victim scan — the crocodile lunge, the grass fire —
+ *  must never claim an animal a different system already holds, or two dramas
+ *  fight over one actor. Shared so both scans exclude the same set: a caught /
+ *  in-water / mired / crossing / fire-trapped animal, or the lion's chase
+ *  victim. (The scan then adds its own extra gates: the croc needs an animal
+ *  actually drinking at the bank; the fire needs a calf.) */
+export function claimedByAnotherDrama(f: {
+  caught?: number
+  inWater?: number
+  mired?: number
+  crossing?: unknown
+  fireTrapped?: number
+  isLionVictim: boolean
+}): boolean {
+  return (
+    f.caught !== undefined ||
+    f.inWater !== undefined ||
+    f.mired !== undefined ||
+    f.crossing !== undefined ||
+    f.fireTrapped !== undefined ||
+    f.isLionVictim
+  )
+}
+
 /** Which predators roam each region (~1890 range, design.md §19). Lions
  *  everywhere; cheetahs and hyenas favour the open eastern/southern plains;
  *  leopards the wooded west/centre; the arid north holds lion, cheetah and
