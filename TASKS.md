@@ -7931,6 +7931,48 @@ the remaining open points in their numeric order.
   boundary wording changes. Coordinate with point 209 (same coast) — a shared
   before/after Cairo screenshot proves both.
 
+- [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
+  river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
+  21.07.2026, screenshot at Cairo: the Nile ribbon STOPS short of the sea with a
+  strip of BEACH between its mouth and the ocean, and a strange cut-out sits in
+  the Nile right at Cairo; "such gaps recur in water bodies — please check ALL").
+  Same Cairo/Nile area as 209/210 — do them in ONE water/coast pass.
+  TWO defects:
+  (a) MOUTH JUNCTION — the river ribbon ends at its last vector control point,
+  which lies inland of the real coastline, so the Nile does not reach the sea (a
+  land gap at the mouth). §7.1 pt.21 promises "one continuous ribbon … to its
+  mouth" and "bridged stray sea points", but the mouth-to-sea CONNECTION is not
+  closed. FIX: extend/bridge the river's carved bed + rendered ribbon + water
+  mask from the last river point to where the receiving water begins (the ocean
+  or lake sheet), so the water is visually continuous — no beach wedge between
+  the ribbon and the sea. The carve/ribbon should fade into the sea shelf, not
+  butt against sand.
+  (b) INTERIOR NOTCHES — a hole in a water body's rendered surface. At Cairo the
+  likely cause is a settlement CLEARANCE punching the ribbon: pt.3 keeps a
+  port AT the river (§4.2 exemption) but "their rendered cluster clears the band
+  by its own footprint margin" — that clearance may cut a notch into the Nile
+  where Cairo sits. Other candidates: the confluence bank-masking
+  (riverBanks.ts) over-masking an interior span; a sparse spline control point
+  letting `riverDistance` exceed the ribbon half-width; a lake/river sheet edge
+  gap. FIX per cause: never let a settlement clearance or a bank-mask remove
+  INTERIOR water (mask the banks, keep the channel); densify or clamp so the
+  ribbon has no sub-width hole.
+  DIAGNOSE FIRST with a probe (the 145b/129 lesson): sample `riverDistance` /
+  the ribbon mask / `waterSurfaceY` along the Nile from ~Cairo (30.05N,31.24E)
+  to the delta mouth (~31.5N,31.8E), and around the notch, to pin each cause;
+  then sweep ALL rivers×their mouths and ALL 8 lakes for the same two defects
+  (the user's "check all"). VERIFY: extend `scripts/verify/enrichments.mjs` (the
+  pt.21 water checks) — every river reaches its receiving water with NO land gap
+  at the mouth (sample the mouth run: water is continuous from the last river
+  cell into the sea/lake), and NO river/lake surface has an interior hole (the
+  existing "no interior gap" check widened to catch the settlement-clearance
+  notch); the pure ribbon-continuity tests
+  (`src/scenes/travel/riverSmoothness.test.ts`, `riverBanks.test.ts`) gain the
+  mouth-junction + no-interior-clearance cases; a driven Cairo screenshot shows
+  the Nile flowing unbroken into the sea. DOCS: design.md §11.3 + CLAUDE §7.1
+  pt.21 (mouth junction + no interior notch). Keep every river's course and the
+  §4.2 clearances otherwise intact.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
