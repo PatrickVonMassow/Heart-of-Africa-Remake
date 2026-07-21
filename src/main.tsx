@@ -24,4 +24,9 @@ async function boot() {
   )
 }
 
-void boot()
+// boot() already renders a user-facing panel on a real geodata failure; the
+// only thing left is to keep its promise from surfacing as an UNHANDLED
+// rejection. A load cancelled by a reload/navigation mid-fetch is benign — the
+// page is going away — but WebKit reports it as "TypeError: Load failed", which
+// otherwise shows up as an uncaught rejection in the console.
+boot().catch((e) => console.warn('Geodata boot did not complete:', e))

@@ -34,6 +34,34 @@ interface DemMeta {
 let meta: DemMeta | null = null
 let pixels: Uint8ClampedArray | null = null
 
+/**
+ * Decode the DEM PNG to a drawable. Prefers `createImageBitmap` with raw
+ * decode options (no premultiply, no colour conversion) so the height bytes
+ * survive untouched. WebKit/Safari can reject that options bag on a Blob
+ * ("error reading the Blob argument to createImageBitmap"), which left the
+ * terrain unloaded on iOS Safari; fall back to an <img> decode there. The
+ * dem.png carries no colour profile, so the sRGB canvas draw stays
+ * byte-identical to the ImageBitmap path.
+ */
+async function decodeDem(blob: Blob): Promise<CanvasImageSource> {
+  try {
+    return await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
+  } catch {
+    const url = URL.createObjectURL(blob)
+    try {
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('dem.png <img> decode failed'))
+        img.src = url
+      })
+      return img
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+}
+
 export async function loadGeodata(): Promise<void> {
   const base = import.meta.env.BASE_URL
   const [metaRes, imgRes] = await Promise.all([
@@ -42,18 +70,15 @@ export async function loadGeodata(): Promise<void> {
   ])
   if (!metaRes.ok || !imgRes.ok) throw new Error('failed to load geodata')
   meta = (await metaRes.json()) as DemMeta
-  const bitmap = await createImageBitmap(await imgRes.blob(), {
-    premultiplyAlpha: 'none',
-    colorSpaceConversion: 'none',
-  })
+  const source = await decodeDem(await imgRes.blob())
   const canvas = document.createElement('canvas')
   canvas.width = meta.width
   canvas.height = meta.height
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) throw new Error('2D context unavailable')
-  ctx.drawImage(bitmap, 0, 0)
+  ctx.drawImage(source, 0, 0)
   pixels = ctx.getImageData(0, 0, meta.width, meta.height).data
-  bitmap.close()
+  if (typeof ImageBitmap !== 'undefined' && source instanceof ImageBitmap) source.close()
   trimToGameWorld(pixels, meta)
 }
 
