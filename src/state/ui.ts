@@ -101,7 +101,7 @@ interface UiState {
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
 // the debug unlock this is also the furthest the wheel can zoom out — only the
-// unlock opens the wider range. Zooming in (down to 0.25) is always available.
+// unlock opens the wider range. Zooming in (down to 0.125) is always available.
 export const DEFAULT_TRAVEL_ZOOM = 0.5
 
 export const useUi = create<UiState>()((set) => ({
@@ -143,7 +143,7 @@ export const useUi = create<UiState>()((set) => ({
   // requires the debug unlock (design.md §21). The unlocked range reaches far
   // enough to take in the whole continent.
   setTravelZoom: (travelZoom) =>
-    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : DEFAULT_TRAVEL_ZOOM, Math.max(0.25, travelZoom)) })),
+    set((s) => ({ travelZoom: Math.min(s.wheelZoomEnabled ? 16 : DEFAULT_TRAVEL_ZOOM, Math.max(0.125, travelZoom)) })),
   setJournalDnd: (journalDnd) => set({ journalDnd }),
   // First touch arms the layer and drops to the mobile quality preset: TRAA off
   // (back to the render pass' MSAA), SSAO off, half-size shadow maps. Each stays

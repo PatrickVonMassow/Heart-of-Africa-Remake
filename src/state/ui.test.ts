@@ -22,8 +22,10 @@ describe('travel zoom (design.md §21)', () => {
     expect(u().travelZoom).toBe(0.3) // zoom-in always allowed
     u().setTravelZoom(3)
     expect(u().travelZoom).toBe(DEFAULT_TRAVEL_ZOOM) // zoom-out beyond default blocked
+    u().setTravelZoom(0.2)
+    expect(u().travelZoom).toBe(0.2) // zoom-in below the default stays unclamped
     u().setTravelZoom(0.1)
-    expect(u().travelZoom).toBe(0.25) // hard minimum
+    expect(u().travelZoom).toBe(0.125) // hard minimum (design.md §21.4)
   })
 
   it('the debug unlock allows zoom-out far enough to take in the continent', () => {

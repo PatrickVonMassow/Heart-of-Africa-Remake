@@ -6501,7 +6501,13 @@ the remaining open points in their numeric order.
   skyline) and a no-capture settlement, with a screenshot. Docs: design.md 2.5,
   CLAUDE 7.1 pt.31. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
-- [ ] 182. Extend the bird's-eye ZOOM-IN range to 0.125 (from the current 0.25
+- [x] 182. DONE 21.07.2026 — the setTravelZoom clamp floor moved 0.25 -> 0.125
+  in src/state/ui.ts (zoom-IN only; the zoom-OUT clamp to the default / 16x
+  unlock is untouched). ui.test.ts pins the 0.125 hard minimum and that 0.2
+  survives unclamped; CLAUDE §7.1 pt.20 (0.125x-16x) and §7.2 (non-debug range
+  0.125-0.5) + the memory note test-realistic-zoom updated (design.md §21.4 is
+  prose, no numeric range to change). Build/lint/9 ui tests green.
+  ORIGINAL: Extend the bird's-eye ZOOM-IN range to 0.125 (from the current 0.25
   floor). User decision 19.07.2026: standard-mode zoom-in should reach 0.125x
   (closer than today's 0.25x hard minimum). ONLY the zoom-IN floor moves; the
   zoom-OUT behaviour is unchanged (still clamped to the 0.5 default without the

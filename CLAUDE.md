@@ -980,7 +980,7 @@ verify suite that proves it.
     terrain relief items are tunable as factors (§11/§21.2). All of these
     are adjustable at runtime in the debug menu (§21) in both languages.
     The zoom behavior of §21.4 holds: the bird's-eye mouse-wheel zoom is
-    always active (0.25x-16x) starting at the closer default 0.5. A debug
+    always active (0.125x-16x) starting at the closer default 0.5. A debug
     checkbox gates zoom-out beyond that default (disabling clamps a wider
     view back to it), and the unlocked range reaches a whole-continent
     view per §21.4. The camera near plane snaps back to the first-person
@@ -1372,7 +1372,7 @@ After completion and after every major system:
   of §7.1.
 - **Test at in-game-achievable conditions (point 172).** A verification must
   exercise a feature at a state the player can actually reach — for the
-  bird's-eye zoom that is the NON-DEBUG range 0.25–0.5 (default 0.5), never a
+  bird's-eye zoom that is the NON-DEBUG range 0.125–0.5 (default 0.5), never a
   debug-only wide zoom, unless the check specifically tests the debug wide-zoom
   feature. Judge "is it in view" by PROJECTING the point to the rendered frame
   (`__camera.onScreen`/`ndc`), never by an assumed radius (100×zoom, fog.far, a
