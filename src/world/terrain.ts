@@ -7,7 +7,8 @@
 
 import { regionAt } from './geo'
 import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
-import { elevationAt, landFractionAt } from './geodata'
+import { coastDistanceAt, elevationAt, landFractionAt } from './geodata'
+import { coastSignedDistance } from './coastVector'
 import { lakeContains, lakeIndexAt } from './hydro'
 import { fbm2 } from './noise'
 import { isNortheastOfBoundary } from './redSea'
@@ -49,6 +50,11 @@ const METERS_TO_UNITS = 1.35 / 1000
 const MOUNTAIN_M = 1600
 /** Degrees of low-frequency meander applied to biome/region borders (design.md §3). */
 const BIOME_WARP = 3.0
+// point 209: half-width (deg) of the near-coast band where the land fraction is
+// taken from the smooth vector-coast signed distance instead of the raster mask.
+// ~3 DEM texels — wide enough for the mesh to carry a smooth shore, narrow
+// enough that the gate (and its per-vertex vector-distance cost) stays local.
+const COAST_SMOOTH_BAND = 0.08
 
 // Permanent ice (design.md §19.13, point 141): ONLY the three massifs that
 // really carried glaciers in 1890 — Kilimanjaro, Mount Kenya, Rwenzori, all
@@ -195,7 +201,19 @@ function lakeBasinLevel(li: number, seed: number): number {
 }
 
 export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
-  const land = landFractionAt(lat, lon)
+  let land = landFractionAt(lat, lon)
+  // point 209: the bilinear BINARY land mask crosses 0.5 only along the DEM
+  // texel grid, so the sea coast staircased at close zoom. Near the coast,
+  // rebuild the land fraction from the SIGNED distance to the smooth vector
+  // coastline so the waterline follows the true shore. Gated to the near-coast
+  // band — the cheap raster coast distance on the land side plus the bilinear
+  // straddle at the crossing — so far-field vertices skip the vector-distance
+  // cost and the deep-sea / trimmed acceptance coordinates keep the raster
+  // verdict (redSea.test.ts) untouched.
+  if ((land > 0 && land < 1) || (land >= 0.5 && coastDistanceAt(lat, lon) < COAST_SMOOTH_BAND)) {
+    const sd = coastSignedDistance(lat, lon)
+    land = Math.max(0, Math.min(1, 0.5 + sd / (2 * COAST_SMOOTH_BAND)))
+  }
   const elevation = elevationAt(lat, lon)
   const detail = fbm2(lon * 3, lat * 3, seed + 7, 3)
 
