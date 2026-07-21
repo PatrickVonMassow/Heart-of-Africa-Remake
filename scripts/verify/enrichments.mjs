@@ -1414,8 +1414,12 @@ const animalHit = await page.evaluate(async () => {
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' })) // drive east, straight at it
   let minDist = Infinity
   let reached = false // the player got within engaging range at some point
+  // point 200: bound the drive by SIM time (with a wall-clock safety cap), not a
+  // fixed wall wait — under full-regression load a 2500 ms window ran too few
+  // frames for the traveller to reach and press against the target.
+  const s0 = window.__simTime()
   const t0 = Date.now()
-  while (Date.now() - t0 < 2500) {
+  while (window.__simTime() - s0 < 2.5 && Date.now() - t0 < 15000) {
     // Fallback: should the zebra be streamed out regardless, re-add and re-pin
     // it — the real game collides against genuinely streamed animals, this
     // only keeps the fixed test target present.
@@ -1433,14 +1437,16 @@ const animalHit = await page.evaluate(async () => {
   // Escape phase (regression for the collision blocker): once stopped against the
   // animal, steering must still work — drive back WEST, away from it, and confirm
   // the traveller actually moves clear instead of being pinned to the boundary.
-  // Condition-polled with a generous timeout: the distance covered per wall-clock
-  // window is frame-count-dependent and collapses under full-regression load
-  // (a fixed 1500 ms window flaked at escaped 1.36 vs 5.3 standalone).
+  // point 200: bound the escape by SIM time (wall-clock cap as a safety). The
+  // distance covered per WALL second is frame-count-dependent and collapses under
+  // full-regression load — a wall-timed window flaked at escaped 0 / 1.36 vs 5.3
+  // standalone even though the traveller does move clear given enough frames.
   const contact = window.__game.getState().pos
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' })) // drive west, away
+  const s1 = window.__simTime()
   const t1 = Date.now()
   let escaped = 0
-  while (Date.now() - t1 < 12000) {
+  while (window.__simTime() - s1 < 4 && Date.now() - t1 < 15000) {
     const herds2 = window.__wildlife?.herdsRef?.current
     if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.unshift(zebra)
     zebra.x = ax
