@@ -7406,7 +7406,31 @@ the remaining open points in their numeric order.
   may already be partly fixed, e.g. settings 277: verify against HEAD first).
   PROGRESS 21.07.2026: converted the six named non-enrichments waits (commit
   7ed3c56) + six enrichments family/predator/scavenge/rescue STAGING settles to
-  __sleepSim (5127afa, af4533f) — all touched suites green. TRIPWIRE-TRANSIENT
+  __sleepSim (5127afa, af4533f) — all touched suites green.
+  PROGRESS 21.07.2026 (evening): three more increments, each validated green +
+  pushed — (1) FAIL-SOFT against a whole-run ABORT (7360b62): a rare mid-check
+  scene remount briefly nulls window.__wildlife; a non-optional herdsRef access
+  threw an UNCAUGHT error that killed the entire run and DEFEATED the auto-retry
+  (a crash on attempt 1 + any rotating flake on attempt 2 = double failure). The
+  collision-drive loops now optional-chain the hook and __pollSim wraps its
+  doneFn in try/catch — a crash becomes at worst one recoverable check miss. This
+  was the key structural win: the suite now reaches green via retry-cushioning as
+  designed. (2) Canoe/swim staging settles -> condition polls (same commit).
+  (3) The collision drive-in/escape loops bound by SIM time with a wall cap
+  (79ff2cb) — a wall-timed window ran too few frames under load (escaped 0 vs
+  5.3). NEXT / NOT YET DONE (a flood-convergence batch was tried and REVERTED
+  unvalidated — do it right): replace the long weather blend waits
+  (waitForTimeout 4000-4500, "blends at 0.02/frame": Nile flood ~5047, Okavango
+  ~5090, harmattan ~5119) with a convergence poll — BUT settle on the value the
+  CHECK ACTUALLY READS, not just the blend driver: the harmattan check reads
+  __climate.fog().far, which LAGS __climate.dust() by its own fog blend, so
+  settling on dust() returned before fogFar closed and the Jan<Aug assertion
+  failed (161 vs 153). Settle on fogFar (and for the Nile settle on surfaceAt,
+  for the Okavango on deltaWaterScale — whatever the check compares), or poll
+  until ALL read values are stable. Speeds up every run ~15-20 s AND de-flakes.
+  REMAINING drama flakes still rotating (cushioned by the retry, to root-cause
+  for the closing's strict 3x gate): point-102 vicinity count, plover 145b,
+  calf-play, parent-guards-calf, the crocodile-spawn cluster. TRIPWIRE-TRANSIENT
   ROBUSTNESS (for the closing's 3× flake-free): the point-203A anchoring tripwire
   intermittently fires ONE console-error per several enrichments runs on a rare
   1-frame anchoring transient at a state transition — observed a floating
