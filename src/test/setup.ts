@@ -9,6 +9,17 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
 
+// jsdom has no ResizeObserver; the inventory bar observes itself to publish its
+// height (point 163). A no-op stub lets the effect mount without throwing; real
+// layout measurement is a browser concern, covered by the Playwright suite.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
+
 afterEach(() => {
   cleanup()
 })

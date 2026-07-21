@@ -320,12 +320,13 @@ textarea {
 .map-overlay {
   position: absolute;
   left: 12px;
-  /* Bottom-left, the SAME gap to the bottom controls as the journal panel keeps
-     on the right (design.md §17.4; user request): both sit at 56px. The
-     single-row inventory bar (bottom: 12px) clears this; a debug full-loadout
-     that wraps it to a second row is the only case it can reach under, and the
-     plate then scrolls within its capped box. */
-  bottom: 56px;
+  /* Bottom-left, anchored ABOVE the inventory bar whatever its height (point
+     163): the HUD publishes the live bar height as --inv-bar-height, so the map
+     rides bar-bottom (12px) + bar height + a 12px gap and clears a wrapped
+     two-row loadout instead of covering its second row. Falls back to the
+     single-row 32px (→ 56px total, the journal panel's gap, design.md §17.4)
+     when the bar is absent. */
+  bottom: calc(var(--inv-bar-height, 32px) + 24px);
   transform: rotate(-0.4deg);
   background: var(--paper);
   color: var(--paper-ink);

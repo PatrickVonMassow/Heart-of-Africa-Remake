@@ -61,6 +61,20 @@ describe('InventoryBar .inv-active glow (design.md §17)', () => {
   })
 })
 
+describe('map overlay anchors above the inventory bar (point 163)', () => {
+  it('the inventory bar publishes its height as --inv-bar-height, cleared on unmount', () => {
+    jumpTo(...COORD.savanna)
+    g().debugAddEquipment('shovel')
+    const { unmount } = render(<Hud />)
+    // Present bar → the ResizeObserver effect publishes the height (the map CSS
+    // reads it to anchor its bottom above however many rows the bar wraps to).
+    expect(document.documentElement.style.getPropertyValue('--inv-bar-height')).toMatch(/px$/)
+    unmount()
+    // Cleared when the bar leaves, so the map falls back to the single-row default.
+    expect(document.documentElement.style.getPropertyValue('--inv-bar-height')).toBe('')
+  })
+})
+
 describe('bottom-right button row: map always, camp only where allowed (point 93)', () => {
   const btn = (cls: string) => document.querySelector(`.hud-bottom-right .${cls}`)
 

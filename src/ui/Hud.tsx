@@ -2,7 +2,7 @@
 // dialogs, start/victory overlays and the debug menu. All player-visible
 // text comes from the language files (design.md §17 localization).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { healthState, listCheckpoints, canCampHere, useGame, type EquipmentId } from '../state/store'
 import { TREASURE_IDS } from '../systems/economy'
 import { placeById, worldToLatLon } from '../world/geo'
@@ -37,6 +37,31 @@ function InventoryBar() {
   const ownedTreasures = TREASURE_IDS.filter((id) => treasures[id] > 0).sort((a, b) =>
     t.treasures[a].localeCompare(t.treasures[b], t.lang),
   )
+
+  // Publish the live inventory-bar height as --inv-bar-height so the map overlay
+  // (and its town-plan variant) can anchor its bottom edge above the bar however
+  // many rows it wraps to (point 163: a two-row loadout used to cover the second
+  // row). Hooks stay above the early return. Cleared when the bar is absent, so
+  // the CSS falls back to the single-row default.
+  const barRef = useRef<HTMLDivElement>(null)
+  const itemCount = owned.length + ownedTreasures.length
+  useEffect(() => {
+    const root = document.documentElement
+    const el = barRef.current
+    if (!el) {
+      root.style.removeProperty('--inv-bar-height')
+      return
+    }
+    const publish = () => root.style.setProperty('--inv-bar-height', `${el.offsetHeight}px`)
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--inv-bar-height')
+    }
+  }, [itemCount])
+
   if (owned.length === 0 && ownedTreasures.length === 0) return null
 
   // Medicine and shovel are used by clicking them on the spot (design.md §17);
@@ -71,7 +96,7 @@ function InventoryBar() {
   const canteenBlink = canteenFill < 1 / 3 ? ' canteen-blink' : ''
 
   return (
-    <div className="inventory-bar">
+    <div className="inventory-bar" ref={barRef}>
       {owned.map((e) => {
         const activeCls = active.has(e) ? ' inv-active' : ''
         if (e === 'canteen') {

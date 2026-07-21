@@ -5493,7 +5493,18 @@ the remaining open points in their numeric order.
   the flock — 145a passed this run). Verify: `wildlifeBehavior.test.ts`,
   `scripts/verify/enrichments.mjs`.
 
-- [ ] 163. The opened map covers the inventory bar's SECOND row.
+- [x] 163. DONE 21.07.2026 — the HUD now publishes the live inventory-bar height
+  as the CSS variable `--inv-bar-height` (a ResizeObserver on `.inventory-bar` in
+  `InventoryBar`, cleared when the bar is absent), and `.map-overlay` anchors its
+  bottom to `calc(var(--inv-bar-height, 32px) + 24px)` — so the atlas AND the
+  town-plan variant ride above the bar however many rows it wraps to, while a
+  single row keeps the journal's ~56px gap (point 115). A jsdom ResizeObserver
+  stub was added to the test setup; `Hud.test.tsx` asserts the variable is
+  published on mount and cleared on unmount; `enrichments.mjs` presses F3 to wrap
+  the bar to two rows, opens the map and asserts no overlap and the map's bottom
+  clears the bar's top (placed last so F3's loadout/zoom/speed can't leak). Build
+  + lint + 41 Hud / 9 ui vitest green; enrichments 208/0/0 (point 115 intact).
+  ORIGINAL: The opened map covers the inventory bar's SECOND row.
   User report (17.07.2026, screenshot, deployed build): with enough items to
   wrap the inventory bar into a second row (the F3 full loadout shows it —
   treasures wrap), the opened map overlay covers the wrapped row(s): "Die

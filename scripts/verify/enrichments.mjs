@@ -5637,6 +5637,39 @@ check(
 await page.screenshot({ path: `${OUT}104-region-border-river.png` })
 console.log('shot 104-region-border-river.png')
 
+// Point 163: the opened map must clear the inventory bar even when a full F3
+// loadout WRAPS it to a second row — the map anchors its bottom to the live bar
+// height (--inv-bar-height, published by a ResizeObserver), not a fixed 56px.
+// Placed LAST: F3's loadout/zoom/speed changes must not leak into earlier checks.
+const wrap163 = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3' }))
+  await sleep(500) // full loadout + ResizeObserver + re-render settle
+  const ui = window.__ui.getState()
+  if (!ui.mapOpen) ui.toggleMap()
+  await sleep(250)
+  const ov = document.querySelector('.map-overlay')
+  const bar = document.querySelector('.inventory-bar')
+  const oneBtn = document.querySelector('.inventory-bar button, .inventory-bar .inv-item')
+  if (!ov || !bar || !oneBtn) return null
+  const o = ov.getBoundingClientRect()
+  const b = bar.getBoundingClientRect()
+  const rowH = oneBtn.getBoundingClientRect().height
+  const overlaps = !(o.right <= b.left || o.left >= b.right || o.bottom <= b.top || o.top >= b.bottom)
+  return {
+    barHeight: +b.height.toFixed(1),
+    rowH: +rowH.toFixed(1),
+    wrapped: b.height > rowH * 1.5, // genuinely two-plus rows
+    overlaps,
+    mapClearsBar: o.bottom <= b.top + 1, // map's bottom edge at/above the bar's top
+  }
+})
+check(
+  'the opened map clears a two-row (F3) inventory bar without covering it (point 163)',
+  !!wrap163 && wrap163.wrapped && !wrap163.overlaps && wrap163.mapClearsBar,
+  JSON.stringify(wrap163),
+)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
