@@ -7989,18 +7989,24 @@ the remaining open points in their numeric order.
   the Nile flowing unbroken into the sea. DOCS: design.md §11.3 + CLAUDE §7.1
   pt.21 (mouth junction + no interior notch). Keep every river's course and the
   §4.2 clearances otherwise intact.
-  PROBE (21.07.2026, Node geodata probe): (a) CONFIRMED the mouth gap — a
-  transect up the Nile shows `riverDistance` staying within the ribbon
-  (<0.17°) only to ~lat 30.5, then growing past the width (0.5 cap) by ~lat
-  31.0 while the land mask stays lf=1.0 until ~lat 31.4 and the sea (lf=0)
-  begins ~31.5: the ribbon TERMINATES at its last spline control point well
-  inland, leaving a wide land gap before the sea. The vector river polyline
-  simply does not run to the coast. (b) The Cairo NOTCH is NOT in the raw
-  `riverDistance` field (a fine grid at 29.9-30.2N/31.0-31.5E shows an
-  unbroken river band) — so it is a RENDER-STAGE artifact (the settlement
-  cluster clearance / bank-mask carving the drawn ribbon at Cairo, or a
-  mesh/mask hole), to be found by inspecting the ribbon/water-mask build, not
-  the distance field.
+  PROBE + READ (21.07.2026): (a) the Nile's LAST data point is its mouth at
+  `[30.42, 31.45]` (Rosetta on the Mediterranean, rivers.ts ~27) — so the
+  river polyline DOES end at the coast, but the rendered ribbon still stops
+  short with a beach gap in play. The gap is therefore in the RIBBON/MASK
+  BUILD: the ribbon is masked to land (or `riverDistance` saturates near the
+  mouth) and ends at the coast CONTOUR, which sits inland of where the sea
+  PLANE begins, so a sand strip shows between the ribbon's end and the water.
+  FIX: bridge the last ribbon span into the receiving sea/lake sheet (let the
+  ribbon/bed carry over the coast contour into the shallow shelf), and verify
+  at the ACTUAL mouth (30.42,31.45) not the earlier off-course transect. (b)
+  the Cairo NOTCH is NOT the raw river field (an unbroken band there) AND NOT
+  the settlement clearance (it only NUDGES the place off the water, geo.ts
+  ~175) NOR the bank-mask (riverBanks.ts only drops the FOAM line, keeps the
+  water) — both preserve water. So it is a WATER-SURFACE-MESH / overlay
+  artifact, to be pinned with a RENDERED probe at Cairo (a screenshot at the
+  notch), not the data. Both (a) and (b) need visual iteration (a rendered
+  screenshot I inspect), so they belong in a focused coast pass, not a rushed
+  edit.
 
 ## Closing (only after all points)
 
