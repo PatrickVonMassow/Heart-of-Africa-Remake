@@ -596,6 +596,7 @@ Complementary elements that reinforce the feeling of Africa, mostly without new 
 - Prey animals (zebras, wildebeest, antelopes, warthogs, giraffes) flee a hunting or feeding predator smoothly — accumulated movement, never a sudden jump to a new spot.
 - Every blood stain is laid into the local slope of the ground (never a horizontal disc that rising terrain slices into a half-moon).
 - No animal ever strays into the impassable open ocean (§11): scripted prey balks at the waterline, and any animal that ends up on open-ocean ground — pushed, fleeing or dodging — is set back to the nearest land at once.
+- Rivers and lakes are different from the sea (user revision, point 192): animals never spawn or idle in them, but they MAY cross them on purpose — swimming chest-deep on the rendered water at the seasonal wade speed to a far bank within a calibratable reach — and a prey animal boxed against the water by a predator or an oncoming elephant flees INTO it rather than be taken or trampled; the hunter does not follow into the deep. A crossing always resolves (it lands, or the deadline grounds it). The §19.8 water dramas (drowning, rescue, the crocodile) keep their own rules on top.
 
 ### 19.6 Vultures and carcasses
 

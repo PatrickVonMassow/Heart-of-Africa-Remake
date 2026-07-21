@@ -53,6 +53,7 @@ import {
   deflectedStep,
   escapeCorridorHeading,
   guardEngagement,
+  crossingTarget,
   calfFleeStep,
   defendChance,
   killChance,
@@ -352,6 +353,33 @@ describe('landedBirdY / landedBirdClearance (point 128 — a landed vulture stan
         expect(landedBirdClearance(base, ground, 0)).toBeGreaterThanOrEqual(LANDED_BIRD_HOVER - 1e-9)
       }
     }
+  })
+})
+
+describe('crossingTarget (point 192 — animals may cross rivers/lakes, never the ocean)', () => {
+  // Fake terrain along +z: water for z in (0, 3], land beyond.
+  const riverThenLand = (_x: number, z: number) => (z > 0 && z <= 3 ? 'water' : 'savanna')
+
+  it('finds the far bank across a swimmable channel', () => {
+    const t = crossingTarget(0, 0, 0, 6, riverThenLand) // heading 0 = +z
+    expect(t).not.toBeNull()
+    expect(t!.tz).toBeGreaterThan(3) // past the water, on land
+  })
+
+  it('refuses when the channel is wider than the swim reach', () => {
+    const wide = (_x: number, z: number) => (z > 0 && z <= 9 ? 'water' : 'savanna')
+    expect(crossingTarget(0, 0, 0, 6, wide)).toBeNull()
+  })
+
+  it('refuses the OCEAN anywhere on the line — the sea stays absolute', () => {
+    const toSea = (_x: number, z: number) => (z > 0 && z <= 2 ? 'water' : 'ocean')
+    expect(crossingTarget(0, 0, 0, 6, toSea)).toBeNull()
+  })
+
+  it('a heading over dry land crosses nothing (first step is the bank already)', () => {
+    const t = crossingTarget(0, 0, Math.PI, 6, riverThenLand) // heading away from the water
+    expect(t).not.toBeNull()
+    expect(Math.hypot(t!.tx, t!.tz)).toBeLessThanOrEqual(1.01) // immediate land
   })
 })
 

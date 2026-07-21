@@ -7090,7 +7090,24 @@ the remaining open points in their numeric order.
   active hunt always INCREASES its distance to the hunter (or at least never
   tracks it); live staging with two families where only the victim's parent
   engages. DOCS: none (§19.8 already says the parent).
-- [ ] 192. WATER-RULE REVISION (user clarification 20.07.2026): "no animals in
+- [x] 192. DONE 21.07.2026: animals may now purposefully CROSS rivers/lakes and
+  FLEE INTO them — never the ocean, never spawning or idling in water. Built:
+  a `crossing` state (swims chest-deep ON the rendered sheet at the seasonal
+  wade speed; lands or the hard I4 deadline grounds it), the pure
+  `crossingTarget` pick (refuses ocean and over-wide channels), flee-into-water
+  at the FLEE and DODGE dead-ends (boxed against water by a predator or an
+  oncoming elephant), water-setback + live-check exemptions for `crossing` AND
+  `caught` (the point-197 croc-grip teleport gap closed on the way),
+  `balance.waterCross.{maxUnits,chance,resolveSeconds}` debug-editable with
+  de/en labels, design.md §19.5 + CLAUDE §7.1 pt.12 updated in the same
+  commit; 4 pure tests + a staged live crossing (swims the Zambezi channel and
+  lands, chest-deep asserted against __rivers.surfaceAt). enrichments 207/0,
+  build+lint+1954 vitest green. OPEN sub-items (honest scope): the elephant
+  ROAM does not yet roll purposeful crossings (it still deflects along banks —
+  `waterCross.chance` is wired for it), and the HUNTED calf keeps its §19.8
+  dead-end-for-the-catch rule (its water escape needs the lion waterline-balk
+  wiring) — both filed here for a follow-up, not silently dropped.
+  ORIGINAL: WATER-RULE REVISION (user clarification 20.07.2026): "no animals in
   water" was implemented too strictly. TARGET STATE: animals do NOT spawn in
   water and do NOT idle/stand in water by default (unchanged); ocean stays
   hard-forbidden (unchanged, I5); BUT animals MAY purposefully CROSS a

@@ -285,6 +285,8 @@ export interface Strings {
     crocStrikeRadius: string
     crocGripSeconds: string
     huntLeaveOvertime: string
+    waterCrossMax: string
+    waterCrossChance: string
     seasonStrength: string
     season: string
     seasonAuto: string

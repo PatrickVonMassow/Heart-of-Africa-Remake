@@ -364,6 +364,8 @@ export const de: Strings = {
     crocStrikeRadius: 'Krokodil: Angriffsradius am Ufer',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     huntLeaveOvertime: 'Jagd: Abzugs-Überzeit (s)',
+    waterCrossMax: 'Wasser-Querung: max. Breite',
+    waterCrossChance: 'Wasser-Querung: Chance',
     seasonStrength: 'Stärke des Saisonwetters',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',

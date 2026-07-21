@@ -32,6 +32,7 @@ import { balance } from '../../config/balance'
 import {
   blockHeading,
   guardEngagement,
+  crossingTarget,
   griefTarget,
   fleeHeading,
   flightStep,
@@ -241,6 +242,11 @@ interface Animal {
    *  feeds guardEngagement's release-on-recede, so a PASSING hunt is guarded
    *  only while it closes in — never leapfrog-followed to the kill. */
   guardMinD?: number
+  /** A purposeful river/lake crossing (point 192): the far-bank target and the
+   *  time spent. Exempt from the water setback while it lasts; swims at the
+   *  seasonal wade speed with a lowered body; cleared on landing (or by the
+   *  resolve deadline — every started move ends, invariant I4). */
+  crossing?: { tx: number; tz: number; time: number }
   /** The crocodile ambush (design.md §19.16, point 130), per-crocodile state:
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
@@ -382,6 +388,9 @@ const FLEES_LION: Record<Species, boolean> = {
 }
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
+/** Base swim speed of a purposeful crossing (point 192) — slower than the walk,
+ *  further braked by the seasonal flow via wadeSpeed. */
+const CROSS_SWIM_SPEED = 2.6
 /** Speed (units/sec) at which prey run from an active predator; the flee
  *  accumulates into the animal's position so it never teleports (design.md §19). */
 const FLEE_SPEED = 5
@@ -2076,8 +2085,14 @@ function Herds() {
           // Water drama (struggle, rescue, plunge, a wading parent) owns its
           // own movement; everyone else must never STAND in water — not in
           // the open sea, and not in a river or lake either (an animal only
-          // reaches the water's edge to drink, design.md §19).
-          if (a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo || a.trampleTo || a.vigil)
+          // reaches the water's edge to drink, design.md §19). A purposeful
+          // CROSSING (point 192) is exempt while it lasts, and so is a CAUGHT
+          // victim (point 197: the croc grips its prey at the waterline — the
+          // setback used to teleport it out of the grip, the vanish class).
+          if (
+            a.dead || a.inWater !== undefined || a.mired !== undefined || a.rescued || a.plungeTo ||
+            a.trampleTo || a.vigil || a.crossing !== undefined || a.caught !== undefined
+          )
             continue
           if (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined)) continue
           const ll = worldToLatLon(a.x, a.z)
@@ -2823,6 +2838,39 @@ function Herds() {
             yaw = a.rot + Math.sin(t * 16 + a.phase) * 0.7
             pitch = Math.PI / 2.3 // thrown on its side, thrashing
             familyHeld = true
+          } else if (a.crossing !== undefined) {
+            // Purposeful water crossing (point 192, the user's water-rule
+            // revision): swim straight for the far bank at the seasonal wade
+            // speed, chest-deep ON the rendered surface; landing — or the
+            // resolve deadline (invariant I4) — ends it.
+            const c = a.crossing
+            c.time += dt
+            const cdx = c.tx - a.x
+            const cdz = c.tz - a.z
+            const cd = Math.hypot(cdx, cdz)
+            const bw2 = balance.waterDrama
+            const swim = wadeSpeed(CROSS_SWIM_SPEED, seasonFlowFactor(CURRENT_WEATHER.wetness, bw2.dryFlowFactor, bw2.wetFlowFactor))
+            if (cd > 0.05) {
+              a.x += (cdx / cd) * Math.min(cd, swim * dt)
+              a.z += (cdz / cd) * Math.min(cd, swim * dt)
+            }
+            const cll2 = worldToLatLon(a.x, a.z)
+            const ct2 = sampleTerrain(cll2.lat, cll2.lon, seed)
+            const onLand = ct2.type !== 'water' && ct2.type !== 'ocean'
+            if ((onLand && cd < 0.6) || c.time > balance.waterCross.resolveSeconds) {
+              a.crossing = undefined
+              a.y = Math.max(0.02, ct2.height)
+            } else if (!onLand) {
+              const ws2 = waterSurfaceY(cll2.lat, cll2.lon, seed, ct2.height)
+              a.y = (ws2 ?? ct2.height + 0.3) - 0.32 // chest-deep on the sheet
+            } else {
+              a.y = Math.max(0.02, ct2.height) // wading out over the bank
+            }
+            px = a.x
+            pz = a.z
+            yaw = Math.atan2(cdx, cdz)
+            pitch = 0.08
+            familyHeld = true
           } else if (a.kick !== undefined) {
             // The defence strike (design.md §19.8, points 124/125): every
             // parent that drove the hunt off stands its ground, tail to the
@@ -3110,6 +3158,16 @@ function Herds() {
             // water on purpose — this only swaps the blocked predicate then.
             const fleeH = Math.atan2(dx, dz)
             const fleeStep = deflectedStep(a.x, a.z, fleeH, FLEE_SPEED * urgency * dt, waterBlockedAt, 0.8)
+            if (!fleeStep.moved && a.crossing === undefined) {
+              // Boxed against the water with the predator behind (point 192):
+              // flee INTO the water — predators do not follow into the deep.
+              // Only across river/lake (crossingTarget refuses the ocean).
+              const esc = crossingTarget(a.x, a.z, fleeH, balance.waterCross.maxUnits, (nx, nz) => {
+                const nll = worldToLatLon(nx, nz)
+                return sampleTerrain(nll.lat, nll.lon, seed).type
+              })
+              if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
+            }
             a.x = fleeStep.x
             a.z = fleeStep.z
             px = a.x
@@ -3137,6 +3195,16 @@ function Herds() {
             // 201/197): the raw step ran the dodge onto a water cell where the
             // backstop teleported it back — a vibrating pin at the waterline.
             const dodgeStep = deflectedStep(a.x, a.z, a.dodgeHeading, PREY_PANIC_SPEED * dt, waterBlockedAt, 0.8)
+            if (!dodgeStep.moved && a.crossing === undefined) {
+              // Boxed against the water with the elephant bearing down (point
+              // 192): rather than be trampled, take to the water — the herd
+              // does not follow into the deep. River/lake only.
+              const esc = crossingTarget(a.x, a.z, a.dodgeHeading, balance.waterCross.maxUnits, (nx, nz) => {
+                const nll = worldToLatLon(nx, nz)
+                return sampleTerrain(nll.lat, nll.lon, seed).type
+              })
+              if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
+            }
             a.x = dodgeStep.x
             a.z = dodgeStep.z
             px = a.x

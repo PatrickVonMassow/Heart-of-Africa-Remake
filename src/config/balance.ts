@@ -302,6 +302,18 @@ export interface BalanceConfig {
      *  kill is never cut short. */
     gripSeconds: number
   }
+  /** Purposeful water crossings (point 192 — the user's water-rule revision:
+   *  animals may cross rivers/lakes and flee into them; never the ocean). */
+  waterCross: {
+    /** Farthest swimmable channel width in world units — a wider water reads
+     *  as a barrier and the mover deflects along the bank instead. */
+    maxUnits: number
+    /** Chance a roam blocked by water starts a crossing instead of turning. */
+    chance: number
+    /** Hard resolve deadline in seconds (invariant I4): a crossing that has
+     *  not landed by then ends where it stands and the setback grounds it. */
+    resolveSeconds: number
+  }
   /** The scripted hunt (design.md §19.3). */
   hunt: {
     /** Walk-off overtime (point 188): a leaving predator still inside the view
@@ -567,6 +579,11 @@ export const balance: BalanceConfig = {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
+  },
+  waterCross: {
+    maxUnits: 6, // calibratable: swimmable channel width (point 192) — the widened rivers span ~2-4 units
+    chance: 0.3, // calibratable: how often a water-blocked roam crosses instead of turning
+    resolveSeconds: 25, // calibratable: crossing hard deadline (I4) — a normal swim needs ~3-6 s
   },
   hunt: {
     leaveOvertimeSeconds: 45, // calibratable: walk-off overtime before an off-frame retire (point 188) — generous vs the ~20 s a clear walk-off needs

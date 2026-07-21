@@ -271,6 +271,10 @@ export function DebugMenu() {
         onChange={(v) => { balance.crocodile.gripSeconds = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.huntLeaveOvertime} value={balance.hunt.leaveOvertimeSeconds} step={5}
         onChange={(v) => { balance.hunt.leaveOvertimeSeconds = Math.max(5, v); bump() }} />
+      <NumberField label={t.debug.waterCrossMax} value={balance.waterCross.maxUnits} step={1}
+        onChange={(v) => { balance.waterCross.maxUnits = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.waterCrossChance} value={balance.waterCross.chance} step={0.05}
+        onChange={(v) => { balance.waterCross.chance = Math.max(0, Math.min(1, v)); bump() }} />
       <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>

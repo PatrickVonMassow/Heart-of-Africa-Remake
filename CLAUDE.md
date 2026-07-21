@@ -649,9 +649,16 @@ verify suite that proves it.
       animals keep their body spacing after spawn (no two inside one
       another) and an animal placed onto another parts from it within
       moments, while the elephant trample remains possible; an animal on
-      an open-ocean cell — and, outside the §19.8 water dramas and the
-      wading flamingos, on any river/lake water cell — is set back to
-      the nearest land; the scripted walk-off deflects along the coast
+      an open-ocean cell — and, outside the §19.8 water dramas, the wading
+      flamingos, a CAUGHT victim at the waterline and a purposeful CROSSING
+      (point 192), on any river/lake water cell — is set back to the nearest
+      land; the point-192 water rule holds: an animal may CROSS a river/lake
+      (chest-deep on the rendered sheet, seasonal wade speed,
+      `balance.waterCross.*` calibratable, hard resolve deadline) and a prey
+      boxed against the water by a predator or an oncoming elephant flees
+      INTO it — the crossingTarget pick refuses the ocean and over-wide
+      channels (pure-tested), and a staged crossing swims the channel and
+      lands in `scripts/verify/enrichments.mjs`; the scripted walk-off deflects along the coast
       instead of entering the ocean (the step rule pure-tested in
       `src/scenes/travel/wildlifeBehavior.test.ts`, the coast walk
       live-gated in `scripts/verify/enrichments.mjs`) (no animal strays into the impassable sea or

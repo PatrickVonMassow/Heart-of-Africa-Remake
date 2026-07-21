@@ -3966,7 +3966,9 @@ const inWater = await page.evaluate(async () => {
       // (SS)19.16) - both exempt by design.
       if (sp === 'flamingo' || sp === 'crocodile') continue
       for (const a of herds[sp]) {
-        if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo) continue
+        // A purposeful crossing and a caught victim at the waterline are
+        // legitimate water occupants (points 192/197) — like the dramas.
+        if (a.dead || a.inWater !== undefined || a.rescued || a.plungeTo || a.crossing !== undefined || a.caught !== undefined) continue
         if (a.child && !a.child.dead && a.child.inWater !== undefined) continue
         seen++
         const lat = -a.z / 10
@@ -3985,6 +3987,87 @@ const inWater = await page.evaluate(async () => {
   return r
 })
 check('no animal stands in river/lake water (banks only)', inWater.seen > 10 && inWater.bad === 0, JSON.stringify(inWater))
+
+// --- Point 192: a purposeful crossing swims the channel and lands ------------
+// The user's water-rule revision: animals may CROSS a river/lake (chest-deep on
+// the rendered sheet, seasonal wade speed) and may flee into water; they still
+// never spawn or idle in it, and the ocean stays absolute. Staged: a zebra at a
+// bank gets a crossing to the far side; it must traverse ON the water (never
+// teleported out by the setback — the exemption under test), ride BELOW the
+// bank line while swimming, and land with the state cleared.
+await page.evaluate(() => {
+  // A known narrow reach (the croc staging's Zambezi spot): banks with land
+  // within swim reach on the far side exist reliably here.
+  window.__game.getState().debugJumpTo(-17.9, 25.9)
+})
+await page.waitForTimeout(1200)
+const crossing = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const U = 10
+  const p0 = window.__game.getState().pos
+  // A bank cell beside water, then far land past the channel — sweep ALL
+  // headings from each candidate bank (a fixed bank->water direction missed
+  // diagonal crossings and staged:false'd).
+  let bank = null
+  let far = null
+  outer: for (let r = 4; r <= 50 && !far; r += 2) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2
+      const x = p0.x + Math.cos(ang) * r
+      const z = p0.z + Math.sin(ang) * r
+      if (window.__terrainType(-z / U, x / U, seed) !== 'water') continue
+      for (let n = 0; n < 8; n++) {
+        const na = (n / 8) * Math.PI * 2
+        const bx = x + Math.cos(na) * 1.8
+        const bz = z + Math.sin(na) * 1.8
+        const bt = window.__terrainType(-bz / U, bx / U, seed)
+        if (bt === 'water' || bt === 'ocean') continue
+        for (let h = 0; h < 8; h++) {
+          const ha = (h / 8) * Math.PI * 2
+          const hx = Math.sin(ha)
+          const hz = Math.cos(ha)
+          let sawWater = false
+          for (let s = 1; s <= 6; s++) {
+            const qx = bx + hx * s
+            const qz = bz + hz * s
+            const qt = window.__terrainType(-qz / U, qx / U, seed)
+            if (qt === 'ocean') break
+            if (qt === 'water') { sawWater = true; continue }
+            if (sawWater) { bank = { x: bx, z: bz }; far = { x: qx, z: qz }; break outer }
+            break // land before any water on this heading — not a crossing
+          }
+        }
+      }
+    }
+  }
+  if (!far) return { staged: false }
+  const zebra = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined }
+  herds.zebra.push(zebra)
+  zebra.crossing = { tx: far.x, tz: far.z, time: 0 }
+  let sawOnWater = false
+  let sawLowY = false
+  let landed = false
+  await window.__pollSim(30, () => {
+    const lat = -zebra.z / U
+    const lon = zebra.x / U
+    const t = window.__terrainType(lat, lon, seed)
+    if (t === 'water' && zebra.crossing !== undefined) {
+      sawOnWater = true
+      const ws = window.__rivers?.surfaceAt(lat, lon)
+      if (ws != null && zebra.y < ws - 0.1) sawLowY = true
+    }
+    if (zebra.crossing === undefined && t !== 'water' && t !== 'ocean') { landed = true; return true }
+    return false
+  }, 60000)
+  herds.zebra = herds.zebra.filter((a) => a !== zebra)
+  return { staged: true, sawOnWater, sawLowY, landed }
+})
+check(
+  'a purposeful crossing swims the channel chest-deep and lands on the far bank (point 192)',
+  crossing.staged && crossing.sawOnWater && crossing.sawLowY && crossing.landed,
+  JSON.stringify(crossing),
+)
 
 const parting = await page.evaluate(async () => {
   const herds = window.__wildlife.herdsRef.current

@@ -365,6 +365,8 @@ export const en: Strings = {
     crocStrikeRadius: 'Crocodile: bank strike radius',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
     huntLeaveOvertime: 'Hunt: walk-off overtime (s)',
+    waterCrossMax: 'Water crossing: max width',
+    waterCrossChance: 'Water crossing: chance',
     seasonStrength: 'Seasonal weather strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',

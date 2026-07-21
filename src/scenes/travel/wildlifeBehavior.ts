@@ -83,6 +83,34 @@ export function blockHeading(
 }
 
 /**
+ * Water-crossing target (point 192 — the user's water-rule revision: animals
+ * may purposefully CROSS a river/lake and may FLEE INTO water, they just never
+ * spawn or idle in it; the ocean stays absolute). Probes 1-unit steps along
+ * `heading`: every wet step must be RIVER/LAKE water ('water', never 'ocean'),
+ * and the first LAND cell within `maxUnits` becomes the crossing target. Ocean
+ * anywhere on the line, or no land within reach, returns null — no crossing.
+ */
+export function crossingTarget(
+  x: number,
+  z: number,
+  heading: number,
+  maxUnits: number,
+  terrainTypeAt: (x: number, z: number) => string,
+  step = 1,
+): { tx: number; tz: number } | null {
+  const sx = Math.sin(heading) * step
+  const sz = Math.cos(heading) * step
+  for (let i = 1; i * step <= maxUnits; i++) {
+    const px = x + sx * i
+    const pz = z + sz * i
+    const t = terrainTypeAt(px, pz)
+    if (t === 'ocean') return null
+    if (t !== 'water') return { tx: px, tz: pz } // the far bank
+  }
+  return null
+}
+
+/**
  * Guard engagement with release-on-recede (point 191). The passive gate
  * ("chasing lion within GUARD_RADIUS of my calf") kept a parent stationed on
  * the lion side of its calf while the hunter merely PASSED — and because the
