@@ -7518,6 +7518,28 @@ the remaining open points in their numeric order.
   closing so the batch of finds is fixed in one push. Each real find is its own
   atomic point/commit. Docs: CLAUDE §7.2 gains the anchoring + liveness invariant
   suites; this is the pillar the harness was missing.
+  DONE (A) 21.07.2026 — the anchoring tripwire is BUILT and it immediately paid
+  for itself. Implementation: a throttled (~1/13 per frame) dev-only assert in
+  the wildlife render loop compares each rendered body's height against the
+  terrain sampled at its OWN anchor (a.x/a.z), tolerances −0.75·scale/+2.5·scale
+  (buried/floating), exemptions exactly mirroring the water-sweep's drama locks
+  (plus drink until 196) so scripted poses are never flagged; violations go
+  through the 207(i) devAssert channel and fail ANY suite. A `grounded` gate
+  (set on the animal's first water-sweep visit, which now HARD-sets the standing
+  height instead of easing) keeps test-staged injections with hard-coded y from
+  false-firing before their first sweep correction. WHAT IT CAUGHT (the real
+  class bug, fixed in the same commit): movers carried STALE standing heights —
+  every follow/flee/dodge/guard/charge/vigil step updated x/z but not y, so
+  on any slope the whole background herd slowly sank into (or floated off) the
+  earth as it drifted; the worst case was the ordinary calf-follow step (every
+  background calf tails its parent). Fixed by making EVERY mover carry its own
+  ground height (land only — water occupants belong to their dramas), including
+  the two sweep-skipped rescue-parent walks (the land approach to a calf in the
+  water and the escort back), and by refreshing the locally captured render
+  height in the same frame a correction lands (no one-frame buried render on a
+  long-dt hitch). Proof: enrichments 207 pass / 0 fail / 0 console-errors with
+  the tripwire armed; build+lint+vitest+audit clean. (B)-(N) and the visual
+  sweep (C) remain open above.
 
 - [ ] 204. Make WebGPU coverage UNIVERSAL where it is possible (user request
   20.07.2026, from the sweep-on-WebGL2 gap: "Analysiere alle Tests daraufhin,

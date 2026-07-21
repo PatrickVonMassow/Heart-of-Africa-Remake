@@ -243,6 +243,10 @@ interface Animal {
    *  feeds guardEngagement's release-on-recede, so a PASSING hunt is guarded
    *  only while it closes in — never leapfrog-followed to the kill. */
   guardMinD?: number
+  /** Swept-and-grounded at least once (point 203(A)): the anchoring assert only
+   *  judges animals the ground sweep has seen — a staged injection with a
+   *  hard-coded y is corrected on its first sweep visit, not flagged. */
+  grounded?: boolean
   /** A purposeful river/lake crossing (point 192): the far-bank target and the
    *  time spent. Exempt from the water setback while it lasts; swims at the
    *  seasonal wade speed with a lowered body; cleared on landing (or by the
@@ -484,6 +488,8 @@ const GUARD_STANDOFF = 2.2
  *  that only got close (TOO_LATE_DIST) by the time the window ends is eaten
  *  alongside the calf. */
 const CAUGHT_DURATION = 5
+// Rotating throttle for the 203(A) anchoring asserts (~1/13 of animals per frame).
+let ASSERT_TICK = 0
 const CALF_HUNT_CHANCE = 0.6 // chance a hunt targets a calf near the player over a generic grazer
 const CALF_HUNT_SEEK = 45 // radius around the player within which a huntable calf is picked
 const CALF_CATCH_DIST = 0.9 // the predator catches the chased calf within this
@@ -1592,6 +1598,11 @@ function Herds() {
           const d = Math.hypot(toX, toZ) || 1
           a.x += (toX / d) * RESCUE_SPEED * dt
           a.z += (toZ / d) * RESCUE_SPEED * dt
+          { // ground-follow (point 203(A)): a mover carries its own standing height
+            const gfl = worldToLatLon(a.x, a.z)
+            const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+          }
           if (d < PARENT_SACRIFICE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146): ONE
             // roll resolves the charging parent's attack three ways — its
@@ -1917,6 +1928,9 @@ function Herds() {
               }
             } else {
               a.wadeTime = undefined
+              // Ground-follow (point 203(A)): the land approach carries its own
+              // standing height — the sweep skips rescue parents entirely.
+              if (ter.type !== 'ocean') a.y = Math.max(0.02, ter.height)
             }
           } else if (calf.rescueEntry) {
             // Escort the pulled-out calf back to the bank. The wade is over —
@@ -1928,6 +1942,10 @@ function Herds() {
             if (d > 1) {
               a.x += (dx / d) * RETURN_SPEED * dt
               a.z += (dz / d) * RETURN_SPEED * dt
+              // Ground-follow (point 203(A)): the escort too is sweep-skipped.
+              const ell = worldToLatLon(a.x, a.z)
+              const ett = sampleTerrain(ell.lat, ell.lon, seed)
+              if (ett.type !== 'water' && ett.type !== 'ocean') a.y = Math.max(0.02, ett.height)
             }
           }
         }
@@ -1989,6 +2007,11 @@ function Herds() {
         if (d > VIGIL_HOLD_DIST) {
           a.x += (dx / d) * YOUNG_FOLLOW_SPEED * dt
           a.z += (dz / d) * YOUNG_FOLLOW_SPEED * dt
+          { // ground-follow (point 203(A)): a mover carries its standing height
+            const gfl = worldToLatLon(a.x, a.z)
+            const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+          }
         }
       }
     }
@@ -2063,6 +2086,13 @@ function Herds() {
             const k = m > cap ? cap / m : 1
             a.x += dx * k
             a.z += dz * k
+            // Ground-follow (point 203(A)): the pushes are small but continuous
+            // — at a crowded bank slope (the dry-season gathering) they drifted
+            // an animal off its cached standing height until it stood in the
+            // earth. Land only; water occupants are owned by their dramas.
+            const gfl = worldToLatLon(a.x, a.z)
+            const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
           }
         }
       }
@@ -2114,7 +2144,18 @@ function Herds() {
             continue
           if (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined)) continue
           const ll = worldToLatLon(a.x, a.z)
-          const ter = sampleTerrain(ll.lat, ll.lon, seed).type
+          const terSample = sampleTerrain(ll.lat, ll.lon, seed)
+          const ter = terSample.type
+          // Ground re-anchor (the first catch of the 203(A) tripwire): drifting
+          // movers (separation pushes, cohesion, dodges) kept their SPAWN
+          // height while the ground under them changed — on a slope they stood
+          // up to half a body in the earth. Ease the standing height onto the
+          // current ground (the sweep already sampled it); the eased step over
+          // a few sweep visits avoids a visible snap.
+          if (ter !== 'ocean' && ter !== 'water') {
+            a.y = Math.max(0.02, terSample.height)
+            a.grounded = true // seen by the sweep at least once (203(A) gate)
+          }
           if (ter === 'ocean' || ter === 'water') {
             const back = findLandNear(a.x, a.z, seed)
             a.x = back.x
@@ -2443,6 +2484,7 @@ function Herds() {
       setAmbienceAnimals(near)
     }
 
+    ASSERT_TICK = (ASSERT_TICK + 1) % 13
     const t = clock.elapsedTime
     // Point 193: 'leave' counts as ACTIVE for the prey — the walking-off
     // predator is still a visible lion on the field, and prey grazing calmly
@@ -2976,6 +3018,11 @@ function Herds() {
             if (dm > 1.6) {
               a.x += (dxm / dm) * YOUNG_FOLLOW_SPEED * dt
               a.z += (dzm / dm) * YOUNG_FOLLOW_SPEED * dt
+              { // ground-follow (point 203(A))
+                const gfl = worldToLatLon(a.x, a.z)
+                const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+              }
             }
             px = a.x
             pz = a.z
@@ -3011,6 +3058,11 @@ function Herds() {
             const fleeStep = calfFleeStep(a.x, a.z, LION_STATE.lx, LION_STATE.lz, CALF_FLEE_SPEED * dt, fleeBlocked)
             a.x = fleeStep.x
             a.z = fleeStep.z
+            { // ground-follow (point 203(A)): a mover carries its own standing height
+              const gfl = worldToLatLon(a.x, a.z)
+              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+            }
             px = a.x
             pz = a.z
             yaw = fleeStep.heading
@@ -3106,6 +3158,14 @@ function Herds() {
               a.boutDetour = undefined
               a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
               a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+              { // ground-follow (point 203(A)) — THE main calf mover: every
+                // background calf tails its drifting parent through this step,
+                // and without the height update they sank into every slope
+                // (the tripwire's persistent young=true burials).
+                const gfl = worldToLatLon(a.x, a.z)
+                const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+              }
               px = a.x
               pz = a.z
               yaw = Math.atan2(toX, toZ)
@@ -3142,6 +3202,11 @@ function Herds() {
               if (h !== null) {
                 a.x += Math.sin(h) * RESCUE_SPEED * dt
                 a.z += Math.cos(h) * RESCUE_SPEED * dt
+                { // ground-follow (point 203(A)): a mover carries its own standing height
+                  const gfl = worldToLatLon(a.x, a.z)
+                  const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+                  if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+                }
                 yaw = h
               } else {
                 yaw = Math.atan2(LION_STATE.lx - a.x, LION_STATE.lz - a.z) // on station: face it down
@@ -3191,6 +3256,11 @@ function Herds() {
             }
             a.x = fleeStep.x
             a.z = fleeStep.z
+            { // ground-follow (point 203(A)): a mover carries its own standing height
+              const gfl = worldToLatLon(a.x, a.z)
+              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+            }
             px = a.x
             pz = a.z
             wobTarget = 0.3
@@ -3228,6 +3298,11 @@ function Herds() {
             }
             a.x = dodgeStep.x
             a.z = dodgeStep.z
+            { // ground-follow (point 203(A)): a mover carries its own standing height
+              const gfl = worldToLatLon(a.x, a.z)
+              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+            }
             px = a.x
             pz = a.z
             wobTarget = 0
@@ -3301,6 +3376,37 @@ function Herds() {
         }
         vscl.setScalar(a.scale)
         mtx.compose(vpos, quat, vscl)
+        // ANCHORING invariant (point 203(A), throttled ~1/13): the rendered
+        // body must neither sink under its own ground nor float high over it.
+        // Water occupants (dramas, crossings, the §19.16 crocodile, waders)
+        // ride the water rules instead and are skipped. Tolerances are generous
+        // — this is a tripwire for the buried/floating CLASS (187/190/202/185),
+        // not a pixel gate; a violation fails any suite via the assert channel.
+        // (a.drink is exempt UNTIL point 196 fixes the drink render's stale
+        // bodyY — the tripwire would rightly fire on that known bug today. The
+        // drama locks mirror the WATER-SWEEP's exemptions exactly: those
+        // animals are never re-anchored there, so asserting them would flag
+        // the dramas' own scripted poses, not a real burial.)
+        if ((aIdx + ASSERT_TICK) % 13 === 0 && !a.dead && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
+            a.crossing === undefined && a.inWater === undefined && a.caught === undefined && a.mired === undefined &&
+            a.drink === undefined && !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
+            a.fireTrapped === undefined && LION_STATE.victim !== a) {
+          const gll = worldToLatLon(a.x, a.z)
+          const gt = sampleTerrain(gll.lat, gll.lon, seed)
+          if (gt.type !== 'water' && gt.type !== 'ocean') {
+            const ground = Math.max(0, gt.height)
+            devAssert(
+              bodyY >= ground - 0.75 * a.scale,
+              'animal-buried',
+              () =>
+                `${sp} bodyY=${bodyY.toFixed(2)} ground=${ground.toFixed(2)} y=${a.y.toFixed(2)} ` +
+                `young=${!!a.young} bathe=${!!a.bathe} dodge=${a.dodgeHeading !== undefined} hop=${a.hop !== undefined} ` +
+                `chunk=${a.chunk ?? 'none'} shoreSeed=${!!a.shoreSeed} parent=${!!a.parent} child=${!!a.child} ` +
+                `dPlayer=${Math.hypot(a.x - pos.x, a.z - pos.z).toFixed(0)}`,
+            )
+            devAssert(bodyY <= ground + 2.5 * a.scale, 'animal-floating', () => `${sp} bodyY=${bodyY.toFixed(2)} ground=${ground.toFixed(2)}`)
+          }
+        }
         write(a)
       }
       mesh.count = aIdx
