@@ -427,6 +427,7 @@ export const de: Strings = {
       region: (p: TextParams) => `Region: ${de.regions[p.region as keyof typeof de.regions]}`,
       arrival: (p: TextParams) => `Ankunft in ${PLACES[p.place as string]}`,
       village: (p: TextParams) => PLACES[p.place as string],
+      villageReturn: (p: TextParams) => `Wieder in ${PLACES[p.place as string]}`,
       audience: 'Audienz beim Oberhaupt',
       mistake: 'Ein schwerer Fehler',
       chiefHint: 'Die Worte des Oberhaupts',
@@ -562,6 +563,26 @@ export const de: Strings = {
       return (
         texts[p.people as string] ??
         `Ich habe das ${name} erreicht. Einfache Hütten aus Lehm und Schilf drängen sich am Wasser, und Kinder laufen mir entgegen, [pause]voller Neugier. Der Häuptling residiert in der großen Hütte in der Dorfmitte. [somber]Wenn ich sein Wohlwollen gewinne,[pause] zeigt er mir vielleicht den Weg.[/somber]`
+      )
+    },
+    // Return vignette (point 170): the situation CHANGED since the last visit —
+    // describe only the change, in a shocked register. Keyed on people +
+    // fromPhase_toPhase; only the rinderpest peoples ever reach it.
+    villageReturn: (p: TextParams) => {
+      const transitionKey = `${p.fromPhase as string}_${p.toPhase as string}`
+      const texts: Record<string, Record<string, string>> = {
+        maasai: {
+          preDamaged_struck: `[fear]Ich kam zurück und fand die Kraale leer.[/fear] Wo im vergangenen Jahr noch Rinder standen, [somber]wenige zwar, aber lebendig,[/somber] ist nur gestampfte Erde geblieben. [pause] Eine ausgezehrte Frau las Schoten vom Boden auf und sah durch mich hindurch; man sagt mir, sie lebe von wildem Honig und gehe dem sicheren Tod entgegen. [breath] Nur am Feuer der Alten und an den Speeren der jungen Männer hält sich ein Rest der alten Ordnung.`,
+          struck_aftermath: `[somber]Der Hunger, den ich hier mitansah, ist weitergezogen — und hat das halbe Volk mit sich genommen.[/somber] Die großen Kraale stehen offen und still; mit den Herden zerriss das Geflecht aus Viehleihe und Verwandtschaft, das diese Menschen zusammenhielt. [pause] Manche sind zu den Ackerbauern in die Berge gegangen, die Gebliebenen reiten verzweifeltere Raubzüge als je zuvor. [breath] Und doch steht der Ring der Hütten, [emph]und die jungen Männer springen noch ihren Tanz.[/emph]`,
+          preDamaged_aftermath: `[fear]Ich kam zurück und erkannte den Ort kaum wieder.[/fear] In den Jahren meiner Abwesenheit ist die Seuche durch die Kraale gegangen [somber]wie ein Feuer[/somber]: Die Rinder, die ich damals noch sah, sind bis auf das letzte Stück dahin, und mit ihnen das Geflecht aus Viehleihe und Verwandtschaft. [pause] Manche sind fort zu den Hackbauern der Berge; die Gebliebenen reiten verzweifelte Raubzüge. [breath] Nur der Ring der Hütten steht noch, [weary]und abends springen die jungen Männer ihren Tanz — schmaler geworden, aber ungebrochen.[/weary]`,
+        },
+        sidama: {
+          struck_aftermath: `[breath] Ich kam zurück und wagte kaum zu hoffen — [somber]doch die Bösen Tage liegen hinter ihnen.[/somber] Die Viehpferche stehen noch immer fast leer, stumme Zeugen dessen, was ich hier mitangesehen habe; aber die Ensete-Haine haben sie durch den Hunger getragen. [pause] Heute rösten sie wieder die roten Kaffeebeeren, [emph]einen Trank, der Tote wecken könnte,[/emph] und reichten mir davon wie in besseren Zeiten.`,
+        },
+      }
+      return (
+        texts[p.people as string]?.[transitionKey] ??
+        `[somber]Ich kam zurück, und der Ort ist nicht mehr, wie ich ihn verließ.[pause] Was hier seit meinem letzten Besuch geschah, steht stumm in den Gesichtern.[/somber]`
       )
     },
     giftRevered: (p: TextParams) =>

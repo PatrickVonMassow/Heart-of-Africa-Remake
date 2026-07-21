@@ -3,7 +3,7 @@
 
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
-import { rinderpestPhaseAtDay } from '../systems/rinderpest'
+import { rinderpestPhaseAtDay, villageSituationChanged } from '../systems/rinderpest'
 import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
 import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
@@ -155,6 +155,11 @@ export interface GameState {
   region: RegionId
   visitedRegions: RegionId[]
   visitedPlaces: string[]
+  /** The rinderpest phase last JOURNALED per village (point 170): a re-entry
+   *  whose phase differs from the stored one emits a return vignette describing
+   *  the change, then updates this. Non-rinderpest peoples stay 'clean' and so
+   *  never change or re-fire. */
+  villagePhases: Record<string, string>
   /** Audience state per village. */
   /** Explored map cells for the self-drawing map (design.md §19). */
   explored: Record<string, true>
@@ -439,6 +444,7 @@ function startState(seed: number) {
     region: 'north' as RegionId,
     visitedRegions: ['north' as RegionId],
     visitedPlaces: ['cairo'],
+    villagePhases: {} as Record<string, string>,
     explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
     goodwill: {},
     reveredGiftGiven: {},
@@ -1263,19 +1269,41 @@ export const useGame = create<GameState>()((set, get) => ({
       // The rinderpest years (design.md §16, point 133): the vignette reads
       // the PLAGUE PHASE of the visit date — a Maasai village met in 1890 and
       // one met in 1892 are different worlds.
+      const phase = rinderpestPhaseAtDay(place.peopleId ?? '', s.day, START_YEAR)
       get().addEntry(
         { key: 'journal.titles.village', params: { place: id } },
-        {
-          key: 'journal.villageFirstVisit',
-          params: {
-            place: id,
-            people: place.peopleId ?? '',
-            phase: rinderpestPhaseAtDay(place.peopleId ?? '', s.day, START_YEAR),
-          },
-        },
+        { key: 'journal.villageFirstVisit', params: { place: id, people: place.peopleId ?? '', phase } },
         'event',
         'hut',
       )
+      // Remember the phase we just journaled, so a later visit can tell whether
+      // the situation has CHANGED (point 170).
+      if (place.kind === 'village') set((st) => ({ villagePhases: { ...st.villagePhases, [id]: phase } }))
+    } else if (place.kind === 'village') {
+      // Return visit (design.md §16, point 170): if the plague phase has moved
+      // since this village was last journaled, add a RETURN vignette that
+      // describes ONLY the change — the horror of what befell it since — and
+      // update the stored phase. Non-rinderpest peoples keep a constant phase,
+      // so this stays silent for them (villageSituationChanged is false).
+      const currentPhase = rinderpestPhaseAtDay(place.peopleId ?? '', s.day, START_YEAR)
+      const stored = s.villagePhases[id]
+      if (stored === undefined) {
+        // A village visited before this system existed (legacy save): seed its
+        // phase silently — we cannot describe a change from an unknown past, but
+        // now a FUTURE change will fire.
+        set((st) => ({ villagePhases: { ...st.villagePhases, [id]: currentPhase } }))
+      } else if (villageSituationChanged(stored, currentPhase)) {
+        get().addEntry(
+          { key: 'journal.titles.villageReturn', params: { place: id } },
+          {
+            key: 'journal.villageReturn',
+            params: { place: id, people: place.peopleId ?? '', fromPhase: stored, toPhase: currentPhase },
+          },
+          'event',
+          'hut',
+        )
+        set((st) => ({ villagePhases: { ...st.villagePhases, [id]: currentPhase } }))
+      }
     }
     // Honored Friend (design.md §12): food, water and medicine free of
     // charge in every village of the region — granted when needed.
@@ -1856,7 +1884,7 @@ export const useGame = create<GameState>()((set, get) => ({
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
-      visitedPlaces: s.visitedPlaces, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
+      visitedPlaces: s.visitedPlaces, villagePhases: s.villagePhases, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
@@ -1900,6 +1928,7 @@ export const useGame = create<GameState>()((set, get) => ({
         ...snap,
         equipment: cleanEquipment,
         explored: snap.explored ?? {},
+        villagePhases: snap.villagePhases ?? {}, // legacy saves lack it (point 170)
         health: snap.health ?? balance.health.max,
         penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false, canoeOnLand: false },
         dangerWarned: snap.dangerWarned ?? { unarmed: false, desert: false, water: false, wetland: false },

@@ -220,6 +220,43 @@ describe('village first visit (design.md §16)', () => {
   })
 })
 
+describe('village return entry on a changed situation (design.md §16, point 170)', () => {
+  const returnEntries = () =>
+    g().journal.filter((e) => typeof e.text === 'object' && e.text.key === 'journal.villageReturn')
+
+  it('a re-entry after the plague phase moved adds exactly one return entry; an unchanged re-entry adds none', () => {
+    // First visit in 1890 (preDamaged): stores the phase, no return entry.
+    g().debugSet({ day: 10 })
+    g().enterPlace('maasai-village')
+    expect(returnEntries().length).toBe(0)
+
+    // Return in 1891 (struck): the situation changed → one return entry naming
+    // the transition; the stored phase advances.
+    g().debugSet({ day: 400 })
+    g().enterPlace('maasai-village')
+    const after = returnEntries()
+    expect(after.length).toBe(1)
+    const params = typeof after[0].text === 'object' ? after[0].text.params : undefined
+    expect(params?.people).toBe('maasai')
+    expect(params?.fromPhase).toBe('preDamaged')
+    expect(params?.toPhase).toBe('struck')
+
+    // Re-entering again in the SAME phase adds nothing (no spam).
+    g().enterPlace('maasai-village')
+    expect(returnEntries().length).toBe(1)
+  })
+
+  it('a village whose people has no plague model never fires a return entry', () => {
+    // Tuareg carry no rinderpest phase (always 'clean'); crossing years changes
+    // nothing, so a re-entry stays silent.
+    g().debugSet({ day: 10 })
+    g().enterPlace('tuareg-village')
+    g().debugSet({ day: 1200 })
+    g().enterPlace('tuareg-village')
+    expect(returnEntries().length).toBe(0)
+  })
+})
+
 describe('river current drift (design.md §11)', () => {
   it('sweeps an idle traveller downstream and spends time + provisions', () => {
     // A river cell with flow: the White Nile below Lake Victoria.

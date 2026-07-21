@@ -353,6 +353,7 @@ export interface Strings {
       region(p: TextParams): string
       arrival(p: TextParams): string
       village(p: TextParams): string
+      villageReturn(p: TextParams): string
       audience: string
       mistake: string
       chiefHint: string
@@ -408,6 +409,7 @@ export interface Strings {
     regionEntry(p: TextParams): string
     portArrival(p: TextParams): string
     villageFirstVisit(p: TextParams): string
+    villageReturn(p: TextParams): string
     giftRevered(p: TextParams): string
     giftNeutral: string
     giftRejected(p: TextParams): string

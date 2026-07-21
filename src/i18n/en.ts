@@ -428,6 +428,7 @@ export const en: Strings = {
       region: (p: TextParams) => `Region: ${en.regions[p.region as keyof typeof en.regions]}`,
       arrival: (p: TextParams) => `Arrival in ${PLACES[p.place as string]}`,
       village: (p: TextParams) => PLACES[p.place as string],
+      villageReturn: (p: TextParams) => `Back in ${PLACES[p.place as string]}`,
       audience: 'Audience with the Chief',
       mistake: 'A Grave Mistake',
       chiefHint: "The Chief's Words",
@@ -556,6 +557,26 @@ export const en: Strings = {
       return (
         texts[p.people as string] ??
         `I have reached the ${name}. Simple huts of clay and reed huddle close to the water, and children run out to meet me, [pause]full of curiosity. The chief resides in the great hut at the center of the village. [somber]If I can win his goodwill,[pause] perhaps he will show me the way.[/somber]`
+      )
+    },
+    // Return vignette (point 170): the situation CHANGED since the last visit —
+    // describe only the change, in a shocked register. Keyed on people +
+    // fromPhase_toPhase; only the rinderpest peoples ever reach it.
+    villageReturn: (p: TextParams) => {
+      const transitionKey = `${p.fromPhase as string}_${p.toPhase as string}`
+      const texts: Record<string, Record<string, string>> = {
+        maasai: {
+          preDamaged_struck: `[fear]I came back to find the kraals empty.[/fear] Where cattle still stood last year — [somber]thinned, but alive[/somber] — there is nothing now but trodden earth. [pause] A wasted woman was gathering pods from the ground and looked straight through me; they say she lives on wild honey and is walking toward a certain death. [breath] Only the elders at their fire and the young men on guard still hold a remnant of the old order.`,
+          struck_aftermath: `[somber]The famine I witnessed here has moved on — and taken half the people with it.[/somber] The great kraals stand open and silent; with the herds went the web of cattle-loans and kinship that bound these people together. [pause] Some have gone to the farming peoples in the hills; those who stayed ride raids more desperate than any I had heard of. [breath] And yet the ring of huts still stands, [emph]and the young men still leap their dance.[/emph]`,
+          preDamaged_aftermath: `[fear]I came back and scarcely knew the place.[/fear] In the years I was away the plague went through these kraals [somber]like a fire[/somber]: the cattle I once watched at dusk are gone to the last head, and with them the web of cattle-loans and kinship that held this people together. [pause] Some have gone off to the farming peoples of the hills; those who remain ride desperate raids. [breath] Only the ring of huts still stands, [weary]and at evening the young men still leap their dance — thinner than I remember, but unbroken.[/weary]`,
+        },
+        sidama: {
+          struck_aftermath: `[breath] I came back scarcely daring to hope — [somber]but the Evil Days lie behind them now.[/somber] The cattle pens still stand almost bare, mute witnesses to what I saw here; yet the enset groves carried them through the hunger. [pause] Today they roast the red coffee-berries again, [emph]a drink that would wake the dead,[/emph] and they offered me a cup as in better times.`,
+        },
+      }
+      return (
+        texts[p.people as string]?.[transitionKey] ??
+        `[somber]I came back, and the place is not the one I left.[pause] What has happened here since my last visit stands unspoken in every face.[/somber]`
       )
     },
     giftRevered: (p: TextParams) =>

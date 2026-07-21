@@ -69,3 +69,38 @@ describe('village first-visit entries (per-people vignettes)', () => {
     })
   }
 })
+
+// Return vignettes (design.md §16, point 170): a re-entry after the plague phase
+// changed adds a shocked entry describing ONLY the change — one distinct,
+// markup-clean text per (people, transition) in both languages.
+describe('village return entries (phase-transition vignettes)', () => {
+  const transitions = [
+    ['maasai', 'preDamaged', 'struck'],
+    ['maasai', 'struck', 'aftermath'],
+    ['maasai', 'preDamaged', 'aftermath'],
+    ['sidama', 'struck', 'aftermath'],
+  ] as const
+
+  for (const lang of [en, de]) {
+    it(`${lang.lang}: each modelled transition has its own markup-clean return text`, () => {
+      const texts = transitions.map(([people, fromPhase, toPhase]) =>
+        lang.journal.villageReturn({ place: `${people}-village`, people, fromPhase, toPhase }),
+      )
+      for (const t of texts) {
+        expect(t.length).toBeGreaterThan(80) // a real vignette, not a stub
+        expect(stripVoiceMarkup(t)).not.toMatch(/[[\]]/) // markup strips cleanly
+      }
+      // Every transition reads as its own text, and none falls back to the generic.
+      expect(new Set(texts).size).toBe(transitions.length)
+      const generic = lang.journal.villageReturn({
+        place: 'maasai-village',
+        people: 'no-such-people',
+        fromPhase: 'struck',
+        toPhase: 'aftermath',
+      })
+      for (const t of texts) expect(t).not.toBe(generic)
+      // The generic fallback is itself well-formed markup.
+      expect(stripVoiceMarkup(generic)).not.toMatch(/[[\]]/)
+    })
+  }
+})

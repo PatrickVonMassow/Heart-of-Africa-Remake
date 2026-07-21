@@ -78,6 +78,17 @@ export function rinderpestPhaseAtDay(peopleId: string, day: number, startYear: n
   return rinderpestPhase(peopleId, d.getUTCFullYear(), d.getUTCMonth() + 1)
 }
 
+/** Whether re-entering a village should add a RETURN vignette (point 170):
+ *  the plague phase last journaled here differs from the phase now. A people
+ *  with no phase model keeps a constant phase ('clean'), so this is false for
+ *  them by construction — only maasai/sidama ever re-fire. */
+export function villageSituationChanged(
+  storedPhase: string | undefined,
+  currentPhase: RinderpestPhase,
+): boolean {
+  return storedPhase !== undefined && storedPhase !== currentPhase
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__rinderpest = { rinderpestPhase, rinderpestPhaseAtDay }

@@ -5846,7 +5846,24 @@ the remaining open points in their numeric order.
   fraction yields strictly more juveniles). design.md §19.8 + CLAUDE §7.1 pt.12.
   1828 Vitest + enrichments 197/0 green.
 
-- [ ] 170. A RETURN journal entry when a village's situation has changed.
+- [x] 170. DONE 21.07.2026 — a re-entry into a village whose rinderpest phase
+  changed since it was last journaled now adds a shocked RETURN vignette
+  describing only the change. The store persists `villagePhases` (phase last
+  journaled per village, saved with the checkpoint, legacy saves default to {}
+  and are seeded silently on first re-entry); `enterPlace` stores the phase on
+  first visit and, on a return, emits `journal.villageReturn` when the pure
+  `villageSituationChanged(stored, current)` predicate fires (non-rinderpest
+  peoples keep a constant 'clean' phase → never re-fire). New bilingual texts
+  (voice markup, shocked register drafted with Fable 5) cover the modelled
+  transitions — maasai preDamaged→struck, struck→aftermath, preDamaged→aftermath;
+  sidama struck→aftermath — with a markup-clean generic fallback. Tests: pure
+  predicate (rinderpest.test.ts), per-transition distinct + markup-clean texts in
+  both languages (villages.test.ts), and a store test that a phase-changed
+  re-entry adds exactly one entry while an unchanged one and a plague-less people
+  add none (store.travel.test.ts); parity count 59→61, i18n markup scan green
+  (the `[transitionKey]` rename avoided a false-positive tag match). design.md §16
+  documents the return-visit path. build+lint+1989 vitest green.
+  ORIGINAL: A RETURN journal entry when a village's situation has changed.
   User request (17.07.2026 23:xx): the village vignette currently fires only on
   the FIRST visit. "Aendere das dahingehend, dass auch wieder einer kommt, wenn
   sich im Dorf die Situation veraendert hat. Der neue Eintrag soll dann nur

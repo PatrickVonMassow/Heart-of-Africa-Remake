@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { CARRION_RADIUS_DEG, rinderpestCarrionActive, rinderpestPhase, rinderpestPhaseAtDay } from './rinderpest'
+import {
+  CARRION_RADIUS_DEG,
+  rinderpestCarrionActive,
+  rinderpestPhase,
+  rinderpestPhaseAtDay,
+  villageSituationChanged,
+} from './rinderpest'
 
 // The date table of point 133 (research: docs/peoples-1890.md §5): the game's
 // window IS the panzootic, and the phase is a pure function of people + date.
@@ -64,5 +70,28 @@ describe('rinderpestPhase (design.md §16/§19.13, point 133)', () => {
     expect(rinderpestPhase('bemba', 1891, 6)).toBe('clean') // tsetse belt: no herds to lose
     expect(rinderpestPhase('maasai' + 'x', 1891, 6)).toBe('clean')
     expect(rinderpestPhase('baganda', 1891, 6)).toBe('clean') // the cattle blow fell on Bunyoro/Nkore, not banana-based Buganda
+  })
+})
+
+describe('villageSituationChanged (return-vignette predicate, point 170)', () => {
+  it('fires only when a KNOWN stored phase differs from the current one', () => {
+    expect(villageSituationChanged('preDamaged', 'struck')).toBe(true)
+    expect(villageSituationChanged('struck', 'aftermath')).toBe(true)
+    expect(villageSituationChanged('preDamaged', 'aftermath')).toBe(true)
+    // Unchanged → silent.
+    expect(villageSituationChanged('struck', 'struck')).toBe(false)
+    expect(villageSituationChanged('aftermath', 'aftermath')).toBe(false)
+    // No stored phase (never journaled / legacy) → silent, not a spurious entry.
+    expect(villageSituationChanged(undefined, 'struck')).toBe(false)
+  })
+
+  it('a non-rinderpest people keeps a constant phase, so it never re-fires', () => {
+    // Its phase is 'clean' at every visit → stored === current → false, by
+    // construction, across the whole 1890-1895 window.
+    const start = 1890
+    for (const day of [0, 400, 1000, 2000]) {
+      const p = rinderpestPhaseAtDay('tuareg', day, start)
+      expect(villageSituationChanged(p, rinderpestPhaseAtDay('tuareg', day + 365, start))).toBe(false)
+    }
   })
 })
