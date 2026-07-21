@@ -8023,6 +8023,28 @@ the remaining open points in their numeric order.
   screenshot I inspect), so they belong in a focused coast pass, not a rushed
   edit.
 
+- [x] 212. DONE 21.07.2026 — a drinking PARENT rendered buried under its own
+  ground. The point-200-hardened anchoring tripwire (203A) caught it on a
+  re-verification: `[ASSERT] animal-buried — giraffe bodyY=0.15 ground=0.92
+  … drink=true child=true`, persistent over 2+ consecutive assert-visits (not
+  the one-frame transient the strike-counter tolerates), so a real bug, not a
+  flake. ROOT CAUSE: the periodic-drink render block (Wildlife.tsx ~2942) sets
+  the local `bodyY` to the LOW bank height it slides to, but seven family/grief
+  branches then render the parent back at its OWN inland sim spot (`px=a.x;
+  pz=a.z`) while INHERITING that stale bank `bodyY` — so a parent that was mid
+  drink-cycle when a calf drama pulled it home rendered sunk ~0.77 under its
+  inland ground. The sibling movement branches already re-derive their standing
+  height (the point-203A rule, e.g. `bodyY = a.y = max(0.02, groundHeight)`);
+  these seven did not. FIX: `bodyY = a.y` (the maintained sim-ground height) in
+  all seven sim-spot render branches — kick (defence strike), caught (charge),
+  plungeTo, trampleTo, vigil, escort (calf-in-water), shield (chased calf).
+  VERIFIED: build + lint + 1980 vitest green; enrichments re-run reports
+  0 console-errors (the buried-drinker assert is gone). No deterministic bespoke
+  test: the drink cycle has a 75 s period, so staging the bank-phase × family-
+  branch overlap deterministically is fragile — the standing point-207i
+  anchoring tripwire (which caught this) is the live regression guard for the
+  class, per its design. Found by the 203/207i finder.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this

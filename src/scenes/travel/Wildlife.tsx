@@ -3012,6 +3012,12 @@ function Herds() {
             // strike — front dips (positive pitch), rear flies, then settles.
             px = a.x
             pz = a.z
+            // Render at the sim spot: resync bodyY to the maintained sim height.
+            // A drink cycle this frame set bodyY to the low bank; a family branch
+            // that discards the drink slide (rendering back at a.x,a.z) must reset
+            // it, else the parent renders sunk under its own inland ground — the
+            // buried-drinker the point-200 anchoring tripwire caught.
+            bodyY = a.y
             yaw = Math.atan2(a.x - LION_STATE.lx, a.z - LION_STATE.lz)
             const strike = Math.min(1, Math.max(0, 1 - a.kick / PARENT_KICK_SECONDS))
             pitch = 0.55 * Math.sin(Math.PI * strike)
@@ -3021,6 +3027,7 @@ function Herds() {
             // face the calf while rushing in.
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
             pitch = 0
             familyHeld = true
@@ -3044,6 +3051,7 @@ function Herds() {
             // Rushing after its swept-over calf (movement in the pre-pass).
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(a.plungeTo.x - a.x, a.plungeTo.z - a.z)
             pitch = 0
             familyHeld = true
@@ -3054,6 +3062,7 @@ function Herds() {
             // to die under instead of darting aside like ordinary prey.
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(a.trampleTo.x - a.x, a.trampleTo.z - a.z)
             pitch = 0
             familyHeld = true
@@ -3066,6 +3075,7 @@ function Herds() {
             // existing hunt path, a sacrifice at the spot where its young fell.
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(a.vigil.x - a.x, a.vigil.z - a.z)
             pitch = -0.15 // head lowered over the carcass
             familyHeld = true
@@ -3104,9 +3114,12 @@ function Herds() {
             // Wading to (or escorting) the calf in the water (pre-pass moves).
             px = a.x
             pz = a.z
-            yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
             // In the water a.y already rides the sheet chest-deep (point 196)
-            // — an extra dip here read the wader half a body too low.
+            // — an extra dip here read the wader half a body too low. Resync
+            // bodyY to it so a drink slide this frame can't leave the parent
+            // sunk at its inland bank height (see the kick branch).
+            bodyY = a.y
+            yaw = Math.atan2(a.child.x - a.x, a.child.z - a.z)
             pitch = 0.15
             familyHeld = true
           } else if (a.young && LION_STATE.mode === 'chase' && LION_STATE.victim === a) {
@@ -3143,6 +3156,7 @@ function Herds() {
             // takes it in the calf's place (§19).
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             const h = blockHeading(a.x, a.z, a.child.x, a.child.z, LION_STATE.lx, LION_STATE.lz, PARENT_BLOCK_OFFSET)
             if (h !== null) {
               // Running to hold the station: face the run direction (snap, so the
