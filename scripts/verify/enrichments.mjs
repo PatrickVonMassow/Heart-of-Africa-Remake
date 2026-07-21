@@ -4998,6 +4998,31 @@ check(
   `zones: ${[...new Set(placeClimate.map((p) => p.zone))].join(', ')}`,
 )
 
+// point 200: wait for a blended scalar to CONVERGE instead of a fixed wall wait.
+// These weather values approach their target at ~0.02/frame, so they settle well
+// before the old 4000-4500 ms AND a heavy-load frame drop can no longer race the
+// wait. Poll until two consecutive samples agree within a RELATIVE tolerance
+// (fogFar ~155 needs relative; the small absolute floor covers floodRise ~1),
+// capped. Settle on the SAME value the check reads — the mistake in the reverted
+// first attempt was settling on the blend DRIVER (dust) while the check reads a
+// value that LAGS it (fogFar), so it returned before the read value had closed.
+// The 250 ms lead lets the blend get underway so two pre-motion samples can't
+// read as "already converged" at the previous month's value.
+const settleScalar = async (read, rel = 0.003) => {
+  await page.waitForTimeout(250)
+  let prev = null
+  const t0 = Date.now()
+  while (Date.now() - t0 < 12000) {
+    const v = await page.evaluate(read)
+    if (typeof v === 'number') {
+      if (prev !== null && Math.abs(v - prev) <= rel * Math.max(1, Math.abs(v))) return v
+      prev = v
+    }
+    await page.waitForTimeout(150)
+  }
+  return prev
+}
+
 // Point 138 — the Nile flood: remote-fed, so it crests in OCTOBER at places
 // where it never rains. Read through the APP's dev hook (__rivers), never a
 // dynamic import: after HMR a URL import gets a FRESH module instance whose
@@ -5007,7 +5032,7 @@ check(
   await page.waitForTimeout(1200)
   const surfAt = async (month) => {
     await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
-    await page.waitForTimeout(4500) // the rise blends at 0.02/frame
+    await settleScalar(() => window.__rivers.surfaceAt(24.09, 32.9)) // point 200: settle on the READ value
     return page.evaluate(() => ({
       y: window.__rivers.surfaceAt(24.09, 32.9),
       rise: window.__rivers.floodRise(),
@@ -5044,7 +5069,7 @@ check(
   await page.waitForTimeout(1200)
   const deltaAt = async (month) => {
     await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
-    await page.waitForTimeout(4500) // the swell blends at 0.02/frame
+    await settleScalar(() => window.__naturalSites.deltaWaterScale()) // point 200: settle on the READ value
     return page.evaluate(() => ({
       flood: window.__naturalSites.deltaFlood(),
       scale: window.__naturalSites.deltaWaterScale(),
@@ -5073,7 +5098,7 @@ check(
   await page.waitForTimeout(1200)
   const at = async (month) => {
     await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
-    await page.waitForTimeout(4000)
+    await settleScalar(() => window.__climate.fog()?.far ?? null) // point 200: settle on the READ value (fogFar LAGS dust)
     return page.evaluate(() => ({
       dust: window.__climate.dust(),
       fogFar: window.__climate.fog()?.far ?? null,
