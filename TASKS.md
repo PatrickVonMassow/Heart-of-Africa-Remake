@@ -7321,7 +7321,21 @@ the remaining open points in their numeric order.
   VERIFY: pure test for the nudge-failure branch (unchanged point → counter not
   reset → escalation fires); the collision suite's no-pinned-walker check stays
   green across seeds. DOCS: none (the point-155 wording already promises it).
-- [ ] 199. The dragged canoe's centre slides when the pitch clamp binds
+- [x] 199. VERIFIED & REJECTED 21.07.2026 — inline analysis of the pose maths
+  shows the clamp-induced drift is a rare, negligible corner (the task's
+  "reject with the measured bound" path). The pitch clamp (±CANOE_PITCH_MIN
+  -0.65 / MAX 0.5) only binds when the far end sits beyond ~40-43° below/above
+  the player over the ~1.35-unit trail — a very steep drop DIRECTLY behind the
+  traveller while dragging (mountains). Below that, every reachable drag slope
+  leaves the pitch UNCLAMPED, so there is zero clamp-induced drift. At the clamp
+  threshold the near-end drift is ~0.16 m and grows only on steeper drops, a
+  momentary cosmetic effect. The pose is an accepted approximation anyway
+  (CANOE_TRAIL_CENTRE 1.35 != the half hull 1.065, so the near end never sits
+  exactly at the grip regardless of the clamp), so a pin-the-near-end
+  re-derivation would re-tune the whole screenshot-accepted pose (and introduce
+  a discontinuity at the clamp boundary if applied only when clamped) for a
+  disproportionate gain. Documented in a canoeDrag.ts comment; no code/behaviour
+  change. ORIGINAL: The dragged canoe's centre slides when the pitch clamp binds
   (canoeDrag.ts ~152, Pillar-2 finding): centreY keeps tracking the raw far-end
   ground height while the pitch is clamped, so on a steep trail the
   reconstructed near end drifts off the grip line. Verify inline whether the

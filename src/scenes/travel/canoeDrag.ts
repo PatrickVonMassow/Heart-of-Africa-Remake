@@ -148,7 +148,17 @@ export function canoeDragPose(
   const pitch = clamp(-Math.atan2(drop, CANOE_DRAG_LEN), CANOE_PITCH_MIN, CANOE_PITCH_MAX)
   const roll = clamp(Math.atan2(groundLeft - groundRight, 1.4) * 0.8, -CANOE_ROLL_MAX, CANOE_ROLL_MAX)
   // The far end may legitimately sit below the player root (a dip behind);
-  // the pitch clamp alone bounds the pose.
+  // the pitch clamp alone bounds the pose. centreY is the midpoint of the grip
+  // and the far-end ground. When the pitch CLAMP binds (point 199) this midpoint
+  // no longer matches the clamped hull line, so the near end drifts a little off
+  // the grip — but only beyond a ~40-43° drop directly behind the player (where
+  // the natural pitch exceeds ±CANOE_PITCH_MIN/MAX), a rare, momentary
+  // steep-slope case, and only ~0.16 m at the threshold; at every reachable drag
+  // slope below that the pitch is unclamped and there is no clamp-induced drift.
+  // The pose is an accepted approximation regardless (CANOE_TRAIL_CENTRE 1.35 !=
+  // the half hull 1.065, so the near end never sits exactly at the grip), so a
+  // full pin-the-near-end re-derivation is not worth re-tuning the whole
+  // screenshot-accepted pose for this corner (point 199, verified & rejected).
   const centreY = (CANOE_GRIP_HEIGHT + hFarRel + CANOE_REST_LIFT) / 2
   return {
     yaw: yawT + Math.PI,
