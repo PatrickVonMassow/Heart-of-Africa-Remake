@@ -557,7 +557,9 @@ if (waterSpot && landSpot) {
     window.__game.setState({ equipment: { ...g.equipment, canoe: 1 } })
     g.debugJumpTo(s.lat, s.lon)
   }, waterSpot)
-  await page.waitForTimeout(400)
+  // point 200: wait for the canoe state to actually flip (a frame or two after
+  // the jump) rather than a fixed wall wait that races it under load.
+  await page.waitForFunction(() => window.__player?.canoeing === true, null, { timeout: 6000 }).catch(() => {})
   const ride = await page.evaluate(() => window.__player)
   check('Canoe: the explorer rides the canoe on water', ride?.canoeing === true && ride?.carrying === false, JSON.stringify(ride))
   // Zoom in for legible evidence (zoom-in below 1 is always allowed). The
@@ -572,7 +574,8 @@ if (waterSpot && landSpot) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), landSpot)
   await page.waitForTimeout(300)
   await page.evaluate(() => { const p = window.__game.getState().pos; window.__game.setState({ pos: { x: p.x, z: p.z - 2 } }) })
-  await page.waitForTimeout(500)
+  // point 200: wait for the drag state to flip rather than a fixed settle.
+  await page.waitForFunction(() => window.__player?.carrying === true, null, { timeout: 6000 }).catch(() => {})
   const drag = await page.evaluate(() => window.__player)
   check('Canoe: on land the explorer drags the canoe (not ridden)', drag?.carrying === true && drag?.canoeing === false, JSON.stringify(drag))
   // The dragged hull lies ON the terrain (design.md §7/§11): its far end
@@ -596,7 +599,8 @@ if (waterSpot && landSpot) {
     const g = window.__game.getState()
     window.__game.setState({ equipment: { ...g.equipment, canoe: 0 } })
   })
-  await page.waitForTimeout(300)
+  // point 200: wait until both possession flags clear rather than a fixed wait.
+  await page.waitForFunction(() => window.__player?.canoeing === false && window.__player?.carrying === false, null, { timeout: 6000 }).catch(() => {})
   const none = await page.evaluate(() => window.__player)
   check('Canoe: no canoe in the pack, neither ridden nor dragged', none?.canoeing === false && none?.carrying === false, JSON.stringify(none))
 
@@ -616,7 +620,8 @@ if (waterSpot && landSpot) {
     if (!edward) return { found: false }
     const spot = [edward.center[1], edward.center[0]]
     g.debugJumpTo(spot[0], spot[1])
-    await sleep(800)
+    // point 200: poll for the swim state to settle instead of a fixed wait.
+    for (let i = 0; i < 80 && window.__player?.swimming !== true; i++) await sleep(50)
     return { found: true, spot, player: window.__player }
   })
   const swimGap = swim.found
@@ -1187,11 +1192,16 @@ await page.evaluate(() => {
     const s0 = window.__simTime()
     const t0 = Date.now()
     const cap = wallCapMs ?? simBudget * 3000 + 20000
+    // Fail-soft (point 200): a doneFn that touches __wildlife can throw on a
+    // rare mid-poll scene remount (the hook briefly goes undefined). Treat a
+    // throw as "not done yet" and keep polling instead of letting it propagate
+    // as an UNCAUGHT error that aborts the whole suite.
+    const safeDone = () => { try { return doneFn() } catch { return false } }
     while (window.__simTime() - s0 < simBudget && Date.now() - t0 < cap) {
-      if (doneFn()) return true
+      if (safeDone()) return true
       await new Promise((r) => setTimeout(r, 80))
     }
-    return doneFn()
+    return safeDone()
   }
   window.__sleepSim = (simSecs, wallCapMs) => window.__pollSim(simSecs, () => false, wallCapMs)
 })
@@ -1388,7 +1398,7 @@ const animalHit = await page.evaluate(async () => {
   // correctly — with the wrong body and never reaches the test target.
   {
     const p0 = window.__game.getState().pos
-    const h0 = window.__wildlife.herdsRef.current
+    const h0 = window.__wildlife?.herdsRef?.current
     if (h0) {
       for (const sp of Object.keys(h0)) {
         for (const a of h0[sp]) {
@@ -1409,7 +1419,7 @@ const animalHit = await page.evaluate(async () => {
     // Fallback: should the zebra be streamed out regardless, re-add and re-pin
     // it — the real game collides against genuinely streamed animals, this
     // only keeps the fixed test target present.
-    const herds = window.__wildlife.herdsRef.current
+    const herds = window.__wildlife?.herdsRef?.current
     if (herds && !herds.zebra.includes(zebra)) herds.zebra.unshift(zebra)
     zebra.x = ax
     zebra.z = az
@@ -1431,7 +1441,7 @@ const animalHit = await page.evaluate(async () => {
   const t1 = Date.now()
   let escaped = 0
   while (Date.now() - t1 < 12000) {
-    const herds2 = window.__wildlife.herdsRef.current
+    const herds2 = window.__wildlife?.herdsRef?.current
     if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.unshift(zebra)
     zebra.x = ax
     zebra.z = az
@@ -1440,7 +1450,7 @@ const animalHit = await page.evaluate(async () => {
     await sleep(20)
   }
   window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA' }))
-  const herds = window.__wildlife.herdsRef.current
+  const herds = window.__wildlife?.herdsRef?.current
   if (herds) herds.zebra = herds.zebra.filter((a) => a !== zebra)
   return { minDist, reached, escaped }
 })
