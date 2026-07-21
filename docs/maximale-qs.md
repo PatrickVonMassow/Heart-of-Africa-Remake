@@ -123,6 +123,13 @@ Cheap automated classes first, then the visual sweep:
   play out; capture a temporal filmstrip; I inspect every frame and the deltas.
   Judge "in view" by projecting to the frame (`__camera.onScreen`/`ndc`), never
   an assumed radius (memory `test-realistic-zoom`).
+  KEEP THE EYES OPEN FOR "LOOKS-WRONG" ODDITIES (user directive 21.07.2026): the
+  inspection must catch things that are functionally FINE but look WEIRD to a
+  human — the aesthetic/plausibility class (a stepped coastline, a sea-arm poking
+  into the desert, a river ending in a beach gap, a notch in the water, jagged
+  edges/seams/holes, wrong scale or colour). These pass every functional check,
+  so only the eye finds them; ask "does this look right to a human?" on every
+  frame and file each real one as its own point.
 
 ## Phase 7 — Additional finding methods (207 ii–vii)
 - **(ii) Golden-image differential** — bake the baseline of the sweep frames NOW

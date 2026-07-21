@@ -7463,6 +7463,16 @@ the remaining open points in their numeric order.
   / mis-posed / wrong-looking things). Each anomaly → verify against the code →
   file a real one as its own point + fix. Keep a checklist of scenes so the sweep
   is repeatable and grows.
+  KEEP THE VIRTUAL EYES OPEN FOR "LOOKS-WRONG" ODDITIES (user directive
+  21.07.2026): the inspection must catch not only functional bugs but things that
+  are functionally FINE yet look WEIRD to a human eye — the aesthetic/plausibility
+  class the user keeps spotting: the stepped coastline (209), the sea-arm poking
+  into the desert (210), a river that stops short of the sea with a beach gap or a
+  notch punched in the water (211), and any similar "it works but it's ugly/odd"
+  artefact (jagged edges, seams, holes, mismatched scale/colour, an object that
+  reads wrong even though nothing errors). These pass every functional check, so
+  ONLY the eye finds them — treat "does this look right to a human?" as a
+  first-class question on every frame, and file each real one as its own point.
   (D) CROSS-SYSTEM / TARGETING SANITY — the class where a reaction or event fires
   for the WRONG actor or situation (derived from the past reports 162 a flock
   descends on a family the parent just SAVED, 168 carrion not shown when it
@@ -7930,6 +7940,13 @@ the remaining open points in their numeric order.
   points are unchanged. DOCS: design.md §3.1/§11.2 + CLAUDE §7.1 pt.4 if the
   boundary wording changes. Coordinate with point 209 (same coast) — a shared
   before/after Cairo screenshot proves both.
+  PROBE (21.07.2026): the arm is a sea (lf<0.5) wedge on the KEPT (SW) side of
+  the boundary at ~29.5-29.9N / 32.3-32.5E — the head of the real Gulf of Suez
+  (Suez ~29.97N/32.55E), so it is partly GENUINE sea, but rendered as a broad,
+  jagged inlet poking into the desert. The fix is therefore to make the edge
+  follow the real, NARROW Gulf-of-Suez shore (tighten the boundary polyline /
+  mask so the head reads as a slim gulf, not a wide arm), not to delete the sea
+  outright.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
@@ -7972,6 +7989,18 @@ the remaining open points in their numeric order.
   the Nile flowing unbroken into the sea. DOCS: design.md §11.3 + CLAUDE §7.1
   pt.21 (mouth junction + no interior notch). Keep every river's course and the
   §4.2 clearances otherwise intact.
+  PROBE (21.07.2026, Node geodata probe): (a) CONFIRMED the mouth gap — a
+  transect up the Nile shows `riverDistance` staying within the ribbon
+  (<0.17°) only to ~lat 30.5, then growing past the width (0.5 cap) by ~lat
+  31.0 while the land mask stays lf=1.0 until ~lat 31.4 and the sea (lf=0)
+  begins ~31.5: the ribbon TERMINATES at its last spline control point well
+  inland, leaving a wide land gap before the sea. The vector river polyline
+  simply does not run to the coast. (b) The Cairo NOTCH is NOT in the raw
+  `riverDistance` field (a fine grid at 29.9-30.2N/31.0-31.5E shows an
+  unbroken river band) — so it is a RENDER-STAGE artifact (the settlement
+  cluster clearance / bank-mask carving the drawn ribbon at Cairo, or a
+  mesh/mask hole), to be found by inspecting the ribbon/water-mask build, not
+  the distance field.
 
 ## Closing (only after all points)
 
