@@ -620,7 +620,7 @@ export function sunDimFactor(wetness: number, strength: number): number {
  * greenness per-zone via `effectiveGreenness` from the player's coordinate,
  * because the absolute wetness this holds cannot carry a per-zone flora look.
  */
-export const CURRENT_WEATHER = { wetness: 0, dust: 0 }
+export const CURRENT_WEATHER = { wetness: 0, dust: 0, flash: 0 }
 
 export function wetnessAt(
   day: number,

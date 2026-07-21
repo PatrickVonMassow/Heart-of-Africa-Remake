@@ -5649,7 +5649,7 @@ the remaining open points in their numeric order.
   carrion more forward-visible at 0.5 is left as a follow-up, the enrichments
   carrion check still counts within viewR with an OPEN note.
 
-- [ ] 166. Thunderstorms: lightning WITH thunder, as a pair.
+- [x] 166. Thunderstorms: lightning WITH thunder, as a pair.
   User question/wish (17.07.2026, screenshot at 10.0N/26.0E in the August
   rains): "Hat das Wetter hier Gewitter mit Blitzen? Dann sollte es auch
   einen Donner dazu geben." AUDIT ANSWER (code, 17.07.2026): the game has NO
@@ -5680,6 +5680,19 @@ the remaining open points in their numeric order.
   weather audio). DOCS: design.md §19.13 + CLAUDE.md §7.1 pt. 12. (Filed
   17.07.2026; queued at the batch end per the standing append-and-defer
   rule.)
+  DONE (21.07.2026): `thunderstormAt(day,lat,lon,startYear,elevationM)` in
+  `src/systems/season.ts` gates a strike on the hail precondition (heavy
+  storm, real rain, deterministic hash — a rainless/dry zone never flashes),
+  `thunderDelaySeconds(strikeSeed)` derives the 1-4 s hash-per-strike delay,
+  and `CURRENT_WEATHER.flash` carries the pulse. The flash brightens the sun
+  + ambient light additively in BOTH views (Climate.tsx bird's-eye,
+  PlaceScene.tsx settlement, TravelScene.tsx sun uniform — no new light
+  source), and `playThunder(delay,strength)` in `src/systems/ambience.ts`
+  rumbles a brown-noise sample on the single ambience bus (volume 0 =>
+  silent). The traveller is never harmed. Pure tests in season.test.ts (gate
+  sweep + delay derivation); live in `scripts/verify/enrichments.mjs` via the
+  deterministic `__climate.forceStrike(0.8)` dev hook (flashPeak + delayed
+  `__thunder` node). Docs: design.md §19.13, CLAUDE.md §7.1 pt. 12.
 
 - [x] 167. Rain snaps on at a climate-zone border instead of easing in.
   User report (17.07.2026 22:54, screenshot at 5.0N/25.4E walking south into
@@ -8096,6 +8109,25 @@ the remaining open points in their numeric order.
   branch overlap deterministically is fragile — the standing point-207i
   anchoring tripwire (which caught this) is the live regression guard for the
   class, per its design. Found by the 203/207i finder.
+
+- [ ] 213. CROSS-BROWSER FUNCTIONAL SMOKE (user request 21.07.2026). The
+  regression runs on Chromium (Playwright-Chromium for WebGL2 + system Chrome for
+  the WebGPU lane) — that covers all Chromium browsers (Chrome/Edge/Brave) but
+  NOT Firefox (Gecko) or Safari (WebKit). A SHORT functional smoke on those two
+  engines catches a Gecko/WebKit-only break WITHOUT re-running the whole suite per
+  engine (which would multiply the runtime by the browser count, user 21.07.2026).
+  BUILT + WIRED: `scripts/verify/crossbrowser.mjs` launches firefox + webkit
+  (installed via `npx playwright install firefox webkit`) at a DEPTH that scales
+  with the tier — `minimal` (SMALL gate): boots + renderer + no console errors;
+  `standard` (LARGE/default): + the ACTUAL backend (Firefox ships WebGPU from FF
+  141+, so it reports WebGPU vs the WebGL2 fallback), a sized canvas, a bird's-eye
+  move; `thorough` (maximale QS): + core flows (enter a settlement, open the map &
+  journal). `run-all.mjs` runs it once on the WebGL2 Chromium lane (`runCrossBrowser`,
+  depth from the tier), on a full tier/default run or `npm test -- crossbrowser`,
+  and GRACEFULLY SKIPS (exit 0, notice) if the engines are not installed so a
+  runner without them never breaks. REMAINING: run it green on both engines and
+  fix any Gecko/WebKit-only issue found; the maximale-qs.md pass runs it at
+  `thorough`. DOCS: scripts/verify/README.md + maximale-qs.md note the tiered smoke.
 
 ## Closing (only after all points)
 

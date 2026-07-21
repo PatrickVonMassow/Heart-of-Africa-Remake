@@ -25,7 +25,10 @@ import {
   rainAmount,
   seasonFogParams,
   skyOvercastParams,
+  thunderstormAt,
+  thunderDelaySeconds,
 } from '../../systems/season'
+import { playThunder } from '../../systems/ambience'
 import { elevationAt } from '../../world/geodata'
 import type { RegionId } from '../../world/geo'
 
@@ -166,6 +169,13 @@ export function Climate() {
   const hazeTarget = useMemo(() => new THREE.Color(), [])
   /** This frame's effective season wetness, for the dev hook. */
   const wetness = useRef(0)
+  /** Lightning flash (0..1) and its strike scheduler on the render clock (point 166). */
+  const flashRef = useRef(0)
+  const nextStrikeRef = useRef(0)
+  const strikeCountRef = useRef(0)
+  /** Peak flash since the last reset — the verify probe reads THIS (a flash lasts
+   *  ~1 frame at the headless clamped dt, so a per-frame poll races the decay). */
+  const flashPeakRef = useRef(0)
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
@@ -181,6 +191,26 @@ export function Climate() {
       rainOpacity: () => rain.opacityU.value,
       dust: () => CURRENT_WEATHER.dust,
       hail: () => rain.hailU.value,
+      flash: () => flashRef.current,
+      flashPeak: () => flashPeakRef.current,
+      resetFlashPeak: () => {
+        flashPeakRef.current = 0
+      },
+      strikes: () => strikeCountRef.current,
+      // Fire a strike NOW (verify hook): the same flash + delayed thunder a real
+      // storm strike produces — lets the live check prove the runtime wiring
+      // deterministically, without the fragile positioning onto a natural storm
+      // cell. The GATE (only fires inside a storm) is pure-tested separately.
+      forceStrike: (strength = 0.8) => {
+        flashRef.current = strength
+        if (strength > flashPeakRef.current) flashPeakRef.current = strength
+        playThunder(thunderDelaySeconds(strikeCountRef.current), strength)
+        strikeCountRef.current++
+      },
+      thunderstorm: () => {
+        const s = useGame.getState()
+        return thunderstormAt(s.day, -s.pos.z / 10, s.pos.x / 10, START_YEAR, elevationAt(-s.pos.z / 10, s.pos.x / 10))
+      },
     }
     return () => {
       delete w.__climate
@@ -246,6 +276,33 @@ export function Climate() {
       Math.min(1, Math.max(0, balance.season.weatherStrength))
     setHail(hail * (1 - hazeClear), s.pos.x, s.pos.z)
     rain.hailU.value += (hail - rain.hailU.value) * k
+
+    // Thunderstorm (design.md §19.13, point 166): inside a heavy storm, lightning
+    // FLASHES fire on the render clock, each scheduling its THUNDER 1-4 s later so
+    // the pair reads as weather, never a silent flash. The flash brightens the
+    // scene via CURRENT_WEATHER.flash (read by the sun light and the sky dome) and
+    // decays in <300 ms. Hidden in the debug zoom-out like the rest of the weather.
+    const stormStrength =
+      thunderstormAt(s.day, lat, lon, START_YEAR, elevationAt(lat, lon)) *
+      Math.min(1, Math.max(0, balance.season.weatherStrength)) *
+      (1 - hazeClear)
+    const now = clock.elapsedTime
+    if (stormStrength > 0) {
+      if (nextStrikeRef.current === 0) nextStrikeRef.current = now + 2 // first bolt soon after the gate opens
+      if (now >= nextStrikeRef.current) {
+        flashRef.current = stormStrength // the bolt
+        if (stormStrength > flashPeakRef.current) flashPeakRef.current = stormStrength
+        playThunder(thunderDelaySeconds(strikeCountRef.current), stormStrength)
+        strikeCountRef.current++
+        // Next strike in 4-13 s, deterministic jitter per strike.
+        nextStrikeRef.current = now + 4 + (thunderDelaySeconds(strikeCountRef.current * 31 + 7) - 1) * 3
+      }
+    } else {
+      nextStrikeRef.current = 0 // storm over → fresh timing next time
+    }
+    flashRef.current *= Math.max(0, 1 - dt * 7) // fast decay (<~0.3 s)
+    if (flashRef.current < 0.01) flashRef.current = 0
+    CURRENT_WEATHER.flash = flashRef.current
     const rainTarget = rainAmount(wet, balance.season.weatherStrength) * (1 - hazeClear)
     rain.opacityU.value += (rainTarget - rain.opacityU.value) * k
     const rg = rainGroup.current

@@ -405,6 +405,49 @@ export function emitFootstep(surface: 'ground' | 'stone') {
   src.stop(t0 + dur + 0.02)
 }
 
+/**
+ * A single thunderclap (design.md §19.13, point 166), played DELAYED after its
+ * lightning flash so the pair reads as weather, not a sound effect. A deep brown-
+ * noise rumble — a quick crack, then a long rolling tail — scaled by the strike
+ * strength and the single ambience volume (0 => silent). One-shot, through the
+ * ambient bus like every other ambient sound.
+ */
+export function playThunder(delaySeconds: number, strength = 1): void {
+  // Count the strike even when no audio context is running (headless verify has
+  // no audio) so the strike->thunder wiring is observable via window.__thunder.
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const w = window as unknown as { __thunder?: { count: number; lastDelay: number } }
+    w.__thunder = { count: (w.__thunder?.count ?? 0) + 1, lastDelay: delaySeconds }
+  }
+  if (!ctx || !master) return
+  const t0 = ctx.currentTime + Math.max(0, delaySeconds)
+  const dur = 1.9
+  const buffer = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate)
+  const data = buffer.getChannelData(0)
+  let last = 0
+  for (let i = 0; i < data.length; i++) {
+    last = last * 0.985 + (Math.random() * 2 - 1) * 0.015 // brown-ish noise, deep
+    data[i] = last * 8
+  }
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = 220
+  filter.Q.value = 0.6
+  const g = ctx.createGain()
+  const peak = 0.9 * Math.min(1, Math.max(0, strength)) * balance.ambienceVolume
+  g.gain.setValueAtTime(0.0001, t0)
+  g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), t0 + 0.05) // the crack
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.4), t0 + 0.5)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur) // the rolling tail
+  src.connect(filter)
+  filter.connect(g)
+  g.connect(ambientBus ?? master)
+  src.start(t0)
+  src.stop(t0 + dur + 0.05)
+}
+
 /** Report the closest wildlife to the player (design.md §19): each field is a
  *  0..1 proximity that raises that voice's calls, scaled by the ambience
  *  volume. Called every frame by the travel scene while animals are near. */

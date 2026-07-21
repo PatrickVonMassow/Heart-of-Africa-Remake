@@ -760,7 +760,14 @@ verify suite that proves it.
       check, screenshot 122); hail fires only inside a heavy storm, never
       in a rainless zone (swept over the whole window), rarely, and
       deterministically (`src/systems/season.test.ts`,
-      `scripts/verify/enrichments.mjs`);
+      `scripts/verify/enrichments.mjs`); a THUNDERSTORM (point 166) fires
+      lightning FLASHES with a delayed THUNDER (1-4 s) as a pair, gated like
+      the hail (heavy storm only, never rainless, deterministic, a minority of
+      storm days) and visible in both the bird's-eye and the settlement view —
+      the gate and the delay band pure-tested (`thunderstormAt`,
+      `thunderDelaySeconds` in `src/systems/season.test.ts`), the live flash
+      pulse and the fired thunder gated in `scripts/verify/enrichments.mjs`
+      (screenshot 134);
       the harmattan (§19.13, point 140) palls the Sahel from late November
       to mid-March — the dome whitens toward dust (its own axis, not the
       wet gray), the noon sun reddens, the HALO IS MUTED (the researched,

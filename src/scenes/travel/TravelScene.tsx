@@ -626,6 +626,9 @@ function Sun() {
     light.intensity = SUN_BASE_INTENSITY * sunDimFactor(CURRENT_WEATHER.wetness, balance.season.weatherStrength)
       // The harmattan pall conceals the sun (Dobson 1781) — a modest extra dim.
       * (1 - CURRENT_WEATHER.dust * 0.25 * Math.min(1, Math.max(0, balance.season.weatherStrength)))
+      // Lightning flash (point 166): a bright additive burst over the dimmed storm
+      // light — brief (Climate decays it in <300 ms) so it reads as a bolt.
+      + SUN_BASE_INTENSITY * CURRENT_WEATHER.flash * 2
   })
   return (
     <>

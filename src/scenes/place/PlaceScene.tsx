@@ -28,7 +28,8 @@ import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonCollapse
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor } from '../../systems/season'
+import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor, thunderstormAt, thunderDelaySeconds } from '../../systems/season'
+import { playThunder } from '../../systems/ambience'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
@@ -1493,6 +1494,14 @@ export function PlaceScene() {
   const hemiRef = useRef<THREE.HemisphereLight>(null)
   /** This frame's season wetness at the settlement, for the dev hook. */
   const placeWetness = useRef(0)
+  /** Lightning flash (0..1) and its strike scheduler at the settlement (point 166).
+   *  The dimmed light BASE is tracked separately from the flash so the additive
+   *  burst is not amplified by the slow season lerp. */
+  const placeFlash = useRef(0)
+  const placeNextStrike = useRef(0)
+  const placeStrikeCount = useRef(0)
+  const placeSunBase = useRef(PLACE_SUN_INTENSITY)
+  const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
   const shadowSize = shadowMapHalf ? 1024 : 2048
@@ -1650,6 +1659,26 @@ export function PlaceScene() {
       )
       placeWetness.current = wet
       const dim = sunDimFactor(wet, balance.season.weatherStrength)
+      // Thunderstorm at THIS settlement (design.md §19.13, point 166): the same
+      // gate as the bird's-eye, at the place's own coordinates — lightning flashes
+      // brighten the sun/sky and each schedules its thunder 1-4 s later.
+      const stormStrength =
+        thunderstormAt(useGame.getState().day, place.lat, place.lon, START_YEAR, elevationAt(place.lat, place.lon)) *
+        Math.min(1, Math.max(0, balance.season.weatherStrength))
+      const now = clock.elapsedTime
+      if (stormStrength > 0) {
+        if (placeNextStrike.current === 0) placeNextStrike.current = now + 2
+        if (now >= placeNextStrike.current) {
+          placeFlash.current = stormStrength
+          playThunder(thunderDelaySeconds(placeStrikeCount.current), stormStrength)
+          placeStrikeCount.current++
+          placeNextStrike.current = now + 4 + (thunderDelaySeconds(placeStrikeCount.current * 31 + 7) - 1) * 3
+        }
+      } else {
+        placeNextStrike.current = 0
+      }
+      placeFlash.current *= Math.max(0, 1 - dt * 7)
+      if (placeFlash.current < 0.01) placeFlash.current = 0
       const sky = skyOvercastParams(wet, balance.season.weatherStrength)
       setSkyOvercast(sky.grayMix, sky.cloudBoost)
       // The ground and flora bleach/green with the season, driven from THIS
@@ -1672,12 +1701,12 @@ export function PlaceScene() {
         fog.color.lerp(placeFogColor, k)
         if (scene.background instanceof THREE.Color) scene.background.lerp(placeFogColor, k)
       }
-      if (sunRef.current) {
-        sunRef.current.intensity += (PLACE_SUN_INTENSITY * dim - sunRef.current.intensity) * k
-      }
-      if (hemiRef.current) {
-        hemiRef.current.intensity += (PLACE_HEMI_INTENSITY * dim - hemiRef.current.intensity) * k
-      }
+      // The dimmed base lerps with the season; the lightning flash is a fast
+      // additive burst on top of it (kept out of the lerp so it is not amplified).
+      placeSunBase.current += (PLACE_SUN_INTENSITY * dim - placeSunBase.current) * k
+      placeHemiBase.current += (PLACE_HEMI_INTENSITY * dim - placeHemiBase.current) * k
+      if (sunRef.current) sunRef.current.intensity = placeSunBase.current + placeFlash.current * PLACE_SUN_INTENSITY * 2
+      if (hemiRef.current) hemiRef.current.intensity = placeHemiBase.current + placeFlash.current * PLACE_HEMI_INTENSITY * 2
     }
 
     // Target body-relative velocity from the input (0 while no input / modal).

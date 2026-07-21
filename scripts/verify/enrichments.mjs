@@ -1361,6 +1361,12 @@ await page
 await page.waitForTimeout(400)
 const animalHit = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  // Fail-soft (point 200): if the travel scene's wildlife hook is not ready
+  // (a rare transient during a scene remount — the waitForFunction above can
+  // time out), skip gracefully instead of throwing an UNCAUGHT error that aborts
+  // the whole suite. A persistent absence would fail every collision run, which
+  // is a different signal from this one-off staging miss.
+  if (!window.__wildlife?.herdsRef?.current) return { notReady: true, minDist: 0, reached: false, escaped: 0 }
   const p0 = window.__game.getState().pos
   const ax = p0.x + 2.6 // 2.6 east — clear of the player (body+player ≈ 1.2)
   const az = p0.z
@@ -5070,6 +5076,37 @@ check(
     'the pall closes the sight lines below the rainy-season fog',
     jan.fogFar !== null && aug.fogFar !== null && jan.fogFar < aug.fogFar - 20,
     `fogFar Jan ${jan.fogFar?.toFixed(0)} vs Aug ${aug.fogFar?.toFixed(0)}`,
+  )
+  await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
+}
+
+// Point 166 — the thunderstorm: a lightning FLASH brightens the scene and each
+// schedules its THUNDER 1-4 s later (never a silent flash). The GATE (only inside
+// a genuinely heavy storm) is pure-tested (thunderstormAt / thunderDelaySeconds);
+// here the RUNTIME wiring is verified deterministically via __climate.forceStrike
+// at an OPEN travel spot — jumping onto a natural storm cell kept auto-entering
+// the village sitting on it (mode 'place'), which flaked the positioning.
+{
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.8)) // open Serengeti savanna → travel mode
+  await page.waitForTimeout(900) // travel scene + __climate mount
+  const storm = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+    const c = window.__climate
+    if (!c?.forceStrike) return { ready: false, mode: window.__game.getState().mode }
+    const mode = window.__game.getState().mode
+    if (window.__thunder) window.__thunder.count = 0
+    c.resetFlashPeak()
+    c.forceStrike(0.8) // fire a bolt: the same flash + delayed thunder a real strike makes
+    await sleep(350)
+    return { ready: true, mode, flashPeak: c.flashPeak(), thunder: window.__thunder?.count ?? 0, delay: window.__thunder?.lastDelay ?? 0 }
+  })
+  await page.evaluate(() => window.__climate?.forceStrike?.(1)) // a fresh bolt for the screenshot
+  await page.screenshot({ path: `${OUT}134-thunderstorm.png` })
+  console.log('shot 134-thunderstorm.png')
+  check(
+    'a lightning strike flashes and fires thunder delayed 1-4 s (point 166)',
+    storm.ready && storm.mode === 'travel' && storm.flashPeak > 0.1 && storm.thunder > 0 && storm.delay >= 1 && storm.delay <= 4,
+    JSON.stringify(storm),
   )
   await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 }
