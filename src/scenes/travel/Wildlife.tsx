@@ -19,6 +19,7 @@ import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals } from '../../systems/ambience'
+import { devAssert } from '../../systems/devAssert'
 import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon, type RegionId } from '../../world/geo'
@@ -2082,6 +2083,23 @@ function Herds() {
         const list = herds[sp]
         for (let i = phase; i < list.length; i += 7) {
           const a = list[i]
+          // In-game invariants (point 207(i)) — piggyback on the sweep slice so
+          // the whole herd is asserted every few frames at no extra pass:
+          // positions stay finite, and every timed drama respects its deadline
+          // (the I4 rule made loud — a silent violation now fails ANY suite).
+          devAssert(
+            Number.isFinite(a.x) && Number.isFinite(a.z) && Number.isFinite(a.y),
+            'animal-position-finite',
+            () => `${sp} at ${a.x},${a.z},${a.y}`,
+          )
+          if (a.crossing !== undefined)
+            devAssert(
+              a.crossing.time <= balance.waterCross.resolveSeconds + 2,
+              'crossing-deadline',
+              () => `${sp} crossing for ${a.crossing?.time.toFixed(1)}s`,
+            )
+          if (a.caught !== undefined)
+            devAssert(a.caught <= CAUGHT_DURATION + 2, 'caught-window-bounded', () => `${sp} caught=${a.caught}`)
           // Water drama (struggle, rescue, plunge, a wading parent) owns its
           // own movement; everyone else must never STAND in water — not in
           // the open sea, and not in a river or lake either (an animal only
@@ -2191,6 +2209,9 @@ function Herds() {
           // without this cap the crocodile would stay gripped forever — violating
           // the §19.8 "every started drama resolves" rule (invariant I4).
           c.lunge.timer += dt
+          // Point 207(i): the grip deadline is a hard invariant — a timer past
+          // it means the release above failed and the drama is pinned.
+          devAssert(c.lunge.timer <= bc.gripSeconds + 2, 'croc-grip-bounded', () => `grip ${c.lunge?.timer.toFixed(1)}s`)
           if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
             c.lunge.retreat = true
           } else {

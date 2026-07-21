@@ -7620,7 +7620,14 @@ the remaining open points in their numeric order.
   sharply (user request 20.07.2026). The existing net is designed-scenario
   invariants + an inspected visual sweep + static review; these orthogonal METHODS
   raise sensitivity a lot:
-   (i) IN-GAME INVARIANT ASSERTIONS — the biggest force-multiplier. Instrument the
+   (i) [DONE 21.07.2026] IN-GAME INVARIANT ASSERTIONS — built as
+     src/systems/devAssert.ts (dev-only, per-code rate limit, console.error so
+     EVERY suite's console-error gate fails on a violation, window.__assertLog
+     for probes; 3 pure tests). First invariants live, piggybacked on the
+     water-sweep slice at no extra pass: finite positions, the crossing/caught/
+     croc-grip deadlines (I4 made loud). Proven silent across two full
+     enrichments runs (207/0 incl. every staged drama). Extend the invariant
+     set opportunistically as systems change. ORIGINAL: the biggest force-multiplier. Instrument the
      game code with DEV-MODE assertions that fire the MOMENT a rule breaks,
      ANYWHERE (no animal rendered below its ground; no NaN/Infinity position;
      every started drama carries a deadline; a lake sheet never below its bed;
