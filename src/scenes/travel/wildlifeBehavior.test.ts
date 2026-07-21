@@ -50,7 +50,7 @@ import {
   ploverTaken,
   vigilBlocksLanding,
   vigilDrawReady,
-  vigilDrawSpawn,
+  offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
   escapeCorridorHeading,
@@ -1066,61 +1066,57 @@ describe('mournDeadline (point 126 — the vigil hard deadline with the arc walk
   })
 })
 
-describe('vigilDrawSpawn (point 121 (f) — the drawn predator walks in, never pops in)', () => {
-  // The hunt's stage geometry: view ring 50 (default zoom), offstage abort
-  // ring 80 (view + margin 30), keeper within the 45 m seek range.
-  const VIEW_R = 50
-  const OFFSTAGE_R = 80
+describe('offscreenRingSpawn (point 195 — the scripted predator never pops into frame)', () => {
+  // A frustum stub: on-screen = a disc of radius R around the origin (the
+  // camera centre for the test). The spawn must land OUTSIDE it.
+  const onScreenDisc = (R: number) => (x: number, z: number) => Math.hypot(x, z) <= R
+  const offScreen = (R: number) => (x: number, z: number) => !onScreenDisc(R)(x, z)
 
-  const cases: Array<{ name: string; kx: number; kz: number }> = [
-    { name: 'keeper at the player', kx: 0, kz: 0 },
-    { name: 'keeper 20 m out', kx: 20, kz: 0 },
-    { name: 'keeper at the 45 m seek edge', kx: 27, kz: -36 },
-  ]
-
-  it.each(cases)('spawns beyond the view ring and inside the abort ring ($name)', ({ kx, kz }) => {
+  it.each([
+    { name: 'spot at the camera centre', cx: 0, cz: 0 },
+    { name: 'spot 20 m out', cx: 20, cz: 0 },
+    { name: 'spot at the seek edge', cx: 27, cz: -36 },
+  ])('returns an off-screen point within [minR, maxR] of the spot ($name)', ({ cx, cz }) => {
     for (const rand of [0, 0.17, 0.5, 0.83, 0.999]) {
-      const p = vigilDrawSpawn(kx, kz, 0, 0, VIEW_R, OFFSTAGE_R, rand)
-      const fromPlayer = Math.hypot(p.x, p.z)
-      expect(fromPlayer).toBeGreaterThan(VIEW_R) // never pops into sight
-      expect(fromPlayer).toBeLessThan(OFFSTAGE_R) // never aborts on frame one
+      const p = offscreenRingSpawn(cx, cz, 15, 110, rand, offScreen(50))
+      expect(onScreenDisc(50)(p.x, p.z)).toBe(false) // never pops into sight
+      const fromSpot = Math.hypot(p.x - cx, p.z - cz)
+      expect(fromSpot).toBeGreaterThanOrEqual(15 - 1e-6) // never inside minR
+      expect(fromSpot).toBeLessThanOrEqual(110 + 1e-6) // never past the abort ring
     }
   })
 
-  it('keeps the spec spawn distance from the keeper: view radius + margin', () => {
-    const p = vigilDrawSpawn(20, 0, 0, 0, VIEW_R, OFFSTAGE_R, 0.3)
-    expect(Math.hypot(p.x - 20, p.z)).toBeCloseTo(VIEW_R + 8, 6)
+  it('is nearest-first: an already-clear minR ring returns exactly minR', () => {
+    // Spot far from the camera: the whole minR ring is already off-screen, so
+    // the run-in is as short as allowed (the first ring wins).
+    const p = offscreenRingSpawn(200, 0, 15, 110, 0, offScreen(50))
+    expect(Math.hypot(p.x - 200, p.z)).toBeCloseTo(15, 6)
   })
 
-  it('honors a custom margin', () => {
-    const p = vigilDrawSpawn(0, 0, 0, 0, VIEW_R, OFFSTAGE_R, 0.6, 20)
-    expect(Math.hypot(p.x, p.z)).toBeCloseTo(VIEW_R + 20, 6)
+  it('pushes outward when the near rings are on-screen', () => {
+    // Spot at the camera centre under a wide on-screen disc (radius 60): minR=15
+    // is inside it, so the spawn must sit on a ring beyond 60.
+    const p = offscreenRingSpawn(0, 0, 15, 200, 0.3, offScreen(60))
+    expect(Math.hypot(p.x, p.z)).toBeGreaterThan(60)
+    expect(Math.hypot(p.x, p.z)).toBeLessThanOrEqual(200 + 1e-6)
   })
 
-  it('scales with the zoomed view ring (the ring is zoom-aware like the vulture rule)', () => {
-    const wideView = 200
-    const p = vigilDrawSpawn(30, 10, 0, 0, wideView, wideView + 30, 0.42)
-    const fromPlayer = Math.hypot(p.x, p.z)
-    expect(fromPlayer).toBeGreaterThan(wideView)
-    expect(fromPlayer).toBeLessThan(wideView + 30)
+  it('with no predicate (no camera mounted) falls back to the minR ring, finite and deterministic', () => {
+    const p1 = offscreenRingSpawn(10, -5, 58, 90, 0.42)
+    const p2 = offscreenRingSpawn(10, -5, 58, 90, 0.42)
+    expect(Number.isFinite(p1.x)).toBe(true)
+    expect(Number.isFinite(p1.z)).toBe(true)
+    expect(Math.hypot(p1.x - 10, p1.z - (-5))).toBeCloseTo(58, 6)
+    expect(p1).toEqual(p2)
   })
 
-  it('an empty annulus (lo > hi) falls back to the closest-score probe — finite, never NaN', () => {
-    // view ring 50 -> lo = 52; abort ring 53 -> hi = 51: lo > hi, so no probe
-    // can ever satisfy `d > lo && d < hi`, forcing every call through the
-    // score-based fallback for the whole 24-probe sweep.
-    const p = vigilDrawSpawn(10, -5, 0, 0, 50, 53, 0.42)
+  it('every probe on-screen (a very wide zoom) falls back to the far ring — finite, never NaN', () => {
+    // The on-screen disc (radius 500) swallows the whole [minR, maxR] band, so
+    // no probe is ever off-screen; the fallback sits at maxR, still finite.
+    const p = offscreenRingSpawn(0, 0, 15, 110, 0.42, offScreen(500))
     expect(Number.isFinite(p.x)).toBe(true)
     expect(Number.isFinite(p.z)).toBe(true)
-    // Every candidate (and the initial fallback default) sits exactly at the
-    // keeper-centred spawn distance, whichever one the score picks.
-    expect(Math.hypot(p.x - 10, p.z - (-5))).toBeCloseTo(58, 6) // viewR + default margin
-  })
-
-  it('the empty-annulus fallback is deterministic for a given rand01', () => {
-    const p1 = vigilDrawSpawn(10, -5, 0, 0, 50, 53, 0.42)
-    const p2 = vigilDrawSpawn(10, -5, 0, 0, 50, 53, 0.42)
-    expect(p1).toEqual(p2)
+    expect(Math.hypot(p.x, p.z)).toBeCloseTo(110, 6)
   })
 })
 

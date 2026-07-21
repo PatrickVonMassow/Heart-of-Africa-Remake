@@ -7193,7 +7193,35 @@ the remaining open points in their numeric order.
   `lionTouched` asserts clean without retries. DOCS: CLAUDE §7.1 pt.12 §19.16
   bullet already promises this; no wording change needed.
 
-- [ ] 195. RADIUS-NOT-FRUSTUM sweep over the remaining wildlife spawn/despawn
+- [x] 195. DONE 21.07.2026 — the RADIUS-NOT-FRUSTUM sweep over the remaining
+  wildlife spawn/despawn paths (the points-165/171/172/183 class). All six suspect
+  sites moved off an assumed radius onto the true camera frustum (`isOnScreen`):
+  (1)+(2) the calf-hunt AND generic-hunt predator now spawn via a new pure
+  `offscreenRingSpawn` (nearest off-screen point on a ring out to the abort
+  radius) instead of the raw `HUNT_LION_APPROACH`, so a predator never pops in
+  beside its on-screen prey; the generic-hunt SPOT itself is off-screen-gated so
+  the scripted prey mesh never appears in view. (3) the vigil-drawn predator uses
+  the same frustum-aware helper (was a radius annulus — `vigilDrawSpawn` retired,
+  its test block rewritten for `offscreenRingSpawn`). (4) `flightStep`'s OUT-mode
+  bird despawn requires genuinely off-screen (was raw viewR+margin, could despawn
+  in view at a wide zoom). (5) the vicinity seeder now requires the whole ±SPREAD
+  scatter disc off-screen, not just the anchor, else it defers. (6) the chunk
+  streaming coverage cap (`SPAWN_RANGE_MAX`) is derived from a 288-unit cover
+  radius so the range grid always exceeds the frustum out to the wide zoom (the
+  point-171 flora fix, applied to wildlife). ALSO fixed a real bug the sweep
+  surfaced: the GENERIC lion-leave transition (feed→leave with no victim,
+  Wildlife ~3922) never reset `leaveHeading`/`leaveT` — point 188 added the reset
+  only to the victim branch — so a generic hunt's walk-off carried a stale
+  corridor heading and overtime clock (the two enrichments leave-despawn checks
+  failed on the inherited state my sweep shifted). Both branches now reset
+  identically. Hardened the two leave-despawn checks to a deterministic inland
+  stage (Serengeti jump — point 200) so they never inherit a coastal player
+  position, and exempted the wading bather from the point-196 anchoring assert (a
+  water occupant below the bank, like the drama poses). New pure tests for
+  `offscreenRingSpawn` (off-screen guarantee, nearest-first, wide-zoom fallback);
+  build+lint+audit clean, 1960 unit green, enrichments 207 pass / 0 fail / 0
+  console-errors.
+  ORIGINAL: RADIUS-NOT-FRUSTUM sweep over the remaining wildlife spawn/despawn
   paths (Pillar-2 group; the points-165/171/172/183 class, finding list in the
   184 log). Suspect sites: the calf-hunt predator spawn (Wildlife ~3441,
   hard-coded 15-unit approach, visible the same frame — a predator can POP into

@@ -84,7 +84,7 @@ import {
   ploverTaken,
   vigilBlocksLanding,
   vigilDrawReady,
-  vigilDrawSpawn,
+  offscreenRingSpawn,
   waterStruggleFate,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
@@ -586,7 +586,12 @@ const VIEW_AT_ZOOM1 = 100
 const SPAWN_MARGIN = 18
 const DESPAWN_MARGIN = 60
 const SPAWN_RANGE_MIN = 4
-const SPAWN_RANGE_MAX = 6
+// A radius that exceeds the frustum out to the F3-report wide zoom (~2.2x): the
+// range grid must cover the spawn radius so no herd is missing inside the
+// rendered frame at a wide zoom (point 195; the point-171 flora fix, applied to
+// wildlife). Beyond this cap animals are sub-pixel and the far sheet takes over.
+const SPAWN_COVER_RADIUS_MAX = 288
+const SPAWN_RANGE_MAX = Math.ceil(SPAWN_COVER_RADIUS_MAX / CHUNK_SIZE)
 /** Scavenging (design.md §19): a trampled/other-death carcass draws a vulture
  *  that flies in, lands and consumes it, dissolving it like a lion kill. */
 const CARCASS_DISSOLVE_SECONDS = 9
@@ -1127,6 +1132,18 @@ function seedSettlementVicinity(
     if (!anchor) continue
     const ax = anchor[0]
     const az = anchor[1]
+    // The scatter cloud, not just the anchor, must clear the frame (point 195):
+    // members land within ±SPREAD, so a member near the edge could pop in. Defer
+    // unless the whole SPREAD disc around the anchor is off-screen.
+    let discClear = true
+    for (let e = 0; e < 8; e++) {
+      const ea = (e * Math.PI) / 4
+      if (isOnScreen(ax + Math.cos(ea) * SPREAD, az + Math.sin(ea) * SPREAD)) {
+        discClear = false
+        break
+      }
+    }
+    if (!discClear) continue
     placeGroup(herds[species], scx, scz, ax, az, deficit, SPREAD, seed, 0.9, BODY_RADIUS[species], false, undefined, chunkKey)
   }
 }
@@ -3436,8 +3453,12 @@ function Herds() {
         // the dramas' own scripted poses, not a real burial.)
         if ((aIdx + ASSERT_TICK) % 13 === 0 && !a.dead && a.grounded === true && sp !== 'crocodile' && sp !== 'flamingo' &&
             a.crossing === undefined && a.inWater === undefined && a.caught === undefined && a.mired === undefined &&
-            !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
+            !a.bathe && !a.vigil && !a.rescued && !a.plungeTo && !a.trampleTo &&
             a.fireTrapped === undefined && LION_STATE.victim !== a) {
+          // A bather wades a step past the bank and sits chest-deep in the
+          // shallow (point 196) — a water occupant like the drama poses, below
+          // the bank ground the assert would sample. The head-dip drinker
+          // (feet on the bank, !a.bathe) stays policed.
           const gll = worldToLatLon(anchorX, anchorZ)
           const gt = sampleTerrain(gll.lat, gll.lon, seed)
           if (gt.type !== 'water' && gt.type !== 'ocean') {
@@ -3692,13 +3713,16 @@ function LionHunt() {
         s.victim = calf
         s.victimHunt = true
       } else {
-        // Generic hunt: a random savanna spot within view.
+        // Generic hunt: a random savanna spot beyond the frame (point 195). The
+        // spot must be OFF the rendered frame so the scripted prey mesh is never
+        // seen popping into existence — the chase then enters view as the camera
+        // moves, the way you come across a real hunt.
         const ang = Math.random() * Math.PI * 2
         const dist = 25 + Math.random() * 20
         px = pos.x + Math.cos(ang) * dist
         pz = pos.z + Math.sin(ang) * dist
         ll = worldToLatLon(px, pz)
-        if (sampleTerrain(ll.lat, ll.lon, seed).type !== 'savanna') {
+        if (sampleTerrain(ll.lat, ll.lon, seed).type !== 'savanna' || isOnScreen(px, pz)) {
           s.timer = 4
           return
         }
@@ -3740,18 +3764,24 @@ function LionHunt() {
         // it spawns beyond the zoom-aware view ring — inside the offstage
         // abort ring — and visibly WALKS in to the keeper, never popping
         // into sight or finding the carcass already claimed.
-        const spawn = vigilDrawSpawn(
-          px, pz, pos.x, pos.z,
-          VIEW_AT_ZOOM1 * useUi.getState().travelZoom, offstageR, Math.random(),
+        const spawn = offscreenRingSpawn(
+          px, pz,
+          VIEW_AT_ZOOM1 * useUi.getState().travelZoom + 2, offstageR - 2, Math.random(),
+          (x, z) => !isOnScreen(x, z),
         )
         s.lx = spawn.x
         s.lz = spawn.z
       } else {
-        // The predator closes in from a random direction, so the chase runs any
-        // which way rather than always toward the same corner.
-        const lionAng = Math.random() * Math.PI * 2
-        s.lx = px + Math.cos(lionAng) * HUNT_LION_APPROACH
-        s.lz = pz + Math.sin(lionAng) * HUNT_LION_APPROACH
+        // The predator spawns OFF the rendered frame and runs in (point 195):
+        // the old raw approach put it HUNT_LION_APPROACH from the spot in a
+        // random direction, so beside an on-screen calf it popped into view.
+        // Nearest off-screen point on a ring out to the abort radius, so the
+        // chase still starts as close as the frustum allows.
+        const spawn = offscreenRingSpawn(
+          px, pz, HUNT_LION_APPROACH, offstageR - 2, Math.random(), (x, z) => !isOnScreen(x, z),
+        )
+        s.lx = spawn.x
+        s.lz = spawn.z
       }
       s.heading = Math.random() * Math.PI * 2 // per-hunt weave phase
       s.lionHeading = Math.atan2(s.px - s.lx, s.pz - s.lz)
@@ -3895,6 +3925,8 @@ function LionHunt() {
           spawnRemnant(s, seed)
           s.mode = 'leave'
           s.heading = leaveHeading(s.px, s.pz, pos.x, pos.z)
+          s.leaveHeading = undefined // fresh corridor pick per leave (point 188)
+          s.leaveT = 0 // reset the overtime clock — the victim branch does too
           s.lx = s.px + 0.7
           s.lz = s.pz + 0.25
         }

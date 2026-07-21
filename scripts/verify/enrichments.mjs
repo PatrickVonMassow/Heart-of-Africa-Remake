@@ -4270,6 +4270,11 @@ const leaveOffstage = await page.evaluate(async () => {
   // Calibrated at zoom 1 (default is the closer 0.5).
   window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(1)
+  // Deterministic inland stage (point 200): the predator must walk off over open
+  // LAND, never a coast pocket the inherited player position might drop it in
+  // (there it can neither cross offstageR nor leave the frame, so it never
+  // despawns and the test reads a false null). The Serengeti is deep inland.
+  window.__game.getState().debugJumpTo(-2.2, 34.8)
   L.victim = null
   L.victimHunt = false
   L.px = p().x + 80
@@ -4381,6 +4386,8 @@ const leaveZoom = await page.evaluate(async () => {
   const p = () => window.__game.getState().pos
   const L = window.__lionHunt.state
   window.__ui.getState().setTravelZoom(0.5) // view ring 50 → offstage past 80
+  // Deterministic inland stage (point 200), as in the zoom-1 leave check above.
+  window.__game.getState().debugJumpTo(-2.2, 34.8)
   L.victim = null
   L.victimHunt = false
   L.px = p().x + 60

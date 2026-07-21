@@ -328,7 +328,12 @@ export function flightStep(
     }
     s.x += dx * speed * dt
     s.z += dz * speed * dt
-    if (d > viewR + FLIGHT_DESPAWN_OUT) s.mode = 'idle'
+    // Despawn only once the bird has genuinely left the frame (point 195): the
+    // raw viewR+margin underestimates the tilted frustum at a wide zoom, so with
+    // a projection predicate it must be BOTH off-screen and past the view ring
+    // (the ring floor avoids an edge flicker); without one, the radius stands in.
+    const gone = isOffscreen ? isOffscreen(s.x, s.z) && d > viewR : d > viewR + FLIGHT_DESPAWN_OUT
+    if (gone) s.mode = 'idle'
   }
   return s
 }
@@ -750,36 +755,39 @@ export function mournDeadline(now: number, distToTarget: number, holdSeconds: nu
  * probe exists; the probe closest to the annulus middle backstops the
  * discrete sweep.
  */
-export function vigilDrawSpawn(
-  keeperX: number,
-  keeperZ: number,
-  playerX: number,
-  playerZ: number,
-  viewR: number,
-  offstageR: number,
+export function offscreenRingSpawn(
+  cx: number,
+  cz: number,
+  minR: number,
+  maxR: number,
   rand01: number,
-  margin = 8,
+  offScreen?: (x: number, z: number) => boolean,
 ): { x: number; z: number } {
-  const r = viewR + margin
-  const lo = viewR + 2 // clear of the view ring — the arrival is walked, not popped
-  const hi = offstageR - 2 // clear of the abort ring — the chase must survive frame one
-  const mid = (lo + hi) / 2
-  let best = { x: keeperX + r, z: keeperZ }
-  let bestScore = Infinity
-  const PROBES = 24
-  for (let k = 0; k < PROBES; k++) {
-    const ang = rand01 * Math.PI * 2 + (k * Math.PI * 2) / PROBES
-    const x = keeperX + Math.cos(ang) * r
-    const z = keeperZ + Math.sin(ang) * r
-    const d = Math.hypot(x - playerX, z - playerZ)
-    if (d > lo && d < hi) return { x, z }
-    const score = Math.abs(d - mid)
-    if (score < bestScore) {
-      bestScore = score
-      best = { x, z }
+  // A scripted predator (the hunt lion, the vigil-drawn predator) must never
+  // POP into the rendered frame beside its prey (point 195, the 165/172/183
+  // class). Probe angles at increasing radii from minR to maxR and return the
+  // FIRST point that is off the rendered frame — nearest-first, so the run-in
+  // is as short as the frustum allows. `offScreen` projects a world point
+  // through the LIVE camera (the true frustum, not an assumed radius — the
+  // point-172 lesson). With no camera mounted (predicate omitted) the minR ring
+  // is used, as the old radius annulus did.
+  const ringPoint = (r: number, k: number, probes: number) => {
+    const ang = rand01 * Math.PI * 2 + (k * Math.PI * 2) / probes
+    return { x: cx + Math.cos(ang) * r, z: cz + Math.sin(ang) * r }
+  }
+  if (!offScreen) return ringPoint(minR, 0, 1)
+  const PROBES = 16
+  const RINGS = 6
+  for (let ring = 0; ring <= RINGS; ring++) {
+    const r = minR + ((maxR - minR) * ring) / RINGS
+    for (let k = 0; k < PROBES; k++) {
+      const p = ringPoint(r, k, PROBES)
+      if (offScreen(p.x, p.z)) return p
     }
   }
-  return best
+  // Every probe on-screen (a very wide zoom past the abort ring): start as far
+  // out as allowed so the run-in is at least maximal.
+  return ringPoint(maxR, 0, 1)
 }
 
 /**
