@@ -912,7 +912,11 @@ verify suite that proves it.
     inhabitants move about and use their dwellings; Cairo's walkable
     radius and dwelling count exceed Boma's; the backdrop mesh is present
     and Berber Village's backdrop stays a low horizon range (max elevation
-    angle bounded); the application loads without console errors
+    angle bounded), and the backdrop relief shades SMOOTH per §2.5 — no
+    flat facets: the material stays non-flat-shaded and the heightfield
+    holds its raised sampling floors with the resolution-independent
+    inner-rim taper (`src/scenes/place/backdrop.test.ts`); the
+    application loads without console errors
     (`scripts/verify/enrichments.mjs`); the first-person ground clears a
     measured edge-energy bar (Laplacian of a ground crop,
     `scripts/verify/settings.mjs`) and the settlement materials sample the

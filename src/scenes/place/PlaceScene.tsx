@@ -10,18 +10,12 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
 import {
   atan,
-  attribute,
-  color,
   float,
-  mix,
-  mx_fractal_noise_float,
-  normalWorldGeometry,
   positionWorld,
   smoothstep,
   tan,
   texture as textureNode,
   vec2,
-  vec3,
   vertexColor,
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
@@ -43,15 +37,17 @@ import {
   BACKDROP_RINGS,
   BACKDROP_SCALE,
   BACKDROP_SEGS,
+  backdropTaper,
   panoramaGroundY,
 } from './backdrop'
+import { createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
 import { consumeTouchLook, gamepadLook, gamepadMove, isKeyDown, onKeyPress, touchMove } from '../../systems/input'
 import { SkyDome } from '../../render/sky'
 import { PlaceRain } from './PlaceRain'
 import { setSkyOvercast, skyOvercast } from '../../render/skyOvercast'
 import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
-import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial, detailFade, proceduralBump } from '../../render/materials'
+import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
@@ -1316,8 +1312,9 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     for (let ri = 0; ri < BACKDROP_RINGS; ri++) {
       // Logarithmic ring spacing: more detail near the settlement.
       const r = r0 * Math.pow(r1 / r0, ri / (BACKDROP_RINGS - 1))
-      // The inner rim tucks below the settlement ground and fades upward.
-      const taper = Math.min(1, ri / 5)
+      // The inner rim tucks below the settlement ground and fades upward
+      // (pure radius function, so it matches backdropHeightAt exactly).
+      const taper = backdropTaper(r, r0)
       for (let si = 0; si < BACKDROP_SEGS; si++) {
         const a = (si / BACKDROP_SEGS) * Math.PI * 2
         const x = Math.cos(a) * r
@@ -1347,36 +1344,12 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3))
     geo.setIndex(indices)
+    // Smooth interpolated vertex normals — the backdrop ridge must never
+    // shade as hard flat facets (createBackdropMaterial keeps flat shading off).
     geo.computeVertexNormals()
     return geo
   }, [lat, lon, seed, innerRadius])
-  const material = useMemo(() => {
-    // Double-sided so steep far slopes never show as black backface overhangs.
-    // The relief itself is shaded (design.md §2.5/§7.1 pt. 11): rocky fBm
-    // structure over the biome vertex colors, steeper faces darkening toward
-    // bare rock, and a bump normal so ridges catch the light — the flat
-    // vertex-color wash read soft and detail-less behind the settlement.
-    const m = new THREE.MeshStandardNodeMaterial()
-    m.vertexColors = true
-    m.roughness = 0.95
-    m.metalness = 0
-    m.side = THREE.DoubleSide
-    const p = positionWorld
-    const rock = mx_fractal_noise_float(p.mul(vec3(0.16, 0.28, 0.16)), 4).mul(0.5).add(0.5)
-    const fine = mx_fractal_noise_float(p.mul(0.65), 3).mul(0.5).add(0.5)
-    // Steepness from the mesh normal: flat ground keeps its biome color,
-    // steeper faces mix toward a bare rock tone with banded structure.
-    const steep = smoothstep(float(0.95), float(0.55), normalWorldGeometry.y)
-    let col = attribute('color', 'vec3') as unknown as ReturnType<typeof vec3>
-    col = mix(col, color('#8d7f6a').mul(rock.mul(0.5).add(0.7)), steep.mul(0.75)) as typeof col
-    // The fine octave and the bump are distance-faded: past ~200 units they
-    // are sub-pixel and only fed the TRAA trembling (the low-frequency rock
-    // banding carries the far silhouette structure on its own).
-    const fade = detailFade(70, 200)
-    m.colorNode = col.mul(rock.mul(0.22).add(0.89)).mul(fine.sub(0.5).mul(0.12).mul(fade).add(1.0))
-    m.normalNode = proceduralBump(rock.mul(0.7).add(fine.mul(0.3)), float(2.6).mul(fade))
-    return m
-  }, [])
+  const material = useMemo(() => createBackdropMaterial(), [])
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 
