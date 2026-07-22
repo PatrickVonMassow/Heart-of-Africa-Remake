@@ -1480,7 +1480,7 @@ function Herds() {
       FIRE_STATE.victim = null
       FIRE_STATE.keeper = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, igniteFire, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, lion: LION_STATE, igniteFire, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
     return () => {
       delete w.__wildlife
     }

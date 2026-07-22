@@ -1789,6 +1789,11 @@ const brokenWing = await page.evaluate(async () => {
   herds.plover.push(parent, chick)
   const out = { lured: false, maxFromNest: 0, tookOff: false, resolved: false, homeAgain: false }
   await window.__pollSim(45, () => {
+    // point 200: keep the plover ALIVE through its lure — the rotating flake was
+    // the bird dying mid-act (a lion hunt, or a stray grass fire despite the
+    // Serengeti jump). Quiet both for the duration of the drama.
+    if (window.__wildlife.lion) window.__wildlife.lion.mode = 'idle'
+    if (window.__wildlife.fire) window.__wildlife.fire.mode = 'idle'
     if (parent.lure) out.lured = true
     if (parent.lure && parent.lure.returning) out.tookOff = true
     out.maxFromNest = Math.max(out.maxFromNest, Math.hypot(parent.x - nx, parent.z - nz))
@@ -1886,6 +1891,22 @@ const calfJitter = await page.evaluate(async () => {
   let last = null
   let lastStep = null
   await window.__pollSim(20, () => {
+    // point 200: keep young calves PLAY-ELIGIBLE so the check reliably finds one
+    // gambolling. The flake (samples:0) was all calves play-locked (they wandered
+    // past GAMBOL_RANGE from their parents) or a lion suppressing play (canPlay =
+    // !lionActive && !playLock && huntable). Quiet any lion and snap each young
+    // calf's parent adjacent (clears the play-lock). Moves the PARENTS only, never
+    // the calves, so the measured calf gambol stays genuine.
+    if (window.__wildlife.lion) window.__wildlife.lion.mode = 'idle'
+    for (const sp of SP) {
+      for (const a of herds[sp] ?? []) {
+        if (a.young && a.parent && !a.parent.dead && !a.dead) {
+          a.parent.x = a.x + 1
+          a.parent.z = a.z + 1
+          a.playLock = undefined
+        }
+      }
+    }
     if (!tracked || tracked.dead || tracked.hop === undefined) {
       tracked = null
       for (const sp of SP) {
