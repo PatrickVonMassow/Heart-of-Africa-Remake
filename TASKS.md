@@ -8676,6 +8676,27 @@ the remaining open points in their numeric order.
   README version section if wording changes. Do NOT touch the v0.1 tag; 174 (v0.2)
   is a separate later release.
 
+- [ ] 225. WET GROUND WHEN IT RAINS (user 22.07.2026, position: AFTER 224). When
+  it rains the ground must visibly get WET — in BOTH the bird's-eye/outdoor terrain
+  AND inside settlements — and MORE so the harder it rains / the longer it has
+  already been raining (accumulated). Optional stretch: in settlements, water
+  SPLASHES up where a person or animal walks through it. DIAGNOSE/design: derive a
+  wetness factor from the rain state — `rainAmount`/the storm intensity
+  (`src/systems/season.ts`) combined with an ACCUMULATED-rain term (how long it has
+  rained at this place), clamped. Feed it into the ground materials: darken the
+  albedo, raise specular/gloss (lower roughness) and deepen the normal-relief
+  sheen, scaling with the wetness — outdoor terrain material
+  (`src/render/materials.ts` / the travel ground) AND the settlement ground
+  material (`src/scenes/place/…`). The splash is a cheap particle/decal burst on a
+  walker footstep while wetness is high (settlement walkers + the player), gated on
+  wetness > threshold. Keep it cheap (a material factor, no second pass); gate the
+  splash behind the mobile/quality preset. VERIFIABLE: a rendered before/after
+  (dry vs mid-rain vs long-rain) in BOTH scenes shows the ground darkening/
+  glistening progressively, on both backends (screenshot set); the wetness factor
+  pure-tested (0 dry, rising with intensity AND duration, clamped); a live check the
+  splash fires on a footstep at high wetness. DOCS: design.md §2.4/§19.13 note the
+  wet-ground response; CLAUDE §7.1 pt.12 if acceptance wording changes.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
