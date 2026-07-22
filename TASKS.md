@@ -8097,6 +8097,26 @@ the remaining open points in their numeric order.
   Narrow it by tightening the NORTHEAST_BOUNDARY control points near [32.42,31.45]
   …[32.7,29.75] so the head reads slim, keeping every redSea.test.ts verdict
   (Suez ~29.97/32.55 stays ocean, the isthmus stays land). Then 211.
+  STEPPING NOT RESOLVED (user re-reported 22.07, second screenshot "immer noch
+  stufig"). The terrain shelf smoothed the SHORE at the boundary (30.02N/32.62E
+  renders as an organic graded coast on WebGL2), but a FRESH render at the user's
+  own framing (30.05N/32.4E, no cache) STILL shows a stepped dark patch — so it is
+  NOT a stale-geometry cache on the user's side, the fix is genuinely incomplete.
+  BACKEND FINDING (WebGPU lane, VERIFY_GL=webgpu, system Chrome): rendered the same
+  "coast" spot on the REAL WebGPU backend — the coast is STILL stepped there while
+  it was smooth on WebGL2, so there IS a backend-dependent component the CPU-side
+  shelf (sampleTerrain, backend-agnostic) does not cover — most likely the WATER
+  material (TSL) reading the raw stamped bathymetry (demElevation) for its
+  depth-colour/transparency, which the terrain shelf never touched. NEXT (do NOT
+  guess further on WebGL2): (1) grade the stamped sea floor the water shader reads
+  — either the trim stamp in redSea.trimToGameWorld (guarded near kept land, keep
+  every redSea verdict incl. Dahlak/Persian-Gulf deep) or a coast-distance shelf
+  in the water depth path — and VERIFY on the WebGPU lane, not only WebGL2; (2)
+  ALSO seen on the WebGPU headless render: the whole scene is washed-out/cold
+  (pale blue-grey sand vs warm beige on WebGL2) — a SEPARATE WebGPU colour/tonemap
+  issue (or a headless-WebGPU artefact) to confirm against a real-GPU WebGPU
+  session and, if real, file under the point-184/204 WebGPU work. Captures:
+  scratchpad gpu-coast.png / 211-user.png.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
