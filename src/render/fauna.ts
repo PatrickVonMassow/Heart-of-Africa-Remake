@@ -19,12 +19,20 @@ import { mulberry32 } from '../world/noise'
  * elephant). Boxy parts (ears, wings, the crocodile's snout and armour
  * ridge) stay deliberately hard-edged. The vertex cost is negligible: each
  * species is ONE merged geometry drawn instanced.
+ *
+ * Point 214 close-zoom follow-up: at the 16x bird's-eye zoom the elephant
+ * body's OUTLINE still stepped at 22x16 (16.4° of arc per face — a
+ * silhouette-class facet; the normals were already smooth, so only more
+ * tessellation rounds it). Body 36x24 (10°/face) and head 28x20 hold smooth
+ * at the closest achievable zoom; measured cost is ~1.7-1.8x vertices per
+ * species (the whole elephant: 1288 -> 2184), spread over one instanced draw
+ * per species.
  */
 export const FAUNA_TESSELLATION = {
   /** Torso-class spheres: bodies, humps, manes [width, height]. */
-  body: [22, 16],
+  body: [36, 24],
   /** Head spheres [width, height]. */
-  head: [18, 12],
+  head: [28, 20],
   /** Small spheres: eyes, bird bodies/heads, chicks [width, height]. */
   small: [12, 9],
   /** Limb cylinders/cones: legs, necks, tails, trunk segments (radial). */

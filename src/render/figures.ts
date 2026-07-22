@@ -6,8 +6,14 @@
 // is negligible (a handful of figures and props per place).
 
 export const TESSELLATION = {
-  /** Villager/figure body cone, radial segments. */
-  figureBody: 24,
+  /** Villager/figure body cone, radial segments. At 24 the cone still read
+   *  as faceted panels at conversation range (point 214 close-zoom report):
+   *  the material never flat-shades and ConeGeometry's lateral normals are
+   *  already smooth per column, so the panels were the RESIDUAL per-face
+   *  normal interpolation (15° spread per face — Mach banding) plus the
+   *  24-gon outline. 48 halves the spread to 7.5°, below what reads at
+   *  first-person range; a handful of figures per place makes this free. */
+  figureBody: 48,
   /** Figure head sphere [width, height] — the roundest primitive the eye
    *  gets close to; raised with the fauna smoothing (point 214) so no facet
    *  reads on a head at conversation range. */

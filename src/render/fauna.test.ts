@@ -138,10 +138,13 @@ describe('smooth organic shading (CLAUDE.md §7.1 pt. 12, point 214)', () => {
   ]
 
   it('the tessellation floors hold (old: 8x6 body spheres, 5-6-seg limbs)', () => {
-    expect(FAUNA_TESSELLATION.body[0]).toBeGreaterThanOrEqual(20)
-    expect(FAUNA_TESSELLATION.body[1]).toBeGreaterThanOrEqual(14)
-    expect(FAUNA_TESSELLATION.head[0]).toBeGreaterThanOrEqual(16)
-    expect(FAUNA_TESSELLATION.head[1]).toBeGreaterThanOrEqual(12)
+    // Body/head floors raised again for the 16x close-zoom silhouette
+    // (point 214 follow-up): at 22x16 the elephant body's OUTLINE still
+    // stepped — 36 width segments keep the facet arc at 10° or below.
+    expect(FAUNA_TESSELLATION.body[0]).toBeGreaterThanOrEqual(36)
+    expect(FAUNA_TESSELLATION.body[1]).toBeGreaterThanOrEqual(24)
+    expect(FAUNA_TESSELLATION.head[0]).toBeGreaterThanOrEqual(28)
+    expect(FAUNA_TESSELLATION.head[1]).toBeGreaterThanOrEqual(20)
     expect(FAUNA_TESSELLATION.small[0]).toBeGreaterThanOrEqual(10)
     expect(FAUNA_TESSELLATION.small[1]).toBeGreaterThanOrEqual(8)
     expect(FAUNA_TESSELLATION.limb).toBeGreaterThanOrEqual(10)
@@ -197,5 +200,18 @@ describe('smooth organic shading (CLAUDE.md §7.1 pt. 12, point 214)', () => {
     expect(body.attributes.position.count).toBeGreaterThan(oldBody.attributes.position.count * 4)
     body.dispose()
     oldBody.dispose()
+  })
+
+  it('the raised body/head floors outresolve the first-pass 22x16 / 18x12 build', () => {
+    // The 16x close-zoom witness: the first point-214 pass (22x16) still
+    // stepped on the elephant body's silhouette, so the raise must be a real
+    // resolution jump on both raised primitive classes, not a nudge.
+    const body = new THREE.SphereGeometry(1, ...FAUNA_TESSELLATION.body)
+    const firstPassBody = new THREE.SphereGeometry(1, 22, 16)
+    expect(body.attributes.position.count).toBeGreaterThan(firstPassBody.attributes.position.count * 2)
+    const head = new THREE.SphereGeometry(1, ...FAUNA_TESSELLATION.head)
+    const firstPassHead = new THREE.SphereGeometry(1, 18, 12)
+    expect(head.attributes.position.count).toBeGreaterThan(firstPassHead.attributes.position.count * 2)
+    for (const g of [body, firstPassBody, head, firstPassHead]) g.dispose()
   })
 })
