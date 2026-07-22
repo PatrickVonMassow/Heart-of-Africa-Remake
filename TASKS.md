@@ -8117,6 +8117,43 @@ the remaining open points in their numeric order.
   issue (or a headless-WebGPU artefact) to confirm against a real-GPU WebGPU
   session and, if real, file under the point-184/204 WebGPU work. Captures:
   scratchpad gpu-coast.png / 211-user.png.
+  PREP (22.07, sharpened fix location): the water material reads
+  `demElevation(lon,lat)` = the R channel of the shared DEM half-float texture,
+  built in `src/render/demElevation.ts getDemDataTexture()` (line ~99:
+  `metersUp = dem.data[..]*256+.. - offsetMeters`, then LinearFilter-sampled). That
+  is the RAW trimmed elevation with the ~-3000 m Suez stamp — the water shader's
+  depth-colour/shore-foam/opacity all key on it, so it bands at the stamp step.
+  FIX THERE (not the trim): while baking `metersUp`, grade the elevation to a
+  gentle SHELF near the NE boundary — compute lon/lat per texel (res/meta already
+  in scope), call `boundarySignedDistance`, and for a texel with bsd in
+  (-SHELF_BAND,0) that abuts kept land, ease metersUp from a shallow shore depth
+  into the stamped deep (mirror terrain.ts's hOcean shelf). This touches ONLY the
+  water-depth texture — trim verdicts, movement, `elevationAt`, the terrain mesh
+  are untouched — and makes the WATER read the same smooth shelf the terrain
+  already does. VERIFY on the WebGPU lane (gpu-coast.png) AND WebGL2, plus a pure
+  bake test that the graded texel band is monotonic (no stamp step) while a deep
+  acceptance texel (Persian Gulf/Dahlak) stays deep. Do this AFTER the in-flight
+  200 enrichments validation frees the dev server (no src edit during a browser
+  suite).
+  DONE the demElevation shelf (commit 0850ab2, 5 pure tests) — but VERIFIED ON
+  BOTH BACKENDS per the new rule ([[verify-gui-on-both-backends]]) and it does
+  NOT fix the visible stepping on either: WebGPU headless is washed-out (untrusted
+  witness), and on WebGL2 the dark blocky cliff wedge REMAINS. So the water DEPTH
+  colour was not the cause. Re-diagnosis from the WebGL2 picture: the wedge has 3D
+  relief (lit tops, shadowed faces) = GEOMETRY seen THROUGH the shallow water,
+  which the water material renders TRANSPARENT below ~60 m (water.ts opacityNode
+  `smoothstep(0,60,depthM)`); so it is the low-LOD OCEAN-FLOOR mesh showing through
+  the transparent shallows — and the demElevation shelf, by making the near-shore
+  water shallower over a wider band, likely WIDENS that transparent zone (exposes
+  MORE floor), i.e. it is data-correct but may marginally worsen the wedge. NEXT
+  (real lever, still needs the WebGPU witness): either (a) the shallow ocean-floor
+  mesh under transparent water must be high-LOD/smooth where it shows through (the
+  200-seg test earlier did NOT smooth it — re-check whether those coast chunks are
+  actually the coastal-flagged 112-seg ones or a pure-ocean chunk at low LOD that
+  chunkIsCoastal misses), or (b) tighten the water opacity/transparency so the
+  blocky floor is not revealed, or (c) both. Decide with a rendered A/B that
+  isolates the floor mesh vs the water transparency. Consider reverting 0850ab2 if
+  the widened transparent zone reads worse to the user on a real WebGPU session.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
