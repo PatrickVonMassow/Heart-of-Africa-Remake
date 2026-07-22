@@ -10,12 +10,22 @@
 // for it by POLLING within the turn (read its log / TaskOutput), never by yielding
 // to idle. The ONLY clean ways to end a turn: the batch is complete, or the user
 // asked to stop (create .claude/batch-paused).
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const TASKS = R('../TASKS.md')
 const PAUSE = R('../.claude/batch-paused')
+const LOCK = R('../.claude/batch-lock.json')
+
+// Liveness heartbeat: refresh the lock's claimedAt on every turn-end so the OS
+// autostart launcher (scripts/batch-autostart.mjs) can tell a LIVE working
+// session (fresh lock) from a dead one (stale lock) and never disturb the former.
+try {
+  const lock = JSON.parse(readFileSync(LOCK, 'utf8'))
+  lock.claimedAt = Date.now()
+  writeFileSync(LOCK, JSON.stringify(lock, null, 2))
+} catch { /* no lock yet — fine */ }
 
 try {
   if (existsSync(PAUSE)) process.exit(0) // user-paused: a clean stop is allowed

@@ -35,3 +35,5 @@ scripts/.tile-cache
 .batch-dashboard.html
 .claude/dashboard-state.json
 .claude/wait-prep.json
+.claude/autostart.log
+.claude/autostart-last.json
