@@ -8,7 +8,7 @@
 // plunge-pool foam, and rivers rising in open land get a spring marker.
 // Lakes are flat polygon surfaces at their local shore height.
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import {
@@ -56,6 +56,13 @@ import {
   BANK_PROBE_DEG,
   type BankAxisSample,
 } from './riverBanks'
+import {
+  SPRING_POOL_RADIUS,
+  SPRING_RIPPLE_COUNT,
+  SPRING_BUBBLE_COUNT,
+  springRipple,
+  springBubble,
+} from './springAnimation'
 
 const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
 
@@ -396,18 +403,76 @@ function Waterfall({ fall }: { fall: FallDef }) {
   )
 }
 
-/** Spring: a small pool ring where a river rises in open land. */
+/** Spring: a small welling water pool where a river rises in open land
+ *  (point 219). A shallow basin at the source height with rising bubbles and
+ *  expanding surface ripples, replacing the former flat symbolic ring. */
 function Spring({ spring }: { spring: SpringDef }) {
+  const ripples = useRef<(THREE.Mesh | null)[]>([])
+  const bubbles = useRef<(THREE.Mesh | null)[]>([])
+  const bubbleAngles = useMemo(
+    () => Array.from({ length: SPRING_BUBBLE_COUNT }, (_, i) => (i / SPRING_BUBBLE_COUNT) * Math.PI * 2),
+    [],
+  )
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    for (let i = 0; i < SPRING_RIPPLE_COUNT; i++) {
+      const m = ripples.current[i]
+      if (!m) continue
+      const r = springRipple(i, t)
+      m.scale.set(r.radius, r.radius, r.radius)
+      ;(m.material as THREE.MeshStandardMaterial).opacity = r.opacity
+    }
+    for (let i = 0; i < SPRING_BUBBLE_COUNT; i++) {
+      const m = bubbles.current[i]
+      if (!m) continue
+      const b = springBubble(i, t)
+      m.position.y = b.y
+      const s = Math.max(0.001, b.scale)
+      m.scale.set(s, s, s)
+    }
+  })
   return (
     <group position={[spring.x, spring.y, spring.z]}>
+      {/* Pool surface — a shallow disc of spring water at the source height. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.35, 0.7, 14]} />
-        <meshStandardMaterial color="#dff0f2" transparent opacity={0.8} roughness={0.5} side={THREE.DoubleSide} />
+        <circleGeometry args={[SPRING_POOL_RADIUS, 24]} />
+        <meshStandardMaterial color="#2f6c90" transparent opacity={0.92} roughness={0.14} metalness={0.02} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <circleGeometry args={[0.4, 12]} />
-        <meshStandardMaterial color="#2c6285" transparent opacity={0.9} roughness={0.2} />
+      {/* Wet gravel rim just below the surface — a soft natural edge, not a symbol. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+        <circleGeometry args={[SPRING_POOL_RADIUS + 0.14, 24]} />
+        <meshStandardMaterial color="#6b7d74" transparent opacity={0.5} roughness={0.95} />
       </mesh>
+      {/* Expanding surface ripples (unit rings, uniformly scaled to their radius). */}
+      {Array.from({ length: SPRING_RIPPLE_COUNT }, (_, i) => (
+        <mesh
+          key={i}
+          ref={(m) => { ripples.current[i] = m }}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, 0.006, 0]}
+        >
+          <ringGeometry args={[0.82, 1, 24]} />
+          <meshStandardMaterial
+            color="#cfeaf0"
+            transparent
+            opacity={0}
+            roughness={0.4}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+      {/* Bubbles welling up from the centre of the pool. */}
+      {bubbleAngles.map((a, i) => (
+        <mesh
+          key={i}
+          ref={(m) => { bubbles.current[i] = m }}
+          position={[Math.cos(a) * 0.13, 0, Math.sin(a) * 0.13]}
+        >
+          <sphereGeometry args={[0.05, 6, 5]} />
+          <meshStandardMaterial color="#e6f6f9" transparent opacity={0.82} roughness={0.2} depthWrite={false} />
+        </mesh>
+      ))}
     </group>
   )
 }
