@@ -8641,6 +8641,19 @@ the remaining open points in their numeric order.
   `climateZoneAt` (rainless) vs the interior (Nov-Mar wet), pure-tested against the
   research; live pixel check no rain on the coastal Namib. DOCS: docs/climate-1890.md
   §, design.md §19.13; update the peoples/climate implementation sections in lockstep.
+  DIAGNOSED (22.07.2026, read-only) — CONFIRMED a real bug, root cause found: the
+  wetness model has NO longitudinal term (`src/systems/season.ts` ~279:
+  `void lon // no longitudinal term in the model`), and the only hyper-arid gate
+  `isHyperArid` (~108) covers ONLY the eastern Sahara / Libyan Desert. So the
+  coastal Namib at ~18S/15E samples the SAME latitude-driven summer-rain wetness
+  as the far wetter interior at that latitude — hence rain on a fog desert that is
+  effectively rainless. FIX: add a Namib coastal hyper-arid gate (mirror
+  `isHyperArid`) for the southwest-coast strip (roughly the Atlantic-side band
+  ~13-30S, west of the escarpment ~15-16E — pin the exact bounds from
+  `docs/climate-1890.md`) so `wetnessAt` returns ~0 there year-round, while the
+  interior at the same latitude keeps its Nov-Mar rains. Pure-test both sides
+  (coastal Namib rainless every month; interior wet Nov-Mar); a live pixel check no
+  rain on the coastal strip. This needs a real fix, not just the check.
 
 ## Closing (only after all points)
 
