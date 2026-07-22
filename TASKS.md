@@ -8747,7 +8747,7 @@ the remaining open points in their numeric order.
   body-spacing pure test to the pinned-at-edge case; a live/staged pair at a
   waterline parts within moments (enrichments). DOCS: design.md §19.5.
 
-- [ ] 223. WEATHER × TERRAIN-TYPE PLAUSIBILITY AUDIT (user 22.07.2026) — a
+- [x] 223. WEATHER × TERRAIN-TYPE PLAUSIBILITY AUDIT (user 22.07.2026) — a
   repeatable audit that the modelled weather/season is plausible for the terrain it
   renders on EVERYWHERE, not a single spot (method like point 205/147). SCOPE:
   sweep a grid across EVERY biome/region; for each cell cross-check the modelled
