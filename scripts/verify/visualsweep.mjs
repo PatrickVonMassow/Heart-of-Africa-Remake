@@ -7,7 +7,7 @@
 // is the inspection of the images. Not a pass/fail suite.
 //
 // Env: BASE_URL (dev/preview server), SWEEP_OUT (folder), VERIFY_GL (webgl|webgpu).
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -41,6 +41,7 @@ await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.evaluate(() => {
   window.__ui.getState().setWheelZoomEnabled(true)
   // Do-not-disturb keeps discovery entries from re-opening the journal over the

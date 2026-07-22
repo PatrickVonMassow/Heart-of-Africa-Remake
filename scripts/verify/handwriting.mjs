@@ -2,7 +2,7 @@
 // design.md §16): a new entry is written visibly by a hand, the hand shows
 // the wound level, wounded entries keep blood traces, a click finishes the
 // entry, and do-not-disturb writes silently. Dev server only.
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import { installTtsCache } from './ttsCache.mjs'
 
@@ -37,6 +37,8 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__balance, null, { timeout: 60000 })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.waitForTimeout(4000)
 await page.evaluate(() => {
   window.__balance.randomEventsEnabled = false

@@ -7,7 +7,7 @@
 // via the RAF-driven window.__lionHunt scene and confirming that touching a
 // lion — and a hyena — triggers that predator's attack, plus the console-error
 // gate. Dev server only (dev hooks).
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 let failures = 0
@@ -28,6 +28,8 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.waitForTimeout(4000)
 await page.evaluate(() => {
   window.__game.getState().setJournalOpen(false)

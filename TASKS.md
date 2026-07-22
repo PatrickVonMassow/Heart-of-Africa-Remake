@@ -7756,6 +7756,17 @@ the remaining open points in their numeric order.
   pass is green (modulo the documented touch/voice skip) and assertBackend
   throws if a suite silently falls back. DOCS: CLAUDE §7.2 + scripts/verify/
   README (the backend coverage policy).
+  PROGRESS 22.07 (part a done): added `assertBackend(page)` (after a
+  `window.__renderer` wait) to the six render suites that lacked it — events,
+  gamepad, handwriting, health, polish, visualsweep — so ALL eleven
+  render-dependent suites now assert the backend (collision, enrichments, events,
+  flow, gamepad, handwriting, health, invariants, polish, settings, visualsweep);
+  the data suites (docs/world/i18n) and the WebGL2-only touch/voice are the
+  documented exceptions. scripts/verify/README backend-coverage section added.
+  STILL OPEN: (b) wire the LARGE tier to invoke the render suites on BOTH backends
+  automatically (currently two manual VERIFY_GL invocations); (c) resolve the two
+  WebGPU reds (collision 19/20, polish 42/43); (d) the 203 finder on both backends
+  (waits on 203); CLAUDE §7.2 backend-policy line.
 
 - [ ] 205. A WORLD & FUNCTIONALITY PLAUSIBILITY AUDIT — a THIRD audit kind beyond
   code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its

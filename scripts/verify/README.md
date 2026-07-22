@@ -102,6 +102,17 @@ here; consumes the `.cache/tts/` replay cache because adding an entry
 auto-narrates — voice.mjs owns and primes that cache), `docs.mjs` (pure Node
 doc-structure check), `preview.mjs` (production build acceptance).
 
+## Backend assertion coverage (point 204)
+
+Every render-dependent browser suite calls `assertBackend(page)` right after the
+renderer initialises (`window.__renderer`): a run launched with
+`VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a `webgl` run that came
+up on WebGPU) fails LOUD instead of giving false confidence. Covered: collision,
+enrichments, events, flow, gamepad, handwriting, health, invariants, polish,
+settings, visualsweep. The pure-data suites (docs, world, i18n) read files/state,
+not pixels, so a backend assertion adds nothing; touch and voice are the
+documented WebGL2-only exception (they never touch the GPU process, see below).
+
 ## Headless limitations (WebGL 2 fallback only)
 
 Headless Chromium has no WebGPU adapter, so every suite here runs on the game's

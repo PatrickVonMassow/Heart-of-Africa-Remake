@@ -1,6 +1,6 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
-import { launchVerifyBrowser, waitForStable } from './_browser.mjs'
+import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -24,6 +24,8 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__balance, null, { timeout: 60000 })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.waitForTimeout(4000)
 await page.evaluate(() => {
   window.__balance.randomEventsEnabled = false
