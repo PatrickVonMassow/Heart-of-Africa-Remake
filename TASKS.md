@@ -8905,7 +8905,7 @@ the remaining open points in their numeric order.
   changes. Related to 227 (the skyline "gliding animal" is the same foot-slide on
   the panorama band).
 
-- [ ] 229. LIGHTNING WITHOUT THUNDER — the user sees lightning FLASHES in the
+- [x] 229. LIGHTNING WITHOUT THUNDER — the user sees lightning FLASHES in the
   Central region but hears NO thunder (report 22.07.2026). §7.1 pt.12 / point 166
   promise a thunderstorm fires "lightning FLASHES with a delayed THUNDER (1-4 s)
   as a PAIR" — so the flash fires but its paired thunder sound never plays.
