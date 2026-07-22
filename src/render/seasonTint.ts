@@ -70,6 +70,48 @@ export function groundSprout(dryness: number): number {
 }
 
 /**
+ * The flora material's brightness lift (point 206): the ground multiplies its
+ * albedo by 2.6 while the vertex-coloured flora never got a matching lift, so
+ * crowns read as near-black silhouettes. Both scenes (travel + settlement)
+ * multiply their flora colorNode by THIS constant — shared so the pure
+ * luminance floor in flora.test.ts gates the same number the shaders use.
+ */
+export const FLORA_COLOR_LIFT = 1.9
+
+/**
+ * CPU mirror of seasonTintNode below (the collapse-mirror pattern above): the
+ * SAME formulas, kept in lock-step — a change here must change seasonTintNode
+ * identically. Exists so the crown-colour luminance floor (point 206,
+ * flora.test.ts) can evaluate the shader's recolour purely, without a renderer.
+ * `c` is a LINEAR-space rgb triple (what vertexColor() carries), `tint` the
+ * field value (0 straw, 0.5 neutral, 1 lush).
+ */
+export function seasonTintCpu(
+  c: [number, number, number],
+  tint: number,
+): [number, number, number] {
+  const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+  const [r, g, b] = c
+  const greenness = clamp01((g - b) * 2.5) * clamp01(1 - (r - g) * 4)
+  const luma = r * 0.35 + g * 0.5 + b * 0.15
+  const straw: [number, number, number] = [luma * 2.15, luma * 1.75, luma * 0.4]
+  const lush: [number, number, number] = [luma * 0.28, luma * 1.5, luma * 0.3]
+  const dryK = clamp01(1 - tint * 2)
+  const lushK = clamp01(tint * 2 - 1)
+  const mix = (a: number, o: number, t: number) => a + (o - a) * t
+  const dried = [
+    mix(r, straw[0], greenness * dryK),
+    mix(g, straw[1], greenness * dryK),
+    mix(b, straw[2], greenness * dryK),
+  ]
+  return [
+    mix(dried[0], lush[0], greenness * lushK),
+    mix(dried[1], lush[1], greenness * lushK),
+    mix(dried[2], lush[2], greenness * lushK),
+  ]
+}
+
+/**
  * Recolour a base colour toward straw (dry) or deep green (lush), leaving
  * everything that is not foliage alone.
  *
@@ -82,6 +124,9 @@ export function groundSprout(dryness: number): number {
  * multiplicative nudge, so the rains only DIMMED the scene and never shifted its
  * hue (measured: the Sahel's ground green excess moved 41 -> 45 across its whole
  * year). Keep both ends luma-keyed.
+ *
+ * seasonTintCpu above is this node's CPU mirror (point 206) — any change here
+ * must change it identically.
  */
 export function seasonTintNode(
   c: ReturnType<typeof vertexColor>['rgb'],

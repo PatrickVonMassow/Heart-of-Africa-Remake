@@ -121,7 +121,19 @@ export function buildAcacia(): THREE.BufferGeometry {
   return merge([trunk, crown, crown2])
 }
 
-/** Tall rainforest tree with a layered canopy. Height ~3.6 units. */
+/** Tall rainforest tree with a layered canopy. Height ~3.6 units.
+ *
+ * Crown colours (point 206, Central reopen): THREE.Color converts the authored
+ * hex from sRGB to the LINEAR working space, so a "dark green" hex lands far
+ * darker than it reads on a colour picker — the old #1f5323/#2a6128/#245a24
+ * came out at linear luminance 0.066/0.092/0.078, 2-2.7x darker than every
+ * other crown (acacia 0.18/0.14, palm 0.12/0.16, bush 0.19). The global x1.9
+ * material lift was calibrated against that brighter average, and the Congo
+ * additionally runs under a permanent wet-season sun dim (x0.6 year round) and
+ * dense mutual canopy shadow — so jungle crowns alone still read near-black.
+ * These hexes put the jungle crown at linear luminance 0.123/0.168/0.141: a
+ * LIT deep green, still a step darker than the savanna's olive acacia.
+ * Pinned by the max-greenness luminance floor in flora.test.ts. */
 export function buildJungleTree(): THREE.BufferGeometry {
   const trunk = new THREE.CylinderGeometry(0.12, 0.22, 2.6, 6)
   trunk.translate(0, 1.3, 0)
@@ -130,17 +142,17 @@ export function buildJungleTree(): THREE.BufferGeometry {
   const c1 = new THREE.SphereGeometry(1.25, 8, 6)
   c1.scale(1, 0.75, 1)
   c1.translate(0, 2.95, 0)
-  tint(c1, '#1f5323', 0.16, 22)
+  tint(c1, '#2b7030', 0.16, 22)
   foliage(c1)
 
   const c2 = new THREE.SphereGeometry(0.85, 7, 5)
   c2.translate(0.75, 2.5, 0.25)
-  tint(c2, '#2a6128', 0.16, 23)
+  tint(c2, '#37813a', 0.16, 23)
   foliage(c2)
 
   const c3 = new THREE.SphereGeometry(0.7, 7, 5)
   c3.translate(-0.65, 2.65, -0.3)
-  tint(c3, '#245a24', 0.16, 24)
+  tint(c3, '#317736', 0.16, 24)
   foliage(c3)
 
   return merge([trunk, c1, c2, c3])
