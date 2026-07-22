@@ -9538,6 +9538,29 @@ the remaining open points in their numeric order.
   `Wildlife.tsx` — same files as 242/245/247/248; bundles with 242 (both are
   crocodile behaviour); do NOT delegate concurrently with the other wildlife points.
 
+- [ ] 251. MULTIPLE CARCASSES NEED MULTIPLE VULTURE FLOCKS — the user reports
+  (22.07.2026) that with several carcasses present there is only ONE set of vultures,
+  which after finishing the first meal hops straight to the second; instead EACH
+  carcass should draw its OWN vultures flying in independently. Per §19.6 a carcass
+  draws vultures that spawn beyond the zoom-aware view ring, fly in, consume until
+  it is removed, then fly off — but that draw is apparently GLOBAL (a single flock
+  migrating between carcasses) rather than PER-CARCASS. FIX: make the vulture draw
+  per-carcass/per-remnant — each eligible carcass spawns and owns its own flock
+  (flying in from beyond the view ring, consuming, flying off + despawning outside
+  the ring, the point-128 landed-bird ground rule intact), so N carcasses draw N
+  independent flocks concurrently rather than one flock serially hopping. Keep the
+  existing bounds (carcasses far off-screen culled; the kill-flock vs ground-
+  scavenger vs trampled-carcass-vulture distinctions of §19.6; the point-162
+  drive-off-draws-no-flock rule). Anchors: `src/scenes/travel/wildlifeBehavior.ts`
+  (the vulture/flock spawn keyed on a carcass, `killFlockActive`/the remnant logic),
+  `src/scenes/travel/Wildlife.tsx` (the vulture flock instances + per-carcass
+  wiring). VERIFIABLE: pure test that the vulture-flock ownership is keyed per
+  carcass (two carcasses → two independent flocks, neither hops to the other); a
+  live check in `scripts/verify/enrichments.mjs` that two simultaneous carcasses
+  each draw their own vultures. DOCS: design.md §19.6 if wording changes. No
+  player-visible text. NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx` — same files as
+  217/242/245/247/248/250; do NOT delegate concurrently with those wildlife points.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
