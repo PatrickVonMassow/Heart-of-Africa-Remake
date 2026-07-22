@@ -9455,7 +9455,7 @@ the remaining open points in their numeric order.
   233) + the croc render — verify the 233 confluence is preserved after any depth
   change; overlaps the river files and the wildlife/fauna croc work (242/243/245).
 
-- [ ] 247. JUVENILE DOES NOT FLEE THE PLAYER (point 239 follow-up) — the user
+- [x] 247. JUVENILE DOES NOT FLEE THE PLAYER (point 239 follow-up) — the user
   reports (22.07.2026, screenshot near the Nile, North) a juvenile standing right
   next to the player WITHOUT fleeing, although point 239 should make weak animals +
   any juvenile shy from the traveller. FIRST rule out DEPLOY LAG: 239 (`fade0aa`)
@@ -9480,7 +9480,7 @@ the remaining open points in their numeric order.
   — same files as 242/245/237/217; do NOT delegate concurrently with those; bundles
   naturally with 245 (both are calf/juvenile behaviour).
 
-- [ ] 248. FLEEING ANIMALS CANNOT CROSS THE WATER (point 239 + point-192
+- [x] 248. FLEEING ANIMALS CANNOT CROSS THE WATER (point 239 + point-192
   interaction) — the user asks (22.07.2026) why animals fleeing the player cannot
   cross a river/lake. Point 192 already lets an animal CROSS water (chest-deep,
   seasonal wade) and a prey boxed against the water by a predator flees INTO it —
@@ -9561,7 +9561,7 @@ the remaining open points in their numeric order.
   player-visible text. NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx` — same files as
   217/242/245/247/248/250; do NOT delegate concurrently with those wildlife points.
 
-- [ ] 252. AUDIT + RESOLVE CONFLICTS BETWEEN PLAYER-FLEE (239) AND OTHER WILDLIFE
+- [x] 252. AUDIT + RESOLVE CONFLICTS BETWEEN PLAYER-FLEE (239) AND OTHER WILDLIFE
   MECHANISMS — the user asks (22.07.2026) to check whether the point-239 player-shy
   flee CONFLICTS with other wildlife mechanisms — e.g. an animal fleeing the PLAYER
   and a PREDATOR at the same time — and to resolve it so the PREDATOR flee takes
