@@ -1,9 +1,12 @@
 // Float height vs rendered water surface (CLAUDE.md §7.1 pt. 4, design.md
 // §7/§11.3). The river ribbon is FLAT across its width at the axis-sample
 // height; the canoe float height must never end up below it, or the ribbon
-// covers the hull (the recurring "flooded canoe"). The ribbon construction is
-// mirrored here exactly (densified axis samples + SURFACE_LIFT) and the float
-// helper is asserted against it across the channel width.
+// covers the hull (the recurring "flooded canoe"). The ribbon's BASE row
+// height is mirrored here (densified axis samples + SURFACE_LIFT) and the
+// float helper is asserted against it across the channel width; since point
+// 211(b) the rendered row may sit HIGHER (lifted clear of cross-band carved
+// wedges via ribbonRowSurfaceAt), so the mirror is a floor, never an
+// overstatement — float ≥ rendered row ≥ this mirror.
 import { describe, it, expect, beforeAll } from 'vitest'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { RIVERS } from '../../world/geo'

@@ -36,16 +36,19 @@ import { WATERFALLS } from '../../world/data/landmarks'
 // The surface heights and the axis sampling are shared with the module the
 // floating canoe reads (waterSurface.ts), so a floater and the rendered
 // surface can never diverge.
-import { NILE_FLOOD, SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, registerRiverSurfaces, waterSurfaceY } from './waterSurface'
+import {
+  NILE_FLOOD,
+  LAKE_LIFT,
+  lakeBedMax,
+  densifyRiver,
+  planRibbonStrips,
+  registerRiverSurfaces,
+  ribbonRowSurfaceAt,
+  waterSurfaceY,
+} from './waterSurface'
 import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
 
 const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
-// point 211(a): the river mouth reaches the sea across a short OCEAN run, but the
-// ribbon used to end at the last LAND point (the coast contour), which sits
-// inland of where the sea sheet begins — leaving a beach strip between ribbon and
-// sea. Carry the ribbon over the first few ocean points of the mouth so it merges
-// into the sea sheet; a longer run is still the open sea and ends the strip.
-const MOUTH_BRIDGE = 3
 
 interface FallDef {
   x: number
@@ -99,10 +102,12 @@ function buildRivers(seed: number): {
     // never buried under a local rise of the terrain (which would leave visible
     // gaps in the river). The bed itself descends overall from source to mouth,
     // so the water reads as flowing downhill without sea-level canyons
-    // (design.md §11).
+    // (design.md §11). Row heights come from the SHARED formula (point 211b:
+    // lifted where a cross-sloping bank's carved wedge would poke through the
+    // flat cross-section) so the canoe float reads the identical surface.
     const surf: number[] = []
     for (let i = 0; i < pts.length; i++) {
-      surf.push(Math.max(-0.05, samples[i].height + SURFACE_LIFT))
+      surf.push(ribbonRowSurfaceAt(pts, i, seed))
       axisSamples.push({ lat: pts[i].lat, lon: pts[i].lon, surf: surf[i], nile: river.id === 'nile' })
     }
 
@@ -157,12 +162,12 @@ function buildRivers(seed: number): {
 
     // Ribbon strip. Isolated inland points that the domain-warped biome map
     // misclassifies as ocean are bridged so they do not tear the river into
-    // pieces; only a sustained ocean run (the actual river mouth reaching the
-    // sea) ends the ribbon.
-    let stripStart = -1
+    // pieces; the mouth of an open strip is carried MOUTH_BRIDGE points into
+    // the sea so it merges with the sea sheet (point 211a); only a sustained
+    // ocean run (the open sea beyond the mouth) ends the ribbon. The drawn/
+    // connected decisions live in the pure planRibbonStrips.
+    const plan = planRibbonStrips(samples.map((s) => s.type === 'ocean'))
     let arc = 0
-    let oceanRun = 0
-    let strips = 0
     let buried = 0
     let interiorEdges = 0
     // A ribbon edge is a real bank only when the probe just OUTSIDE it is
@@ -177,21 +182,9 @@ function buildRivers(seed: number): {
     const PROBE = (HALF_WIDTH + BANK_PROBE_DEG * 10) / HALF_WIDTH
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
+      if (!plan.drawn[i]) continue
       const isOcean = samples[i].type === 'ocean'
-      if (isOcean) {
-        oceanRun++
-        // Bridge only the MOUTH of an open strip (point 211a): carry the ribbon
-        // over the first MOUTH_BRIDGE ocean points so it reaches the sea sheet,
-        // then a longer run is the open sea and ends the strip. Ocean points with
-        // no open strip (a source in misclassified sea) are still skipped.
-        if (stripStart < 0 || oceanRun > MOUTH_BRIDGE) {
-          if (oceanRun > 3) stripStart = -1 // reached open sea: stop rather than bridge across it
-          continue
-        }
-      } else {
-        oceanRun = 0
-        if (surf[i] < samples[i].height - 0.05) buried++
-      }
+      if (!isOcean && surf[i] < samples[i].height - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)
@@ -212,11 +205,9 @@ function buildRivers(seed: number): {
       const bankR = isOcean ? 0 : bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
       if (!isOcean) interiorEdges += (1 - bankL) + (1 - bankR)
       banks.push(bankL, bankR)
-      if (stripStart >= 0) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
-      else strips++ // a land point with no open strip begins a new drawn strip
-      stripStart = i
+      if (plan.connected[i]) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
     }
-    report[river.id] = { strips, buried, interiorEdges }
+    report[river.id] = { strips: plan.strips, buried, interiorEdges }
   }
 
   const geometry = new THREE.BufferGeometry()
