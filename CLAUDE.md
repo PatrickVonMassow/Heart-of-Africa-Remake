@@ -210,6 +210,18 @@ old→new coverage map live in `scripts/verify/README.md`.
     after moving the `poc` tag, run the deploy via `workflow_dispatch` (or ensure
     the closing-cycle `main` push lands AFTER the tag move), else the deploy
     builds the old tag.
+  - **User-facing judgment is always against DEPLOYED `main`, never a branch.**
+    The user tests only the GH-Pages URL (which serves `main`) — never a feature
+    branch, never a local checkout. So a render/GUI fix that needs the user's
+    AESTHETIC sign-off ("is it bright/smooth/right ENOUGH?") is MERGED to `main`
+    as soon as it is test-green AND I have verified on BOTH backends that it is a
+    correct improvement (not broken/worse); completeness = my verification, the
+    user's aesthetic "good enough?" is a SEPARATE follow-up asked against the
+    deployed result. A "Von dir zu klären" render card must therefore point at
+    the deployed `main` state — never ask the user to judge unmerged branch work.
+    (If a change genuinely needs the user's eyes BEFORE it is safe to land, that
+    is the rare exception: set up a branch-preview deploy rather than merge
+    unverified.)
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
