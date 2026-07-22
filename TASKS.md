@@ -9291,11 +9291,15 @@ the remaining open points in their numeric order.
   §19.16 water-only placement is not holding (likely a side effect of the widened
   river / water mask leaving them on the bank, cf. point 218 floating objects), and
   (2) the hidden pose is not applied — an idle croc should be SUNK to the eye knobs
-  (body below the water sheet), lurking, not lying exposed and flat. NOT the cause:
-  interpenetration/body-separation pinning (point 222) was considered and RULED OUT
-  by the user — a LONE crocodile is equally idle, so this is the crocodile's general
-  resting behaviour + presentation, not two crocs locking each other; do not chase a
-  222-style pin here. WHAT IS BY
+  (body below the water sheet), lurking, not lying exposed and flat. CONFIRMED (user
+  22.07.2026): the LUNGE mechanism WORKS (a crocodile was seen to snap), so the
+  FAILING mechanism is the SUBMERGE — the idle/hidden "sink to the eye knobs" pose
+  does not apply, leaving the croc exposed and flat. This SUBMERGE fix (2) is the
+  PRIMARY target, together with (1) the water-only placement; the lunge/attack path
+  is fine, leave it. NOT the cause: interpenetration/body-separation pinning (point
+  222) was considered and RULED OUT by the user — a LONE crocodile is equally idle,
+  so this is the crocodile's hidden-pose mechanism, not two crocs locking each
+  other; do not chase a 222-style pin here. WHAT IS BY
   DESIGN (leave it): no lunge at the PLAYER here — the §14.2 walk-into attack is a
   random event that defaults OFF in the relaxed preset; and with no prey in the
   strike radius, no prey-lunge fires. FIX: (a) keep crocodiles ON water only —
