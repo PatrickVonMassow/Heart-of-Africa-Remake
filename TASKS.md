@@ -7457,6 +7457,17 @@ the remaining open points in their numeric order.
   bug) still fails loudly while a one-frame spawn/drink/shore-seed transition
   does not. Do this as part of the closing prep so the LARGE gate can reach 3×
   clean.
+  OBSERVED 22.07 (a WebGL enrichments run during the 210b work): 207 pass, 2 fail,
+  0 console-errors — both KNOWN rotating staging flakes, cushioned by the retry:
+  (1) plover-145b again `dead:true` (the bird died before its broken-wing act —
+  the documented cause above); (2) the point-129 witness "a tree contact blocks
+  the entry but leaves N/S/W free" with `reached:false` (minDist 1.41, N/S/W all
+  ~2.2-2.4 free) — a NEW entry for the rotating-flake list: the driven post-
+  collision move did not COMPLETE in the frames allotted (the 200 SIM-clock class,
+  not a real collision bug — the free directions are all open). ADD to the
+  closing root-cause set: poll the point-129 driven move on the SIM clock / its
+  own arrival condition rather than a fixed frame budget. The point-102 vicinity
+  check (this session's anchor fix) PASSED first try, confirming that fix.
 
 - [x] 201. DONE 20.07.2026: the generic FLEE step (radial away from an active
   lion) and the elephant DODGE step both moved RAW — onto a water cell, where
