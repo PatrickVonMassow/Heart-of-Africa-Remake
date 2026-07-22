@@ -12,7 +12,7 @@ import { coastSignedDistance } from './coastVector'
 import { lakeContains, lakeIndexAt } from './hydro'
 import { riverBedProfileAt } from './riverProfile'
 import { fbm2 } from './noise'
-import { isNortheastOfBoundary, boundarySignedDistance } from './redSea'
+import { boundarySignedDistance, oceanSwimBlocked } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
 import { LAKES } from './data/lakes'
 import { balance } from '../config/balance'
@@ -504,47 +504,15 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
 }
 
 // --- Movement boundary (design.md §11.2) --------------------------------------
-// Ocean enclosed by the continent's outline (bays, gulfs, straits cutting
-// into the landmass) counts as inland water and can be swum through — but
-// only within a calibratable band off the coast (balance.oceanSwimMarginDeg);
-// further out, and everywhere outside the outline's convex hull, the open
-// sea blocks movement. Exception: everything northeast of the Red Sea
-// boundary (redSea.ts) is always open, impassable ocean — the Red Sea is
-// never inland water.
-
-let hullCache: Array<[number, number]> | null = null
-
-/** Convex hull of the mainland outline (Andrew's monotone chain), lon/lat. */
-function continentHull(): Array<[number, number]> {
-  if (hullCache) return hullCache
-  const pts = [...LAND_POLYGONS[0].points].sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-  const lower: Array<[number, number]> = []
-  for (const p of pts) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop()
-    lower.push(p)
-  }
-  const upper: Array<[number, number]> = []
-  for (let i = pts.length - 1; i >= 0; i--) {
-    const p = pts[i]
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop()
-    upper.push(p)
-  }
-  hullCache = [...lower.slice(0, -1), ...upper.slice(0, -1)]
-  return hullCache
-}
-
-/** Point-in-convex-polygon test (hull is counterclockwise, lon/lat). */
-function insideContinentOutline(lat: number, lon: number): boolean {
-  const hull = continentHull()
-  for (let i = 0; i < hull.length; i++) {
-    const [ax, ay] = hull[i]
-    const [bx, by] = hull[(i + 1) % hull.length]
-    if ((bx - ax) * (lat - ay) - (by - ay) * (lon - ax) < 0) return false
-  }
-  return true
-}
+// Enclosed sea water can be swum through, but only within a calibratable,
+// SHAPE-INDEPENDENT band off the coast (balance.oceanSwimMarginDeg); farther
+// out the open sea blocks movement. The swimmable-vs-blocked decision itself
+// lives in redSea.ts (`oceanSwimBlocked`, point 221) — a uniform coast-distance
+// ring that superseded the former convex-hull gate, whose seaward reach varied
+// with coast shape (a convex cape blocked at the beach while a concave bay
+// wadeable far out). Exception: everything northeast of the Red Sea boundary
+// (redSea.ts) is always open, impassable ocean — the Red Sea is never inland
+// water. This module only supplies the coast-distance metric.
 
 let coastSegments: Float64Array | null = null
 
@@ -578,29 +546,18 @@ function coastlineDistanceDeg(lat: number, lon: number): number {
   return Math.sqrt(best)
 }
 
-/** The Mediterranean is open sea, never a swimmable bight (design.md §11.2):
- *  the convex hull spanning the northern coast would otherwise class the
- *  water off Alexandria or in the Gulf of Sidra as continent-enclosed and
- *  open its coastal band to swimming. Ocean north of this latitude and east
- *  of Gibraltar always blocks; the African north coast itself lies south of
- *  the latitude only as land, so no legitimate swim water is caught. */
-const MEDITERRANEAN_LAT_MIN = 30.2
-const MEDITERRANEAN_LON_MIN = -6.5
-
 /**
- * Ocean blocks movement only outside the continent's outline (design.md
- * §11.2); enclosed sea water is swimmable like rivers and lakes, but only
- * within the calibratable swim margin off the coast — no swimming far out
- * into the open sea. Northeast of the Red Sea boundary and throughout the
- * Mediterranean the ocean always blocks, hull or not.
+ * Ocean blocks movement except within the calibratable swim margin off the
+ * coast (design.md §11.2): enclosed sea water is swimmable like rivers and
+ * lakes, but only a uniform band from any coast — no swimming far out into the
+ * open sea. The shape-independent decision (coast-distance ring plus the
+ * Red-Sea cut and the Mediterranean gate) lives in redSea.ts; this passes it
+ * the coast-distance metric and the calibratable margin (point 221).
  */
 export function isBlocked(type: TerrainType, lat?: number, lon?: number): boolean {
   if (type !== 'ocean') return false
   if (lat === undefined || lon === undefined) return true
-  if (isNortheastOfBoundary(lat, lon)) return true
-  if (lat > MEDITERRANEAN_LAT_MIN && lon > MEDITERRANEAN_LON_MIN) return true
-  if (!insideContinentOutline(lat, lon)) return true
-  return coastlineDistanceDeg(lat, lon) > balance.oceanSwimMarginDeg
+  return oceanSwimBlocked(lat, lon, coastlineDistanceDeg(lat, lon), balance.oceanSwimMarginDeg)
 }
 
 // Dev hooks for the headless verification (CLAUDE.md §7.2): terrain type and
