@@ -105,6 +105,60 @@ export function boundarySignedDistance(lat: number, lon: number): number {
   return bestCross >= 0 ? -dist : dist
 }
 
+// --- Swim margin (design.md §11.2) --------------------------------------------
+// The traveller may wade only a calibratable band off the coast; deeper, farther
+// water blocks. The Mediterranean is open sea, never a swimmable bight (design.md
+// §11.2): its explicit gate blocks the sea off the delta, Alexandria and the Gulf
+// of Sidra, which a coast-distance band alone would keep swimmable right at the
+// shore. The African north coast itself lies south of MEDITERRANEAN_LAT_MIN only
+// as land, so no legitimate swim water is caught.
+export const MEDITERRANEAN_LAT_MIN = 30.2
+export const MEDITERRANEAN_LON_MIN = -6.5
+
+// Sensible starting width for the swimmable band (point 221): NARROW enough that
+// the traveller cannot wade out into deep blue water, WIDE enough to keep the
+// documented nearshore swim cases (Gulf of Guinea ~0.89 deg). The reported
+// over-permit sat at ~1.18 deg off the SW Atlantic coast, so the former 1.2 deg
+// let it through; a band at/under ~1.1 deg blocks it while every nearshore verdict
+// (<=0.89 deg) stays swimmable. The live value is balance.oceanSwimMarginDeg
+// (calibratable, debug-editable); this constant only documents the calibrated
+// target the reported far-wade needs.
+export const SWIM_MARGIN_DEG_DEFAULT = 1.0
+
+/**
+ * Movement verdict for an OCEAN cell (design.md §11.2): `true` = blocked. The
+ * caller guards `type === 'ocean'` first; this decides swimmable-vs-blocked for
+ * that sea cell. `coastDistanceDeg` is the horizontal distance (degrees) to the
+ * nearest rendered coastline (the caller owns the metric); `marginDeg` is the
+ * calibratable band width (balance.oceanSwimMarginDeg).
+ *
+ * The band is a CONSISTENT near-shore ring: the traveller wades a uniform
+ * `marginDeg` off ANY coast and open/deep sea blocks everywhere. Northeast of
+ * the Red-Sea boundary and throughout the Mediterranean the sea always blocks,
+ * band or not.
+ *
+ * Point 221: this REPLACES the former convex-hull gate, whose seaward reach
+ * depended on coast SHAPE — a convex cape blocked ~0 deg off the beach while a
+ * concave bay wadeable ~1.4 deg, so the wadeable distance swung ~35x between
+ * coasts (the reported "sometimes far into deep blue, sometimes only a little").
+ * A pure coast-distance ring treats every coast identically; the open ocean is
+ * blocked because it lies beyond `marginDeg` of any coast, so no separate hull
+ * test is needed (and none of the acceptance blocks — the open Atlantic, the
+ * Mozambique channel — depend on the hull: each is well beyond the band). It
+ * opens no new land route: every strait to reachable land is either the Red-Sea
+ * cut, the Mediterranean, or wider than the band on both sides.
+ */
+export function oceanSwimBlocked(
+  lat: number,
+  lon: number,
+  coastDistanceDeg: number,
+  marginDeg: number,
+): boolean {
+  if (isNortheastOfBoundary(lat, lon)) return true
+  if (lat > MEDITERRANEAN_LAT_MIN && lon > MEDITERRANEAN_LON_MIN) return true
+  return coastDistanceDeg > marginDeg
+}
+
 /** Subset of the DEM metadata the trimming pass needs (see geodata.ts). */
 export interface StampMeta {
   width: number
