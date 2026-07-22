@@ -186,11 +186,30 @@ old→new coverage map live in `scripts/verify/README.md`.
   resolve any conflict CAREFULLY so nothing breaks, and RE-TEST (re-run the
   relevant regression) whenever a conflict touched real code. `main` therefore
   always reflects finished, verified work — it is the deployed branch (the
-  GH-Pages root and the `/poc/` tag build from it). CROSS-CUTTING changes that
+  GH-Pages root builds from `main`; the `/poc/` deploy builds from the immutable
+  `poc` TAG, not from main). CROSS-CUTTING changes that
   are not a single feature — guards, docs, the progress dashboard, workflow/
   process files — are committed directly to `main` (a feature branch for each
   would be needless ceremony). Use worktree isolation for parallel file-mutating
   agents so their branches never collide in one tree.
+- **Feature-branch process rules (bind the workflow; verified against the
+  automation 22.07.2026).**
+  - `TASKS.md` is **main-only**. Feature branches NEVER edit it. New points are
+    appended on `main`; the `[ ]→[x]` tick happens on `main` at (or immediately
+    after) the merge — never on the branch. This keeps the working-tree TASKS.md
+    the guards/dashboard/resume-hook read consistent with the dashboard on every
+    branch, and avoids TASKS.md merge conflicts on every point.
+  - After EVERY merge to `main` — conflict or not — run the fast gate
+    (`npm run test:unit` + build + lint) before moving on; two points that
+    auto-merge cleanly can still break together. On a conflict that touched real
+    code, additionally re-run the relevant browser regression.
+  - Keep branches SHORT. If `main` moved substantially, merge `main` INTO the
+    branch before the final verify, and run that verify on the synced state, so
+    what is verified is what lands.
+  - Point 224 tag re-point: the `/poc/` rebuild does not trigger on a tag push —
+    after moving the `poc` tag, run the deploy via `workflow_dispatch` (or ensure
+    the closing-cycle `main` push lands AFTER the tag move), else the deploy
+    builds the old tag.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
