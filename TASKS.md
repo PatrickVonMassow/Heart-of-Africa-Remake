@@ -9510,6 +9510,26 @@ the remaining open points in their numeric order.
   (test:unit/build), which is why the break slipped through — worth a follow-up to
   add enrichments.mjs to a lint/parse gate.
 
+- [ ] 250. CROCODILE SWIMS AWAY AFTER A CATCH WHILE THE PREY DISSOLVES SEPARATELY —
+  the user reports (22.07.2026, screenshot, Central near a waterfall) that after the
+  crocodile snapped (a successful catch/lunge) it SWAM AWAY, yet the prey still
+  DISSOLVED (was consumed) — the croc left while the kill resolved on its own. Per
+  §19.16 a crocodile kill SINKS (the river keeps the body, no bank carcass) and the
+  seized victim struggles through the shared §19.8 window against the crocodile
+  (`caughtBy`); the croc must STAY with / sink with the caught prey through that
+  resolution, not walk off mid-feed while the prey vanishes independently. FIX:
+  couple the crocodile's post-catch state to its victim — after a catch the croc
+  holds the victim through the struggle window then sinks the kill (the body sinks,
+  nothing scavenges), and the prey's dissolve/removal is driven by the croc's feed,
+  not decoupled; the walk-off/idle-drift must not fire while a catch is unresolved.
+  Anchors: `src/scenes/travel/wildlifeBehavior.ts` (the crocodile `caughtBy`
+  resolution, the sink-kill, the idle/walk-off), `src/scenes/travel/Wildlife.tsx`
+  (the croc feed/removal wiring). VERIFIABLE: live check that a crocodile that
+  catches prey stays through the resolution and sinks with it (no walk-off mid-feed,
+  prey removal tied to the croc). DOCS: none. NOTE: `wildlifeBehavior.ts`/
+  `Wildlife.tsx` — same files as 242/245/247/248; bundles with 242 (both are
+  crocodile behaviour); do NOT delegate concurrently with the other wildlife points.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
