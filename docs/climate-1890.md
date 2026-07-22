@@ -172,6 +172,22 @@ Notes that matter for implementation:
   wet seasons** than today, with ~10 % more rain. Model Cape Town slightly wetter
   with a slightly longer, earlier season than modern normals.
   — https://cp.copernicus.org/articles/18/2463/2022/
+- **The west-facing fog deserts are a LONGITUDINAL exception the zone model
+  cannot express.** The season model keys on (date, latitude, elevation) only —
+  it has no longitudinal term — so a coastal cell inherits the same rainfall as
+  the interior at its latitude. Along the cold Benguela current that is wrong by
+  an order of magnitude: the **Namib** (Orange River to the Angola border,
+  ~17–27°S) and its Angolan continuation the **Iona / Namibe (Moçâmedes)
+  desert** (~15–17°S) are hyper-arid fog deserts — Namibe ~50 mm/yr, the central
+  Namib ≤15 mm/yr — while the plateau one escarpment inland (~15°E in the
+  Kaokoveld, feeding the Okavango from the Angolan highlands) keeps its real
+  Nov–Mar summer rain. The escarpment runs **closer to the coast in the north**
+  (the eastern desert edge is ~13.8°E in the Kaokoveld but only ~13.2°E off
+  Namibe), so the two dry strips need different eastern bounds. These are carved
+  out with tight coordinate boxes (`isHyperArid`, returning 0 in every month);
+  the semi-arid Benguela coast north of ~15°S, which does get a little rain, is
+  left outside them. Same class as the eastern Libyan Desert box: a real dry
+  strip the latitude-only rain curve would otherwise water.
 
 ---
 

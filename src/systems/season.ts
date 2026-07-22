@@ -117,6 +117,16 @@ function isHyperArid(lat: number, lon: number): boolean {
   // interior at the same latitude (e.g. ~15E Kaokoveld), which does get light
   // Nov-Mar summer rain, so the eastern edge stays at ~13.8E (point 223).
   if (lat >= -27 && lat <= -17 && lon >= 10.5 && lon <= 13.8) return true
+  // The northern continuation of the same fog desert into Angola — the Iona /
+  // Namibe (Moçâmedes) desert, ~15-17S along the coast. It fell OUTSIDE the box
+  // above (which stops at the Angola border, -17), so the no-longitudinal-term
+  // model gave the Benguela-current coast the southern-plateau's summer rain:
+  // Namibe (~15.2S, 12.2E) greened to 1.0 and rained in January, on ~50mm/yr
+  // desert. The escarpment lies closer to the coast this far north than in the
+  // Kaokoveld, so the eastern edge is tighter (~13.2E): inland of it the Angolan
+  // plateau (e.g. ~15E) genuinely gets its Nov-Mar rains and must keep them, and
+  // the semi-arid Benguela coast north of ~15S is left out (point 223).
+  if (lat > -17 && lat <= -15 && lon >= 11 && lon <= 13.2) return true
   return false
 }
 
