@@ -9291,15 +9291,11 @@ the remaining open points in their numeric order.
   §19.16 water-only placement is not holding (likely a side effect of the widened
   river / water mask leaving them on the bank, cf. point 218 floating objects), and
   (2) the hidden pose is not applied — an idle croc should be SUNK to the eye knobs
-  (body below the water sheet), lurking, not lying exposed and flat; and (3) — the
-  LIKELY ROOT CAUSE (user insight 22.07.2026) — the two crocodiles appear to be
-  INTERPENETRATING each other and thus PINNED/blocked, which is the same §19.5
-  body-separation failure as point 222 (animals interlocking at the waterline): if
-  two crocs overlap and the separation force does not resolve (e.g. because the
-  water-only backstop and the body-separation fight each other at the bank), they
-  lock in place inert. CHECK (3) FIRST — fixing the shared waterline body-separation
-  (coordinate with point 222) may resolve the inertness directly, and the beaching/
-  hidden-pose items then remain as the presentation half. WHAT IS BY
+  (body below the water sheet), lurking, not lying exposed and flat. NOT the cause:
+  interpenetration/body-separation pinning (point 222) was considered and RULED OUT
+  by the user — a LONE crocodile is equally idle, so this is the crocodile's general
+  resting behaviour + presentation, not two crocs locking each other; do not chase a
+  222-style pin here. WHAT IS BY
   DESIGN (leave it): no lunge at the PLAYER here — the §14.2 walk-into attack is a
   random event that defaults OFF in the relaxed preset; and with no prey in the
   strike radius, no prey-lunge fires. FIX: (a) keep crocodiles ON water only —
