@@ -1,19 +1,21 @@
-// PostToolUse hook: refresh the batch lock's claimedAt on every tool call, so a
-// LIVE session's lock never goes stale mid-turn. The batch-progress-guard only
-// refreshes it at turn-end; a long working turn (the norm under the anti-idle
-// guard) would otherwise let the lock age past the OS autostart launcher's
-// 12-min "alive" window, and the launcher would false-spawn a redundant session
-// that — now that the launcher authorizes resumption — would actually take over
-// and collide. A fresh lock keeps "stale lock == dead session" true. Never errors.
-import { readFileSync, writeFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+// PostToolUse hook: keep THIS session's batch lock fresh on every tool call, so a
+// live working session never ages past the launcher's 12-min window (the
+// batch-progress-guard only refreshes at turn-end; a long turn is the norm under
+// the anti-idle guard). Ownership-aware (Fable-5 audit #4): it refreshes/claims
+// the lock only when it is free, stale, or already THIS session's — it NEVER keeps
+// a different, still-live session's lock warm. Never errors.
+import { readFileSync } from 'node:fs'
+import { lockStatus, claimLock } from './batch-lock.mjs'
 
-const LOCK = fileURLToPath(new URL('../.claude/batch-lock.json', import.meta.url))
+let sid = ''
 try {
-  const lock = JSON.parse(readFileSync(LOCK, 'utf8'))
-  lock.claimedAt = Date.now()
-  writeFileSync(LOCK, JSON.stringify(lock, null, 2))
+  sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
 } catch {
-  /* no lock yet, or unreadable — nothing to refresh */
+  /* no/!JSON stdin */
+}
+try {
+  if (sid && lockStatus(sid, Date.now()) !== 'held') claimLock(sid, Date.now())
+} catch {
+  /* no lock dir / unreadable — nothing to do */
 }
 process.exit(0)

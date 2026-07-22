@@ -13,11 +13,20 @@
 // its resume instruction; the active instance refreshes the lock as it works
 // and releases it (or sets the pause marker) when it stops.
 
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const LOCK_PATH = fileURLToPath(new URL('../.claude/batch-lock.json', import.meta.url))
 const PAUSE_PATH = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
+
+// Atomic write (Fable-5 audit #18): the lock is rewritten on EVERY tool call by
+// the heartbeat, so a torn read (writeFileSync interrupted) would parse as null
+// and be treated as "no lock". temp-file + rename makes the swap atomic.
+function writeAtomic(path, text) {
+  const tmp = `${path}.tmp`
+  writeFileSync(tmp, text)
+  renameSync(tmp, path)
+}
 
 // A lock older than this without a refresh is treated as dead. Generous enough
 // that the per-point work cadence (commit + dashboard, ~10-40 min) keeps a live
@@ -51,7 +60,7 @@ export function lockStatus(sessionId, nowMs) {
 export function claimLock(sessionId, nowMs) {
   const prev = readLock()
   const startedAt = prev && prev.sessionId === sessionId ? prev.startedAt : nowMs
-  writeFileSync(LOCK_PATH, JSON.stringify({ sessionId, startedAt, claimedAt: nowMs }, null, 2))
+  writeAtomic(LOCK_PATH, JSON.stringify({ sessionId, startedAt, claimedAt: nowMs }, null, 2))
 }
 
 /** Release the lock if this session owns it (no-op otherwise). */
@@ -80,7 +89,7 @@ export function pauseReason() {
 }
 
 export function setPaused(reason) {
-  writeFileSync(PAUSE_PATH, `${reason}\n`)
+  writeAtomic(PAUSE_PATH, `${reason}\n`)
 }
 
 export function clearPaused() {

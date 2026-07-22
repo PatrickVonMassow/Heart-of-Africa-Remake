@@ -38,3 +38,6 @@ scripts/.tile-cache
 .claude/autostart.log
 .claude/autostart-last.json
 .claude/autostart-authorized.json
+.claude/ntfy-topic
+.claude/autostart-state.json
+.claude/autostart-run.log

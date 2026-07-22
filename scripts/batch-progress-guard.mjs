@@ -1,53 +1,74 @@
 // Stop hook (user mandate 22.07.2026): GUARANTEE the batch never idle-stops.
-// The repeated failure it prevents: ending a turn while the batch still has open
-// TASKS points and nothing is scheduled to resume — which left the batch sitting
-// idle for HOURS. Reminders and "measures" that were only discipline or that
-// needed a session restart kept failing, so this is a HARD block.
+// While open, non-deferred TASKS points remain and .claude/batch-paused is absent,
+// this BLOCKS the turn from ending — the assistant must continue the next item (and
+// wait for a running validation by POLLING within the turn, never by yielding).
 //
-// While there are open, non-deferred TASKS points AND the user has not paused the
-// batch (.claude/batch-paused), this BLOCKS the turn from ending. The assistant
-// must then continue the next queue item — and, if a validation is running, WAIT
-// for it by POLLING within the turn (read its log / TaskOutput), never by yielding
-// to idle. The ONLY clean ways to end a turn: the batch is complete, or the user
-// asked to stop (create .claude/batch-paused).
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+// Ownership-aware (Fable-5 audit #10): it blocks only the session that OWNS the
+// batch lock (or that legitimately becomes the owner). A different, still-live
+// session — e.g. a second VS Code window the user opened to chat — is allowed to
+// stop, so it is never dragged into batch work. Refreshes this session's lock when
+// it blocks. Format-safe (#12): a TASKS.md whose checkboxes no longer parse blocks
+// with a warning instead of silently reading "complete". Fail-open on any error.
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { lockStatus, claimLock, isPaused } from './batch-lock.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const TASKS = R('../TASKS.md')
-const PAUSE = R('../.claude/batch-paused')
-const LOCK = R('../.claude/batch-lock.json')
+const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
 
-// Liveness heartbeat: refresh the lock's claimedAt on every turn-end so the OS
-// autostart launcher (scripts/batch-autostart.mjs) can tell a LIVE working
-// session (fresh lock) from a dead one (stale lock) and never disturb the former.
+let sid = ''
 try {
-  const lock = JSON.parse(readFileSync(LOCK, 'utf8'))
-  lock.claimedAt = Date.now()
-  writeFileSync(LOCK, JSON.stringify(lock, null, 2))
-} catch { /* no lock yet — fine */ }
+  sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+} catch {
+  /* no/!JSON stdin — proceed without an id (treated as owner, errs toward blocking) */
+}
+
+const block = (reason) => {
+  process.stdout.write(JSON.stringify({ decision: 'block', reason }))
+  process.exit(0)
+}
 
 try {
-  if (existsSync(PAUSE)) process.exit(0) // user-paused: a clean stop is allowed
-  const lines = readFileSync(TASKS, 'utf8').split('\n')
+  if (isPaused()) process.exit(0) // user-paused: a clean stop is allowed
+
+  const text = readFileSync(TASKS, 'utf8')
   const open = []
-  for (const l of lines) {
+  let sawCheckbox = false
+  let sawDone = false
+  for (const l of text.split('\n')) {
+    if (/^- \[/.test(l)) sawCheckbox = true
+    if (/^- \[x\] \d+\./.test(l)) sawDone = true
     const m = l.match(/^- \[ \] (\d+)\./)
     if (m && !/\bDEFERRED\b/.test(l)) open.push(Number(m[1]))
   }
+
+  // Format sanity: checkboxes exist but nothing parses as a point → do NOT read
+  // this as "batch complete" and silently allow idle.
+  if (open.length === 0 && sawCheckbox && !sawDone) {
+    block(
+      'TASKS.md format not recognized (checkbox lines exist but no "- [ ] N." points parsed). ' +
+        'Do NOT treat this as a finished batch. Check TASKS.md formatting before stopping.',
+    )
+  }
   if (open.length === 0) process.exit(0) // batch complete: a clean stop is allowed
 
+  // Ownership: a DIFFERENT live session owns the batch → this one is not the
+  // worker → let it stop (do not drag a second/chat window into the batch).
+  if (sid && lockStatus(sid, Date.now()) === 'held') process.exit(0)
+
+  // This session is (or now becomes) the batch worker — refresh ownership + block.
+  if (sid) { try { claimLock(sid, Date.now()) } catch { /* no lock dir */ } }
+
   const list = open.slice(0, 12).join(', ') + (open.length > 12 ? ', …' : '')
-  const reason =
+  block(
     `DO NOT STOP THE BATCH. ${open.length} open TASKS point(s) remain (${list}) and the batch is not ` +
-    `paused. Continue the NEXT queue item now — implement it, commit, push, tick it. If a validation ` +
-    `is running, WAIT by POLLING within this turn (read the log file / TaskOutput), never by ending the ` +
-    `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
-    `stops; that must not recur. The ONLY legitimate ways to end this turn: (a) every point is done, or ` +
-    `(b) the user asked you to stop — then create the file .claude/batch-paused and stop. If you are ` +
-    `blocked on a user decision for the current item, pick a DIFFERENT open item instead of stopping.`
-  process.stdout.write(JSON.stringify({ decision: 'block', reason }))
-  process.exit(0)
+      `paused. Continue the NEXT queue item now — implement it, commit, push, tick it. If a validation ` +
+      `is running, WAIT by POLLING within this turn (read the log file / TaskOutput), never by ending the ` +
+      `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
+      `stops; that must not recur. The ONLY legitimate ways to end this turn: (a) every point is done, or ` +
+      `(b) the user asked you to stop — then create .claude/batch-paused and stop. If you are blocked on a ` +
+      `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
+      `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.`,
+  )
 } catch {
   process.exit(0) // never hard-block on a guard error
 }
