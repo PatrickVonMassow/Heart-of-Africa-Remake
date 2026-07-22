@@ -9321,7 +9321,7 @@ the remaining open points in their numeric order.
   (237/238/239) and the fauna points; do NOT delegate concurrently with those —
   queue after the wildlife branch merges.
 
-- [ ] 243. REDESIGN THE CROCODILE MESH — the user reports (22.07.2026) that the
+- [x] 243. REDESIGN THE CROCODILE MESH — the user reports (22.07.2026) that the
   crocodile's appearance is poor: they did not even recognise it as a crocodile.
   Two specifics: (1) the SNOUT lacks the classic crocodile shape (the long tapered
   jaw), and (2) there is a long unexplained ROD lying on TOP of the body that reads
