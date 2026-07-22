@@ -114,6 +114,7 @@ import {
   buildWildebeestCalf,
   buildZebra,
   buildZebraCalf,
+  createFaunaMaterial,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
@@ -1296,7 +1297,9 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     warthog: buildWarthogCalf(),
     lion: buildLionCub(),
   }
-  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })
+  // Shared smooth-shaded fauna material (point 214): flat shading would fold
+  // the rounded bodies back into hard polygon panels.
+  const material = createFaunaMaterial()
   const adult = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const m = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])

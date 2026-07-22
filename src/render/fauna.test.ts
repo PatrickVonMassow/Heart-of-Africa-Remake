@@ -4,14 +4,23 @@
 // (horns, tusks, beard, mane). The calf builds stay at adult scale; the
 // per-animal spawn scale shrinks them.
 import { describe, expect, it } from 'vitest'
-import type * as THREE from 'three/webgpu'
+import * as THREE from 'three/webgpu'
 import {
   buildAntelope,
   buildAntelopeCalf,
+  buildCheetah,
+  buildCrocodile,
   buildElephant,
+  buildFlamingo,
   buildGiraffe,
+  buildGoat,
+  buildHyena,
+  buildLeopard,
   buildLion,
   buildLionCub,
+  buildPlover,
+  buildPloverChick,
+  buildVulture,
   buildWarthog,
   buildWarthogCalf,
   buildWildebeest,
@@ -19,6 +28,8 @@ import {
   buildZebra,
   buildZebraCalf,
   calfProportions,
+  createFaunaMaterial,
+  FAUNA_TESSELLATION,
   type QuadrupedSpec,
 } from './fauna'
 
@@ -92,5 +103,99 @@ describe('calf geometries (design.md §19 — juveniles read as young)', () => {
   it('the giraffe calf carries its bigger head on a much shorter neck', () => {
     const [, adult, calf] = pairs.find(([n]) => n === 'giraffe')!
     expect(topY(calf)).toBeLessThan(topY(adult) - 0.3)
+  })
+})
+
+// Point 214 — the rounded organic bodies read SMOOTH, not as flat polygon
+// panels: the tessellation floors hold, every built species carries smooth
+// per-vertex normals (shared vertices whose corner normals curve across a
+// face), and the one shared fauna material never flat-shades.
+describe('smooth organic shading (CLAUDE.md §7.1 pt. 12, point 214)', () => {
+  const builders: Array<[string, () => THREE.BufferGeometry]> = [
+    ['elephant', () => buildElephant()],
+    ['elephant calf', () => buildElephant(true)],
+    ['giraffe', () => buildGiraffe()],
+    ['giraffe calf', () => buildGiraffe(true)],
+    ['zebra', buildZebra],
+    ['zebra calf', buildZebraCalf],
+    ['wildebeest', buildWildebeest],
+    ['wildebeest calf', buildWildebeestCalf],
+    ['antelope', buildAntelope],
+    ['antelope calf', buildAntelopeCalf],
+    ['warthog', buildWarthog],
+    ['warthog calf', buildWarthogCalf],
+    ['lion', buildLion],
+    ['lion cub', buildLionCub],
+    ['cheetah', buildCheetah],
+    ['leopard', buildLeopard],
+    ['hyena', buildHyena],
+    ['flamingo', buildFlamingo],
+    ['crocodile', buildCrocodile],
+    ['plover', buildPlover],
+    ['plover chick', buildPloverChick],
+    ['vulture', buildVulture],
+    ['goat', buildGoat],
+  ]
+
+  it('the tessellation floors hold (old: 8x6 body spheres, 5-6-seg limbs)', () => {
+    expect(FAUNA_TESSELLATION.body[0]).toBeGreaterThanOrEqual(20)
+    expect(FAUNA_TESSELLATION.body[1]).toBeGreaterThanOrEqual(14)
+    expect(FAUNA_TESSELLATION.head[0]).toBeGreaterThanOrEqual(16)
+    expect(FAUNA_TESSELLATION.head[1]).toBeGreaterThanOrEqual(12)
+    expect(FAUNA_TESSELLATION.small[0]).toBeGreaterThanOrEqual(10)
+    expect(FAUNA_TESSELLATION.small[1]).toBeGreaterThanOrEqual(8)
+    expect(FAUNA_TESSELLATION.limb).toBeGreaterThanOrEqual(10)
+    expect(FAUNA_TESSELLATION.spike).toBeGreaterThanOrEqual(6)
+  })
+
+  it('the shared fauna material is smooth-shaded (never flatShading)', () => {
+    const m = createFaunaMaterial()
+    expect(m.flatShading).toBe(false)
+    expect(m.vertexColors).toBe(true)
+    m.dispose()
+  })
+
+  it('every species build keeps smooth per-vertex normals after the merge', () => {
+    for (const [name, build] of builders) {
+      const geo = build()
+      // Indexed with shared vertices: the basis for interpolated (smooth)
+      // shading — a flat-shaded build would need unindexed per-face corners.
+      expect(geo.index, name).not.toBeNull()
+      expect(geo.attributes.normal, name).toBeDefined()
+      expect(geo.attributes.position.count, name).toBeLessThan(geo.index!.count)
+
+      // Normals stay unit-length through the non-uniform part scaling.
+      const n = geo.attributes.normal
+      for (let i = 0; i < n.count; i += 7) {
+        const len = Math.hypot(n.getX(i), n.getY(i), n.getZ(i))
+        expect(len, `${name} normal ${i}`).toBeCloseTo(1, 2)
+      }
+
+      // Curvature witness: on most triangles the three corner normals differ
+      // (the surface bends across the face). Only the boxy minority (ears,
+      // wings, armour plates) and cylinder caps are flat.
+      const idx = geo.index!
+      const tris = idx.count / 3
+      let curved = 0
+      for (let t = 0; t < tris; t++) {
+        const a = idx.getX(t * 3)
+        const b = idx.getX(t * 3 + 1)
+        const c = idx.getX(t * 3 + 2)
+        const flat =
+          n.getX(a) === n.getX(b) && n.getY(a) === n.getY(b) && n.getZ(a) === n.getZ(b) &&
+          n.getX(a) === n.getX(c) && n.getY(a) === n.getY(c) && n.getZ(a) === n.getZ(c)
+        if (!flat) curved++
+      }
+      expect(curved / tris, `${name} curved-triangle share`).toBeGreaterThan(0.5)
+      geo.dispose()
+    }
+  })
+
+  it('the built body sphere clearly outresolves the old faceted 8x6 build', () => {
+    const body = new THREE.SphereGeometry(1, ...FAUNA_TESSELLATION.body)
+    const oldBody = new THREE.SphereGeometry(1, 8, 6)
+    expect(body.attributes.position.count).toBeGreaterThan(oldBody.attributes.position.count * 4)
+    body.dispose()
+    oldBody.dispose()
   })
 })

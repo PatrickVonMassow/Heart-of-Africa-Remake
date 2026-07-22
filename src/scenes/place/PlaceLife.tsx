@@ -10,7 +10,7 @@ import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
-import { buildGoat } from '../../render/fauna'
+import { buildGoat, createFaunaMaterial } from '../../render/fauna'
 import { TESSELLATION } from '../../render/figures'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
@@ -195,10 +195,9 @@ function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[
 /** Goats drifting around, grazing — inside the pen when one exists. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const geo = useMemo(() => buildGoat(), [])
-  const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
-    [],
-  )
+  // The shared smooth-shaded fauna material (point 214) — the goats stand at
+  // first-person range, where flat shading would read as hard panels.
+  const material = useMemo(() => createFaunaMaterial(), [])
   const anchors = useMemo(() => {
     const rand = mulberry32((seed + 31337) >>> 0)
     return Array.from({ length: count }, () => {

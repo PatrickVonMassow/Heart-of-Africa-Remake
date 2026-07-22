@@ -4,16 +4,21 @@
 // facets nor the polygonal silhouette read at first-person range. Pinned via
 // the shared constants AND the geometry actually built from them.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import * as THREE from 'three/webgpu'
 import { TESSELLATION } from './figures'
 
 describe('TESSELLATION floors', () => {
   it('figure bodies and heads are visibly round (old: 8-cone, 10x8 sphere)', () => {
     expect(TESSELLATION.figureBody).toBeGreaterThanOrEqual(24)
-    expect(TESSELLATION.figureHead[0]).toBeGreaterThanOrEqual(18)
-    expect(TESSELLATION.figureHead[1]).toBeGreaterThanOrEqual(12)
-    expect(TESSELLATION.figureCap[0]).toBeGreaterThanOrEqual(16)
-    expect(TESSELLATION.figureCap[1]).toBeGreaterThanOrEqual(10)
+    // Head/cap/hand floors raised with the organic smoothing pass (point 214).
+    expect(TESSELLATION.figureHead[0]).toBeGreaterThanOrEqual(24)
+    expect(TESSELLATION.figureHead[1]).toBeGreaterThanOrEqual(16)
+    expect(TESSELLATION.figureCap[0]).toBeGreaterThanOrEqual(20)
+    expect(TESSELLATION.figureCap[1]).toBeGreaterThanOrEqual(14)
+    expect(TESSELLATION.figureHand[0]).toBeGreaterThanOrEqual(12)
+    expect(TESSELLATION.figureHand[1]).toBeGreaterThanOrEqual(9)
   })
 
   it('hut roofs, domes and near props hold their floors', () => {
@@ -36,5 +41,18 @@ describe('TESSELLATION floors', () => {
     expect(head.attributes.position.count).toBeGreaterThan(oldHead.attributes.position.count * 2)
 
     for (const g of [body, oldBody, head, oldHead]) g.dispose()
+  })
+})
+
+describe('smooth shading (point 214 — the shading half of the same goal)', () => {
+  it('no settlement figure/prop material ever turns flat shading on', () => {
+    // The figure materials are inline <meshStandardMaterial> props in the
+    // settlement scenes; three.js defaults to smooth (per-vertex) shading, so
+    // the pure guard is that no organic-scene material opts INTO flat shading
+    // — which would collapse the tessellation floors above back into facets.
+    for (const rel of ['../scenes/place/PlaceScene.tsx', '../scenes/place/PlaceLife.tsx']) {
+      const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+      expect(src.includes('flatShading'), `${rel} must stay smooth-shaded`).toBe(false)
+    }
   })
 })
