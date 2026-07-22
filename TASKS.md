@@ -8928,7 +8928,7 @@ the remaining open points in their numeric order.
   mirroring the existing flash gate. DOCS: none (implements the promised pt.166
   pairing). Both languages if any player-visible text is added (none expected).
 
-- [ ] 230. MOUNTAINS READ ANGULAR — the user reports (22.07.2026) that the
+- [x] 230. MOUNTAINS READ ANGULAR — the user reports (22.07.2026) that the
   mountains still look faceted/angular ("eckig"). Same two-class distinction as
   point 214: a facet is EITHER a shading break OR a silhouette step, and each
   needs a different lever. DIAGNOSE per case (read the material + geometry, judge
