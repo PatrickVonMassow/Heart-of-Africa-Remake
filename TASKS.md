@@ -9350,6 +9350,43 @@ the remaining open points in their numeric order.
   then 242 (the behaviour/pose) builds on it; do NOT delegate 243 concurrently with
   any other `fauna.ts` point.
 
+- [ ] 244. SPACE IS THE USE KEY; FUNCTIONAL BUILDINGS NEED THE KEY (no walk-in
+  auto-open) — user decision 22.07.2026. TWO coupled changes: (A) the interaction/
+  use key changes from E to SPACE everywhere; (B) entering a FUNCTIONAL building
+  (the highlighted enterable huts — shops, bazaar, ferry/trade, the chief's/elder
+  hut, etc.) now REQUIRES pressing SPACE while standing at its door — merely walking
+  against the door no longer enters it. This REVERSES the §7.1 pt.2 rule "buildings
+  open by walking against their door" FOR functional buildings, while KEEPING the
+  door-proximity detection (to show the prompt and arm the key). WHAT STAYS (do not
+  change): the settlement ENTRY from the bird's-eye view still happens by MOVEMENT
+  (walking into the place, §2.3) — only functional BUILDINGS inside a settlement
+  need the key; the just-left-settlement clearance, the leave-by-walking-clear rule,
+  and the water-cell no-auto-enter rule are unchanged; the §17.5 focus-on-entry
+  behaviour stays. SCOPE of (A): the keybinding/prompt for the elder talk AND the
+  functional-building entry becomes SPACE; every "press E"/`E` label in player text
+  becomes SPACE (both languages, from the language files); the gamepad A-button
+  (§17.5/pt.30) maps to SPACE via the existing synthetic-key path (one input path);
+  the touch interaction prompt (pt.30) dispatches SPACE. Anchors: the input/keybind
+  layer and the place-scene interaction/door-entry logic (search `src/scenes/place/`
+  and the input handling for the E key and the walk-in auto-enter of buildings),
+  `src/systems/` gamepad + touch prompt, and the i18n prompt strings. VERIFIABLE:
+  `scripts/verify/flow.mjs` — walking a functional building's door WITHOUT a key
+  press NO LONGER enters it; pressing SPACE at the door enters; the elder is
+  addressed with SPACE; entering still focuses the controls (no HUD focus). Update
+  the pure/unit tests for the new keybinding (E→SPACE) and the gamepad suite
+  (A→SPACE) and the touch suite (prompt fires SPACE). The settlement walk-in entry
+  and leave tests stay green. DOCS (in the SAME branch/commit — this changes the
+  target state): `design.md` §2.3 (functional buildings enter via the use key, not
+  by walking in; settlement entry stays movement-based), §17.5 (SPACE is the use
+  key; gamepad A→SPACE), §17.3 (prompt wording); and CLAUDE.md §7.1 pt.2 (rewrite
+  the "buildings open by walking against their door" clause to "functional buildings
+  are entered with the SPACE use key at the door; settlement entry stays movement-
+  based"), pt.9 and pt.30 wherever the E key / A-button interaction is stated. Both
+  languages for any changed prompt text. NOTE: input/place/gamepad/touch/i18n/docs —
+  non-render logic; non-overlapping with the running water/wildlife/ambience
+  branches, but it edits CLAUDE.md §7.1 (a documented acceptance criterion), so
+  keep the numbering/references intact per the doc rules.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
