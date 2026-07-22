@@ -9472,6 +9472,44 @@ the remaining open points in their numeric order.
   — same files as 242/245/237/217; do NOT delegate concurrently with those; bundles
   naturally with 245 (both are calf/juvenile behaviour).
 
+- [ ] 248. FLEEING ANIMALS CANNOT CROSS THE WATER (point 239 + point-192
+  interaction) — the user asks (22.07.2026) why animals fleeing the player cannot
+  cross a river/lake. Point 192 already lets an animal CROSS water (chest-deep,
+  seasonal wade) and a prey boxed against the water by a predator flees INTO it —
+  but the point-239 player-shy flee apparently does NOT route through that
+  water-crossing path, so a fleeing animal pins at the waterline instead of crossing.
+  FIX: give the player-shy flee the same point-192 `crossingTarget` / water-crossing
+  behaviour the predator-flee uses, so an animal boxed against water by the
+  approaching player crosses it rather than balking at the bank (the crossingTarget
+  still refuses the ocean + over-wide channels). Anchors: `src/scenes/travel/
+  Wildlife.tsx` (the `fleesFromPlayer` wiring + the water backstop), `src/scenes/
+  travel/wildlifeBehavior.ts` (`crossingTarget`, the flee step). VERIFIABLE: pure/
+  live check that a player-shy flee boxed against a crossable river triggers a
+  crossing (not a waterline pin). DOCS: none. NOTE: `wildlifeBehavior.ts`/
+  `Wildlife.tsx` — same files as 239/245/247/242/237; bundles with 247 (both are
+  239 flee refinements); do NOT delegate concurrently with the other wildlife points.
+
+- [ ] 249. ENRICHMENTS SUITE CRASHES (real failure after the river/wildlife/croc
+  merges) — the `scripts/verify/enrichments.mjs` both-backend run FAILED (a real
+  failure, twice — not a flake) with an UNCAUGHT Node error, discovered when the
+  post-merge render verification ran (22.07.2026). `node --check enrichments.mjs`
+  is syntactically valid, so it is a RUNTIME crash: most likely a check reads a dev
+  hook (`__wildlife`/`__rivers`/`__vegetation`/…) that one of the just-merged points
+  (232-234 river, 238/239 wildlife, 243 croc, or the earlier ones) renamed, nulled
+  or changed shape, OR the scene now throws, OR (less likely) dev-server/port
+  contention from parallel runs. INVESTIGATE: run `VERIFY_GL=webgl node scripts/
+  verify/run-all.mjs enrichments` and capture the FULL stack/error (the compact
+  summary hides it), identify the throwing check + the hook/value that changed, and
+  FIX it (repair the check or the hook it reads — do NOT weaken a real assertion to
+  hide a genuine product regression). Re-run enrichments on BOTH backends to
+  green. This BLOCKS the render-verify gate and CI/closing, so it is high priority.
+  Anchors: `scripts/verify/enrichments.mjs` + whichever dev hook / scene code the
+  failing check touches. VERIFIABLE: enrichments passes on both backends (0 fail, 0
+  console errors). DOCS: none. NOTE: enrichments.mjs is also edited by the unmerged
+  point 241 (thunder) — coordinate; and it is NOT covered by the fast-gate
+  (test:unit/build), which is why the break slipped through — worth a follow-up to
+  add enrichments.mjs to a lint/parse gate.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
