@@ -159,12 +159,22 @@ export interface NaturalSiteDef {
   kind: 'crater' | 'volcano' | 'delta' | 'wetland'
 }
 
-// Natural sites clear the widened band too (point 156) — EXCEPT the Okavango,
-// whose identity IS the water (its fan floods by design), and with only a
-// small margin for the Sudd: its reeds may hug the White Nile, but the
-// anchor (and the solid parts of its dressing) must not sit in the channel.
+// The Sudd marsh (render/landmarks.ts buildWetland) is a spread of water lobes
+// reaching a RIVERWARD TONGUE ~3.15 world units (0.315° at 10 units/°) from its
+// anchor — the scene aims that +z tongue at the nearest channel (point 189). At
+// the old RIVER_WIDTH_DEG + 0.05 clearance the anchor sat only ~0.06° past the
+// water band, so the solid tongue lobe reached back across the whole widened
+// channel and floated over the water at land height (the point-218 report). The
+// clearance must therefore SCALE with the widened band AND clear the marsh's
+// own rendered footprint, exactly like the cultural-landmark field radii and
+// the point-129 rule that the clearance derives from the same placement the
+// renderer draws: RIVER_WIDTH_DEG + the wetland footprint. The marsh's riverward
+// edge then just meets the bank (reeds hug the waterline) while no solid lobe
+// sits in the channel. (The Okavango stays exempt — its identity IS the water,
+// its fan floods by design.)
+const WETLAND_FOOTPRINT_DEG = 0.32 // buildWetland reaches ~3.15 units (0.315°); +margin
 const NATURAL_SITE_CLEARANCE_DEG: Record<string, number> = {
-  sudd: RIVER_WIDTH_DEG + 0.05,
+  sudd: RIVER_WIDTH_DEG + WETLAND_FOOTPRINT_DEG,
   ngorongoro: RIVER_WIDTH_DEG + 0.3,
   lengai: RIVER_WIDTH_DEG + 0.3,
 }
