@@ -8346,6 +8346,25 @@ the remaining open points in their numeric order.
   VERIFY on BOTH backends (the user's WebGPU is the trusted witness) with a
   before/after Cairo capture showing ONE clean continent edge, plus a redSea.test
   guardrail that the patch coordinates now read land. This is the last leg of 210.
+  SIMPLIFIED DIRECTION (user 22.07.2026, AUTHORITATIVE — supersedes the subtle
+  shelf/floor smoothing that proved insufficient): do NOT preserve the real
+  gulf-head geography. Just CROP the game map cleanly — "the continent simply ends
+  at that point and next to it is contiguous ocean; no knowledge that this was
+  once the Red Sea is needed; that is just where the walkable game-map area ends."
+  So the fix is a clean-CUT of the land/sea mask at the NE trim boundary near the
+  gulf head: fill the narrow real-gulf water fingers + the isthmus-strip mess on
+  the KEPT side to LAND so the continent is solid up to the boundary line, and keep
+  everything on the ocean side as uniform deep open ocean — the messy stepped arms
+  + dark patches come from those narrow near-boundary water/stamp fingers, so
+  removing them (land up to the line, clean ocean beyond) yields one clean edge.
+  Likely in `redSea.trimToGameWorld` (extend the kept-land fill / a boundary-side
+  land seed so no sub-boundary water pocket survives) and/or the terrain land
+  fraction near the boundary. KEEP every redSea.test verdict: Suez stays ocean
+  (it is on the ocean side of the boundary), the Nile delta + African Red-Sea
+  coast stay walkable land, no land route rounds the Red Sea, mid-Red-Sea/Sinai/
+  Arabia/Gulf-of-Aden stay blocked ocean. Add a redSea.test guardrail that the
+  former gulf-head water pocket now reads land while Suez stays ocean. This is
+  much simpler than the smoothing approach and is the intended fix.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
