@@ -7785,9 +7785,32 @@ the remaining open points in their numeric order.
   (flaky, unrelated) preflight failure without proceeding to WebGPU; the
   skip-preflight WebGPU pass ran only its suites (docs, ALL GREEN, no build/lint/
   unit/preview). README backend-coverage section updated.
-  STILL OPEN: (c) resolve the two WebGPU reds (collision door-latch, polish
-  panorama-capture); (d) the 203 finder on both backends (waits on 203); the
-  CLAUDE §7.2 backend-policy line.
+  PROGRESS 22.07 (part c, investigation): ran both reds on the WebGPU lane at HEAD
+  (`VERIFY_GL=webgpu run-all <suite>`). (1) COLLISION is now GREEN on WebGPU (20
+  pass, 0 fail, assertBackend confirms it ran on WebGPU) — the old door-latch red
+  was fixed by later work; "verify against HEAD first" confirmed. (2) POLISH still
+  FAILS on WebGPU, twice (not a flake): the check "a direct enter without the
+  travel scene falls back (no capture)" reads `__placePanoramaActive === true`
+  where it wants false (polish.mjs ~357, after a direct cairo->maasai-village
+  enterPlace). ROOT CAUSE: `__placePanoramaActive = !!getPanoramaCapture(placeId,
+  seed)` (PlaceScene ~1299); `getPanoramaCapture` returns the MODULE SINGLETON
+  `current` (panoramaCapture.ts ~24) when its placeId+seed match. `current` is set
+  only by `capturePanorama` (travel-scene frame loop on a travel enter) and is
+  NEVER cleared on a DIRECT (place->place / snapshot / ferry) enter — so a direct
+  re-enter to a place that was travel-captured earlier in the run wrongly shows the
+  stale capture, violating §2.5 point 99 ("a direct place->place enter falls back
+  to the geometry backdrop"). The place scene has no "entered from travel" signal;
+  it assumes any existing capture for the placeId is fresh. FIX (backend-neutral,
+  the real point-99 fix): thread an `enteredFromTravel` flag (set true on the
+  travel->place enter that runs capturePanorama, false on a direct enterPlace /
+  snapshot / ferry) and use the capture only when it is true — OR clear `current`
+  at the start of a direct enterPlace WITHOUT racing the travel-enter's own
+  capturePanorama (ordering care: travel enter = capture THEN switch scene). Needs
+  both-backend re-verification of the whole panorama behavior (points 92/94/99/102)
+  after. (Whether it also reproduces on WebGL2 is being disambiguated by a
+  polish-webgl run; the fix is the same either way.) NOT YET FIXED.
+  STILL OPEN: (c) the polish panorama-capture point-99 fix above; (d) the 203
+  finder on both backends (waits on 203); the CLAUDE §7.2 backend-policy line.
 
 - [ ] 205. A WORLD & FUNCTIONALITY PLAUSIBILITY AUDIT — a THIRD audit kind beyond
   code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its
