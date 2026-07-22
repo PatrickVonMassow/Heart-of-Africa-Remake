@@ -2,8 +2,9 @@
 // (render-verify-guard, render-verify-recorder). One JSON state file under
 // .claude/, git-ignored:
 //
-//   render-verify-state.json — { clearedHead, clearedAt,   the verified baseline
-//                                runs: [...],              recorded verify-suite runs
+//   render-verify-state.json — { clearedHead,              legacy scalar baseline (mirror)
+//                                clearedHeads: {branch:sha}, per-BRANCH verified baselines
+//                                clearedAt, runs: [...],   recorded verify-suite runs
 //                                deferral, lastDeferral }  the loud escape valve
 //
 // A "run" record is written by the recorder from INSIDE a verify-suite process

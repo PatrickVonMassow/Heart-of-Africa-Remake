@@ -12,6 +12,7 @@ import {
   isRenderPath,
   coveringRun,
   suggestSuite,
+  baselineFor,
   evaluate,
 } from './render-verify-core.mjs'
 
@@ -164,6 +165,34 @@ describe('evaluate — the dual-backend gate', () => {
     const r = evaluate(renderChange({ changedRenderPaths: paths }))
     expect(r.decision).toBe('block')
     expect(r.reason).toContain('…')
+  })
+})
+
+describe('baselineFor — the per-branch verified baseline (feature-branch workflow)', () => {
+  const state = {
+    clearedHead: 'featTip99', // legacy scalar — last cleared anywhere (here: the branch)
+    clearedHeads: { main: 'mainBase1', 'feat/42-water': 'featTip99' },
+  }
+  it('picks each branch its OWN baseline', () => {
+    expect(baselineFor(state, 'main')).toBe('mainBase1')
+    expect(baselineFor(state, 'feat/42-water')).toBe('featTip99')
+  })
+  it('the branch-switch case: back on main, the baseline is main’s own entry, never the branch tip', () => {
+    // Before the per-branch map, switching feat/42-water -> main compared main
+    // against the branch tip and re-showed the verified branch work as pending.
+    expect(baselineFor(state, 'main')).not.toBe(state.clearedHead)
+  })
+  it('falls back to the legacy scalar for a branch without an entry (first visit)', () => {
+    expect(baselineFor({ clearedHead: 'abc1234' }, 'feat/7-new')).toBe('abc1234')
+    expect(baselineFor(state, 'feat/7-new')).toBe('featTip99')
+  })
+  it('null when no baseline exists at all (the wrapper bootstraps)', () => {
+    expect(baselineFor({}, 'main')).toBeNull()
+    expect(baselineFor(null, 'main')).toBeNull()
+  })
+  it('total on malformed input', () => {
+    expect(() => baselineFor({ clearedHeads: 'garbage', clearedHead: 42 }, 'main')).not.toThrow()
+    expect(baselineFor({ clearedHeads: null, clearedHead: '' }, '')).toBeNull()
   })
 })
 

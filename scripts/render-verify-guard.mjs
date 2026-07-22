@@ -29,30 +29,73 @@ import {
   readRenderState,
   mergeRenderState,
 } from './render-verify-state.mjs'
-import { isRenderPath, evaluate, BACKENDS, coveringRun } from './render-verify-core.mjs'
+import { isRenderPath, evaluate, BACKENDS, coveringRun, baselineFor } from './render-verify-core.mjs'
 
 function git(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 }
 
-/** Render-set paths changed between the verified baseline and HEAD. */
-function changedRenderPaths(clearedHead, head) {
-  if (!clearedHead || clearedHead === head) return []
-  const out = git(`git diff --name-only ${clearedHead} ${head}`)
-  return out.split('\n').filter(Boolean).filter(isRenderPath)
+/** Current branch name ('HEAD' when detached) — the per-branch baseline key. */
+function currentBranch() {
+  try {
+    return git('git rev-parse --abbrev-ref HEAD')
+  } catch {
+    return 'HEAD'
+  }
 }
 
-/** Latest edit time of the changed files (a covering run must postdate it).
- *  Falls back to HEAD's commit time when no file is statable (all deleted). */
-function latestChangeAt(paths, head) {
+/**
+ * Render-set paths changed between the verified baseline and HEAD, diffed from
+ * `git merge-base(baseline, HEAD)` — never the raw baseline: after a `git
+ * switch` the baseline can sit on ANOTHER branch, and a plain two-dot diff
+ * would then re-show that branch's (already verified) render work as pending
+ * and spuriously hard-block the turn (feature-branch workflow, fix B1).
+ * On linear history merge-base(baseline, HEAD) == baseline, so ordinary main
+ * work behaves exactly as before. Returns { paths, base }.
+ */
+function changedRenderPaths(clearedHead, head) {
+  if (!clearedHead || clearedHead === head) return { paths: [], base: clearedHead }
+  let base = clearedHead
+  try {
+    base = git(`git merge-base ${clearedHead} ${head}`)
+  } catch {
+    /* unrelated/gc'd baseline — the raw diff below then decides (or re-baselines) */
+  }
+  if (base === head) return { paths: [], base }
+  const out = git(`git diff --name-only ${base} ${head}`)
+  return { paths: out.split('\n').filter(Boolean).filter(isRenderPath), base }
+}
+
+/** Latest change time of the changed render paths (a covering run must
+ *  postdate it): the newest commit in base..HEAD touching them — COMMIT time,
+ *  not file mtime, because a mere `git switch` rewrites working-tree mtimes
+ *  and would demand a fresh dual-backend run after every branch hop (B1) —
+ *  plus the mtime of any changed path still DIRTY in the working tree (an
+ *  uncommitted edit is newer than any commit). Falls back to HEAD's commit
+ *  time when nothing is datable. */
+function latestChangeAt(paths, head, base) {
   let latest = 0
-  for (const p of paths) {
-    try {
-      const t = statSync(resolve(REPO_ROOT, p)).mtimeMs
-      if (t > latest) latest = t
-    } catch {
-      /* deleted/renamed file — covered by the commit-time fallback */
+  const quoted = paths.map((p) => `"${p}"`).join(' ')
+  try {
+    const range = base && base !== head ? `${base}..${head}` : head
+    const out = git(`git log -1 --format=%ct ${range} -- ${quoted}`)
+    if (out) latest = Number(out) * 1000
+  } catch {
+    /* unlogable range — the HEAD fallback below covers it */
+  }
+  try {
+    const dirty = git(`git status --porcelain -- ${quoted}`)
+    for (const line of dirty.split('\n').filter(Boolean)) {
+      const p = line.slice(3).trim().replace(/^"|"$/g, '')
+      try {
+        const t = statSync(resolve(REPO_ROOT, p)).mtimeMs
+        if (t > latest) latest = t
+      } catch {
+        /* deleted while dirty — the commit/HEAD time stands */
+      }
     }
+  } catch {
+    /* status unavailable — the commit time stands */
   }
   if (latest === 0) {
     try {
@@ -62,6 +105,16 @@ function latestChangeAt(paths, head) {
     }
   }
   return latest
+}
+
+/** Advance the verified baseline for `branch`: the per-branch map entry plus
+ *  the legacy scalar mirror (status display, pre-branch-workflow readers). */
+function advanceBaseline(state, branch, head, extra = {}) {
+  mergeRenderState({
+    clearedHead: head,
+    clearedHeads: { ...(state.clearedHeads ?? {}), [branch]: head },
+    ...extra,
+  })
 }
 
 const arg = process.argv[2]
@@ -100,13 +153,15 @@ if (arg === '--clear') {
   }
   try {
     const head = git('git rev-parse HEAD')
-    mergeRenderState({
-      clearedHead: head,
+    const branch = currentBranch()
+    advanceBaseline(readRenderState() ?? {}, branch, head, {
       clearedAt: Date.now(),
       clearedBy: `manual: ${reason}`,
       deferral: undefined,
     })
-    console.log(`render-verify baseline advanced to ${head.slice(0, 7)} (manual: "${reason}")`)
+    console.log(
+      `render-verify baseline advanced to ${head.slice(0, 7)} on ${branch} (manual: "${reason}")`,
+    )
     process.exit(0)
   } catch (e) {
     console.error(`render-verify-guard --clear failed: ${e && e.message}`)
@@ -119,12 +174,14 @@ if (arg === 'status') {
   try {
     const state = readRenderState() ?? {}
     const head = git('git rev-parse HEAD')
+    const branch = currentBranch()
+    const cleared = baselineFor(state, branch)
     console.log(`state file:    ${RENDER_STATE_PATH}`)
-    console.log(`HEAD:          ${head.slice(0, 7)}`)
-    console.log(`clearedHead:   ${String(state.clearedHead ?? '<none — bootstraps on first Stop>').slice(0, 7)}`)
-    const paths = state.clearedHead ? changedRenderPaths(state.clearedHead, head) : []
+    console.log(`HEAD:          ${head.slice(0, 7)} (branch ${branch})`)
+    console.log(`baseline:      ${String(cleared ?? '<none — bootstraps on first Stop>').slice(0, 7)}`)
+    const { paths, base } = cleared ? changedRenderPaths(cleared, head) : { paths: [], base: cleared }
     console.log(`pending render paths: ${paths.length ? paths.join(', ') : '(none)'}`)
-    const since = paths.length ? latestChangeAt(paths, head) : 0
+    const since = paths.length ? latestChangeAt(paths, head, base) : 0
     for (const b of BACKENDS) {
       const run = coveringRun(state.runs, b, since)
       console.log(
@@ -161,31 +218,34 @@ try {
   }
 
   const head = git('git rev-parse HEAD')
+  const branch = currentBranch()
   const state = readRenderState() ?? {}
+  const cleared = baselineFor(state, branch)
 
   // Bootstrap: first ever evaluation baselines at the current HEAD (the gate
   // audits work from now on, not history).
-  if (!state.clearedHead) {
-    mergeRenderState({ clearedHead: head, clearedAt: Date.now(), clearedBy: sessionId || 'bootstrap' })
+  if (!cleared) {
+    advanceBaseline(state, branch, head, { clearedAt: Date.now(), clearedBy: sessionId || 'bootstrap' })
     process.exit(0)
   }
 
   let changed
+  let base
   try {
-    changed = changedRenderPaths(state.clearedHead, head)
+    ;({ paths: changed, base } = changedRenderPaths(cleared, head))
   } catch (e) {
     // The baseline commit no longer resolves (rebase/gc): re-baseline rather
     // than block forever on an undiffable window — fail-open, logged.
-    console.error(`render-verify-guard: diff vs ${String(state.clearedHead).slice(0, 7)} failed (${e && e.message}) — re-baselining`)
-    mergeRenderState({ clearedHead: head, clearedAt: Date.now(), clearedBy: 'rebaseline' })
+    console.error(`render-verify-guard: diff vs ${String(cleared).slice(0, 7)} failed (${e && e.message}) — re-baselining`)
+    advanceBaseline(state, branch, head, { clearedAt: Date.now(), clearedBy: 'rebaseline' })
     process.exit(0)
   }
 
   const result = evaluate({
     head,
-    clearedHead: state.clearedHead,
+    clearedHead: cleared,
     changedRenderPaths: changed,
-    latestChangeAt: changed.length ? latestChangeAt(changed, head) : 0,
+    latestChangeAt: changed.length ? latestChangeAt(changed, head, base) : 0,
     runs: state.runs,
     deferral: state.deferral,
   })
@@ -194,14 +254,14 @@ try {
     process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
     process.exit(0)
   }
-  if (result.clear && head !== state.clearedHead) {
-    const patch = { clearedHead: head, clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
+  if (result.clear && head !== cleared) {
+    const extra = { clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
     if (result.deferred) {
       // Consume the deferral but keep it visible (status shows lastDeferral).
-      patch.lastDeferral = state.deferral
-      patch.deferral = undefined
+      extra.lastDeferral = state.deferral
+      extra.deferral = undefined
     }
-    mergeRenderState(patch)
+    advanceBaseline(state, branch, head, extra)
   }
   process.exit(0)
 } catch (e) {

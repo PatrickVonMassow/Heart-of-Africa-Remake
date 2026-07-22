@@ -57,6 +57,28 @@ export function coveringRun(runs, backend, since) {
   return best
 }
 
+/**
+ * The verified baseline sha for `branch` (feature-branch workflow): the
+ * per-branch `clearedHeads[branch]` entry when one exists, else the legacy
+ * scalar `clearedHead` — which may sit on ANOTHER branch after a `git switch`;
+ * the wrapper diffs from `git merge-base(baseline, HEAD)` so a cross-branch
+ * scalar can never produce a reversed diff that re-arms the gate on a mere
+ * branch switch. Null when the state holds no baseline at all (the wrapper
+ * then bootstraps at the current HEAD). Total: never throws.
+ */
+export function baselineFor(state, branch) {
+  try {
+    const map = state && state.clearedHeads
+    if (map && typeof map === 'object' && branch && typeof map[branch] === 'string' && map[branch]) {
+      return map[branch]
+    }
+    const legacy = state && state.clearedHead
+    return typeof legacy === 'string' && legacy ? legacy : null
+  } catch {
+    return null
+  }
+}
+
 /** A concrete suite name for the block message: the most recently run one. */
 export function suggestSuite(runs) {
   if (Array.isArray(runs)) {
