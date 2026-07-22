@@ -9281,6 +9281,38 @@ the remaining open points in their numeric order.
   `TravelScene.tsx`/`Climate.tsx`) — non-overlapping with the running river/wildlife/
   fauna branches; this is the 229 follow-up.
 
+- [ ] 242. CROCODILES LIE EXPOSED AND INERT ON THE BANK — the user reports
+  (22.07.2026, screenshot near the Cairo/Giza Nile) two crocodiles lying flat, fully
+  visible and motionless on the river BANK/sand beside the player, reading as
+  lifeless props. Per §19.16 / point 130 a crocodile is a WATER-ONLY ambush
+  predator: hidden it sinks to the eye knobs on the water surface and lunges at
+  prey/player only within the strike radius. WHAT IS NOT INTENDED here: (1) the
+  crocs are BEACHED/visible on the sand bank rather than sitting ON the water — the
+  §19.16 water-only placement is not holding (likely a side effect of the widened
+  river / water mask leaving them on the bank, cf. point 218 floating objects), and
+  (2) the hidden pose is not applied — an idle croc should be SUNK to the eye knobs
+  (body below the water sheet), lurking, not lying exposed and flat. WHAT IS BY
+  DESIGN (leave it): no lunge at the PLAYER here — the §14.2 walk-into attack is a
+  random event that defaults OFF in the relaxed preset; and with no prey in the
+  strike radius, no prey-lunge fires. FIX: (a) keep crocodiles ON water only —
+  re-anchor any croc that ended up on the bank/sand back onto a river/lake water
+  cell (reuse the §19.5 water/land backstop + the point-192 water rules); (b) render
+  an idle/hidden crocodile properly sunk to the eye knobs on the water surface (not
+  flat on land), so a resting croc reads as a lurking ambush; (c) optionally a
+  subtle idle motion (slow drift / tail sway) so it is not frozen. Keep the
+  lunge-at-prey and the §14.2 walk-into event unchanged. Anchors:
+  `src/scenes/travel/wildlifeBehavior.ts` (crocodile placement + hidden/idle state),
+  `src/scenes/travel/Wildlife.tsx` (croc pose/render), `src/render/fauna.ts`
+  (`buildCrocodile` — the hidden eye-knob pose), `src/scenes/travel/
+  waterEdgeRules.ts` (the water-only rule). VERIFIABLE: pure test that a crocodile's
+  resting anchor is a water cell (never bank/sand) and its hidden pose sits at
+  ~eye-knob height (body below the water sheet); a live check in
+  `scripts/verify/enrichments.mjs` that an idle croc sits on water sunk, not beached.
+  DOCS: design.md §19.16 if wording changes. No player-visible text. NOTE:
+  `wildlifeBehavior.ts`/`Wildlife.tsx`/`fauna.ts` — overlaps the wildlife points
+  (237/238/239) and the fauna points; do NOT delegate concurrently with those —
+  queue after the wildlife branch merges.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
