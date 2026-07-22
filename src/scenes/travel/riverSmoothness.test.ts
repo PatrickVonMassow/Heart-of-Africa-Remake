@@ -8,9 +8,12 @@ import {
   densifyRiver,
   extendSourceIntoLake,
   lakeSurfaceY,
+  MOUTH_FADE_ROWS,
+  mouthSeaness,
   planRibbonStrips,
   ribbonRowSurfaceAt,
   riverAxisRows,
+  riverIsSeaBound,
   SEA_MERGE_Y,
   smoothRowsDownstream,
   springForRiver,
@@ -400,5 +403,77 @@ describe('river↔water-body transitions (point 234)', () => {
     // The flood rise never applies to sea rows (floodK and the float index
     // zero it there), and the merge height itself sits below the plane.
     expect(SEA_MERGE_Y).toBeLessThan(-0.05)
+  })
+
+  // The mouth crossfade: the height-merge alone still ended the ribbon as a
+  // distinct bright strip on a visible colour boundary — the ribbon now
+  // dissolves into the sea (opacity to zero, colour to the sea tone) over its
+  // final approach, so nothing marks where river ends and sea begins.
+  describe('mouthSeaness (the ribbon dissolves into the sea)', () => {
+    it('pure: rises over the last land rows, 1 in the sea, none for inland enders or stray points', () => {
+      // A mouth with a 3-row fade: 0 far upstream, rising, 1 from the coast on.
+      const fade = mouthSeaness([false, false, false, false, true, true], true, 3)
+      expect(fade[0]).toBe(0)
+      expect(fade[1]).toBeGreaterThan(0)
+      expect(fade[1]).toBeLessThan(fade[2])
+      expect(fade[2]).toBeLessThan(fade[3])
+      expect(fade[3]).toBe(1) // the coast-crossing row is fully the sea
+      expect(fade[4]).toBe(1)
+      expect(fade[5]).toBe(1)
+      // A mouth whose final texels are land-typed shore fades toward the
+      // course END instead of an ocean run (most mouths on the DEM).
+      const shore = mouthSeaness([false, false, false, false, false], true, 3)
+      expect(shore[4]).toBe(1)
+      expect(shore[3]).toBeGreaterThan(0)
+      expect(shore[3]).toBeLessThan(1)
+      expect(shore[0]).toBe(0)
+      // A river ending inland (confluence/lake) never fades.
+      expect(mouthSeaness([false, true, false, false], false, 3)).toEqual([0, 0, 0, 0])
+      // An interior misclassified sea point does not start a fade mid-river —
+      // only the TRAILING ocean run is the mouth (upstream of it, the fade is
+      // exactly the distance-to-mouth curve, unmoved by the stray point).
+      const stray = mouthSeaness([false, true, false, false, false, false, false, false, true], true, 3)
+      expect(stray[1]).toBe(0)
+      expect(stray[2]).toBe(0)
+      expect(stray[8]).toBe(1)
+    })
+
+    it('the Rosetta mouth dissolves: ~0 well upstream, near-1 at the sea-most drawn row', () => {
+      // The Nile (a real trailing-ocean mouth) and the Congo (a shore-typed
+      // mouth at Banana): both sea-bound, both dissolving at the sea.
+      for (const id of ['nile', 'congo']) {
+        const rows = riverAxisRows(riverById(id), SEED)
+        expect(riverIsSeaBound(rows), id).toBe(true)
+        const ocean = rows.map((r) => r.ocean)
+        const fade = mouthSeaness(ocean, true)
+        const plan = planRibbonStrips(ocean)
+        const lastDrawn = plan.drawn.lastIndexOf(true)
+        const mouth = ocean[ocean.length - 1] ? ocean.lastIndexOf(false) : ocean.length - 1
+        // Fully the sea at the tail — the ribbon is effectively invisible
+        // where it meets the sea sheet.
+        expect(fade[lastDrawn], id).toBeGreaterThan(0.99)
+        // Fully the ribbon well upstream of the fade window.
+        for (let i = 0; i < mouth - MOUTH_FADE_ROWS; i++) {
+          expect(fade[i], `${id} row ${i}`).toBe(0)
+        }
+        // And monotone non-decreasing down the final approach: a smooth
+        // dissolve, never a re-brightening band.
+        for (let i = Math.max(1, mouth - MOUTH_FADE_ROWS); i <= lastDrawn; i++) {
+          expect(fade[i] - fade[i - 1], `${id} row ${i}`).toBeGreaterThanOrEqual(0)
+        }
+      }
+    })
+
+    it('rivers ending inland are not sea-bound and carry no sea fade anywhere', () => {
+      for (const id of ['white-nile', 'blue-nile', 'vaal', 'benue']) {
+        const rows = riverAxisRows(riverById(id), SEED)
+        expect(riverIsSeaBound(rows), id).toBe(false)
+        const fade = mouthSeaness(
+          rows.map((r) => r.ocean),
+          riverIsSeaBound(rows),
+        )
+        expect(Math.max(...fade), id).toBe(0)
+      }
+    })
   })
 })

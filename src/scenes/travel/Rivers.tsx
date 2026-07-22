@@ -40,9 +40,11 @@ import {
   NILE_FLOOD,
   LAKE_LIFT,
   lakeBedMax,
+  mouthSeaness,
   planRibbonStrips,
   registerRiverSurfaces,
   riverAxisRows,
+  riverIsSeaBound,
   springForRiver,
   waterSurfaceY,
 } from './waterSurface'
@@ -85,6 +87,7 @@ function buildRivers(seed: number): {
   const flows: number[] = []
   const banks: number[] = []
   const merges: number[] = [] // point 233: 0 where a junior arm hands the junction water to its senior
+  const seaFades: number[] = [] // point 234: 0 upstream → 1 at the mouth, the ribbon dissolving into the sea
   const floodK: number[] = [] // 1 on the Nile: its vertices ride the flood uniform
   const indices: number[] = []
   const falls: FallDef[] = []
@@ -175,6 +178,12 @@ function buildRivers(seed: number): {
     // ocean run (the open sea beyond the mouth) ends the ribbon. The drawn/
     // connected decisions live in the pure planRibbonStrips.
     const plan = planRibbonStrips(rows.map((r) => r.ocean))
+    // Point 234: the ribbon crossfades into the sea over its final approach —
+    // no visible boundary where river ends and sea begins.
+    const seaness = mouthSeaness(
+      rows.map((r) => r.ocean),
+      riverIsSeaBound(rows),
+    )
     let arc = 0
     let buried = 0
     let interiorEdges = 0
@@ -227,6 +236,7 @@ function buildRivers(seed: number): {
         mergeFactorAt(qL.lat, qL.lon, river.id, bankIndex, RIVER_WIDTH_DEG, juniorPairs),
         mergeFactorAt(qR.lat, qR.lon, river.id, bankIndex, RIVER_WIDTH_DEG, juniorPairs),
       )
+      seaFades.push(seaness[i], seaness[i])
       if (plan.connected[i]) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
     }
     report[river.id] = { strips: plan.strips, buried, interiorEdges }
@@ -238,6 +248,7 @@ function buildRivers(seed: number): {
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
   geometry.setAttribute('bank', new THREE.BufferAttribute(new Float32Array(banks), 1))
   geometry.setAttribute('merge', new THREE.BufferAttribute(new Float32Array(merges), 1))
+  geometry.setAttribute('seaFade', new THREE.BufferAttribute(new Float32Array(seaFades), 1))
   geometry.setAttribute('floodK', new THREE.BufferAttribute(new Float32Array(floodK), 1))
   geometry.setIndex(indices)
   // Hand the axis samples to the float-height module: the canoe then floats
@@ -286,6 +297,10 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   // 0 where a junior junction arm hands the shared water to its senior
   // (point 233) — the overlap is drawn once, never alpha-doubled.
   const merge = attribute('merge', 'float') as unknown as ReturnType<typeof float>
+  // 0 upstream → 1 at a sea mouth (point 234): the ribbon's colour slides to
+  // the sea sheet's nearshore tone and its opacity dissolves, so the river
+  // fades into the sea with no recognizable boundary.
+  const seaFade = attribute('seaFade', 'float') as unknown as ReturnType<typeof float>
 
 
   // Streaks elongated along the flow, scrolling downstream with the current.
@@ -303,7 +318,10 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
     .mul(bank)
   const rapidFoam = smoothstep(float(1.7), float(3.0), flow).mul(smoothstep(float(0.3), float(0.62), streak))
   const foam = max(bankFoam, rapidFoam)
-  m.colorNode = mix(base, color('#eef6f7'), foam.mul(0.9))
+  // The sea-mouth crossfade is applied LAST, over base and foam alike, so
+  // streaks and whitewater dissolve along with the ribbon ('#1c5c86' is the
+  // sea sheet's nearshore mid tone, render/water.ts).
+  m.colorNode = mix(mix(base, color('#eef6f7'), foam.mul(0.9)), color('#1c5c86'), seaFade)
 
   // Only slight movement on the surface (design.md §11): a tiny ripple, no
   // wave field.
@@ -314,7 +332,7 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   const floodRise = (attribute('floodK', 'float') as unknown as ReturnType<typeof float>).mul(NILE_FLOOD_U)
   m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.035).add(floodRise), 0))
 
-  m.opacityNode = merge.mul(0.9)
+  m.opacityNode = merge.mul(seaFade.oneMinus()).mul(0.9)
   m.roughnessNode = foam.mul(0.6).add(0.12)
   return m
 }

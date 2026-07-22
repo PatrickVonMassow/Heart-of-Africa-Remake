@@ -12,6 +12,7 @@ import { LAKES } from '../../world/data/lakes'
 import { RIVERS_DATA, type RiverDef } from '../../world/data/rivers'
 import { lakeIndexAt } from '../../world/hydro'
 import { AXIS_STEP_DEG, densifyRiverAxis } from '../../world/riverProfile'
+import { coastDistance } from '../../world/geoIndex'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 
 /** River/lake surfaces sit this far above their carved bed (ribbon lift). */
@@ -253,6 +254,57 @@ export function riverAxisRows(river: RiverDef, seed: number): AxisRow[] {
   )
   for (let i = 0; i < rows.length; i++) rows[i].surf = smoothed[i]
   return rows
+}
+
+/**
+ * Rows over which a sea-bound river dissolves into the sea (point 234): the
+ * height-merge alone still ended the ribbon as a distinct bright strip on a
+ * visible colour/material boundary — the ribbon now CROSSFADES into the sea
+ * over its final approach, so nothing marks where river ends and sea begins.
+ */
+export const MOUTH_FADE_ROWS = 10
+/** A river whose course ends this close to the sea coast is sea-bound even
+ *  when its final DEM texels still classify as land (most mouths do: only
+ *  the Nile's course carries on into ocean-typed water). */
+export const MOUTH_COAST_DEG = 0.25
+
+/**
+ * Whether a river's course ends at the sea — the trailing row lies in the
+ * ocean (the Nile past Rosetta) or right at the coast (every other mouth,
+ * whose last DEM texels are still land-typed shore).
+ */
+export function riverIsSeaBound(rows: AxisRow[]): boolean {
+  if (rows.length === 0) return false
+  const tail = rows[rows.length - 1]
+  return tail.ocean || coastDistance(tail.lat, tail.lon) < MOUTH_COAST_DEG
+}
+
+/**
+ * Per-row "sea-ness" of a river's axis (pure): 0 well upstream — the ribbon
+ * fully itself — rising smoothly over the last MOUTH_FADE_ROWS rows toward
+ * the mouth, 1 at the coast crossing and on every trailing sea row, where
+ * the ribbon is fully the sea (colour matched, opacity gone; only the sea
+ * sheet remains). Non-sea-bound rivers (a confluence or lake mouth) are 0
+ * throughout, and interior misclassified ocean rows (the bridged stray
+ * points) never start a fade — only the TRAILING ocean run counts as sea.
+ */
+export function mouthSeaness(
+  ocean: boolean[],
+  seaBound: boolean,
+  fadeRows = MOUTH_FADE_ROWS,
+): number[] {
+  const n = ocean.length
+  const out = new Array<number>(n).fill(0)
+  if (n === 0 || !seaBound) return out
+  // The coast crossing: the last land row before the trailing ocean run — or
+  // the course's final row when the mouth's texels are all land-typed shore.
+  const mouth = ocean[n - 1] ? ocean.lastIndexOf(false) : n - 1
+  for (let i = 0; i < n; i++) {
+    const d = mouth - i // rows upstream of the mouth (≤ 0 in the sea)
+    const t = Math.max(0, Math.min(1, 1 - d / fadeRows))
+    out[i] = t * t * (3 - 2 * t)
+  }
+  return out
 }
 
 /**
