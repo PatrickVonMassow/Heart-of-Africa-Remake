@@ -8701,7 +8701,7 @@ the remaining open points in their numeric order.
   not floating; re-assert the point-156 village clearances stay green. DOCS:
   design.md §4.2/§11.3; CLAUDE §7.1 pt.3/4 if clearance wording changes.
 
-- [ ] 219. SPRINGS render as an ugly symbolic RING — replace with something nicer,
+- [x] 219. SPRINGS render as an ugly symbolic RING — replace with something nicer,
   ANIMATED, that reads as a real spring (user 22.07.2026). A river that rises in
   open land gets a spring marker (`Rivers.tsx`, the `springs` build + its mesh).
   Redesign: a small animated water source — e.g. a little pool with rising
