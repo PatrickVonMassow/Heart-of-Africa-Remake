@@ -8815,8 +8815,14 @@ the remaining open points in their numeric order.
   report 22.07.2026, real-WebGPU screenshot inside Cairo looking at the desert
   skyline: between the near dune and the Giza pyramid a horizontal grey line runs
   across the horizon with a thin blue/grey band below it — reads as a graphics
-  error, not real landscape). Likely causes to diagnose (picture-first, BOTH
-  backends): (a) the §2.5 settlement PANORAMA backdrop cylinder/band — a horizon
+  error, not real landscape). KEY CLUE (user 22.07.2026): an ANIMAL GLIDES
+  BACKWARD ALONG the line — so the line is a SURFACE an animal stands/moves on
+  (foot-sliding), which points hard at either the §2.5 panorama-WILDLIFE horizon
+  band (silhouettes are meant to drift far/small/hazed on the visible horizon, but
+  here the band reads as a hard line and the silhouette as a gliding animal) OR a
+  distant flat WATER/terrain sheet the animal is walking on at the wrong height.
+  Weight (a)/(b) below accordingly and check the panorama-wildlife band first.
+  Likely causes to diagnose (picture-first, BOTH backends): (a) the §2.5 settlement PANORAMA backdrop cylinder/band — a horizon
   SEAM where the captured band meets the sky, or a top/bottom edge of the panorama
   texture showing as a hard line (anchors: `src/scenes/place` backdrop/panorama,
   `src/scenes/place/backdrop.ts`, the panorama-band build); (b) a distant WATER
@@ -8833,6 +8839,30 @@ the remaining open points in their numeric order.
   in `src/scenes/place/backdrop.test.ts` on the band's vertical bounds/seam; if a
   water strip, tie it into the 210/211 water-edge checks. DOCS: design.md §2.5 if
   the panorama band wording changes.
+
+- [ ] 228. ANIMALS FOOT-SLIDE (glide without moving their legs), and can even
+  glide BACKWARD (user report 22.07.2026, likely SETTLEMENT/first-person only —
+  the user saw it in-town; confirm whether the bird's-eye travel fauna already
+  animate). A walking animal must play a LEG/WALK CYCLE synced to its movement so
+  it does not slide, and must never translate backward while facing forward. The
+  bird's-eye wildlife (`src/scenes/travel/Wildlife.tsx` + the `src/render/fauna.ts`
+  leg meshes) may already gait — DIAGNOSE FIRST which scene slides: the settlement
+  animals (`src/scenes/place/PlaceLife.tsx` goats/livestock and any village fauna)
+  are the prime suspect (a simpler mover that translates the body without a leg
+  animation). FIX: give the sliding animals a gait — swing the leg meshes in a
+  walk cycle whose phase advances with distance travelled (so speed and stride
+  match, no slide), and ensure the body faces its velocity direction (no
+  backward-gliding: if the mover can go backward, either turn the body to face
+  travel or play a reverse gait — turning to face is the natural fix). Reuse the
+  bird's-eye gait approach if one exists. Keep it cheap (skeletal-free leg-mesh
+  rotation, gated by the mobile/quality preset if needed). VERIFIABLE: a pure test
+  that the leg-swing phase is a function of distance travelled (stride matches
+  speed, zero at rest) and that a walker's facing tracks its velocity (never
+  backward); a live check in the settlement verify suite that an in-town animal's
+  legs move while it walks and its facing matches its motion (no foot-slide /
+  no backward glide). DOCS: design.md §19 (animal locomotion) / §2.6 if wording
+  changes. Related to 227 (the skyline "gliding animal" is the same foot-slide on
+  the panorama band).
 
 ## Closing (only after all points)
 
