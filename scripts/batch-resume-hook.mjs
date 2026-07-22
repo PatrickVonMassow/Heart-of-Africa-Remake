@@ -7,7 +7,7 @@
 //   - a batch LOCK held by another still-fresh session suppresses it too, so two
 //     Claude instances never work the same repo in parallel.
 // Otherwise the hook claims the lock for this session and emits the instruction.
-import { readFileSync, existsSync, rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { lockStatus, claimLock, readLock, isPaused, pauseReason } from './batch-lock.mjs'

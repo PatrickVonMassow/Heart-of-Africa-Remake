@@ -14,7 +14,9 @@ export default defineConfig({
   esbuild: { jsx: 'automatic', jsxImportSource: 'react' },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.test.{ts,tsx}'],
+    // scripts/*.test.mjs covers the plain-JS tooling layer (e.g. the dashboard
+    // Stop-hook guard's decision logic) — pure modules, no game imports.
+    include: ['src/**/*.test.{ts,tsx}', 'scripts/*.test.mjs'],
     setupFiles: ['./src/test/setup.ts'],
     // The R3F/three scenes never render here; only pure modules and HUD
     // components are imported, so no canvas/WebGL is needed.

@@ -97,6 +97,33 @@ $existing = (Get-ScheduledTask -TaskName "HoA-Batch-Autostart").Triggers
 Set-ScheduledTask -TaskName "HoA-Batch-Autostart" -Trigger (@($existing) + $t)
 ```
 
+## Dashboard currency (enforced, not reminded)
+
+The living progress dashboard must ALWAYS reflect the real batch state — above
+all the now-card ("Woran ich gerade arbeite"). Reminders repeatedly failed
+(latest: the card still said point 200 while the work had pivoted to 210 after a
+user question), so currency is machine-enforced by `scripts/dashboard-guard.mjs`
+(Stop hook; decision logic in `dashboard-guard-core.mjs`, Vitest-covered). It
+blocks turn-end on nine invariants: registered board, fresh vs HEAD, no ticked
+point in the queue, every open point visible, a DECLARED focus
+(`scripts/focus.mjs set <N> "<what>"`), now-card title == declared focus, an
+acknowledged pivot check after every user prompt (`focus.mjs confirm` — armed
+automatically by the UserPromptSubmit hook), a re-affirmation after ~30 min of
+tool work, and publish parity (repo file bytes == the content last handed to the
+Artifact tool, recorded automatically by the PostToolUse heartbeat — so
+"edited" can never masquerade as "live"; the two-file repo/scratchpad split is
+bridged by `scripts/dashboard-publish.mjs`).
+
+The standard cycle after any dashboard edit:
+`node scripts/dashboard-publish.mjs` → Artifact publish of the synced scratchpad
+file (same artifact url) → `node scripts/dashboard-guard.mjs --synced
+.batch-dashboard.html` (which doubles as the focus confirmation when card and
+focus agree). On every work switch: `node scripts/focus.mjs set <N> "<what>"`.
+Headless sessions without the Artifact tool record
+`dashboard-publish.mjs --defer "<reason>"` — a logged escape valve covering the
+current content only. What stays judgment: the machine verifies the card's
+POINT NUMBER, publish state and freshness, never the truth of the prose.
+
 ## Signal channel + never blocking on the user
 
 - **Out-of-band notification (ntfy):** `scripts/notify.mjs` POSTs to `ntfy.sh/<topic>`

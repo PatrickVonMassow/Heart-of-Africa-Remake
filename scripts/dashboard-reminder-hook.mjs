@@ -2,7 +2,36 @@
 // staleness): inject the standing dashboard obligation into the context on
 // EVERY user prompt, so no turn can end with a stale board. Stdout becomes
 // context for the assistant.
+//
+// Since 22.07.2026 (the now-card still said point 200 while the work had
+// pivoted to point 210 after a user question) this hook also ARMS the pivot
+// check: it writes .claude/focus-check-pending.json, and the dashboard Stop
+// guard BLOCKS the turn from ending until the assistant explicitly confirms or
+// re-declares its focus (scripts/focus.mjs) — enforcement, not a reminder.
 import fs from 'node:fs'
+import path from 'node:path'
+import { PENDING_PATH, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
+
+// Arm the pivot check for THIS session (fail-soft: the reminder text below is
+// still the payload if any of this goes wrong).
+try {
+  let sid = ''
+  try {
+    sid = JSON.parse(fs.readFileSync(0, 'utf8')).session_id || ''
+  } catch {
+    /* no/!JSON stdin */
+  }
+  writeJsonAtomic(PENDING_PATH, { sessionId: sid, at: Date.now() })
+  // Keep the current session's scratchpad target on record so a plain
+  // `node scripts/dashboard-publish.mjs` works even without the env variable.
+  if (process.env.CLAUDE_SCRATCHPAD_DIR) {
+    mergeState({
+      scratchpadPath: path.resolve(process.env.CLAUDE_SCRATCHPAD_DIR, 'hoa-batch-dashboard.html'),
+    })
+  }
+} catch {
+  // best effort
+}
 
 // Surface the current Europe/Berlin time on EVERY user prompt so the reply can
 // lead with an accurate timestamp (the chat-timestamp rule) without a separate
@@ -57,6 +86,14 @@ console.log(
   'Bei JEDER Änderung: die GANZE Datei lesen, jede Sektion gegen den Ist-Zustand ' +
   'prüfen (topaktuell, konsistent, redundanzfrei), dann per Artifact republishen.' +
   mtimeNote,
+)
+
+console.log(
+  '[focus-guard] Diese Nutzer-Nachricht hat den Fokus-Abgleich SCHARFGESCHALTET: bevor dieser ' +
+  'Zug enden kann, musst du prüfen, ob die »Woran ich gerade arbeite«-Karte noch das nennt, was ' +
+  'du WIRKLICH tust — dann `node scripts/focus.mjs confirm` (unverändert) oder `node scripts/' +
+  'focus.mjs set <N> "<was>"` + Karte aktualisieren + `node scripts/dashboard-publish.mjs` + ' +
+  'Artifact-Republish + `--synced` (geändert). Der Stop-Guard blockiert sonst das Zug-Ende.',
 )
 
 // Repeat the timestamp obligation LAST — the final line of hook output sits closest

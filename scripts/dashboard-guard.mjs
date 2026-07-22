@@ -1,54 +1,48 @@
-// Stop hook (user mandate 21.07.2026): GUARANTEE the batch dashboard stays
-// current. Reminders alone failed — a queue update was missed while the now-card
-// was changed — so this BLOCKS a turn from ending while the dashboard is out of
-// sync with the real batch state. Two enforced invariants:
+// Stop hook (user mandate 21.07.2026, hardened 22.07.2026): GUARANTEE the batch
+// dashboard stays current — reminders alone repeatedly failed, so this BLOCKS a
+// turn from ending while the dashboard is out of sync with the real batch state.
+// The decision logic lives in dashboard-guard-core.mjs (pure, Vitest-covered);
+// this wrapper only gathers the inputs and is fail-OPEN: any internal error →
+// allow, so a guard bug never traps the session.
 //
-//   (1) FRESHNESS — after every commit (HEAD moves) the dashboard must be
-//       re-synced. `--synced` records the HEAD it was reviewed against; a later
-//       HEAD means work happened without a dashboard review, so the stop is
-//       blocked. The re-sync IS the forced review of all four sections.
-//   (2) NO STALE QUEUE ITEM — a TASKS point ticked done ([x]) must not still sit
-//       in the dashboard Warteschlange (the exact 182-left-in-queue slip).
+// Enforced invariants (see the core for the full comments):
+//   (1) registered   (2) fresh vs HEAD          (3) no ticked point in the queue
+//   (4) every open point visible                (5) focus declared (focus.mjs)
+//   (6) now-card title point == declared focus  (7) reconcile after a user prompt
+//   (8) re-affirm after ~30 min of work         (9) repo file == published content
 //
-// Silent (allows the stop) when the batch is paused or complete, and fail-OPEN
-// on any internal error so a guard bug never traps the session.
-//
-// Register the live dashboard after publishing it:
+// The companion flow after every dashboard edit:
+//   node scripts/dashboard-publish.mjs          # sync repo copy → scratchpad copy
+//   <publish the scratchpad file via the Artifact tool (same artifact url)>
 //   node scripts/dashboard-guard.mjs --synced <dashboard.html path>
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+// --synced records the reviewed HEAD and, when the now-card matches the declared
+// focus, also counts as the focus confirmation (clears a pending pivot check).
+import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
+import {
+  REPO_ROOT,
+  STATE_PATH,
+  FOCUS_PATH,
+  PENDING_PATH,
+  ACTIVITY_PATH,
+  readJson,
+  writeJsonAtomic,
+  mergeState,
+  removeFile,
+  sha256File,
+} from './dashboard-state.mjs'
+import { parseTasks, parseNowCardPoint, evaluate } from './dashboard-guard-core.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const MARKER = R('../.claude/dashboard-state.json')
-const TASKS = R('../TASKS.md')
-const PAUSE = R('../.claude/batch-paused')
+const TASKS = resolve(REPO_ROOT, 'TASKS.md')
+const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
 function head() {
   try {
-    return execSync('git rev-parse HEAD', { cwd: R('..'), encoding: 'utf8' }).trim()
+    return execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
   } catch {
     return ''
   }
-}
-
-function tasks() {
-  const lines = readFileSync(TASKS, 'utf8').split('\n')
-  const open = []
-  const done = []
-  for (const l of lines) {
-    let m = l.match(/^- \[ \] (\d+)\./)
-    if (m && !/\bDEFERRED\b/.test(l)) open.push(Number(m[1]))
-    m = l.match(/^- \[x\] (\d+)\./)
-    if (m) done.push(Number(m[1]))
-  }
-  return { open, done }
-}
-
-const allow = () => process.exit(0)
-const block = (reason) => {
-  process.stdout.write(JSON.stringify({ decision: 'block', reason }))
-  process.exit(0)
 }
 
 // --synced <path>: record that the dashboard at <path> was reviewed at this HEAD.
@@ -58,76 +52,72 @@ if (process.argv[2] === '--synced') {
     console.error(`dashboard-guard --synced: file not found: ${p}`)
     process.exit(1)
   }
-  writeFileSync(MARKER, JSON.stringify({ dashboardPath: p, head: head(), syncedAt: Date.now() }, null, 2))
+  mergeState({ dashboardPath: p, head: head(), syncedAt: Date.now() })
   console.log(`dashboard registered at HEAD ${head().slice(0, 7)}: ${p}`)
+
+  // The re-sync IS the forced review of all four sections — when the reviewed
+  // now-card matches the declared focus it doubles as the focus confirmation.
+  try {
+    const focus = readJson(FOCUS_PATH)
+    const nowPoint = parseNowCardPoint(readFileSync(p, 'utf8'))
+    if (focus && (focus.point == null || focus.point === nowPoint)) {
+      writeJsonAtomic(FOCUS_PATH, { ...focus, confirmedAt: Date.now() })
+      removeFile(PENDING_PATH)
+      console.log(`focus confirmed by the review (point ${focus.point ?? '-'}: ${focus.note ?? ''})`)
+    } else if (focus) {
+      console.log(
+        `WARNING: now-card point ${nowPoint ?? '<none>'} != declared focus ${focus.point} — ` +
+          'fix the stale side (card edit + republish, or node scripts/focus.mjs set).',
+      )
+    } else {
+      console.log('note: no focus declared yet — run node scripts/focus.mjs set <N> "<what>"')
+    }
+  } catch (e) {
+    console.log(`note: focus cross-check skipped (${e && e.message})`)
+  }
   process.exit(0)
 }
 
 // Stop-hook mode.
 try {
-  if (existsSync(PAUSE)) allow() // user-paused: no batch work in flight
-  const { open, done } = tasks()
-  if (open.length === 0) allow() // batch complete
-
-  let marker = null
+  let sessionId = ''
   try {
-    marker = JSON.parse(readFileSync(MARKER, 'utf8'))
+    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
   } catch {
-    marker = null
-  }
-  if (!marker || !marker.dashboardPath || !existsSync(marker.dashboardPath)) {
-    block(
-      'BATCH DASHBOARD NOT REGISTERED. Bring all four dashboard sections in line with ' +
-        'the real state, republish it, then run: node scripts/dashboard-guard.mjs --synced ' +
-        `<dashboard.html path>. Open points: ${open.join(', ')}.`,
-    )
+    // no/non-JSON stdin (manual run) — invariant 7 then binds regardless of session
   }
 
-  // (1) Freshness: a moved HEAD means work happened since the last review.
-  const cur = head()
-  if (cur && marker.head && cur !== marker.head) {
-    block(
-      `BATCH DASHBOARD OUT OF DATE: HEAD moved to ${cur.slice(0, 7)} since the dashboard was ` +
-        `last reviewed (${String(marker.head).slice(0, 7)}). Review ALL FOUR sections against the ` +
-        'current state (now-card, queue order, Erledigt), republish, then run: ' +
-        'node scripts/dashboard-guard.mjs --synced ' + marker.dashboardPath + '.',
-    )
-  }
+  const marker = readJson(STATE_PATH)
+  const dashboardFile = marker && marker.dashboardPath ? resolve(REPO_ROOT, marker.dashboardPath) : null
+  const markerFileExists = !!(dashboardFile && existsSync(dashboardFile))
+  const html = markerFileExists ? readFileSync(dashboardFile, 'utf8') : null
 
-  // (2) No ticked point still in the Warteschlange.
-  const html = readFileSync(marker.dashboardPath, 'utf8')
-  const qStart = html.indexOf('Warteschlange')
-  const qEnd = html.indexOf('<h2>', qStart + 1)
-  const queueHtml = qStart >= 0 ? html.slice(qStart, qEnd < 0 ? undefined : qEnd) : ''
-  const queued = new Set()
-  for (const m of queueHtml.matchAll(/class="num">\s*(\d+)/g)) queued.add(Number(m[1]))
-  const stale = done.filter((n) => queued.has(n))
-  if (stale.length) {
-    block(
-      `BATCH DASHBOARD STALE: point(s) ${stale.join(', ')} are ticked done in TASKS.md but still ` +
-        'listed in the dashboard Warteschlange. Move them to Erledigt, republish, then re-run --synced.',
-    )
-  }
+  // Only THIS session's tool activity drives the focus-freshness invariant —
+  // a parallel chat window's calls must not nag the batch session (and vice versa).
+  const activity = readJson(ACTIVITY_PATH)
+  const lastToolAt =
+    activity && (!activity.sessionId || !sessionId || activity.sessionId === sessionId)
+      ? Number(activity.lastToolAt ?? 0)
+      : 0
 
-  // (3) Completeness: EVERY open, non-deferred TASKS point must be visible on the
-  // dashboard — in the Warteschlange or named in the now-card. (Missing 200/184/205
-  // slipped past because the guard only checked freshness + no-stale-queue before.)
-  // The now-card's OWN point (taken from its TITLE, not incidental mentions in
-  // the status text — "the point-200 class" falsely covered 200 before) is
-  // exempt; every OTHER open point must be in the Warteschlange.
-  const nowStart = html.indexOf('Woran ich gerade arbeite')
-  const nowTitleM = nowStart >= 0 ? html.slice(nowStart).match(/class="t">\s*(\d+)/) : null
-  const nowPoint = nowTitleM ? Number(nowTitleM[1]) : -1
-  const missing = open.filter((n) => n !== nowPoint && !queued.has(n))
-  if (missing.length) {
-    block(
-      `BATCH DASHBOARD INCOMPLETE: open TASKS point(s) ${missing.join(', ')} appear in NEITHER the ` +
-        'Warteschlange nor the now-card. Add every open point to the dashboard (an ongoing/umbrella ' +
-        'point still gets a queue card), republish, then re-run --synced.',
-    )
-  }
-
-  allow()
+  const result = evaluate({
+    paused: existsSync(PAUSE),
+    ...parseTasks(readFileSync(TASKS, 'utf8')),
+    marker,
+    markerFileExists,
+    head: head(),
+    html,
+    repoHash: markerFileExists ? sha256File(dashboardFile) : null,
+    focus: readJson(FOCUS_PATH),
+    pending: readJson(PENDING_PATH),
+    sessionId,
+    lastToolAt,
+    now: Date.now(),
+    // Calibratable without a code change: minutes in dashboard-state.json.
+    freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,
+  })
+  if (result.decision === 'block') process.stdout.write(JSON.stringify(result))
+  process.exit(0)
 } catch (e) {
   console.error(`dashboard-guard error (allowing stop): ${e && e.message}`)
   process.exit(0)
