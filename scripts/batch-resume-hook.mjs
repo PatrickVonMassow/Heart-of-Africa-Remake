@@ -7,9 +7,32 @@
 //   - a batch LOCK held by another still-fresh session suppresses it too, so two
 //     Claude instances never work the same repo in parallel.
 // Otherwise the hook claims the lock for this session and emits the instruction.
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync, rmSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { lockStatus, claimLock, readLock, isPaused, pauseReason } from './batch-lock.mjs'
+
+// The OS autostart launcher (batch-autostart.mjs) writes this one-shot marker
+// when it spawns a session to TAKE OVER a dead batch. It authorizes THIS session
+// to resume regardless of the lock's age — the launcher already decided the
+// previous session is dead (12-min freshness + boot check), which the 45-min
+// STALE_MS here would otherwise not yet agree with. Recent (<10 min) + one-shot.
+const AUTH_PATH = fileURLToPath(new URL('../.claude/autostart-authorized.json', import.meta.url))
+function autostartAuthorized(nowMs) {
+  try {
+    const m = JSON.parse(readFileSync(AUTH_PATH, 'utf8'))
+    return m && typeof m.at === 'number' && nowMs - m.at < 10 * 60 * 1000
+  } catch {
+    return false
+  }
+}
+function clearAuthorized() {
+  try {
+    rmSync(AUTH_PATH)
+  } catch {
+    /* already gone */
+  }
+}
 
 // SessionStart hooks receive a JSON payload on stdin ({ session_id, source, … }).
 // A missing id falls back to a fresh random id, which errs toward NOT resuming
@@ -45,6 +68,17 @@ try {
           'Do NOT auto-resume — wait for an explicit go from the user. When the user ' +
           'says to continue, clear the pause marker (scripts/batch-lock.mjs clearPaused, ' +
           'or delete .claude/batch-paused) before resuming.',
+      )
+    } else if (autostartAuthorized(now)) {
+      // The OS autostart launcher spawned this session to resurrect a dead batch.
+      claimLock(sessionId, now)
+      clearAuthorized()
+      console.log(
+        `${header} Resumed by the OS autostart launcher (the previous session was dead). ` +
+          'Continue the batch autonomously per CLAUDE.md/TASKS.md — implement -> docs -> tests -> ' +
+          'atomic commit + push -> tick, point by point, then the Closing. Read the handoff memory ' +
+          'resume-184-qa-framework first. This session now holds the batch lock; do NOT idle-stop ' +
+          '(the batch-progress-guard enforces this). First check git status for work already underway.',
       )
     } else if (lockStatus(sessionId, now) === 'held') {
       const lock = readLock()

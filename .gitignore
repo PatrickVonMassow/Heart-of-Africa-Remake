@@ -37,3 +37,4 @@ scripts/.tile-cache
 .claude/wait-prep.json
 .claude/autostart.log
 .claude/autostart-last.json
+.claude/autostart-authorized.json

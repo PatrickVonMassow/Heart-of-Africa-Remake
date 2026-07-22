@@ -47,6 +47,15 @@
             "command": "node scripts/prep-arm-hook.mjs"
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/lock-heartbeat-hook.mjs"
+          }
+        ]
       }
     ]
   },
