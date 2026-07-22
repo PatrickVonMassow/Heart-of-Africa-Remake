@@ -8535,7 +8535,7 @@ the remaining open points in their numeric order.
   requirement alongside the tessellation floors; CLAUDE §7.1 pt.15 if the
   acceptance wording changes.
 
-- [ ] 215. ANGULAR / FACETED TERRAIN RELIEF — (A) the §2.5 skyline/panorama
+- [x] 215. DONE 22.07.2026 (feat/215-backdrop-smooth 85f22e6, merged) — the panorama backdrop ridge is now smooth on BOTH backends; the facets were the coarse heightfield silhouette, so rings 24->48 + segs 160->320 (facet size halved), taper bit-identical (panoramaGroundY unchanged), material extracted with explicit flatShading:false; relief-cap/no-sink invariants held, backdrop.test.ts extended. ORIGINAL: ANGULAR / FACETED TERRAIN RELIEF — (A) the §2.5 skyline/panorama
   backdrop mountains, and (B, user ext. 22.07.2026) the BIRD'S-EYE travel terrain
   itself (land + river height profile + mountains). PART A: the §2.5
   surroundings-panorama backdrop (the far map-landscape relief around a
