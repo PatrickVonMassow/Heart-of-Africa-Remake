@@ -8167,6 +8167,16 @@ the remaining open points in their numeric order.
   Narrow it by tightening the NORTHEAST_BOUNDARY control points near [32.42,31.45]
   …[32.7,29.75] so the head reads slim, keeping every redSea.test.ts verdict
   (Suez ~29.97/32.55 stays ocean, the isthmus stays land). Then 211.
+  TEXTURE ROOT CAUSE (22.07.2026, picture-confirmed) — NEITHER the point-215
+  bicubic elevation NOR raising the water opacity (0.58→0.7, reverted) fixes the
+  blocky "wall": the WATER SHADER reads the RAW `demElevation` GPU texture
+  (`src/render/demElevation.ts` → `water.ts` depthM), which still carries the
+  coarse per-texel trim STAMP (~-3000 m cells); the CPU `elevationAt` bicubic never
+  touches that texture, so the shallow semi-transparent water still shows the
+  blocky stamped floor through it. REAL FIX (next, picture-iterated, both backends):
+  smooth the DEM elevation TEXTURE — sample it bicubically in the TSL shader, or
+  (cleaner, CPU one-time) bake a smoothing/shelf-grade pass in `demElevation.ts`.
+  Keep the depth-colour bands + outside-bbox mask; verify Nile/normal coast/lakes.
   STEPPING NOT RESOLVED (user re-reported 22.07, second screenshot "immer noch
   stufig"). The terrain shelf smoothed the SHORE at the boundary (30.02N/32.62E
   renders as an organic graded coast on WebGL2), but a FRESH render at the user's
