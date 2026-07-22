@@ -8905,6 +8905,29 @@ the remaining open points in their numeric order.
   changes. Related to 227 (the skyline "gliding animal" is the same foot-slide on
   the panorama band).
 
+- [ ] 229. LIGHTNING WITHOUT THUNDER — the user sees lightning FLASHES in the
+  Central region but hears NO thunder (report 22.07.2026). §7.1 pt.12 / point 166
+  promise a thunderstorm fires "lightning FLASHES with a delayed THUNDER (1-4 s)
+  as a PAIR" — so the flash fires but its paired thunder sound never plays.
+  DIAGNOSE: the gate + timing are pure-tested (`thunderstormAt`,
+  `thunderDelaySeconds` in `src/systems/season.test.ts`) and the flash is visible,
+  so the model side works — the break is on the AUDIO side: is the thunder sound
+  wired into the ambience/sound engine at all, does the delayed-thunder scheduler
+  actually trigger playback (the 1-4 s timeout may be dropped when the flash
+  frame's state changes, or the thunder audio asset is missing / never loaded /
+  gated behind a volume that is 0), and does it respect the single ambience volume
+  (§7.1 pt.20)? Anchors: the thunder trigger in `src/scenes/travel/TravelScene.tsx`
+  (and the settlement view) where the flash pulse fires, `src/systems/ambience.ts`
+  / the sound engine, and `src/systems/season.ts` `thunderDelaySeconds`. FIX: make
+  the thunder actually PLAY the delayed clap after each flash (both bird's-eye and
+  settlement views), scaled by the ambience volume. VERIFIABLE: a pure test that
+  the thunder is SCHEDULED after a flash at the pure `thunderDelaySeconds` delay
+  and survives to fire (not cancelled by the next frame); a live check in
+  `scripts/verify/enrichments.mjs` that a forced thunderstorm plays a thunder
+  sound after the flash (assert the audio node / a `__thunder` dev hook fires),
+  mirroring the existing flash gate. DOCS: none (implements the promised pt.166
+  pairing). Both languages if any player-visible text is added (none expected).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
