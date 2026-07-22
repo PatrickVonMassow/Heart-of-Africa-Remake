@@ -283,6 +283,9 @@ export interface Strings {
     vigilPredatorDelay: string
     rescueBurst: string
     calfFraction: string
+    calfFollowRadius: string
+    calfGambolRange: string
+    calfGambolBout: string
     crocStrikeRadius: string
     crocGripSeconds: string
     huntLeaveOvertime: string

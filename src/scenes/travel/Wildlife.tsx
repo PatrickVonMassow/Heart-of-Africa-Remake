@@ -477,10 +477,11 @@ const FACE_TURN = 7
 /** A dodge disengages only well past its trigger ring (hysteresis), so an
  *  elephant tailing its prey cannot flap the dodge on and off at the ring. */
 const PREY_PANIC_EXIT = 1.5
-/** Family life (design.md §19): a calf keeps within this radius of its parent,
- *  and a parent moves between an approaching predator and its calf to guard it,
- *  standing off a short distance in front of the young. */
-const YOUNG_FOLLOW_RADIUS = 1.8
+/** Family life (design.md §19): a calf keeps within the calibratable leash
+ *  radius of its parent (balance.family.followRadius, read fresh per frame so
+ *  the debug edit applies live), and a parent moves between an approaching
+ *  predator and its calf to guard it, standing off a short distance in front
+ *  of the young. */
 const YOUNG_FOLLOW_SPEED = 4.5
 const GUARD_RADIUS = 12
 const GUARD_STANDOFF = 2.2
@@ -561,10 +562,11 @@ function nearestVigilKeeperDist(herds: Record<Species, Animal[]>, x: number, z: 
  *  in and pulls it back to land, and near a waterfall the current takes any of
  *  them over the falls — a calf that goes over is followed by its plunging
  *  parent, which dies with it. */
-const GAMBOL_PERIOD = 16 // s between play bouts (bout = first quarter)
-const GAMBOL_ACTIVE = 0.25
+// Bout length and play range are calibratable (balance.family.gambolBoutSeconds
+// / .gambolRange, read fresh per frame); only the idle gap between bouts and
+// the hop speed stay fixed here.
+const GAMBOL_IDLE_SECONDS = 12 // gap between play bouts (was 16 s period − 4 s bout)
 const GAMBOL_SPEED = 2.2
-const GAMBOL_RANGE = 4 // calves only play while this close to the parent
 const CALF_DRIFT_DEG = 0.06 // deg/s downstream drift of a struggling calf
 const RESCUE_REACH = 1.2 // parent this close pulls the calf out
 const RETURN_SPEED = PREY_WALK_SPEED // walking back to the rescue entry — the ordinary walk the burst is measured against
@@ -1514,6 +1516,13 @@ function Herds() {
     // The one burst-derived speed of all four rescue drives (point 127),
     // read fresh so a debug edit of balance.family.rescueBurst applies live.
     const RESCUE_SPEED = rescueSpeed(balance.family.rescueBurst)
+    // The calf leash and play bout (design.md §19.8, §21.2) — read fresh each
+    // frame so the debug edits apply live. Lengthening the bout lengthens the
+    // play; the idle gap between bouts stays the fixed GAMBOL_IDLE_SECONDS.
+    const YOUNG_FOLLOW_RADIUS = balance.family.followRadius
+    const GAMBOL_RANGE = balance.family.gambolRange
+    const GAMBOL_PERIOD = balance.family.gambolBoutSeconds + GAMBOL_IDLE_SECONDS
+    const GAMBOL_ACTIVE = balance.family.gambolBoutSeconds / GAMBOL_PERIOD
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)

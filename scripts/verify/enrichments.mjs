@@ -1867,17 +1867,48 @@ await page.evaluate(() => window.__sleepSim(2))
 const familyLife = await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']
+  // "Close" follows the calibratable leash (the widened balance.family
+  // .followRadius): the follow yank settles a calf just inside that radius.
+  const leashR = window.__balance.family.followRadius + 1
   let young = 0, close = 0
   for (const sp of SP)
     for (const a of herds[sp] ?? []) {
       if (a.young && a.parent && !a.parent.dead) {
         young++
-        if (Math.hypot(a.x - a.parent.x, a.z - a.parent.z) < 5) close++
+        if (Math.hypot(a.x - a.parent.x, a.z - a.parent.z) < leashR) close++
       }
     }
   return { young, close }
 })
 check('herds raise young that keep close to a parent (nursing)', familyLife.young > 0 && familyLife.close > 0, JSON.stringify(familyLife))
+
+// --- The widened calf leash (design.md §19.8): a calf can stand clearly ------
+// further from its parent than the old 1.8-unit leash — watch the live pairs
+// while play/follow run and take the maximum parent distance seen.
+const calfLeash = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
+  let maxD = 0
+  let pairs = 0
+  await window.__pollSim(20, () => {
+    if (window.__wildlife.lion) window.__wildlife.lion.mode = 'idle'
+    pairs = 0
+    for (const sp of SP) {
+      for (const a of herds[sp] ?? []) {
+        if (
+          a.young && a.parent && !a.parent.dead && !a.dead &&
+          a.mired === undefined && a.inWater === undefined && a.caught === undefined
+        ) {
+          pairs++
+          maxD = Math.max(maxD, Math.hypot(a.x - a.parent.x, a.z - a.parent.z))
+        }
+      }
+    }
+    return maxD > 2.5
+  })
+  return { maxD: +maxD.toFixed(2), pairs, followRadius: window.__balance.family.followRadius }
+})
+check('a calf strays clearly further than the old 1.8 leash (widened calf leash)', calfLeash.maxD > 2.5, JSON.stringify(calfLeash))
 
 // --- No jitter (design.md §19): a playing calf's step direction must not saw
 // back and forth between frames (the old play/follow boundary ping-pong).

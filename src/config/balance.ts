@@ -334,6 +334,18 @@ export interface BalanceConfig {
      *  linked to its own parent — so the family dramas happen more often.
      *  Calibratable/debug-editable. */
     calfFraction: number
+    /** Calf leash (design.md §19.8): a calf may stray this far (world units)
+     *  from its parent before the follow yank pulls it back in — wide enough
+     *  that the family dramas read spatially. Calibratable/debug-editable. */
+    followRadius: number
+    /** Play range (design.md §19.8): calves gambol only while within this of
+     *  the parent, and the leashed scamper orbits inside it (the outward step
+     *  dies at the edge). Scales with the leash. Calibratable/debug-editable. */
+    gambolRange: number
+    /** Length (seconds) of one gambol hop-bout — how long the young hop
+     *  around before a bout ends; the idle gap between bouts stays fixed in
+     *  the scene. Calibratable/debug-editable. */
+    gambolBoutSeconds: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -574,6 +586,18 @@ export const balance: BalanceConfig = {
     // group of 8 raises 2 and a group of 4 raises 1 (floor(N/2) caps it so every
     // calf keeps its own distinct parent). Was effectively one calf per group.
     calfFraction: 0.25,
+    // Calibratable (user decision: 3× the old 1.8 leash): the wider roam makes
+    // the sacrifice/shield/flight dramas readable as separate bodies. The
+    // rescue burst still closes this gap well inside the caught window
+    // (6 units/s × 5 s = 30 ≫ gambolRange + the too-late distance).
+    followRadius: 5.4,
+    // Calibratable (scaled 3× with the leash, was the fixed 4): the scamper
+    // orbit's outer edge. The leash damping has no cancellation point at any
+    // range, so widening it cannot reintroduce the play/follow jitter.
+    gambolRange: 12,
+    // Calibratable: one hop-bout now runs 8 s (was 16 s × 0.25 = 4 s), so the
+    // young visibly hop around before settling; the 12 s idle gap is unchanged.
+    gambolBoutSeconds: 8,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

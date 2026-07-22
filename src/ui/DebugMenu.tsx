@@ -265,6 +265,12 @@ export function DebugMenu() {
         onChange={(v) => { balance.family.rescueBurst = Math.max(1, v); bump() }} />
       <NumberField label={t.debug.calfFraction} value={balance.family.calfFraction} step={0.05}
         onChange={(v) => { balance.family.calfFraction = Math.max(0, Math.min(1, v)); bump() }} />
+      <NumberField label={t.debug.calfFollowRadius} value={balance.family.followRadius} step={0.2}
+        onChange={(v) => { balance.family.followRadius = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.calfGambolRange} value={balance.family.gambolRange} step={0.5}
+        onChange={(v) => { balance.family.gambolRange = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.calfGambolBout} value={balance.family.gambolBoutSeconds} step={0.5}
+        onChange={(v) => { balance.family.gambolBoutSeconds = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocStrikeRadius} value={balance.crocodile.strikeRadius} step={0.5}
         onChange={(v) => { balance.crocodile.strikeRadius = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocGripSeconds} value={balance.crocodile.gripSeconds} step={0.5}
