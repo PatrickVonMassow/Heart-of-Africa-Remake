@@ -870,10 +870,19 @@ export function escapeCorridorHeading(
  * The flee step for a calf being run down by a land hunt (design.md §19.8,
  * point 157). It heads directly away from the hunter, then routes through
  * deflectedStep so a coast or river bank turns it aside instead of pinning it
- * (the old raw step ran straight into the water and stuck). A dead-end
- * (moved:false) leaves the calf in place for the catch to resolve — the "always
- * resolves" rule. `dist` stays CALF_FLEE_SPEED*dt (slower than the hunter, so
- * the chase still ends); the caller passes the water/ocean `blocked` predicate.
+ * (the old raw step ran straight into the water and stuck). At a CONCAVE sea
+ * pocket the whole ±90° deflection fan lands in water and the direct step
+ * dead-ends — the calf froze at the waterline while its parent was eaten
+ * (point 226, the user's Cairo coast). That is not a genuine dead-end: land
+ * runs along the shore beyond the fan, so the flight falls back to the
+ * point-188 escape corridor — the longest clear-LAND heading over the full
+ * circle, biased away from the hunter, STICKY across frames (`corridor` in →
+ * `corridor` out; re-picked only when its way ahead closes) so the choice
+ * cannot flip-flop between the two along-shore corridors. Only when even the
+ * corridor step dead-ends (water on every side) does the calf stand
+ * (moved:false) for the catch to resolve — the "always resolves" rule. `dist`
+ * stays CALF_FLEE_SPEED*dt (slower than the hunter, so the chase still ends);
+ * the caller passes the water/ocean `blocked` predicate.
  */
 export function calfFleeStep(
   cx: number,
@@ -883,9 +892,22 @@ export function calfFleeStep(
   dist: number,
   blocked: (x: number, z: number) => boolean,
   lookahead = 0.8,
-): { x: number; z: number; heading: number; moved: boolean } {
+  corridor?: number,
+): { x: number; z: number; heading: number; moved: boolean; corridor?: number } {
   const away = Math.atan2(cx - hunterX, cz - hunterZ)
-  return deflectedStep(cx, cz, away, dist, blocked, lookahead)
+  const direct = deflectedStep(cx, cz, away, dist, blocked, lookahead)
+  if (direct.moved) return direct // open flight — the sticky corridor clears
+  const probe = Math.max(dist, lookahead)
+  let h = corridor
+  if (h === undefined || blocked(cx + Math.sin(h) * probe, cz + Math.cos(h) * probe)) {
+    // The outward weight scales with the probe stride so a short seaward stub
+    // can never outscore a full-length along-shore corridor (with the default
+    // stepLen 2 the predator walk-off's weight 8 keeps that margin; at the
+    // calf's ~0.8 stride a fixed 8 would tie against 12·0.8 of clear land).
+    h = escapeCorridorHeading(cx, cz, away, blocked, probe, 12, 16, probe * 4)
+  }
+  const step = deflectedStep(cx, cz, h, dist, blocked, lookahead)
+  return { ...step, corridor: step.moved ? h : undefined }
 }
 
 /**

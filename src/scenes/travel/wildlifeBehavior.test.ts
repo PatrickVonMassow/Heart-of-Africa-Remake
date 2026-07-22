@@ -1237,6 +1237,84 @@ describe('calfFleeStep (design.md §19.8, point 157 — a run-down calf steers a
     expect(r.moved).toBe(false)
     expect(r.x).toBe(3)
     expect(r.z).toBe(0)
+    expect(r.corridor).toBeUndefined() // a genuine dead-end holds no corridor
+  })
+})
+
+describe('calfFleeStep at a concave coast pocket (point 226 — the calf never freezes at the waterline)', () => {
+  // The user's Cairo geometry: the calf stands at the tip of a narrow land
+  // tongue poking north into the sea — water fills the bight ahead AND wraps
+  // around both flanks, so EVERY probe within the ±90° deflection fan of the
+  // straight-away flight (north, hunter to the south) is wet. Land: the
+  // tongue itself (|x| <= 0.6, z <= 0.01) and the open country south of
+  // z = -0.9.
+  const pocket = (x: number, z: number) => z > 0.01 || (z > -0.9 && Math.abs(x) > 0.6)
+
+  it('the direct deflection fan alone dead-ends here (the reproduced bug)', () => {
+    // This is what pinned the calf: deflectedStep on the away heading finds
+    // no dry probe within its ±90° fan and stands.
+    const r = deflectedStep(0, 0, 0, 0.5, pocket, 0.8)
+    expect(r.moved).toBe(false)
+  })
+
+  it('gets a deflected step onto LAND — never a water cell — via the escape corridor', () => {
+    const r = calfFleeStep(0, 0, 0, -5, 0.5, pocket, 0.8)
+    expect(r.moved).toBe(true) // visibly moving, not frozen at the water
+    expect(pocket(r.x, r.z)).toBe(false) // the step landed on dry ground
+    expect(r.corridor).toBeDefined() // the point-188 corridor is engaged (and sticky)
+  })
+
+  it('keeps a non-zero land-ward step every frame until the catch', () => {
+    // Chase loop: the hunter closes from the south faster than the calf flees
+    // (the slower-than-hunter property), so the catch is guaranteed — and up
+    // to that catch the calf must MOVE on land every single frame.
+    let cx = 0
+    let cz = 0
+    let hx = 0
+    let hz = -5
+    let corridor: number | undefined
+    let corridorUsed = false
+    let caught = false
+    for (let i = 0; i < 60; i++) {
+      const r = calfFleeStep(cx, cz, hx, hz, 0.5, pocket, 0.8, corridor)
+      expect(r.moved).toBe(true) // never frozen at the waterline
+      expect(pocket(r.x, r.z)).toBe(false) // never rests on a water cell
+      expect(Math.hypot(r.x - cx, r.z - cz)).toBeGreaterThan(0.4) // a real step
+      cx = r.x
+      cz = r.z
+      corridor = r.corridor
+      if (corridor !== undefined) corridorUsed = true
+      const d = Math.hypot(cx - hx, cz - hz)
+      if (d < 0.6) {
+        caught = true // the hunter has run the calf down — the drama resolves
+        break
+      }
+      hx += ((cx - hx) / d) * 0.7
+      hz += ((cz - hz) / d) * 0.7
+    }
+    expect(caught).toBe(true) // the chase still ends in the catch
+    expect(corridorUsed).toBe(true) // the pocket actually exercised the fallback
+  })
+
+  it('reuses the sticky corridor while its way ahead stays clear (no flip-flop)', () => {
+    // At the tongue tip the direct fan is dead — a held corridor due south
+    // (down the tongue, clear) is carried unchanged, never re-picked to the
+    // opposite flank mid-run.
+    const r = calfFleeStep(0, 0, 0, -5, 0.5, pocket, 0.8, Math.PI)
+    expect(r.moved).toBe(true)
+    expect(r.corridor).toBe(Math.PI)
+    expect(r.heading).toBeCloseTo(Math.PI)
+    expect(r.z).toBeCloseTo(-0.5)
+  })
+
+  it('re-picks the corridor only once its way ahead closes', () => {
+    // A held corridor pointing straight INTO the bay (north) probes wet — it
+    // is dropped and a fresh clear-land corridor picked instead.
+    const r = calfFleeStep(0, 0, 0, -5, 0.5, pocket, 0.8, 0)
+    expect(r.moved).toBe(true)
+    expect(pocket(r.x, r.z)).toBe(false)
+    expect(r.corridor).toBeDefined()
+    expect(r.corridor).not.toBe(0)
   })
 })
 

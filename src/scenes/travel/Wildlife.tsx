@@ -188,6 +188,11 @@ interface Animal {
   /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
    *  the facing never snaps between flanking threats (design.md §19). */
   dodgeHeading?: number
+  /** Sticky escape-corridor heading for a hunted calf boxed against the sea
+   *  (point 226): held while the direct flight dead-ends at a concave coast
+   *  pocket so the shore run cannot flip-flop; cleared by the step itself the
+   *  moment the direct flight opens again. */
+  fleeCorridor?: number
   /** Blended amplitude of the idle shuffle render offset: behaviours fade it
    *  instead of switching it — a hard on/off popped the rendered position at
    *  every behaviour transition (design.md §19). */
@@ -3132,15 +3137,29 @@ function Herds() {
             // Steer around a coast or river the way every other mover does
             // (point 157): the old raw step ran straight into the water and
             // pinned the calf. calfFleeStep heads away from the hunter and fans
-            // out to a way around; a dead-end (moved:false) leaves the calf where
-            // it is and the catch resolves it — the §19.8 "always resolves" rule.
-            // Speed and the slower-than-hunter property are unchanged.
+            // out to a way around; at a concave sea pocket where the whole fan
+            // is wet it falls back to the point-188 escape corridor (sticky via
+            // a.fleeCorridor) and runs ALONG the shore instead of freezing at
+            // the waterline (point 226). Only a genuine dead-end (water on
+            // every side) stands (moved:false) for the catch to resolve — the
+            // §19.8 "always resolves" rule. Speed and the slower-than-hunter
+            // property are unchanged.
             const fleeBlocked = (nx: number, nz: number) => {
               const ll = worldToLatLon(nx, nz)
               const ty = sampleTerrain(ll.lat, ll.lon, seed).type
               return ty === 'ocean' || ty === 'water'
             }
-            const fleeStep = calfFleeStep(a.x, a.z, LION_STATE.lx, LION_STATE.lz, CALF_FLEE_SPEED * dt, fleeBlocked)
+            const fleeStep = calfFleeStep(
+              a.x,
+              a.z,
+              LION_STATE.lx,
+              LION_STATE.lz,
+              CALF_FLEE_SPEED * dt,
+              fleeBlocked,
+              0.8,
+              a.fleeCorridor,
+            )
+            a.fleeCorridor = fleeStep.corridor
             a.x = fleeStep.x
             a.z = fleeStep.z
             { // ground-follow (point 203(A)): a mover carries its own standing height
