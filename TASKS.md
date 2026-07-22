@@ -9595,7 +9595,7 @@ the remaining open points in their numeric order.
   concurrently with those — the whole wildlife-behaviour cluster should be planned
   together (this conflict audit naturally scopes/sequences them).
 
-- [ ] 253. WILDLIFE DRAMAS DO NOT FIRE / RESOLVE — ANIMALS STAND IDLE (regression,
+- [x] 253. WILDLIFE DRAMAS DO NOT FIRE / RESOLVE — ANIMALS STAND IDLE (regression,
   PRIORITY) — the user reports (22.07.2026, multiple): a LION and a JUVENILE stand
   idly next to each other (no hunt, no flee); a CROCODILE swims off after a catch
   while the prey dissolves separately (point 250); AND the enrichments suite TIMES
