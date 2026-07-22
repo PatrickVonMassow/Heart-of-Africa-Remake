@@ -27,6 +27,7 @@ import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { landFractionAt } from '../../world/geodata'
+import { chunkIsMountainous, refinedSegments } from './terrainLod'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
@@ -98,10 +99,9 @@ const VEGETATION_HIDE_ZOOM = 2.5
 const CAMERA_OFFSET = { y: 42, z: 24 }
 const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 
-/** LOD: mesh resolution per chunk by Chebyshev ring distance. */
-function lodSegments(ring: number): number {
-  return ring <= 2 ? 56 : ring <= 4 ? 28 : 20
-}
+// The LOD segment rules (base resolution per ring plus the near-ring quality
+// doubling for coastal and mountainous chunks) live in terrainLod.ts so they
+// are unit-testable (terrainShading.test.ts).
 
 // point 209: a chunk straddling the sea coast gets a finer mesh, so the smooth
 // vector shoreline (terrain.ts derives the near-coast land fraction from the
@@ -403,10 +403,15 @@ function TerrainChunks() {
     for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
       for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
         const ring = Math.max(Math.abs(dx), Math.abs(dz))
-        let segments = lodSegments(ring)
-        // point 209: double the resolution of near coast-crossing chunks (capped)
-        // so the smooth vector shoreline reads smooth instead of mesh-stepped.
-        if (ring <= 4 && chunkIsCoastal(cx + dx, cz + dz)) segments = Math.min(112, segments * 2)
+        // Near-ring quality doubling (terrainLod.ts): coast-crossing chunks
+        // (point 209 — the smooth vector shoreline must not re-quantize to
+        // mesh steps) and mountainous chunks (the smooth bicubic relief must
+        // not fold into polyline facets) share one capped doubling. The gates
+        // OR together — either refines once, never twice — and short-circuit
+        // so far rings and flat inland chunks skip the probes.
+        const refine =
+          ring <= 4 && (chunkIsCoastal(cx + dx, cz + dz) || chunkIsMountainous(cx + dx, cz + dz))
+        const segments = refinedSegments(ring, refine)
         const key = `${chunkKey(cx + dx, cz + dz)}:${segments}`
         keys.push(key)
         if (!cache.current.has(key)) {
