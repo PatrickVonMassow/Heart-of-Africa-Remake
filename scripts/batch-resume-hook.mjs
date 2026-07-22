@@ -116,7 +116,15 @@ try {
           'tests -> atomic commit + push the BRANCH after every commit; merge to main ONLY when the ' +
           'point is complete + verified (tests green; render/GUI changes picture-checked on BOTH ' +
           'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
-          'changes (guards, docs, dashboard, process files) go directly to main. Then the Closing. ' +
+          'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
+          'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
+          'dashboard work to parallel WORKTREE-ISOLATED Fable subagents on NON-OVERLAPPING files ' +
+          '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
+          'session keeps only the picture-verification on both backends, the serial merge -> ' +
+          'fast-gate -> tick -> deploy -> cleanup, and the Artifact publish. CLOSING FREEZE ' +
+          '(user decision 22.07.2026): during a closing run the code is FROZEN — no parallel agent ' +
+          'work lands/merges while the closing runs; merge or park in-flight branches first, ' +
+          'resume the pool only after. Then the Closing. ' +
           'Read the handoff memory resume-184-qa-framework first. This session now holds the batch ' +
           'lock; do NOT idle-stop (the batch-progress-guard enforces this). First check git status ' +
           'AND the checked-out branch above for work already underway.',
@@ -142,6 +150,14 @@ try {
           'when the point is complete + verified (tests green; render/GUI changes picture-checked ' +
           'on BOTH backends); TASKS.md is MAIN-only — tick the point on main at the merge; ' +
           'cross-cutting changes (guards, docs, dashboard, process files) go directly to main. ' +
+          'MAXIMAL DELEGATION (user decision 22.07.2026): delegate implementation AND infra/' +
+          'guard/doc/dashboard work to parallel WORKTREE-ISOLATED Fable subagents on ' +
+          'NON-OVERLAPPING files (each point on its own branch, gates green, pushed, not merged ' +
+          'by the agent); the main session keeps only the picture-verification on both backends, ' +
+          'the serial merge -> fast-gate -> tick -> deploy -> cleanup, and the Artifact publish. ' +
+          'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
+          'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +
+          'branches first, resume the pool only after. ' +
           'First check git status AND the checked-out branch above for work already underway, and ' +
           'do not double-start regressions. This session now holds the batch lock ' +
           '(.claude/batch-lock.json); refresh it as you work (claimLock) and release it ' +
