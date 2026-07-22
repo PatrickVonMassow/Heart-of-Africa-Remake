@@ -9167,6 +9167,37 @@ the remaining open points in their numeric order.
   `wildlifeBehavior.ts`/`Wildlife.tsx`; do NOT delegate these wildlife-behaviour
   points concurrently with each other.
 
+- [ ] 238. WIDEN THE CALF LEASH SO THE FAMILY DRAMAS READ — the user observes
+  (22.07.2026) that a calf stays VERY close to its parent, so the §19.8 family
+  dramas (the parent's sacrifice, hurling itself before an elephant's feet, the
+  calf's flight) happen in such a tight cluster that they are not recognisable as
+  such; letting a calf stray FURTHER from its parent would let the drama read
+  spatially. Current leash: `YOUNG_FOLLOW_RADIUS = 1.8` world units in
+  `src/scenes/travel/Wildlife.tsx` (a calf beyond it is yanked back; within it it
+  gambols via `leashedGambolDir`). FIX: widen the calf follow/leash radius (and the
+  gambol play `range` fed to `leashedGambolDir`) so the calf can roam noticeably
+  further, and MOVE the value(s) into `balance.family` so they are debug-editable
+  per §21.2 (calibratable). Keep the leashed-gambol anti-jitter intact (just a
+  larger range — the damping has no cancellation point regardless of range).
+  Verify the dependent drama mechanics still resolve at the wider spacing: the
+  parent still guards from `GUARD_RADIUS = 12` and must still reach the calf/
+  predator in time — check that the rescue-burst speed (`balance.family.rescueBurst`,
+  §19.8 pt.12) lets a parent close the wider gap within the CAUGHT/SACRIFICE/
+  TOO_LATE windows, and widen those reach distances proportionally if the wider
+  leash would otherwise make every rescue fail. Anchors: `src/scenes/travel/
+  Wildlife.tsx` (`YOUNG_FOLLOW_RADIUS`/`YOUNG_FOLLOW_SPEED`, the guard/sacrifice
+  distances), `src/scenes/travel/wildlifeBehavior.ts` (`leashedGambolDir` range),
+  `src/config/balance.ts` (`family`), `src/ui/DebugMenu.tsx`. VERIFIABLE: pure test
+  that the widened leash lets a calf reach a larger max distance from its parent
+  while `leashedGambolDir` still orbits without jitter, that the family-drama
+  reach/resolution still fires at the wider spacing (the parent reaches in time
+  under the rescue burst), and that the new balance value writes through the debug
+  menu (`src/ui/DebugMenu.test.tsx`); a live check in `scripts/verify/
+  enrichments.mjs` that a calf can stand clearly further from its parent than 1.8.
+  DOCS: design.md §19.8 (calf leash / family life) + §21.2 (calibratable value).
+  No player-visible text. NOTE: same files as points 217/228/237
+  (`wildlifeBehavior.ts`/`Wildlife.tsx`) — do NOT delegate concurrently with those.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
