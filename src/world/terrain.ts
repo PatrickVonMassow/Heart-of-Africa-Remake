@@ -11,7 +11,7 @@ import { coastDistanceAt, elevationAt, landFractionAt } from './geodata'
 import { coastSignedDistance } from './coastVector'
 import { lakeContains, lakeIndexAt } from './hydro'
 import { fbm2 } from './noise'
-import { isNortheastOfBoundary } from './redSea'
+import { isNortheastOfBoundary, boundarySignedDistance } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
 import { LAKES } from './data/lakes'
 import { balance } from '../config/balance'
@@ -55,6 +55,13 @@ const BIOME_WARP = 3.0
 // ~3 DEM texels — wide enough for the mesh to carry a smooth shore, narrow
 // enough that the gate (and its per-vertex vector-distance cost) stays local.
 const COAST_SMOOTH_BAND = 0.08
+
+// point 210: over this distance (degrees) out from the trim boundary the stamped
+// deep floor is replaced by a smooth shelf, so the depth-driven water colour
+// grades instead of banding at the ~800 m stamp step. SLOPE reaches the deep
+// tone (~-0.6) at the band edge, then joins the stamped floor seamlessly.
+const SHELF_BAND = 0.3
+const SHELF_SLOPE = 2.0
 
 // Permanent ice (design.md §19.13, point 141): ONLY the three massifs that
 // really carried glaciers in 1890 — Kilimanjaro, Mount Kenya, Rwenzori, all
@@ -214,6 +221,37 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     const sd = coastSignedDistance(lat, lon)
     land = Math.max(0, Math.min(1, 0.5 + sd / (2 * COAST_SMOOTH_BAND)))
   }
+  // point 210: the Red-Sea/Suez trim (redSea.ts) stamps a UNIFORM deep floor
+  // (~-3000 m) northeast of the NORTHEAST_BOUNDARY per texel, so where that
+  // artificial cut IS the coast (the Suez isthmus east of Cairo — real land
+  // trimmed on both sides) TWO defects staircased the sea: (a) the waterline,
+  // which 209's vector smoothing does not reach (the boundary is not a
+  // LAND_POLYGONS shore); and (b) the sea FLOOR, which plunged from shore to
+  // -3000 m in one texel — a blocky underwater cliff the shallow, partly
+  // transparent water shows through and a hard step in the water shader's
+  // depth-driven colour. Fix both from the SIGNED distance to the boundary:
+  // straighten the waterline to a smooth diagonal, and replace the stamped floor
+  // with a gentle shelf easing into the deep across SHELF_BAND. Both are GATED on
+  // the boundary genuinely abutting kept land (`boundaryIsCoast`) — sampled along
+  // the inward normal, one landFractionAt — so the real Gulf-of-Suez head and any
+  // stretch where the boundary lies seaward of the true 209 coast keep their
+  // raster/vector verdict and bathymetry. The shelf is applied to hOcean, which
+  // feeds BOTH the land-side shore blend and the ocean floor, so shore and sea
+  // stay ONE continuous surface (an earlier ocean-only shelf lifted the sea above
+  // the still-plunging land shore, carving a moat at the waterline).
+  const bsd = boundarySignedDistance(lat, lon)
+  let boundaryIsCoast = false
+  if (Math.abs(bsd) < SHELF_BAND) {
+    const eps = 0.02
+    const gLon = (boundarySignedDistance(lat, lon + eps) - bsd) / eps
+    const gLat = (boundarySignedDistance(lat + eps, lon) - bsd) / eps
+    const mag = Math.hypot(gLon, gLat) || 1
+    const step = 1.2 * COAST_SMOOTH_BAND - bsd // reach just inside the boundary's land edge
+    boundaryIsCoast = landFractionAt(lat + (gLat / mag) * step, lon + (gLon / mag) * step) >= 0.5
+    if (boundaryIsCoast && Math.abs(bsd) < COAST_SMOOTH_BAND) {
+      land = Math.max(0, Math.min(1, 0.5 + bsd / (2 * COAST_SMOOTH_BAND)))
+    }
+  }
   const elevation = elevationAt(lat, lon)
   const detail = fbm2(lon * 3, lat * 3, seed + 7, 3)
 
@@ -221,7 +259,16 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // (bilinear) land fraction, so the waterline is the smooth 0-contour of
   // the height field — no per-vertex land/ocean steps.
   const shoreT = sstep(0.32, 0.68, land)
-  const hOcean = -0.12 + Math.max(-3.4, elevation * 0.0006)
+  let hOcean = -0.12 + Math.max(-3.4, elevation * 0.0006)
+  if (boundaryIsCoast && bsd < COAST_SMOOTH_BAND) {
+    // Cover the land-side transition too (bsd up to +COAST_SMOOTH_BAND): the shore
+    // blend uses hOcean while shoreT < 1, so a still-deep hOcean there plunges the
+    // land shore just inside the waterline and reopens the moat. t ramps 0 at/inside
+    // the line to 1 at the deep edge; the shelf only deepens seaward (min(0, bsd)).
+    const t = Math.max(0, Math.min(1, -bsd / SHELF_BAND))
+    const shelf = -0.05 + Math.min(0, bsd) * SHELF_SLOPE // shallow at the line, deepening outward
+    hOcean = Math.max(hOcean, shelf * (1 - t) + hOcean * t)
+  }
   const hLandBase = Math.max(0.06, elevation * METERS_TO_UNITS) + detail * 0.2 * shoreT
 
   if (land < 0.5) {

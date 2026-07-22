@@ -60,6 +60,40 @@ export function isNortheastOfBoundary(lat: number, lon: number): boolean {
   return bestCross >= 0
 }
 
+/**
+ * Signed perpendicular distance (in degrees) to the boundary polyline:
+ * POSITIVE on the southwest (kept-land) side, NEGATIVE on the northeast
+ * (trimmed-ocean) side, growing with distance. Same closest-segment geometry
+ * as `isNortheastOfBoundary` (its boolean is `≥ 0` on the NE side, i.e. this
+ * value `≤ 0`). Used by the travel terrain (terrain.ts, point 210) to rebuild
+ * the near-boundary land fraction as a smooth diagonal — the trim's hard
+ * per-texel land/sea stamp otherwise staircases the Red-Sea/Suez coast, which
+ * point 209's vector-coast smoothing does not cover (it is an artificial cut,
+ * not a `LAND_POLYGONS` shore). Cheap far-field escape: points well southwest
+ * of the boundary box return a large positive sentinel without the loop.
+ */
+export function boundarySignedDistance(lat: number, lon: number): number {
+  if (lon < BOX_LON_MIN - 0.5 || lat < BOX_LAT_MIN - 0.5) return 99
+  let bestD = Infinity
+  let bestCross = 0
+  for (let i = 0; i < NORTHEAST_BOUNDARY.length - 1; i++) {
+    const [ax, ay] = NORTHEAST_BOUNDARY[i]
+    const [bx, by] = NORTHEAST_BOUNDARY[i + 1]
+    const dx = bx - ax
+    const dy = by - ay
+    const t = Math.max(0, Math.min(1, ((lon - ax) * dx + (lat - ay) * dy) / (dx * dx + dy * dy)))
+    const px = lon - (ax + dx * t)
+    const py = lat - (ay + dy * t)
+    const d = px * px + py * py
+    if (d < bestD) {
+      bestD = d
+      bestCross = dx * (lat - ay) - dy * (lon - ax)
+    }
+  }
+  const dist = Math.sqrt(bestD)
+  return bestCross >= 0 ? -dist : dist
+}
+
 /** Subset of the DEM metadata the trimming pass needs (see geodata.ts). */
 export interface StampMeta {
   width: number

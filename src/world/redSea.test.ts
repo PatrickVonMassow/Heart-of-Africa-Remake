@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import sharp from 'sharp'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { isNortheastOfBoundary, trimToGameWorld, NORTHEAST_BOUNDARY } from './redSea'
+import { isNortheastOfBoundary, trimToGameWorld, NORTHEAST_BOUNDARY, boundarySignedDistance } from './redSea'
 import { sampleTerrain, isBlocked } from './terrain'
 import { elevationAt, landFractionAt } from './geodata'
 import { balance } from '../config/balance'
@@ -295,6 +295,91 @@ describe('world trim on the real DEM', () => {
     expect(t.type).toBe('desert')
     expect(landFractionAt(19, 37)).toBeGreaterThan(0.9)
     expect(isBlocked(t.type, 19, 37)).toBe(false)
+  })
+})
+
+describe('boundarySignedDistance + the trim-coast smoothing (point 210)', () => {
+  const seed = 1
+
+  it('is signed: positive on the kept-land (SW) side, negative on the trimmed-ocean (NE) side', () => {
+    expect(boundarySignedDistance(30.05, 31.25)).toBeGreaterThan(0) // Cairo (land)
+    expect(boundarySignedDistance(19, 37)).toBeGreaterThan(0) // African Red Sea coast (land)
+    expect(boundarySignedDistance(20, 38)).toBeLessThan(0) // mid Red Sea (ocean)
+    expect(boundarySignedDistance(24, 45)).toBeLessThan(0) // Arabia (ocean)
+    expect(boundarySignedDistance(12, 45)).toBeLessThan(0) // Gulf of Aden (ocean)
+  })
+
+  it('its sign agrees with isNortheastOfBoundary everywhere (≤ 0 ⟺ northeast)', () => {
+    for (let lat = 12; lat <= 33; lat += 1.5) {
+      for (let lon = 31; lon <= 52; lon += 1.5) {
+        const bsd = boundarySignedDistance(lat, lon)
+        if (Math.abs(bsd) < 1e-6) continue // skip the exact line
+        expect(bsd <= 0, `sign at ${lat},${lon} (bsd=${bsd})`).toBe(isNortheastOfBoundary(lat, lon))
+      }
+    }
+  })
+
+  // The trim stamps ocean per texel northeast of NORTHEAST_BOUNDARY, so where
+  // that artificial cut IS the coast (the Suez isthmus east of Cairo) it
+  // staircased like the raster coast before point 209 — and 209's vector
+  // smoothing does not reach it. Point 210 rebuilds the land fraction there
+  // from the signed boundary distance: a smooth diagonal.
+  const oceanCrossingLon = (lat: number): number => {
+    // First longitude (scanning east) where the terrain turns to ocean.
+    let prevLand = false
+    for (let lon = 32.0; lon <= 33.6; lon += 0.004) {
+      const isOcean = sampleTerrain(lat, lon, seed).type === 'ocean'
+      if (isOcean && prevLand) return lon
+      prevLand = !isOcean
+    }
+    return NaN
+  }
+
+  it('the Suez-isthmus coast crossing MOVES continuously with latitude (sub-texel smooth, not grid-locked)', () => {
+    // A binary per-texel stamp would snap the land→ocean crossing to the DEM
+    // texel grid, repeating one quantized longitude across a whole texel band
+    // of latitudes. The smoothed boundary must instead shift the crossing
+    // continuously as the polyline slants — distinct crossings a fine step apart.
+    const crossings = [30.02, 30.06, 30.1, 30.14].map(oceanCrossingLon)
+    for (const c of crossings) expect(Number.isFinite(c)).toBe(true)
+    const distinct = new Set(crossings.map((c) => c.toFixed(3)))
+    expect(distinct.size).toBeGreaterThanOrEqual(3) // not one repeated grid value
+    // and the motion is gentle (a smooth slant, no texel jump)
+    for (let i = 1; i < crossings.length; i++) {
+      expect(Math.abs(crossings[i] - crossings[i - 1])).toBeLessThan(0.03)
+    }
+  })
+
+  it('the smoothed trim coast has a graded shore ramp, not an instant deep-ocean step', () => {
+    // The land fraction ramps down across the boundary, so the sea floor rises
+    // toward the shore: a near-shore ocean sample is clearly SHALLOWER than one
+    // a band further out. A binary per-texel stamp would drop both to the same
+    // deep floor (difference ~0) — the staircase this point removes.
+    const cross = oceanCrossingLon(30.05)
+    const near = sampleTerrain(30.05, cross + 0.015, seed).height
+    const far = sampleTerrain(30.05, cross + 0.1, seed).height
+    expect(near).toBeGreaterThan(far + 0.08)
+  })
+
+  it('does NOT re-add land in the real Gulf-of-Suez head (no spurious sliver across open water)', () => {
+    // Genuine gulf water sits southwest of the boundary here; the guard must
+    // leave it — and the thin band at the boundary must not sprout a land bridge
+    // across the gulf mouth.
+    for (const [lat, lon] of [
+      [29.7, 32.5],
+      [29.5, 32.55],
+      [29.5, 32.7], // in the boundary band, but water reaches SW of it
+    ] as const) {
+      expect(sampleTerrain(lat, lon, seed).type, `gulf head ${lat},${lon}`).toBe('ocean')
+    }
+  })
+
+  it('leaves every world-trim acceptance verdict unchanged', () => {
+    expect(sampleTerrain(20, 38, seed).type).toBe('ocean') // mid Red Sea
+    expect(sampleTerrain(29, 34, seed).type).toBe('ocean') // Sinai
+    expect(sampleTerrain(30.05, 31.25, seed).type).not.toBe('ocean') // Cairo (land)
+    expect(landFractionAt(30.05, 31.25)).toBeGreaterThan(0.5)
+    expect(sampleTerrain(19, 37, seed).type).toBe('desert') // African Red Sea coast
   })
 })
 
