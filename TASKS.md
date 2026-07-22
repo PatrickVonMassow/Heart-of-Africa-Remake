@@ -9177,8 +9177,11 @@ the remaining open points in their numeric order.
   gambols via `leashedGambolDir`). FIX: widen the calf follow/leash radius (and the
   gambol play `range` fed to `leashedGambolDir`) so the calf can roam noticeably
   further, and MOVE the value(s) into `balance.family` so they are debug-editable
-  per §21.2 (calibratable). Keep the leashed-gambol anti-jitter intact (just a
-  larger range — the damping has no cancellation point regardless of range).
+  per §21.2 (calibratable). CONCRETE TARGET (user decision 22.07.2026): use 3× the
+  current follow radius (1.8 → 5.4) — scale the gambol play range with it — AND
+  LENGTHEN the gambol hop-bout duration so the young hop around longer before the
+  bout ends. Keep the leashed-gambol anti-jitter intact (just a larger range — the
+  damping has no cancellation point regardless of range).
   Verify the dependent drama mechanics still resolve at the wider spacing: the
   parent still guards from `GUARD_RADIUS = 12` and must still reach the calf/
   predator in time — check that the rescue-burst speed (`balance.family.rescueBurst`,
@@ -9197,6 +9200,39 @@ the remaining open points in their numeric order.
   DOCS: design.md §19.8 (calf leash / family life) + §21.2 (calibratable value).
   No player-visible text. NOTE: same files as points 217/228/237
   (`wildlifeBehavior.ts`/`Wildlife.tsx`) — do NOT delegate concurrently with those.
+
+- [ ] 239. SMALL/WEAK ANIMALS FLEE THE PLAYER TOO (not only predators) — the user
+  wants (22.07.2026) small/weak animals to flee (run or fly) from the PLAYER's
+  bird's-eye figure, not only from predators; for JUVENILES this extends to species
+  that are MID-RANKED per the §14.1 danger order (a calf/chick is vulnerable
+  whatever its adult rank). A collision between the player and these animals must
+  stay WITHOUT CONSEQUENCE, exactly as now (no damage, no event — the flee is
+  cosmetic shyness; these animals remain passable, and the §19.3 walk-into-a-
+  wandering-PREDATOR attack is unchanged since that is about predators, not weak
+  prey). BEHAVIOUR: when the player approaches within a flee radius, a weak/prey
+  animal turns and flees away from the player using the EXISTING steady-escape /
+  anti-oscillation machinery (the same smooth held heading as the predator flee —
+  cf. point 237, no ~90° flip), and birds fly off; apex/strong adults (lion,
+  leopard, hyena, cheetah, elephant, crocodile, hippo, buffalo, rhino …) do NOT
+  flee the player. Decide "small/weak" from the §14.1 danger rank / the species
+  weapon table already in `wildlifeBehavior.ts`: the weak prey tier flees as
+  adults; an animal at/above a mid rank does not — EXCEPT any JUVENILE (calf, foal,
+  chick, cub), which flees even when its species is mid-ranked. FIX: add a
+  flee-from-player trigger that reuses the predator-flee heading logic (do not fork
+  a second oscillation-prone path), keyed on a `fleesFromPlayer(species, isJuvenile)`
+  predicate; keep the player-collision resolution consequence-free (nudge/pass, no
+  event). Anchors: `src/scenes/travel/wildlifeBehavior.ts` (the rank/weapon tables,
+  the flee/steady-escape heading, the player-proximity), `src/scenes/travel/
+  Wildlife.tsx` (player position + the flee trigger + the consequence-free collide).
+  VERIFIABLE: pure test — `fleesFromPlayer` is TRUE for the weak/prey species and
+  for ANY juvenile (incl. a mid-rank juvenile) and FALSE for apex adults; the
+  flee heading is the steady-escape (no oscillation, reusing 237's test pattern);
+  a live check in `scripts/verify/enrichments.mjs` that an approaching player makes
+  a grazer flee while the player takes NO event and the pass stays consequence-free.
+  DOCS: design.md §19 (ambient wildlife shy from the traveller). No player-visible
+  text. NOTE: same files as points 238/217/228/237 (`wildlifeBehavior.ts`/
+  `Wildlife.tsx`) — delegate TOGETHER with 238 on the wildlife-behaviour branch (or
+  strictly after), never concurrently with the other wildlife points.
 
 ## Closing (only after all points)
 
