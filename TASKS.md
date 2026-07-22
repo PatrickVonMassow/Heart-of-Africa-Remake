@@ -8402,6 +8402,28 @@ the remaining open points in their numeric order.
   requirement alongside the tessellation floors; CLAUDE §7.1 pt.15 if the
   acceptance wording changes.
 
+- [ ] 215. SKYLINE / PANORAMA MOUNTAINS read ANGULAR / FACETED — the §2.5
+  surroundings-panorama backdrop (the far map-landscape relief around a
+  settlement, relief-capped, double-sided, rock-shaded) shows hard flat facets on
+  its mountains/dunes instead of a smooth ridge (user report 22.07.2026,
+  screenshot at Cairo: the desert hills behind the town read as angular polygon
+  planes). Smooth them. DIAGNOSE FIRST (a rendered close-up of the backdrop at
+  Cairo, both backends): the cause is a coarse backdrop heightfield mesh and/or
+  FLAT shading (per-face normals). Anchors: `src/scenes/place/backdrop.ts` (the
+  backdrop mesh build + its material), `src/scenes/place/backdrop.test.ts` (pins
+  the heightfield bounds/clamp). FIX: give the backdrop mesh SMOOTH vertex normals
+  (`computeVertexNormals` / `flatShading: false` on its material) and, if the
+  silhouette still steps, raise the heightfield sample resolution a step — keeping
+  the §2.5 relief cap, the double-sided draw and the no-sunken-below-ground clamp
+  (backdrop.test.ts must stay green, incl. the Berber low-horizon bound). This is
+  the SHADING/tessellation cousin of point 214 (figures) — do NOT flatten the
+  intended stylization elsewhere, only smooth the backdrop terrain silhouette.
+  VERIFIABLE: extend `backdrop.test.ts` to assert the backdrop carries smooth
+  (non-flat) normals at/above its sample floor; a rendered close-up of the Cairo
+  backdrop shows a smooth ridge with no hard facets, on BOTH WebGL2 and WebGPU per
+  [[verify-gui-on-both-backends]] (screenshot pair). DOCS: design.md §2.5 note the
+  smooth-shading requirement; CLAUDE §7.1 pt.15 if acceptance wording changes.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
