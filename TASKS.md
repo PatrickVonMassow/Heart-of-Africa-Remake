@@ -9167,7 +9167,7 @@ the remaining open points in their numeric order.
   `wildlifeBehavior.ts`/`Wildlife.tsx`; do NOT delegate these wildlife-behaviour
   points concurrently with each other.
 
-- [ ] 238. WIDEN THE CALF LEASH SO THE FAMILY DRAMAS READ — the user observes
+- [x] 238. WIDEN THE CALF LEASH SO THE FAMILY DRAMAS READ — the user observes
   (22.07.2026) that a calf stays VERY close to its parent, so the §19.8 family
   dramas (the parent's sacrifice, hurling itself before an elephant's feet, the
   calf's flight) happen in such a tight cluster that they are not recognisable as
@@ -9201,7 +9201,7 @@ the remaining open points in their numeric order.
   No player-visible text. NOTE: same files as points 217/228/237
   (`wildlifeBehavior.ts`/`Wildlife.tsx`) — do NOT delegate concurrently with those.
 
-- [ ] 239. SMALL/WEAK ANIMALS FLEE THE PLAYER TOO (not only predators) — the user
+- [x] 239. SMALL/WEAK ANIMALS FLEE THE PLAYER TOO (not only predators) — the user
   wants (22.07.2026) small/weak animals to flee (run or fly) from the PLAYER's
   bird's-eye figure, not only from predators; for JUVENILES this extends to species
   that are MID-RANKED per the §14.1 danger order (a calf/chick is vulnerable
