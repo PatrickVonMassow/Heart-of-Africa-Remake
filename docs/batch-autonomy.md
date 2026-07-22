@@ -124,6 +124,55 @@ Headless sessions without the Artifact tool record
 current content only. What stays judgment: the machine verifies the card's
 POINT NUMBER, publish state and freshness, never the truth of the prose.
 
+## Render-verify (both backends — enforced, not reminded)
+
+Every GUI/rendering/shader fix must be verified on BOTH renderer backends —
+`VERIFY_GL=webgpu` (system Chrome, the user's real backend) AND `VERIFY_GL=webgl`
+(the shipped fallback) — judged by the rendered PICTURE, before it is
+committed/ticked/called done. The reminder alone failed (22.07.2026: the
+point-210 sea-coast fix was "done" after a WebGL2-only check while the WebGPU
+picture was still stepped — the fix never touched the water shader's path), so
+the rule is machine-enforced by `scripts/render-verify-guard.mjs` (Stop hook;
+decision logic in `render-verify-core.mjs`, Vitest-covered; state in the
+git-ignored `.claude/render-verify-state.json`).
+
+How it works, mechanically:
+
+- **Evidence is recorded inside the suite process, never self-reported.**
+  `scripts/verify/_browser.mjs` arms `scripts/render-verify-recorder.mjs` on
+  every browser-suite launch; at process exit it records backend, suite, exit
+  code, whether `assertBackend` CONFIRMED the backend, and the screenshots the
+  run actually wrote. Only an exit-0 record counts as coverage, and only if it
+  finished AFTER the last edit of any changed render file (an earlier run never
+  saw the final code).
+- **The gate fires on committed render changes.** At turn-end the Stop hook
+  diffs the verified baseline (`clearedHead`) against HEAD; if the diff touches
+  the render set (`src/render/**`, `src/scenes/**`, `src/ui/**`, `src/App.tsx`,
+  `*.tsl.*`, the browser verify suites) it BLOCKS until a passing run per
+  backend is recorded — naming the missing backend and the exact command. When
+  both are covered it advances the baseline by itself. Fail-open: any guard
+  error → allow.
+- **The standard command pair for a render fix** (then LOOK at both frames —
+  the screenshots in `verification/` — before committing/ticking):
+
+  ```
+  VERIFY_GL=webgpu node scripts/verify/run-all.mjs <suite>
+  VERIFY_GL=webgl  node scripts/verify/run-all.mjs <suite>
+  ```
+
+  Pick the suite whose screenshots show the changed view. Inspect with
+  `node scripts/render-verify-guard.mjs status`.
+- **The loud escape valve:** if one backend genuinely cannot be judged headless
+  (e.g. a washed-out WebGPU frame — that is a FINDING, not a pass), record
+  `node scripts/render-verify-guard.mjs --defer "<reason>"`. It covers the
+  CURRENT head only, is logged in the state file, and must be named in any
+  report. `--clear "<reason>"` exists for the manual-hardware-verified case.
+
+What stays judgment: the machine proves a passing run per backend happened
+after the change — it cannot prove a human (or the assistant) actually LOOKED
+at the frames. Looking is the standing rule; the gate makes skipping a backend
+impossible, not skipping the inspection.
+
 ## Signal channel + never blocking on the user
 
 - **Out-of-band notification (ntfy):** `scripts/notify.mjs` POSTs to `ntfy.sh/<topic>`

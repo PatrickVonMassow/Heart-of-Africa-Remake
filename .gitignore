@@ -38,6 +38,7 @@ scripts/.tile-cache
 .claude/focus-check-pending.json
 .claude/tool-activity.json
 .claude/wait-prep.json
+.claude/render-verify-state.json
 .claude/autostart.log
 .claude/autostart-last.json
 .claude/autostart-authorized.json

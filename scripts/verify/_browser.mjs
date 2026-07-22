@@ -8,6 +8,7 @@
 // and asserts the backend that initialised is the one requested — no silent fallback
 // (the guardrail, the whole point of the lane).
 import { chromium } from 'playwright'
+import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.mjs'
 
 // Which backend the verify run targets. 'webgpu' = system Chrome, headless=new (the
 // player's primary backend); 'webgl' = the bundled Chromium with ANGLE (the WebGL2
@@ -22,6 +23,11 @@ export const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'w
  *  --headless=new works on a secure-context page (the point-184 breakthrough). The
  *  WebGL2 lane keeps the historical bundled-Chromium + ANGLE D3D11 launch. */
 export async function launchVerifyBrowser() {
+  // Render-verify evidence (user mandate 22.07.2026): record this suite run —
+  // backend, exit code, screenshots — from inside the process, so the Stop-hook
+  // guard (scripts/render-verify-guard.mjs) can enforce that every render change
+  // was verified on BOTH backends. Observe-only; can never fail the suite.
+  armRunRecorder(VERIFY_GL)
   if (VERIFY_GL === 'webgpu') {
     return chromium.launch({
       channel: 'chrome',
@@ -49,6 +55,7 @@ export async function assertBackend(page) {
   if (VERIFY_GL === 'webgl' && info.isWebGPU) {
     throw new Error('assertBackend: VERIFY_GL=webgl but the renderer initialised on WebGPU — the fallback lane is not exercising WebGL2')
   }
+  markBackendAsserted() // render-verify evidence: the backend was CONFIRMED, not assumed
   return info
 }
 
