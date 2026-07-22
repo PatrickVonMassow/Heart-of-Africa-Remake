@@ -4,7 +4,17 @@
 // inner plain (y ≈ -2) were horizon-clipped by the settlement's ground disc
 // to flat black back-slivers "lying on the sand".
 import { describe, it, expect, beforeAll } from 'vitest'
-import { backdropHeightAt, panoramaGroundY, BACKDROP_MAX_SLOPE, BACKDROP_OUTER } from './backdrop'
+import * as THREE from 'three/webgpu'
+import {
+  backdropHeightAt,
+  backdropTaper,
+  panoramaGroundY,
+  BACKDROP_MAX_SLOPE,
+  BACKDROP_OUTER,
+  BACKDROP_RINGS,
+  BACKDROP_SEGS,
+} from './backdrop'
+import { createBackdropMaterial } from './backdropMaterial'
 import { placeById } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { setupGeodata } from '../../test/geodata'
@@ -41,6 +51,44 @@ describe('backdrop heightfield (design.md §2.5)', () => {
       const y = backdropHeightAt(Math.cos(a) * r, Math.sin(a) * r, lat, lon, SEED, centerH, r0)
       expect(y).toBeLessThanOrEqual(r * BACKDROP_MAX_SLOPE)
     }
+  })
+
+  it('holds the raised sampling resolution (no stepped ridge silhouette)', () => {
+    // User-reported hard polygon facets at Cairo: the visible steps were the
+    // silhouette of the coarse 24×160 heightfield. Floors, not exact values —
+    // the resolution may rise further but never fall back.
+    expect(BACKDROP_RINGS).toBeGreaterThanOrEqual(48)
+    expect(BACKDROP_SEGS).toBeGreaterThanOrEqual(320)
+  })
+
+  it('keeps the historic inner-rim taper profile independent of the resolution', () => {
+    // The taper used to be a function of the 24-ring index (min(1, ri/5));
+    // raising the mesh resolution must not squeeze the fade-in band, so it is
+    // now a pure radius function pinned against the historic 24-ring profile.
+    const { r0 } = placeParams('cairo', 48)
+    for (let i = 0; i <= 20; i++) {
+      const r = r0 * Math.pow(BACKDROP_OUTER / r0, i / 20)
+      const logFrac = Math.log(r / r0) / Math.log(BACKDROP_OUTER / r0)
+      const historic = Math.min(1, (23 * logFrac) / 5)
+      expect(backdropTaper(r, r0)).toBeCloseTo(historic, 10)
+    }
+    expect(backdropTaper(r0, r0)).toBe(0)
+    expect(backdropTaper(BACKDROP_OUTER, r0)).toBe(1)
+  })
+})
+
+describe('backdrop material (design.md §2.5 smooth shading)', () => {
+  it('shades smooth — never flat per-face facets — and keeps the §2.5 draw state', () => {
+    const m = createBackdropMaterial()
+    // The Cairo facet report: flatShading would replace the heightfield's
+    // interpolated vertex normals with per-face normals.
+    expect(m.flatShading).toBe(false)
+    // Double-sided so steep far slopes never show as black backface overhangs.
+    expect(m.side).toBe(THREE.DoubleSide)
+    // Biome vertex colors under the rock shading, with a real normal node.
+    expect(m.vertexColors).toBe(true)
+    expect(m.colorNode).toBeTruthy()
+    expect(m.normalNode).toBeTruthy()
   })
 })
 

@@ -10,9 +10,25 @@ export const BACKDROP_HEIGHT = 30 // vertical exaggeration of the map relief
 // angle): keeps mountains as a distant horizon range, never looming over the
 // camera. atan(0.32) ≈ 18°.
 export const BACKDROP_MAX_SLOPE = 0.32
-export const BACKDROP_RINGS = 24
-export const BACKDROP_SEGS = 160 // smoother far-range silhouette (shader adds detail)
+// Mesh resolution. Doubled (24×160 → 48×320) after the user-reported hard
+// polygon facets on the Cairo dune ridge: the shading is already smooth
+// (interpolated vertex normals), so the visible steps were the SILHOUETTE of
+// the coarse heightfield sampling. The taper below is a pure radius function,
+// so raising the resolution never changes the backdrop's shape.
+export const BACKDROP_RINGS = 48
+export const BACKDROP_SEGS = 320
 export const BACKDROP_OUTER = 340 // outermost ring radius
+
+// The inner rim fades in over a fixed fraction of the log-radial span
+// (historically the first 5 of 24 rings) — resolution-independent.
+export const BACKDROP_TAPER_SPAN = 5 / 23
+
+/** Inner-rim fade-in (0 at r0 → 1 past the taper band) as a pure function of
+ * the radius, shared by the mesh build and `backdropHeightAt`. */
+export function backdropTaper(r: number, r0: number): number {
+  const t = Math.log(Math.max(r, r0) / r0) / Math.log(BACKDROP_OUTER / r0)
+  return Math.min(1, t / BACKDROP_TAPER_SPAN)
+}
 
 /**
  * Height of the backdrop surface at a point (x, z) around the place centre —
@@ -32,9 +48,7 @@ export function backdropHeightAt(
   const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
   const relief = (smp.height - centerH) * BACKDROP_HEIGHT
   const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
-  const ri = ((BACKDROP_RINGS - 1) * Math.log(Math.max(r, r0) / r0)) / Math.log(BACKDROP_OUTER / r0)
-  const taper = Math.min(1, ri / 5)
-  return capped * taper - 2
+  return capped * backdropTaper(r, r0) - 2
 }
 
 /**
