@@ -40,6 +40,12 @@ import { NILE_FLOOD, SURFACE_LIFT, LAKE_LIFT, lakeBedMax, densifyRiver, register
 import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
 
 const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
+// point 211(a): the river mouth reaches the sea across a short OCEAN run, but the
+// ribbon used to end at the last LAND point (the coast contour), which sits
+// inland of where the sea sheet begins — leaving a beach strip between ribbon and
+// sea. Carry the ribbon over the first few ocean points of the mouth so it merges
+// into the sea sheet; a longer run is still the open sea and ends the strip.
+const MOUTH_BRIDGE = 3
 
 interface FallDef {
   x: number
@@ -171,13 +177,21 @@ function buildRivers(seed: number): {
     const PROBE = (HALF_WIDTH + BANK_PROBE_DEG * 10) / HALF_WIDTH
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
-      if (samples[i].type === 'ocean') {
+      const isOcean = samples[i].type === 'ocean'
+      if (isOcean) {
         oceanRun++
-        if (oceanRun > 3) stripStart = -1 // reached open sea: stop rather than bridge across it
-        continue
+        // Bridge only the MOUTH of an open strip (point 211a): carry the ribbon
+        // over the first MOUTH_BRIDGE ocean points so it reaches the sea sheet,
+        // then a longer run is the open sea and ends the strip. Ocean points with
+        // no open strip (a source in misclassified sea) are still skipped.
+        if (stripStart < 0 || oceanRun > MOUTH_BRIDGE) {
+          if (oceanRun > 3) stripStart = -1 // reached open sea: stop rather than bridge across it
+          continue
+        }
+      } else {
+        oceanRun = 0
+        if (surf[i] < samples[i].height - 0.05) buried++
       }
-      oceanRun = 0
-      if (surf[i] < samples[i].height - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)
@@ -192,9 +206,11 @@ function buildRivers(seed: number): {
       flows.push(f, f)
       const fk = river.id === 'nile' ? 1 : 0
       floodK.push(fk, fk)
-      const bankL = bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
-      const bankR = bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
-      interiorEdges += (1 - bankL) + (1 - bankR)
+      // A mouth-bridge vertex sits in the sea: no real bank, and it must not count
+      // as an interior edge (the bank/foam metric stays about land banks only).
+      const bankL = isOcean ? 0 : bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
+      const bankR = isOcean ? 0 : bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
+      if (!isOcean) interiorEdges += (1 - bankL) + (1 - bankR)
       banks.push(bankL, bankR)
       if (stripStart >= 0) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
       else strips++ // a land point with no open strip begins a new drawn strip
