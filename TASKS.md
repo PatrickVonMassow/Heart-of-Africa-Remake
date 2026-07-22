@@ -8170,6 +8170,28 @@ the remaining open points in their numeric order.
   and the safer lever. Either way, verify on BOTH backends per
   [[verify-gui-on-both-backends]] with the user's real WebGPU as the trusted
   witness (headless WebGPU is washed-out). Mesh-LOD and water-colour are RULED OUT.
+  RESOLVED the broad wedge (22.07, commit 3e00390) — ROOT CAUSE finally pinned by
+  a fine height probe: the DEM bathymetry at the gulf head is GARBAGE — the
+  ~-3000 m trim stamp alternates CELL-BY-CELL with shallow (~0 m) real texels
+  (e.g. 29.85N reads -1.9, -1.4, -0.1, -1.5, -1.9 across five cells), cliffing the
+  NEAR-terrain ocean-floor mesh (buildChunkGeometry → sampleTerrain().height) into
+  the blocky lit wedge the transparent shallows reveal. Confirmed via A/B renders
+  on BOTH backends: FarTerrain is not involved (visible at zoom 0.5); grading the
+  demElevation water-depth texture, the kept-side hOcean, and the NE-side hOcean
+  all left it unchanged (a partial ease stays below the -0.6 deep-tone threshold,
+  so nothing read); a red-injection probe proved the harness reaches the render
+  and the cells ARE ocean. FIX: clamp the stamped-floor texels (elevation <
+  -900 m — garbage stamp, never natural bathymetry) near the boundary to a shallow
+  shelf, GATED on !boundaryIsCoast (so the isthmus shore ramp — redSea shore-ramp
+  test — is untouched) and eased back to the DEM floor across the seaward half of
+  the band. redSea.test +1 guardrail (31), full Vitest 2075 green, lint clean; the
+  broad dark sea-arm is GONE on WebGPU AND WebGL2 (captures gulf-gpu2 / gulf-iter2).
+  STILL OPEN: a SMALL residual dark streak remains at the gulf head on both
+  backends (a thin diagonal, far less prominent than the original wedge) — likely
+  the boundaryIsCoast=true cells the clamp excludes, or moderately-deep natural
+  cells. Needs the user's real-WebGPU eyes to judge whether it still reads as a
+  defect; if so, a follow-up can widen the clamp carefully or address those cells.
+  The user's actual complaint (the broad inlet into the desert) is resolved.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
