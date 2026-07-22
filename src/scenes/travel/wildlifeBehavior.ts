@@ -148,6 +148,100 @@ export function fleesPlayerNow(
 }
 
 /**
+ * The drink-errand exemption from the player-shy flee, NARROWED (point 247).
+ * The old blanket rule ("any animal with a drink target never shies") existed
+ * to protect the staged §19.16 bank dramas — but it also made a PLAIN drinking
+ * juvenile ignore the traveller standing over it (the reported bug). The
+ * exemption now keeps exactly what it was for:
+ * - a STAGED BANK VICTIM — a crocodile's current lunge target, or a drinker
+ *   whose bank spot lies inside a lurking crocodile's strike radius (the
+ *   imminent-ambush window; fleeing there would starve the drama) — never
+ *   shies, juvenile or adult (the mired/caught calves are already covered by
+ *   the isInDrama gate);
+ * - an ADULT keeps its whole bank errand (the walk-to-water/drink/walk-back
+ *   cycle is its own deliberate behaviour, and the ambush needs standing
+ *   adult drinkers as its pool);
+ * - a plain drinking JUVENILE is NOT exempt — it bolts from the close
+ *   traveller like any calf.
+ */
+export function drinkExemptFromPlayerShy(
+  isJuvenile: boolean,
+  drinking: boolean,
+  stagedBankVictim: boolean,
+): boolean {
+  if (!drinking) return false
+  if (stagedBankVictim) return true
+  return !isJuvenile
+}
+
+/** Which threat source won the flee arbitration (point 252). The DRAMA and
+ *  PREDATOR-flee cases yield no source here: a drama owns its animal's whole
+ *  movement, and the predator flee runs its own urgency-scaled block — the
+ *  resolver's job for those is to return null so the player-shy flee can
+ *  never pre-empt them. */
+export type FleeThreatSource = 'elephant' | 'player'
+
+/** The animal-side state the flee arbitration reads (point 252). */
+export interface FleeArbitrationState {
+  species: string
+  isJuvenile: boolean
+  /** The §14.1-aligned weapon table (balance.parentDefense.preyWeapon). */
+  preyWeapon: Record<string, number>
+  /** The FULL co-active drama/hunt state — every flag, so no drama can slip
+   *  past the gate through an incomplete hand-built object. */
+  drama: DramaState
+  /** Mid drink/bathe bank errand (a.drink set). */
+  drinking: boolean
+  /** Bound into a staged §19.16 bank drama (see drinkExemptFromPlayerShy). */
+  stagedBankVictim: boolean
+}
+
+/**
+ * THE arbitration point for a free animal's flee target (point 252): ONE
+ * resolver ranks every co-active threat instead of scattered checks, so the
+ * held dodge heading is chosen consistently. Priority, high to low:
+ * 1. Any scripted §19.8 drama — handled BEFORE this resolver (familyHeld owns
+ *    the movement); the drama gate inside fleesPlayerNow is the structural
+ *    backstop should a drama flag ever reach here.
+ * 2. The predator flee — its own block moves the animal; it reaches this
+ *    resolver flagged `isHunted`, which silences the player-shy flee while
+ *    the elephant dart below stays live (a prey boxed between lion and herd
+ *    still darts).
+ * 3. The last-moment elephant dart (`elephants` in `elephantRing`).
+ * 4. The player-shy flee (`player` in `playerRing`) — only from an idle/
+ *    graze/drink state per fleesPlayerNow and the narrowed drink exemption.
+ * 5. Nothing (null): idle.
+ * The winner's heading feeds the SAME held `dodgeHeading` (turnToward under
+ * the caller's turn cap and hysteresis rings), so a hand-over between
+ * sources — elephant dart ending into a player flight — turns smoothly and
+ * can never flip-flop (the point-237 steady-escape rule ACROSS sources).
+ */
+export function resolveFleeTarget(
+  x: number,
+  z: number,
+  s: FleeArbitrationState,
+  elephants: ReadonlyArray<readonly [number, number]>,
+  player: ReadonlyArray<readonly [number, number]>,
+  elephantRing: number,
+  playerRing: number,
+): { source: FleeThreatSource; heading: number } | null {
+  // The elephant dart: the top flee reflex — live even for a predator-fleeing
+  // prey (the caller passes [] for species that never dart, and no drama-held
+  // animal reaches this resolver at all).
+  if (elephants.length > 0) {
+    const e = fleeHeading(x, z, elephants, elephantRing)
+    if (e !== null) return { source: 'elephant', heading: e }
+  }
+  // The player-shy flee: only from an idle state — a hunt/drama outranks it
+  // (fleesPlayerNow), and the staged bank victims / adult drinkers keep
+  // their errand (point 247).
+  if (drinkExemptFromPlayerShy(s.isJuvenile, s.drinking, s.stagedBankVictim)) return null
+  if (!fleesPlayerNow(s.species, s.isJuvenile, s.preyWeapon, s.drama)) return null
+  const p = fleeHeading(x, z, player, playerRing)
+  return p === null ? null : { source: 'player', heading: p }
+}
+
+/**
  * Blocking station for a parent whose calf is being run down by a predator
  * (design.md §19): the parent keeps itself between the hunter and its young,
  * at a point `offset` from the calf toward the predator — a living shield on
@@ -202,6 +296,28 @@ export function crossingTarget(
     if (t !== 'water') return { tx: px, tz: pz } // the far bank
   }
   return null
+}
+
+/**
+ * The boxed-flight crossing decision (points 192/248): when a flee/dodge step
+ * dead-ends against the water (`moved` false), the animal takes to it and
+ * swims for the far bank rather than balking at the waterline — the SAME rule
+ * for every flight source (predator flee, elephant dart AND the player-shy
+ * flee; point 248 closed the player-shy gap that pinned a player-boxed animal
+ * at the bank). crossingTarget still refuses the ocean and over-wide channels,
+ * and an animal already mid-crossing starts no second one.
+ */
+export function fleeCrossing(
+  moved: boolean,
+  alreadyCrossing: boolean,
+  x: number,
+  z: number,
+  heading: number,
+  maxUnits: number,
+  terrainTypeAt: (x: number, z: number) => string,
+): { tx: number; tz: number } | null {
+  if (moved || alreadyCrossing) return null
+  return crossingTarget(x, z, heading, maxUnits, terrainTypeAt)
 }
 
 /**

@@ -14,6 +14,10 @@ import {
   fleesFromPlayer,
   fleesPlayerNow,
   isInDrama,
+  drinkExemptFromPlayerShy,
+  resolveFleeTarget,
+  fleeCrossing,
+  type FleeArbitrationState,
   PLAYER_SHY_STRONG_WEAPON,
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
@@ -325,6 +329,189 @@ describe('fleesPlayerNow (point 252 — player-shy flee only in an idle state)',
     const [lsx, lsz] = dir(lionFlee as number)
     expect(lsz).toBeGreaterThan(0.9) // away from the lion, up the +z axis
     expect(lsx).toBeCloseTo(0, 5) // and NOT deflected toward −x by the player
+  })
+})
+
+describe('drinkExemptFromPlayerShy (point 247 — the drinker exemption narrowed to the staged bank victims)', () => {
+  it('a non-drinker is never exempt, whatever the other flags say', () => {
+    expect(drinkExemptFromPlayerShy(true, false, false)).toBe(false)
+    expect(drinkExemptFromPlayerShy(false, false, true)).toBe(false)
+  })
+
+  it('a staged §19.16 bank victim keeps its stand — juvenile or adult', () => {
+    // The crocodile's lunge target / a drinker inside a lurking crocodile's
+    // strike radius: fleeing there would starve the ambush drama the
+    // exemption exists to protect.
+    expect(drinkExemptFromPlayerShy(true, true, true)).toBe(true)
+    expect(drinkExemptFromPlayerShy(false, true, true)).toBe(true)
+  })
+
+  it('a PLAIN drinking juvenile is NOT exempt — it flees the close traveller (the reported bug)', () => {
+    expect(drinkExemptFromPlayerShy(true, true, false)).toBe(false)
+  })
+
+  it('an adult keeps its whole bank errand (and stays in the ambush pool)', () => {
+    expect(drinkExemptFromPlayerShy(false, true, false)).toBe(true)
+  })
+})
+
+describe('resolveFleeTarget (point 252 — ONE arbitration point for every co-active threat)', () => {
+  const W = balance.parentDefense.preyWeapon
+  // The rings/speeds mirror Wildlife.tsx: PREY_PANIC_RADIUS 3.2, PLAYER_SHY_
+  // RADIUS 6, the PREY_PANIC_EXIT 1.5 hysteresis, PREY_DODGE_TURN 8 rad/s.
+  const free = (over: Partial<FleeArbitrationState> = {}): FleeArbitrationState => ({
+    species: 'antelope',
+    isJuvenile: false,
+    preyWeapon: W,
+    drama: {},
+    drinking: false,
+    stagedBankVictim: false,
+    ...over,
+  })
+
+  it('a free weak prey inside the shy ring flees the PLAYER — heading straight away', () => {
+    const pick = resolveFleeTarget(0, 0, free(), [], [[0, -4]], 3.2, 6)
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('player')
+    const [, sz] = dir(pick!.heading)
+    expect(sz).toBeGreaterThan(0.9) // away from the traveller at −z
+  })
+
+  it('threatened by BOTH a predator and the player, the prey flees the PREDATOR — the resolver yields nothing', () => {
+    // The predator flee runs its own urgency-scaled block and reaches the
+    // resolver flagged isHunted: the player-shy flee must stay silent so the
+    // hunt keeps its own heading and always resolves (the lion victim too).
+    expect(resolveFleeTarget(0, 0, free({ drama: { isHunted: true } }), [], [[0, -2]], 3.2, 6)).toBeNull()
+    expect(resolveFleeTarget(0, 0, free({ drama: { isLionVictim: true } }), [], [[0, -2]], 3.2, 6)).toBeNull()
+  })
+
+  it('EVERY drama state silences the player-shy flee — incl. the flags the old call sites omitted', () => {
+    // The pre-252 hand-built DramaState objects left out vigil/kick/plunge/
+    // trample/defending; the one dramaStateOf builder now feeds them all.
+    const dramas = [
+      { caught: 0 },
+      { fireTrapped: 2 },
+      { inWater: 0.5 },
+      { rescued: true },
+      { mired: 0 },
+      { crossing: { tx: 1, tz: 1, time: 0 } },
+      { vigil: { x: 0, z: 0 } },
+      { kick: 0.3 },
+      { plungeTo: { x: 0, z: 0 } },
+      { trampleTo: { x: 0, z: 0 } },
+      { defending: true },
+    ]
+    for (const drama of dramas) {
+      expect(resolveFleeTarget(0, 0, free({ drama }), [], [[0, -2]], 3.2, 6), JSON.stringify(drama)).toBeNull()
+    }
+  })
+
+  it('the elephant dart outranks the player-shy flee — one source, the pure elephant heading, no blend', () => {
+    const elephants: [number, number][] = [[-2.5, 0]]
+    const player: [number, number][] = [[0, -4]]
+    const pick = resolveFleeTarget(0, 0, free(), elephants, player, 3.2, 6)
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('elephant')
+    // The heading is EXACTLY the elephant escape — an equal-weight blend of two
+    // opposing sources would have a cancellation point (the leash lesson).
+    expect(pick!.heading).toBe(fleeHeading(0, 0, elephants, 3.2) as number)
+  })
+
+  it('the elephant dart stays live even for a hunted prey (boxed between lion and herd)', () => {
+    const pick = resolveFleeTarget(0, 0, free({ drama: { isHunted: true } }), [[-2.5, 0]], [[0, -4]], 3.2, 6)
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('elephant')
+  })
+
+  it('the staged bank drinker stands its ground; a plain drinking juvenile flees (point 247)', () => {
+    const juv = free({ species: 'zebra', isJuvenile: true, drinking: true })
+    // Bound into the staged §19.16 drama: no player-shy target.
+    expect(resolveFleeTarget(0, 0, { ...juv, stagedBankVictim: true }, [], [[0, -2]], 3.2, 6)).toBeNull()
+    // A PLAIN drinking juvenile with the traveller close: it bolts.
+    const pick = resolveFleeTarget(0, 0, juv, [], [[0, -2]], 3.2, 6)
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('player')
+    // An adult drinker keeps its errand either way.
+    expect(resolveFleeTarget(0, 0, free({ drinking: true }), [], [[0, -2]], 3.2, 6)).toBeNull()
+  })
+
+  it('a strong free adult yields no player target — but still darts from a close elephant', () => {
+    expect(resolveFleeTarget(0, 0, free({ species: 'giraffe' }), [], [[0, -2]], 3.2, 6)).toBeNull()
+    const pick = resolveFleeTarget(0, 0, free({ species: 'giraffe' }), [[-2.5, 0]], [[0, -2]], 3.2, 6)
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('elephant')
+  })
+
+  it('out of every ring the resolver is silent — idle', () => {
+    expect(resolveFleeTarget(0, 0, free(), [[-10, 0]], [[0, -10]], 3.2, 6)).toBeNull()
+  })
+
+  it('the held heading turns smoothly across a source hand-over — no flip (the point-237 rule ACROSS the arbitration)', () => {
+    // Drive the exact call-site loop: elephant to the west, traveller to the
+    // south, the resolved target fed into the held dodgeHeading via the capped
+    // turnToward under the hysteresis rings. The dart ends as the animal
+    // outruns the elephant ring and HANDS OVER to the player flight — the
+    // sources must switch exactly once (never alternate) and the held heading
+    // must never jump more than the per-frame turn cap.
+    const dt = 1 / 60
+    const cap = 8 * dt // PREY_DODGE_TURN · dt
+    const elephants: [number, number][] = [[-2.5, 0]]
+    const player: [number, number][] = [[0, -5]]
+    let x = 0
+    let z = 0
+    let held: number | undefined
+    const sources: string[] = []
+    let maxDelta = 0
+    for (let i = 0; i < 600; i++) {
+      const engaged = held !== undefined
+      const ring = engaged ? 3.2 * 1.5 : 3.2
+      const shyRing = engaged ? 6 * 1.5 : 6
+      const pick = resolveFleeTarget(x, z, free(), elephants, player, ring, shyRing)
+      if (pick === null) break // fled clear of both rings — the flight resolved
+      if (sources[sources.length - 1] !== pick.source) sources.push(pick.source)
+      const prev = held
+      held = held === undefined ? pick.heading : turnToward(held, pick.heading, cap)
+      if (prev !== undefined) {
+        let d = held - prev
+        while (d > Math.PI) d -= Math.PI * 2
+        while (d < -Math.PI) d += Math.PI * 2
+        maxDelta = Math.max(maxDelta, Math.abs(d))
+      }
+      x += Math.sin(held) * 4.2 * dt // PLAYER_SHY_SPEED-class step
+      z += Math.cos(held) * 4.2 * dt
+    }
+    expect(sources).toEqual(['elephant', 'player']) // one hand-over, no flip-flop
+    expect(maxDelta).toBeLessThanOrEqual(cap + 1e-9) // capped turn — never a snap
+  })
+})
+
+describe('fleeCrossing (point 248 — a boxed flight takes to the water like the predator-flee)', () => {
+  // Fake terrain along +z: water for z in (0, 3], land beyond — the
+  // crossingTarget fixture shape.
+  const riverThenLand = (_x: number, z: number) => (z > 0 && z <= 3 ? 'water' : 'savanna')
+
+  it('a player-boxed shy flee (deflected step dead-ended) triggers a crossing to the far bank', () => {
+    // The call-site pattern: the shy step fans against a water cove and cannot
+    // move; fleeCrossing then finds the far bank along the held heading — the
+    // animal crosses instead of pinning at the waterline.
+    const cove = () => true // every probe wet — the dead-ended fan
+    const step = deflectedStep(0, 0, 0, 0.07, cove, 0.8)
+    expect(step.moved).toBe(false)
+    const esc = fleeCrossing(step.moved, false, 0, 0, 0, 6, riverThenLand)
+    expect(esc).not.toBeNull()
+    expect(esc!.tz).toBeGreaterThan(3) // past the channel, on land
+  })
+
+  it('still refuses the ocean and an over-wide channel — the point-192 rules are unchanged', () => {
+    const toSea = (_x: number, z: number) => (z > 0 && z <= 2 ? 'water' : 'ocean')
+    expect(fleeCrossing(false, false, 0, 0, 0, 6, toSea)).toBeNull()
+    const wide = (_x: number, z: number) => (z > 0 && z <= 9 ? 'water' : 'savanna')
+    expect(fleeCrossing(false, false, 0, 0, 0, 6, wide)).toBeNull()
+  })
+
+  it('a step that MOVED, or an animal already mid-crossing, starts no crossing', () => {
+    expect(fleeCrossing(true, false, 0, 0, 0, 6, riverThenLand)).toBeNull()
+    expect(fleeCrossing(false, true, 0, 0, 0, 6, riverThenLand)).toBeNull()
   })
 })
 
