@@ -55,26 +55,6 @@ export function parseQueuePoints(html) {
   return queued
 }
 
-/**
- * Point numbers of the "Von dir zu klären" cards (items blocked on the user).
- * Anchored on the SECTION HEADER like parseQueuePoints, and reading only the
- * LEADING number of each card TITLE (`<span class="t">226 — …`) — the pattern
- * parseNowCardPoint uses — never every digit: cards without a leading number
- * (the ntfy subscription, the communication-system question) are not
- * point-tied and yield nothing. Empty Set on non-string input or a missing
- * section.
- */
-export function parseKlaerungPoints(html) {
-  const points = new Set()
-  if (typeof html !== 'string') return points
-  const kStart = html.indexOf('<h2>Von dir zu klären')
-  if (kStart < 0) return points
-  const kEnd = html.indexOf('<h2>', kStart + 1)
-  const sectionHtml = html.slice(kStart, kEnd < 0 ? undefined : kEnd)
-  for (const m of sectionHtml.matchAll(/class="t">\s*(\d+)/g)) points.add(Number(m[1]))
-  return points
-}
-
 const block = (reason) => ({ decision: 'block', reason })
 const ALLOW = { decision: 'allow' }
 
@@ -138,7 +118,6 @@ export function evaluate(input) {
 
   const queued = parseQueuePoints(html)
   const nowPoint = parseNowCardPoint(html)
-  const klaerung = parseKlaerungPoints(html)
 
   // (3) NO STALE QUEUE ITEM — a ticked point must not still sit in the Warteschlange.
   const stale = done.filter((n) => queued.has(n))
@@ -149,15 +128,13 @@ export function evaluate(input) {
     )
   }
 
-  // (4) COMPLETENESS — every open point is visible: queue, the now-card's own
-  // title, or a "Von dir zu klären" card (a point blocked on the user lives
-  // ONLY there — see 4c).
-  const missing = open.filter((n) => n !== nowPoint && !queued.has(n) && !klaerung.has(n))
+  // (4) COMPLETENESS — every open point is visible (queue, or the now-card's own title).
+  const missing = open.filter((n) => n !== nowPoint && !queued.has(n))
   if (missing.length) {
     return block(
       `BATCH DASHBOARD INCOMPLETE: open TASKS point(s) ${missing.join(', ')} appear in NEITHER the ` +
-        'Warteschlange nor the now-card nor "Von dir zu klären". Add every open point to the ' +
-        'dashboard (an ongoing/umbrella point still gets a queue card), republish, then re-run --synced.',
+        'Warteschlange nor the now-card. Add every open point to the dashboard (an ongoing/umbrella ' +
+        'point still gets a queue card), republish, then re-run --synced.',
     )
   }
 
@@ -172,34 +149,6 @@ export function evaluate(input) {
         'arbeite") AND has a Warteschlange card. The current-work point must appear ONLY in the ' +
         'now-card — delete its Warteschlange card, republish (dashboard-publish.mjs + Artifact), then ' +
         're-run --synced.',
-    )
-  }
-
-  // (4c) ONE SECTION PER POINT — a point number may appear in AT MOST ONE of
-  // the three open sections (now-card, Warteschlange, "Von dir zu klären"),
-  // and a DONE point in none of them. (3) polices done∈queue and (4b)
-  // now∈queue; this adds every "Von dir zu klären" overlap: a point that is
-  // queued as pending work, or IS the current now-card focus, or is ticked
-  // done, is not (purely) "waiting on the user" — its VDZK card is stale or
-  // the point is double-listed. User-reported twice for the answered-question
-  // case (the card lingered after work resumed) and once for point 206
-  // standing in the Warteschlange AND under "Von dir zu klären" at once.
-  const klaerungOverlaps = [...klaerung]
-    .map((n) => {
-      const also = []
-      if (queued.has(n)) also.push('Warteschlange')
-      if (nowPoint != null && n === nowPoint) also.push('now-card')
-      if (done.includes(n)) also.push('ticked done')
-      return also.length ? `${n} (also: ${also.join(' + ')})` : null
-    })
-    .filter(Boolean)
-  if (klaerungOverlaps.length) {
-    return block(
-      `BATCH DASHBOARD DOUBLE-LISTS "VON DIR ZU KLÄREN" point(s) ${klaerungOverlaps.join('; ')}. ` +
-        'A point belongs in exactly ONE section: blocked on the user → ONLY under "Von dir zu ' +
-        'klären" (delete its Warteschlange card); being worked → the now-card (delete its VDZK ' +
-        'card); done → only Erledigt. Fix the card(s), republish (dashboard-publish.mjs + ' +
-        'Artifact), then re-run --synced.',
     )
   }
 
