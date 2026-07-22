@@ -14,6 +14,19 @@ import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_
 import { setupGeodata } from '../test/geodata'
 import { densifyRiver } from '../scenes/travel/waterSurface'
 import { balance } from '../config/balance'
+import { buildWetland } from '../render/landmarks'
+
+// The rendered XZ footprint radius (in degrees, 10 world units/°) of a landmark
+// mesh built at the origin — the honest "what the renderer draws" the clearance
+// must exceed so no part of the mesh floats over the widened water band
+// (point 129/156: the clearance derives from the same placement the renderer
+// draws). Used to pin the Sudd marsh's clearance to its actual reach.
+function meshFootprintDeg(geo: { computeBoundingBox: () => void; attributes: { position: { count: number; getX: (i: number) => number; getZ: (i: number) => number } } }): number {
+  const pos = geo.attributes.position
+  let maxR = 0
+  for (let i = 0; i < pos.count; i++) maxR = Math.max(maxR, Math.hypot(pos.getX(i), pos.getZ(i)))
+  return maxR / 10 // world units → degrees
+}
 
 const SEED = 42
 
@@ -262,10 +275,81 @@ describe('terrain sampling on real geodata', () => {
     },
   )
 
+  it('the Sudd marsh clears the widened band by its own rendered footprint, not floating over the channel (point 218)', () => {
+    // The wetland (render/landmarks.ts buildWetland) is a spread of solid water
+    // lobes with a riverward TONGUE the scene aims at the nearest channel
+    // (point 189). Before point 218 its clearance was only RIVER_WIDTH_DEG +
+    // 0.05, so with the point-136/156 river widening the tongue reached back
+    // ACROSS the widened channel and floated over the water at land height (the
+    // user report). The anchor must now clear the band by the marsh's whole
+    // rendered footprint so no lobe sits in the channel.
+    const footprint = meshFootprintDeg(buildWetland()) // ~0.315°
+    expect(footprint).toBeGreaterThan(0.3) // the tongue really does reach that far
+    const sudd = NATURAL_SITES.find((n) => n.id === 'sudd')
+    expect(sudd).toBeDefined()
+    if (!sudd) return
+    const d = riverDistance(sudd.lat, sudd.lon, 4, 2)
+    // The whole footprint clears the widened water band.
+    expect(d).toBeGreaterThanOrEqual(RIVER_WIDTH_DEG + footprint - 1e-9)
+    // Regression witness: the pre-218 margin of 0.05 was LESS than the footprint,
+    // so the tongue lobe sat inside the widened band — the float the fix removes.
+    expect(RIVER_WIDTH_DEG + 0.05).toBeLessThan(RIVER_WIDTH_DEG + footprint)
+    // Grounded on land (savanna bank), never a water cell.
+    const t = sampleTerrain(sudd.lat, sudd.lon, SEED)
+    expect(t.type).not.toBe('water')
+    expect(t.type).not.toBe('ocean')
+    // Still the Sudd: it moved off the water, not away from the White Nile.
+    // The nudge is minimal (a small overshoot past the required clearance), so
+    // the marsh's riverward tongue still reaches down to the bank — its tip lands
+    // just past the water band edge (reeds hug the waterline), not far inland.
+    expect(d).toBeLessThanOrEqual(RIVER_WIDTH_DEG + footprint + 0.15)
+    expect(d - footprint - RIVER_WIDTH_DEG).toBeLessThan(0.15) // tongue tip near the water edge
+    expect(sudd.lat).toBeGreaterThan(6) // in the historical Sudd basin
+    expect(sudd.lat).toBeLessThan(10)
+    expect(sudd.lon).toBeGreaterThan(29)
+    expect(sudd.lon).toBeLessThan(32)
+  })
+
   it('the elephant graveyard stands clear of the widened band', () => {
     expect(riverDistance(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)).toBeGreaterThanOrEqual(
       RIVER_WIDTH_DEG + 0.05 - 1e-9,
     )
+  })
+
+  it('no flat-mesh river-near landmark floats over the widened water band (point 218 sweep)', () => {
+    // The point-218 defect: a flat marker/field mesh placed by the OLD narrower
+    // bank (or at a §4.2 exemption) ended up over the widened water surface and
+    // read as floating. Sweep EVERY flat-mesh landmark family — natural sites,
+    // cultural landmarks, the elephant graveyard, ports and villages — and
+    // assert each anchor clears the widened band by at least a footprint margin,
+    // so no part of its mesh sits over the channel. EXEMPTIONS (asserted as such
+    // below): waterfalls render AS the river cascade (rd 0, on the axis by
+    // design), the Okavango's fan floods by design, and mountains raise terrain
+    // rather than laying a flat mesh over the water (a massif may straddle a
+    // river valley).
+    const MIN_FOOTPRINT = 0.05 // the smallest cleared margin any family uses
+    for (const n of NATURAL_SITES) {
+      if (n.id === 'okavango') continue // floods by design
+      expect(riverDistance(n.lat, n.lon, 4, 2), `natural ${n.id}`).toBeGreaterThanOrEqual(
+        RIVER_WIDTH_DEG + MIN_FOOTPRINT - 1e-9,
+      )
+    }
+    for (const c of CULTURAL_LANDMARKS) {
+      expect(riverDistance(c.lat, c.lon, 4, 2), `cultural ${c.id}`).toBeGreaterThanOrEqual(
+        RIVER_WIDTH_DEG + MIN_FOOTPRINT - 1e-9,
+      )
+    }
+    for (const p of PLACES) {
+      const margin = p.kind === 'port' ? PORT_RIVER_CLEARANCE_DEG : VILLAGE_RIVER_CLEARANCE_DEG
+      expect(riverDistance(p.lat, p.lon), `place ${p.id}`).toBeGreaterThanOrEqual(margin - 1e-9)
+    }
+    expect(riverDistance(ELEPHANT_GRAVEYARD.lat, ELEPHANT_GRAVEYARD.lon)).toBeGreaterThanOrEqual(
+      RIVER_WIDTH_DEG + MIN_FOOTPRINT - 1e-9,
+    )
+    // Exemption check: every waterfall sits ON its river (the cascade IS water).
+    for (const w of WATERFALLS) {
+      expect(riverDistance(w.lat, w.lon), `waterfall ${w.id}`).toBeLessThanOrEqual(0.25)
+    }
   })
 
   it('the width factor actually widens the sampled water span (point 136)', () => {
