@@ -9234,7 +9234,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`) — delegate TOGETHER with 238 on the wildlife-behaviour branch (or
   strictly after), never concurrently with the other wildlife points.
 
-- [ ] 240. PRETTIER ELEPHANT TRUNKS — the user wants (22.07.2026) a nicer way to
+- [x] 240. PRETTIER ELEPHANT TRUNKS — the user wants (22.07.2026) a nicer way to
   render the elephants' trunks. Read the current elephant build in
   `src/render/fauna.ts` (`buildElephant`) — the trunk is likely a coarse
   tapered stack/cylinder. REDESIGN it into a graceful, natural trunk: a smooth
