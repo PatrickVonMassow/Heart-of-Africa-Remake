@@ -9447,6 +9447,31 @@ the remaining open points in their numeric order.
   233) + the croc render — verify the 233 confluence is preserved after any depth
   change; overlaps the river files and the wildlife/fauna croc work (242/243/245).
 
+- [ ] 247. JUVENILE DOES NOT FLEE THE PLAYER (point 239 follow-up) — the user
+  reports (22.07.2026, screenshot near the Nile, North) a juvenile standing right
+  next to the player WITHOUT fleeing, although point 239 should make weak animals +
+  any juvenile shy from the traveller. FIRST rule out DEPLOY LAG: 239 (`fade0aa`)
+  merged only minutes before the report, so the deployed build may predate it —
+  verify against CURRENT main / a fresh deploy before treating it as a bug. IF it
+  reproduces on current main, the likely cause is 239's DRINKER EXEMPTION: the
+  flee is skipped for an animal with `a.drink !== undefined` (a drinking calf at the
+  bank deliberately does NOT flee, to protect the §19.8/§19.16 staged crocodile/
+  sacrifice dramas), and the reported juvenile stands at the river edge. Reconsider
+  the exemption scope: a drinking juvenile should probably STILL flee a player who
+  comes within the (smaller) flee radius — narrow the exemption to only the animals
+  actually bound into a staged drama (the crocodile-target / mired / caught calf),
+  not every drinking juvenile; OR let a very-close player override the drink state.
+  Also confirm `PLAYER_SHY_RADIUS` (6) and that the specific species/juvenile is
+  covered by `fleesFromPlayer`. Anchors: `src/scenes/travel/Wildlife.tsx` (the
+  `fleesFromPlayer` wiring, `PLAYER_SHY_RADIUS`, the `a.drink` exemption),
+  `src/scenes/travel/wildlifeBehavior.ts` (`fleesFromPlayer`). VERIFIABLE: a live
+  check (`scripts/verify/enrichments.mjs`) that a juvenile within the flee radius of
+  the player flees even at a bank UNLESS it is a staged-drama calf; a pure test
+  pinning the narrowed drinker-exemption scope. DOCS: design.md §19 if the shyness
+  wording changes. No player-visible text. NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx`
+  — same files as 242/245/237/217; do NOT delegate concurrently with those; bundles
+  naturally with 245 (both are calf/juvenile behaviour).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
