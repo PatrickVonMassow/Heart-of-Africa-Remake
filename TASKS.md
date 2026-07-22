@@ -9255,6 +9255,32 @@ the remaining open points in their numeric order.
   point 214 re-tessellated (merged); do NOT delegate concurrently with any other
   `fauna.ts` point.
 
+- [ ] 241. THUNDER PLAYS ONLY ONCE — after point 229 made the thunderclap audible,
+  the user reports (22.07.2026) hearing the thunder EXACTLY ONCE and then never
+  again. So something is not re-armed after the first clap: either the flash→thunder
+  TRIGGER fires only once (a one-shot flag set on the first storm/flash and never
+  reset), or the AUDIO path is consumed/torn down after the first play (a shared
+  node stopped/disconnected, an init-once guard, or the `__thunder`/scheduler state
+  latching). NOTE 229 already proved a single clap schedules and survives the next
+  frame — so the regression is in the RE-FIRE across successive flashes/storms, a
+  case 229's tests did not cover. DIAGNOSE: trace the flash trigger in
+  `src/scenes/travel/TravelScene.tsx` / `src/scenes/travel/Climate.tsx` (does the
+  lightning flash itself re-fire on later storm frames/days, or fire once?) AND the
+  `playThunder` path in `src/systems/ambience.ts` (does a second call still create
+  fresh BufferSource/gain nodes and schedule, or is it gated after the first — e.g.
+  a boolean that never resets, a disconnected bus, a scheduler that clears itself)?
+  Check both the bird's-eye and the settlement views. FIX: ensure EVERY lightning
+  flash schedules and plays its thunderclap, repeatedly across the whole session
+  (re-arm after each clap; each play builds its own short-lived nodes). VERIFIABLE:
+  extend `src/systems/ambience.test.ts` / `src/systems/season.test.ts` — a pure/
+  FakeAudioContext test that TWO (and N) successive flashes EACH schedule and play a
+  thunderclap (the second is not suppressed), and that the trigger re-arms per flash;
+  extend the `scripts/verify/enrichments.mjs` storm check to force TWO flashes and
+  assert `__thunder` fires BOTH times (count increments past 1 with audio each time).
+  DOCS: none. No player-visible text. NOTE: `src/systems/ambience.ts` (+ possibly
+  `TravelScene.tsx`/`Climate.tsx`) — non-overlapping with the running river/wildlife/
+  fauna branches; this is the 229 follow-up.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
