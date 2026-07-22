@@ -8633,7 +8633,7 @@ the remaining open points in their numeric order.
   fix a silhouette). Start with lever 1 (fixes terrain + rivers + backdrop at the
   source) then reassess by the picture before adding 2/3.
 
-- [ ] 216. The PALM TREES render BROKEN, not just plain — redesign them. The
+- [x] 216. The PALM TREES render BROKEN, not just plain — redesign them. The
   trunk is a stack of DISCONNECTED cylinder segments with visible GAPS (the trunk
   reads as floating chunks), the crown hangs detached ABOVE a gap, and the fronds
   are flat angular triangles (user report 22.07.2026, screenshot at Cairo: a palm
