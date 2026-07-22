@@ -9421,6 +9421,32 @@ the remaining open points in their numeric order.
   242/237/217/228; do NOT delegate concurrently with those wildlife points; can be
   bundled with 242 (both are crocodile/wildlife on the same files).
 
+- [ ] 246. CROCODILE SHOWS THROUGH THE WATER — the user reports (22.07.2026,
+  screenshot) that a SUBMERGED crocodile's BODY is clearly visible THROUGH the water
+  surface (a sharp silhouette), although its eyes correctly sit above the water (the
+  submerge pose is right). A submerged body should be OBSCURED/murky under the water,
+  not read as a clear shape. LIKELY REGRESSION from point 233 (just merged): the
+  river material was given `depthWrite = false` (so a confluence's junior arm does
+  not depth-cull the senior water) — but with the water no longer writing depth, a
+  body BELOW the water sheet (the sunk croc) is no longer depth-occluded by the water
+  and shows through. The point-233 agent explicitly flagged this side-effect risk.
+  DIAGNOSE: confirm the depthWrite change is the cause (a submerged croc read fine
+  before it). FIX without breaking 233's confluence merge — options: keep depthWrite
+  ON for the water and solve the junior-arm cull differently (e.g. per-vertex merge
+  opacity already exists — rely on it + a small polygon offset rather than disabling
+  depth entirely), OR render submerged animals with the water's depth absorption over
+  them (depth-tinted so a sunk croc reads as a faint murky shape, only the eye knobs
+  proud). Anchors: `src/scenes/travel/Rivers.tsx` (the river material `depthWrite`/
+  `depthTest` — the point-233 change), `src/render/water.ts` (water depth/absorption),
+  and the crocodile submerge render in `src/scenes/travel/Wildlife.tsx`. VERIFIABLE:
+  a test that the water occludes or murks a submerged body (the submerged fraction is
+  not drawn at full clarity); the parent picture-verifies a submerged crocodile on
+  BOTH backends (body obscured under the water, only the eyes/knobs proud) AND
+  re-checks that the point-233 confluence still merges cleanly (no doubled wedge).
+  DOCS: none. No player-visible text. NOTE: touches the river material (just-merged
+  233) + the croc render — verify the 233 confluence is preserved after any depth
+  change; overlaps the river files and the wildlife/fauna croc work (242/243/245).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
