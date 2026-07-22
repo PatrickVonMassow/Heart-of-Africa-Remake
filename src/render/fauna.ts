@@ -16,9 +16,9 @@ import { mulberry32 } from '../world/noise'
  * TESSELLATION in figures.ts): segment counts high enough that the curved
  * bodies read smooth at the close/mid bird's-eye range (the old 8x6 body
  * spheres and 5-6-segment limb cylinders read as hard flat panels on the
- * elephant). Boxy parts (ears, wings, the crocodile's snout and armour
- * ridge) stay deliberately hard-edged. The vertex cost is negligible: each
- * species is ONE merged geometry drawn instanced.
+ * elephant). Boxy parts (ears, wings) stay deliberately hard-edged. The
+ * vertex cost is negligible: each species is ONE merged geometry drawn
+ * instanced.
  *
  * Point 214 close-zoom follow-up: at the 16x bird's-eye zoom the elephant
  * body's OUTLINE still stepped at 22x16 (16.4° of arc per face — a
@@ -639,41 +639,125 @@ export function buildPloverChick(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Nile crocodile (design.md §19.16, point 130): a long, low armoured body
- *  with a flat snout, ridged tail and raised eye knobs. Built with the origin
- *  at the waterline in mind — hidden it sinks so only the eye/snout tops
- *  break the surface, lunging it rides fully out. */
+/**
+ * Documented stations of the crocodile build (point 243) — the z split lines
+ * and back line the silhouette tests read (the trunk-ring precedent). +Z is
+ * forward, origin at the ground/waterline.
+ */
+export const CROCODILE_LAYOUT = {
+  /** Rear end of the torso ellipsoid — where the tail takes over. */
+  tailBaseZ: -0.7,
+  /** Front end of the torso — the skull sits ahead of this. */
+  torsoFrontZ: 0.56,
+  /** Front of the skull — the tapered snout reaches well beyond this. */
+  snoutBaseZ: 0.87,
+  /** The torso's top line: the LOW back nothing tall may ride above. */
+  backTopY: 0.266,
+  /** Torso half width — the splayed stance reaches beyond it. */
+  torsoHalfWidth: 0.345,
+} as const
+
+/** Nile crocodile (design.md §19.16, points 130/243): the classic silhouette —
+ *  a long LOW raft of a body under a double row of low dorsal scutes (the old
+ *  build's tall thin ridge rod is gone), a long TAPERED two-jaw snout meeting
+ *  at a narrowed tip well forward of the skull, raised eye knobs as the
+ *  highest point (the only thing breaking the surface when it lies hidden —
+ *  also the anchor of point 242's submerge pose), four short splayed legs and
+ *  a tail longer than the body core. Origin at the waterline in mind: hidden
+ *  it sinks to the eye knobs, lunging it rides fully out. */
 export function buildCrocodile(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
-  const body = new THREE.SphereGeometry(0.3, ...FAUNA_TESSELLATION.body)
-  body.scale(1.05, 0.55, 2.6)
-  body.translate(0, 0.16, 0)
-  parts.push(tint(body, '#4d5b3f', 0.1, 191))
-  // Flat snout forward of the head, with a slight taper.
-  const snout = new THREE.BoxGeometry(0.26, 0.12, 0.55)
-  snout.translate(0, 0.14, 0.95)
-  parts.push(tint(snout, '#46543a', 0.08, 192))
-  // Raised eye knobs — the only thing visible when it lies submerged.
-  for (const hx of [-1, 1]) {
-    const eye = new THREE.SphereGeometry(0.05, ...FAUNA_TESSELLATION.small)
-    eye.translate(hx * 0.09, 0.28, 0.62)
-    parts.push(tint(eye, '#39452f', 0.06, 193))
+  const L = CROCODILE_LAYOUT
+
+  // Torso: one long, low, wide ellipsoid (center y 0.14, half height 0.126).
+  const torso = new THREE.SphereGeometry(0.3, ...FAUNA_TESSELLATION.body)
+  torso.scale(1.15, 0.42, 2.2)
+  torso.translate(0, 0.14, -0.1)
+  parts.push(tint(torso, '#4d5b3f', 0.1, 191))
+  /** Top of the torso ellipsoid at (x, z) — seats the dorsal scutes ON the back. */
+  const torsoTopAt = (x: number, z: number): number => {
+    const nx = x / 0.345
+    const nz = (z + 0.1) / 0.66
+    return 0.14 + 0.126 * Math.sqrt(Math.max(0, 1 - nx * nx - nz * nz))
   }
-  // Ridged tail tapering behind.
-  const tail = new THREE.ConeGeometry(0.16, 1.1, FAUNA_TESSELLATION.limb)
-  tail.rotateX(Math.PI / 2 + 0.06)
-  tail.scale(1, 0.55, 1)
-  tail.translate(0, 0.14, -1.25)
-  parts.push(tint(tail, '#46543a', 0.1, 194))
-  const ridge = new THREE.BoxGeometry(0.06, 0.08, 1.6)
-  ridge.translate(0, 0.34, -0.2)
-  parts.push(tint(ridge, '#39452f', 0.1, 195))
-  // Short splayed legs.
+
+  // Skull: a flat wedge-round head ahead of the torso, lower than the eyes.
+  const skull = new THREE.SphereGeometry(0.17, ...FAUNA_TESSELLATION.head)
+  skull.scale(1.05, 0.55, 1.35)
+  skull.translate(0, 0.17, 0.64)
+  parts.push(tint(skull, '#46543a', 0.08, 192))
+
+  // The classic croc jaw line: upper and lower jaw as flat tapered tubes
+  // meeting at a narrowed tip well forward of the skull (ring vertices along
+  // the length let the taper read in the mesh, not only at the ends).
+  const upperJaw = new THREE.CylinderGeometry(0.038, 0.135, 0.75, FAUNA_TESSELLATION.limb, 6)
+  upperJaw.rotateX(Math.PI / 2) // axis to +z, narrow end forward
+  upperJaw.scale(1.4, 0.42, 1)
+  upperJaw.translate(0, 0.155, 1.17)
+  parts.push(tint(upperJaw, '#46543a', 0.08, 193))
+  const lowerJaw = new THREE.CylinderGeometry(0.032, 0.115, 0.66, FAUNA_TESSELLATION.limb, 6)
+  lowerJaw.rotateX(Math.PI / 2)
+  lowerJaw.scale(1.35, 0.34, 1)
+  lowerJaw.translate(0, 0.1, 1.08) // slight overbite: ends behind the upper tip
+  parts.push(tint(lowerJaw, '#8a9070', 0.08, 194))
+  // Nostril bump on the snout tip — with the eyes, what a swimmer sees first.
+  const nostril = new THREE.SphereGeometry(0.032, ...FAUNA_TESSELLATION.small)
+  nostril.scale(1.3, 0.7, 1)
+  nostril.translate(0, 0.185, 1.47)
+  parts.push(tint(nostril, '#39452f', 0.06, 195))
+
+  // Raised eye knobs above the skull — the crown of the whole silhouette.
   for (const hx of [-1, 1]) {
-    for (const hz of [0.45, -0.55]) {
-      const leg = new THREE.BoxGeometry(0.12, 0.14, 0.16)
-      leg.translate(hx * 0.3, 0.07, hz)
-      parts.push(tint(leg, '#46543a', 0.08, 196))
+    const eye = new THREE.SphereGeometry(0.052, ...FAUNA_TESSELLATION.small)
+    eye.translate(hx * 0.095, 0.262, 0.55)
+    parts.push(tint(eye, '#39452f', 0.06, 196))
+  }
+
+  // Armoured back: a double row of LOW wide-based scutes seated on the torso
+  // top (replaces the old floating ridge box that read as a rod, point 243).
+  for (const hx of [-1, 1]) {
+    for (const sz of [-0.55, -0.33, -0.1, 0.11, 0.32]) {
+      const scute = new THREE.ConeGeometry(0.055, 0.048, FAUNA_TESSELLATION.spike)
+      scute.scale(1.7, 1, 1.25)
+      scute.translate(hx * 0.075, torsoTopAt(hx * 0.075, sz) + 0.005, sz)
+      parts.push(tint(scute, '#39452f', 0.1, 197))
+    }
+  }
+
+  // Tail: longer than the body core, tapering to a fine tip, slightly drooped.
+  const tailLen = 1.45
+  const tail = new THREE.ConeGeometry(0.2, tailLen, FAUNA_TESSELLATION.limb, 8)
+  tail.rotateX(-Math.PI / 2 - 0.04) // apex to -z, tip nosing down
+  tail.scale(1.05, 0.52, 1)
+  tail.translate(0, 0.125, L.tailBaseZ - tailLen / 2)
+  parts.push(tint(tail, '#46543a', 0.1, 198))
+  // A shrinking single row of tail scutes continues the back armour.
+  for (const [tz, th] of [
+    [-0.85, 0.042],
+    [-1.15, 0.036],
+    [-1.45, 0.03],
+    [-1.75, 0.025],
+  ]) {
+    const frac = (L.tailBaseZ - tz) / tailLen
+    const tailTop = 0.135 - 0.03 * frac + 0.52 * 0.2 * (1 - frac)
+    const scute = new THREE.ConeGeometry(0.05, th, FAUNA_TESSELLATION.spike)
+    scute.scale(1.5, 1, 1.2)
+    scute.translate(0, tailTop + 0.005, tz)
+    parts.push(tint(scute, '#39452f', 0.1, 199))
+  }
+
+  // Four short splayed legs: out-and-down stubs with flat feet — the sprawl
+  // stance wider than the torso.
+  for (const hx of [-1, 1]) {
+    for (const hz of [0.32, -0.5]) {
+      const leg = new THREE.CylinderGeometry(0.052, 0.04, 0.19, FAUNA_TESSELLATION.limb)
+      leg.rotateZ(hx * 0.75)
+      leg.translate(hx * 0.365, 0.071, hz)
+      parts.push(tint(leg, '#46543a', 0.08, 200))
+      const foot = new THREE.SphereGeometry(0.048, ...FAUNA_TESSELLATION.small)
+      foot.scale(1.25, 0.45, 1.45)
+      foot.translate(hx * 0.43, 0.03, hz + 0.03)
+      parts.push(tint(foot, '#46543a', 0.08, 210))
     }
   }
   return merge(parts)

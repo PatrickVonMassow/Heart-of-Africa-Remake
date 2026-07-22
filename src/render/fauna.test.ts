@@ -31,6 +31,7 @@ import {
   buildZebraCalf,
   calfProportions,
   createFaunaMaterial,
+  CROCODILE_LAYOUT,
   FAUNA_TESSELLATION,
   type QuadrupedSpec,
 } from './fauna'
@@ -370,5 +371,110 @@ describe('elephant trunk (graceful tapered curve)', () => {
     expect(cR[cR.length - 1] / cR[0]).toBeGreaterThan(aR[aR.length - 1] / aR[0])
     adult.dispose()
     calf.dispose()
+  })
+})
+
+// The crocodile silhouette (design.md §19.16, point 243): the rebuilt mesh
+// reads as a classic crocodile — a long TAPERED two-jaw snout meeting at a
+// narrowed tip well forward of the skull, raised eye knobs as the crown of
+// the whole build (the anchor of point 242's submerge pose), a LOW armoured
+// back (never the old build's tall thin ridge rod floating above the body),
+// a sprawl stance wider than the torso and a tapering tail longer than the
+// body core. Normals and tessellation are covered by the point-214 sweep
+// above, which includes the crocodile.
+describe('crocodile silhouette (design.md §19.16, point 243)', () => {
+  const geo = buildCrocodile()
+  const pos = geo.attributes.position
+  const L = CROCODILE_LAYOUT
+  geo.computeBoundingBox()
+  const bb = geo.boundingBox!
+
+  /** Full |x| width across the vertices inside the z slab [z0, z1]. */
+  const slabWidth = (z0: number, z1: number): number => {
+    let w = 0
+    for (let i = 0; i < pos.count; i++) {
+      const z = pos.getZ(i)
+      if (z >= z0 && z <= z1) w = Math.max(w, Math.abs(pos.getX(i)) * 2)
+    }
+    return w
+  }
+
+  it('carries a long snout extending well forward of the skull', () => {
+    expect(bb.max.z - L.snoutBaseZ).toBeGreaterThan(0.5)
+  })
+
+  it('the snout narrows toward its tip — the classic tapered jaw line', () => {
+    const base = slabWidth(L.snoutBaseZ, L.snoutBaseZ + 0.15)
+    const mid = slabWidth(1.15, 1.3)
+    const tip = slabWidth(bb.max.z - 0.125, bb.max.z)
+    expect(base).toBeGreaterThan(mid)
+    expect(mid).toBeGreaterThan(tip)
+    expect(tip).toBeLessThan(base * 0.5)
+  })
+
+  it('raised eye knobs above the skull are the highest point, one per side', () => {
+    expect(bb.max.y).toBeGreaterThan(L.backTopY + 0.03)
+    let left = false
+    let right = false
+    for (let i = 0; i < pos.count; i++) {
+      if (pos.getY(i) <= bb.max.y - 0.005) continue
+      // Every crown vertex sits in the eye region on the skull top...
+      expect(pos.getZ(i)).toBeGreaterThan(0.45)
+      expect(pos.getZ(i)).toBeLessThan(0.65)
+      // ...off the centreline, in the left or right knob.
+      if (pos.getX(i) > 0.05) right = true
+      if (pos.getX(i) < -0.05) left = true
+    }
+    expect(left).toBe(true)
+    expect(right).toBe(true)
+  })
+
+  it('holds the flat low profile: total height a low fraction of the length', () => {
+    // The old build peaked at ~0.38 over ~3.0 of length (ratio ~0.13, the
+    // ridge rod's line); the rebuilt croc stays clearly under a tenth.
+    expect(bb.max.y).toBeLessThan((bb.max.z - bb.min.z) * 0.1)
+  })
+
+  it('nothing rides above the back as a tall thin rod — the armour is low and wide', () => {
+    // Back region: everything behind the eye/skull section (z < 0.4).
+    let backMax = 0
+    let minX = Infinity
+    let maxX = -Infinity
+    let above = 0
+    for (let i = 0; i < pos.count; i++) {
+      if (pos.getZ(i) >= 0.4) continue
+      const y = pos.getY(i)
+      backMax = Math.max(backMax, y)
+      if (y > L.backTopY + 0.008) {
+        above++
+        minX = Math.min(minX, pos.getX(i))
+        maxX = Math.max(maxX, pos.getX(i))
+      }
+    }
+    // The scutes protrude only a touch above the torso's top line (the old
+    // rod stood ~0.11 proud of the new back line)...
+    expect(backMax).toBeLessThan(L.backTopY + 0.05)
+    // ...and what does stand above the back is wider than it is tall — a low
+    // armour ridge, never a rod (the old ridge box was 0.06 wide).
+    expect(above).toBeGreaterThan(0)
+    expect(maxX - minX).toBeGreaterThanOrEqual((backMax - L.backTopY) * 2)
+  })
+
+  it('the tail is longer than the body core and tapers to its tip', () => {
+    expect(L.tailBaseZ - bb.min.z).toBeGreaterThan(L.torsoFrontZ - L.tailBaseZ)
+    const near = slabWidth(-0.9, -0.8)
+    const mid = slabWidth(-1.5, -1.4)
+    const tip = slabWidth(bb.min.z, bb.min.z + 0.2)
+    expect(near).toBeGreaterThan(mid)
+    expect(mid).toBeGreaterThan(tip)
+    expect(tip).toBeLessThan(near * 0.25)
+  })
+
+  it('four short splayed legs plant the stance wider than the torso', () => {
+    expect(bb.max.x).toBeGreaterThan(L.torsoHalfWidth + 0.04)
+    expect(bb.min.x).toBeLessThan(-(L.torsoHalfWidth + 0.04))
+    // Short legs on a low belly: feet at the ground, nothing sunk into it.
+    expect(bb.min.y).toBeGreaterThan(-0.05)
+    expect(bb.min.y).toBeLessThan(0.03)
   })
 })
