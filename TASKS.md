@@ -9234,6 +9234,27 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`) — delegate TOGETHER with 238 on the wildlife-behaviour branch (or
   strictly after), never concurrently with the other wildlife points.
 
+- [ ] 240. PRETTIER ELEPHANT TRUNKS — the user wants (22.07.2026) a nicer way to
+  render the elephants' trunks. Read the current elephant build in
+  `src/render/fauna.ts` (`buildElephant`) — the trunk is likely a coarse
+  tapered stack/cylinder. REDESIGN it into a graceful, natural trunk: a smooth
+  tapered curve along a curved centreline (thick at the base where it meets the
+  head, tapering to the tip), with a natural downward droop / gentle curl, built
+  from several segments so the curve and taper read; cheap and instanced,
+  tessellation consistent with the point-214/230 smoothness (no facet panels at
+  the close zoom the user inspects). Keep the tusks, ears and the rest of the
+  elephant unchanged; only the trunk changes. Consider a subtle idle sway if it is
+  cheap and the build already animates parts (optional, not required). VERIFIABLE
+  (pure layer): extend `src/render/fauna.test.ts` — assert the rebuilt trunk is a
+  multi-segment tapered curve (radius decreases monotonically base→tip over >=4
+  segments, the centreline is not a straight vertical line — it curves/droops),
+  and its segment/tessellation floor holds so no facets read. GATES: `npm run
+  test:unit` green, `npm run build` passes, `npm run lint` zero findings. Do NOT
+  run browser suites (the parent picture-verifies an elephant close-up on BOTH
+  backends). DOCS: none. No player-visible text. NOTE: `fauna.ts` — the same file
+  point 214 re-tessellated (merged); do NOT delegate concurrently with any other
+  `fauna.ts` point.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
