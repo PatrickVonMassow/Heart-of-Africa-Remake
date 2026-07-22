@@ -14,6 +14,52 @@ import { RIVERS_DATA } from '../world/data/rivers'
 import { getDemMeta, getDemPixels } from '../world/geodata'
 import { catmullRom } from '../world/hydro'
 import { RIVER_WIDTH_DEG } from '../world/terrain'
+import { boundarySignedDistance } from '../world/redSea'
+
+// point 210: the water material reads THIS texture's R channel (metersUp) for its
+// depth-driven colour, shore foam and opacity. Near the Red-Sea/Suez trim the DEM
+// is stamped to a uniform deep (~-3000 m) in one texel, so the water banded into a
+// staircase along that cut (the "stepped sea" east of Cairo) — the terrain's own
+// hOcean shelf (terrain.ts) smooths the LAND mesh but never touches this texture.
+// Grade the baked depth into the same gentle shelf here, so the water reads one
+// continuous shelf with the terrain. Only the trimmed (bsd<0) side, only where the
+// boundary abuts kept land — genuine bathymetry (the Gulf-of-Suez head, deep
+// Persian Gulf / Dahlak) is left untouched.
+const SHELF_BAND_DEG = 0.3 // grade over this distance out from the boundary line
+const SHELF_SLOPE_M = 5300 // ~reaches the deep-tone floor (~1600 m) at the band edge
+const SHORE_DEPTH_M = -20 // shallow shelf depth right at the shore line
+
+/** Ease the stamped deep floor into a shallow shelf near the trim coast (meters,
+ *  negative below sea level). Returns metersUp unchanged away from the coast. */
+export function shelfGradedMeters(
+  metersUp: number,
+  lat: number,
+  lon: number,
+  dem: { width: number; height: number; data: Uint8ClampedArray },
+  lonMin: number,
+  latMax: number,
+  res: number,
+): number {
+  const bsd = boundarySignedDistance(lat, lon)
+  if (bsd >= 0 || bsd <= -SHELF_BAND_DEG) return metersUp
+  // Guard: the boundary must abut kept land here (sample the DEM land flag just
+  // inside the boundary's land edge, along the inward normal) — else it runs
+  // through open water and grading would invent a false shallow bank.
+  const eps = 0.02
+  const gLon = (boundarySignedDistance(lat, lon + eps) - bsd) / eps
+  const gLat = (boundarySignedDistance(lat + eps, lon) - bsd) / eps
+  const mag = Math.hypot(gLon, gLat) || 1
+  const step = 0.12 - bsd // reach ~0.12° inside the boundary on the land side
+  const ilon = lon + (gLon / mag) * step
+  const ilat = lat + (gLat / mag) * step
+  const ix = Math.max(0, Math.min(dem.width - 1, Math.round((ilon - lonMin) / res - 0.5)))
+  const iy = Math.max(0, Math.min(dem.height - 1, Math.round((latMax - ilat) / res - 0.5)))
+  if (dem.data[(iy * dem.width + ix) * 4 + 2] <= 0) return metersUp // inward is not kept land
+  const t = -bsd / SHELF_BAND_DEG // 0 at the shore line -> 1 at the band's deep edge
+  const shelf = SHORE_DEPTH_M + bsd * SHELF_SLOPE_M // shallow at the line, deepening seaward
+  // max = the shallower (less negative) floor near shore, easing into the stamp
+  return Math.max(metersUp, shelf * (1 - t) + metersUp * t)
+}
 
 /** River ribbon half width (RIVER_WIDTH_DEG, terrain.ts) plus margin. */
 const RIVER_MASK_RADIUS_DEG = RIVER_WIDTH_DEG + 0.05
@@ -95,8 +141,18 @@ function getDemDataTexture(): THREE.DataTexture {
   // the exact semantics for "does the open-sea plane belong here").
   const data = new Uint16Array(texelCount * 4)
   const one = THREE.DataUtils.toHalfFloat(1)
+  const res = (meta.lonMax - meta.lonMin) / dem.width
   for (let i = 0; i < texelCount; i++) {
-    const metersUp = dem.data[i * 4] * 256 + dem.data[i * 4 + 1] - meta.offsetMeters
+    let metersUp = dem.data[i * 4] * 256 + dem.data[i * 4 + 1] - meta.offsetMeters
+    if (metersUp < 0) {
+      // point 210: grade the stamped Suez sea floor into a shelf so the water
+      // shader's depth colour does not staircase along the trim (ocean texels only).
+      const x = i % dem.width
+      const y = (i / dem.width) | 0
+      const lon = meta.lonMin + (x + 0.5) * res
+      const lat = meta.latMax - (y + 0.5) * res
+      metersUp = shelfGradedMeters(metersUp, lat, lon, dem, meta.lonMin, meta.latMax, res)
+    }
     data[i * 4] = THREE.DataUtils.toHalfFloat(metersUp)
     data[i * 4 + 1] = waterMask[i] ? one : 0
     data[i * 4 + 2] = dem.data[i * 4 + 2] > 0 ? one : 0
