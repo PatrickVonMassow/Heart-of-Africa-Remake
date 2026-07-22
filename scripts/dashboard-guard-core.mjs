@@ -44,7 +44,10 @@ export function parseNowCardPoint(html) {
 export function parseQueuePoints(html) {
   const queued = new Set()
   if (typeof html !== 'string') return queued
-  const qStart = html.indexOf('Warteschlange')
+  // Anchor on the SECTION HEADER, not any mention: a now-card/card that names
+  // "Warteschlange" in prose otherwise steals qStart and the slice misses the
+  // real queue cards (observed 22.07.2026 — all points falsely read "missing").
+  const qStart = html.indexOf('<h2>Warteschlange')
   if (qStart < 0) return queued
   const qEnd = html.indexOf('<h2>', qStart + 1)
   const queueHtml = html.slice(qStart, qEnd < 0 ? undefined : qEnd)
