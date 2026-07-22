@@ -5169,11 +5169,28 @@ const settleScalar = async (read, rel = 0.003) => {
     const c = window.__climate
     if (!c?.forceStrike) return { ready: false, mode: window.__game.getState().mode }
     const mode = window.__game.getState().mode
-    if (window.__thunder) window.__thunder.count = 0
+    // Arm the real WebAudio graph first: the thunder gate must prove a clap
+    // was SCHEDULED with a positive level (__thunder.audio/lastPeak), not only
+    // that the strike counter moved — the counter increments even with no
+    // audio context, and once stayed green while the clap was inaudible.
+    window.__ambience?.start?.()
+    if (window.__thunder) {
+      window.__thunder.count = 0
+      window.__thunder.audio = 0
+      window.__thunder.lastPeak = 0
+    }
     c.resetFlashPeak()
     c.forceStrike(0.8) // fire a bolt: the same flash + delayed thunder a real strike makes
     await sleep(350)
-    return { ready: true, mode, flashPeak: c.flashPeak(), thunder: window.__thunder?.count ?? 0, delay: window.__thunder?.lastDelay ?? 0 }
+    return {
+      ready: true,
+      mode,
+      flashPeak: c.flashPeak(),
+      thunder: window.__thunder?.count ?? 0,
+      delay: window.__thunder?.lastDelay ?? 0,
+      audio: window.__thunder?.audio ?? 0,
+      peak: window.__thunder?.lastPeak ?? 0,
+    }
   })
   await page.evaluate(() => window.__climate?.forceStrike?.(1)) // a fresh bolt for the screenshot
   await page.screenshot({ path: `${OUT}134-thunderstorm.png` })
@@ -5182,6 +5199,11 @@ const settleScalar = async (read, rel = 0.003) => {
     'a lightning strike flashes and fires thunder delayed 1-4 s (point 166)',
     storm.ready && storm.mode === 'travel' && storm.flashPeak > 0.1 && storm.thunder > 0 && storm.delay >= 1 && storm.delay <= 4,
     JSON.stringify(storm),
+  )
+  check(
+    'the delayed thunder SCHEDULES a real WebAudio clap at a positive level (point 166 — never a silent flash)',
+    storm.ready && storm.audio > 0 && storm.peak > 0,
+    `audio claps ${storm.audio}, peak gain ${Number(storm.peak).toFixed(3)}`,
   )
   await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 }
