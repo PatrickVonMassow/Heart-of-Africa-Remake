@@ -9116,6 +9116,57 @@ the remaining open points in their numeric order.
   point 221 (swim margin, redSea) and 220 (chunk seam); do not delegate those
   concurrently.
 
+- [ ] 236. SETTLEMENT GROUND ↔ BACKDROP TRANSITION LOOKS WRONG — the user reports
+  (22.07.2026, screenshot in Khartoum) that the transition between the flat
+  walkable settlement ground and the surrounding §2.5 panorama backdrop looks
+  wrong: a hard rectangular STEP/NOTCH where the settlement ground disc ends and
+  the backdrop landscape begins (a visible height gap + a hard geometric edge),
+  instead of a smooth blend. DIAGNOSE the boundary between the settlement ground
+  plane and the backdrop heightfield (the ground disc radius vs where the backdrop
+  starts; the point-215 backdrop taper begins at `BACKDROP_TAPER_SPAN` — check the
+  join height/continuity). FIX: blend the settlement ground into the backdrop so no
+  step or notch shows at the edge — match the heights at the join and overlap/skirt
+  the ground disc under the backdrop (or feather the transition), the way a real
+  horizon recedes; keep the point-215 ridge smoothness and the `panoramaGroundY` /
+  backdrop clamp invariants. Anchors: `src/scenes/place/backdrop.ts`
+  (`backdropHeightAt`/`panoramaGroundY`/taper), `src/scenes/place/PlaceScene.tsx`
+  (the ground disc + backdrop mount), `src/scenes/place/backdrop.test.ts`.
+  VERIFIABLE: extend `backdrop.test.ts` — assert the ground-plane height and the
+  backdrop height are continuous at the join (the step across the boundary is
+  within a small bound, no notch); the parent picture-verifies the settlement edge
+  on BOTH backends (smooth ground→backdrop transition, no hard step). DOCS:
+  design.md §2.5 if wording changes. No player-visible text. NOTE: same place-scene
+  backdrop/panorama area as point 227 (horizontal skyline line) and 181 (floating
+  panorama silhouettes) — coordinate/sequence these place-backdrop points so their
+  shared files never collide.
+
+- [ ] 237. FLEEING CALF OSCILLATES BETWEEN TWO DIRECTIONS — the user reports
+  (22.07.2026) that a calf fleeing an elephant rapidly OSCILLATED between two
+  directions as it ran. §7.1 pt.12 already requires a fleeing prey to hold ONE
+  steady escape direction "rather than oscillating ~90° between two flanking
+  herd-mates" — so this is either a case that rule does not cover (a CALF fleeing a
+  dangerous/approaching ELEPHANT, as opposed to prey dodging between two herd-mates)
+  or a regression of the anti-oscillation hysteresis. DIAGNOSE: trace the calf's
+  flee-heading pick when the threat is an elephant — is it re-choosing the escape
+  direction every frame (flipping between two comparably-good headings) instead of
+  committing to one with hysteresis, the way the point-208/pt.12 steady-escape and
+  the point-157 `calfFleeStep`/`escapeCorridorHeading` sticky-corridor logic
+  intend? FIX: give the calf-vs-elephant flee the same steady, hysteresis-held
+  escape heading the other flee paths use (commit to one direction; only switch
+  past a margin), reusing the existing sticky-corridor/steady-escape machinery
+  rather than adding a parallel path. Anchors:
+  `src/scenes/travel/wildlifeBehavior.ts` (the calf flee / dodge heading, the
+  elephant-dodge, `calfFleeStep`/`escapeCorridorHeading`, the steady-escape
+  hysteresis), `src/scenes/travel/Wildlife.tsx` if a per-animal field is threaded.
+  VERIFIABLE: extend `src/scenes/travel/wildlifeBehavior.test.ts` — a calf fleeing
+  an approaching elephant holds one escape heading over successive steps (heading
+  variance below a small bound / no ~90° flip between two directions), mirroring
+  the existing steady-escape/anti-oscillation tests; a live check in
+  `scripts/verify/enrichments.mjs` if reachable. DOCS: none. No player-visible text.
+  NOTE: same file as points 217 (vulture wings) and 228 (foot-slide) —
+  `wildlifeBehavior.ts`/`Wildlife.tsx`; do NOT delegate these wildlife-behaviour
+  points concurrently with each other.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
