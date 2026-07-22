@@ -8114,7 +8114,22 @@ the remaining open points in their numeric order.
   steps; enrichments green worldwide, 0 console errors. (The Nile-mouth beach gap
   and the river band in the same shot are point 211, separate.)
 
-- [ ] 210. A spurious SEA-ARM juts into the coast EAST of Cairo — remove it (or
+- [x] 210. DONE 22.07.2026 (commit 9284f05, merged to main) — the coast east of
+  Cairo (Gulf-of-Suez head) now reads as ONE clean continent edge with contiguous
+  ocean beyond, verified on BOTH backends (WebGL2 + real WebGPU). Per the user's
+  authoritative simplified direction the fix CROPS the game map cleanly rather than
+  preserving the real gulf geography: the `NORTHEAST_BOUNDARY` was tightened through
+  the gulf head (new control points [32.52,30.02],[32.38,29.62],[32.6,29.36]) so the
+  narrow gulf-head water fingers + isthmus-strip garbage-stamp mess fall on the
+  ocean (trimmed) side — a `__terrainType` sweep now shows exactly ONE land→ocean
+  crossing per row (was 4 pocket-rows), uniform deep ocean beyond, and the rendered
+  dark arms + stepped patches the user marked are gone on both backends. Every
+  redSea.test.ts acceptance verdict holds (Suez ocean, delta/African coast land, no
+  land route rounds the Red Sea) + a new guardrail describe "the Gulf-of-Suez head
+  clean crop" (3 cases). The core defect (broad desert inlet) was already resolved
+  earlier (3e00390); this closed the residual. History of the earlier attempts below.
+  HISTORY: - [ ]-marker removed on tick — REOPEN/attempt trail preserved for the record:
+  A spurious SEA-ARM juts into the coast EAST of Cairo — remove it (or
   adjust the ocean beside it) so the continent has ONE clean, continuous sea edge
   as close to the real ~1890 shape as possible (user report 21.07.2026, screenshot
   at Cairo: a broad dark inlet pokes west into the eastern desert). The user's read
