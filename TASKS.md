@@ -8263,6 +8263,18 @@ the remaining open points in their numeric order.
   notch), not the data. Both (a) and (b) need visual iteration (a rendered
   screenshot I inspect), so they belong in a focused coast pass, not a rushed
   edit.
+  PROBE 22.07 (mouth data, prep): sampled __terrainType + __rivers.surfaceAt on a
+  grid around the Rosetta mouth ([lon 30.42, lat 31.45]). The river 'water' cells
+  (lon 30.45-30.60, lat 31.30-31.40, surface-minus-terrain +0.6 = submerged)
+  transition DIRECTLY to 'ocean' cells (+0.3, submerged) at lat 31.40-31.45 — NO
+  dry-land/coast strip in the classification (no '#'/'.' between W and ~), every
+  cell submerged. So defect (a) is NOT a data gap: terrain/ocean is continuous.
+  The visible beach strip is a RENDER seam — the RIBBON MESH (Rivers.tsx, built
+  from the polyline) ends at its last inland control point while the ocean WATER
+  PLANE starts further seaward, so the terrain's coast colour shows between the
+  ribbon end and the sea plane. FIX: extend the ribbon's last span into the sea
+  shelf (or fade it under the ocean plane), confirmed on a rendered mouth
+  screenshot. Needs the visual-iteration pass; not started this session.
 
 - [x] 212. DONE 21.07.2026 — a drinking PARENT rendered buried under its own
   ground. The point-200-hardened anchoring tripwire (203A) caught it on a
