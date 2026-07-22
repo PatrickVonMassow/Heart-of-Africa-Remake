@@ -8975,29 +8975,45 @@ the remaining open points in their numeric order.
   that the river ribbon's water surface shows visible TRANSVERSE STEP-BANDS across
   its flow (each ribbon row sits at a slightly different height, so the sheet
   stairsteps down the current — most pronounced in the faster/steeper reach), and
-  the whitewater foam bands in the same hard rows. LIKELY CAUSE: point 211's fix
-  (`ribbonRowSurfaceAt` in `src/scenes/travel/waterSurface.ts`) lifts EACH ribbon
-  row independently until every water-typed terrain sample under its band sits
-  below the sheet — neighbouring rows can get DIFFERENT lifts, and the raw per-row
-  height then reads as hard steps. DIAGNOSE first (confirm the stepping is the
-  per-row lift, and whether 211 introduced or only exposed it). FIX: smooth the
-  per-row ribbon heights ALONG the flow so the surface descends gradually instead
-  of stairstepping — e.g. a monotonic/low-pass pass over the row heights (a running
-  max keeps every row clear of its terrain while removing upward steps; a light
-  longitudinal smoothing removes the downward ones) — WITHOUT re-burying any
-  water-typed sample (the 211 invariant: no terrain pokes through the sheet) and
-  without breaking the mouth-bridge ocean rows or the §11.3 continuity/never-buried
-  invariants. If the foam texture also bands, soften its longitudinal sampling too.
-  Anchors: `src/scenes/travel/waterSurface.ts` (`ribbonRowSurfaceAt`, `planRibbonStrips`),
-  the ribbon geometry build in `src/scenes/travel/Rivers.tsx`. VERIFIABLE: extend
-  the DEM-backed pure tests in `src/scenes/travel/riverSmoothness.test.ts` — assert
-  adjacent ribbon-row heights differ by at most a small bounded step (no hard
-  stair) AND that every water-typed sample still sits below its row (211's
-  never-buried invariant re-held) AND ribbon continuity holds; the parent
-  picture-verifies the Nile/rapids reach on BOTH backends (smooth descending
-  sheet, no transverse steps). DOCS: design.md §11.3 only if wording changes. No
-  player-visible text. NOTE: touches `Rivers.tsx` — overlaps point 219 (spring
-  redesign) and 218's water sweep; do not delegate those concurrently.
+  the whitewater foam bands in the same hard rows. TWO candidate causes, to be
+  told apart by DIAGNOSIS: (a) point 211's fix (`ribbonRowSurfaceAt` in
+  `src/scenes/travel/waterSurface.ts`) lifts EACH ribbon row independently until
+  every water-typed terrain sample under its band sits below the sheet, so
+  neighbouring rows can get DIFFERENT lifts and the raw per-row height reads as
+  hard steps; and (b) — the deeper, likelier one (user insight 22.07.2026) — the
+  UNDERLYING DEM height profile along the river course is itself jagged, and a real
+  river bed descends SMOOTHLY and monotonically, so a stairstepped bed is
+  physically wrong regardless of the ribbon: the honest fix is to SMOOTH THE HEIGHT
+  DATA along the flow, not to paper over it at the water sheet. DIAGNOSE which
+  dominates (sample the carved-bed / DEM elevation profile down a river's
+  centreline and see whether it stairsteps before the ribbon lift is applied).
+  FIX per diagnosis, preferring the realism fix where it is the cause: smooth the
+  river BED elevation longitudinally so it descends monotonically from source to
+  mouth (a running-min / low-pass along the ordered course, applied to the carved
+  bed the ribbon and water mask derive from), which fixes the sheet AND the terrain
+  under it; and/or smooth the per-row ribbon heights (a running max keeps every row
+  clear of its terrain while removing upward steps, a light longitudinal smoothing
+  the downward ones). EITHER fix must preserve the 211 invariant (no water-typed
+  sample re-buried / pokes through the sheet), the mouth-bridge ocean rows, the
+  §11.3 continuity/never-buried invariants and the descending current sense (a
+  smoothed bed must still fall toward the mouth, so waterfalls/rapids keep their
+  drop). If the foam texture also bands, soften its longitudinal sampling too.
+  Anchors: `src/scenes/travel/waterSurface.ts` (`ribbonRowSurfaceAt`,
+  `planRibbonStrips`), the ribbon geometry build in `src/scenes/travel/Rivers.tsx`,
+  and the carved-bed / river-height source (search `src/world/` and
+  `src/scenes/travel/` for where the river centreline elevation / carved bed is
+  computed). VERIFIABLE: extend the DEM-backed pure tests in
+  `src/scenes/travel/riverSmoothness.test.ts` — assert the sampled bed elevation
+  along a river descends with at most a small bounded per-step drop (monotone
+  non-increasing within tolerance, no upward jag) AND adjacent ribbon-row heights
+  differ by at most a small bounded step (no hard stair) AND every water-typed
+  sample still sits below its row (211's never-buried invariant re-held) AND ribbon
+  continuity holds; the parent picture-verifies the Nile/rapids reach on BOTH
+  backends (smooth descending sheet + bed, no transverse steps). DOCS: design.md
+  §3.3/§11.3 only if wording changes. No player-visible text. NOTE: touches
+  `Rivers.tsx` / the river-height source — overlaps point 219 (spring redesign),
+  218's water sweep and 220 (terrain chunk seam); do not delegate those
+  concurrently.
 
 ## Closing (only after all points)
 
