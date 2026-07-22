@@ -4,9 +4,18 @@
 // centripetal Catmull-Rom in hydro.ts rounds them; these tests pin the result
 // so a regression back to corners cannot slip through unnoticed.
 import { beforeAll, describe, expect, it } from 'vitest'
-import { densifyRiver, planRibbonStrips, ribbonRowSurfaceAt, SURFACE_LIFT } from './waterSurface'
+import {
+  densifyRiver,
+  planRibbonStrips,
+  ribbonRowSurfaceAt,
+  riverAxisRows,
+  smoothRowsDownstream,
+  SURFACE_LIFT,
+} from './waterSurface'
 import { RIVERS_DATA } from '../../world/data/rivers'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
+import { bedProfiles, rawSampleTerrain } from '../../world/riverProfile'
+import { lakeContains, lakeShoreDistanceExact } from '../../world/hydro'
 import { setupGeodata } from '../../test/geodata'
 
 /** Worst direction change between consecutive densified segments, degrees. */
@@ -138,13 +147,15 @@ describe('ribbon continuity at mouths and across the band (point 211)', () => {
   })
 
   it('the flat axis-height row genuinely notched at Cairo (regression witness)', () => {
-    // Reproduce the pre-211b construction on the Nile at Cairo and confirm it
-    // violates — proving the sweep above would have caught the user's notch.
+    // Reproduce the pre-211b construction on the Nile at Cairo — on the RAW
+    // pre-profile bed (rawSampleTerrain), since the point-232 longitudinal
+    // smoothing removed the cross-band wedge at its root — and confirm it
+    // violates: the sweep above would have caught the user's notch.
     const { pts } = classify('nile')
     let worstOver = -Infinity
     for (let i = 0; i < pts.length; i++) {
       if (pts[i].lat < 29.8 || pts[i].lat > 30.1) continue
-      const s = sampleTerrain(pts[i].lat, pts[i].lon, SEED)
+      const s = rawSampleTerrain(pts[i].lat, pts[i].lon, SEED)
       if (s.type === 'ocean') continue
       const oldSurf = Math.max(-0.05, s.height + SURFACE_LIFT)
       const a = pts[Math.max(0, i - 1)]
@@ -153,10 +164,111 @@ describe('ribbon continuity at mouths and across the band (point 211)', () => {
       const pLat = (-(b.lon - a.lon) / len) * RIVER_WIDTH_DEG
       const pLon = ((b.lat - a.lat) / len) * RIVER_WIDTH_DEG
       for (const f of [-0.9, -0.7, -0.5, -0.3, 0.3, 0.5, 0.7, 0.9]) {
-        const q = sampleTerrain(pts[i].lat + pLat * f, pts[i].lon + pLon * f, SEED)
+        const q = rawSampleTerrain(pts[i].lat + pLat * f, pts[i].lon + pLon * f, SEED)
         if (q.type === 'water') worstOver = Math.max(worstOver, q.height - oldSurf)
       }
     }
     expect(worstOver).toBeGreaterThan(0.02) // the east-bank wedge stood proud of the old sheet
+  })
+})
+
+// Point 232 — the longitudinal bed profile, on the REAL terrain data: the DEM
+// height profile along a course is jagged (upward jags between neighbouring
+// axis samples), and both the carved bed and the water sheet riding it
+// stairstepped down the current in visible transverse bands. The bed now
+// blends toward a smoothed, monotone profile, and the rendered rows carry a
+// downstream running max — so the sheet never steps upward and the bed never
+// jags up. Lake-adjacent rows are excluded here: near a lake the basin-level
+// carve (point 190) owns the bed, and the lake junction rows are pinned to
+// the lake sheet by the point-234 rules.
+describe('longitudinal bed smoothing (point 232)', () => {
+  const SEED = 42
+
+  beforeAll(async () => {
+    await setupGeodata()
+  })
+
+  const nearLake = (lat: number, lon: number) =>
+    lakeContains(lat, lon) || lakeShoreDistanceExact(lat, lon, 0.5, 2) < 0.45
+
+  /** Pairs of adjacent non-ocean, non-lake-adjacent rows of a river. */
+  function landPairs(riverId: string) {
+    const river = RIVERS_DATA.find((r) => r.id === riverId) ?? RIVERS_DATA[0]
+    const rows = riverAxisRows(river, SEED)
+    const pairs: Array<[(typeof rows)[number], (typeof rows)[number]]> = []
+    for (let i = 1; i < rows.length; i++) {
+      const a = rows[i - 1]
+      const b = rows[i]
+      if (a.ocean || b.ocean) continue
+      if (nearLake(a.lat, a.lon) || nearLake(b.lat, b.lon)) continue
+      pairs.push([a, b])
+    }
+    return pairs
+  }
+
+  it('the carved bed descends source→mouth: no upward jag, bounded per-step drop', () => {
+    for (const r of RIVERS_DATA) {
+      for (const [a, b] of landPairs(r.id)) {
+        const label = `${r.id} at ${b.lat.toFixed(2)},${b.lon.toFixed(2)}`
+        expect(b.bed - a.bed, `${label} bed jags upward`).toBeLessThanOrEqual(0.02)
+        expect(a.bed - b.bed, `${label} bed cliffs`).toBeLessThanOrEqual(0.2)
+      }
+    }
+  })
+
+  it('adjacent rendered rows never step upward and drop at most a bounded step', () => {
+    for (const r of RIVERS_DATA) {
+      for (const [a, b] of landPairs(r.id)) {
+        const label = `${r.id} at ${b.lat.toFixed(2)},${b.lon.toFixed(2)}`
+        expect(b.surf - a.surf, `${label} sheet steps upward`).toBeLessThanOrEqual(1e-6)
+        expect(a.surf - b.surf, `${label} sheet stairsteps`).toBeLessThanOrEqual(0.2)
+      }
+    }
+  })
+
+  it('the downstream smoothing only ever raises a row — 211b holds by construction', () => {
+    for (const r of RIVERS_DATA) {
+      const pts = densifyRiver(r.points)
+      const rows = riverAxisRows(r, SEED)
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].ocean) continue
+        expect(rows[i].surf, `${r.id} row ${i}`).toBeGreaterThanOrEqual(
+          ribbonRowSurfaceAt(pts, i, SEED) - 1e-9,
+        )
+      }
+    }
+  })
+
+  it('smoothRowsDownstream: pure behaviour (running max from the mouth, skip resets)', () => {
+    // An upward jag downstream is filled by raising the upstream rows.
+    expect(smoothRowsDownstream([5, 3, 4, 2], [false, false, false, false])).toEqual([5, 4, 4, 2])
+    // A genuine drop (waterfall) survives untouched.
+    expect(smoothRowsDownstream([5, 4, 1, 0.5], [false, false, false, false])).toEqual([5, 4, 1, 0.5])
+    // A skipped row (sea mouth / lake) resets the chain and keeps its value:
+    // without the skip the downstream 2 would back up across the whole run …
+    expect(smoothRowsDownstream([3, 1, -0.1, 2], [false, false, false, false])).toEqual([3, 2, 2, 2])
+    // … with it, the rows upstream of the junction stay at their own levels.
+    expect(smoothRowsDownstream([3, 1, -0.1, 2], [false, false, true, false])).toEqual([3, 1, -0.1, 2])
+  })
+
+  it('raw witness: the pre-profile DEM bed genuinely stairstepped along the Nile', () => {
+    // The raw carved bed the smoothing exists to fix — proving the sweeps
+    // above guard against a real, formerly-present defect (the user's
+    // transverse step-bands), not a hypothetical one.
+    const prof = bedProfiles(SEED).find((p) => p.id === 'nile')
+    expect(prof).toBeDefined()
+    let upJags = 0
+    let maxUp = 0
+    for (let i = 1; i < (prof?.raw.length ?? 0); i++) {
+      const d = (prof?.raw[i] ?? 0) - (prof?.raw[i - 1] ?? 0)
+      if (d > 0.02) upJags++
+      maxUp = Math.max(maxUp, d)
+    }
+    expect(upJags).toBeGreaterThan(30)
+    expect(maxUp).toBeGreaterThan(0.1)
+    // And the smoothed profile is monotone non-increasing.
+    for (let i = 1; i < (prof?.profile.length ?? 0); i++) {
+      expect((prof?.profile[i] ?? 0) - (prof?.profile[i - 1] ?? 0)).toBeLessThanOrEqual(1e-9)
+    }
   })
 })

@@ -40,10 +40,9 @@ import {
   NILE_FLOOD,
   LAKE_LIFT,
   lakeBedMax,
-  densifyRiver,
   planRibbonStrips,
   registerRiverSurfaces,
-  ribbonRowSurfaceAt,
+  riverAxisRows,
   waterSurfaceY,
 } from './waterSurface'
 import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
@@ -84,31 +83,29 @@ function buildRivers(seed: number): {
   const report: Record<string, { strips: number; buried: number; interiorEdges: number }> = {}
   const axisSamples: Array<{ lat: number; lon: number; surf: number; nile: boolean }> = []
 
-  // Phase 1 — densify every axis first: the bank mask below must see ALL
+  // Phase 1 — build every axis first: the bank mask below must see ALL
   // rivers' bands, not only the ones built so far (confluences are between
   // rivers in either build order).
-  const densified = RIVERS_DATA.map((river) => ({ river, pts: densifyRiver(river.points) }))
+  const built = RIVERS_DATA.map((river) => ({ river, rows: riverAxisRows(river, seed) }))
   const bankSamples: BankAxisSample[] = []
-  for (const { river, pts } of densified) {
-    pts.forEach((p, i) => bankSamples.push({ riverId: river.id, index: i, lat: p.lat, lon: p.lon }))
+  for (const { river, rows } of built) {
+    rows.forEach((p, i) => bankSamples.push({ riverId: river.id, index: i, lat: p.lat, lon: p.lon }))
   }
   const bankIndex = buildBankIndex(bankSamples)
 
-  for (const { river, pts } of densified) {
-    const world = pts.map((p) => latLonToWorld(p.lat, p.lon))
-    const samples = pts.map((p) => sampleTerrain(p.lat, p.lon, seed))
+  for (const { river, rows } of built) {
+    const world = rows.map((p) => latLonToWorld(p.lat, p.lon))
 
     // Surface sits just above the carved bed at every point, so the ribbon is
     // never buried under a local rise of the terrain (which would leave visible
-    // gaps in the river). The bed itself descends overall from source to mouth,
-    // so the water reads as flowing downhill without sea-level canyons
-    // (design.md §11). Row heights come from the SHARED formula (point 211b:
-    // lifted where a cross-sloping bank's carved wedge would poke through the
-    // flat cross-section) so the canoe float reads the identical surface.
-    const surf: number[] = []
-    for (let i = 0; i < pts.length; i++) {
-      surf.push(ribbonRowSurfaceAt(pts, i, seed))
-      axisSamples.push({ lat: pts[i].lat, lon: pts[i].lon, surf: surf[i], nile: river.id === 'nile' })
+    // gaps in the river). The bed itself descends smoothly from source to
+    // mouth (the point-232 longitudinal profile), so the water reads as
+    // flowing downhill without sea-level canyons (design.md §11). Row heights
+    // come from the SHARED builder (point 211b cross-band lift + point 232
+    // downstream smoothing) so the canoe float reads the identical surface.
+    const surf = rows.map((r) => r.surf)
+    for (const r of rows) {
+      axisSamples.push({ lat: r.lat, lon: r.lon, surf: r.surf, nile: river.id === 'nile' })
     }
 
     // Flow speed: base current plus local slope; boosted near the river's
@@ -150,7 +147,7 @@ function buildRivers(seed: number): {
 
     // Spring at the source when the river rises in open land (not at a
     // lake outlet or a confluence with another river).
-    const src = pts[0]
+    const src = rows[0]
     const nearOtherRiver = RIVERS_DATA.some(
       (o) =>
         o.id !== river.id &&
@@ -166,7 +163,7 @@ function buildRivers(seed: number): {
     // the sea so it merges with the sea sheet (point 211a); only a sustained
     // ocean run (the open sea beyond the mouth) ends the ribbon. The drawn/
     // connected decisions live in the pure planRibbonStrips.
-    const plan = planRibbonStrips(samples.map((s) => s.type === 'ocean'))
+    const plan = planRibbonStrips(rows.map((r) => r.ocean))
     let arc = 0
     let buried = 0
     let interiorEdges = 0
@@ -183,8 +180,8 @@ function buildRivers(seed: number): {
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
       if (!plan.drawn[i]) continue
-      const isOcean = samples[i].type === 'ocean'
-      if (!isOcean && surf[i] < samples[i].height - 0.05) buried++
+      const isOcean = rows[i].ocean
+      if (!isOcean && surf[i] < rows[i].bed - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)

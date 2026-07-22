@@ -9,8 +9,9 @@
 // stretch can cover a point, and the floater clears the highest of them.
 
 import { LAKES } from '../../world/data/lakes'
-import { RIVERS_DATA } from '../../world/data/rivers'
-import { catmullRom, lakeIndexAt } from '../../world/hydro'
+import { RIVERS_DATA, type RiverDef } from '../../world/data/rivers'
+import { lakeIndexAt } from '../../world/hydro'
+import { AXIS_STEP_DEG, densifyRiverAxis } from '../../world/riverProfile'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 
 /** River/lake surfaces sit this far above their carved bed (ribbon lift). */
@@ -18,34 +19,15 @@ export const SURFACE_LIFT = 0.3
 /** Lake sheets sit this far above their highest interior bed sample. */
 export const LAKE_LIFT = 0.12
 /** Sampling step along a river axis (matches the ribbon build in Rivers.tsx). */
-const STEP_DEG = 0.08
+const STEP_DEG = AXIS_STEP_DEG
 
 /**
- * Densify a river polyline at STEP_DEG — the exact ribbon sampling. The
- * samples follow a Catmull-Rom curve through the control points (point 136):
- * the source data averages ~1.1° between points, so linear interpolation put
- * a hard corner at every control point. The curve is hydro.ts' own — the same
- * one the terrain's water cells are carved along — and passes through every
- * control point, so the researched course stays anchored.
+ * Densify a river polyline at STEP_DEG — the exact ribbon sampling (point
+ * 136: a centripetal Catmull-Rom through every control point, shared with
+ * the terrain carve). The implementation lives with the bed profile in
+ * world/riverProfile.ts; re-exported here for the ribbon build and tests.
  */
-export function densifyRiver(points: Array<[number, number]>): Array<{ lat: number; lon: number }> {
-  const n = points.length
-  const out: Array<{ lat: number; lon: number }> = []
-  for (let i = 0; i < n - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)]
-    const p1 = points[i]
-    const p2 = points[i + 1]
-    const p3 = points[Math.min(n - 1, i + 2)]
-    const steps = Math.max(1, Math.round(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / STEP_DEG))
-    for (let s = 0; s < steps; s++) {
-      const [lon, lat] = catmullRom(p0, p1, p2, p3, s / steps)
-      out.push({ lat, lon })
-    }
-  }
-  const last = points[n - 1]
-  out.push({ lat: last[1], lon: last[0] })
-  return out
-}
+export const densifyRiver = densifyRiverAxis
 
 // point 211(a): a river's mouth reaches the sea across a short OCEAN run, but
 // the ribbon build used to end at the last LAND point (the coast contour),
@@ -137,6 +119,67 @@ export function ribbonRowSurfaceAt(
   return surf
 }
 
+/**
+ * Remove upward steps from the rendered rows (point 232): water never flows
+ * uphill, so downstream of any row no later row may stand higher. A running
+ * max from the mouth back to the source lifts each row to its downstream
+ * maximum — rows are only ever RAISED, so every per-row terrain-clearance
+ * lift (the point-211b notch rule) keeps holding by construction, while the
+ * hard transverse stair the independent per-row lifts painted disappears.
+ * Rows flagged `skip` (the sea-mouth bridge; lake crossings since point 234)
+ * sit at their receiving water body's own level and reset the chain.
+ */
+export function smoothRowsDownstream(surfs: number[], skip: boolean[]): number[] {
+  const out = surfs.slice()
+  let carry = -Infinity
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (skip[i]) {
+      carry = -Infinity
+      continue
+    }
+    if (out[i] < carry) out[i] = carry
+    carry = out[i]
+  }
+  return out
+}
+
+export interface AxisRow {
+  lat: number
+  lon: number
+  /** Rendered ribbon surface height of this row. */
+  surf: number
+  /** Terrain height under the axis sample (the carved bed). */
+  bed: number
+  /** The axis sample lies in the sea (mouth-bridge candidates). */
+  ocean: boolean
+}
+
+/**
+ * The canonical per-river axis rows — positions and rendered surface heights
+ * — shared by the ribbon build in Rivers.tsx and the lazy float index below,
+ * so the rendered sheet and the canoe float can never diverge: per-row
+ * heights from ribbonRowSurfaceAt, then the downstream monotone smoothing.
+ */
+export function riverAxisRows(river: RiverDef, seed: number): AxisRow[] {
+  const pts = densifyRiver(river.points)
+  const rows: AxisRow[] = pts.map((p, i) => {
+    const s = sampleTerrain(p.lat, p.lon, seed)
+    return {
+      lat: p.lat,
+      lon: p.lon,
+      surf: ribbonRowSurfaceAt(pts, i, seed),
+      bed: s.height,
+      ocean: s.type === 'ocean',
+    }
+  })
+  const smoothed = smoothRowsDownstream(
+    rows.map((r) => r.surf),
+    rows.map((r) => r.ocean),
+  )
+  for (let i = 0; i < rows.length; i++) rows[i].surf = smoothed[i]
+  return rows
+}
+
 // A ribbon cross-section reaches RIVER_WIDTH_DEG off its axis; add one
 // sampling step of slack so a point between two axis samples still sees both.
 const COVER_RANGE_DEG = RIVER_WIDTH_DEG + STEP_DEG
@@ -193,11 +236,9 @@ function axisIndex(seed: number): AxisIndex {
   if (hit) return hit
   const grid: AxisIndex = new Map()
   for (const river of RIVERS_DATA) {
-    const pts = densifyRiver(river.points)
-    for (let i = 0; i < pts.length; i++) {
-      // The SAME row formula the ribbon renders (incl. the point-211b lift).
-      const surf = ribbonRowSurfaceAt(pts, i, seed)
-      insertAxisSample(grid, pts[i].lat, pts[i].lon, surf, river.id === 'nile')
+    // The SAME rows the ribbon renders (211b lift + downstream smoothing).
+    for (const row of riverAxisRows(river, seed)) {
+      insertAxisSample(grid, row.lat, row.lon, row.surf, river.id === 'nile')
     }
   }
   axisIndexCache.set(seed, grid)
