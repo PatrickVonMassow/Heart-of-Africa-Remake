@@ -8666,8 +8666,18 @@ the remaining open points in their numeric order.
   body-spacing pure test to the pinned-at-edge case; a live/staged pair at a
   waterline parts within moments (enrichments). DOCS: design.md §19.5.
 
-- [ ] 223. RAIN IN THE HYPER-ARID DESERT? — plausibility check (user 22.07.2026):
-  rain rendered at ~18.3S/15E (Namib/Kalahari edge) in late November. The interior
+- [ ] 223. WEATHER × TERRAIN-TYPE PLAUSIBILITY AUDIT (user 22.07.2026) — a
+  repeatable audit that the modelled weather/season is plausible for the terrain it
+  renders on, EVERYWHERE (method like point 205), not a single spot. The wetness
+  model has NO longitudinal term (`season.ts` ~279), so any place whose rainfall
+  depends on more than latitude+elevation is suspect. Sweep a grid across EVERY
+  biome/region, cross-check the modelled wetness/season against
+  `docs/climate-1890.md` + the rendered terrain, and pin each mismatch (rain on a
+  bone-dry desert, a rainforest with a dry season it never had, a Mediterranean
+  coast on a summer-rain curve, a highland off its own calendar, fog-coast vs
+  interior …) as a sub-fix with a coordinate + a pure test, mirroring the point-147
+  model-bug catches. FIRST INSTANCE, found + FIXED (commit 3341a80): the hyper-arid
+  coastal NAMIB rendered rain — the interior
   has a Nov-Mar summer wet season (plausible), but the western/coastal NAMIB is
   hyper-arid (fog desert, ~rainless). VERIFY the wetness model (`season.ts`
   `climateZoneAt`/the rain curve, against `docs/climate-1890.md`) at the exact
@@ -8691,21 +8701,9 @@ the remaining open points in their numeric order.
   interior at the same latitude keeps its Nov-Mar rains. Pure-test both sides
   (coastal Namib rainless every month; interior wet Nov-Mar); a live pixel check no
   rain on the coastal strip. This needs a real fix, not just the check.
-  EXTENDED (user 22.07.2026) — the Namib rain is likely just ONE symptom: audit the
-  WEATHER x TERRAIN-TYPE interplay GENERALLY for plausibility, not only this spot.
-  The wetness model has NO longitudinal term, so any place where rainfall depends on
-  more than latitude+elevation is suspect. Method (a repeatable plausibility audit,
-  akin to point 205): sweep a grid of representative points across EVERY terrain
-  type / biome (desert, savanna, jungle, coast, mountain, highland) and region, and
-  cross-check the modelled wetness/season against docs/climate-1890.md + the terrain
-  the game renders there — flag every mismatch (rain on a bone-dry desert, a
-  rainforest reading a dry season it never had, a Mediterranean coast on a summer-
-  rain curve, a highland not on its own calendar, fog-coast vs interior, etc.). Also
-  check the DERIVED weather visuals track the terrain (fog/overcast/greenness/flora
-  bleach vs the biome). Turn findings into concrete sub-fixes (each a pinned coord +
-  wrong-vs-right regime) + pure tests, mirroring the point-147 catches (Fang-in-
-  Sahara, Somali-in-Congo). A Fable-5 plausibility pass fits here. Keep every
-  season.test.ts verdict.
+  Also check the DERIVED weather VISUALS track the terrain (fog/overcast/greenness/
+  flora bleach vs the biome), and keep every season.test.ts verdict. A Fable-5
+  plausibility pass fits this audit.
 
 - [ ] 224. DEMO CHECKPOINT — full closing run → re-point the `poc` tag to the
   then-current main → publish that state playable at
