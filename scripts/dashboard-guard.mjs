@@ -33,6 +33,7 @@ import {
   sha256File,
 } from './dashboard-state.mjs'
 import { parseTasks, parseNowCardPoint, evaluate } from './dashboard-guard-core.mjs'
+import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
@@ -54,6 +55,18 @@ if (process.argv[2] === '--synced') {
   }
   mergeState({ dashboardPath: p, head: head(), syncedAt: Date.now() })
   console.log(`dashboard registered at HEAD ${head().slice(0, 7)}: ${p}`)
+
+  // Record the card/spec drift baselines for the integrity guard (check C):
+  // per queue card, a hash of the card text and of its TASKS spec block. A
+  // later spec change with an unchanged card then flags at turn end until the
+  // next reviewed --synced refreshes these snapshots.
+  try {
+    const snaps = specSnapshots(readFileSync(TASKS, 'utf8'), readFileSync(p, 'utf8'))
+    mergeState({ integritySnapshots: snaps })
+    console.log(`integrity snapshots recorded for ${Object.keys(snaps).length} queue card(s)`)
+  } catch (e) {
+    console.log(`note: integrity snapshots skipped (${e && e.message})`)
+  }
 
   // The re-sync IS the forced review of all four sections — when the reviewed
   // now-card matches the declared focus it doubles as the focus confirmation.
