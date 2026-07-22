@@ -19,8 +19,16 @@ import {
   evaluate,
 } from './dashboard-integrity-guard-core.mjs'
 
-/** Minimal dashboard in the real board's markup (mirrors the queue-order tests). */
-function boardHtml({ nowTitle = '210 — Meereskante', nowBody = 'Status: in Arbeit.', queue = [], done = [209] } = {}) {
+/** Minimal dashboard in the real board's markup (mirrors the queue-order tests).
+ *  `nowTitles` renders SEVERAL now-cards (parallel feature-branch work) and
+ *  overrides the single `nowTitle`. */
+function boardHtml({
+  nowTitle = '210 — Meereskante',
+  nowTitles = null,
+  nowBody = 'Status: in Arbeit.',
+  queue = [],
+  done = [209],
+} = {}) {
   const q = queue
     .map(
       ({ n, t = `Task ${n}`, body = 'Offener Punkt.' }) =>
@@ -30,10 +38,15 @@ function boardHtml({ nowTitle = '210 — Meereskante', nowBody = 'Status: in Arb
   const d = done
     .map((n) => `<details><summary><span class="num">${n}</span><span class="t">Done ${n}</span></summary></details>`)
     .join('\n')
+  const now = (nowTitles ?? [nowTitle])
+    .map(
+      (t) => `<details class="now" open><summary><span class="t">${t}</span></summary>
+<div class="body"><p>${nowBody}</p></div></details>`,
+    )
+    .join('\n')
   return `<main><h1>Dashboard</h1>
 <h2>Woran ich gerade arbeite</h2>
-<details class="now" open><summary><span class="t">${nowTitle}</span></summary>
-<div class="body"><p>${nowBody}</p></div></details>
+${now}
 <h2>Von dir zu klären</h2>
 <h2>Warteschlange</h2>
 ${q}
@@ -162,6 +175,22 @@ describe('nowCardMatchesWork (check A)', () => {
     expect(nowCardMatchesWork(null).ok).toBe(true)
     expect(nowCardMatchesWork({ nowPoint: 215, touchedFiles: 'garbage', specs: 'garbage' }).ok).toBe(true)
   })
+  it('accepts evidence for ANY of several parallel now-card points (nowPoints Set)', () => {
+    // Two cards in the now-section (215 and 210); every edit is 210 work —
+    // supported, because 210 IS one of the parallel now-cards.
+    const r = nowCardMatchesWork({ nowPoints: new Set([215, 210]), touchedFiles: foreignEdits, specs })
+    expect(r.ok).toBe(true)
+  })
+  it('still blocks when the evidence supports NONE of the parallel now-cards', () => {
+    const r = nowCardMatchesWork({ nowPoints: new Set([215, 223]), touchedFiles: foreignEdits, specs })
+    expect(r.ok).toBe(false)
+    expect(r.foreignPoints).toEqual([210])
+  })
+  it('is total on a malformed nowPoints value', () => {
+    expect(nowCardMatchesWork({ nowPoints: 'garbage', focusPoint: 210, touchedFiles: foreignEdits, specs }).ok).toBe(
+      true,
+    )
+  })
 })
 
 describe('staleQueueCards (check B)', () => {
@@ -241,6 +270,28 @@ describe('evaluate — end to end', () => {
     })
     expect(r.block).toBe(true)
     expect(r.reason).toMatch(/POSSIBLY STALE AFTER A SPEC CHANGE.*223/)
+  })
+  it('allows a second parallel now-card to supply the work evidence (multi-now board)', () => {
+    // Parallel feature-branch work: 215 AND 210 each hold a now-card; all
+    // edits are 210 work. The single-card reading (first card 215 only) used
+    // to block this legitimate state.
+    const r = evaluate({
+      dashboardHtml: boardHtml({ nowTitles: ['215 — Skyline', '210 — Meereskante'], queue: [{ n: 223 }] }),
+      tasksMd: SPECS,
+      focusPoint: 215,
+      touchedFiles: ['src/render/demElevation.ts', 'src/world/terrain.ts'],
+    })
+    expect(r.block).toBe(false)
+  })
+  it('still blocks a multi-now board when the evidence matches NO now-card', () => {
+    const r = evaluate({
+      dashboardHtml: boardHtml({ nowTitles: ['215 — Skyline', '223 — Audit'], queue: [{ n: 210 }] }),
+      tasksMd: SPECS,
+      focusPoint: 215,
+      touchedFiles: ['src/render/demElevation.ts', 'src/world/terrain.ts'],
+    })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/CONTRADICTS THE ACTUAL WORK.*210/)
   })
   it('allows a clean, in-sync board', () => {
     const html = boardHtml({ queue: [{ n: 210 }, { n: 215 }, { n: 223 }] })

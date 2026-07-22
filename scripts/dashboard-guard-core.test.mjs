@@ -9,18 +9,23 @@ import {
   FOCUS_FRESH_MS,
   parseTasks,
   parseNowCardPoint,
+  parseNowCardPoints,
   parseQueuePoints,
   parseKlaerungPoints,
   evaluate,
 } from './dashboard-guard-core.mjs'
 
 /** Minimal dashboard HTML in the real board's markup (incl. an Erledigt section
- *  that also uses `.num`, which the queue parser must NOT pick up). `klaerung`
- *  renders point-tied "Von dir zu klären" cards (leading number in the title);
- *  `klaerungExtra` adds no-number cards like the real ntfy one. */
+ *  that also uses `.num`, which the queue parser must NOT pick up). `nowCards`
+ *  renders SEVERAL now-cards for the parallel-work workflow (numbers become
+ *  `N — Task N` titles, strings stay literal non-point titles) and overrides
+ *  the single `nowPoint`/`nowTitle` pair. `klaerung` renders point-tied
+ *  "Von dir zu klären" cards (leading number in the title); `klaerungExtra`
+ *  adds no-number cards like the real ntfy one. */
 function boardHtml({
   nowPoint = 210,
   nowTitle = 'Meereskante glätten',
+  nowCards = null,
   queue = [211, 204],
   done = [209],
   klaerung = [],
@@ -36,11 +41,18 @@ function boardHtml({
     ...klaerung.map((n) => `<details><summary><span class="t">${n} — Frage zu Punkt ${n}</span></summary></details>`),
     ...klaerungExtra.map((t) => `<details><summary><span class="t">${t}</span></summary></details>`),
   ].join('\n')
-  const nowT = nowPoint == null ? nowTitle : `${nowPoint} — ${nowTitle}`
+  const nowTitles = (nowCards ?? [nowPoint == null ? nowTitle : `${nowPoint} — ${nowTitle}`]).map((c) =>
+    typeof c === 'number' ? `${c} — Task ${c}` : c,
+  )
+  const now = nowTitles
+    .map(
+      (t) => `<details class="now" open><summary><span class="t">${t}</span></summary>
+<div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>`,
+    )
+    .join('\n')
   return `<main><h1>Dashboard</h1>
 <h2>Woran ich gerade arbeite</h2>
-<details class="now" open><summary><span class="t">${nowT}</span></summary>
-<div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>
+${now}
 <h2>Von dir zu klären</h2>
 ${k}
 <h2>Warteschlange</h2>
@@ -110,6 +122,29 @@ describe('parseNowCardPoint', () => {
     // now-card point. The search must stop at the now-card section boundary.
     const html = boardHtml({ nowPoint: null, nowTitle: 'Automatik absichern', klaerung: [206] })
     expect(parseNowCardPoint(html)).toBeNull()
+  })
+  it('reads the FIRST of several parallel now-cards (back-compat view)', () => {
+    expect(parseNowCardPoint(boardHtml({ nowCards: [226, 211] }))).toBe(226)
+  })
+})
+
+describe('parseNowCardPoints', () => {
+  it('collects ALL numeric now-card title points (parallel work)', () => {
+    const set = parseNowCardPoints(boardHtml({ nowCards: [226, 211] }))
+    expect([...set].sort()).toEqual([211, 226])
+  })
+  it('lets non-numeric now-cards contribute nothing beside numeric siblings', () => {
+    const set = parseNowCardPoints(boardHtml({ nowCards: [226, 'Closing-Zyklus'] }))
+    expect([...set]).toEqual([226])
+  })
+  it('stays section-bounded: numbered VDZK/queue cards never leak in', () => {
+    const html = boardHtml({ nowCards: ['Automatik absichern'], klaerung: [206], queue: [211, 204] })
+    expect(parseNowCardPoints(html).size).toBe(0)
+  })
+  it('is empty on a missing section and non-string input', () => {
+    expect(parseNowCardPoints('<h2>Warteschlange</h2>').size).toBe(0)
+    expect(parseNowCardPoints(null).size).toBe(0)
+    expect(parseNowCardPoints(undefined).size).toBe(0)
   })
 })
 
@@ -190,6 +225,50 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
   it('allows the now-card point when it is NOT also in the queue', () => {
     const r = evaluate(green({ html: boardHtml({ nowPoint: 210, queue: [211, 204] }) }))
     expect(r.decision).toBe('allow')
+  })
+})
+
+describe('evaluate — multiple parallel now-cards (feature-branch workflow)', () => {
+  // One card PER point in active work (user decision 22.07.2026): 226 and 211
+  // are both being worked in parallel worktrees, 204 waits in the queue.
+  const multi = (overrides = {}) =>
+    green({
+      open: [226, 211, 204],
+      html: boardHtml({ nowCards: [226, 211], queue: [204] }),
+      focus: { point: 226, note: 'guard multi-now', setAt: 1000, confirmedAt: 1000 },
+      ...overrides,
+    })
+
+  it('completeness (4) counts EVERY now-card: both parallel points are covered', () => {
+    expect(evaluate(multi()).decision).toBe('allow')
+  })
+  it('blocks (4) when a point is in no now-card, queue, or VDZK section', () => {
+    const r = evaluate(multi({ open: [226, 211, 204, 184] }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/INCOMPLETE.*184/)
+  })
+  it('blocks (4b) when ANY now-card point also has a queue card', () => {
+    const r = evaluate(multi({ html: boardHtml({ nowCards: [226, 211], queue: [211, 204] }) }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/DOUBLE-LISTS.*211/)
+  })
+  it('allows the focus on the FIRST now-card', () => {
+    expect(evaluate(multi()).decision).toBe('allow')
+  })
+  it('allows the focus on a LATER now-card (among the set, not necessarily first)', () => {
+    const r = evaluate(multi({ focus: { point: 211, note: 'parallel branch', setAt: 1000, confirmedAt: 1000 } }))
+    expect(r.decision).toBe('allow')
+  })
+  it('blocks (6) a focus point that is in NO now-card', () => {
+    const r = evaluate(multi({ focus: { point: 204, note: 'queued, not now', setAt: 1000, confirmedAt: 1000 } }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/NOW-CARD OUT OF SYNC/)
+    expect(r.reason).toMatch(/204/)
+  })
+  it('blocks (4c) a VDZK point that equals ANY now-card point', () => {
+    const r = evaluate(multi({ html: boardHtml({ nowCards: [226, 211], queue: [204], klaerung: [211] }) }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/VON DIR ZU KLÄREN.*211.*now-card/)
   })
 })
 
