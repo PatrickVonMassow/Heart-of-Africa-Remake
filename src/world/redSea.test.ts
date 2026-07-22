@@ -8,7 +8,16 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import sharp from 'sharp'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { isNortheastOfBoundary, trimToGameWorld, NORTHEAST_BOUNDARY, boundarySignedDistance } from './redSea'
+import {
+  isNortheastOfBoundary,
+  trimToGameWorld,
+  NORTHEAST_BOUNDARY,
+  boundarySignedDistance,
+  oceanSwimBlocked,
+  MEDITERRANEAN_LAT_MIN,
+  MEDITERRANEAN_LON_MIN,
+  SWIM_MARGIN_DEG_DEFAULT,
+} from './redSea'
 import { sampleTerrain, isBlocked } from './terrain'
 import { elevationAt, landFractionAt } from './geodata'
 import { balance } from '../config/balance'
@@ -552,5 +561,104 @@ describe('swim margin (design.md §11.2)', () => {
     const openMed = sampleTerrain(37.5, 11.5, seed)
     expect(openMed.type).toBe('ocean')
     expect(isBlocked(openMed.type, 37.5, 11.5)).toBe(true) // outside the hull
+  })
+})
+
+describe('oceanSwimBlocked — consistent near-shore band (point 221)', () => {
+  // Pure over the coast-distance metric (no geodata needed): the band decision
+  // the terrain movement gate delegates to. The reported defect (user 22.07.2026,
+  // far out in deep blue at ~32.2S/16.9E) was a swim margin whose SEAWARD reach
+  // depended on coast shape — a convex cape blocked the traveller ~0 deg off the
+  // beach while a concave bay let him wade ~1.4 deg — so the wadeable distance
+  // swung ~35x between coasts. These coast-distance figures are measured off the
+  // real vector coastline; the band here treats every coast identically.
+  const M = SWIM_MARGIN_DEG_DEFAULT // 1.0 deg
+
+  it('is a bounded, consistent distance from the coast — a point just inside swims, a bounded step further out blocks, IDENTICALLY at every coast', () => {
+    // Same margin, same coast-distances, several unrelated coastlines that are
+    // NOT in the Red-Sea cut or the Mediterranean: a convex cape and a concave
+    // bay must give the SAME verdict at the SAME distance (the shape-independence
+    // the point-221 fix installs — the former hull gate did not).
+    const coasts: Array<[number, number, string]> = [
+      [5.5, 3.0, 'Gulf of Guinea (open coast)'],
+      [-32.2, 17.9, 'SW Atlantic (concave St Helena bay)'],
+      [-34.4, 18.5, 'Cape of Good Hope (convex cape)'],
+      [11.8, 51.4, 'Cape Guardafui (convex cape)'],
+    ]
+    for (const [lat, lon, label] of coasts) {
+      // just inside the band → swimmable
+      expect(oceanSwimBlocked(lat, lon, M * 0.8, M), `just inside @ ${label}`).toBe(false)
+      // a bounded step further out → blocked, no matter the coast shape
+      expect(oceanSwimBlocked(lat, lon, M * 1.2, M), `bounded step out @ ${label}`).toBe(true)
+    }
+  })
+
+  it('the band width is exactly marginDeg: at the boundary the last swimmable cell is <= marginDeg, the first blocked cell just beyond', () => {
+    const lat = -32.2
+    const lon = 17.9
+    expect(oceanSwimBlocked(lat, lon, M, M)).toBe(false) // exactly at the margin: still swimmable
+    expect(oceanSwimBlocked(lat, lon, M + 1e-6, M)).toBe(true) // a hair beyond: blocked
+    // and it scales with the calibratable margin (debug-editable balance value)
+    expect(oceanSwimBlocked(lat, lon, 0.5, 0.4)).toBe(true)
+    expect(oceanSwimBlocked(lat, lon, 0.3, 0.4)).toBe(false)
+  })
+
+  it('the reported WIDE-BAY over-permit now blocks: the SW Atlantic point ~1.18 deg offshore is out of the band', () => {
+    // Measured coast-distance at the reported spot (~32.2S/16.9E) is ~1.184 deg.
+    // The former 1.2 deg margin let it through (deep blue, far from land); the
+    // narrowed calibrated band blocks it while the nearshore cases stay in.
+    const reportedCoastDist = 1.184
+    expect(oceanSwimBlocked(-32.2, 16.9, reportedCoastDist, M)).toBe(true) // now blocked
+    expect(oceanSwimBlocked(-32.2, 16.9, reportedCoastDist, 1.2)).toBe(false) // the old over-permit
+    // the documented nearshore swim (Gulf of Guinea, ~0.889 deg) stays swimmable
+    expect(oceanSwimBlocked(5.5, 3.0, 0.889, M)).toBe(false)
+    // and the far-offshore blocks (Gulf of Guinea bight ~1.986 / ~3.338 deg)
+    expect(oceanSwimBlocked(4.4, 3.0, 1.986, M)).toBe(true)
+    expect(oceanSwimBlocked(2.0, 0.0, 3.338, M)).toBe(true)
+  })
+
+  it('deep/far-offshore sea blocks everywhere, independent of coast shape', () => {
+    for (const [lat, lon, cd, label] of [
+      [0, -30, 18.069, 'open Atlantic'],
+      [-18, 41, 2.092, 'Mozambique channel'],
+      [-40, 20, 6.0, 'Southern Ocean'],
+    ] as const) {
+      expect(oceanSwimBlocked(lat, lon, cd, M), `far offshore @ ${label}`).toBe(true)
+    }
+  })
+
+  it('the Red-Sea cut always blocks, even for a cell hard against the coast (coastDist 0) with a huge margin', () => {
+    // mid Red Sea, the Arabian side, the Gulf of Aden — northeast of the boundary.
+    for (const [lat, lon] of [
+      [20, 38],
+      [24, 45],
+      [12, 45],
+      [29, 34], // Sinai
+    ] as const) {
+      expect(isNortheastOfBoundary(lat, lon)).toBe(true)
+      expect(oceanSwimBlocked(lat, lon, 0, 5)).toBe(true)
+    }
+  })
+
+  it('the Mediterranean always blocks — off the delta, off Alexandria, in the Sidra bight — even inside the band and even with a widened margin', () => {
+    for (const [lat, lon] of [
+      [31.6, 31.0], // off the Nile delta
+      [31.4, 30.0], // off Alexandria
+      [33.5, 13.0], // Gulf of Sidra bight
+      [37.5, 11.5], // open Med off Tunisia
+      [34.0, 15.0], // Sidra
+    ] as const) {
+      expect(lat > MEDITERRANEAN_LAT_MIN && lon > MEDITERRANEAN_LON_MIN).toBe(true)
+      expect(oceanSwimBlocked(lat, lon, 0, 5)).toBe(true) // coastDist 0, margin 5: still blocked
+    }
+  })
+
+  it('south of the Mediterranean latitude the same coast-distance swims (the gate is a latitude/longitude box, not a global block)', () => {
+    // A sanity check that the Mediterranean rule does not over-reach: an Atlantic
+    // coast cell south of the box, within the band, is swimmable.
+    expect(oceanSwimBlocked(MEDITERRANEAN_LAT_MIN - 0.1, 3.0, 0.3, M)).toBe(false)
+    // west of MEDITERRANEAN_LON_MIN (the Atlantic beyond Gibraltar) is not caught
+    // by the Mediterranean box either.
+    expect(oceanSwimBlocked(35.0, MEDITERRANEAN_LON_MIN - 0.1, 0.3, M)).toBe(false)
   })
 })
