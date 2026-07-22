@@ -8381,7 +8381,7 @@ the remaining open points in their numeric order.
   former gulf-head water pocket now reads land while Suez stays ocean. This is
   much simpler than the smoothing approach and is the intended fix.
 
-- [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
+- [x] 211. DONE 22.07.2026 (feat/211-river-mouth 61acbd5, merged) — verified on BOTH backends: the Nile flows into the sea at Rosetta with no beach wedge (mouth-bridge carries the ribbon into the sea shelf) and the Cairo interior notch is gone (root cause: flat ribbon sheet vs relief-relative carve left a water-typed wedge poking through; fix ribbonRowSurfaceAt lifts each row above its own band). DEM-backed pure tests added. ORIGINAL: RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
   21.07.2026, screenshot at Cairo: the Nile ribbon STOPS short of the sea with a
   strip of BEACH between its mouth and the ocean, and a strange cut-out sits in
