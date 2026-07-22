@@ -406,46 +406,141 @@ export function emitFootstep(surface: 'ground' | 'stone') {
 }
 
 /**
- * A single thunderclap (design.md §19.13, point 166), played DELAYED after its
- * lightning flash so the pair reads as weather, not a sound effect. A deep brown-
- * noise rumble — a quick crack, then a long rolling tail — scaled by the strike
- * strength and the single ambience volume (0 => silent). One-shot, through the
- * ambient bus like every other ambient sound.
+ * The thunderclap's pure timing/level plan (design.md §19.13, point 166): the
+ * clap starts exactly `delaySeconds` after the flash (the pure
+ * thunderDelaySeconds lag) and its two voices — a mid-band CRACK small
+ * speakers can render and a long low RUMBLE — are scaled by the strike
+ * strength and the single ambience volume (0 => silent). Pure, so the
+ * flash->thunder pairing is unit-testable without WebAudio.
  */
-export function playThunder(delaySeconds: number, strength = 1): void {
-  // Count the strike even when no audio context is running (headless verify has
-  // no audio) so the strike->thunder wiring is observable via window.__thunder.
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    const w = window as unknown as { __thunder?: { count: number; lastDelay: number } }
-    w.__thunder = { count: (w.__thunder?.count ?? 0) + 1, lastDelay: delaySeconds }
+export interface ThunderPlan {
+  /** Seconds after "now" the clap starts — the flash->thunder lag, >= 0. */
+  startOffset: number
+  /** Envelope peak of the sharp mid-band onset (pre-bus gain). */
+  crackPeak: number
+  crackDuration: number
+  /** Envelope peak of the low rolling tail (pre-bus gain). */
+  rumblePeak: number
+  rumbleDuration: number
+}
+
+// The clap must survive the ambient-bus (0.5) and master (0.5) attenuation and
+// read over the storm's own rain/wind beds. The first synthesis peaked at
+// 0.9 × strength × ambienceVolume over an unnormalized ~0.4-amplitude buffer,
+// entirely below 220 Hz — after the ×0.25 bus chain that landed near -45 dBFS
+// of sub-bass: scheduled, but inaudible on real speakers (the reported
+// "lightning without thunder"). These peaks compensate the bus chain; the
+// buffers are normalized so the envelope alone sets the level.
+const THUNDER_CRACK_PEAK = 9
+const THUNDER_RUMBLE_PEAK = 5.5
+
+export function thunderClapPlan(delaySeconds: number, strength: number, volume: number): ThunderPlan {
+  const s = Math.min(1, Math.max(0, strength))
+  const v = Math.max(0, volume)
+  return {
+    startOffset: Math.max(0, delaySeconds),
+    crackPeak: THUNDER_CRACK_PEAK * s * v,
+    crackDuration: 0.32,
+    rumblePeak: THUNDER_RUMBLE_PEAK * s * v,
+    rumbleDuration: 4.5,
   }
-  if (!ctx || !master) return
-  const t0 = ctx.currentTime + Math.max(0, delaySeconds)
-  const dur = 1.9
-  const buffer = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate)
+}
+
+/** A normalized one-shot noise buffer (peak ~1): white for the crack, deep
+ *  brown-ish for the rumble. Normalized so the gain envelope alone sets the
+ *  level — the old raw brown chain's ~0.4 amplitude was part of the silence. */
+function noiseBuffer(ac: AudioContext, dur: number, brown: boolean): AudioBuffer {
+  const buffer = ac.createBuffer(1, Math.max(1, Math.ceil(ac.sampleRate * dur)), ac.sampleRate)
   const data = buffer.getChannelData(0)
   let last = 0
+  let peak = 0
   for (let i = 0; i < data.length; i++) {
-    last = last * 0.985 + (Math.random() * 2 - 1) * 0.015 // brown-ish noise, deep
-    data[i] = last * 8
+    const white = Math.random() * 2 - 1
+    data[i] = brown ? (last = last * 0.985 + white * 0.015) : white
+    const a = Math.abs(data[i])
+    if (a > peak) peak = a
   }
-  const src = ctx.createBufferSource()
-  src.buffer = buffer
-  const filter = ctx.createBiquadFilter()
-  filter.type = 'lowpass'
-  filter.frequency.value = 220
-  filter.Q.value = 0.6
-  const g = ctx.createGain()
-  const peak = 0.9 * Math.min(1, Math.max(0, strength)) * balance.ambienceVolume
-  g.gain.setValueAtTime(0.0001, t0)
-  g.gain.linearRampToValueAtTime(Math.max(0.0001, peak), t0 + 0.05) // the crack
-  g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * 0.4), t0 + 0.5)
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur) // the rolling tail
+  if (peak > 0) for (let i = 0; i < data.length; i++) data[i] /= peak
+  return buffer
+}
+
+/** One clap voice: normalized noise -> filter -> envelope -> the ambient bus. */
+function clapVoice(
+  ac: AudioContext,
+  dest: AudioNode,
+  t0: number,
+  dur: number,
+  brown: boolean,
+  filterType: BiquadFilterType,
+  freq: number,
+  q: number,
+  shape: (gain: AudioParam) => void,
+) {
+  const src = ac.createBufferSource()
+  src.buffer = noiseBuffer(ac, dur, brown)
+  const filter = ac.createBiquadFilter()
+  filter.type = filterType
+  filter.frequency.value = freq
+  filter.Q.value = q
+  const g = ac.createGain()
+  shape(g.gain)
   src.connect(filter)
   filter.connect(g)
-  g.connect(ambientBus ?? master)
+  g.connect(dest)
   src.start(t0)
   src.stop(t0 + dur + 0.05)
+}
+
+/**
+ * A single thunderclap (design.md §19.13, point 166), played DELAYED after its
+ * lightning flash so the pair reads as weather, not a sound effect. Scheduled
+ * entirely on the AudioContext clock (src.start(t0), envelopes at t0), so a
+ * re-render or state change between flash and clap can never cancel it — there
+ * is no JS timer to lose. Two voices through the ambient bus: a sharp mid-band
+ * CRACK (audible on small speakers with no deep bass) and a long low ROLLING
+ * tail, both scaled by the strike strength and the single ambience volume.
+ */
+export function playThunder(delaySeconds: number, strength = 1): void {
+  const plan = thunderClapPlan(delaySeconds, strength, balance.ambienceVolume)
+  // Probe (dev/verify): count every strike even without a running audio context
+  // (headless has no gesture), and SEPARATELY count the actually scheduled
+  // claps with their level — so the live gate proves audio output, not only
+  // that the counter moved (the old counter-only probe stayed green while the
+  // clap was inaudible).
+  const probe =
+    import.meta.env.DEV && typeof window !== 'undefined'
+      ? ((window as unknown as { __thunder?: { count: number; lastDelay: number; audio: number; lastPeak: number } }).__thunder ??= {
+          count: 0,
+          lastDelay: 0,
+          audio: 0,
+          lastPeak: 0,
+        })
+      : null
+  if (probe) {
+    probe.count++
+    probe.lastDelay = delaySeconds
+  }
+  if (!ctx || !master) return
+  const ac = ctx
+  const dest = ambientBus ?? master
+  const t0 = ac.currentTime + plan.startOffset
+  // The crack: a hard mid-band onset — the part a laptop speaker can render.
+  clapVoice(ac, dest, t0, plan.crackDuration, false, 'bandpass', 1800, 0.8, (gain) => {
+    gain.setValueAtTime(0.0001, t0)
+    gain.linearRampToValueAtTime(Math.max(0.0001, plan.crackPeak), t0 + 0.02)
+    gain.exponentialRampToValueAtTime(0.0001, t0 + plan.crackDuration)
+  })
+  // The rumble: the deep rolling tail under it.
+  clapVoice(ac, dest, t0, plan.rumbleDuration, true, 'lowpass', 380, 0.5, (gain) => {
+    gain.setValueAtTime(0.0001, t0)
+    gain.linearRampToValueAtTime(Math.max(0.0001, plan.rumblePeak), t0 + 0.08)
+    gain.exponentialRampToValueAtTime(Math.max(0.0001, plan.rumblePeak * 0.5), t0 + 1.2)
+    gain.exponentialRampToValueAtTime(0.0001, t0 + plan.rumbleDuration)
+  })
+  if (probe) {
+    probe.audio++
+    probe.lastPeak = Math.max(plan.crackPeak, plan.rumblePeak)
+  }
 }
 
 /** Report the closest wildlife to the player (design.md §19): each field is a
