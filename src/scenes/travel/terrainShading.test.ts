@@ -17,6 +17,7 @@ import {
   REFINE_RING_MAX,
   REFINE_SEGMENT_CAP,
 } from './terrainLod'
+import { buildChunkGeometry, stitchedEdgeHeights } from './TravelScene'
 import { setupGeodata } from '../../test/geodata'
 
 const src = readFileSync(resolve(process.cwd(), 'src/scenes/travel/TravelScene.tsx'), 'utf8')
@@ -117,5 +118,88 @@ describe('mountain-chunk tessellation gate (silhouette smoothness)', () => {
     expect(refinedSegments(0, chunkIsMountainous(cx, cz))).toBe(112)
     const [fx, fz] = chunkOf(15, 5) // flat sahel at ring 0
     expect(refinedSegments(0, chunkIsMountainous(fx, fz))).toBe(56)
+  })
+})
+
+describe('seam stitch: shared-edge height morph (no T-junction crack, point 220)', () => {
+  const chunkOf = (lat: number, lon: number): [number, number] => [
+    Math.floor((lon * 10) / 24),
+    Math.floor((-lat * 10) / 24),
+  ]
+
+  it('morphs a fine edge onto the coarse neighbour chord (identity when equal)', () => {
+    // edgeSeg === segments: every vertex is its own anchor -> unchanged.
+    const anchors = Float32Array.from([1, 2, 5, 3, 4])
+    const id = stitchedEdgeHeights(anchors, 4)
+    expect(Array.from(id)).toEqual([1, 2, 5, 3, 4])
+
+    // A finer 4-seg edge stitched onto a 2-seg (coarse) neighbour: the two
+    // coincident vertices keep the anchor heights, the in-between ones land on
+    // the straight chord — exactly what the coarse chunk's linear edge draws.
+    const coarse = Float32Array.from([1, 5, 3]) // edgeSeg = 2
+    const s = stitchedEdgeHeights(coarse, 4)
+    expect(s[0]).toBeCloseTo(1, 12) // corner
+    expect(s[2]).toBeCloseTo(5, 12) // shared mid vertex
+    expect(s[4]).toBeCloseTo(3, 12) // corner
+    expect(s[1]).toBeCloseTo(3, 12) // chord midpoint of (1,5)
+    expect(s[3]).toBeCloseTo(4, 12) // chord midpoint of (5,3)
+  })
+
+  it('preserves the two edge corners under any morph', () => {
+    const coarse = Float32Array.from([7, -2, 9]) // edgeSeg 2
+    const s = stitchedEdgeHeights(coarse, 8)
+    expect(s[0]).toBeCloseTo(7, 12)
+    expect(s[8]).toBeCloseTo(9, 12)
+  })
+
+  it('two adjacent chunks at different LOD agree on every shared-edge vertex', async () => {
+    // A fine mountain chunk (112 seg) east of which sits a coarse chunk (56).
+    const [cx, cz] = chunkOf(-3.07, 37.35) // kilimanjaro relief
+    // A meshes fine; its east edge is stitched down to the neighbour's 56.
+    const A = buildChunkGeometry(cx, cz, 1, 112, [112, 112, 112, 56])
+    // B (east neighbour) meshes coarse; its west edge stays its own 56.
+    const B = buildChunkGeometry(cx + 1, cz, 1, 56, [56, 56, 56, 56])
+    const pa = A.getAttribute('position').array as Float32Array
+    const pb = B.getAttribute('position').array as Float32Array
+    const nA = 113
+    const nB = 57
+    // A east edge vertex i -> i*nA + (nA-1); B west edge vertex k -> k*nB.
+    // A vertex 2k coincides with B vertex k along the shared boundary line.
+    let maxGap = 0
+    for (let k = 0; k <= 56; k++) {
+      const ya = pa[(2 * k * nA + (nA - 1)) * 3 + 1]
+      const yb = pb[(k * nB) * 3 + 1]
+      maxGap = Math.max(maxGap, Math.abs(ya - yb))
+    }
+    expect(maxGap).toBeLessThan(1e-6)
+    A.dispose()
+    B.dispose()
+  })
+
+  it('the stitch is doing real work: the unstitched fine edge would gap the coarse chord', async () => {
+    // Same boundary, but A's east edge left at its own 112 (no morph). Its
+    // odd (in-between) vertices follow the true curved terrain, which departs
+    // from the coarse neighbour's straight chord — the T-junction the skirt
+    // could not always hide once a 112-seg chunk met a 56-seg one.
+    const [cx, cz] = chunkOf(-3.07, 37.35)
+    const A = buildChunkGeometry(cx, cz, 1, 112, [112, 112, 112, 112]) // unstitched east
+    const B = buildChunkGeometry(cx + 1, cz, 1, 56, [56, 56, 56, 56])
+    const pa = A.getAttribute('position').array as Float32Array
+    const pb = B.getAttribute('position').array as Float32Array
+    const nA = 113
+    const nB = 57
+    let maxOddGap = 0
+    for (let k = 0; k < 56; k++) {
+      // A odd vertex 2k+1 sits between B vertices k and k+1: compare to the
+      // chord the coarse chunk actually renders there (its linear midpoint).
+      const yaOdd = pa[((2 * k + 1) * nA + (nA - 1)) * 3 + 1]
+      const chord = (pb[(k * nB) * 3 + 1] + pb[((k + 1) * nB) * 3 + 1]) / 2
+      maxOddGap = Math.max(maxOddGap, Math.abs(yaOdd - chord))
+    }
+    // A real, human-visible deviation exists without the stitch (the crack),
+    // far exceeding the epsilon the stitched edges meet within.
+    expect(maxOddGap).toBeGreaterThan(1e-3)
+    A.dispose()
+    B.dispose()
   })
 })
