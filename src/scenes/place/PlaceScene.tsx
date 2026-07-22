@@ -37,6 +37,7 @@ import {
   BACKDROP_RINGS,
   BACKDROP_SCALE,
   BACKDROP_SEGS,
+  backdropBase,
   backdropTaper,
   panoramaGroundY,
 } from './backdrop'
@@ -1315,6 +1316,10 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
       // The inner rim tucks below the settlement ground and fades upward
       // (pure radius function, so it matches backdropHeightAt exactly).
       const taper = backdropTaper(r, r0)
+      // Base offset feathers the tucked rim up to the ground-disc plane across
+      // the disc overhang, so the horizon meets the walkable ground with no step
+      // (point 236). Shared with backdropHeightAt so mesh and sampler agree.
+      const base = backdropBase(r, r0)
       for (let si = 0; si < BACKDROP_SEGS; si++) {
         const a = (si / BACKDROP_SEGS) * Math.PI * 2
         const x = Math.cos(a) * r
@@ -1326,7 +1331,7 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
         // range on the horizon instead of looming up and arcing over the camera
         // (which showed as a dark overhanging "ceiling" with gaps).
         const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
-        const y = capped * taper - 2
+        const y = capped * taper + base
         positions.push(x, y, z)
         colors.push(smp.color[0], smp.color[1], smp.color[2])
       }

@@ -6,9 +6,11 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import * as THREE from 'three/webgpu'
 import {
+  backdropBase,
   backdropHeightAt,
   backdropTaper,
   panoramaGroundY,
+  BACKDROP_DISC_OVERLAP,
   BACKDROP_MAX_SLOPE,
   BACKDROP_OUTER,
   BACKDROP_RINGS,
@@ -50,6 +52,44 @@ describe('backdrop heightfield (design.md §2.5)', () => {
       const r = r0 + (i % 8) * ((BACKDROP_OUTER - r0) / 8)
       const y = backdropHeightAt(Math.cos(a) * r, Math.sin(a) * r, lat, lon, SEED, centerH, r0)
       expect(y).toBeLessThanOrEqual(r * BACKDROP_MAX_SLOPE)
+    }
+  })
+
+  it('feathers the backdrop base from the tucked rim up to the ground-disc plane (point 236)', () => {
+    // The ground disc is flat at y = 0 out to r0 + BACKDROP_DISC_OVERLAP. The
+    // backdrop base tucks -2 under it at the inner rim, then feathers UP to 0 by
+    // the disc edge and stays flush beyond — so the horizon meets the walkable
+    // ground with no step. Pre-236 the base was a flat -2 (a hard notch).
+    const { r0 } = placeParams('cairo', 48)
+    const discEdge = r0 + BACKDROP_DISC_OVERLAP
+    expect(backdropBase(r0, r0)).toBeCloseTo(-2, 10) // tucked rim, hidden under disc
+    expect(backdropBase(discEdge, r0)).toBeCloseTo(0, 10) // flush at the disc edge
+    expect(backdropBase(discEdge + 30, r0)).toBeCloseTo(0, 10) // and flush everywhere beyond
+    // Monotone rise across the overhang — never a dip back into a moat.
+    let prev = -Infinity
+    for (let i = 0; i <= 10; i++) {
+      const r = r0 + (i / 10) * BACKDROP_DISC_OVERLAP
+      const b = backdropBase(r, r0)
+      expect(b).toBeGreaterThanOrEqual(prev)
+      prev = b
+    }
+  })
+
+  it('leaves no vertical step where the ground-disc edge meets the backdrop (point 236)', () => {
+    // At the disc edge the ground plane (y = 0) and the backdrop surface must be
+    // continuous: the only remaining offset is the small, continuous local relief,
+    // never the pre-236 artificial -2 drop that read as a rectangular notch on the
+    // flat delta ports. Sweep the join circle and bound the height step.
+    const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
+    const discEdge = r0 + BACKDROP_DISC_OVERLAP
+    for (const a of [0, 1.2, 2.5, 4.1, 5.7]) {
+      const x = Math.cos(a) * discEdge
+      const z = Math.sin(a) * discEdge
+      const y = backdropHeightAt(x, z, lat, lon, SEED, centerH, r0)
+      // No moat: the join stays within a small bound of the ground plane, and
+      // nowhere near the -2 notch it replaced.
+      expect(Math.abs(y)).toBeLessThan(0.75)
+      expect(y).toBeGreaterThan(-0.75)
     }
   })
 
