@@ -8928,6 +8928,49 @@ the remaining open points in their numeric order.
   mirroring the existing flash gate. DOCS: none (implements the promised pt.166
   pairing). Both languages if any player-visible text is added (none expected).
 
+- [ ] 230. MOUNTAINS READ ANGULAR — the user reports (22.07.2026) that the
+  mountains still look faceted/angular ("eckig"). Same two-class distinction as
+  point 214: a facet is EITHER a shading break OR a silhouette step, and each
+  needs a different lever. DIAGNOSE per case (read the material + geometry, judge
+  by the rendered picture at an achievable zoom): (a) SHADING facets — hard light
+  breaks between polygons while the outline is fine → the cheap correct fix is
+  SMOOTH VERTEX NORMALS (`flatShading:false` + `geometry.computeVertexNormals()`),
+  no added geometry (this was the point-215 backdrop-ridge fix); (b) SILHOUETTE
+  facets — the mountain's OUTLINE visibly steps → only finer TESSELLATION of the
+  DEM relief mesh rounds it (weigh the vertex cost). Determine WHICH mountains the
+  user sees stepped: the bird's-eye DEM terrain relief (the travel-scene ground/
+  relief mesh) and/or the settlement backdrop panorama (already smoothed for the
+  ridge in point 215 — re-check it is not a regression there). Apply the minimal
+  correct lever per case; do not raise tessellation where smooth normals suffice.
+  Anchors: the travel-scene relief/ground mesh build and its material (search
+  `src/scenes/travel/` and `src/world/terrain.ts` for the terrain mesh +
+  `computeVertexNormals`/`flatShading`), and `src/scenes/place/backdrop.ts` /
+  `backdropMaterial.ts` for the panorama. VERIFIABLE: a pure test that the
+  terrain/relief material is smooth-shaded (flatShading not true) and its geometry
+  carries smooth (interpolated, non-per-face) vertex normals — a curvature witness
+  like the point-215 backdrop test — and, if any tessellation floor is raised,
+  that the raised floor holds; the parent picture-verifies a stepped mountain on
+  BOTH backends at an achievable zoom before/after. DOCS: design.md §2.5/§3.3 only
+  if the wording changes. No player-visible text.
+
+- [ ] 231. TRAVELLER'S PACK SITS ON THE CHEST — the user reports (22.07.2026,
+  screenshot) that the bird's-eye traveller figure carries a brown box (the
+  backpack/carry-crate) in FRONT of the torso instead of on the BACK. DIAGNOSE:
+  is the pack mesh modelled on the figure's front (+forward) side, or is the
+  figure's facing inverted so a back-mounted pack renders toward the camera? The
+  natural fix is to seat the pack on the BACK relative to the figure's forward/
+  heading axis (behind the torso), so that when the traveller faces its travel
+  direction the pack is away from the viewer. Keep the crate's size/material;
+  only its local offset (and, if the facing is the real bug, the facing) changes.
+  Anchors: the bird's-eye traveller build in `src/render/figures.ts` (the pack/
+  box mesh and its local transform; the same file also carries the §6.2 wound
+  overlay `__player.wounds`). VERIFIABLE: a pure test that the pack mesh's local
+  offset lies on the BACK side of the figure (behind the torso along the forward
+  axis, not in front); the parent picture-verifies the traveller from behind on
+  BOTH backends (pack on the back, not the chest). DOCS: none. No player-visible
+  text. NOTE: `figures.ts` overlaps point 214 — sequence this AFTER 214 merges (or
+  fold it into the 214 branch) so the two figure edits never collide in one tree.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
