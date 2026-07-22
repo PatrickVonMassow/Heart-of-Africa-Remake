@@ -9081,7 +9081,7 @@ the remaining open points in their numeric order.
   river-rendering cluster (232 + 233 + 234, and fold in 219's spring redesign)
   TOGETHER on ONE branch, sequentially, so the shared files never collide.
 
-- [ ] 235. TRIM OFFSHORE BATHYMETRY TO FLAT DEEP OCEAN — hard-cut the map at the
+- [x] 235. TRIM OFFSHORE BATHYMETRY TO FLAT DEEP OCEAN — hard-cut the map at the
   continent edge. The user reports (22.07.2026, two screenshots, red debug outlines
   around the offending patches) leftover "Fetzen" (scraps) of shallow-water
   bathymetry — offshore shelf patches, island-like detail and depth profile —
