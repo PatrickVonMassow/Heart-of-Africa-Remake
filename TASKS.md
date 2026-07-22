@@ -8676,7 +8676,7 @@ the remaining open points in their numeric order.
   keeps its wings above the terrain across the bob (screenshot). Keep the feed
   animation lively. DOCS: design.md §19.6; CLAUDE §7.1 pt.12.
 
-- [ ] 218. RIVER-ADJACENT OBJECTS FLOAT IN THE WATER after the river WIDENING — the
+- [x] 218. RIVER-ADJACENT OBJECTS FLOAT IN THE WATER after the river WIDENING — the
   Sudd (natural site, the Nile swamp) hangs in the middle of the water; the user
   suspects the point-156 river widening (`river.widthFactor`, carved bed/ribbon/
   mask/clearances all derived from one width) and asks to check EVERYTHING near a
