@@ -47,6 +47,96 @@ export function densifyRiver(points: Array<[number, number]>): Array<{ lat: numb
   return out
 }
 
+// point 211(a): a river's mouth reaches the sea across a short OCEAN run, but
+// the ribbon build used to end at the last LAND point (the coast contour),
+// which sits inland of where the sea sheet begins — leaving a beach strip
+// between ribbon and sea. Carry the ribbon over the first MOUTH_BRIDGE ocean
+// points of an open strip so it merges into the sea sheet; a longer run is the
+// open sea and ends the strip.
+export const MOUTH_BRIDGE = 3
+
+/**
+ * Which axis points the ribbon draws, and which connect to their predecessor
+ * (point 211a, pure so the mouth junction is unit-testable): isolated inland
+ * points misclassified as ocean are bridged; the MOUTH of an open strip is
+ * carried `bridge` points into the sea; a longer ocean run is the open sea and
+ * ends the strip; ocean points with no open strip (a source in misclassified
+ * sea) are skipped. `strips` counts the separately drawn pieces — 1 means the
+ * river renders as one continuous ribbon.
+ */
+export function planRibbonStrips(
+  isOcean: boolean[],
+  bridge = MOUTH_BRIDGE,
+): { drawn: boolean[]; connected: boolean[]; strips: number } {
+  const n = isOcean.length
+  const drawn = new Array<boolean>(n).fill(false)
+  const connected = new Array<boolean>(n).fill(false)
+  let stripStart = -1
+  let oceanRun = 0
+  let strips = 0
+  for (let i = 0; i < n; i++) {
+    if (isOcean[i]) {
+      oceanRun++
+      if (stripStart < 0 || oceanRun > bridge) {
+        if (oceanRun > bridge) stripStart = -1 // reached open sea: stop rather than bridge across it
+        continue
+      }
+    } else {
+      oceanRun = 0
+    }
+    drawn[i] = true
+    if (stripStart >= 0) connected[i] = true
+    else strips++
+    stripStart = i
+  }
+  return { drawn, connected, strips }
+}
+
+// point 211(b): the flat ribbon cross-section rides the AXIS height while the
+// terrain carve is relative to the LOCAL relief — on a cross-sloping bank a
+// carved, still-high 'water'-typed wedge stood ABOVE the sheet and cut a
+// visible notch into the rendered river (the user's Cairo report; the same
+// pattern along the Blue Nile gorge). Each row therefore lifts until every
+// water-typed terrain sample across its own band sits below the sheet by
+// NOTCH_CLEARANCE. Only water-typed samples count: the band-edge LAND is the
+// bank itself, and the ribbon edge disappearing into it is the waterline.
+const NOTCH_CLEARANCE = 0.08
+const NOTCH_FRACTIONS = [-0.9, -0.7, -0.5, -0.3, 0.3, 0.5, 0.7, 0.9]
+
+/**
+ * The rendered ribbon surface height of axis row `i` (shared by the ribbon
+ * build in Rivers.tsx and the lazy float index below — one formula, so the
+ * canoe float and the rendered surface can never diverge). Base: just above
+ * the carved bed at the axis; lifted per the point-211(b) cross-band rule.
+ * Ocean rows (the mouth bridge) keep the plain base so they merge under the
+ * sea sheet instead of standing proud of it.
+ */
+export function ribbonRowSurfaceAt(
+  pts: Array<{ lat: number; lon: number }>,
+  i: number,
+  seed: number,
+): number {
+  const p = pts[i]
+  const s = sampleTerrain(p.lat, p.lon, seed)
+  let surf = Math.max(-0.05, s.height + SURFACE_LIFT)
+  if (s.type === 'ocean') return surf
+  // Cross-band direction: perpendicular to the local axis, matching the ribbon
+  // vertex offsets exactly (world x = lon·10, z = −lat·10 is a uniform scale,
+  // so the degree-space perpendicular is the same lateral line).
+  const a = pts[Math.max(0, i - 1)]
+  const b = pts[Math.min(pts.length - 1, i + 1)]
+  const dLat = b.lat - a.lat
+  const dLon = b.lon - a.lon
+  const len = Math.hypot(dLat, dLon) || 1
+  const pLat = (-dLon / len) * RIVER_WIDTH_DEG
+  const pLon = (dLat / len) * RIVER_WIDTH_DEG
+  for (const f of NOTCH_FRACTIONS) {
+    const q = sampleTerrain(p.lat + pLat * f, p.lon + pLon * f, seed)
+    if (q.type === 'water' && q.height + NOTCH_CLEARANCE > surf) surf = q.height + NOTCH_CLEARANCE
+  }
+  return surf
+}
+
 // A ribbon cross-section reaches RIVER_WIDTH_DEG off its axis; add one
 // sampling step of slack so a point between two axis samples still sees both.
 const COVER_RANGE_DEG = RIVER_WIDTH_DEG + STEP_DEG
@@ -103,9 +193,11 @@ function axisIndex(seed: number): AxisIndex {
   if (hit) return hit
   const grid: AxisIndex = new Map()
   for (const river of RIVERS_DATA) {
-    for (const p of densifyRiver(river.points)) {
-      const surf = Math.max(-0.05, sampleTerrain(p.lat, p.lon, seed).height + SURFACE_LIFT)
-      insertAxisSample(grid, p.lat, p.lon, surf, river.id === 'nile')
+    const pts = densifyRiver(river.points)
+    for (let i = 0; i < pts.length; i++) {
+      // The SAME row formula the ribbon renders (incl. the point-211b lift).
+      const surf = ribbonRowSurfaceAt(pts, i, seed)
+      insertAxisSample(grid, pts[i].lat, pts[i].lon, surf, river.id === 'nile')
     }
   }
   axisIndexCache.set(seed, grid)

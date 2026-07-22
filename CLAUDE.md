@@ -1119,7 +1119,15 @@ verify suite that proves it.
     points, a calm surface with a visible current strengthening at rapids
     and falls, five white waterfall cascades with plunge-pool foam,
     springs in open land, flat lake surfaces just above their carved
-    beds), the §11.3 width/course rule (rivers wider than scale via the
+    beds), the §11.3 mouth-junction and no-interior-notch rules (point
+    211: a sea-mouth ribbon carries `MOUTH_BRIDGE` axis points past the
+    coast contour into the receiving shelf, so no beach strip parts river
+    and sea; and each ribbon row lifts via the shared
+    `ribbonRowSurfaceAt` until every water-typed terrain sample across
+    its own band sits below the sheet, so a cross-sloping bank's carved
+    wedge can never poke a notch through the water — the reported Cairo
+    cut-out; the canoe float reads the SAME lifted rows, one formula in
+    `waterSurface.ts`), the §11.3 width/course rule (rivers wider than scale via the
     calibratable `river.widthFactor` balance value — carved bed, ribbon,
     water mask and clearances all derive from ONE width; the course
     interpolated through the shared centripetal spline so no source
@@ -1140,7 +1148,12 @@ verify suite that proves it.
     chest-deep ON the lake sheet — never on the carved bed below it
     (point 152, checked mid-Lake-Edward via `__player`,
     screenshot 125), and — pure — that the densified courses
-    hold the bounded turn angle with every control point anchored
+    hold the bounded turn angle with every control point anchored, that on
+    the real DEM every river plans as ONE strip with every land point
+    drawn, every sea-mouth ribbon bridges past its last land point into
+    the sea, and no water-typed terrain stands above the rendered row
+    anywhere across the band — with the pre-211b flat row reproduced at
+    Cairo as the notch's regression witness
     (`src/scenes/travel/riverSmoothness.test.ts`) while the width factor
     widens the sampled water span (`src/world/world.test.ts`), and that
     confluence edges are bank-masked (the Nile tributaries report interior
