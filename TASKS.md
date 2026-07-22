@@ -8177,6 +8177,18 @@ the remaining open points in their numeric order.
   smooth the DEM elevation TEXTURE — sample it bicubically in the TSL shader, or
   (cleaner, CPU one-time) bake a smoothing/shelf-grade pass in `demElevation.ts`.
   Keep the depth-colour bands + outside-bbox mask; verify Nile/normal coast/lakes.
+  UPDATE (22.07.2026) — the texture theory is now DISPROVEN too: a 2-pass 3x3
+  OCEAN-floor blur of the demElevation texture (baked, ocean-only) left the blocky
+  dark patches UNCHANGED (reverted). So the "wall" is NOT the water depth/colour at
+  all. Ruled out across the session: land/sea classification, terrain mesh LOD,
+  FAR_TERRAIN, water opacity, the point-215 bicubic terrain height, AND the water
+  depth texture. REMAINING HYPOTHESES for a FRESH look: (a) a SHOAL — trimmed/
+  stamped terrain that pokes ABOVE the water plane and renders as dark terrain
+  (test: hide the water plane / read the terrain height at the patch — if it's > the
+  water level, it's a shoal to sink); or (b) a SHADOW — the cascaded shadow map of
+  the coast relief cast onto the water (test: toggle shadows). PIN IT with a
+  water-plane-hidden capture + a height/shadow probe at the exact patch BEFORE any
+  further fix — the depth-smoothing path is a dead end.
   STEPPING NOT RESOLVED (user re-reported 22.07, second screenshot "immer noch
   stufig"). The terrain shelf smoothed the SHORE at the boundary (30.02N/32.62E
   renders as an organic graded coast on WebGL2), but a FRESH render at the user's
