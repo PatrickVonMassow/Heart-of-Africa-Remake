@@ -15,7 +15,18 @@
 /** Boundary polyline as [lon, lat], northwest (Mediterranean) → southeast. */
 export const NORTHEAST_BOUNDARY: Array<[number, number]> = [
   // Eastern Mediterranean down to the Suez isthmus (east of the Nile delta).
-  [30.6, 39.0], [31.9, 34.2], [32.42, 31.45], [32.62, 30.4], [32.7, 29.75],
+  [30.6, 39.0], [31.9, 34.2], [32.42, 31.45], [32.62, 30.4],
+  // Clean crop of the Gulf-of-Suez HEAD (point 210, user decision): the head's
+  // narrow water fingers, the thin isthmus strip east of them and the trim
+  // stamp used to alternate cell-by-cell right at the old line and rendered as
+  // a blocky stairstepped sea-arm east of Cairo. The line now hugs the gulf's
+  // African WEST shore through the head (lat ~30.0 down to ~29.35, within
+  // ~0.06 deg of the raster shore, so the near-boundary land-fraction rebuild
+  // in terrain.ts covers every kept-side gap), putting the whole messy head —
+  // including Suez itself — on the trimmed side: solid continent up to the
+  // line, uniform deep ocean beyond. No knowledge that this was once the Red
+  // Sea tip is kept; the game map simply ends here.
+  [32.52, 30.02], [32.38, 29.62], [32.6, 29.36],
   // Down the Gulf of Suez, hugging its African west shore (the Sinai side
   // stays northeast), then seaward of the African Red Sea coast to
   // Bab-el-Mandeb.

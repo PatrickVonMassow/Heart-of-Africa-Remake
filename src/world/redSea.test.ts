@@ -361,20 +361,19 @@ describe('boundarySignedDistance + the trim-coast smoothing (point 210)', () => 
     expect(near).toBeGreaterThan(far + 0.08)
   })
 
-  it('grades the Gulf-of-Suez head floor to a shallow shelf (no blocky trim-stamp wedge)', () => {
-    // point 210b: at the gulf head the boundary runs through gulf water, so the
-    // coast-gated shelf skips it and the DEM's ~-3000 m trim stamp (alternating
-    // cell-by-cell with shallow real texels) cliffed the ocean floor into a
-    // blocky lit wedge east of Cairo. The stamp-clamp lifts those garbage-deep
-    // texels to a shallow shelf: adjacent gulf-head cells now read shallow and
-    // level (no cliff), while genuine deep sea far from the boundary is untouched.
+  it('the cropped Gulf-of-Suez head reads as clean graded deep ocean (no blocky trim-stamp wedge)', () => {
+    // point 210 (user decision, clean crop — supersedes the 210b shallow-shelf
+    // lift at these cells): the tightened boundary hugs the gulf's African west
+    // shore, so the former garbage-stamp wedge now lies on the trimmed side —
+    // the map simply ends at the line. The cells read as open ocean deepening
+    // SMOOTHLY with distance from the new coast: deep tone (no shallow arm
+    // poking into the desert), and no per-cell cliff between neighbours.
     const a = sampleTerrain(29.8, 32.55, seed).height
     const b = sampleTerrain(29.85, 32.55, seed).height
-    expect(a).toBeGreaterThan(-0.4) // lifted off the deep stamp
-    expect(b).toBeGreaterThan(-0.4)
-    expect(Math.abs(a - b)).toBeLessThan(0.3) // level, no per-cell cliff
-    // Deep open Red Sea, far from the boundary, keeps its bathymetry (the clamp
-    // is bounded — it does not globally shallow the sea).
+    expect(a).toBeLessThan(-0.6) // clean deep ocean, not a shallow arm
+    expect(b).toBeLessThan(-0.6)
+    expect(Math.abs(a - b)).toBeLessThan(0.3) // graded, no per-cell cliff
+    // Deep open Red Sea, far from the boundary, keeps its bathymetry.
     expect(sampleTerrain(19, 39, seed).height).toBeLessThan(-0.8)
   })
 
@@ -397,6 +396,48 @@ describe('boundarySignedDistance + the trim-coast smoothing (point 210)', () => 
     expect(sampleTerrain(30.05, 31.25, seed).type).not.toBe('ocean') // Cairo (land)
     expect(landFractionAt(30.05, 31.25)).toBeGreaterThan(0.5)
     expect(sampleTerrain(19, 37, seed).type).toBe('desert') // African Red Sea coast
+  })
+})
+
+describe('the Gulf-of-Suez head clean crop (point 210)', () => {
+  const seed = 1
+
+  it('the former messy gulf-head water pocket reads clean deep ocean', () => {
+    // Before the crop an isolated 2-cell water pocket (the vector gulf tip
+    // inside kept raster land) sat at ~29.95N/32.57E, cut off from the main
+    // sea — one of the dark arm patches poking into the sand east of Cairo.
+    // It now lies on the trimmed side of the tightened boundary: uniform deep
+    // open ocean, no land, no shallow garbage.
+    expect(sampleTerrain(29.95, 32.57, seed).type).toBe('ocean')
+    expect(landFractionAt(29.95, 32.57)).toBe(0)
+    expect(elevationAt(29.95, 32.57)).toBeLessThan(-500)
+  })
+
+  it('Suez itself stays ocean while the African coast keeps its land', () => {
+    expect(sampleTerrain(29.97, 32.55, seed).type).toBe('ocean')
+    expect(isBlocked('ocean', 29.97, 32.55)).toBe(true)
+    expect(sampleTerrain(19, 37, seed).type).toBe('desert') // African Red Sea coast
+    expect(landFractionAt(30.05, 31.25)).toBeGreaterThan(0.5) // Cairo
+  })
+
+  it('one clean continent edge: every head-zone latitude crosses land→ocean exactly once', () => {
+    // The defect was alternation — narrow water fingers, a detached isthmus
+    // land strip and trim-stamp cells switching class cell-by-cell near the
+    // boundary (stepped arms, dark patches). Sweep the head zone: each row
+    // starts on land, ends in ocean, and once the sea begins it never turns
+    // back to land — no pocket, finger or strip survives on either side.
+    for (let lat = 29.5; lat <= 30.15 + 1e-9; lat += 0.05) {
+      let crossings = 0
+      let prev = sampleTerrain(lat, 32.0, seed).type === 'ocean'
+      expect(prev, `row ${lat.toFixed(2)} starts on land`).toBe(false)
+      for (let lon = 32.01; lon <= 33.2 + 1e-9; lon += 0.01) {
+        const ocean = sampleTerrain(lat, lon, seed).type === 'ocean'
+        if (ocean !== prev) crossings++
+        prev = ocean
+      }
+      expect(prev, `row ${lat.toFixed(2)} ends in ocean`).toBe(true)
+      expect(crossings, `row ${lat.toFixed(2)} crosses the coast once`).toBe(1)
+    }
   })
 })
 
