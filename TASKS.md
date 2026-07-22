@@ -7959,7 +7959,7 @@ the remaining open points in their numeric order.
   six fixes verifiable per their tests; design.md/CLAUDE.md updated where noted;
   no regression in the wildlife/event/health/reputation suites.
 
-- [ ] 209. The SEA COASTLINE renders as an ugly STAIRCASE at the close bird's-eye
+- [x] 209. The SEA COASTLINE renders as an ugly STAIRCASE at the close bird's-eye
   zoom (user report 21.07.2026, screenshot at Cairo: the sand↔sea boundary steps
   in axis-aligned blocks). DIAGNOSED: the waterline is the 0.5-contour of a 1-BIT
   land/sea mask read from the DEM's blue channel, bilinearly interpolated
@@ -8009,6 +8009,19 @@ the remaining open points in their numeric order.
   focused rendering effort, not a one-shot tune — do it with the same driven
   Cairo/Suez before/after captures. (WIP domain-warp experiment reverted, not
   committed.)
+  DONE (22.07.2026), option (a) + the mesh half: `src/world/coastVector.ts` gives
+  a SIGNED distance to the vector coastline (LAND_POLYGONS, ~265 pts, brute-forced
+  + even-odd inside test; commit 01e108c, pure-tested sub-texel-smooth). In
+  `sampleTerrain` (1c21aa2) the near-coast land fraction is rebuilt from that
+  signed distance behind a raster gate (COAST_SMOOTH_BAND ~0.08deg on the land
+  side + the bilinear straddle), so the waterline follows the true smooth shore
+  while the deep-sea/trimmed acceptance coords keep the raster verdict — all 130
+  redSea + world tests stay green. The coarse LOD mesh still re-quantized the
+  smooth field, so coast-straddling near chunks now build at DOUBLE resolution
+  (56->112, `chunkIsCoastal` in TravelScene.tsx, 30f305e). A driven Cairo-coast
+  capture at zoom 0.5 shows an organic curved shoreline with no axis-aligned
+  steps; enrichments green worldwide, 0 console errors. (The Nile-mouth beach gap
+  and the river band in the same shot are point 211, separate.)
 
 - [ ] 210. A spurious SEA-ARM juts into the coast EAST of Cairo — remove it (or
   adjust the ocean beside it) so the continent has ONE clean, continuous sea edge
