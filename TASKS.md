@@ -8971,7 +8971,7 @@ the remaining open points in their numeric order.
   text. NOTE: `figures.ts` overlaps point 214 — sequence this AFTER 214 merges (or
   fold it into the 214 branch) so the two figure edits never collide in one tree.
 
-- [ ] 232. RIVER SURFACE READS STEPPED — the user reports (22.07.2026, screenshot)
+- [x] 232. RIVER SURFACE READS STEPPED — the user reports (22.07.2026, screenshot)
   that the river ribbon's water surface shows visible TRANSVERSE STEP-BANDS across
   its flow (each ribbon row sits at a slightly different height, so the sheet
   stairsteps down the current — most pronounced in the faster/steeper reach), and
@@ -9015,7 +9015,7 @@ the remaining open points in their numeric order.
   218's water sweep and 220 (terrain chunk seam); do not delegate those
   concurrently.
 
-- [ ] 233. RIVER CONFLUENCE/BRANCH ARMS OVERLAP — the user reports (22.07.2026,
+- [x] 233. RIVER CONFLUENCE/BRANCH ARMS OVERLAP — the user reports (22.07.2026,
   screenshot) that at a river junction (a confluence or distributary branch) the
   two river arms visibly OVERLAP: each arm is drawn as its own semi-transparent
   ribbon strip, and where they meet the strips CROSS rather than merging into one
@@ -9044,7 +9044,7 @@ the remaining open points in their numeric order.
   (two atomic commits, both ticked at the one merge) so the river-rendering edits
   never collide; keep 218/219/220 off that branch's concurrency.
 
-- [ ] 234. SMOOTH RIVER ↔ WATER-BODY TRANSITIONS (lake outflow + sea mouth) — the
+- [x] 234. SMOOTH RIVER ↔ WATER-BODY TRANSITIONS (lake outflow + sea mouth) — the
   user reports (22.07.2026, two screenshots) two related junction defects and asks
   for the GENERAL rule that a river transitions SMOOTHLY into any other water body:
   (a) at Lake Victoria the (White) Nile is drawn with its OWN detached SPRING (the
