@@ -11,6 +11,8 @@ import {
   buildCheetah,
   buildCrocodile,
   buildElephant,
+  buildElephantTrunk,
+  ELEPHANT_TRUNK_RINGS,
   buildFlamingo,
   buildGiraffe,
   buildGoat,
@@ -213,5 +215,160 @@ describe('smooth organic shading (CLAUDE.md §7.1 pt. 12, point 214)', () => {
     const firstPassHead = new THREE.SphereGeometry(1, 18, 12)
     expect(head.attributes.position.count).toBeGreaterThan(firstPassHead.attributes.position.count * 2)
     for (const g of [body, firstPassBody, head, firstPassHead]) g.dispose()
+  })
+})
+
+// The elephant trunk is ONE connected, tapered tube swept along a curved
+// centreline (thick at the head root, tapering to a drooping, softly curling
+// tip) — no more stacked cylinder segments with gapped joints. The tests read
+// the builder's documented ring-major vertex layout: rings of
+// FAUNA_TESSELLATION.limb vertices from root to tip, one apex vertex last.
+describe('elephant trunk (graceful tapered curve)', () => {
+  const radial = FAUNA_TESSELLATION.limb
+
+  /** Per-ring centreline point and mean ring radius from the vertex layout. */
+  const ringData = (geo: THREE.BufferGeometry) => {
+    const pos = geo.attributes.position
+    const centers: THREE.Vector3[] = []
+    const radii: number[] = []
+    for (let k = 0; k < ELEPHANT_TRUNK_RINGS; k++) {
+      const c = new THREE.Vector3()
+      for (let j = 0; j < radial; j++) {
+        const i = k * radial + j
+        c.x += pos.getX(i)
+        c.y += pos.getY(i)
+        c.z += pos.getZ(i)
+      }
+      c.multiplyScalar(1 / radial)
+      let r = 0
+      for (let j = 0; j < radial; j++) {
+        const i = k * radial + j
+        r += Math.hypot(pos.getX(i) - c.x, pos.getY(i) - c.y, pos.getZ(i) - c.z)
+      }
+      centers.push(c)
+      radii.push(r / radial)
+    }
+    return { centers, radii }
+  }
+
+  it('tapers monotonically root->tip over well more than 4 segments', () => {
+    expect(ELEPHANT_TRUNK_RINGS - 1).toBeGreaterThanOrEqual(4)
+    for (const calf of [false, true]) {
+      const geo = buildElephantTrunk(calf)
+      const { radii } = ringData(geo)
+      for (let k = 1; k < radii.length; k++) {
+        expect(radii[k], `${calf ? 'calf' : 'adult'} ring ${k}`).toBeLessThan(radii[k - 1])
+      }
+      // The taper is substantial: the root is clearly a thick base, the tip fine.
+      expect(radii[0]).toBeGreaterThan(radii[radii.length - 1] * 2)
+      geo.dispose()
+    }
+  })
+
+  it('the centreline curves and droops — not a straight vertical stack', () => {
+    for (const calf of [false, true]) {
+      const geo = buildElephantTrunk(calf)
+      const { centers } = ringData(geo)
+      const base = centers[0]
+      const tip = centers[centers.length - 1]
+      // Droop: the tip hangs well below the root...
+      expect(tip.y, calf ? 'calf' : 'adult').toBeLessThan(base.y - 0.5)
+      // ...and is offset horizontally (forward of the head), so the line is
+      // not vertical...
+      expect(Math.abs(tip.z - base.z), calf ? 'calf' : 'adult').toBeGreaterThan(0.2)
+      // ...and the direction TURNS along the way (a curve, not a straight
+      // slanted line): the first and last segment directions clearly differ.
+      const first = centers[1].clone().sub(centers[0]).normalize()
+      const last = tip.clone().sub(centers[centers.length - 2]).normalize()
+      expect(first.dot(last), calf ? 'calf' : 'adult').toBeLessThan(0.85)
+      geo.dispose()
+    }
+  })
+
+  it('is one connected mesh spanning root to tip (no gapped segments)', () => {
+    for (const calf of [false, true]) {
+      const geo = buildElephantTrunk(calf)
+      const pos = geo.attributes.position
+      const idx = geo.index!
+      // Union-find over position-sharing vertices (the point-216 palm test):
+      // quantized coordinates merge coincident seams, triangle edges connect.
+      const parent = Array.from({ length: pos.count }, (_, i) => i)
+      const find = (i: number): number => {
+        while (parent[i] !== i) {
+          parent[i] = parent[parent[i]]
+          i = parent[i]
+        }
+        return i
+      }
+      const union = (a: number, b: number) => {
+        parent[find(a)] = find(b)
+      }
+      const byPos = new Map<string, number>()
+      for (let i = 0; i < pos.count; i++) {
+        const key = `${Math.round(pos.getX(i) * 1000)},${Math.round(pos.getY(i) * 1000)},${Math.round(pos.getZ(i) * 1000)}`
+        const seen = byPos.get(key)
+        if (seen === undefined) byPos.set(key, i)
+        else union(i, seen)
+      }
+      for (let t = 0; t < idx.count; t += 3) {
+        union(idx.getX(t), idx.getX(t + 1))
+        union(idx.getX(t), idx.getX(t + 2))
+      }
+      const roots = new Set<number>()
+      for (let i = 0; i < pos.count; i++) roots.add(find(i))
+      expect(roots.size, calf ? 'calf' : 'adult').toBe(1)
+      // The one component spans the trunk's full height: highest and lowest
+      // vertices are in it by construction (roots.size === 1), so pin the
+      // span itself — the mesh reaches from the head root down to the tip.
+      geo.computeBoundingBox()
+      const span = geo.boundingBox!.max.y - geo.boundingBox!.min.y
+      expect(span, calf ? 'calf' : 'adult').toBeGreaterThan(calf ? 0.6 : 1.2)
+      geo.dispose()
+    }
+  })
+
+  it('holds the tessellation floor with smooth shared-vertex normals', () => {
+    // Ring density: each bend step stays a few degrees, no facet panels.
+    expect(ELEPHANT_TRUNK_RINGS).toBeGreaterThanOrEqual(10)
+    expect(radial).toBe(FAUNA_TESSELLATION.limb)
+    for (const calf of [false, true]) {
+      const geo = buildElephantTrunk(calf)
+      expect(geo.index).not.toBeNull()
+      expect(geo.attributes.normal).toBeDefined()
+      // Indexed with shared ring vertices — the basis of smooth shading.
+      expect(geo.attributes.position.count).toBeLessThan(geo.index!.count)
+      const n = geo.attributes.normal
+      for (let i = 0; i < n.count; i += 5) {
+        expect(Math.hypot(n.getX(i), n.getY(i), n.getZ(i)), `normal ${i}`).toBeCloseTo(1, 2)
+      }
+      // Every face bends: the swept tube has no flat panel anywhere.
+      const idx = geo.index!
+      let curved = 0
+      for (let t = 0; t < idx.count; t += 3) {
+        const [a, b, c] = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)]
+        const flat =
+          n.getX(a) === n.getX(b) && n.getY(a) === n.getY(b) && n.getZ(a) === n.getZ(b) &&
+          n.getX(a) === n.getX(c) && n.getY(a) === n.getY(c) && n.getZ(a) === n.getZ(c)
+        if (!flat) curved++
+      }
+      expect(curved / (idx.count / 3)).toBeGreaterThan(0.95)
+      geo.dispose()
+    }
+  })
+
+  it('the calf trunk is the shorter, stubbier variant of the same build', () => {
+    const adult = buildElephantTrunk(false)
+    const calf = buildElephantTrunk(true)
+    adult.computeBoundingBox()
+    calf.computeBoundingBox()
+    const adultSpan = adult.boundingBox!.max.y - adult.boundingBox!.min.y
+    const calfSpan = calf.boundingBox!.max.y - calf.boundingBox!.min.y
+    expect(calfSpan).toBeLessThan(adultSpan * 0.7)
+    // The calf tip stays proportionally blunter (stubby, not needle-fine).
+    const { radii: aR } = ringData(adult)
+    const { radii: cR } = ringData(calf)
+    expect(cR[cR.length - 1] / cR[0]).toBeGreaterThan(aR[aR.length - 1] / aR[0])
+    adult.dispose()
+    calf.dispose()
   })
 })

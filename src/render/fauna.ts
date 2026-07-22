@@ -151,6 +151,108 @@ function buildQuadruped(s: QuadrupedSpec): THREE.BufferGeometry[] {
   return parts
 }
 
+/** Rings sampled along the elephant trunk's curved centreline (segments =
+ *  rings - 1). High enough that the droop reads as one smooth curve at the
+ *  16x close zoom, in line with the point-214 tessellation floors. */
+export const ELEPHANT_TRUNK_RINGS = 14
+
+/**
+ * Elephant trunk: ONE connected tapered tube swept along a curved centreline —
+ * thick where it roots in the head, tapering monotonically to the tip, with
+ * the natural downward droop and a gentle inward curl at the end. It replaces
+ * the old three loosely stacked cylinders whose joints gapped and read as
+ * separate parts. Built as an indexed ring sweep (ring-major vertex layout,
+ * one apex vertex closing the tip) with recomputed smooth normals — the same
+ * one-bent-surface approach as the palm trunk rebuild — at the limb
+ * tessellation floor so no facet panels read at close zoom. The calf keeps a
+ * shorter, stubbier curve on the same construction.
+ */
+export function buildElephantTrunk(calf = false): THREE.BufferGeometry {
+  // Centreline control points (x = 0 plane): root buried in the head sphere,
+  // then forward and down past the tusk line, drooping to a low tip that
+  // curls softly back toward the body.
+  const spine = (calf
+    ? [
+        [0, 2.05, 1.6],
+        [0, 1.85, 2.0],
+        [0, 1.6, 2.18],
+        [0, 1.38, 2.16],
+      ]
+    : [
+        [0, 2.05, 1.75],
+        [0, 1.8, 2.18],
+        [0, 1.45, 2.34],
+        [0, 1.05, 2.32],
+        [0, 0.78, 2.18],
+        [0, 0.66, 2.0],
+      ]
+  ).map(([x, y, z]) => new THREE.Vector3(x, y, z))
+  const curve = new THREE.CatmullRomCurve3(spine, false, 'centripetal')
+  const rBase = calf ? 0.17 : 0.2
+  const rTip = calf ? 0.075 : 0.055
+
+  const rings = ELEPHANT_TRUNK_RINGS
+  const radial = FAUNA_TESSELLATION.limb
+  const xAxis = new THREE.Vector3(1, 0, 0)
+  const center = new THREE.Vector3()
+  const tangent = new THREE.Vector3()
+  const side = new THREE.Vector3()
+
+  const positions = new Float32Array((rings * radial + 1) * 3)
+  const uvs = new Float32Array((rings * radial + 1) * 2)
+  for (let k = 0; k < rings; k++) {
+    const t = k / (rings - 1)
+    curve.getPointAt(t, center)
+    curve.getTangentAt(t, tangent)
+    // The centreline stays in the x=0 plane, so the constant world X axis and
+    // its cross with the tangent give a stable, twist-free ring frame.
+    side.crossVectors(tangent, xAxis).normalize()
+    const r = rBase + (rTip - rBase) * t
+    for (let j = 0; j < radial; j++) {
+      const a = (j / radial) * Math.PI * 2
+      const i = k * radial + j
+      positions[i * 3] = center.x + Math.cos(a) * r
+      positions[i * 3 + 1] = center.y + Math.sin(a) * r * side.y
+      positions[i * 3 + 2] = center.z + Math.sin(a) * r * side.z
+      uvs[i * 2] = j / radial
+      uvs[i * 2 + 1] = t
+    }
+  }
+  // Rounded tip: one apex vertex a touch past the last ring closes the tube.
+  const tipIndex = rings * radial
+  curve.getPointAt(1, center)
+  curve.getTangentAt(1, tangent)
+  center.addScaledVector(tangent, rTip)
+  positions[tipIndex * 3] = center.x
+  positions[tipIndex * 3 + 1] = center.y
+  positions[tipIndex * 3 + 2] = center.z
+  uvs[tipIndex * 2] = 0.5
+  uvs[tipIndex * 2 + 1] = 1
+
+  const indices: number[] = []
+  for (let k = 0; k < rings - 1; k++) {
+    for (let j = 0; j < radial; j++) {
+      const j2 = (j + 1) % radial
+      const a = k * radial + j
+      const b = k * radial + j2
+      const c = (k + 1) * radial + j2
+      const d = (k + 1) * radial + j
+      indices.push(a, b, c, a, c, d)
+    }
+  }
+  for (let j = 0; j < radial; j++) {
+    const j2 = (j + 1) % radial
+    indices.push((rings - 1) * radial + j, (rings - 1) * radial + j2, tipIndex)
+  }
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+  geo.setIndex(indices)
+  geo.computeVertexNormals()
+  return geo
+}
+
 /** Savanna elephant, ~2.6 units tall. With `calf`, baby-schema proportions
  *  (design.md §19): a rounder, shorter body, a proportionally bigger head with
  *  smaller ears, a stubby trunk and no tusks yet — built at adult scale, the
@@ -184,17 +286,9 @@ export function buildElephant(calf = false): THREE.BufferGeometry {
     parts.push(tint(ear, '#7d766f', 0.06, 104))
   }
 
-  // Trunk: tapering segments curving down (the calf's is short and stubby).
-  let ty = 1.85
-  let tz = calf ? 1.95 : 2.0
-  for (let i = 0; i < (calf ? 2 : 3); i++) {
-    const seg = new THREE.CylinderGeometry(0.14 - i * 0.03, 0.18 - i * 0.03, calf ? 0.45 : 0.55, FAUNA_TESSELLATION.limb)
-    seg.rotateX(0.5 + i * 0.45)
-    seg.translate(0, ty, tz)
-    parts.push(tint(seg, '#847d77', 0.06, 105 + i))
-    ty -= 0.42
-    tz += 0.16
-  }
+  // Trunk: one connected tapered tube drooping along a curved centreline
+  // (the calf's is short and stubby on the same construction).
+  parts.push(tint(buildElephantTrunk(calf), '#847d77', 0.06, 105))
 
   if (!calf) {
     for (const tx of [-0.3, 0.3]) {
