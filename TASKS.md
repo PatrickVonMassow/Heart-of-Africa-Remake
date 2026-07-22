@@ -8953,7 +8953,7 @@ the remaining open points in their numeric order.
   BOTH backends at an achievable zoom before/after. DOCS: design.md §2.5/§3.3 only
   if the wording changes. No player-visible text.
 
-- [ ] 231. TRAVELLER'S PACK SITS ON THE CHEST — the user reports (22.07.2026,
+- [x] 231. TRAVELLER'S PACK SITS ON THE CHEST — the user reports (22.07.2026,
   screenshot) that the bird's-eye traveller figure carries a brown box (the
   backpack/carry-crate) in FRONT of the torso instead of on the BACK. DIAGNOSE:
   is the pack mesh modelled on the figure's front (+forward) side, or is the
