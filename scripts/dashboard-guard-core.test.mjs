@@ -10,24 +10,39 @@ import {
   parseTasks,
   parseNowCardPoint,
   parseQueuePoints,
+  parseKlaerungPoints,
   evaluate,
 } from './dashboard-guard-core.mjs'
 
 /** Minimal dashboard HTML in the real board's markup (incl. an Erledigt section
- *  that also uses `.num`, which the queue parser must NOT pick up). */
-function boardHtml({ nowPoint = 210, nowTitle = 'Meereskante glätten', queue = [211, 204], done = [209] } = {}) {
+ *  that also uses `.num`, which the queue parser must NOT pick up). `klaerung`
+ *  renders point-tied "Von dir zu klären" cards (leading number in the title);
+ *  `klaerungExtra` adds no-number cards like the real ntfy one. */
+function boardHtml({
+  nowPoint = 210,
+  nowTitle = 'Meereskante glätten',
+  queue = [211, 204],
+  done = [209],
+  klaerung = [],
+  klaerungExtra = [],
+} = {}) {
   const q = queue
     .map((n) => `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span></summary></details>`)
     .join('\n')
   const d = done
     .map((n) => `<details><summary><span class="num">${n}</span><span class="t">Done ${n}</span></summary></details>`)
     .join('\n')
+  const k = [
+    ...klaerung.map((n) => `<details><summary><span class="t">${n} — Frage zu Punkt ${n}</span></summary></details>`),
+    ...klaerungExtra.map((t) => `<details><summary><span class="t">${t}</span></summary></details>`),
+  ].join('\n')
   const nowT = nowPoint == null ? nowTitle : `${nowPoint} — ${nowTitle}`
   return `<main><h1>Dashboard</h1>
 <h2>Woran ich gerade arbeite</h2>
 <details class="now" open><summary><span class="t">${nowT}</span></summary>
 <div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>
 <h2>Von dir zu klären</h2>
+${k}
 <h2>Warteschlange</h2>
 ${q}
 <h2>Erledigt</h2>
@@ -103,6 +118,25 @@ describe('parseQueuePoints', () => {
   })
 })
 
+describe('parseKlaerungPoints', () => {
+  it('reads leading-number VDZK cards and ignores a no-number card', () => {
+    const html = boardHtml({
+      klaerung: [206, 210],
+      klaerungExtra: ['📱 ntfy-Topic abonnieren — dann bekommst du Ausfall-Pushes'],
+    })
+    expect([...parseKlaerungPoints(html)].sort()).toEqual([206, 210])
+  })
+  it('does not pick up now-card, queue, or Erledigt titles', () => {
+    // No VDZK cards at all — nothing from the surrounding sections leaks in.
+    expect(parseKlaerungPoints(boardHtml()).size).toBe(0)
+  })
+  it('is empty on missing section / non-string input', () => {
+    expect(parseKlaerungPoints('<h2>Warteschlange</h2>').size).toBe(0)
+    expect(parseKlaerungPoints(null).size).toBe(0)
+    expect(parseKlaerungPoints(undefined).size).toBe(0)
+  })
+})
+
 describe('evaluate — silent allows', () => {
   it('allows when the batch is paused, whatever else is stale', () => {
     expect(evaluate(green({ paused: true, head: 'moved', focus: null })).decision).toBe('allow')
@@ -148,6 +182,40 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
   })
   it('allows the now-card point when it is NOT also in the queue', () => {
     const r = evaluate(green({ html: boardHtml({ nowPoint: 210, queue: [211, 204] }) }))
+    expect(r.decision).toBe('allow')
+  })
+})
+
+describe('evaluate — one section per point ("Von dir zu klären" overlaps)', () => {
+  it('blocks a point in BOTH the Warteschlange and "Von dir zu klären" (the 206 case)', () => {
+    const r = evaluate(
+      green({ open: [210, 211, 204, 206], html: boardHtml({ queue: [211, 204, 206], klaerung: [206] }) }),
+    )
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/VON DIR ZU KLÄREN.*206.*Warteschlange/)
+  })
+  it('blocks when a VDZK point is the now-card focus (user answered, work resumed)', () => {
+    // The twice-reported failure: the question was answered, the point became
+    // the current work, but its VDZK card lingered.
+    const r = evaluate(green({ html: boardHtml({ nowPoint: 210, klaerung: [210] }) }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/VON DIR ZU KLÄREN.*210.*now-card/)
+  })
+  it('blocks when a VDZK point is ticked done', () => {
+    const r = evaluate(green({ html: boardHtml({ klaerung: [209] }) }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/VON DIR ZU KLÄREN.*209.*done/)
+  })
+  it('allows a point that lives ONLY under "Von dir zu klären" (blocked on the user)', () => {
+    // Not queued, not the focus, not done — the one legitimate home for a
+    // user-blocked point; completeness (4) counts the VDZK card as visible.
+    const r = evaluate(
+      green({ open: [210, 211, 204, 206], html: boardHtml({ queue: [211, 204], klaerung: [206] }) }),
+    )
+    expect(r.decision).toBe('allow')
+  })
+  it('ignores no-number VDZK cards (never point-tied)', () => {
+    const r = evaluate(green({ html: boardHtml({ klaerungExtra: ['ntfy-Topic abonnieren'] }) }))
     expect(r.decision).toBe('allow')
   })
 })
