@@ -45,7 +45,14 @@ import {
   riverAxisRows,
   waterSurfaceY,
 } from './waterSurface'
-import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
+import {
+  edgeIsInterior,
+  buildBankIndex,
+  buildJuniorPairs,
+  mergeFactorAt,
+  BANK_PROBE_DEG,
+  type BankAxisSample,
+} from './riverBanks'
 
 const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
 
@@ -76,6 +83,7 @@ function buildRivers(seed: number): {
   const uvs: number[] = []
   const flows: number[] = []
   const banks: number[] = []
+  const merges: number[] = [] // point 233: 0 where a junior arm hands the junction water to its senior
   const floodK: number[] = [] // 1 on the Nile: its vertices ride the flood uniform
   const indices: number[] = []
   const falls: FallDef[] = []
@@ -92,6 +100,12 @@ function buildRivers(seed: number): {
     rows.forEach((p, i) => bankSamples.push({ riverId: river.id, index: i, lat: p.lat, lon: p.lon }))
   }
   const bankIndex = buildBankIndex(bankSamples)
+  // Point 233: at each junction exactly one arm draws the shared water — the
+  // junior arm's vertices fade out inside its senior partner's channel band.
+  const juniorPairs = buildJuniorPairs(
+    built.map(({ river, rows }) => ({ id: river.id, pts: rows })),
+    RIVER_WIDTH_DEG,
+  )
 
   for (const { river, rows } of built) {
     const world = rows.map((p) => latLonToWorld(p.lat, p.lon))
@@ -202,6 +216,14 @@ function buildRivers(seed: number): {
       const bankR = isOcean ? 0 : bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
       if (!isOcean) interiorEdges += (1 - bankL) + (1 - bankR)
       banks.push(bankL, bankR)
+      // Point 233: per-vertex junction hand-over — a junior arm's water fades
+      // out inside its senior partner's band so the shared region blends once.
+      const qL = worldToLatLon(world[i].x - px, world[i].z - pz)
+      const qR = worldToLatLon(world[i].x + px, world[i].z + pz)
+      merges.push(
+        mergeFactorAt(qL.lat, qL.lon, river.id, bankIndex, RIVER_WIDTH_DEG, juniorPairs),
+        mergeFactorAt(qR.lat, qR.lon, river.id, bankIndex, RIVER_WIDTH_DEG, juniorPairs),
+      )
       if (plan.connected[i]) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
     }
     report[river.id] = { strips: plan.strips, buried, interiorEdges }
@@ -212,6 +234,7 @@ function buildRivers(seed: number): {
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
   geometry.setAttribute('bank', new THREE.BufferAttribute(new Float32Array(banks), 1))
+  geometry.setAttribute('merge', new THREE.BufferAttribute(new Float32Array(merges), 1))
   geometry.setAttribute('floodK', new THREE.BufferAttribute(new Float32Array(floodK), 1))
   geometry.setIndex(indices)
   // Hand the axis samples to the float-height module: the canoe then floats
@@ -242,6 +265,10 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   if (riverMaterialCache) return riverMaterialCache
   const m = riverMaterialCache = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
+  // Point 233: overlapping junction arms crossfade by the merge attribute —
+  // depth writes would let the first-drawn arm's transparent fragments cull
+  // the senior arm underneath and punch a hole where the junior fades out.
+  m.depthWrite = false
   m.roughness = 0.14
   m.metalness = 0.02
   m.side = THREE.DoubleSide
@@ -253,6 +280,9 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   // 1 at real banks, 0 where the edge lies inside the joined water body
   // (confluences, lake mouths, the sea) — no bank foam across open water.
   const bank = attribute('bank', 'float') as unknown as ReturnType<typeof float>
+  // 0 where a junior junction arm hands the shared water to its senior
+  // (point 233) — the overlap is drawn once, never alpha-doubled.
+  const merge = attribute('merge', 'float') as unknown as ReturnType<typeof float>
 
 
   // Streaks elongated along the flow, scrolling downstream with the current.
@@ -281,7 +311,7 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   const floodRise = (attribute('floodK', 'float') as unknown as ReturnType<typeof float>).mul(NILE_FLOOD_U)
   m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.035).add(floodRise), 0))
 
-  m.opacityNode = float(0.9)
+  m.opacityNode = merge.mul(0.9)
   m.roughnessNode = foam.mul(0.6).add(0.12)
   return m
 }
