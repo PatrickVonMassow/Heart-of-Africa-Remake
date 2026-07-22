@@ -5662,7 +5662,15 @@ await page
   .waitForFunction(() => window.__game.getState().placeId === 'cairo', null, { timeout: 30000 })
   .catch(() => {})
 await page.waitForTimeout(600)
-await page.evaluate(() => window.__game.getState().leavePlace())
+await page.evaluate(() => {
+  window.__game.getState().leavePlace()
+  // Freeze the settlement anchor the moment we leave, BEFORE any idle/current
+  // drift moves the traveller: the vicinity seeder tops up the region-typical
+  // presence around THIS anchor, so the count below must measure around it too,
+  // not around the live (drifting) position (point 102 flake — idle sim time
+  // inside the poll drifted the count centre off the seeded cluster).
+  window.__leaveAnchor = { ...window.__game.getState().pos }
+})
 await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 20000 }).catch(() => {})
 // point 177: wait on the SIM clock for the per-frame vicinity top-up to
 // establish the guarantee, not a fixed wall wait. The old waitForTimeout(2500)
@@ -5684,11 +5692,11 @@ const vicinity = await page.evaluate(async () => {
   }[region] ?? []
   const radius = window.__balance.panoramaWildlife.vicinityRadius
   const min = window.__balance.panoramaWildlife.vicinityMinAnimals
+  const anchor = window.__leaveAnchor ?? window.__game.getState().pos
   const countNow = () => {
-    const pos = window.__game.getState().pos
     const herds = window.__wildlife.herdsRef.current ?? {}
     let c = 0
-    for (const sp of pool) for (const a of herds[sp] ?? []) if (!a.dead && Math.hypot(a.x - pos.x, a.z - pos.z) <= radius) c++
+    for (const sp of pool) for (const a of herds[sp] ?? []) if (!a.dead && Math.hypot(a.x - anchor.x, a.z - anchor.z) <= radius) c++
     return c
   }
   const ok = await window.__pollSim(6, () => countNow() >= min)
