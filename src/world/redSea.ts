@@ -192,8 +192,6 @@ export function trimToGameWorld(
   // therefore inherit the depth of the nearest kept sea (multi-source BFS);
   // everything else gets the uniform deep stamp.
   const stampedElevation = meta.offsetMeters - 3000
-  const hi = (stampedElevation >> 8) & 0xff
-  const lo = stampedElevation & 0xff
   const stamped = new Uint8Array(total)
   for (let idx = 0; idx < total; idx++) {
     if (visited[idx] || !isLand(idx)) continue
@@ -273,82 +271,39 @@ export function trimToGameWorld(
       writeEnc(idx, val)
     }
   }
-  // The northeast side of the boundary reads as plain open ocean in full:
-  // shallow sea there — the Persian Gulf's banks, the Dahlak shelf, the
-  // Levant shore — would otherwise stay behind as bright ghost shallows
-  // beside the trimmed land. The African side keeps its real bathymetry.
-  // 800 m in the trimmed regions (deep enough that even the steep old
-  // coast slopes leave no pale outline); the global shelf dilation further
-  // down uses 150 m instead, since it acts next to kept shores.
-  const regionCap = meta.offsetMeters - 800
-  for (let y = 0; y < meta.height; y++) {
-    const lat = meta.latMax - (y + 0.5) * meta.res
-    if (lat < BOX_LAT_MIN) break
-    for (let x = Math.max(0, Math.floor((BOX_LON_MIN - meta.lonMin) / meta.res)); x < meta.width; x++) {
-      const i = (y * meta.width + x) * 4
-      if (pixels[i + 2] > 0) continue // land (kept)
-      if (pixels[i] * 256 + pixels[i + 1] <= regionCap) continue // already deep
-      const lon = meta.lonMin + (x + 0.5) * meta.res
-      if (!isNortheastOfBoundary(lat, lon)) continue
-      pixels[i] = hi
-      pixels[i + 1] = lo
-    }
-  }
-  // The Madagascar box likewise: the island is unreachable and removed on
-  // user request (design.md §3.1), and its shelf banks reach further out
-  // than the ghost-shelf dilation below — after the trim the box holds no
-  // kept land, so all shallow sea there reads as deep open ocean.
-  const MG = { lonMin: 42, latMin: -27, latMax: -11 }
-  for (let y = Math.max(0, Math.floor((meta.latMax - MG.latMax) / meta.res)); y < meta.height; y++) {
-    const lat = meta.latMax - (y + 0.5) * meta.res
-    if (lat < MG.latMin) break
-    for (let x = Math.max(0, Math.floor((MG.lonMin - meta.lonMin) / meta.res)); x < meta.width; x++) {
-      const i = (y * meta.width + x) * 4
-      if (pixels[i + 2] > 0) continue
-      if (pixels[i] * 256 + pixels[i + 1] <= regionCap) continue
-      pixels[i] = hi
-      pixels[i + 1] = lo
-    }
-  }
-  // Ghost shelves: a trimmed island would leave its shallow shelf behind as
-  // a bright outline of the removed land. Deepen shallow sea near DEEP
-  // stamps (separable box dilation of that mask), so removed open-sea land
-  // leaves no trace; deep sea and shores of kept land stay untouched. The
-  // shallow near-shore stamps are excluded — around them the dilation would
-  // re-punch the dark holes the nearest-sea inheritance just closed.
-  const radius = Math.max(1, Math.round(0.3 / meta.res))
-  const shallowLimit = meta.offsetMeters - 150 // above = shallower than 150 m
-  const deepLimit = meta.offsetMeters - 500
-  const stampedDeep = new Uint8Array(total)
+  // Point 235 (user decision 22.07.2026): hard-cut the map at the continent
+  // edge. Beyond the near-shore shelf of the kept continent and its reachable
+  // islands there is ONLY flat deep ocean — no shallow shelf, no bathymetric
+  // relief, no unreachable-island scraps left floating in the sea. The user
+  // reported such shallow-water "Fetzen" around the Red Sea, the Gulf of Aden
+  // and the Horn (the Farasan/Dahlak banks, the Socotra-area shelf, the
+  // Persian-Gulf banks, the Madagascar banks). This GENERALISES the point-210
+  // Red-Sea clean-crop to the WHOLE offshore: every SEA texel outside the
+  // kept-land near-shore band is forced to the uniform DEEP stamp value,
+  // subsuming the former per-region deepening passes (the NE-boundary cap, the
+  // Madagascar box and the ghost-shelf dilation) in one rule. Excluded, so the
+  // coast still reads right: kept land; the near-shore band on the KEPT side;
+  // and texels already at/below the deep floor (real ocean trenches are left
+  // alone, never raised). The deep value is the same as the trimmed-land stamp
+  // (offset − 3000 m, ~−1.9 in world height): well past the deep-tone
+  // threshold, and terrain.ts's point-210b stamp clamp only re-shallows it in
+  // the narrow band straddling the trim boundary (the intended Gulf-of-Suez
+  // head), never far offshore.
   for (let idx = 0; idx < total; idx++) {
-    if (stamped[idx] && encAt(idx) <= deepLimit) stampedDeep[idx] = 1
-  }
-  const maskH = new Uint8Array(total)
-  for (let y = 0; y < meta.height; y++) {
-    const row = y * meta.width
-    let count = 0
-    for (let x = 0; x < meta.width + radius; x++) {
-      if (x < meta.width && stampedDeep[row + x]) count++
-      const drop = x - 2 * radius - 1
-      if (drop >= 0 && stampedDeep[row + drop]) count--
-      const cx = x - radius
-      if (cx >= 0 && cx < meta.width && count > 0) maskH[row + cx] = 1
+    if (pixels[idx * 4 + 2] > 0) continue // kept land
+    if (encAt(idx) <= stampedElevation) continue // already at/below the deep floor
+    if (nearShore[idx]) {
+      // Preserve the coastal shelf, but only on the KEPT (continental) side.
+      // The trimmed side (northeast of the NORTHEAST_BOUNDARY) reads uniform
+      // deep even where it lies near kept land — the map ends at the boundary
+      // (point 210: the Gulf-of-Suez head east of Cairo would otherwise keep a
+      // pale shallow arm). The kept side's coastal shelf and the trimmed delta
+      // bars that inherited it (design.md §21.4) stay shallow.
+      const x = idx % width
+      const lon = meta.lonMin + (x + 0.5) * meta.res
+      const lat = meta.latMax - (((idx / width) | 0) + 0.5) * meta.res
+      if (!isNortheastOfBoundary(lat, lon)) continue
     }
-  }
-  for (let x = 0; x < meta.width; x++) {
-    let count = 0
-    for (let y = 0; y < meta.height + radius; y++) {
-      if (y < meta.height && maskH[y * meta.width + x]) count++
-      const drop = y - 2 * radius - 1
-      if (drop >= 0 && maskH[drop * meta.width + x]) count--
-      const cy = y - radius
-      if (cy < 0 || cy >= meta.height || count === 0) continue
-      const idx = cy * meta.width + x
-      const i = idx * 4
-      if (pixels[i + 2] > 0) continue // land (kept): untouched
-      if (pixels[i] * 256 + pixels[i + 1] <= shallowLimit) continue // already deep
-      pixels[i] = hi
-      pixels[i + 1] = lo
-    }
+    writeEnc(idx, stampedElevation)
   }
 }
