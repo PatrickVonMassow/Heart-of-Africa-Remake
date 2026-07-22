@@ -75,6 +75,44 @@ export function planRibbonStrips(
   return { drawn, connected, strips }
 }
 
+/**
+ * Which ribbon rows are actually EMITTED as geometry, and which connect to the
+ * previously emitted row (point 254) — refining planRibbonStrips: a row inside a
+ * LAKE is never emitted, because the lake sheet ALREADY renders that water. The
+ * point-234 outflow extension marched the ribbon head into its source lake; with
+ * both the ribbon and the lake sheet drawing depthWrite-off, that underlapping
+ * head strip was not occluded and showed through as a visible semi-transparent
+ * strip ACROSS the lake (the user's Lake Victoria / Lake Albert / Lake Tana
+ * report). Suppressing the in-lake rows removes that strip while KEEPING the
+ * point-234 outflow semantics: the ribbon resumes at the first row OUTSIDE the
+ * lake — the shore, where the original source sits — while the source row itself
+ * still lies in the lake (so no spring returns), and nothing draws over the
+ * sheet. A suppressed row breaks the strip so the next emitted row starts fresh.
+ * `strips` stays the OCEAN-continuity count: a lake crossing reads as continuous
+ * WATER under its own sheet, not a gap, so the never-a-gap invariant is unmoved.
+ */
+export function planRibbonRows(
+  isOcean: boolean[],
+  inLake: boolean[],
+  bridge = MOUTH_BRIDGE,
+): { emitted: boolean[]; connected: boolean[]; strips: number } {
+  const base = planRibbonStrips(isOcean, bridge)
+  const n = isOcean.length
+  const emitted = new Array<boolean>(n).fill(false)
+  const connected = new Array<boolean>(n).fill(false)
+  let prev = false
+  for (let i = 0; i < n; i++) {
+    if (!base.drawn[i] || inLake[i]) {
+      prev = false
+      continue
+    }
+    emitted[i] = true
+    connected[i] = base.connected[i] && prev
+    prev = true
+  }
+  return { emitted, connected, strips: base.strips }
+}
+
 // point 211(b): the flat ribbon cross-section rides the AXIS height while the
 // terrain carve is relative to the LOCAL relief — on a cross-sloping bank a
 // carved, still-high 'water'-typed wedge stood ABOVE the sheet and cut a
