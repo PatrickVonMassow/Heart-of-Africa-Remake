@@ -8349,6 +8349,36 @@ the remaining open points in their numeric order.
   gate, standard on LARGE/default, thorough via CROSSBROWSER_DEPTH in
   maximale-qs; graceful skip when the engines are absent.
 
+- [ ] 214. FIGURES read FACETED — the round organic figures (the bird's-eye
+  ANIMALS incl. the elephant, and the first-person town INHABITANTS/people) show
+  visible flat polygon FACES at close/mid range instead of a smooth curved
+  surface (user report 22.07.2026, screenshot: the elephant's body/head reads as
+  hard flat panels). Soften the shading so curvature reads smooth. DIAGNOSE FIRST
+  (a rendered close-up, both backends): the cause is almost certainly FLAT shading
+  (per-face normals — a material with `flatShading: true`, or a geometry whose
+  normals were never smoothed) and/or a too-coarse tessellation floor on the
+  rounded body primitives. Anchors: `src/render/fauna.ts` (animal bodies/heads/
+  limbs), `src/render/figures.ts` (human figure bodies/heads), and their
+  materials. CLAUDE §7.1 pt.15 already pins tessellation FLOORS for these
+  primitives (`src/render/figures.test.ts`, `fauna.test.ts`) so faces do not read
+  at eye height — this point is the SHADING half of the same goal. FIX: give the
+  rounded meshes SMOOTH (vertex) normals — `geometry.computeVertexNormals()` on
+  the built body primitives and/or `flatShading: false` on their material — and,
+  where curvature still facets, raise the segment counts on the round primitives
+  (sphere/cylinder/cone bodies, heads, limbs) a step. Keep the DELIBERATE low-poly
+  stylization where it is a design choice (angular huts/props, §2.6); this is only
+  about the round ORGANIC figures (animals + people) reading faceted. Watch the
+  instanced-fauna path (bird's-eye animals are instanced) — the fix must apply to
+  the shared instanced geometry/material, not only a one-off mesh. VERIFIABLE:
+  extend `figures.test.ts`/`fauna.test.ts` to assert the rounded figure/fauna
+  primitives carry SMOOTH normals (adjacent-face normals not identical / material
+  not flatShaded) at/above the tessellation floor; a rendered close-up of the
+  elephant AND a town inhabitant shows soft gradients with no hard facets, on BOTH
+  WebGL2 and WebGPU per [[verify-gui-on-both-backends]] (screenshot pair). DOCS:
+  design.md §2.6 / §15 (close-range primitives) note the smooth-shading
+  requirement alongside the tessellation floors; CLAUDE §7.1 pt.15 if the
+  acceptance wording changes.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
