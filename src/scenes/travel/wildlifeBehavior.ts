@@ -85,6 +85,68 @@ export function fleesFromPlayer(
   return weapon < PLAYER_SHY_STRONG_WEAPON
 }
 
+/** The set of scripted §19.8 drama / hunt states an animal can be in. A truthy
+ *  flag means the animal is CLAIMED by that drama and its movement is owned by
+ *  the drama's own logic — not free to be redirected. */
+export interface DramaState {
+  caught?: number // seized by a predator (lion or crocodile grip) — thrashing
+  fireTrapped?: number // pinned by the grass-fire line (point 145a)
+  inWater?: number // struggling in open water (the drowning drama)
+  rescued?: boolean // pulled out, walking back to the bank beside the parent
+  mired?: number // stuck at the drying waterhole (point 123)
+  crossing?: unknown // purposefully swimming a river/lake (point 192)
+  vigil?: unknown // mourning over a fallen calf/herd-mate (point 121/126)
+  kick?: number // the parent defence strike (points 124/125)
+  plungeTo?: unknown // rushing after a swept-over calf (waterfall grief)
+  trampleTo?: unknown // charging the elephant that trampled its calf
+  defending?: boolean // parent shield / charge / guard / wade for its calf
+  isLionVictim?: boolean // the designated victim of the running lion hunt
+  isHunted?: boolean // actively fleeing a predator this frame
+}
+
+/** Is this animal currently OWNED by a scripted §19.8 drama or a hunt (point
+ *  252 priority ordering)? A predator/drama state must OUTRANK the point-238/239
+ *  player-shy flee: an animal in any of these states keeps its drama behaviour
+ *  regardless of the traveller's proximity (a hunted prey keeps fleeing the
+ *  predator, a caught victim keeps struggling, a defending parent holds its
+ *  shield). Only an idle/roaming/grazing animal — none of these flags set — is
+ *  free to shy from the player. Broader than `claimedByAnotherDrama` (which
+ *  gates the fresh-victim scans): it also covers the surrender/grief drives
+ *  (vigil, kick, plunge, trample), the rescue/defence drives and the
+ *  being-hunted flee, exactly the states that must beat the player-shy flee. */
+export function isInDrama(f: DramaState): boolean {
+  return (
+    f.caught !== undefined ||
+    f.fireTrapped !== undefined ||
+    f.inWater !== undefined ||
+    f.rescued === true ||
+    f.mired !== undefined ||
+    f.crossing !== undefined ||
+    f.vigil !== undefined ||
+    f.kick !== undefined ||
+    f.plungeTo !== undefined ||
+    f.trampleTo !== undefined ||
+    f.defending === true ||
+    f.isLionVictim === true ||
+    f.isHunted === true
+  )
+}
+
+/** Whether an animal flees the traveller RIGHT NOW (point 252): the point-238/239
+ *  player shyness (`fleesFromPlayer`) applies ONLY to an idle/roaming/grazing
+ *  animal — an animal already in a hunt/drama state (`isInDrama`) IGNORES the
+ *  player-shy flee for that drama's whole duration, so a running hunt or drama
+ *  is never pre-empted by the player wandering near (predator > player-flee >
+ *  idle). */
+export function fleesPlayerNow(
+  species: string,
+  isJuvenile: boolean,
+  preyWeapon: Record<string, number>,
+  drama: DramaState,
+): boolean {
+  return fleesFromPlayer(species, isJuvenile, preyWeapon) && !isInDrama(drama)
+}
+
 /**
  * Blocking station for a parent whose calf is being run down by a predator
  * (design.md §19): the parent keeps itself between the hunter and its young,

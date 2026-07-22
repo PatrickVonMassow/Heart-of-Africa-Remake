@@ -12,6 +12,8 @@ import {
   blockHeading,
   fleeHeading,
   fleesFromPlayer,
+  fleesPlayerNow,
+  isInDrama,
   PLAYER_SHY_STRONG_WEAPON,
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
@@ -233,6 +235,96 @@ describe('fleesFromPlayer (design.md §19 — small/weak animals shy from the tr
     expect(maxDelta).toBeLessThan(0.05) // a radial escape never wavers
     // And it ends AWAY from the traveller: further out than it started.
     expect(Math.hypot(x, z)).toBeGreaterThan(Math.hypot(0.6, 0.25) + 1)
+  })
+})
+
+describe('isInDrama (point 252 — a hunt/drama state outranks the player-shy flee)', () => {
+  it('is false for an idle/roaming animal (no drama flag set)', () => {
+    expect(isInDrama({})).toBe(false)
+  })
+
+  it('is true for every scripted §19.8 drama / hunt state', () => {
+    // caught/gripped (lion or crocodile), the grass fire, the water dramas, the
+    // surrender/grief drives, the parent defence, and being hunted.
+    expect(isInDrama({ caught: 0 })).toBe(true) // seized — a zero timer still counts
+    expect(isInDrama({ fireTrapped: 3 })).toBe(true)
+    expect(isInDrama({ inWater: 1.2 })).toBe(true)
+    expect(isInDrama({ rescued: true })).toBe(true)
+    expect(isInDrama({ mired: 0 })).toBe(true)
+    expect(isInDrama({ crossing: { tx: 0, tz: 0, time: 0 } })).toBe(true)
+    expect(isInDrama({ vigil: { x: 0, z: 0 } })).toBe(true)
+    expect(isInDrama({ kick: 0.4 })).toBe(true)
+    expect(isInDrama({ plungeTo: { x: 0, z: 0 } })).toBe(true)
+    expect(isInDrama({ trampleTo: { x: 0, z: 0 } })).toBe(true)
+    expect(isInDrama({ defending: true })).toBe(true)
+    expect(isInDrama({ isLionVictim: true })).toBe(true)
+    expect(isInDrama({ isHunted: true })).toBe(true)
+  })
+})
+
+describe('fleesPlayerNow (point 252 — player-shy flee only in an idle state)', () => {
+  const W = balance.parentDefense.preyWeapon
+
+  it('a free weak/prey adult flees the traveller, and so does a free juvenile', () => {
+    // No drama flag set: the point-238/239 shyness applies as before.
+    expect(fleesPlayerNow('antelope', false, W, {})).toBe(true)
+    expect(fleesPlayerNow('zebra', true, W, {})).toBe(true)
+  })
+
+  it('does NOT flee the traveller while in any drama / hunt state', () => {
+    // A predator/drama state outranks the player-shy flee (predator > player-flee
+    // > idle): the animal keeps its drama behaviour regardless of proximity.
+    const states = [
+      { caught: 0 },
+      { fireTrapped: 2 },
+      { inWater: 0.5 },
+      { rescued: true },
+      { mired: 0 },
+      { crossing: { tx: 1, tz: 1, time: 0 } },
+      { vigil: { x: 0, z: 0 } },
+      { kick: 0.3 },
+      { plungeTo: { x: 0, z: 0 } },
+      { trampleTo: { x: 0, z: 0 } },
+      { defending: true },
+      { isLionVictim: true },
+      { isHunted: true },
+    ]
+    for (const s of states) {
+      expect(fleesPlayerNow('antelope', false, W, s), JSON.stringify(s)).toBe(false)
+      expect(fleesPlayerNow('zebra', true, W, s), JSON.stringify(s)).toBe(false)
+    }
+  })
+
+  it('a strong adult never flees regardless of state (unchanged from fleesFromPlayer)', () => {
+    expect(fleesPlayerNow('lion', false, W, {})).toBe(false)
+    expect(fleesPlayerNow('giraffe', false, W, {})).toBe(false)
+  })
+
+  it('a hunted prey within the player-shy radius keeps its predator-flee heading, not the player-flee', () => {
+    // The scene layout the bug report hit: the lion behind the prey, the
+    // traveller off to one side, both inside the shy radius. Because the prey is
+    // hunted (isHunted / the designated victim), the player-flee is suppressed —
+    // so the animal keeps the LION-flee heading (away from the predator) and the
+    // hunt resolves instead of stalling next to the idle prey.
+    const ax = 0
+    const az = 0
+    const lion: [number, number][] = [[0, -4]] // predator directly behind (−z)
+    const player: [number, number][] = [[4, 0]] // traveller off to the +x side
+    const radius = 9
+    // The predator-flee heading (the 3411 block): straight away from the lion.
+    const lionFlee = fleeHeading(ax, az, lion, radius)
+    expect(lionFlee).not.toBeNull()
+    // Gated player-flee (the site's pTarget decision): null while hunted.
+    const hunted = { isHunted: true }
+    const pTarget = fleesPlayerNow('antelope', false, W, hunted)
+      ? fleeHeading(ax, az, player, radius)
+      : null
+    expect(pTarget).toBeNull()
+    // So the heading the animal keeps is the lion-flee — pointing away from the
+    // predator (+z), NOT away from the player (−x).
+    const [lsx, lsz] = dir(lionFlee as number)
+    expect(lsz).toBeGreaterThan(0.9) // away from the lion, up the +z axis
+    expect(lsx).toBeCloseTo(0, 5) // and NOT deflected toward −x by the player
   })
 })
 

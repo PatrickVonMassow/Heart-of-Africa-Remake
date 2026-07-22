@@ -37,6 +37,7 @@ import {
   griefTarget,
   fleeHeading,
   fleesFromPlayer,
+  fleesPlayerNow,
   flightStep,
   segPointDist,
   gambolState,
@@ -3240,8 +3241,21 @@ function Herds() {
             // a drink errand (incl. the staged §19.16 bank victims) is never
             // interrupted.
             const shyRing = a.dodgeHeading === undefined ? PLAYER_SHY_RADIUS : PLAYER_SHY_RADIUS * PREY_PANIC_EXIT
+            // Priority ordering (point 252): a calf in a hunt/drama state ignores
+            // the player-shy flee — a hunted calf takes its own chase-victim
+            // branch above, so this follow branch is reached only by a free calf,
+            // but the drama gate keeps the invariant explicit and robust.
             const shyTarget =
-              a.drink === undefined && fleesFromPlayer(sp, true, balance.parentDefense.preyWeapon)
+              a.drink === undefined &&
+              fleesPlayerNow(sp, true, balance.parentDefense.preyWeapon, {
+                caught: a.caught,
+                fireTrapped: a.fireTrapped,
+                inWater: a.inWater,
+                rescued: a.rescued,
+                mired: a.mired,
+                crossing: a.crossing,
+                isLionVictim: a === LION_STATE.victim,
+              })
                 ? fleeHeading(a.x, a.z, playerThreat, shyRing)
                 : null
             if (shyTarget !== null) {
@@ -3408,11 +3422,13 @@ function Herds() {
         // Prey flees from an active predator (design.md §19): it runs away
         // smoothly, accumulating into its own position, so it never teleports
         // when the hunt begins or snaps back when it ends.
+        let fleeingLion = false // set once the flee actually fires this frame
         if (!familyHeld && lionActive && FLEES_LION[sp] && sp !== 'elephant') {
           const dx = a.x - LION_STATE.lx
           const dz = a.z - LION_STATE.lz
           const d = Math.hypot(dx, dz)
           if (d < FLEE_RADIUS && d > 0.01) {
+            fleeingLion = true
             const urgency = (FLEE_RADIUS - d) / FLEE_RADIUS
             // Water-deflected flight (points 201/197): the raw radial step ran a
             // fleeing animal straight onto a water cell where the §19.5 backstop
@@ -3475,8 +3491,24 @@ function Herds() {
           const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
           // A drinker keeps its bank errand (and the staged §19.16 drama
           // victims their stand) — shyness never claims an animal mid-errand.
+          // Priority ordering (point 252): a predator/drama state OUTRANKS the
+          // player-shy flee. A prey actively fleeing the lion (the 3411 block
+          // fired) or the hunt's designated victim keeps fleeing the LION, not
+          // the traveller — so the hunt/drama always resolves rather than
+          // stalling when the player wanders near. The elephant dart (eTarget)
+          // stays a higher priority still.
           const pTarget =
-            a.drink === undefined && fleesFromPlayer(sp, !!a.young, balance.parentDefense.preyWeapon)
+            a.drink === undefined &&
+            fleesPlayerNow(sp, !!a.young, balance.parentDefense.preyWeapon, {
+              caught: a.caught,
+              fireTrapped: a.fireTrapped,
+              inWater: a.inWater,
+              rescued: a.rescued,
+              mired: a.mired,
+              crossing: a.crossing,
+              isLionVictim: a === LION_STATE.victim,
+              isHunted: fleeingLion,
+            })
               ? fleeHeading(a.x, a.z, playerThreat, shyRing)
               : null
           const target = eTarget !== null ? eTarget : pTarget
