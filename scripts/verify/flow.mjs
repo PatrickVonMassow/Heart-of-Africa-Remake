@@ -352,8 +352,19 @@ await page2.evaluate(() => localStorage.clear())
 await page2.reload()
 await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
 await page2.waitForTimeout(700)
-const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
-check('a fresh start (no overlay) grabs the pointer for mouse-look', !fresh.overlay && fresh.calls > 0)
+// Under browser automation the game deliberately SKIPS the real pointer lock
+// (it would grab the OS cursor under system-Chrome --headless=new) and instead
+// applies mouse-look from raw movement — so assert the behaviour (the view turns
+// on a mouse move at a fresh, overlay-free start) rather than the grab call.
+const yawBefore = await page2.evaluate(() => window.__placePlayer?.yaw ?? null)
+await page2.mouse.move(640, 400)
+await page2.mouse.move(760, 400)
+await page2.waitForTimeout(60)
+const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), yaw: window.__placePlayer?.yaw ?? null }))
+check(
+  'a fresh start (no overlay) engages mouse-look (the view turns on a mouse move)',
+  !fresh.overlay && fresh.yaw !== null && fresh.yaw !== yawBefore,
+)
 // Seed a checkpoint (entering a port saves one) and reload → the StartOverlay shows.
 await page2.evaluate(() => window.__game.getState().enterPlace('cairo'))
 await page2.waitForTimeout(200)

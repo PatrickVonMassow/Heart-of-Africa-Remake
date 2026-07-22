@@ -1570,6 +1570,13 @@ export function PlaceScene() {
       // click it. The DOM is committed before this effect runs, so the overlay
       // is already present on the start-of-game grab.
       if (document.querySelector('.overlay')) return
+      // Never engage pointer lock under browser automation (navigator.webdriver
+      // is set by Playwright/CDP): the verify captures enter this first-person
+      // scene headless, and system-Chrome --headless=new (the WebGPU lane) grabs
+      // the REAL OS cursor on requestPointerLock, dragging the user's Windows
+      // mouse into a corner. Real players never set webdriver, so mouse-look is
+      // unaffected; the headless suites drive yaw via synthetic events anyway.
+      if (navigator.webdriver) return
       if (!useUi.getState().dialog && document.pointerLockElement !== el) {
         try {
           const r = el.requestPointerLock() as unknown as Promise<void> | undefined
@@ -1582,7 +1589,10 @@ export function PlaceScene() {
     grab() // engage immediately on entry (activation from the walk-in keypress)
     const onClick = () => grab()
     const onMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === el) {
+      // Under automation we deliberately skip the real pointer lock (above), so
+      // apply mouse-look from the raw movement instead — the verify suites still
+      // drive and assert first-person yaw, without the OS cursor being grabbed.
+      if (document.pointerLockElement === el || navigator.webdriver) {
         player.current.yaw -= e.movementX * balance.mouseSensitivity
       }
     }
