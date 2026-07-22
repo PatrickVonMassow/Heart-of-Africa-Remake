@@ -36,7 +36,14 @@ export function parseNowCardPoint(html) {
   if (typeof html !== 'string') return null
   const nowStart = html.indexOf('Woran ich gerade arbeite')
   if (nowStart < 0) return null
-  const m = html.slice(nowStart).match(/class="t">\s*(\d+)/)
+  // Bound the search to the now-card SECTION (up to the next <h2>). A
+  // NON-numeric now-card title (a closing cycle, cross-cutting work) otherwise
+  // lets the scan run on into "Von dir zu klären"/Warteschlange and grab the
+  // first numbered card there — a false now-card point (observed 22.07.2026:
+  // a non-numeric now-card read the VDZK 206 card as its point).
+  const nextH2 = html.indexOf('<h2>', nowStart + 1)
+  const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
+  const m = section.match(/class="t">\s*(\d+)/)
   return m ? Number(m[1]) : null
 }
 

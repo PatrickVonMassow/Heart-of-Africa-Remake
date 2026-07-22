@@ -104,6 +104,13 @@ describe('parseNowCardPoint', () => {
     expect(parseNowCardPoint('<h2>Warteschlange</h2>')).toBeNull()
     expect(parseNowCardPoint(undefined)).toBeNull()
   })
+  it('does not run past the now-card into a numbered VDZK card (non-numeric title)', () => {
+    // Regression 22.07.2026: a cross-cutting/closing now-card (no leading number)
+    // let the scan reach the "Von dir zu klären" 206 card and read 206 as the
+    // now-card point. The search must stop at the now-card section boundary.
+    const html = boardHtml({ nowPoint: null, nowTitle: 'Automatik absichern', klaerung: [206] })
+    expect(parseNowCardPoint(html)).toBeNull()
+  })
 })
 
 describe('parseQueuePoints', () => {
