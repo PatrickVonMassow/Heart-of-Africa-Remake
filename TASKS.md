@@ -8711,7 +8711,7 @@ the remaining open points in their numeric order.
   hook still reports ≥1 spring; a rendered close-up shows the animated source, both
   backends. DOCS: design.md §11.3.
 
-- [ ] 220. TERRAIN CHUNK SEAM / CRACK — a vertical "crack in the ground" runs
+- [x] 220. TERRAIN CHUNK SEAM / CRACK — a vertical "crack in the ground" runs
   through the bird's-eye terrain (user 22.07.2026, deployed build, right of the
   player). It is a chunk-boundary seam: adjacent LOD chunks don't meet flush and
   the `SKIRT_DROP` skirt doesn't fully hide the gap. Anchor:
