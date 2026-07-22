@@ -203,3 +203,24 @@ impossible, not skipping the inspection.
 - **Runaway safety**: if the agent ever loops unproductively (re-spawning and
   burning the limit each cycle without advancing a point), pause it; the design
   favours a stuck-but-recoverable state over silent idle.
+
+## Parallel subagents and the working tree (enforced, not reminded)
+
+Two parallel file-mutating subagents once shared the ONE working tree
+(22.07.2026): both left uncommitted edits, the files entangled, and selective
+commits became fragile. The standing rule:
+
+- **Parallel file-mutating subagents run with `isolation: 'worktree'`** — each
+  gets its own git worktree and commits independently; the trees never contend.
+- **Non-isolated agents must touch NON-OVERLAPPING files** and leave their work
+  **UNCOMMITTED**; the parent harvests, verifies and commits serially.
+
+Enforcement: the `PreToolUse` hook (`matcher: "Agent"`,
+`scripts/worktree-reminder.mjs`, logic in `worktree-reminder-core.mjs`,
+Vitest-covered) injects this rule into the model's context whenever a
+BACKGROUND Agent is spawned without worktree isolation. It never blocks the
+spawn — a non-blocking allow with the reminder as the decision reason — and is
+fail-open (any error → no-op). Foreground agents, already-isolated agents and
+every other tool pass silently. Like the other guards it respects
+`.claude/batch-paused`, and like every hook change it needs a session restart
+(or `/hooks` reload) to take effect.
