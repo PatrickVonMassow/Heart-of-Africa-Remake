@@ -946,7 +946,13 @@ verify suite that proves it.
     acceptance but after **every** change; both checks are part of the
     self-verification (§7.2). If a vulnerability has no upstream fix, it
     is recorded as an open item with its advisory ID instead of being
-    ignored silently.
+    ignored silently — the audit gate is `scripts/audit-check.mjs` (used by
+    CI and the self-verification), which fails on any NEW advisory but
+    tolerates the recorded, unfixable ones listed in its `ALLOW` map with a
+    written justification. Currently accepted: GHSA-f88m-g3jw-g9cj (sharp/
+    libvips, high, no upstream fix) — a transitive Node dependency of
+    kokoro-js that is NOT in the browser bundle, so it is not exploitable in
+    the shipped game.
 19. **Journal voice markup and read-aloud.** The voice markup and
     read-aloud of `design.md` §15.2/§15.3 hold: every journal text in both
     language files carries the markers, the UI never shows one, English

@@ -34,5 +34,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
-      - run: npm audit
+      # Fails on any NEW advisory; tolerates recorded, unfixable ones
+      # (CLAUDE.md §7.1 pt.18). See the ALLOW list in scripts/audit-check.mjs.
+      - run: node scripts/audit-check.mjs
       - run: npm run test:unit
