@@ -8216,6 +8216,20 @@ the remaining open points in their numeric order.
   shore rocks/relief casting onto it). If shadows are NOT it, inspect the water
   material's own depth/opacity term at those exact cells. All height/depth/colour
   smoothing paths are dead ends — this is a water-plane shading matter now.
+  MOST LIKELY MECHANISM (reasoned from the hidden test) — the water plane's DEPTH
+  COLOUR, not shadows: the water shader reads `demElevation` (the GPU texture, still
+  the ~-3000 m trim STAMP at these cells) for its depth tint, while the TERRAIN mesh
+  floor there is SHALLOW (`sampleTerrain` height ~-0.02, teal when the plane is
+  hidden). So over a shallow floor the water still paints the DEEP dark tone because
+  demElevation says deep — the dark "wall". The demElevation shelf grade
+  (`shelfGradedMeters`, demElevation.ts) is meant to fix exactly this but does not
+  reach these patches (its `boundaryIsCoast`/band guard excludes them, or the ocean-
+  floor blur averaged uniform -3000 neighbours to no effect). CONFIRM with a probe:
+  read `demElevation` (or the raw stamped elevation) at a dark-patch cell vs its
+  `sampleTerrain` height — if demElevation is deep while the terrain is shallow, the
+  fix is to extend the demElevation shelf grade to cover ALL near-coast shallow-
+  floor cells (or clamp the water's depth read to the terrain height there), so the
+  water tints teal over shallow floor. Rule shadows in/out first (cheap toggle).
   STEPPING NOT RESOLVED (user re-reported 22.07, second screenshot "immer noch
   stufig"). The terrain shelf smoothed the SHORE at the boundary (30.02N/32.62E
   renders as an organic graded coast on WebGL2), but a FRESH render at the user's
@@ -8680,42 +8694,34 @@ the remaining open points in their numeric order.
 
 - [ ] 223. WEATHER × TERRAIN-TYPE PLAUSIBILITY AUDIT (user 22.07.2026) — a
   repeatable audit that the modelled weather/season is plausible for the terrain it
-  renders on, EVERYWHERE (method like point 205), not a single spot. The wetness
-  model has NO longitudinal term (`season.ts` ~279), so any place whose rainfall
-  depends on more than latitude+elevation is suspect. Sweep a grid across EVERY
-  biome/region, cross-check the modelled wetness/season against
-  `docs/climate-1890.md` + the rendered terrain, and pin each mismatch (rain on a
-  bone-dry desert, a rainforest with a dry season it never had, a Mediterranean
-  coast on a summer-rain curve, a highland off its own calendar, fog-coast vs
-  interior …) as a sub-fix with a coordinate + a pure test, mirroring the point-147
-  model-bug catches. FIRST INSTANCE, found + FIXED (commit 3341a80): the hyper-arid
-  coastal NAMIB rendered rain — the interior
-  has a Nov-Mar summer wet season (plausible), but the western/coastal NAMIB is
-  hyper-arid (fog desert, ~rainless). VERIFY the wetness model (`season.ts`
-  `climateZoneAt`/the rain curve, against `docs/climate-1890.md`) at the exact
-  coastal-Namib band: it must read ~rainless year-round there (the point-147 class
-  of bug — a desert that should be bone dry showing rain). If the Namib coast gets
-  modeled rain, fix the zone/curve so the hyper-arid strip stays dry while the
-  interior keeps its summer rains. VERIFIABLE: sweep the Namib coast months through
-  `climateZoneAt` (rainless) vs the interior (Nov-Mar wet), pure-tested against the
-  research; live pixel check no rain on the coastal Namib. DOCS: docs/climate-1890.md
-  §, design.md §19.13; update the peoples/climate implementation sections in lockstep.
-  DIAGNOSED (22.07.2026, read-only) — CONFIRMED a real bug, root cause found: the
-  wetness model has NO longitudinal term (`src/systems/season.ts` ~279:
-  `void lon // no longitudinal term in the model`), and the only hyper-arid gate
-  `isHyperArid` (~108) covers ONLY the eastern Sahara / Libyan Desert. So the
-  coastal Namib at ~18S/15E samples the SAME latitude-driven summer-rain wetness
-  as the far wetter interior at that latitude — hence rain on a fog desert that is
-  effectively rainless. FIX: add a Namib coastal hyper-arid gate (mirror
-  `isHyperArid`) for the southwest-coast strip (roughly the Atlantic-side band
-  ~13-30S, west of the escarpment ~15-16E — pin the exact bounds from
-  `docs/climate-1890.md`) so `wetnessAt` returns ~0 there year-round, while the
-  interior at the same latitude keeps its Nov-Mar rains. Pure-test both sides
-  (coastal Namib rainless every month; interior wet Nov-Mar); a live pixel check no
-  rain on the coastal strip. This needs a real fix, not just the check.
-  Also check the DERIVED weather VISUALS track the terrain (fog/overcast/greenness/
-  flora bleach vs the biome), and keep every season.test.ts verdict. A Fable-5
-  plausibility pass fits this audit.
+  renders on EVERYWHERE, not a single spot (method like point 205/147). SCOPE:
+  sweep a grid across EVERY biome/region; for each cell cross-check the modelled
+  wetness/season (`src/systems/season.ts` `wetnessAt`/`climateZoneAt`/the rain
+  curve) against `docs/climate-1890.md` AND the rendered terrain type, and pin each
+  mismatch as a sub-fix with a coordinate + a pure test. Known suspect classes to
+  cover: rain on a bone-dry desert; a rainforest carrying a dry season it never
+  had; a Mediterranean coast on a summer-rain curve; a highland off its own
+  elevation-keyed calendar; a fog-coast reading like its wet interior. STRUCTURAL
+  ROOT of the whole class: the wetness model has NO longitudinal term
+  (`season.ts`: `void lon`), so wetness is a pure function of latitude+elevation —
+  any place whose real rainfall depends on longitude (a west-coast fog desert vs
+  the interior at the same latitude) is mis-modelled until a targeted gate is
+  added. FIX each confirmed mismatch by adding/adjusting the minimal zone gate or
+  curve so the cell reads its real ~1890 regime, WITHOUT regressing its neighbours
+  or any existing `season.test.ts` verdict. ALSO verify the DERIVED weather VISUALS
+  track the terrain (fog/overcast/greenness/flora-bleach vs the biome), both
+  bird's-eye and in-settlement. VERIFIABLE: a grid sweep test (extend
+  `src/systems/season.test.ts`) asserting every settlement/biome sample sits in a
+  plausible zone with the correct wet/dry calendar; per fixed instance a pure
+  boundary test (the mis-modelled cell now reads correctly, a neighbour unchanged)
+  + a live pixel check where the defect was visible. FIRST FIXED INSTANCE (commit
+  3341a80): the hyper-arid coastal NAMIB rendered summer rain because it sampled
+  the same latitude-driven wetness as the far wetter interior — a coastal
+  hyper-arid gate now returns ~0 rain on the Atlantic-side band (~17-27S, ~10.5-13.8E)
+  year-round while the interior keeps its Nov-Mar rains (pure-tested both sides).
+  The remaining all-biome sweep is the open work. DOCS: docs/climate-1890.md,
+  design.md §19.13; update the peoples/climate implementation sections in lockstep.
+  A Fable-5 plausibility pass fits this audit.
 
 - [ ] 224. DEMO CHECKPOINT — full closing run → re-point the `poc` tag to the
   then-current main → publish that state playable at
