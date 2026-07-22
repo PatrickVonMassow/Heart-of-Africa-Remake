@@ -152,32 +152,123 @@ export interface AxisRow {
   bed: number
   /** The axis sample lies in the sea (mouth-bridge candidates). */
   ocean: boolean
+  /** The axis sample lies inside a lake polygon — the row hugs the lake
+   *  sheet just beneath it (point 234: outflow heads, inflow tails and
+   *  lake crossings all read as one water body with the lake). */
+  lake: boolean
+}
+
+// Point 234 — smooth river↔water-body transitions. A ribbon row that lies
+// inside a lake sits this far BELOW the lake sheet (the sheet draws on top,
+// the ribbon slides underneath — no seam, no double surface) …
+const LAKE_UNDERLAP = 0.02
+// … and the sea-mouth bridge rows dive to this height, safely under the sea
+// plane at y = 0, so the tail merges beneath the sea sheet instead of
+// standing proud of it on a shallow shore.
+export const SEA_MERGE_Y = -0.15
+
+/** How far a lake-outflow head is marched past the shore into the lake. */
+const LAKE_OVERLAP_STEPS = 2
+
+/**
+ * A river SOURCE that coincides with a lake is an outflow, not a spring
+ * (point 234: the White Nile leaves Lake Victoria at the Ripon Falls, the
+ * Blue Nile Lake Tana): extend the course head INTO the lake so the ribbon
+ * overlaps under the lake sheet with no shore gap. The head is marched
+ * upstream along the course's own backward direction first; where that runs
+ * parallel to the shore (Lake Tana), it aims at the nearest lake centre
+ * instead. A source near no lake is returned unchanged. Injectable lake
+ * containment/centres keep the rule pure-testable.
+ */
+export function extendSourceIntoLake(
+  pts: Array<{ lat: number; lon: number }>,
+  lakeAt: (lat: number, lon: number) => number = lakeIndexAt,
+  centers: ReadonlyArray<[number, number]> = LAKES.map((l) => l.center),
+): { pts: Array<{ lat: number; lon: number }>; added: number } {
+  if (pts.length < 2 || lakeAt(pts[0].lat, pts[0].lon) >= 0) return { pts, added: 0 }
+  const src = pts[0]
+  // A march succeeds only when it ends DEEP inside the lake — several
+  // consecutive inside steps, so the head cannot come to rest just past a
+  // rounded shore lobe it already exited again, and the raw-polygon lake
+  // sheet reliably covers the overlap.
+  const march = (dLat: number, dLon: number, maxSteps: number) => {
+    const len = Math.hypot(dLat, dLon)
+    if (len < 1e-9) return null
+    const sLat = (dLat / len) * STEP_DEG
+    const sLon = (dLon / len) * STEP_DEG
+    const out: Array<{ lat: number; lon: number }> = []
+    let insideRun = 0
+    for (let k = 1; k <= maxSteps + LAKE_OVERLAP_STEPS + 1; k++) {
+      const q = { lat: src.lat + sLat * k, lon: src.lon + sLon * k }
+      out.push(q)
+      insideRun = lakeAt(q.lat, q.lon) >= 0 ? insideRun + 1 : 0
+      if (insideRun > LAKE_OVERLAP_STEPS) return out
+    }
+    return null
+  }
+  // The course's own backward direction first — the natural outflow line.
+  let head = march(src.lat - pts[1].lat, src.lon - pts[1].lon, 6)
+  if (!head) {
+    // Fallback: aim at the nearest lake centre (within a short reach).
+    let best = -1
+    let bd = 2.0
+    for (let i = 0; i < centers.length; i++) {
+      const d = Math.hypot(centers[i][1] - src.lat, centers[i][0] - src.lon)
+      if (d < bd) {
+        bd = d
+        best = i
+      }
+    }
+    if (best >= 0) {
+      head = march(centers[best][1] - src.lat, centers[best][0] - src.lon, Math.min(14, Math.ceil(bd / STEP_DEG)))
+    }
+  }
+  if (!head) return { pts, added: 0 }
+  return { pts: [...head.slice().reverse(), ...pts], added: head.length }
 }
 
 /**
  * The canonical per-river axis rows — positions and rendered surface heights
  * — shared by the ribbon build in Rivers.tsx and the lazy float index below,
- * so the rendered sheet and the canoe float can never diverge: per-row
- * heights from ribbonRowSurfaceAt, then the downstream monotone smoothing.
+ * so the rendered sheet and the canoe float can never diverge: a lake-outflow
+ * head extension (point 234), per-row heights from ribbonRowSurfaceAt, rows
+ * inside lakes pinned just under their lake sheet, sea rows diving under the
+ * sea plane, then the downstream monotone smoothing over the land rows.
  */
 export function riverAxisRows(river: RiverDef, seed: number): AxisRow[] {
-  const pts = densifyRiver(river.points)
+  const pts = extendSourceIntoLake(densifyRiver(river.points)).pts
   const rows: AxisRow[] = pts.map((p, i) => {
     const s = sampleTerrain(p.lat, p.lon, seed)
-    return {
-      lat: p.lat,
-      lon: p.lon,
-      surf: ribbonRowSurfaceAt(pts, i, seed),
-      bed: s.height,
-      ocean: s.type === 'ocean',
-    }
+    const ocean = s.type === 'ocean'
+    const li = lakeIndexAt(p.lat, p.lon)
+    let surf: number
+    if (ocean) surf = SEA_MERGE_Y
+    else if (li >= 0) surf = Math.max(-0.05, lakeSurfaceY(li, seed) - LAKE_UNDERLAP)
+    else surf = ribbonRowSurfaceAt(pts, i, seed)
+    return { lat: p.lat, lon: p.lon, surf, bed: s.height, ocean, lake: !ocean && li >= 0 }
   })
   const smoothed = smoothRowsDownstream(
     rows.map((r) => r.surf),
-    rows.map((r) => r.ocean),
+    rows.map((r) => r.ocean || r.lake),
   )
   for (let i = 0; i < rows.length; i++) rows[i].surf = smoothed[i]
   return rows
+}
+
+/**
+ * Whether a river renders a spring marker at its head (design.md §11.3): only
+ * where it rises in OPEN LAND — not at a confluence with another river, and
+ * not at a lake (point 234: a source at a lake is an outflow; with the head
+ * extension above, a lake-sourced river's first row lies inside the lake).
+ */
+export function springForRiver(river: RiverDef, rows: AxisRow[]): boolean {
+  const src = rows[0]
+  const nearOtherRiver = RIVERS_DATA.some(
+    (o) =>
+      o.id !== river.id &&
+      o.points.some(([lon, lat]) => Math.hypot(lon - src.lon, lat - src.lat) < 0.3),
+  )
+  return !nearOtherRiver && lakeIndexAt(src.lat, src.lon) < 0
 }
 
 // A ribbon cross-section reaches RIVER_WIDTH_DEG off its axis; add one
@@ -237,8 +328,10 @@ function axisIndex(seed: number): AxisIndex {
   const grid: AxisIndex = new Map()
   for (const river of RIVERS_DATA) {
     // The SAME rows the ribbon renders (211b lift + downstream smoothing).
+    // Sea rows never ride the flood: the mouth bridge stays under the sea
+    // sheet at flood peak (the rendered ribbon zeroes floodK there too).
     for (const row of riverAxisRows(river, seed)) {
-      insertAxisSample(grid, row.lat, row.lon, row.surf, river.id === 'nile')
+      insertAxisSample(grid, row.lat, row.lon, row.surf, river.id === 'nile' && !row.ocean)
     }
   }
   axisIndexCache.set(seed, grid)

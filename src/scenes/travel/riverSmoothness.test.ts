@@ -6,16 +6,21 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   densifyRiver,
+  extendSourceIntoLake,
+  lakeSurfaceY,
   planRibbonStrips,
   ribbonRowSurfaceAt,
   riverAxisRows,
+  SEA_MERGE_Y,
   smoothRowsDownstream,
+  springForRiver,
   SURFACE_LIFT,
 } from './waterSurface'
 import { RIVERS_DATA } from '../../world/data/rivers'
+import { LAKES } from '../../world/data/lakes'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { bedProfiles, rawSampleTerrain } from '../../world/riverProfile'
-import { lakeContains, lakeShoreDistanceExact } from '../../world/hydro'
+import { lakeContains, lakeIndexAt, lakeShoreDistanceExact } from '../../world/hydro'
 import { setupGeodata } from '../../test/geodata'
 
 /** Worst direction change between consecutive densified segments, degrees. */
@@ -228,10 +233,12 @@ describe('longitudinal bed smoothing (point 232)', () => {
 
   it('the downstream smoothing only ever raises a row — 211b holds by construction', () => {
     for (const r of RIVERS_DATA) {
-      const pts = densifyRiver(r.points)
       const rows = riverAxisRows(r, SEED)
+      const pts = rows.map((row) => ({ lat: row.lat, lon: row.lon }))
       for (let i = 0; i < rows.length; i++) {
-        if (rows[i].ocean) continue
+        // Sea rows dive under the sea sheet, lake rows hug their lake sheet
+        // (point 234) — the terrain-clearance floor is about open-land rows.
+        if (rows[i].ocean || rows[i].lake) continue
         expect(rows[i].surf, `${r.id} row ${i}`).toBeGreaterThanOrEqual(
           ribbonRowSurfaceAt(pts, i, SEED) - 1e-9,
         )
@@ -270,5 +277,128 @@ describe('longitudinal bed smoothing (point 232)', () => {
     for (let i = 1; i < (prof?.profile.length ?? 0); i++) {
       expect((prof?.profile[i] ?? 0) - (prof?.profile[i - 1] ?? 0)).toBeLessThanOrEqual(1e-9)
     }
+  })
+})
+
+// Point 234 — smooth river↔water-body transitions: a source at a lake is an
+// OUTFLOW (no spring, the ribbon head overlaps under the lake sheet), a sea
+// mouth merges under the sea sheet with no gap, and a course crossing a lake
+// hugs that lake's sheet.
+describe('river↔water-body transitions (point 234)', () => {
+  const SEED = 42
+
+  beforeAll(async () => {
+    await setupGeodata()
+  })
+
+  const riverById = (id: string) => RIVERS_DATA.find((r) => r.id === id) ?? RIVERS_DATA[0]
+  const lakeIdxById = (id: string) => LAKES.findIndex((l) => l.id === id)
+
+  it('extendSourceIntoLake: the backward march enters the lake and overlaps it (pure)', () => {
+    // A river flowing north whose source stands just off a lake to the south.
+    const pts = [
+      { lat: 0.05, lon: 10 },
+      { lat: 1.0, lon: 10 },
+      { lat: 2.0, lon: 10 },
+    ]
+    const lakeAt = (lat: number) => (lat < 0 ? 0 : -1)
+    const ext = extendSourceIntoLake(pts, lakeAt, [])
+    expect(ext.added).toBeGreaterThan(0)
+    expect(lakeAt(ext.pts[0].lat)).toBe(0) // the head now lies inside the lake
+    // The original course follows unchanged after the prepended head.
+    expect(ext.pts[ext.added]).toEqual(pts[0])
+    expect(ext.pts.length).toBe(pts.length + ext.added)
+  })
+
+  it('extendSourceIntoLake: a shore-parallel course falls back to aiming at the lake centre (pure)', () => {
+    // Backward direction runs due south, the lake lies east — the backward
+    // march never enters it, the centre-aim fallback does.
+    const pts = [
+      { lat: 10, lon: 10 },
+      { lat: 9, lon: 10 },
+      { lat: 8, lon: 10 },
+    ]
+    const lakeAt = (_lat: number, lon: number) => (lon > 10.5 ? 0 : -1)
+    const ext = extendSourceIntoLake(pts, lakeAt, [[10.7, 10]])
+    expect(ext.added).toBeGreaterThan(0)
+    expect(ext.pts[0].lon).toBeGreaterThan(10.5)
+  })
+
+  it('extendSourceIntoLake: a source near no lake stays unchanged (pure)', () => {
+    const pts = [
+      { lat: 10, lon: 10 },
+      { lat: 9, lon: 10 },
+    ]
+    const ext = extendSourceIntoLake(pts, () => -1, [])
+    expect(ext.added).toBe(0)
+    expect(ext.pts).toBe(pts)
+  })
+
+  it('the White Nile flows OUT of Lake Victoria: no spring, head under the lake sheet', () => {
+    const river = riverById('white-nile')
+    const rows = riverAxisRows(river, SEED)
+    const victoria = lakeIdxById('lake-victoria')
+    expect(victoria).toBeGreaterThanOrEqual(0)
+    // The head lies inside Lake Victoria …
+    expect(lakeIndexAt(rows[0].lat, rows[0].lon)).toBe(victoria)
+    // … strictly below the lake sheet (the sheet draws on top, no seam) …
+    const sheet = lakeSurfaceY(victoria, SEED)
+    expect(rows[0].surf).toBeLessThan(sheet)
+    expect(sheet - rows[0].surf).toBeLessThan(0.1) // just beneath, not sunken
+    // … and a lake outflow renders NO spring marker.
+    expect(springForRiver(river, rows)).toBe(false)
+  })
+
+  it('the Blue Nile flows OUT of Lake Tana the same way', () => {
+    const river = riverById('blue-nile')
+    const rows = riverAxisRows(river, SEED)
+    const tana = lakeIdxById('lake-tana')
+    expect(lakeIndexAt(rows[0].lat, rows[0].lon)).toBe(tana)
+    expect(rows[0].surf).toBeLessThan(lakeSurfaceY(tana, SEED))
+    expect(springForRiver(river, rows)).toBe(false)
+  })
+
+  it('open-land sources keep their springs', () => {
+    for (const id of ['congo', 'niger', 'zambezi']) {
+      const river = riverById(id)
+      expect(springForRiver(river, riverAxisRows(river, SEED)), id).toBe(true)
+    }
+  })
+
+  it('every head row inside the source lake hugs that lake sheet (one water body)', () => {
+    const rows = riverAxisRows(riverById('white-nile'), SEED)
+    const victoria = lakeIdxById('lake-victoria')
+    const overlap = rows.filter((r) => r.lake && lakeIndexAt(r.lat, r.lon) === victoria)
+    expect(overlap.length).toBeGreaterThan(0)
+    const sheet = lakeSurfaceY(victoria, SEED)
+    for (const r of overlap) {
+      expect(r.surf).toBeLessThan(sheet)
+      expect(sheet - r.surf).toBeLessThan(0.1)
+    }
+  })
+
+  it('every sea mouth merges UNDER the sea sheet — bridge rows dive below the plane at y=0', () => {
+    let seaMouths = 0
+    for (const r of RIVERS_DATA) {
+      const rows = riverAxisRows(r, SEED)
+      if (!rows[rows.length - 1].ocean) continue // ends inland (confluence/lake)
+      seaMouths++
+      const plan = planRibbonStrips(rows.map((row) => row.ocean))
+      const lastDrawn = plan.drawn.lastIndexOf(true)
+      // The drawn tail row is a sea row sitting under the sea sheet …
+      expect(rows[lastDrawn].ocean, r.id).toBe(true)
+      expect(rows[lastDrawn].surf, r.id).toBeLessThanOrEqual(SEA_MERGE_Y)
+      // … and it CONNECTS to its predecessor: one unbroken strip, no gap.
+      expect(plan.connected[lastDrawn], r.id).toBe(true)
+      expect(plan.strips, r.id).toBe(1)
+    }
+    // The Nile's Rosetta mouth (the reported gap) is among them.
+    expect(seaMouths).toBeGreaterThan(0)
+  })
+
+  it('the sea-merge height stays under the sea plane even at full Nile flood', () => {
+    // The flood rise never applies to sea rows (floodK and the float index
+    // zero it there), and the merge height itself sits below the plane.
+    expect(SEA_MERGE_Y).toBeLessThan(-0.05)
   })
 })

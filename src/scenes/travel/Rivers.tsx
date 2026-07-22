@@ -43,6 +43,7 @@ import {
   planRibbonStrips,
   registerRiverSurfaces,
   riverAxisRows,
+  springForRiver,
   waterSurfaceY,
 } from './waterSurface'
 import {
@@ -119,7 +120,9 @@ function buildRivers(seed: number): {
     // downstream smoothing) so the canoe float reads the identical surface.
     const surf = rows.map((r) => r.surf)
     for (const r of rows) {
-      axisSamples.push({ lat: r.lat, lon: r.lon, surf: r.surf, nile: river.id === 'nile' })
+      // Sea rows never ride the flood (point 234): the mouth bridge stays
+      // under the sea sheet at flood peak (floodK is zeroed there too).
+      axisSamples.push({ lat: r.lat, lon: r.lon, surf: r.surf, nile: river.id === 'nile' && !r.ocean })
     }
 
     // Flow speed: base current plus local slope; boosted near the river's
@@ -159,15 +162,9 @@ function buildRivers(seed: number): {
       })
     }
 
-    // Spring at the source when the river rises in open land (not at a
-    // lake outlet or a confluence with another river).
-    const src = rows[0]
-    const nearOtherRiver = RIVERS_DATA.some(
-      (o) =>
-        o.id !== river.id &&
-        o.points.some(([lon, lat]) => Math.hypot(lon - src.lon, lat - src.lat) < 0.3),
-    )
-    if (!nearOtherRiver && !lakeContains(src.lat, src.lon)) {
+    // Spring at the source when the river rises in open land — never at a
+    // confluence or a lake outflow (point 234; the pure springForRiver).
+    if (springForRiver(river, rows)) {
       springs.push({ x: world[0].x, z: world[0].z, y: surf[0] + 0.06 })
     }
 
@@ -195,7 +192,9 @@ function buildRivers(seed: number): {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
       if (!plan.drawn[i]) continue
       const isOcean = rows[i].ocean
-      if (!isOcean && surf[i] < rows[i].bed - 0.05) buried++
+      // Lake rows hug the LAKE sheet just beneath it (point 234) — they are
+      // covered water by design, not a burial under open terrain.
+      if (!isOcean && !rows[i].lake && surf[i] < rows[i].bed - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)
@@ -208,13 +207,17 @@ function buildRivers(seed: number): {
       uvs.push(arc, 0, arc, 1)
       const f = flowAt(i)
       flows.push(f, f)
-      const fk = river.id === 'nile' ? 1 : 0
+      // Sea rows never ride the flood (point 234): the mouth bridge must
+      // stay under the sea sheet at flood peak.
+      const fk = river.id === 'nile' && !isOcean ? 1 : 0
       floodK.push(fk, fk)
       // A mouth-bridge vertex sits in the sea: no real bank, and it must not count
       // as an interior edge (the bank/foam metric stays about land banks only).
       const bankL = isOcean ? 0 : bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
       const bankR = isOcean ? 0 : bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
-      if (!isOcean) interiorEdges += (1 - bankL) + (1 - bankR)
+      // The interior-edge metric stays about land banks at junctions: rows
+      // inside a lake carry no bank by design (point 234), like sea rows.
+      if (!isOcean && !rows[i].lake) interiorEdges += (1 - bankL) + (1 - bankR)
       banks.push(bankL, bankR)
       // Point 233: per-vertex junction hand-over — a junior arm's water fades
       // out inside its senior partner's band so the shared region blends once.
