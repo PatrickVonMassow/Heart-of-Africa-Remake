@@ -172,13 +172,25 @@ old→new coverage map live in `scripts/verify/README.md`.
 
 ## 6. Working Method
 
-- Work incrementally: small, topically well-scoped commits. Commit after
-  each self-contained system. Prerequisite is an initialized git repository
-  with an initial commit of the scaffold, `design.md` and `CLAUDE.md`; if
-  none exists, run `git init` first and create that initial commit.
-  **Every commit is immediately pushed to the remote (`git push`).** If no
-  remote is configured or the push fails, report that instead of skipping
-  it silently.
+- Work incrementally: small, topically well-scoped commits, one self-contained
+  unit each. Prerequisite is an initialized git repository with an initial
+  commit of the scaffold, `design.md` and `CLAUDE.md`; if none exists, run
+  `git init` first and create that initial commit.
+- **Feature-branch workflow (user decision 22.07.2026).** Each TASKS point is
+  developed on its OWN feature branch (`feat/<point>-<slug>`), branched from
+  `main`. Commit atomically AND immediately push the BRANCH after every commit
+  (durability — nothing stays only local, nothing is lost if a session dies;
+  a failed push is reported, never skipped silently). Merge to `main` ONLY when
+  the point is COMPLETE and verified — tests green on both layers AND, for a
+  render/GUI change, the rendered picture checked on BOTH backends. On merge,
+  resolve any conflict CAREFULLY so nothing breaks, and RE-TEST (re-run the
+  relevant regression) whenever a conflict touched real code. `main` therefore
+  always reflects finished, verified work — it is the deployed branch (the
+  GH-Pages root and the `/poc/` tag build from it). CROSS-CUTTING changes that
+  are not a single feature — guards, docs, the progress dashboard, workflow/
+  process files — are committed directly to `main` (a feature branch for each
+  would be needless ceremony). Use worktree isolation for parallel file-mutating
+  agents so their branches never collide in one tree.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
