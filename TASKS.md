@@ -9628,7 +9628,7 @@ the remaining open points in their numeric order.
   gameplay. NOTE: wildlife cluster (`wildlifeBehavior.ts`/`Wildlife.tsx`) — bundle
   with 249/250/252; this is the lead item of that cluster.
 
-- [ ] 254. NILE RIBBON SHOWS THROUGH LAKE VICTORIA (point-234 side effect) — the
+- [x] 254. NILE RIBBON SHOWS THROUGH LAKE VICTORIA (point-234 side effect) — the
   user reports (22.07.2026, screenshot at Lake Victoria, 0.0N/33.5E) that a Nile
   ribbon SEGMENT shows through / over the lake surface — a visible semi-transparent
   strip on the lake where point 234 extended the White Nile's head INTO Lake
