@@ -8204,6 +8204,18 @@ the remaining open points in their numeric order.
   above-plane shallow floor as shallow WATER (teal) so it reads as sea, not a dark
   wall. Test each against the Nile/normal coast/lakes (the -0.4 sink exists to keep
   the plane off the carved river beds — do not re-flood them).
+  CORRECTION (22.07.2026, water-plane-HIDDEN capture — the decisive test): with the
+  ocean water plane hidden the sea floor is SMOOTH TEAL and the blocky dark "wall"
+  is GONE — so it is NOT the floor/shoal and NOT the terrain colour (the earlier
+  colour-teal fix was rightly wirkungslos, reverted). The wall belongs to the WATER
+  PLANE's own appearance. Coastal ROCK dressing is clearly visible at the shore in
+  that capture, so the leading hypothesis is now SHADOWS: the cascaded shadow map of
+  the coastal rocks + shore relief cast onto the water plane read as dark blocky
+  patches. NEXT (fresh turn): toggle shadows (or the water plane's receiveShadow) —
+  if the patches vanish, soften/limit the shadow on the water surface (or stop the
+  shore rocks/relief casting onto it). If shadows are NOT it, inspect the water
+  material's own depth/opacity term at those exact cells. All height/depth/colour
+  smoothing paths are dead ends — this is a water-plane shading matter now.
   STEPPING NOT RESOLVED (user re-reported 22.07, second screenshot "immer noch
   stufig"). The terrain shelf smoothed the SHORE at the boundary (30.02N/32.62E
   renders as an organic graded coast on WebGL2), but a FRESH render at the user's
