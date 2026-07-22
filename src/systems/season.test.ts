@@ -45,6 +45,16 @@ describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regi
     expect(climateZoneAt(21, 5, 0)).toBe('sahara-south')
   })
 
+  it('keeps the coastal Namib rainless but leaves the semi-arid interior its summer rain (point 223)', () => {
+    // The Atlantic fog desert (west of the ~14E escarpment) is hyper-arid: no rain
+    // in ANY month — the no-longitudinal-term model would otherwise hand it the
+    // interior's summer rain.
+    for (const m of [1, 3, 7, 11, 12]) expect(wet(m, -22.5, 13), `Namib coast month ${m}`).toBe(0)
+    // The interior at the same band (~15E Kaokoveld) is semi-arid and DOES get
+    // Nov-Mar summer rain — it must NOT be dried out with the coast.
+    expect(wet(1, -18.3, 15), 'interior January').toBeGreaterThan(0)
+  })
+
   it('separates the Guinea coast from the Atlantic-facing west coast by LONGITUDE', () => {
     // The August break is a Gulf-of-Guinea upwelling effect; Conakry is unimodal.
     expect(climateZoneAt(ACCRA.lat, ACCRA.lon, 0)).toBe('guinea-coast')

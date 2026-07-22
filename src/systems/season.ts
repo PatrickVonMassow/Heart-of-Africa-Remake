@@ -105,10 +105,19 @@ const ZONE_WETNESS: Record<ClimateZone, number> = {
   cape: 0.5,
 }
 
-/** Cairo and the eastern Libyan Desert: rainless enough that any rain is wrong. */
+/** Hyper-arid deserts where any modelled rain is wrong (point 147/223). The
+ *  wetness model has no longitudinal term, so a latitude-only zone would give the
+ *  rainless coastal Namib the same summer rain as the semi-arid interior at that
+ *  latitude — these boxes carve the truly rainless strips back out. */
 function isHyperArid(lat: number, lon: number): boolean {
   // The eastern Sahara (Libyan Desert) averages ~0.5mm/yr — rainless for years.
-  return lat >= 22 && lat <= 31 && lon >= 22 && lon <= 33
+  if (lat >= 22 && lat <= 31 && lon >= 22 && lon <= 33) return true
+  // The COASTAL Namib (Atlantic fog desert, Angola border to the Orange, west of
+  // the escarpment ~14E): hyper-arid, effectively rainless. NOT the semi-arid
+  // interior at the same latitude (e.g. ~15E Kaokoveld), which does get light
+  // Nov-Mar summer rain, so the eastern edge stays at ~13.8E (point 223).
+  if (lat >= -27 && lat <= -17 && lon >= 10.5 && lon <= 13.8) return true
+  return false
 }
 
 /** Metres above which the Horn's terrain runs the kiremt/belg calendar. */
