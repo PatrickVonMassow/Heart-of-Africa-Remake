@@ -133,12 +133,48 @@ function chunkKey(cx: number, cz: number): string {
 }
 
 /**
+ * Morph one chunk edge onto the coarser neighbour's anchor polyline so the two
+ * adjacent LOD chunks share an IDENTICAL boundary curve — no T-junction crack
+ * (point 220). `anchorH` holds the neighbour-resolution edge samples (length
+ * `edgeSeg + 1`, corners included); each of this chunk's `segments + 1` edge
+ * vertices is placed by linear interpolation between the two bracketing
+ * anchors, so every fine vertex lands exactly on the coarse chord. When
+ * `edgeSeg === segments` (neighbour equal or finer) the result is the identity.
+ * The field the anchors sample (`sampleTerrain`) is deterministic per (lat,lon),
+ * so both sides compute bit-identical edges and meet flush.
+ */
+// Pure helper extracted for unit testing (terrainShading.test.ts); not a component.
+// eslint-disable-next-line react/only-export-components
+export function stitchedEdgeHeights(anchorH: ArrayLike<number>, segments: number): Float32Array {
+  const edgeSeg = anchorH.length - 1
+  const out = new Float32Array(segments + 1)
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * edgeSeg
+    let j = Math.floor(t)
+    if (j >= edgeSeg) j = edgeSeg - 1
+    const frac = t - j
+    out[i] = anchorH[j] * (1 - frac) + anchorH[j + 1] * frac
+  }
+  return out
+}
+
+/**
  * Build one terrain chunk with smooth, seam-free normals: heights are sampled
  * with a one-vertex margin ring and normals derived by central differences,
- * so neighboring chunks agree exactly at their shared edges. A dropped skirt
- * around each chunk hides cracks between different LOD levels.
+ * so neighboring chunks agree exactly at their shared edges. Each shared edge
+ * is additionally stitched to the coarser neighbour's resolution (edgeSegs,
+ * point 220) so a fine chunk meeting a coarse one has no T-junction gap; a
+ * dropped skirt still backs the seam against any residual hairline.
  */
-function buildChunkGeometry(cx: number, cz: number, seed: number, segments: number): THREE.BufferGeometry {
+// Exported for the seam-agreement unit test (terrainShading.test.ts); not a component.
+// eslint-disable-next-line react/only-export-components
+export function buildChunkGeometry(
+  cx: number,
+  cz: number,
+  seed: number,
+  segments: number,
+  edgeSegs: readonly [number, number, number, number] = [segments, segments, segments, segments],
+): THREE.BufferGeometry {
   const n = segments + 1
   const step = CHUNK_SIZE / segments
   const x0 = cx * CHUNK_SIZE
@@ -209,6 +245,48 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
     }
   }
 
+  // Edge index for edge e (0 north/-z, 1 south/+z, 2 west/-x, 3 east/+x) at
+  // along-edge position i (0..segments). Shared by the seam stitch and the
+  // skirt below.
+  const edgeIndex = (e: number, i: number): number => {
+    switch (e) {
+      case 0: return i // north edge (iz = 0)
+      case 1: return (n - 1) * n + i // south edge
+      case 2: return i * n // west edge
+      default: return i * n + (n - 1) // east edge
+    }
+  }
+
+  // Seam stitch (point 220): where a neighbour meshes coarser than this chunk
+  // (edgeSegs[e] < segments), snap this edge's vertices onto the neighbour's
+  // anchor polyline so both chunks share one identical boundary curve — the
+  // T-junction that the SKIRT_DROP skirt could not always hide once the
+  // point-230 mountain doubling put a 112-seg chunk beside a 28/56-seg one.
+  // Only the FINER side morphs (the coarser side has edgeSeg === segments, an
+  // identity); both compute the same deterministic anchors and meet flush.
+  for (let e = 0; e < 4; e++) {
+    const edgeSeg = edgeSegs[e]
+    if (edgeSeg >= segments) continue
+    const anchorH = new Float32Array(edgeSeg + 1)
+    for (let j = 0; j <= edgeSeg; j++) {
+      const f = (j / edgeSeg) * CHUNK_SIZE
+      let x: number
+      let z: number
+      switch (e) {
+        case 0: x = x0 + f; z = z0; break
+        case 1: x = x0 + f; z = z0 + CHUNK_SIZE; break
+        case 2: x = x0; z = z0 + f; break
+        default: x = x0 + CHUNK_SIZE; z = z0 + f; break
+      }
+      const { lat, lon } = worldToLatLon(x, z)
+      anchorH[j] = sampleTerrain(lat, lon, seed).height
+    }
+    const stitched = stitchedEdgeHeights(anchorH, segments)
+    for (let i = 0; i <= segments; i++) {
+      positions[edgeIndex(e, i) * 3 + 1] = stitched[i]
+    }
+  }
+
   const indices: number[] = []
   for (let iz = 0; iz < segments; iz++) {
     for (let ix = 0; ix < segments; ix++) {
@@ -220,16 +298,8 @@ function buildChunkGeometry(cx: number, cz: number, seed: number, segments: numb
     }
   }
 
-  // Skirt: duplicate the border vertices, dropped by SKIRT_DROP. The terrain
-  // material renders double-sided, so winding does not matter here.
-  const edgeIndex = (e: number, i: number): number => {
-    switch (e) {
-      case 0: return i // north edge (iz = 0)
-      case 1: return (n - 1) * n + i // south edge
-      case 2: return i * n // west edge
-      default: return i * n + (n - 1) // east edge
-    }
-  }
+  // Skirt: duplicate the (now stitched) border vertices, dropped by SKIRT_DROP.
+  // The terrain material renders double-sided, so winding does not matter here.
   let sv = n * n
   for (let e = 0; e < 4; e++) {
     const base = sv
@@ -400,23 +470,45 @@ function TerrainChunks() {
     if (center === lastCenter.current) return
     lastCenter.current = center
 
+    // Segment count for the chunk at camera-relative offset (dx,dz), memoized
+    // so the seam stitch can read a chunk's four neighbours (some just outside
+    // the render window) without repeating the 5x5 coast/mountain probes.
+    // Near-ring quality doubling (terrainLod.ts): coast-crossing chunks
+    // (point 209 — the smooth vector shoreline must not re-quantize to mesh
+    // steps) and mountainous chunks (the smooth bicubic relief must not fold
+    // into polyline facets) share one capped doubling. The gates OR together —
+    // either refines once, never twice — and short-circuit so far rings and
+    // flat inland chunks skip the probes.
+    const segsCache = new Map<string, number>()
+    const segsAt = (dx: number, dz: number): number => {
+      const k = `${dx},${dz}`
+      const hit = segsCache.get(k)
+      if (hit !== undefined) return hit
+      const ring = Math.max(Math.abs(dx), Math.abs(dz))
+      const refine =
+        ring <= 4 && (chunkIsCoastal(cx + dx, cz + dz) || chunkIsMountainous(cx + dx, cz + dz))
+      const s = refinedSegments(ring, refine)
+      segsCache.set(k, s)
+      return s
+    }
+
     const keys: string[] = []
     for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
       for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
-        const ring = Math.max(Math.abs(dx), Math.abs(dz))
-        // Near-ring quality doubling (terrainLod.ts): coast-crossing chunks
-        // (point 209 — the smooth vector shoreline must not re-quantize to
-        // mesh steps) and mountainous chunks (the smooth bicubic relief must
-        // not fold into polyline facets) share one capped doubling. The gates
-        // OR together — either refines once, never twice — and short-circuit
-        // so far rings and flat inland chunks skip the probes.
-        const refine =
-          ring <= 4 && (chunkIsCoastal(cx + dx, cz + dz) || chunkIsMountainous(cx + dx, cz + dz))
-        const segments = refinedSegments(ring, refine)
-        const key = `${chunkKey(cx + dx, cz + dz)}:${segments}`
+        const segments = segsAt(dx, dz)
+        // Stitch each shared edge to the coarser neighbour (min of the two res)
+        // so no T-junction crack opens where LOD levels meet (point 220). Order
+        // matches edgeIndex: north/-z, south/+z, west/-x, east/+x.
+        const edgeSegs: [number, number, number, number] = [
+          Math.min(segments, segsAt(dx, dz - 1)),
+          Math.min(segments, segsAt(dx, dz + 1)),
+          Math.min(segments, segsAt(dx - 1, dz)),
+          Math.min(segments, segsAt(dx + 1, dz)),
+        ]
+        const key = `${chunkKey(cx + dx, cz + dz)}:${segments}:${edgeSegs.join(',')}`
         keys.push(key)
         if (!cache.current.has(key)) {
-          cache.current.set(key, buildChunkGeometry(cx + dx, cz + dz, seed, segments))
+          cache.current.set(key, buildChunkGeometry(cx + dx, cz + dz, seed, segments, edgeSegs))
         }
       }
     }
