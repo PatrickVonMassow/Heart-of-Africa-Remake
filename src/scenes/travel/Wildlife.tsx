@@ -33,11 +33,11 @@ import { balance } from '../../config/balance'
 import {
   blockHeading,
   guardEngagement,
-  crossingTarget,
   griefTarget,
-  fleeHeading,
   fleesFromPlayer,
-  fleesPlayerNow,
+  fleeCrossing,
+  resolveFleeTarget,
+  type DramaState,
   flightStep,
   segPointDist,
   gambolState,
@@ -359,6 +359,34 @@ interface LionHuntState {
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
   predator: 'lion', prey: 'zebra', victim: null, victimHunt: false,
+}
+
+/** The COMPLETE co-active drama/hunt state of one animal (point 252), fed to
+ *  the flee arbitration. One builder — never a hand-picked subset at a call
+ *  site — so no §19.8 drama can slip past the player-shy gate through an
+ *  incomplete object (the earlier sites omitted vigil/kick/plunge/trample/
+ *  defending; structurally unreachable while familyHeld suppresses the dodge
+ *  block, but the arbitration must not depend on that ordering). `defending`
+ *  derives from the child-in-peril relations the §19.8 rescue drives key on. */
+function dramaStateOf(a: Animal, isHunted: boolean): DramaState {
+  return {
+    caught: a.caught,
+    fireTrapped: a.fireTrapped,
+    inWater: a.inWater,
+    rescued: a.rescued,
+    mired: a.mired,
+    crossing: a.crossing,
+    vigil: a.vigil,
+    kick: a.kick,
+    plungeTo: a.plungeTo,
+    trampleTo: a.trampleTo,
+    defending:
+      a.child !== undefined && !a.child.dead &&
+      (a.child.caught !== undefined || a.child.inWater !== undefined || a.child.mired !== undefined ||
+        LION_STATE.victim === a.child),
+    isLionVictim: a === LION_STATE.victim,
+    isHunted,
+  }
 }
 
 /** Pointer to the herds of the mounted <Herds>, so <LionHunt> can pick a nearby
@@ -2680,10 +2708,29 @@ function Herds() {
       const ll = worldToLatLon(nx, nz)
       return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
     }
+    // Raw terrain type at a world point — the shape fleeCrossing/crossingTarget
+    // probe the channel with (point 192).
+    const terrainTypeAtWorld = (nx: number, nz: number) => {
+      const ll = worldToLatLon(nx, nz)
+      return sampleTerrain(ll.lat, ll.lon, seed).type
+    }
     // The traveller as a threat source for the player-shy flight (design.md
     // §19): fed into the SAME fleeHeading/held-heading machinery as the
     // elephant dodge — never a second oscillation-prone path.
     const playerThreat: Array<readonly [number, number]> = [[pos.x, pos.z]]
+    // Staged §19.16 bank victim (point 247): a crocodile's current lunge
+    // target, or a drinker whose bank spot lies inside a lurking crocodile's
+    // strike radius (the same distance the lunge trigger measures) — the only
+    // drinkers the narrowed player-shy exemption still holds at their stand.
+    const stagedBankVictim = (a: Animal): boolean => {
+      if (a.drink === undefined) return false
+      const strike = balance.crocodile.strikeRadius
+      for (const c of herds.crocodile) {
+        if (c.lunge !== undefined && c.lunge.victim === a) return true
+        if (!c.dead && Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z) <= strike) return true
+      }
+      return false
+    }
     const elephantPos: Array<[number, number]> = []
     {
       const list = herds.elephant
@@ -3235,35 +3282,58 @@ function Herds() {
             // Player shyness (design.md §19): ANY juvenile — even of a stout
             // species whose adults stand their ground — bolts from the nearby
             // traveller before play/follow resume, through the SAME held dodge
-            // heading as the adult flight (fleeHeading → turnToward under the
-            // dodge's own hysteresis ring and turn cap — no second
-            // oscillation-prone path). The dramas above own their claims, and
-            // a drink errand (incl. the staged §19.16 bank victims) is never
-            // interrupted.
+            // heading as the adult flight (turnToward under the dodge's own
+            // hysteresis ring and turn cap — no second oscillation-prone
+            // path). The dramas above own their claims; the arbitration is
+            // the ONE shared resolver (point 252) with the FULL drama state —
+            // a hunted calf takes its chase-victim branch above, so this
+            // follow branch is reached only by a free calf, but the resolver's
+            // gate keeps the invariant explicit and ordering-independent.
+            // Calves never dart from elephants (the herd is their shield, and
+            // the §19.8 trample drama needs them catchable), so the elephant
+            // threat list stays empty here. The drink exemption is NARROWED
+            // (point 247): only the staged §19.16 bank victims keep their
+            // stand — a plain drinking juvenile bolts like any calf.
             const shyRing = a.dodgeHeading === undefined ? PLAYER_SHY_RADIUS : PLAYER_SHY_RADIUS * PREY_PANIC_EXIT
-            // Priority ordering (point 252): a calf in a hunt/drama state ignores
-            // the player-shy flee — a hunted calf takes its own chase-victim
-            // branch above, so this follow branch is reached only by a free calf,
-            // but the drama gate keeps the invariant explicit and robust.
-            const shyTarget =
-              a.drink === undefined &&
-              fleesPlayerNow(sp, true, balance.parentDefense.preyWeapon, {
-                caught: a.caught,
-                fireTrapped: a.fireTrapped,
-                inWater: a.inWater,
-                rescued: a.rescued,
-                mired: a.mired,
-                crossing: a.crossing,
-                isLionVictim: a === LION_STATE.victim,
-              })
-                ? fleeHeading(a.x, a.z, playerThreat, shyRing)
-                : null
-            if (shyTarget !== null) {
+            const shyPick = resolveFleeTarget(
+              a.x,
+              a.z,
+              {
+                species: sp,
+                isJuvenile: true,
+                preyWeapon: balance.parentDefense.preyWeapon,
+                drama: dramaStateOf(a, false),
+                drinking: a.drink !== undefined,
+                stagedBankVictim: stagedBankVictim(a),
+              },
+              [],
+              playerThreat,
+              0,
+              shyRing,
+            )
+            if (shyPick !== null) {
               a.hop = undefined
               a.boutDetour = undefined
               a.dodgeHeading =
-                a.dodgeHeading === undefined ? shyTarget : turnToward(a.dodgeHeading, shyTarget, PREY_DODGE_TURN * dt)
+                a.dodgeHeading === undefined
+                  ? shyPick.heading
+                  : turnToward(a.dodgeHeading, shyPick.heading, PREY_DODGE_TURN * dt)
               const shyStep = deflectedStep(a.x, a.z, a.dodgeHeading, PLAYER_SHY_SPEED * dt, waterBlockedAt, 0.8)
+              // Boxed against the water by the approaching traveller (point
+              // 248): cross the river/lake like the predator-fleeing prey
+              // does (point 192) instead of pinning at the waterline. The
+              // crossing (a drama state) then owns the calf and silences the
+              // player-shy flee until it lands.
+              const esc = fleeCrossing(
+                shyStep.moved,
+                a.crossing !== undefined,
+                a.x,
+                a.z,
+                a.dodgeHeading,
+                balance.waterCross.maxUnits,
+                terrainTypeAtWorld,
+              )
+              if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
               a.x = shyStep.x
               a.z = shyStep.z
               { // ground-follow (point 203(A)): a mover carries its own standing height
@@ -3439,14 +3509,19 @@ function Herds() {
             // water on purpose — this only swaps the blocked predicate then.
             const fleeH = Math.atan2(dx, dz)
             const fleeStep = deflectedStep(a.x, a.z, fleeH, FLEE_SPEED * urgency * dt, waterBlockedAt, 0.8)
-            if (!fleeStep.moved && a.crossing === undefined) {
-              // Boxed against the water with the predator behind (point 192):
-              // flee INTO the water — predators do not follow into the deep.
-              // Only across river/lake (crossingTarget refuses the ocean).
-              const esc = crossingTarget(a.x, a.z, fleeH, balance.waterCross.maxUnits, (nx, nz) => {
-                const nll = worldToLatLon(nx, nz)
-                return sampleTerrain(nll.lat, nll.lon, seed).type
-              })
+            // Boxed against the water with the predator behind (point 192):
+            // flee INTO the water — predators do not follow into the deep.
+            // Shared fleeCrossing rule (river/lake only, never the ocean).
+            {
+              const esc = fleeCrossing(
+                fleeStep.moved,
+                a.crossing !== undefined,
+                a.x,
+                a.z,
+                fleeH,
+                balance.waterCross.maxUnits,
+                terrainTypeAtWorld,
+              )
               if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
             }
             a.x = fleeStep.x
@@ -3487,37 +3562,41 @@ function Herds() {
           // on and off at the ring.
           const engaged = a.dodgeHeading !== undefined
           const ring = engaged ? PREY_PANIC_RADIUS * PREY_PANIC_EXIT : PREY_PANIC_RADIUS
-          const eTarget = FLEES_LION[sp] ? fleeHeading(a.x, a.z, elephantPos, ring) : null
           const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
-          // A drinker keeps its bank errand (and the staged §19.16 drama
-          // victims their stand) — shyness never claims an animal mid-errand.
-          // Priority ordering (point 252): a predator/drama state OUTRANKS the
-          // player-shy flee. A prey actively fleeing the lion (the 3411 block
-          // fired) or the hunt's designated victim keeps fleeing the LION, not
-          // the traveller — so the hunt/drama always resolves rather than
-          // stalling when the player wanders near. The elephant dart (eTarget)
-          // stays a higher priority still.
-          const pTarget =
-            a.drink === undefined &&
-            fleesPlayerNow(sp, !!a.young, balance.parentDefense.preyWeapon, {
-              caught: a.caught,
-              fireTrapped: a.fireTrapped,
-              inWater: a.inWater,
-              rescued: a.rescued,
-              mired: a.mired,
-              crossing: a.crossing,
-              isLionVictim: a === LION_STATE.victim,
-              isHunted: fleeingLion,
-            })
-              ? fleeHeading(a.x, a.z, playerThreat, shyRing)
-              : null
-          const target = eTarget !== null ? eTarget : pTarget
-          if (target !== null) {
+          // THE arbitration point (point 252): resolveFleeTarget ranks every
+          // co-active threat — drama > predator flee (the block above, fed in
+          // as isHunted) > elephant dart > player-shy > idle. A prey actively
+          // fleeing the lion or the hunt's designated victim keeps fleeing
+          // the LION, not the traveller — so the hunt/drama always resolves
+          // rather than stalling when the player wanders near — while the
+          // elephant dart stays live even then. The drink exemption is
+          // NARROWED (point 247): staged §19.16 bank victims and adult
+          // drinkers keep their stand/errand, a plain drinking juvenile
+          // bolts. Both sources feed ONE dodgeHeading under the capped
+          // turnToward, so a hand-over between them turns smoothly and never
+          // flip-flops (the point-237 steady-escape rule ACROSS sources).
+          const pick = resolveFleeTarget(
+            a.x,
+            a.z,
+            {
+              species: sp,
+              isJuvenile: !!a.young,
+              preyWeapon: balance.parentDefense.preyWeapon,
+              drama: dramaStateOf(a, fleeingLion),
+              drinking: a.drink !== undefined,
+              stagedBankVictim: stagedBankVictim(a),
+            },
+            FLEES_LION[sp] ? elephantPos : [],
+            playerThreat,
+            ring,
+            shyRing,
+          )
+          if (pick !== null) {
             a.dodgeHeading =
-              a.dodgeHeading === undefined ? target : turnToward(a.dodgeHeading, target, PREY_DODGE_TURN * dt)
+              a.dodgeHeading === undefined ? pick.heading : turnToward(a.dodgeHeading, pick.heading, PREY_DODGE_TURN * dt)
             // The elephant dart stays deliberately slower than the herd (the
             // trample must remain possible); a pure player flight runs.
-            const spd = eTarget !== null ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
+            const spd = pick.source === 'elephant' ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
             // Deflect the dart along a bank instead of into the water (points
             // 201/197): the raw step ran the dodge onto a water cell where the
             // backstop teleported it back — a vibrating pin at the waterline.
@@ -3531,14 +3610,20 @@ function Herds() {
               sp === 'flamingo' ? oceanBlockedAt : waterBlockedAt,
               0.8,
             )
-            if (sp !== 'flamingo' && !dodgeStep.moved && a.crossing === undefined) {
+            if (sp !== 'flamingo') {
               // Boxed against the water with the threat bearing down (point
               // 192): rather than be caught, take to the water — the herd
-              // does not follow into the deep. River/lake only.
-              const esc = crossingTarget(a.x, a.z, a.dodgeHeading, balance.waterCross.maxUnits, (nx, nz) => {
-                const nll = worldToLatLon(nx, nz)
-                return sampleTerrain(nll.lat, nll.lon, seed).type
-              })
+              // does not follow into the deep. Shared fleeCrossing rule
+              // (river/lake only, never the ocean).
+              const esc = fleeCrossing(
+                dodgeStep.moved,
+                a.crossing !== undefined,
+                a.x,
+                a.z,
+                a.dodgeHeading,
+                balance.waterCross.maxUnits,
+                terrainTypeAtWorld,
+              )
               if (esc) a.crossing = { tx: esc.tx, tz: esc.tz, time: 0 }
             }
             a.x = dodgeStep.x
@@ -3565,7 +3650,7 @@ function Herds() {
           // Birds fly off (design.md §19): the climb ramps while the shy
           // flight is engaged and settles once it ends — blended, never a pop.
           if (sp === 'flamingo') {
-            if (target !== null) a.flyLift = Math.min(1, (a.flyLift ?? 0) + dt * 1.5)
+            if (pick !== null) a.flyLift = Math.min(1, (a.flyLift ?? 0) + dt * 1.5)
             else if (a.flyLift !== undefined) {
               a.flyLift -= dt * 0.8
               if (a.flyLift <= 0) a.flyLift = undefined
