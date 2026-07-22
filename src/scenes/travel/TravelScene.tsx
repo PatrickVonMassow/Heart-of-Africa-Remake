@@ -33,7 +33,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
-import { crownCollapse, drynessFromTint, groundSprout, seasonTintNode } from '../../render/seasonTint'
+import { crownCollapse, drynessFromTint, FLORA_COLOR_LIFT, groundSprout, seasonTintNode } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
@@ -874,9 +874,12 @@ function getVegetationMeshes(): VegetationMeshes {
   // ~329) but the flora never got the matching lift, and the crown greens are
   // intrinsically dark (~6-18% luminance) — under the filmic tone mapping the
   // trees read as NEAR-BLACK silhouettes even on their sunlit tops (the first
-  // find of the point-203 visual sweep, user-confirmed a bug). 1.9 keeps the
-  // crowns a step darker than the boosted ground so they still read as foliage.
-  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintAttrNode()).mul(1.9)
+  // find of the point-203 visual sweep, user-confirmed a bug). The shared
+  // FLORA_COLOR_LIFT (1.9, gated with the crown colours in flora.test.ts)
+  // keeps the crowns a step darker than the boosted ground so they still read
+  // as foliage. The Central reopen's remaining darkness was the JUNGLE crown
+  // palette itself (sRGB->linear trap, fixed in buildJungleTree), not this lift.
+  material.colorNode = seasonTintNode(vertexColor().rgb, seasonFieldTintAttrNode()).mul(FLORA_COLOR_LIFT)
   const base = {} as Record<Species, THREE.InstancedMesh>
   const crown: Partial<Record<Species, THREE.InstancedMesh>> = {}
   const makeMesh = (geo: THREE.BufferGeometry, cap: number): THREE.InstancedMesh => {

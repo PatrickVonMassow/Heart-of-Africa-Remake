@@ -24,7 +24,7 @@ import {
   vec3,
   vertexColor,
 } from 'three/tsl'
-import { SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
+import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
@@ -1476,7 +1476,7 @@ export function PlaceScene() {
     m.roughness = 0.9
     // Same brightness lift as the travel flora (point 206): without it the
     // settlement trees read as near-black silhouettes at eye height too.
-    m.colorNode = seasonTintNode(vertexColor().rgb).mul(1.9)
+    m.colorNode = seasonTintNode(vertexColor().rgb).mul(FLORA_COLOR_LIFT)
     m.positionNode = seasonFoliagePosition() // baked attribute, point 144 retry
     return m
   }, [])
