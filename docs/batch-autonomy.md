@@ -49,13 +49,39 @@ outside the agent's control.
 | 11 | Batch stuck on one item (needs data / a user decision) | the guard says "pick a DIFFERENT open item"; only if ALL are user-blocked does it pause with a `Von dir zu klären` card | correct behaviour — nothing to do without the user |
 | 12 | Scheduled task deleted (by the user or a cleanup tool) | — | not recoverable by the agent; re-create with the command below |
 
-## The one true residual (NOT in the agent's control)
+## Extra hardening after the reboot/visibility probing (22.07)
 
-`claude` needs the user's **interactive, logged-in Windows profile** for its stored
-authentication. If the user is **not logged in** (a forced-update reboot left the
-machine at the lock screen, or the user logged off), no mechanism can run an
-*authenticated* Claude — auth lives in the user profile. This is a hard limit of
-running an authenticated agent, not a hole to patch.
+- **Resurrection actually resumes.** The launcher spawns at 12-min lock staleness,
+  but the SessionStart hook treats a lock as "held by another live session" until
+  45-min `STALE_MS` — so a spawned session would have refused to resume in that
+  window. The launcher now writes a one-shot `autostart-authorized` marker;
+  SessionStart, seeing it, claims the lock and resumes regardless of lock age.
+- **A live lock never falsely reads dead.** `scripts/lock-heartbeat-hook.mjs`
+  (PostToolUse, every tool) refreshes `claimedAt` continuously, so a long working
+  turn cannot age the lock past the launcher's window and trigger a redundant
+  (now-authorized, colliding) spawn.
+- **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
+  the allow-list (a permission prompt would hang the unattended run). The launcher
+  sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.
+
+## The two true residuals (NOT in the agent's control)
+
+1. **Auth needs a logged-in profile.** `claude` needs the user's interactive,
+   logged-in Windows profile for its stored authentication. If the user is **not
+   logged in** (a forced-update reboot left the machine at the lock screen, or the
+   user logged off), no mechanism can run an *authenticated* Claude. It resumes the
+   moment the user logs in.
+
+2. **The headless resume is INVISIBLE in the VS Code chat.** The scheduler runs
+   `claude -p` in the background — it keeps the batch WORKING (commits pushed to
+   GitHub) but does **not** open VS Code or a Claude chat, so the user sees no live
+   output there after a reboot. VS Code is not in autostart, and even if it were,
+   the extension does not auto-open a resuming chat — there is no CLI/API to trigger
+   it. The live dashboard artifact also likely does not update headlessly (publishing
+   needs the claude.ai connection a `-p` run may lack). So while the user is away the
+   batch progresses and is visible on **GitHub**; the live chat + dashboard resume
+   when the user reopens VS Code + a Claude chat (SessionStart then resumes visibly).
+   This is a hard limit of an interactive-extension chat, not a hole to patch.
 
 Mitigation, and why it is small in practice: the moment the user logs in, the task
 resurrects the batch (promptly, thanks to `StartWhenAvailable` + the boot-time
