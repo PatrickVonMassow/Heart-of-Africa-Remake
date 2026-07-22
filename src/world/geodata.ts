@@ -114,9 +114,31 @@ function gridPos(lat: number, lon: number): { x: number; y: number } {
   }
 }
 
+// point 215: Mitchell-Netravali cubic kernel (B=C=1/3). Bilinear elevation was
+// only C0-smooth — every DEM texel boundary is a gradient crease that the terrain
+// mesh renders as a polygon fold ("angular relief"). A bicubic sample makes the
+// height field C1-smooth so terrain, rivers, the backdrop and the through-water
+// sea floor all read smooth at the source. Mitchell (over Catmull-Rom) bounds the
+// overshoot that would otherwise invent phantom peaks/pits at coasts and basins.
+function mitchell(t: number): number {
+  const B = 1 / 3
+  const C = 1 / 3
+  const x = Math.abs(t)
+  if (x < 1) return ((12 - 9 * B - 6 * C) * x * x * x + (-18 + 12 * B + 6 * C) * x * x + (6 - 2 * B)) / 6
+  if (x < 2) return ((-B - 6 * C) * x * x * x + (6 * B + 30 * C) * x * x + (-12 * B - 48 * C) * x + (8 * B + 24 * C)) / 6
+  return 0
+}
+
+/** The four separable cubic weights for a fractional offset f in [0,1) — taps at
+ *  the grid points -1,0,+1,+2 relative to floor. */
+function cubicWeights(f: number): [number, number, number, number] {
+  return [mitchell(f + 1), mitchell(f), mitchell(f - 1), mitchell(f - 2)]
+}
+
 /**
- * Bilinear real elevation in meters. Outside the dataset (open Atlantic /
- * Indian Ocean / Mediterranean beyond the bbox) returns deep ocean.
+ * Bicubic (Mitchell-Netravali) real elevation in meters. Outside the dataset
+ * (open Atlantic / Indian Ocean / Mediterranean beyond the bbox) returns deep
+ * ocean. C1-smooth so the terrain relief reads without polygon facets (point 215).
  */
 export function elevationAt(lat: number, lon: number): number {
   if (!pixels || !meta) return 0
@@ -127,16 +149,20 @@ export function elevationAt(lat: number, lon: number): number {
   const { x, y } = gridPos(lat, lon)
   const x0 = Math.floor(x)
   const y0 = Math.floor(y)
-  const fx = x - x0
-  const fy = y - y0
+  const wx = cubicWeights(x - x0)
+  const wy = cubicWeights(y - y0)
   const p = pixels
-  const e00 = p[texel(x0, y0)] * 256 + p[texel(x0, y0) + 1]
-  const e10 = p[texel(x0 + 1, y0)] * 256 + p[texel(x0 + 1, y0) + 1]
-  const e01 = p[texel(x0, y0 + 1)] * 256 + p[texel(x0, y0 + 1) + 1]
-  const e11 = p[texel(x0 + 1, y0 + 1)] * 256 + p[texel(x0 + 1, y0 + 1) + 1]
-  const top = e00 + (e10 - e00) * fx
-  const bot = e01 + (e11 - e01) * fx
-  return top + (bot - top) * fy - m.offsetMeters
+  let v = 0
+  for (let j = 0; j < 4; j++) {
+    const gy = y0 - 1 + j
+    let row = 0
+    for (let i = 0; i < 4; i++) {
+      const t = texel(x0 - 1 + i, gy)
+      row += (p[t] * 256 + p[t + 1]) * wx[i]
+    }
+    v += row * wy[j]
+  }
+  return v - m.offsetMeters
 }
 
 /**
