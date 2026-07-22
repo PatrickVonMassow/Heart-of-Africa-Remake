@@ -26,6 +26,7 @@ import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
+import { landFractionAt } from '../../world/geodata'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
@@ -100,6 +101,27 @@ const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 /** LOD: mesh resolution per chunk by Chebyshev ring distance. */
 function lodSegments(ring: number): number {
   return ring <= 2 ? 56 : ring <= 4 ? 28 : 20
+}
+
+// point 209: a chunk straddling the sea coast gets a finer mesh, so the smooth
+// vector shoreline (terrain.ts derives the near-coast land fraction from the
+// vector signed distance) is not re-quantized to blocky steps by the coarse
+// LOD vertex spacing. Detected cheaply from the raster land mask at a 5x5 grid
+// — a mix of sea and land in the chunk means the coast crosses it.
+function chunkIsCoastal(cx: number, cz: number): boolean {
+  const x0 = cx * CHUNK_SIZE
+  const z0 = cz * CHUNK_SIZE
+  let sea = false
+  let land = false
+  for (let iz = 0; iz <= 4; iz++) {
+    for (let ix = 0; ix <= 4; ix++) {
+      const { lat, lon } = worldToLatLon(x0 + (ix / 4) * CHUNK_SIZE, z0 + (iz / 4) * CHUNK_SIZE)
+      if (landFractionAt(lat, lon) < 0.5) sea = true
+      else land = true
+      if (sea && land) return true
+    }
+  }
+  return false
 }
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
@@ -381,7 +403,10 @@ function TerrainChunks() {
     for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
       for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
         const ring = Math.max(Math.abs(dx), Math.abs(dz))
-        const segments = lodSegments(ring)
+        let segments = lodSegments(ring)
+        // point 209: double the resolution of near coast-crossing chunks (capped)
+        // so the smooth vector shoreline reads smooth instead of mesh-stepped.
+        if (ring <= 4 && chunkIsCoastal(cx + dx, cz + dz)) segments = Math.min(112, segments * 2)
         const key = `${chunkKey(cx + dx, cz + dz)}:${segments}`
         keys.push(key)
         if (!cache.current.has(key)) {
