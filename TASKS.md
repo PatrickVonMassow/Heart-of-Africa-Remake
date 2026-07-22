@@ -7430,7 +7430,21 @@ the remaining open points in their numeric order.
   until ALL read values are stable. Speeds up every run ~15-20 s AND de-flakes.
   REMAINING drama flakes still rotating (cushioned by the retry, to root-cause
   for the closing's strict 3x gate): point-102 vicinity count, plover 145b,
-  calf-play, parent-guards-calf, the crocodile-spawn cluster. TRIPWIRE-TRANSIENT
+  calf-play, parent-guards-calf, the crocodile-spawn cluster.
+  PROGRESS 22.07: the lone-scavenger-185 landing is now DETERMINISTIC (commit
+  f76dc3d) — before polling, remove other carcasses from its target pool + shove
+  nearby live animals clear + commit the bird to the injected carcass. CLOSING
+  NOTES for the others (do NOT repeat these dead ends): (a) the vicinity-102
+  budget must NOT simply be widened — MORE sim time lets the seeded grazers
+  WANDER out of the leave-point radius (the code comment says exactly this), so a
+  bigger budget is counterproductive; fix by counting from the settlement ANCHOR
+  (where the seeder guarantees the min) or by pinning the count to the immediate
+  post-leave moment. (b) calf-play (samples:0): a calf gambols only ~25% duty
+  (GAMBOL 4s/16s) AND canPlay needs no active lion + calf near its parent (not
+  play-locked) + a CALF_HUNT_SPECIES; force a young calf beside its parent with
+  playLock cleared so it stays play-eligible through the poll. (c) plover-145b
+  (dead:true): the bird dies before its broken-wing act — keep it alive / force
+  its lure state. TRIPWIRE-TRANSIENT
   ROBUSTNESS (for the closing's 3× flake-free): the point-203A anchoring tripwire
   intermittently fires ONE console-error per several enrichments runs on a rare
   1-frame anchoring transient at a state transition — observed a floating
