@@ -43,17 +43,15 @@ function git(args) {
   }).trim()
 }
 
-/** HEAD counts as pushed once origin/main contains it (local ref, no network). */
+/** HEAD counts as pushed once ANY origin ref contains it (local refs, no
+ *  network). Feature branches push to origin/feat/<point>-<slug>, so the old
+ *  origin/main-only ancestor check silenced the guard for ALL branch work —
+ *  a red branch run would have gone unnoticed until the merge. */
 function isPushed(head) {
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', head, 'origin/main'], {
-      cwd: REPO_ROOT,
-      timeout: 5000,
-      stdio: 'ignore',
-    })
-    return true
+    return git(['branch', '-r', '--contains', head]).length > 0
   } catch {
-    return false // not pushed yet (or no origin/main) — nothing to check
+    return false // unknown sha / no remote refs — nothing to check
   }
 }
 

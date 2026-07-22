@@ -13,7 +13,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # main AND the per-point feature branches (feature-branch workflow,
+    # CLAUDE.md §6): branch pushes must run the fast gate too, or days of
+    # branch commits reach the merge with zero CI coverage.
+    branches: [main, 'feat/**']
   pull_request:
   workflow_dispatch:
 
