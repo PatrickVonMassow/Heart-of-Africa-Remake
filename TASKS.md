@@ -8583,6 +8583,65 @@ the remaining open points in their numeric order.
   not floating; re-assert the point-156 village clearances stay green. DOCS:
   design.md §4.2/§11.3; CLAUDE §7.1 pt.3/4 if clearance wording changes.
 
+- [ ] 219. SPRINGS render as an ugly symbolic RING — replace with something nicer,
+  ANIMATED, that reads as a real spring (user 22.07.2026). A river that rises in
+  open land gets a spring marker (`Rivers.tsx`, the `springs` build + its mesh).
+  Redesign: a small animated water source — e.g. a little pool with rising
+  bubbles / concentric ripples emanating, or a low bubbling upwelling — that reads
+  as a spring at the bird's-eye zoom, not a flat ring. Keep it cheap (a few
+  instanced quads / a shader ripple), region-neutral. VERIFIABLE: the spring dev
+  hook still reports ≥1 spring; a rendered close-up shows the animated source, both
+  backends. DOCS: design.md §11.3.
+
+- [ ] 220. TERRAIN CHUNK SEAM / CRACK — a vertical "crack in the ground" runs
+  through the bird's-eye terrain (user 22.07.2026, deployed build, right of the
+  player). It is a chunk-boundary seam: adjacent LOD chunks don't meet flush and
+  the `SKIRT_DROP` skirt doesn't fully hide the gap. Anchor:
+  `TravelScene.tsx` `buildChunkGeometry` (margin ring + skirts) + `lodSegments`.
+  DIAGNOSE: with the point-215 bicubic elevation the shared edge heights are now
+  deterministic per (lat,lon) so a T-junction/LOD-mismatch gap (fine vs coarse
+  neighbour) or an insufficient skirt depth is the likely cause. FIRST re-check on
+  the current build (bicubic may already have closed value gaps); if a crack
+  remains, deepen/repair the skirt or match edge sampling across LOD levels.
+  VERIFIABLE: a driven pass over a chunk boundary shows no seam (screenshot), both
+  backends; pure test if a helper changes. DOCS: design.md §3.3.
+
+- [ ] 221. WALKING ARBITRARILY FAR INTO THE OCEAN — the player can wade a variable,
+  sometimes very large distance into open sea (user 22.07.2026, screenshot: far out
+  in deep blue at ~32.2S/16.9E), sometimes only a little. The §11.2 swim margin (a
+  calibratable near-shore band) is inconsistent. Anchor: the swim-margin / ocean
+  walkability (`terrain.ts` isBlocked + the coastal band, `redSea.ts`, and the
+  runtime margin edit noted in redSea.test.ts). DIAGNOSE: why the swimmable band
+  reaches far offshore in places — coast-distance saturation, the widened band, or
+  a hull rule. FIX so the wadeable band is a consistent, modest near-shore width
+  everywhere (deep open ocean blocks). VERIFIABLE: sweep offshore points along
+  several coasts — beyond the band all block; pure-test the band width; a live check
+  the player cannot reach deep water. DOCS: design.md §11.2; keep every
+  redSea.test.ts verdict.
+
+- [ ] 222. ANIMALS STUCK INSIDE EACH OTHER — two animals overlap/interpenetrate and
+  stay (user 22.07.2026, screenshot at a waterline). The §19.5 body separation
+  should push them apart but fails here — likely because both are pinned against
+  the water by the ocean/edge backstop, so the separation force can't resolve.
+  Anchor: `Wildlife.tsx` body separation + the water/edge setback. FIX: the
+  separation must resolve even at a water/coast edge (resolve along the shore
+  tangent, or let one cross/step back before re-pinning). VERIFIABLE: extend the
+  body-spacing pure test to the pinned-at-edge case; a live/staged pair at a
+  waterline parts within moments (enrichments). DOCS: design.md §19.5.
+
+- [ ] 223. RAIN IN THE HYPER-ARID DESERT? — plausibility check (user 22.07.2026):
+  rain rendered at ~18.3S/15E (Namib/Kalahari edge) in late November. The interior
+  has a Nov-Mar summer wet season (plausible), but the western/coastal NAMIB is
+  hyper-arid (fog desert, ~rainless). VERIFY the wetness model (`season.ts`
+  `climateZoneAt`/the rain curve, against `docs/climate-1890.md`) at the exact
+  coastal-Namib band: it must read ~rainless year-round there (the point-147 class
+  of bug — a desert that should be bone dry showing rain). If the Namib coast gets
+  modeled rain, fix the zone/curve so the hyper-arid strip stays dry while the
+  interior keeps its summer rains. VERIFIABLE: sweep the Namib coast months through
+  `climateZoneAt` (rainless) vs the interior (Nov-Mar wet), pure-tested against the
+  research; live pixel check no rain on the coastal Namib. DOCS: docs/climate-1890.md
+  §, design.md §19.13; update the peoples/climate implementation sections in lockstep.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this

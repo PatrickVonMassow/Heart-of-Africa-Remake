@@ -16,7 +16,10 @@
 // Fail-open is the WRAPPER's job; this core must never throw on partial input.
 
 /** The bug-FINDING / QA-framework point numbers; every other open point is a fix. */
-export const FINDER_POINTS = new Set([181, 184, 203, 204, 205, 207])
+// The big bug-FINDING / QA-framework block (worked after the known-bug fixes).
+// 181 is a concrete WebGPU BUG (a fix), not a finder — it is intentionally NOT
+// here, so it may sit among the fixes ahead of the finder/closing block.
+export const FINDER_POINTS = new Set([184, 203, 204, 205, 207])
 
 /** The release tag is always last and exempt from the order rule. */
 export const RELEASE_TAG_POINT = 174
