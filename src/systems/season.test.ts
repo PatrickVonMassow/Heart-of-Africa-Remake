@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, wetnessAt, type StrikeSchedulerState } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, wetnessAt, type ClimateZone, type StrikeSchedulerState } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -53,6 +53,20 @@ describe('climateZoneAt (docs/climate-1890.md §3 — regimes, not the game regi
     // The interior at the same band (~15E Kaokoveld) is semi-arid and DOES get
     // Nov-Mar summer rain — it must NOT be dried out with the coast.
     expect(wet(1, -18.3, 15), 'interior January').toBeGreaterThan(0)
+  })
+
+  it('extends the fog-desert gate over the Iona/Namibe coast in Angola, sparing the wet interior (point 223)', () => {
+    // The northern continuation of the same Benguela-current desert (~15-17S). It
+    // sat NORTH of the old gate's -17 edge, so Namibe (~15.2S, 12.2E) greened to
+    // 1.0 and rained in January on ~50mm/yr desert — the exact fog-coast-reads-
+    // like-its-wet-interior class the longitudinal gap creates.
+    for (const m of [1, 3, 7, 11, 12]) expect(wet(m, -15.2, 12.2), `Namibe coast month ${m}`).toBe(0)
+    expect(wet(1, -16, 12.5), 'Iona desert January').toBe(0)
+    // The named neighbour that must NOT be dried: the Angolan plateau just inland
+    // (~15S, 15E) keeps its Nov-Mar summer rain — the escarpment, not the coast.
+    expect(wet(1, -15, 15), 'Angolan plateau January').toBeGreaterThan(0.3)
+    // And the Okavango's own Angolan source (the flood feeder) is untouched.
+    expect(wet(1, -12.5, 16), 'Okavango source January').toBeGreaterThan(0.3)
   })
 
   it('separates the Guinea coast from the Atlantic-facing west coast by LONGITUDE', () => {
@@ -230,6 +244,166 @@ describe('wetnessAt (the findings that must survive any refactor)', () => {
         }
       }
     }
+  })
+})
+
+describe('weather x terrain plausibility sweep (point 223 — every settlement in a real regime)', () => {
+  // Every port and village heartland (src/world/geo.ts) at its real ~1890
+  // position, with an approximate real elevation (the DEM's value in game), the
+  // zone the model must place it in, and the calendar class its rainfall must
+  // obey. This is the repeatable audit: a settlement drifting into an
+  // implausible zone, or a desert sprouting a wet season, fails here.
+  type Regime = 'desert' | 'winter-rain' | 'summer-rain' | 'sahel' | 'arid-bimodal'
+    | 'guinea-bimodal' | 'equatorial-hard-dry' | 'rainforest' | 'unimodal-summer'
+    | 'east-bimodal' | 'kiremt'
+  const SETTLEMENTS: Array<{ id: string; lat: number; lon: number; elev: number; zone: ClimateZone; regime: Regime }> = [
+    // Ports
+    { id: 'cairo', lat: 30.05, lon: 31.55, elev: 20, zone: 'sahara-north', regime: 'desert' },
+    { id: 'tangier', lat: 35.6, lon: -5.75, elev: 20, zone: 'mediterranean', regime: 'winter-rain' },
+    { id: 'khartoum', lat: 15.5, lon: 32.15, elev: 380, zone: 'sahel', regime: 'sahel' },
+    { id: 'st-louis', lat: 15.9, lon: -16.2, elev: 4, zone: 'sahel', regime: 'sahel' },
+    { id: 'timbuktu', lat: 16.95, lon: -3.0, elev: 260, zone: 'sahel', regime: 'sahel' },
+    { id: 'lagos', lat: 6.55, lon: 3.4, elev: 40, zone: 'guinea-coast', regime: 'guinea-bimodal' },
+    { id: 'boma', lat: -5.53, lon: 13.05, elev: 10, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'berbera', lat: 10.3, lon: 45.0, elev: 10, zone: 'horn', regime: 'arid-bimodal' },
+    { id: 'zanzibar', lat: -6.16, lon: 39.3, elev: 15, zone: 'east-rift', regime: 'east-bimodal' },
+    { id: 'capetown', lat: -33.8, lon: 18.5, elev: 30, zone: 'cape', regime: 'winter-rain' },
+    // Villages (heartland anchors)
+    { id: 'tuareg', lat: 23.2, lon: 5.8, elev: 1400, zone: 'sahara-south', regime: 'desert' },
+    { id: 'berber', lat: 31.7, lon: -7.2, elev: 1000, zone: 'mediterranean', regime: 'winter-rain' },
+    { id: 'nubian', lat: 21.8, lon: 31.6, elev: 200, zone: 'sahara-south', regime: 'desert' },
+    { id: 'bambara', lat: 13.45, lon: -6.27, elev: 300, zone: 'sahel', regime: 'sahel' },
+    { id: 'hausa', lat: 12.0, lon: 8.5, elev: 480, zone: 'sahel', regime: 'sahel' },
+    { id: 'mandinka', lat: 11.5, lon: -9.0, elev: 350, zone: 'sahel', regime: 'sahel' },
+    { id: 'fang', lat: 1.8, lon: 11.5, elev: 642, zone: 'atlantic-equatorial', regime: 'equatorial-hard-dry' },
+    { id: 'mongo', lat: -1.5, lon: 21.0, elev: 350, zone: 'congo', regime: 'rainforest' },
+    { id: 'mbuti', lat: 1.4, lon: 28.6, elev: 800, zone: 'congo', regime: 'rainforest' },
+    { id: 'banda', lat: 6.0, lon: 21.5, elev: 500, zone: 'congo-north', regime: 'unimodal-summer' },
+    { id: 'bambundu', lat: -9.3, lon: 15.3, elev: 1100, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'lunda', lat: -10.0, lon: 23.4, elev: 1000, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'maasai', lat: -2.5, lon: 36.8, elev: 1500, zone: 'east-rift', regime: 'east-bimodal' },
+    { id: 'swahili', lat: -2.4, lon: 40.6, elev: 15, zone: 'east-rift', regime: 'east-bimodal' },
+    { id: 'somali', lat: 9.0, lon: 45.0, elev: 964, zone: 'horn', regime: 'arid-bimodal' },
+    { id: 'sidama', lat: 6.7, lon: 38.4, elev: 1700, zone: 'ethiopian-highlands', regime: 'kiremt' },
+    { id: 'baganda', lat: 0.75, lon: 32.55, elev: 1200, zone: 'east-rift', regime: 'east-bimodal' },
+    { id: 'wayeyi', lat: -19.0, lon: 22.5, elev: 950, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'bemba', lat: -12.5, lon: 31.0, elev: 1400, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'pedi', lat: -24.5, lon: 29.5, elev: 1100, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'zulu', lat: -28.4, lon: 31.3, elev: 100, zone: 'southern-plateau', regime: 'summer-rain' },
+    { id: 'san', lat: -22.5, lon: 21.0, elev: 1000, zone: 'southern-plateau', regime: 'summer-rain' },
+  ]
+
+  /** Monthly wetness (mid-month) for a settlement, index 1..12. */
+  const curve = (s: { lat: number; lon: number; elev: number }) =>
+    Array.from({ length: 12 }, (_, i) => wet(i + 1, s.lat, s.lon, s.elev))
+  const peakMonth = (c: number[]) => c.indexOf(Math.max(...c)) + 1
+
+  it('places every settlement in its expected climate zone', () => {
+    for (const s of SETTLEMENTS) {
+      expect(climateZoneAt(s.lat, s.lon, s.elev), s.id).toBe(s.zone)
+    }
+  })
+
+  it('gives every settlement a wet/dry calendar plausible for its terrain', () => {
+    for (const s of SETTLEMENTS) {
+      const c = curve(s) // 0-indexed month m is c[m-1]
+      const max = Math.max(...c)
+      const min = Math.min(...c)
+      const peak = peakMonth(c)
+      const rainy = (m: number) => rainAmount(c[m - 1], 1)
+      switch (s.regime) {
+        case 'desert':
+          // A desert renders NO wet-season rain in ANY month — the headline bound.
+          expect(max, `${s.id} desert peak`).toBeLessThan(0.1)
+          for (let m = 1; m <= 12; m++) expect(rainy(m), `${s.id} desert rain m${m}`).toBe(0)
+          break
+        case 'winter-rain':
+          // Mediterranean / Cape: wet in the local winter, dry in the local summer.
+          if (s.lat > 0) {
+            expect(c[6], `${s.id} Jul`).toBeLessThan(0.1) // northern summer dry
+            expect([12, 1, 2].includes(peak), `${s.id} winter peak (got m${peak})`).toBe(true)
+          } else {
+            expect(c[0], `${s.id} Jan`).toBeLessThan(0.2) // austral summer dry
+            expect(c[6], `${s.id} Jul`).toBeGreaterThan(c[0]) // winter wetter than summer
+          }
+          break
+        case 'sahel':
+          // One summer wet season peaking August, bone dry in January.
+          expect([7, 8].includes(peak), `${s.id} sahel peak (got m${peak})`).toBe(true)
+          expect(c[0], `${s.id} Jan`).toBeLessThan(0.05)
+          break
+        case 'summer-rain':
+          // Southern-plateau: peak in the austral summer (Nov-Mar), dry Jun-Aug.
+          expect([11, 12, 1, 2].includes(peak), `${s.id} summer peak (got m${peak})`).toBe(true)
+          expect(c[6], `${s.id} Jul`).toBeLessThan(0.1)
+          break
+        case 'arid-bimodal':
+          // The Horn: arid throughout, never a real wet season, but not bone dry.
+          expect(max, `${s.id} horn peak`).toBeLessThan(0.35)
+          for (let m = 1; m <= 12; m++) expect(rainy(m), `${s.id} horn rain m${m}`).toBe(0)
+          break
+        case 'guinea-bimodal':
+          // Two maxima with the August "little dry season" between them.
+          expect(c[7], `${s.id} Aug break`).toBeLessThan(c[5]) // below June
+          expect(c[7], `${s.id} Aug break`).toBeLessThan(c[9]) // below October
+          break
+        case 'equatorial-hard-dry':
+          // Gabon (Köppen As): a HARD Jun-Sep dry despite being rainforest-wet.
+          expect(c[6], `${s.id} Jul dry`).toBeLessThan(0.2)
+          expect(c[9], `${s.id} Oct peak`).toBeGreaterThan(0.7)
+          break
+        case 'rainforest':
+          // The Congo has NO dry month — every month stays genuinely wet.
+          expect(min, `${s.id} rainforest min`).toBeGreaterThan(0.3)
+          break
+        case 'unimodal-summer':
+          // Congo-north: one wet season peaking mid-year, dry Jan-Mar.
+          expect([6, 7, 8].includes(peak), `${s.id} unimodal peak (got m${peak})`).toBe(true)
+          expect(c[0], `${s.id} Jan`).toBeLessThan(0.1)
+          break
+        case 'east-bimodal':
+          // Long rains MAM (the bigger) + short rains OND, dry Jun-Sep between.
+          expect(c[3], `${s.id} Apr`).toBeGreaterThan(c[6]) // long rains over the dry
+          expect(c[10], `${s.id} Nov`).toBeGreaterThan(c[6]) // short rains over it too
+          break
+        case 'kiremt':
+          // Ethiopian highlands: kiremt peak Jul-Aug, bega dry Dec.
+          expect([7, 8].includes(peak), `${s.id} kiremt peak (got m${peak})`).toBe(true)
+          expect(c[11], `${s.id} Dec bega`).toBeLessThan(0.1)
+          break
+      }
+    }
+  })
+
+  it('never sprouts flora on a true desert settlement, and fully greens a wet-season one', () => {
+    const greenPeak = (s: { lat: number; lon: number; elev: number }) => {
+      let g = 0
+      for (let m = 1; m <= 12; m++) g = Math.max(g, floraGreennessAt(on(m, 15), s.lat, s.lon, START_YEAR, s.elev))
+      return g
+    }
+    for (const s of SETTLEMENTS) {
+      if (s.regime === 'desert') expect(greenPeak(s), `${s.id} desert stays bare`).toBeLessThan(0.15)
+      if (s.regime === 'sahel' || s.regime === 'summer-rain' || s.regime === 'rainforest') {
+        expect(greenPeak(s), `${s.id} greens in its rains`).toBeGreaterThan(0.8)
+      }
+    }
+  })
+
+  it('leaves no west-facing arid coast a wet-season rain (the longitudinal-gap class, point 223)', () => {
+    // A latitude/longitude grid over the Benguela-current fog deserts: the whole
+    // Namib (Orange to the Angola border) AND its Iona/Namibe continuation must
+    // read bone dry in every month — the class the no-longitudinal-term model
+    // mis-rains. Each cell here is a coastal desert strip west of the escarpment.
+    const coastalDesertCells: Array<[number, number]> = []
+    for (let lat = -26; lat <= -15; lat += 1) coastalDesertCells.push([lat, 12], [lat, 13])
+    for (const [lat, lon] of coastalDesertCells) {
+      for (let m = 1; m <= 12; m++) {
+        expect(wet(m, lat, lon), `coastal desert ${lat},${lon} m${m}`).toBe(0)
+      }
+    }
+    // …while one step inland (the escarpment/plateau) keeps its real summer rain.
+    expect(wet(1, -20, 16), 'Namibian interior January').toBeGreaterThan(0)
+    expect(wet(1, -15, 15), 'Angolan plateau January').toBeGreaterThan(0.3)
   })
 })
 
