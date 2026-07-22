@@ -8505,7 +8505,7 @@ the remaining open points in their numeric order.
   gate, standard on LARGE/default, thorough via CROSSBROWSER_DEPTH in
   maximale-qs; graceful skip when the engines are absent.
 
-- [ ] 214. FIGURES read FACETED — the round organic figures (the bird's-eye
+- [x] 214. FIGURES read FACETED — the round organic figures (the bird's-eye
   ANIMALS incl. the elephant, and the first-person town INHABITANTS/people) show
   visible flat polygon FACES at close/mid range instead of a smooth curved
   surface (user report 22.07.2026, screenshot: the elephant's body/head reads as
