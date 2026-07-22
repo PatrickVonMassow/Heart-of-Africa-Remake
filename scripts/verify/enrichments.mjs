@@ -4623,6 +4623,19 @@ const scavFlat = await page.evaluate(async () => {
   }
   herds.zebra.push(carcass)
   const sc = window.__wildlife.scavenger.current
+  // point 200: make the landing deterministic. The rotating flake was the lone
+  // scavenger committing to a stray carcass elsewhere, or a live animal that
+  // wandered next to the injected one vigil-blocking the landing. Take every
+  // OTHER carcass out of its target pool and shove any nearby live animal clear,
+  // then commit the bird to this carcass — so it reliably flies in and lands.
+  for (const sp of Object.keys(herds)) {
+    for (const a of herds[sp]) {
+      if (a === carcass) continue
+      if (a.dead) a.gone = true
+      else if (Math.hypot(a.x - carcass.x, a.z - carcass.z) < 10) { a.x += 60; a.z += 60 }
+    }
+  }
+  sc.target = carcass
   const out = { found: true, swing: +best.swing.toFixed(3), landed: false, minClear: Infinity, maxClear: 0 }
   const landed = await window.__pollSim(40, () => sc.target === carcass && sc.landed)
   if (landed) {
