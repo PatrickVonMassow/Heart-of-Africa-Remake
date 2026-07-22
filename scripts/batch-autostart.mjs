@@ -143,7 +143,12 @@ try {
 const prompt =
   'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). ' +
   'Setze den "Heart of Africa"-Batch fort. Lies ZUERST die Handoff-Memory resume-184-qa-framework. ' +
-  'Arbeite die offenen TASKS-Punkte in Reihenfolge ab, in atomaren Commits, jeden pushen, Dashboard-Guard + ' +
+  'Pruefe als erstes den ausgecheckten Git-Branch und ob ein Merge halb fertig ist. Arbeite die offenen ' +
+  'TASKS-Punkte in Reihenfolge ab — Feature-Branch-Workflow (CLAUDE.md §6): jeder Punkt auf seinem ' +
+  'EIGENEN feat/<punkt>-<slug>-Branch von main, atomare Commits, den BRANCH nach jedem Commit pushen, ' +
+  'Merge nach main NUR wenn der Punkt fertig und verifiziert ist (Tests gruen; Render-/GUI-Aenderungen ' +
+  'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
+  'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. Dashboard-Guard + ' +
   'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. Halte NICHT still an. Wenn ein git push ' +
   'scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. Wenn alles erledigt ist: Closing fahren.'
 

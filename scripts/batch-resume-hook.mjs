@@ -7,10 +7,46 @@
 //   - a batch LOCK held by another still-fresh session suppresses it too, so two
 //     Claude instances never work the same repo in parallel.
 // Otherwise the hook claims the lock for this session and emits the instruction.
-import { readFileSync, rmSync } from 'node:fs'
+import { readFileSync, rmSync, existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { lockStatus, claimLock, readLock, isPaused, pauseReason } from './batch-lock.mjs'
+
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+/** Where git stands: current branch + whether a merge is half-done. A resumed
+ *  session must know this — a crash can leave a stale feature branch or a
+ *  conflicted index checked out (feature-branch workflow). Empty on any git
+ *  failure (never blocks the hook). */
+function gitStanding() {
+  try {
+    const g = (args) =>
+      execFileSync('git', args, {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+        timeout: 5000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim()
+    const branch = g(['rev-parse', '--abbrev-ref', 'HEAD'])
+    let merging = false
+    try {
+      const p = g(['rev-parse', '--git-path', 'MERGE_HEAD'])
+      merging = existsSync(isAbsolute(p) ? p : join(REPO_ROOT, p))
+    } catch {
+      /* unknown merge state — report just the branch */
+    }
+    return (
+      `Git: on branch "${branch}"` +
+      (merging
+        ? ' — a MERGE IS IN PROGRESS (conflicted/half-done index): resolve and finish it, or abort it, FIRST.'
+        : '.')
+    )
+  } catch {
+    return ''
+  }
+}
 
 // The OS autostart launcher (batch-autostart.mjs) writes this one-shot marker
 // when it spawns a session to TAKE OVER a dead batch. It authorizes THIS session
@@ -74,11 +110,16 @@ try {
       claimLock(sessionId, now)
       clearAuthorized()
       console.log(
-        `${header} Resumed by the OS autostart launcher (the previous session was dead). ` +
-          'Continue the batch autonomously per CLAUDE.md/TASKS.md — implement -> docs -> tests -> ' +
-          'atomic commit + push -> tick, point by point, then the Closing. Read the handoff memory ' +
-          'resume-184-qa-framework first. This session now holds the batch lock; do NOT idle-stop ' +
-          '(the batch-progress-guard enforces this). First check git status for work already underway.',
+        `${header} ${gitStanding()} Resumed by the OS autostart launcher (the previous session was ` +
+          'dead). Continue the batch autonomously per CLAUDE.md/TASKS.md — feature-branch workflow ' +
+          '(§6): each point on its OWN feat/<point>-<slug> branch off main; implement -> docs -> ' +
+          'tests -> atomic commit + push the BRANCH after every commit; merge to main ONLY when the ' +
+          'point is complete + verified (tests green; render/GUI changes picture-checked on BOTH ' +
+          'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
+          'changes (guards, docs, dashboard, process files) go directly to main. Then the Closing. ' +
+          'Read the handoff memory resume-184-qa-framework first. This session now holds the batch ' +
+          'lock; do NOT idle-stop (the batch-progress-guard enforces this). First check git status ' +
+          'AND the checked-out branch above for work already underway.',
       )
     } else if (lockStatus(sessionId, now) === 'held') {
       const lock = readLock()
@@ -93,13 +134,18 @@ try {
     } else {
       claimLock(sessionId, now)
       console.log(
-        `${header} Standing user instruction: continue the batch autonomously per ` +
-          'CLAUDE.md/TASKS.md (implement -> docs -> tests on both layers -> full regression -> ' +
-          'atomic commit + push -> tick), point by point, then the Closing steps — without ' +
-          'waiting for the user to say "continue". First check git status and any in-progress ' +
-          'point for work already underway, and do not double-start regressions. This session ' +
-          'now holds the batch lock (.claude/batch-lock.json); refresh it as you work (claimLock) ' +
-          'and release it (releaseLock) or set the pause marker when you stop.',
+        `${header} ${gitStanding()} Standing user instruction: continue the batch autonomously per ` +
+          'CLAUDE.md/TASKS.md, point by point, then the Closing steps — without waiting for the ' +
+          'user to say "continue". Feature-branch workflow (§6): each point on its OWN ' +
+          'feat/<point>-<slug> branch off main; implement -> docs -> tests on both layers -> full ' +
+          'regression -> atomic commit + push the BRANCH after every commit; merge to main ONLY ' +
+          'when the point is complete + verified (tests green; render/GUI changes picture-checked ' +
+          'on BOTH backends); TASKS.md is MAIN-only — tick the point on main at the merge; ' +
+          'cross-cutting changes (guards, docs, dashboard, process files) go directly to main. ' +
+          'First check git status AND the checked-out branch above for work already underway, and ' +
+          'do not double-start regressions. This session now holds the batch lock ' +
+          '(.claude/batch-lock.json); refresh it as you work (claimLock) and release it ' +
+          '(releaseLock) or set the pause marker when you stop.',
       )
     }
   }

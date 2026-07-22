@@ -61,7 +61,9 @@ try {
   const list = open.slice(0, 12).join(', ') + (open.length > 12 ? ', …' : '')
   block(
     `DO NOT STOP THE BATCH. ${open.length} open TASKS point(s) remain (${list}) and the batch is not ` +
-      `paused. Continue the NEXT queue item now — implement it, commit, push, tick it. If a validation ` +
+      `paused. Continue the NEXT queue item now — on its own feat/<point>-<slug> branch off main: ` +
+      `implement it, commit + push the branch after every commit, merge to main only when it is ` +
+      `complete + verified, and tick it in TASKS.md on main at the merge (CLAUDE.md §6). If a validation ` +
       `is running, WAIT by POLLING within this turn (read the log file / TaskOutput), never by ending the ` +
       `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
       `stops; that must not recur. The ONLY legitimate ways to end this turn: (a) every point is done, or ` +
