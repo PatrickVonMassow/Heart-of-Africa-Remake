@@ -8971,6 +8971,34 @@ the remaining open points in their numeric order.
   text. NOTE: `figures.ts` overlaps point 214 — sequence this AFTER 214 merges (or
   fold it into the 214 branch) so the two figure edits never collide in one tree.
 
+- [ ] 232. RIVER SURFACE READS STEPPED — the user reports (22.07.2026, screenshot)
+  that the river ribbon's water surface shows visible TRANSVERSE STEP-BANDS across
+  its flow (each ribbon row sits at a slightly different height, so the sheet
+  stairsteps down the current — most pronounced in the faster/steeper reach), and
+  the whitewater foam bands in the same hard rows. LIKELY CAUSE: point 211's fix
+  (`ribbonRowSurfaceAt` in `src/scenes/travel/waterSurface.ts`) lifts EACH ribbon
+  row independently until every water-typed terrain sample under its band sits
+  below the sheet — neighbouring rows can get DIFFERENT lifts, and the raw per-row
+  height then reads as hard steps. DIAGNOSE first (confirm the stepping is the
+  per-row lift, and whether 211 introduced or only exposed it). FIX: smooth the
+  per-row ribbon heights ALONG the flow so the surface descends gradually instead
+  of stairstepping — e.g. a monotonic/low-pass pass over the row heights (a running
+  max keeps every row clear of its terrain while removing upward steps; a light
+  longitudinal smoothing removes the downward ones) — WITHOUT re-burying any
+  water-typed sample (the 211 invariant: no terrain pokes through the sheet) and
+  without breaking the mouth-bridge ocean rows or the §11.3 continuity/never-buried
+  invariants. If the foam texture also bands, soften its longitudinal sampling too.
+  Anchors: `src/scenes/travel/waterSurface.ts` (`ribbonRowSurfaceAt`, `planRibbonStrips`),
+  the ribbon geometry build in `src/scenes/travel/Rivers.tsx`. VERIFIABLE: extend
+  the DEM-backed pure tests in `src/scenes/travel/riverSmoothness.test.ts` — assert
+  adjacent ribbon-row heights differ by at most a small bounded step (no hard
+  stair) AND that every water-typed sample still sits below its row (211's
+  never-buried invariant re-held) AND ribbon continuity holds; the parent
+  picture-verifies the Nile/rapids reach on BOTH backends (smooth descending
+  sheet, no transverse steps). DOCS: design.md §11.3 only if wording changes. No
+  player-visible text. NOTE: touches `Rivers.tsx` — overlaps point 219 (spring
+  redesign) and 218's water sweep; do not delegate those concurrently.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
