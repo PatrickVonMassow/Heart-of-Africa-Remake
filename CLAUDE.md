@@ -222,6 +222,17 @@ old→new coverage map live in `scripts/verify/README.md`.
     (If a change genuinely needs the user's eyes BEFORE it is safe to land, that
     is the rare exception: set up a branch-preview deploy rather than merge
     unverified.)
+- **Maximal delegation (user decision 22.07.2026, permanent process).** The
+  main session delegates the MAXIMUM to subagents so as little as possible
+  bottlenecks at it. Each open TASKS point is implemented by a
+  WORKTREE-ISOLATED Fable subagent on its own `feat/<point>-<slug>` branch
+  (gates green, branch pushed, NOT merged by the agent — the main session
+  merges); a POOL of such agents runs in PARALLEL on NON-OVERLAPPING files.
+  Infra, guard, doc and dashboard-restructure work is delegated the same
+  way. What stays at the main session — the deliberate, minimal bottleneck:
+  the picture-verification on BOTH backends, the serial
+  merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
+  (URL-bound).
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
@@ -1460,3 +1471,10 @@ At the end:
 - List the collected open items (`// OPEN: …`).
 - Name the simplifications made and the placeholder values set.
 - No silent extensions beyond §7.1.
+
+**Closing freeze (user decision 22.07.2026).** During a closing run the code
+is FROZEN: no parallel agent work may land or merge while the closing runs,
+else the closing does not test the FINAL state. Before starting a closing
+cycle, stop spawning agents and let all in-flight branches merge (or park
+them); run the closing on the frozen `main`; resume the agent pool only
+AFTER the closing completes.
