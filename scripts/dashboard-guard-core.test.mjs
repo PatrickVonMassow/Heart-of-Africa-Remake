@@ -138,6 +138,18 @@ describe('evaluate — registration and freshness (pre-existing invariants)', ()
     expect(r.decision).toBe('block')
     expect(r.reason).toMatch(/INCOMPLETE.*184/)
   })
+  it('blocks a point double-listed in the now-card AND the Warteschlange', () => {
+    // 214 regression: the now-card point also had a queue card (reads as
+    // in-progress and pending at once).
+    const html = boardHtml({ nowPoint: 210, queue: [210, 211, 204] })
+    const r = evaluate(green({ html }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/DOUBLE-LISTS.*210/)
+  })
+  it('allows the now-card point when it is NOT also in the queue', () => {
+    const r = evaluate(green({ html: boardHtml({ nowPoint: 210, queue: [211, 204] }) }))
+    expect(r.decision).toBe('allow')
+  })
 })
 
 describe('evaluate — focus declaration and the now-card match', () => {

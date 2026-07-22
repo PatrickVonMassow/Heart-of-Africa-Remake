@@ -138,6 +138,20 @@ export function evaluate(input) {
     )
   }
 
+  // (4b) NO DOUBLE-LISTING — the now-card's own point must not ALSO sit in the
+  // Warteschlange. It is "current work", not a pending queue item; listing it in
+  // both reads as simultaneously in-progress AND waiting. Observed 22.07.2026:
+  // point 214 stood in the now-card and the queue at once (user-reported
+  // inconsistency). Enforced so the contradiction cannot recur.
+  if (nowPoint != null && queued.has(nowPoint)) {
+    return block(
+      `BATCH DASHBOARD DOUBLE-LISTS point ${nowPoint}: it is BOTH the now-card ("Woran ich gerade ` +
+        'arbeite") AND has a Warteschlange card. The current-work point must appear ONLY in the ' +
+        'now-card — delete its Warteschlange card, republish (dashboard-publish.mjs + Artifact), then ' +
+        're-run --synced.',
+    )
+  }
+
   // (5) FOCUS DECLARED — the machine cannot know what you are doing; you must
   // SAY it, so the card can be held against the declaration.
   if (!focus || (focus.point == null && !focus.note)) {
