@@ -9357,12 +9357,20 @@ the remaining open points in their numeric order.
   hut, etc.) now REQUIRES pressing SPACE while standing at its door — merely walking
   against the door no longer enters it. This REVERSES the §7.1 pt.2 rule "buildings
   open by walking against their door" FOR functional buildings, while KEEPING the
-  door-proximity detection (to show the prompt and arm the key). WHAT STAYS (do not
-  change): the settlement ENTRY from the bird's-eye view still happens by MOVEMENT
-  (walking into the place, §2.3) — only functional BUILDINGS inside a settlement
-  need the key; the just-left-settlement clearance, the leave-by-walking-clear rule,
-  and the water-cell no-auto-enter rule are unchanged; the §17.5 focus-on-entry
-  behaviour stays. SCOPE of (A): the keybinding/prompt for the elder talk AND the
+  door-proximity detection (to show the prompt and arm the key). (C) SETTLEMENT
+  ENTRY ALSO via SPACE (user extension 22.07.2026): entering a settlement from the
+  bird's-eye view is NO LONGER automatic on reaching the enter radius — instead,
+  while the traveller is within that radius a localized hint "Space to enter
+  <name>" appears (both languages; <name> = the settlement's name), and pressing
+  SPACE enters. The settlement's map NAME-LABEL is HIDDEN while that hint shows (the
+  hint replaces it for that moment). REMOVE the accidental-entry DEBOUNCE/CLEARANCE
+  machinery ENTIRELY — the just-left-settlement clearance, the "stays closed to
+  re-entry until moved clear" lock and the leave-by-walking-clear timing are no
+  longer needed once entry is an explicit Space press, so delete them AND their
+  §7.1 pt.2 acceptance clauses. WHAT STAYS: a Space press while on a water cell must
+  still NOT enter (keep that guard); the §17.5 focus-on-entry behaviour stays
+  (entering via Space focuses the controls); LEAVING a settlement by walking out to
+  the edge is unchanged. SCOPE of (A): the keybinding/prompt for the elder talk AND the
   functional-building entry becomes SPACE; every "press E"/`E` label in player text
   becomes SPACE (both languages, from the language files); the gamepad A-button
   (§17.5/pt.30) maps to SPACE via the existing synthetic-key path (one input path);
