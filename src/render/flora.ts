@@ -159,47 +159,122 @@ export function buildJungleTree(): THREE.BufferGeometry {
 }
 
 /**
- * Coconut palm with a curved trunk and radiating fronds. `detailed` adds
- * more/longer fronds for the walkable first-person places.
+ * One feathered palm-frond blade: a tapering strip along +z whose centreline
+ * arches up then droops to `-tipDrop` at the tip, with the two edges folded
+ * below the midrib (a soft V crease) so it reads as a feathered leaf under
+ * smooth normals. The flora materials are single-sided, so the strip carries
+ * its own back faces (flipped winding, negated normals). Origin at the stalk
+ * end — the frond ATTACHES at (0,0,0), never floats off its crown.
+ */
+function frondBlade(
+  len: number,
+  halfWidth: number,
+  segs: number,
+  tipDrop: number,
+  rise: number,
+): THREE.BufferGeometry {
+  const pos: number[] = []
+  const uv: number[] = []
+  for (let s = 0; s <= segs; s++) {
+    const t = s / segs
+    const z = t * len
+    // Quadratic arch: rises with `rise`, ends `tipDrop` below the base.
+    const y = rise * t - (rise + tipDrop) * t * t
+    // Leaf-shaped taper: near-zero at the stalk AND the tip, widest mid-blade.
+    const w = Math.max(halfWidth * Math.sin(Math.PI * Math.pow(t, 0.8)), 0.015)
+    const fold = w * 0.75 // edges droop below the midrib (feather crease)
+    pos.push(-w, y - fold, z, 0, y, z, w, y - fold, z)
+    uv.push(0, t, 0.5, t, 1, t)
+  }
+  const idx: number[] = []
+  for (let s = 0; s < segs; s++) {
+    const a = s * 3
+    const b = a + 3
+    idx.push(a, b, a + 1, a + 1, b, b + 1)
+    idx.push(a + 1, b + 1, a + 2, a + 2, b + 1, b + 2)
+  }
+  const front = new THREE.BufferGeometry()
+  front.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3))
+  front.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2))
+  front.setIndex(idx)
+  front.computeVertexNormals()
+  const back = front.clone()
+  const bi = back.index!.array as Uint16Array | Uint32Array
+  for (let i = 0; i < bi.length; i += 3) {
+    const t = bi[i + 1]
+    bi[i + 1] = bi[i + 2]
+    bi[i + 2] = t
+  }
+  const bn = back.attributes.normal.array as Float32Array
+  for (let i = 0; i < bn.length; i++) bn[i] = -bn[i]
+  const blade = mergeGeometries([front, back], false)
+  front.dispose()
+  back.dispose()
+  return blade
+}
+
+/**
+ * Coconut palm (redesigned): ONE continuous, gently curved, tapering trunk —
+ * a single bent cylinder, never stacked segments (the old build's laterally
+ * offset stack read as floating chunks with gaps) — a husk bud seating the
+ * crown EXACTLY on the trunk top, and a radial fan of feathered blade fronds
+ * in two staggered layers (raised over drooping), every stalk rooted at the
+ * trunk-top point. `detailed` is the taller first-person variant with more,
+ * longer fronds and coconuts. Fronds are foliage class 1 (dry-season crown
+ * collapse); trunk, bud and nuts stay class 0 — the §19.13 season path is
+ * unchanged.
  */
 export function buildPalm(detailed = false): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
-  const segs = 4
   const height = detailed ? 4.4 : 2.8
   const lean = detailed ? 0.55 : 0.35
-  // Trunk from stacked, progressively offset segments (cheap curve).
-  for (let i = 0; i < segs; i++) {
-    const h = height / segs
-    const r0 = 0.16 - i * 0.025
-    const seg = new THREE.CylinderGeometry(r0 - 0.02, r0, h * 1.15, 6)
-    const t = (i + 0.5) / segs
-    seg.translate(lean * t * t, h * (i + 0.5), 0)
-    tint(seg, '#7a5c33', 0.12, 31 + i)
-    parts.push(seg)
+  // Trunk: one tapered cylinder with height segments, bent along a quadratic
+  // curve toward +x, normals recomputed for the bend.
+  const heightSegs = detailed ? 8 : 6
+  const trunk = new THREE.CylinderGeometry(0.09, 0.18, height, 7, heightSegs)
+  trunk.translate(0, height / 2, 0)
+  {
+    const p = trunk.attributes.position
+    for (let i = 0; i < p.count; i++) {
+      const t = Math.min(1, Math.max(0, p.getY(i) / height))
+      p.setX(i, p.getX(i) + lean * t * t)
+    }
+    trunk.computeVertexNormals()
   }
+  tint(trunk, '#7a5c33', 0.12, 31)
+  parts.push(trunk)
   const topX = lean
   const topY = height
-  // Fronds: squashed cones radiating from the crown, drooping outward.
-  const fronds = detailed ? 7 : 5
+  // Husk bud: overlaps the trunk top and the frond stalks — the crown sits ON
+  // the trunk, never above a gap.
+  const bud = new THREE.SphereGeometry(0.16, 6, 4)
+  bud.scale(1, 0.8, 1)
+  bud.translate(topX, topY, 0)
+  tint(bud, '#6f5a30', 0.1, 36)
+  parts.push(bud)
+  // Frond fan: feathered blades radiating from the bud, alternating a raised
+  // and a drooping layer, with deterministic per-frond variation.
+  const fronds = detailed ? 9 : 7
+  const baseLen = detailed ? 2.2 : 1.5
+  const rand = mulberry32(7)
   for (let i = 0; i < fronds; i++) {
-    const a = (i / fronds) * Math.PI * 2
-    const len = detailed ? 2.2 : 1.5
-    const frond = new THREE.ConeGeometry(0.32, len, 4)
-    frond.scale(1, 1, 0.22)
-    frond.rotateX(-Math.PI / 2)
-    frond.rotateZ(-0.5) // droop
-    frond.rotateY(a)
-    frond.translate(topX + Math.sin(a) * len * 0.32, topY + 0.18 - len * 0.1, Math.cos(a) * len * 0.32)
-    tint(frond, i % 2 ? '#3f6b2a' : '#4a7a30', 0.12, 41 + i)
-    foliage(frond)
-    parts.push(frond)
+    const a = (i / fronds) * Math.PI * 2 + (rand() - 0.5) * 0.25
+    const len = baseLen * (0.85 + rand() * 0.3)
+    const tilt = (i % 2 ? 0.12 : 0.5) + (rand() - 0.5) * 0.12
+    const blade = frondBlade(len, len * 0.14, detailed ? 6 : 4, len * 0.4, len * 0.5)
+    blade.rotateX(-tilt)
+    blade.rotateY(a)
+    blade.translate(topX, topY, 0)
+    tint(blade, i % 2 ? '#3f6b2a' : '#4a7a30', 0.12, 41 + i)
+    foliage(blade)
+    parts.push(blade)
   }
-  // Coconuts on the detailed variant.
+  // Coconuts under the bud on the detailed variant.
   if (detailed) {
     for (let i = 0; i < 3; i++) {
       const nut = new THREE.SphereGeometry(0.12, 5, 4)
       const a = (i / 3) * Math.PI * 2 + 0.4
-      nut.translate(topX + Math.sin(a) * 0.22, topY - 0.12, Math.cos(a) * 0.22)
+      nut.translate(topX + Math.sin(a) * 0.2, topY - 0.16, Math.cos(a) * 0.2)
       tint(nut, '#5c4526', 0.1, 51 + i)
       parts.push(nut)
     }
