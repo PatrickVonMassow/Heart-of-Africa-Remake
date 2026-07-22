@@ -8820,7 +8820,7 @@ the remaining open points in their numeric order.
   splash fires on a footstep at high wetness. DOCS: design.md §2.4/§19.13 note the
   wet-ground response; CLAUDE §7.1 pt.12 if acceptance wording changes.
 
-- [ ] 226. A FLEEING CALF PINS ON THE WATERLINE instead of routing along the
+- [x] 226. DONE 22.07.2026 (commit 4780497, merged) — the fleeing calf now routes coast-safe along the shore (point-188 escapeCorridorHeading fallback + sticky corridor in calfFleeStep) instead of pinning on the waterline; parent-sacrifice intact; 5 pure tests. ORIGINAL: A FLEEING CALF PINS ON THE WATERLINE instead of routing along the
   coast (user report 22.07.2026, real-WebGPU screenshot at Cairo/North coast: a
   juvenile fleeing a predator sticks at the sea edge while its parent sacrifices
   itself and is eaten). This is the point-157 class of bug — the flight step must
