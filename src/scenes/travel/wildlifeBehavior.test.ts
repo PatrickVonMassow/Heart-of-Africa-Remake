@@ -11,6 +11,8 @@ import {
   waterStruggleFate,
   blockHeading,
   fleeHeading,
+  fleesFromPlayer,
+  PLAYER_SHY_STRONG_WEAPON,
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
   flightStep,
@@ -165,6 +167,72 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
     }
     expect(maxDelta).toBeLessThan(0.35) // no ~90° snap
     expect(reversals).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('fleesFromPlayer (design.md §19 — small/weak animals shy from the traveller)', () => {
+  const W = balance.parentDefense.preyWeapon
+
+  it('weak/prey adults flee the traveller', () => {
+    for (const sp of ['antelope', 'zebra', 'wildebeest', 'warthog']) {
+      expect(fleesFromPlayer(sp, false, W), sp).toBe(true)
+    }
+    // The one weak bird without a weapon entry flies off.
+    expect(fleesFromPlayer('flamingo', false, W)).toBe(true)
+  })
+
+  it('apex/strong adults never flee the traveller', () => {
+    // The §14.1 predators, the elephant and the armoured crocodile stand; the
+    // giraffe's 1.5 weapon reaches the strong bar (a lion-killing kick is
+    // nothing to flee a human over).
+    for (const sp of ['lion', 'leopard', 'hyena', 'cheetah', 'elephant', 'crocodile', 'giraffe']) {
+      expect(fleesFromPlayer(sp, false, W), sp).toBe(false)
+    }
+    // The adult plover keeps the broken-wing lure (point 145b) as its own
+    // answer to the approaching traveller — it never simply bolts.
+    expect(fleesFromPlayer('plover', false, W)).toBe(false)
+    // The weak-tier bar itself sits at the giraffe's weapon strength.
+    expect(W.giraffe).toBeGreaterThanOrEqual(PLAYER_SHY_STRONG_WEAPON)
+    expect(W.zebra).toBeLessThan(PLAYER_SHY_STRONG_WEAPON)
+  })
+
+  it('ANY juvenile flees — including mid-/high-ranked species', () => {
+    // A calf, foal, chick or cub is vulnerable whatever its adults' rank: the
+    // giraffe calf (mid-rank), the lion cub and the plover chick all bolt.
+    for (const sp of ['giraffe', 'lion', 'plover', 'zebra', 'elephant']) {
+      expect(fleesFromPlayer(sp, true, W), sp).toBe(true)
+    }
+  })
+
+  it('the flee heading is the steady summed escape — same machinery, no oscillation', () => {
+    // The traveller as the single fleeHeading threat (exactly how the scene
+    // feeds it): walking along the recomputed escape heading never reverses
+    // it — the held-heading behaviour the elephant dodge already pins.
+    const player: [number, number][] = [[0, 0]]
+    let x = 0.6
+    let z = 0.25
+    let prev: number | null = null
+    let maxDelta = 0
+    let steps = 0
+    for (let i = 0; i < 200; i++) {
+      const h = fleeHeading(x, z, player, 9)
+      if (h === null) break // fled out of the ring — done
+      if (prev !== null) {
+        let d = h - prev
+        while (d > Math.PI) d -= Math.PI * 2
+        while (d < -Math.PI) d += Math.PI * 2
+        maxDelta = Math.max(maxDelta, Math.abs(d))
+      }
+      prev = h
+      const [sx, sz] = dir(h)
+      x += sx * 0.07
+      z += sz * 0.07
+      steps++
+    }
+    expect(steps).toBeGreaterThan(20) // the flight genuinely ran
+    expect(maxDelta).toBeLessThan(0.05) // a radial escape never wavers
+    // And it ends AWAY from the traveller: further out than it started.
+    expect(Math.hypot(x, z)).toBeGreaterThan(Math.hypot(0.6, 0.25) + 1)
   })
 })
 

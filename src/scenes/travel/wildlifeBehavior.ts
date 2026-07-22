@@ -53,6 +53,38 @@ export function fleeHeading(
   return Math.atan2(rx, rz)
 }
 
+/** Player shyness (design.md §19): the weapon-strength bar above which an
+ *  ADULT stands its ground against the traveller. The giraffe's 1.5 sits
+ *  exactly on it — a lion-killing kick is nothing to flee a human over —
+ *  and the lion's 2.0 is above it; everything weaker bolts. */
+export const PLAYER_SHY_STRONG_WEAPON = 1.5
+
+/**
+ * Whether an animal flees the traveller's bird's-eye figure (design.md §19):
+ * the weak/prey tier flees as adults — read from the §14.1-aligned weapon
+ * table (balance.parentDefense.preyWeapon, the same ranking the defence
+ * matrix uses) — and so does ANY juvenile (calf, foal, chick, cub),
+ * vulnerable whatever its species' adult rank. Apex/strong adults never
+ * flee: the §14.1 predators (cheetah/leopard/hyena/lion), the elephant and
+ * the armoured crocodile have no weak-tier weapon entry, and the giraffe's
+ * 1.5 reaches the strong bar. The adult plover keeps the broken-wing lure
+ * (point 145b) as its own answer to the approaching traveller, and the
+ * flamingo — the one weak bird with no weapon entry — flies off. The flee is
+ * cosmetic shyness only: the player-collision resolution stays
+ * consequence-free and §19.3's walk-into-a-predator attack is untouched.
+ */
+export function fleesFromPlayer(
+  species: string,
+  isJuvenile: boolean,
+  preyWeapon: Record<string, number>,
+): boolean {
+  if (isJuvenile) return true
+  if (species === 'flamingo') return true // the weak wader — it takes to the air
+  const weapon = preyWeapon[species]
+  if (weapon === undefined) return false // predators/elephant/crocodile/plover: no weak-tier entry
+  return weapon < PLAYER_SHY_STRONG_WEAPON
+}
+
 /**
  * Blocking station for a parent whose calf is being run down by a predator
  * (design.md §19): the parent keeps itself between the hunter and its young,

@@ -36,6 +36,7 @@ import {
   crossingTarget,
   griefTarget,
   fleeHeading,
+  fleesFromPlayer,
   flightStep,
   segPointDist,
   gambolState,
@@ -186,8 +187,14 @@ interface Animal {
   /** Shore animals that also wade in and bathe, not just drink (design.md §19). */
   bathe?: boolean
   /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
-   *  the facing never snaps between flanking threats (design.md §19). */
+   *  the facing never snaps between flanking threats (design.md §19). Shared by
+   *  the elephant dodge AND the player-shy flight — ONE held heading, so the
+   *  two threats can never fight each other into an oscillation. */
   dodgeHeading?: number
+  /** Blended climb (0..1) of a bird flying off from the traveller (design.md
+   *  §19): ramps up while the shy flight is engaged, settles once it ends —
+   *  never a pop. */
+  flyLift?: number
   /** Sticky escape-corridor heading for a hunted calf boxed against the sea
    *  (point 226): held while the direct flight dead-ends at a concave coast
    *  pocket so the shore run cannot flip-flop; cleared by the step itself the
@@ -477,6 +484,16 @@ const FACE_TURN = 7
 /** A dodge disengages only well past its trigger ring (hysteresis), so an
  *  elephant tailing its prey cannot flap the dodge on and off at the ring. */
 const PREY_PANIC_EXIT = 1.5
+/** Player shyness (design.md §19): weak/prey animals and any juvenile flee the
+ *  traveller's bird's-eye figure inside this ring (hysteresis via
+ *  PREY_PANIC_EXIT, exactly like the elephant dodge), running slower than the
+ *  default travel speed so the traveller can still overtake them. The flee is
+ *  cosmetic — the collision resolution stays consequence-free (blocked at the
+ *  body edge, no damage, no event) and the §19.3 walk-into-a-predator attack
+ *  is untouched. Birds take to the air instead of running. */
+const PLAYER_SHY_RADIUS = 6
+const PLAYER_SHY_SPEED = 4.2
+const BIRD_FLY_LIFT = 2.6 // world units of climb at full flight
 /** Family life (design.md §19): a calf keeps within the calibratable leash
  *  radius of its parent (balance.family.followRadius, read fresh per frame so
  *  the debug edit applies live), and a parent moves between an approaching
@@ -2656,6 +2673,16 @@ function Herds() {
       const ty = sampleTerrain(ll.lat, ll.lon, seed).type
       return ty === 'ocean' || ty === 'water'
     }
+    // A flying bird crosses river/lake water freely — only the open ocean
+    // deflects its shy flight (design.md §19).
+    const oceanBlockedAt = (nx: number, nz: number) => {
+      const ll = worldToLatLon(nx, nz)
+      return sampleTerrain(ll.lat, ll.lon, seed).type === 'ocean'
+    }
+    // The traveller as a threat source for the player-shy flight (design.md
+    // §19): fed into the SAME fleeHeading/held-heading machinery as the
+    // elephant dodge — never a second oscillation-prone path.
+    const playerThreat: Array<readonly [number, number]> = [[pos.x, pos.z]]
     const elephantPos: Array<[number, number]> = []
     {
       const list = herds.elephant
@@ -3204,89 +3231,127 @@ function Herds() {
             const toX = a.parent.x - a.x
             const toZ = a.parent.z - a.z
             const d = Math.hypot(toX, toZ)
-            // Play-lock hysteresis: a bout that ended out of range (a parent
-            // that walked off) does not restart at the boundary — only well
-            // inside it — so play and follow never alternate per frame.
-            if (a.playLock && d < GAMBOL_RANGE * 0.6) a.playLock = undefined
-            if (!a.playLock && d > GAMBOL_RANGE) a.playLock = true
-            const canPlay =
-              !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
-            const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
-            // The drying waterhole (design.md §19.8, point 123): a bout that
-            // ENDS at a lake bank whose season has dried to mud may stick the
-            // calf — one roll per bout, hashed from the calf's phase and the
-            // bout cycle so it is deterministic per (calf, bout).
-            if (!bout && a.bouted) {
-              a.bouted = undefined
-              const bw = balance.waterDrama
-              const llm = worldToLatLon(a.x, a.z)
-              const bankD = lakeDistance(llm.lat, llm.lon, 0.2)
-              const cycle = Math.floor(t / GAMBOL_PERIOD)
-              const roll = Math.abs(Math.sin(a.phase * 127.1 + cycle * 311.7)) % 1
-              if (
-                mireRoll(bankD, 0.06, CURRENT_WEATHER.wetness, bw.mireDrynessThreshold, bw.mireChancePerBout, roll)
-              ) {
-                a.mired = 0
-                a.hop = undefined
-              }
-            }
-            if (bout) {
-              a.bouted = true
-              // Playful gambolling (design.md §19): scampering hops around the
-              // parent, LEASHED — a homeward pull grows toward the range edge
-              // so the scamper orbits the parent instead of crossing the
-              // boundary (crossing switched play/follow per frame: trembling).
-              // The step is real, so a bout at the shore can still carry the
-              // calf into the water — the accident the rescue drama hangs on.
-              const heading = bout.heading + (a.boutDetour ?? 0)
-              const [sx, sz] = leashedGambolDir(heading, toX, toZ, d, GAMBOL_RANGE)
-              const beforeX = a.x
-              const beforeZ = a.z
-              a.x += sx * GAMBOL_SPEED * dt
-              a.z += sz * GAMBOL_SPEED * dt
-              const llp = worldToLatLon(a.x, a.z)
-              const terp = sampleTerrain(llp.lat, llp.lon, seed)
-              if (terp.type === 'water') {
-                // Hopped off the bank: remember the entry for the rescue.
-                a.rescueEntry = { x: beforeX, z: beforeZ }
-              } else if (terp.type === 'ocean' || terp.height <= 0.02) {
-                // Never gambol into the open sea: bend the rest of the bout
-                // along the bank instead of vibrating in place against it.
-                a.x = beforeX
-                a.z = beforeZ
-                a.boutDetour = ((a.boutDetour ?? 0) + Math.PI / 2) % (Math.PI * 2)
-              } else {
-                a.y = Math.max(0.02, terp.height)
-              }
-              a.hop = bout.hop
-              px = a.x
-              pz = a.z
-              bodyY = a.y + bout.hop * 0.35
-              // Face the actual step, not the raw bout heading; a radially
-              // pinned calf ([0,0] step) keeps its facing instead of snapping.
-              if (Math.hypot(sx, sz) > 0.05) yaw = Math.atan2(sx, sz)
-              else yaw = a.face ?? a.rot
-              pitch = 0
-            } else if (d > YOUNG_FOLLOW_RADIUS) {
+            // Player shyness (design.md §19): ANY juvenile — even of a stout
+            // species whose adults stand their ground — bolts from the nearby
+            // traveller before play/follow resume, through the SAME held dodge
+            // heading as the adult flight (fleeHeading → turnToward under the
+            // dodge's own hysteresis ring and turn cap — no second
+            // oscillation-prone path). The dramas above own their claims, and
+            // a drink errand (incl. the staged §19.16 bank victims) is never
+            // interrupted.
+            const shyRing = a.dodgeHeading === undefined ? PLAYER_SHY_RADIUS : PLAYER_SHY_RADIUS * PREY_PANIC_EXIT
+            const shyTarget =
+              a.drink === undefined && fleesFromPlayer(sp, true, balance.parentDefense.preyWeapon)
+                ? fleeHeading(a.x, a.z, playerThreat, shyRing)
+                : null
+            if (shyTarget !== null) {
               a.hop = undefined
               a.boutDetour = undefined
-              a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
-              a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
-              { // ground-follow (point 203(A)) — THE main calf mover: every
-                // background calf tails its drifting parent through this step,
-                // and without the height update they sank into every slope
-                // (the tripwire's persistent young=true burials).
+              a.dodgeHeading =
+                a.dodgeHeading === undefined ? shyTarget : turnToward(a.dodgeHeading, shyTarget, PREY_DODGE_TURN * dt)
+              const shyStep = deflectedStep(a.x, a.z, a.dodgeHeading, PLAYER_SHY_SPEED * dt, waterBlockedAt, 0.8)
+              a.x = shyStep.x
+              a.z = shyStep.z
+              { // ground-follow (point 203(A)): a mover carries its own standing height
                 const gfl = worldToLatLon(a.x, a.z)
                 const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
                 if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
               }
               px = a.x
               pz = a.z
-              yaw = Math.atan2(toX, toZ)
+              wobTarget = 0
+              yaw = a.dodgeHeading
+              pitch = 0
             } else {
-              a.hop = undefined
-              a.boutDetour = undefined
-              pitch = -0.22 // nurse: head up toward the parent's flank
+              if (a.dodgeHeading !== undefined) {
+                // Shy flight over: keep facing where it ended, like the dodge.
+                a.rot = a.dodgeHeading
+                a.dodgeHeading = undefined
+              }
+              // Play-lock hysteresis: a bout that ended out of range (a parent
+              // that walked off) does not restart at the boundary — only well
+              // inside it — so play and follow never alternate per frame.
+              if (a.playLock && d < GAMBOL_RANGE * 0.6) a.playLock = undefined
+              if (!a.playLock && d > GAMBOL_RANGE) a.playLock = true
+              const canPlay =
+                !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
+              const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
+              // The drying waterhole (design.md §19.8, point 123): a bout that
+              // ENDS at a lake bank whose season has dried to mud may stick the
+              // calf — one roll per bout, hashed from the calf's phase and the
+              // bout cycle so it is deterministic per (calf, bout).
+              if (!bout && a.bouted) {
+                a.bouted = undefined
+                const bw = balance.waterDrama
+                const llm = worldToLatLon(a.x, a.z)
+                const bankD = lakeDistance(llm.lat, llm.lon, 0.2)
+                const cycle = Math.floor(t / GAMBOL_PERIOD)
+                const roll = Math.abs(Math.sin(a.phase * 127.1 + cycle * 311.7)) % 1
+                if (
+                  mireRoll(bankD, 0.06, CURRENT_WEATHER.wetness, bw.mireDrynessThreshold, bw.mireChancePerBout, roll)
+                ) {
+                  a.mired = 0
+                  a.hop = undefined
+                }
+              }
+              if (bout) {
+                a.bouted = true
+                // Playful gambolling (design.md §19): scampering hops around the
+                // parent, LEASHED — a homeward pull grows toward the range edge
+                // so the scamper orbits the parent instead of crossing the
+                // boundary (crossing switched play/follow per frame: trembling).
+                // The step is real, so a bout at the shore can still carry the
+                // calf into the water — the accident the rescue drama hangs on.
+                const heading = bout.heading + (a.boutDetour ?? 0)
+                const [sx, sz] = leashedGambolDir(heading, toX, toZ, d, GAMBOL_RANGE)
+                const beforeX = a.x
+                const beforeZ = a.z
+                a.x += sx * GAMBOL_SPEED * dt
+                a.z += sz * GAMBOL_SPEED * dt
+                const llp = worldToLatLon(a.x, a.z)
+                const terp = sampleTerrain(llp.lat, llp.lon, seed)
+                if (terp.type === 'water') {
+                  // Hopped off the bank: remember the entry for the rescue.
+                  a.rescueEntry = { x: beforeX, z: beforeZ }
+                } else if (terp.type === 'ocean' || terp.height <= 0.02) {
+                  // Never gambol into the open sea: bend the rest of the bout
+                  // along the bank instead of vibrating in place against it.
+                  a.x = beforeX
+                  a.z = beforeZ
+                  a.boutDetour = ((a.boutDetour ?? 0) + Math.PI / 2) % (Math.PI * 2)
+                } else {
+                  a.y = Math.max(0.02, terp.height)
+                }
+                a.hop = bout.hop
+                px = a.x
+                pz = a.z
+                bodyY = a.y + bout.hop * 0.35
+                // Face the actual step, not the raw bout heading; a radially
+                // pinned calf ([0,0] step) keeps its facing instead of snapping.
+                if (Math.hypot(sx, sz) > 0.05) yaw = Math.atan2(sx, sz)
+                else yaw = a.face ?? a.rot
+                pitch = 0
+              } else if (d > YOUNG_FOLLOW_RADIUS) {
+                a.hop = undefined
+                a.boutDetour = undefined
+                a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
+                a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+                { // ground-follow (point 203(A)) — THE main calf mover: every
+                  // background calf tails its drifting parent through this step,
+                  // and without the height update they sank into every slope
+                  // (the tripwire's persistent young=true burials).
+                  const gfl = worldToLatLon(a.x, a.z)
+                  const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+                  if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+                }
+                px = a.x
+                pz = a.z
+                yaw = Math.atan2(toX, toZ)
+              } else {
+                a.hop = undefined
+                a.boutDetour = undefined
+                pitch = -0.22 // nurse: head up toward the parent's flank
+              }
             }
             familyHeld = true
           } else if (a.child && !a.child.dead && LION_STATE.mode !== 'chase') {
@@ -3388,21 +3453,55 @@ function Herds() {
         // the summed repulsion of ALL nearby elephants (not just the nearest)
         // and turn toward it at a bounded rate, so the facing never flip-flops
         // ~90° between two flanking herd-mates (no oscillation, design.md §19).
-        if (!familyHeld && sp !== 'elephant' && FLEES_LION[sp]) {
+        // The SAME block also carries the player shyness (design.md §19): a
+        // weak/prey adult — or an orphaned juvenile that fell out of the family
+        // branch — flees the traveller through the identical held heading
+        // (fleesFromPlayer gates who; elephant calves stay with their herd,
+        // whose cohesion is their shield). Both threats feed ONE dodgeHeading;
+        // the close-range elephant dart takes strict priority (an equal-weight
+        // blend of two opposing headings would have a cancellation point — the
+        // exact degeneracy the leash damping teaches to avoid), and the
+        // capped turnToward smooths any hand-over between the two sources.
+        if (
+          !familyHeld && sp !== 'elephant' &&
+          (FLEES_LION[sp] || fleesFromPlayer(sp, !!a.young, balance.parentDefense.preyWeapon))
+        ) {
           // Hysteresis: once dodging, only disengage well past the trigger
-          // ring — a tailing elephant cannot flap the dodge on and off.
-          const ring = a.dodgeHeading === undefined ? PREY_PANIC_RADIUS : PREY_PANIC_RADIUS * PREY_PANIC_EXIT
-          const target = fleeHeading(a.x, a.z, elephantPos, ring)
+          // ring — a tailing elephant (or the traveller) cannot flap the dodge
+          // on and off at the ring.
+          const engaged = a.dodgeHeading !== undefined
+          const ring = engaged ? PREY_PANIC_RADIUS * PREY_PANIC_EXIT : PREY_PANIC_RADIUS
+          const eTarget = FLEES_LION[sp] ? fleeHeading(a.x, a.z, elephantPos, ring) : null
+          const shyRing = engaged ? PLAYER_SHY_RADIUS * PREY_PANIC_EXIT : PLAYER_SHY_RADIUS
+          // A drinker keeps its bank errand (and the staged §19.16 drama
+          // victims their stand) — shyness never claims an animal mid-errand.
+          const pTarget =
+            a.drink === undefined && fleesFromPlayer(sp, !!a.young, balance.parentDefense.preyWeapon)
+              ? fleeHeading(a.x, a.z, playerThreat, shyRing)
+              : null
+          const target = eTarget !== null ? eTarget : pTarget
           if (target !== null) {
             a.dodgeHeading =
               a.dodgeHeading === undefined ? target : turnToward(a.dodgeHeading, target, PREY_DODGE_TURN * dt)
+            // The elephant dart stays deliberately slower than the herd (the
+            // trample must remain possible); a pure player flight runs.
+            const spd = eTarget !== null ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
             // Deflect the dart along a bank instead of into the water (points
             // 201/197): the raw step ran the dodge onto a water cell where the
             // backstop teleported it back — a vibrating pin at the waterline.
-            const dodgeStep = deflectedStep(a.x, a.z, a.dodgeHeading, PREY_PANIC_SPEED * dt, waterBlockedAt, 0.8)
-            if (!dodgeStep.moved && a.crossing === undefined) {
-              // Boxed against the water with the elephant bearing down (point
-              // 192): rather than be trampled, take to the water — the herd
+            // A flying bird instead crosses river/lake freely (ocean-only
+            // deflection) — it is in the air.
+            const dodgeStep = deflectedStep(
+              a.x,
+              a.z,
+              a.dodgeHeading,
+              spd * dt,
+              sp === 'flamingo' ? oceanBlockedAt : waterBlockedAt,
+              0.8,
+            )
+            if (sp !== 'flamingo' && !dodgeStep.moved && a.crossing === undefined) {
+              // Boxed against the water with the threat bearing down (point
+              // 192): rather than be caught, take to the water — the herd
               // does not follow into the deep. River/lake only.
               const esc = crossingTarget(a.x, a.z, a.dodgeHeading, balance.waterCross.maxUnits, (nx, nz) => {
                 const nll = worldToLatLon(nx, nz)
@@ -3412,10 +3511,13 @@ function Herds() {
             }
             a.x = dodgeStep.x
             a.z = dodgeStep.z
-            { // ground-follow (point 203(A)): a mover carries its own standing height
+            { // ground-follow (point 203(A)): a mover carries its own standing
+              // height — and the fleeing wader stands on the sheet over water.
               const gfl = worldToLatLon(a.x, a.z)
               const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+              if (gft.type === 'water' && sp === 'flamingo')
+                bodyY = a.y = waderStandY(gft.height, waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height))
+              else if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
             }
             px = a.x
             pz = a.z
@@ -3427,6 +3529,16 @@ function Herds() {
             // back to the pre-flight orientation (design.md §19).
             a.rot = a.dodgeHeading
             a.dodgeHeading = undefined
+          }
+          // Birds fly off (design.md §19): the climb ramps while the shy
+          // flight is engaged and settles once it ends — blended, never a pop.
+          if (sp === 'flamingo') {
+            if (target !== null) a.flyLift = Math.min(1, (a.flyLift ?? 0) + dt * 1.5)
+            else if (a.flyLift !== undefined) {
+              a.flyLift -= dt * 0.8
+              if (a.flyLift <= 0) a.flyLift = undefined
+            }
+            if (a.flyLift !== undefined) bodyY += a.flyLift * BIRD_FLY_LIFT
           }
         }
         // The LOGICAL render spot (point 196): the anchoring assert judges the
