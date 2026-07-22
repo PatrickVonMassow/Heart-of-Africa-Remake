@@ -97,6 +97,27 @@ $existing = (Get-ScheduledTask -TaskName "HoA-Batch-Autostart").Triggers
 Set-ScheduledTask -TaskName "HoA-Batch-Autostart" -Trigger (@($existing) + $t)
 ```
 
+## Signal channel + never blocking on the user
+
+- **Out-of-band notification (ntfy):** `scripts/notify.mjs` POSTs to `ntfy.sh/<topic>`
+  (topic in the gitignored `.claude/ntfy-topic`; subscribe once on the phone). No
+  auth, works headless and from the launcher. The launcher notifies on
+  resurrection, on a stalled batch (auto-pause), and on a missing claude.exe; the
+  batch should notify on a failed `git push` (write `.claude/push-failed`).
+- **A pending user decision NEVER stalls the batch** (user rule 22.07.2026). The
+  assistant does NOT block on `AskUserQuestion` during autonomous work. When a
+  point needs the user: add a *Von dir zu klären* dashboard card, run
+  `node scripts/defer-for-user.mjs <N> "<question>"` (marks the point
+  `AWAITING-USER`, pings the phone), and MOVE ON to the next workable point.
+  `AWAITING-USER` points still count as open (the batch is not done) but are
+  SKIPPED when picking the next item; the user's answer clears them
+  (`defer-for-user.mjs --clear <N>`). Only if EVERY open point is `AWAITING-USER`
+  does the batch pause (`setPaused`) and notify — a legitimate wait, not a stall.
+- **Tool permission prompts** don't fire for the batch: `defaultMode: dontAsk` +
+  a trusted workspace (`hasTrustDialogAccepted`) + an allow-list covering every
+  tool the batch uses. Avoid editing `.claude/settings.json` mid-batch (the one
+  file that always prompts). Headless `-p` in the trusted repo never prompts.
+
 ## Operating it
 
 - **Pause** (stop all resurrection + the in-session guard): create `.claude/batch-paused`.
