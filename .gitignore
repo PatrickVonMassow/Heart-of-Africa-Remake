@@ -45,3 +45,7 @@ scripts/.tile-cache
 .claude/ntfy-topic
 .claude/autostart-state.json
 .claude/autostart-run.log
+.claude/ci-status-guard-state.json
+
+# Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
+.secrets/

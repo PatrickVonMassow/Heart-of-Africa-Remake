@@ -38,3 +38,23 @@ jobs:
       # (CLAUDE.md §7.1 pt.18). See the ALLOW list in scripts/audit-check.mjs.
       - run: node scripts/audit-check.mjs
       - run: npm run test:unit
+      # Layer B of the CI-red detection (the PRIMARY guaranteed push): a red run
+      # pings the user's/assistant's ntfy topic directly from the runner, so a
+      # failure is announced even when no local session is looking. Requires the
+      # repo secret NTFY_TOPIC (same value as the local .claude/ntfy-topic);
+      # without it the step logs and no-ops — it must NEVER fail the build.
+      - name: Alert ntfy on failure
+        if: failure()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          if [ -n "$NTFY_TOPIC" ]; then
+            curl -fsS -m 10 \
+              -H "Title: HoA batch: CI red" \
+              -H "Priority: high" \
+              -H "Tags: rotating_light" \
+              -d "CI '${{ github.workflow }}' FAILED for ${GITHUB_SHA::7} on ${{ github.ref_name }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              "https://ntfy.sh/${NTFY_TOPIC}" || echo "ntfy alert failed (non-fatal)"
+          else
+            echo "NTFY_TOPIC secret not set — skipping the failure alert"
+          fi
