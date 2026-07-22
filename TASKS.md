@@ -7848,7 +7848,14 @@ the remaining open points in their numeric order.
   model-diverse pass is welcome (a Fable lens on "does this cohere") within the
   point-200 token limits.
 
-- [ ] 206. REOPENED 22.07.2026 — the user reports the trees in the CENTRAL region
+- [x] 206. DONE 22.07.2026 — the user confirmed on the deployed main ("Die Bäume
+  sind jetzt in Ordnung") that the Central trees now read correctly. Root cause +
+  fix in baf2200: the jungle crown hexes collapsed in the sRGB->linear conversion
+  to ~0.07-0.09 luminance (2-2.7x darker than any other crown); the albedo was
+  lifted out of that trap (luminance floor >0.18, pure-tested in flora.test.ts),
+  which the user's WebGPU picture and the WebGL2 enrichments run both confirm — so
+  no sun-dim/canopy lever was needed.
+  HISTORY (the reopen): REOPENED 22.07.2026 — the user reported the trees in the CENTRAL region
   (Congo rainforest / jungle biome) still render VERY DARK. The 20.07 fix (below)
   lifted the flora brightness globally and passed a jungle-crop pixel check, but it
   did NOT hold for the Central region as the user sees it. RE-DIAGNOSE picture-first
