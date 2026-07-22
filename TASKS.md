@@ -9561,6 +9561,40 @@ the remaining open points in their numeric order.
   player-visible text. NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx` — same files as
   217/242/245/247/248/250; do NOT delegate concurrently with those wildlife points.
 
+- [ ] 252. AUDIT + RESOLVE CONFLICTS BETWEEN PLAYER-FLEE (239) AND OTHER WILDLIFE
+  MECHANISMS — the user asks (22.07.2026) to check whether the point-239 player-shy
+  flee CONFLICTS with other wildlife mechanisms — e.g. an animal fleeing the PLAYER
+  and a PREDATOR at the same time — and to resolve it so the PREDATOR flee takes
+  PRIORITY; also to find OTHER potential conflicts and implement a suitable solution.
+  (User suggests Fable is worth it here — Fable fits the AUDIT/analysis pass, per
+  [[audit-with-model-diversity]]; this is the user-endorsed exception to
+  [[fable-sparingly]] for this analytical task.) SCOPE: audit the 239 player-flee
+  (`fleesFromPlayer`, `PLAYER_SHY_RADIUS`, its wiring into the shared
+  `dodgeHeading`/steady-escape) against EVERY other co-active wildlife state:
+  predator flee/dodge, the elephant dodge, the §19.8 family dramas (calf flee,
+  parent shield/charge/guard/wade, sacrifice, the mired calf pt.123, grief drives),
+  the point-192/248 water crossing, the drinking exemption (`a.drink`, pt.247), the
+  crocodile ambush (`caughtBy`), the calf gambol/leash (238), and the ambient herd
+  states. For EACH pairing, decide the priority when both are active. PRIMARY RULE:
+  fleeing a PREDATOR — and being in any active drama state (caught, shielding,
+  crossing, mired) — takes PRIORITY over fleeing the player; player-flee outranks
+  only idle/graze. Establish ONE clear arbitration point (a single priority resolver
+  for the animal's active threat/state), not scattered checks, so a steady held
+  heading is chosen consistently (no oscillation between a player-flee direction and
+  a predator-flee direction — the point-237 anti-oscillation must hold across the
+  arbitration). FIX: implement the resolver (predator/drama > player > idle) reusing
+  the existing steady-escape machinery; fix any other genuine conflict the audit
+  finds. VERIFIABLE: pure tests for the resolver — an animal threatened by BOTH a
+  predator and the player flees the PREDATOR; an animal in a drama state (caught/
+  shielding/crossing/mired) ignores the player-flee; the resolver yields ONE steady
+  heading (no flip); plus a test per other conflict found. Anchors: `src/scenes/
+  travel/wildlifeBehavior.ts` (the threat/flee arbitration, `fleesFromPlayer`, the
+  `dodgeHeading`), `src/scenes/travel/Wildlife.tsx`. DOCS: design.md §19 if the
+  priority wording changes. No player-visible text. NOTE: `wildlifeBehavior.ts`/
+  `Wildlife.tsx` — same files as 237/242/245/247/248/250/251; do NOT delegate
+  concurrently with those — the whole wildlife-behaviour cluster should be planned
+  together (this conflict audit naturally scopes/sequences them).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
