@@ -9015,6 +9015,35 @@ the remaining open points in their numeric order.
   218's water sweep and 220 (terrain chunk seam); do not delegate those
   concurrently.
 
+- [ ] 233. RIVER CONFLUENCE/BRANCH ARMS OVERLAP — the user reports (22.07.2026,
+  screenshot) that at a river junction (a confluence or distributary branch) the
+  two river arms visibly OVERLAP: each arm is drawn as its own semi-transparent
+  ribbon strip, and where they meet the strips CROSS rather than merging into one
+  water body — the alpha-blended water DOUBLES in the overlap (a darker wedge) and
+  each arm's bank/foam edges run through the other's water (crossing edges). FIX:
+  make a junction read as ONE continuous water surface — merge or mask the
+  overlapping ribbons at the branch (draw each ribbon's water only outside the
+  other's shared region, or render the junction region once, so the alpha never
+  doubles) and SUPPRESS the interior bank/foam edges inside the confluence. There
+  is already interior-edge masking for confluences in
+  `src/scenes/travel/riverBanks.ts` (the point-211-era tributary-edge rule) — the
+  natural approach is to extend that so a branch overlap is masked the same way,
+  and to depth-test / draw-once the shared water so it does not blend twice.
+  Preserve §11.3 continuity (the merged junction stays gap-free) and the 232
+  smoothing (do not reintroduce steps). Anchors: `src/scenes/travel/Rivers.tsx`
+  (how multiple rivers/branches are drawn), `src/scenes/travel/riverBanks.ts`
+  (confluence interior-edge masking + its test `riverBanks.test.ts`),
+  `src/scenes/travel/waterSurface.ts`. VERIFIABLE: extend
+  `src/scenes/travel/riverBanks.test.ts` — assert that at a confluence the two
+  ribbons' shared region is masked/merged (the overlap is not double-drawn and the
+  interior edges inside the junction are suppressed); the parent picture-verifies
+  a confluence/branch on BOTH backends (one clean continuous water body, no dark
+  overlap wedge, no crossing edges). DOCS: design.md §11.3 only if wording changes.
+  No player-visible text. NOTE: same files as point 232 (Rivers.tsx /
+  waterSurface.ts / riverBanks.ts) — DELEGATE 232 AND 233 TOGETHER on ONE branch
+  (two atomic commits, both ticked at the one merge) so the river-rendering edits
+  never collide; keep 218/219/220 off that branch's concurrency.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
