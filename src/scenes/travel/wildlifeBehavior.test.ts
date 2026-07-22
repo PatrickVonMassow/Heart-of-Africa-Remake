@@ -11,6 +11,8 @@ import {
   waterStruggleFate,
   blockHeading,
   fleeHeading,
+  fleesFromPlayer,
+  PLAYER_SHY_STRONG_WEAPON,
   FLIGHT_DESPAWN_OUT,
   FLIGHT_SPAWN_OUT,
   flightStep,
@@ -165,6 +167,72 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
     }
     expect(maxDelta).toBeLessThan(0.35) // no ~90° snap
     expect(reversals).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('fleesFromPlayer (design.md §19 — small/weak animals shy from the traveller)', () => {
+  const W = balance.parentDefense.preyWeapon
+
+  it('weak/prey adults flee the traveller', () => {
+    for (const sp of ['antelope', 'zebra', 'wildebeest', 'warthog']) {
+      expect(fleesFromPlayer(sp, false, W), sp).toBe(true)
+    }
+    // The one weak bird without a weapon entry flies off.
+    expect(fleesFromPlayer('flamingo', false, W)).toBe(true)
+  })
+
+  it('apex/strong adults never flee the traveller', () => {
+    // The §14.1 predators, the elephant and the armoured crocodile stand; the
+    // giraffe's 1.5 weapon reaches the strong bar (a lion-killing kick is
+    // nothing to flee a human over).
+    for (const sp of ['lion', 'leopard', 'hyena', 'cheetah', 'elephant', 'crocodile', 'giraffe']) {
+      expect(fleesFromPlayer(sp, false, W), sp).toBe(false)
+    }
+    // The adult plover keeps the broken-wing lure (point 145b) as its own
+    // answer to the approaching traveller — it never simply bolts.
+    expect(fleesFromPlayer('plover', false, W)).toBe(false)
+    // The weak-tier bar itself sits at the giraffe's weapon strength.
+    expect(W.giraffe).toBeGreaterThanOrEqual(PLAYER_SHY_STRONG_WEAPON)
+    expect(W.zebra).toBeLessThan(PLAYER_SHY_STRONG_WEAPON)
+  })
+
+  it('ANY juvenile flees — including mid-/high-ranked species', () => {
+    // A calf, foal, chick or cub is vulnerable whatever its adults' rank: the
+    // giraffe calf (mid-rank), the lion cub and the plover chick all bolt.
+    for (const sp of ['giraffe', 'lion', 'plover', 'zebra', 'elephant']) {
+      expect(fleesFromPlayer(sp, true, W), sp).toBe(true)
+    }
+  })
+
+  it('the flee heading is the steady summed escape — same machinery, no oscillation', () => {
+    // The traveller as the single fleeHeading threat (exactly how the scene
+    // feeds it): walking along the recomputed escape heading never reverses
+    // it — the held-heading behaviour the elephant dodge already pins.
+    const player: [number, number][] = [[0, 0]]
+    let x = 0.6
+    let z = 0.25
+    let prev: number | null = null
+    let maxDelta = 0
+    let steps = 0
+    for (let i = 0; i < 200; i++) {
+      const h = fleeHeading(x, z, player, 9)
+      if (h === null) break // fled out of the ring — done
+      if (prev !== null) {
+        let d = h - prev
+        while (d > Math.PI) d -= Math.PI * 2
+        while (d < -Math.PI) d += Math.PI * 2
+        maxDelta = Math.max(maxDelta, Math.abs(d))
+      }
+      prev = h
+      const [sx, sz] = dir(h)
+      x += sx * 0.07
+      z += sz * 0.07
+      steps++
+    }
+    expect(steps).toBeGreaterThan(20) // the flight genuinely ran
+    expect(maxDelta).toBeLessThan(0.05) // a radial escape never wavers
+    // And it ends AWAY from the traveller: further out than it started.
+    expect(Math.hypot(x, z)).toBeGreaterThan(Math.hypot(0.6, 0.25) + 1)
   })
 })
 
@@ -759,10 +827,46 @@ describe('turnToward', () => {
 })
 
 describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', () => {
-  const GAMBOL_RANGE = 4
+  // The shipped, calibratable leash values (design.md §19.8): 3× the original
+  // 1.8 leash / 4 play range, so the family dramas read spatially. The bout
+  // derivation mirrors Wildlife.tsx (calibratable bout + fixed 12 s idle gap).
+  const GAMBOL_RANGE = balance.family.gambolRange
   const GAMBOL_SPEED = 2.2
   const YOUNG_FOLLOW_SPEED = 4.5
-  const YOUNG_FOLLOW_RADIUS = 1.8
+  const YOUNG_FOLLOW_RADIUS = balance.family.followRadius
+  const GAMBOL_IDLE_SECONDS = 12
+  const PERIOD = balance.family.gambolBoutSeconds + GAMBOL_IDLE_SECONDS
+  const ACTIVE = balance.family.gambolBoutSeconds / PERIOD
+
+  it('ships the widened leash: 3× the original follow radius and play range', () => {
+    expect(balance.family.followRadius).toBeCloseTo(3 * 1.8, 10)
+    expect(balance.family.gambolRange).toBeCloseTo(3 * 4, 10)
+  })
+
+  it('a hop-bout runs the full calibratable length — longer than the old 4 s bout', () => {
+    expect(balance.family.gambolBoutSeconds).toBeGreaterThan(4)
+    // Play is continuous through the whole widened bout window (phase 0 puts
+    // the bout at the cycle start) …
+    for (let t = 0.1; t < balance.family.gambolBoutSeconds - 0.05; t += 0.5) {
+      expect(gambolState(t, 0, PERIOD, ACTIVE), `t=${t}`).not.toBeNull()
+    }
+    // … while the OLD default bout (16 s × 0.25 = 4 s) was already over at 6 s,
+    // and the widened bout still ends (idle follows).
+    expect(gambolState(6, 0)).toBeNull()
+    expect(gambolState(balance.family.gambolBoutSeconds + 0.2, 0, PERIOD, ACTIVE)).toBeNull()
+  })
+
+  it('the rescue burst still closes the widened leash within the caught window', () => {
+    // Worst case: the calf is caught at the far edge of the play range with the
+    // parent on the opposite side. The charge must cover that gap — plus the
+    // too-late band as slack — well inside the 5 s struggle window
+    // (CAUGHT_DURATION / PARENT_TOO_LATE_DIST in Wildlife.tsx), so the
+    // sacrifice/shield/too-late outcomes all stay reachable at 3× spacing.
+    const CAUGHT_DURATION = 5
+    const PARENT_TOO_LATE_DIST = 3.2
+    const worstGap = balance.family.gambolRange + PARENT_TOO_LATE_DIST
+    expect(rescueSpeed(balance.family.rescueBurst) * CAUGHT_DURATION).toBeGreaterThan(worstGap * 1.5)
+  })
 
   it('plays freely near the parent (the leash barely bends the heading)', () => {
     for (const h of [0, 1.2, Math.PI, -2]) {
@@ -795,7 +899,10 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
 
   // Frame-loop simulation in the shape of the real integrator: the calf must
   // never leave the play range mid-bout (so the follow yank never alternates
-  // with play), and its step direction must not saw back and forth.
+  // with play), and its step direction must not saw back and forth. At the
+  // widened leash it must also genuinely USE the room — reaching clearly
+  // beyond the old 1.8 leash — while the anti-jitter damping holds unchanged
+  // (it has no cancellation point at any range).
   it('a full simulated bout stays leashed with no direction sawtooth', () => {
     const dt = 1 / 60
     let x = 0.5
@@ -808,7 +915,7 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
     let maxDist = 0
     for (let f = 0; f < 3600; f++) {
       const t = f * dt
-      const bout = gambolState(t, 0.37)
+      const bout = gambolState(t, 0.37, PERIOD, ACTIVE)
       const toX = parent.x - x
       const toZ = parent.z - z
       const d = Math.hypot(toX, toZ)
@@ -832,10 +939,15 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
     }
     expect(steps).toBeGreaterThan(400) // the bout actually ran
     expect(maxDist).toBeLessThanOrEqual(GAMBOL_RANGE + 0.05) // leashed — never past the edge
+    expect(maxDist).toBeGreaterThan(YOUNG_FOLLOW_RADIUS) // the widened room is really used (≫ the old 1.8)
     expect(flips / Math.max(1, steps)).toBeLessThan(0.02) // no per-frame sawtooth
   })
 
   it('the OLD unleashed range-switch genuinely sawtoothed (regression witness)', () => {
+    // Pinned to the ORIGINAL constants (range 4, leash 1.8, 4 s default bout):
+    // this documents the historical bug the leash damping fixed.
+    const OLD_RANGE = 4
+    const OLD_FOLLOW_RADIUS = 1.8
     const dt = 1 / 60
     let x = 0.5
     let z = 0
@@ -846,7 +958,7 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
     for (let f = 0; f < 3600; f++) {
       const t = f * dt
       const d = Math.hypot(x, z)
-      const bout = d <= GAMBOL_RANGE ? gambolState(t, 0.37) : null
+      const bout = d <= OLD_RANGE ? gambolState(t, 0.37) : null
       if (bout) {
         const sx = Math.sin(bout.heading)
         const sz = Math.cos(bout.heading)
@@ -857,7 +969,7 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
         prevStepZ = sz
         steps++
       } else {
-        if (d > YOUNG_FOLLOW_RADIUS) {
+        if (d > OLD_FOLLOW_RADIUS) {
           const sx = -x / d
           const sz = -z / d
           x += sx * YOUNG_FOLLOW_SPEED * dt

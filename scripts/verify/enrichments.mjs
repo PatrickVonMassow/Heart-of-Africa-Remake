@@ -1391,7 +1391,11 @@ const animalHit = await page.evaluate(async () => {
     for (const sp of Object.keys(h)) for (const a of h[sp]) if (a.chunk && !a.dead) return a.chunk
     return undefined
   })()
-  const zebra = { x: ax, z: az, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: liveChunk ?? 'collide-test' }
+  // The drink errand exempts the target from the player-shy flight (design.md
+  // §19) — the same exemption the staged bank dramas use — so the PINNED body
+  // stands its ground for the drive-into-it collision measurement instead of
+  // being displaced between re-pins.
+  const zebra = { x: ax, z: az, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: liveChunk ?? 'collide-test', drink: { tx: ax, tz: az } }
   // Clear the drive corridor of every OTHER animal (point 135e): the
   // guarantee seeders (vicinity, dry shore) can stand a grazer on the
   // straight line to the pinned target, and the traveller then collides —
@@ -1867,17 +1871,96 @@ await page.evaluate(() => window.__sleepSim(2))
 const familyLife = await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe', 'elephant']
+  // "Close" follows the calibratable leash (the widened balance.family
+  // .followRadius): the follow yank settles a calf just inside that radius.
+  const leashR = window.__balance.family.followRadius + 1
   let young = 0, close = 0
   for (const sp of SP)
     for (const a of herds[sp] ?? []) {
       if (a.young && a.parent && !a.parent.dead) {
         young++
-        if (Math.hypot(a.x - a.parent.x, a.z - a.parent.z) < 5) close++
+        if (Math.hypot(a.x - a.parent.x, a.z - a.parent.z) < leashR) close++
       }
     }
   return { young, close }
 })
 check('herds raise young that keep close to a parent (nursing)', familyLife.young > 0 && familyLife.close > 0, JSON.stringify(familyLife))
+
+// --- The widened calf leash (design.md §19.8): a calf can stand clearly ------
+// further from its parent than the old 1.8-unit leash — watch the live pairs
+// while play/follow run and take the maximum parent distance seen.
+const calfLeash = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
+  let maxD = 0
+  let pairs = 0
+  await window.__pollSim(20, () => {
+    if (window.__wildlife.lion) window.__wildlife.lion.mode = 'idle'
+    pairs = 0
+    for (const sp of SP) {
+      for (const a of herds[sp] ?? []) {
+        if (
+          a.young && a.parent && !a.parent.dead && !a.dead &&
+          a.mired === undefined && a.inWater === undefined && a.caught === undefined
+        ) {
+          pairs++
+          maxD = Math.max(maxD, Math.hypot(a.x - a.parent.x, a.z - a.parent.z))
+        }
+      }
+    }
+    return maxD > 2.5
+  })
+  return { maxD: +maxD.toFixed(2), pairs, followRadius: window.__balance.family.followRadius }
+})
+check('a calf strays clearly further than the old 1.8 leash (widened calf leash)', calfLeash.maxD > 2.5, JSON.stringify(calfLeash))
+
+// --- Player shyness (design.md §19): a weak grazer flees the traveller -------
+// An animal of the weak/prey tier inside the shy ring turns and runs away from
+// the player's bird's-eye figure through the held dodge heading — and the pass
+// stays consequence-free: no damage, no event, no journal entry (the §19.3
+// walk-into-a-predator attack is about predators, not shy prey).
+const playerShy = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const g0 = window.__game.getState()
+  const before = { health: g0.health, journal: g0.journal.length }
+  const p = g0.pos
+  // Inject a zebra just inside the shy ring (front of the list: the behaviour
+  // window caps per-species processing).
+  const shy = { x: p.x + 3.5, z: p.z, y: 0.2, rot: 0, scale: 1, phase: 0.4 }
+  herds.zebra.unshift(shy)
+  const d0 = Math.hypot(shy.x - p.x, shy.z - p.z)
+  let engaged = false
+  let dEnd = d0
+  for (let k = 0; k < 60; k++) {
+    // Keep the scripted hunt quiet so the measured flight is the player's.
+    if (window.__wildlife.lion) { window.__wildlife.lion.mode = 'idle'; window.__wildlife.lion.timer = 999 }
+    await sleep(100)
+    if (typeof shy.dodgeHeading === 'number') engaged = true
+    const pn = window.__game.getState().pos
+    dEnd = Math.hypot(shy.x - pn.x, shy.z - pn.z)
+    if (engaged && dEnd > 8.5) break
+  }
+  const g1 = window.__game.getState()
+  herds.zebra = herds.zebra.filter((a) => a !== shy)
+  return {
+    d0: +d0.toFixed(2),
+    dEnd: +dEnd.toFixed(2),
+    engaged,
+    healthSame: g1.health === before.health,
+    journalSame: g1.journal.length === before.journal,
+  }
+})
+check(
+  'a weak grazer shies away from the nearby traveller (steady flight, no pin)',
+  playerShy.engaged && playerShy.dEnd > playerShy.d0 + 1.5,
+  JSON.stringify(playerShy),
+)
+check(
+  'the shy pass costs the traveller nothing (no damage, no event journaled)',
+  playerShy.healthSame && playerShy.journalSame,
+  JSON.stringify(playerShy),
+)
 
 // --- No jitter (design.md §19): a playing calf's step direction must not saw
 // back and forth between frames (the old play/follow boundary ping-pong).

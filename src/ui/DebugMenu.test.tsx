@@ -36,6 +36,9 @@ const DEFAULTS = {
   vigilPredatorDelay: balance.vigil.predatorDelay,
   rescueBurst: balance.family.rescueBurst,
   calfFraction: balance.family.calfFraction,
+  calfFollowRadius: balance.family.followRadius,
+  calfGambolRange: balance.family.gambolRange,
+  calfGambolBout: balance.family.gambolBoutSeconds,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   placeStrafeFactor: balance.placeStrafeFactor,
   inventoryCapacity: balance.inventoryCapacity,
@@ -92,6 +95,9 @@ afterEach(() => {
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   balance.family.rescueBurst = DEFAULTS.rescueBurst
   balance.family.calfFraction = DEFAULTS.calfFraction
+  balance.family.followRadius = DEFAULTS.calfFollowRadius
+  balance.family.gambolRange = DEFAULTS.calfGambolRange
+  balance.family.gambolBoutSeconds = DEFAULTS.calfGambolBout
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.placeStrafeFactor = DEFAULTS.placeStrafeFactor
   balance.inventoryCapacity = DEFAULTS.inventoryCapacity
@@ -176,6 +182,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.rescueBurst, read: () => balance.family.rescueBurst, value: 3 },
     // The juvenile fraction per herd (design.md §19, point 169).
     { label: en.debug.calfFraction, read: () => balance.family.calfFraction, value: 0.4 },
+    // The calf leash, play range and bout length (design.md §19.8, §21.2).
+    { label: en.debug.calfFollowRadius, read: () => balance.family.followRadius, value: 7 },
+    { label: en.debug.calfGambolRange, read: () => balance.family.gambolRange, value: 15 },
+    { label: en.debug.calfGambolBout, read: () => balance.family.gambolBoutSeconds, value: 10 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
   ]
