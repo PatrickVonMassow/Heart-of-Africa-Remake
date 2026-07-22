@@ -62,6 +62,14 @@ const COAST_SMOOTH_BAND = 0.08
 // tone (~-0.6) at the band edge, then joins the stamped floor seamlessly.
 const SHELF_BAND = 0.3
 const SHELF_SLOPE = 2.0
+// point 210b: how far LANDWARD of the trim boundary the kept-side shallow shelf
+// reaches. The Gulf-of-Suez head is a wide near-shore shallow that extends well
+// past COAST_SMOOTH_BAND; clamping the shelf only to 0.08 deg let the floor past
+// it plunge to the trim stamp and read as a blocky underwater wedge east of
+// Cairo. Beyond this band the DEM bathymetry is restored (eased, no step).
+const KEPT_LANDWARD_BAND = 0.25
+const STAMP_FLOOR_M = -900 // below this the near-boundary DEM floor is trim-stamp garbage, not natural bathymetry
+const STAMP_SHELF_H = -0.15 // shallow shelf height the stamped gulf-head texels are lifted to
 
 // Permanent ice (design.md §19.13, point 141): ONLY the three massifs that
 // really carried glaciers in 1890 — Kilimanjaro, Mount Kenya, Rwenzori, all
@@ -260,14 +268,35 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // the height field — no per-vertex land/ocean steps.
   const shoreT = sstep(0.32, 0.68, land)
   let hOcean = -0.12 + Math.max(-3.4, elevation * 0.0006)
-  if (boundaryIsCoast && bsd < COAST_SMOOTH_BAND) {
-    // Cover the land-side transition too (bsd up to +COAST_SMOOTH_BAND): the shore
-    // blend uses hOcean while shoreT < 1, so a still-deep hOcean there plunges the
-    // land shore just inside the waterline and reopens the moat. t ramps 0 at/inside
-    // the line to 1 at the deep edge; the shelf only deepens seaward (min(0, bsd)).
+  if (boundaryIsCoast && bsd < KEPT_LANDWARD_BAND) {
+    // Cover the land-side transition too: the shore blend uses hOcean while
+    // shoreT < 1, so a still-deep hOcean there plunges the land shore just inside
+    // the waterline and reopens the moat. t ramps 0 at/inside the line to 1 at the
+    // deep (seaward) edge; the shelf only deepens seaward (min(0, bsd)). Landward
+    // (bsd>0) the shallow clamp used to stop at COAST_SMOOTH_BAND, so the wider
+    // gulf-head near-shore ocean past it plunged to the trim stamp and read as a
+    // blocky underwater wedge east of Cairo (point 210b); extend the clamp across
+    // KEPT_LANDWARD_BAND, easing back to the DEM floor at the band edge (no step).
     const t = Math.max(0, Math.min(1, -bsd / SHELF_BAND))
     const shelf = -0.05 + Math.min(0, bsd) * SHELF_SLOPE // shallow at the line, deepening outward
     hOcean = Math.max(hOcean, shelf * (1 - t) + hOcean * t)
+  }
+  // Gulf-of-Suez head (point 210b): the DEM's bathymetry here is garbage — the
+  // ~-3000 m trim stamp alternates cell-by-cell with shallow (~0 m) real texels,
+  // cliffing the ocean floor into a blocky lit wedge seen through the transparent
+  // shallows east of Cairo. The coast-gated shelf above never reaches it (its
+  // inward sample is gulf water, not land), and a partial ease stays below the
+  // deep-tone threshold anyway. Clamp ONLY the stamped-floor texels (elevation
+  // below STAMP_FLOOR_M — the uniform garbage stamp, never natural bathymetry)
+  // near the boundary to a smooth shallow shelf, so they read as coastal
+  // shallows level with their real neighbours. Deep open water (natural
+  // bathymetry, or far from the boundary) is untouched.
+  if (!boundaryIsCoast && elevation < STAMP_FLOOR_M && bsd > -SHELF_BAND && bsd < KEPT_LANDWARD_BAND) {
+    // Blend the shallow clamp back to the DEM floor across the seaward half of
+    // the band (bsd < 0), so it eases into the deep open gulf with no step; on
+    // the landward side (bsd >= 0) the full shallow shelf holds.
+    const seaward = bsd < 0 ? Math.max(0, 1 + bsd / SHELF_BAND) : 1
+    hOcean = Math.max(hOcean, STAMP_SHELF_H * seaward + hOcean * (1 - seaward))
   }
   const hLandBase = Math.max(0.06, elevation * METERS_TO_UNITS) + detail * 0.2 * shoreT
 

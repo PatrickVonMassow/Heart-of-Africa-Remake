@@ -361,6 +361,23 @@ describe('boundarySignedDistance + the trim-coast smoothing (point 210)', () => 
     expect(near).toBeGreaterThan(far + 0.08)
   })
 
+  it('grades the Gulf-of-Suez head floor to a shallow shelf (no blocky trim-stamp wedge)', () => {
+    // point 210b: at the gulf head the boundary runs through gulf water, so the
+    // coast-gated shelf skips it and the DEM's ~-3000 m trim stamp (alternating
+    // cell-by-cell with shallow real texels) cliffed the ocean floor into a
+    // blocky lit wedge east of Cairo. The stamp-clamp lifts those garbage-deep
+    // texels to a shallow shelf: adjacent gulf-head cells now read shallow and
+    // level (no cliff), while genuine deep sea far from the boundary is untouched.
+    const a = sampleTerrain(29.8, 32.55, seed).height
+    const b = sampleTerrain(29.85, 32.55, seed).height
+    expect(a).toBeGreaterThan(-0.4) // lifted off the deep stamp
+    expect(b).toBeGreaterThan(-0.4)
+    expect(Math.abs(a - b)).toBeLessThan(0.3) // level, no per-cell cliff
+    // Deep open Red Sea, far from the boundary, keeps its bathymetry (the clamp
+    // is bounded — it does not globally shallow the sea).
+    expect(sampleTerrain(19, 39, seed).height).toBeLessThan(-0.8)
+  })
+
   it('does NOT re-add land in the real Gulf-of-Suez head (no spurious sliver across open water)', () => {
     // Genuine gulf water sits southwest of the boundary here; the guard must
     // leave it — and the thin band at the boundary must not sprout a land bridge
