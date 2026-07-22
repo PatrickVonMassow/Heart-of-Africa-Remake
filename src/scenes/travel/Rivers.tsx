@@ -41,7 +41,7 @@ import {
   LAKE_LIFT,
   lakeBedMax,
   mouthSeaness,
-  planRibbonStrips,
+  planRibbonRows,
   registerRiverSurfaces,
   riverAxisRows,
   riverIsSeaBound,
@@ -183,8 +183,17 @@ function buildRivers(seed: number): {
     // pieces; the mouth of an open strip is carried MOUTH_BRIDGE points into
     // the sea so it merges with the sea sheet (point 211a); only a sustained
     // ocean run (the open sea beyond the mouth) ends the ribbon. The drawn/
-    // connected decisions live in the pure planRibbonStrips.
-    const plan = planRibbonStrips(rows.map((r) => r.ocean))
+    // connected decisions live in the pure planRibbonRows, which also SUPPRESSES
+    // rows lying inside a lake (point 254): the lake sheet already renders that
+    // water, so the point-234 in-lake head strip must NOT be drawn over it — it
+    // showed through the sheet (both draw depthWrite-off) as a visible strip.
+    // The ribbon resumes at the shore (first row outside the lake): the outflow
+    // still reads, no spring returns, and `strips` stays the ocean-continuity
+    // count (a lake crossing is continuous water under its sheet, not a gap).
+    const plan = planRibbonRows(
+      rows.map((r) => r.ocean),
+      rows.map((r) => r.lake),
+    )
     // Point 234: the ribbon crossfades into the sea over its final approach —
     // no visible boundary where river ends and sea begins.
     const seaness = mouthSeaness(
@@ -206,7 +215,10 @@ function buildRivers(seed: number): {
     const PROBE = (HALF_WIDTH + BANK_PROBE_DEG * 10) / HALF_WIDTH
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
-      if (!plan.drawn[i]) continue
+      // Skips the ocean-beyond-bridge rows AND the in-lake rows (point 254): a
+      // suppressed row is not emitted and breaks the strip so the next emitted
+      // row starts fresh (planRibbonRows already cleared its `connected`).
+      if (!plan.emitted[i]) continue
       const isOcean = rows[i].ocean
       // Lake rows hug the LAKE sheet just beneath it (point 234) — they are
       // covered water by design, not a burial under open terrain.

@@ -10,6 +10,7 @@ import {
   lakeSurfaceY,
   MOUTH_FADE_ROWS,
   mouthSeaness,
+  planRibbonRows,
   planRibbonStrips,
   ribbonRowSurfaceAt,
   riverAxisRows,
@@ -476,4 +477,86 @@ describe('river↔water-body transitions (point 234)', () => {
       }
     })
   })
+})
+
+// Point 254 — the point-234 in-lake outflow head must NOT render its ribbon
+// strip over the lake sheet (the lake sheet is the water there; both draw
+// depthWrite-off, so the underlapping strip showed through at Lake Victoria /
+// Lake Albert / Lake Tana). planRibbonRows suppresses the in-lake rows while
+// keeping the outflow semantics (shore connection, no spring).
+describe('in-lake ribbon rows are suppressed (point 254)', () => {
+  const SEED = 42
+
+  beforeAll(async () => {
+    await setupGeodata()
+  })
+
+  const riverById = (id: string) => RIVERS_DATA.find((r) => r.id === id) ?? RIVERS_DATA[0]
+
+  it('planRibbonRows (pure): a lake head is not emitted and the ribbon resumes at the shore', () => {
+    // land land preceded by two in-lake head rows: [lake lake | land land land land].
+    const ocean = [false, false, false, false, false, false]
+    const inLake = [true, true, false, false, false, false]
+    const { emitted, connected, strips } = planRibbonRows(ocean, inLake)
+    // The two in-lake head rows draw nothing …
+    expect(emitted).toEqual([false, false, true, true, true, true])
+    // … the first emitted row (the shore, just outside the lake) starts a strip,
+    // i.e. it does NOT connect back to a suppressed in-lake row …
+    expect(connected[2]).toBe(false)
+    expect(connected.slice(3)).toEqual([true, true, true])
+    // … and the ocean-continuity count is unchanged (no false gap).
+    expect(strips).toBe(1)
+  })
+
+  it('planRibbonRows (pure): a mid-course lake crossing is suppressed but not counted as a gap', () => {
+    // The lake sheet renders the crossing, so the ribbon reads continuous even
+    // though its strip breaks — strips stays the ocean-continuity count (1).
+    const ocean = [false, false, false, false, false]
+    const inLake = [false, false, true, false, false]
+    const { emitted, connected, strips } = planRibbonRows(ocean, inLake)
+    expect(emitted).toEqual([true, true, false, true, true])
+    expect(connected[3]).toBe(false) // resumes fresh after the lake
+    expect(strips).toBe(1)
+  })
+
+  it('planRibbonRows (pure): with no lakes it matches planRibbonStrips exactly', () => {
+    // A sea mouth (bridged) with no lake input must be byte-for-byte the old plan.
+    const ocean = [false, false, false, true, true, true, true, true]
+    const noLake = ocean.map(() => false)
+    const rows = planRibbonRows(ocean, noLake)
+    const strip = planRibbonStrips(ocean)
+    expect(rows.emitted).toEqual(strip.drawn)
+    expect(rows.connected).toEqual(strip.connected)
+    expect(rows.strips).toBe(strip.strips)
+  })
+
+  for (const [river, lake] of [
+    ['white-nile', 'Lake Victoria'],
+    ['blue-nile', 'Lake Tana'],
+  ] as const) {
+    it(`the ${river} outflow: every in-lake row suppressed, the shore outflow remains, no spring (${lake})`, () => {
+      const r = riverById(river)
+      const rows = riverAxisRows(r, SEED)
+      const ocean = rows.map((row) => row.ocean)
+      const inLake = rows.map((row) => row.lake)
+      const { emitted } = planRibbonRows(ocean, inLake)
+      // The head really entered the lake (point 234) …
+      expect(inLake.some(Boolean), `${river}: no in-lake head`).toBe(true)
+      // … and every in-lake row draws NOTHING (no strip over the lake sheet) …
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].lake) expect(emitted[i], `${river} row ${i} over the lake sheet`).toBe(false)
+      }
+      // … while the ribbon RESUMES at the first row outside the lake — the
+      // shore, where the original source sits — so the outflow still reads …
+      const firstEmitted = emitted.indexOf(true)
+      expect(firstEmitted, `${river}: nothing emitted`).toBeGreaterThanOrEqual(0)
+      expect(
+        lakeIndexAt(rows[firstEmitted].lat, rows[firstEmitted].lon),
+        `${river}: the resumed ribbon must start OUTSIDE the lake`,
+      ).toBeLessThan(0)
+      // … and the source row still lies in the lake, so NO spring returns.
+      expect(lakeIndexAt(rows[0].lat, rows[0].lon)).toBeGreaterThanOrEqual(0)
+      expect(springForRiver(r, rows)).toBe(false)
+    })
+  }
 })
