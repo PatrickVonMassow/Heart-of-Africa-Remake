@@ -11,6 +11,7 @@ import { readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import os from 'node:os'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO = R('..')
@@ -37,11 +38,18 @@ const now = Date.now()
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')) } catch { return null } }
 
 // A live session refreshes the lock's claimedAt; within 12 min => alive, leave it.
+// EXCEPT after a reboot: a lock claimed before this machine booted belongs to a
+// session that cannot have survived (forced Windows-Update restart, crash, power
+// loss) — treat it as dead and resurrect immediately, no matter how fresh the
+// timestamp looks. os.uptime() is seconds since boot.
+const bootTime = now - Math.round(os.uptime() * 1000)
 const lock = readJson(join(REPO, '.claude', 'batch-lock.json'))
-if (lock && typeof lock.claimedAt === 'number' && now - lock.claimedAt < 12 * 60 * 1000) {
+const lockPredatesBoot = lock && typeof lock.claimedAt === 'number' && lock.claimedAt < bootTime
+if (lock && !lockPredatesBoot && typeof lock.claimedAt === 'number' && now - lock.claimedAt < 12 * 60 * 1000) {
   log(`skip: a session is alive (lock ${Math.round((now - lock.claimedAt) / 60000)} min old)`)
   process.exit(0)
 }
+if (lockPredatesBoot) log('lock predates this boot — the previous session is dead, resurrecting')
 // Debounce: if we already spawned recently, give that session time to claim the lock.
 const last = readJson(join(REPO, '.claude', 'autostart-last.json'))
 if (last && typeof last.at === 'number' && now - last.at < 10 * 60 * 1000) {
