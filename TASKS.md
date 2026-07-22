@@ -9044,6 +9044,43 @@ the remaining open points in their numeric order.
   (two atomic commits, both ticked at the one merge) so the river-rendering edits
   never collide; keep 218/219/220 off that branch's concurrency.
 
+- [ ] 234. SMOOTH RIVER ↔ WATER-BODY TRANSITIONS (lake outflow + sea mouth) — the
+  user reports (22.07.2026, two screenshots) two related junction defects and asks
+  for the GENERAL rule that a river transitions SMOOTHLY into any other water body:
+  (a) at Lake Victoria the (White) Nile is drawn with its OWN detached SPRING (the
+  §219 ring marker) set beside the lake with a gap between lake and river — but the
+  Nile SOURCES from Lake Victoria (historically it flows out at Jinja), so the
+  river must flow OUT of the lake as a seamless outflow, with NO separate spring
+  and NO gap; (b) the Nile's MOUTH into the Mediterranean still shows an
+  interruption/gap between the river ribbon and the sea. FIRST rule out deploy lag
+  for (b): point 211 (merged c66fd0d, ~21:05) bridged the Rosetta mouth — verify
+  the gap against a build of CURRENT main (or freshly-deployed main), and if 211
+  already closed it, the remaining item is only (a) plus any OTHER mouth. FIX: a
+  smooth blend at every river↔lake and river↔sea junction — (1) LAKE OUTFLOW: where
+  a river's SOURCE coincides with (or lies at the shore of) a lake, suppress the
+  spring marker and overlap the ribbon's head UNDER the lake sheet at the lake's
+  surface height, so the river reads as flowing out of the lake (a source-at-a-lake
+  is an outflow, not a spring); (2) SEA MOUTH: ensure the ribbon's tail actually
+  reaches and merges under the sea sheet with no gap (extend/repair the 211
+  mouth-bridge wherever a mouth still gaps); (3) GENERAL: match heights and overlap
+  the ribbon head/tail beneath the receiving water sheet at every such junction so
+  no seam shows. Determine which river SOURCES coincide with lakes from the world
+  river/lake data. Anchors: `src/scenes/travel/waterSurface.ts` (mouth bridge,
+  `planRibbonStrips`, ribbon head/tail), `src/scenes/travel/Rivers.tsx` (spring
+  rendering — shared with point 219 — and the ribbon ends), the spring-placement /
+  river-source logic and the lake-surface rendering (search `src/world/` and
+  `src/scenes/travel/` for river sources, springs and lake sheets). VERIFIABLE:
+  pure tests that a river whose source coincides with a lake produces NO spring and
+  its head overlaps the lake sheet, and that the Nile mouth ribbon overlaps the sea
+  sheet with no gap (extend `riverSmoothness.test.ts` / the water tests); the
+  parent picture-verifies Lake Victoria (Nile flowing out of the lake, no detached
+  spring) and the Nile sea mouth on BOTH backends against current main. DOCS:
+  design.md §11.3 (river↔water-body transitions). No player-visible text. NOTE:
+  same subsystem/files as points 211/218/219/232/233 — this is the umbrella
+  "smooth river↔other-water transition" the user asked for; DELEGATE the coupled
+  river-rendering cluster (232 + 233 + 234, and fold in 219's spring redesign)
+  TOGETHER on ONE branch, sequentially, so the shared files never collide.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
