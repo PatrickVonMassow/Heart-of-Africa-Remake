@@ -140,17 +140,25 @@ describe('trimToGameWorld', () => {
     expect(elev(px, east)).toBeLessThan(0)
   })
 
-  it('keeps the real bathymetry of sea texels', () => {
+  // Point 235: near-shore sea keeps its real bathymetry, far offshore flattens.
+  it('keeps near-shore sea bathymetry but flattens far offshore to deep ocean', () => {
     const px = fill()
     trimToGameWorld(px, meta, seeds)
-    const sea = texel(8.5, 20.5)
-    expect(elev(px, sea)).toBe(-200)
-    expect(px[sea + 2]).toBe(0)
+    // A sea texel bordering the kept west land (inside the near-shore band)
+    // keeps its real shelf depth.
+    const nearSea = texel(7.5, 20.5)
+    expect(elev(px, nearSea)).toBe(-200)
+    expect(px[nearSea + 2]).toBe(0)
+    // A sea texel beyond the near-shore band reads flat deep ocean, not its
+    // real -200 m shelf.
+    const farSea = texel(8.5, 20.5)
+    expect(elev(px, farSea)).toBeLessThan(-800)
+    expect(px[farSea + 2]).toBe(0)
   })
 
-  // The trimmed east mass sits well beyond the near-shore band (0.6°), so it
-  // takes the deep open-sea stamp and its shelf ring is hidden; a trimmed
-  // spit at a kept shore is covered by the delta assertions below.
+  // The trimmed east mass sits well beyond the near-shore band (0.6°), so its
+  // shelf ring is flattened to deep open ocean; a trimmed spit at a kept shore
+  // is covered by the delta assertions below.
   it('deepens the shallow shelf around trimmed land, not shallows near kept land', () => {
     const px = fill()
     const shelfEast = texel(9.5, 21.5) // shallow sea texel bordering the trimmed east mass
@@ -162,7 +170,7 @@ describe('trimToGameWorld', () => {
     px[shelfWest + 1] = (12000 - 50) & 0xff
     px[shelfWest + 2] = 0
     trimToGameWorld(px, meta, seeds)
-    expect(elev(px, shelfEast)).toBeLessThan(-1000) // ghost shelf removed
+    expect(elev(px, shelfEast)).toBeLessThan(-800) // ghost shelf removed (flat deep ocean)
     expect(elev(px, shelfWest)).toBe(-50) // kept-land shore untouched
   })
 
@@ -233,6 +241,44 @@ describe('world trim on the real DEM', () => {
   it('shallow sea northeast of the boundary reads as deep open ocean (Persian Gulf)', () => {
     expect(elevationAt(27, 51)).toBeLessThan(-500)
     expect(elevationAt(16, 40.2)).toBeLessThan(-500) // Dahlak shelf
+  })
+
+  it('offshore shelves and island scraps beyond the continent read as flat deep ocean (point 235)', () => {
+    // The user reported leftover shallow-water "Fetzen" (offshore shelf
+    // patches, island-like relief) floating in the deep ocean around the Red
+    // Sea, the Gulf of Aden and the Horn. Beyond the reachable continent and
+    // its near-shore shelf there is only flat deep ocean: each sample reads
+    // deep, with no land and blocked movement.
+    for (const [lat, lon, label] of [
+      [16.7, 42.0, 'Farasan bank (Red Sea)'],
+      [16.0, 40.2, 'Dahlak shelf (Red Sea)'],
+      [14.5, 42.0, 'southern Red Sea'],
+      [12.5, 48.0, 'Gulf of Aden'],
+      [12.5, 51.5, 'Socotra-area approaches'],
+      [27.0, 51.0, 'Persian Gulf bank'],
+      [-17.5, 43.5, 'Madagascar western bank'],
+    ] as const) {
+      expect(landFractionAt(lat, lon), `land at ${label}`).toBe(0)
+      expect(elevationAt(lat, lon), `depth at ${label}`).toBeLessThan(-800)
+      const t = sampleTerrain(lat, lon, seed)
+      expect(t.type, `type at ${label}`).toBe('ocean')
+      expect(isBlocked(t.type, lat, lon), `blocked at ${label}`).toBe(true)
+    }
+  })
+
+  it('the reachable islands and the African coast keep their near-shore shelf as land (point 235)', () => {
+    // The offshore flatten must NOT reach the kept land or its coastal shelf.
+    for (const [lat, lon] of [
+      [-6.1, 39.3], // Zanzibar
+      [-5.15, 39.72], // Pemba
+      [3.5, 8.65], // Bioko
+    ] as const) {
+      expect(landFractionAt(lat, lon), `island land at ${lat},${lon}`).toBeGreaterThan(0.5)
+    }
+    // Trimmed near-shore spits (the Nile-delta lagoon bars) still inherit the
+    // local shallow shelf — not the deep flatten.
+    expect(elevationAt(31.6, 30.75)).toBeGreaterThan(-100)
+    expect(elevationAt(31.6, 31.25)).toBeGreaterThan(-100)
   })
 
   it('Madagascar leaves no land and no ghost shelf (unreachable, removed)', () => {
