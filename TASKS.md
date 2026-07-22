@@ -9116,7 +9116,7 @@ the remaining open points in their numeric order.
   point 221 (swim margin, redSea) and 220 (chunk seam); do not delegate those
   concurrently.
 
-- [ ] 236. SETTLEMENT GROUND ↔ BACKDROP TRANSITION LOOKS WRONG — the user reports
+- [x] 236. SETTLEMENT GROUND ↔ BACKDROP TRANSITION LOOKS WRONG — the user reports
   (22.07.2026, screenshot in Khartoum) that the transition between the flat
   walkable settlement ground and the surrounding §2.5 panorama backdrop looks
   wrong: a hard rectangular STEP/NOTCH where the settlement ground disc ends and
