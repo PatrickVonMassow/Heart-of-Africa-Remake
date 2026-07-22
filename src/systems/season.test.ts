@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, sunDimFactor, thunderstormAt, thunderDelaySeconds, wetnessAt } from './season'
+import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, wetnessAt, type StrikeSchedulerState } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -752,6 +752,95 @@ describe('thunderDelaySeconds (point 166 — the flash-to-thunder lag)', () => {
     expect(thunderDelaySeconds(7)).toBe(thunderDelaySeconds(7))
     const spread = new Set([0, 1, 2, 3, 4, 5, 6, 7].map((i) => thunderDelaySeconds(i).toFixed(2)))
     expect(spread.size).toBeGreaterThan(4) // not a constant
+  })
+})
+
+describe('strikeSchedulerStep (point 166 — every flash re-fires, across the whole storm)', () => {
+  const fresh = (): StrikeSchedulerState => ({ nextAt: 0, count: 0, lastOpenAt: 0 })
+  const DT = 1 / 60
+
+  /** Drive the scheduler for `seconds`, calling `gate(t)` for the storm strength. */
+  const run = (state: StrikeSchedulerState, seconds: number, gate: (t: number) => number, from = 0) => {
+    const fires: Array<{ t: number; delay: number }> = []
+    for (let t = from; t < from + seconds; t += DT) {
+      const d = strikeSchedulerStep(state, gate(t), t)
+      if (d !== null) fires.push({ t, delay: d })
+    }
+    return fires
+  }
+
+  it('fires the first bolt after the arm-up, then a SECOND, then N more — never one-shot', () => {
+    const state = fresh()
+    const fires = run(state, 120, () => 0.8)
+    expect(fires.length).toBeGreaterThanOrEqual(8) // many bolts across 2 min, not one
+    expect(fires[0].t).toBeCloseTo(STRIKE_FIRST_BOLT_SECONDS, 1)
+    for (const f of fires) {
+      expect(f.delay).toBeGreaterThanOrEqual(1) // each bolt carries its 1-4 s thunder lag
+      expect(f.delay).toBeLessThanOrEqual(4)
+    }
+    // The trigger re-arms per flash: every successive gap sits in the 4-13 s band.
+    for (let i = 1; i < fires.length; i++) {
+      const gap = fires[i].t - fires[i - 1].t
+      expect(gap).toBeGreaterThanOrEqual(STRIKE_MIN_GAP_SECONDS - DT)
+      expect(gap).toBeLessThanOrEqual(13 + DT)
+    }
+    // And the delay seed advances — the bolts are not one repeated clap.
+    expect(new Set(fires.slice(0, 8).map((f) => f.delay.toFixed(3))).size).toBeGreaterThan(4)
+  })
+
+  it('survives the travel gate flicker — the regression that made thunder fire at most once', () => {
+    // While DRIVING, the per-day/per-cell re-roll flickers the gate roughly
+    // every second (day ticks ~1.1/s at travel speed, THUNDERSTORM_CHANCE 0.35).
+    // Model that: 0.9 s open, 1.8 s closed, repeating — one continuous rain belt.
+    const flicker = (t: number) => (t % 2.7 < 0.9 ? 0.7 : 0)
+    // The OLD scheduler (reset to unarmed on the first closed frame) never got
+    // past its 2 s arm-up here — zero bolts, ever. The witness:
+    const old = { nextAt: 0, count: 0 }
+    for (let t = 0; t < 120; t += DT) {
+      const s = flicker(t)
+      if (s > 0) {
+        if (old.nextAt === 0) old.nextAt = t + STRIKE_FIRST_BOLT_SECONDS
+        if (t >= old.nextAt) old.count++
+      } else {
+        old.nextAt = 0
+      }
+    }
+    expect(old.count).toBe(0) // the reported defect: thunder starved while moving
+    // The held scheduler keeps firing through the same flicker.
+    const state = fresh()
+    const fires = run(state, 120, flicker)
+    expect(fires.length).toBeGreaterThanOrEqual(5)
+    // …and every bolt still fires ON an open-gate frame (no clear-sky thunder).
+    for (const f of fires) expect(flicker(f.t)).toBeGreaterThan(0)
+  })
+
+  it('never fires while the gate is closed', () => {
+    const state = fresh()
+    expect(run(state, 60, () => 0).length).toBe(0)
+    expect(state.nextAt).toBe(0) // nothing armed by a clear sky
+  })
+
+  it('disarms only after a full hold window without the storm, then re-arms fresh', () => {
+    const state = fresh()
+    const first = run(state, 10, () => 0.8)
+    expect(first.length).toBeGreaterThanOrEqual(1)
+    // A short off spell (well under the hold) keeps the schedule armed…
+    run(state, 5, () => 0, 10)
+    expect(state.nextAt).not.toBe(0)
+    // …a spell past STRIKE_HOLD_SECONDS disarms it…
+    run(state, STRIKE_HOLD_SECONDS + 2, () => 0, 15)
+    expect(state.nextAt).toBe(0)
+    // …and the NEXT storm starts over with the fresh arm-up, then keeps firing.
+    const from = 15 + STRIKE_HOLD_SECONDS + 2
+    const again = run(state, 30, () => 0.8, from)
+    expect(again.length).toBeGreaterThanOrEqual(2) // re-fires in the new storm too
+    expect(again[0].t - from).toBeCloseTo(STRIKE_FIRST_BOLT_SECONDS, 1)
+  })
+
+  it('is deterministic over the state — a replay agrees bolt for bolt', () => {
+    const a = run(fresh(), 60, () => 0.9)
+    const b = run(fresh(), 60, () => 0.9)
+    expect(a).toEqual(b)
   })
 })
 

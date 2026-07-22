@@ -580,6 +580,65 @@ export function thunderDelaySeconds(strikeSeed: number): number {
   return 1 + r * 3
 }
 
+/** Seconds after the storm gate first opens until the first bolt. */
+export const STRIKE_FIRST_BOLT_SECONDS = 2
+/** Minimum gap between two bolts; the deterministic jitter adds up to 9 s. */
+export const STRIKE_MIN_GAP_SECONDS = 4
+/**
+ * How long an ARMED strike schedule survives the gate reading closed
+ * (design.md §19.13, point 166). The travel gate re-rolls per game DAY and per
+ * 2° cell — and a moving traveller ticks ~a day a second — so inside one
+ * continuous rain belt the thunderstorm gate FLICKERS on and off every second
+ * or two. Disarming on the first off frame (the original behaviour) restarted
+ * the 2 s first-bolt arm-up on every flicker and starved the 4-13 s re-strike
+ * wait outright: while travelling, thunder fired at most once per journey (the
+ * field-reported "thunder plays only once"). The schedule therefore holds
+ * through off spells up to this window — comfortably above the longest
+ * re-strike gap — and only a genuinely left-behind storm (a continuous off
+ * spell this long) disarms it. A bolt still FIRES only on a frame whose gate
+ * is open, so thunder under a rainless sky stays impossible.
+ */
+export const STRIKE_HOLD_SECONDS = 30
+
+/** Mutable per-scene strike-scheduler state (one per view, reset on remount). */
+export interface StrikeSchedulerState {
+  /** Render-clock time the next bolt is due; 0 = unarmed. */
+  nextAt: number
+  /** Bolts fired so far — the deterministic delay/jitter seed. */
+  count: number
+  /** Render-clock time the gate was last seen open; 0 = never. */
+  lastOpenAt: number
+}
+
+/**
+ * One frame of the lightning-strike scheduler (point 166; shared by the
+ * bird's-eye Climate and the settlement view). Returns the fired bolt's
+ * flash→thunder delay in seconds, or null when no bolt fires this frame.
+ * Pure over its state argument, so the re-fire behaviour — including the
+ * gate-flicker survival above — is unit-testable without a browser.
+ */
+export function strikeSchedulerStep(state: StrikeSchedulerState, stormStrength: number, now: number): number | null {
+  if (stormStrength > 0) {
+    state.lastOpenAt = now
+    if (state.nextAt === 0) state.nextAt = now + STRIKE_FIRST_BOLT_SECONDS // first bolt soon after the gate opens
+    if (now >= state.nextAt) {
+      const delay = thunderDelaySeconds(state.count)
+      state.count++
+      // Next strike in 4-13 s, deterministic jitter per strike.
+      state.nextAt = now + STRIKE_MIN_GAP_SECONDS + (thunderDelaySeconds(state.count * 31 + 7) - 1) * 3
+      return delay
+    }
+    return null
+  }
+  // Gate closed this frame: keep the armed schedule through the per-day/per-cell
+  // flicker; disarm only once the storm has been gone for the whole hold window.
+  if (state.nextAt !== 0 && now - state.lastOpenAt > STRIKE_HOLD_SECONDS) {
+    state.nextAt = 0
+    state.lastOpenAt = 0
+  }
+  return null
+}
+
 /** The harmattan pall's tone: whitish ochre dust, NOT the wet RAIN_GRAY. */
 export const HARMATTAN_PALE = '#d9cdb2'
 
