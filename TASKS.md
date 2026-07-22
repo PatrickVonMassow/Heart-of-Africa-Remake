@@ -8154,6 +8154,22 @@ the remaining open points in their numeric order.
   blocky floor is not revealed, or (c) both. Decide with a rendered A/B that
   isolates the floor mesh vs the water transparency. Consider reverting 0850ab2 if
   the widened transparent zone reads worse to the user on a real WebGPU session.
+  DIAGNOSTIC NARROWED (22.07, __allHi + shelf A/B on WebGL2): forcing ALL near
+  chunks to 220 segments WITH the smooth shelf data in place did NOT smooth the
+  blocky wedge (it read SHARPER) — so the wedge is DEFINITIVELY neither the terrain
+  mesh LOD nor the water depth colour. It is the GULF-HEAD stretch just south of
+  the isthmus (~29.8-30.0N) where the shelf's kept-land guard CORRECTLY does not
+  apply (real gulf water sits SW of the boundary, so the inward land sample fails),
+  leaving the hard -3000 m stamp on that boundary's NE floor. So 210's remaining
+  visible defect == 210b (the Gulf-of-Suez arm), not a separate render bug. THE FIX
+  is one of: (a) relax/replace the shelf guard specifically for the gulf head so
+  its NE-stamped floor is graded too WITHOUT inventing shallows in the real gulf
+  water SW of the line (needs care — the guard exists precisely to avoid that); or
+  (b) tighten the NORTHEAST_BOUNDARY control points near the gulf so the head reads
+  as a slim gulf and the stamped wedge shrinks; (b) is the originally-planned 210b
+  and the safer lever. Either way, verify on BOTH backends per
+  [[verify-gui-on-both-backends]] with the user's real WebGPU as the trusted
+  witness (headless WebGPU is washed-out). Mesh-LOD and water-colour are RULED OUT.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
