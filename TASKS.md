@@ -8078,6 +8078,25 @@ the remaining open points in their numeric order.
   follow the real, NARROW Gulf-of-Suez shore (tighten the boundary polyline /
   mask so the head reads as a slim gulf, not a wide arm), not to delete the sea
   outright.
+  PROGRESS (22.07.2026, commit 0e5e435) — the STAIRCASE half done. A rendered A/B
+  + a browser height probe found the stepped sea east of Cairo was NOT the
+  waterline (209 covers that for vector coasts, but the Suez trim is an artificial
+  cut, not a LAND_POLYGONS shore) but the stamped sea FLOOR: the trim drops depth
+  from shore to ~-3000 m in one DEM texel, a blocky underwater cliff the shallow
+  (partly transparent) water shows through + a hard step in the water shader's
+  depth-driven colour. Coast-LOD 336 and far-terrain 0.5 changed nothing (a data
+  cliff, not a mesh limit). Fix: new `redSea.boundarySignedDistance` drives a
+  gentle SHELF on `hOcean` (feeds shore blend AND floor as one surface, no
+  waterline moat) easing into the stamped deep across SHELF_BAND, plus the
+  waterline straightened to a smooth diagonal — both gated on the boundary
+  abutting kept land, so the Gulf-of-Suez head and seaward-of-coast stretches keep
+  their bathymetry. redSea.test.ts +6 cases (30 total), full Vitest 2006 green,
+  lint clean; the isthmus coast renders as an organic graded shore (captures).
+  STILL OPEN — the second half: the Gulf-of-Suez head still reads as a too-wide,
+  partly-stepped arm (the guard leaves it: real water, not kept-land shore).
+  Narrow it by tightening the NORTHEAST_BOUNDARY control points near [32.42,31.45]
+  …[32.7,29.75] so the head reads slim, keeping every redSea.test.ts verdict
+  (Suez ~29.97/32.55 stays ocean, the isthmus stays land). Then 211.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
