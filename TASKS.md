@@ -8724,7 +8724,7 @@ the remaining open points in their numeric order.
   VERIFIABLE: a driven pass over a chunk boundary shows no seam (screenshot), both
   backends; pure test if a helper changes. DOCS: design.md §3.3.
 
-- [ ] 221. WALKING ARBITRARILY FAR INTO THE OCEAN — the player can wade a variable,
+- [x] 221. WALKING ARBITRARILY FAR INTO THE OCEAN — the player can wade a variable,
   sometimes very large distance into open sea (user 22.07.2026, screenshot: far out
   in deep blue at ~32.2S/16.9E), sometimes only a little. The §11.2 swim margin (a
   calibratable near-shore band) is inconsistent. Anchor: the swim-margin / ocean
