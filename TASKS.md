@@ -7848,7 +7848,22 @@ the remaining open points in their numeric order.
   model-diverse pass is welcome (a Fable lens on "does this cohere") within the
   point-200 token limits.
 
-- [x] 206. DONE 20.07.2026: the flora material now carries the brightness lift
+- [ ] 206. REOPENED 22.07.2026 — the user reports the trees in the CENTRAL region
+  (Congo rainforest / jungle biome) still render VERY DARK. The 20.07 fix (below)
+  lifted the flora brightness globally and passed a jungle-crop pixel check, but it
+  did NOT hold for the Central region as the user sees it. RE-DIAGNOSE picture-first
+  on BOTH backends at a Central-region spot (e.g. debugJumpTo ~0,20 — Congo): is the
+  crown ALBEDO too dark for the dense jungle foliage class specifically, is the
+  ×1.9 lift being overridden by the season/greenness tint or the jungle biome
+  colour (PALETTE.jungle [0.13,0.38,0.14] / PALETTE_ALT.jungle [0.09,0.28,0.11] are
+  themselves very dark), or is the dense-canopy self-shadow/instance density eating
+  the light there? Fix so Central jungle crowns read as LIT dark green (not black)
+  on their sunlit tops, verified by a Central-region before/after screenshot pair
+  on both backends + a pixel check AT a Central spot (the old check may have sampled
+  a lighter biome). Keep savanna/lakeside crowns unregressed. This is a real
+  "green-check-but-wrong-picture" recurrence — judge by the Central render, not the
+  prior gate. DOCS: design.md §2.4/§19; CLAUDE §7.1 pt.12.
+  DONE 20.07.2026 (INSUFFICIENT for Central, see above): the flora material now carries the brightness lift
   the ground always had (×1.9 on the colorNode, a step below the ground's ×2.6
   so crowns stay darker than grass) — in BOTH scenes (travel flora material +
   the settlement flora material, which had the same gap). Before/after frames
@@ -8462,6 +8477,43 @@ the remaining open points in their numeric order.
   DOCS: design.md §2.4/§2.5/§3.3 note the relief-smoothing + the perf ceiling;
   CLAUDE §7.1 pt.11/13 if acceptance wording changes. Keep every existing terrain
   test green (world/redSea/riverSmoothness); do not disturb the coast work.
+  TECHNIQUE ANALYSIS (Fable-5, codebase-grounded, 22.07.2026) — the implementation
+  plan. ROOT CAUSE: normals are ALREADY smooth everywhere (chunks via central
+  differences, backdrop + far sheet via computeVertexNormals) — flat shading is
+  RULED OUT. The facets are the HEIGHT FIELD: `elevationAt` (geodata.ts ~121) is
+  BILINEAR over the 0.025° DEM, so every texel boundary is a gradient crease;
+  scaled by METERS_TO_UNITS a mountain flank folds every ~0.25 units ≈ 10-15 px at
+  the start zoom. The mesh also undersamples the DEM (near ring 56 segs ≈ 1.7
+  texels/vertex). The backdrop is worse + geometric: 160 azimuth segs (2.25°/seg
+  silhouette), ×30 exaggeration of undersampled data, and hard clamp creases that
+  snap the surface onto a cone. RANKED, PERF-SAFE LEVERS (do in order, each with
+  rendered before/after + a start-zoom frame-time guardrail):
+  (1) BICUBIC `elevationAt` — replace the bilinear kernel with Mitchell-Netravali
+  (4×4 taps, B=C=1/3 to bound overshoot near coasts/lake basins). ZERO per-frame
+  cost (CPU, chunk-build only); every consumer (sampleTerrain heights AND its
+  central-difference normals, river beds/ribbons, backdrop, FAR_TERRAIN) inherits
+  a C1-smooth field. Leave the GPU `demElevation` texture bilinear (it only drives
+  water tint/haze). Rerun water/ribbon/redSea/world gates (small height shifts).
+  (2) RELIEF-ADAPTIVE chunk LOD — add `chunkIsMountainous(cx,cz)` (5×5 elevationAt
+  range > ~400 m, mirroring `chunkIsCoastal`) and join the existing ×2→112 gate,
+  ring ≤ 2 only (112 segs ≈ DEM Nyquist; more is wasted); optionally include
+  river-band chunks so banks smooth. Watch chunk-build hitching (flagged chunks
+  ~4× cost); mobile preset caps at 84.
+  (3) BACKDROP rebuild (backdrop.ts + PlaceScene LandscapeBackdrop): BACKDROP_SEGS
+  160→320, RINGS 24→32; run 1-2 passes of a 3-tap ring-space neighbour-average
+  over the height grid BEFORE writing positions (the real silhouette low-pass, pure
+  -testable); replace the two hard clamps with a polynomial smooth-min/max (k≈3-5)
+  so the slope cap joins the relief without a crease. Keep the cap value, taper and
+  the Berber elevation bound (backdrop.test.ts green). Zero per-frame cost.
+  (4) OPTIONAL only if a residual reads: offline smoother DEM re-bake
+  (scripts/build-geodata.mjs, z7 2×2 supersample or σ≈0.5-texel Gaussian) + halve
+  the FAR_TERRAIN step. REJECTED (do NOT pursue): hydraulic erosion (adds
+  aliasing-prone high-freq detail at 0.025°, harms the researched geography), GPU
+  displacement/tessellation (forks the single CPU height source of truth for
+  movement/collision/wildlife; WebGPU has no tess stage), extra AO passes
+  (darkens + EMPHASISES creases), more detail-normal maps (already wired, cannot
+  fix a silhouette). Start with lever 1 (fixes terrain + rivers + backdrop at the
+  source) then reassess by the picture before adding 2/3.
 
 - [ ] 216. The PALM TREES render BROKEN, not just plain — redesign them. The
   trunk is a stack of DISCONNECTED cylinder segments with visible GAPS (the trunk
@@ -8486,6 +8538,50 @@ the remaining open points in their numeric order.
   contiguous vertical span, no vertical gap between segments) and the crown seated
   at the trunk top. DOCS: design.md §19.9 (landscape dressing) note the palm
   redesign; CLAUDE §7.1 pt.12/15 if acceptance wording changes.
+
+- [ ] 217. VULTURE WINGS CLIP INTO THE GROUND — while a vulture feeds (the §19.6
+  peck/bob, rocking back and forth over a carcass) its WING TIPS dip through the
+  terrain (user report 22.07.2026). The point-128 `landedBirdY` rule clears the
+  pecking BODY (positive-only slope lift + a hover over the body) but the bob
+  rotation swings the wing extent BELOW that clearance, so the wings intersect the
+  ground. Anchor: `src/scenes/travel/Wildlife.tsx` (the vulture feed/peck render +
+  bob animation) and `landedBirdY` (`wildlifeBehavior.ts`, pure-tested). DIAGNOSE:
+  the bob is a pitch/vertical rock about a pivot; at the bob extremes the folded
+  wing tips reach lower than the body-based clearance. FIX: raise the feed-bob
+  clearance so the WING SPAN (not just the body centre) stays above the local
+  ground through the whole bob — either lift the pivot by the wing half-extent, cap
+  the bob amplitude on steeper ground, or add the wing reach into the `landedBirdY`
+  clearance term (keep it one shared rule with the kill-flock + ground scavenger,
+  point 128). VERIFIABLE: extend the `landedBirdY`/clearance pure test to assert
+  the WING-TIP y (body y − bob dip + wing extent) stays ≥ ground through the bob
+  range on a slope; a live/staged feeding vulture in `scripts/verify/enrichments.mjs`
+  keeps its wings above the terrain across the bob (screenshot). Keep the feed
+  animation lively. DOCS: design.md §19.6; CLAUDE §7.1 pt.12.
+
+- [ ] 218. RIVER-ADJACENT OBJECTS FLOAT IN THE WATER after the river WIDENING — the
+  Sudd (natural site, the Nile swamp) hangs in the middle of the water; the user
+  suspects the point-156 river widening (`river.widthFactor`, carved bed/ribbon/
+  mask/clearances all derived from one width) and asks to check EVERYTHING near a
+  river. When the river was widened, an object placed by its OLD (narrower) bank —
+  or sitting AT the river per a §4.2 exemption — now lies over the widened water
+  surface and reads as floating. DIAGNOSE FIRST with a rendered probe at the Sudd
+  (the natural-site coords) + a data sweep: for the Sudd and EVERY river-adjacent
+  entity — natural sites, cultural landmarks, villages/ports, and scene dressing —
+  compare its position/footprint against the CURRENT widened river water mask
+  (`riverDistance` / the ribbon half-width from `RIVER_WIDTH_DEG`): does it now
+  overlap open water, and is its render height the land/bank height or the water
+  surface? Anchors: the natural-site placement (Sudd), `src/world/world.test.ts`
+  (already sweeps village river clearance — extend to landmarks/natural sites),
+  `terrain.ts` RIVER_WIDTH_DEG / the carve, `Rivers.tsx` surface height. FIX per
+  cause: either the clearance for these objects must SCALE with the widened width
+  (like the point-156 village clearances) so they sit on the bank, or a genuinely
+  in-river feature like the Sudd must render at the correct height ON its own
+  ground, not floating on the water sheet. VERIFIABLE: extend `world.test.ts` to
+  sweep all river-adjacent landmarks/natural-sites/settlements for the widened-river
+  clearance (none overlaps open water unless intended, and an intended in-water one
+  sits at the right height); a rendered before/after at the Sudd shows it grounded,
+  not floating; re-assert the point-156 village clearances stay green. DOCS:
+  design.md §4.2/§11.3; CLAUDE §7.1 pt.3/4 if clearance wording changes.
 
 ## Closing (only after all points)
 
