@@ -9595,6 +9595,64 @@ the remaining open points in their numeric order.
   concurrently with those — the whole wildlife-behaviour cluster should be planned
   together (this conflict audit naturally scopes/sequences them).
 
+- [ ] 253. WILDLIFE DRAMAS DO NOT FIRE / RESOLVE — ANIMALS STAND IDLE (regression,
+  PRIORITY) — the user reports (22.07.2026, multiple): a LION and a JUVENILE stand
+  idly next to each other (no hunt, no flee); a CROCODILE swims off after a catch
+  while the prey dissolves separately (point 250); AND the enrichments suite TIMES
+  OUT (exit 143, 71 pass / 0 fail / 0 console-errors) right at the crocodile-drama
+  check (point 249, `crocDrama` at enrichments.mjs ~L3716). All three are one root
+  cause: the §19.8/§19.16 dramas (lion hunt, crocodile ambush, calf predation) no
+  longer TRIGGER or no longer RESOLVE, leaving predator + prey idle — and the
+  enrichments checks that wait real-time for the drama to play out therefore HANG
+  until the per-suite timeout (which read as the "enrichments crash"). PRIME
+  SUSPECT: the point-238/239 merge (player-shy flee + widened calf leash / the new
+  `fleesFromPlayer` → `dodgeHeading` wiring) pre-empts or conflicts with the hunt/
+  drama claim, so a predator next to a juvenile neither hunts nor is fled — exactly
+  the point-252 arbitration conflict (predator/drama MUST outrank player-flee/idle).
+  A water/placement change (232-235) moving a staged cell is a secondary suspect.
+  DIAGNOSE: why does the lion not claim the hunt when a predator + juvenile are
+  adjacent, and why does the crocodile catch not resolve (250)? Does the 239
+  player-flee / 238 leash logic hold the animal in a state that blocks the hunt
+  trigger or the `caughtBy` resolution? FIX: restore drama triggering + resolution
+  with the point-252 priority (predator/drama > player-flee > idle); this SUBSUMES
+  250 (croc resolve) and UNBLOCKS 249 (the enrichments hang goes away once the
+  drama resolves) and is the concrete instance of 252. Confirm with the long
+  enrichments run reaching the croc check green. Anchors: `src/scenes/travel/
+  wildlifeBehavior.ts` (the hunt/drama trigger, `caughtBy`, the 238/239 player-flee/
+  leash interaction), `src/scenes/travel/Wildlife.tsx`. VERIFIABLE: pure test that a
+  predator adjacent to a prey juvenile (no player near) claims the hunt (not idle),
+  and the crocodile catch resolves (sink/drama), even with the 239 player-flee
+  predicate present; the enrichments crocDrama + hunt checks pass within their
+  timeout. DOCS: design.md §19.8 if wording changes. No player-visible text.
+  PRIORITY — blocks the render-verify pipeline (via 249) and breaks core §19.8
+  gameplay. NOTE: wildlife cluster (`wildlifeBehavior.ts`/`Wildlife.tsx`) — bundle
+  with 249/250/252; this is the lead item of that cluster.
+
+- [ ] 254. NILE RIBBON SHOWS THROUGH LAKE VICTORIA (point-234 side effect) — the
+  user reports (22.07.2026, screenshot at Lake Victoria, 0.0N/33.5E) that a Nile
+  ribbon SEGMENT shows through / over the lake surface — a visible semi-transparent
+  strip on the lake where point 234 extended the White Nile's head INTO Lake
+  Victoria (the lake-outflow: source flows out of the lake, no detached spring). The
+  ribbon rows that lie INSIDE the lake should be HIDDEN under the lake sheet (the
+  lake sheet IS the water there), not drawn as a visible strip through it. CAUSE:
+  234's `extendSourceIntoLake` put the ribbon head into the lake, but those in-lake
+  ribbon rows still render (over/through the lake sheet) — either they are not
+  occluded (possibly the same `depthWrite=false` issue as point 246), or their
+  height is not below the lake sheet, or they should simply not be drawn inside the
+  lake polygon. FIX: SUPPRESS drawing the ribbon rows that fall inside a lake
+  polygon (the lake sheet renders the water there), OR ensure they sit below the
+  lake sheet AND are occluded — while KEEPING the point-234 outflow semantics (no
+  spring; the river reads as flowing out of the lake at the shore). Verify the
+  Blue Nile / Lake Tana outflow the same way. Anchors: `src/scenes/travel/
+  waterSurface.ts` (`extendSourceIntoLake`, the in-lake ribbon rows / the
+  lake-hug height), `src/scenes/travel/Rivers.tsx` (ribbon draw + the lake-sheet
+  occlusion). VERIFIABLE: a pure test that a river head extended into a lake has its
+  in-lake rows suppressed or below the lake sheet (not visible over it); the parent
+  picture-verifies Lake Victoria (Jinja) + Lake Tana on both backends (no ribbon
+  strip through the lake, the outflow still reads). DOCS: none. No player-visible
+  text. NOTE: same river-render files as 232-234/246 — bundle with the river-render
+  follow-ups (246 depthWrite + this).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
