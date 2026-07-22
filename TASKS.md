@@ -8655,6 +8655,27 @@ the remaining open points in their numeric order.
   (coastal Namib rainless every month; interior wet Nov-Mar); a live pixel check no
   rain on the coastal strip. This needs a real fix, not just the check.
 
+- [ ] 224. DEMO CHECKPOINT — full closing run → re-point the `poc` tag to the
+  then-current main → publish that state playable at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ (user request
+  22.07.2026). GATE/POSITION: the user wants this as the NEXT milestone right
+  AFTER the current terrain task (215) once everything is stable and 215 is done —
+  i.e. a visible demo update for the terrain smoothing, NOT waiting for every open
+  bug. Run it when 215 is finished + the tree is stable (build/lint/CVE clean,
+  full Vitest + the LARGE browser regression on BOTH backends green — the §7.2
+  closing cycle per docs/maximale-qs.md's closing steps). STEPS: (1) full closing
+  cycle (Vitest + LARGE regression both backends, dead-code/stale-doc pass, lint/
+  audit clean) — only proceed if GREEN; (2) re-point the EXISTING `poc` tag to the
+  current main HEAD (this is an explicit, authorized re-tag per the user — the only
+  standing exception to [[tags-only-on-request]], for THIS request) and push the
+  moved tag; (3) the GH-Pages deploy builds the poc tag into the `/poc/` path
+  (deploy-pages.yml, guarded, worktree --base=/…/poc/) — verify the deploy is green
+  and BOTH URLs resolve 200 (root = main, /poc/ = the moved tag) with correctly
+  based asset URLs (the MSYS-mangling Git-Bash trap is documented). This is
+  outward-facing: run only after the closing is GREEN; report the result. DOCS:
+  README version section if wording changes. Do NOT touch the v0.1 tag; 174 (v0.2)
+  is a separate later release.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
