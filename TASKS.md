@@ -9081,6 +9081,41 @@ the remaining open points in their numeric order.
   river-rendering cluster (232 + 233 + 234, and fold in 219's spring redesign)
   TOGETHER on ONE branch, sequentially, so the shared files never collide.
 
+- [ ] 235. TRIM OFFSHORE BATHYMETRY TO FLAT DEEP OCEAN — hard-cut the map at the
+  continent edge. The user reports (22.07.2026, two screenshots, red debug outlines
+  around the offending patches) leftover "Fetzen" (scraps) of shallow-water
+  bathymetry — offshore shelf patches, island-like detail and depth profile —
+  floating in the deep ocean around the Red Sea, the Gulf of Aden and the Horn of
+  Africa (Farasan/Dahlak shelves, the Socotra-area shelf, etc.). DECISION (user):
+  the map should be HARD-CUT where the continent ends — beyond the playable
+  continent (and beyond the REACHABLE game islands) there is ONLY flat deep ocean,
+  with NO differentiated DEM/height profile at all. This GENERALISES point 210's
+  Red-Sea clean-crop to the whole offshore. FIX: define the reachable-land mask
+  (the continent + the reachable game islands the game already keeps as land, e.g.
+  Zanzibar) and, for every sample OUTSIDE it, force the terrain to a uniform
+  DEEP-OCEAN value — no shallow shelf, no bathymetric relief, no unreachable
+  islands, flat. Reuse/extend the existing trim machinery (the §3.1 world trim and
+  the point-210 `redSea` boundary already flatten Sinai/Arabia and sample foreign
+  land — Spain, Sicily, Crete, the Canaries, the Comoros, Madagascar — as ocean);
+  the new rule is the same clamp applied EVERYWHERE offshore, so the shallow-water
+  shelves and island scraps beyond the coast read as deep open ocean. PRESERVE the
+  existing acceptance invariants (`src/world/redSea.test.ts`): the reachable
+  islands stay land, the African coastline and the Nile delta stay walkable land,
+  nearshore sea still swims while far-offshore blocks (§11.2 swim margin), and the
+  Red Sea cut / Mediterranean-always-blocked verdicts hold. Anchors:
+  `src/world/redSea.ts` (the offshore boundary/trim), `src/world/terrain.ts`
+  (`sampleTerrain`, the DEM clamp / STAMP_FLOOR machinery, the deep-ocean value).
+  VERIFIABLE: extend `src/world/redSea.test.ts` — sample the reported offshore
+  scrap locations (the Red Sea shelves, the Gulf of Aden, the Socotra/Farasan/
+  Dahlak areas) and assert they read as FLAT DEEP OCEAN (deep, no shallow shelf, no
+  land), while the reachable islands and the coastal land stay land and the swim
+  margin still holds nearshore; the parent picture-verifies the trimmed offshore
+  reads as uniform flat deep ocean (no teal shelf patches, no island scraps) on
+  BOTH backends. DOCS: design.md §3.1/§11.2 if wording changes. No player-visible
+  text. NOTE: touches `src/world/redSea.ts` + `src/world/terrain.ts` — overlaps
+  point 221 (swim margin, redSea) and 220 (chunk seam); do not delegate those
+  concurrently.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
