@@ -9255,7 +9255,7 @@ the remaining open points in their numeric order.
   point 214 re-tessellated (merged); do NOT delegate concurrently with any other
   `fauna.ts` point.
 
-- [ ] 241. THUNDER PLAYS ONLY ONCE — after point 229 made the thunderclap audible,
+- [x] 241. THUNDER PLAYS ONLY ONCE — after point 229 made the thunderclap audible,
   the user reports (22.07.2026) hearing the thunder EXACTLY ONCE and then never
   again. So something is not re-armed after the first clap: either the flash→thunder
   TRIGGER fires only once (a one-shot flag set on the first storm/flash and never
