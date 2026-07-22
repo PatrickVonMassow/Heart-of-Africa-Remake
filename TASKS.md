@@ -8402,7 +8402,9 @@ the remaining open points in their numeric order.
   requirement alongside the tessellation floors; CLAUDE §7.1 pt.15 if the
   acceptance wording changes.
 
-- [ ] 215. SKYLINE / PANORAMA MOUNTAINS read ANGULAR / FACETED — the §2.5
+- [ ] 215. ANGULAR / FACETED TERRAIN RELIEF — (A) the §2.5 skyline/panorama
+  backdrop mountains, and (B, user ext. 22.07.2026) the BIRD'S-EYE travel terrain
+  itself (land + river height profile + mountains). PART A: the §2.5
   surroundings-panorama backdrop (the far map-landscape relief around a
   settlement, relief-capped, double-sided, rock-shaded) shows hard flat facets on
   its mountains/dunes instead of a smooth ridge (user report 22.07.2026,
@@ -8423,6 +8425,67 @@ the remaining open points in their numeric order.
   backdrop shows a smooth ridge with no hard facets, on BOTH WebGL2 and WebGPU per
   [[verify-gui-on-both-backends]] (screenshot pair). DOCS: design.md §2.5 note the
   smooth-shading requirement; CLAUDE §7.1 pt.15 if acceptance wording changes.
+  PART B (user extension 22.07.2026): the BIRD'S-EYE travel terrain reads angular
+  too — the land + RIVER height profile and the mountains show visible polygon
+  planes at the start zoom. Anchors: `src/scenes/travel/TravelScene.tsx`
+  (`buildChunkGeometry` — note it ALREADY builds smooth seam-free normals via
+  central differences + a margin ring, and `lodSegments` 56/28/20 with the
+  coastal ×2→112; `FAR_TERRAIN` step 2.5 is the coarse distance sheet),
+  `src/render/materials.ts` (the terrain material + its normal node),
+  `src/scenes/travel/Rivers.tsx` (the river ribbon relief). DIAGNOSE FIRST with a
+  rendered close-up (both backends) WHICH surface faceting is which: since the
+  chunk normals are already smooth, the visible planes are almost certainly MESH
+  RESOLUTION (low LOD on high-relief mountain chunks + the coarse FAR_TERRAIN),
+  not flat shading — confirm before choosing a lever.
+  TECHNIQUE MENU (the user's list) — applies to BOTH part A (backdrop) and part B,
+  ordered CHEAPEST-FIRST because the user's binding caveat is "do not tank the
+  frame rate": (1) SMOOTH vertex normals / normal-node shading — verify it is on
+  everywhere (backdrop, chunks, far sheet, ribbon); (2) a detail/relief NORMAL MAP
+  on the terrain + backdrop material — adds rock/relief shading detail with NO
+  extra geometry, the best perf/looks trade; (3) TEXTURE SPLATTING micro-relief is
+  already wired (§2.6) — extend its normal contribution; (4) SELECTIVE higher LOD
+  only for high-relief (mountain) chunks near the player, capped like the coastal
+  ×2, and a finer FAR_TERRAIN step where it reads — bounded, not global; (5) mild
+  screen-space AO already exists (SSAO, §2.7) — tune, do not add a second pass.
+  EXPENSIVE / OFF THE RUNTIME PATH: hydraulic EROSION belongs in the OFFLINE DEM
+  preprocessing (bake smoother, more natural relief into the height data once, in
+  scripts/ — never per frame); heavy DISPLACEMENT mapping and extra AO passes cost
+  frame time — if used at all, gate them behind the §30 mobile/quality preset and
+  keep them OFF by default. The point is a smooth-reading relief at the start zoom,
+  NOT maximum fidelity: pick the least-cost lever that removes the visible facets.
+  VERIFIABLE: a rendered before/after at the start zoom (0.5) over a MOUNTAIN
+  (e.g. the Ethiopian highlands / an Atlas ridge) AND a river reach shows a smooth
+  relief with no polygon planes, on BOTH WebGL2 and WebGPU per
+  [[verify-gui-on-both-backends]]; a PERFORMANCE guardrail — the driven frame time
+  / FPS at the start zoom must not regress beyond a small budget vs. before (add a
+  frame-time sample to a verify script); pure tests for any new normal/LOD helper.
+  DOCS: design.md §2.4/§2.5/§3.3 note the relief-smoothing + the perf ceiling;
+  CLAUDE §7.1 pt.11/13 if acceptance wording changes. Keep every existing terrain
+  test green (world/redSea/riverSmoothness); do not disturb the coast work.
+
+- [ ] 216. The PALM TREES render BROKEN, not just plain — redesign them. The
+  trunk is a stack of DISCONNECTED cylinder segments with visible GAPS (the trunk
+  reads as floating chunks), the crown hangs detached ABOVE a gap, and the fronds
+  are flat angular triangles (user report 22.07.2026, screenshot at Cairo: a palm
+  with a segmented, broken trunk and a floating triangle-fan crown). The user
+  invites a COMPLETELY NEW representation rather than patching the current one
+  ("besonders schön ist es ohnehin nicht"). REDESIGN: build the trunk as ONE
+  continuous, gently curved tapering mesh (a single lathe/tube along a slight
+  bend — no stacked segments, no gaps), seat the crown exactly at the trunk top
+  (shared vertices / overlapping origin, never a gap), and give it curved, layered
+  FEATHERED fronds that droop (a few bent blades per frond, smooth-normal shaded)
+  instead of flat fanned triangles; a couple of coconuts at the crown base is fine.
+  Keep it low-ish poly and in the game's stylized look, and keep the existing palm
+  PLACEMENT/regions and collider unchanged. Anchor: the palm build in
+  `src/render/flora.ts` (grep `palm`), placement in
+  `src/scenes/place/regionStyles.ts` / the flora placement. VERIFIABLE: a rendered
+  close-up of a Cairo palm shows a continuous trunk (no gaps), an attached crown
+  and soft feathered fronds, on BOTH WebGL2 and WebGPU per
+  [[verify-gui-on-both-backends]] (screenshot pair); a pure test in
+  `src/render/flora.test.ts` pins the new trunk as a single connected mesh (one
+  contiguous vertical span, no vertical gap between segments) and the crown seated
+  at the trunk top. DOCS: design.md §19.9 (landscape dressing) note the palm
+  redesign; CLAUDE §7.1 pt.12/15 if acceptance wording changes.
 
 ## Closing (only after all points)
 
