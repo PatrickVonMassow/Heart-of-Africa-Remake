@@ -8325,6 +8325,20 @@ the remaining open points in their numeric order.
   cells. Needs the user's real-WebGPU eyes to judge whether it still reads as a
   defect; if so, a follow-up can widen the clamp carefully or address those cells.
   The user's actual complaint (the broad inlet into the desert) is resolved.
+  REACTIVATED (user 22.07.2026, real-WebGPU screenshot at Cairo/North coast): the
+  RESIDUAL is confirmed a real defect on the user's own backend — several dark
+  sea-arm patches still poke into the Cairo coast (the user red-outlined them and
+  said "this should simply be LAND"). So the deferral is closed: FIX these patches
+  to land. They are the same class as the resolved Gulf-head wedge — stamped/
+  flooded near-coast cells reading as dark sea that juts into the beach. DIAGNOSE
+  the red-marked patches' coordinates (Cairo ~30.05N/31.24E, the patches sit E/NE
+  along the coast) via the land/sea mask + `sampleTerrain`, then EXTEND the
+  point-3e00390 stamped-floor clamp / boundary tightening to force these coastal
+  patches to land WITHOUT re-flooding the genuine open sea or any redSea.test.ts
+  acceptance verdict (Mediterranean, Gulf of Suez head, delta all unchanged).
+  VERIFY on BOTH backends (the user's WebGPU is the trusted witness) with a
+  before/after Cairo capture showing ONE clean continent edge, plus a redSea.test
+  guardrail that the patch coordinates now read land. This is the last leg of 210.
 
 - [ ] 211. RIVERS must MERGE CLEANLY into the water body they reach (river→ocean,
   river→lake), and NO water body may carry a spurious NOTCH/HOLE (user report
@@ -8764,6 +8778,61 @@ the remaining open points in their numeric order.
   pure-tested (0 dry, rising with intensity AND duration, clamped); a live check the
   splash fires on a footstep at high wetness. DOCS: design.md §2.4/§19.13 note the
   wet-ground response; CLAUDE §7.1 pt.12 if acceptance wording changes.
+
+- [ ] 226. A FLEEING CALF PINS ON THE WATERLINE instead of routing along the
+  coast (user report 22.07.2026, real-WebGPU screenshot at Cairo/North coast: a
+  juvenile fleeing a predator sticks at the sea edge while its parent sacrifices
+  itself and is eaten). This is the point-157 class of bug — the flight step must
+  route AROUND water (coast/river), never dead-end into the sea and stall. §7.1
+  pt.12 already promises the hunted calf "steering around a coast or river the way
+  every mover does rather than pinning on the waterline (point 157: the flee
+  routes through `calfFleeStep`/`deflectedStep`, a dead-end left for the catch to
+  resolve)". So either the calf-flight path here does NOT go through the deflected
+  step, or the deflection fails at THIS coast geometry (a concave sea pocket where
+  the deflected heading still points into water). DIAGNOSE FIRST
+  (`src/scenes/travel/wildlifeBehavior.test.ts` + the live scene): reproduce a calf
+  fleeing toward a coast pocket and confirm whether `calfFleeStep`/`deflectedStep`
+  is invoked and whether its deflected heading still lands on a water cell (the
+  sea-pocket dead-end). Anchors: `calfFleeStep`, `deflectedStep`,
+  `src/scenes/travel/waterEdgeRules.ts` and the §19.8 calf-flight branch in the
+  wildlife update. FIX: make the calf flight use the SAME coast-safe corridor
+  logic every other mover uses (the point-188 sticky escape-corridor / longest
+  clear-land heading), so a calf boxed against the sea flees ALONG the shore (or
+  crosses per point-192 where valid), never stalls on the waterline; the catch
+  still resolves at a genuine dead-end, but the calf must be visibly moving, not
+  frozen at the water. Keep the parent-sacrifice / living-shield outcome intact
+  (that part read correctly). VERIFIABLE: a pure test in
+  `wildlifeBehavior.test.ts` that a calf fleeing toward a concave coast pocket
+  gets a deflected step onto LAND (never a water cell) and keeps a non-zero
+  land-ward step until the catch; a live check in `scripts/verify/enrichments.mjs`
+  staging a calf flight against a coast that asserts the calf never rests on a
+  water cell during the flight (mirrors the point-157/188 coast-safe checks).
+  DOCS: none (implements the already-promised §7.1 pt.12 behaviour at this coast
+  geometry). Coordinate with 210 (same Cairo coast — the sea-pocket geometry that
+  traps the calf is partly the very sea-arm 210 is removing).
+
+- [ ] 227. A HORIZONTAL LINE / BAND ARTIFACT IN THE FIRST-PERSON SKYLINE (user
+  report 22.07.2026, real-WebGPU screenshot inside Cairo looking at the desert
+  skyline: between the near dune and the Giza pyramid a horizontal grey line runs
+  across the horizon with a thin blue/grey band below it — reads as a graphics
+  error, not real landscape). Likely causes to diagnose (picture-first, BOTH
+  backends): (a) the §2.5 settlement PANORAMA backdrop cylinder/band — a horizon
+  SEAM where the captured band meets the sky, or a top/bottom edge of the panorama
+  texture showing as a hard line (anchors: `src/scenes/place` backdrop/panorama,
+  `src/scenes/place/backdrop.ts`, the panorama-band build); (b) a distant WATER
+  SHEET (sea/river) rendering as a thin horizontal strip at the horizon behind the
+  dunes (the Mediterranean/Nile sheet poking through — related to 210's coast); or
+  (c) a z-fighting / far-plane band between the backdrop heightfield and the sky
+  dome. DIAGNOSE FIRST with a rendered first-person capture at the Cairo desert
+  view (both backends) and by toggling the panorama backdrop vs the water sheet to
+  isolate which layer owns the line. FIX per cause: close the panorama seam / clamp
+  the band edge, or sink/hide the distant water strip, or resolve the depth
+  fighting — so the skyline reads as a continuous dune-to-pyramid horizon with no
+  hard horizontal line. VERIFIABLE: a first-person Cairo skyline capture (both
+  backends) with no horizontal seam/band; if it is the panorama band, a pure test
+  in `src/scenes/place/backdrop.test.ts` on the band's vertical bounds/seam; if a
+  water strip, tie it into the 210/211 water-edge checks. DOCS: design.md §2.5 if
+  the panorama band wording changes.
 
 ## Closing (only after all points)
 
