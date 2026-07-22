@@ -268,6 +268,33 @@ describe('playThunder (point 166 — scheduled on the audio clock, survives to f
     }
   })
 
+  it('re-fires: TWO and then N successive claps EACH schedule and play — never gated after the first (point 241)', () => {
+    const ctx = FakeCtx.last
+    if (!ctx) return
+    const N = 6
+    const allSources: FakeSource[] = []
+    for (let i = 0; i < N; i++) {
+      ctx.currentTime = 100 + i * 10 // successive flashes, 10 s apart
+      const before = ctx.sources.length
+      const d = thunderDelaySeconds(i)
+      playThunder(d, 0.8)
+      const claps = ctx.sources.slice(before)
+      // The 2nd..Nth claps are NOT suppressed: each call builds its own two
+      // fresh voices and schedules them at ITS OWN flash time + delay.
+      expect(claps).toHaveLength(2)
+      for (const s of claps) {
+        expect(allSources).not.toContain(s) // fresh short-lived nodes, never a reused/stopped one
+        expect(s.startedAt).toBeCloseTo(100 + i * 10 + d, 10)
+        expect(s.stoppedAt).toBeGreaterThan(s.startedAt as number)
+        const peak = Math.max(...clapGain(s).events.filter((e) => e.type === 'lin').map((e) => e.value ?? 0))
+        expect(peak).toBeGreaterThan(0.001) // each clap ramps to an audible level
+        expect(clapGain(s).events.some((e) => e.type === 'cancel')).toBe(false) // no later clap cancels an earlier envelope
+      }
+      allSources.push(...claps)
+    }
+    expect(allSources).toHaveLength(N * 2) // every flash produced its own pair
+  })
+
   it('reports the strike AND the scheduled audio level on the __thunder probe', () => {
     const ctx = FakeCtx.last
     if (!ctx) return

@@ -22,7 +22,7 @@ import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode,
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, sunDimFactor, thunderstormAt, thunderDelaySeconds } from '../../systems/season'
+import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { playThunder } from '../../systems/ambience'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
@@ -1471,8 +1471,7 @@ export function PlaceScene() {
    *  The dimmed light BASE is tracked separately from the flash so the additive
    *  burst is not amplified by the slow season lerp. */
   const placeFlash = useRef(0)
-  const placeNextStrike = useRef(0)
-  const placeStrikeCount = useRef(0)
+  const placeStrike = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
   const placeSunBase = useRef(PLACE_SUN_INTENSITY)
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
@@ -1648,17 +1647,12 @@ export function PlaceScene() {
       const stormStrength =
         thunderstormAt(useGame.getState().day, place.lat, place.lon, START_YEAR, elevationAt(place.lat, place.lon)) *
         Math.min(1, Math.max(0, balance.season.weatherStrength))
-      const now = clock.elapsedTime
-      if (stormStrength > 0) {
-        if (placeNextStrike.current === 0) placeNextStrike.current = now + 2
-        if (now >= placeNextStrike.current) {
-          placeFlash.current = stormStrength
-          playThunder(thunderDelaySeconds(placeStrikeCount.current), stormStrength)
-          placeStrikeCount.current++
-          placeNextStrike.current = now + 4 + (thunderDelaySeconds(placeStrikeCount.current * 31 + 7) - 1) * 3
-        }
-      } else {
-        placeNextStrike.current = 0
+      // Shared pure scheduler (point 166): re-arms after every bolt and holds
+      // through the gate's per-day flicker (the "thunder only once" fix).
+      const boltDelay = strikeSchedulerStep(placeStrike.current, stormStrength, clock.elapsedTime)
+      if (boltDelay !== null) {
+        placeFlash.current = stormStrength
+        playThunder(boltDelay, stormStrength)
       }
       placeFlash.current *= Math.max(0, 1 - dt * 7)
       if (placeFlash.current < 0.01) placeFlash.current = 0

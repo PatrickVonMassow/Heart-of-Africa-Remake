@@ -5265,28 +5265,52 @@ const settleScalar = async (read, rel = 0.003) => {
     c.resetFlashPeak()
     c.forceStrike(0.8) // fire a bolt: the same flash + delayed thunder a real strike makes
     await sleep(350)
-    return {
-      ready: true,
-      mode,
+    const first = {
       flashPeak: c.flashPeak(),
       thunder: window.__thunder?.count ?? 0,
       delay: window.__thunder?.lastDelay ?? 0,
       audio: window.__thunder?.audio ?? 0,
       peak: window.__thunder?.lastPeak ?? 0,
     }
+    // The SECOND flash (point 241): the clap must RE-FIRE — count past 1 with a
+    // freshly scheduled clap at a positive level, never a one-shot latched after
+    // the first (the field-reported "thunder plays only once").
+    c.resetFlashPeak()
+    if (window.__thunder) window.__thunder.lastPeak = 0
+    c.forceStrike(0.9)
+    await sleep(350)
+    const second = {
+      flashPeak: c.flashPeak(),
+      thunder: window.__thunder?.count ?? 0,
+      delay: window.__thunder?.lastDelay ?? 0,
+      audio: window.__thunder?.audio ?? 0,
+      peak: window.__thunder?.lastPeak ?? 0,
+    }
+    return { ready: true, mode, first, second }
   })
   await page.evaluate(() => window.__climate?.forceStrike?.(1)) // a fresh bolt for the screenshot
   await page.screenshot({ path: `${OUT}134-thunderstorm.png` })
   console.log('shot 134-thunderstorm.png')
   check(
     'a lightning strike flashes and fires thunder delayed 1-4 s (point 166)',
-    storm.ready && storm.mode === 'travel' && storm.flashPeak > 0.1 && storm.thunder > 0 && storm.delay >= 1 && storm.delay <= 4,
-    JSON.stringify(storm),
+    storm.ready && storm.mode === 'travel' && storm.first.flashPeak > 0.1 && storm.first.thunder > 0 && storm.first.delay >= 1 && storm.first.delay <= 4,
+    JSON.stringify(storm.first ?? storm),
   )
   check(
     'the delayed thunder SCHEDULES a real WebAudio clap at a positive level (point 166 — never a silent flash)',
-    storm.ready && storm.audio > 0 && storm.peak > 0,
-    `audio claps ${storm.audio}, peak gain ${Number(storm.peak).toFixed(3)}`,
+    storm.ready && storm.first.audio > 0 && storm.first.peak > 0,
+    storm.ready ? `audio claps ${storm.first.audio}, peak gain ${Number(storm.first.peak).toFixed(3)}` : 'climate hook missing',
+  )
+  check(
+    'a SECOND flash re-fires the thunder — count past 1, a fresh clap scheduled with audio and peak (point 241)',
+    storm.ready &&
+      storm.second.thunder === 2 &&
+      storm.second.audio === 2 &&
+      storm.second.peak > 0 &&
+      storm.second.flashPeak > 0.1 &&
+      storm.second.delay >= 1 &&
+      storm.second.delay <= 4,
+    JSON.stringify(storm.second ?? storm),
   )
   await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 }
