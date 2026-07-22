@@ -35,3 +35,21 @@ export const TESSELLATION = {
   /** Rounded goods at stalls (bread mounds, pots, finial balls) [w, h]. */
   goods: [16, 10],
 } as const
+
+/** The bird's-eye traveller's backpack (the brown carry-crate), consumed by
+ *  the traveller build in `src/scenes/travel/TravelScene.tsx`.
+ *
+ *  Forward-axis convention: the traveller's inner group yaws with
+ *  `rotation.y = Math.atan2(dx, dz)`, which maps the group's LOCAL +Z axis
+ *  onto the travel direction — local +Z is the figure's FRONT, local -Z its
+ *  BACK. The pack therefore carries a NEGATIVE z offset so it rides behind
+ *  the torso (the torso box spans z -0.14..+0.14); at +0.2 it hung on the
+ *  chest, facing the camera whenever the traveller walked toward the viewer
+ *  (user report 22.07.2026). Size and material are unchanged — only the
+ *  side. */
+export const TRAVELLER_PACK = {
+  /** Box size [width, height, depth]. */
+  size: [0.32, 0.38, 0.16],
+  /** Local offset in the yawing figure group; z < 0 = on the BACK. */
+  offset: [0, 0.72, -0.2],
+} as const

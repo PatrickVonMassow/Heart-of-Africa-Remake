@@ -51,6 +51,7 @@ import {
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
 import { chunkOffsetsByDistance, FLORA_FOG, floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
+import { TRAVELLER_PACK } from '../../render/figures'
 import { getStrings, useStrings } from '../../i18n'
 import { SkyDome } from '../../render/sky'
 import { TRAVEL_SKY } from '../../render/skyPresets'
@@ -2030,9 +2031,9 @@ function Player() {
           <cylinderGeometry args={[0.29, 0.29, 0.035, 14]} />
           <meshStandardMaterial color="#d0c298" roughness={0.85} />
         </mesh>
-        {/* Backpack */}
-        <mesh position={[0, 0.72, 0.2]} castShadow>
-          <boxGeometry args={[0.32, 0.38, 0.16]} />
+        {/* Backpack — on the BACK (local -z; +z is the heading, see TRAVELLER_PACK). */}
+        <mesh position={[...TRAVELLER_PACK.offset]} castShadow>
+          <boxGeometry args={[...TRAVELLER_PACK.size]} />
           <meshStandardMaterial color="#7c5a34" roughness={0.95} />
         </mesh>
         {/* Wounds show on the figure (design.md §6), toggled in useFrame. From

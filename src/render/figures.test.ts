@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three/webgpu'
-import { TESSELLATION } from './figures'
+import { TESSELLATION, TRAVELLER_PACK } from './figures'
 
 describe('TESSELLATION floors', () => {
   it('figure bodies and heads are visibly round (old: 8-cone, 10x8 sphere)', () => {
@@ -44,6 +44,39 @@ describe('TESSELLATION floors', () => {
     expect(head.attributes.position.count).toBeGreaterThan(oldHead.attributes.position.count * 2)
 
     for (const g of [body, oldBody, head, oldHead]) g.dispose()
+  })
+})
+
+describe("traveller's backpack rides the BACK (user report 22.07.2026)", () => {
+  // Forward-axis convention (see TRAVELLER_PACK in figures.ts): the traveller
+  // group yaws with rotation.y = atan2(dx, dz), which maps local +Z onto the
+  // travel direction — so the figure's BACK is local NEGATIVE z. The pack once
+  // sat at z = +0.2 and hung on the chest.
+  it('the pack offset lies on the back side of the forward axis (z < 0, sign pinned)', () => {
+    expect(TRAVELLER_PACK.offset[2]).toBeLessThan(0)
+  })
+
+  it('the whole crate sits behind the torso mid-plane, not just its centre', () => {
+    // Back face of the crate deeper than its front face, and even the front
+    // face at or behind the figure's z = 0 mid-plane: no part of the pack can
+    // read as chest-mounted from the travel direction.
+    const front = TRAVELLER_PACK.offset[2] + TRAVELLER_PACK.size[2] / 2
+    expect(front).toBeLessThanOrEqual(0)
+  })
+
+  it('the crate keeps its original size (only the side changed)', () => {
+    expect(TRAVELLER_PACK.size).toEqual([0.32, 0.38, 0.16])
+  })
+
+  it('the travel scene consumes the shared constant (no stray literal offset)', () => {
+    // Same pure-guard technique as the flatShading check below: the constant
+    // being green means nothing if the scene hardcodes its own position. The
+    // path goes through a variable so Vite's asset rewrite of literal
+    // `new URL(..., import.meta.url)` does not swallow the file scheme.
+    const rel = '../scenes/travel/TravelScene.tsx'
+    const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+    expect(src.includes('TRAVELLER_PACK.offset')).toBe(true)
+    expect(src.includes('TRAVELLER_PACK.size')).toBe(true)
   })
 })
 
