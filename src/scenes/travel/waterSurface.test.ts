@@ -9,6 +9,7 @@
 // overstatement — float ≥ rendered row ≥ this mirror.
 import { describe, it, expect, beforeAll } from 'vitest'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
+import { rawSampleTerrain } from '../../world/riverProfile'
 import { RIVERS } from '../../world/geo'
 import { LAKES } from '../../world/data/lakes'
 import { lakeIndexAt } from '../../world/hydro'
@@ -80,13 +81,16 @@ describe('waterSurfaceY (the canoe float height)', () => {
 
   it('the old local-bed float genuinely sank below the ribbon (regression witness)', () => {
     // Reproduce the pre-fix construction on the Nile and confirm it violates —
-    // proving this suite would have caught the flooded canoe.
+    // proving this suite would have caught the flooded canoe. On the RAW
+    // pre-profile bed (rawSampleTerrain): the point-232 longitudinal bed
+    // smoothing levels the channel cross-band too, so the current in-game bed
+    // no longer exhibits the divergence this witness reproduces.
     const nile = RIVERS.find((r) => r.id === 'nile')
     let worst = 0
     walkAxis(nile?.points ?? [], 0.08, (lat, lon, pLat, pLon) => {
-      const ribbonY = Math.max(-0.05, sampleTerrain(lat, lon, SEED).height + SURFACE_LIFT)
+      const ribbonY = Math.max(-0.05, rawSampleTerrain(lat, lon, SEED).height + SURFACE_LIFT)
       for (const off of OFFSETS) {
-        const t = sampleTerrain(lat + pLat * off, lon + pLon * off, SEED)
+        const t = rawSampleTerrain(lat + pLat * off, lon + pLon * off, SEED)
         if (t.type !== 'water') continue
         const oldY = Math.max(-0.05, t.height + SURFACE_LIFT)
         worst = Math.max(worst, ribbonY - oldY)

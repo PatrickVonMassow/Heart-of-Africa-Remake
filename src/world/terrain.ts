@@ -10,6 +10,7 @@ import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
 import { coastDistanceAt, elevationAt, landFractionAt } from './geodata'
 import { coastSignedDistance } from './coastVector'
 import { lakeContains, lakeIndexAt } from './hydro'
+import { riverBedProfileAt } from './riverProfile'
 import { fbm2 } from './noise'
 import { isNortheastOfBoundary, boundarySignedDistance } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
@@ -457,7 +458,8 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   // beds (scenes/travel/Rivers.tsx).
   let carve = 0
   let lakeDrop = 0 // applied directly here; carve below is river-only
-  if (lakeD < 0.3 || lakeContains(lat, lon)) {
+  const nearLake = lakeD < 0.3 || lakeContains(lat, lon)
+  if (nearLake) {
     const inside = lakeContains(lat, lon)
     const sd = inside ? -lakeD : lakeD // signed: negative inside
     const w = sstep(0.28, -0.12, sd)
@@ -478,7 +480,18 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     carve = Math.max(carve, sstep(RIVER_WIDTH_DEG * 1.6, -RIVER_WIDTH_DEG * 0.6, riverS) * 0.5)
     if (riverS < -0.005) type = 'water'
   }
-  if (carve > 0) height -= carve
+  if (carve > 0) {
+    // Longitudinal bed smoothing (riverProfile.ts): the DEM profile along a
+    // course is jagged, and the raw carve stairstepped bed and water sheet
+    // down the current. Blend the channel toward the smoothed, monotone bed
+    // profile by the carve weight — full at the axis, easing to the local
+    // relief at the banks. Skipped near lakes (the basin-level carve above
+    // owns those beds) and while the profile itself is being built (the
+    // lookup returns null and the plain local carve is the raw bed).
+    const pb = nearLake ? null : riverBedProfileAt(lat, lon, seed)
+    if (pb === null) height -= carve
+    else height += (pb - height) * (carve / 0.5)
+  }
   if (type === 'water') {
     // Sandy bank fading into water-blue with channel depth; the river/lake
     // surface meshes above add the actual water.

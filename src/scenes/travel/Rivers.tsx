@@ -40,13 +40,22 @@ import {
   NILE_FLOOD,
   LAKE_LIFT,
   lakeBedMax,
-  densifyRiver,
+  mouthSeaness,
   planRibbonStrips,
   registerRiverSurfaces,
-  ribbonRowSurfaceAt,
+  riverAxisRows,
+  riverIsSeaBound,
+  springForRiver,
   waterSurfaceY,
 } from './waterSurface'
-import { edgeIsInterior, buildBankIndex, BANK_PROBE_DEG, type BankAxisSample } from './riverBanks'
+import {
+  edgeIsInterior,
+  buildBankIndex,
+  buildJuniorPairs,
+  mergeFactorAt,
+  BANK_PROBE_DEG,
+  type BankAxisSample,
+} from './riverBanks'
 
 const HALF_WIDTH = RIVER_WIDTH_DEG * 10 // ribbon half width in world units (1° = 10 units)
 
@@ -77,6 +86,8 @@ function buildRivers(seed: number): {
   const uvs: number[] = []
   const flows: number[] = []
   const banks: number[] = []
+  const merges: number[] = [] // point 233: 0 where a junior arm hands the junction water to its senior
+  const seaFades: number[] = [] // point 234: 0 upstream → 1 at the mouth, the ribbon dissolving into the sea
   const floodK: number[] = [] // 1 on the Nile: its vertices ride the flood uniform
   const indices: number[] = []
   const falls: FallDef[] = []
@@ -84,31 +95,37 @@ function buildRivers(seed: number): {
   const report: Record<string, { strips: number; buried: number; interiorEdges: number }> = {}
   const axisSamples: Array<{ lat: number; lon: number; surf: number; nile: boolean }> = []
 
-  // Phase 1 — densify every axis first: the bank mask below must see ALL
+  // Phase 1 — build every axis first: the bank mask below must see ALL
   // rivers' bands, not only the ones built so far (confluences are between
   // rivers in either build order).
-  const densified = RIVERS_DATA.map((river) => ({ river, pts: densifyRiver(river.points) }))
+  const built = RIVERS_DATA.map((river) => ({ river, rows: riverAxisRows(river, seed) }))
   const bankSamples: BankAxisSample[] = []
-  for (const { river, pts } of densified) {
-    pts.forEach((p, i) => bankSamples.push({ riverId: river.id, index: i, lat: p.lat, lon: p.lon }))
+  for (const { river, rows } of built) {
+    rows.forEach((p, i) => bankSamples.push({ riverId: river.id, index: i, lat: p.lat, lon: p.lon }))
   }
   const bankIndex = buildBankIndex(bankSamples)
+  // Point 233: at each junction exactly one arm draws the shared water — the
+  // junior arm's vertices fade out inside its senior partner's channel band.
+  const juniorPairs = buildJuniorPairs(
+    built.map(({ river, rows }) => ({ id: river.id, pts: rows })),
+    RIVER_WIDTH_DEG,
+  )
 
-  for (const { river, pts } of densified) {
-    const world = pts.map((p) => latLonToWorld(p.lat, p.lon))
-    const samples = pts.map((p) => sampleTerrain(p.lat, p.lon, seed))
+  for (const { river, rows } of built) {
+    const world = rows.map((p) => latLonToWorld(p.lat, p.lon))
 
     // Surface sits just above the carved bed at every point, so the ribbon is
     // never buried under a local rise of the terrain (which would leave visible
-    // gaps in the river). The bed itself descends overall from source to mouth,
-    // so the water reads as flowing downhill without sea-level canyons
-    // (design.md §11). Row heights come from the SHARED formula (point 211b:
-    // lifted where a cross-sloping bank's carved wedge would poke through the
-    // flat cross-section) so the canoe float reads the identical surface.
-    const surf: number[] = []
-    for (let i = 0; i < pts.length; i++) {
-      surf.push(ribbonRowSurfaceAt(pts, i, seed))
-      axisSamples.push({ lat: pts[i].lat, lon: pts[i].lon, surf: surf[i], nile: river.id === 'nile' })
+    // gaps in the river). The bed itself descends smoothly from source to
+    // mouth (the point-232 longitudinal profile), so the water reads as
+    // flowing downhill without sea-level canyons (design.md §11). Row heights
+    // come from the SHARED builder (point 211b cross-band lift + point 232
+    // downstream smoothing) so the canoe float reads the identical surface.
+    const surf = rows.map((r) => r.surf)
+    for (const r of rows) {
+      // Sea rows never ride the flood (point 234): the mouth bridge stays
+      // under the sea sheet at flood peak (floodK is zeroed there too).
+      axisSamples.push({ lat: r.lat, lon: r.lon, surf: r.surf, nile: river.id === 'nile' && !r.ocean })
     }
 
     // Flow speed: base current plus local slope; boosted near the river's
@@ -148,15 +165,9 @@ function buildRivers(seed: number): {
       })
     }
 
-    // Spring at the source when the river rises in open land (not at a
-    // lake outlet or a confluence with another river).
-    const src = pts[0]
-    const nearOtherRiver = RIVERS_DATA.some(
-      (o) =>
-        o.id !== river.id &&
-        o.points.some(([lon, lat]) => Math.hypot(lon - src.lon, lat - src.lat) < 0.3),
-    )
-    if (!nearOtherRiver && !lakeContains(src.lat, src.lon)) {
+    // Spring at the source when the river rises in open land — never at a
+    // confluence or a lake outflow (point 234; the pure springForRiver).
+    if (springForRiver(river, rows)) {
       springs.push({ x: world[0].x, z: world[0].z, y: surf[0] + 0.06 })
     }
 
@@ -166,7 +177,13 @@ function buildRivers(seed: number): {
     // the sea so it merges with the sea sheet (point 211a); only a sustained
     // ocean run (the open sea beyond the mouth) ends the ribbon. The drawn/
     // connected decisions live in the pure planRibbonStrips.
-    const plan = planRibbonStrips(samples.map((s) => s.type === 'ocean'))
+    const plan = planRibbonStrips(rows.map((r) => r.ocean))
+    // Point 234: the ribbon crossfades into the sea over its final approach —
+    // no visible boundary where river ends and sea begins.
+    const seaness = mouthSeaness(
+      rows.map((r) => r.ocean),
+      riverIsSeaBound(rows),
+    )
     let arc = 0
     let buried = 0
     let interiorEdges = 0
@@ -183,8 +200,10 @@ function buildRivers(seed: number): {
     for (let i = 0; i < world.length; i++) {
       if (i > 0) arc += Math.hypot(world[i].x - world[i - 1].x, world[i].z - world[i - 1].z)
       if (!plan.drawn[i]) continue
-      const isOcean = samples[i].type === 'ocean'
-      if (!isOcean && surf[i] < samples[i].height - 0.05) buried++
+      const isOcean = rows[i].ocean
+      // Lake rows hug the LAKE sheet just beneath it (point 234) — they are
+      // covered water by design, not a burial under open terrain.
+      if (!isOcean && !rows[i].lake && surf[i] < rows[i].bed - 0.05) buried++
       const a = world[Math.max(0, i - 1)]
       const b = world[Math.min(world.length - 1, i + 1)]
       let px = -(b.z - a.z)
@@ -197,14 +216,27 @@ function buildRivers(seed: number): {
       uvs.push(arc, 0, arc, 1)
       const f = flowAt(i)
       flows.push(f, f)
-      const fk = river.id === 'nile' ? 1 : 0
+      // Sea rows never ride the flood (point 234): the mouth bridge must
+      // stay under the sea sheet at flood peak.
+      const fk = river.id === 'nile' && !isOcean ? 1 : 0
       floodK.push(fk, fk)
       // A mouth-bridge vertex sits in the sea: no real bank, and it must not count
       // as an interior edge (the bank/foam metric stays about land banks only).
       const bankL = isOcean ? 0 : bankAt(world[i].x - px * PROBE, world[i].z - pz * PROBE, i)
       const bankR = isOcean ? 0 : bankAt(world[i].x + px * PROBE, world[i].z + pz * PROBE, i)
-      if (!isOcean) interiorEdges += (1 - bankL) + (1 - bankR)
+      // The interior-edge metric stays about land banks at junctions: rows
+      // inside a lake carry no bank by design (point 234), like sea rows.
+      if (!isOcean && !rows[i].lake) interiorEdges += (1 - bankL) + (1 - bankR)
       banks.push(bankL, bankR)
+      // Point 233: per-vertex junction hand-over — a junior arm's water fades
+      // out inside its senior partner's band so the shared region blends once.
+      const qL = worldToLatLon(world[i].x - px, world[i].z - pz)
+      const qR = worldToLatLon(world[i].x + px, world[i].z + pz)
+      merges.push(
+        mergeFactorAt(qL.lat, qL.lon, river.id, bankIndex, RIVER_WIDTH_DEG, juniorPairs),
+        mergeFactorAt(qR.lat, qR.lon, river.id, bankIndex, RIVER_WIDTH_DEG, juniorPairs),
+      )
+      seaFades.push(seaness[i], seaness[i])
       if (plan.connected[i]) indices.push(vi - 2, vi, vi - 1, vi - 1, vi, vi + 1)
     }
     report[river.id] = { strips: plan.strips, buried, interiorEdges }
@@ -215,6 +247,8 @@ function buildRivers(seed: number): {
   geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2))
   geometry.setAttribute('flow', new THREE.BufferAttribute(new Float32Array(flows), 1))
   geometry.setAttribute('bank', new THREE.BufferAttribute(new Float32Array(banks), 1))
+  geometry.setAttribute('merge', new THREE.BufferAttribute(new Float32Array(merges), 1))
+  geometry.setAttribute('seaFade', new THREE.BufferAttribute(new Float32Array(seaFades), 1))
   geometry.setAttribute('floodK', new THREE.BufferAttribute(new Float32Array(floodK), 1))
   geometry.setIndex(indices)
   // Hand the axis samples to the float-height module: the canoe then floats
@@ -245,6 +279,10 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   if (riverMaterialCache) return riverMaterialCache
   const m = riverMaterialCache = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
+  // Point 233: overlapping junction arms crossfade by the merge attribute —
+  // depth writes would let the first-drawn arm's transparent fragments cull
+  // the senior arm underneath and punch a hole where the junior fades out.
+  m.depthWrite = false
   m.roughness = 0.14
   m.metalness = 0.02
   m.side = THREE.DoubleSide
@@ -256,6 +294,13 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   // 1 at real banks, 0 where the edge lies inside the joined water body
   // (confluences, lake mouths, the sea) — no bank foam across open water.
   const bank = attribute('bank', 'float') as unknown as ReturnType<typeof float>
+  // 0 where a junior junction arm hands the shared water to its senior
+  // (point 233) — the overlap is drawn once, never alpha-doubled.
+  const merge = attribute('merge', 'float') as unknown as ReturnType<typeof float>
+  // 0 upstream → 1 at a sea mouth (point 234): the ribbon's colour slides to
+  // the sea sheet's nearshore tone and its opacity dissolves, so the river
+  // fades into the sea with no recognizable boundary.
+  const seaFade = attribute('seaFade', 'float') as unknown as ReturnType<typeof float>
 
 
   // Streaks elongated along the flow, scrolling downstream with the current.
@@ -273,7 +318,10 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
     .mul(bank)
   const rapidFoam = smoothstep(float(1.7), float(3.0), flow).mul(smoothstep(float(0.3), float(0.62), streak))
   const foam = max(bankFoam, rapidFoam)
-  m.colorNode = mix(base, color('#eef6f7'), foam.mul(0.9))
+  // The sea-mouth crossfade is applied LAST, over base and foam alike, so
+  // streaks and whitewater dissolve along with the ribbon ('#1c5c86' is the
+  // sea sheet's nearshore mid tone, render/water.ts).
+  m.colorNode = mix(mix(base, color('#eef6f7'), foam.mul(0.9)), color('#1c5c86'), seaFade)
 
   // Only slight movement on the surface (design.md §11): a tiny ripple, no
   // wave field.
@@ -284,7 +332,7 @@ function createRiverMaterial(): THREE.MeshStandardNodeMaterial {
   const floodRise = (attribute('floodK', 'float') as unknown as ReturnType<typeof float>).mul(NILE_FLOOD_U)
   m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.035).add(floodRise), 0))
 
-  m.opacityNode = float(0.9)
+  m.opacityNode = merge.mul(seaFade.oneMinus()).mul(0.9)
   m.roughnessNode = foam.mul(0.6).add(0.12)
   return m
 }
