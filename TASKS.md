@@ -8189,6 +8189,21 @@ the remaining open points in their numeric order.
   the coast relief cast onto the water (test: toggle shadows). PIN IT with a
   water-plane-hidden capture + a height/shadow probe at the exact patch BEFORE any
   further fix — the depth-smoothing path is a dead end.
+  ROOT CAUSE FOUND (22.07.2026, probe CONFIRMED) — it is a SHOAL, not water: a
+  `sampleTerrain` sweep near the Suez coast finds OCEAN-typed cells whose HEIGHT
+  reaches up to ~-0.02, while the water PLANE sinks to ~-0.4 (TravelScene FAR note).
+  So the shallow ocean FLOOR pokes ~0.38 ABOVE the water plane and renders as dark
+  ocean-coloured TERRAIN that the plane never covers — the blocky "wall". (The
+  point-210 shore SHELF, which lifts the near-shore floor toward -0.02 for a smooth
+  waterline, is what raises it above the sunk plane here.) REAL FIX (fresh turn,
+  picture-verified both backends): make the water plane cover the shallow ocean
+  floor — either RAISE the ocean-plane sink toward ~-0.05/0 near the coast (watch
+  the river/lake sheets that the -0.4 sink protects — the reason it is sunk), or
+  CLAMP the ocean terrain height to stay below the plane (sink the shelf's seaward
+  half under -0.4 so only the LAND-side shore stays visible), or colour the
+  above-plane shallow floor as shallow WATER (teal) so it reads as sea, not a dark
+  wall. Test each against the Nile/normal coast/lakes (the -0.4 sink exists to keep
+  the plane off the carved river beds — do not re-flood them).
   STEPPING NOT RESOLVED (user re-reported 22.07, second screenshot "immer noch
   stufig"). The terrain shelf smoothed the SHORE at the boundary (30.02N/32.62E
   renders as an organic graded coast on WebGL2), but a FRESH render at the user's
@@ -8676,6 +8691,21 @@ the remaining open points in their numeric order.
   interior at the same latitude keeps its Nov-Mar rains. Pure-test both sides
   (coastal Namib rainless every month; interior wet Nov-Mar); a live pixel check no
   rain on the coastal strip. This needs a real fix, not just the check.
+  EXTENDED (user 22.07.2026) — the Namib rain is likely just ONE symptom: audit the
+  WEATHER x TERRAIN-TYPE interplay GENERALLY for plausibility, not only this spot.
+  The wetness model has NO longitudinal term, so any place where rainfall depends on
+  more than latitude+elevation is suspect. Method (a repeatable plausibility audit,
+  akin to point 205): sweep a grid of representative points across EVERY terrain
+  type / biome (desert, savanna, jungle, coast, mountain, highland) and region, and
+  cross-check the modelled wetness/season against docs/climate-1890.md + the terrain
+  the game renders there — flag every mismatch (rain on a bone-dry desert, a
+  rainforest reading a dry season it never had, a Mediterranean coast on a summer-
+  rain curve, a highland not on its own calendar, fog-coast vs interior, etc.). Also
+  check the DERIVED weather visuals track the terrain (fog/overcast/greenness/flora
+  bleach vs the biome). Turn findings into concrete sub-fixes (each a pinned coord +
+  wrong-vs-right regime) + pure tests, mirroring the point-147 catches (Fang-in-
+  Sahara, Somali-in-Congo). A Fable-5 plausibility pass fits here. Keep every
+  season.test.ts verdict.
 
 - [ ] 224. DEMO CHECKPOINT — full closing run → re-point the `poc` tag to the
   then-current main → publish that state playable at
