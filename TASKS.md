@@ -9387,6 +9387,40 @@ the remaining open points in their numeric order.
   branches, but it edits CLAUDE.md §7.1 (a documented acceptance criterion), so
   keep the numbering/references intact per the doc rules.
 
+- [ ] 245. JUVENILES ROAM FURTHER + ARE THE PREFERRED PREY (esp. crocodiles at the
+  drink) — user follow-up 22.07.2026 to points 238/239. THREE tweaks: (1) multiply
+  the max juvenile↔parent distance by 1.5 AGAIN — `balance.family.followRadius`
+  5.4 → 8.1 and `balance.family.gambolRange` 12 → 18 (scale together; keep the
+  hop-bout duration). Re-check the drama still resolves at 8.1: the rescue burst
+  must still close the gap within the caught window (widen `GUARD_RADIUS` / the
+  reach distances if the wider leash would make rescues systematically fail — the
+  point-238 head-room was gap 15.2 vs burst-cover 30, so 8.1 leash → gap ~19 stays
+  inside 30, but re-assert it with a pure test). (2) A calf/foal DRINKING at a
+  water bank is ESPECIALLY OFTEN the crocodile's lunge target, so the §19.16 +
+  §19.8 sacrifice/rescue drama fires more often: strongly bias the crocodile's
+  ambush target toward a drinking juvenile at the bank (a calibratable preference,
+  clearly above an adult or a non-drinking target). (3) Juveniles are the PREFERRED
+  PREY of the OTHER predators generally too: raise the existing juvenile hunt bias
+  (`CALF_HUNT_CHANCE`, currently 0.6) and/or the target-pick so a nearby juvenile
+  is preferred over an adult grazer for every predator — a calibratable balance
+  value. Anchors: `src/config/balance.ts` (`family` — followRadius/gambolRange, and
+  a new `juvenilePreyBias` / crocodile drinking-target preference), `src/scenes/
+  travel/wildlifeBehavior.ts` (`CALF_HUNT_CHANCE`, the hunt target selection, the
+  crocodile ambush target pick), `src/scenes/travel/Wildlife.tsx` (the croc ambush
+  + the calf drinking state `a.drink`), `src/ui/DebugMenu.tsx` for any new value.
+  VERIFIABLE: pure tests — `followRadius` = 8.1 (1.5 × 5.4) and `gambolRange` = 18;
+  the drama still resolves at the wider leash (burst-cover > worst gap × margin);
+  a drinking juvenile is the strongly-preferred crocodile target (predicate/weight
+  test); a nearby juvenile is preferred over an adult for a predator hunt
+  (calibratable, boundary-tested); the new balance values write through the debug
+  menu. Live (`scripts/verify/enrichments.mjs`): a drinking calf near a forced
+  crocodile is taken and the sacrifice/rescue drama runs. DOCS: design.md §19.8
+  (juvenile roam distance + preferred prey), §19.16 (crocodile prefers a drinking
+  juvenile), §21.2 (the new calibratable values). No player-visible text. NOTE:
+  `wildlifeBehavior.ts`/`Wildlife.tsx`/`balance.ts` — same files as points
+  242/237/217/228; do NOT delegate concurrently with those wildlife points; can be
+  bundled with 242 (both are crocodile/wildlife on the same files).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
