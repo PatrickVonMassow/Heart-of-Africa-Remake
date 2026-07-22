@@ -9321,6 +9321,35 @@ the remaining open points in their numeric order.
   (237/238/239) and the fauna points; do NOT delegate concurrently with those —
   queue after the wildlife branch merges.
 
+- [ ] 243. REDESIGN THE CROCODILE MESH — the user reports (22.07.2026) that the
+  crocodile's appearance is poor: they did not even recognise it as a crocodile.
+  Two specifics: (1) the SNOUT lacks the classic crocodile shape (the long tapered
+  jaw), and (2) there is a long unexplained ROD lying on TOP of the body that reads
+  as nothing identifiable. Make it prettier / more detailed. Read the current
+  `buildCrocodile` in `src/render/fauna.ts`, DIAGNOSE what the "rod on top" is (a
+  mis-scaled dorsal ridge? a leftover primitive?), and REBUILD the crocodile into a
+  recognisable, classic silhouette: a long LOW body, a distinctive long TAPERED
+  SNOUT (the classic croc jaw line, upper + lower jaw), raised EYE KNOBS above the
+  head (also needed for point 242's submerge pose), a low ARMOURED/ridged back
+  (dorsal scutes as a LOW ridge — replace the tall rod with this, never a thin tall
+  rod), four short splayed legs, and a long tapering muscular tail. Cheap instanced
+  geometry, tessellation consistent with points 214/240 (smooth where it should be,
+  the croc's characteristic low profile). Keep the placement/scale/colour and the
+  water-only behaviour hooks intact (do not touch wildlife behaviour — mesh only).
+  VERIFIABLE (pure layer): extend `src/render/fauna.test.ts` — assert the rebuilt
+  crocodile has a long tapered snout (a front section that extends well forward of
+  the head and narrows toward the tip), raised eye knobs above the skull, a tapering
+  tail longer than the body core, and a LOW profile: NO part protrudes as a tall
+  thin rod above the back (max part height above the body is bounded to a low
+  fraction of the body length/width), plus the tessellation floor. GATES: `npm run
+  test:unit` green, `npm run build` passes, `npm run lint` zero findings. Do NOT run
+  browser suites (the parent picture-verifies a crocodile on a river on BOTH
+  backends). DOCS: design.md §19.16 if wording changes. No player-visible text.
+  NOTE: `fauna.ts` `buildCrocodile` — coordinate with point 242 (which adds the
+  submerge POSE + placement to the same crocodile). Sequence 243 (the MESH) FIRST,
+  then 242 (the behaviour/pose) builds on it; do NOT delegate 243 concurrently with
+  any other `fauna.ts` point.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
