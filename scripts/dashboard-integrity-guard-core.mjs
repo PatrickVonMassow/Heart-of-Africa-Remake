@@ -30,6 +30,7 @@
 // here is total (never throws, degrades to "no finding") on partial input.
 import { createHash } from 'node:crypto'
 import { parseQueueCards, parseNowCard } from './queue-order-guard-core.mjs'
+import { parseNowCardPoints } from './dashboard-guard-core.mjs'
 
 // ---- calibratable constants -------------------------------------------------
 
@@ -111,22 +112,28 @@ export function pointsFromText(text, knownPoints) {
 // ---- (A) now-card vs actual work -------------------------------------------
 
 /**
- * Does the git evidence support the now-card / declared focus?
- * Inputs: nowPoint/focusPoint (numbers or null), commitSubjects (recent
- * subject lines), touchedFiles (working-tree paths, any separator), specs
- * (parsePointSpecs output). Returns {ok:true} or
+ * Does the git evidence support the now-card(s) / declared focus?
+ * Inputs: nowPoints (Set of ALL now-section card points — with the parallel
+ * feature-branch workflow the section holds one card per point in active
+ * work, and evidence for ANY of them supports the board), nowPoint/focusPoint
+ * (numbers or null; nowPoint kept for back-compat single-card callers),
+ * commitSubjects (recent subject lines), touchedFiles (working-tree paths,
+ * any separator), specs (parsePointSpecs output). Returns {ok:true} or
  * {ok:false, foreignPoints:[…], evidence:[…strings]}.
  *
  * Conservative by construction: allows when no point is derivable, when ANY
- * evidence supports the now/focus point (mixed turns), or when the foreign
+ * evidence supports a now/focus point (mixed turns), or when the foreign
  * file evidence is below FOREIGN_EVIDENCE_MIN. Only OPEN points count as
  * foreign — commits/edits for a just-closed point never block the pivot away
  * from it. Total: any malformed input → {ok:true}.
  */
 export function nowCardMatchesWork(input) {
   try {
-    const { nowPoint = null, focusPoint = null, commitSubjects = [], touchedFiles = [], specs } = input ?? {}
-    const support = new Set([nowPoint, focusPoint].filter((n) => Number.isInteger(n)))
+    const { nowPoints = null, nowPoint = null, focusPoint = null, commitSubjects = [], touchedFiles = [], specs } =
+      input ?? {}
+    const support = new Set(
+      [...(nowPoints instanceof Set ? nowPoints : []), nowPoint, focusPoint].filter((n) => Number.isInteger(n)),
+    )
     if (support.size === 0) return { ok: true } // non-point work — nothing to hold evidence against
     if (!(specs instanceof Map)) return { ok: true }
 
@@ -277,6 +284,10 @@ export function evaluate(input) {
 
     const cards = parseQueueCards(dashboardHtml)
     const nowCard = parseNowCard(dashboardHtml)
+    // ALL now-section card points — the section holds one card PER point in
+    // active parallel work (user decision 22.07.2026), so check A must accept
+    // evidence for any of them, not only the first card.
+    const nowPoints = parseNowCardPoints(dashboardHtml)
     if (!nowCard && cards.length === 0) return ALLOW // no board — dashboard-guard owns registration
 
     const problems = []
@@ -297,9 +308,9 @@ export function evaluate(input) {
       )
     }
 
-    // (A) now-card vs actual work
+    // (A) now-card(s) vs actual work
     const match = nowCardMatchesWork({
-      nowPoint: nowCard ? nowCard.point : null,
+      nowPoints,
       focusPoint,
       commitSubjects,
       touchedFiles,
@@ -307,8 +318,8 @@ export function evaluate(input) {
     })
     if (!match.ok) {
       problems.push(
-        `NOW-CARD CONTRADICTS THE ACTUAL WORK: the now-card/declared focus names point ` +
-          `${nowCard && nowCard.point != null ? nowCard.point : focusPoint} but the git evidence points at ` +
+        `NOW-CARD CONTRADICTS THE ACTUAL WORK: the now-card(s)/declared focus name point(s) ` +
+          `${nowPoints.size ? [...nowPoints].join(', ') : focusPoint} but the git evidence points at ` +
           `open point(s) ${match.foreignPoints.join(', ')} — ${match.evidence.join('; ')}. Reconcile NOW: ` +
           'if the work really is on the evidenced point(s), retitle the now-card + re-declare ' +
           '(focus.mjs set) + republish + --synced; if the card is right, commit/clean the unrelated edits ' +

@@ -26,25 +26,40 @@ export function parseTasks(text) {
 }
 
 /**
- * The point number in the now-card's TITLE (`<span class="t">210 — …`), taken
- * from the first title after the "Woran ich gerade arbeite" heading — never from
- * incidental mentions in the status text ("the point-200 class" falsely covered
- * 200 once). Null when the card has no leading number (non-point work) or the
- * section is missing.
+ * ALL leading point numbers of the now-SECTION card TITLES
+ * (`<span class="t">210 — …`), as a Set in document order. With the
+ * feature-branch + worktree workflow several TASKS points are worked in
+ * parallel, so "Woran ich gerade arbeite" holds one card PER point in active
+ * work (user decision 22.07.2026) — every invariant below reads this SET, not
+ * a single card. Only card TITLES count, never incidental mentions in the
+ * status text ("the point-200 class" falsely covered 200 once); a card whose
+ * title has no leading number (non-point work) contributes nothing. Empty Set
+ * on a missing section or non-string input.
  */
-export function parseNowCardPoint(html) {
-  if (typeof html !== 'string') return null
+export function parseNowCardPoints(html) {
+  const points = new Set()
+  if (typeof html !== 'string') return points
   const nowStart = html.indexOf('Woran ich gerade arbeite')
-  if (nowStart < 0) return null
+  if (nowStart < 0) return points
   // Bound the search to the now-card SECTION (up to the next <h2>). A
   // NON-numeric now-card title (a closing cycle, cross-cutting work) otherwise
-  // lets the scan run on into "Von dir zu klären"/Warteschlange and grab the
-  // first numbered card there — a false now-card point (observed 22.07.2026:
+  // lets the scan run on into "Von dir zu klären"/Warteschlange and grab
+  // numbered cards there — false now-card points (observed 22.07.2026:
   // a non-numeric now-card read the VDZK 206 card as its point).
   const nextH2 = html.indexOf('<h2>', nowStart + 1)
   const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
-  const m = section.match(/class="t">\s*(\d+)/)
-  return m ? Number(m[1]) : null
+  for (const m of section.matchAll(/class="t">\s*(\d+)/g)) points.add(Number(m[1]))
+  return points
+}
+
+/**
+ * Back-compat single-card view: the FIRST now-card point (document order) or
+ * null. Kept for the wrapper/focus tooling; the guard invariants themselves
+ * use the full parseNowCardPoints Set.
+ */
+export function parseNowCardPoint(html) {
+  for (const n of parseNowCardPoints(html)) return n
+  return null
 }
 
 /** Point numbers of the Warteschlange cards only (the Erledigt section also uses `.num`). */
@@ -144,7 +159,7 @@ export function evaluate(input) {
   }
 
   const queued = parseQueuePoints(html)
-  const nowPoint = parseNowCardPoint(html)
+  const nowPoints = parseNowCardPoints(html)
   const klaerung = parseKlaerungPoints(html)
 
   // (3) NO STALE QUEUE ITEM — a ticked point must not still sit in the Warteschlange.
@@ -156,10 +171,10 @@ export function evaluate(input) {
     )
   }
 
-  // (4) COMPLETENESS — every open point is visible: queue, the now-card's own
-  // title, or a "Von dir zu klären" card (a point blocked on the user lives
-  // ONLY there — see 4c).
-  const missing = open.filter((n) => n !== nowPoint && !queued.has(n) && !klaerung.has(n))
+  // (4) COMPLETENESS — every open point is visible: queue, one of the
+  // now-cards' own titles, or a "Von dir zu klären" card (a point blocked on
+  // the user lives ONLY there — see 4c).
+  const missing = open.filter((n) => !nowPoints.has(n) && !queued.has(n) && !klaerung.has(n))
   if (missing.length) {
     return block(
       `BATCH DASHBOARD INCOMPLETE: open TASKS point(s) ${missing.join(', ')} appear in NEITHER the ` +
@@ -168,25 +183,27 @@ export function evaluate(input) {
     )
   }
 
-  // (4b) NO DOUBLE-LISTING — the now-card's own point must not ALSO sit in the
-  // Warteschlange. It is "current work", not a pending queue item; listing it in
-  // both reads as simultaneously in-progress AND waiting. Observed 22.07.2026:
-  // point 214 stood in the now-card and the queue at once (user-reported
-  // inconsistency). Enforced so the contradiction cannot recur.
-  if (nowPoint != null && queued.has(nowPoint)) {
+  // (4b) NO DOUBLE-LISTING — no now-card's own point may ALSO sit in the
+  // Warteschlange. A now-card point is "current work", not a pending queue
+  // item; listing it in both reads as simultaneously in-progress AND waiting.
+  // Observed 22.07.2026: point 214 stood in the now-card and the queue at once
+  // (user-reported inconsistency). Enforced over EVERY now-card so the
+  // contradiction cannot recur under parallel work either.
+  const doubled = [...nowPoints].filter((n) => queued.has(n))
+  if (doubled.length) {
     return block(
-      `BATCH DASHBOARD DOUBLE-LISTS point ${nowPoint}: it is BOTH the now-card ("Woran ich gerade ` +
-        'arbeite") AND has a Warteschlange card. The current-work point must appear ONLY in the ' +
+      `BATCH DASHBOARD DOUBLE-LISTS point(s) ${doubled.join(', ')}: BOTH a now-card ("Woran ich ` +
+        'gerade arbeite") AND a Warteschlange card. A current-work point must appear ONLY as a ' +
         'now-card — delete its Warteschlange card, republish (dashboard-publish.mjs + Artifact), then ' +
         're-run --synced.',
     )
   }
 
   // (4c) ONE SECTION PER POINT — a point number may appear in AT MOST ONE of
-  // the three open sections (now-card, Warteschlange, "Von dir zu klären"),
+  // the three open sections (now-cards, Warteschlange, "Von dir zu klären"),
   // and a DONE point in none of them. (3) polices done∈queue and (4b)
   // now∈queue; this adds every "Von dir zu klären" overlap: a point that is
-  // queued as pending work, or IS the current now-card focus, or is ticked
+  // queued as pending work, or has a now-card of its own, or is ticked
   // done, is not (purely) "waiting on the user" — its VDZK card is stale or
   // the point is double-listed. User-reported twice for the answered-question
   // case (the card lingered after work resumed) and once for point 206
@@ -195,7 +212,7 @@ export function evaluate(input) {
     .map((n) => {
       const also = []
       if (queued.has(n)) also.push('Warteschlange')
-      if (nowPoint != null && n === nowPoint) also.push('now-card')
+      if (nowPoints.has(n)) also.push('now-card')
       if (done.includes(n)) also.push('ticked done')
       return also.length ? `${n} (also: ${also.join(' + ')})` : null
     })
@@ -220,14 +237,17 @@ export function evaluate(input) {
     )
   }
 
-  // (6) NOW-CARD == FOCUS — the exact 200-vs-210 slip: the card's title point
-  // must equal the declared focus point. (A null focus point — non-point work —
-  // skips the number equality; the pivot ritual in (7) still applies.)
-  if (focus.point != null && nowPoint !== focus.point) {
+  // (6) NOW-CARD == FOCUS — the exact 200-vs-210 slip: the declared focus
+  // point must be AMONG the now-card title points (with parallel work the
+  // section holds several cards; the focus names the one being driven RIGHT
+  // NOW, not necessarily the first). (A null focus point — non-point work —
+  // skips the membership check; the pivot ritual in (7) still applies.)
+  if (focus.point != null && !nowPoints.has(focus.point)) {
     return block(
-      `DASHBOARD NOW-CARD OUT OF SYNC WITH THE DECLARED FOCUS: the now-card is titled point ` +
-        `${nowPoint ?? '<none parseable>'} but the declared focus is ${focus.point} ("${focus.note ?? ''}"). ` +
-        'Reconcile NOW: if the work really moved, rewrite the now-card (and queue), republish ' +
+      `DASHBOARD NOW-CARD OUT OF SYNC WITH THE DECLARED FOCUS: the now-card(s) are titled point(s) ` +
+        `${nowPoints.size ? [...nowPoints].join(', ') : '<none parseable>'} but the declared focus is ` +
+        `${focus.point} ("${focus.note ?? ''}"). ` +
+        'Reconcile NOW: if the work really moved, add/rewrite the now-card (and queue), republish ' +
         '(dashboard-publish.mjs + Artifact) and re-run --synced; if the declaration is the stale side, ' +
         'run node scripts/focus.mjs set <N> "<what>".',
     )
