@@ -155,6 +155,186 @@ describe('crown albedo luminance floor (point 206 — Central jungle reads lit, 
   })
 })
 
+// The palm redesign (point 216): the old palm's trunk was a stack of four
+// DISCONNECTED, laterally offset cylinder segments (visible gaps on the outside
+// of the bend), its crown a ring of flat squashed cones hovering above the top
+// segment. The rebuilt palm is pinned structurally: one connected trunk mesh
+// spanning the full height, the crown seated exactly on the trunk top, and a
+// radial fan of >= 6 feathered fronds — never two crossed billboards.
+describe('palm redesign (point 216 — continuous trunk, seated crown, radial frond fan)', () => {
+  const positions = (geo: THREE.BufferGeometry) => geo.attributes.position.array as Float32Array
+
+  /**
+   * Union-find over shared vertex POSITIONS of a non-indexed part: triangles
+   * that touch (share a coordinate-equal vertex) join one component. Returns
+   * the component containing the lowest vertex — for the palm's base part that
+   * is the trunk — with its vertical span, distinct ring levels and top point.
+   */
+  const lowestComponent = (geo: THREE.BufferGeometry) => {
+    const pos = positions(geo)
+    const n = pos.length / 3
+    const parent = Array.from({ length: n }, (_, i) => i)
+    const find = (i: number): number => {
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]]
+        i = parent[i]
+      }
+      return i
+    }
+    const union = (a: number, b: number) => {
+      const ra = find(a)
+      const rb = find(b)
+      if (ra !== rb) parent[ra] = rb
+    }
+    const byPos = new Map<string, number>()
+    for (let i = 0; i < n; i++) {
+      const k = `${Math.round(pos[i * 3] * 1e4)},${Math.round(pos[i * 3 + 1] * 1e4)},${Math.round(pos[i * 3 + 2] * 1e4)}`
+      const first = byPos.get(k)
+      if (first === undefined) byPos.set(k, i)
+      else union(i, first)
+    }
+    for (let t = 0; t < n; t += 3) {
+      union(t, t + 1)
+      union(t, t + 2)
+    }
+    let lowest = 0
+    for (let i = 1; i < n; i++) if (pos[i * 3 + 1] < pos[lowest * 3 + 1]) lowest = i
+    const root = find(lowest)
+    let minY = Infinity
+    let maxY = -Infinity
+    let top: [number, number, number] = [0, -Infinity, 0]
+    const levels = new Set<number>()
+    for (let i = 0; i < n; i++) {
+      if (find(i) !== root) continue
+      const y = pos[i * 3 + 1]
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+      levels.add(Math.round(y * 1e3))
+      if (y > top[1]) top = [pos[i * 3], y, pos[i * 3 + 2]]
+    }
+    return { minY, maxY, levels: levels.size, top }
+  }
+
+  /**
+   * Count the crown's fronds by their TIPS: a vertex is a tip candidate when
+   * its horizontal radius (about the trunk-top axis) is within 5% of the
+   * largest radius in its own azimuth neighbourhood (±0.15 rad) — each frond's
+   * pointed tip dominates its own direction. Candidates are then clustered by
+   * azimuth; the cluster count is the number of distinct radial fronds, and
+   * the largest gap between adjacent clusters measures the radial coverage.
+   */
+  const frondFan = (crown: THREE.BufferGeometry, cx: number, cz: number) => {
+    const pos = positions(crown)
+    const n = pos.length / 3
+    const az: number[] = []
+    const rad: number[] = []
+    for (let i = 0; i < n; i++) {
+      const dx = pos[i * 3] - cx
+      const dz = pos[i * 3 + 2] - cz
+      az.push(Math.atan2(dx, dz))
+      rad.push(Math.hypot(dx, dz))
+    }
+    const angDist = (a: number, b: number) => {
+      const d = Math.abs(a - b) % (Math.PI * 2)
+      return d > Math.PI ? Math.PI * 2 - d : d
+    }
+    const tips: number[] = []
+    for (let i = 0; i < n; i++) {
+      let localMax = 0
+      for (let j = 0; j < n; j++) {
+        if (angDist(az[i], az[j]) <= 0.15) localMax = Math.max(localMax, rad[j])
+      }
+      if (rad[i] >= localMax * 0.95) tips.push(az[i])
+    }
+    tips.sort((a, b) => a - b)
+    let clusters = 0
+    let maxGap = 0
+    for (let i = 0; i < tips.length; i++) {
+      const next = tips[(i + 1) % tips.length]
+      const gap = i === tips.length - 1 ? tips[0] + Math.PI * 2 - tips[i] : next - tips[i]
+      maxGap = Math.max(maxGap, gap)
+      if (gap > 0.2) clusters++
+    }
+    if (clusters === 0) clusters = 1 // all tips in one azimuth bundle
+    return { clusters, maxGap, maxRadius: Math.max(...rad) }
+  }
+
+  for (const [label, detailed, minFronds, minRings, minCrownVerts] of [
+    ['travel palm', false, 6, 6, 350],
+    ['detailed settlement palm', true, 8, 8, 700],
+  ] as const) {
+    it(`${label}: the trunk is ONE connected mesh over the full height — no stacked gap segments`, () => {
+      const { base, crown } = splitFoliage(buildPalm(detailed))
+      const trunk = lowestComponent(base)
+      // Rooted at the ground…
+      expect(trunk.minY).toBeLessThan(0.01)
+      // …and one piece all the way to the crown seat: the connected component
+      // spans >= 90% of the base part's full vertical extent (bud included).
+      const posB = positions(base)
+      let baseMaxY = -Infinity
+      for (let i = 1; i < posB.length; i += 3) baseMaxY = Math.max(baseMaxY, posB[i])
+      expect(trunk.maxY - trunk.minY).toBeGreaterThan((baseMaxY - trunk.minY) * 0.9)
+      // Tessellation floor for the curve: enough distinct ring levels.
+      expect(trunk.levels).toBeGreaterThanOrEqual(minRings)
+      // The gentle bend is real: the trunk top sits off the root axis.
+      expect(Math.abs(trunk.top[0])).toBeGreaterThan(0.25)
+      base.dispose()
+      crown.dispose()
+    })
+
+    it(`${label}: the crown seats exactly at the trunk top and fans >= ${minFronds} fronds radially`, () => {
+      const { base, crown } = splitFoliage(buildPalm(detailed))
+      const trunk = lowestComponent(base)
+      // Seated: some crown vertex coincides with the trunk-top point (the
+      // frond stalks are rooted there) — no floating crown above a gap.
+      const posC = positions(crown)
+      let seatDist = Infinity
+      for (let i = 0; i < posC.length; i += 3) {
+        seatDist = Math.min(
+          seatDist,
+          Math.hypot(posC[i] - trunk.top[0], posC[i + 1] - trunk.top[1], posC[i + 2] - trunk.top[2]),
+        )
+      }
+      expect(seatDist).toBeLessThan(0.1)
+      // Radial fan about the trunk-top axis: >= minFronds distinct tip
+      // directions, no half-empty crown (largest angular hole < 90°). Two
+      // crossed billboards would read as 4 directions with 90° holes.
+      const fan = frondFan(crown, trunk.top[0], trunk.top[2])
+      expect(fan.clusters).toBeGreaterThanOrEqual(minFronds)
+      expect(fan.maxGap).toBeLessThan(Math.PI / 2)
+      // The fronds reach well out of the bud — a real crown, not a stub.
+      expect(fan.maxRadius).toBeGreaterThan(detailed ? 1.6 : 1.1)
+      // Arched and drooping: the crown rises above its seat and its drooping
+      // layer falls below it.
+      let crownMinY = Infinity
+      let crownMaxY = -Infinity
+      for (let i = 1; i < posC.length; i += 3) {
+        crownMinY = Math.min(crownMinY, posC[i])
+        crownMaxY = Math.max(crownMaxY, posC[i])
+      }
+      expect(crownMaxY).toBeGreaterThan(trunk.top[1] + 0.1)
+      expect(crownMinY).toBeLessThan(trunk.top[1] - 0.2)
+      // Vertex floor: feathered multi-segment blades, not single quads.
+      expect(crown.attributes.position.count).toBeGreaterThanOrEqual(minCrownVerts)
+      // Collapse path (§19.13): the whole fan is crown class 1 — splitFoliage
+      // keeps it on the instance-matrix collapse like every other tree crown.
+      for (const v of crown.attributes.foliage.array as Float32Array) expect(v).toBe(1)
+      base.dispose()
+      crown.dispose()
+    })
+  }
+
+  it('the build is deterministic: two builds are byte-identical', () => {
+    for (const detailed of [false, true]) {
+      const a = buildPalm(detailed)
+      const b = buildPalm(detailed)
+      expect(a.attributes.position.array).toEqual(b.attributes.position.array)
+      expect(a.attributes.color.array).toEqual(b.attributes.color.array)
+      expect(a.attributes.foliage.array).toEqual(b.attributes.foliage.array)
+    }
+  })
+})
+
 describe('splitFoliage — crown/trunk split for the matrix-borne collapse (point 175)', () => {
   it('splits a tree into an all-crown part and a no-crown remainder, conserving every triangle', () => {
     for (const build of [buildAcacia, buildJungleTree, buildBaobab, () => buildPalm(false)]) {
