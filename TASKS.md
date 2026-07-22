@@ -7774,10 +7774,20 @@ the remaining open points in their numeric order.
   flow, gamepad, handwriting, health, invariants, polish, settings, visualsweep);
   the data suites (docs/world/i18n) and the WebGL2-only touch/voice are the
   documented exceptions. scripts/verify/README backend-coverage section added.
-  STILL OPEN: (b) wire the LARGE tier to invoke the render suites on BOTH backends
-  automatically (currently two manual VERIFY_GL invocations); (c) resolve the two
-  WebGPU reds (collision 19/20, polish 42/43); (d) the 203 finder on both backends
-  (waits on 203); CLAUDE §7.2 backend-policy line.
+  PROGRESS 22.07 (part b done): a full LARGE-equivalent run (`npm test` /
+  `npm run test:large`, no VERIFY_GL pinned) now covers BOTH backends in one
+  command — run-all runs the whole LARGE on WebGL 2 (with preflight + preview),
+  then re-runs the render browser suites on WebGPU with the backend-agnostic
+  preflight/preview skipped (`RVA_SKIP_PREFLIGHT`); the WebGL 2 pass runs first and
+  a failure there stops before WebGPU. An explicit VERIFY_GL, the SMALL tier or a
+  bare single-suite filter stays single-backend. Validated: the orchestrator
+  triggered on `large flow`, ran the WebGL2 pass and correctly stopped on a
+  (flaky, unrelated) preflight failure without proceeding to WebGPU; the
+  skip-preflight WebGPU pass ran only its suites (docs, ALL GREEN, no build/lint/
+  unit/preview). README backend-coverage section updated.
+  STILL OPEN: (c) resolve the two WebGPU reds (collision door-latch, polish
+  panorama-capture); (d) the 203 finder on both backends (waits on 203); the
+  CLAUDE §7.2 backend-policy line.
 
 - [ ] 205. A WORLD & FUNCTIONALITY PLAUSIBILITY AUDIT — a THIRD audit kind beyond
   code bugs (Pillar 2) and visual/behaviour bugs (203): does the world and its

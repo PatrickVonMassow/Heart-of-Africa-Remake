@@ -78,6 +78,37 @@ const fullRun = tier !== null || filter.length === 0
 const tierSuites = tier === 'small' ? SMALL_SUITES : DEV_SUITES
 const pick = (list) => (filter.length ? list.filter((s) => filter.includes(s)) : tierSuites)
 
+// point 204(b): a bare LARGE run (`npm test` / `npm run test:large`) covers BOTH
+// renderer backends in one command. When this is a full LARGE-equivalent run
+// (explicit `large`, or the bare default with no suite filter — both run the whole
+// DEV_SUITES set + preview) and no backend was pinned, run the full LARGE on
+// WebGL 2 (with the preflight), then re-run the browser suites on WebGPU (the
+// backend-agnostic build/lint/unit preflight and prod preview already proven, so
+// skipped). An explicit VERIFY_GL (the gate's per-backend clear command), the
+// SMALL tier, or a bare single-suite filter stays a single-backend pass, as before.
+const isLargeEquivalent = tier === 'large' || (tier === null && filter.length === 0)
+if (isLargeEquivalent && process.env.VERIFY_GL === undefined && process.env.RVA_RAN_BOTH !== '1') {
+  const self = fileURLToPath(import.meta.url)
+  const runBackend = (extraEnv) =>
+    spawnSync(process.execPath, [self, ...args], {
+      cwd: join(HERE, '..', '..'),
+      stdio: 'inherit',
+      env: { ...process.env, RVA_RAN_BOTH: '1', ...extraEnv },
+    }).status ?? 1
+  console.log('\n===== LARGE regression — backend 1/2: WebGL 2 (full, with preflight) =====')
+  const glStatus = runBackend({ VERIFY_GL: 'webgl' })
+  if (glStatus !== 0) {
+    console.log('\nLARGE FAILED on the WebGL 2 backend — not proceeding to WebGPU.')
+    process.exit(glStatus)
+  }
+  console.log('\n===== LARGE regression — backend 2/2: WebGPU (render suites; preflight/preview already proven) =====')
+  process.exit(runBackend({ VERIFY_GL: 'webgpu', RVA_SKIP_PREFLIGHT: '1' }))
+}
+// On the second (WebGPU) pass of a both-backend LARGE run, the backend-agnostic
+// preflight (build/lint/unit) and the prod preview were already proven on the
+// first pass — skip them and run only the render browser suites.
+const skipPreflight = process.env.RVA_SKIP_PREFLIGHT === '1'
+
 function waitForServer(url, timeoutMs) {
   const start = Date.now()
   return new Promise((resolve, reject) => {
@@ -205,7 +236,7 @@ const results = []
 // Preflight: type-check + production build and lint must be clean before the
 // suites run (CLAUDE.md §7.2). Folding these into `npm test` means a feature's
 // whole verification is one already-allowed command.
-if (fullRun || filter.includes('build')) {
+if (!skipPreflight && (fullRun || filter.includes('build'))) {
   console.log('# type-check + production build…')
   const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const buildOk = build.status === 0
@@ -217,7 +248,7 @@ if (fullRun || filter.includes('build')) {
   }
   results.push(buildOk)
 }
-if (fullRun || filter.includes('lint')) {
+if (!skipPreflight && (fullRun || filter.includes('lint'))) {
   console.log('# lint (oxlint)…')
   const lint = spawnSync('npx oxlint', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const out = (lint.stdout ?? '') + (lint.stderr ?? '')
@@ -231,7 +262,7 @@ if (fullRun || filter.includes('lint')) {
 // carry the bulk of the coverage. Type-checked first (esbuild strips types at
 // runtime, so tsc guards the test files), then run. Fail fast — no point
 // driving the slow browser suites if the deterministic layer is red.
-if (fullRun || filter.includes('unit')) {
+if (!skipPreflight && (fullRun || filter.includes('unit'))) {
   console.log('# unit + component tests (vitest, jsdom)…')
   const root = join(HERE, '..', '..')
   const tc = spawnSync('npx tsc -p tsconfig.vitest.json --noEmit', { cwd: root, shell: true, encoding: 'utf8' })
@@ -294,7 +325,7 @@ try {
 // The prod-preview smoke test runs in the LARGE/default regression, not the SMALL
 // gate (the `build` step already type-checks and builds; SMALL trades the extra
 // prod-runtime smoke for speed).
-if ((fullRun && tier !== 'small') || filter.includes('preview')) {
+if (!skipPreflight && ((fullRun && tier !== 'small') || filter.includes('preview'))) {
   console.log('# building for the production-preview smoke test…')
   const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, stdio: 'inherit' })
   if (build.status !== 0) {

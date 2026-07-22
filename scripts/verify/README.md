@@ -113,6 +113,15 @@ settings, visualsweep. The pure-data suites (docs, world, i18n) read files/state
 not pixels, so a backend assertion adds nothing; touch and voice are the
 documented WebGL2-only exception (they never touch the GPU process, see below).
 
+A full LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) now
+covers BOTH backends automatically (point 204b): run-all runs the whole LARGE on
+WebGL 2 (with the build/lint/unit preflight + prod preview), then re-runs the
+render browser suites on WebGPU (system Chrome) with the backend-agnostic
+preflight/preview skipped (`RVA_SKIP_PREFLIGHT`). An explicit `VERIFY_GL=…` (the
+render-verify gate's per-backend clear command), the SMALL tier, or a bare
+single-suite filter stays a single-backend pass. The WebGL 2 pass runs first; a
+failure there stops before WebGPU.
+
 ## Headless limitations (WebGL 2 fallback only)
 
 Headless Chromium has no WebGPU adapter, so every suite here runs on the game's
