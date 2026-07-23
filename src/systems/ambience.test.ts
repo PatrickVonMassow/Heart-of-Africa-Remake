@@ -9,11 +9,15 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import {
   coastSurfGain,
   playThunder,
+  proximityGain,
   refreshAmbienceVolume,
   setAmbienceAnimals,
   setAmbienceScene,
   startAmbience,
   thunderClapPlan,
+  trampleCrunchFires,
+  trampleCrunchGain,
+  PROXIMITY_AUDIBLE,
 } from './ambience'
 import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
@@ -48,6 +52,53 @@ describe('coastSurfGain (point 153 — the coastal surf fade)', () => {
   it('is a smoothstep — halfway between the edges it sits near 0.5', () => {
     const mid = (near + cut) / 2
     expect(coastSurfGain(mid, near, cut)).toBeCloseTo(0.5, 5)
+  })
+})
+
+describe('trampleCrunchGain (point 260 — the crunch follows the §19.1 distance + ambience-volume curve)', () => {
+  const vol = balance.ambienceVolume
+
+  it('is loudest right beside the traveller and fades to 0 at the audible radius', () => {
+    expect(vol).toBeGreaterThan(0)
+    const near = trampleCrunchGain(0, vol)
+    expect(near).toBeGreaterThan(0)
+    // The gain is the SHARED proximity curve scaled by a fixed peak+volume, so
+    // gain(d)/gain(0) reproduces proximityGain(d) at every distance.
+    for (const d of [8, 24, 40]) {
+      expect(trampleCrunchGain(d, vol) / near).toBeCloseTo(proximityGain(d), 10)
+    }
+    expect(trampleCrunchGain(PROXIMITY_AUDIBLE, vol)).toBe(0)
+    expect(trampleCrunchGain(PROXIMITY_AUDIBLE + 20, vol)).toBe(0)
+  })
+
+  it('falls monotonically with distance (a far trample is fainter than a near one)', () => {
+    let prev = trampleCrunchGain(0, vol)
+    for (let d = 1; d <= PROXIMITY_AUDIBLE; d += 1) {
+      const g = trampleCrunchGain(d, vol)
+      expect(g).toBeLessThanOrEqual(prev)
+      expect(g).toBeGreaterThanOrEqual(0)
+      prev = g
+    }
+  })
+
+  it('scales linearly with the single ambience volume and is silent when muted', () => {
+    const base = trampleCrunchGain(10, vol)
+    expect(base).toBeGreaterThan(0)
+    expect(trampleCrunchGain(10, vol * 2)).toBeCloseTo(base * 2, 10)
+    expect(trampleCrunchGain(10, 0)).toBe(0)
+    expect(trampleCrunchGain(10, -1)).toBe(0) // a negative volume never inverts the sound
+  })
+})
+
+describe('trampleCrunchFires (point 260 — an edge, one crunch per kill)', () => {
+  it('fires on the alive->dead transition (the frame the animal is crushed)', () => {
+    expect(trampleCrunchFires(false, true)).toBe(true)
+  })
+
+  it('does not re-fire while the carcass stays down, nor for a living animal', () => {
+    expect(trampleCrunchFires(true, true)).toBe(false) // body already down: silent every later frame
+    expect(trampleCrunchFires(false, false)).toBe(false) // still alive
+    expect(trampleCrunchFires(true, false)).toBe(false) // never revives
   })
 })
 

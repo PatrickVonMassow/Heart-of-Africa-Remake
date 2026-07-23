@@ -18,7 +18,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { setAmbienceAnimals } from '../../systems/ambience'
+import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
@@ -2729,11 +2729,9 @@ function Herds() {
     // nearest live animal of each voice group so their sounds rise as the
     // player draws near, all under the single ambience volume.
     {
-      const AUDIBLE = 48
       const near = { elephant: 0, lion: 0, grazer: 0, flock: 0 }
       const consider = (dx: number, dz: number, key: keyof typeof near) => {
-        const d = Math.hypot(dx, dz)
-        if (d < AUDIBLE) near[key] = Math.max(near[key], 1 - d / AUDIBLE)
+        near[key] = Math.max(near[key], proximityGain(Math.hypot(dx, dz)))
       }
       for (const a of herds.elephant) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'elephant')
       for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe'] as const)
@@ -3856,6 +3854,7 @@ function Herds() {
         // must never carry an animal under a trample. (A calf killed by a
         // predator above is already dead; skip the scan and just re-render.)
         if (sp !== 'elephant') {
+          const wasDead = a.dead
           if (!a.dead) {
             for (let ei = 0; ei < elephantPos.length; ei++) {
               const [ex, ez] = elephantPos[ei]
@@ -3885,6 +3884,18 @@ function Herds() {
                 break
               }
             }
+          }
+          // The trample crunch (design.md §19.1/§19.5, point 260): one short
+          // CRACK/CRUNCH at the victim's world position the frame it is crushed
+          // — the ordinary trample above AND the parent grief-trample (the
+          // charging parent is trampled by this same check on arrival). An EDGE,
+          // not a level: gated on the alive->dead transition so it fires exactly
+          // once per kill and never per frame while the carcass lies here; a
+          // predator kill (already dead on entry) draws no crunch. Positional —
+          // the shared §19.1 proximity fade makes a near trample loud, a far one
+          // faint (via the single ambience volume, one audio path).
+          if (trampleCrunchFires(!!wasDead, !!a.dead)) {
+            playTrampleCrunch(Math.hypot(a.x - pos.x, a.z - pos.z))
           }
           if (a.dead) {
             i-- // re-render this animal in its dead pose immediately
