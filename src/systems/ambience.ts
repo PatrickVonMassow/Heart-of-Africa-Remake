@@ -405,6 +405,85 @@ export function emitFootstep(surface: 'ground' | 'stone') {
   src.stop(t0 + dur + 0.02)
 }
 
+/** Audible radius (world units) of the §19.1 proximity wildlife sounds — the
+ *  distance at which a call or a trample crunch fades to silence. Shared by the
+ *  looped proximity calls (Wildlife.tsx) and the trample-crunch gain curve so
+ *  both fall off over the same range. */
+export const PROXIMITY_AUDIBLE = 48
+
+/** The §19.1 proximity gain curve: 1 right beside the traveller, a linear fall
+ *  to 0 at `audible`, clamped outside. The single shared distance->loudness
+ *  helper for the proximity calls and the trample crunch — pure, so both the
+ *  curve and its reuse are unit-testable. */
+export function proximityGain(distance: number, audible = PROXIMITY_AUDIBLE): number {
+  if (distance <= 0) return 1
+  if (distance >= audible) return 0
+  return 1 - distance / audible
+}
+
+// Peak envelope of the trample crunch (pre-bus). Like the thunder peaks it
+// compensates the ambient-bus (0.5) x master (0.5) attenuation so a near
+// trample reads clearly over the beds; calibratable (design.md §21).
+const CRUNCH_PEAK = 2.2
+
+/** Peak gain of the trample crunch (design.md §19.1/§19.5, point 260): the
+ *  shared proximity curve times the single ambience volume times the crunch
+ *  peak — clearly heard up close, faint far off, silent beyond the audible
+ *  radius or at volume 0. Pure, so the distance + volume scaling is pinned. */
+export function trampleCrunchGain(distance: number, volume: number): number {
+  return CRUNCH_PEAK * proximityGain(distance) * Math.max(0, volume)
+}
+
+/** Whether the trample crunch fires this frame (design.md §19.5, point 260): an
+ *  EDGE, not a level — true only on the alive->dead transition, so the crunch
+ *  sounds once at the kill and never again while the carcass lies there. Pure,
+ *  so the once-per-kill latch is testable without the scene. */
+export function trampleCrunchFires(prevDead: boolean, nowDead: boolean): boolean {
+  return !prevDead && nowDead
+}
+
+/**
+ * The trample crunch one-shot (design.md §19.1/§19.5, point 260): a single
+ * short CRACK/CRUNCH the moment an animal is crushed under an elephant's feet —
+ * the ordinary trample and the parent grief-trample alike. A positional §19.1
+ * proximity SFX, scaled by the distance to the traveller (the shared
+ * proximityGain curve) and the single ambience volume, through the SAME ambient
+ * bus as every other wildlife sound — no second audio path. Two cheap synth
+ * voices like the footstep/thunder SFX (no asset): a short filtered-noise BURST
+ * (the dry snap) over a low sine THUD (the body's weight). Silent far off or
+ * when muted.
+ */
+export function playTrampleCrunch(distance: number): void {
+  if (!ctx || !master) return
+  const peak = trampleCrunchGain(distance, balance.ambienceVolume)
+  if (peak <= 0) return // beyond the audible radius or muted: nothing to play
+  const ac = ctx
+  const dest = ambientBus ?? master
+  const t0 = ac.currentTime
+  // The crack: a hard, short low-passed noise burst — the dry snap of breaking.
+  const dur = 0.16
+  const buffer = ac.createBuffer(1, Math.max(1, Math.ceil(ac.sampleRate * dur)), ac.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  const src = ac.createBufferSource()
+  src.buffer = buffer
+  const filter = ac.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = 900
+  filter.Q.value = 1.1
+  const g = ac.createGain()
+  g.gain.setValueAtTime(0.0001, t0)
+  g.gain.linearRampToValueAtTime(peak, t0 + 0.006)
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+  src.connect(filter)
+  filter.connect(g)
+  g.connect(dest)
+  src.start(t0)
+  src.stop(t0 + dur + 0.02)
+  // The body: a low sine thud under the crack for the crushing weight.
+  envOsc(dest, 'sine', 120, 48, t0, 0.18, peak * 0.6)
+}
+
 /**
  * The thunderclap's pure timing/level plan (design.md §19.13, point 166): the
  * clap starts exactly `delaySeconds` after the flash (the pure
