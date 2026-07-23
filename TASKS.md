@@ -9978,6 +9978,52 @@ the remaining open points in their numeric order.
   another Wildlife.tsx point — this is the top-priority wildlife fix (a core mechanic
   is currently broken on main).
 
+- [ ] 264. INTRASPECIES COMBAT — TERRITORIAL/DOMINANCE FIGHTS WITHIN A SPECIES (user
+  23.07.2026; queue position: directly AFTER point 224). Animals of the SAME species
+  fight each other. RESEARCH FIRST (Fable-5 pass, recorded in a new
+  `docs/intraspecies-combat-1890.md`, cited): which of the game's ~1890 African
+  species realistically engage in intraspecific fighting (territorial disputes,
+  dominance/rut, resource/mate competition) and how — e.g. male antelope/wildebeest
+  horn-clashes in the rut, hippo territorial battles (often lethal), male lion
+  dominance fights, crocodile territorial combat, elephant musth clashes — so the
+  mechanic applies to the species it truly fits and not to those that do not (map
+  each of the game's species to fights / does-not-fight, with the driver and lethality
+  from the research). BUILD the mechanic on the researched species: some individuals
+  carry a "wants to fight" disposition. Two interaction paths — (a) BOTH want to
+  fight: they RUN TOWARD each other (converge to contact); (b) ONE wants to fight and
+  targets another: it HUNTS/chases the other — the chase resolves either as a DRIVE-OFF
+  (the aggressor is satisfied once the other flees far enough, breaks off, no kill) or
+  a CATCH (it runs the other down). When two same-species animals COLLIDE and at least
+  one wants to fight, a FIGHT happens: it lasts a few (calibratable) seconds — a visible
+  clash — and ENDS with ONE of the two DYING (the loser dies; its body enters the
+  ordinary carcass system so scavengers/vultures work it like any death). The
+  loser/winner outcome is a calibratable roll (may weight by species/size). All timings
+  and chances (fight duration, drive-off distance/chance, per-species fight
+  disposition rate, catch vs drive-off) are balance values, debug-editable (§21.2).
+  Reuse the existing chase/flee + collision + carcass machinery (the §19 hunt/flee
+  steps, `deflectAroundCircle`/collision, the caught/stain/carcass system) — do NOT
+  build a parallel path; the intraspecies fight is a new state layered on the shared
+  drama/hunt core (like the §19.8 dramas resolving through one core). Every started
+  fight/chase RESOLVES (a hard deadline backstop, like the other dramas — invariant
+  I4). Anchors: `src/scenes/travel/wildlifeBehavior.ts` (the fight/chase state, a pure
+  outcome/drive-off resolver + the per-species fight table), `src/scenes/travel/
+  Wildlife.tsx` (the converge/chase/fight drives + the clash pose + the loser death →
+  carcass), `src/render/fauna.ts` (a fight/clash pose if needed), `src/config/
+  balance.ts` + `src/ui/DebugMenu.tsx` (the calibratable values), `docs/intraspecies-
+  combat-1890.md` (the research). VERIFIABLE: pure tests — the per-species fight table
+  (a fighting species fights, a non-fighting one never does), the converge-vs-hunt
+  decision, the drive-off-vs-catch resolver (bounded, deterministic per roll), the
+  fight outcome (exactly one of two dies, loser → carcass), and every fight resolves by
+  the deadline; a live check in `scripts/verify/enrichments.mjs` that a staged pair of
+  a fighting species clashes and one dies (body scavenged). DOCS: `docs/intraspecies-
+  combat-1890.md` (research, same branch as the build or a preceding research commit),
+  design.md §19 (the intraspecies-combat behaviour), §21.2 (the new balance values).
+  No player-visible text unless a journal/debug label is added (then both languages).
+  NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx`/`fauna`/`balance` — the wildlife-behaviour
+  cluster; do NOT delegate the BUILD concurrently with another Wildlife.tsx point. The
+  RESEARCH half (the docs file + the species table) is a standalone Fable pass with no
+  code, safe to run in parallel; the build follows on the researched species.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
