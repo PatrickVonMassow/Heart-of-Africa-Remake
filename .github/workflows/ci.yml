@@ -34,7 +34,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      # Retry npm ci against transient native-dep (sharp/onnxruntime-node)
+      # binary-fetch flakes; a genuine failure still exits non-zero.
+      - run: |
+          n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done
       - run: npm run build
       - run: npm run lint
       # Fails on any NEW advisory; tolerates recorded, unfixable ones
