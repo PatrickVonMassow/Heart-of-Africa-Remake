@@ -7743,7 +7743,7 @@ the remaining open points in their numeric order.
   the tripwire armed; build+lint+vitest+audit clean. (B)-(N) and the visual
   sweep (C) remain open above.
 
-- [ ] 204. Make WebGPU coverage UNIVERSAL where it is possible (user request
+- [x] 204. Make WebGPU coverage UNIVERSAL where it is possible (user request
   20.07.2026, from the sweep-on-WebGL2 gap: "Analysiere alle Tests daraufhin,
   dass — wo immer möglich — auch WebGPU abgedeckt ist"). ANALYSIS (done
   20.07.2026): the Vitest layer (1941) is jsdom / pure logic → backend-agnostic,
@@ -10506,7 +10506,7 @@ the remaining open points in their numeric order.
   But that GPU is not geometry-bound (115-238 fps), so which lever actually pays MUST be
   decided on the user's hardware — point 277 delivers those numbers first.
 
-- [ ] 277. IN-GAME BENCHMARK ON A FUNCTION KEY, IN THE DELIVERED BUILD (user 24.07.2026).
+- [x] 277. IN-GAME BENCHMARK ON A FUNCTION KEY, IN THE DELIVERED BUILD (user 24.07.2026).
   The headless numbers cannot decide the point-276 levers: that machine is not
   geometry-bound, so the doubled geometry costs it 8 % while the user's GPU may pay far
   more. So the game itself must measure, on the user's real hardware, in the DEPLOYED
