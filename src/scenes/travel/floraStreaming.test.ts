@@ -5,11 +5,16 @@
 // These pure rules are pinned here.
 import { describe, expect, it } from 'vitest'
 import {
+  FLORA_FILL_MAX_FRAMES,
+  FLORA_RANGE_MAX,
   FLORA_REBUILD_STEP,
   FLORA_SPAWN_HARD_CAP,
   FLORA_SPAWN_MARGIN,
   chunkOffsetsByDistance,
+  floraAmortiseMaxStep,
   floraChunkRange,
+  floraFillBatchSize,
+  floraFillWorstDriftWu,
   floraInSpawnCircle,
   floraShouldRebuild,
   floraSpawnRadius,
@@ -107,6 +112,37 @@ describe('floraChunkRange (bounded iteration covering the circle)', () => {
       expect(range * CHUNK_SIZE).toBeGreaterThanOrEqual(floraSpawnRadius(fogFar))
       expect(range).toBeLessThanOrEqual(15)
     }
+  })
+})
+
+describe('amortised fill bounds (driving hitches — the old circle covers during the fill)', () => {
+  it('the batch size completes any fill within the frame bound by construction', () => {
+    for (const total of [1, 100, 841, (2 * FLORA_RANGE_MAX + 1) ** 2]) {
+      const batch = floraFillBatchSize(total)
+      expect(batch).toBeGreaterThanOrEqual(1)
+      // batch offsets per frame × the frame bound covers every offset.
+      expect(batch * FLORA_FILL_MAX_FRAMES).toBeGreaterThanOrEqual(total)
+    }
+  })
+
+  it('a step trigger plus the worst fill drift stays under the spawn margin (F3 speed, 30 fps)', () => {
+    // While the fill runs, the drawn circle is still the PREVIOUS build's, so
+    // its edge recedes by the trigger step plus the drive during the fill. At
+    // the F3 test speed 25 under a heavy-load 30 fps, that recession must stay
+    // inside FLORA_SPAWN_MARGIN — the frozen edge never enters the fog-clear
+    // view mid-fill.
+    expect(FLORA_REBUILD_STEP + floraFillWorstDriftWu(25, 30)).toBeLessThan(FLORA_SPAWN_MARGIN)
+  })
+
+  it('the amortise gate itself enforces the recession bound and still admits real driving', () => {
+    const maxStep = floraAmortiseMaxStep(25, 30)
+    // By construction: even the largest amortisable trigger distance plus the
+    // worst drift never exceeds the margin (anything larger swaps sync).
+    expect(maxStep + floraFillWorstDriftWu(25, 30)).toBeLessThanOrEqual(FLORA_SPAWN_MARGIN)
+    // And a REAL driving trigger passes the gate: the step check runs once per
+    // frame, so the worst overshoot beyond FLORA_REBUILD_STEP is one frame of
+    // travel at F3 speed 25 and 30 fps.
+    expect(maxStep).toBeGreaterThan(FLORA_REBUILD_STEP + 25 / 30)
   })
 })
 
