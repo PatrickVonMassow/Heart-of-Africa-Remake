@@ -10,7 +10,7 @@ import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
-import { buildGoat, createFaunaMaterial } from '../../render/fauna'
+import { buildGoatParts, createFaunaMaterial, faceVelocity, gaitPhase, legSwingAngle } from '../../render/fauna'
 import { TESSELLATION } from '../../render/figures'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
@@ -192,9 +192,13 @@ function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[
   )
 }
 
-/** Goats drifting around, grazing — inside the pen when one exists. */
+/** Goats drifting around, grazing — inside the pen when one exists. Each goat
+ *  walks with a real gait (design.md §19, point 228): its legs swing about their
+ *  hips on a phase driven by the DISTANCE it covers (still legs at rest, longer
+ *  strides when it moves faster), and its body FACES its velocity so it can
+ *  never glide backward. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
-  const geo = useMemo(() => buildGoat(), [])
+  const parts = useMemo(() => buildGoatParts(), [])
   // The shared smooth-shaded fauna material (point 214) — the goats stand at
   // first-person range, where flat shading would read as hard panels.
   const material = useMemo(() => createFaunaMaterial(), [])
@@ -211,15 +215,38 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
     })
   }, [seed, count, pen])
   const refs = useRef<Array<THREE.Group | null>>([])
+  // Per-goat leg-pivot groups (four each) and gait state (last position, walked
+  // distance, held facing) so the swing rides distance and the body faces travel.
+  const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
+  const gait = useRef<Array<{ x: number; z: number; dist: number; yaw: number }>>([])
+  if (gait.current.length !== anchors.length) {
+    gait.current = anchors.map((a) => ({ x: a.x, z: a.z, dist: 0, yaw: 0 }))
+  }
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
       const a = anchors[i]
-      if (!g || !a) return
+      const s = gait.current[i]
+      if (!g || !a || !s) return
       const wob = Math.sin(t * 0.2 + a.phase)
       const [px, pz] = resolveMove(colliders, a.x + wob * a.amp, a.z + Math.cos(t * 0.17 + a.phase) * a.amp, NPC_RADIUS)
+      const vx = px - s.x
+      const vz = pz - s.z
+      s.dist += Math.hypot(vx, vz)
+      s.yaw = faceVelocity(vx, vz, s.yaw)
+      s.x = px
+      s.z = pz
       g.position.set(px, 0, pz)
-      g.rotation.y = a.phase + wob * 0.6
+      g.rotation.y = s.yaw
+      // Swing the legs on the distance-driven phase (still at rest, no slide).
+      const phase = gaitPhase(s.dist)
+      const legs = legRefs.current[i]
+      if (legs) {
+        for (let li = 0; li < parts.legs.length; li++) {
+          const lg = legs[li]
+          if (lg) lg.rotation.x = legSwingAngle(phase, parts.legs[li].phaseOffset)
+        }
+      }
     })
   })
   return (
@@ -231,7 +258,18 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
             refs.current[i] = el
           }}
         >
-          <mesh geometry={geo} material={material} castShadow />
+          <mesh geometry={parts.body} material={material} castShadow />
+          {parts.legs.map((leg, li) => (
+            <group
+              key={li}
+              position={leg.hip}
+              ref={(el) => {
+                ;(legRefs.current[i] ??= [])[li] = el
+              }}
+            >
+              <mesh geometry={leg.geo} material={material} castShadow />
+            </group>
+          ))}
         </group>
       ))}
     </>
