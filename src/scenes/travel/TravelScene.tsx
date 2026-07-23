@@ -26,8 +26,8 @@ import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
-import { landFractionAt } from '../../world/geodata'
-import { chunkIsMountainous, refinedSegments } from './terrainLod'
+import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments } from './terrainLod'
+import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
@@ -81,7 +81,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
-import { PERF, maxFrameMs, recordFrame, resetPerf } from './perfProbe'
+import { PERF, maxFrameMs, recordBurst, recordFrame, resetPerf } from './perfProbe'
 import { Climate } from './Climate'
 import { setFrameVisibilityTest } from './frameVisibility'
 import { RegionBorders } from './RegionBorders'
@@ -105,26 +105,9 @@ const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 // doubling for coastal and mountainous chunks) live in terrainLod.ts so they
 // are unit-testable (terrainShading.test.ts).
 
-// point 209: a chunk straddling the sea coast gets a finer mesh, so the smooth
-// vector shoreline (terrain.ts derives the near-coast land fraction from the
-// vector signed distance) is not re-quantized to blocky steps by the coarse
-// LOD vertex spacing. Detected cheaply from the raster land mask at a 5x5 grid
-// — a mix of sea and land in the chunk means the coast crosses it.
-function chunkIsCoastal(cx: number, cz: number): boolean {
-  const x0 = cx * CHUNK_SIZE
-  const z0 = cz * CHUNK_SIZE
-  let sea = false
-  let land = false
-  for (let iz = 0; iz <= 4; iz++) {
-    for (let ix = 0; ix <= 4; ix++) {
-      const { lat, lon } = worldToLatLon(x0 + (ix / 4) * CHUNK_SIZE, z0 + (iz / 4) * CHUNK_SIZE)
-      if (landFractionAt(lat, lon) < 0.5) sea = true
-      else land = true
-      if (sea && land) return true
-    }
-  }
-  return false
-}
+// The coast/mountain refine probes live in terrainLod.ts (point 209), memoised
+// per chunk there so a crossing never re-probes long-known ground
+// (docs/perf-driving-hitches.md).
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.5, 0.62, 0.38]
@@ -288,14 +271,23 @@ export function buildChunkGeometry(
     }
   }
 
-  const indices: number[] = []
+  // Preallocated index buffer (docs/perf-driving-hitches.md): the former
+  // number[] push built ~37k-150k elements of GC garbage per chunk — the
+  // largest single allocation of the crossing burst.
+  const indexArray = new Uint32Array(segments * segments * 6 + 4 * (n - 1) * 6)
+  let ii = 0
   for (let iz = 0; iz < segments; iz++) {
     for (let ix = 0; ix < segments; ix++) {
       const a = iz * n + ix
       const b = a + 1
       const c = a + n
       const d = c + 1
-      indices.push(a, c, b, b, c, d)
+      indexArray[ii++] = a
+      indexArray[ii++] = c
+      indexArray[ii++] = b
+      indexArray[ii++] = b
+      indexArray[ii++] = c
+      indexArray[ii++] = d
     }
   }
 
@@ -325,7 +317,12 @@ export function buildChunkGeometry(
     for (let i = 0; i < n - 1; i++) {
       const a = edgeIndex(e, i)
       const b = edgeIndex(e, i + 1)
-      indices.push(a, b, base + i, b, base + i + 1, base + i)
+      indexArray[ii++] = a
+      indexArray[ii++] = b
+      indexArray[ii++] = base + i
+      indexArray[ii++] = b
+      indexArray[ii++] = base + i + 1
+      indexArray[ii++] = base + i
     }
   }
 
@@ -336,6 +333,7 @@ export function buildChunkGeometry(
   geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
   geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
   geo.setAttribute('seasonUV', new THREE.BufferAttribute(seasonUVs, 2))
+  const indices = new THREE.BufferAttribute(indexArray, 1)
   geo.setIndex(indices)
   return geo
 }
@@ -448,13 +446,39 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
 // re-entry (no rebuild either). Seed-keyed — a new run disposes and restarts.
 const chunkGeometryCache = new Map<string, THREE.BufferGeometry>()
 let chunkCacheSeed: number | null = null
+// Latest BUILT geometry key per chunk `cx,cz` (any resolution): while a merely
+// re-keyed chunk (its LOD or a neighbour's stitch resolution changed) waits in
+// the build queue, its previous geometry keeps drawing as a stand-in — a stale
+// LOD for a few frames is invisible, a hole is not
+// (docs/perf-driving-hitches.md).
+const chunkLatestKey = new Map<string, string>()
+
+// Per-frame terrain build budget (ms): the queue drains until the budget is
+// spent, at least one chunk per frame so it always progresses. A refined
+// 112-seg chunk can overshoot on its own — its build is atomic; splitting it
+// into a Web Worker is the documented follow-up (docs/perf-driving-hitches.md).
+const TERRAIN_BUILD_BUDGET_MS = 5
+// Prefetch lookahead (wu): once the drive heading puts a point this far ahead
+// into the next chunk, that window's builds start early, so the crossing
+// usually finds its chunks already built.
+const PREFETCH_LOOKAHEAD = CHUNK_SIZE / 2
 
 function TerrainChunks() {
   const seed = useGame((s) => s.seed)
   const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
+  const activeSig = useRef('')
   const lastCenter = useRef<string | null>(null)
   const material = useMemo(() => createTerrainMaterial(), [])
+  // Budgeted build queue (docs/perf-driving-hitches.md): the boundary crossing
+  // used to build every changed chunk of the window synchronously in one frame
+  // (~40-60 geometries, the tallest driving hitch). It now enqueues the missing
+  // builds and the loop below drains a few per frame; stand-ins cover re-keyed
+  // chunks meanwhile (chunkLatestKey above).
+  const queueRef = useRef<ChunkJob[]>([])
+  const desiredRef = useRef<ChunkJob[]>([])
+  const prefetchRef = useRef<{ center: string; keys: Set<string>; queue: ChunkJob[] } | null>(null)
+  const prevPos = useRef<{ x: number; z: number } | null>(null)
 
   // Reset the cache when a new run (seed) starts — NOT on remount.
   useEffect(() => {
@@ -462,71 +486,137 @@ function TerrainChunks() {
     chunkCacheSeed = seed
     cache.current.forEach((g) => g.dispose())
     cache.current.clear()
+    chunkLatestKey.clear()
     lastCenter.current = null
+    queueRef.current = []
+    desiredRef.current = []
+    prefetchRef.current = null
+    activeSig.current = ''
     setActive([])
   }, [seed])
 
   useFrame(() => {
+    const t0 = performance.now()
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
     const center = chunkKey(cx, cz)
-    if (center === lastCenter.current) return
-    lastCenter.current = center
+    let worked = false
 
-    // Segment count for the chunk at camera-relative offset (dx,dz), memoized
-    // so the seam stitch can read a chunk's four neighbours (some just outside
-    // the render window) without repeating the 5x5 coast/mountain probes.
-    // Near-ring quality doubling (terrainLod.ts): coast-crossing chunks
-    // (point 209 — the smooth vector shoreline must not re-quantize to mesh
-    // steps) and mountainous chunks (the smooth bicubic relief must not fold
-    // into polyline facets) share one capped doubling. The gates OR together —
-    // either refines once, never twice — and short-circuit so far rings and
-    // flat inland chunks skip the probes.
-    const segsCache = new Map<string, number>()
-    const segsAt = (dx: number, dz: number): number => {
-      const k = `${dx},${dz}`
-      const hit = segsCache.get(k)
-      if (hit !== undefined) return hit
-      const ring = Math.max(Math.abs(dx), Math.abs(dz))
-      const refine =
-        ring <= 4 && (chunkIsCoastal(cx + dx, cz + dz) || chunkIsMountainous(cx + dx, cz + dz))
-      const s = refinedSegments(ring, refine)
-      segsCache.set(k, s)
-      return s
+    // Plan the window around a centre: segment count per offset, memoized so
+    // the seam stitch can read a chunk's four neighbours (some just outside
+    // the render window) cheaply. Near-ring quality doubling (terrainLod.ts):
+    // coast-crossing chunks (point 209 — the smooth vector shoreline must not
+    // re-quantize to mesh steps) and mountainous chunks (the smooth bicubic
+    // relief must not fold into polyline facets) share one capped doubling
+    // behind the persistent per-chunk probe memo.
+    const planWindow = (ccx: number, ccz: number): ChunkJob[] => {
+      const segsCache = new Map<string, number>()
+      const segsAt = (dx: number, dz: number): number => {
+        const k = `${dx},${dz}`
+        const hit = segsCache.get(k)
+        if (hit !== undefined) return hit
+        const ring = Math.max(Math.abs(dx), Math.abs(dz))
+        const refine = ring <= REFINE_RING_MAX && chunkNeedsRefine(ccx + dx, ccz + dz)
+        const s = refinedSegments(ring, refine)
+        segsCache.set(k, s)
+        return s
+      }
+      return planChunkWindow(ccx, ccz, CHUNK_RADIUS, segsAt)
+    }
+    const hasStandIn = (chunk: string): boolean => {
+      const k = chunkLatestKey.get(chunk)
+      return k !== undefined && cache.current.has(k)
+    }
+    const buildJob = (job: ChunkJob): void => {
+      if (cache.current.has(job.key)) return
+      cache.current.set(job.key, buildChunkGeometry(job.cx, job.cz, seed, job.segments, job.edgeSegs))
+      chunkLatestKey.set(job.chunk, job.key)
     }
 
-    const keys: string[] = []
-    for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
-      for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
-        const segments = segsAt(dx, dz)
-        // Stitch each shared edge to the coarser neighbour (min of the two res)
-        // so no T-junction crack opens where LOD levels meet (point 220). Order
-        // matches edgeIndex: north/-z, south/+z, west/-x, east/+x.
-        const edgeSegs: [number, number, number, number] = [
-          Math.min(segments, segsAt(dx, dz - 1)),
-          Math.min(segments, segsAt(dx, dz + 1)),
-          Math.min(segments, segsAt(dx - 1, dz)),
-          Math.min(segments, segsAt(dx + 1, dz)),
-        ]
-        const key = `${chunkKey(cx + dx, cz + dz)}:${segments}:${edgeSegs.join(',')}`
-        keys.push(key)
-        if (!cache.current.has(key)) {
-          cache.current.set(key, buildChunkGeometry(cx + dx, cz + dz, seed, segments, edgeSegs))
+    if (center !== lastCenter.current) {
+      const prevCenter = lastCenter.current
+      lastCenter.current = center
+      const jobs = planWindow(cx, cz)
+      desiredRef.current = jobs
+      prefetchRef.current = null // superseded by the real crossing
+      const missing = jobs.filter((j) => !cache.current.has(j.key))
+      // A one-chunk step is the DRIVING case: spread the builds over the
+      // coming frames (stand-ins cover meanwhile, and the prefetch has usually
+      // built ahead already). Any larger jump — teleport, scene entry, first
+      // frame — builds synchronously as before: no stand-ins exist there, and
+      // a progressive fill would show holes.
+      const [pcx, pcz] = prevCenter === null ? [NaN, NaN] : prevCenter.split(',').map(Number)
+      const adjacent = prevCenter !== null && Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz)) === 1
+      if (adjacent) {
+        queueRef.current = orderChunkJobs(missing, hasStandIn)
+      } else {
+        for (const job of missing) buildJob(job)
+        queueRef.current = []
+      }
+      worked = true
+    } else if (queueRef.current.length === 0 && prevPos.current !== null) {
+      // Idle between crossings: prefetch the predicted next window along the
+      // drive heading so the crossing finds its chunks already built.
+      const predicted = predictedNextCenter(pos, prevPos.current, CHUNK_SIZE, PREFETCH_LOOKAHEAD)
+      if (predicted !== null) {
+        const pKey = chunkKey(predicted.cx, predicted.cz)
+        if (prefetchRef.current?.center !== pKey) {
+          const jobs = planWindow(predicted.cx, predicted.cz)
+          prefetchRef.current = {
+            center: pKey,
+            keys: new Set(jobs.map((j) => j.key)),
+            queue: orderChunkJobs(jobs.filter((j) => !cache.current.has(j.key)), hasStandIn),
+          }
         }
       }
     }
-    // Bound the cache: drop non-active geometries once it grows large.
-    if (cache.current.size > 700) {
-      const activeSet = new Set(keys)
-      for (const [key, geo] of cache.current) {
-        if (!activeSet.has(key)) {
-          geo.dispose()
-          cache.current.delete(key)
+    prevPos.current = { x: pos.x, z: pos.z }
+
+    // Drain under the frame budget: the current window first (it fills real
+    // gaps), then the prefetch queue.
+    const q = queueRef.current.length > 0 ? queueRef.current : prefetchRef.current?.queue
+    if (q !== undefined && q.length > 0) {
+      drainChunkQueue(q, TERRAIN_BUILD_BUDGET_MS, () => performance.now(), buildJob)
+      worked = true
+    }
+
+    if (worked) {
+      // Resolve the drawn set: the desired key where built, else the chunk's
+      // latest older geometry (a stale LOD beats a hole; a never-built chunk
+      // waits at the queue front — it has hole priority).
+      const resolved: string[] = []
+      for (const job of desiredRef.current) {
+        if (cache.current.has(job.key)) {
+          resolved.push(job.key)
+        } else {
+          const fallback = chunkLatestKey.get(job.chunk)
+          if (fallback !== undefined && cache.current.has(fallback)) resolved.push(fallback)
         }
       }
+      const sig = resolved.join('|')
+      if (sig !== activeSig.current) {
+        activeSig.current = sig
+        // Bound the cache: drop geometries neither drawn nor about to be
+        // needed (desired still queued, or prefetched for the next window).
+        if (cache.current.size > 700) {
+          const keep = new Set(resolved)
+          for (const job of desiredRef.current) keep.add(job.key)
+          if (prefetchRef.current !== null) for (const k of prefetchRef.current.keys) keep.add(k)
+          for (const [key, geo] of cache.current) {
+            if (!keep.has(key)) {
+              geo.dispose()
+              cache.current.delete(key)
+            }
+          }
+          for (const [chunk, key] of chunkLatestKey) {
+            if (!cache.current.has(key)) chunkLatestKey.delete(chunk)
+          }
+        }
+        setActive(resolved)
+      }
+      if (import.meta.env.DEV) recordBurst(PERF.terrain, performance.now() - t0)
     }
-    setActive(keys)
   })
 
   return (
