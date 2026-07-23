@@ -39,7 +39,7 @@ import {
   createFaunaMaterial,
   CROCODILE_FADE_BAND,
   CROCODILE_LAYOUT,
-  CROCODILE_SUBMERGE_DEPTH,
+  CROCODILE_WATERLINE_LOCAL,
   CROCODILE_WATERLINE_NONE,
   crocodileSubmergedAlpha,
   crocodileWaterlineLocal,
@@ -515,12 +515,13 @@ describe('crocodile silhouette (design.md §19.16, point 243)', () => {
   })
 })
 
-// The hidden-crocodile submerge pose (design.md §19.16, point 242): a resting
-// crocodile sits SUNK to the eye knobs on the water sheet — its armoured back
-// below the surface, only the raised eyes breaking it. The old inline 0.24
-// render offset left the back riding above the water, beaching the ambusher as a
-// flat, lifeless prop; the pose is now derived from the mesh via crocodileBodyY.
-describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
+// The hidden-crocodile submerge pose (design.md §19.16, points 242/274): a
+// resting crocodile sits SUNK on the water sheet — its whole armoured back
+// UNDER the surface, only the raised eye knobs breaking it. Point 274 lifted
+// the waterline above the back crest (points 242/246 pinned it AT the crest, so
+// the near-top-down bird's-eye view saw the whole dorsal back opaque) and made
+// the pose scale-invariant. Derived from the mesh via crocodileBodyY.
+describe('crocodile submerge pose (design.md §19.16, points 242/274)', () => {
   // Reuse the built mesh from the silhouette block: its eye-knob crown (the
   // highest vertex) is what breaks the surface when the croc lies hidden.
   const geo = buildCrocodile()
@@ -528,27 +529,46 @@ describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
   const eyeKnobTopY = geo.boundingBox!.max.y // the raised eyes, the crown of the build
   const surfaceY = 3 // an arbitrary water-sheet height to pose against
 
-  it('the submerge depth drops the whole armoured BACK below the water sheet', () => {
-    const bodyY = crocodileBodyY(surfaceY, true)
-    // The group origin sits below the surface...
-    expect(bodyY).toBeLessThan(surfaceY)
-    // ...far enough that the torso's top line (the back) sits at or below the
-    // sheet — nothing of the low back rides proud of the water.
-    expect(bodyY + CROCODILE_LAYOUT.backTopY).toBeLessThanOrEqual(surfaceY + 1e-9)
-    expect(CROCODILE_SUBMERGE_DEPTH).toBe(CROCODILE_LAYOUT.backTopY) // derived from the mesh
+  it('the waterline sits above the back crest but below the eye knobs', () => {
+    // The line that the render submerges the body to (and the fade cuts at) must
+    // lie in the gap between the dorsal crest and the eye tops — so the back
+    // goes fully under while the eyes still rise clear.
+    expect(CROCODILE_WATERLINE_LOCAL).toBeGreaterThan(CROCODILE_LAYOUT.backTopY)
+    expect(CROCODILE_WATERLINE_LOCAL).toBeLessThan(eyeKnobTopY)
+    // A clear margin over the crest, so the fully-transparent floor of the fade
+    // (waterline − band) still clears the crest (see the fade block).
+    expect(CROCODILE_WATERLINE_LOCAL - CROCODILE_FADE_BAND).toBeGreaterThan(CROCODILE_LAYOUT.backTopY)
   })
 
-  it('only the raised eye knobs break the surface while hidden', () => {
-    const bodyY = crocodileBodyY(surfaceY, true)
-    // The eye knobs — the crown of the build — rise above the sheet...
-    expect(bodyY + eyeKnobTopY).toBeGreaterThan(surfaceY)
-    // ...and they are the ONLY thing above it: the back top is at/below the water,
-    // so the exposed part is just the eye region (higher than the back line).
-    expect(eyeKnobTopY).toBeGreaterThan(CROCODILE_LAYOUT.backTopY)
+  it('the submerge drops the whole armoured BACK below the water sheet', () => {
+    for (const scale of [0.9, 1, 1.2]) {
+      const bodyY = crocodileBodyY(surfaceY, true, scale)
+      // The group origin sits below the surface...
+      expect(bodyY).toBeLessThan(surfaceY)
+      // ...far enough that the torso's top line (the back CREST) sits strictly
+      // BELOW the sheet — nothing of the back rides proud of the water, at ANY
+      // instance scale (point 274: the submerge scales with the geometry).
+      expect(bodyY + CROCODILE_LAYOUT.backTopY * scale).toBeLessThan(surfaceY)
+    }
+  })
+
+  it('only the raised eye knobs break the surface while hidden — at every scale', () => {
+    for (const scale of [0.9, 1, 1.2]) {
+      const bodyY = crocodileBodyY(surfaceY, true, scale)
+      // The eye knobs — the crown of the build — rise CLEARLY above the sheet
+      // (point 274: a visible crisp turret cap, not a hairline sliver), so the
+      // croc is legibly present and lurking rather than absent.
+      expect(bodyY + eyeKnobTopY * scale).toBeGreaterThan(surfaceY + 0.03 * scale)
+    }
+    // ...and they are higher than the back crest, so the exposed part is just
+    // the eye region above the submerged back — by a real margin (point 274
+    // raised the turrets onto the skull crown).
+    expect(eyeKnobTopY - CROCODILE_LAYOUT.backTopY).toBeGreaterThan(0.06)
+    expect(eyeKnobTopY).toBeGreaterThan(CROCODILE_WATERLINE_LOCAL)
   })
 
   it('striking at prey it rides fully out — the body clears the sheet', () => {
-    const bodyY = crocodileBodyY(surfaceY, false)
+    const bodyY = crocodileBodyY(surfaceY, false, 1)
     expect(bodyY).toBe(surfaceY - CROCODILE_LUNGE_LIFT)
     // The origin sits just under the surface, so the whole raft of the body
     // (belly at the origin, legs a bare dip below) rides essentially out of the
@@ -559,31 +579,31 @@ describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
   })
 
   it('hidden sits markedly lower than striking — the pose actually changes', () => {
-    expect(crocodileBodyY(surfaceY, true)).toBeLessThan(crocodileBodyY(surfaceY, false) - 0.2)
+    expect(crocodileBodyY(surfaceY, true, 1)).toBeLessThan(crocodileBodyY(surfaceY, false, 1) - 0.2)
   })
 })
 
-// The crocodile submersion fade (design.md §19.16, point 246): the water sheets
-// are alpha-blended and depthWrite-off (point 233), and the croc body draws in
-// the opaque pass BEFORE them — so a submerged body read as a crisp silhouette
-// straight through the water. The croc's own material now fades every fragment
-// below the instance's local waterline, so the body vanishes into the murk
-// while the eye knobs above the sheet stay crisp.
-describe('crocodile submersion fade (design.md §19.16, point 246)', () => {
+// The crocodile submersion fade (design.md §19.16, points 246/274): the water
+// sheets are alpha-blended and depthWrite-off (point 233), and the croc body
+// draws before/under them — so a submerged body read as a crisp silhouette
+// straight through the water. The croc's own material fades every fragment
+// below its waterline; point 274 lifted that line above the back crest, so the
+// whole dorsal surface the top-down camera sees vanishes into the murk while
+// the eye knobs stay crisp.
+describe('crocodile submersion fade (design.md §19.16, points 246/274)', () => {
   const geo = buildCrocodile()
   geo.computeBoundingBox()
   const eyeKnobTopY = geo.boundingBox!.max.y
 
-  it('the local waterline sits at the submerge depth over the instance scale', () => {
-    expect(crocodileWaterlineLocal(1, true)).toBeCloseTo(CROCODILE_SUBMERGE_DEPTH, 12)
-    // A larger croc is scaled up, so the same world-space depth is a SMALLER
-    // local height (the fragment compares pre-scale positionLocal.y).
-    expect(crocodileWaterlineLocal(1.2, true)).toBeCloseTo(CROCODILE_SUBMERGE_DEPTH / 1.2, 12)
-    expect(crocodileWaterlineLocal(1.2, true)).toBeLessThan(crocodileWaterlineLocal(0.9, true))
+  it('the local waterline is a size-free constant while hidden', () => {
+    // Point 274: no longer divided by scale — the body origin submerges by the
+    // same local depth · scale, so the fragment (pre-scale positionLocal.y) sees
+    // one constant line for every croc size.
+    expect(crocodileWaterlineLocal(true)).toBe(CROCODILE_WATERLINE_LOCAL)
   })
 
   it('riding out drops the waterline far below the geometry — the strike shows the whole body', () => {
-    const wl = crocodileWaterlineLocal(1, false)
+    const wl = crocodileWaterlineLocal(false)
     expect(wl).toBe(CROCODILE_WATERLINE_NONE)
     // The sentinel plus the fade band still lies below the lowest vertex, so
     // nothing on the body can fade during a strike.
@@ -592,17 +612,25 @@ describe('crocodile submersion fade (design.md §19.16, point 246)', () => {
     expect(crocodileSubmergedAlpha(0, wl)).toBe(1)
   })
 
-  it('hidden: eye knobs stay opaque, belly and legs vanish, the back just under the sheet only hints', () => {
-    const wl = crocodileWaterlineLocal(1, true)
+  it('hidden: eye knobs stay opaque, the whole BACK (crest included) vanishes', () => {
+    const wl = crocodileWaterlineLocal(true)
     // The eye knobs rise above the waterline — fully opaque, the lurking marker.
-    expect(eyeKnobTopY).toBeGreaterThan(wl)
+    // Point 274: they clear it by MORE than a full fade band, so the crisp cap
+    // is a solid turret (not a hairline at the fading edge) — the croc reads as
+    // present, never invisible.
+    expect(eyeKnobTopY - wl).toBeGreaterThan(CROCODILE_FADE_BAND)
     expect(crocodileSubmergedAlpha(eyeKnobTopY, wl)).toBe(1)
-    // At the waterline itself the fade is continuous with the exposed part.
-    expect(crocodileSubmergedAlpha(wl, wl)).toBe(1)
-    // Belly and feet (local y near 0) lie a full band below — invisible.
+    // The back CREST — the highest point of the dorsal surface, and what the
+    // near-top-down camera sees — is now fully faded (the point-274 fix: it used
+    // to sit AT the line and render opaque, showing the whole body from above).
+    expect(crocodileSubmergedAlpha(CROCODILE_LAYOUT.backTopY, wl)).toBe(0)
+    // Belly and feet (local y near 0) lie far below — invisible.
     expect(crocodileSubmergedAlpha(0.02, wl)).toBe(0)
     expect(crocodileSubmergedAlpha(geo.boundingBox!.min.y, wl)).toBe(0)
-    // Just under the line the back reads only as a faint hint, strictly between.
+    // At the waterline itself the fade is continuous with the exposed part.
+    expect(crocodileSubmergedAlpha(wl, wl)).toBe(1)
+    // Just under the line, above the crest, a fragment reads only as a faint
+    // hint — strictly between (the murk right at the surface).
     const hint = crocodileSubmergedAlpha(wl - CROCODILE_FADE_BAND / 2, wl)
     expect(hint).toBeGreaterThan(0)
     expect(hint).toBeLessThan(1)

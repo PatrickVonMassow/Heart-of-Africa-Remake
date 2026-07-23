@@ -3266,14 +3266,16 @@ function Herds() {
           wobTarget = 0
           const hidden = a.lunge === undefined
           const striking = a.lunge !== undefined && !a.lunge.retreat && !(a.lunge.victim?.dead ?? false)
-          // Submersion fade (point 246): carry this instance's local waterline
-          // to the croc material so the body below the sheet fades out instead
-          // of reading through the alpha-blended water. aIdx is the index this
-          // croc gets in write() below — nothing between here and there skips a
-          // living croc, and crocs are never young or dead (structurally
-          // unkillable, §19.16). Submerged in every pose except the live strike
-          // — exactly the crocodileBodyY submerge flag.
-          pool.crocWaterline.setX(aIdx, crocodileWaterlineLocal(a.scale, !striking))
+          // Submersion fade (points 246/274): carry this instance's local
+          // waterline to the croc material so the body below the sheet fades out
+          // instead of reading through the alpha-blended water. The line is a
+          // size-free constant (point 274: the body origin submerges by that
+          // same local depth · scale, so the fade line lands on the sheet for
+          // every croc size). aIdx is the index this croc gets in write() below
+          // — nothing between here and there skips a living croc, and crocs are
+          // never young or dead (structurally unkillable, §19.16). Submerged in
+          // every pose except the live strike — exactly the crocodileBodyY flag.
+          pool.crocWaterline.setX(aIdx, crocodileWaterlineLocal(!striking))
           // Subtle idle life (point 242) only while fully at rest: a slow float
           // bob and a few-degree yaw sway so a hidden croc never reads as a frozen
           // prop. The sway is a BOUNDED oscillation about a FIXED rest heading
@@ -3286,11 +3288,11 @@ function Herds() {
           if (hidden) {
             if (a.restYaw === undefined) a.restYaw = a.rot
             yaw = crocodileIdleYaw(a.restYaw, t, a.phase)
-            bodyY = crocodileBodyY(a.y, true) + Math.sin(t * 0.5 + a.phase * 6.283) * 0.008
+            bodyY = crocodileBodyY(a.y, true, a.scale) + Math.sin(t * 0.5 + a.phase * 6.283) * 0.008
           } else {
             a.restYaw = undefined
             yaw = a.rot
-            bodyY = crocodileBodyY(a.y, !striking)
+            bodyY = crocodileBodyY(a.y, !striking, a.scale)
           }
         }
         // The broken-wing act (point 145b): the luring plover tilts hard onto

@@ -709,57 +709,74 @@ export const CROCODILE_LAYOUT = {
 } as const
 
 /**
- * Hidden-crocodile submerge depth (design.md §19.16, point 242): a resting
- * crocodile drops its group origin by the torso's TOP line so the whole armoured
- * back sits at/below the water sheet and only the higher eye knobs break the
- * surface (the point-243 silhouette's crown). The old inline 0.24 render offset
- * left the back riding ~0.03 ABOVE the water — the exposed, flat-on-the-water
- * reading the user hit at the Giza Nile. Derived from CROCODILE_LAYOUT so a mesh
+ * Hidden-crocodile waterline (design.md §19.16, points 242/246/274): the local
+ * geometry height at which the rendered water sheet meets a RESTING crocodile.
+ * It is set a clear margin ABOVE the armoured back crest (CROCODILE_LAYOUT
+ * .backTopY) and below the eye-knob tops, so the WHOLE dorsal back sinks under
+ * the sheet and only the raised eye knobs (and at most the scute tips) break
+ * the surface.
+ *
+ * Point 274 fix: points 242/246 pinned this line AT the back crest (waterline
+ * = backTopY). In the near-top-down bird's-eye view the surface a crocodile
+ * shows the camera IS its dorsal back — whose crest sat exactly at the line and
+ * rendered fully opaque, so the whole body read as a dark silhouette from above
+ * even though the never-seen flanks faded correctly. Lifting the line above the
+ * crest submerges the back itself. Derived from CROCODILE_LAYOUT so a mesh
  * rebuild can never silently drift the pose off the geometry.
  */
-export const CROCODILE_SUBMERGE_DEPTH = CROCODILE_LAYOUT.backTopY
+export const CROCODILE_WATERLINE_LOCAL = CROCODILE_LAYOUT.backTopY + 0.034 // 0.30
 /** Ride-out lift while lunging/striking (point 130): the origin sits just under
  *  the surface so the whole body clears the sheet — the burst rides fully out. */
 export const CROCODILE_LUNGE_LIFT = 0.02
 
 /**
  * Rendered body-origin y of a crocodile floating on a water surface (design.md
- * §19.16, points 130/242): hidden, slinking home, or dragging a kill under it
- * submerges to the eye knobs (body below the sheet); striking at live prey it
- * rides fully out. The single source of the render's crocodile bodyY.
+ * §19.16, points 130/242/274): hidden, slinking home, or dragging a kill under
+ * it submerges its back below the sheet (only the eye knobs break it); striking
+ * at live prey it rides fully out. The single source of the render's crocodile
+ * bodyY.
+ *
+ * Point 274 — SCALE-INVARIANT pose. The submerge offset scales with the
+ * instance (`* scale`), so the geometry-local waterline lands at the water
+ * surface for EVERY croc size: local waterline · scale is exactly how far the
+ * body origin drops below the sheet, so a fragment at local y =
+ * CROCODILE_WATERLINE_LOCAL sits precisely at the surface regardless of scale.
+ * The old fixed WORLD offset let the scaled geometry (0.9–1.2×) drift off the
+ * line — a large croc rode its back proud of the water.
  */
-export function crocodileBodyY(surfaceY: number, submerged: boolean): number {
-  return surfaceY - (submerged ? CROCODILE_SUBMERGE_DEPTH : CROCODILE_LUNGE_LIFT)
+export function crocodileBodyY(surfaceY: number, submerged: boolean, scale: number): number {
+  return surfaceY - (submerged ? CROCODILE_WATERLINE_LOCAL : CROCODILE_LUNGE_LIFT) * scale
 }
 
 /**
- * Submersion fade of the hidden crocodile (design.md §19.16, point 246). The
- * water sheets are alpha-blended (river ~0.9, lake 0.92) and the croc body is
- * drawn in the OPAQUE pass BEFORE them, so the sheet can only ever tint it —
- * the submerged body read as a crisp silhouette straight through the water, as
- * if it were glass. Depth cannot fix that (the sheets stay depthWrite-off for
- * the point-233 confluence crossfade, and depth only occludes LATER draws
- * anyway — the croc draws first). So the croc itself reads as underwater: its
- * material fades every fragment below the instance's own waterline over
- * CROCODILE_FADE_BAND, leaving the eye knobs (and the scute tips at the
- * surface) crisp while belly, legs and tail vanish into the murk. The sheet
- * then blends over the faded body and the croc lurks instead of showing.
+ * Submersion fade of the hidden crocodile (design.md §19.16, points 246/274).
+ * The water sheets are alpha-blended (river ~0.9, lake 0.92) and the croc body
+ * draws before/under them, so the sheet can only ever TINT the body — a
+ * submerged croc read as a crisp silhouette straight through the water. So the
+ * croc's own material fades every fragment below its waterline over
+ * CROCODILE_FADE_BAND: above the line stays crisp, a band below fades to
+ * nothing. With the point-274 waterline lifted above the back crest, the fade's
+ * fully-transparent floor (waterline − band) now sits ABOVE the back, so the
+ * entire dorsal surface the top-down camera sees vanishes into the murk and
+ * only the eye knobs (and at most the scute tips) remain.
  *
- * The waterline is carried per instance in GEOMETRY-LOCAL units (the fragment
- * compares against positionLocal.y, before the instance scale): submerged, the
- * surface sits CROCODILE_SUBMERGE_DEPTH above the body origin in WORLD units
- * (crocodileBodyY), i.e. at depth/scale in local units. Riding out on a strike
- * the sentinel drops the line far below the geometry, so the burst shows the
- * whole body. The hidden pose's ±0.008 float bob is deliberately ignored —
- * sub-centimetre against the fade band.
+ * The waterline is carried per instance in GEOMETRY-LOCAL units — a CONSTANT
+ * (CROCODILE_WATERLINE_LOCAL), no longer divided by scale, because the body
+ * origin now submerges by that same local depth · scale (crocodileBodyY): the
+ * geometry and the submerge scale together, so the local line is size-free.
+ * Riding out on a strike the sentinel drops the line far below the geometry, so
+ * the burst shows the whole body. The hidden pose's ±0.008 float bob is
+ * deliberately ignored — sub-centimetre against the fade band.
  */
-export const CROCODILE_FADE_BAND = 0.1
+export const CROCODILE_FADE_BAND = 0.03
 /** "No waterline" sentinel: far below the geometry (min local y is 0), so a
  *  striking croc renders fully opaque. */
 export const CROCODILE_WATERLINE_NONE = -10
-/** Per-instance waterline in geometry-local units for the fade attribute. */
-export function crocodileWaterlineLocal(scale: number, submerged: boolean): number {
-  return submerged ? CROCODILE_SUBMERGE_DEPTH / scale : CROCODILE_WATERLINE_NONE
+/** Per-instance waterline in geometry-local units for the fade attribute — a
+ *  size-free constant while hidden (see crocodileBodyY), the sentinel while
+ *  striking. */
+export function crocodileWaterlineLocal(submerged: boolean): number {
+  return submerged ? CROCODILE_WATERLINE_LOCAL : CROCODILE_WATERLINE_NONE
 }
 
 /**
@@ -773,7 +790,7 @@ export function crocodileSubmergedAlpha(yLocal: number, waterlineLocal: number):
 }
 
 /**
- * Crocodile-only fauna material (point 246): the shared fauna look (vertex
+ * Crocodile-only fauna material (points 246/274): the shared fauna look (vertex
  * colors, roughness 0.9, smooth shading) plus the submersion fade driven by
  * the per-instance 'crocWaterline' attribute (written each frame beside the
  * instance matrix in Wildlife.tsx). depthWrite stays ON — the body must
@@ -838,10 +855,15 @@ export function buildCrocodile(): THREE.BufferGeometry {
   nostril.translate(0, 0.185, 1.47)
   parts.push(tint(nostril, '#39452f', 0.06, 195))
 
-  // Raised eye knobs above the skull — the crown of the whole silhouette.
+  // Raised eye knobs above the skull — the crown of the whole silhouette. Point
+  // 274 lifts them onto distinct orbital TURRETS (centre y 0.305, base still
+  // seated on the skull top ~0.263) so they clear the back crest (0.266) by a
+  // clear margin: a lurking croc submerges its whole back under the water sheet
+  // and only these turrets break the surface, the way a real Nile crocodile
+  // watches from just its eyes. (Still under the point-243 low-profile cap.)
   for (const hx of [-1, 1]) {
     const eye = new THREE.SphereGeometry(0.052, ...FAUNA_TESSELLATION.small)
-    eye.translate(hx * 0.095, 0.262, 0.55)
+    eye.translate(hx * 0.095, 0.305, 0.55)
     parts.push(tint(eye, '#39452f', 0.06, 196))
   }
 
