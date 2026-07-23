@@ -1,55 +1,105 @@
-# Point 276 — framerate work: benchmarking method + findings so far
+# Point 276 — the bird's-eye framerate regression: measurements and findings
 
-Durable handoff (23.07.2026 evening). The earlier measurements were run while a
-PARALLEL batch session was active (two Claude sessions auto-resumed the batch),
-so their numbers are **contaminated and discarded**. After a clean single-session
-restart, re-run the whole series from scratch, SOLO.
+Measured 23./24.07.2026 on a clean, SOLO machine (single session, warm dev
+server, vsync disabled), WebGPU backend, viewport 1440x900, zoom 0.5 — the
+reachable default, not a debug wide zoom (CLAUDE.md §7.2, point 172).
 
-## The benchmark tool
-`scripts/perf-bench.mjs` — drives the game on the requested backend
-(`VERIFY_GL=webgpu` is the user's), jumps to three reachable states (dense East
-savanna, empty desert, driving) at zoom 0.5, and samples per-frame time via a
-self-contained rAF loop.
+## The instruments
 
-MUST-DO for meaningful numbers (learned the hard way):
-1. **VSync OFF** — `launchBenchBrowser()` must pass
-   `--disable-gpu-vsync --disable-frame-rate-limit`. Otherwise every run caps at
-   ~60 fps (16.7 ms) and masks the true per-frame cost; a capped and an uncapped
-   run are NOT comparable.
-2. **WARM the server** — the FIRST bench run against a freshly-started dev server
-   has multi-second warm-up stalls (p99 ~3200 ms, console errors). Discard a
-   warm-up pass (or use the 2nd run). Always compare warm-to-warm.
-3. **SOLO** — nothing else on the machine (no parallel agents/verifies/sessions),
-   or the CPU-bound parts skew.
+| script | what it answers | noise |
+| --- | --- | --- |
+| `scripts/perf-bench.mjs` | frame time (median/p95/p99) per render config × state, plus spike attribution against the point-272 burst probe | ±1.2 ms run to run |
+| `scripts/perf-structure.mjs` | what the renderer SUBMITS per frame (draw calls, triangles, memory) | camera/culling dependent |
+| `scripts/perf-breakdown.mjs` | per-system triangle breakdown of the live scene graph | none (counts) |
+| `scripts/perf-bisect.sh` | one commit's frame time in the throwaway bench worktree | inherits the bench noise |
+| `scripts/perf-lod-experiment.sh` | one terrain-LOD variant, priced for both time and geometry | inherits the bench noise |
 
-## Findings so far (to CONFIRM cleanly after restart)
-- Warm + vsync-off, WebGPU: standing ~5–6 ms (~170 fps), **driving-savanna
-  ~9.1 ms (~110 fps)**. (The earlier "80 fps driving" was a cold-server artifact.)
-- **N1 wildlife behaviour-LOD** (branch `feat/276-wildlife-lod`, picture-neutral by
-  construction, tested, gates green) gave **NO measurable win** here (9.4 vs 9.1 ms
-  driving) and is slightly slower in the empty desert (its pre-pass overhead with no
-  wildlife to throttle). => this machine is **GPU/STREAMING-bound while driving, not
-  wildlife-CPU-bound**. The +3 ms driving cost over standing is **streaming**
-  (terrain/flora rebuild on movement), not the animal loop.
-- Implication: the "gratis" CPU levers (N1–N4) are picture-neutral but won't raise
-  FPS on this GPU-bound machine. Park N1 (keep the branch; it may help slow CPUs /
-  feed Low-Details, but it is NOT an always-on win). The real wins are GPU-side.
+MUST-DOs, learned the hard way:
+1. **VSync OFF** or every run caps at ~60 fps and hides the true cost.
+2. **Warm the server** — the first run against a fresh dev server stalls for
+   seconds (p99 ~3200 ms). The bench discards a warm-up pass.
+3. **SOLO** — no parallel agent, verify or second session.
+4. **Judge structure by COUNTS, timing by REPEATS.** A single timing sample
+   carries ±1.2 ms here, which is more than most levers are worth; a scene-graph
+   triangle count carries none. Commit-level bisection by timing is therefore
+   NOT reliable (a re-measured commit swung 5.70 → 4.60 → 4.40 ms) — the
+   regression was found structurally instead.
 
-## The comprehensive sweep to run (autonomous, ~10 h, deliver options)
-1. Extend perf-bench to a **config sweep**: one warm browser, and for each config
-   apply a set of debug-flag overrides via `window.__ui.getState()` then measure the
-   3 points. Output a table (config × point → fps/dt/p99). No code changes needed to
-   bisect the GPU cost — the debug store already has `traaEnabled`, `ssaoEnabled`,
-   `shadowsEnabled`, etc. Configs: baseline, TRAA off, SSAO off, shadows off, all-post
-   off, and combinations — to attribute the GPU cost to each feature.
-2. Measure the **streaming/driving** cost separately (the p99 spikes while moving) —
-   what a further terrain/flora streaming tune or a coarser refine would save.
-3. Build + measure the **Low-Details F7 mode** (point 276 Part B): dpr cap to 1
-   (App.tsx — likely the single biggest GPU lever, NOT a debug flag so it needs code),
-   shadows 3→2 + half-res + off, post off, flora fog-radius ×0.55, terrain refine off,
-   water calm, weather reduced — each measured for its FPS gain and its visible cost.
-4. Deliver a full results table + ranked options as a **dashboard "Von dir zu klären"
-   card** (the user reviews it; no mid-run questions).
+## The regression is real and it is GEOMETRY
 
-Baseline scratch numbers + lessons also in `scratchpad/perf-baseline.txt` (but Temp
-may be cleared on a PC restart — this doc is the durable copy).
+v0.1 (cfc2736, 15.07.) vs main (1f575a4, 23.07.), same harness:
+
+| state | v0.1 | main | delta |
+| --- | --- | --- | --- |
+| savanna standing | 4.40 ms / 227 fps | 5.60 ms / 179 fps | +1.2 ms |
+| desert standing (empty) | 4.20 ms / 238 fps | 5.40 ms / 185 fps | +1.2 ms |
+| driving savanna | 6.90 ms / 145 fps | 8.70 ms / 115 fps | +1.8 ms |
+
+The surcharge is the SAME in the empty desert as in the dense savanna, so it is
+not wildlife and not content. The scene-graph breakdown (desert, triangles):
+
+| system | v0.1 | main | factor |
+| --- | --- | --- | --- |
+| terrain chunks | 425 114 | 847 076 | **1.99x** |
+| flora / dressing | 107 788 | 260 030 | **2.41x** |
+| rivers + water | 11 340 | 44 052 | 3.9x |
+| climate (new) | — | 3 610 | new |
+| sky | 1 216 | 1 216 | — |
+
+### Where the terrain doubling comes from — exactly
+
+Per-chunk triangle histogram in the Sahara (chunk counts by triangle count):
+
+| segments | tris/chunk | v0.1 | main | refine off |
+| --- | --- | --- | --- | --- |
+| 20 (far ring) | 960 | 88 | 88 | 88 |
+| 28 (mid ring) | 1 792 | 56 | 29 | 56 |
+| 56 (near ring) | 6 720 | 25 | 37 | 25 |
+| **112 (refined)** | **25 984** | **0** | **15** | **0** |
+| terrain total | | 352 832 | 774 848 | 352 832 |
+
+The whole difference is point 209's near-ring refinement (`refinedSegments` in
+`src/scenes/travel/terrainLod.ts`): a near chunk that is coastal OR carries more
+than `MOUNTAIN_CHUNK_RELIEF_M` (400 m) of relief doubles its segments, which
+QUADRUPLES its triangles. The threshold's own comment records that 400 m marks
+**60 % of all land chunks** — so the "targeted" refinement is in practice
+near-universal. Switching it off reproduces v0.1's histogram exactly.
+
+## What each lever is worth ON THIS MACHINE
+
+| lever | savanna | desert | driving | verdict |
+| --- | --- | --- | --- | --- |
+| baseline (main) | 5.60 | 5.40 | 8.70 | — |
+| TRAA off | 5.80 | 5.30 | 8.10 | no win |
+| SSAO off | 5.90 | 5.70 | 8.40 | no win |
+| shadows off | 6.30 | 5.40 | 8.50 | no win |
+| shadow map half | 5.90 | 5.60 | 8.50 | no win |
+| all post off | 5.80 | 5.40 | 8.20 | no win |
+| everything off | 5.90 | 5.70 | 8.40 | no win |
+| device pixel ratio 2 (4x pixels) | 5.50 | 7.90 | 8.60 | barely moves — not fill-rate bound |
+| wildlife behaviour LOD (N1) | — | slower | 9.4 vs 9.1 | no win, parked |
+| **terrain refine OFF** | **5.20** | **5.00** | **8.10** | **the only real win: ~0.4-0.6 ms (~8 %)** |
+| refine rings 0-2 only | 5.80 | 5.00 | 8.60 | little — the 15 near chunks are the cost |
+| flora radius 260 -> 170 | 5.40 | 5.00 | 8.60 | rejected: p99 while driving 12 -> 48 ms |
+
+### Consequences
+
+- **The render features are not the problem.** Everything the debug menu can
+  switch off is worth almost nothing here; an F7 "Low Details" mode built out of
+  those switches would buy the user nothing on hardware like this.
+- **The p99 "hitch" trail was a measurement artifact.** A short 6 s sample once
+  showed p99 38 ms; 12 s samples put every config at 12-13 ms with a single
+  ~28 ms outlier, and the point-272 burst probe attributes ~0 ms of it to
+  terrain/flora rebuilds (terrain max 0.3 ms, flora max 0.6 ms per burst). The
+  streaming work is genuinely cheap now.
+- **Absolute framerates here are high** (179-238 fps standing, 115 fps driving).
+  This headless GPU is NOT geometry-bound, which is exactly why doubling the
+  geometry costs it only 8 %. A slower or more geometry-bound GPU can pay far
+  more for the same doubling — so the numbers that decide which lever ships must
+  come from the USER's real hardware, not from here.
+
+## Therefore: the in-game benchmark (user's request, 24.07.2026)
+
+Measure on the real machine, in the DELIVERED build, deterministically — same
+route, same seed, same date, same events, with only the graphics config varying
+between runs — and hand back a downloadable report. That is point 277.
