@@ -128,8 +128,11 @@ import {
   buildWildebeestCalf,
   buildZebra,
   buildZebraCalf,
+  createCrocodileMaterial,
   createFaunaMaterial,
   crocodileBodyY,
+  crocodileWaterlineLocal,
+  CROCODILE_WATERLINE_NONE,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
@@ -1408,6 +1411,9 @@ interface WildlifeMeshPool {
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
   stain: THREE.InstancedMesh
   material: THREE.MeshStandardMaterial
+  /** Per-instance local waterline feeding the croc submersion fade (point 246),
+   *  written each frame beside the instance matrix. */
+  crocWaterline: THREE.InstancedBufferAttribute
   vultureGeo: THREE.BufferGeometry
 }
 let wildlifeMeshCache: WildlifeMeshPool | null = null
@@ -1442,10 +1448,24 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   // Shared smooth-shaded fauna material (point 214): flat shading would fold
   // the rounded bodies back into hard polygon panels.
   const material = createFaunaMaterial()
+  // The crocodile draws through its own material (point 246): same fauna look
+  // plus the submersion fade below the per-instance 'crocWaterline' attribute,
+  // so a hidden croc's body vanishes under the alpha-blended water sheets
+  // instead of reading through them. Module singleton like everything here.
+  const crocMaterial = createCrocodileMaterial()
+  const crocWaterline = new THREE.InstancedBufferAttribute(
+    new Float32Array(MAX_INSTANCES.crocodile).fill(CROCODILE_WATERLINE_NONE),
+    1,
+  )
+  crocWaterline.setUsage(THREE.DynamicDrawUsage)
+  geometries.crocodile.setAttribute('crocWaterline', crocWaterline)
   const adult = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
-    const m = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
-    m.castShadow = true
+    const m = new THREE.InstancedMesh(geometries[sp], sp === 'crocodile' ? crocMaterial : material, MAX_INSTANCES[sp])
+    // No croc cast shadow (point 246): a submerged body threw a crisp shadow
+    // onto the river bed, which read through the ~0.9-alpha sheet exactly like
+    // the body itself. The flat-on-the-water croc loses nothing visible.
+    m.castShadow = sp !== 'crocodile'
     m.frustumCulled = false
     m.count = 0
     adult[sp] = m
@@ -1465,7 +1485,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   )
   stain.frustumCulled = false
   stain.count = 0
-  wildlifeMeshCache = { adult, calf, stain, material, vultureGeo: buildVulture() }
+  wildlifeMeshCache = { adult, calf, stain, material, crocWaterline, vultureGeo: buildVulture() }
   return wildlifeMeshCache
 }
 
@@ -3234,6 +3254,14 @@ function Herds() {
           wobTarget = 0
           const hidden = a.lunge === undefined
           const striking = a.lunge !== undefined && !a.lunge.retreat && !(a.lunge.victim?.dead ?? false)
+          // Submersion fade (point 246): carry this instance's local waterline
+          // to the croc material so the body below the sheet fades out instead
+          // of reading through the alpha-blended water. aIdx is the index this
+          // croc gets in write() below — nothing between here and there skips a
+          // living croc, and crocs are never young or dead (structurally
+          // unkillable, §19.16). Submerged in every pose except the live strike
+          // — exactly the crocodileBodyY submerge flag.
+          pool.crocWaterline.setX(aIdx, crocodileWaterlineLocal(a.scale, !striking))
           // Subtle idle life (point 242) only while fully at rest: a slow float
           // bob and a few-degree yaw sway so a hidden croc never reads as a frozen
           // prop. The sway is a BOUNDED oscillation about a FIXED rest heading
@@ -4072,6 +4100,7 @@ function Herds() {
       }
       mesh.count = aIdx
       mesh.instanceMatrix.needsUpdate = true
+      if (sp === 'crocodile') pool.crocWaterline.needsUpdate = true // point 246
       if (calfMesh) {
         calfMesh.count = cIdx
         calfMesh.instanceMatrix.needsUpdate = true
