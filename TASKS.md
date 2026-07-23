@@ -9702,6 +9702,39 @@ the remaining open points in their numeric order.
   files as point 228 (now merged); relates to point 227 (skyline gliding animal — 255
   covers the fauna leg-motion half).
 
+- [ ] 256. THE VILLAGE FIRE BURNS ON IN THE RAIN — RESEARCH + A REALISTIC SHELTER
+  (user 23.07.2026). The user reports that the §19.10 village fire keeps burning
+  unprotected in the rain, which reads wrong, and asks: did ~1890 African
+  settlements have a real solution to keep a fire going through rain (e.g. roofing
+  it over)? RESEARCH FIRST (record the finding in `docs/peoples-1890.md`, a new
+  short subsection, cited): how period sub-Saharan settlements kept a hearth/cooking
+  fire alight in the rains — the well-attested answers include a dedicated ROOFED
+  COOKING SHELTER / open-sided thatch canopy on posts (a common separate cook-house
+  or lean-to over the hearth), the central hearth kept INSIDE the dwelling under the
+  thatch with a smoke vent, a raised/banked fire under eaves, and windbreaks; pick
+  the option(s) that fit the peoples the game shows and are cheap to render. FIX
+  (realistic): give the village fire a visible SHELTER so its burning in rain is
+  plausible — the most legible is a small open-sided thatched CANOPY on posts over
+  the fire (a cook-shelter), present at the fire site; and gate the §19.10 firelight/
+  flame so in rain the OPEN fire does not simply blaze unaffected — under the shelter
+  it burns on (a touch lower/steamier), and any UNSHELTERED flame is visibly damped
+  by the rain. Keep it cheap (a simple roofed-post primitive + the existing fire),
+  gated on the place's rain state (the §19.13/point-225 rain factor). Anchors: the
+  village fire + §19.10 firelight (search `src/scenes/place/` for the fire/flame and
+  the firelight — likely `PlaceLife.tsx` or a fire component), the rain state
+  (`__placeSeason`/the point-225 wetness), `src/render/` for the canopy primitive,
+  `docs/peoples-1890.md` (the research subsection). VERIFIABLE: a pure test that the
+  fire is sheltered / its rain-response is a function of the rain factor (open flame
+  damped in rain, sheltered flame persists); a live check in `scripts/verify/
+  polish.mjs` that in a rainy settlement the fire shows its shelter and the picture
+  reads plausibly; the parent picture-verifies on both backends (a rainy village
+  fire under its canopy). DOCS: `docs/peoples-1890.md` (research, in the SAME
+  branch/commit), design.md §19.10 (the fire shelter + rain response). No
+  player-visible text unless a label is added (then both languages). Research fits a
+  Fable pass. NOTE: touches `src/scenes/place/` (the fire) — do NOT delegate
+  concurrently with point 255 (PlaceLife.tsx) or 244 (PlaceScene.tsx); queue after
+  they merge, or scope it to a fire-only file that does not overlap.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
