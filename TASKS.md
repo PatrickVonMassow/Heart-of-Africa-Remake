@@ -10268,7 +10268,7 @@ the remaining open points in their numeric order.
   text. NOTE: wildlife-streaming/render cluster (Wildlife.tsx/wildlifeBehavior.ts/
   fauna.ts) — do NOT build concurrently with another Wildlife.tsx point. Implementation-ready.
 
-- [ ] 272. OCCASIONAL FRAME HITCHES WHILE DRIVING CONTINUOUSLY (bird's-eye) — profile
+- [x] 272. OCCASIONAL FRAME HITCHES WHILE DRIVING CONTINUOUSLY (bird's-eye) — profile
   and smooth (user 23.07.2026). Walking/driving continuously in one direction in the
   bird's-eye view produces occasional short HITCHES (frame stalls). The user suggests
   clever PRELOADING off the main thread (a worker) to avoid sudden load spikes. ANALYSE

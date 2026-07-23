@@ -251,3 +251,38 @@ for the flora — and move the pure terrain sampling into a Web Worker
 cost (refined 112-seg chunks) provably cannot fit a frame budget. All caches
 and scheduling changes are behaviour-neutral: the same pure functions, the
 same seed, the same picture — just not all in one frame.
+
+## Implementation status (fix branch)
+
+Landed, in order:
+
+1. **Attribution probe**: `src/scenes/travel/perfProbe.ts` + `window.__perf`
+   (DEV) — terrain/flora burst stats and a 600-frame delta ring, pure-tested.
+2. **Terrain (spike 1)**: the crossing now only PLANS the window
+   (`src/scenes/travel/terrainQueue.ts`, pure-tested in
+   `terrainQueue.test.ts`); missing builds drain under a ~5 ms/frame budget,
+   holes-then-nearest first, with the chunk's previous geometry drawn as a
+   stand-in while a re-key waits, plus prefetch-by-heading (half a chunk of
+   lookahead). Teleports/scene entry still build synchronously (no stand-ins
+   exist there). The coast/mountain probes memoise per chunk in
+   `terrainLod.ts`; the index buffer is a preallocated `Uint32Array`.
+3. **Flora (spike 2)**: `placedFloraChunk` caches each chunk's placement
+   (seed-keyed, bounded; render, collider and dev hook read the SAME arrays —
+   point 129 by construction; pinned in `floraPlacementCache.test.ts`), and a
+   driving-step rebuild fills scratch buffers over ≤ `FLORA_FILL_MAX_FRAMES`
+   frames, swapped in atomically (double-buffered). The recession bound
+   (trigger distance + worst fill drift ≤ `FLORA_SPAWN_MARGIN`) is enforced
+   by the `floraAmortiseMaxStep` gate and pure-tested in
+   `floraStreaming.test.ts`; radius-change/first/jump rebuilds stay
+   synchronous.
+4. **Regression gate**: the enrichments driven no-pop pass also asserts via
+   `__perf` that both systems worked the drive in bounded slices (terrain
+   maxMs < 150, flora maxMs < 100 — generous headless bounds).
+
+**Deferred (documented follow-up): the Web Worker.** A refined 112-seg chunk
+build is atomic and can alone overshoot the terrain frame budget (~20-40 ms on
+real hardware) in mountain/coast belts; moving `buildChunkGeometry`'s sampling
+into a worker (ttsWorker pattern, transferable typed arrays, geodata
+initialised worker-side) remains the second stage if the measured overshoot
+still reads as a hitch after this pass. The prefetch usually hides it today:
+the refined builds run one per frame ahead of the crossing.
