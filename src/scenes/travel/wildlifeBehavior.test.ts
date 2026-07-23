@@ -74,6 +74,7 @@ import {
   vigilDrawReady,
   ambientSavannaSpecies,
   claimedByAnotherDrama,
+  keepStreamedAnimal,
   offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
@@ -2878,5 +2879,74 @@ describe('claimedByAnotherDrama (point 197 — one actor per emergent drama)', (
     // caught/mired/fireTrapped use `!== undefined`, so a 0 counter still counts.
     expect(claimedByAnotherDrama({ ...base, caught: 0 })).toBe(true)
     expect(claimedByAnotherDrama({ ...base, fireTrapped: 0 })).toBe(true)
+  })
+})
+
+describe('keepStreamedAnimal (the streaming cull judges the animal where it STANDS, never only its birth chunk)', () => {
+  const CHUNK = 24 // Wildlife.tsx CHUNK_SIZE
+  const chunkKeyAt = (x: number, z: number) => `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`
+  const never = () => false
+  const always = () => true
+  const noChunks = () => false
+
+  it('keeps and re-homes an animal standing inside a live chunk after its birth chunk dropped', () => {
+    const a = { chunk: '-9,0', x: 30, z: 5 } // birth chunk long gone, standing in "1,0"
+    const live = new Set(['1,0'])
+    const v = keepStreamedAnimal(a, (k) => live.has(k), CHUNK, 0, 0, 110, never)
+    expect(v.keep).toBe(true)
+    expect(v.rehomeTo).toBe('1,0')
+    expect(v.rehomeTo).toBe(chunkKeyAt(a.x, a.z))
+  })
+
+  it('keeps an animal outside all live chunks while it is within despawnR of the player', () => {
+    const a = { chunk: '-9,0', x: 50, z: 0 }
+    const v = keepStreamedAnimal(a, noChunks, CHUNK, 0, 0, 110, never)
+    expect(v.keep).toBe(true)
+    expect(v.rehomeTo).toBeUndefined()
+  })
+
+  it('keeps an on-screen animal regardless of the despawn radius (swept across zoom levels)', () => {
+    // The projection backstop wins at every ring size (point-172 doctrine):
+    // despawnR = 100*zoom + 60, the animal parked well beyond each ring.
+    for (const zoom of [0.125, 0.5, 1.5, 2.2]) {
+      const despawnR = 100 * zoom + 60
+      const a = { chunk: '-9,0', x: despawnR + 40, z: 0 }
+      const v = keepStreamedAnimal(a, noChunks, CHUNK, 0, 0, despawnR, always)
+      expect(v.keep).toBe(true)
+    }
+  })
+
+  it('drops an animal that is off-screen, beyond despawnR and outside every live chunk', () => {
+    const a = { chunk: '-9,0', x: 200, z: 0 }
+    const v = keepStreamedAnimal(a, noChunks, CHUNK, 0, 0, 110, never)
+    expect(v.keep).toBe(false)
+  })
+
+  it('always keeps dead carcasses and untagged animals', () => {
+    // Dead: dissolves on screen; untagged: e.g. injected by the verification.
+    expect(keepStreamedAnimal({ dead: true, chunk: '-9,0', x: 500, z: 0 }, noChunks, CHUNK, 0, 0, 110, never).keep).toBe(true)
+    expect(keepStreamedAnimal({ x: 500, z: 0 }, noChunks, CHUNK, 0, 0, 110, never).keep).toBe(true)
+  })
+
+  it('regression: a fled animal on-screen beside the player survives the zoom-in that culls its birth chunk', () => {
+    // The reported vanish: the animal fled ~120 units from its birth chunk and
+    // stands ~30 units ahead of the player, in view. Zooming 0.5 -> 0.125
+    // collapses despawnR 110 -> 72.5 in one frame and streams the birth chunk
+    // out; the old birth-chunk filter deleted the animal mid-frame (its TRAA
+    // ghost read as scattered body parts).
+    const a = { chunk: chunkKeyAt(-120, 0), x: 30, z: 0 } // birth "-5,0", standing in "1,0"
+    const liveAt = (despawnR: number) => (key: string) => {
+      const [kx, kz] = key.split(',').map(Number)
+      return Math.hypot((kx + 0.5) * CHUNK, (kz + 0.5) * CHUNK) <= despawnR // player at origin
+    }
+    // Zoom 0.5: the birth chunk is still live — kept without re-homing.
+    const before = keepStreamedAnimal(a, liveAt(100 * 0.5 + 60), CHUNK, 0, 0, 100 * 0.5 + 60, always)
+    expect(before.keep).toBe(true)
+    expect(before.rehomeTo).toBeUndefined()
+    // Zoom 0.125: the birth chunk streams out (centre -108 beyond 72.5) while
+    // the chunk under its feet stays live — kept AND re-homed, never culled.
+    const after = keepStreamedAnimal(a, liveAt(100 * 0.125 + 60), CHUNK, 0, 0, 100 * 0.125 + 60, always)
+    expect(after.keep).toBe(true)
+    expect(after.rehomeTo).toBe('1,0')
   })
 })
