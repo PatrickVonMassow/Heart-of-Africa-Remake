@@ -79,6 +79,56 @@ page.on('console', (m) => {
 })
 page.on('pageerror', (e) => errors.push(String(e)))
 
+// Point 249b — WebGPU navigation robustness. The point-249 harness converted
+// many staged-drama checks to POLL-until-state, either as a Node-side loop of
+// repeated `page.evaluate` reads (settleScalar) or as a single long in-page
+// `page.evaluate(async () => { ... await window.__pollSim(...) ... })`. On the
+// WebGPU headless path (system Chrome, no display) sustained load can crash the
+// GPU process; Chrome recovers by RELOADING the page, which DESTROYS the live
+// execution context of whatever evaluate is spanning that moment — surfaced by
+// Playwright as "Execution context was destroyed, most likely because of a
+// navigation" (or "Target closed"/"Target crashed"/"detached frame"). The old
+// fixed-`waitForTimeout` harness never held an evaluate open across the reload,
+// so it never hit this; the poll loops do, and the exception killed the whole
+// run. The reload is non-deterministic and can strike ANY of the ~50 poll
+// evaluates, so the retry is installed ONCE at the seam every evaluate passes
+// through rather than at hand-picked sites: `page.evaluate` is wrapped so the
+// navigation/context-destroyed class is treated as TRANSIENT — wait for the
+// reloaded page to re-mount and re-install its dev hooks, then retry the same
+// evaluate, bounded. A genuine evaluate error (a real bug, a thrown assertion)
+// is NOT this class and re-throws immediately; the bounded count means a truly
+// dead page still fails eventually instead of looping forever.
+const isNavTransient = (e) => {
+  const m = String((e && e.message) || e)
+  return (
+    m.includes('Execution context was destroyed') ||
+    m.includes('Target closed') ||
+    m.includes('Target crashed') ||
+    m.includes('Cannot find context with specified id') ||
+    m.includes('frame was detached') ||
+    m.includes('Frame was detached')
+  )
+}
+const rawEvaluate = page.evaluate.bind(page)
+page.evaluate = async (...args) => {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await rawEvaluate(...args)
+    } catch (e) {
+      if (!isNavTransient(e) || attempt >= 8) throw e
+      // Let the reloaded page re-establish before retrying: wait for the load
+      // and for the app's dev hooks to be back (the same readiness the boot
+      // sequence waits on), then a short settle. Each guard is failure-soft so
+      // the retry proceeds even if a wait times out — the bounded loop caps it.
+      await page.waitForLoadState('domcontentloaded').catch(() => {})
+      await page
+        .waitForFunction(() => window.__game && window.__ui, null, { timeout: 30000 })
+        .catch(() => {})
+      await page.waitForTimeout(300)
+    }
+  }
+}
+
 await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
