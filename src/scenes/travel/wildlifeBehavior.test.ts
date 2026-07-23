@@ -27,6 +27,7 @@ import {
   griefTarget,
   frontInterceptTarget,
   trampleKills,
+  deflectAroundCircle,
   groundNormal,
   leashedGambolDir,
   separationPush,
@@ -1260,6 +1261,74 @@ describe('frontInterceptTarget (design.md §19.8 — the grief parent aims at th
     const p = frontInterceptTarget(0, 0, 0, 5) // (sin,cos)=(0,1) → +z
     expect(p.x).toBeCloseTo(0, 10)
     expect(p.z).toBeCloseTo(5, 10)
+  })
+})
+
+describe('deflectAroundCircle (design.md §19.5 — the elephant body collider, point 261)', () => {
+  const R = 1.3 // an elephant body radius
+
+  it('slides a step aimed straight THROUGH the body around it (never inside, keeps moving)', () => {
+    // From directly behind the body to directly ahead of it — the straight path
+    // passes through the centre. The result must NOT land inside the circle and
+    // must make lateral (tangential) progress rather than stopping dead.
+    const [ex, ez] = deflectAroundCircle(0, -2, 0, 2, 0, 0, R)
+    expect(Math.hypot(ex, ez)).toBeGreaterThanOrEqual(R)
+    // Slid sideways off the centre line (went AROUND), and did not just rest at
+    // the start point.
+    expect(Math.abs(ex)).toBeGreaterThan(0.1)
+    expect(Math.hypot(ex - 0, ez - -2)).toBeGreaterThan(0.1)
+  })
+
+  it('leaves a step that never touches the body unchanged', () => {
+    // A step well to the side of the body: returned verbatim.
+    const [ex, ez] = deflectAroundCircle(5, -1, 5, 3, 0, 0, R)
+    expect(ex).toBe(5)
+    expect(ez).toBe(3)
+  })
+
+  it('leaves a step that only grazes past (closest approach ≥ radius) unchanged', () => {
+    // Passes at x = R exactly — tangent, does not enter.
+    const [ex, ez] = deflectAroundCircle(R, -2, R, 2, 0, 0, R)
+    expect(ex).toBe(R)
+    expect(ez).toBe(2)
+  })
+
+  it('de-penetrates a step that ENDS inside the body out to its edge', () => {
+    // The elephant walked onto a nearly-still grazer: its tiny step ends inside
+    // the body. The collider pushes it back out to the surface (never inside).
+    const [ex, ez] = deflectAroundCircle(0.4, -0.4, 0.5, -0.3, 0, 0, R)
+    expect(Math.hypot(ex, ez)).toBeGreaterThanOrEqual(R - 1e-9)
+  })
+
+  it('lets the grief parent ROUTE AROUND the body to the front and be crushable — no stall', () => {
+    // Replays the grief charge (points 259/261): the parent starts BEHIND the
+    // elephant and each frame aims at the front-intercept point (reach 1, which
+    // is INSIDE the body circle), stepping at the grief speed. With the collider
+    // it must round the body and, at some frame, stand within the trample reach
+    // AHEAD of the elephant (where the moving elephant would crush it) — proving
+    // it neither clips through nor stalls behind. It never enters the body.
+    const SPEED = 6.5 // TRAMPLE_GRIEF_SPEED
+    const REACH = 1 // GRIEF_FRONT_REACH
+    const TRAMPLE = 1.5 // TRAMPLE_RADIUS
+    const dt = 0.1
+    let px = 0
+    let pz = -3 // behind an elephant at the origin heading +z (sin,cos)=(0,1)
+    let crushable = false
+    for (let i = 0; i < 400; i++) {
+      const front = frontInterceptTarget(0, 0, 0, REACH) // (0, 1)
+      const dx = front.x - px
+      const dz = front.z - pz
+      const d = Math.hypot(dx, dz) || 1
+      const tx = px + (dx / d) * SPEED * dt
+      const tz = pz + (dz / d) * SPEED * dt
+      ;[px, pz] = deflectAroundCircle(px, pz, tx, tz, 0, 0, R)
+      // Never inside the body.
+      expect(Math.hypot(px, pz)).toBeGreaterThanOrEqual(R - 1e-6)
+      // Within the trample reach AND ahead of the elephant → the moving elephant
+      // (travelling +z) would crush it here (trampleKills holds for a +z victim).
+      if (Math.hypot(px, pz) <= TRAMPLE && pz > 0) crushable = true
+    }
+    expect(crushable).toBe(true)
   })
 })
 

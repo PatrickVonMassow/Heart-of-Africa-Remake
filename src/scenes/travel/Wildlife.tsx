@@ -36,6 +36,7 @@ import {
   griefTarget,
   frontInterceptTarget,
   trampleKills,
+  deflectAroundCircle,
   fleesFromPlayer,
   fleeCrossing,
   resolveFleeTarget,
@@ -642,7 +643,13 @@ const STRUGGLE_SELF_RESCUE = 25 // s after which an unaided calf clambers out
 // saves nobody and stays on its own speed, off the rescue burst. So does the
 // point-121 vigil walk (YOUNG_FOLLOW_SPEED in the vigil pre-pass).
 const TRAMPLE_GRIEF_SPEED = 6.5 // a parent rushing the elephant that trampled its calf
-const TRAMPLE_GRIEF_SECONDS = 12 // grief window; an unresolved charge clears here
+// Grief window; an unresolved charge clears here (the I4 "every drama resolves"
+// backstop). Widened from 12 s (point 261): the elephant is now a solid body the
+// grieving parent must ROUTE AROUND to reach the front-intercept point instead
+// of clipping straight through its legs, which lengthens the path — so the
+// deadline is doubled to comfortably cover circling the body (~π·bodyRadius at
+// TRAMPLE_GRIEF_SPEED, plus the chase after a walking elephant) before it fires.
+const TRAMPLE_GRIEF_SECONDS = 24
 // How far ahead of the elephant (along its heading) the grieving parent aims
 // (point 259): it must reach the elephant's FRONT to be crushed, so the moving
 // elephant travels toward it (the trampleKills direction condition). Kept BELOW
@@ -1704,6 +1711,17 @@ function Herds() {
           (a, b) => Math.hypot(a.x - pos.x, a.z - pos.z) - Math.hypot(b.x - pos.x, b.z - pos.z),
         )
       }
+    }
+
+    // Frame-start positions for the elephant body collider (design.md §19.5,
+    // point 261): every non-elephant animal's step this frame is later swept
+    // against the elephants' bodies so it slides AROUND them rather than through.
+    // Snapshotted here, before any drive moves an animal, so the sweep sees the
+    // whole frame's displacement (no tunnelling through the ~2.6 m-wide body).
+    const stepFrom = new Map<Animal, [number, number]>()
+    for (const sp of SPECIES) {
+      if (sp === 'elephant') continue
+      for (const a of herds[sp]) stepFrom.set(a, [a.x, a.z])
     }
 
     // Calf predation resolution (design.md §19), over the FULL herd lists — not
@@ -2959,6 +2977,50 @@ function Herds() {
         }
         elephantPos.push([a.x, a.z])
         elephantVel.push([a.x - ex0, a.z - ez0])
+      }
+    }
+
+    // Elephant body collider (design.md §19.5, point 261): an elephant is a
+    // SOLID obstacle to every OTHER animal's locomotion. Each non-elephant
+    // animal's whole step this frame (frame-start → now) is swept around every
+    // live elephant body so it slides AROUND the body instead of walking through
+    // it — the grief parent must ROUTE AROUND the body to reach the front
+    // (points 259/261), and no animal clips an elephant in general. The collider
+    // radius is the elephant body radius alone (no self radius added), so a
+    // deflected animal rests AT the body edge — still inside the wider
+    // TRAMPLE_RADIUS (1.5 > 1.3), so the designed §19.5 trample and the
+    // grief-crush at the front are never blocked. The elephant's own movement
+    // (its trample step) is never deflected here — only the other animals'.
+    {
+      const bodies: Array<[number, number, number]> = []
+      for (const e of herds.elephant) {
+        if (e.dead) continue
+        bodies.push([e.x, e.z, BODY_RADIUS.elephant * e.scale])
+      }
+      if (bodies.length > 0) {
+        for (const sp of SPECIES) {
+          if (sp === 'elephant') continue
+          for (const a of herds[sp]) {
+            if (a.dead) continue
+            const from = stepFrom.get(a)
+            if (from === undefined) continue
+            let nx = a.x
+            let nz = a.z
+            // deflectAroundCircle returns the step unchanged when it never
+            // touches a body, so a far grazer is untouched; only a step that
+            // would enter a body is slid to its edge (never a dead stop).
+            for (const [ex, ez, r] of bodies) [nx, nz] = deflectAroundCircle(from[0], from[1], nx, nz, ex, ez, r)
+            if (nx !== a.x || nz !== a.z) {
+              a.x = nx
+              a.z = nz
+              // Ground-follow (point 203(A)): carry the standing height onto the
+              // slid spot; land only, water occupants are owned by their dramas.
+              const gfl = worldToLatLon(a.x, a.z)
+              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+              if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+            }
+          }
+        }
       }
     }
 

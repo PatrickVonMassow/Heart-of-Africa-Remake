@@ -389,6 +389,97 @@ export function frontInterceptTarget(
 }
 
 /**
+ * Deflect one animal's per-frame step so it SLIDES AROUND an elephant's body
+ * instead of walking through it (design.md §19.5, point 261). An elephant is a
+ * solid obstacle to every other animal's LOCOMOTION: a step from `(fromX,fromZ)`
+ * to `(toX,toZ)` whose straight path would enter the body circle
+ * `(obstX,obstZ,radius)` is redirected to the circle's tangent — the returned
+ * end point is never inside the circle and always keeps moving forward along the
+ * surface (never a dead stop, even for a shot aimed straight at the centre), so
+ * the mover rounds the body toward its goal. A step that never touches the
+ * circle is returned unchanged.
+ *
+ * The collider guards only the mover's OWN step (radius = the elephant body
+ * radius, no self-radius added) so a deflected animal rests AT the body edge —
+ * still inside the wider §19.5 trample reach. It therefore never blocks the
+ * designed contacts: the elephant may still step over a pinned animal to
+ * trample it, and a grief parent rounds the body to the front and is crushed
+ * there (points 259/261). It is not applied to the elephant itself.
+ */
+export function deflectAroundCircle(
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  obstX: number,
+  obstZ: number,
+  radius: number,
+): [number, number] {
+  const mx = toX - fromX
+  const mz = toZ - fromZ
+  const segLen = Math.hypot(mx, mz)
+  const fdx = fromX - obstX
+  const fdz = fromZ - obstZ
+  const fromDist = Math.hypot(fdx, fdz)
+  // Closest approach of the step segment to the body centre. If it stays outside
+  // the circle the straight step is free — the common case (no elephant in the
+  // way) returns untouched.
+  let closest2: number
+  if (segLen < 1e-9) {
+    closest2 = fromDist * fromDist
+  } else {
+    let tc = -(fdx * mx + fdz * mz) / (segLen * segLen)
+    tc = Math.max(0, Math.min(1, tc))
+    const px = fromX + mx * tc - obstX
+    const pz = fromZ + mz * tc - obstZ
+    closest2 = px * px + pz * pz
+  }
+  if (closest2 >= radius * radius) return [toX, toZ]
+  // The step enters the body: slide along the surface instead. Anchor on the
+  // boundary at the side the mover approaches FROM, then advance tangentially by
+  // the intended step length toward `to`. A centre-aimed shot (no radial side)
+  // falls back to the reverse of the motion, then a fixed axis, so it still
+  // picks a tangent and slides rather than stalling.
+  let rx: number
+  let rz: number
+  if (fromDist > 1e-6) {
+    rx = fdx / fromDist
+    rz = fdz / fromDist
+  } else if (segLen > 1e-6) {
+    rx = -mx / segLen
+    rz = -mz / segLen
+  } else {
+    rx = 1
+    rz = 0
+  }
+  // The two surface tangents; take the one that carries the mover toward `to`.
+  const t1x = -rz
+  const t1z = rx
+  const dirx = segLen > 1e-6 ? mx / segLen : t1x
+  const dirz = segLen > 1e-6 ? mz / segLen : t1z
+  const useFirst = t1x * dirx + t1z * dirz >= 0
+  const tx = useFirst ? t1x : -t1x
+  const tz = useFirst ? t1z : -t1z
+  let ex = obstX + rx * radius + tx * segLen
+  let ez = obstZ + rz * radius + tz * segLen
+  // Guarantee the result rests outside the body (round-off / a long step's
+  // chord could dip in): push it back out to the edge radially if needed.
+  const edx = ex - obstX
+  const edz = ez - obstZ
+  const ed = Math.hypot(edx, edz)
+  if (ed < radius) {
+    if (ed < 1e-6) {
+      ex = obstX + rx * radius
+      ez = obstZ + rz * radius
+    } else {
+      ex = obstX + (edx / ed) * radius
+      ez = obstZ + (edz / ed) * radius
+    }
+  }
+  return [ex, ez]
+}
+
+/**
  * The trample direction condition (design.md §19.5, point 259): an animal caught
  * in the §19.5 elephant-overlap exception is killed ONLY when the elephant is
  * actively moving with a positive component TOWARD it — its per-frame movement
