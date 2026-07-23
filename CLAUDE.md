@@ -959,13 +959,24 @@ verify suite that proves it.
     samples the mirrored column, and a magenta probe injected due west
     of the capture point proves the rendered horizon compass-true
     seed-independently; a direct place-to-place enter falls back to the
-    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99) — the
-    capture is a module singleton that OUTLIVES its visit, so the freshness
-    gate is the store's `enteredFromTravel` (true only for an enter out of the
-    bird's-eye view; false on a place→place enter, a ferry passage, a resumed
-    snapshot and while travelling), without which a place captured earlier in
-    the run wrongly re-showed its stale band; pure-tested in
-    `src/state/store.travel.test.ts`; the §4.4 port skyline landmarks
+    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). TWO
+    gates keep that band honest. Freshness: the capture is a module
+    singleton that OUTLIVES its visit, so the store's `enteredFromTravel`
+    (true only for an enter out of the bird's-eye view; false on a
+    place→place enter, a ferry passage, a resumed snapshot and while
+    travelling) decides whether it may be shown at all, without which a
+    place captured earlier in the run wrongly re-showed its stale band
+    (pure-tested in `src/state/store.travel.test.ts`). Completeness: the
+    capture never fires before the terrain chunk under the capture point
+    is COMMITTED to the scene (point 227) — the first travel frame after
+    leaving a settlement runs before the streamed chunk meshes mount, and
+    a capture that frame baked a TERRAINLESS band (only water sheets,
+    landmarks and markers) which a re-entry drew over the backdrop as a
+    hard grey horizon line with a thin blue-grey water band below it; the
+    gate (`panoramaCaptureReady`) is pure-tested in
+    `src/scenes/travel/panoramaMath.test.ts` and the leave-capture's band
+    is live-checked to bake the surrounding terrain (bottom-quarter
+    opacity) in `scripts/verify/polish.mjs`; the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
     Cairo mounts the Giza pyramids as its western skyline (point 82) —
