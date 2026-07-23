@@ -10300,6 +10300,44 @@ the remaining open points in their numeric order.
   flora/wildlife streaming points (164/171/271); the ANALYSIS is read-only and can run in
   parallel now, the fix lands on its own branch. Implementation-ready after the analysis.
 
+- [ ] 273. WALKABLE PYRAMIDS — an enterable first-person "pyramid settlement" at Giza
+  (user 23.07.2026). PRIORITY/POSITION: a NEW FEATURE → v0.3, queued AFTER 224 (per the
+  ordering rule: before 224 only bugfixes + almost-done points; new features go to v0.3).
+  Make the Giza pyramids + Sphinx ENTERABLE in first-person like a settlement: the
+  traveller stands right in front and can walk AROUND them, with the pyramids and the
+  Sphinx as GIANT "buildings". Entry is via the SPACE key exactly like the future §2.3
+  settlement entry (point 244): walking into the site's radius shows a "Space to enter
+  <name>" hint, and pressing Space enters. NO interior functionality at first (no trade/
+  elder/etc.) — it is a walkable monument space. RESEARCH FIRST (Fable pass, docs — extend
+  the landmarks/peoples research or a new doc): how the Giza pyramids + Sphinx actually
+  LOOK (the three pyramids Khufu/Khafre/Menkaure with their relative sizes, Khafre's
+  casing cap, the Sphinx's proportions and its ~1890 state — how much was excavated vs
+  sand-buried then, the causeways, any queens' pyramids), and the DIFFERENCES between the
+  Giza pyramids and the OTHER pyramids the game shows (Meroë §4.4 Nubian pyramids —
+  smaller, steeper, different profile) so the two read distinct; and whether those
+  differences should also be reflected in the BIRD'S-EYE view and in Cairo's SKYLINE
+  (point 82, the Giza skyline + buildSphinx) — fold that in if the research supports it.
+  If the research shows people/workers/visitors were about the site in ~1890, add ambient
+  walkers accordingly. BUILD (after the research + after 244's Space-entry mechanism is
+  live): a new enterable place/scene for Giza rendered like a settlement, where the
+  pyramids and Sphinx are giant COLLIDABLE structures the player walks around (reuse the
+  §2.6 collision + the first-person walk), SPACE-entry via the point-244 `settlementEntry`
+  pattern (radius → "Space to enter" hint → Space), listed as a special map point;
+  optional ambient walkers if researched; the improved Giza/Sphinx model shared with the
+  point-82 Cairo skyline if the research refines it. ANCHORS: `src/scenes/place/` (the
+  settlement scene + entry), `src/scenes/travel/settlementEntry.ts` (point 244 Space
+  entry), `src/render/landmarks.ts` (the Giza pyramids + `buildSphinx`, point 82), the
+  Cairo skyline (point 82), the place/map-point roster, docs for the research. VERIFIABLE:
+  the research doc; pure tests for the Giza place definition + its Space-enter candidate
+  (radius/hint) reusing point 244's helpers, and for the pyramid/Sphinx model proportions
+  (like `buildSphinx`); a live check that walking into the Giza radius shows the hint and
+  Space enters a walkable scene with the pyramids as collidable structures, on BOTH
+  backends, with a screenshot; if the skyline model changed, re-check the point-82 Cairo
+  skyline. DOCS: design.md §4.4/§2.5/§17.3 (the walkable Giza site + its entry). Any new
+  place name / hint text in BOTH languages with voice markup where applicable. NOTE:
+  DEPENDS on point 244 (the Space-entry mechanism) landing first; a big feature for v0.3.
+  The RESEARCH half is a standalone Fable pass, safe to run now; the BUILD follows 244.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
