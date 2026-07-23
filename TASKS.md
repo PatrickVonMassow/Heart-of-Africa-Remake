@@ -10268,6 +10268,38 @@ the remaining open points in their numeric order.
   text. NOTE: wildlife-streaming/render cluster (Wildlife.tsx/wildlifeBehavior.ts/
   fauna.ts) — do NOT build concurrently with another Wildlife.tsx point. Implementation-ready.
 
+- [ ] 272. OCCASIONAL FRAME HITCHES WHILE DRIVING CONTINUOUSLY (bird's-eye) — profile
+  and smooth (user 23.07.2026). Walking/driving continuously in one direction in the
+  bird's-eye view produces occasional short HITCHES (frame stalls). The user suggests
+  clever PRELOADING off the main thread (a worker) to avoid sudden load spikes. ANALYSE
+  FIRST with Fable (the user asked for it): profile what work happens on the spike —
+  the likely culprits are the per-chunk STREAMING done synchronously on a chunk-boundary
+  crossing (terrain chunk build/LOD refine, the flora instance-buffer rebuild — points
+  164/171, the wildlife restock, the water/ribbon rebuild), all of which fire in a burst
+  when the traveller crosses into a new chunk and can stall a frame. Establish, with
+  evidence (which function, how long, on which event), the biggest main-thread spike;
+  read `src/scenes/travel/` (the chunk streaming, `floraStreaming`, terrain LOD, the
+  wildlife/water rebuilds) and any existing worker usage. RECOMMEND + IMPLEMENT a fix
+  that smooths the spike without changing what the player sees — options to weigh:
+  AMORTISE the per-chunk work across several frames (a small time-budget per frame,
+  building N instances/chunks per frame instead of all at once) and/or PREFETCH the next
+  chunks slightly ahead of the crossing (predict from the heading) so the build is spread
+  out before it is needed; move genuinely heavy pure computation to a Web Worker if it is
+  worker-safe (no three.js objects across the boundary — pass plain data, build meshes on
+  the main thread from the worker's output), the way the TTS worker is structured. Keep
+  the visible result identical (no popping/edge regressions — the point-164/171 frustum
+  rules still hold) and keep it deterministic under the fixed seed. ANCHORS: the chunk
+  streaming + `floraStreaming` + terrain LOD + wildlife/water rebuild in
+  `src/scenes/travel/`, any worker pattern (`src/journal/ttsWorker.ts` as the reference).
+  VERIFIABLE: a profiling finding recorded (the measured spike + the fix), a pure test of
+  any new amortise/prefetch scheduler (it covers the same chunks over a few frames, drops
+  nothing), and a live check that a continuous driven pass shows no per-chunk instance
+  pop and no dropped-frame spike above a budget (measure frame times over a straight
+  drive); on BOTH backends. DOCS: design.md §2.4/§19 if the streaming approach changes.
+  No player-visible text. NOTE: touches the travel-scene streaming — coordinate with the
+  flora/wildlife streaming points (164/171/271); the ANALYSIS is read-only and can run in
+  parallel now, the fix lands on its own branch. Implementation-ready after the analysis.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
