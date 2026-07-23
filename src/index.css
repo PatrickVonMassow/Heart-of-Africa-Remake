@@ -968,7 +968,7 @@ textarea {
   padding: 10px 22px;
 }
 
-/* --- State dump (design.md §21.1, F5) ------------------------------------- */
+/* --- State dump (design.md §21.1, F6) ------------------------------------- */
 
 /* Reuses the modal dialog frame; wider, since it shows a full JSON document. */
 .state-dump {

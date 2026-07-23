@@ -1,4 +1,4 @@
-// F5 state-dump popup (design.md §21.1): the complete game state as pretty
+// F6 state-dump popup (design.md §21.1): the complete game state as pretty
 // JSON in a top-most modal (§17.4), with download and copy controls so the
 // state can be attached to a bug report. Read-only and selectable; opening
 // never moves focus onto a control (§17.5 — no autofocus, no .focus()).
@@ -12,7 +12,7 @@ import { getStrings, useStrings } from '../i18n'
 export function StateDump() {
   const t = useStrings()
   const open = useUi((s) => s.stateDumpOpen)
-  // The dump is a snapshot of the moment F5 was pressed — recomputed on each
+  // The dump is a snapshot of the moment F6 was pressed — recomputed on each
   // open, not live-tracking every store change while the popup stays up.
   const json = useMemo(
     () => (open ? dumpGameState(useGame.getState(), { ui: useUi.getState() }) : ''),
