@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceGroundWetness, climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, groundWetnessFactor, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, WET_ACCUM_DECAY_PER_SEC, WET_ACCUM_RISE_PER_SEC, wetnessAt, type ClimateZone, type StrikeSchedulerState } from './season'
+import { advanceGroundWetness, climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, fireRainFactor, floraGreennessAt, groundWetnessFactor, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, WET_ACCUM_DECAY_PER_SEC, WET_ACCUM_RISE_PER_SEC, wetnessAt, type ClimateZone, type StrikeSchedulerState } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -463,6 +463,46 @@ describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () 
     expect(sunDimFactor(1, 0)).toBe(1)
     expect(sunDimFactor(1, 1)).toBeLessThan(1)
     expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
+  })
+})
+
+describe('fireRainFactor (point 256 — the cook-shelter keeps the fire alight in rain)', () => {
+  const shelteredDamp = 0.25
+  const openDamp = 0.7
+
+  it('is 1 when dry, for both a sheltered and an open fire', () => {
+    expect(fireRainFactor(0, true, shelteredDamp, openDamp)).toBe(1)
+    expect(fireRainFactor(0, false, shelteredDamp, openDamp)).toBe(1)
+  })
+
+  it('damps the OPEN flame as rain rises (an unsheltered fire is drowned toward embers)', () => {
+    const dry = fireRainFactor(0, false, shelteredDamp, openDamp)
+    const light = fireRainFactor(0.5, false, shelteredDamp, openDamp)
+    const heavy = fireRainFactor(1, false, shelteredDamp, openDamp)
+    expect(light).toBeLessThan(dry)
+    expect(heavy).toBeLessThan(light)
+    expect(heavy).toBeCloseTo(1 - openDamp, 6)
+  })
+
+  it('keeps the SHELTERED flame near full however hard it rains (it burns on)', () => {
+    const heavy = fireRainFactor(1, true, shelteredDamp, openDamp)
+    // Only a small steamy dip at full downpour — well above half.
+    expect(heavy).toBeGreaterThan(0.5)
+    expect(heavy).toBeCloseTo(1 - shelteredDamp, 6)
+  })
+
+  it('a sheltered fire always burns brighter than an open one in the same rain', () => {
+    for (const rain of [0.3, 0.6, 1]) {
+      expect(fireRainFactor(rain, true, shelteredDamp, openDamp)).toBeGreaterThan(
+        fireRainFactor(rain, false, shelteredDamp, openDamp),
+      )
+    }
+  })
+
+  it('clamps its inputs and never returns a negative factor', () => {
+    expect(fireRainFactor(-1, false, shelteredDamp, openDamp)).toBe(1) // rain clamped to 0
+    expect(fireRainFactor(2, false, shelteredDamp, openDamp)).toBeCloseTo(1 - openDamp, 6) // rain clamped to 1
+    expect(fireRainFactor(1, false, 0, 2)).toBe(0) // damping clamped, floored at 0
   })
 })
 

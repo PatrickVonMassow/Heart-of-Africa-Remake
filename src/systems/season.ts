@@ -736,6 +736,28 @@ export function sunDimFactor(wetness: number, strength: number): number {
 }
 
 /**
+ * The §19.10 village fire's response to rain (point 256, design.md §19.10).
+ * ~1890 sub-Saharan settlements kept the cooking hearth alight through the
+ * rains under a roofed cook-shelter / thatch canopy (docs/peoples-1890.md §10);
+ * the game shows that shelter over the fire. So the SHELTERED flame burns on —
+ * only slightly lowered (steamier) — however hard it rains, while an UNSHELTERED
+ * flame is visibly DAMPED as the rain rises. The result is a multiplier on the
+ * cold-season `blaze` factor (point 142). Pure and deterministic — no clock, no
+ * random — so tests, a reload and the picture agree.
+ *
+ * @param rain the place's instantaneous rain amount (0..1, from `rainAmount`)
+ * @param sheltered whether the fire sits under the cook-shelter canopy
+ * @param shelteredDamp full-rain damping under the shelter (small; `balance.fire.shelteredRainDamp`)
+ * @param openDamp full-rain damping in the open (large; `balance.fire.openRainDamp`)
+ * @returns a factor in (0..1]: 1 when dry, lower as rain rises, never below 0
+ */
+export function fireRainFactor(rain: number, sheltered: boolean, shelteredDamp: number, openDamp: number): number {
+  const r = Math.min(1, Math.max(0, rain))
+  const damp = sheltered ? shelteredDamp : openDamp
+  return Math.max(0, 1 - Math.max(0, damp) * r)
+}
+
+/**
  * This frame's effective weather at the traveller, written by the travel
  * Climate component — a frame-scratch global in the mould of Wildlife's
  * LION_STATE. Read by the travel sun-dim (TravelScene) and the dry-season shore

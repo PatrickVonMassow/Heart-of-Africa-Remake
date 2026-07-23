@@ -373,6 +373,13 @@ export interface BalanceConfig {
     /** How strongly rain darkens/glosses the ground, 0 dry .. 1 full (point 225). */
     wetGroundStrength: number
   }
+  /** The village cooking fire's response to rain (design.md §19.10, point 256). */
+  fire: {
+    /** How much full rain damps the SHELTERED flame under the cook-shelter (0..1, small: it burns on). */
+    shelteredRainDamp: number
+    /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
+    openRainDamp: number
+  }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
     stickRadius: number
@@ -634,6 +641,13 @@ export const balance: BalanceConfig = {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
     nileFloodRise: 0.55, // the unregulated 1890 flood is dramatic; calibratable
     wetGroundStrength: 1, // rain fully darkens/glosses the ground (point 225); calibratable, debug-editable
+  },
+  fire: {
+    // The cooking fire keeps burning through the rains under its thatch cook-shelter
+    // (design.md §19.10, docs/peoples-1890.md §10, point 256): the sheltered flame
+    // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
+    shelteredRainDamp: 0.25, // calibratable, debug-editable
+    openRainDamp: 0.7, // calibratable, debug-editable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection
