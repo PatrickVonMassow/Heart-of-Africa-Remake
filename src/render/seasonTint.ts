@@ -21,6 +21,38 @@ export function setSeasonTint(greenness: number, strength: number) {
   SEASON_TINT_U.value = 0.5 + (g - 0.5) * s
 }
 
+// Ground wetness (design.md §19.13, point 225): 0 dry .. 1 soaked. BOTH ground
+// materials — the travel terrain and the settlement ground — read THIS uniform,
+// driven per frame by whichever scene renders (only ever one does), exactly like
+// SEASON_TINT_U above: a module uniform, not a fresh material, so it never trips
+// point 96's program relink.
+export const GROUND_WET_U = uniform(0)
+
+/** Set this frame's ground wetness (from `groundWetnessFactor`, 0..1). */
+export function setGroundWetness(w: number) {
+  GROUND_WET_U.value = Math.min(1, Math.max(0, w))
+}
+
+// The wet look, shared by both ground materials so the two can never drift: wet
+// earth DARKENS and turns GLOSSIER (lower roughness), which lets the existing
+// micro-relief normals catch a specular sheen — the "wet after rain" read
+// without a second render pass. The typings on a colour/roughness node are
+// narrower than the runtime (the same gap materials.ts bridges with `unknown`).
+
+/** Darken a ground albedo node toward damp as it soaks (point 225). */
+export function wetGroundColor(col: unknown) {
+  return (col as ReturnType<typeof float>).mul(
+    float(1).sub((GROUND_WET_U as unknown as ReturnType<typeof float>).mul(0.4)),
+  )
+}
+
+/** Lower a ground roughness node toward a wet sheen as it soaks (point 225). */
+export function wetGroundRoughness(rough: unknown) {
+  return (rough as ReturnType<typeof float>).mul(
+    float(1).sub((GROUND_WET_U as unknown as ReturnType<typeof float>).mul(0.55)),
+  )
+}
+
 // Debug diagnostic (point 175): gates the dry-season flora DEFORMATION — the
 // crown bare-branch collapse AND the ground-flora sprout — live via a uniform,
 // so it toggles without a program relink (the point 96 rule). 1 = on (default),

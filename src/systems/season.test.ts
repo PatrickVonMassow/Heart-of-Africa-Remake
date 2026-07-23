@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, wetnessAt, type ClimateZone, type StrikeSchedulerState } from './season'
+import { advanceGroundWetness, climateZoneAt, COLD_DRESS_THRESHOLD, coldnessAt, dayOfMonthJump, dayOfYear, effectiveGreenness, effectiveWetness, floraGreennessAt, groundWetnessFactor, hailAt, harmattanAt, harmattanSkyParams, karifAt, nileFloodAt, okavangoFloodAt, seasonalSnowAt, rainAmount, seasonFogParams, SEASON_SLOTS, skyOvercastParams, slotWetness, STRIKE_FIRST_BOLT_SECONDS, STRIKE_HOLD_SECONDS, STRIKE_MIN_GAP_SECONDS, strikeSchedulerStep, sunDimFactor, thunderstormAt, thunderDelaySeconds, WET_ACCUM_DECAY_PER_SEC, WET_ACCUM_RISE_PER_SEC, wetnessAt, type ClimateZone, type StrikeSchedulerState } from './season'
 import { START_YEAR } from '../config/balance'
 import { inIceMassif } from '../world/terrain'
 
@@ -463,6 +463,55 @@ describe('rainAmount and sunDimFactor (point 120c — the visible weather)', () 
     expect(sunDimFactor(1, 0)).toBe(1)
     expect(sunDimFactor(1, 1)).toBeLessThan(1)
     expect(sunDimFactor(1, 1)).toBeGreaterThanOrEqual(0.55)
+  })
+})
+
+describe('groundWetnessFactor (point 225 — the ground wets with intensity AND duration)', () => {
+  it('is 0 when dry: no rain and no accumulated soak', () => {
+    expect(groundWetnessFactor(0, 0, 1)).toBe(0)
+  })
+
+  it('rises with the rain INTENSITY (accumulation held constant)', () => {
+    const a = 0.2
+    expect(groundWetnessFactor(0.6, a, 1)).toBeGreaterThan(groundWetnessFactor(0.2, a, 1))
+    expect(groundWetnessFactor(0.2, a, 1)).toBeGreaterThan(groundWetnessFactor(0, a, 1))
+  })
+
+  it('rises with the accumulated DURATION (intensity held constant)', () => {
+    const r = 0.3
+    expect(groundWetnessFactor(r, 0.8, 1)).toBeGreaterThan(groundWetnessFactor(r, 0.3, 1))
+    expect(groundWetnessFactor(r, 0.3, 1)).toBeGreaterThan(groundWetnessFactor(r, 0, 1))
+  })
+
+  it('clamps at 1 however hard and long it rains', () => {
+    expect(groundWetnessFactor(1, 1, 1)).toBe(1)
+    expect(groundWetnessFactor(1, 1, 5)).toBe(1)
+  })
+
+  it('the strength scale turns the wet look off (0) and never goes negative', () => {
+    expect(groundWetnessFactor(1, 1, 0)).toBe(0)
+    expect(groundWetnessFactor(0.5, 0.5, 0)).toBe(0)
+  })
+})
+
+describe('advanceGroundWetness (point 225 — the leaky-integrator soak)', () => {
+  it('rises while it rains and decays when dry', () => {
+    const wetter = advanceGroundWetness(0.3, 1, 1)
+    expect(wetter).toBeGreaterThan(0.3)
+    expect(wetter).toBeCloseTo(0.3 + WET_ACCUM_RISE_PER_SEC, 6)
+    const drier = advanceGroundWetness(0.3, 0, 1)
+    expect(drier).toBeLessThan(0.3)
+    expect(drier).toBeCloseTo(0.3 - WET_ACCUM_DECAY_PER_SEC, 6)
+  })
+
+  it('scales the rise with the rain amount (lighter rain soaks slower)', () => {
+    expect(advanceGroundWetness(0, 1, 1)).toBeGreaterThan(advanceGroundWetness(0, 0.4, 1))
+  })
+
+  it('stays clamped 0..1', () => {
+    expect(advanceGroundWetness(1, 1, 10)).toBe(1)
+    expect(advanceGroundWetness(0, 0, 10)).toBe(0)
+    expect(advanceGroundWetness(0.01, 0, 10)).toBe(0)
   })
 })
 

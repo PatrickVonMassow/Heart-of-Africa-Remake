@@ -18,11 +18,11 @@ import {
   vec2,
   vertexColor,
 } from 'three/tsl'
-import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
+import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { coldnessAt, effectiveGreenness, effectiveWetness, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
+import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { playThunder } from '../../systems/ambience'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
@@ -1472,6 +1472,8 @@ export function PlaceScene() {
   const hemiRef = useRef<THREE.HemisphereLight>(null)
   /** This frame's season wetness at the settlement, for the dev hook. */
   const placeWetness = useRef(0)
+  /** Accumulated ground soak (point 225): rises while it rains, decays when dry. */
+  const placeGroundWet = useRef(0)
   /** Lightning flash (0..1) and its strike scheduler at the settlement (point 166).
    *  The dimmed light BASE is tracked separately from the flash so the additive
    *  burst is not amplified by the slow season lerp. */
@@ -1520,6 +1522,7 @@ export function PlaceScene() {
       sky: skyOvercast(),
       rain: rainAmount(placeWetness.current, balance.season.weatherStrength),
       tint: SEASON_TINT_U.value,
+      groundWet: placeGroundWet.current,
       fireBlaze,
     })
     return () => {
@@ -1645,6 +1648,12 @@ export function PlaceScene() {
         elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,
       )
       placeWetness.current = wet
+      // Wet ground (design.md §19.13, point 225): the settlement ground darkens
+      // and glosses as it rains — more the harder AND the longer — through the
+      // shared GROUND_WET_U uniform, exactly like the travel terrain.
+      const placeRain = rainAmount(wet, balance.season.weatherStrength)
+      placeGroundWet.current = advanceGroundWetness(placeGroundWet.current, placeRain, dt)
+      setGroundWetness(groundWetnessFactor(placeRain, placeGroundWet.current, balance.season.wetGroundStrength))
       const dim = sunDimFactor(wet, balance.season.weatherStrength)
       // Thunderstorm at THIS settlement (design.md §19.13, point 166): the same
       // gate as the bird's-eye, at the place's own coordinates — lightning flashes

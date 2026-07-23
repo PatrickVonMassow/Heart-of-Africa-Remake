@@ -42,6 +42,7 @@ const DEFAULTS = {
   juvenilePreyBias: balance.family.juvenilePreyBias,
   juvenileDrinkCrocBias: balance.family.juvenileDrinkCrocBias,
   crocStrikeRadius: balance.crocodile.strikeRadius,
+  wetGroundStrength: balance.season.wetGroundStrength,
   placeStrafeFactor: balance.placeStrafeFactor,
   inventoryCapacity: balance.inventoryCapacity,
   randomEventsEnabled: balance.randomEventsEnabled,
@@ -103,6 +104,7 @@ afterEach(() => {
   balance.family.juvenilePreyBias = DEFAULTS.juvenilePreyBias
   balance.family.juvenileDrinkCrocBias = DEFAULTS.juvenileDrinkCrocBias
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
+  balance.season.wetGroundStrength = DEFAULTS.wetGroundStrength
   balance.placeStrafeFactor = DEFAULTS.placeStrafeFactor
   balance.inventoryCapacity = DEFAULTS.inventoryCapacity
   balance.randomEventsEnabled = DEFAULTS.randomEventsEnabled
@@ -195,6 +197,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.juvenileDrinkCrocBias, read: () => balance.family.juvenileDrinkCrocBias, value: 8 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
+    // The wet-ground strength (design.md §19.13, point 225).
+    { label: en.debug.wetGroundStrength, read: () => balance.season.wetGroundStrength, value: 0.5 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {

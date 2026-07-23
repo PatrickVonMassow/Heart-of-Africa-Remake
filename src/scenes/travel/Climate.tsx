@@ -12,11 +12,14 @@ import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setSkyHarmattan, setSkyOvercast } from '../../render/skyOvercast'
+import { setGroundWetness } from '../../render/seasonTint'
 import { setHail } from '../../render/seasonalSnow'
 import { FLORA_FOG } from './floraStreaming'
 import { smoothedWetnessAt } from '../../render/seasonField'
 import {
+  advanceGroundWetness,
   CURRENT_WEATHER,
+  groundWetnessFactor,
   HARMATTAN_PALE,
   hailAt,
   harmattanAt,
@@ -171,6 +174,8 @@ export function Climate() {
   const hazeTarget = useMemo(() => new THREE.Color(), [])
   /** This frame's effective season wetness, for the dev hook. */
   const wetness = useRef(0)
+  /** Accumulated ground soak (point 225): rises while it rains, decays when dry. */
+  const groundWet = useRef(0)
   /** Lightning flash (0..1) and its strike scheduler on the render clock (point 166). */
   const flashRef = useRef(0)
   const strikeState = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
@@ -189,6 +194,7 @@ export function Climate() {
       },
       hazeOpacity: () => haze.opacityU.value as number,
       seasonWetness: () => wetness.current,
+      groundWet: () => groundWet.current,
       rainOpacity: () => rain.opacityU.value,
       dust: () => CURRENT_WEATHER.dust,
       hail: () => rain.hailU.value,
@@ -299,8 +305,17 @@ export function Climate() {
     flashRef.current *= Math.max(0, 1 - dt * 7) // fast decay (<~0.3 s)
     if (flashRef.current < 0.01) flashRef.current = 0
     CURRENT_WEATHER.flash = flashRef.current
-    const rainTarget = rainAmount(wet, balance.season.weatherStrength) * (1 - hazeClear)
+    const rainReal = rainAmount(wet, balance.season.weatherStrength)
+    const rainTarget = rainReal * (1 - hazeClear)
     rain.opacityU.value += (rainTarget - rain.opacityU.value) * k
+
+    // Wet ground (design.md §19.13, point 225): the ground darkens and glosses
+    // as it rains — more the harder AND the longer. The soak accumulates from
+    // the REAL rain (zoom-independent), and only the DISPLAYED wetness fades in
+    // the debug zoom-out (clearView), like the rest of the weather look.
+    groundWet.current = advanceGroundWetness(groundWet.current, rainReal, dt)
+    const wetGround = groundWetnessFactor(rainReal, groundWet.current, balance.season.wetGroundStrength)
+    setGroundWetness(wetGround * (1 - clearView))
     const rg = rainGroup.current
     if (rg) {
       rg.visible = rain.opacityU.value > 0.01
