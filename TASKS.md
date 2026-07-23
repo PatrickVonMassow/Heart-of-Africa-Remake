@@ -8799,7 +8799,7 @@ the remaining open points in their numeric order.
   README version section if wording changes. Do NOT touch the v0.1 tag; 174 (v0.2)
   is a separate later release.
 
-- [ ] 225. WET GROUND WHEN IT RAINS (user 22.07.2026, position: AFTER 224). When
+- [x] 225. WET GROUND WHEN IT RAINS (user 22.07.2026, position: AFTER 224). When
   it rains the ground must visibly get WET — in BOTH the bird's-eye/outdoor terrain
   AND inside settlements — and MORE so the harder it rains / the longer it has
   already been raining (accumulated). Optional stretch: in settlements, water
