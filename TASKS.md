@@ -9497,26 +9497,39 @@ the remaining open points in their numeric order.
   `Wildlife.tsx` — same files as 239/245/247/242/237; bundles with 247 (both are
   239 flee refinements); do NOT delegate concurrently with the other wildlife points.
 
-- [ ] 249. ENRICHMENTS SUITE CRASHES (real failure after the river/wildlife/croc
-  merges) — the `scripts/verify/enrichments.mjs` both-backend run FAILED (a real
-  failure, twice — not a flake) with an UNCAUGHT Node error, discovered when the
-  post-merge render verification ran (22.07.2026). `node --check enrichments.mjs`
-  is syntactically valid, so it is a RUNTIME crash: most likely a check reads a dev
-  hook (`__wildlife`/`__rivers`/`__vegetation`/…) that one of the just-merged points
-  (232-234 river, 238/239 wildlife, 243 croc, or the earlier ones) renamed, nulled
-  or changed shape, OR the scene now throws, OR (less likely) dev-server/port
-  contention from parallel runs. INVESTIGATE: run `VERIFY_GL=webgl node scripts/
-  verify/run-all.mjs enrichments` and capture the FULL stack/error (the compact
-  summary hides it), identify the throwing check + the hook/value that changed, and
-  FIX it (repair the check or the hook it reads — do NOT weaken a real assertion to
-  hide a genuine product regression). Re-run enrichments on BOTH backends to
-  green. This BLOCKS the render-verify gate and CI/closing, so it is high priority.
-  Anchors: `scripts/verify/enrichments.mjs` + whichever dev hook / scene code the
-  failing check touches. VERIFIABLE: enrichments passes on both backends (0 fail, 0
-  console errors). DOCS: none. NOTE: enrichments.mjs is also edited by the unmerged
-  point 241 (thunder) — coordinate; and it is NOT covered by the fast-gate
-  (test:unit/build), which is why the break slipped through — worth a follow-up to
-  add enrichments.mjs to a lint/parse gate.
+- [ ] 249. ENRICHMENTS STAGED-DRAMA ASSERTIONS ARE TIMING-FRAGILE (rotating flakes,
+  WebGPU-amplified) — NOT a crash. Measured over full clean runs (23.07.2026):
+  `VERIFY_GL=webgl run-all enrichments` passes 214/0/0 (green, no retry needed); the
+  earlier "crash twice" reading was a wrapper-`timeout` kill (the slow suite) plus
+  point-200 rotating flakes, not an uncaught Node error — run-all itself has no
+  timeout and completes. The real defect is that many staged-drama checks sample the
+  simulation at a FIXED time/step and assert it has reached a state (a crocodile has
+  retreated after its grip deadline, a parent has sacrificed itself, a lion's hunt
+  headings show variety, a tree-contact escape has been reached) — so when the frame
+  timing runs slower the sim has not progressed far enough and the check fails,
+  giving DIFFERENT failing checks each run. On WebGL2 this shows as ~2 known rotating
+  flakes (steering-after-collision `escaped:0`; elephant-herd `centreMoved`); on
+  WebGPU HEADLESS (real WebGPU, verified — frame 129 renders correctly, no fallback
+  notice) it is far worse: two back-to-back runs failed on entirely different staged
+  dramas (run1: croc grip-deadline `crocRetreated:false`; retry: tree-contact-129 /
+  lion-hunt-direction-variety / calf-sacrifice) at 0 console-errors, because WebGPU's
+  lazy pipeline/shader compiles hitch the early frames and skew the staged timing.
+  The PICTURE is correct on both backends and the identical JS logic is WebGL2-green
+  — this is a HARNESS-timing defect, not a product regression. FIX: make the
+  staged-drama assertions timing-robust — drive the staged sims on a FIXED timestep
+  (or poll-until-state with a generous deadline rather than sample-at-fixed-time),
+  and widen/adapt the sampling windows — so they pass DETERMINISTICALLY on both
+  backends; also raise the run-all enrichments per-suite timeout so a slow-but-green
+  run is never killed. Do NOT weaken a real assertion to hide a genuine product
+  regression — make it timing-robust, not lax. Anchors: `scripts/verify/
+  enrichments.mjs` (the staged-drama checks: croc grip-deadline / calf sacrifice /
+  lion-hunt variety / tree-contact / elephant-herd / steering-after-collision), the
+  staged-sim stepping helper it uses, and `scripts/verify/run-all.mjs` (the suite
+  timeout). VERIFIABLE: enrichments passes on BOTH backends (0 fail, 0 console
+  errors) across repeated runs — no rotating flake on either. DOCS: none. NOTE:
+  enrichments.mjs is NOT covered by the fast-gate (test:unit/build), which is why the
+  timing fragility is invisible there — worth a follow-up to add enrichments.mjs to a
+  lint/parse gate.
 
 - [ ] 250. CROCODILE SWIMS AWAY AFTER A CATCH WHILE THE PREY DISSOLVES SEPARATELY —
   the user reports (22.07.2026, screenshot, Central near a waterfall) that after the
