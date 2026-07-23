@@ -55,6 +55,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/tasks-spec-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-integrity-guard.mjs"
           },
           {
