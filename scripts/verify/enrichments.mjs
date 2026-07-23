@@ -3916,12 +3916,14 @@ const crocSpawn = await page.evaluate(() => {
   const list = (window.__wildlife.herdsRef.current?.crocodile ?? []).filter((c) => !c.dead)
   const home = (c) => (c.lunge ? { x: c.lunge.homeX, z: c.lunge.homeZ } : { x: c.x, z: c.z })
   const offWater = list.filter((c) => { const p = home(c); return window.__terrainType(-p.z / U, p.x / U, seed) !== 'water' })
-  // Point 187: every crocodile is anchored to the RENDERED water surface at its
-  // home (|y - surface| small), never to the carved bed ~0.3+ below it — the
-  // hidden pose offsets from y so only the eye knobs break the water.
+  // Point 187: every crocodile is anchored to the RENDERED water sheet at its
+  // home (|y - sheet| small), never to the carved bed ~0.3+ below it — the
+  // hidden pose offsets from y so only the eye knobs break the water. Since
+  // point 274 the anchor is the visibly DRAWN sheet (sheetAt), which on a
+  // cross-sloping bank sits below the canoe-float height surfaceAt.
+  const sheetOf = (p) => window.__rivers?.sheetAt(-p.z / U, p.x / U) ?? window.__rivers?.surfaceAt(-p.z / U, p.x / U)
   const offSurface = list.filter((c) => {
-    const p = home(c)
-    const ws = window.__rivers?.surfaceAt(-p.z / U, p.x / U)
+    const ws = sheetOf(home(c))
     return ws != null && Math.abs(c.y - ws) > 0.15
   })
   return {
@@ -3929,7 +3931,7 @@ const crocSpawn = await page.evaluate(() => {
     allOnWater: offWater.length === 0,
     allAtSurface: offSurface.length === 0,
     offWater: offWater.slice(0, 4).map((c) => { const p = home(c); return { x: +p.x.toFixed(1), z: +p.z.toFixed(1), t: window.__terrainType(-p.z / U, p.x / U, seed) } }),
-    offSurface: offSurface.slice(0, 4).map((c) => { const p = home(c); return { y: +c.y.toFixed(2), ws: +(window.__rivers?.surfaceAt(-p.z / U, p.x / U) ?? -9).toFixed(2) } }),
+    offSurface: offSurface.slice(0, 4).map((c) => { const p = home(c); return { y: +c.y.toFixed(2), ws: +(sheetOf(p) ?? -9).toFixed(2) } }),
   }
 })
 check(
@@ -3956,25 +3958,32 @@ check(
 // The teeth: a control forces the SAME croc to STRIKE (fully out) and asserts the
 // BODY rect then reads CLEARLY different from water — so hidden = eyes present AND
 // body==water, visible = body!=water, and an empty frame = eyes absent -> FAIL.
-// Sampled at the ACHIEVABLE gameplay zoom 0.5 (point 172); every point projected
-// via the installed camera hook, never an assumed radius.
+// Staging discipline (the fix of this check's own false-fail): the ambush
+// trigger is FROZEN while the croc is sampled (balance.crocodile.strikeRadius
+// = 0 — debug-editable; the point-247 bank drinkers stand within the default
+// radius of a mid-channel cell, and a staged croc that auto-lunged during the
+// settle burst 2-3 units out of every pre-computed rect, so all three rects
+// read as plain water), the rects are RE-DERIVED from the croc's LIVE x/z/y at
+// every sample (never once up front), and `lunge === undefined` is asserted at
+// the hidden sample. Sampled at an ACHIEVABLE gameplay zoom (point 172 —
+// the non-debug wheel range is 0.125–0.5): the closest candidate at which both
+// rects project fully on screen, preferring 0.25 where the two ~0.06-unit
+// eye-knob caps are a readable pixel patch rather than a few pixels; every
+// point projected via the installed camera hook, never an assumed radius.
 await page.evaluate(() => {
   window.__ui.getState().setWheelZoomEnabled(true)
-  window.__ui.getState().setTravelZoom(0.5) // the closer, in-game-achievable zoom
+  window.__ui.getState().setTravelZoom(0.5) // start in the achievable range
 })
 await page.evaluate(() => window.__pollSim(30, () => window.__camera.settled()))
 // (1) Pick a mid-channel water cell near the (stationary) player whose ~1.6-unit
 // surroundings are ALL water, so the ≈2-unit croc body lies within the channel,
 // not over a bank. Splice out the water-dwelling species (crocodile + flamingo —
 // no land animal can stand on the all-water rect, §19.5) so the reference frame
-// is pure water and only the staged croc can render there. Compute TWO screen
-// clips: the BODY rect over the torso/tail (bracketing the hidden surface AND the
-// raised strike back), and a tight EYE rect over the two eye knobs.
-const crocPix = await page.evaluate(() => {
+// is pure water and only the staged croc can render there.
+const crocStage = await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const U = 10
-  const VW = 1440, VH = 900
   const p0 = window.__game.getState().pos
   let water = null
   outer: for (let r = 4; r <= 45 && !water; r += 2) {
@@ -3992,17 +4001,38 @@ const crocPix = await page.evaluate(() => {
     }
   }
   if (!water) return { staged: false }
+  // Freeze the ambush while the croc is sampled (restored in the cleanup).
+  window.__stagedCrocPrevStrike = window.__balance.crocodile.strikeRadius
+  window.__balance.crocodile.strikeRadius = 0
   window.__stagedCrocBackup = { crocodile: herds.crocodile.splice(0), flamingo: herds.flamingo.splice(0) }
-  const ws = window.__rivers?.surfaceAt(-water.z / U, water.x / U) ?? 0.4
-  const SCALE = 1.1
-  window.__stagedCrocPos = { x: water.x, z: water.z, y: ws, scale: SCALE }
+  // Anchor at the visibly DRAWN sheet (point 274): sheetAt, never the canoe
+  // float height surfaceAt — its local-bed floor can stand ~0.22 proud of the
+  // rendered ribbon row on a cross-sloping bank, floating the croc's waterline
+  // (and its "submerged" back) above the visible water.
+  const ws = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U) ?? 0.4
+  window.__stagedCrocPos = { x: water.x, z: water.z, y: ws, scale: 1.1 }
+  return { staged: true }
+})
+// Compute the two screen clips from the croc's CURRENT position — the staged
+// spot before it exists (`live` false), the LIVE animal at each sample after:
+// the BODY rect over the torso/tail (bracketing the hidden surface AND the
+// raised strike back), and a tight EYE rect over the two eye knobs. Also
+// reports the croc's world pos + projected ndc and whether it is mid-lunge, so
+// a failure log proves (or disproves) that the rects sat ON the croc.
+const crocClips = (live) => page.evaluate((liveIn) => {
+  const VW = 1440, VH = 900
+  const p = window.__stagedCrocPos
+  const c = liveIn ? window.__wildlife.herdsRef.current.crocodile[0] : null
+  const cx = c ? c.x : p.x, cz = c ? c.z : p.z, cy = c ? c.y : p.y
+  const SCALE = p.scale
   // Project a world rect to a pixel clip; `heights` are the world y planes the
   // rect is sampled at (union of the pixel bboxes), so the clip covers where the
-  // geometry draws across those heights. `pad` grows the clip a few px each side.
-  const clipFor = (cx, cz, halfX, halfZ, heights, pad) => {
+  // geometry draws across those heights. `pad` grows the clip a few px each
+  // side; `on` reports whether the padded rect lies fully inside the viewport.
+  const clipFor = (x0, z0, halfX, halfZ, heights, pad) => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (const wx of [cx - halfX, cx + halfX]) {
-      for (const wz of [cz - halfZ, cz + halfZ]) {
+    for (const wx of [x0 - halfX, x0 + halfX]) {
+      for (const wz of [z0 - halfZ, z0 + halfZ]) {
         for (const yy of heights) {
           const n = window.__camera.ndc(wx, wz, yy)
           const sx = (n.x * 0.5 + 0.5) * VW
@@ -4018,27 +4048,46 @@ const crocPix = await page.evaluate(() => {
       x, y,
       width: Math.min(VW - x, Math.round(maxX - minX + pad * 2)),
       height: Math.min(VH - y, Math.round(maxY - minY + pad * 2)),
+      on: minX - pad >= 0 && maxX + pad <= VW && minY - pad >= 0 && maxY + pad <= VH,
     }
   }
   // BODY rect: tail-ward of the eyes (rot 0 → world +z is forward, the eyes at
   // local z ≈ +0.55·scale; centre at world z − 0.6 so the eye knobs are OUTSIDE
   // it). Bracket the hidden surface and the ≈0.29·scale raised strike back.
-  const bodyClip = clipFor(water.x, water.z - 0.6, 0.7, 0.7, [ws, ws + 0.29 * SCALE], 3)
+  const bodyClip = clipFor(cx, cz - 0.6, 0.7, 0.7, [cy, cy + 0.29 * SCALE], 3)
   // EYE rect: tight over the two knobs at world (x, z + 0.55·scale), a hair above
   // the surface (their crisp cap), a touch wider than the ±0.095·scale knob span.
-  const eyeClip = clipFor(water.x, water.z + 0.55 * SCALE, 0.24 * SCALE, 0.14 * SCALE, [ws + 0.03 * SCALE], 2)
-  return { staged: true, bodyClip, eyeClip }
-})
-let crocHiddenResult = crocPix.staged ? { staged: true, bodyClip: crocPix.bodyClip, eyeClip: crocPix.eyeClip } : { staged: false }
+  const eyeClip = clipFor(cx, cz + 0.55 * SCALE, 0.24 * SCALE, 0.14 * SCALE, [cy + 0.03 * SCALE], 2)
+  const ndc = window.__camera.ndc(cx, cz, cy)
+  return {
+    bodyClip, eyeClip,
+    croc: {
+      x: +cx.toFixed(2), z: +cz.toFixed(2), y: +cy.toFixed(3),
+      ndc: { x: +ndc.x.toFixed(3), y: +ndc.y.toFixed(3) },
+      lunging: c ? c.lunge !== undefined : null,
+    },
+  }
+}, live)
+// (2) Zoom to the closest achievable level that keeps both rects on screen.
+let crocView = null
+if (crocStage.staged) {
+  for (const zoom of [0.25, 0.32, 0.4, 0.5]) {
+    await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoom)
+    await page.evaluate(() => window.__pollSim(30, () => window.__camera.settled()))
+    crocView = { ...(await crocClips(false)), zoom }
+    if (crocView.bodyClip.on && crocView.eyeClip.on) break
+  }
+}
+let crocHiddenResult = crocStage.staged ? { staged: true, ...crocView } : { staged: false }
 if (
-  crocPix.staged &&
-  crocPix.bodyClip.width >= 6 && crocPix.bodyClip.height >= 6 &&
-  crocPix.eyeClip.width >= 3 && crocPix.eyeClip.height >= 3
+  crocStage.staged &&
+  crocView.bodyClip.on && crocView.eyeClip.on &&
+  crocView.bodyClip.width >= 6 && crocView.bodyClip.height >= 6 &&
+  crocView.eyeClip.width >= 3 && crocView.eyeClip.height >= 3
 ) {
-  const { bodyClip, eyeClip } = crocPix
   // Sample a clip to raw RGB: its mean, and the pixel array for per-pixel work.
   const sample = async (clip) => {
-    const buf = await page.screenshot({ clip })
+    const buf = await page.screenshot({ clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height } })
     const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
     const n = info.width * info.height, ch = info.channels
     let r = 0, g = 0, b = 0
@@ -4046,35 +4095,41 @@ if (
     return { mean: [r / n, g / n, b / n], data, n, ch }
   }
   const l1 = (a, c) => Math.abs(a[0] - c[0]) + Math.abs(a[1] - c[1]) + Math.abs(a[2] - c[2])
-  // Fraction of a clip's pixels that read as CROC rather than water: colour more
-  // than T (L1) from the local water mean, EXCLUDING bright specular/foam (which
-  // also differs from the mean but is water, not croc) — so an animated river's
-  // wave crests never masquerade as an eye knob and inflate the reference floor.
-  const crocFrac = (s, water, T) => {
+  // Pixels of a clip that read as CROC rather than water: colour more than T
+  // (L1) from the local water mean, EXCLUDING bright specular/foam (which also
+  // differs from the mean but is water, not croc) — so an animated river's
+  // wave crests never masquerade as an eye knob and inflate the reference
+  // floor. Returned as an ABSOLUTE count: the two eye-knob caps are a small
+  // patch whose FRACTION of the rect shrinks with the projection, but a real
+  // croc yields a two-digit pixel count while an empty frame stays at the
+  // water-noise floor near 0.
+  const crocPx = (s, water, T) => {
     let c = 0
     for (let i = 0; i < s.n; i++) {
       const r = s.data[i * s.ch], g = s.data[i * s.ch + 1], b = s.data[i * s.ch + 2]
       const foam = Math.min(r, g, b) > 200
       if (!foam && Math.abs(r - water[0]) + Math.abs(g - water[1]) + Math.abs(b - water[2]) > T) c++
     }
-    return c / s.n
+    return c
   }
   const EYE_T = 22 // an eye-knob pixel must differ from water by at least this (L1)
   // (a) WATER REFERENCE — both rects with NO crocodile over them.
   await page.evaluate(() => window.__pollSim(1.5, () => false))
-  const bodyRef = await sample(bodyClip)
-  const eyeRef = await sample(eyeClip)
+  const refClips = await crocClips(false)
+  const bodyRef = await sample(refClips.bodyClip)
+  const eyeRef = await sample(refClips.eyeClip)
   const waterMean = bodyRef.mean
   const eyeWater = eyeRef.mean
-  const eyeFracRef = crocFrac(eyeRef, eyeWater, EYE_T) // water-noise floor (≈0)
+  const eyePxRef = crocPx(eyeRef, eyeWater, EYE_T) // water-noise floor (≈0)
   // (b) HIDDEN croc on that cell — body vanishes into the water, eye knobs show.
   await page.evaluate(() => {
     const p = window.__stagedCrocPos
     window.__wildlife.herdsRef.current.crocodile.push({ x: p.x, z: p.z, y: p.y, rot: 0, scale: p.scale, phase: 0.1, chunk: undefined })
   })
   await page.evaluate(() => window.__pollSim(2, () => false))
-  const bodyHidden = await sample(bodyClip)
-  const eyeHidden = await sample(eyeClip)
+  const hiddenClips = await crocClips(true) // re-derived from the LIVE croc
+  const bodyHidden = await sample(hiddenClips.bodyClip)
+  const eyeHidden = await sample(hiddenClips.eyeClip)
   await page.screenshot({ path: `${OUT}129-crocodile-hidden.png` })
   // (c) STRIKING control — the SAME croc forced fully out. A gripped lunge holds
   // it in place (the AI settles it at its own spot with the victim 0.6 ahead) and
@@ -4085,34 +4140,50 @@ if (
     c.lunge = { victim: { x: c.x, z: c.z + 0.6, caught: 5, dead: false }, gripped: true, timer: 0, retreat: false, homeX: c.x, homeZ: c.z }
   })
   await page.evaluate(() => window.__pollSim(2, () => false))
-  const bodyStrike = await sample(bodyClip)
+  const strikeClips = await crocClips(true)
+  const bodyStrike = await sample(strikeClips.bodyClip)
   const bodyDiff = l1(bodyHidden.mean, waterMean)   // hidden body vs water (want small)
   const strikeDiff = l1(bodyStrike.mean, waterMean) // strike body vs water (want large)
-  const eyeFracHidden = crocFrac(eyeHidden, eyeWater, EYE_T) // eye knobs present (want > floor)
+  const eyePxHidden = crocPx(eyeHidden, eyeWater, EYE_T) // eye knobs present (want ≫ floor)
   crocHiddenResult = {
-    staged: true, bodyClip, eyeClip,
+    staged: true, zoom: crocView.zoom,
+    croc: hiddenClips.croc, bodyClip: hiddenClips.bodyClip, eyeClip: hiddenClips.eyeClip,
+    // The staged croc must have LAIN STILL through the hidden sample: not
+    // lunging (the frozen strikeRadius) and at its staged spot — else the
+    // rects, live-derived or not, would compare different water.
+    notLunged: hiddenClips.croc.lunging === false,
     waterMean: waterMean.map((v) => +v.toFixed(1)),
     bodyHidden: bodyHidden.mean.map((v) => +v.toFixed(1)), bodyStrike: bodyStrike.mean.map((v) => +v.toFixed(1)),
     bodyDiff: +bodyDiff.toFixed(1), strikeDiff: +strikeDiff.toFixed(1),
-    eyeFracRef: +eyeFracRef.toFixed(3), eyeFracHidden: +eyeFracHidden.toFixed(3),
+    eyePxRef, eyePxHidden, eyeN: eyeHidden.n,
   }
-  // Restore the natural herds so the following staged drama starts clean.
+}
+// Restore the natural herds and the ambush radius whenever the staging spliced
+// them — even when the rect guard above bailed — so the following staged drama
+// starts clean and with its lunge trigger live.
+if (crocStage.staged) {
   await page.evaluate(() => {
     const herds = window.__wildlife.herdsRef.current
     herds.crocodile.splice(0)
     const bk = window.__stagedCrocBackup || { crocodile: [], flamingo: [] }
     herds.crocodile.push(...bk.crocodile)
     herds.flamingo.push(...bk.flamingo)
+    if (window.__stagedCrocPrevStrike !== undefined) window.__balance.crocodile.strikeRadius = window.__stagedCrocPrevStrike
     delete window.__stagedCrocBackup
     delete window.__stagedCrocPos
+    delete window.__stagedCrocPrevStrike
   })
 }
 check(
   "a lurking crocodile shows its eye knobs while its body reads as WATER, and a strike does not (point 274)",
   crocHiddenResult.staged &&
-    // (1) eye knobs present — the croc is there, not an empty frame (a false pass)
-    crocHiddenResult.eyeFracHidden > 0.06 &&
-    crocHiddenResult.eyeFracHidden > crocHiddenResult.eyeFracRef * 3 + 0.04 &&
+    // the staging held: the croc lay still (no auto-lunge) under the sampled rects
+    crocHiddenResult.notLunged === true &&
+    // (1) eye knobs present — the croc is there, not an empty frame (a false
+    // pass): an absolute two-digit-ish pixel patch, clearly above the water-
+    // noise floor of the same rect sampled croc-free
+    crocHiddenResult.eyePxHidden >= 6 &&
+    crocHiddenResult.eyePxHidden > crocHiddenResult.eyePxRef * 3 + 4 &&
     // (2) the submerged body is indistinguishable from the water
     crocHiddenResult.bodyDiff < 22 &&
     // teeth: the risen strike body is a clear dark silhouette the test tells apart
@@ -4161,9 +4232,10 @@ const crocDrama = async (mode, attempt = 0) =>
     // chunk-less animals, so no zoom restore or ring change can silently
     // filter the stage out mid-scenario (the rotating crocLunge:false runs
     // were exactly that — a despawned liveChunk took croc and calf with it).
-    // Stage the croc at the RENDERED water surface (point 187) so the hidden
-    // pose shows the eye knobs breaking the water on the screenshots too.
-    const stageWs = window.__rivers?.surfaceAt(-water.z / U, water.x / U)
+    // Stage the croc at the visibly DRAWN sheet (points 187/274 — sheetAt,
+    // never the canoe-float surfaceAt with its proud local-bed floor) so the
+    // hidden pose shows the eye knobs breaking the water on the screenshots too.
+    const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
     const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
     herds.crocodile.push(croc)
     const bankX = bank.x

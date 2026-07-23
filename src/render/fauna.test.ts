@@ -37,12 +37,11 @@ import {
   calfProportions,
   createCrocodileMaterial,
   createFaunaMaterial,
+  CROCODILE_ALPHA_TEST,
   CROCODILE_FADE_BAND,
   CROCODILE_LAYOUT,
   CROCODILE_WATERLINE_LOCAL,
-  CROCODILE_WATERLINE_NONE,
   crocodileSubmergedAlpha,
-  crocodileWaterlineLocal,
   CROCODILE_LUNGE_LIFT,
   crocodileBodyY,
   FAUNA_TESSELLATION,
@@ -586,34 +585,22 @@ describe('crocodile submerge pose (design.md §19.16, points 242/274)', () => {
 // The crocodile submersion fade (design.md §19.16, points 246/274): the water
 // sheets are alpha-blended and depthWrite-off (point 233), and the croc body
 // draws before/under them — so a submerged body read as a crisp silhouette
-// straight through the water. The croc's own material fades every fragment
-// below its waterline; point 274 lifted that line above the back crest, so the
-// whole dorsal surface the top-down camera sees vanishes into the murk while
-// the eye knobs stay crisp.
+// straight through the water. The HIDDEN croc's material fades (and past the
+// alphaTest, cuts out) every fragment below the CONSTANT local waterline;
+// point 274 lifted that line above the back crest, so the whole dorsal surface
+// the top-down camera sees vanishes into the murk while the eye knobs stay
+// crisp — and split the STRIKING pose onto its own mesh with the ordinary
+// opaque fauna material (the burst shows the whole body): the constant
+// replaced the per-instance 'crocWaterline' attribute, which never reached
+// the WebGL2 shader (the "hidden" body rendered exactly like the strike in
+// the pixel check).
 describe('crocodile submersion fade (design.md §19.16, points 246/274)', () => {
   const geo = buildCrocodile()
   geo.computeBoundingBox()
   const eyeKnobTopY = geo.boundingBox!.max.y
 
-  it('the local waterline is a size-free constant while hidden', () => {
-    // Point 274: no longer divided by scale — the body origin submerges by the
-    // same local depth · scale, so the fragment (pre-scale positionLocal.y) sees
-    // one constant line for every croc size.
-    expect(crocodileWaterlineLocal(true)).toBe(CROCODILE_WATERLINE_LOCAL)
-  })
-
-  it('riding out drops the waterline far below the geometry — the strike shows the whole body', () => {
-    const wl = crocodileWaterlineLocal(false)
-    expect(wl).toBe(CROCODILE_WATERLINE_NONE)
-    // The sentinel plus the fade band still lies below the lowest vertex, so
-    // nothing on the body can fade during a strike.
-    expect(wl + CROCODILE_FADE_BAND).toBeLessThan(geo.boundingBox!.min.y)
-    expect(crocodileSubmergedAlpha(geo.boundingBox!.min.y, wl)).toBe(1)
-    expect(crocodileSubmergedAlpha(0, wl)).toBe(1)
-  })
-
   it('hidden: eye knobs stay opaque, the whole BACK (crest included) vanishes', () => {
-    const wl = crocodileWaterlineLocal(true)
+    const wl = CROCODILE_WATERLINE_LOCAL
     // The eye knobs rise above the waterline — fully opaque, the lurking marker.
     // Point 274: they clear it by MORE than a full fade band, so the crisp cap
     // is a solid turret (not a hairline at the fading edge) — the croc reads as
@@ -643,19 +630,36 @@ describe('crocodile submersion fade (design.md §19.16, points 246/274)', () => 
     }
   })
 
-  it('the croc material carries the fade and keeps the shared fauna look', () => {
+  it('the hidden-croc material carries the fade and keeps the shared fauna look', () => {
     const m = createCrocodileMaterial()
     // Transparent with an opacity node: the fade needs alpha blending...
     expect(m.transparent).toBe(true)
     expect(m.opacityNode).toBeTruthy()
-    // ...but keeps writing depth so the body self-occludes within its own draw
-    // (the water sheets render after it at renderOrder 1 and lie above, so
-    // their point-233 depthWrite-off crossfade is untouched).
+    // ...but keeps writing depth so the exposed caps self-occlude within their
+    // own transparent draw (the water sheets render after it at renderOrder 1
+    // and lie above, so their point-233 depthWrite-off crossfade is untouched).
     expect(m.depthWrite).toBe(true)
     // The shared fauna look (point 214): vertex colors, smooth shading.
     expect(m.vertexColors).toBe(true)
     expect(m.roughness).toBeCloseTo(0.9, 12)
     expect(m.flatShading).toBe(false)
+  })
+
+  it('fully-faded fragments are CUT OUT — no colour, no depth punch into the water (point 274)', () => {
+    // With depthWrite on, an alpha-blended-to-0 fragment still wrote DEPTH, and
+    // the later-drawn water sheets (renderOrder 1, depthWrite off) were
+    // depth-rejected wherever a faded croc fragment lay nearer the camera — a
+    // bed-coloured croc outline punched into the rendered water. The alphaTest
+    // makes the fade floor a hard discard: neither colour nor depth.
+    const m = createCrocodileMaterial()
+    expect(m.alphaTest).toBe(CROCODILE_ALPHA_TEST)
+    const wl = CROCODILE_WATERLINE_LOCAL
+    // Hidden: the whole dorsal back — crest included — falls under the discard
+    // threshold (it cannot punch the sheet), while the eye-knob caps above the
+    // waterline pass it crisp.
+    expect(crocodileSubmergedAlpha(CROCODILE_LAYOUT.backTopY, wl)).toBeLessThanOrEqual(CROCODILE_ALPHA_TEST)
+    expect(crocodileSubmergedAlpha(0, wl)).toBeLessThanOrEqual(CROCODILE_ALPHA_TEST)
+    expect(crocodileSubmergedAlpha(eyeKnobTopY, wl)).toBeGreaterThan(CROCODILE_ALPHA_TEST)
   })
 })
 

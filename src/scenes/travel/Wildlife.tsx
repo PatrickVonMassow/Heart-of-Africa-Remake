@@ -24,7 +24,7 @@ import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
-import { waterSurfaceY } from './waterSurface'
+import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
@@ -132,8 +132,6 @@ import {
   createCrocodileMaterial,
   createFaunaMaterial,
   crocodileBodyY,
-  crocodileWaterlineLocal,
-  CROCODILE_WATERLINE_NONE,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
@@ -903,12 +901,16 @@ function spawnChunk(herds: Record<Species, Animal[]>, ccx: number, ccz: number, 
         const cll = worldToLatLon(x, z)
         const ct = sampleTerrain(cll.lat, cll.lon, seed)
         if (!crocodileAllowedAt(ct.type)) continue
-        // Anchor to the RENDERED water surface, not the carved bed (point 187 —
+        // Anchor to the RENDERED water sheet, not the carved bed (point 187 —
         // the point-152 class): the hidden pose offsets from a.y so only the eye
         // knobs break the surface; anchored to the bed the whole crocodile sat
-        // ~SURFACE_LIFT below the ribbon (deeper on lakes). Fallback: bed + 0.3
-        // (the river SURFACE_LIFT) should waterSurfaceY miss on an edge texel.
-        const cws = waterSurfaceY(cll.lat, cll.lon, seed, ct.height)
+        // ~SURFACE_LIFT below the ribbon (deeper on lakes). renderedSheetY, not
+        // waterSurfaceY (point 274): the canoe-float height carries a local-bed
+        // floor that on a cross-sloping bank stands up to ~0.22 ABOVE the drawn
+        // ribbon row — a croc anchored there rode its waterline proud of the
+        // visible sheet, body exposed. Fallbacks: the float height, then bed +
+        // 0.3 (the river SURFACE_LIFT) should both miss on an edge texel.
+        const cws = renderedSheetY(cll.lat, cll.lon, seed) ?? waterSurfaceY(cll.lat, cll.lon, seed, ct.height)
         herds.crocodile.push({
           x, z, y: cws ?? ct.height + 0.3, rot: hash(ccx, ccz, 34 + i, seed) * Math.PI * 2,
           scale: 0.9 + hash(ccx, ccz, 35 + i, seed) * 0.3, phase: hash(ccx, ccz, 36 + i, seed), chunk: key,
@@ -1412,9 +1414,11 @@ interface WildlifeMeshPool {
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
   stain: THREE.InstancedMesh
   material: THREE.MeshStandardMaterial
-  /** Per-instance local waterline feeding the croc submersion fade (point 246),
-   *  written each frame beside the instance matrix. */
-  crocWaterline: THREE.InstancedBufferAttribute
+  /** STRIKING crocodiles' mesh (point 274): same geometry as the hidden pool
+   *  mesh but the ordinary OPAQUE fauna material — the two croc poses draw
+   *  through two meshes instead of a per-instance waterline attribute (which
+   *  never bound on WebGL2; see CROCODILE_FADE_BAND in fauna.ts). */
+  crocStrike: THREE.InstancedMesh
   vultureGeo: THREE.BufferGeometry
 }
 let wildlifeMeshCache: WildlifeMeshPool | null = null
@@ -1449,17 +1453,12 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   // Shared smooth-shaded fauna material (point 214): flat shading would fold
   // the rounded bodies back into hard polygon panels.
   const material = createFaunaMaterial()
-  // The crocodile draws through its own material (point 246): same fauna look
-  // plus the submersion fade below the per-instance 'crocWaterline' attribute,
-  // so a hidden croc's body vanishes under the alpha-blended water sheets
-  // instead of reading through them. Module singleton like everything here.
+  // The HIDDEN crocodile draws through its own material (points 246/274): same
+  // fauna look plus the submersion fade below the CONSTANT geometry-local
+  // waterline, so a hidden croc's body is cut out under the alpha-blended
+  // water sheets instead of reading through them. Module singleton like
+  // everything here.
   const crocMaterial = createCrocodileMaterial()
-  const crocWaterline = new THREE.InstancedBufferAttribute(
-    new Float32Array(MAX_INSTANCES.crocodile).fill(CROCODILE_WATERLINE_NONE),
-    1,
-  )
-  crocWaterline.setUsage(THREE.DynamicDrawUsage)
-  geometries.crocodile.setAttribute('crocWaterline', crocWaterline)
   const adult = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
     const m = new THREE.InstancedMesh(geometries[sp], sp === 'crocodile' ? crocMaterial : material, MAX_INSTANCES[sp])
@@ -1471,6 +1470,15 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.count = 0
     adult[sp] = m
   }
+  // STRIKING crocodiles ride fully out of the water and draw through the
+  // ordinary opaque fauna material on their own mesh (point 274) — the pose
+  // split replaces the per-instance waterline attribute, which never reached
+  // the WebGL2 shader (the "hidden" body rendered exactly like the strike) and
+  // whose WebGPU binding the point-175 crown-collapse jitter already indicted.
+  const crocStrike = new THREE.InstancedMesh(geometries.crocodile, material, MAX_INSTANCES.crocodile)
+  crocStrike.castShadow = false
+  crocStrike.frustumCulled = false
+  crocStrike.count = 0
   const calf = {} as Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
   for (const sp of CALF_SPECIES) {
     const m = new THREE.InstancedMesh(calfGeometries[sp], material, MAX_CALF_INSTANCES)
@@ -1486,7 +1494,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   )
   stain.frustumCulled = false
   stain.count = 0
-  wildlifeMeshCache = { adult, calf, stain, material, crocWaterline, vultureGeo: buildVulture() }
+  wildlifeMeshCache = { adult, calf, stain, material, crocStrike, vultureGeo: buildVulture() }
   return wildlifeMeshCache
 }
 
@@ -2451,7 +2459,10 @@ function Herds() {
               c.z = w.z
               const wll = worldToLatLon(w.x, w.z)
               const wt = sampleTerrain(wll.lat, wll.lon, seed)
-              c.y = waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ?? wt.height + 0.3
+              // The drawn sheet, never the canoe-float height (point 274 — see
+              // the spawn anchor): the float's local-bed floor can stand proud
+              // of the visible ribbon and expose the hidden body.
+              c.y = renderedSheetY(wll.lat, wll.lon, seed) ?? waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ?? wt.height + 0.3
             }
           }
         }
@@ -3214,9 +3225,15 @@ function Herds() {
       const calfMesh = calfMeshRefs.current[sp]
       let aIdx = 0
       let cIdx = 0
+      // Striking crocodiles divert into the opaque-material strike mesh (point
+      // 274 — the pose split that replaced the per-instance waterline).
+      let sIdx = 0
+      let crocStrikeThis = false
       const write = (a: Animal) => {
         if (a.young && calfMesh) {
           if (cIdx < MAX_CALF_INSTANCES) calfMesh.setMatrixAt(cIdx++, mtx)
+        } else if (crocStrikeThis) {
+          pool.crocStrike.setMatrixAt(sIdx++, mtx)
         } else {
           mesh.setMatrixAt(aIdx++, mtx)
         }
@@ -3224,6 +3241,7 @@ function Herds() {
       let eIdx = 0
       for (let i = 0; i < n; i++) {
         const a = list[i]
+        crocStrikeThis = false
         if (a.dead) {
           // Trampled: lies on its side where it was caught, over a stain; once
           // a scavenger lands the carcass shrinks away (design.md §19).
@@ -3266,16 +3284,15 @@ function Herds() {
           wobTarget = 0
           const hidden = a.lunge === undefined
           const striking = a.lunge !== undefined && !a.lunge.retreat && !(a.lunge.victim?.dead ?? false)
-          // Submersion fade (points 246/274): carry this instance's local
-          // waterline to the croc material so the body below the sheet fades out
-          // instead of reading through the alpha-blended water. The line is a
-          // size-free constant (point 274: the body origin submerges by that
-          // same local depth · scale, so the fade line lands on the sheet for
-          // every croc size). aIdx is the index this croc gets in write() below
-          // — nothing between here and there skips a living croc, and crocs are
-          // never young or dead (structurally unkillable, §19.16). Submerged in
-          // every pose except the live strike — exactly the crocodileBodyY flag.
-          pool.crocWaterline.setX(aIdx, crocodileWaterlineLocal(!striking))
+          // Pose split (point 274): a submerged croc (every pose except the
+          // live strike — exactly the crocodileBodyY flag) draws through the
+          // fading hidden-croc material on THIS mesh; the live STRIKE diverts
+          // into the opaque strike mesh via write() so the burst shows the
+          // whole body. The submerge fade is a constant local waterline in the
+          // material — size-free because the body origin submerges by the same
+          // local depth · scale, so the fade line lands on the sheet for every
+          // croc size.
+          crocStrikeThis = striking
           // Subtle idle life (point 242) only while fully at rest: a slow float
           // bob and a few-degree yaw sway so a hidden croc never reads as a frozen
           // prop. The sway is a BOUNDED oscillation about a FIXED rest heading
@@ -4114,7 +4131,11 @@ function Herds() {
       }
       mesh.count = aIdx
       mesh.instanceMatrix.needsUpdate = true
-      if (sp === 'crocodile') pool.crocWaterline.needsUpdate = true // point 246
+      if (sp === 'crocodile') {
+        // The strike mesh (point 274): whatever diverted out of the hidden pool.
+        pool.crocStrike.count = sIdx
+        pool.crocStrike.instanceMatrix.needsUpdate = true
+      }
       if (calfMesh) {
         calfMesh.count = cIdx
         calfMesh.instanceMatrix.needsUpdate = true
@@ -4167,6 +4188,7 @@ function Herds() {
       {CALF_SPECIES.map((sp) => (
         <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
       ))}
+      <primitive object={pool.crocStrike} dispose={null} />
       <primitive object={pool.stain} dispose={null} />
       <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_COUNT]} visible={false} frustumCulled={false} />
       <instancedMesh ref={fireBand} args={[fireBandGeo, fireBandMat, FIRE_BAND_SEGMENTS]} visible={false} frustumCulled={false} />
