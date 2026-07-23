@@ -9735,7 +9735,7 @@ the remaining open points in their numeric order.
   concurrently with point 255 (PlaceLife.tsx) or 244 (PlaceScene.tsx); queue after
   they merge, or scope it to a fire-only file that does not overlap.
 
-- [ ] 257. IDLE CROCODILE TURNS IN CIRCLES (user 23.07.2026, screenshot, West river
+- [x] 257. IDLE CROCODILE TURNS IN CIRCLES (user 23.07.2026, screenshot, West river
   — regression from point 242). The resting/lurking crocodile slowly rotates in a
   full circle instead of waiting still. §19.16 is explicit: "Hidden, it lies
   submerged … It waits; it does NOT roam." Point 242 added an OPTIONAL subtle idle
