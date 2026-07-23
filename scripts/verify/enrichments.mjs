@@ -3725,6 +3725,13 @@ const mourn = !mournStage.staged ? { found: false, stage: mournStage } : await p
     e.x = gx + 20 + (e.x - cx)
     e.z = gz + (e.z - cz)
   }
+  // Staging hygiene (point 249): the streamed herd may have wandered toward the
+  // graveyard during the staging phase and already carry a running vigil or the
+  // once-per-visit latch — either would corrupt the measured phases (a stale
+  // latch suppresses the vigil entirely; a stale vigil shifts its deadline).
+  // The check stages a FRESH arrival, so reset both before observing.
+  const st0 = window.__wildlife.herdState?.current?.get(window.__mournHerdId)
+  if (st0) { st0.mourn = undefined; st0.mourned = undefined }
   const centre = () => {
     const xs = best.reduce((a, e) => a + e.x, 0) / best.length
     const zs = best.reduce((a, e) => a + e.z, 0) / best.length
