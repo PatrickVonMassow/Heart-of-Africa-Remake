@@ -647,6 +647,56 @@ export function killFlockMayDescend(
 }
 
 /**
+ * Per-carcass vulture-flock ownership (design.md §19.6, point 251). Each
+ * eligible carcass draws and OWNS its own scavenger flock, so N carcasses draw
+ * N INDEPENDENT concurrent flocks — never the old single GLOBAL draw that
+ * finished one carcass and then HOPPED straight to the next (the user report:
+ * one set of vultures migrating between carcasses instead of one flock per
+ * carcass). Rules:
+ *  - A slot bound to a carcass KEEPS it while the carcass is still eligible.
+ *  - When its carcass is gone (no longer in `carcasses`) the slot is RELEASED
+ *    (target → null); it then flies off and despawns on its own — it does NOT
+ *    hop to another carcass. Only once its flight has fully left (a slot marked
+ *    `available`, i.e. idle again) may it take a NEW carcass.
+ *  - A free, available slot is assigned the nearest still-UNOWNED carcass; two
+ *    slots never share one carcass.
+ * The point-162 rule is orthogonal and untouched: only real carcasses/remnants
+ * are ever passed in, so a drive-off (no carcass) draws no flock here.
+ *
+ * Pure over the per-slot view (current target + availability) and the live
+ * carcass list; returns the next per-slot target. Carcass identity is by
+ * reference (`===`), matching the herd-array Animal objects.
+ */
+export interface ScavengerSlotView<T> {
+  /** The carcass this slot currently owns, or null when free. */
+  target: T | null
+  /** The slot's flight has fully despawned (idle) — free to take a new carcass.
+   *  A slot still flying in/out is NOT available, so it can't hop mid-flight. */
+  available: boolean
+}
+
+export function assignPerCarcassFlocks<T>(
+  slots: ReadonlyArray<ScavengerSlotView<T>>,
+  carcasses: ReadonlyArray<T>,
+  distanceTo: (carcass: T) => number,
+): (T | null)[] {
+  const live = new Set(carcasses)
+  // Keep each slot's carcass while it is still eligible; else release it.
+  const next: (T | null)[] = slots.map((s) => (s.target !== null && live.has(s.target) ? s.target : null))
+  const owned = new Set<T>()
+  for (const t of next) if (t !== null) owned.add(t)
+  // Hand out the still-unowned carcasses nearest-first to free available slots.
+  const unowned = carcasses.filter((c) => !owned.has(c)).sort((a, b) => distanceTo(a) - distanceTo(b))
+  let ui = 0
+  for (let i = 0; i < slots.length && ui < unowned.length; i++) {
+    if (next[i] !== null || !slots[i].available) continue
+    next[i] = unowned[ui++]
+    owned.add(next[i] as T)
+  }
+  return next
+}
+
+/**
  * The vigil at a calf's carcass (design.md §19.8, point 121): while a LIVE
  * vigil-keeper stands within this radius of a carcass, no vulture may LAND on
  * it — the kill flock keeps circling and the ground scavenger does not commit
@@ -860,17 +910,78 @@ export function landedBirdClearance(groupBaseY: number, groundUnderBird: number,
 }
 
 /**
- * The LOWEST point of a landed bird's POSED geometry below its origin (point
- * 202): the peck/bob feed animation pitches the bird forward, dipping the HEAD
- * (local y 0.03, z 0.24 in fauna.ts) below the origin — at a full peck it
- * reaches deeper than the body sphere's bottom (0.096) that the flat
- * LANDED_BIRD_HOVER was sized for, so a feeding vulture clipped through the
- * ground (the user report; the wing tips ride high, the head is the deep end).
- * Scales with the render scale.
+ * The vulture's deep local extents (buildVulture, src/render/fauna.ts), as the
+ * bounding-box corners of every part in unit (scale-1) local space: the body
+ * ellipsoid and head bboxes plus the two SPREAD WINGS (inner plate + outer tip,
+ * both sides). The corners bound the actual rounded/tapered geometry from
+ * outside, so a min taken over them can never sit ABOVE a real vertex — the
+ * lift it drives always clears the true mesh. Mirrors the fauna.ts numbers; if
+ * buildVulture's proportions change, update both (fauna.test.ts pins the wing
+ * span these are derived from).
  */
-export function landedBirdLowestDepth(pitch: number, scale: number): number {
-  const head = 0.24 * Math.sin(pitch) - 0.03 * Math.cos(pitch)
-  return Math.max(0.096, head) * scale
+function vultureLowExtents(): [number, number, number][] {
+  const rotZ = (x: number, y: number, a: number): [number, number] => {
+    const c = Math.cos(a)
+    const s = Math.sin(a)
+    return [x * c - y * s, x * s + y * c]
+  }
+  const box = (
+    hx: number,
+    hy: number,
+    hz: number,
+    tx: number,
+    ty: number,
+    tz: number,
+    rz: number,
+  ): [number, number, number][] => {
+    const out: [number, number, number][] = []
+    for (const sx of [-1, 1])
+      for (const sy of [-1, 1])
+        for (const sz of [-1, 1]) {
+          const [x, y] = rotZ(tx + sx * hx, ty + sy * hy, rz)
+          out.push([x, y, tz + sz * hz])
+        }
+    return out
+  }
+  const pts: [number, number, number][] = []
+  pts.push(...box(0.128, 0.096, 0.224, 0, 0, 0, 0)) // body ellipsoid bbox (0.16·(0.8,0.6,1.4))
+  pts.push(...box(0.06, 0.06, 0.06, 0, 0.03, 0.24, 0)) // head sphere bbox
+  for (const side of [-1, 1]) {
+    pts.push(...box(0.425, 0.0125, 0.14, side * 0.5, 0.04, -0.02, side * 0.12)) // wing plate
+    pts.push(...box(0.15, 0.01, 0.1, side * 1.0, 0.12, -0.04, side * 0.3)) // wing tip
+  }
+  return pts
+}
+
+const VULTURE_LOW_EXTENTS: readonly (readonly [number, number, number])[] = vultureLowExtents()
+
+/**
+ * The LOWEST point of a landed bird's POSED geometry below its origin (points
+ * 202 + 217). The peck/bob feed animation applies TWO rotations to the bird:
+ * a forward pitch AND its heading yaw (`bird.rotation.set(pitch, yaw, 0)` in
+ * Wildlife.tsx). Point 202 modelled only the pitched HEAD as the deep end, but
+ * the SPREAD WINGS reach far out in ±x, and under the pose a wing tip on the
+ * descending side of the yaw swings well BELOW the head — the reported
+ * wing-through-ground clip (point 217). So the depth is the min y of the whole
+ * posed extent set (body, head, both wing tips), not the head alone. The y of a
+ * local point under Euler XYZ (z = 0) is
+ *   y' = sin(pitch)·sin(yaw)·x + cos(pitch)·y − sin(pitch)·cos(yaw)·z
+ * — the `sin(pitch)·sin(yaw)·x` term is the wing-tip dip point 202 missed.
+ * Floored at the body reach so a flat pose still clears the pecking body, and
+ * scaled with the render scale. ONE shared rule for the kill flock and the
+ * ground scavenger (point 128) — do not fork a second clearance path.
+ */
+export function landedBirdLowestDepth(pitch: number, yaw: number, scale: number): number {
+  const s1 = Math.sin(pitch)
+  const c1 = Math.cos(pitch)
+  const s2 = Math.sin(yaw)
+  const c2 = Math.cos(yaw)
+  let minY = Infinity
+  for (const [x, y, z] of VULTURE_LOW_EXTENTS) {
+    const yp = s1 * s2 * x + c1 * y - s1 * c2 * z
+    if (yp < minY) minY = yp
+  }
+  return Math.max(0.096, -minY) * scale
 }
 
 /** Ground-sample offsets under a landed bird's EXTENTS — centre, both wing tips
@@ -889,34 +1000,39 @@ export function birdExtentOffsets(yaw: number, scale: number): [number, number][
   return local.map(([x, z]) => [x * c + z * s, -x * s + z * c])
 }
 
-/** Pose-aware landed-bird y (point 202): the point-128 positive-only lift onto
- *  the HIGHEST ground under the bird's extents, plus a clearance derived from
- *  the posed geometry's lowest point (never the flat hover), plus the hop. */
+/** Pose-aware landed-bird y (points 202 + 217): the point-128 positive-only
+ *  lift onto the HIGHEST ground under the bird's extents, plus a clearance
+ *  derived from the posed geometry's lowest point — head AND spread wing tips
+ *  under the pitch/yaw pose (never the flat hover) — plus the hop. */
 export function landedBirdYPosed(
   groupBaseY: number,
   maxGroundUnder: number,
   hop: number,
   pitch: number,
+  yaw: number,
   scale: number,
 ): number {
   const lift = Math.max(0, Math.max(0, maxGroundUnder) - groupBaseY)
-  return lift + landedBirdLowestDepth(pitch, scale) + 0.06 + hop
+  return lift + landedBirdLowestDepth(pitch, yaw, scale) + 0.06 + hop
 }
 
 /** The posed bird's LOWEST-POINT clearance above its own highest ground — the
  *  verify metric; by construction never below the 0.06 margin, and a group
- *  pre-lift bug (the point-185 double lift) still blows past any upper cap. */
+ *  pre-lift bug (the point-185 double lift) still blows past any upper cap. The
+ *  lowest point now includes the wing tips (point 217), so this is the wing-tip
+ *  clearance, not merely the head's. */
 export function landedBirdClearancePosed(
   groupBaseY: number,
   maxGroundUnder: number,
   hop: number,
   pitch: number,
+  yaw: number,
   scale: number,
 ): number {
   return (
     groupBaseY +
-    landedBirdYPosed(groupBaseY, maxGroundUnder, hop, pitch, scale) -
-    landedBirdLowestDepth(pitch, scale) -
+    landedBirdYPosed(groupBaseY, maxGroundUnder, hop, pitch, yaw, scale) -
+    landedBirdLowestDepth(pitch, yaw, scale) -
     Math.max(0, maxGroundUnder)
   )
 }

@@ -200,6 +200,29 @@ describe('smooth organic shading (CLAUDE.md §7.1 pt. 12, point 214)', () => {
     }
   })
 
+  it('the vulture keeps its wide spread-wing span (the point-217 clearance model is derived from it)', () => {
+    // The landed-bird clearance (wildlifeBehavior.landedBirdLowestDepth) lifts a
+    // feeding vulture by its posed WING-TIP reach so the tips never clip the
+    // ground (point 217). That reach is derived from these fauna.ts numbers, so
+    // pin the span here: if buildVulture's wings change, both must move together.
+    const geo = buildVulture()
+    const pos = geo.attributes.position
+    let maxX = 0
+    let maxY = -Infinity
+    let minY = Infinity
+    for (let i = 0; i < pos.count; i++) {
+      maxX = Math.max(maxX, Math.abs(pos.getX(i)))
+      maxY = Math.max(maxY, pos.getY(i))
+      minY = Math.min(minY, pos.getY(i))
+    }
+    // Outer wing tip reaches ~1.07 in x; the tips ride ABOVE the body (positive y).
+    expect(maxX).toBeGreaterThan(1.0)
+    expect(maxX).toBeLessThan(1.15)
+    expect(maxY).toBeGreaterThan(0.4) // the dihedral lifts the tips well above the origin
+    expect(minY).toBeGreaterThan(-0.11) // body-ellipsoid bottom ~ -0.096 at rest
+    geo.dispose()
+  })
+
   it('the built body sphere clearly outresolves the old faceted 8x6 build', () => {
     const body = new THREE.SphereGeometry(1, ...FAUNA_TESSELLATION.body)
     const oldBody = new THREE.SphereGeometry(1, 8, 6)
