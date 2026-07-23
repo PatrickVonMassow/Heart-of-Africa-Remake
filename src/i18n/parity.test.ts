@@ -169,10 +169,11 @@ collectFunctionPaths(en, '', FUNCTION_PATHS)
 
 describe('template-function callability (de and en behave alike)', () => {
   it('finds the expected number of function leaves', () => {
-    // Guards the walk itself: 26 positional + 36 journal templates (the +2 are
-    // the point-170 villageReturn title and vignette resolver). A drift here
-    // means a template was added/removed and this suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(62)
+    // Guards the walk itself: 30 positional + 36 journal templates (the +2 are
+    // the point-170 villageReturn title and vignette resolver; the +4 the
+    // benchmark overlay's progress lines). A drift here means a template was
+    // added/removed and this suite should follow.
+    expect(FUNCTION_PATHS.length).toBe(66)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

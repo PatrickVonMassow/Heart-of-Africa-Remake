@@ -43,6 +43,7 @@ function getFreePort() {
 const DEV_SUITES = [
   'docs', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
   'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
+  'benchmark',
 ]
 
 // Regression tiers (point 173). The browser suites split into a SMALL everyday

@@ -992,6 +992,61 @@ textarea {
   -webkit-user-select: text;
 }
 
+/* --- Render benchmark (design.md §21.1, F8) ------------------------------- */
+
+.bench-progress {
+  width: min(460px, 92vw);
+  text-align: center;
+}
+
+.bench-report {
+  width: min(860px, 96vw);
+}
+
+.bench-bar {
+  height: 8px;
+  margin: 12px 0 10px;
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  background: rgba(10, 12, 18, 0.7);
+  overflow: hidden;
+}
+
+.bench-bar-fill {
+  height: 100%;
+  background: #d8b26a;
+  transition: width 0.2s linear;
+}
+
+.bench-remaining,
+.bench-abort-hint {
+  margin: 4px 0 0;
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.bench-aborted {
+  margin: 4px 0 0;
+  color: #e2a15a;
+}
+
+.bench-summary {
+  margin: 8px 0 0;
+  max-height: 55vh;
+  overflow: auto;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  /* The report digest must be selectable despite the global user-select: none. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* --- Debug menu ----------------------------------------------------------- */
 
 .debug-menu {

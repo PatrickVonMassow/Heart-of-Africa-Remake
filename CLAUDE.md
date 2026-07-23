@@ -1083,7 +1083,31 @@ verify suite that proves it.
     every data field, drops the actions, stays deterministic) and
     `src/ui/StateDump.test.tsx` (hidden by default, F6/Esc toggle without
     moving focus onto a control, the F6 browser default prevented, F5
-    left untouched)); the
+    left untouched) — F8 the in-game render benchmark (point 277), the one
+    debug tool that SHIPS IN THE DELIVERED BUILD (the levers of point 276
+    must be priced on the USER's hardware, not on the headless one), its
+    runner LAZILY imported on the keypress so it stays out of the eager
+    startup chunks: it sweeps the ten graphics configs of §21.1 over one
+    identical route (dense savanna standing, empty desert standing,
+    driving out of the savanna — the anchors of `scripts/perf-bench.mjs`)
+    and DETERMINISTICALLY — a seeded PRNG installed over `Math.random` for
+    the run, world seed/date/position/travel speed/zoom/journal and the
+    event+deadline switches reset before every section, and a FIXED
+    simulation timestep (1/60 s) stepped a FIXED number of frames, so the
+    path and every roll repeat and only the measured wall-clock varies —
+    then offers the report (environment incl. backend/adapter/build
+    commit; per config the frame-time median/p95/p99/max, fps, the CPU
+    time inside the frame, `renderer.info` draw calls/triangles and a
+    scene-graph triangle count per system) as a downloadable JSON with a
+    readable digest plus a copy button, behind a localized modal whose
+    Esc aborts and restores every setting; verifiable via
+    `src/systems/benchmark.test.ts` (sweep plan, route, fixed-timestep
+    clock, statistics, breakdown, report shaping),
+    `src/ui/BenchmarkOverlay.test.tsx` (F8 starts the lazy runner and
+    prevents the browser default, Esc aborts/closes, both languages) and
+    `scripts/verify/benchmark.mjs` (a live `?bench=short` run: one row per
+    config × phase, the progress modal, every setting — `Math.random`
+    included — restored afterwards)); the
     canteen's consumption
     rates and capacity are editable (§21.2), as is the parental rescue
     burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's

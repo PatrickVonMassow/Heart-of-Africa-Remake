@@ -14,8 +14,11 @@ import {
   chunkIsCoastal,
   chunkIsMountainous,
   chunkNeedsRefine,
+  getTerrainRefine,
   lodSegments,
   refinedSegments,
+  resetTerrainRefine,
+  setTerrainRefine,
   REFINE_RING_MAX,
   REFINE_SEGMENT_CAP,
 } from './terrainLod'
@@ -146,6 +149,35 @@ describe('mountain-chunk tessellation gate (silhouette smoothness)', () => {
       // The memoised second read must return the identical decision.
       expect(chunkNeedsRefine(cx, cz)).toBe(expected)
     }
+  })
+
+  // The in-game benchmark (design.md §21.1, F8) prices point 209's refinement
+  // on the player's own hardware, so both levers are switchable at runtime.
+  // Not player-facing: the benchmark sets them for one config and restores.
+  it('the runtime override can switch the refinement off and cap its segments', () => {
+    try {
+      setTerrainRefine({ enabled: false })
+      expect(getTerrainRefine().enabled).toBe(false)
+      // Refine off reproduces the pre-209 histogram: every ring at base cost.
+      for (const ring of [0, 1, 2, 3, 4]) expect(refinedSegments(ring, true)).toBe(lodSegments(ring))
+
+      resetTerrainRefine()
+      setTerrainRefine({ segmentCap: 84 })
+      expect(getTerrainRefine().segmentCap).toBe(84)
+      for (const ring of [0, 1, 2]) expect(refinedSegments(ring, true)).toBe(84)
+      // Below the ring's base resolution the cap must not COARSEN the chunk.
+      setTerrainRefine({ segmentCap: 8 })
+      expect(refinedSegments(0, true)).toBe(lodSegments(0))
+    } finally {
+      resetTerrainRefine()
+    }
+  })
+
+  it('resetting restores the shipped defaults exactly', () => {
+    setTerrainRefine({ enabled: false, segmentCap: 40 })
+    resetTerrainRefine()
+    expect(getTerrainRefine()).toEqual({ enabled: true, segmentCap: REFINE_SEGMENT_CAP })
+    for (const ring of [0, 1, 2]) expect(refinedSegments(ring, true)).toBe(112)
   })
 })
 

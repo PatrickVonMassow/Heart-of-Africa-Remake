@@ -238,6 +238,28 @@ export const en: Strings = {
     close: 'Close (F6)',
   },
 
+  benchmark: {
+    title: 'Render Benchmark',
+    config: (name, index, count) => `Setting ${index}/${count}: ${name}`,
+    warmup: 'Warm-up pass (not measured)',
+    phase: (name) => `Section: ${name}`,
+    phases: {
+      savannaStanding: 'Standing in dense savanna',
+      desertStanding: 'Standing in empty desert',
+      savannaDriving: 'Travelling through the savanna',
+    },
+    remaining: (time) => `About ${time} left`,
+    abortHint: 'Esc aborts the benchmark and restores every setting.',
+    doneTitle: 'Benchmark Finished',
+    abortedNote: 'The run was aborted — the report covers the completed settings only.',
+    download: 'Download report',
+    copy: 'Copy',
+    copied: 'Benchmark report copied to the clipboard.',
+    close: 'Close',
+    unavailable: 'The benchmark needs the running 3D view.',
+    failed: (message) => `Benchmark aborted: ${message}`,
+  },
+
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
     mountainNoRopeWarn: 'Without a rope this climb is dangerous — one slip and I fall. Slowly and carefully!',

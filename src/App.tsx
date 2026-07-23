@@ -1,5 +1,5 @@
 import { Suspense, useEffect } from 'react'
-import { Canvas, extend, type ThreeToJSXElements } from '@react-three/fiber'
+import { Canvas, extend, useThree, type ThreeToJSXElements } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { useGame } from './state/store'
 import { useUi } from './state/ui'
@@ -8,6 +8,7 @@ import { speechAvailable, warmupSpeech } from './journal/speech'
 import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
 import { Effects } from './render/Effects'
+import { setRenderContext } from './render/renderContext'
 import { Hud } from './ui/Hud'
 import { AmbienceController } from './ui/AmbienceController'
 
@@ -17,6 +18,24 @@ declare module '@react-three/fiber' {
 
 // Register the WebGPU build's classes for JSX elements (R3F v9 pattern).
 extend(THREE as unknown as Parameters<typeof extend>[0])
+
+/**
+ * Publishes the live render handles (renderer, scene, camera, frame clock) to
+ * the module registry, so non-React code can reach them — the in-game
+ * benchmark (design.md §21.1, F8) reads the renderer's counters and the scene
+ * graph and pins the frame clock to a fixed timestep. Renders nothing.
+ */
+function RenderContextBridge() {
+  const gl = useThree((s) => s.gl)
+  const scene = useThree((s) => s.scene)
+  const camera = useThree((s) => s.camera)
+  const clock = useThree((s) => s.clock)
+  useEffect(() => {
+    setRenderContext({ gl: gl as unknown as THREE.WebGPURenderer, scene, camera, clock })
+    return () => setRenderContext(null)
+  }, [gl, scene, camera, clock])
+  return null
+}
 
 export default function App() {
   const mode = useGame((s) => s.mode)
@@ -62,6 +81,7 @@ export default function App() {
           return renderer
         }}
       >
+        <RenderContextBridge />
         <Suspense fallback={null}>
           {mode === 'travel' ? <TravelScene /> : <PlaceScene />}
           <Effects />

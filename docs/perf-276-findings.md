@@ -103,3 +103,21 @@ near-universal. Switching it off reproduces v0.1's histogram exactly.
 Measure on the real machine, in the DELIVERED build, deterministically — same
 route, same seed, same date, same events, with only the graphics config varying
 between runs — and hand back a downloadable report. That is point 277.
+
+### The method it uses (F8, design.md §21.1)
+
+| piece | how |
+| --- | --- |
+| route | the three states above, same anchors as `perf-bench.mjs`: savanna (-2.5, 34.0) standing, desert (23.0, 15.0) standing, driving out of the savanna |
+| configs | baseline, traa-off, ssao-off, shadows-off, shadow-half, post-off, dpr-1, terrain-refine-off, terrain-cap-84, all-off |
+| determinism | a seeded PRNG replaces `Math.random` for the run (restored in a `finally`); seed, date, position, travel speed, zoom, journal and the event/deadline switches are reset before EVERY section |
+| **fixed step** | R3F's frame clock is pinned (`installFixedClock`): every `useFrame` gets dt = 1/60 s and `elapsedTime` advances once per frame, and each section runs a FIXED FRAME COUNT — so the simulated path, the streaming crossings and every roll are identical across configs and only the wall clock varies |
+| warm-up | one discarded pass over the whole route, so the cold caches (terrain geometry, flora, shader compiles) do not land on whichever config runs first |
+| metrics | wall-clock frame time (median/p95/p99/max, fps) AND the CPU time inside the frame, measured between R3F's before/after render effects, plus `renderer.info` draw calls/triangles and a scene-graph triangle count per system |
+| terrain levers | module-level runtime overrides in `src/scenes/travel/terrainLod.ts` (`setTerrainRefine`), which change the chunk geometry KEYS and therefore rebuild by themselves; restored after the run |
+
+**Reading the numbers:** a page cannot disable vsync, so a config that is
+comfortably fast reads as a flat ~16.7 ms and the wall clock cannot separate the
+levers — the report flags that per row (`vsyncLikely`), and the CPU frame time
+stays informative there. Nothing below the vsync period is evidence AGAINST a
+lever; a wall clock ABOVE it is evidence for one.
