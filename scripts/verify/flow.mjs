@@ -221,7 +221,12 @@ await page
   .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
   .finally(() => page.keyboard.up('KeyS'))
 await page.keyboard.press('Space')
-await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
+// The mode switch is synchronous on the press, but the FIRST entry into this
+// village then builds the whole first-person place (layout, panorama capture,
+// texture bake, shader compile) in one long main-thread block — measured ~19 s
+// on a loaded dev server — during which no rAF poll can fire. Budget what the
+// pre-use-key flow gave this same transition (60 s); 15 s starves in the stall.
+await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 60000 })
 await page.waitForTimeout(500)
 s = await state()
 check('Entered the village (Space at the enter radius)', s.mode === 'place' && s.placeId === village.id)

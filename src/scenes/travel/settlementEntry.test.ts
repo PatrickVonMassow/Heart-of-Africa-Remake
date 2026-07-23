@@ -2,7 +2,7 @@
 // helpers. Entering is movement-based but confirmed with the Space use key —
 // reaching the enter radius never enters on its own, and a water cell blocks it.
 import { describe, it, expect } from 'vitest'
-import { settlementEnterCandidate, shouldEnterSettlement, type EnterablePlace } from './settlementEntry'
+import { settlementEnterCandidate, settlementToEnter, shouldEnterSettlement, type EnterablePlace } from './settlementEntry'
 
 const PLACES: EnterablePlace[] = [
   { id: 'cairo', x: 0, z: 0 },
@@ -45,5 +45,29 @@ describe('shouldEnterSettlement (design.md §2.3)', () => {
 
   it('is blocked while a dialog is open or the run is over (checkpoint safety)', () => {
     expect(shouldEnterSettlement('cairo', true, true)).toBe(false)
+  })
+})
+
+describe('settlementToEnter — the press-time decision at the LIVE position (design.md §2.3)', () => {
+  it('resolves against the position handed in NOW, not any earlier frame: a press right after a teleport onto the marker enters', () => {
+    // The stale-candidate race: the last rendered frame stood far away (its
+    // candidate was null), then the traveller teleported onto the marker and
+    // Space landed before the next frame. Deriving from the live position must
+    // enter — reading the frame-written candidate did nothing.
+    expect(settlementToEnter(50, 50, PLACES, R, false, false)).toBeNull() // where the LAST frame stood
+    expect(settlementToEnter(1, 0, PLACES, R, false, false)).toBe('cairo') // where the press LANDS
+  })
+
+  it('keeps the radius rule: a press outside every enter radius does nothing', () => {
+    expect(settlementToEnter(R + 0.01, 0, PLACES, R, false, false)).toBeNull()
+    expect(settlementToEnter(R, 0, PLACES, R, false, false)).toBe('cairo')
+  })
+
+  it('keeps the water guard: a press on a water cell never enters (river/lake passage)', () => {
+    expect(settlementToEnter(1, 0, PLACES, R, true, false)).toBeNull()
+  })
+
+  it('keeps the block gate: an open dialog or a finished run never enters', () => {
+    expect(settlementToEnter(1, 0, PLACES, R, false, true)).toBeNull()
   })
 })

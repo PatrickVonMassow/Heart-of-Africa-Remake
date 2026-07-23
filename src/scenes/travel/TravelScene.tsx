@@ -25,7 +25,7 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
-import { settlementEnterCandidate, shouldEnterSettlement } from './settlementEntry'
+import { settlementEnterCandidate, settlementToEnter } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
@@ -2585,16 +2585,29 @@ export function TravelScene() {
 
   // Space enters the settlement the traveller stands within (design.md §2.3):
   // movement-based approach, confirmed with the use key — never automatic on
-  // reaching the enter radius. The candidate + water guard are computed each
-  // frame into ui.enterPlaceId; entering a finished/defeated run is blocked so
-  // a dead traveller never overwrites the checkpoint.
+  // reaching the enter radius. The candidate + water guard still arm the hint
+  // each frame (ui.enterPlaceId, below), but the press re-derives the decision
+  // from the LIVE traveller position through the same pure helper: a keydown
+  // landing after a teleport or between frames used to act on the last rendered
+  // frame's candidate — the stale-`nearRef` race the first-person use key had.
+  // Entering a finished/defeated run stays blocked so a dead traveller never
+  // overwrites the checkpoint.
   useEffect(() => {
     const off = onKeyPress('Space', () => {
       const ui = useUi.getState()
       const g = useGame.getState()
-      const id = ui.enterPlaceId
       const blocked = !!ui.dialog || !!g.defeat || g.victory
-      if (id !== null && shouldEnterSettlement(id, true, blocked)) g.enterPlace(id)
+      const ll = worldToLatLon(g.pos.x, g.pos.z)
+      const onWater = sampleTerrain(ll.lat, ll.lon, g.seed).type === 'water'
+      const id = settlementToEnter(
+        g.pos.x,
+        g.pos.z,
+        PLACE_WORLD_POSITIONS,
+        balance.placeEnterRadius,
+        onWater,
+        blocked,
+      )
+      if (id !== null) g.enterPlace(id)
     })
     return () => {
       off()

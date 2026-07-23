@@ -39,3 +39,24 @@ export function settlementEnterCandidate(
 export function shouldEnterSettlement(candidateId: string | null, spacePressed: boolean, blocked: boolean): boolean {
   return candidateId !== null && spacePressed && !blocked
 }
+
+/**
+ * The settlement a Space press enters at the LIVE traveller position, or null.
+ * The press-time decision is re-derived from the position instead of read from
+ * the frame-written ui.enterPlaceId: a synchronous keydown after a teleport (or
+ * one landing between frames) used to act on the last rendered frame's
+ * candidate — the same stale-candidate race the first-person use key had. The
+ * radius rule and the water guard are exactly the per-frame hint's
+ * (settlementEnterCandidate); `blocked` carries the dialog/defeat/victory gate.
+ */
+export function settlementToEnter(
+  posX: number,
+  posZ: number,
+  places: readonly EnterablePlace[],
+  enterRadius: number,
+  onWater: boolean,
+  blocked: boolean,
+): string | null {
+  const id = settlementEnterCandidate(posX, posZ, places, enterRadius, onWater)
+  return shouldEnterSettlement(id, true, blocked) ? id : null
+}
