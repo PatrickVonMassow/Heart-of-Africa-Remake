@@ -10389,6 +10389,33 @@ the remaining open points in their numeric order.
   wildlife-render cluster (Wildlife.tsx/fauna.ts) — do NOT build concurrently with another
   Wildlife.tsx point. A user-reported visible bug → before 224. Implementation-ready.
 
+- [ ] 275. CROCODILE RARELY STRIKES — the ambush reads as inert (user 23.07.2026,
+  screenshot: a lurking crocodile in the river with prey nearby that it never attacks).
+  Current design (§19.16, `src/scenes/travel/Wildlife.tsx` ~:2459-2494): a hidden crocodile
+  lunges ONLY at an eligible BANK DRINKER standing at the waterline inside `strikeRadius`
+  (young preferred via `crocodileTargetWeight`), plus fleeing/dodging drinkers near a stale
+  drink target and crossing/vigil/fire-trapped animals — via `crocodileLungeReady(d, atBank,
+  strikeRadius)`. An animal merely GRAZING/PASSING near the river never triggers it, so if no
+  animal is in a "drinking at the bank in range" state the croc stays hidden and looks
+  passive. INVESTIGATE + TUNE (do NOT weaken the §19.8 drama safety — a lunge still routes
+  through `caughtBy` and the shared struggle window): (a) confirm the point-247 drinker-
+  staging (`Wildlife.tsx` ~:1343, the off-screen bank-drinker seeder near a lurking croc)
+  actually fires often enough that a player sees ambushes at a realistic rate — measure how
+  often a lurking croc ever gets an eligible target; (b) decide whether to BROADEN the trigger
+  so any prey that comes to the WATERLINE within the strike radius (not only a formal "drink"
+  pose) can be ambushed — a wandering grazer that steps to the bank should be catchable —
+  while keeping the ambush occasional (a hidden croc should not clear the whole bank); (c)
+  consider raising the ambush rate near a visible croc (staging a drinker toward it more
+  reliably) so the mechanic reads as alive. Anchor: `crocodileLungeReady` /
+  `crocodileTargetWeight` and the bank-drinker seeder; keep everything pure-testable. Balance
+  values (`balance.crocodile.strikeRadius`, any new ambush-rate value) stay debug-editable.
+  VERIFIABLE: pure-test the (possibly broadened) target predicate; a live enrichments check
+  that a lurking croc with a grazer brought to the waterline within range DOES lunge (and one
+  just outside range or merely passing does not); on BOTH backends. DOCS: design.md §19.16 if
+  the trigger rule changes. No player-visible text. NOTE: wildlife-render cluster
+  (Wildlife.tsx) — serialize with 274 and any other Wildlife.tsx point. A user-reported
+  behaviour gap → before 224. Implementation-ready once 274 has landed (same file).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
