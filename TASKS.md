@@ -10205,7 +10205,7 @@ the remaining open points in their numeric order.
   now; the BUILD waits for the cluster to be free and does NOT run concurrently with
   another Wildlife.tsx point. Implementation-ready once the research lands.
 
-- [ ] 270. F5 STATE-DUMP POPUP FOR BUG REPORTS (user 23.07.2026 — do this as the NEXT
+- [x] 270. F5 STATE-DUMP POPUP FOR BUG REPORTS (user 23.07.2026 — do this as the NEXT
   task). Add an F5 shortcut that opens a popup/overlay showing the COMPLETE game state
   in a suitable encoding, with a DOWNLOAD-as-file option, so the user can attach it to
   bug reports and make diagnosis easier. DETAILS: (1) a new `dumpGameState()` that
