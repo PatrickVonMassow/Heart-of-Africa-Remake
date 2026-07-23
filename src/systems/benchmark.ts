@@ -42,10 +42,17 @@ export interface BenchFlags {
   shadowMapHalf?: boolean
 }
 
-/** Terrain near-ring refinement levers (src/scenes/travel/terrainLod.ts). */
+/**
+ * Terrain near-ring refinement levers. The field names MUST match
+ * `setTerrainRefine` in src/scenes/travel/terrainLod.ts — the runner passes
+ * this object straight through, and a mismatched key silently does nothing
+ * (it did: a `refine` key left point 209's refinement fully on while the
+ * report claimed to have switched it off — caught by measuring the terrain
+ * triangles, not by a green test).
+ */
 export interface BenchTerrainOverride {
   /** false switches point 209's near-ring refinement off entirely. */
-  refine?: boolean
+  enabled?: boolean
   /** Caps the refined segment count (default 112). */
   segmentCap?: number
 }
@@ -73,13 +80,13 @@ export const BENCH_CONFIGS: readonly BenchConfig[] = [
   { name: 'shadow-half', flags: { shadowMapHalf: true } },
   { name: 'post-off', flags: { traaEnabled: false, ssaoEnabled: false } },
   { name: 'dpr-1', flags: {}, pixelRatio: 1 },
-  { name: 'terrain-refine-off', flags: {}, terrain: { refine: false } },
+  { name: 'terrain-refine-off', flags: {}, terrain: { enabled: false } },
   { name: 'terrain-cap-84', flags: {}, terrain: { segmentCap: 84 } },
   {
     name: 'all-off',
     flags: { traaEnabled: false, ssaoEnabled: false, shadowsEnabled: false, shadowMapHalf: true },
     pixelRatio: 1,
-    terrain: { refine: false },
+    terrain: { enabled: false },
   },
 ]
 
@@ -167,8 +174,8 @@ export function frameStats(samples: readonly number[]): FrameStats {
  * Whether the wall-clock frame time looks VSYNC-CAPPED rather than
  * GPU-limited. A page cannot disable vsync, so a config that is comfortably
  * fast reads as a flat ~16.7 ms (or ~8.3 ms at 120 Hz) and the levers are
- * indistinguishable in the wall clock — the CPU frame time still separates
- * them. The report carries the flag so the analysis knows which it is.
+ * indistinguishable in the wall clock. The report carries the flag so a
+ * capped number is never read as "this lever is worth nothing".
  */
 export function vsyncLikely(stats: FrameStats): boolean {
   if (stats.n === 0) return false
@@ -177,6 +184,32 @@ export function vsyncLikely(stats: FrameStats): boolean {
     if (Math.abs(stats.median - period) < period * 0.06) return true
   }
   return false
+}
+
+/** Which measured series actually answers "what does this lever cost?". */
+export type BenchHeadline = 'gpu' | 'cpu' | 'wall'
+
+/**
+ * The series the report leads with.
+ *
+ * The question point 276 asks is a GPU question (terrain 1.99x, dressing
+ * 2.41x): a config 40 % more expensive on the GPU shows up in NEITHER a
+ * vsync-capped wall clock NOR the CPU time. So wherever real GPU timestamps
+ * exist they are the headline; without them a capped wall clock is worthless
+ * and only the CPU time carries information (it still misses pure GPU cost —
+ * the report must say so rather than imply a verdict); only an UNCAPPED wall
+ * clock is a trustworthy end-to-end number on its own.
+ */
+export function headlineSeries(gpuAvailable: boolean, vsyncCapped: boolean): BenchHeadline {
+  if (gpuAvailable) return 'gpu'
+  return vsyncCapped ? 'cpu' : 'wall'
+}
+
+/** One-line English note for the report digest (the UI localizes its own). */
+export function headlineNote(headline: BenchHeadline, gpuReason: string): string {
+  if (headline === 'gpu') return 'HEADLINE: gpu — real GPU timestamps, unaffected by vsync.'
+  if (headline === 'wall') return 'HEADLINE: frame — the wall clock is not vsync-capped here, so it measures end to end.'
+  return `HEADLINE: cpu — no GPU timestamps (${gpuReason}) and the wall clock is vsync-capped, so pure GPU cost is NOT measured here.`
 }
 
 /**
@@ -300,8 +333,12 @@ export interface BenchRow {
   frame: FrameStats
   /** CPU time inside the frame (ms): every useFrame plus the render
    *  submission, measured between R3F's before/after effects. Not capped by
-   *  vsync, so it separates configs even at a locked 60 Hz. */
+   *  vsync, but blind to pure GPU cost. */
   cpu: FrameStats
+  /** REAL GPU time (ms) from the backend's timestamp queries — the series
+   *  that answers the geometry question. null where unavailable (WebGL 2, or
+   *  an adapter without `timestamp-query`); never fabricated. */
+  gpu: FrameStats | null
   vsyncLikely: boolean
   drawCalls: number
   triangles: number
@@ -318,6 +355,11 @@ export interface BenchReport {
   dt: number
   frames: BenchFrameCounts
   env: BenchEnvironment
+  /** Whether real GPU timestamps were measured, and why not when they were
+   *  not — an unavailable series is FLAGGED, never faked. */
+  gpuTiming: { available: boolean; reason: string }
+  /** The series to read as the result (see `headlineSeries`). */
+  headline: BenchHeadline
   rows: BenchRow[]
   /** Wall-clock duration of the whole sweep (ms). */
   durationMs: number
@@ -350,21 +392,24 @@ function padStart(s: string, n: number): string {
  */
 export function benchSummaryLines(report: BenchReport): string[] {
   const e = report.env
+  const num = (v: number | undefined): string => (v === undefined ? '—' : v.toFixed(2))
   const lines = [
     `${report.app} — render benchmark${report.short ? ' (short mode)' : ''}${report.aborted ? ' — ABORTED' : ''}`,
     `${e.startedAt} · ${e.backend} · ${e.viewport.width}x${e.viewport.height} @dpr ${e.devicePixelRatio} · build ${e.build} ${e.commit}`,
     `fixed timestep ${report.dt.toFixed(5)}s · ${report.frames.sample} sampled frames per phase · seed ${report.seed} · day ${report.day}`,
-    `${pad('config', 20)}${pad('phase', 18)}${padStart('fps', 7)}${padStart('med', 8)}${padStart('p95', 8)}${padStart('p99', 8)}${padStart('cpu', 8)}${padStart('draws', 8)}${padStart('tris', 10)}`,
+    headlineNote(report.headline, report.gpuTiming.reason),
+    `${pad('config', 20)}${pad('phase', 18)}${padStart('fps', 7)}${padStart('gpu', 8)}${padStart('gpu95', 8)}${padStart('cpu', 8)}${padStart('frame', 8)}${padStart('f95', 8)}${padStart('draws', 8)}${padStart('tris', 10)}`,
   ]
   for (const r of report.rows) {
     lines.push(
       pad(r.config, 20) +
         pad(r.phase, 18) +
         padStart(r.frame.fps.toFixed(1), 7) +
-        padStart(r.frame.median.toFixed(2), 8) +
-        padStart(r.frame.p95.toFixed(2), 8) +
-        padStart(r.frame.p99.toFixed(2), 8) +
-        padStart(r.cpu.median.toFixed(2), 8) +
+        padStart(num(r.gpu?.median), 8) +
+        padStart(num(r.gpu?.p95), 8) +
+        padStart(num(r.cpu.median), 8) +
+        padStart(num(r.frame.median), 8) +
+        padStart(num(r.frame.p95), 8) +
         padStart(String(r.drawCalls), 8) +
         padStart(String(r.triangles), 10) +
         (r.vsyncLikely ? '  [vsync-capped]' : ''),

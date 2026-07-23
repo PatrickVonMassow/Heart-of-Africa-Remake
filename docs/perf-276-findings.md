@@ -113,11 +113,47 @@ between runs — and hand back a downloadable report. That is point 277.
 | determinism | a seeded PRNG replaces `Math.random` for the run (restored in a `finally`); seed, date, position, travel speed, zoom, journal and the event/deadline switches are reset before EVERY section |
 | **fixed step** | R3F's frame clock is pinned (`installFixedClock`): every `useFrame` gets dt = 1/60 s and `elapsedTime` advances once per frame, and each section runs a FIXED FRAME COUNT — so the simulated path, the streaming crossings and every roll are identical across configs and only the wall clock varies |
 | warm-up | one discarded pass over the whole route, so the cold caches (terrain geometry, flora, shader compiles) do not land on whichever config runs first |
-| metrics | wall-clock frame time (median/p95/p99/max, fps) AND the CPU time inside the frame, measured between R3F's before/after render effects, plus `renderer.info` draw calls/triangles and a scene-graph triangle count per system |
+| metrics | THREE series — **real GPU time** from the WebGPU backend's timestamp queries, the CPU time inside the frame (between R3F's before/after render effects) and the wall-clock frame interval — plus `renderer.info` draw calls/triangles and a scene-graph triangle count per system |
+| GPU time | `backend.trackTimestamp = true` for the run (three requests every adapter-supported feature at device creation, so `timestamp-query` is already enabled where the hardware has it), then `renderer.resolveTimestampsAsync('render')` per frame; it returns the summed GPU duration of the last frame in the batch, so a phase collects one sample per resolve round-trip (`gpu.n` in the report). Missing feature or a throwing resolve ⇒ the series is marked unavailable WITH a reason and the run continues |
 | terrain levers | module-level runtime overrides in `src/scenes/travel/terrainLod.ts` (`setTerrainRefine`), which change the chunk geometry KEYS and therefore rebuild by themselves; restored after the run |
 
-**Reading the numbers:** a page cannot disable vsync, so a config that is
+**Reading the numbers.** A page cannot disable vsync, so a config that is
 comfortably fast reads as a flat ~16.7 ms and the wall clock cannot separate the
-levers — the report flags that per row (`vsyncLikely`), and the CPU frame time
-stays informative there. Nothing below the vsync period is evidence AGAINST a
-lever; a wall clock ABOVE it is evidence for one.
+levers (flagged per row as `vsyncLikely`). That matters more than it sounds: the
+regression above is GEOMETRY, i.e. a GPU cost — a config 40 % more expensive on
+the GPU moves NEITHER a capped wall clock NOR the CPU time, so a CPU-only report
+would say "no difference" for exactly the lever in question. Hence the GPU
+series, and hence the report names its own headline (`headline`, also written
+into the digest and shown in the result panel):
+
+| headline | when | what it means |
+| --- | --- | --- |
+| `gpu` | GPU timestamps resolved | read the GPU column — vsync-independent, the real cost of the lever |
+| `wall` | no timestamps, wall clock NOT capped | the frame column measures end to end |
+| `cpu` | no timestamps AND a capped wall clock | only the CPU column carries information, and the GPU cost is NOT measured — do not read this run as a verdict on a geometry lever |
+
+The headless WebGL 2 lane always lands in the third case, which is why the
+in-game run on the user's WebGPU machine is the one that decides.
+
+### First results from the instrument itself (headless WebGPU, 24.07.2026)
+
+Two things showed up the moment the benchmark measured geometry rather than
+render features:
+
+1. **The terrain lever really is worth its 2x.** With the refinement off, the
+   desert scene graph drops from **847 074 to 425 058** triangles — the v0.1
+   histogram of the table above, reproduced live and now switchable at runtime.
+   (It also caught its own wiring bug: the first version passed the override
+   under a mis-named key, so the lever silently did nothing while every test
+   stayed green. The gate now asserts the RENDERED triangle drop, not the
+   config object.)
+2. **OPEN — the dressing creeps upward over a session.** At a FIXED desert
+   anchor, with a fixed seed and a fixed date, the instanced dressing grows
+   with every flora rebuild: 235 808 → 327 808 triangles over five round trips
+   between two anchors (mesh count constant at 37), and 252 766 → 354 958
+   across one full benchmark run. Terrain, water and sky stay bit-stable
+   meanwhile, so it is the flora instance counts alone. Reproduced OUTSIDE the
+   benchmark (plain debug jumps), so it is the game's own behaviour, not a
+   measurement artifact — a growing per-frame cost the longer one plays, and a
+   candidate for the same regression family as this document. Not diagnosed
+   further here; it needs its own point.

@@ -170,6 +170,16 @@ export interface Strings {
     doneTitle: string
     /** Shown instead of the result when the run was aborted. */
     abortedNote: string
+    /** Which of the three measured series is the trustworthy result here. */
+    headline: {
+      /** Real GPU timestamps were measured — the headline number. */
+      gpu: string
+      /** No GPU timestamps AND a vsync-capped wall clock: only the CPU column
+       *  carries information, and pure GPU cost is not measured at all. */
+      cpu: (reason: string) => string
+      /** No GPU timestamps, but the wall clock is not capped. */
+      wall: string
+    }
     /** Save the report as a .json file. */
     download: string
     copy: string

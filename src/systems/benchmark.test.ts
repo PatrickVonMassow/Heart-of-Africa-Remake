@@ -21,6 +21,8 @@ import {
   benchTotalFrames,
   formatDuration,
   frameStats,
+  headlineNote,
+  headlineSeries,
   installFixedClock,
   sceneTriangleBreakdown,
   vsyncLikely,
@@ -51,7 +53,7 @@ describe('benchmark sweep plan (design.md §21.1)', () => {
 
   it('the terrain levers carry the runtime overrides the runner applies', () => {
     const refineOff = BENCH_CONFIGS.find((c) => c.name === 'terrain-refine-off')
-    expect(refineOff?.terrain).toEqual({ refine: false })
+    expect(refineOff?.terrain).toEqual({ enabled: false })
     const cap = BENCH_CONFIGS.find((c) => c.name === 'terrain-cap-84')
     expect(cap?.terrain).toEqual({ segmentCap: 84 })
     expect(BENCH_CONFIGS.find((c) => c.name === 'dpr-1')?.pixelRatio).toBe(1)
@@ -66,7 +68,7 @@ describe('benchmark sweep plan (design.md §21.1)', () => {
       shadowMapHalf: true,
     })
     expect(all?.pixelRatio).toBe(1)
-    expect(all?.terrain).toEqual({ refine: false })
+    expect(all?.terrain).toEqual({ enabled: false })
   })
 })
 
@@ -203,6 +205,31 @@ describe('frame statistics', () => {
   })
 })
 
+describe('which series is the trustworthy result', () => {
+  it('GPU timestamps always win — they answer the geometry question', () => {
+    // The point-276 regression is GEOMETRY: a config 40 % more expensive on
+    // the GPU moves NEITHER a capped wall clock NOR the CPU time.
+    expect(headlineSeries(true, true)).toBe('gpu')
+    expect(headlineSeries(true, false)).toBe('gpu')
+  })
+
+  it('without GPU times a capped wall clock is worthless, so the CPU leads', () => {
+    expect(headlineSeries(false, true)).toBe('cpu')
+  })
+
+  it('without GPU times an UNCAPPED wall clock is the end-to-end number', () => {
+    expect(headlineSeries(false, false)).toBe('wall')
+  })
+
+  it('the note names the missing feature and warns that GPU cost is unmeasured', () => {
+    const note = headlineNote('cpu', 'WebGL 2 backend has no timestamp queries')
+    expect(note).toContain('WebGL 2 backend has no timestamp queries')
+    expect(note).toMatch(/NOT measured/)
+    expect(headlineNote('gpu', '')).toMatch(/vsync/)
+    expect(headlineNote('wall', '')).toMatch(/end to end/)
+  })
+})
+
 describe('scene-graph triangle breakdown', () => {
   const mesh = (name: string | undefined, verts: number, extra: Partial<BenchSceneNode> = {}): BenchSceneNode => ({
     name,
@@ -263,7 +290,7 @@ describe('scene-graph triangle breakdown', () => {
 })
 
 describe('report shaping', () => {
-  const report = (): BenchReport => ({
+  const report = (gpu = true): BenchReport => ({
     app: BENCH_APP,
     kind: 'render-benchmark',
     short: true,
@@ -281,13 +308,16 @@ describe('report shaping', () => {
       commit: 'abc1234',
       startedAt: '2026-07-24T10:00:00.000Z',
     },
+    gpuTiming: gpu ? { available: true, reason: '' } : { available: false, reason: 'WebGL 2 backend has no timestamp queries' },
+    headline: headlineSeries(gpu, !gpu),
     rows: [
       {
         config: 'baseline',
         phase: 'savanna-standing',
         frame: frameStats([8, 9, 10]),
         cpu: frameStats([3, 4, 5]),
-        vsyncLikely: false,
+        gpu: gpu ? frameStats([6, 6.5, 7]) : null,
+        vsyncLikely: !gpu,
         drawCalls: 412,
         triangles: 1234567,
         sceneTriangles: { terrain: { tris: 847076, meshes: 169 } },
@@ -310,16 +340,47 @@ describe('report shaping', () => {
     expect(lines[1]).toContain('1440x900')
     expect(lines[1]).toContain('abc1234')
     expect(lines[2]).toContain('seed')
+    // The series to read comes BEFORE the table, not as a footnote.
+    expect(lines[3]).toContain('HEADLINE: gpu')
+    expect(lines[4]).toContain('gpu')
     expect(lines.some((l) => l.includes('baseline') && l.includes('savanna-standing'))).toBe(true)
-    expect(lines).toHaveLength(5) // 3 header lines + the table head + one row
+    expect(lines).toHaveLength(6) // 3 header lines + headline + table head + one row
   })
 
-  it('is valid JSON that leads with the digest', () => {
+  it('prints the GPU column where it exists and a dash where it does not', () => {
+    const withGpu = benchSummaryLines(report()).at(-1) ?? ''
+    expect(withGpu).toContain('6.50') // the gpu median of [6, 6.5, 7]
+    const withoutGpu = benchSummaryLines(report(false))
+    expect(withoutGpu[3]).toContain('HEADLINE: cpu')
+    expect(withoutGpu[3]).toContain('WebGL 2 backend has no timestamp queries')
+    expect(withoutGpu.at(-1)).toContain('—')
+    expect(withoutGpu.at(-1)).toContain('[vsync-capped]')
+  })
+
+  it('is valid JSON that leads with the digest and states the GPU availability', () => {
     const json = benchReportJson(report())
-    const parsed = JSON.parse(json) as { summary: string[]; rows: unknown[] }
+    const parsed = JSON.parse(json) as {
+      summary: string[]
+      rows: Array<{ gpu: unknown }>
+      gpuTiming: { available: boolean }
+      headline: string
+    }
     expect(Object.keys(parsed)[0]).toBe('summary')
     expect(parsed.summary.length).toBeGreaterThan(3)
     expect(parsed.rows).toHaveLength(1)
+    expect(parsed.gpuTiming.available).toBe(true)
+    expect(parsed.headline).toBe('gpu')
+    expect(parsed.rows[0].gpu).not.toBeNull()
+
+    // Unavailable is FLAGGED, never fabricated.
+    const none = JSON.parse(benchReportJson(report(false))) as {
+      rows: Array<{ gpu: unknown }>
+      gpuTiming: { available: boolean; reason: string }
+      headline: string
+    }
+    expect(none.gpuTiming).toEqual({ available: false, reason: 'WebGL 2 backend has no timestamp queries' })
+    expect(none.headline).toBe('cpu')
+    expect(none.rows[0].gpu).toBeNull()
   })
 
   it('estimates the remaining time from the pace so far', () => {

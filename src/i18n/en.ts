@@ -252,6 +252,12 @@ export const en: Strings = {
     abortHint: 'Esc aborts the benchmark and restores every setting.',
     doneTitle: 'Benchmark Finished',
     abortedNote: 'The run was aborted — the report covers the completed settings only.',
+    headline: {
+      gpu: 'Read the GPU column: these are real GPU times from the graphics driver, unaffected by the display refresh rate.',
+      cpu: (reason) =>
+        `No GPU times available (${reason}), and the frame times are capped by the display refresh rate. Only the CPU column carries information — the graphics card's own cost is not measured in this run.`,
+      wall: 'Read the frame column: the frame times are not capped by the display refresh rate here, so they measure the whole frame.',
+    },
     download: 'Download report',
     copy: 'Copy',
     copied: 'Benchmark report copied to the clipboard.',

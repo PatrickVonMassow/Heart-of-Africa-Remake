@@ -42,6 +42,7 @@ import {
   benchShortMode,
   benchTotalFrames,
   frameStats,
+  headlineSeries,
   installFixedClock,
   sceneTriangleBreakdown,
   vsyncLikely,
@@ -72,6 +73,107 @@ let running = false
 
 function pressKey(code: string, down: boolean): void {
   window.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code }))
+}
+
+// --- GPU timing (the series the geometry question actually needs) ------------
+
+/** Minimal structural view of the renderer's timestamp plumbing (three 0.185). */
+interface TimestampRenderer {
+  backend?: { isWebGPUBackend?: boolean; trackTimestamp?: boolean }
+  hasFeature?: (name: string) => boolean
+  resolveTimestampsAsync?: (type?: string) => Promise<number | undefined>
+}
+
+interface GpuTimer {
+  available: boolean
+  /** Why GPU time is missing — carried into the report, never a fake number. */
+  reason: string
+  /** Kick a resolve if none is in flight; a settled one appends to `sink`. */
+  poll(sink: number[] | null): void
+  /** Await the in-flight resolve (and one more) so a phase's samples are in. */
+  flush(sink: number[] | null): Promise<void>
+  restore(): void
+}
+
+/**
+ * Real GPU milliseconds per frame via the WebGPU backend's timestamp queries.
+ *
+ * Why it matters: point 276's regression is GEOMETRY (terrain 1.99x, dressing
+ * 2.41x). A page cannot disable vsync, so a config 40 % more expensive on the
+ * GPU reads as a flat 16.7 ms wall clock AND as unchanged CPU time — exactly
+ * the lever the benchmark exists to price would look free. `trackTimestamp`
+ * makes three write timestamp queries around every render pass;
+ * `resolveTimestampsAsync('render')` returns the summed GPU duration of the
+ * last frame in the resolved batch.
+ *
+ * three requests every adapter-supported feature at device creation, so
+ * `timestamp-query` is already enabled where the hardware has it and the flag
+ * can be flipped for the run and restored afterwards. Everything here is
+ * defensive: a missing feature or a throwing resolve marks the series
+ * unavailable and the run continues on the other two.
+ */
+function createGpuTimer(gl: unknown): GpuTimer {
+  const renderer = gl as TimestampRenderer
+  const backend = renderer.backend
+  const off: GpuTimer = {
+    available: false,
+    reason: '',
+    poll: () => {},
+    flush: () => Promise.resolve(),
+    restore: () => {},
+  }
+  if (!backend || backend.isWebGPUBackend !== true) {
+    return { ...off, reason: 'WebGL 2 backend has no timestamp queries' }
+  }
+  if (typeof renderer.resolveTimestampsAsync !== 'function') {
+    return { ...off, reason: 'renderer exposes no timestamp resolve' }
+  }
+  try {
+    if (renderer.hasFeature?.('timestamp-query') !== true) {
+      return { ...off, reason: 'adapter without the timestamp-query feature' }
+    }
+  } catch {
+    return { ...off, reason: 'timestamp-query feature check failed' }
+  }
+  const originalTrack = backend.trackTimestamp === true
+  backend.trackTimestamp = true
+
+  const timer: GpuTimer = {
+    available: true,
+    reason: '',
+    poll: () => {},
+    flush: () => Promise.resolve(),
+    restore: () => {
+      backend.trackTimestamp = originalTrack
+    },
+  }
+  let inFlight: Promise<void> | null = null
+  const resolveOnce = (sink: number[] | null): Promise<void> => {
+    // One resolve at a time: three returns the SAME promise for a concurrent
+    // call, which would record one duration twice.
+    if (inFlight) return inFlight
+    inFlight = (renderer.resolveTimestampsAsync as (type?: string) => Promise<number | undefined>)('render')
+      .then((ms) => {
+        if (typeof ms === 'number' && ms > 0 && sink !== null) sink.push(ms)
+      })
+      .catch(() => {
+        timer.available = false
+        timer.reason = 'timestamp resolve failed mid-run'
+      })
+      .finally(() => {
+        inFlight = null
+      })
+    return inFlight
+  }
+  timer.poll = (sink) => {
+    if (timer.available) void resolveOnce(sink)
+  }
+  timer.flush = async (sink) => {
+    if (!timer.available) return
+    if (inFlight) await inFlight
+    await resolveOnce(sink)
+  }
+  return timer
 }
 
 /**
@@ -171,13 +273,15 @@ function describeBackend(gl: unknown): { backend: string; adapter: string } {
   const backend = (gl as { backend?: { isWebGPUBackend?: boolean } }).backend
   const isWebGpu = backend?.isWebGPUBackend === true
   const info = backend as unknown as {
-    adapter?: { info?: { vendor?: string; architecture?: string; device?: string } }
+    // three keeps no adapter handle, but the device carries its info
+    // (GPUDevice.adapterInfo) — that is the GPU's name in the report.
+    device?: { adapterInfo?: { vendor?: string; architecture?: string; device?: string; description?: string } }
     gl?: WebGL2RenderingContext
   } | null
   let adapter = 'unknown'
-  if (isWebGpu && info?.adapter?.info) {
-    const a = info.adapter.info
-    adapter = [a.vendor, a.architecture, a.device].filter(Boolean).join(' ') || 'unknown'
+  if (isWebGpu && info?.device?.adapterInfo) {
+    const a = info.device.adapterInfo
+    adapter = [a.vendor, a.architecture, a.device, a.description].filter(Boolean).join(' ').trim() || 'unknown'
   } else if (info?.gl) {
     try {
       const dbg = info.gl.getExtension('WEBGL_debug_renderer_info')
@@ -218,6 +322,9 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   const terrainSnapshot = getTerrainRefine()
   const defaultPixelRatio = ctx.gl.getPixelRatio()
   const restoreClock = installFixedClock(ctx.clock, BENCH_DT)
+  // Real GPU milliseconds where the backend can measure them — the only series
+  // that answers the geometry question under vsync.
+  const gpu = createGpuTimer(ctx.gl)
   Math.random = mulberry32(BENCH_SEED)
 
   ui.clearBenchAbort()
@@ -250,8 +357,13 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     resetWorld(phase)
     publish(measured ? config.name : null, configIndex, phase.name)
     let sinceUpdate = 0
+    // GPU durations of the measured frames. During the settle the queries are
+    // still resolved but DISCARDED (an unresolved pool overflows at 2048).
+    const gpuSamples: number[] = []
+    let gpuSink: number[] | null = null
     const tick = (): void => {
       framesDone++
+      gpu.poll(gpuSink)
       if (++sinceUpdate >= 15) {
         sinceUpdate = 0
         publish(measured ? config.name : null, configIndex, phase.name)
@@ -260,16 +372,22 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     if (phase.drive) pressKey('KeyW', true)
     try {
       await runFrames(counts.settle, null, tick)
+      gpuSink = measured ? gpuSamples : null
       const samples: FrameSample[] = []
       await runFrames(counts.sample, samples, tick)
+      // Drain the last in-flight resolve so the phase's GPU sample is complete.
+      await gpu.flush(gpuSink)
       if (!measured) return
       const render = (ctx.gl.info as { render?: { drawCalls?: number; triangles?: number } }).render
+      const frame = frameStats(samples.map((s) => s.frameMs))
       rows.push({
         config: config.name,
         phase: phase.name,
-        frame: frameStats(samples.map((s) => s.frameMs)),
+        frame,
         cpu: frameStats(samples.map((s) => s.cpuMs)),
-        vsyncLikely: vsyncLikely(frameStats(samples.map((s) => s.frameMs))),
+        // Never fabricated: no timestamps, no number.
+        gpu: gpu.available && gpuSamples.length > 0 ? frameStats(gpuSamples) : null,
+        vsyncLikely: vsyncLikely(frame),
         drawCalls: render?.drawCalls ?? 0,
         triangles: render?.triangles ?? 0,
         sceneTriangles: sceneTriangleBreakdown(ctx.scene as unknown as BenchSceneNode),
@@ -300,6 +418,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     }
   } finally {
     restoreClock()
+    gpu.restore()
     Math.random = originalRandom
     resetTerrainRefine()
     setTerrainRefine(terrainSnapshot)
@@ -315,6 +434,12 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   }
 
   const { backend, adapter } = describeBackend(ctx.gl)
+  // The GPU series counts as measured only if rows actually carry it.
+  const gpuMeasured = gpu.available && rows.some((r) => r.gpu !== null)
+  const gpuReason = gpuMeasured ? '' : gpu.reason || 'no GPU timestamps were resolved'
+  // "Capped" if the wall clock sat at a refresh period in most rows — then it
+  // cannot be the headline, whatever it reads.
+  const capped = rows.length > 0 && rows.filter((r) => r.vsyncLikely).length * 2 >= rows.length
   const report: BenchReport = {
     app: BENCH_APP,
     kind: 'render-benchmark',
@@ -333,6 +458,8 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       commit: import.meta.env.VITE_BUILD_COMMIT ?? 'unknown',
       startedAt: startedAt.toISOString(),
     },
+    gpuTiming: { available: gpuMeasured, reason: gpuReason },
+    headline: headlineSeries(gpuMeasured, capped),
     rows,
     durationMs: Math.round(performance.now() - t0),
     aborted,

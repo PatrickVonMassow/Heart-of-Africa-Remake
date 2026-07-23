@@ -1096,18 +1096,28 @@ verify suite that proves it.
     simulation timestep (1/60 s) stepped a FIXED number of frames, so the
     path and every roll repeat and only the measured wall-clock varies —
     then offers the report (environment incl. backend/adapter/build
-    commit; per config the frame-time median/p95/p99/max, fps, the CPU
-    time inside the frame, `renderer.info` draw calls/triangles and a
-    scene-graph triangle count per system) as a downloadable JSON with a
-    readable digest plus a copy button, behind a localized modal whose
-    Esc aborts and restores every setting; verifiable via
+    commit; per config THREE series — the REAL GPU time from the WebGPU
+    backend's timestamp queries, the CPU time inside the frame and the
+    wall-clock frame time, each median/p95/p99/max — plus fps,
+    `renderer.info` draw calls/triangles and a scene-graph triangle count
+    per system) as a downloadable JSON with a readable digest plus a copy
+    button, behind a localized modal whose Esc aborts and restores every
+    setting. The GPU series is the point: a page cannot disable vsync, so
+    a config 40 % dearer on the GPU moves NEITHER a capped wall clock NOR
+    the CPU time — exactly the geometry lever of point 276 would look
+    free. Where timestamps are unavailable (WebGL 2, or an adapter
+    without `timestamp-query`) the series is FLAGGED with its reason,
+    never fabricated, and the report names which series is the
+    trustworthy one (`headline`, in the digest and in the result panel);
+    verifiable via
     `src/systems/benchmark.test.ts` (sweep plan, route, fixed-timestep
     clock, statistics, breakdown, report shaping),
     `src/ui/BenchmarkOverlay.test.tsx` (F8 starts the lazy runner and
     prevents the browser default, Esc aborts/closes, both languages) and
     `scripts/verify/benchmark.mjs` (a live `?bench=short` run: one row per
-    config × phase, the progress modal, every setting — `Math.random`
-    included — restored afterwards)); the
+    config × phase, the progress modal, the GPU series measured on WebGPU
+    and flagged-with-reason on WebGL 2, and every setting —
+    `Math.random` included — restored afterwards)); the
     canteen's consumption
     rates and capacity are editable (§21.2), as is the parental rescue
     burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's

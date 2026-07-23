@@ -31,9 +31,14 @@ const progress = {
   remainingMs: 65000,
 }
 
-const reportFile = (aborted = false) => ({
+const reportFile = (aborted = false, headline = 'gpu', reason = '') => ({
   filename: 'hoa-bench-2026-07-24-webgpu.json',
-  json: JSON.stringify({ summary: ['line one', 'line two'], rows: [] }),
+  json: JSON.stringify({
+    summary: ['line one', 'line two'],
+    headline,
+    gpuTiming: { available: headline === 'gpu', reason },
+    rows: [],
+  }),
   aborted,
 })
 
@@ -141,6 +146,25 @@ describe('benchmark overlay (design.md §21.1, §17.4)', () => {
     expect(document.querySelector('.bench-aborted')).toBeNull()
     act(() => useUi.getState().setBenchReport(reportFile(true)))
     expect(document.querySelector('.bench-aborted')?.textContent).toBe(en.benchmark.abortedNote)
+  })
+
+  it('names the trustworthy series — GPU where measured, in both languages', () => {
+    render(<BenchmarkOverlay />)
+    act(() => useUi.getState().setBenchReport(reportFile()))
+    expect(document.querySelector('.bench-headline')?.textContent).toBe(en.benchmark.headline.gpu)
+    act(() => useLocale.getState().setLang('de'))
+    expect(document.querySelector('.bench-headline')?.textContent).toBe(de.benchmark.headline.gpu)
+  })
+
+  it('says outright when GPU time is missing and the wall clock is capped', () => {
+    render(<BenchmarkOverlay />)
+    const reason = 'WebGL 2 backend has no timestamp queries'
+    act(() => useUi.getState().setBenchReport(reportFile(false, 'cpu', reason)))
+    const note = document.querySelector('.bench-headline')?.textContent ?? ''
+    expect(note).toBe(en.benchmark.headline.cpu(reason))
+    expect(note).toContain(reason)
+    act(() => useUi.getState().setBenchReport(reportFile(false, 'wall')))
+    expect(document.querySelector('.bench-headline')?.textContent).toBe(en.benchmark.headline.wall)
   })
 
   it('the close button clears the report', () => {

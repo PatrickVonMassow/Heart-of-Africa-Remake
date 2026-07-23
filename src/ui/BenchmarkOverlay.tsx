@@ -8,7 +8,7 @@
 
 import { useGame } from '../state/store'
 import { useUi } from '../state/ui'
-import { formatDuration, type BenchPhaseName } from '../systems/benchmark'
+import { formatDuration, type BenchHeadline, type BenchPhaseName } from '../systems/benchmark'
 import { getStrings, useStrings } from '../i18n'
 import type { Strings } from '../i18n/types'
 
@@ -22,13 +22,21 @@ function phaseLabel(t: Strings, phase: string): string {
 }
 
 /** The digest the report file carries as its first key — shown for a glance
- *  check before the file is sent on. */
-function summaryOf(json: string): string {
+ *  check before the file is sent on, together with the series to read. */
+function reportDigest(json: string): { summary: string; headline: BenchHeadline | null; gpuReason: string } {
   try {
-    const parsed = JSON.parse(json) as { summary?: string[] }
-    return (parsed.summary ?? []).join('\n')
+    const parsed = JSON.parse(json) as {
+      summary?: string[]
+      headline?: BenchHeadline
+      gpuTiming?: { reason?: string }
+    }
+    return {
+      summary: (parsed.summary ?? []).join('\n'),
+      headline: parsed.headline ?? null,
+      gpuReason: parsed.gpuTiming?.reason ?? '',
+    }
   } catch {
-    return ''
+    return { summary: '', headline: null, gpuReason: '' }
   }
 }
 
@@ -38,6 +46,17 @@ export function BenchmarkOverlay() {
   const report = useUi((s) => s.benchReport)
 
   if (report) {
+    const digest = reportDigest(report.json)
+    // Which of the three measured series actually answers the question — said
+    // outright, so nobody reads a vsync-capped wall clock as a verdict.
+    const headlineNote =
+      digest.headline === 'gpu'
+        ? t.benchmark.headline.gpu
+        : digest.headline === 'wall'
+          ? t.benchmark.headline.wall
+          : digest.headline === 'cpu'
+            ? t.benchmark.headline.cpu(digest.gpuReason)
+            : null
     const download = () => {
       const blob = new Blob([report.json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -60,7 +79,8 @@ export function BenchmarkOverlay() {
         <div className="dialog bench-report">
           <h3>{t.benchmark.doneTitle}</h3>
           {report.aborted && <p className="bench-aborted">{t.benchmark.abortedNote}</p>}
-          <pre className="bench-summary">{summaryOf(report.json)}</pre>
+          {headlineNote && <p className="bench-headline">{headlineNote}</p>}
+          <pre className="bench-summary">{digest.summary}</pre>
           <div className="actions">
             <button className="hud-button bench-download" onClick={download}>
               {t.benchmark.download}

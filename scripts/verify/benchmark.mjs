@@ -4,8 +4,9 @@
 // in src/systems/benchmark.test.ts; the F8 binding and the localized overlay
 // in src/ui/BenchmarkOverlay.test.tsx. What needs a real browser is the RUN:
 // F8 in the `?bench=short` mode must drive the live scene through every config
-// of the route, publish one report row per config × phase, put the progress
-// modal up while it runs — and afterwards leave the game EXACTLY as it was,
+// of the route, publish one report row per config × phase (with the GPU series
+// measured on WebGPU and honestly flagged unavailable on the WebGL 2 lane), put
+// the progress modal up while it runs — and afterwards leave the game as it was,
 // Math.random included (the run installs a seeded PRNG over it, and a leaked
 // one would silently derandomise every later session).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
@@ -107,6 +108,52 @@ check(
   'every row carries a scene-graph triangle breakdown',
   report.rows.every((r) => Object.keys(r.sceneTriangles).length > 0),
 )
+// GPU time is the series that answers the geometry question under vsync — it
+// must be MEASURED where the backend can (WebGPU + timestamp-query) and
+// FLAGGED, never fabricated, where it cannot (the WebGL 2 lane).
+const gpuRows = report.rows.filter((r) => r.gpu !== null)
+if (report.env.backend === 'webgl2') {
+  check(
+    'WebGL 2: GPU timing is flagged unavailable with a reason, and no row fakes one',
+    report.gpuTiming.available === false && report.gpuTiming.reason.length > 0 && gpuRows.length === 0,
+    `${report.gpuTiming.reason} / ${gpuRows.length} rows with gpu`,
+  )
+} else {
+  check(
+    'WebGPU: real GPU timestamps were measured for every row',
+    report.gpuTiming.available === true && gpuRows.length === report.rows.length && gpuRows.every((r) => r.gpu.n > 0 && r.gpu.median > 0),
+    `${gpuRows.length}/${report.rows.length} rows, reason "${report.gpuTiming.reason}"`,
+  )
+}
+// The levers must BITE, judged by the real signal (the rendered geometry), not
+// by the config object agreeing with itself: a mis-named override key once left
+// point 209's refinement fully on while the report claimed it off.
+const desertRow = (config) => report.rows.find((r) => r.config === config && r.phase === 'desert-standing')
+const baseDesert = desertRow('baseline')
+const heaviest = Object.entries(baseDesert?.sceneTriangles ?? {}).sort((a, b) => b[1].tris - a[1].tris)[0]
+const terrainTris = (row) => row?.sceneTriangles?.[heaviest?.[0]]?.tris ?? 0
+for (const config of ['terrain-refine-off', 'terrain-cap-84']) {
+  const cut = terrainTris(baseDesert) - terrainTris(desertRow(config))
+  check(
+    `the ${config} lever really cuts the terrain geometry`,
+    cut > 0,
+    `${terrainTris(baseDesert)} -> ${terrainTris(desertRow(config))} (${heaviest?.[0]})`,
+  )
+}
+
+check(
+  'the report names the series to read, consistent with the GPU availability',
+  ['gpu', 'cpu', 'wall'].includes(report.headline) && (report.headline === 'gpu') === report.gpuTiming.available,
+  `headline ${report.headline}, gpu ${report.gpuTiming.available}`,
+)
+check(
+  'the digest states the headline series before the table',
+  report.summary.some((l) => l.startsWith('HEADLINE:')),
+)
+check(
+  'the result panel names the trustworthy series to the player',
+  (await page.locator('.bench-headline').count()) === 1,
+)
 check(
   'the report names the environment (backend, viewport, build)',
   ['webgpu', 'webgl2'].includes(report.env.backend) &&
@@ -162,6 +209,10 @@ check('the progress state is cleared once the report is up', after.progressClear
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' })))
 await page.waitForTimeout(300)
 check('Esc closes the result panel', (await page.locator('.bench-report').count()) === 0)
+
+// The digest itself, so a suite run leaves the actual numbers behind (run-all
+// captures this; only a direct run prints it).
+console.log(report.summary.join('\n'))
 
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 await browser.close()

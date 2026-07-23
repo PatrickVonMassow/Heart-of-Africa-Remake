@@ -1030,6 +1030,14 @@ textarea {
   color: #e2a15a;
 }
 
+/* Which measured series is the trustworthy one — the first thing to read. */
+.bench-headline {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #d8b26a;
+}
+
 .bench-summary {
   margin: 8px 0 0;
   max-height: 55vh;
