@@ -10155,6 +10155,49 @@ the remaining open points in their numeric order.
   No player-visible text. NOTE: rendering/behaviour — touches Wildlife.tsx (+ maybe a
   pure pose helper in wildlifeBehavior.ts), the wildlife-render cluster. Implementation-ready.
 
+- [ ] 269. BIRDS FLEE BY FLYING + REGION-APPROPRIATE AERIAL PREDATORS (research-gated)
+  (user 23.07.2026). Two linked additions, BOTH gated on a Fable research pass first.
+  (A) FLIGHT-CAPABLE BIRDS ESCAPE BY FLYING: every bird species that can fly gets a
+  GROUND (perched/sitting/feeding) state and an IN-AIR (flying) state; when it flees a
+  ground predator (or an approaching elephant) it TAKES OFF and flies, which puts it
+  OUT OF REACH of ground predators and elephants (they can no longer catch it in the
+  air). A ground predator can catch a bird ONLY if it SURPRISES it while the bird is
+  still ON THE GROUND (took off too late) — an airborne bird is safe from ground
+  hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
+  etc.) needs the ground↔air state and a takeoff-on-flee transition.
+  (B) AERIAL PREDATORS: add region- and ~1890-period-appropriate FLYING predators
+  (raptors) that hunt prey birds and CAN catch them IN THE AIR; and — ONLY if the
+  research establishes it as plausible for African wildlife — a STOOP/DIVE from above
+  that the prey may not notice in time, which requires multiple FLIGHT-HEIGHT levels
+  (prey at a lower band, the raptor diving from a higher one). Everything in (B) is
+  contingent on the research: if a mechanic is not well-supported, it is flagged and
+  NOT built.
+  RESEARCH FIRST (Fable pass, docs-only, extend `docs/fauna-behaviour-1890.md`): which
+  African raptors/aerial hunters (~1890, by region) take BIRDS as prey; their hunting
+  mode (stoop/dive vs. tail-chase), typical prey birds, whether flight-height layering
+  and a surprise-from-above are realistic, and whether "a ground predator only gets a
+  bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
+  predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
+  "Implementation brief". BUILD (per the research, after the wildlife cluster is free):
+  the bird ground/air state machine + takeoff-on-flee (pure flee/height helpers in
+  `src/scenes/travel/wildlifeBehavior.ts`, wired in `src/scenes/travel/Wildlife.tsx`);
+  a flight-height field; the aerial-predator species (build in `src/render/fauna.ts`,
+  seeded from a new region-keyed aerial-predator pool) with an air-catch and, if
+  supported, the stoop-dive; ground predators lose the airborne target. Reuse the
+  existing hunt/flee/carcass machinery; every started drama resolves (I4). All
+  calibratable (takeoff trigger distance, flight heights, dive chance/speed,
+  aerial-hunt rate) and debug-editable. VERIFIABLE: pure tests — a fleeing bird
+  transitions to air and a ground predator's reach excludes an airborne bird while a
+  still-grounded (surprised) one is catchable; the aerial predator's air-catch and (if
+  built) the height-gated dive; region pools sane. Live check / screenshot: a forced
+  ground-predator approach makes birds take off and escape, and (if built) an aerial
+  predator stoops on a flying bird — on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
+  (research); design.md §19 (bird flight escape + aerial predators). Any new
+  sighting/journal text both languages with voice markup. NOTE: wildlife-render/behaviour
+  cluster (Wildlife.tsx/wildlifeBehavior.ts/fauna.ts) — the RESEARCH runs in parallel
+  now; the BUILD waits for the cluster to be free and does NOT run concurrently with
+  another Wildlife.tsx point. Implementation-ready once the research lands.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
