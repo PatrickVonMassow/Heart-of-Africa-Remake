@@ -1092,6 +1092,24 @@ const PANORAMA_FAUNA: Record<RegionId, Array<() => THREE.BufferGeometry>> = {
 }
 
 /**
+ * The travel panorama capture that belongs to THIS visit (design.md §2.5).
+ * The capture is a module singleton keyed by place+seed which deliberately
+ * survives the scene switch — so it can outlive its visit and still match a
+ * later place+seed. The store's `enteredFromTravel` is the missing freshness
+ * signal: only an enter out of the bird's-eye view captured this horizon, so a
+ * direct place→place enter, a ferry passage and a resumed snapshot fall back to
+ * the geometry backdrop rather than showing a stale band (point 99).
+ * One rule, used by every consumer of the capture.
+ */
+function useFreshPanoramaCapture(placeId: string, seed: number) {
+  const enteredFromTravel = useGame((s) => s.enteredFromTravel)
+  return useMemo(
+    () => (enteredFromTravel ? getPanoramaCapture(placeId, seed) : null),
+    [enteredFromTravel, placeId, seed],
+  )
+}
+
+/**
  * Far-off animals drifting through the surroundings panorama: dark, slightly
  * oversized silhouettes on the backdrop ring so they read at person scale.
  */
@@ -1170,6 +1188,7 @@ function PanoramaWildlife({
     [items],
   )
   const refs = useRef<Array<THREE.Group | null>>([])
+  const capture = useFreshPanoramaCapture(placeId, seed)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1193,7 +1212,7 @@ function PanoramaWildlife({
     // black clipped slivers (points 73/92). So place the feet on that visible
     // horizon line (minus a small sink) whenever a capture stands; without one
     // (snapshot/ferry) the geometry backdrop is the horizon, so keep the clamp.
-    const captureActive = !!getPanoramaCapture(placeId, seed)
+    const captureActive = !!capture
     const horizonY = EYE_HEIGHT - pw.sinkEpsilon
     items.forEach((it, i) => {
       const g = refs.current[i]
@@ -1313,7 +1332,7 @@ const PANORAMA_RADIUS = 200
 
 function TravelPanorama({ placeId }: { placeId: string }) {
   const seed = useGame((s) => s.seed)
-  const capture = useMemo(() => getPanoramaCapture(placeId, seed), [placeId, seed])
+  const capture = useFreshPanoramaCapture(placeId, seed)
   const material = useMemo(() => {
     if (!capture) return null
     const m = new THREE.MeshBasicNodeMaterial()

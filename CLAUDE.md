@@ -959,7 +959,13 @@ verify suite that proves it.
     samples the mirrored column, and a magenta probe injected due west
     of the capture point proves the rendered horizon compass-true
     seed-independently; a direct place-to-place enter falls back to the
-    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
+    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99) — the
+    capture is a module singleton that OUTLIVES its visit, so the freshness
+    gate is the store's `enteredFromTravel` (true only for an enter out of the
+    bird's-eye view; false on a place→place enter, a ferry passage, a resumed
+    snapshot and while travelling), without which a place captured earlier in
+    the run wrongly re-showed its stale band; pure-tested in
+    `src/state/store.travel.test.ts`; the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
     Cairo mounts the Giza pyramids as its western skyline (point 82) —
@@ -1513,6 +1519,24 @@ After completion and after every major system:
   hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
   so no radius stands in for the picture. A green assertion against a computed
   radius can hide a real bug the player sees (points 164/171/172).
+- **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
+  the player's real backend and WebGL 2 the shipped fallback, so both are
+  verified, not just the one that happens to launch:
+  - Every browser suite launches through `launchVerifyBrowser()` and asserts the
+    backend it actually got (`assertBackend`, right after the `window.__renderer`
+    wait). A `VERIFY_GL=webgpu` run that silently fell back to WebGL 2 — or a
+    `webgl` run that came up on WebGPU — FAILS LOUD instead of giving false
+    confidence. The only exceptions are `docs` (pure Node, no browser) and
+    `preview` (production build, where `__renderer` is dev-only).
+  - A LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) covers
+    BOTH backends in one command: the whole LARGE on WebGL 2 (with preflight and
+    prod preview), then the render suites on WebGPU. A pinned `VERIFY_GL`, the
+    SMALL tier and a bare suite filter stay single-backend. `touch` and `voice`
+    are the documented WebGL2-only skip (headless WebGPU drives neither the CDP
+    touch events nor the TTS speak state; both were verified on WebGL 2).
+  - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
+    pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
+    there and in `scripts/verify/README.md` together.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 

@@ -39,11 +39,19 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 | Tier | Command | Browser suites | Preview |
 |------|---------|----------------|---------|
 | **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 16** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings`), `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) and `benchmark` (the F8 in-game benchmark, driven in its `?bench=short` mode) | yes |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 16** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
-of `DEV_SUITES` in `run-all.mjs`; keep it that way. New heavy or flaky browser
-scenarios join LARGE only (they must not slow or flake the everyday gate).
+of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
+LARGE only (they must not slow or flake the everyday gate).
+
+The suite→tier→backend map itself is a **pure module**: `scripts/verify/tiers.mjs`
+holds `DEV_SUITES` / `SMALL_SUITES` / `WEBGL_ONLY_SUITES` and the arg, suite and
+backend-plan functions `run-all.mjs` drives, and `scripts/verify/tiers.test.mjs`
+pins them in the Vitest layer (the subset rule, the WebGPU skip, and that a bare
+LARGE run plans WebGL 2 → WebGPU while a pinned `VERIFY_GL` / SMALL / a bare suite
+filter stays single-backend). Change the map in `tiers.mjs` and this README
+together — never only in the runner.
 
 ## Adding tests for a new feature (do this every time)
 
@@ -95,13 +103,6 @@ ported asserts now live in Vitest:
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
 
-Purely new (no Vitest predecessor): `benchmark.mjs` — F8 drives the in-game
-render benchmark (design.md §21.1) over the live scene in `?bench=short` mode:
-one report row per config × phase, the progress modal, and the restore of every
-setting incl. `Math.random`. Its plan/statistics/report shaping are pure-tested
-in `src/systems/benchmark.test.ts`, the key binding and the localized overlay in
-`src/ui/BenchmarkOverlay.test.tsx`.
-
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
 `handwriting.mjs` (the writing animation is timing/DOM-sensitive and stays
@@ -111,14 +112,19 @@ doc-structure check), `preview.mjs` (production build acceptance).
 
 ## Backend assertion coverage (point 204)
 
-Every render-dependent browser suite calls `assertBackend(page)` right after the
-renderer initialises (`window.__renderer`): a run launched with
-`VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a `webgl` run that came
-up on WebGPU) fails LOUD instead of giving false confidence. Covered: benchmark, collision,
-enrichments, events, flow, gamepad, handwriting, health, invariants, polish,
-settings, visualsweep. The pure-data suites (docs, world, i18n) read files/state,
-not pixels, so a backend assertion adds nothing; touch and voice are the
-documented WebGL2-only exception (they never touch the GPU process, see below).
+Every browser suite launches through `launchVerifyBrowser()` and calls
+`assertBackend(page)` right after the renderer initialises (`window.__renderer`):
+a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
+`webgl` run that came up on WebGPU) fails LOUD instead of giving false
+confidence. Covered: collision, enrichments, events, flow, gamepad, handwriting,
+health, i18n, invariants, polish, settings, touch, visualsweep, voice, world.
+
+Two suites carry no assertion, each for a structural reason:
+
+| Suite | Why no `assertBackend` |
+|---|---|
+| `docs` | Pure Node doc-structure check — it never opens a browser. |
+| `preview` | Runs the PRODUCTION build, where `window.__renderer` is dev-only and does not exist. It also runs on the WebGL 2 lane only (the WebGPU pass skips the preview). |
 
 A full LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) now
 covers BOTH backends automatically (point 204b): run-all runs the whole LARGE on
@@ -129,12 +135,26 @@ render-verify gate's per-backend clear command), the SMALL tier, or a bare
 single-suite filter stays a single-backend pass. The WebGL 2 pass runs first; a
 failure there stops before WebGPU.
 
-## Headless limitations (WebGL 2 fallback only)
+Per-backend commands (what the render-verify gate uses to clear a GUI change on
+both backends):
 
-Headless Chromium has no WebGPU adapter, so every suite here runs on the game's
-**WebGL 2 fallback** path. Backend-specific behaviour therefore cannot be gated
-headless and needs a manual check on real WebGPU hardware. Two documented
-artifacts of the fallback path (not real-hardware bugs):
+```
+VERIFY_GL=webgl  node scripts/verify/run-all.mjs polish   # WebGL 2 pass of one suite
+VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish   # WebGPU pass of one suite
+npm test -- large polish                                  # the same suite on BOTH, preflighted
+```
+
+## Headless limitations
+
+WebGPU IS drivable headless — but only through **system Chrome**
+(`channel: 'chrome'` + `--headless=new` on a localhost page, which `_browser.mjs`
+selects for `VERIFY_GL=webgpu`); Playwright's *bundled* Chromium has no WebGPU
+adapter and silently falls back, which is exactly what `assertBackend` now makes
+loud. Two suites stay WebGL2-only (`touch`, `voice`): headless WebGPU under
+system Chrome drives neither the CDP touch events nor the TTS speak state, and
+both were verified to render correctly on the WebGL 2 path.
+
+Two documented artifacts of the WebGL 2 fallback path (not real-hardware bugs):
 
 - **Ground black-patch class (point 111).** `pow(negative, y)` is `NaN` on
   WGSL/WebGPU but returns a value on GLSL/WebGL 2, so a shader that fed a

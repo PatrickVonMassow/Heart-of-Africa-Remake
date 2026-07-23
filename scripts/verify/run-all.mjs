@@ -6,7 +6,8 @@
 //   npm run test:small  # Vitest + the SMALL everyday browser gate (no preview)
 //   npm run test:large  # Vitest + every browser suite + preview (== npm test)
 //   npm test -- flow    # only the named suite(s), dev server managed for you
-// See the SMALL_SUITES note below for the tier split (point 173).
+// The tier split (point 173) and the backend map (points 184/204) live in
+// ./tiers.mjs; see the note below and scripts/verify/README.md.
 //
 // Requires the dev dependencies installed (Playwright + Chromium).
 import { spawn, spawnSync } from 'node:child_process'
@@ -14,6 +15,7 @@ import http from 'node:http'
 import net from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const isWin = process.platform === 'win32'
@@ -40,70 +42,59 @@ function getFreePort() {
 // and one end-to-end core flow. `docs` is a pure Node check that runs in the
 // same pass for a single report. See scripts/verify/README.md for the full
 // old→new mapping table.
-const DEV_SUITES = [
-  'docs', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
-  'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
-  'benchmark',
-]
-
-// Regression tiers (point 173). The browser suites split into a SMALL everyday
-// gate — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core
-// loop, health/events/collision, TTS) — and the LARGE set, which is EVERY suite
-// (adds the heavier scene/geometry/screenshot suites and the wildlife-staging
-// ones that carry the rotating family flakes). Pick per task:
+//
+// Regression tiers (point 173) and the backend dimension (points 184/204) are
+// the pure decision layer in ./tiers.mjs (Vitest-pinned in tiers.test.mjs):
+// DEV_SUITES (the LARGE set), SMALL_SUITES (the fast everyday gate),
+// WEBGL_ONLY_SUITES (touch/voice — the documented headless-WebGPU exception),
+// and the arg/backend planning below. Pick per task:
 //   npm run test:small   # Vitest + the small browser gate (no prod preview)
-//   npm run test:large   # Vitest + every browser suite + preview  (== npm test)
-//   npm test             # the full LARGE regression (default)
+//   npm run test:large   # Vitest + every browser suite + preview, BOTH backends
+//   npm test             # the full LARGE regression (default) — same
 //   npm test -- flow …   # just the named suite(s); dev server managed, no preflight
-// The closing cycle ALWAYS runs LARGE. Keep SMALL a strict subset of DEV_SUITES.
-const SMALL_SUITES = ['docs', 'i18n', 'flow', 'health', 'events', 'collision', 'voice']
-
-// Backend dimension (point 184 Pillar 3). VERIFY_GL selects the renderer the suites
-// launch (mirrored from _browser.mjs; default webgl, propagated to each suite via the
-// inherited env). The LARGE regression covers both backends by invoking twice
-// (VERIFY_GL=webgl, then VERIFY_GL=webgpu). Two suites are WebGL2-ONLY (user decision,
-// 20.07.2026): headless WebGPU under system Chrome cannot drive touch's CDP touch
-// events nor voice's TTS speak-state, and BOTH were verified to render correctly on the
-// WebGL2 path — so a webgpu invocation SKIPS them rather than false-failing on a harness
-// limitation. Everything else runs on whichever backend VERIFY_GL selects.
-const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
-const WEBGL_ONLY_SUITES = ['touch', 'voice']
+// The closing cycle ALWAYS runs LARGE.
+// VERIFY_GL selects the renderer the suites launch (mirrored from _browser.mjs;
+// default webgl, propagated to each suite via the inherited env).
+const VERIFY_GL = selectBackend(process.env.VERIFY_GL)
 
 const args = process.argv.slice(2)
-const tier = args.includes('small') ? 'small' : args.includes('large') ? 'large' : null
-// Suite-name filters are the args minus the tier tokens.
-const filter = args.filter((a) => a !== 'small' && a !== 'large')
-// A "full" run does the preflight (build + lint + unit): the default (no args)
-// or an explicit tier. Bare suite-name args skip the preflight (quick single run).
-const fullRun = tier !== null || filter.length === 0
-const tierSuites = tier === 'small' ? SMALL_SUITES : DEV_SUITES
-const pick = (list) => (filter.length ? list.filter((s) => filter.includes(s)) : tierSuites)
+const { tier, filter, fullRun, isLargeEquivalent } = parseArgs(args)
 
 // point 204(b): a bare LARGE run (`npm test` / `npm run test:large`) covers BOTH
-// renderer backends in one command. When this is a full LARGE-equivalent run
-// (explicit `large`, or the bare default with no suite filter — both run the whole
-// DEV_SUITES set + preview) and no backend was pinned, run the full LARGE on
-// WebGL 2 (with the preflight), then re-run the browser suites on WebGPU (the
-// backend-agnostic build/lint/unit preflight and prod preview already proven, so
-// skipped). An explicit VERIFY_GL (the gate's per-backend clear command), the
-// SMALL tier, or a bare single-suite filter stays a single-backend pass, as before.
-const isLargeEquivalent = tier === 'large' || (tier === null && filter.length === 0)
-if (isLargeEquivalent && process.env.VERIFY_GL === undefined && process.env.RVA_RAN_BOTH !== '1') {
+// renderer backends in one command — it re-invokes itself once per planned pass.
+// An explicit VERIFY_GL (the gate's per-backend clear command), the SMALL tier,
+// or a bare single-suite filter stays a single-backend pass, as before.
+const backendPlan = planBackends({
+  isLargeEquivalent,
+  verifyGl: process.env.VERIFY_GL,
+  ranBoth: process.env.RVA_RAN_BOTH === '1',
+})
+if (backendPlan.length > 0) {
   const self = fileURLToPath(import.meta.url)
-  const runBackend = (extraEnv) =>
+  const runBackend = (pass) =>
     spawnSync(process.execPath, [self, ...args], {
       cwd: join(HERE, '..', '..'),
       stdio: 'inherit',
-      env: { ...process.env, RVA_RAN_BOTH: '1', ...extraEnv },
+      env: {
+        ...process.env,
+        RVA_RAN_BOTH: '1',
+        VERIFY_GL: pass.backend,
+        ...(pass.skipPreflight ? { RVA_SKIP_PREFLIGHT: '1' } : {}),
+      },
     }).status ?? 1
-  console.log('\n===== LARGE regression — backend 1/2: WebGL 2 (full, with preflight) =====')
-  const glStatus = runBackend({ VERIFY_GL: 'webgl' })
-  if (glStatus !== 0) {
-    console.log('\nLARGE FAILED on the WebGL 2 backend — not proceeding to WebGPU.')
-    process.exit(glStatus)
+  for (const [i, pass] of backendPlan.entries()) {
+    const label = pass.backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'
+    const shape = pass.skipPreflight
+      ? 'render suites; preflight/preview already proven'
+      : 'full, with preflight'
+    console.log(`\n===== LARGE regression — backend ${i + 1}/${backendPlan.length}: ${label} (${shape}) =====`)
+    const status = runBackend(pass)
+    if (status !== 0) {
+      console.log(`\nLARGE FAILED on the ${label} backend — not proceeding to the remaining backend(s).`)
+      process.exit(status)
+    }
   }
-  console.log('\n===== LARGE regression — backend 2/2: WebGPU (render suites; preflight/preview already proven) =====')
-  process.exit(runBackend({ VERIFY_GL: 'webgpu', RVA_SKIP_PREFLIGHT: '1' }))
+  process.exit(0)
 }
 // On the second (WebGPU) pass of a both-backend LARGE run, the backend-agnostic
 // preflight (build/lint/unit) and the prod preview were already proven on the
@@ -307,13 +298,9 @@ let dev
 try {
   // On WebGPU, drop the WebGL2-only suites (logged so the skip is explicit, never a
   // silent gap) — the rest run on the selected backend.
-  const devPick = pick(DEV_SUITES).filter(
-    (s) => !(VERIFY_GL === 'webgpu' && WEBGL_ONLY_SUITES.includes(s)),
-  )
-  for (const s of pick(DEV_SUITES)) {
-    if (VERIFY_GL === 'webgpu' && WEBGL_ONLY_SUITES.includes(s)) {
-      console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — not run on WebGPU, point 184)`)
-    }
+  const devPick = suitesFor({ tier, filter, backend: VERIFY_GL })
+  for (const s of skippedSuites({ tier, filter, backend: VERIFY_GL })) {
+    console.log(`SKIP  ${s.padEnd(12)} (WebGL2-only — not run on WebGPU, point 184)`)
   }
   // Cross-browser smoke (point 213): on a FULL tier/default run (not a bare
   // single-suite filter) or when asked by name; depth scales with the tier
