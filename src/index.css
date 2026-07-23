@@ -968,6 +968,30 @@ textarea {
   padding: 10px 22px;
 }
 
+/* --- State dump (design.md §21.1, F5) ------------------------------------- */
+
+/* Reuses the modal dialog frame; wider, since it shows a full JSON document. */
+.state-dump {
+  width: min(720px, 94vw);
+}
+
+.state-dump-json {
+  margin: 8px 0 0;
+  max-height: 55vh;
+  overflow: auto;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  /* Bug-report text must be selectable despite the global user-select: none. */
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* --- Debug menu ----------------------------------------------------------- */
 
 .debug-menu {

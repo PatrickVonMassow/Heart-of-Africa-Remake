@@ -75,6 +75,8 @@ interface UiState {
    *  keeps the flora at its full shape (the season colour stays) to isolate
    *  whether that per-instance vertex deformation causes a WebGPU-only jump. */
   seasonCollapseEnabled: boolean
+  /** F5 state-dump popup (design.md §21.1): the full game state for bug reports. */
+  stateDumpOpen: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -97,6 +99,7 @@ interface UiState {
   setShadowsEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
+  toggleStateDump: () => void
 }
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
@@ -123,6 +126,7 @@ export const useUi = create<UiState>()((set) => ({
   shadowsEnabled: true,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
+  stateDumpOpen: false,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -156,6 +160,7 @@ export const useUi = create<UiState>()((set) => ({
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
+  toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
 }))
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
