@@ -8657,7 +8657,7 @@ the remaining open points in their numeric order.
   at the trunk top. DOCS: design.md §19.9 (landscape dressing) note the palm
   redesign; CLAUDE §7.1 pt.12/15 if acceptance wording changes.
 
-- [ ] 217. VULTURE WINGS CLIP INTO THE GROUND — while a vulture feeds (the §19.6
+- [x] 217. VULTURE WINGS CLIP INTO THE GROUND — while a vulture feeds (the §19.6
   peck/bob, rocking back and forth over a carcass) its WING TIPS dip through the
   terrain (user report 22.07.2026). The point-128 `landedBirdY` rule clears the
   pecking BODY (positive-only slope lift + a hover over the body) but the bob
@@ -9551,7 +9551,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx` — same files as 242/245/247/248; bundles with 242 (both are
   crocodile behaviour); do NOT delegate concurrently with the other wildlife points.
 
-- [ ] 251. MULTIPLE CARCASSES NEED MULTIPLE VULTURE FLOCKS — the user reports
+- [x] 251. MULTIPLE CARCASSES NEED MULTIPLE VULTURE FLOCKS — the user reports
   (22.07.2026) that with several carcasses present there is only ONE set of vultures,
   which after finishing the first meal hops straight to the second; instead EACH
   carcass should draw its OWN vultures flying in independently. Per §19.6 a carcass
