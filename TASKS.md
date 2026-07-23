@@ -9870,6 +9870,37 @@ the remaining open points in their numeric order.
   into 259's trample resolution if convenient), do not delegate concurrently with a
   Wildlife.tsx point.
 
+- [ ] 261. ANIMALS WALK THROUGH AN ELEPHANT — NEED A BODY COLLIDER (user 23.07.2026,
+  follow-up to 259). During the elephant-suicide the grief parent runs from BEHIND
+  THROUGH the elephant's legs to reach the front-intercept point (point 259) instead
+  of routing AROUND the body. Root: an elephant body is not a solid obstacle to other
+  animals' movement — a mover's step is not deflected by the elephant, so it passes
+  straight through. FIX: give the elephant a BODY COLLIDER that other animals cannot
+  pass through — an animal's movement step deflects/slides AROUND an elephant's body
+  circle (reuse the existing bird's-eye obstacle-resolve — the §11/§19 swept
+  collision against trees/animals in `src/systems/movement.ts` / the mover step, or
+  the §19.5 body-separation geometry — treat the elephant as a circular obstacle of
+  its body radius). So the grief parent must ROUTE AROUND the elephant to reach its
+  front (it circles the body rather than clipping through it), and no animal walks
+  through an elephant in general. KEEP the trample POSSIBLE: the designed §19.5
+  overlap exception (an elephant stepping onto/over a PINNED animal to trample it, and
+  the point-259 directional kill) must still work — the collider is for the OTHER
+  animals' locomotion (they cannot enter the elephant), not a block on the elephant's
+  own trample; the caught/pinned victim and the parent being crushed at the front are
+  the intended contacts. DIAGNOSE + FIX in `src/scenes/travel/Wildlife.tsx` (the
+  per-animal movement step, the grief drive path) and `src/scenes/travel/
+  wildlifeBehavior.ts` (a pure obstacle-deflection helper, or reuse
+  `src/systems/movement.ts`'s swept-obstacle resolve with the elephant as the
+  obstacle). VERIFIABLE: a pure test that an animal step aimed through an elephant is
+  deflected to slide around the body circle (never ends inside it), while a step that
+  is the trample contact still resolves; a live check in `scripts/verify/
+  enrichments.mjs` that the grief parent reaches the elephant's front by going around
+  (does not pass through the body) and the grief still resolves. DOCS: design.md §19.5
+  (animals cannot pass through an elephant body; the trample overlap exception is
+  unchanged). No player-visible text. NOTE: `Wildlife.tsx`/`wildlifeBehavior.ts`/
+  possibly `movement.ts` — wildlife-movement files; do NOT delegate concurrently with
+  another Wildlife.tsx point (258/etc.).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
