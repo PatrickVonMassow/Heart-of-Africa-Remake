@@ -9939,6 +9939,45 @@ the remaining open points in their numeric order.
   another Wildlife.tsx point (258/etc.); bundles naturally with the family-drama
   points.
 
+- [ ] 263. THE 261 COLLIDER BREAKS THE 259 TRAMPLE — AN ELEPHANT NO LONGER TRAMPLES A
+  FREE ANIMAL (regression found by the both-backend enrichments verification, 23.07.
+  2026). Point 261's elephant body collider deflects other animals AROUND the
+  elephant, but point 259's directional trample requires the elephant to REACH the
+  animal's body (dot>0 and within TRAMPLE_RADIUS). The two conflict: as the elephant
+  moves toward a free animal, the collider slides the animal around the body, so the
+  overlap the trample needs never happens — the elephant tramples nothing, no blood
+  stain is laid, and the §19.8 calf-trample grief chain never starts (its step 1, the
+  calf being trampled, cannot fire). The enrichments checks caught it: "Elephant
+  tramples a smaller animal — no trample within 8s", "blood stains carry a unit ground
+  normal — []" (empty: no stain because no trample), and "a parent whose calf is
+  trampled throws itself before the elephant (point 119)" (calfDead:false — the calf
+  is never trampled). FIX (product, do NOT weaken the checks): the collider must NOT
+  prevent an intended trample. When the elephant is within trample range of an animal
+  AND the 259 direction condition holds (moving toward it) — i.e. `trampleKills` is
+  about to fire — that animal is TRAMPLED (the elephant catches it), not deflected
+  around the body. So EXEMPT the trample victim from `deflectAroundCircle` for that
+  elephant (skip the deflection when this elephant would trample this animal this
+  step), so a free animal the elephant bears down on is caught and trampled, the
+  calf-trample grief chain starts, and the parent's front-intercept grief still
+  resolves. Everything else 261 keeps: an animal walking near a NON-trampling elephant
+  (stationary, or not moving toward it) still slides around the body (no walk-through).
+  Also RE-VERIFY the staged enrichments trample checks match the new 259/261 semantics
+  (the elephant must move toward the victim; the victim must be catchable) — update the
+  STAGING (how the check drives the elephant/victim) to the real behaviour, never the
+  assertion, so the check proves a real trample. Anchors: `src/scenes/travel/
+  Wildlife.tsx` (the 261 deflection application — add the trample-exempt condition
+  using the existing `trampleKills`/trample-range test), `src/scenes/travel/
+  wildlifeBehavior.ts` (a pure predicate for "this elephant would trample this animal
+  this step" if helpful), and `scripts/verify/enrichments.mjs` (the trample + stain +
+  point-119 grief staged checks). VERIFIABLE: a pure test that an animal the elephant
+  bears down on (within range, dot>0) is NOT deflected (it is trampled), while an
+  animal near a non-trampling elephant IS deflected; the enrichments trample / stain /
+  point-119 grief checks pass on BOTH backends (0 fail). DOCS: design.md §19.5 (the
+  collider yields to an intended trample). No player-visible text. NOTE: same files as
+  the wildlife/trample points (259/261, merged); do NOT delegate concurrently with
+  another Wildlife.tsx point — this is the top-priority wildlife fix (a core mechanic
+  is currently broken on main).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
