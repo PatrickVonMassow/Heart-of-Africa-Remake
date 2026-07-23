@@ -235,7 +235,7 @@ export const en: Strings = {
     download: 'Download',
     copy: 'Copy',
     copied: 'Game state copied to the clipboard.',
-    close: 'Close (F5)',
+    close: 'Close (F6)',
   },
 
   toasts: {

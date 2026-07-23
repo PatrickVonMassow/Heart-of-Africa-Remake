@@ -234,7 +234,7 @@ export const de: Strings = {
     download: 'Herunterladen',
     copy: 'Kopieren',
     copied: 'Spielzustand in die Zwischenablage kopiert.',
-    close: 'Schließen (F5)',
+    close: 'Schließen (F6)',
   },
 
   toasts: {

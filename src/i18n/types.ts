@@ -136,7 +136,7 @@ export interface Strings {
     back: string
   }
 
-  /** F5 state-dump popup (design.md §21.1): the full game state for bug reports. */
+  /** F6 state-dump popup (design.md §21.1): the full game state for bug reports. */
   stateDump: {
     title: string
     /** Save the JSON as a .json file. */

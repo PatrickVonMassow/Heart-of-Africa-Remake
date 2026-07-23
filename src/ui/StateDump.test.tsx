@@ -1,7 +1,8 @@
-// F5 state-dump popup (design.md §21.1, §17.4/§17.5): hidden by default; F5
+// F6 state-dump popup (design.md §21.1, §17.4/§17.5): hidden by default; F6
 // toggles the top-most modal showing the complete-state JSON with download/
-// copy/close controls; Esc closes it; the F5 default (browser reload) is
-// prevented; and toggling never moves focus onto a control.
+// copy/close controls; Esc closes it; the F6 default is prevented (F5 was
+// abandoned — the browser reloads before preventDefault can run); and
+// toggling never moves focus onto a control.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, act } from '@testing-library/react'
 import { Hud } from './Hud'
@@ -29,7 +30,7 @@ afterEach(() => {
 const dump = () => document.querySelector('.state-dump')
 const jsonText = () => document.querySelector('.state-dump-json')?.textContent ?? ''
 
-describe('StateDump popup (design.md §21.1, F5)', () => {
+describe('StateDump popup (design.md §21.1, F6)', () => {
   it('is hidden by default and shown when toggled, with the state as JSON', () => {
     render(<StateDump />)
     expect(dump()).toBeNull()
@@ -78,33 +79,43 @@ describe('StateDump popup (design.md §21.1, F5)', () => {
   })
 })
 
-describe('F5 wiring in the Hud (design.md §21.1)', () => {
-  it('F5 toggles the popup open and closed without moving focus onto a control', () => {
+describe('F6 wiring in the Hud (design.md §21.1)', () => {
+  it('F6 toggles the popup open and closed without moving focus onto a control', () => {
     render(<Hud />)
     expect(dump()).toBeNull()
-    fireEvent.keyDown(window, { code: 'F5' })
+    fireEvent.keyDown(window, { code: 'F6' })
     expect(dump()).not.toBeNull()
     // §17.5: opening must not shift focus onto any control.
     const tag = document.activeElement?.tagName ?? 'BODY'
     expect(['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT']).not.toContain(tag)
-    fireEvent.keyDown(window, { code: 'F5' })
+    fireEvent.keyDown(window, { code: 'F6' })
     expect(dump()).toBeNull()
   })
 
   it('Esc closes an open popup', () => {
     render(<Hud />)
-    fireEvent.keyDown(window, { code: 'F5' })
+    fireEvent.keyDown(window, { code: 'F6' })
     expect(dump()).not.toBeNull()
     fireEvent.keyDown(window, { code: 'Escape' })
     expect(dump()).toBeNull()
   })
 
-  it('prevents the browser default (page reload) on F5 while the game has focus', () => {
+  it('prevents the browser default on F6 while the game has focus', () => {
+    render(<Hud />)
+    const e = new KeyboardEvent('keydown', { code: 'F6', cancelable: true, bubbles: true })
+    act(() => {
+      window.dispatchEvent(e)
+    })
+    expect(e.defaultPrevented).toBe(true)
+  })
+
+  it('F5 stays with the browser: it neither opens the popup nor is prevented', () => {
     render(<Hud />)
     const e = new KeyboardEvent('keydown', { code: 'F5', cancelable: true, bubbles: true })
     act(() => {
       window.dispatchEvent(e)
     })
-    expect(e.defaultPrevented).toBe(true)
+    expect(e.defaultPrevented).toBe(false)
+    expect(dump()).toBeNull()
   })
 })

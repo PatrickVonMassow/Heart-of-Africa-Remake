@@ -1,4 +1,4 @@
-// F5 state dump (design.md §21.1, CLAUDE.md §7.1 pt. 20): the pure serialiser
+// F6 state dump (design.md §21.1, CLAUDE.md §7.1 pt. 20): the pure serialiser
 // must return valid JSON capturing EVERY data field of the store (not just the
 // §18 snapshot fields) plus the balance object and the self-describing header,
 // drop every store action, and be deterministic given a state and a date.
@@ -13,7 +13,7 @@ beforeEach(() => {
   useGame.setState({ seed: 4711 })
 })
 
-describe('dumpGameState (design.md §21.1, F5)', () => {
+describe('dumpGameState (design.md §21.1, F6)', () => {
   it('returns valid JSON capturing the key store fields', () => {
     const s = useGame.getState()
     const parsed = JSON.parse(dumpGameState(s))

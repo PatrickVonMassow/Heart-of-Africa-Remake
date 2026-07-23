@@ -1074,13 +1074,16 @@ verify suite that proves it.
     gifts/dollars/provisions, full health, full canteen, no afflictions,
     capacity raised to fit, the extended zoom unlocked, and the travel
     speed set to 25 for fast test traversal (point 154) — F4 canoe
-    toggle — F5 state-dump popup for bug reports: the complete game
+    toggle — F6 state-dump popup for bug reports: the complete game
     state incl. balance and UI as pretty JSON in a top-most modal with
-    download/copy, F5 prevented from reloading while the game has focus;
+    download/copy; F5 stays the browser's reload (it fires before
+    preventDefault can stop it, hence F6) and F7 is reserved for the
+    future "Low Details" performance mode;
     verifiable via `src/state/stateDump.test.ts` (the serialiser captures
     every data field, drops the actions, stays deterministic) and
-    `src/ui/StateDump.test.tsx` (hidden by default, F5/Esc toggle without
-    moving focus onto a control, the F5 browser default prevented)); the
+    `src/ui/StateDump.test.tsx` (hidden by default, F6/Esc toggle without
+    moving focus onto a control, the F6 browser default prevented, F5
+    left untouched)); the
     canteen's consumption
     rates and capacity are editable (§21.2), as is the parental rescue
     burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's

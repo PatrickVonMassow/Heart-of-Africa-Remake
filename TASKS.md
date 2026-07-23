@@ -7838,6 +7838,26 @@ the remaining open points in their numeric order.
   (provisions/health/afflictions create real decisions, not noise), and the
   CROSS-SYSTEM loop (exploration → language → hints → goal; reputation → access;
   economy → equipment → capability) actually holds together.
+  RESEARCH-BACKED WORLD ACCURACY (added per user 23.07.2026): beyond coherence,
+  run a RESEARCH pass over EVERY concrete element of the game world and check it
+  against the ACTUAL ~1890 record — verified against real sources, NOT free
+  invention. The trigger/exemplar: the Great Sphinx of Giza was BURIED TO THE
+  SHOULDERS in sand until the 1920s excavation, so a ~1890 depiction must show it
+  sand-buried — yet it was built free-standing (fixed within the walkable-pyramids
+  scene, point 273). That is a case of insufficient prior research, and the concern
+  generalises: sweep the whole world for the same class of error — each landmark
+  and monument (its real ~1890 state of construction/ruin/burial), each people's
+  material culture and settlement form, the flora/fauna ranges, the rivers/lakes/
+  ice, the trade goods and their period plausibility, place names and their 1890
+  forms — asking for EACH: is this accurate for the EPOCH (~1890, not modern, not
+  ancient), the REGION, and the SEASON as depicted? Flag every anachronism or
+  unresearched guess with the correct researched state and a source. This is
+  ANALYSIS + PROPOSALS ONLY — change nothing now; because the world keeps evolving
+  until 205 runs, fold this research into 205's pass then so the latest state is
+  audited. Most findings are design judgments for the USER; clear objective
+  inaccuracies (a monument in the wrong physical state for 1890, an anachronistic
+  good, a mis-dated name) are filed. A model-diverse (Fable) research lens is
+  welcome within the point-200 token limits.
   METHOD: system-by-system + the cross-system matrix, and PLAY the loop end to end
   asking "why am I doing this / does it matter". OUTPUT: unlike the mechanical
   audits, most findings here are DESIGN JUDGMENTS — design.md is authoritative and
@@ -10349,6 +10369,130 @@ the remaining open points in their numeric order.
   place name / hint text in BOTH languages with voice markup where applicable. NOTE:
   DEPENDS on point 244 (the Space-entry mechanism) landing first; a big feature for v0.3.
   The RESEARCH half is a standalone Fable pass, safe to run now; the BUILD follows 244.
+
+- [x] 274. CROCODILE BODY STILL VISIBLE IN THE WATER — the point-246 fix is
+  INSUFFICIENT (user 23.07.2026, screenshot, deployed main). A lurking (non-striking)
+  Nile crocodile still shows its whole body as a clear dark silhouette in the river; only
+  the eye knobs should break the surface. Point 246 added an opacity fade
+  (`createCrocodileMaterial`: `opacityNode = smoothstep(waterline-BAND, waterline,
+  positionLocal.y)`, `transparent:true`, `depthWrite:true`) driven by the per-instance
+  `crocWaterline` attribute (`crocodileWaterlineLocal(scale, !striking)` = SUBMERGE_DEPTH/
+  scale when submerged), with the body sunk by `CROCODILE_SUBMERGE_DEPTH = backTopY`
+  (`crocodileBodyY`). It does NOT hide the body in real play. DIAGNOSE LIVE on the REAL
+  backend (WebGPU) at an ACHIEVABLE zoom (0.5) — do NOT trust a staged enrichments frame
+  that reads "no croc in view" (that false-positive is exactly what shipped 246). Candidate
+  causes to check: (a) the croc's `a.y`/`surfaceY` (fed to `crocodileBodyY` and the local
+  waterline) does not match the RENDERED water-sheet height at that cell, so the fade line
+  sits below the visible body and the body stays opaque above the real water; (b) the
+  `transparent:true` + `depthWrite:true` + `opacityNode` combination does not actually
+  blend-hide the below-waterline fragments on the real backend (a TSL/material wiring or
+  render-order issue — the water sheet at renderOrder 1 may not occlude the semi-transparent
+  croc), so the whole body renders; (c) sinking the back-top to the surface still leaves the
+  full body readable THROUGH the semi-transparent water — the hidden pose may need the body
+  to genuinely disappear (a deeper submerge, a wider/【stronger fade band, or letting the
+  water's own depth-absorption swallow the body). FIX per the diagnosis so a LURKING
+  crocodile shows essentially ONLY its eye knobs (and at most the scute tips) at zoom 0.5 on
+  BOTH backends — the body must not read as a crocodile in the water; keep the STRIKE/LUNGE
+  fully opaque and visible (unchanged, `!striking` gate). ANCHORS: `src/render/fauna.ts`
+  (`createCrocodileMaterial`, `crocodileWaterlineLocal`, `crocodileSubmergedAlpha`,
+  `CROCODILE_SUBMERGE_DEPTH`, `crocodileBodyY`, `CROCODILE_FADE_BAND`), `src/scenes/travel/
+  Wildlife.tsx` (:3262-3293 the `crocWaterline`/`bodyY` writing + the `striking` flag; the
+  croc vs water-sheet render order). VERIFIABLE — POSITIVE, not absence-based (the point-210/
+  172 lesson): stage a LURKING croc on a river/lake at zoom 0.5, screenshot, and assert by
+  PIXELS that the body footprint reads as WATER (hidden), NOT as a distinct dark croc
+  silhouette — rewrite the enrichments croc-hidden check (screenshot 129) to this positive
+  standard (sample the body-region pixels, require them to match the surrounding water within
+  a tolerance, and require a visible-body control — the striking croc — to FAIL that same
+  test so the check has teeth); on BOTH backends, matching the user's deployed view. Pure-test
+  any changed helper (`crocodileSubmergedAlpha`/waterline). DOCS: design.md §19.16 if the
+  hidden depiction changes. No player-visible text. NOTE: supersedes 246's visual goal;
+  wildlife-render cluster (Wildlife.tsx/fauna.ts) — do NOT build concurrently with another
+  Wildlife.tsx point. A user-reported visible bug → before 224. Implementation-ready.
+
+- [ ] 275. CROCODILE RARELY STRIKES — the ambush reads as inert (user 23.07.2026,
+  screenshot: a lurking crocodile in the river with prey nearby that it never attacks).
+  Current design (§19.16, `src/scenes/travel/Wildlife.tsx` ~:2459-2494): a hidden crocodile
+  lunges ONLY at an eligible BANK DRINKER standing at the waterline inside `strikeRadius`
+  (young preferred via `crocodileTargetWeight`), plus fleeing/dodging drinkers near a stale
+  drink target and crossing/vigil/fire-trapped animals — via `crocodileLungeReady(d, atBank,
+  strikeRadius)`. An animal merely GRAZING/PASSING near the river never triggers it, so if no
+  animal is in a "drinking at the bank in range" state the croc stays hidden and looks
+  passive. INVESTIGATE + TUNE (do NOT weaken the §19.8 drama safety — a lunge still routes
+  through `caughtBy` and the shared struggle window): (a) confirm the point-247 drinker-
+  staging (`Wildlife.tsx` ~:1343, the off-screen bank-drinker seeder near a lurking croc)
+  actually fires often enough that a player sees ambushes at a realistic rate — measure how
+  often a lurking croc ever gets an eligible target; (b) decide whether to BROADEN the trigger
+  so any prey that comes to the WATERLINE within the strike radius (not only a formal "drink"
+  pose) can be ambushed — a wandering grazer that steps to the bank should be catchable —
+  while keeping the ambush occasional (a hidden croc should not clear the whole bank); (c)
+  consider raising the ambush rate near a visible croc (staging a drinker toward it more
+  reliably) so the mechanic reads as alive. Anchor: `crocodileLungeReady` /
+  `crocodileTargetWeight` and the bank-drinker seeder; keep everything pure-testable. Balance
+  values (`balance.crocodile.strikeRadius`, any new ambush-rate value) stay debug-editable.
+  VERIFIABLE: pure-test the (possibly broadened) target predicate; a live enrichments check
+  that a lurking croc with a grazer brought to the waterline within range DOES lunge (and one
+  just outside range or merely passing does not); on BOTH backends. DOCS: design.md §19.16 if
+  the trigger rule changes. No player-visible text. NOTE: wildlife-render cluster
+  (Wildlife.tsx) — serialize with 274 and any other Wildlife.tsx point. A user-reported
+  behaviour gap → before 224. Implementation-ready once 274 has landed (same file).
+
+- [ ] 276. BIRD'S-EYE FRAMERATE — RECOVER THE v0.1 DROP + a "LOW DETAILS" MODE (user
+  23.07.2026, chose OPTION C = both, measure after each step). Travel-scene FPS fell
+  substantially since v0.1; the post-pipeline is UNCHANGED — the cost is the systems
+  added since (Fable's code analysis is the source; a fresh code-analysis before
+  building is fine). MEASURE-FIRST, SOLO: every measurement runs with NOTHING else on
+  the machine (no other agents/verifies, user closes background apps), WebGPU (the
+  user's backend), zoom 0.5, at three points — (a) standing in dense East savanna
+  (herds in frame), (b) standing in empty desert, (c) driving — so a−b attributes the
+  wildlife share. Baseline BEFORE any change; re-measure after EACH lever to prove it a
+  real win (FPS counter `Hud.tsx:148` + DEV `window.__perf` from point 272; consider a
+  `scripts/verify/perf.mjs` that gates a p99 frame-delta over `__perf.frames`; extend
+  `perfProbe.ts` with `wildlife` (the `Wildlife.tsx` useFrame body) and `seasonField`
+  (`TravelScene.tsx` updateSeasonField call) burst/duration stats — the structure
+  already anticipates them).
+  PART A — quality-NEUTRAL levers (no visible change; land these first, each measured):
+   N1 wildlife behaviour-LOD — tick animals outside ~1.2× view only every Nth frame
+     (round-robin like the existing water sweep), animals IN an active §19.8 drama tick
+     EVERY frame (I4 holds); plus a cheap height/type-only `sampleTerrain` branch for
+     behaviour queries (skip colour/splat/region maths) — `terrain.ts:219`,
+     `Wildlife.tsx:1668-4160`. Biggest CPU posten.
+   N2 throttle `updateSeasonField` — rewrite the 150×148×15 texel field only ~every
+     250 ms or when a `greens[i]` moved ≥1/255 (`seasonField.ts:114-151`, called
+     `TravelScene.tsx:1400`); scale the lerp accordingly.
+   N3 decouple the HUD from `pos` — `InventoryBar`/`MovementPenalty` re-render every
+     frame while driving (`Hud.tsx:30`, `StatusBar.tsx:29`, the latter calls
+     `sampleTerrain` in render); move to derived, change-only store slices; memoise the
+     `localeCompare` sort.
+   N4 distance-gate the always-mounted `<Html>` labels — ~32 `PlaceMarker` + ~40
+     `LandmarkLabels` project + write DOM transforms every frame even off-screen
+     (`TravelScene.tsx:1652,1726`); mount only within the (zoom-aware) view radius, the
+     `RegionBorders.tsx:56` pattern.
+   (N5 GC pressure in the wildlife separation loop, N6 a coarse terrain-query cache —
+     evaluate after N1, per the analysis.)
+  PART B — the "LOW DETAILS" mode, toggled by **F7** (F6 is now the state-dump, point
+  270; reserve F7): a `lowDetails` flag in `useUi` read DERIVED (`effectiveSsao =
+  ssaoEnabled && !lowDetails`, etc. — do NOT clobber the individual debug flags the way
+  `activateTouch` does), a localized debug-menu checkbox (de+en), and the F7 handler
+  beside the existing F-keys (`Hud.tsx:423-471`, add F7 to the preventDefault list).
+  Visible quality loss allowed for a large win on weak GPUs (~2-4×): dpr cap to 1
+  (`App.tsx:38` Canvas — the single biggest GPU lever), post off (TRAA+MSAA off, SSAO
+  off, Bloom off — `Effects.tsx`), shadows 3→2 cascades + half-res then off
+  (`TravelScene.tsx:804-812`, the `shadowsEnabled` flag exists), flora fog-radius factor
+  ~0.55 (spawn radius ~320→180, instance count falls quadratically, no-pop invariant
+  preserved since it stays fog-coupled — `floraStreaming.ts:57`, `Climate.tsx:244`) plus
+  `castShadow=false` for bush/papyrus/rock, terrain refine off + a coarser base LOD
+  (`terrainLod.ts`), water `calm`→1 (`water.ts`), haze layers 5→2 + rain halved
+  (`Climate.tsx`), wildlife spawn density halved. The touch mobile-quality preset is a
+  SUBSET — Low Details is its superset; do not regress touch.
+  TESTS: pure-tests for the derived-flag reads (`ui.test`), the debug checkboxes
+  (`DebugMenu.test`), and a `settings.mjs`/`perf.mjs` live check that F7 flips the
+  effective flags and that each landed lever is a measured FPS win on BOTH backends (the
+  neutral ones must not change the PICTURE — a pixel-diff gate). DOCS: design.md
+  §2.7/§21 (the render pipeline + the Low-Details toggle + F7), CLAUDE §7.1 pt.20/32; all
+  new UI text in de+en. NOTE: touches many render/scene files — sequence the levers as
+  separate commits, each measured; a perf REGRESSION in the game is a bugfix (Part A is
+  before 224), the Low-Details MODE is the new feature (v0.3-ok, but small). Neutral
+  levers must be PICTURE-IDENTICAL. Implementation-ready; measure solo.
 
 ## Closing (only after all points)
 
