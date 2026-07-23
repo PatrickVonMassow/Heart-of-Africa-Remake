@@ -7,10 +7,12 @@ import {
   inReedBelt,
   solidDressingAllowed,
   drinkWalkDistance,
+  crocodileNeedsReanchor,
   CHANNEL_CLEARANCE_DEG,
   BANK_GAP_DEG,
   BATHE_WADE_DEG,
 } from './waterEdgeRules'
+import { crocodileAllowedAt } from './wildlifeBehavior'
 
 const WATERLINE = RIVER_WIDTH_DEG - 0.005 // river water reaches to here (terrain cut)
 
@@ -107,5 +109,30 @@ describe('drinkWalkDistance (to the bank, never into the channel)', () => {
   it('never walks a negative distance (spawn already at the bank)', () => {
     expect(drinkWalkDistance(RIVER_WIDTH_DEG, 99, false)).toBeGreaterThanOrEqual(0)
     expect(drinkWalkDistance(99, 0.005, false)).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('crocodileNeedsReanchor (a resting crocodile must be ON water, design.md §19.16 point 242)', () => {
+  it('a crocodile on river/lake water is at home — no re-anchor', () => {
+    expect(crocodileNeedsReanchor('water')).toBe(false)
+  })
+
+  it('a crocodile beached on any bank/sand/land cell must be re-anchored to water', () => {
+    // The point-218 river widening can leave a once-water spawn cell reading as
+    // bank/sand, stranding the ambusher flat and exposed — every non-water cell
+    // triggers the relocation back to the nearest river/lake water.
+    for (const t of ['coast', 'sand', 'desert', 'savanna', 'jungle', 'mountain', 'land']) {
+      expect(crocodileNeedsReanchor(t), t).toBe(true)
+    }
+  })
+
+  it('the ocean is never a crocodile home either — re-anchor away from it', () => {
+    expect(crocodileNeedsReanchor('ocean')).toBe(true)
+  })
+
+  it('mirrors crocodileAllowedAt: needs-reanchor is the negation of allowed-at', () => {
+    for (const t of ['water', 'ocean', 'coast', 'desert', 'savanna', 'jungle', 'mountain']) {
+      expect(crocodileNeedsReanchor(t), t).toBe(!crocodileAllowedAt(t))
+    }
   })
 })

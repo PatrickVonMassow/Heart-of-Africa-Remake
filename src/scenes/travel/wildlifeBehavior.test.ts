@@ -51,6 +51,7 @@ import {
   crocodileAllowedAt,
   crocodileLungeReady,
   crocodileGripExpired,
+  crocodileHoldsCatch,
   grassFireEligible,
   ploverShouldLure,
   ploverLureHeading,
@@ -675,6 +676,59 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
     expect(pd.predatorFlight.crocodile).toBeGreaterThan(0)
     expect(defendChance('giraffe', 'crocodile', pd)).toBeGreaterThan(defendChance('antelope', 'crocodile', pd))
     expect(killChance('giraffe', 'crocodile', pd)).toBe(0)
+  })
+})
+
+// The crocodile stays COUPLED to its catch (design.md §19.16, point 250): the
+// reported bug was a snapped catch after which the croc swam away while the prey
+// still dissolved on its own — the removal was decoupled from the croc. A
+// gripping crocodile must hold its victim through the whole struggle window AND
+// the sink that follows the kill (the river keeps the body), so the prey's
+// dissolve is DRIVEN BY the croc's feed. It may only slink home / idle once the
+// catch is fully resolved.
+describe('crocodileHoldsCatch — the croc holds its catch until resolved (point 250)', () => {
+  it('an ungripped croc (mid-burst, no catch) holds nothing', () => {
+    // The burst run toward a live victim is governed elsewhere; this predicate
+    // only gates the grip, so without a grip there is nothing to hold.
+    expect(crocodileHoldsCatch(false, 5, false, undefined)).toBe(false)
+    expect(crocodileHoldsCatch(false, undefined, true, 9)).toBe(false)
+  })
+
+  it('holds through the STRUGGLE window while the victim is still caught', () => {
+    expect(crocodileHoldsCatch(true, 5, false, undefined)).toBe(true) // just seized
+    expect(crocodileHoldsCatch(true, 0.1, false, undefined)).toBe(true) // window nearly out
+  })
+
+  it('holds through the SINK: a killed body dissolving in the water keeps the croc coupled', () => {
+    // caught cleared, the body is dead and dissolving — the croc drags it under
+    // (no bank carcass); it must NOT swim off and leave the prey to dissolve alone.
+    expect(crocodileHoldsCatch(true, undefined, true, 9)).toBe(true)
+    expect(crocodileHoldsCatch(true, undefined, true, 0.01)).toBe(true) // still sinking
+  })
+
+  it('releases only once the catch is fully resolved — body gone, or the victim freed', () => {
+    expect(crocodileHoldsCatch(true, undefined, true, 0)).toBe(false) // body fully dissolved
+    expect(crocodileHoldsCatch(true, undefined, true, undefined)).toBe(false) // body removed (gone)
+    // Driven off (point 130): the parent freed the victim — caught cleared, not
+    // dead. The grip's own retreat flag then sends the croc home; the hold is
+    // over here too.
+    expect(crocodileHoldsCatch(true, undefined, false, undefined)).toBe(false)
+  })
+
+  it('the struggle-to-sink-to-done timeline stays continuously coupled, never a gap', () => {
+    // Walk the victim state as a real kill runs: seized -> struggling -> killed &
+    // sinking -> gone. The croc is held at every step until the body is gone, so
+    // there is no frame where it is released while the prey still exists.
+    const timeline: Array<[number | undefined, boolean, number | undefined, boolean]> = [
+      [5, false, undefined, true], // seized, struggling
+      [1, false, undefined, true], // still struggling
+      [undefined, true, 9, true], // killed, body begins to sink
+      [undefined, true, 3, true], // sinking
+      [undefined, true, 0, false], // fully dissolved — released
+    ]
+    for (const [caught, dead, dissolve, held] of timeline) {
+      expect(crocodileHoldsCatch(true, caught, dead, dissolve), `${caught}/${dead}/${dissolve}`).toBe(held)
+    }
   })
 })
 
