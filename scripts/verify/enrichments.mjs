@@ -2180,7 +2180,6 @@ check(
 // not a rescue — it must CLOSE on the elephant (ordinary prey dodges away) and
 // end up dead over its own stain. Park an elephant on a calf and watch both.
 const trampleGrief = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const w = window.__wildlife
   const herds = w.herdsRef.current
   const SP = ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe']
@@ -2199,8 +2198,14 @@ const trampleGrief = await page.evaluate(async () => {
   const eleph = { x: calf.x + 0.7, z: calf.z, y: calf.y, rot: etoward, heading: etoward, scale: 1, phase: 0 }
   herds.elephant.push(eleph)
   const stains0 = w.stains.current.length
-  let calfDead = false
-  for (let i = 0; i < 40 && !calfDead; i++) { await sleep(100); calfDead = calf.dead === true }
+  // Poll on the SIM clock (point 249): the elephant bears down and the grief
+  // parent charges at sim speed (dt is clamped at 0.1, so long frames advance
+  // the sim SLOWER than wall time), and the old wall-clock sleep loops starved
+  // a loaded WebGPU run — the flake read closed≈2.4 with the parent still
+  // mid-chase, kinematically impossible within 6 REAL sim-seconds. The budgets
+  // sit well inside the 24 s grief window; a genuine regression (parent never
+  // trampled) still exhausts them and fails.
+  const calfDead = await window.__pollSim(10, () => calf.dead === true)
   const charged = parent.trampleTo !== undefined // it inherited the grief
   // Measure the approach against the elephant the grief ACTUALLY charges —
   // the nearest living one — not against the injected decoy: with a natural
@@ -2218,8 +2223,7 @@ const trampleGrief = await page.evaluate(async () => {
     return best
   })()
   const d0 = target ? Math.hypot(parent.x - target.x, parent.z - target.z) : NaN
-  let parentDead = false
-  for (let i = 0; i < 60 && !parentDead; i++) { await sleep(100); parentDead = parent.dead === true }
+  const parentDead = await window.__pollSim(20, () => parent.dead === true)
   const d1 = target ? Math.hypot(parent.x - target.x, parent.z - target.z) : NaN
   const stainsAdded = w.stains.current.length - stains0
   const idx = herds.elephant.indexOf(eleph)
@@ -5969,9 +5973,11 @@ const vicinity = await page.evaluate(async () => {
     return c
   }
   // Poll until the per-frame vicinity top-up has crossed the minimum (point 249):
-  // the seeder DEFERS on frames where Cairo's Nile-facing bearings expose no
-  // off-screen land, so it can need several sim-seconds (and a little camera
-  // drift) to place the full group. `ok` latches the moment count>=min is first
+  // the seeder DEFERS on frames whose candidate draw exposes no off-screen land
+  // (Cairo's Nile-facing bearings), and each attempt draws FRESH bearings
+  // (vicinityAttemptSeed — the old frozen draw could defer forever under the
+  // static post-leave camera and stalled the count one short), so a deferral
+  // resolves within a few frames. `ok` latches the moment count>=min is first
   // reached, so a later drift/despawn cannot un-satisfy it; a generous sim budget
   // gives the seeder enough frames. A genuine seeder failure exhausts the budget.
   let reached = false
