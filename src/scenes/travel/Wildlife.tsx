@@ -75,6 +75,7 @@ import {
   type PredatorKind,
   type PreyKind,
   vicinitySeedBounds,
+  vicinityAttemptSeed,
   seasonFlowFactor,
   shouldMourn,
   mournDeadline,
@@ -1181,6 +1182,11 @@ function placeGroup(
  * rules. A clearance keeps them off the leave point so the player never
  * materialises inside a herd.
  */
+// Per-place seeding-attempt counter (point 102): advances once per frame in
+// which that place's vicinity needed a top-up, so every attempt draws a fresh
+// candidate set via vicinityAttemptSeed — a deferring frame (all bearings
+// on-screen or wet) never re-tests the same frozen candidates forever.
+const vicinitySeedAttempt = new Map<string, number>()
 function seedSettlementVicinity(
   herds: Record<Species, Animal[]>,
   pos: { x: number; z: number },
@@ -1214,10 +1220,17 @@ function seedSettlementVicinity(
     }
     if (count >= min) continue
     const deficit = min - count
-    // Deterministic placement from the settlement id + world seed.
+    // Deterministic placement from the settlement id + world seed + attempt
+    // index: the attempt stride makes each frame's draw EXPLORE fresh ring
+    // bearings (see vicinityAttemptSeed) instead of re-testing one frozen set —
+    // the old fixed seed let an idle player's static camera pin a deferring
+    // draw (or a member offset on wet/low ground) in place forever, stalling
+    // the guarantee one animal short (point 249).
     let h = 0
     for (const c of place.id) h = (h * 31 + c.charCodeAt(0)) | 0
-    const rand = mulberry32(((seed ^ h) + 0x102) >>> 0)
+    const attempt = vicinitySeedAttempt.get(place.id) ?? 0
+    vicinitySeedAttempt.set(place.id, attempt + 1)
+    const rand = mulberry32(vicinityAttemptSeed(seed, h, attempt))
     // Rotate through the pool from a deterministic start until a species has
     // instance capacity left (point 135a): picking ONE and giving up at its
     // cap silently starved the guarantee once the test scenarios had filled
@@ -2816,12 +2829,19 @@ function Herds() {
             tgZ = m.z
           }
         }
-        if (st.mourn && t >= st.mourn.until) {
+        // The vigil window runs on the SIM clock, like every other drama timer
+        // (grief, keeper vigil, caught countdowns — all `dt`-driven): the herd
+        // WALKS at sim speed, so a wall-clock deadline expires mid-walk-in
+        // whenever frames run long (the dt clamp lets sim time fall behind wall
+        // time) and the herd would release before it ever held at the bones —
+        // the measured point-126 miss under load, and the same degradation a
+        // player on a weak machine would see.
+        if (st.mourn && simTimeRef.current >= st.mourn.until) {
           st.mourn = undefined
           st.mourned = true // vigil over — move on; not again until the herd has left the radius
         }
         if (!st.mourn && shouldMourn(tgD, bm.radius, st.mourned === true)) {
-          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(t, tgD, bm.seconds, ELEPHANT_SPEED) }
+          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(simTimeRef.current, tgD, bm.seconds, ELEPHANT_SPEED) }
         }
         if (st.mourned && tgD > bm.radius) st.mourned = undefined
         if (st.mourn) {
