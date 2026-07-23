@@ -91,6 +91,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileWaterlinePrey,
   crocodileIdleYaw,
   crocodileGripExpired,
   crocodileHoldsCatch,
@@ -2467,34 +2468,62 @@ function Herds() {
           }
         }
         if (!c.lunge) {
-          // Hidden: wait for a drinker standing at a bank inside the radius.
-          // A drinking JUVENILE is the strongly-preferred target (point 245),
+          // Hidden: wait for a prey standing at the waterline inside the reach.
+          // Two ways in (point 275 broadens the point-130 trigger, which fired
+          // only on a formal drink pose and so read as inert whenever no drinker
+          // was in its narrow window):
+          //  (1) a bank DRINKER genuinely standing in its drink cycle — the
+          //      original, still the surest catch;
+          //  (2) ANY prey that has come to the WATERLINE — its rendered feet on
+          //      LAND (not on the water itself, so it is at the bank, not
+          //      crossing) — within the calibratable ambush band of the croc.
+          // A drinking JUVENILE stays the strongly-preferred target (point 245),
           // so the §19.8 sacrifice/rescue drama fires more often — score every
-          // eligible bank drinker by crocodileTargetWeight (young ≫ adult) and
-          // take the best (nearer breaks a same-weight tie), rather than the
-          // first one found.
+          // eligible prey by crocodileTargetWeight (young ≫ adult) and take the
+          // best (nearer breaks a same-weight tie), rather than the first found.
           let bestVictim: Animal | null = null
           let bestScore = -Infinity
           for (const sp of CALF_HUNT_SPECIES) {
             for (const a of herds[sp]) {
-              // Skip any animal already owned by another drama or not actually
-              // standing at the bank (point 197, the 194 seam pattern): the lion's
-              // chase victim (§19.16 — the two systems never claim one animal), a
-              // fleeing/dodging drinker whose stale drink target still sits near
-              // the croc (it is rendered away at its flight, not at the water), a
-              // crossing/vigil/fire-trapped animal. The croc lunges only at an
-              // animal genuinely drinking at the bank.
+              // Skip any animal already owned by another drama or otherwise
+              // ineligible (point 197, the 194 seam pattern): the lion's chase
+              // victim (§19.16 — the two systems never claim one animal), a
+              // fleeing/dodging/crossing/vigil/fire-trapped animal. The croc waits
+              // for prey genuinely at the bank; it never chases across open land.
               if (
-                a.dead || !a.drink || a.dodgeHeading !== undefined || a.vigil !== undefined ||
+                a.dead || a.dodgeHeading !== undefined || a.vigil !== undefined ||
+                a.crossing !== undefined || a.fireTrapped !== undefined ||
                 claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })
               )
                 continue
-              const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
-              const atBank = cycle > 0.1 && cycle < 0.4 // rendered standing at the water
-              const d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
-              if (!crocodileLungeReady(d, atBank, bc.strikeRadius)) continue
+              let eligible = false
+              let d = Infinity
+              if (a.drink) {
+                // (1) The formal drinker: eligible only while its drink cycle has
+                // it rendered standing at the water (the stale-target guard).
+                const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
+                const atBank = cycle > 0.1 && cycle < 0.4 // rendered standing at the water
+                d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
+                eligible = crocodileLungeReady(d, atBank, bc.strikeRadius)
+              }
+              if (!eligible) {
+                // (2) The broadened waterline catch (point 275): a prey standing
+                // on LAND within the ambush band of the croc is at the bank and
+                // catchable even without a drink pose. Sample its own cell so an
+                // animal mid-channel (on water) is excluded — only a bank-stander.
+                const dSelf = Math.hypot(a.x - c.x, a.z - c.z)
+                if (dSelf <= Math.min(bc.strikeRadius, bc.ambushBankBand)) {
+                  const all = worldToLatLon(a.x, a.z)
+                  const onLand = sampleTerrain(all.lat, all.lon, seed).type !== 'water'
+                  if (crocodileWaterlinePrey(dSelf, onLand, bc.strikeRadius, bc.ambushBankBand)) {
+                    eligible = true
+                    d = dSelf
+                  }
+                }
+              }
+              if (!eligible) continue
               // Weight dominates (gap ≥ 1); the tiny distance term only breaks
-              // ties between two same-age drinkers, so a juvenile always wins.
+              // ties between two same-age prey, so a juvenile always wins.
               const score = crocodileTargetWeight(a.young === true, balance.family.juvenileDrinkCrocBias) - d * 1e-3
               if (score > bestScore) {
                 bestScore = score

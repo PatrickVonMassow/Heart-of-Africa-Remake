@@ -61,6 +61,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileWaterlinePrey,
   crocodileIdleYaw,
   CROCODILE_IDLE_SWAY_AMP,
   crocodileGripExpired,
@@ -783,6 +784,21 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
     expect(crocodileLungeReady(5, true, 5)).toBe(true) // boundary inclusive
     expect(crocodileLungeReady(5.01, true, 5)).toBe(false)
     expect(crocodileLungeReady(2, false, 5)).toBe(false) // nobody at the bank — it waits
+  })
+
+  it('the broadened waterline trigger (point 275): any prey at the bank in range is a target', () => {
+    // A grazer standing ON LAND within the ambush band is now catchable even
+    // without a formal drink pose — a wandering grazer stepping to the bank.
+    expect(crocodileWaterlinePrey(3, true, 5, 4)).toBe(true)
+    expect(crocodileWaterlinePrey(4, true, 5, 4)).toBe(true) // boundary inclusive (min(5,4)=4)
+    // Just past the band: not caught — the croc never chases up the shore.
+    expect(crocodileWaterlinePrey(4.01, true, 5, 4)).toBe(false)
+    // Merely passing on WATER (crossing, mid-channel) is not a bank-stander.
+    expect(crocodileWaterlinePrey(2, false, 5, 4)).toBe(false)
+    // The reach is the SMALLER of strike radius and bank band, so a wide strike
+    // radius never lets the croc snatch a grazer far up the shore.
+    expect(crocodileWaterlinePrey(4.5, true, 8, 4)).toBe(false)
+    expect(crocodileWaterlinePrey(4.5, true, 4, 8)).toBe(false)
   })
 
   it('the gripped lunge expires after gripSeconds so a vanished victim never pins it (point 186)', () => {

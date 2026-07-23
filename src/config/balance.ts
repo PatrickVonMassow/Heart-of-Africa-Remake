@@ -288,10 +288,16 @@ export interface BalanceConfig {
      *  the common ending; the user asked for sometimes, not often. */
     killFlight: Record<string, number>
   }
-  /** The crocodile ambush (design.md §19.16, point 130). */
+  /** The crocodile ambush (design.md §19.16, points 130/268/275). */
   crocodile: {
     /** Bank visitors inside this radius of a hidden crocodile trigger the lunge. */
     strikeRadius: number
+    /** Broadened ambush reach (point 275): a prey standing at the WATERLINE (its
+     *  feet on land) up to this distance from a hidden crocodile is a legal target
+     *  even without a formal drink pose, so a wandering grazer stepping to the bank
+     *  can be ambushed. Kept small so the croc never snatches a grazer far up the
+     *  shore — the ambush stays occasional and never clears the whole bank. */
+    ambushBankBand: number
     /** Speed of the lunge burst (units/s) — visible motion, never a teleport. */
     lungeSpeed: number
     /** Hard cap on the gripped hold (s, point 186): the grip normally ends with the
@@ -621,6 +627,7 @@ export const balance: BalanceConfig = {
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
+    ambushBankBand: 4, // calibratable (point 275): a prey at the waterline within this of a hidden croc is a legal target even without drinking — kept < strikeRadius so the ambush stays occasional
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
   },

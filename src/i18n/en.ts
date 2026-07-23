@@ -376,6 +376,7 @@ export const en: Strings = {
     calfGambolRange: 'Calf play range',
     calfGambolBout: 'Calf play bout (s)',
     crocStrikeRadius: 'Crocodile: bank strike radius',
+    crocAmbushBankBand: 'Crocodile: ambush bank band',
     juvenilePreyBias: 'Juvenile prey preference',
     juvenileDrinkCrocBias: 'Crocodile: drinking-juvenile preference',
     crocGripSeconds: 'Crocodile: grip deadline (s)',

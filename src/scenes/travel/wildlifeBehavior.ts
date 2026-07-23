@@ -1068,6 +1068,35 @@ export function crocodileLungeReady(distToPrey: number, preyAtBank: boolean, str
 }
 
 /**
+ * The BROADENED ambush trigger (design.md §19.16, point 275): the original
+ * trigger only fired at a formal bank DRINKER standing in the drink pose, so a
+ * lurking crocodile with no drinker in its narrow window read as inert even
+ * while grazers stepped to the water beside it. Now ANY prey that has come to
+ * the WATERLINE — its rendered feet on land (not on the water itself, so it is
+ * standing at the bank rather than crossing) close to a hidden crocodile — is a
+ * legal ambush target within the strike radius, whether or not it is drinking.
+ *
+ * `distToCroc` is the prey's distance to the lurking crocodile (which sits on
+ * water), `preyOnLand` is true when the prey stands on a land cell (the bank,
+ * not mid-channel), and `bankBand` is the calibratable reach past the water
+ * edge that still counts as "at the waterline": a prey up to `bankBand` from
+ * the croc is close enough to seize. The ambush stays OCCASIONAL because the
+ * croc still only lunges when a prey happens into this shallow band — it never
+ * chases across open land, and `crocodileTargetWeight` keeps young preferred.
+ */
+export function crocodileWaterlinePrey(
+  distToCroc: number,
+  preyOnLand: boolean,
+  strikeRadius: number,
+  bankBand: number,
+): boolean {
+  // The croc lies ON water; a prey on LAND within reach stands at the bank. The
+  // effective reach is the smaller of the strike radius and the bank band, so a
+  // large strike radius never lets the croc snatch a grazer far up the shore.
+  return preyOnLand && distToCroc <= Math.min(strikeRadius, bankBand)
+}
+
+/**
  * The resting crocodile's subtle idle yaw (design.md §19.16, points 242/257): a
  * hidden crocodile WAITS — it lies submerged, it does not roam. Its faint life is
  * a BOUNDED oscillation about a FIXED rest heading, an ABSOLUTE value that always
