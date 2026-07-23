@@ -10493,6 +10493,69 @@ the remaining open points in their numeric order.
   separate commits, each measured; a perf REGRESSION in the game is a bugfix (Part A is
   before 224), the Low-Details MODE is the new feature (v0.3-ok, but small). Neutral
   levers must be PICTURE-IDENTICAL. Implementation-ready; measure solo.
+  MEASURED STATE (24.07.2026, `docs/perf-276-findings.md` — read it before building):
+  the regression is GEOMETRY, not the render features. Against v0.1 the frame cost rose
+  by the SAME 1.2 ms in the empty desert as in the dense savanna, and the scene-graph
+  breakdown puts it on terrain (1.99x) and dressing (2.41x); the per-chunk histogram
+  names point 209's near-ring refinement exactly (15 Sahara chunks at 112 segments =
+  25 984 tris each, zero in v0.1), whose 400 m relief threshold admits 60 % of all land
+  chunks. Every debug-switchable render feature — TRAA, SSAO, shadows, half shadow maps,
+  all post — is worth ~nothing on the test GPU, as is a 4x pixel count; N1 gave no win
+  and is parked on `feat/276-wildlife-lod`; a smaller flora radius is REJECTED (it
+  quadruples the driving p99). Terrain refine off is the only measured win there (~8 %).
+  But that GPU is not geometry-bound (115-238 fps), so which lever actually pays MUST be
+  decided on the user's hardware — point 277 delivers those numbers first.
+
+- [ ] 277. IN-GAME BENCHMARK ON A FUNCTION KEY, IN THE DELIVERED BUILD (user 24.07.2026).
+  The headless numbers cannot decide the point-276 levers: that machine is not
+  geometry-bound, so the doubled geometry costs it 8 % while the user's GPU may pay far
+  more. So the game itself must measure, on the user's real hardware, in the DEPLOYED
+  build — and hand back a file to analyse.
+  KEY: **F8** (F5 is the browser's reload, F6 the state dump/point 270, F7 is reserved
+  for Low Details/point 276). Add F8 to the `Hud.tsx` F-key handler and its
+  preventDefault list.
+  SHIPS IN PRODUCTION. Unlike `window.__game` and friends this must NOT be
+  `import.meta.env.DEV`-gated — the user tests the delivery build. Keep the module
+  lazily imported (dynamic `import()` on the keypress) so it never enters the eager
+  startup chunks, exactly like the TTS stack.
+  DETERMINISM IS THE POINT (user: two runs of the same route are otherwise incomparable
+  — other animals spawn, other dramas fire). One run must differ from the next ONLY in
+  the graphics config. Therefore, for the whole benchmark:
+   - Install a seeded PRNG over `Math.random` for the run's duration and restore the
+     original afterwards (save/restore in a `try/finally`), so any system that rolls
+     directly is pinned too.
+   - Reset before EVERY config: fixed world seed, fixed date, fixed start coordinates,
+     random events off, deadline off, fixed travel speed, journal closed, fixed zoom
+     (0.5 — the reachable default), weather/season pinned by the fixed date.
+   - Drive the route on a FIXED SIMULATION TIMESTEP and a FIXED STEP COUNT, not on real
+     dt: step the sim N times at dt = 1/60 s regardless of how long the frame actually
+     took. Then the simulated path, the streaming crossings and every roll are identical
+     across configs; only the wall-clock per frame — the measurement — varies.
+   - The route visits the three point-276 states in order: standing in dense East
+     savanna (-2.5, 34.0), standing in empty desert (23.0, 15.0), and driving from the
+     savanna anchor. Same anchors as `scripts/perf-bench.mjs` so the two agree.
+  CONFIGS SWEPT (each over the identical route): baseline; TRAA off; SSAO off; shadows
+  off; shadow map half; all post off; device pixel ratio capped to 1; terrain refine off;
+  terrain refine cap 112->84; everything off. The terrain/flora levers need a runtime
+  switch to sweep — add plain module-level overrides (`terrainLod.ts` refine enable +
+  segment cap) that the benchmark sets and restores; they are not player-facing options.
+  REPORT: a downloadable file (Blob + `<a download>`) AND a copy button, containing the
+  environment (user agent, backend WebGPU/WebGL2, adapter/renderer string, viewport,
+  device pixel ratio, build commit via `import.meta.env`) and per config the frame-time
+  median/p95/p99/max, the fps, the draw calls and triangles from `renderer.info`, and the
+  scene-graph triangle count per system. JSON, with a short human-readable header so the
+  user can sanity-check it before sending. Name it with the date and the backend.
+  UX: a modal progress overlay naming the running config and the remaining time, an Esc
+  abort that restores every setting, and localized text in de+en (voice markup does not
+  apply — this is UI, not journal). Total run under ~3 minutes; a `?bench=short` query
+  parameter shortens the sample for the automated test.
+  TESTS: pure tests for the sweep plan, the fixed-step route and the statistics
+  (`src/systems/benchmark.test.ts`); `src/ui/*.test.tsx` for the F8 toggle, the
+  preventDefault and the localized overlay; a live check (own short verify suite) that F8
+  in the short mode produces a report object with one row per config, restores every
+  setting afterwards, and leaves `Math.random` the original function.
+  DOCS: design.md §21.1 (the F-key list gains F8) and CLAUDE.md §7.1 pt. 20; record the
+  method in `docs/perf-276-findings.md`. Implementation-ready.
 
 ## Closing (only after all points)
 
