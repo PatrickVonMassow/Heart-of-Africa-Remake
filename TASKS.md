@@ -10198,6 +10198,37 @@ the remaining open points in their numeric order.
   now; the BUILD waits for the cluster to be free and does NOT run concurrently with
   another Wildlife.tsx point. Implementation-ready once the research lands.
 
+- [ ] 270. F5 STATE-DUMP POPUP FOR BUG REPORTS (user 23.07.2026 — do this as the NEXT
+  task). Add an F5 shortcut that opens a popup/overlay showing the COMPLETE game state
+  in a suitable encoding, with a DOWNLOAD-as-file option, so the user can attach it to
+  bug reports and make diagnosis easier. DETAILS: (1) a new `dumpGameState()` that
+  serialises the WHOLE store to pretty-printed JSON — the entire `useGame` state (seed,
+  mode, placeId, position, day, money/food/gifts, inventory + capacity, health +
+  afflictions + canteen, hints/deciphered legs, camps, reputation, discovered places/
+  landmarks, all flags, balance overrides, ui-relevant state) — reuse/extend the §18
+  save-snapshot serialisation but capture EVERYTHING, not just the port-snapshot fields;
+  include an app version/build marker and the current date so a dump is self-describing.
+  (2) F5 toggles a MODAL overlay (a §17.4 top-most modal, styled like the debug menu)
+  that shows the JSON in a scrollable, selectable read-only text area, with a DOWNLOAD
+  button (Blob → a `.json` file, filename like `hoa-state-<date>-<seed>.json`), a COPY
+  button, and close on F5/Esc. F5 is the browser refresh key, so the keydown handler
+  MUST `preventDefault()` when the game has focus (note it in the debug shortcuts list
+  §21.1). (3) Localised title/buttons in BOTH languages. ANCHORS: the key handler where
+  the F1-F4 shortcuts live (`src/systems/` input / the debug shortcut wiring), the store
+  (`src/state/store.ts` — a `dumpGameState` selector/serialiser), the save/load
+  serialisation (`src/state/store.saveload*` — reuse the field capture), a new overlay
+  component in `src/ui/` (e.g. `StateDump.tsx`), `src/i18n/en.ts`/`de.ts`/`types.ts`,
+  DebugMenu/§21. VERIFIABLE: a pure test that `dumpGameState` returns valid JSON
+  capturing the key store fields (non-empty, parses, includes seed/mode/day/inventory/
+  health) and stays stable/round-trippable; a component test (`src/ui/StateDump.test.tsx`)
+  that the overlay renders the JSON text + DOWNLOAD/COPY/close controls and that F5
+  toggles it without shifting focus onto a control; a live check in a browser suite that
+  pressing F5 opens the popup showing the state and the download control is present, no
+  console errors. DOCS: design.md §21 (the F5 state-dump popup + the shortcut). Localised
+  text both languages. NOTE: touches the store + a new UI overlay + input/i18n — a
+  different concern than the wildlife cluster, so it can be built independently and in
+  parallel; keep the serialiser central (one `dumpGameState`). Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
