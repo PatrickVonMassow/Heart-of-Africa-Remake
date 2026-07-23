@@ -99,6 +99,19 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/**
+ * How deep the couchant body sits below the sand. In 1890 the Sphinx was NOT
+ * the freestanding lion of the modern postcard: it lay buried to the neck and
+ * shoulders for the whole 19th century. Caviglia cleared the chest in 1817 and
+ * the sand took it back; Mariette cleared it again in 1853 with the same
+ * result; only Baraize's 1925-36 excavation freed the body for good. A ~1890
+ * expedition therefore sees a head and its nemes rising out of a drift, with
+ * the shoulders barely breaking the surface — nothing of the paws, torso,
+ * haunches or tail. The depth is chosen so the chest just grazes the sand while
+ * head, nemes and crown stand wholly proud.
+ */
+export const SPHINX_BURIAL_DEPTH = 0.4
+
 /** The Great Sphinx as a couchant lion under the nemes (design.md §4.4,
  *  user request: clearly more than a box stand-in): a lying torso with
  *  raised haunches and folded hind legs, both fore paws stretched forward,
@@ -106,7 +119,13 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
  *  the trapezoid nemes silhouette (widening down toward the shoulders,
  *  flat crown). Faces +x (east); origin on the ground at the body centre.
  *  Proportions are readability-exaggerated for the travel camera; the same
- *  geometry scales up in Cairo's western skyline. */
+ *  geometry scales up in Cairo's western skyline.
+ *
+ *  The whole lion is BUILT and then sunk by SPHINX_BURIAL_DEPTH, rather than
+ *  the buried parts being left out: the body below the sand costs nothing the
+ *  player can see, and keeping it means the couchant proportions stay the
+ *  honest thing this builder describes. A low sand drift closes the seam so
+ *  the sand meets the neck as drift rather than as a clean cut. */
 export function buildSphinx(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
   const sand = '#c29c66'
@@ -151,7 +170,18 @@ export function buildSphinx(): THREE.BufferGeometry {
   const crown = new THREE.BoxGeometry(0.14, 0.05, 0.14)
   crown.translate(0.24, 0.68, 0)
   put(crown, sand, 8220)
-  return merge(parts)
+  // Sink the lion: what remains above the sand is the head under its nemes,
+  // with the shoulders just breaking the surface (see SPHINX_BURIAL_DEPTH).
+  const buried = merge(parts)
+  buried.translate(0, -SPHINX_BURIAL_DEPTH, 0)
+  // The drift the body lies in — a low tapered dune, banked ALONG the lion
+  // (squashed across it) so the sand line reads as blown sand rather than as
+  // the lion cut off flat, while the silhouette stays longer than it is wide.
+  // Kept low enough that the shoulders still break its surface.
+  const drift = new THREE.CylinderGeometry(0.38, 0.62, 0.11, 12, 1)
+  drift.scale(1, 1, 0.45)
+  drift.translate(0.05, 0.005, 0)
+  return merge([buried, tint(drift, '#c9a670', 0.05, 8221)])
 }
 
 /** Great Zimbabwe: a curved mortarless dry-stone wall (segmented boxes) and a
