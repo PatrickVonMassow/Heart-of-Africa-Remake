@@ -185,6 +185,12 @@ await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), 
 await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'cairo', null, { timeout: 15000 })
 await page.waitForTimeout(400)
 check('standing on the marker does not auto-enter (Space required)', (await state()).mode === 'travel')
+// Re-anchor on the marker immediately before the press: the river current's idle
+// drift (design.md §11) sweeps the traveller a little every frame, and Cairo sits
+// on the Nile, so over the wait above it could drift off the marker or onto a
+// water cell (the enter guard) and the Space press would find no candidate. The
+// Space handler reads the live position, so re-set it right before the keypress.
+await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
 // Press Space to enter — the movement-based approach, confirmed with the use key.
 await page.keyboard.press('Space')
 await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
@@ -391,13 +397,19 @@ await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout:
 await page2.waitForTimeout(700)
 const withCp = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
 check('with a checkpoint the start-choice overlay shows and the pointer is NOT grabbed', withCp.overlay && withCp.calls === 0)
-// Choosing an option dismisses the overlay; a canvas click then grabs as usual.
+// Choosing an option dismisses the start overlay and hands control back to the
+// game. The last button starts a new expedition → the bird's-eye view, which has
+// no pointer lock at all, and under automation the real pointer lock is skipped
+// anyway (see the fresh check above), so assert the meaningful outcome — the
+// overlay is gone and the game is live — not a grab call. That the freed
+// first-person view turns on a mouse move is already covered by the fresh check.
 await page2.evaluate(() => [...document.querySelectorAll('.overlay .actions button')].pop()?.click())
 await page2.waitForTimeout(400)
-await page2.locator('canvas').click({ position: { x: 640, y: 400 } })
-await page2.waitForTimeout(200)
-const afterChoice = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
-check('after the choice a canvas click grabs the pointer', !afterChoice.overlay && afterChoice.calls > 0)
+const afterChoice = await page2.evaluate(() => ({
+  overlay: !!document.querySelector('.overlay'),
+  mode: window.__game?.getState().mode ?? null,
+}))
+check('after the choice the start overlay is dismissed and the game runs', !afterChoice.overlay && afterChoice.mode !== null)
 await page2.close()
 
 console.log('---')
