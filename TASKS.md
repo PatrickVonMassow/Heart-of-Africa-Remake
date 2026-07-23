@@ -10350,6 +10350,45 @@ the remaining open points in their numeric order.
   DEPENDS on point 244 (the Space-entry mechanism) landing first; a big feature for v0.3.
   The RESEARCH half is a standalone Fable pass, safe to run now; the BUILD follows 244.
 
+- [ ] 274. CROCODILE BODY STILL VISIBLE IN THE WATER — the point-246 fix is
+  INSUFFICIENT (user 23.07.2026, screenshot, deployed main). A lurking (non-striking)
+  Nile crocodile still shows its whole body as a clear dark silhouette in the river; only
+  the eye knobs should break the surface. Point 246 added an opacity fade
+  (`createCrocodileMaterial`: `opacityNode = smoothstep(waterline-BAND, waterline,
+  positionLocal.y)`, `transparent:true`, `depthWrite:true`) driven by the per-instance
+  `crocWaterline` attribute (`crocodileWaterlineLocal(scale, !striking)` = SUBMERGE_DEPTH/
+  scale when submerged), with the body sunk by `CROCODILE_SUBMERGE_DEPTH = backTopY`
+  (`crocodileBodyY`). It does NOT hide the body in real play. DIAGNOSE LIVE on the REAL
+  backend (WebGPU) at an ACHIEVABLE zoom (0.5) — do NOT trust a staged enrichments frame
+  that reads "no croc in view" (that false-positive is exactly what shipped 246). Candidate
+  causes to check: (a) the croc's `a.y`/`surfaceY` (fed to `crocodileBodyY` and the local
+  waterline) does not match the RENDERED water-sheet height at that cell, so the fade line
+  sits below the visible body and the body stays opaque above the real water; (b) the
+  `transparent:true` + `depthWrite:true` + `opacityNode` combination does not actually
+  blend-hide the below-waterline fragments on the real backend (a TSL/material wiring or
+  render-order issue — the water sheet at renderOrder 1 may not occlude the semi-transparent
+  croc), so the whole body renders; (c) sinking the back-top to the surface still leaves the
+  full body readable THROUGH the semi-transparent water — the hidden pose may need the body
+  to genuinely disappear (a deeper submerge, a wider/【stronger fade band, or letting the
+  water's own depth-absorption swallow the body). FIX per the diagnosis so a LURKING
+  crocodile shows essentially ONLY its eye knobs (and at most the scute tips) at zoom 0.5 on
+  BOTH backends — the body must not read as a crocodile in the water; keep the STRIKE/LUNGE
+  fully opaque and visible (unchanged, `!striking` gate). ANCHORS: `src/render/fauna.ts`
+  (`createCrocodileMaterial`, `crocodileWaterlineLocal`, `crocodileSubmergedAlpha`,
+  `CROCODILE_SUBMERGE_DEPTH`, `crocodileBodyY`, `CROCODILE_FADE_BAND`), `src/scenes/travel/
+  Wildlife.tsx` (:3262-3293 the `crocWaterline`/`bodyY` writing + the `striking` flag; the
+  croc vs water-sheet render order). VERIFIABLE — POSITIVE, not absence-based (the point-210/
+  172 lesson): stage a LURKING croc on a river/lake at zoom 0.5, screenshot, and assert by
+  PIXELS that the body footprint reads as WATER (hidden), NOT as a distinct dark croc
+  silhouette — rewrite the enrichments croc-hidden check (screenshot 129) to this positive
+  standard (sample the body-region pixels, require them to match the surrounding water within
+  a tolerance, and require a visible-body control — the striking croc — to FAIL that same
+  test so the check has teeth); on BOTH backends, matching the user's deployed view. Pure-test
+  any changed helper (`crocodileSubmergedAlpha`/waterline). DOCS: design.md §19.16 if the
+  hidden depiction changes. No player-visible text. NOTE: supersedes 246's visual goal;
+  wildlife-render cluster (Wildlife.tsx/fauna.ts) — do NOT build concurrently with another
+  Wildlife.tsx point. A user-reported visible bug → before 224. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
