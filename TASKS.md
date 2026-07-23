@@ -6110,8 +6110,8 @@ the remaining open points in their numeric order.
       fully (198/0), confirming they are timing flakes, not regressions. Their
       deterministic stabilisation is filed as point 177.
 
-- [ ] 174. Tag the demo build v0.3 and publish /v0.3/ (user change 23.07.2026: this
-  release is now v0.3 — v0.2 is the point-224 checkpoint; v0.3 follows it).
+- [ ] 174. Tag the demo build `v0.3` and publish it at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
   GATE (user, 19.07.2026): tag v0.3 only after ALL of these are green — 175 (the
   jumping trees, user-confirmed on WebGPU), 177 (deterministic suite), 176 (drought
   drink-reach cap), the play-test bugs 178/179/180/181/183, 184 (the pre-tag
@@ -6121,15 +6121,13 @@ the remaining open points in their numeric order.
   FINAL TAG HELD FOR THE USER (default, user away 19.07.2026): the tag + /v0.3/
   publish is the one irreversible, outward-facing step — do ALL the work up to it,
   then report "ready to tag" and WAIT for the user's go, unless the user has
-  explicitly authorized auto-tagging. When authorized / on the user's return: tag
-  `v0.3` at that HEAD and serve it at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/ — mirror how
-  /v0.1/, /v0.2/ and /poc/ are wired (the `.github/workflows` Pages build + its tag
-  loop `for tag in v0.1 v0.2 v0.3 poc`; a tag push may not trigger the deploy, so use
-  the same mechanism v0.1 used). Then FREEZE it: never re-point or change v0.3 unless
-  the user elaborately asks (tags-only-on-request memory). The v0.3 content is the
-  175/177/176/178-183/184-closed, closing-verified HEAD; 182 and 163/166/170 come
-  AFTER the tag.
+  explicitly authorized auto-tagging. When authorized: tag `v0.3` at that HEAD and
+  serve it at /v0.3/ — mirror how the other tags are wired (the `.github/workflows`
+  Pages build + its tag loop `for tag in v0.1 v0.2 v0.3 poc`; a tag push may not
+  trigger the deploy, so use the same mechanism v0.1 used). Then FREEZE it: never
+  re-point or change v0.3 unless the user elaborately asks (tags-only-on-request
+  memory). The v0.3 content is the 175/177/176/178-183/184-closed, closing-verified
+  HEAD; 182 and 163/166/170 come AFTER the tag.
 
 - [x] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
   REOPENED 18.07.2026: the shipped fix (5421e46, baked per-instance seasonTint +
@@ -8780,32 +8778,29 @@ the remaining open points in their numeric order.
   design.md §19.13; update the peoples/climate implementation sections in lockstep.
   A Fable-5 plausibility pass fits this audit.
 
-- [ ] 224. DEMO CHECKPOINT — full closing run → re-point the `poc` tag to the
-  then-current main → publish that state playable at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ (user request
-  22.07.2026). GATE/POSITION: the user wants this as the NEXT milestone right
-  AFTER the current terrain task (215) once everything is stable and 215 is done —
-  i.e. a visible demo update for the terrain smoothing, NOT waiting for every open
-  bug. Run it when 215 is finished + the tree is stable (build/lint/CVE clean,
-  full Vitest + the LARGE browser regression on BOTH backends green — the §7.2
-  closing cycle per docs/maximale-qs.md's closing steps). STEPS: (1) full closing
-  cycle (Vitest + LARGE regression both backends, dead-code/stale-doc pass, lint/
-  audit clean) — only proceed if GREEN; (2) at that verified GREEN main HEAD, BOTH
-  re-point the EXISTING `poc` tag to it AND create the NEW `v0.2` release tag on it
-  (this checkpoint publishes as v0.2 — user change 23.07.2026), and push both tags
-  (these are the explicit, authorized tag ops per the user — the standing exception
-  to [[tags-only-on-request]] for THIS request; do NOT touch v0.1); (3) the GH-Pages
-  deploy builds each tag into its path (deploy-pages.yml, guarded, worktree
-  --base=/…/<tag>/) — ADD `v0.2` to the workflow's tag loop (`for tag in v0.1 v0.2
-  poc`, plus v0.3 when 174 ships) so the same Pages artifact serves it — and verify
-  the deploy is green and ALL URLs resolve 200: root = main, /poc/ = the moved poc
-  tag, and /v0.2/ = the new v0.2 tag
-  (https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/), all with
-  correctly based asset URLs (the MSYS-mangling Git-Bash trap is documented). This
-  is outward-facing: run only after the closing is GREEN; report the result. Then
-  FREEZE v0.2 (never re-point unless the user elaborately asks). DOCS: README
-  version section. Do NOT touch the v0.1 tag; 174 (now v0.3, published at /v0.3/) is
-  a separate later release.
+- [ ] 224. DEMO CHECKPOINT — full closing run → publish the checkpoint as `v0.2` at
+  /v0.2/ and re-point the `poc` tag, both playable (user request 22.07.2026).
+  GATE/POSITION: the NEXT milestone right AFTER the terrain task (215) once
+  everything is stable and 215 is done — a visible demo update for the terrain
+  smoothing, NOT waiting for every open bug. Run it when 215 is finished + the tree
+  is stable (build/lint/CVE clean, full Vitest + the LARGE browser regression on
+  BOTH backends green — the §7.2 closing cycle per docs/maximale-qs.md's closing
+  steps). STEPS: (1) full closing cycle (Vitest + LARGE regression both backends,
+  dead-code/stale-doc pass, lint/audit clean) — only proceed if GREEN; (2) at that
+  verified GREEN main HEAD, create the `v0.2` release tag and re-point the `poc` tag
+  to it, and push both tags (these are the explicit, authorized tag ops per the user
+  — the standing exception to [[tags-only-on-request]] for THIS request; do NOT touch
+  v0.1); (3) the GH-Pages deploy builds each tag into its path (deploy-pages.yml,
+  guarded, worktree --base=/…/<tag>/) — the workflow's tag loop is
+  `for tag in v0.1 v0.2 poc` (v0.3 joins it when 174 ships) so the same Pages
+  artifact serves them — verify the deploy is green and ALL URLs resolve 200: root =
+  main, /poc/ = the poc tag, and /v0.2/ =
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/, all with correctly
+  based asset URLs (the MSYS-mangling Git-Bash trap is documented). This is
+  outward-facing: run only after the closing is GREEN; report the result. Then FREEZE
+  v0.2 (never re-point unless the user elaborately asks). DOCS: README version
+  section. Do NOT touch the v0.1 tag; 174 (v0.3, at /v0.3/) is a separate later
+  release.
 
 - [x] 225. WET GROUND WHEN IT RAINS (user 22.07.2026, position: AFTER 224). When
   it rains the ground must visibly get WET — in BOTH the bird's-eye/outdoor terrain
