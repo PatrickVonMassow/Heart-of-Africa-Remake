@@ -9761,33 +9761,49 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`/`wildlifeBehavior.ts` — croc files (same as 242/250, both merged);
   small focused fix, non-conflicting with 244 (place/input) and the 249b harness.
 
-- [ ] 258. DEBUG-MENU TRIGGERS FOR THE WILDLIFE DRAMAS (grass fire first) — user
-  23.07.2026. The §19.8/§19.16 wildlife dramas are RARE BY DESIGN and have NO
-  deployed-build force (the `window.__wildlife.igniteFire` hook is `import.meta.env.
-  DEV`-gated, so it is absent on the GH-Pages build). The grass fire (point 145a) in
-  particular attempts ignition only once every `FIRE_COOLDOWN_SECONDS` (300 s) and
-  only if a hashed spot 45 units ahead is savanna — so it is nearly impossible to
-  observe on demand while playtesting the deployed build. ADD DEBUG-MENU BUTTONS
-  (design.md §21.3, the debug menu is available on the deployed build unlike the DEV
-  hooks) that TRIGGER a wildlife drama at/near the traveller on click: FIRST the
-  GRASS FIRE (ignite the fire front just ahead of the traveller, bypassing the 300 s
-  timer + the savanna/zone gate for the debug trigger — or nudging the timer to 0 and
-  forcing eligibility), and — same pattern, as far as cheap — the other on-demand
-  dramas the player wants to see (a crocodile lunge, a lion hunt, a calf-predation/
-  rescue, an elephant trample). Each button sets the relevant drama state directly
-  (reuse the existing `igniteFire`/`LION_STATE`/`FIRE_STATE`/croc-lunge entry points,
-  promoted from DEV-only to a debug-menu action so they ship). Localized button
-  labels in BOTH languages. Anchors: `src/ui/DebugMenu.tsx` (new trigger section),
-  the wildlife drama entry points in `src/scenes/travel/Wildlife.tsx` (`igniteFire`,
-  the lion/croc/calf drama starters — expose them off the debug store or a
-  `window.__wildlife`-style action that is NOT DEV-gated for these debug triggers),
-  `src/i18n/en.ts`/`de.ts`/`types.ts`. VERIFIABLE: `src/ui/DebugMenu.test.tsx` that
-  the trigger buttons render with localized labels and fire their action; a live
-  check in `scripts/verify/enrichments.mjs` (or settings.mjs) that clicking the
-  grass-fire trigger ignites the fire in the scene. DOCS: design.md §21.3 (the new
-  drama triggers). NOTE: `DebugMenu.tsx`/`Wildlife.tsx`/i18n — coordinate with the
-  other wildlife/debug points; the fire trigger alone is the minimum, the rest are a
-  bonus if cheap.
+- [ ] 258. DEBUG EVENT-TRIGGER DROPDOWN (user 23.07.2026). The §19.8/§19.16 wildlife
+  dramas + §14 events are RARE BY DESIGN and have NO deployed-build force (the
+  `window.__wildlife.igniteFire` hook is `import.meta.env.DEV`-gated, absent on the
+  GH-Pages build) — e.g. the grass fire (point 145a) attempts ignition only once per
+  `FIRE_COOLDOWN_SECONDS` (300 s) and only on savanna 45 units ahead, so it is nearly
+  impossible to observe on demand. ADD A DROPDOWN SELECTOR to the debug menu
+  (design.md §21.3), MODELLED ON THE JUMP-TO MENU: the player picks WHICH event to
+  trigger and it fires at/near the traveller. Requirements: (1) entries STRUCTURED BY
+  CATEGORY and, WITHIN each category, sorted ALPHABETICALLY (exactly like the jump-to
+  dropdown's grouped+sorted structure — reuse that grouping/sort helper). (2) Include
+  AS MANY triggerable events as possible, each firing its real drama state via the
+  existing entry points (promoted from DEV-only to a shipped debug action): the
+  WILDLIFE DRAMAS — grass fire (`igniteFire`), crocodile ambush/lunge, lion hunt
+  (`LION_STATE`), calf predation + parent rescue/sacrifice, elephant trample + parent
+  grief, calf water drowning/rescue, vulture flock on a carcass, elephant-graveyard
+  mourning — AND the §14 RANDOM EVENTS the debug menu can already fire (predator
+  attacks per species, snakebite, etc.), grouped in their own category. (3)
+  PRECONDITION HANDLING — the user's question (what if I pick a crocodile attack but
+  am not near water?): the trigger STAGES the event where its precondition is
+  satisfiable near the traveller — the fire ignites ahead on the nearest savanna, a
+  crocodile lunge finds the NEAREST WATER in range and stages the croc+victim there,
+  a lion hunt spawns predator+prey on nearby suitable ground, etc. If the precondition
+  CANNOT be met within range (no water for a croc, no savanna for a fire, no valid
+  prey), the trigger does NOTHING except a localized TOAST telling the user what is
+  missing (e.g. "No water nearby — move closer to a bank for the crocodile attack" /
+  "Kein Wasser in der Nähe …"), so it is never a silent no-op. Localized labels +
+  toasts in BOTH languages. Anchors: `src/ui/DebugMenu.tsx` (the new dropdown, reuse
+  the jump-to `groupBy`+alphabetical-sort helper), the drama/event entry points in
+  `src/scenes/travel/Wildlife.tsx` (`igniteFire`, `LION_STATE`/`FIRE_STATE`, the croc/
+  calf starters — expose a NON-DEV-gated debug action, e.g. a debug-store command or a
+  `__debug.triggerEvent(kind)` that is not `import.meta.env.DEV`-gated) and the §14
+  event system, `src/state/`/`src/systems/` for the precondition-locate + toast, and
+  `src/i18n/en.ts`/`de.ts`/`types.ts`. VERIFIABLE: `src/ui/DebugMenu.test.tsx` that the
+  dropdown renders its categories grouped + alphabetically sorted with localized
+  labels and firing an entry dispatches its trigger; a pure test of the
+  precondition-locate (returns the nearest valid staging spot, or null → the toast);
+  a live check in `scripts/verify/enrichments.mjs` that selecting the grass-fire entry
+  ignites the fire and selecting the crocodile entry away from water shows the "no
+  water" toast. DOCS: design.md §21.3 (the event-trigger dropdown). Localized text
+  both languages. NOTE: `DebugMenu.tsx`/`Wildlife.tsx`/`state`/i18n — coordinate with
+  the other wildlife/debug points (do not delegate concurrently with a Wildlife.tsx
+  point). The grass fire + the precondition/toast pattern is the minimum; the fuller
+  event roster is the target.
 
 - [ ] 259. ELEPHANT TRAMPLE NEEDS A DIRECTION CONDITION (user design change,
   23.07.2026). Currently an animal caught in the §19.5 elephant-overlap exception is
