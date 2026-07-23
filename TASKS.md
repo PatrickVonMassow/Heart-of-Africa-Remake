@@ -10236,6 +10236,38 @@ the remaining open points in their numeric order.
   different concern than the wildlife cluster, so it can be built independently and in
   parallel; keep the serialiser central (one `dumpGameState`). Implementation-ready.
 
+- [ ] 271. ANIMALS SPORADICALLY VANISH IN VIEW (rare; maybe zoom- or mountain-related)
+  (user 23.07.2026, screenshot, East region). Bird's-eye animals occasionally DISAPPEAR
+  before the player's eyes — rare, and the user suspects it follows having changed the
+  ZOOM level, or being near MOUNTAINS. The screenshot also shows an animal rendered with
+  DETACHED/SCATTERED parts (a floating blob above a separated body) — possibly the same
+  animal caught mid-glitch or mid-despawn. TWO things to diagnose (they may be the same
+  bug or two): (a) an on-screen animal being DESPAWNED — this is the zoom-aware
+  streaming-despawn territory (points 164/165/171/172): the despawn must PROJECT each
+  animal through the CURRENT camera frustum (`__camera.onScreen`/the shared `isOnScreen`)
+  and never cull one still inside the rendered frame; a STALE zoom (the despawn ring/
+  radius computed from an old zoom after the player changed it) or a fog.far/assumed-
+  radius shortcut would wrongly drop a visible animal — re-check that the despawn reads
+  the LIVE zoom/frustum, not a cached value, and that a zoom change updates it
+  immediately. (b) a fauna-MESH glitch — an animal whose parts detach/scatter for a frame
+  (an instance-matrix/rebuild race like the point-175 crown jitter, or a build reading a
+  stale transform) near a chunk/LOD boundary or a terrain feature (mountains). DIAGNOSE
+  by reproducing: drive with a changed non-default zoom and near mountains, watch
+  `__wildlife` for an animal that despawns while `__camera.onScreen` says it is in-frame,
+  and watch for a one-frame detached-parts render. FIX per cause: make the despawn read
+  the live frustum/zoom so no on-screen animal is culled; and/or stabilise the fauna
+  transform so parts never detach. ANCHORS: `src/scenes/travel/Wildlife.tsx` (the
+  streaming despawn + `isOnScreen`), `src/scenes/travel/wildlifeBehavior.ts` (the despawn
+  ring/zoom helpers), `src/render/fauna.ts` (the mesh build, for the detached-parts case),
+  the terrain-LOD/streaming near mountains. VERIFIABLE: a pure test that the despawn
+  predicate keeps any animal the live frustum projects on-screen (across zoom levels) and
+  only culls off-frame ones; a live driven pass at a changed zoom near mountains asserts
+  NO on-screen animal (projected via `__camera.onScreen`) despawns, with a screenshot; if
+  it is the mesh glitch, a pure/live check that the fauna parts stay attached across a
+  rebuild. DOCS: design.md §19 if the streaming rule wording changes. No player-visible
+  text. NOTE: wildlife-streaming/render cluster (Wildlife.tsx/wildlifeBehavior.ts/
+  fauna.ts) — do NOT build concurrently with another Wildlife.tsx point. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
