@@ -36,6 +36,12 @@ const findInteractive = async (type) =>
 // now carries a "Space — <name>" prompt at its door too (design.md §2.3).
 const ELDER_LABEL = 'Alten'
 
+// German building labels (src/i18n/de.ts): the door prompt NAMES its building, so
+// the use-key wait can require the TARGET's name — not merely any prompt. This is
+// what makes the entry deterministic against the one-frame stale-candidate race
+// (point 244): waiting on "some prompt" could arm on a neighbouring building.
+const BUILDING_LABELS = { tools: 'Geräte-Hütte', shop: 'Laden', chief: 'Chefhütte' }
+
 // Stand at the interactive (the elder, or a building's door), wait for the Space
 // use-key prompt to arm, then press Space to talk/enter (design.md §2.3): the
 // building no longer opens by merely walking into its door.
@@ -51,9 +57,15 @@ async function enterBuilding(type) {
     await page.keyboard.press('Space')
   } else {
     // Step onto the door point; the door prompt arms in the render loop, then
-    // Space enters (walking in alone does nothing now, design.md §2.3).
+    // Space enters (walking in alone does nothing now, design.md §2.3). Wait for
+    // the prompt that NAMES THIS building so the press cannot fire on a stale or
+    // neighbouring candidate (point 244).
     await moveTo(it.door[0], it.door[1])
-    await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 30000 })
+    await page.waitForFunction(
+      (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+      BUILDING_LABELS[type],
+      { timeout: 30000 },
+    )
     await page.keyboard.press('Space')
     await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
   }

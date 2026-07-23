@@ -311,7 +311,15 @@ await page.evaluate(() => {
   p.z = it.door[1]
   p.yaw = 0
 })
-await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
+// Wait for the door prompt that NAMES the chief's hut (default language English,
+// src/i18n/en.ts) before pressing Space — waiting on "any prompt" could fire on
+// a neighbouring candidate; the swallowed .catch is dropped so a real arming
+// failure surfaces instead of a silent no-op (point 244).
+await page.waitForFunction(
+  (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+  "Chief's Hut",
+  { timeout: 8000 },
+)
 await page.keyboard.press('Space')
 const audienceOpened = await page
   .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })

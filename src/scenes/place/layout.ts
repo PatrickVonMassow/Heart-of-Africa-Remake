@@ -70,6 +70,49 @@ export interface PlaceLayout {
   colliders: Collider[]
 }
 
+/** Interact radius for the elder/villager Space use key (design.md §2.3). */
+export const INTERACT_RADIUS = 4.5
+/**
+ * Door proximity that arms the Space use key at a functional building — merely
+ * walking into the door no longer enters; the discrete press does (design.md §2.3).
+ */
+export const DOOR_TRIGGER_RADIUS = 1.2
+
+/**
+ * The nearest actionable interactive for the Space use key (design.md §2.3):
+ * the elder/villager within the interact radius, or the functional building at
+ * whose door the traveller stands, whichever is closer — null when none is in
+ * reach. A PURE function of the layout and the LIVE player position, so the key
+ * press can act on where the traveller IS NOW rather than on the last rendered
+ * frame's candidate: a synchronous keydown after a teleport or a fast step used
+ * to read a frame-lagged `nearRef` and open the previously-near building.
+ */
+export function nearestActionable(
+  layout: PlaceLayout | null,
+  x: number,
+  z: number,
+): Interactive | null {
+  if (!layout) return null
+  let near: Interactive | null = null
+  let best = Infinity
+  for (const it of layout.interactives) {
+    if (it.type === 'villager') {
+      const d = Math.hypot(x - it.pos[0], z - it.pos[1])
+      if (d <= INTERACT_RADIUS && d < best) {
+        best = d
+        near = it
+      }
+    } else if (it.door) {
+      const d = Math.hypot(x - it.door[0], z - it.door[1])
+      if (d <= DOOR_TRIGGER_RADIUS && d < best) {
+        best = d
+        near = it
+      }
+    }
+  }
+  return near
+}
+
 /** Fence posts along a circular arc, skipping given gap angles. */
 function fenceRing(
   cx: number,

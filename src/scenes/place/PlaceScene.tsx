@@ -56,7 +56,7 @@ import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../re
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
-import { buildLayout, isOnLane, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -74,13 +74,8 @@ import { emitFootstep } from '../../systems/ambience'
 import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idleSway } from '../../systems/walkFeel'
 import { getStrings, useStrings } from '../../i18n'
 
-const INTERACT_RADIUS = 4.5
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
-// A functional building is entered with the Space use key while standing at
-// its door (design.md §2.3): this is the proximity that shows the prompt and
-// arms the key — merely walking into the door no longer enters.
-const DOOR_TRIGGER_RADIUS = 1.2
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -1461,7 +1456,6 @@ export function PlaceScene() {
 
   // yaw 0 faces -Z (toward the place center from the southern spawn point).
   const player = useRef({ x: 0, z: 18, yaw: 0 })
-  const nearRef = useRef<Interactive | null>(null)
   // Walk feel (design.md §2, point 97): body-relative eased velocity, the
   // step-phase accumulator and the smoothed camera roll — all camera/feel only.
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
@@ -1618,10 +1612,19 @@ export function PlaceScene() {
   // ref keeps openBuilding stable for the one-shot subscription.
   const openBuildingRef = useRef(openBuilding)
   openBuildingRef.current = openBuilding
+  // PlaceScene stays mounted across placeId changes and the handler's effect
+  // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
   useEffect(() => {
     const off = onKeyPress('Space', () => {
-      const near = nearRef.current
-      if (!near || useUi.getState().dialog) return
+      if (useUi.getState().dialog) return
+      // Select against the LIVE player position, not the last rendered frame's
+      // `nearRef`: a synchronous keydown after a teleport/fast step used to act
+      // on the frame-lagged candidate and open the previously-near building.
+      const p = player.current
+      const near = nearestActionable(layoutRef.current, p.x, p.z)
+      if (!near) return
       if (near.type === 'villager') useGame.getState().talkToVillager()
       else openBuildingRef.current(near)
     })
@@ -1816,25 +1819,9 @@ export function PlaceScene() {
     // Nearest actionable interactive for the Space use key (design.md §2.3):
     // the elder within the interact radius, or the functional building at whose
     // door the traveller stands. Door proximity only ARMS the key + shows the
-    // prompt now — entry is the discrete Space press, never walking in.
-    let near: Interactive | null = null
-    let best = Infinity
-    for (const it of layout.interactives) {
-      if (it.type === 'villager') {
-        const d = Math.hypot(p.x - it.pos[0], p.z - it.pos[1])
-        if (d <= INTERACT_RADIUS && d < best) {
-          best = d
-          near = it
-        }
-      } else if (it.door) {
-        const d = Math.hypot(p.x - it.door[0], p.z - it.door[1])
-        if (d <= DOOR_TRIGGER_RADIUS && d < best) {
-          best = d
-          near = it
-        }
-      }
-    }
-    nearRef.current = near
+    // prompt now — entry is the discrete Space press (which reselects against
+    // the live position through the same helper), never walking in.
+    const near = nearestActionable(layout, p.x, p.z)
     const strings = getStrings()
     const prompt = near ? strings.prompts.interact(interactiveLabel(strings, near.type)) : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
