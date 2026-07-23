@@ -9725,7 +9725,7 @@ the remaining open points in their numeric order.
   files as point 228 (now merged); relates to point 227 (skyline gliding animal — 255
   covers the fauna leg-motion half).
 
-- [ ] 256. THE VILLAGE FIRE BURNS ON IN THE RAIN — RESEARCH + A REALISTIC SHELTER
+- [x] 256. THE VILLAGE FIRE BURNS ON IN THE RAIN — RESEARCH + A REALISTIC SHELTER
   (user 23.07.2026). The user reports that the §19.10 village fire keeps burning
   unprotected in the rain, which reads wrong, and asks: did ~1890 African
   settlements have a real solution to keep a fire going through rain (e.g. roofing
