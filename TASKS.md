@@ -9805,7 +9805,7 @@ the remaining open points in their numeric order.
   point). The grass fire + the precondition/toast pattern is the minimum; the fuller
   event roster is the target.
 
-- [ ] 259. ELEPHANT TRAMPLE NEEDS A DIRECTION CONDITION (user design change,
+- [x] 259. ELEPHANT TRAMPLE NEEDS A DIRECTION CONDITION (user design change,
   23.07.2026). Currently an animal caught in the §19.5 elephant-overlap exception is
   trampled/killed on ANY contact. NEW RULE: an animal only DIES from the elephant on
   collision when the elephant's MOVEMENT VECTOR points at least PARTIALLY TOWARD that
