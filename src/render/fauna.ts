@@ -7,6 +7,7 @@
 // reads as a soft gradient instead of hard polygon panels.
 
 import * as THREE from 'three/webgpu'
+import { attribute, float, positionLocal, smoothstep } from 'three/tsl'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../world/noise'
 
@@ -729,6 +730,63 @@ export const CROCODILE_LUNGE_LIFT = 0.02
  */
 export function crocodileBodyY(surfaceY: number, submerged: boolean): number {
   return surfaceY - (submerged ? CROCODILE_SUBMERGE_DEPTH : CROCODILE_LUNGE_LIFT)
+}
+
+/**
+ * Submersion fade of the hidden crocodile (design.md §19.16, point 246). The
+ * water sheets are alpha-blended (river ~0.9, lake 0.92) and the croc body is
+ * drawn in the OPAQUE pass BEFORE them, so the sheet can only ever tint it —
+ * the submerged body read as a crisp silhouette straight through the water, as
+ * if it were glass. Depth cannot fix that (the sheets stay depthWrite-off for
+ * the point-233 confluence crossfade, and depth only occludes LATER draws
+ * anyway — the croc draws first). So the croc itself reads as underwater: its
+ * material fades every fragment below the instance's own waterline over
+ * CROCODILE_FADE_BAND, leaving the eye knobs (and the scute tips at the
+ * surface) crisp while belly, legs and tail vanish into the murk. The sheet
+ * then blends over the faded body and the croc lurks instead of showing.
+ *
+ * The waterline is carried per instance in GEOMETRY-LOCAL units (the fragment
+ * compares against positionLocal.y, before the instance scale): submerged, the
+ * surface sits CROCODILE_SUBMERGE_DEPTH above the body origin in WORLD units
+ * (crocodileBodyY), i.e. at depth/scale in local units. Riding out on a strike
+ * the sentinel drops the line far below the geometry, so the burst shows the
+ * whole body. The hidden pose's ±0.008 float bob is deliberately ignored —
+ * sub-centimetre against the fade band.
+ */
+export const CROCODILE_FADE_BAND = 0.1
+/** "No waterline" sentinel: far below the geometry (min local y is 0), so a
+ *  striking croc renders fully opaque. */
+export const CROCODILE_WATERLINE_NONE = -10
+/** Per-instance waterline in geometry-local units for the fade attribute. */
+export function crocodileWaterlineLocal(scale: number, submerged: boolean): number {
+  return submerged ? CROCODILE_SUBMERGE_DEPTH / scale : CROCODILE_WATERLINE_NONE
+}
+
+/**
+ * CPU mirror of createCrocodileMaterial's opacity node (the seasonTint.ts
+ * precedent): smoothstep from 0 a full fade band below the waterline to 1 at
+ * the line. Keep both in lockstep.
+ */
+export function crocodileSubmergedAlpha(yLocal: number, waterlineLocal: number): number {
+  const t = Math.min(1, Math.max(0, (yLocal - (waterlineLocal - CROCODILE_FADE_BAND)) / CROCODILE_FADE_BAND))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * Crocodile-only fauna material (point 246): the shared fauna look (vertex
+ * colors, roughness 0.9, smooth shading) plus the submersion fade driven by
+ * the per-instance 'crocWaterline' attribute (written each frame beside the
+ * instance matrix in Wildlife.tsx). depthWrite stays ON — the body must
+ * self-occlude (jaw over torso) within its own transparent draw; the water
+ * sheets render after it (renderOrder 1) and lie above it, so their blend is
+ * untouched by the croc's depth.
+ */
+export function createCrocodileMaterial(): THREE.MeshStandardNodeMaterial {
+  const m = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.9, flatShading: false })
+  m.transparent = true
+  const waterline = attribute('crocWaterline', 'float') as unknown as ReturnType<typeof float>
+  m.opacityNode = smoothstep(waterline.sub(CROCODILE_FADE_BAND), waterline, positionLocal.y)
+  return m
 }
 
 /** Nile crocodile (design.md §19.16, points 130/243): the classic silhouette —
