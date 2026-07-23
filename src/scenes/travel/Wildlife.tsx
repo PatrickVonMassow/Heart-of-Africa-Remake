@@ -75,6 +75,7 @@ import {
   type PredatorKind,
   type PreyKind,
   vicinitySeedBounds,
+  vicinityAttemptSeed,
   seasonFlowFactor,
   shouldMourn,
   mournDeadline,
@@ -1181,6 +1182,11 @@ function placeGroup(
  * rules. A clearance keeps them off the leave point so the player never
  * materialises inside a herd.
  */
+// Per-place seeding-attempt counter (point 102): advances once per frame in
+// which that place's vicinity needed a top-up, so every attempt draws a fresh
+// candidate set via vicinityAttemptSeed — a deferring frame (all bearings
+// on-screen or wet) never re-tests the same frozen candidates forever.
+const vicinitySeedAttempt = new Map<string, number>()
 function seedSettlementVicinity(
   herds: Record<Species, Animal[]>,
   pos: { x: number; z: number },
@@ -1214,10 +1220,17 @@ function seedSettlementVicinity(
     }
     if (count >= min) continue
     const deficit = min - count
-    // Deterministic placement from the settlement id + world seed.
+    // Deterministic placement from the settlement id + world seed + attempt
+    // index: the attempt stride makes each frame's draw EXPLORE fresh ring
+    // bearings (see vicinityAttemptSeed) instead of re-testing one frozen set —
+    // the old fixed seed let an idle player's static camera pin a deferring
+    // draw (or a member offset on wet/low ground) in place forever, stalling
+    // the guarantee one animal short (point 249).
     let h = 0
     for (const c of place.id) h = (h * 31 + c.charCodeAt(0)) | 0
-    const rand = mulberry32(((seed ^ h) + 0x102) >>> 0)
+    const attempt = vicinitySeedAttempt.get(place.id) ?? 0
+    vicinitySeedAttempt.set(place.id, attempt + 1)
+    const rand = mulberry32(vicinityAttemptSeed(seed, h, attempt))
     // Rotate through the pool from a deterministic start until a species has
     // instance capacity left (point 135a): picking ONE and giving up at its
     // cap silently starved the guarantee once the test scenarios had filled

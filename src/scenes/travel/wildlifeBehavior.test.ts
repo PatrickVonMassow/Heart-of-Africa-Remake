@@ -5,6 +5,7 @@ import {
   mireFate,
   mireRoll,
   vicinitySeedBounds,
+  vicinityAttemptSeed,
   pickOffscreenLandAnchor,
   calvesForGroup,
   seasonFlowFactor,
@@ -88,6 +89,7 @@ import {
   REGION_PREY,
 } from './wildlifeBehavior'
 import { balance } from '../../config/balance'
+import { mulberry32 } from '../../world/noise'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -2498,6 +2500,43 @@ describe('pickOffscreenLandAnchor (points 165/183 — a seeded guarantee never p
   it('returns null when no candidate is land', () => {
     const cands = [[0, 0], [10, 0]] as const
     expect(pickOffscreenLandAnchor(cands, () => false, () => false)).toBeNull()
+  })
+})
+
+describe('vicinityAttemptSeed (point 102 — a deferring vicinity top-up EXPLORES instead of re-testing frozen bearings)', () => {
+  // The seeder draws its 14 candidate bearings/distances (plus the species
+  // rotation start) from mulberry32(seed); a fresh seed per attempt means a
+  // fresh candidate set, so a static camera can never pin a deferring draw.
+  const draw = (s: number) => {
+    const r = mulberry32(s)
+    return Array.from({ length: 29 }, () => r())
+  }
+
+  it('consecutive attempts yield different seeds AND different whole candidate draws', () => {
+    const s0 = vicinityAttemptSeed(1234, 5678, 0)
+    const s1 = vicinityAttemptSeed(1234, 5678, 1)
+    const s2 = vicinityAttemptSeed(1234, 5678, 2)
+    expect(new Set([s0, s1, s2]).size).toBe(3)
+    expect(draw(s1)).not.toEqual(draw(s0))
+    expect(draw(s2)).not.toEqual(draw(s1))
+  })
+
+  it('is reproducible: the same (seed, place, attempt) always draws the same set', () => {
+    expect(vicinityAttemptSeed(99, 7, 3)).toBe(vicinityAttemptSeed(99, 7, 3))
+    expect(draw(vicinityAttemptSeed(99, 7, 3))).toEqual(draw(vicinityAttemptSeed(99, 7, 3)))
+  })
+
+  it('attempt 0 keeps the historical fixed seed, so first placements are unchanged', () => {
+    expect(vicinityAttemptSeed(4, 11, 0)).toBe(((4 ^ 11) + 0x102) >>> 0)
+  })
+
+  it('stays a valid unsigned 32-bit seed across large attempt counts', () => {
+    for (const attempt of [1, 1000, 123456]) {
+      const s = vicinityAttemptSeed(0xdeadbeef, -12345, attempt)
+      expect(s).toBeGreaterThanOrEqual(0)
+      expect(s).toBeLessThanOrEqual(0xffffffff)
+      expect(Number.isInteger(s)).toBe(true)
+    }
   })
 })
 

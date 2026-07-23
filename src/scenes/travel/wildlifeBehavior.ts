@@ -1665,6 +1665,28 @@ export function pickOffscreenLandAnchor(
 }
 
 /**
+ * The vicinity top-up's per-ATTEMPT rand seed (design.md §2.5, point 102): each
+ * seeding attempt for a place draws a FRESH candidate set. The old frozen seed
+ * `(worldSeed ^ placeHash) + 0x102` was rebuilt identically every frame, so the
+ * seeder re-tested the SAME 14 bearings forever — and with a STATIC camera (an
+ * idle player right after leaving a settlement: the travel camera mounts
+ * already settled and nothing moves it) a frame whose candidates all landed
+ * on-screen or on water deferred identically on every later frame, and the
+ * vicinity guarantee stalled below its minimum (the point-249 WebGPU flake:
+ * count pinned one short across a full 25 sim-second poll). Striding the
+ * attempt index by a golden-ratio constant decorrelates consecutive attempts'
+ * whole candidate sets, so the seeder EXPLORES the ring over successive frames;
+ * every attempt stays reproducible, and attempt 0 is the historical seed.
+ */
+export function vicinityAttemptSeed(
+  worldSeed: number,
+  placeHash: number,
+  attempt: number,
+): number {
+  return (((worldSeed ^ placeHash) + 0x102 + Math.imul(attempt, 0x9e3779b1)) >>> 0)
+}
+
+/**
  * How many calves a herd group of `n` raises (design.md §19, point 169): a
  * calibratable fraction of the group size, but at least 1 (a herd of three or
  * more always raises a juvenile) and at most floor(n/2) so every calf can be
