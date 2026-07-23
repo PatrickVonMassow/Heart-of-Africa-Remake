@@ -442,46 +442,141 @@ export function trampleCrunchFires(prevDead: boolean, nowDead: boolean): boolean
   return !prevDead && nowDead
 }
 
+/** One micro-crackle of the crunch's bone layer: a short, bright, hard-attack
+ *  band-passed noise snap. Several of these a few ms apart read as bones
+ *  crunching rather than one thud. */
+export interface CrunchCrackle {
+  /** Seconds after the impact this snap starts. */
+  startOffset: number
+  /** Attack time — hard (a couple of ms): the snap edge. */
+  attack: number
+  /** Total length — a blink, far shorter than the squelch. */
+  duration: number
+  /** Envelope peak (pre-bus), already §19.1 distance/volume scaled. */
+  peak: number
+  /** Bandpass centre — bright (bone), well above the squelch band. */
+  frequency: number
+  q: number
+}
+
+/** The trample crunch's pure synthesis plan (design.md §19.1/§19.5): two
+ *  layered timbres — (a) a sharp BONE-CRACK transient of fast micro-crackles
+ *  and (b) a wet soft-tissue SQUELCH — with every level scaled by the
+ *  UNCHANGED trampleCrunchGain curve. Pure (rand injectable), so the layers'
+ *  presence and envelope shapes are unit-testable without WebAudio. */
+export interface TrampleCrunchPlan {
+  /** The §19.1 distance + ambience-volume peak (trampleCrunchGain, unchanged). */
+  peak: number
+  /** (a) The bone layer: a loud lead crack plus fast decaying micro-crackles. */
+  crackles: CrunchCrackle[]
+  /** (b) The wet squelch: lower, damped, resonant, softer-enveloped than any snap. */
+  squelch: {
+    startOffset: number
+    /** Soft attack — a squish, not a snap. */
+    attack: number
+    /** Long damped tail — the tissue gives and settles. */
+    duration: number
+    peak: number
+    /** Resonant-lowpass start frequency; sweeps down to `frequencyEnd`. */
+    frequency: number
+    frequencyEnd: number
+    /** Resonance — the wet formant of the squelch. */
+    q: number
+  }
+}
+
+export function trampleCrunchPlan(
+  distance: number,
+  volume: number,
+  rand: () => number = Math.random,
+): TrampleCrunchPlan {
+  const peak = trampleCrunchGain(distance, volume)
+  // (a) The bone layer: a hard lead crack at the impact, then 3-5 decaying
+  // micro-crackles a few ms apart — fast enough to fuse into one crunch, spaced
+  // enough to read as breaking, never a single thud.
+  const crackles: CrunchCrackle[] = []
+  const count = 4 + Math.floor(rand() * 3) // 4..6 snaps
+  let t = 0
+  for (let i = 0; i < count; i++) {
+    crackles.push({
+      startOffset: t,
+      attack: 0.002,
+      duration: 0.02 + rand() * 0.025,
+      peak: peak * (i === 0 ? 1.2 : (0.85 - i * 0.1) * (0.8 + rand() * 0.4)),
+      frequency: 1700 + rand() * 1600,
+      q: 1.4,
+    })
+    t += 0.012 + rand() * 0.024
+  }
+  return {
+    peak,
+    crackles,
+    // (b) The squelch starts as the first bone gives, swells softly and damps
+    // out over a downward resonant sweep — the wet matsch under the snaps.
+    squelch: {
+      startOffset: 0.012,
+      attack: 0.035,
+      duration: 0.3,
+      peak: peak * 0.8,
+      frequency: 460,
+      frequencyEnd: 200,
+      q: 6,
+    },
+  }
+}
+
 /**
- * The trample crunch one-shot (design.md §19.1/§19.5, point 260): a single
- * short CRACK/CRUNCH the moment an animal is crushed under an elephant's feet —
- * the ordinary trample and the parent grief-trample alike. A positional §19.1
- * proximity SFX, scaled by the distance to the traveller (the shared
- * proximityGain curve) and the single ambience volume, through the SAME ambient
- * bus as every other wildlife sound — no second audio path. Two cheap synth
- * voices like the footstep/thunder SFX (no asset): a short filtered-noise BURST
- * (the dry snap) over a low sine THUD (the body's weight). Silent far off or
- * when muted.
+ * The trample crunch one-shot (design.md §19.1/§19.5, point 260): the moment an
+ * animal is crushed under an elephant's feet — the ordinary trample and the
+ * parent grief-trample alike. A positional §19.1 proximity SFX, scaled by the
+ * distance to the traveller (the shared proximityGain curve) and the single
+ * ambience volume, through the SAME ambient bus as every other wildlife sound —
+ * no second audio path. Cheap procedural synth (no asset) from the pure
+ * trampleCrunchPlan: (a) a sharp bone-crack transient — a hard-attack bright
+ * lead snap with fast micro-crackles so it reads as bones crunching, not one
+ * dull "plomp" — over (b) a wet squelch: normalized brown noise through a
+ * resonant lowpass sweeping down under a soft, damped envelope for the
+ * soft-tissue give. Silent far off or when muted.
  */
 export function playTrampleCrunch(distance: number): void {
   if (!ctx || !master) return
-  const peak = trampleCrunchGain(distance, balance.ambienceVolume)
-  if (peak <= 0) return // beyond the audible radius or muted: nothing to play
+  const plan = trampleCrunchPlan(distance, balance.ambienceVolume)
+  if (plan.peak <= 0) return // beyond the audible radius or muted: nothing to play
   const ac = ctx
   const dest = ambientBus ?? master
   const t0 = ac.currentTime
-  // The crack: a hard, short low-passed noise burst — the dry snap of breaking.
-  const dur = 0.16
-  const buffer = ac.createBuffer(1, Math.max(1, Math.ceil(ac.sampleRate * dur)), ac.sampleRate)
-  const data = buffer.getChannelData(0)
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
-  const src = ac.createBufferSource()
-  src.buffer = buffer
-  const filter = ac.createBiquadFilter()
-  filter.type = 'lowpass'
-  filter.frequency.value = 900
-  filter.Q.value = 1.1
-  const g = ac.createGain()
-  g.gain.setValueAtTime(0.0001, t0)
-  g.gain.linearRampToValueAtTime(peak, t0 + 0.006)
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
-  src.connect(filter)
-  filter.connect(g)
-  g.connect(dest)
-  src.start(t0)
-  src.stop(t0 + dur + 0.02)
-  // The body: a low sine thud under the crack for the crushing weight.
-  envOsc(dest, 'sine', 120, 48, t0, 0.18, peak * 0.6)
+  // (a) The bone layer: bright band-passed white-noise snaps, hard attacks.
+  for (const c of plan.crackles) {
+    const at = t0 + c.startOffset
+    clapVoice(ac, dest, at, c.duration, false, 'bandpass', c.frequency, c.q, (gain) => {
+      gain.setValueAtTime(0.0001, at)
+      gain.linearRampToValueAtTime(c.peak, at + c.attack)
+      gain.exponentialRampToValueAtTime(0.0001, at + c.duration)
+    })
+  }
+  // (b) The wet squelch: deep brown noise, resonant lowpass falling through the
+  // tail — the damped soft-tissue matsch under the snaps.
+  const s = plan.squelch
+  const st = t0 + s.startOffset
+  clapVoice(
+    ac,
+    dest,
+    st,
+    s.duration,
+    true,
+    'lowpass',
+    s.frequency,
+    s.q,
+    (gain) => {
+      gain.setValueAtTime(0.0001, st)
+      gain.linearRampToValueAtTime(s.peak, st + s.attack)
+      gain.exponentialRampToValueAtTime(0.0001, st + s.duration)
+    },
+    (frequency) => {
+      frequency.setValueAtTime(s.frequency, st)
+      frequency.exponentialRampToValueAtTime(s.frequencyEnd, st + s.duration)
+    },
+  )
 }
 
 /**
@@ -543,7 +638,9 @@ function noiseBuffer(ac: AudioContext, dur: number, brown: boolean): AudioBuffer
   return buffer
 }
 
-/** One clap voice: normalized noise -> filter -> envelope -> the ambient bus. */
+/** One noise voice (thunder claps, the trample crunch): normalized noise ->
+ *  filter -> envelope -> the ambient bus. `shapeFilter` optionally schedules a
+ *  frequency sweep on top of the static `freq` (the squelch's falling formant). */
 function clapVoice(
   ac: AudioContext,
   dest: AudioNode,
@@ -554,6 +651,7 @@ function clapVoice(
   freq: number,
   q: number,
   shape: (gain: AudioParam) => void,
+  shapeFilter?: (frequency: AudioParam) => void,
 ) {
   const src = ac.createBufferSource()
   src.buffer = noiseBuffer(ac, dur, brown)
@@ -561,6 +659,7 @@ function clapVoice(
   filter.type = filterType
   filter.frequency.value = freq
   filter.Q.value = q
+  shapeFilter?.(filter.frequency)
   const g = ac.createGain()
   shape(g.gain)
   src.connect(filter)
