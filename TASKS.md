@@ -9901,6 +9901,44 @@ the remaining open points in their numeric order.
   possibly `movement.ts` — wildlife-movement files; do NOT delegate concurrently with
   another Wildlife.tsx point (258/etc.).
 
+- [ ] 262. AN ORPHANED JUVENILE IS ADOPTED BY A NEARBY ADULT (user 23.07.2026). When
+  a juvenile's parent DIES (by any cause — predator, crocodile, trample, drowning),
+  the juvenile is ADOPTED by another adult within reach: the nearest eligible adult
+  becomes its new parent, and the §19.8 family dramas (parent defence/shield/
+  sacrifice, the grief-trample, the water rescue) then apply to that new pairing — so
+  the sacrifice and grief dramas recur more often instead of a one-off orphaning.
+  BEHAVIOUR: on a parent's death, scan for the nearest ELIGIBLE adopter within a
+  calibratable adoption radius and re-link the juvenile to it as its parent; the
+  juvenile resumes following/leashing to the new parent (points 238/245) and the new
+  parent takes on the defence/rescue/grief roles for it. Eligibility: an ADULT
+  (non-juvenile) of a species that can parent this juvenile — the same species as the
+  juvenile (a grazer calf adopted by a grazer of its kind), NOT a predator and NOT the
+  hunter that just killed the parent; if the juvenile is itself part of a mixed herd,
+  prefer the same species, else the nearest suitable herd-mate adult. If NO eligible
+  adopter is within the radius, the juvenile stays orphaned (unchanged current
+  behaviour) until one comes into range (re-check as adults move near), OR it simply
+  remains parentless — pick the simpler that keeps the drama invariants (no crash, no
+  dangling parent reference). The adoption radius (and any re-check cadence) is a
+  calibratable balance value in `balance.family`, debug-editable. Guard against
+  degenerate links: a juvenile never adopts itself, a dead adult, or a predator; the
+  new parent's own calf-count/relations stay consistent (an adult can shield more than
+  one juvenile, or cap it — pick per the existing family-relation model). Anchors:
+  `src/scenes/travel/Wildlife.tsx` (the calf→parent link / family relations, the
+  death handling where a parent is removed, the follow/leash + defence drives that
+  read the parent), `src/scenes/travel/wildlifeBehavior.ts` (a pure
+  `findAdopter(juvenile, adults, radius)` helper — nearest eligible adult or null),
+  `src/config/balance.ts` (`family.adoptionRadius`) + `src/ui/DebugMenu.tsx`. VERIFIABLE:
+  a pure test of `findAdopter` — returns the nearest eligible ADULT of the right
+  species within the radius, skips predators/dead/self/juveniles, returns null when
+  none in range; a live check in `scripts/verify/enrichments.mjs` that killing a
+  calf's parent with an eligible adult nearby re-links the calf to that adult (via the
+  dev hook) and the family drama can then fire again; the debug value writes through.
+  DOCS: design.md §19.8 (orphan adoption → recurring family dramas), §21.2 (the
+  adoption radius). No player-visible text. NOTE: `Wildlife.tsx`/`wildlifeBehavior.ts`/
+  `balance`/`DebugMenu` — wildlife/family files; do NOT delegate concurrently with
+  another Wildlife.tsx point (258/etc.); bundles naturally with the family-drama
+  points.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
