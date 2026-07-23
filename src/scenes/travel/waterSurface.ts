@@ -452,6 +452,33 @@ function riverSurfaceAt(lat: number, lon: number, seed: number): number | null {
   return best
 }
 
+/** NEAREST covering ribbon row's surface (point 274) — the closest
+ *  approximation of the locally drawn, row-interpolated sheet; null when no
+ *  river covers the point. Same cover range and flood rise as riverSurfaceAt. */
+function nearestRiverRowSurfaceAt(lat: number, lon: number, seed: number): number | null {
+  const grid = axisIndex(seed)
+  const bx = Math.floor(lon / GRID)
+  const by = Math.floor(lat / GRID)
+  const rangeSq = COVER_RANGE_DEG * COVER_RANGE_DEG
+  let best: number | null = null
+  let bestDistSq = Infinity
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const list = grid.get(`${bx + dx}:${by + dy}`)
+      if (!list) continue
+      for (const p of list) {
+        const eLon = lon - p.lon
+        const eLat = lat - p.lat
+        const dSq = eLon * eLon + eLat * eLat
+        if (dSq > rangeSq || dSq >= bestDistSq) continue
+        bestDistSq = dSq
+        best = p.nile ? p.surf + NILE_FLOOD.rise : p.surf
+      }
+    }
+  }
+  return best
+}
+
 // The lake bedMax scan is 64 terrain samples — too hot for a per-frame float
 // query, so cache it per lake and seed (lakes are static per run).
 const bedMaxCache = new Map<string, number>()
@@ -523,4 +550,29 @@ export function waterSurfaceY(
     y = y === null ? ly : Math.max(y, ly)
   }
   return y
+}
+
+/**
+ * The RENDERED water-sheet height at a point, or null off every river and
+ * lake — the NEAREST covering ribbon-row surface and/or the lake sheet,
+ * WITHOUT the local-bed floor waterSurfaceY applies for floaters (point 274).
+ * waterSurfaceY exists so a CANOE clears any carved rise between axis
+ * samples: it returns max(highest covering row, localBed + SURFACE_LIFT),
+ * which on a cross-sloping bank can stand up to SURFACE_LIFT −
+ * NOTCH_CLEARANCE (~0.22) ABOVE the visibly drawn sheet — the row only lifts
+ * until the water-typed band samples sit NOTCH_CLEARANCE below it — and on a
+ * steeply descending reach the HIGHEST covering row overshoots the locally
+ * drawn (row-interpolated) surface by the drop across the cover range. An
+ * object that must sit UNDER the visible sheet (the hidden crocodile: only
+ * its eye knobs may break the surface) anchors to the NEAREST row instead —
+ * the closest approximation of the interpolated ribbon at the point — maxed
+ * with the lake sheet where one covers. The Nile flood rise is included
+ * exactly as the ribbon renders it.
+ */
+export function renderedSheetY(lat: number, lon: number, seed: number): number | null {
+  const river = nearestRiverRowSurfaceAt(lat, lon, seed)
+  const lake = lakeIndexAt(lat, lon)
+  if (lake < 0) return river
+  const ly = lakeSurfaceY(lake, seed)
+  return river === null ? ly : Math.max(river, ly)
 }

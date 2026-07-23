@@ -16,6 +16,7 @@ import { lakeIndexAt } from '../../world/hydro'
 import { setupGeodata } from '../../test/geodata'
 import {
   waterSurfaceY,
+  renderedSheetY,
   lakeSurfaceY,
   SURFACE_LIFT,
   LAKE_LIFT,
@@ -147,6 +148,66 @@ describe('waterSurfaceY (the canoe float height)', () => {
   it('keeps the lift constants in the documented relation', () => {
     expect(SURFACE_LIFT).toBeCloseTo(0.3)
     expect(LAKE_LIFT).toBeCloseTo(0.12)
+  })
+})
+
+// The hidden-crocodile anchor (design.md §19.16, point 274): a lurking croc's
+// waterline must land on the visibly DRAWN sheet. waterSurfaceY is the CANOE
+// float height — it carries a local-bed floor (localHeight + SURFACE_LIFT) so
+// the hull clears carved rises between axis samples, and on a cross-sloping
+// bank that floor stands up to SURFACE_LIFT − NOTCH_CLEARANCE (~0.22) ABOVE
+// the rendered ribbon row (the row only lifts until the water-typed band
+// samples sit 0.08 below it). A croc anchored there rode its "submerged" back
+// proud of the visible water. renderedSheetY drops that floor: the drawn
+// row/lake-sheet height itself.
+describe('renderedSheetY (the hidden-crocodile anchor, point 274)', () => {
+  it('never stands above the canoe float height, and covers the same water (Nile scan)', () => {
+    const nile = RIVERS.find((r) => r.id === 'nile')
+    expect(nile).toBeDefined()
+    let probes = 0
+    let maxProud = 0 // max float-above-sheet — how far the OLD anchor floated the croc
+    walkAxis(nile?.points ?? [], 0.08, (lat, lon, pLat, pLon) => {
+      for (const off of OFFSETS) {
+        const qLat = lat + pLat * off
+        const qLon = lon + pLon * off
+        const t = sampleTerrain(qLat, qLon, SEED)
+        if (t.type !== 'water') continue
+        const float = waterSurfaceY(qLat, qLon, SEED, t.height)
+        const sheet = renderedSheetY(qLat, qLon, SEED)
+        // Same coverage: wherever the float height exists, the drawn sheet does.
+        expect(sheet, `sheet at ${qLat.toFixed(2)},${qLon.toFixed(2)}`).not.toBeNull()
+        // The anchor is never PROUD of the float height (sheet ≤ float): the
+        // float is the sheet plus at most the local-bed floor.
+        expect(sheet ?? Infinity).toBeLessThanOrEqual((float ?? -Infinity) + 1e-9)
+        maxProud = Math.max(maxProud, (float ?? 0) - (sheet ?? 0))
+        probes++
+      }
+    })
+    expect(probes).toBeGreaterThan(500)
+    // The regression witness: somewhere along the Nile the old float anchor
+    // genuinely stood a visible margin above the drawn sheet — the clamp is
+    // load-bearing, not a no-op.
+    expect(maxProud).toBeGreaterThan(0.05)
+  })
+
+  it('sits at (or above, where a ribbon overlaps) the drawn lake sheet on lake interiors', () => {
+    for (let li = 0; li < LAKES.length; li++) {
+      const lake = LAKES[li]
+      const sheetY = lakeSurfaceY(li, SEED)
+      const [clon, clat] = lake.center
+      if (lakeIndexAt(clat, clon) !== li) continue
+      const y = renderedSheetY(clat, clon, SEED)
+      // The lake branch itself: at least the drawn lake sheet (an overlapping
+      // river row — an inflow reach — may stand higher; the max is what draws).
+      expect(y ?? -Infinity, lake.id).toBeGreaterThanOrEqual(sheetY - 1e-9)
+      // And never the local-bed floor: bounded by the float height.
+      const t = sampleTerrain(clat, clon, SEED)
+      expect(y ?? Infinity).toBeLessThanOrEqual((waterSurfaceY(clat, clon, SEED, t.height) ?? -Infinity) + 1e-9)
+    }
+  })
+
+  it('returns null away from rivers and lakes, like the float height', () => {
+    expect(renderedSheetY(24, 15, SEED)).toBeNull()
   })
 })
 

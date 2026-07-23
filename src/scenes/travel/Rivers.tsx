@@ -46,6 +46,7 @@ import {
   riverAxisRows,
   riverIsSeaBound,
   springForRiver,
+  renderedSheetY,
   waterSurfaceY,
 } from './waterSurface'
 import {
@@ -546,6 +547,9 @@ export function RiversAndLakes() {
         const s = useGame.getState()
         return waterSurfaceY(lat, lon, s.seed, sampleTerrain(lat, lon, s.seed).height)
       },
+      // The visibly drawn sheet height WITHOUT the canoe-float's local-bed
+      // floor (point 274) — what a staged hidden crocodile must anchor to.
+      sheetAt: (lat: number, lon: number) => renderedSheetY(lat, lon, useGame.getState().seed),
     }
     return () => {
       delete w.__rivers
