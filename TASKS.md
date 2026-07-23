@@ -8875,7 +8875,7 @@ the remaining open points in their numeric order.
   geometry). Coordinate with 210 (same Cairo coast — the sea-pocket geometry that
   traps the calf is partly the very sea-arm 210 is removing).
 
-- [ ] 227. A HORIZONTAL LINE / BAND ARTIFACT IN THE FIRST-PERSON SKYLINE (user
+- [x] 227. A HORIZONTAL LINE / BAND ARTIFACT IN THE FIRST-PERSON SKYLINE (user
   report 22.07.2026, real-WebGPU screenshot inside Cairo looking at the desert
   skyline: between the near dune and the Giza pyramid a horizontal grey line runs
   across the horizon with a thin blue/grey band below it — reads as a graphics
@@ -9784,7 +9784,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`/`wildlifeBehavior.ts` — croc files (same as 242/250, both merged);
   small focused fix, non-conflicting with 244 (place/input) and the 249b harness.
 
-- [ ] 258. DEBUG EVENT-TRIGGER DROPDOWN (user 23.07.2026). The §19.8/§19.16 wildlife
+- [x] 258. DEBUG EVENT-TRIGGER DROPDOWN (user 23.07.2026). The §19.8/§19.16 wildlife
   dramas + §14 events are RARE BY DESIGN and have NO deployed-build force (the
   `window.__wildlife.igniteFire` hook is `import.meta.env.DEV`-gated, absent on the
   GH-Pages build) — e.g. the grass fire (point 145a) attempts ignition only once per
