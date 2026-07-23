@@ -10557,6 +10557,39 @@ the remaining open points in their numeric order.
   DOCS: design.md §21.1 (the F-key list gains F8) and CLAUDE.md §7.1 pt. 20; record the
   method in `docs/perf-276-findings.md`. Implementation-ready.
 
+- [ ] 278. THE DRESSING GROWS OVER A SESSION — A COST THAT RISES THE LONGER ONE PLAYS
+  (found 24.07.2026 while proving out the point-277 benchmark; numbers in
+  `docs/perf-276-findings.md`). At a FIXED anchor, with a fixed seed and a fixed
+  date, the instanced flora/dressing triangle count CLIMBS as the session goes on:
+  235 808 -> 327 808 over five round trips between two anchors, and 252 766 ->
+  354 958 across one benchmark run — while the mesh count stays constant (37) and
+  terrain, water and sky stay bit-stable. Reproduced OUTSIDE the benchmark with
+  plain debug jumps, so it is the game's own behaviour, not a measurement artifact.
+  Same regression family as point 276, and worse in kind: point 276's surcharge is
+  constant, this one accumulates, so a long session degrades steadily. It also
+  biases any sweep (~+2 % scene triangles per config — later configs are
+  handicapped), which is why the point-277 report carries a per-row
+  `sceneTriangles` for normalisation.
+  DIAGNOSE FIRST, do not guess: instrument the flora streaming rebuild
+  (`src/scenes/travel/floraStreaming.ts`, the rebuild in `TravelScene.tsx`) and
+  find WHY the instance count per rebuild grows — candidates: instances not
+  released when a chunk leaves the spawn circle (the per-instance buffer keeps
+  stale entries), the nearest-first fill writing past the previous count without
+  truncating, a per-rebuild accumulation in the seasonTint bake, or the hysteresis
+  step (point 171) letting two overlapping fills coexist. The scene-graph
+  breakdown of `scripts/perf-breakdown.mjs` and the count probe used above are the
+  instruments; the point-277 in-game report shows it on real hardware too.
+  FIX so that returning to the SAME anchor with the same seed and date yields the
+  SAME instance count, however long the session has run.
+  TESTS: a pure test over the streaming rules that a repeated
+  fill/rebuild cycle at one position converges to a constant instance count (the
+  regression witness — it must FAIL against today's behaviour); a live check in
+  `scripts/verify/enrichments.mjs` that after several jumps back and forth the
+  dressing triangle count at a fixed anchor is unchanged within a small tolerance.
+  DOCS: record the resolution in `docs/perf-276-findings.md`. No player-visible
+  text. NOTE: touches the flora streaming — coordinate with any point-276 lever
+  work on the same files. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
