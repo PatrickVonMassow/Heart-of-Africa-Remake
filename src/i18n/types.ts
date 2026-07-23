@@ -294,6 +294,7 @@ export interface Strings {
     waterCrossMax: string
     waterCrossChance: string
     seasonStrength: string
+    wetGroundStrength: string
     season: string
     seasonAuto: string
     seasonDry: string

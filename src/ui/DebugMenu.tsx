@@ -288,6 +288,8 @@ export function DebugMenu() {
         onChange={(v) => { balance.waterCross.chance = Math.max(0, Math.min(1, v)); bump() }} />
       <NumberField label={t.debug.seasonStrength} value={balance.season.weatherStrength} step={0.1}
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
+      <NumberField label={t.debug.wetGroundStrength} value={balance.season.wetGroundStrength} step={0.1}
+        onChange={(v) => { balance.season.wetGroundStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>
         <span>{t.debug.season}</span>
         <select

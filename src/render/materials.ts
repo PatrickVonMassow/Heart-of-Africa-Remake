@@ -10,7 +10,7 @@
 // repetition.
 
 import * as THREE from 'three/webgpu'
-import { seasonTintNode } from './seasonTint'
+import { seasonTintNode, wetGroundColor, wetGroundRoughness } from './seasonTint'
 import {
   cameraViewMatrix,
   color,
@@ -328,9 +328,15 @@ export function createGroundMaterial(
   // straw in the dry season and deepens it in the rains, and leaves bare sand
   // and trodden paths alone (its greenness mask). createGroundMaterial is
   // settlement-only, so this never double-tints the travel scene.
-  m.colorNode = seasonTintNode(col).mul(surfaceStructure('ground'))
+  // Rain wets the settlement ground (design.md §19.13, point 225): darker and
+  // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform.
+  m.colorNode = wetGroundColor(seasonTintNode(col).mul(surfaceStructure('ground')))
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
   // fades where the mask is strong).
   m.normalNode = surfaceNormal('ground', pathMask.oneMinus().mul(0.85).add(0.15))
+  // Wet gloss: the base roughness (1) pulls down toward a sheen with the wet
+  // factor, so the micro-relief normals catch a highlight. `m.roughness` stays
+  // its scalar default — the node overrides it.
+  m.roughnessNode = wetGroundRoughness(float(1))
   return m
 }

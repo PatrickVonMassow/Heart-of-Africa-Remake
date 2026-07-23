@@ -83,6 +83,14 @@ describe('createGroundMaterial', () => {
     expect(m.normalNode).toBeTruthy()
     expect(m.roughness).toBe(1)
   })
+
+  it('wires the wet-ground roughness node (point 225 — rain glosses the ground)', () => {
+    // The wet factor darkens the albedo (colorNode wraps wetGroundColor) and
+    // pulls the roughness toward a sheen via a node overriding the scalar 1.
+    const m = createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b')
+    expect(m.roughnessNode).toBeTruthy()
+    expect(m.colorNode).toBeTruthy()
+  })
 })
 
 describe('proceduralBump', () => {

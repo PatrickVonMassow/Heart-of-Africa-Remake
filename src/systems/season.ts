@@ -475,6 +475,51 @@ export function rainAmount(wetness: number, strength: number): number {
   return c * c * (3 - 2 * c) // smoothstep above the drizzle threshold
 }
 
+// Wet ground (design.md §19.13, point 225): when it rains the ground visibly
+// gets WET — darker and glossier — and MORE so the harder AND the longer it has
+// been raining. Two pure pieces: a leaky-integrator ACCUMULATION that rises
+// while it rains and decays when dry (the "how long" term), and a FACTOR that
+// combines the instantaneous rain (a fresh shower wets the surface at once) with
+// that accumulation (a standing storm soaks it deeper). Deterministic — no
+// clock, no Math.random — so a reload and the tests agree, like the rest of the
+// weather model.
+
+/** Soak gained per second of full rain — ~12 s of steady downpour to soak fully. */
+export const WET_ACCUM_RISE_PER_SEC = 0.08
+/** Soak lost per second once the rain stops — ~33 s to dry out again. */
+export const WET_ACCUM_DECAY_PER_SEC = 0.03
+
+/**
+ * Advance the ground-wetness accumulation one frame (point 225), 0..1: it RISES
+ * (scaled by the current rain) while it rains and DECAYS toward 0 when dry.
+ * `prev` and the return are clamped 0..1; `rain` is the current `rainAmount`
+ * (0..1); `dt` is seconds. Pure over its arguments.
+ */
+export function advanceGroundWetness(prev: number, rain: number, dt: number): number {
+  const p = Math.min(1, Math.max(0, prev))
+  const r = Math.min(1, Math.max(0, rain))
+  const d = Math.max(0, dt)
+  const delta = r > 0 ? WET_ACCUM_RISE_PER_SEC * r * d : -WET_ACCUM_DECAY_PER_SEC * d
+  return Math.min(1, Math.max(0, p + delta))
+}
+
+/**
+ * How wet the GROUND reads (point 225), 0 (bone dry) .. 1 (soaked): the
+ * instantaneous `rain` combined with the `accumulation` from
+ * `advanceGroundWetness` — so the ground darkens both with the RAIN'S INTENSITY
+ * and with how LONG it has already rained. `scale`
+ * (`balance.season.wetGroundStrength`) is the calibratable master; 0 keeps the
+ * ground dry. Pure, identity at dry (rain 0 and accumulation 0 -> 0).
+ */
+export function groundWetnessFactor(rain: number, accumulation: number, scale: number): number {
+  const r = Math.min(1, Math.max(0, rain))
+  const a = Math.min(1, Math.max(0, accumulation))
+  const s = Math.max(0, scale)
+  // Fresh rain wets fast; the accumulated soak deepens it. Either term alone can
+  // approach full, and together they clamp.
+  return Math.min(1, Math.max(0, (r * 0.6 + a * 0.7) * s))
+}
+
 /**
  * How the wet season reads on the sky dome: the blue grays toward RAIN_GRAY
  * and the cloud deck thickens. Separate from seasonFogParams because the dome

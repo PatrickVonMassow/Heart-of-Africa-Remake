@@ -374,6 +374,8 @@ export interface BalanceConfig {
     weatherStrength: number
     /** How far the Nile's October crest lifts its surface (world units). */
     nileFloodRise: number
+    /** How strongly rain darkens/glosses the ground, 0 dry .. 1 full (point 225). */
+    wetGroundStrength: number
   }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
@@ -636,6 +638,7 @@ export const balance: BalanceConfig = {
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
     nileFloodRise: 0.55, // the unregulated 1890 flood is dramatic; calibratable
+    wetGroundStrength: 1, // rain fully darkens/glosses the ground (point 225); calibratable, debug-editable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection

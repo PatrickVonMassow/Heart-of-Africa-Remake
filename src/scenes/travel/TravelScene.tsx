@@ -34,7 +34,7 @@ import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATER
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
-import { crownCollapse, drynessFromTint, FLORA_COLOR_LIFT, groundSprout, seasonTintNode } from '../../render/seasonTint'
+import { crownCollapse, drynessFromTint, FLORA_COLOR_LIFT, groundSprout, seasonTintNode, wetGroundColor, wetGroundRoughness } from '../../render/seasonTint'
 import { seasonalSnowNode, setSeasonalSnow } from '../../render/seasonalSnow'
 import { NILE_FLOOD } from './waterSurface'
 import { RiversAndLakes } from './Rivers'
@@ -428,12 +428,15 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
   nrm = nrm.add(texture(normalsTex[3], uvTop).rgb.mul(w.w))
   mat.normalNode = normalMap(vec4(nrm, 1), vec2(0.55, 0.55))
 
-  // Per-material roughness.
-  mat.roughnessNode = w.dot(vec4(0.95, 0.92, 0.85, 0.9))
+  // Per-material roughness, pulled toward a wet sheen as the rain soaks the
+  // ground (design.md §19.13, point 225 — shared GROUND_WET_U uniform).
+  mat.roughnessNode = wetGroundRoughness(w.dot(vec4(0.95, 0.92, 0.85, 0.9)))
 
   // Large-scale brightness variation keeps distant terrain from tiling.
   const macro = mx_fractal_noise_float(vec3(positionWorld.xz.mul(0.05), 1.0), 3).mul(0.5).add(0.5)
-  mat.colorNode = mat.colorNode.mul(macro.mul(0.3).add(0.85))
+  // Rain darkens the terrain toward damp (point 225), applied last over the tint,
+  // splat albedo and macro variation so the whole ground reads wet together.
+  mat.colorNode = wetGroundColor(mat.colorNode.mul(macro.mul(0.3).add(0.85)))
   terrainMaterialCache = mat
   return mat
 }

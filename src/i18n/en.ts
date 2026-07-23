@@ -375,6 +375,7 @@ export const en: Strings = {
     waterCrossMax: 'Water crossing: max width',
     waterCrossChance: 'Water crossing: chance',
     seasonStrength: 'Seasonal weather strength',
+    wetGroundStrength: 'Wet ground strength',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',
     seasonDry: 'Dry season',

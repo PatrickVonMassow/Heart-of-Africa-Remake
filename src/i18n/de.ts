@@ -374,6 +374,7 @@ export const de: Strings = {
     waterCrossMax: 'Wasser-Querung: max. Breite',
     waterCrossChance: 'Wasser-Querung: Chance',
     seasonStrength: 'Stärke des Saisonwetters',
+    wetGroundStrength: 'Stärke des nassen Bodens',
     season: 'Jahreszeit (Wetter)',
     seasonAuto: 'Nach dem Kalender',
     seasonDry: 'Trockenzeit',

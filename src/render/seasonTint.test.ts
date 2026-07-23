@@ -3,7 +3,8 @@
 // recolour curves (seasonTintNode/seasonFoliagePosition) are TSL node graphs
 // exercised live in the running scene, not unit-testable without a renderer.
 import { describe, expect, it } from 'vitest'
-import { crownCollapse, drynessFromTint, groundSprout, setSeasonCollapse, setSeasonTint, SEASON_COLLAPSE_U, SEASON_TINT_U } from './seasonTint'
+import { float } from 'three/tsl'
+import { crownCollapse, drynessFromTint, GROUND_WET_U, groundSprout, setGroundWetness, setSeasonCollapse, setSeasonTint, SEASON_COLLAPSE_U, SEASON_TINT_U, wetGroundColor, wetGroundRoughness } from './seasonTint'
 
 describe('setSeasonTint (design.md §19.13)', () => {
   it('clamps an out-of-range greenness to 0 before mixing at full strength', () => {
@@ -18,6 +19,22 @@ describe('setSeasonTint (design.md §19.13)', () => {
     // override never moves the tint off its neutral 0.5.
     setSeasonTint(2, 0)
     expect(SEASON_TINT_U.value).toBe(0.5)
+  })
+})
+
+describe('setGroundWetness — wet ground uniform (point 225)', () => {
+  it('clamps the wetness into 0..1', () => {
+    setGroundWetness(-2)
+    expect(GROUND_WET_U.value).toBe(0)
+    setGroundWetness(5)
+    expect(GROUND_WET_U.value).toBe(1)
+    setGroundWetness(0.4)
+    expect(GROUND_WET_U.value).toBe(0.4)
+  })
+
+  it('wetGroundColor and wetGroundRoughness build nodes fed by the wet uniform', () => {
+    expect(wetGroundColor(float(1))).toBeTruthy()
+    expect(wetGroundRoughness(float(1))).toBeTruthy()
   })
 })
 
