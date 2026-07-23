@@ -9432,7 +9432,7 @@ the remaining open points in their numeric order.
   242/237/217/228; do NOT delegate concurrently with those wildlife points; can be
   bundled with 242 (both are crocodile/wildlife on the same files).
 
-- [ ] 246. CROCODILE SHOWS THROUGH THE WATER — the user reports (22.07.2026,
+- [x] 246. CROCODILE SHOWS THROUGH THE WATER — the user reports (22.07.2026,
   screenshot) that a SUBMERGED crocodile's BODY is clearly visible THROUGH the water
   surface (a sharp silhouette), although its eyes correctly sit above the water (the
   submerge pose is right). A submerged body should be OBSCURED/murky under the water,
