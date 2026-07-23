@@ -35,7 +35,7 @@ import {
   guardEngagement,
   griefTarget,
   frontInterceptTarget,
-  trampleKills,
+  elephantWouldTrample,
   deflectAroundCircle,
   fleesFromPlayer,
   fleeCrossing,
@@ -2891,6 +2891,10 @@ function Herds() {
     // when it held). Drives the trample DIRECTION condition (trampleKills,
     // point 259) — a standing elephant tramples nothing.
     const elephantVel: Array<[number, number]> = []
+    // This frame's movement vector per elephant, keyed by the animal, so the
+    // point-261 body collider can read the SAME velocity the trample uses and
+    // EXEMPT an animal this elephant would trample this step (point 263).
+    const elephantVelMap = new Map<Animal, [number, number]>()
     {
       const list = herds.elephant
       const n = Math.min(list.length, MAX_INSTANCES.elephant)
@@ -2977,6 +2981,7 @@ function Herds() {
         }
         elephantPos.push([a.x, a.z])
         elephantVel.push([a.x - ex0, a.z - ez0])
+        elephantVelMap.set(a, [a.x - ex0, a.z - ez0])
       }
     }
 
@@ -2991,11 +2996,19 @@ function Herds() {
     // TRAMPLE_RADIUS (1.5 > 1.3), so the designed §19.5 trample and the
     // grief-crush at the front are never blocked. The elephant's own movement
     // (its trample step) is never deflected here — only the other animals'.
+    // A trample the elephant is ABOUT to make is EXEMPT (point 263): an animal
+    // this elephant would trample this step (in range AND moving toward it) is
+    // NOT slid around the body, or the lateral deflection would rotate the
+    // elephant→victim vector perpendicular to the elephant's velocity and the
+    // point-259 directional trample could never fire — so the elephant would
+    // catch nothing, no stain would be laid and the §19.8 calf-trample grief
+    // chain could not start. Each body carries this frame's elephant velocity.
     {
-      const bodies: Array<[number, number, number]> = []
+      const bodies: Array<[number, number, number, number, number]> = []
       for (const e of herds.elephant) {
         if (e.dead) continue
-        bodies.push([e.x, e.z, BODY_RADIUS.elephant * e.scale])
+        const v = elephantVelMap.get(e) ?? [0, 0]
+        bodies.push([e.x, e.z, BODY_RADIUS.elephant * e.scale, v[0], v[1]])
       }
       if (bodies.length > 0) {
         for (const sp of SPECIES) {
@@ -3008,8 +3021,13 @@ function Herds() {
             let nz = a.z
             // deflectAroundCircle returns the step unchanged when it never
             // touches a body, so a far grazer is untouched; only a step that
-            // would enter a body is slid to its edge (never a dead stop).
-            for (const [ex, ez, r] of bodies) [nx, nz] = deflectAroundCircle(from[0], from[1], nx, nz, ex, ez, r)
+            // would enter a body is slid to its edge (never a dead stop) —
+            // UNLESS this elephant is about to trample the animal (point 263),
+            // in which case the step lands and the trample catches it.
+            for (const [ex, ez, r, evx, evz] of bodies) {
+              if (elephantWouldTrample(evx, evz, ex, ez, nx, nz, TRAMPLE_RADIUS)) continue
+              ;[nx, nz] = deflectAroundCircle(from[0], from[1], nx, nz, ex, ez, r)
+            }
             if (nx !== a.x || nz !== a.z) {
               a.x = nx
               a.z = nz
@@ -3926,10 +3944,7 @@ function Herds() {
               // a hit from behind its heading of travel, leaves it unharmed —
               // the §19.5 body-separation parts that overlap instead. Only an
               // elephant driving into/over the animal crushes it.
-              if (
-                Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS &&
-                trampleKills(evx, evz, ex, ez, a.x, a.z)
-              ) {
+              if (elephantWouldTrample(evx, evz, ex, ez, a.x, a.z, TRAMPLE_RADIUS)) {
                 a.dead = true
                 pushStain(a.x, a.z)
                 // A trampled CALF takes its parent with it (design.md §19): the

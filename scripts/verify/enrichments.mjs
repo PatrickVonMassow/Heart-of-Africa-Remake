@@ -857,10 +857,21 @@ const trample = await page.evaluate(async () => {
     herds.zebra.push(victim)
     victimSpecies = 'zebra'
   }
-  // Ring of elephants around the victim: the wander offsets (±4.5) keep at
-  // least one of them within trampling range at any time.
-  for (const [dx, dz] of [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3], [4.5, 4.5], [-4.5, -4.5]]) {
-    herds.elephant.push({ x: victim.x + dx, z: victim.z + dz, y: victim.y, rot: 0, scale: 1, phase: 0 })
+  // Box the victim in with elephants BEARING DOWN on it (points 259/261/263):
+  // each is placed within trample range and HEADED STRAIGHT at the victim, so
+  // its per-frame step carries a velocity toward the victim — the point-259
+  // trampleKills direction condition — and the point-261 body collider EXEMPTS
+  // the victim it is about to trample instead of sliding it around the body
+  // (point 263). A stationary or away-facing ring would (correctly, post-259)
+  // trample nothing: the old rot=0 ring walked +z off the victim, never toward
+  // it. Six approach angles leave the boxed-in victim no gap to dodge into.
+  const RING = 0.9
+  for (let k = 0; k < 6; k++) {
+    const ang = (k / 6) * Math.PI * 2
+    const ex = victim.x + Math.sin(ang) * RING
+    const ez = victim.z + Math.cos(ang) * RING
+    const toward = Math.atan2(victim.x - ex, victim.z - ez)
+    herds.elephant.push({ x: ex, z: ez, y: victim.y, rot: toward, heading: toward, scale: 1, phase: 0 })
   }
   const deadline = Date.now() + 8000
   return await new Promise((resolve) => {
@@ -2179,7 +2190,13 @@ const trampleGrief = await page.evaluate(async () => {
   }
   if (!calf) return { error: 'no pair' }
   parent.x = calf.x + 9; parent.z = calf.z // park it clear so the approach is measurable
-  const eleph = { x: calf.x, z: calf.z, y: calf.y, rot: 0, scale: 1, phase: 0, heading: 0 }
+  // Bear the elephant down on the calf from the parent side (points 259/261/263):
+  // placed just inside trample range and headed straight at the calf, so its
+  // step velocity points at the calf (the trampleKills direction condition) and
+  // the point-261 collider exempts the calf it is about to trample. A stationary
+  // elephant parked ON the calf would (correctly, post-259) trample nothing.
+  const etoward = Math.atan2(calf.x - (calf.x + 0.7), 0) // toward the calf (−x)
+  const eleph = { x: calf.x + 0.7, z: calf.z, y: calf.y, rot: etoward, heading: etoward, scale: 1, phase: 0 }
   herds.elephant.push(eleph)
   const stains0 = w.stains.current.length
   let calfDead = false

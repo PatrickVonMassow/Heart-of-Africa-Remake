@@ -27,6 +27,7 @@ import {
   griefTarget,
   frontInterceptTarget,
   trampleKills,
+  elephantWouldTrample,
   deflectAroundCircle,
   groundNormal,
   leashedGambolDir,
@@ -1356,6 +1357,57 @@ describe('trampleKills (design.md §19.5 — the trample direction condition, po
   it('kills a victim in the forward arc (partial positive component)', () => {
     // Moving +x, victim ahead-and-to-the-side: dot still > 0.
     expect(trampleKills(0.02, 0, 0, 0, 2, 5)).toBe(true)
+  })
+})
+
+describe('elephantWouldTrample (design.md §19.5 — the collider trample exemption, point 263)', () => {
+  const TRAMPLE = 1.5 // TRAMPLE_RADIUS
+  const R = 1.3 // an elephant body radius
+
+  it('is true for an animal in range the elephant is moving TOWARD (it is about to trample it)', () => {
+    // Elephant at origin moving +x; victim 1 unit ahead, inside the reach.
+    expect(elephantWouldTrample(0.02, 0, 0, 0, 1, 0, TRAMPLE)).toBe(true)
+  })
+
+  it('is false outside the trample reach even when moving toward the animal', () => {
+    // Same +x drive, but the animal is 2 units away — beyond 1.5.
+    expect(elephantWouldTrample(0.02, 0, 0, 0, 2, 0, TRAMPLE)).toBe(false)
+  })
+
+  it('is false in range when the elephant is STANDING (no bearing-down velocity)', () => {
+    expect(elephantWouldTrample(0, 0, 0, 0, 1, 0, TRAMPLE)).toBe(false)
+    expect(elephantWouldTrample(1e-6, 0, 0, 0, 1, 0, TRAMPLE)).toBe(false)
+  })
+
+  it('is false in range when the elephant moves AWAY from the animal (dot ≤ 0)', () => {
+    expect(elephantWouldTrample(0.02, 0, 0, 0, -1, 0, TRAMPLE)).toBe(false) // behind
+    expect(elephantWouldTrample(0.02, 0, 0, 0, 0, 1, TRAMPLE)).toBe(false) // lateral, dot = 0
+  })
+
+  it('EXEMPTS the bearing-down victim from the collider while a non-trampling elephant still deflects', () => {
+    // The point-263 fix as the render loop applies it: an animal the elephant
+    // WOULD trample this step keeps its step (no deflection → the trample fires);
+    // an animal near a NON-trampling (here stationary) elephant is still slid
+    // AROUND the body (no walk-through). One free animal, two elephant states.
+    const from: [number, number] = [0, -1]
+    const to: [number, number] = [0, 0.5] // a step that would pass through the body at the origin
+
+    // (a) The elephant bears down on it (moving +z toward the animal's end point,
+    //     which sits within the trample reach). Exempt → the step lands unchanged.
+    const drivingVel: [number, number] = [0, 0.02]
+    const exempt = elephantWouldTrample(drivingVel[0], drivingVel[1], 0, 0, to[0], to[1], TRAMPLE)
+    expect(exempt).toBe(true)
+    const kept = exempt ? to : deflectAroundCircle(from[0], from[1], to[0], to[1], 0, 0, R)
+    expect(kept).toEqual(to) // NOT deflected — stays where the trample catches it
+
+    // (b) The same animal near a STANDING elephant: not a trample → it slides
+    //     around the body and never rests inside it.
+    const stillVel: [number, number] = [0, 0]
+    const notTrample = elephantWouldTrample(stillVel[0], stillVel[1], 0, 0, to[0], to[1], TRAMPLE)
+    expect(notTrample).toBe(false)
+    const slid = notTrample ? to : deflectAroundCircle(from[0], from[1], to[0], to[1], 0, 0, R)
+    expect(slid).not.toEqual(to) // deflected
+    expect(Math.hypot(slid[0], slid[1])).toBeGreaterThanOrEqual(R - 1e-9) // outside the body
   })
 })
 
