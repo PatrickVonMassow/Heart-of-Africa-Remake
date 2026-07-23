@@ -10112,6 +10112,29 @@ the remaining open points in their numeric order.
   Wildlife.tsx/wildlifeBehavior.ts points (it only reads the trample trigger, doesn't
   change it). Implementation-ready.
 
+- [ ] 267. BLOOD POOL SHOWS THE GROUND THROUGH IT — TINT THE GROUND, don't float a
+  decal (user 23.07.2026, screenshot). The kill/trample blood stain currently renders
+  as a flat pool laid ON TOP of the height-profiled ground, so the terrain relief pokes
+  through it (a hole where the ground rises through the flat decal). Raising the whole
+  pool would make it float over the rest of the ground; conforming a mesh to the relief
+  is costly. FIX (user's proposal): instead of a separate stain decal on top, colour the
+  round affected GROUND AREA red so it follows the terrain exactly — reuse the technique
+  the villages use for RAIN-WET GROUND (a ground-surface tint/overlay that conforms to
+  the terrain, `PlaceRain`/the wet-ground darkening path), applied as a red blood tint
+  over the stain's radius, optionally with a matching micro-structure. So the stain
+  becomes a property of the ground surface (a red patch that hugs the relief), not a
+  floating plane. Keep the stain's existing placement, radius, fade/lifetime and the
+  §19.5/§19.8 trigger logic UNCHANGED — only the RENDERING changes from a decal to a
+  ground tint. Anchor: the stain rendering in `src/scenes/travel/Wildlife.tsx` (the
+  `stains` meshes) and the rain-wet-ground tint technique (`src/scenes/place/PlaceRain`
+  / the ground wetness path) as the reference. VERIFIABLE: a screenshot at a fresh
+  kill/trample stain on sloped ground shows the red area following the relief with NO
+  see-through hole, on BOTH backends; the stain still appears/fades on the same trigger
+  (existing stain checks stay green). DOCS: design.md §19.5 if the stain description
+  changes. No player-visible text. NOTE: rendering — touches Wildlife.tsx (the stain
+  meshes), so coordinate with the wildlife-render cluster; the ground-tint approach may
+  share code with the settlement wet-ground path. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
