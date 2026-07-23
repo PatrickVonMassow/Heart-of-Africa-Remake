@@ -9281,7 +9281,7 @@ the remaining open points in their numeric order.
   `TravelScene.tsx`/`Climate.tsx`) — non-overlapping with the running river/wildlife/
   fauna branches; this is the 229 follow-up.
 
-- [ ] 242. CROCODILES LIE EXPOSED AND INERT ON THE BANK — the user reports
+- [x] 242. CROCODILES LIE EXPOSED AND INERT ON THE BANK — the user reports
   (22.07.2026, screenshot near the Cairo/Giza Nile) two crocodiles lying flat, fully
   visible and motionless on the river BANK/sand beside the player, reading as
   lifeless props. Per §19.16 / point 130 a crocodile is a WATER-ONLY ambush
@@ -9531,7 +9531,7 @@ the remaining open points in their numeric order.
   timing fragility is invisible there — worth a follow-up to add enrichments.mjs to a
   lint/parse gate.
 
-- [ ] 250. CROCODILE SWIMS AWAY AFTER A CATCH WHILE THE PREY DISSOLVES SEPARATELY —
+- [x] 250. CROCODILE SWIMS AWAY AFTER A CATCH WHILE THE PREY DISSOLVES SEPARATELY —
   the user reports (22.07.2026, screenshot, Central near a waterfall) that after the
   crocodile snapped (a successful catch/lunge) it SWAM AWAY, yet the prey still
   DISSOLVED (was consumed) — the croc left while the kill resolved on its own. Per
