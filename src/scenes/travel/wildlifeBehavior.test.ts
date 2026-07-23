@@ -32,6 +32,7 @@ import {
   type FlightState,
   killFlockMayDescend,
   killFlockActive,
+  assignPerCarcassFlocks,
   shouldMourn,
   mournDeadline,
   elephantStepAllowed,
@@ -820,33 +821,82 @@ describe('guardEngagement (point 191 — a passing hunt is guarded only while it
   })
 })
 
-describe('posed landed-bird clearance (point 202 — the wing span and the feeding motion count)', () => {
-  it('the lowest point is the body bottom at rest and the dipped HEAD at a full peck', () => {
-    // Pitch 0: no head dip — the body sphere bottom (0.096·scale) is lowest.
-    expect(landedBirdLowestDepth(0, 1)).toBeCloseTo(0.096, 9)
-    // Full flock peck (0.9 rad) at the 1.6 render scale: the head reaches ~0.27
-    // below the origin — far past the flat 0.15 hover that caused the clipping.
-    const full = landedBirdLowestDepth(0.9, 1.6)
-    expect(full).toBeGreaterThan(0.25)
-    expect(full).toBeGreaterThan(landedBirdLowestDepth(0.45, 1.6))
+describe('posed landed-bird clearance (points 202 + 217 — the wing span, the yaw and the feeding motion count)', () => {
+  // The y of a local point under the render pose bird.rotation.set(pitch, yaw, 0)
+  // (Euler XYZ, z = 0) — the ACTUAL pose maths the scene applies, not a proxy.
+  const posedY = (pitch: number, yaw: number, [x, y, z]: [number, number, number]) =>
+    Math.sin(pitch) * Math.sin(yaw) * x + Math.cos(pitch) * y - Math.sin(pitch) * Math.cos(yaw) * z
+  // A real outer WING-TIP corner from buildVulture (fauna.ts): the tip box
+  // (0.3,0.02,0.2) at (±1.0,0.12,-0.04) rotated Z by ±0.3 — outer-bottom corner.
+  const WING_TIP: [number, number, number][] = [
+    [1.066, 0.445, 0.06],
+    [1.066, 0.445, -0.14],
+    [-1.066, 0.445, 0.06],
+    [-1.066, 0.445, -0.14],
+  ]
+
+  it('the lowest point is the body bottom at rest, for any heading', () => {
+    // Pitch 0: no pose dip at all — the body sphere bottom (0.096·scale) is lowest.
+    for (const yaw of [0, Math.PI / 2, Math.PI, -1.3]) {
+      expect(landedBirdLowestDepth(0, yaw, 1)).toBeCloseTo(0.096, 9)
+    }
   })
 
-  it('the posed y keeps the LOWEST point a margin above flat ground through the whole peck', () => {
+  it('a spread WING TIP on the yaw low side is the deep end, far past the head-on depth (point 217)', () => {
+    // Facing the carcass (yaw 0) the head/beak leads; broadside (yaw ±90°) swings
+    // a whole wing tip down — much deeper than the head, the reported clip.
+    const headOn = landedBirdLowestDepth(0.9, 0, 1.6)
+    const broadside = landedBirdLowestDepth(0.9, Math.PI / 2, 1.6)
+    expect(broadside).toBeGreaterThan(headOn + 0.3)
+    expect(broadside).toBeGreaterThan(0.8) // the wing tip reaches ~0.9 below origin at 1.6
+    // Deeper with a fuller peck, and symmetric in the yaw sign.
+    expect(broadside).toBeGreaterThan(landedBirdLowestDepth(0.45, Math.PI / 2, 1.6))
+    expect(landedBirdLowestDepth(0.9, -Math.PI / 2, 1.6)).toBeCloseTo(broadside, 9)
+  })
+
+  it('the WING TIP itself (body y − bob dip + wing extent) stays above ground through the bob — both flocks', () => {
+    // The shared rule must clear the actual wing tip, not just the body centre,
+    // at EVERY heading and pitch across the bob — for the ground scavenger (1.5)
+    // AND the kill flock (1.6). On a slope the extent lift adds on top.
+    for (const scale of [1.5, 1.6]) {
+      for (const groupBaseY of [2]) {
+        for (const ground of [2, 2.5, 3.2]) {
+          for (let pi = 0; pi <= 6; pi++) {
+            const pitch = 0.3 + (0.6 * pi) / 6 // 0.3..0.9 covers scav 0.45..0.75 and kill 0.3..0.9
+            for (let yi = 0; yi < 12; yi++) {
+              const yaw = (yi / 12) * Math.PI * 2
+              const originY = groupBaseY + landedBirdYPosed(groupBaseY, ground, 0, pitch, yaw, scale)
+              // World y of the deepest wing-tip corner under this exact pose.
+              let tipWorld = Infinity
+              for (const c of WING_TIP) tipWorld = Math.min(tipWorld, originY + posedY(pitch, yaw, c) * scale)
+              expect(tipWorld).toBeGreaterThanOrEqual(ground - 1e-9)
+            }
+          }
+        }
+      }
+    }
+  })
+
+  it('the posed y keeps the LOWEST point a margin above flat ground through the whole peck, any heading', () => {
     for (const pitch of [0, 0.45, 0.75, 0.9]) {
-      for (const scale of [1.5, 1.6]) {
-        const y = landedBirdYPosed(2, 2, 0, pitch, scale)
-        const lowestWorld = 2 + y - landedBirdLowestDepth(pitch, scale)
-        expect(lowestWorld - 2).toBeCloseTo(0.06, 9) // exactly the margin above ground
+      for (const yaw of [0, 1, Math.PI / 2, 2.5, Math.PI]) {
+        for (const scale of [1.5, 1.6]) {
+          const y = landedBirdYPosed(2, 2, 0, pitch, yaw, scale)
+          const lowestWorld = 2 + y - landedBirdLowestDepth(pitch, yaw, scale)
+          expect(lowestWorld - 2).toBeCloseTo(0.06, 9) // exactly the margin above ground
+        }
       }
     }
   })
 
   it('ground rising under a WING lifts the whole bird (extent max, never below the margin)', () => {
     for (const ground of [2, 2.4, 3.1]) {
-      expect(landedBirdClearancePosed(2, ground, 0, 0.9, 1.6)).toBeGreaterThanOrEqual(0.06 - 1e-9)
+      for (const yaw of [0, Math.PI / 2, 2.2]) {
+        expect(landedBirdClearancePosed(2, ground, 0, 0.9, yaw, 1.6)).toBeGreaterThanOrEqual(0.06 - 1e-9)
+      }
     }
     // A point-185-style +0.5 group pre-lift bug still reads as a blown cap.
-    expect(landedBirdClearancePosed(2.5, 2, 0, 0.45, 1.5)).toBeGreaterThan(0.5)
+    expect(landedBirdClearancePosed(2.5, 2, 0, 0.45, 0, 1.5)).toBeGreaterThan(0.5)
   })
 
   it('birdExtentOffsets rotates the wing tips and head with the yaw', () => {
@@ -1383,6 +1433,82 @@ describe('killFlockActive (design.md §19.6, point 162 — no flock over a drive
   it('a drive-off / no-kill idle draws no flock, but a leftover scrap does', () => {
     expect(killFlockActive('idle', false)).toBe(false)
     expect(killFlockActive('idle', true)).toBe(true)
+  })
+})
+
+describe('assignPerCarcassFlocks (design.md §19.6, point 251 — one flock PER carcass, not one global draw)', () => {
+  type C = { id: string; x: number }
+  const dist = (c: C) => Math.abs(c.x) // distance from the origin, cheap and deterministic
+
+  it('two carcasses draw two INDEPENDENT flocks — one per carcass', () => {
+    const a: C = { id: 'a', x: 3 }
+    const b: C = { id: 'b', x: 8 }
+    const slots = [
+      { target: null as C | null, available: true },
+      { target: null as C | null, available: true },
+      { target: null as C | null, available: true },
+    ]
+    const next = assignPerCarcassFlocks(slots, [a, b], dist)
+    // The two nearest-first carcasses each get their own free slot; no sharing.
+    expect(next[0]).toBe(a)
+    expect(next[1]).toBe(b)
+    expect(next[2]).toBeNull()
+    expect(new Set(next.filter((t) => t !== null)).size).toBe(2)
+  })
+
+  it('a flock keeps its OWN carcass and never hops to the other (the reported bug)', () => {
+    const a: C = { id: 'a', x: 3 }
+    const b: C = { id: 'b', x: 8 }
+    // Flock 0 owns a, flock 1 owns b, and both are mid-meal (not available).
+    const slots = [
+      { target: a as C | null, available: false },
+      { target: b as C | null, available: false },
+      { target: null as C | null, available: true },
+    ]
+    // Flock 0 finishes a (a leaves the eligible list) — b is still present.
+    const next = assignPerCarcassFlocks(slots, [b], dist)
+    expect(next[0]).toBeNull() // flock 0 is RELEASED — it does NOT hop onto b
+    expect(next[1]).toBe(b) // flock 1 keeps its own carcass
+    expect(next[2]).toBeNull() // no third carcass to draw a flock
+  })
+
+  it('a released flock only takes a new carcass once it is idle again (no mid-flight hop)', () => {
+    const b: C = { id: 'b', x: 8 }
+    const c: C = { id: 'c', x: 4 }
+    // Flock 0 just lost its carcass and is still flying off (not available); a
+    // brand-new carcass c appears. It must NOT be grabbed until flock 0 is idle.
+    const flyingOff = [
+      { target: null as C | null, available: false },
+      { target: b as C | null, available: false },
+      { target: null as C | null, available: false },
+    ]
+    expect(assignPerCarcassFlocks(flyingOff, [b, c], dist)[0]).toBeNull()
+    // Once flock 0 has despawned (available), it takes the unowned carcass c.
+    const idleAgain = [
+      { target: null as C | null, available: true },
+      { target: b as C | null, available: false },
+      { target: null as C | null, available: false },
+    ]
+    expect(assignPerCarcassFlocks(idleAgain, [b, c], dist)[0]).toBe(c)
+  })
+
+  it('two flocks never share one carcass; a lone carcass draws exactly one flock', () => {
+    const a: C = { id: 'a', x: 5 }
+    const slots = [
+      { target: null as C | null, available: true },
+      { target: null as C | null, available: true },
+    ]
+    const next = assignPerCarcassFlocks(slots, [a], dist)
+    expect(next.filter((t) => t === a).length).toBe(1)
+  })
+
+  it('point-162 orthogonality: with no carcass in the list, no flock is ever drawn', () => {
+    // A drive-off leaves no carcass/remnant, so the caller passes an empty list.
+    const slots = [
+      { target: null as C | null, available: true },
+      { target: null as C | null, available: true },
+    ]
+    expect(assignPerCarcassFlocks(slots, [], dist)).toEqual([null, null])
   })
 })
 

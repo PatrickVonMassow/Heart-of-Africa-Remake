@@ -47,6 +47,7 @@ import {
   turnToward,
   killFlockMayDescend,
   killFlockActive,
+  assignPerCarcassFlocks,
   pickOffscreenLandAnchor,
   calvesForGroup,
   deflectedStep,
@@ -1447,18 +1448,20 @@ function Herds() {
   // Rotating index of the water backstop sweep (open sea AND river/lake
   // water outside the scripted dramas, design.md §19).
   const waterSweep = useRef(0)
-  // Scavenger vulture that flies to and consumes a non-lion carcass. Its x/z
-  // and mode live in a FlightState so it flies in from — and departs to —
-  // beyond the zoom-aware view ring instead of popping (design.md §19).
-  const scavengeGroup = useRef<THREE.Group>(null)
-  const scavenger = useRef<FlightState & { y: number; landed: boolean; target: Animal | null }>({
-    mode: 'idle',
-    x: 0,
-    z: 0,
-    y: 14,
-    landed: false,
-    target: null,
-  })
+  // Scavenger vultures that fly to and consume non-lion carcasses. Each flock's
+  // x/z and mode live in a FlightState so it flies in from — and departs to —
+  // beyond the zoom-aware view ring instead of popping (design.md §19). A POOL
+  // of independent flocks (point 251): each eligible carcass draws and OWNS its
+  // own flock, so several carcasses draw several concurrent flocks rather than
+  // one global set of vultures hopping from the finished carcass to the next.
+  type ScavFlock = FlightState & { y: number; landed: boolean; target: Animal | null }
+  const scavengeGroups = useRef<(THREE.Group | null)[]>([])
+  const makeScavFlock = (): ScavFlock => ({ mode: 'idle', x: 0, z: 0, y: 14, landed: false, target: null })
+  // scavenger.current is flock 0 — the dev hook (window.__wildlife.scavenger)
+  // and the single-carcass verify checks read/reset it; scavengers.current[0]
+  // is the same object so both views stay in sync.
+  const scavenger = useRef<ScavFlock>(makeScavFlock())
+  const scavengers = useRef<ScavFlock[]>([scavenger.current, makeScavFlock(), makeScavFlock()])
 
   // Juveniles keep their own baby-schema build (design.md §19) — geometries,
   // materials and meshes all live in the module pool (point 96).
@@ -1470,7 +1473,7 @@ function Herds() {
     herdsRef.current = emptyHerds()
     spawnedChunks.current.clear()
     herdState.current.clear()
-    scavenger.current.target = null
+    for (const f of scavengers.current) f.target = null
   }, [seed])
 
   const mtx = useMemo(() => new THREE.Matrix4(), [])
@@ -1545,7 +1548,7 @@ function Herds() {
       if (h) for (const sp of SPECIES) h[sp].length = 0
       spawnedChunks.current.clear()
       herdState.current.clear()
-      scavenger.current.target = null
+      for (const f of scavengers.current) f.target = null
     }
     const igniteFire = (x: number, z: number, heading: number) => {
       FIRE_STATE.mode = 'burning'
@@ -2881,106 +2884,105 @@ function Herds() {
     // view ring, flies in, and after the meal flies off and despawns only
     // well outside the view again (design.md §19).
     {
-      const sc = scavenger.current
-      const targetValid = (a: Animal | null): a is Animal =>
-        !!a &&
-        !!a.dead &&
-        !a.lionFed &&
-        !a.remnant &&
-        !a.gone &&
-        (a.dissolve === undefined || a.dissolve > 0) &&
-        // The vigil (point 121): a live keeper standing over the carcass keeps
-        // the bird off — an in-flight scavenger releases it and turns away.
-        !vigilBlocksLanding(nearestVigilKeeperDist(herds, a.x, a.z))
-      if (!targetValid(sc.target)) {
-        sc.target = null
-        let bestD = Infinity
-        for (const sp of SPECIES) {
-          for (const a of herds[sp]) {
-            if (!a.dead || a.lionFed) continue // the on-scene predator eats its own kill
-            if (a.remnant) continue // hunt scraps belong to the circling kill flock
-            if (a.dissolve !== undefined && a.dissolve <= 0) continue
-            // The vigil (point 121): never commit to a guarded carcass.
-            if (vigilBlocksLanding(nearestVigilKeeperDist(herds, a.x, a.z))) continue
-            const d = Math.hypot(a.x - pos.x, a.z - pos.z)
-            if (d < bestD) {
-              bestD = d
-              sc.target = a
-            }
-          }
+      // Every eligible carcass (not a lion's own kill, not a hunt remnant, not
+      // vigil-guarded) is a candidate — collected once, then handed out to the
+      // flock POOL so each carcass owns its own flock (point 251).
+      const eligible: Animal[] = []
+      for (const sp of SPECIES) {
+        for (const a of herds[sp]) {
+          if (!a.dead || a.lionFed) continue // the on-scene predator eats its own kill
+          if (a.remnant) continue // hunt scraps belong to the circling kill flock
+          if (a.gone) continue
+          if (a.dissolve !== undefined && a.dissolve <= 0) continue
+          // The vigil (point 121): never commit to a guarded carcass.
+          if (vigilBlocksLanding(nearestVigilKeeperDist(herds, a.x, a.z))) continue
+          eligible.push(a)
         }
       }
-      const sg = scavengeGroup.current
-      const target = sc.target
-      flightStep(
-        sc,
-        target !== null,
-        target ? target.x : sc.x,
-        target ? target.z : sc.z,
-        pos.x,
-        pos.z,
-        viewR,
-        VULTURE_SCAVENGE_SPEED,
-        dt,
-        0.6,
-        (x, z) => !isOnScreen(x, z), // spawn OFF the rendered frame, fly in (point 178)
+      const flocks = scavengers.current
+      // Per-carcass ownership (point 251): keep each flock on its carcass, free
+      // a flock whose carcass is gone (it flies off — no hop), and give a free
+      // idle flock the nearest still-unowned carcass. N carcasses -> N flocks.
+      const nextTargets = assignPerCarcassFlocks(
+        flocks.map((f) => ({ target: f.target, available: f.mode === 'idle' })),
+        eligible,
+        (a) => Math.hypot(a.x - pos.x, a.z - pos.z),
       )
-      sc.landed = sc.mode === 'active' && target !== null
       SCAV_CLEARANCE.v = Infinity
-      if (sg) {
+      for (let si = 0; si < flocks.length; si++) {
+        const sc = flocks[si]
+        sc.target = nextTargets[si]
+        const sg = scavengeGroups.current[si]
+        const target = sc.target
+        flightStep(
+          sc,
+          target !== null,
+          target ? target.x : sc.x,
+          target ? target.z : sc.z,
+          pos.x,
+          pos.z,
+          viewR,
+          VULTURE_SCAVENGE_SPEED,
+          dt,
+          0.6,
+          (x, z) => !isOnScreen(x, z), // spawn OFF the rendered frame, fly in (point 178)
+        )
+        sc.landed = sc.mode === 'active' && target !== null
+        if (!sg) continue
         sg.visible = sc.mode !== 'idle'
-        if (sc.mode !== 'idle') {
-          if (sc.landed && target) {
-            sc.x = target.x
-            sc.z = target.z
-            // Group origin ON the carcass ground (point 185) — exactly the kill
-            // flock's killGroundY. The shared landedBirdY rule below lifts each
-            // bird to its OWN sampled ground and adds LANDED_BIRD_HOVER to clear
-            // the pecking body; the old +0.5 group pre-lift DOUBLED that clearance
-            // and floated the flock ~0.5 above the carcass it feeds on.
-            const scll = worldToLatLon(sc.x, sc.z)
-            sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
-            if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
-            target.dissolve -= dt
-          } else if (target && sc.mode === 'in') {
-            // Glide down toward the carcass as the approach closes.
-            const d = Math.hypot(target.x - sc.x, target.z - sc.z)
-            sc.y = target.y + 0.4 + Math.min(1, d / 40) * 13
-          } else {
-            sc.y = Math.min(14, sc.y + 6 * dt) // climbing away
-          }
-          sg.position.set(sc.x, sc.y, sc.z)
-          sg.children.forEach((bird, i) => {
-            const ph = (i / sg.children.length) * Math.PI * 2
-            if (sc.landed) {
-              const r = 0.5 + i * 0.35
-              const bx = Math.cos(ph) * r
-              const bz = Math.sin(ph) * r
-              // The shared landed-bird rule (points 128 + 202): positive-only
-              // lift onto the HIGHEST ground under the bird's EXTENTS (wing
-              // tips + pecking head, not just the centre), clearance from the
-              // POSED lowest point (the dipped head reaches deeper than the
-              // flat hover covered — the user's ground-clipping report).
-              const pitch = 0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3
-              let bg = 0
-              for (const [ox, oz] of birdExtentOffsets(ph, 1.5)) {
-                const bll = worldToLatLon(sc.x + bx + ox, sc.z + bz + oz)
-                bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, seed).height)
-              }
-              const hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
-              bird.position.set(bx, landedBirdYPosed(sc.y, bg, hop, pitch, 1.5), bz)
-              SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, 1.5))
-              bird.rotation.set(pitch, ph, 0) // heads pecking down
-            } else {
-              const a2 = t * 0.6 + ph
-              bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
-              bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
-            }
-            bird.scale.setScalar(1.5)
-          })
-        } else {
+        if (sc.mode === 'idle') {
           sc.landed = false
+          continue
         }
+        if (sc.landed && target) {
+          sc.x = target.x
+          sc.z = target.z
+          // Group origin ON the carcass ground (point 185) — exactly the kill
+          // flock's killGroundY. The shared landedBirdY rule below lifts each
+          // bird to its OWN sampled ground and adds LANDED_BIRD_HOVER to clear
+          // the pecking body; the old +0.5 group pre-lift DOUBLED that clearance
+          // and floated the flock ~0.5 above the carcass it feeds on.
+          const scll = worldToLatLon(sc.x, sc.z)
+          sc.y = Math.max(0, sampleTerrain(scll.lat, scll.lon, seed).height)
+          if (target.dissolve === undefined) target.dissolve = CARCASS_DISSOLVE_SECONDS
+          target.dissolve -= dt
+        } else if (target && sc.mode === 'in') {
+          // Glide down toward the carcass as the approach closes.
+          const d = Math.hypot(target.x - sc.x, target.z - sc.z)
+          sc.y = target.y + 0.4 + Math.min(1, d / 40) * 13
+        } else {
+          sc.y = Math.min(14, sc.y + 6 * dt) // climbing away
+        }
+        sg.position.set(sc.x, sc.y, sc.z)
+        sg.children.forEach((bird, i) => {
+          const ph = (i / sg.children.length) * Math.PI * 2 + si // per-flock phase offset
+          if (sc.landed) {
+            const r = 0.5 + i * 0.35
+            const bx = Math.cos(ph) * r
+            const bz = Math.sin(ph) * r
+            // The shared landed-bird rule (points 128 + 202 + 217): positive-only
+            // lift onto the HIGHEST ground under the bird's EXTENTS (wing tips +
+            // pecking head, not just the centre), clearance from the POSED lowest
+            // point — head AND the spread WING TIPS under the pitch/yaw pose (a
+            // wing tip on the yaw's low side swings deeper than the head; point
+            // 217's reported wing-through-ground clip).
+            const pitch = 0.45 + Math.abs(Math.sin(t * 4 + ph)) * 0.3
+            let bg = 0
+            for (const [ox, oz] of birdExtentOffsets(ph, 1.5)) {
+              const bll = worldToLatLon(sc.x + bx + ox, sc.z + bz + oz)
+              bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, seed).height)
+            }
+            const hop = Math.abs(Math.sin(t * 3 + ph)) * 0.1
+            bird.position.set(bx, landedBirdYPosed(sc.y, bg, hop, pitch, ph, 1.5), bz)
+            SCAV_CLEARANCE.v = Math.min(SCAV_CLEARANCE.v, landedBirdClearancePosed(sc.y, bg, hop, pitch, ph, 1.5))
+            bird.rotation.set(pitch, ph, 0) // heads pecking down
+          } else {
+            const a2 = t * 0.6 + ph
+            bird.position.set(Math.cos(a2) * 2.4, 1.6 + i * 0.6, Math.sin(a2) * 2.4)
+            bird.rotation.set(0, -a2 - Math.PI / 2, 0.2)
+          }
+          bird.scale.setScalar(1.5)
+        })
       }
     }
 
@@ -3898,11 +3900,19 @@ function Herds() {
       <primitive object={pool.stain} dispose={null} />
       <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_COUNT]} visible={false} frustumCulled={false} />
       <instancedMesh ref={fireBand} args={[fireBandGeo, fireBandMat, FIRE_BAND_SEGMENTS]} visible={false} frustumCulled={false} />
-      <group ref={scavengeGroup} visible={false}>
-        {[0, 1, 2].map((i) => (
-          <mesh key={i} geometry={vultureGeo} material={material} dispose={null} />
-        ))}
-      </group>
+      {scavengers.current.map((_, si) => (
+        <group
+          key={si}
+          ref={(el) => {
+            scavengeGroups.current[si] = el
+          }}
+          visible={false}
+        >
+          {[0, 1, 2].map((i) => (
+            <mesh key={i} geometry={vultureGeo} material={material} dispose={null} />
+          ))}
+        </group>
+      ))}
     </>
   )
 }
@@ -4602,9 +4612,11 @@ function Vultures() {
             const lr = 0.5 + i * 0.35
             const lx = Math.cos(phase) * lr
             const lz = Math.sin(phase) * lr
-            // The shared landed-bird rule (points 128 + 202): positive-only
+            // The shared landed-bird rule (points 128 + 202 + 217): positive-only
             // lift onto the highest ground under the bird's EXTENTS, with the
-            // clearance derived from the POSED lowest point (dipped head).
+            // clearance derived from the POSED lowest point — head AND the spread
+            // WING TIPS under the pitch/yaw pose (a low-side wing tip dips deeper
+            // than the head; point 217).
             const kPitch = 0.6 + Math.sin(t * 4 + phase) * 0.3
             let bg = 0
             for (const [ox, oz] of birdExtentOffsets(phase, 1.6)) {
@@ -4612,9 +4624,9 @@ function Vultures() {
               bg = Math.max(bg, sampleTerrain(bll.lat, bll.lon, s.seed).height)
             }
             const hop = Math.abs(Math.sin(t * 3 + phase)) * 0.12
-            const ly = landedBirdYPosed(killGroundY, bg, hop, kPitch, 1.6)
+            const ly = landedBirdYPosed(killGroundY, bg, hop, kPitch, phase, 1.6)
             bird.position.set(cx + (lx - cx) * dsc, cy + (ly - cy) * dsc, cz + (lz - cz) * dsc)
-            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, 1.6))
+            if (dsc > 0.6) killMinClear = Math.min(killMinClear, landedBirdClearancePosed(killGroundY, bg, hop, kPitch, phase, 1.6))
             if (dsc > 0.6) {
               bird.rotation.set(kPitch, phase, 0) // pecking down
             } else {
