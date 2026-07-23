@@ -2338,3 +2338,202 @@ This record moved to design.md §19.15 on the user's decision (17.07.2026):
 it documents the game design, not the research, so design.md is its home.
 The live dress table (six peoples, drivers, gates, sources) and its notes
 are kept current there; this document remains the underlying research.
+
+---
+
+## 9. Keeping the cook-fire alight in the rains (TASKS point 256)
+
+The game's §19.10 village fire currently burns unprotected through the rain,
+which reads wrong. The question behind this section: did ~1890 settlements have
+a real answer for keeping a hearth/cooking fire alight through the rainy
+season? **They did — two structural answers and one maintenance practice, all
+attested**, and which answer applies depends on the people. Every quotation
+below was verified against the full text of the named source, not taken from a
+summary.
+
+### 9.1 The separate kitchen structure — period-attested, with an open-sided end ✅
+
+The best-attested answer across the compound-building peoples is that **the
+cook-fire has a roof of its own**: a kitchen hut, shed or canopy standing apart
+from the dwelling.
+
+- **Baganda — the direct period-adjacent attestation.** Roscoe, *The Baganda*
+  (1911; resident through the 1890s), p. 435: "In the royal enclosure, and also
+  in a chiefs enclosure, there were large houses set apart as kitchens in which
+  women-slaves lived… and **almost every peasant had a small hut or shed, where
+  his wife could cook outside the house**." Later in the same chapter, plantains
+  for beer "were then divided into sections, and **hung in the kitchens or the
+  cooking-sheds, where the heat from the fire soon ripened them**"
+  ([archive.org](https://archive.org/details/bagandaaccountof00roscuoft)) —
+  PERIOD-adjacent. The cook-fire lives under its own roof at every social rank,
+  and it burns steadily enough to ripen fruit — in one of the rainiest zones
+  the game has.
+- **Central Sudan — the courtyard kitchen, twice from Barth.** Barth vol. 2,
+  p. 442, surveying a courtyard house at Badanijo (Fulbe/Batta country on the
+  Adamawa road): "In the corner, formed between the hut (a) and the wall of the
+  courtyard, was the **'fugodi,' or kitchen**, on a small scale." And the plan
+  of his own Kukawa residence marks an "inner large courtyard, where, in the
+  corner, **the kitchen was established**"
+  ([archive.org](https://archive.org/details/travelsdiscoveri02bart_2)) —
+  PERIOD. A named, dedicated kitchen spot inside the compound wall is normal
+  Central-Sudan house grammar.
+- **Lower Ogowé (the Fang's neighbours).** Kingsley, *Travels in West Africa*
+  (1897), on the Igalwa houses at Lambaréné: "These houses have usually three,
+  sometimes more rooms, and **a separate closed-in little kitchen, built
+  apart**" ([Gutenberg](https://www.gutenberg.org/ebooks/5891)) — PERIOD.
+- **A roof raised over a fire against rain, as usual practice.** Kingsley again
+  (Calabar, describing the slow smoking fires under a corpse-drying platform):
+  "slow fires kept going underneath to dry it, **a mat roof being usually
+  erected over it to keep off rain**" — PERIOD. ⚠️ The context is funerary, not
+  cooking — cited for the *technique*: where a fire had to keep burning through
+  rain, the known answer was to roof it.
+- **The open-sided form exists and has a name.** The Zambian **insaka/nsaka**
+  (a Bemba word, "place to gather") is an open-sided thatched roof on poles,
+  with or without a low wall, used for eating, cooking-adjacent work and
+  meeting ([Nkwazi, vernacular architecture in Zambia](https://nkwazimagazine.com/vernacular-architectural-heritage-in-zambia/));
+  Richards' Bemba fieldwork documents the men's shelter of every village
+  ([Richards 1939](https://archive.org/details/landlabourdietin0000rich)) —
+  MODERN naming / **RETRO-APPLIED** for 1890 (Richards is 1930s; no 1890s
+  attestation of the insaka was found). The Luapula/Lunda equivalent is the
+  central meeting shelter already noted in §4.0.5 ("circular clay houses round
+  a central meeting house") — MODERN.
+- **Hausa.** The standard descriptions of the Hausa compound include the
+  **dakin girki** ("hut of cooking") and the **rumfa** (a shade shelter)
+  as ordinary compound elements
+  ([Hausa architecture](https://en.wikipedia.org/wiki/Hausa_architecture);
+  [Something Curated](https://somethingcurated.com/2022/01/11/a-history-of-hausa-architecture/))
+  — MODERN; consistent with Barth's period courtyard kitchens above.
+- **The spectrum.** A modern field survey of African vernacular building states
+  it directly: "Kitchens are a separate structure with varying degrees of
+  closure. Some kitchens are fully enclosed, others have half walls and **some
+  just have poles supporting a simple roof**"
+  ([Sojkowski](https://www.naturalbuildingcollective.com/dynamic-qualities-african-vernacular-architecture/))
+  — MODERN, uncited by its author, so THIN as a *universal*; the standard
+  scholarly reference is Denyer, *African Traditional Architecture* (1978)
+  ([archive.org](https://archive.org/details/africantradition0000deny)) —
+  **located, not read**.
+
+### 9.2 The indoor hearth — the beehive- and dome-builders' answer ✅
+
+For the peoples whose dwelling is a single thatched dome, the cook-fire is
+**inside the house by construction**, and the rain never touches it. No smoke
+vent: the smoke filters through the door and the thatch.
+
+- **Zulu — settled from the period text.** Grout, *Zulu-Land* (1864),
+  pp. 98–99: "Near the central pillar, and on the side towards the door, is
+  the fire-place, a shallow, basin-like excavation, scooped out in the earth,
+  with an elevated rim of molded clay… **In the evening, and through most of
+  the day, if the weather is cold or wet, gathered around this fire-place**,
+  their only hearth-stone… poking the fire or putting up the brands…
+  **cooking and eating their food**"
+  ([archive.org](https://archive.org/details/zululandorlifeam00grou)) —
+  PERIOD. Wet weather moves the household *around the indoor fire*; the roof
+  "commonly abounds" in smoke and soot.
+- **Maasai — and the hut itself is re-proofed for the rains.** Thomson,
+  *Through Masai Land*, p. 242–3: the hut of interwoven boughs is plastered
+  with dung, which "sufficed for the dry season, **but for the rainy one a
+  further covering of hides had to be laid upon it**"
+  ([archive.org](https://archive.org/details/throughmasailand01thomuoft)) —
+  PERIOD. The hearth is a fixture of the Maasai house down to the idiom:
+  Hollis (1905) records the fireplace in proverb and the phrase "**the child
+  of the fireplace**" for a child born out of wedlock
+  ([archive.org](https://archive.org/details/masaitheirlangua00holl)) —
+  PERIOD. ⚠️ The interior layout detail (hearth between the sleeping
+  platforms) rests on Merker (1904), still unread (§2.1).
+- **The regional norm, one hut east of the Maasai.** Thomson on the Wa-teita,
+  p. 44: "**A fire is kept burning night and day in the hut**, supplying their
+  sole illumination" — PERIOD (a people the game does not show, cited as the
+  regional pattern and for the ember discipline of §9.3).
+- **Fang.** Kingsley: "the Fan huts are **stoutly built of sheets of flattened
+  bark, firmly secured together with bark rope, and thatched**" — PERIOD; a
+  closed, weather-tight box. That the hearth sits inside the wife's house is
+  the norm reported by the standard Fang ethnography, Tessmann, *Die Pangwe*
+  (1913, fieldwork 1904–09,
+  [Tessmann](https://en.wikipedia.org/wiki/G%C3%BCnther_Tessmann)) —
+  **located, not read**; treat as near-period but unverified in detail.
+- **Mbuti.** Dome leaf-huts with a hearth at each; the reports that fire was
+  carried camp-to-camp as smouldering embers (and the stronger claim that
+  fire-drilling was not practised at all) come from Schebesta (1930s) and
+  Turnbull (1950s) — **RETRO-APPLIED and partly CONTESTED**; do not build on
+  the stronger claim.
+- **Somali.** The **gurgi** mat tent is period-described by Swayne (1895):
+  bent poles with mats and skins sewn over, "the skins being tied over the
+  loads **to protect them from sun and rain**" on the march
+  ([Gutenberg](https://www.gutenberg.org/cache/epub/57907/pg57907.txt)) —
+  PERIOD for the rain-shedding skins; **where the hearth sits during the gu
+  rains: GAP.**
+
+### 9.3 What rain does to an open fire — and the maintenance layer
+
+- **The problem is period-real, not a modern intuition.** Kingsley, caught by a
+  storm on Mount Cameroon: "we had thrown dry wood on to the fire, and it
+  blazed just as the rain came down… It could have managed the water fairly
+  well, **but the wind came, very nearly putting an end to it**" — PERIOD. An
+  unprotected flame in a tropical storm is a fight, and often a lost one.
+  Barth's market stalls that "do not exclude the rain" but "retain the
+  humidity" (§4.9) are the same physics.
+- **Embers are kept, not remade.** The Wa-teita fire burning "night and day"
+  (§9.2) is the norm; Thomson's porters letting their fires go out in a hail
+  storm (p. 239) is narrated as a symptom of collapse. Keeping live embers
+  banked and rekindling from them — rather than fire-drilling anew — is the
+  everyday practice everywhere a hearth is described. **PERIOD for the
+  keeping; the rekindling mechanics are nowhere described in what was read.**
+- **Windbreaks.** The San grass windscreen (*scherm*) with its open hearth is
+  the standard picture of Kalahari camps — but the period source that would
+  ground it (Passarge, 1896–98) remains unread (§4.1): **THIN**. No roof over
+  a San fire in any source consulted.
+- **Where the problem is moot.** Cairo and the Nubian and Tuareg points get
+  effectively no rain at all (`climate-1890.md`); the rain-vs-fire question
+  never arises there. The Berber village's problem is cold, not rain-flooded
+  hearths — its winter answer is the indoor hearth (MODERN, THIN).
+- ⚠️ **The "banked fire under the eaves" idea is NOT ATTESTED** in anything
+  read for this pass — no source shows cooking moved under a dwelling's eaves
+  in rain. If used, it is designer invention, not history. **Do not present it
+  as period practice.**
+
+### 9.4 The roster, mapped
+
+| People | Rain-season cook-fire answer | Evidence |
+| --- | --- | --- |
+| Baganda | separate cook-hut / cooking-shed | PERIOD-adjacent (Roscoe p. 435) |
+| Hausa | compound kitchen (dakin girki) + shade roof (rumfa) | MODERN, + Barth's period courtyard kitchens nearby |
+| Bambara, Mandinka | savanna compound kitchen hut | **INFERRED** from the compound pattern (Denyer located, not read) |
+| Bemba | kitchen structure; the open-sided insaka form | RETRO-APPLIED (Richards) / MODERN |
+| Lunda | central meeting shelter (§4.0.5) + kitchen | MODERN |
+| Swahili | interior kitchens of the coast houses | MODERN, THIN |
+| Fang | indoor hearth in a closed bark-walled house | PERIOD (Kingsley, construction) + Tessmann located |
+| Mbuti | hearth at the leaf-hut; embers carried | RETRO-APPLIED, partly CONTESTED |
+| Maasai | indoor hearth; hut re-proofed with hides for the rains | PERIOD (Thomson p. 242–3; Hollis) |
+| Zulu | indoor hearth, wet-weather life around it | PERIOD (Grout pp. 98–99) |
+| Pedi | indoor hearth + courtyard cooking | **INFERRED** from the Sotho-Tswana pattern; THIN |
+| San | open hearth, windbreak only — no roof | THIN (Passarge unread) |
+| Somali | mat tent sheds rain; hearth placement | **GAP** |
+| Sidama | interior hearth of the domed house | MODERN, THIN |
+| Mongo, Banda, Bambundu, Wayeyi | — | **GAP — do not assume** |
+| Tuareg, Nubian (and Cairo) | no meaningful rain — moot | `climate-1890.md` |
+| Berber | cold-season indoor hearth; rain minor | MODERN, THIN |
+
+### 9.5 Recommendation
+
+**The single most legible, period-accurate, cheap-to-render option is the small
+open-sided thatched canopy on posts over the fire — a cook-shelter.** Three
+reasons: (a) it is the attested open end of the real kitchen spectrum (§9.1 —
+Roscoe's cooking-sheds, the insaka form, the rumfa, Kingsley's mat roof raised
+exactly to keep rain off a fire); (b) it is the only option that keeps the fire
+*visible* — the indoor hearth is historically the MOST common answer (§9.2) but
+renders as nothing at all; (c) it is one cheap primitive: four posts and a
+thatch plane over the existing fire, read at a glance.
+
+**Accuracy guard:** for the dome-dwellers — Zulu, Maasai, Mbuti, San — a
+cook-canopy is *not* attested and should not be shown. Their accurate picture
+is the fire indoors (invisible from outside, per §9.2) — and any fire they do
+keep in the open being visibly beaten down by rain, which is exactly what the
+period record says happens to an unprotected flame (§9.3).
+
+**Rendering implication.** Recommended in-game shelter: a small open-sided
+thatched canopy on posts over the village fire, shown where a kitchen structure
+is attested or safely inferable (Baganda, Hausa, Bambara, Mandinka, Bemba,
+Lunda, Swahili and the ports). Rain-response rule: under the canopy the fire
+burns on through rain, a touch lower and steamier; an UNSHELTERED flame (the
+dome-dweller villages, or any fire outside a canopy) is visibly damped by rain;
+the rainless desert settlements are unaffected.

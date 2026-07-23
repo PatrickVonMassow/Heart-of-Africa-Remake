@@ -57,6 +57,13 @@ export const TRAIL_MARKERS = [
   'used to say',
   'used to call for',
   'no longer planned',
+  'renamed from',
+  'renamed to',
+  'reverted from',
+  // retrospective "the user changed the spec" stamp. LEGIT attribution of who/
+  // when uses "user request"/"user decision"/"(user <date>)" — never "user
+  // change", which flags a revision folded into the body (the point-224 trap).
+  'user change',
   // naming the superseded plan/version/spec
   'the earlier plan',
   'the original plan',
@@ -100,6 +107,10 @@ export const TRAIL_MARKERS = [
   'hieß ursprünglich',
   'ersetzt die frühere',
   'ersetzt die ursprüngliche',
+  'umbenannt von',
+  'umbenannt in',
+  'umbenannt zu',
+  'nutzeränderung',
 ]
 
 /**

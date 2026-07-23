@@ -64,6 +64,18 @@ describe('findTrailMarker', () => {
     expect(findTrailMarker('the old rule is now superseded by an explicit user decision')).toBe('superseded by')
     expect(findTrailMarker('Der Punkt war ursprünglich als Buttons gedacht.')).toBe('war ursprünglich')
   })
+
+  it('flags the rename and user-change revision trails (the point-174/224 traps)', () => {
+    expect(findTrailMarker('Tag the demo build v0.3 (RENAMED FROM v0.2).')).toBe('renamed from')
+    expect(findTrailMarker('this checkpoint publishes as v0.2 — user change 23.07.2026')).toBe('user change')
+    expect(findTrailMarker('der Release wurde von v0.2 UMBENANNT IN v0.3')).toBe('umbenannt in')
+  })
+
+  it('keeps legitimate who/when attribution clean (not a revision trail)', () => {
+    expect(findTrailMarker('DEMO CHECKPOINT (user request 22.07.2026): tag v0.2 at /v0.2/.')).toBeNull()
+    expect(findTrailMarker('Feature-branch workflow (user decision 22.07.2026).')).toBeNull()
+    expect(findTrailMarker('SPACE is the new use key (user 23.07.2026).')).toBeNull()
+  })
 })
 
 describe('specTrailOffenders', () => {
