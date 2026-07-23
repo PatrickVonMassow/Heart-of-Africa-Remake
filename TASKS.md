@@ -10165,27 +10165,34 @@ the remaining open points in their numeric order.
   still ON THE GROUND (took off too late) — an airborne bird is safe from ground
   hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
   etc.) needs the ground↔air state and a takeoff-on-flee transition.
-  (B) AERIAL PREDATORS: add region- and ~1890-period-appropriate FLYING predators
-  (raptors) that hunt prey birds and CAN catch them IN THE AIR; and — ONLY if the
-  research establishes it as plausible for African wildlife — a STOOP/DIVE from above
-  that the prey may not notice in time, which requires multiple FLIGHT-HEIGHT levels
-  (prey at a lower band, the raptor diving from a higher one). Everything in (B) is
-  contingent on the research: if a mechanic is not well-supported, it is flagged and
-  NOT built.
+  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md §B): add
+  region-appropriate FLYING predators (raptors) that hunt prey birds and catch them IN
+  THE AIR, per the researched per-region table (§B2.1): falcons (peregrine/lanner/
+  barbary) and the two hawk-eagles (African, Ayres's) attack by a STOOP/DESCEND, while
+  the accipiter/harrier/fish-eagle majority use an air-catch tail-chase or an ambush
+  from cover (no height). The stoop is BUILT — but as a SCRIPTED "descend-and-strike"
+  EVENT (the raptor enters high, plunges onto a flying bird, strikes, resolves), NOT a
+  persistent 3D flight-height simulation (the research explicitly warns against a full
+  altitude-band layer, since most raptors don't use height). So there is at most a
+  simple two-state high/low for the stoop event itself, not a per-bird altitude field.
   RESEARCH FIRST (Fable pass, docs-only, extend `docs/fauna-behaviour-1890.md`): which
   African raptors/aerial hunters (~1890, by region) take BIRDS as prey; their hunting
   mode (stoop/dive vs. tail-chase), typical prey birds, whether flight-height layering
   and a surprise-from-above are realistic, and whether "a ground predator only gets a
   bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
   predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
-  "Implementation brief". BUILD (per the research, after the wildlife cluster is free):
-  the bird ground/air state machine + takeoff-on-flee (pure flee/height helpers in
-  `src/scenes/travel/wildlifeBehavior.ts`, wired in `src/scenes/travel/Wildlife.tsx`);
-  a flight-height field; the aerial-predator species (build in `src/render/fauna.ts`,
-  seeded from a new region-keyed aerial-predator pool) with an air-catch and, if
-  supported, the stoop-dive; ground predators lose the airborne target. Reuse the
+  "Implementation brief" (§B4 — already delivered; the research half is DONE). BUILD
+  (after the wildlife cluster is free): the bird ground/air state machine +
+  takeoff-on-flee (pure flee helpers in `src/scenes/travel/wildlifeBehavior.ts`, wired
+  in `src/scenes/travel/Wildlife.tsx`) — with the researched fly/no-fly split (small
+  birds and flamingos fly to escape, the flamingo with a laborious running take-off as
+  a vulnerable window; plover CHICKS crouch/freeze and can be caught, the adult flies
+  and does the broken-wing distraction); the aerial-predator species (build in
+  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per §B2.1)
+  with an air-catch tail-chase for the ambush guild and the SCRIPTED descend-and-strike
+  for the falcon/hawk-eagle guild; ground predators lose the airborne target. Reuse the
   existing hunt/flee/carcass machinery; every started drama resolves (I4). All
-  calibratable (takeoff trigger distance, flight heights, dive chance/speed,
+  calibratable (takeoff trigger distance, the stoop's high/low band, dive chance/speed,
   aerial-hunt rate) and debug-editable. VERIFIABLE: pure tests — a fleeing bird
   transitions to air and a ground predator's reach excludes an airborne bird while a
   still-grounded (surprised) one is catchable; the aerial predator's air-catch and (if
