@@ -99,7 +99,7 @@ await touch('touchEnd', [])
 const yaw1 = await page.evaluate(() => window.__placePlayer.yaw)
 check('right-half drag turns the first-person view', Math.abs(yaw1 - yaw0) > 0.1, `yaw ${yaw0.toFixed(2)} → ${yaw1.toFixed(2)}`)
 
-// --- Tapping the interaction prompt fires the E interaction (talk to elder) ---
+// --- Tapping the interaction prompt fires the Space use key (talk to elder) ---
 await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
 await page
   .waitForFunction(() => window.__game.getState().placeId === 'nubian-village' && !!window.__placeLayout, null, { timeout: 30000 })

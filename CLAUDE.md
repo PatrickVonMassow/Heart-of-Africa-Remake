@@ -274,20 +274,26 @@ verify suite that proves it.
    without errors. The application loads without console errors.
 2. **Two perspectives.** Bird's-eye view (3D travel across the continent)
    and first-person view (walkable settlement) exist; switching between
-   them happens through movement alone per `design.md` §2.3. In
-   particular: buildings open by walking against their door and only the
-   elder keeps the interaction key. A just-left settlement stays closed to
-   re-entry until the traveller has moved clear (a calibratable clearance
-   beyond the enter radius). A settlement is not auto-entered while the
-   traveller is on a water cell, so a river passage never pulls him in.
-   Entering focuses the controls without an extra click per `design.md`
-   §17.5 (HUD buttons blurred; mouse-look engages on entry from the walk-in
-   keypress, with the click as fallback). Verifiable: an automated run
-   walks into a place and into a building's door and enters both, and walks
-   past the settlement edge to leave, without any key press; standing on
-   the just-left marker does not re-enter until the traveller has moved
-   clear; on entering, no HUD control (button/input) retains focus
-   (`scripts/verify/flow.mjs`). The leave transition stays FLUID: the
+   them is movement-based, confirmed with the SPACE use key, per `design.md`
+   §2.3. In particular: functional buildings are entered with the SPACE use
+   key while standing at their door (door proximity shows the prompt and arms
+   the key — merely walking into the door no longer enters), and the elder is
+   addressed with the same use key. Settlement entry from the bird's-eye view
+   is likewise movement-based but confirmed with SPACE: within the enter
+   radius the localized hint "Space to enter <name>" shows (the map name-label
+   hidden while it does) and a SPACE press enters; reaching the radius alone
+   never enters. The accidental-entry debounce/clearance is removed (no
+   just-left re-entry lock, no move-clear timing). A SPACE press while the
+   traveller is on a water cell still does not enter, so a river passage never
+   pulls him in. Entering focuses the controls without an extra click per
+   `design.md` §17.5 (HUD buttons blurred; mouse-look engages on entry from
+   the SPACE keypress, with the click as fallback). Verifiable: an automated
+   run walks into a place and presses SPACE to enter it, stands at a
+   building's door and presses SPACE to enter it, and walks past the
+   settlement edge to leave (no key); walking a door WITHOUT a key does not
+   enter; on entering, no HUD control (button/input) retains focus
+   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate and
+   the water guard are pure-tested (`src/scenes/travel/settlementEntry.test.ts`). The leave transition stays FLUID: the
    travel scene's shared materials/meshes survive remounts as module
    singletons (surgical dispose opt-outs — a full remount used to re-link
    the whole travel program set synchronously, freezing the main thread
@@ -1018,8 +1024,8 @@ verify suite that proves it.
     the delivery, a new entry auto-narrates without a click, and narration
     blocked by the autoplay policy is deferred to the first gesture
     instead of dropped. The journal is non-modal per §16.1 (movement
-    continues, only modal dialogs block; walking a door open works with
-    the journal open), and the panel ends above the camp/map/journal toggles
+    continues, only modal dialogs block; entering a building with SPACE at its
+    door works with the journal open), and the panel ends above the camp/map/journal toggles
     per §17.4. German read-aloud stays an open item until a German-capable
     voice exists. Verifiable: spot check of both language files for
     markers; journal screenshot free of visible tags; starting narration
@@ -1029,8 +1035,8 @@ verify suite that proves it.
     start, driving movement still advances the player position
     (`scripts/verify/voice.mjs` — the voice and handwriting suites replay
     the TTS assets from the git-ignored local `.cache/tts/` cache, so the
-    regression is CDN-independent); walking into a hut door with the journal
-    forced open still opens the building (`scripts/verify/flow.mjs`); with
+    regression is CDN-independent); pressing SPACE at a hut door with the journal
+    forced open still enters the building (`scripts/verify/flow.mjs`); with
     the journal open, the `.journal` panel's bottom edge sits above the
     `.map-toggle` and `.journal-toggle` button tops and its right edge
     keeps a gap to the screen edge (`scripts/verify/enrichments.mjs`).
@@ -1378,8 +1384,8 @@ verify suite that proves it.
     permanently. Verifiable: `scripts/verify/gamepad.mjs` injects a
     virtual gamepad and asserts that pre-engagement axis drift moves
     nothing, stick travel movement, right-stick turning in the
-    first-person view, the A-button interaction and Y-button journal
-    toggle, and the position-query toast in both languages.
+    first-person view, the A-button interaction (mapped to the SPACE use key)
+    and Y-button journal toggle, and the position-query toast in both languages.
     The touch/tablet layer of `design.md` §17.5 (point 84) holds as a
     third input source with zero change to desktop play: a virtual stick,
     a right-half look/steer drag surface with two-finger pinch zoom, a
@@ -1391,7 +1397,7 @@ verify suite that proves it.
     pure-tested (`src/systems/touchInput.test.ts`); `src/ui/Hud.test.tsx`
     that `touchActive: false` renders no `.touch-controls` while
     `touchActive: true` mounts the stick and look surface and makes the
-    prompt a tappable button firing the E key; `src/state/ui.test.ts` that
+    prompt a tappable button firing the SPACE use key; `src/state/ui.test.ts` that
     `activateTouch` arms the layer with the preset and is idempotent (a
     debug re-enable is not clobbered); `src/ui/DebugMenu.test.tsx` the
     localized SSAO and half-shadow checkboxes writing through to the store;

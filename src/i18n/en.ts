@@ -191,8 +191,9 @@ export const en: Strings = {
   },
 
   prompts: {
-    interact: (label) => `E — ${label}`,
+    interact: (label) => `Space — ${label}`,
     openCamp: 'C — Open camp',
+    enterPlace: (name) => `Space to enter ${name}`,
   },
 
   labels: {

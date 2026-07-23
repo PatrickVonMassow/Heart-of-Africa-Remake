@@ -147,7 +147,8 @@ async function reachableBuildings(sceneLabel) {
       continue
     }
     // Find a collision-free standpoint within the door trigger radius (1.2) and
-    // teleport the player there; the render loop must then open the dialog.
+    // teleport the player there; the door prompt then arms and Space opens the
+    // dialog (design.md §2.3 — walking in alone no longer enters).
     const placed = await page.evaluate((d) => {
       const cs = window.__placeColliders
       for (let r = 0; r <= 1.0; r += 0.2) {
@@ -164,18 +165,22 @@ async function reachableBuildings(sceneLabel) {
       }
       return false
     }, t.door)
-    const opened = placed
-      ? await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 }).then(() => true).catch(() => false)
-      : false
+    let opened = false
+    if (placed) {
+      // Arm the Space prompt at the door, then press it (design.md §2.3).
+      await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
+      await page.keyboard.press('Space')
+      opened = await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 }).then(() => true).catch(() => false)
+    }
     if (!placed || !opened) notOperable.push(`${t.type}${placed ? '' : '(no clear standpoint)'}${opened ? '' : '(no open)'}`)
-    // Close and step away so the door latch re-arms for the next building.
+    // Close and step away from the door for the next building.
     await page.keyboard.press('Escape')
     await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
     await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
     await page.waitForTimeout(150)
   }
   check(
-    `${sceneLabel}: all functional buildings operable (walk into the door opens it)`,
+    `${sceneLabel}: all functional buildings operable (Space at the door opens it)`,
     notOperable.length === 0,
     notOperable.length ? `not operable: ${notOperable.join(',')}` : `${targets.length} buildings ok`,
   )
@@ -297,8 +302,8 @@ await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
 
-// Chief hut operable despite collision: walking into its door opens the
-// audience dialog (design.md §2 walk-in).
+// Chief hut operable despite collision: standing at its door and pressing the
+// Space use key opens the audience dialog (design.md §2.3).
 await page.evaluate(() => {
   const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
   const p = window.__placePlayer
@@ -306,11 +311,21 @@ await page.evaluate(() => {
   p.z = it.door[1]
   p.yaw = 0
 })
+// Wait for the door prompt that NAMES the chief's hut (default language English,
+// src/i18n/en.ts) before pressing Space — waiting on "any prompt" could fire on
+// a neighbouring candidate; the swallowed .catch is dropped so a real arming
+// failure surfaces instead of a silent no-op (point 244).
+await page.waitForFunction(
+  (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+  "Chief's Hut",
+  { timeout: 8000 },
+)
+await page.keyboard.press('Space')
 const audienceOpened = await page
   .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
   .then(() => true)
   .catch(() => false)
-check('Village: chief hut opens by walking into its door', audienceOpened)
+check('Village: chief hut opens with Space at its door', audienceOpened)
 await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
 await page.waitForTimeout(200)
 await dwellingDoorsReachable('Village')

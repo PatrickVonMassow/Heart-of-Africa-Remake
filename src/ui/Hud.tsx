@@ -191,12 +191,12 @@ function Prompt() {
   const touchActive = useUi((s) => s.touchActive)
   if (!prompt || dialog) return null
   // On touch the prompt is the only interaction affordance, so it becomes
-  // tappable: a tap dispatches the same synthetic E keydown the prompt's key
+  // tappable: a tap dispatches the same synthetic Space keydown the use key
   // would (design.md §17.5, point 84) — one input path. On desktop it stays a
   // plain, non-interactive label (PC play unchanged).
   if (touchActive) {
     return (
-      <button className="prompt prompt-tappable" onClick={() => dispatchSyntheticKey('KeyE')}>
+      <button className="prompt prompt-tappable" onClick={() => dispatchSyntheticKey('Space')}>
         {prompt}
       </button>
     )

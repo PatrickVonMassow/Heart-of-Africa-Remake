@@ -6243,9 +6243,10 @@ check(
 // chaining several synthetic wheel events in the headless run is unreliable.
 await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
 // The wheel zoom only responds in the bird's-eye view while its scene is
-// mounted. The jump-to dropdown lands on a place marker, which auto-enters the
-// settlement (walk-in entry), so leave it and jump to open terrain, then wait
-// for the scene's readiness flag before dispatching the wheel.
+// mounted. Settlement entry is now a deliberate Space press (design.md §2.3), so
+// jumping onto a marker only shows the "Space to enter" hint — but leave any
+// current place and jump to open terrain anyway, then wait for the scene's
+// readiness flag before dispatching the wheel.
 await page.evaluate(() => {
   const g = window.__game.getState()
   if (g.mode === 'place') g.leavePlace()

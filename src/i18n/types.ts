@@ -91,6 +91,9 @@ export interface Strings {
     interact(label: string): string
     /** Near a pitched camp (design.md §6). */
     openCamp: string
+    /** Within a settlement's enter radius (design.md §2.3): press the use key
+     *  (Space) to enter. `name` is the settlement's localized name. */
+    enterPlace(name: string): string
   }
 
   labels: {

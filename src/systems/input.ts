@@ -119,7 +119,7 @@ export function gamepadMove(): { x: number; y: number } {
 // Buttons re-enter the keyboard pipeline as synthetic keydown events, so
 // every existing key handler serves the gamepad unchanged.
 const GAMEPAD_BUTTON_KEYS: Record<number, string> = {
-  0: 'KeyE', // A: interact / enter
+  0: 'Space', // A: interact / enter (the use key, design.md §17.5)
   1: 'Escape', // B: close dialogs/panels
   2: 'KeyG', // X: dig
   3: 'Tab', // Y: journal

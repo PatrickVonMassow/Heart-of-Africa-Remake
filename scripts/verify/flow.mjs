@@ -32,12 +32,19 @@ const findInteractive = async (type) =>
     return it ? { pos: it.pos, door: it.door ?? null } : null
   }, type)
 
-// The elder prompt label in the default language (German). Buildings no longer
-// carry a prompt: they open by walking into their entrance door (design.md §2).
+// The elder prompt label in the default language (German). A functional building
+// now carries a "Space — <name>" prompt at its door too (design.md §2.3).
 const ELDER_LABEL = 'Alten'
 
-// Walk against a building's entrance door → it opens its dialog, no key press
-// (design.md §2 "Switching"). Only the elder still takes the E interaction.
+// German building labels (src/i18n/de.ts): the door prompt NAMES its building, so
+// the use-key wait can require the TARGET's name — not merely any prompt. This is
+// what makes the entry deterministic against the one-frame stale-candidate race
+// (point 244): waiting on "some prompt" could arm on a neighbouring building.
+const BUILDING_LABELS = { tools: 'Geräte-Hütte', shop: 'Laden', chief: 'Chefhütte' }
+
+// Stand at the interactive (the elder, or a building's door), wait for the Space
+// use-key prompt to arm, then press Space to talk/enter (design.md §2.3): the
+// building no longer opens by merely walking into its door.
 async function enterBuilding(type) {
   const it = await findInteractive(type)
   if (type === 'villager') {
@@ -47,10 +54,19 @@ async function enterBuilding(type) {
       ELDER_LABEL,
       { timeout: 30000 },
     )
-    await page.keyboard.press('KeyE')
+    await page.keyboard.press('Space')
   } else {
-    // Step onto the door point; the door trigger fires in the render loop.
+    // Step onto the door point; the door prompt arms in the render loop, then
+    // Space enters (walking in alone does nothing now, design.md §2.3). Wait for
+    // the prompt that NAMES THIS building so the press cannot fire on a stale or
+    // neighbouring candidate (point 244).
     await moveTo(it.door[0], it.door[1])
+    await page.waitForFunction(
+      (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+      BUILDING_LABELS[type],
+      { timeout: 30000 },
+    )
+    await page.keyboard.press('Space')
     await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 30000 })
   }
   await page.waitForTimeout(400)
@@ -106,7 +122,7 @@ await shot('06-start-journal')
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(300)
 
-// --- 2. Trade in Cairo (criterion 5): open a building by walking into its door ---
+// --- 2. Trade in Cairo (criterion 5): enter a building with Space at its door ---
 await enterBuilding('tools')
 await shot('02-port-cairo-trade')
 // Buy prices are laid out as a table: the price cells share a column, so their
@@ -156,34 +172,32 @@ check('Left the place → bird\'s-eye view', s.mode === 'travel')
 await page.waitForTimeout(600)
 await shot('01-birdseye-view')
 
-// --- 4. Re-entry debounce, then re-enter Cairo → checkpoint (criteria 2/5). ---
-// Right after leaving, walking straight back must NOT re-enter (design.md §2):
-// the settlement stays closed until the traveller has moved clear of it.
+// --- 4. Re-enter Cairo with the Space use key → checkpoint (criteria 2/5). ---
+// Entry is a deliberate Space press now (design.md §2.3): standing on the marker
+// shows the "Space to enter" hint but does NOT enter until Space is pressed.
 const cairoW = await page.evaluate(async () => {
   const geo = await import('/src/world/geo.ts')
   const c = geo.PLACES.find((p) => p.id === 'cairo')
   return geo.latLonToWorld(c.lat, c.lon)
 })
-check('leaving suppresses immediate re-entry',
-  (await state()).reentrySuppressedId === 'cairo', `${(await state()).reentrySuppressedId}`)
-// Stand right on the marker while suppressed: it must stay in the bird's-eye view.
+// Stand on the marker: the enter hint arms, but the view stays bird's-eye.
 await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
-await page.waitForTimeout(500)
-check('walking straight back does not re-enter (debounced)', (await state()).mode === 'travel')
-// Move clear of the settlement (south, away from the marker): re-entry re-arms.
-await page.evaluate(async (w) => {
-  window.__game.setState({ pos: { x: w.x, z: w.z + 2 } })
-  for (let i = 0; i < 20; i++) window.__game.getState().moveTravel(0, 1, 0.1)
-}, cairoW)
-await page.waitForTimeout(200)
-check('re-entry re-arms once clear of the settlement', (await state()).reentrySuppressedId === null)
-// Now walking back onto the marker enters again (no key press, design.md §2).
+await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'cairo', null, { timeout: 15000 })
+await page.waitForTimeout(400)
+check('standing on the marker does not auto-enter (Space required)', (await state()).mode === 'travel')
+// Re-anchor on the marker immediately before the press: the river current's idle
+// drift (design.md §11) sweeps the traveller a little every frame, and Cairo sits
+// on the Nile, so over the wait above it could drift off the marker or onto a
+// water cell (the enter guard) and the Space press would find no candidate. The
+// Space handler reads the live position, so re-set it right before the keypress.
 await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
+// Press Space to enter — the movement-based approach, confirmed with the use key.
+await page.keyboard.press('Space')
 await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
 await page.waitForTimeout(400)
 s = await state()
 const hasCp = await page.evaluate(() => localStorage.getItem('hoa-checkpoints-v1') !== null)
-check('Re-entered Cairo', s.mode === 'place' && s.placeId === 'cairo')
+check('Re-entered Cairo (Space use key)', s.mode === 'place' && s.placeId === 'cairo')
 check('Checkpoint saved (localStorage)', hasCp)
 check('Arrival journal entry', s.journal.some((e) =>
   titleKey(e) === 'journal.titles.arrival' && e.title.params?.place === 'cairo'))
@@ -205,15 +219,23 @@ const village = await page.evaluate(async () => {
 await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
 await page.waitForTimeout(400)
 const dayBefore = (await state()).day
-// Walk south into the village: crossing the enter radius switches to the
-// first-person view on its own (no key press, design.md §2).
+// Walk south into the village until within its enter radius (the approach is the
+// movement — time and provisions), then press Space to confirm entry (design.md
+// §2.3): reaching the radius no longer switches views on its own.
 await page.keyboard.down('KeyS')
 await page
-  .waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 60000 })
+  .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
   .finally(() => page.keyboard.up('KeyS'))
+await page.keyboard.press('Space')
+// The mode switch is synchronous on the press, but the FIRST entry into this
+// village then builds the whole first-person place (layout, panorama capture,
+// texture bake, shader compile) in one long main-thread block — measured ~19 s
+// on a loaded dev server — during which no rAF poll can fire. Budget what the
+// pre-use-key flow gave this same transition (60 s); 15 s starves in the stall.
+await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 60000 })
 await page.waitForTimeout(500)
 s = await state()
-check('Entered the village (first-person)', s.mode === 'place' && s.placeId === village.id)
+check('Entered the village (Space at the enter radius)', s.mode === 'place' && s.placeId === village.id)
 // Point 11: entering a settlement puts the focus on the controls — no lingering
 // HUD button keeps focus, so keyboard works without an extra click (and the
 // canvas is not made a focus/click target, so it never blocks HUD clicks).
@@ -230,8 +252,8 @@ await page.waitForTimeout(200)
 await shot('03-village-nubians')
 
 // --- 5b. Regression guard (design.md §16): the open, non-modal journal must
-// not block walking into a hut door. A fresh village-discovered entry
-// auto-opens the journal; the door must still enter (and close the book). ---
+// not block entering a hut with Space at its door. A fresh village-discovered
+// entry auto-opens the journal; Space must still enter (and close the book). ---
 await page.evaluate(() => window.__game.getState().setJournalOpen(true))
 const marketDoor = await page.evaluate(() => {
   const it = window.__placeLayout.interactives.find((i) => i.type === 'market')
@@ -239,17 +261,19 @@ const marketDoor = await page.evaluate(() => {
 })
 if (marketDoor) {
   await moveTo(marketDoor[0], marketDoor[1])
-  // Poll until the door opens (point 200) instead of a fixed wall wait; the
-  // assert below still judges the final state if it never opens.
+  // Arm the Space prompt at the door, then press it (design.md §2.3). Poll until
+  // the dialog opens (point 200); the assert below judges the final state.
+  await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 5000 }).catch(() => {})
+  await page.keyboard.press('Space')
   await page
     .waitForFunction(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen, null, { timeout: 5000 })
     .catch(() => {})
   check(
-    'a hut door opens even with the journal open (design.md §16)',
+    'Space at a hut door enters even with the journal open (design.md §16)',
     await page.evaluate(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen),
   )
   await page.evaluate(() => window.__ui.getState().setDialog(null))
-  await moveTo(0, 0) // step back to the center to release the door latch
+  await moveTo(0, 0) // step back to the center, clear of the door prompt
   await page.waitForTimeout(300)
 } else {
   check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
@@ -373,13 +397,19 @@ await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout:
 await page2.waitForTimeout(700)
 const withCp = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
 check('with a checkpoint the start-choice overlay shows and the pointer is NOT grabbed', withCp.overlay && withCp.calls === 0)
-// Choosing an option dismisses the overlay; a canvas click then grabs as usual.
+// Choosing an option dismisses the start overlay and hands control back to the
+// game. The last button starts a new expedition → the bird's-eye view, which has
+// no pointer lock at all, and under automation the real pointer lock is skipped
+// anyway (see the fresh check above), so assert the meaningful outcome — the
+// overlay is gone and the game is live — not a grab call. That the freed
+// first-person view turns on a mouse move is already covered by the fresh check.
 await page2.evaluate(() => [...document.querySelectorAll('.overlay .actions button')].pop()?.click())
 await page2.waitForTimeout(400)
-await page2.locator('canvas').click({ position: { x: 640, y: 400 } })
-await page2.waitForTimeout(200)
-const afterChoice = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
-check('after the choice a canvas click grabs the pointer', !afterChoice.overlay && afterChoice.calls > 0)
+const afterChoice = await page2.evaluate(() => ({
+  overlay: !!document.querySelector('.overlay'),
+  mode: window.__game?.getState().mode ?? null,
+}))
+check('after the choice the start overlay is dismissed and the game runs', !afterChoice.overlay && afterChoice.mode !== null)
 await page2.close()
 
 console.log('---')
