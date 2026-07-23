@@ -9789,6 +9789,44 @@ the remaining open points in their numeric order.
   other wildlife/debug points; the fire trigger alone is the minimum, the rest are a
   bonus if cheap.
 
+- [ ] 259. ELEPHANT TRAMPLE NEEDS A DIRECTION CONDITION (user design change,
+  23.07.2026). Currently an animal caught in the §19.5 elephant-overlap exception is
+  trampled/killed on ANY contact. NEW RULE: an animal only DIES from the elephant on
+  collision when the elephant's MOVEMENT VECTOR points at least PARTIALLY TOWARD that
+  animal — i.e. the trample kill requires `dot(elephantVelocity, (victimPos −
+  elephantPos)) > 0` (a positive component toward the victim). So: a STANDING
+  elephant (near-zero velocity) that another animal walks into does NOT kill it, and
+  an animal that runs into an elephant FROM BEHIND (victim behind the elephant's
+  heading of travel) is NOT killed. Only an elephant actively moving into/over the
+  animal tramples it. The §19.5 body-separation still parts a harmless overlap
+  otherwise (a bump without a forward-moving elephant just resolves). EXTEND THE
+  PARENT ELEPHANT-SUICIDE (§19.8 calf trample grief, the trample-throw drive)
+  ACCORDINGLY: it is no longer enough that the grieving parent walks TO the elephant
+  — the parent must TOUCH IT FROM THE FRONT (get in front of the elephant's line of
+  travel, in its forward arc, so the elephant is moving toward the parent) to be
+  crushed under its feet. So the grief drive must steer the parent to intercept the
+  elephant's FRONT (position ahead of the elephant along its heading), and the
+  trample resolves only when the same direction condition holds (elephant moving
+  toward the parent); a parent that only reaches the elephant's flank/rear is not
+  trampled and keeps trying to get in front (with the existing hard-deadline
+  backstop so the grief still always resolves — point I4). DIAGNOSE + FIX in
+  `src/scenes/travel/Wildlife.tsx` (the elephant trample collision + the parent
+  trample-throw grief drive) and `src/scenes/travel/wildlifeBehavior.ts` (extract the
+  direction test as a pure helper, e.g. `trampleKills(elephantVel, elephantPos,
+  victimPos)` and a `frontInterceptTarget(elephantPos, elephantHeading, reach)` for
+  the parent). Keep the trample POSSIBLE (it must still happen when the elephant
+  moves over a pinned animal) and every started grief drama still RESOLVES.
+  VERIFIABLE: pure tests — `trampleKills` true only for a forward-moving elephant
+  toward the victim, false for a stationary elephant and for a victim behind the
+  heading; the parent grief intercept aims at the elephant's front and the trample
+  fires only on a front contact; a live check in `scripts/verify/enrichments.mjs`
+  that a standing elephant does not kill a bumping animal, a forward-moving one does,
+  and the parent grief-trample still resolves (parent crushed from the front) within
+  the deadline. DOCS: design.md §19.5 (the trample direction condition) and §19.8
+  (the parent must reach the elephant's front). No player-visible text. NOTE:
+  `Wildlife.tsx`/`wildlifeBehavior.ts` — same files as 257 (croc, running) and 258;
+  queue after 257 to avoid the file overlap.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
