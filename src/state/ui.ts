@@ -20,8 +20,12 @@ export type Dialog =
 
 interface UiState {
   dialog: Dialog
-  /** Interaction prompt shown at the bottom of the screen, e.g. "E — Laden". */
+  /** Interaction prompt shown at the bottom of the screen, e.g. "Space — Laden". */
   prompt: string | null
+  /** The settlement (place id) whose enter radius the traveller is within in the
+   *  bird's-eye view (design.md §2.3): the "Space to enter" hint shows and the
+   *  marker's name-label is hidden while set. null when clear of every settlement. */
+  enterPlaceId: string | null
   debugOpen: boolean
   /** Self-drawing exploration map (design.md §19). */
   mapOpen: boolean
@@ -82,6 +86,7 @@ interface UiState {
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
   setDialog: (d: Dialog) => void
   setPrompt: (p: string | null) => void
+  setEnterPlaceId: (id: string | null) => void
   toggleDebug: () => void
   toggleMap: () => void
   setWebglFallback: (fallback: boolean) => void
@@ -110,6 +115,7 @@ export const DEFAULT_TRAVEL_ZOOM = 0.5
 export const useUi = create<UiState>()((set) => ({
   dialog: null,
   prompt: null,
+  enterPlaceId: null,
   debugOpen: false,
   mapOpen: false,
   webglFallback: false,
@@ -132,6 +138,7 @@ export const useUi = create<UiState>()((set) => ({
   // Closing or switching a dialog always discards a pending bazaar bid.
   setDialog: (dialog) => set({ dialog, bazaarBid: null }),
   setPrompt: (prompt) => set({ prompt }),
+  setEnterPlaceId: (enterPlaceId) => set({ enterPlaceId }),
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
   toggleMap: () => set((s) => ({ mapOpen: !s.mapOpen })),
   setWebglFallback: (webglFallback) => set({ webglFallback }),

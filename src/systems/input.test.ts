@@ -111,9 +111,11 @@ describe('touch stick and look/pinch accumulators (design.md §17.5)', () => {
 
 describe('dispatchSyntheticKey (design.md §17.5: gamepad/touch share the keyboard pipeline)', () => {
   it('re-enters the pipeline as an ordinary keydown, reaching onKeyPress handlers', () => {
+    // Space is the use key (design.md §17.5): the gamepad A button and the
+    // tappable touch prompt both dispatch it through this one path.
     const cb = vi.fn()
-    const off = onKeyPress('KeyE', cb)
-    dispatchSyntheticKey('KeyE')
+    const off = onKeyPress('Space', cb)
+    dispatchSyntheticKey('Space')
     expect(cb).toHaveBeenCalledTimes(1)
     off()
   })

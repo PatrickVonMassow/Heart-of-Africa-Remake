@@ -1,7 +1,7 @@
 // Store travel transitions (CLAUDE.md §7.1 pt. 2/4/11/21, design.md §2/§11).
 // Ports the store-driven asserts of flow.mjs and enrichments.mjs (moveTravel
-// cost/canoe-land malus, enclosed-sea vs open-ocean, mountain climb, reentry
-// debounce, once-only penalty/danger journal, landmark bounty sighting, river
+// cost/canoe-land malus, enclosed-sea vs open-ocean, mountain climb, leaving a
+// settlement, once-only penalty/danger journal, landmark bounty sighting, river
 // drift) into fast jsdom checks. The scene-driven walk-in/out edges stay in the
 // Playwright E2E.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -9,7 +9,7 @@ import { CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { balance } from '../config/balance'
 import { totalGifts } from './store'
 import { g, freshGame, withWorld, jumpTo, terrainAt, COORD } from '../test/store'
-import { regionAt, placeById } from '../world/geo'
+import { regionAt, placeById, latLonToWorld } from '../world/geo'
 import { WATERFALLS } from '../world/data/landmarks'
 import { riverFlow } from '../world/geoIndex'
 
@@ -110,16 +110,17 @@ describe('moveTravel cost and terrain (design.md §11)', () => {
   })
 })
 
-describe('re-entry debounce (design.md §2)', () => {
-  it('suppresses re-entry until the traveller clears the settlement', () => {
+describe('leaving a settlement (design.md §2.3)', () => {
+  // Entry is now a deliberate Space press (settlementEntry.test.ts), so there is
+  // no re-entry debounce; leaving only has to land the traveller clear of the
+  // enter radius so the "Space to enter" hint does not reappear at once.
+  it('lands the traveller just clear of the enter radius', () => {
     g().enterPlace('cairo')
     g().leavePlace()
-    expect(g().reentrySuppressedId).toBe('cairo')
-    // A tiny nudge keeps it suppressed; driving well clear re-arms entry.
-    g().moveTravel(0, 1, 0.02)
-    expect(g().reentrySuppressedId).toBe('cairo')
-    drive(0, 1, 40)
-    expect(g().reentrySuppressedId).toBeNull()
+    expect(g().mode).toBe('travel')
+    const c = placeById('cairo')
+    const w = latLonToWorld(c.lat, c.lon)
+    expect(dist(g().pos, w)).toBeGreaterThan(balance.placeEnterRadius)
   })
 })
 

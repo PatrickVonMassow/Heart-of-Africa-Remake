@@ -90,10 +90,6 @@ export interface BalanceConfig {
   /** How far (degrees) off the coast the sea stays swimmable (design.md
    *  §11.2); beyond it the open ocean blocks movement even inside bays. */
   oceanSwimMarginDeg: number
-  /** Extra clearance (world units) beyond the enter radius the traveller must
-   *  reach after leaving a settlement before it can be re-entered, so walking
-   *  straight back in does not immediately re-enter it (design.md §2). */
-  placeReentryMargin: number
   /** Goodwill points required before the chief reveals the location hint. */
   goodwillForHint: number
   /** Goodwill gained per culturally revered gift. */
@@ -387,6 +383,13 @@ export interface BalanceConfig {
     /** How strongly rain darkens/glosses the ground, 0 dry .. 1 full (point 225). */
     wetGroundStrength: number
   }
+  /** The village cooking fire's response to rain (design.md §19.10, point 256). */
+  fire: {
+    /** How much full rain damps the SHELTERED flame under the cook-shelter (0..1, small: it burns on). */
+    shelteredRainDamp: number
+    /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
+    openRainDamp: number
+  }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
     stickRadius: number
@@ -470,7 +473,6 @@ export const balance: BalanceConfig = {
   digRadius: 3,
   placeEnterRadius: 2.5,
   oceanSwimMarginDeg: 1.0, // calibratable: swimmable coastal band width in degrees (point 221: narrowed from 1.2 so the traveller cannot wade ~1.18 deg out into deep blue while the ~0.89 deg nearshore stays swimmable)
-  placeReentryMargin: 1, // small clearance beyond the enter radius before re-entry re-arms (user: shrunk from 2)
   goodwillForHint: 2,
   goodwillRevered: 2,
   goodwillNeutral: 1,
@@ -651,6 +653,13 @@ export const balance: BalanceConfig = {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
     nileFloodRise: 0.55, // the unregulated 1890 flood is dramatic; calibratable
     wetGroundStrength: 1, // rain fully darkens/glosses the ground (point 225); calibratable, debug-editable
+  },
+  fire: {
+    // The cooking fire keeps burning through the rains under its thatch cook-shelter
+    // (design.md §19.10, docs/peoples-1890.md §10, point 256): the sheltered flame
+    // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
+    shelteredRainDamp: 0.25, // calibratable, debug-editable
+    openRainDamp: 0.7, // calibratable, debug-editable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection

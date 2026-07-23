@@ -647,6 +647,37 @@ for (const [placeId, shot] of [
     bembaJul === bembaJan,
     `walkers July ${bembaJul} vs January ${bembaJan}`,
   )
+
+  // The cook-fire's rain shelter (design.md §19.10, point 256). Under a downpour
+  // the compound peoples' fire keeps a cook-shelter canopy and burns on, while a
+  // dome-dweller's open fire is beaten down by the rain — the picture must show
+  // the difference, not blaze on unaffected.
+  const fireInRain = async (placeId) => {
+    await page.evaluate(() => { const g = window.__game.getState(); if (g.placeId) g.leavePlace() })
+    await page.evaluate((id) => window.__game.getState().enterPlace(id), placeId)
+    await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
+    // Force a heavy downpour so the rain-response is at full strength, like the
+    // settlement-season checks above.
+    await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+    await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
+    const s = await page.evaluate(() => window.__placeSeason())
+    return { sheltered: s.fireSheltered, rain: s.rain, rainFactor: s.fireRainFactor }
+  }
+  const bembaFire = await fireInRain('bemba-village') // a cook-shelter people
+  await page.screenshot({ path: `${OUT}135-fire-cook-shelter-rain.png` })
+  console.log('shot 135-fire-cook-shelter-rain.png')
+  const maasaiFire = await fireInRain('maasai-village') // a dome-dweller, no canopy
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+  check(
+    'the compound village keeps its fire under a cook-shelter in the rain (point 256)',
+    bembaFire.sheltered === true && bembaFire.rain > 0.5,
+    `bemba sheltered=${bembaFire.sheltered} rain=${bembaFire.rain.toFixed(2)}`,
+  )
+  check(
+    'the dome-dweller village has no canopy — its open fire is damped by the rain (point 256)',
+    maasaiFire.sheltered === false && maasaiFire.rainFactor < bembaFire.rainFactor,
+    `maasai sheltered=${maasaiFire.sheltered} factor=${maasaiFire.rainFactor.toFixed(2)} vs bemba ${bembaFire.rainFactor.toFixed(2)}`,
+  )
 }
 
 console.log('console errors:', errors.length)

@@ -4,7 +4,7 @@
 // which buildings exist is fixed per place kind. Visuals: TSL sky dome and
 // noise materials, sun shadows, detailed buildings, palms and scatter props.
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three/webgpu'
@@ -22,10 +22,11 @@ import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode,
 import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
+import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { playThunder } from '../../systems/ambience'
 import { marketPlentyAt } from '../../systems/seasonalLife'
 import { cloakForCloth } from '../../systems/dress'
+import { fireHasCookShelter } from '../../systems/cookShelter'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { elevationAt } from '../../world/geodata'
 import { placeById, type RegionId } from '../../world/geo'
@@ -56,7 +57,7 @@ import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../re
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
-import { buildLayout, isOnLane, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -74,13 +75,8 @@ import { emitFootstep } from '../../systems/ambience'
 import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idleSway } from '../../systems/walkFeel'
 import { getStrings, useStrings } from '../../i18n'
 
-const INTERACT_RADIUS = 4.5
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
-// Walking against a building's entrance door opens it (design.md §2): the
-// trigger sits just in front of the door; it re-arms only after stepping away.
-const DOOR_TRIGGER_RADIUS = 1.2
-const DOOR_RELEASE_RADIUS = 2.0
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -866,16 +862,50 @@ function PlaceFlora({
   )
 }
 
-/** Village campfire: stone ring, logs, emissive flame, flickering light. */
-function FirePit({ x, z, blaze = 1 }: { x: number; z: number; blaze?: number }) {
+/**
+ * Village campfire: stone ring, logs, emissive flame, flickering light — under
+ * an open-sided thatched COOK-SHELTER (design.md §19.10, point 256). Period
+ * ~1890 sub-Saharan settlements kept the cooking hearth alight through the rains
+ * under a roofed cook-shelter / thatch canopy on posts (docs/peoples-1890.md
+ * §10), so the fire's burning in rain reads plausibly: under the canopy it burns
+ * on (a touch lower/steamier as rain rises), gated by `fireRainFactor`. `blaze`
+ * is the cold-season warming factor (point 142); `rainRef` reads the place's
+ * live wetness so the flame dims with the rain each frame.
+ */
+function FirePit({
+  x,
+  z,
+  blaze = 1,
+  rainRef,
+  thatchMat,
+  sheltered = false,
+}: {
+  x: number
+  z: number
+  blaze?: number
+  rainRef?: MutableRefObject<number>
+  thatchMat?: THREE.Material
+  sheltered?: boolean
+}) {
   const light = useRef<THREE.PointLight>(null)
+  const flame = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    // Under the cook-shelter the fire burns on through the rain — only a touch
+    // lower/steamier; an unsheltered fire (the dome-dweller villages) is beaten
+    // down by rain (point 256, the two branches of fireRainFactor).
+    const rain = rainRef ? rainAmount(rainRef.current, balance.season.weatherStrength) : 0
+    const rainFactor = fireRainFactor(rain, sheltered, balance.fire.shelteredRainDamp, balance.fire.openRainDamp)
     if (light.current) {
-      const t = clock.elapsedTime
       // The fire burns harder in the cold months (point 142, the §4.9 "fire
       // image": warming fires, not just cooking fires) — and 120g already made
       // its glow carry further under the season's dimmed sun.
-      light.current.intensity = (14 + Math.sin(t * 9) * 2.5 + Math.sin(t * 23.7) * 1.5) * blaze
+      light.current.intensity = (14 + Math.sin(t * 9) * 2.5 + Math.sin(t * 23.7) * 1.5) * blaze * rainFactor
+    }
+    if (flame.current) {
+      // Rain lowers the flame cone too, so a rainy fire visibly steams down.
+      const s = 0.7 + 0.3 * rainFactor
+      flame.current.scale.set(1, s, 1)
     }
   })
   return (
@@ -899,11 +929,44 @@ function FirePit({ x, z, blaze = 1 }: { x: number; z: number; blaze?: number }) 
           <meshStandardMaterial color="#4a3018" roughness={1} />
         </mesh>
       ))}
-      <mesh position={[0, 0.42, 0]}>
+      <mesh ref={flame} position={[0, 0.42, 0]}>
         <coneGeometry args={[0.3, 0.75, 8]} />
         <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
       </mesh>
       <pointLight ref={light} position={[0, 1.1, 0]} color="#ffab4a" distance={14} decay={2} castShadow={false} />
+      {sheltered && <CookShelter thatchMat={thatchMat} />}
+    </group>
+  )
+}
+
+/**
+ * Open-sided thatched cook-shelter over the fire (design.md §19.10, point 256):
+ * four corner posts carrying a low pyramidal thatch roof, well clear of the
+ * flame. Cheap geometry in the settlement's own thatch/wood material style — it
+ * lets the fire read as sheltered from the rain rather than blazing in the open.
+ */
+function CookShelter({ thatchMat }: { thatchMat?: THREE.Material }) {
+  const postR = 1.35 // corner posts a comfortable margin around the 0.9 stone ring
+  const postH = 2.4 // roof eave height, clear of a standing figure and the flame
+  const posts: Array<[number, number]> = [
+    [postR, postR],
+    [postR, -postR],
+    [-postR, postR],
+    [-postR, -postR],
+  ]
+  return (
+    <group>
+      {posts.map(([px, pz], i) => (
+        <mesh key={i} position={[px, postH / 2, pz]} castShadow>
+          <cylinderGeometry args={[0.08, 0.1, postH, 6]} />
+          <meshStandardMaterial color="#5a4526" roughness={1} />
+        </mesh>
+      ))}
+      {/* Low pyramidal thatch roof, eaves overhanging the posts a little. */}
+      <mesh position={[0, postH + 0.42, 0]} rotation={[0, Math.PI / 4, 0]} castShadow material={thatchMat}>
+        <coneGeometry args={[postR * 1.85, 0.95, 4]} />
+        {thatchMat ? null : <meshStandardMaterial color="#8a7248" roughness={1} />}
+      </mesh>
     </group>
   )
 }
@@ -1461,9 +1524,6 @@ export function PlaceScene() {
 
   // yaw 0 faces -Z (toward the place center from the southern spawn point).
   const player = useRef({ x: 0, z: 18, yaw: 0 })
-  const nearRef = useRef<Interactive | null>(null)
-  // Door the player currently stands at; blocks re-triggering until they step away.
-  const doorLatch = useRef<Interactive | null>(null)
   // Walk feel (design.md §2, point 97): body-relative eased velocity, the
   // step-phase accumulator and the smoothed camera roll — all camera/feel only.
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
@@ -1495,7 +1555,6 @@ export function PlaceScene() {
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
     player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
-    doorLatch.current = null
     walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
     // Seed the shared position for the town-plan map marker (point 89).
     placePlayerPosition.x = player.current.x
@@ -1524,6 +1583,15 @@ export function PlaceScene() {
       tint: SEASON_TINT_U.value,
       groundWet: placeGroundWet.current,
       fireBlaze,
+      // The cook-fire's rain shelter (point 256): whether this village keeps its
+      // fire under a cook-shelter canopy, and the resulting rain-damping factor.
+      fireSheltered: place ? fireHasCookShelter(place.peopleId) : false,
+      fireRainFactor: fireRainFactor(
+        rainAmount(placeWetness.current, balance.season.weatherStrength),
+        place ? fireHasCookShelter(place.peopleId) : false,
+        balance.fire.shelteredRainDamp,
+        balance.fire.openRainDamp,
+      ),
     })
     return () => {
       delete w.__placeSeason
@@ -1532,7 +1600,7 @@ export function PlaceScene() {
       delete w.__placeColliders
       delete w.__placeCamera
     }
-  }, [layout, camera, fireBlaze])
+  }, [layout, camera, fireBlaze, place])
 
   // Focus + mouse-look. On entering a settlement any lingering HUD button is
   // blurred so keyboard input goes straight to the game without an extra click
@@ -1585,11 +1653,11 @@ export function PlaceScene() {
     }
   }, [gl])
 
-  // Buildings open by walking against their entrance door (design.md §2);
-  // only the elder keeps the E interaction.
+  // Functional buildings are entered with the Space use key while standing at
+  // their door (design.md §2.3); the elder is addressed with the same key.
   const openBuilding = (near: Interactive) => {
     const game = useGame.getState()
-    // The elder is addressed with the E key, not by a door (has no door point).
+    // The elder is addressed via talkToVillager, not this building path.
     if (near.type === 'villager') return
     // A building's modal opens over the (non-modal) journal — close the book so
     // the dialog is unobstructed (design.md §16/§17).
@@ -1616,15 +1684,29 @@ export function PlaceScene() {
     }
   }
 
-  // Interaction key (elder talk).
+  // Use key (Space, design.md §2.3/§17.5): addresses the elder when near him,
+  // or enters the functional building at whose door the traveller stands. A
+  // ref keeps openBuilding stable for the one-shot subscription.
+  const openBuildingRef = useRef(openBuilding)
+  openBuildingRef.current = openBuilding
+  // PlaceScene stays mounted across placeId changes and the handler's effect
+  // only re-subscribes on setPrompt, so read the CURRENT layout through a ref.
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
   useEffect(() => {
-    const offE = onKeyPress('KeyE', () => {
-      const near = nearRef.current
-      if (!near || near.type !== 'villager' || useUi.getState().dialog) return
-      useGame.getState().talkToVillager()
+    const off = onKeyPress('Space', () => {
+      if (useUi.getState().dialog) return
+      // Select against the LIVE player position, not the last rendered frame's
+      // `nearRef`: a synchronous keydown after a teleport/fast step used to act
+      // on the frame-lagged candidate and open the previously-near building.
+      const p = player.current
+      const near = nearestActionable(layoutRef.current, p.x, p.z)
+      if (!near) return
+      if (near.type === 'villager') useGame.getState().talkToVillager()
+      else openBuildingRef.current(near)
     })
     return () => {
-      offE()
+      off()
       setPrompt(null)
     }
   }, [setPrompt])
@@ -1811,39 +1893,12 @@ export function PlaceScene() {
       if (lastSurface) wfh.lastFootstepSurface = lastSurface
     }
 
-    // Walking against an entrance door opens the building (design.md §2);
-    // the latch re-arms only after stepping away from the door.
-    const latch = doorLatch.current
-    if (latch?.door && Math.hypot(p.x - latch.door[0], p.z - latch.door[1]) > DOOR_RELEASE_RADIUS) {
-      doorLatch.current = null
-    }
-    // Only a modal dialog blocks door entry; the open journal does not freeze
-    // the game (design.md §16), so walking into a door must still enter even
-    // with the journal open — otherwise huts feel unenterable after a fresh
-    // journal entry auto-opens the book.
-    if (!useUi.getState().dialog) {
-      for (const it of layout.interactives) {
-        if (!it.door || it === doorLatch.current) continue
-        if (Math.hypot(p.x - it.door[0], p.z - it.door[1]) <= DOOR_TRIGGER_RADIUS) {
-          doorLatch.current = it
-          openBuilding(it)
-          break
-        }
-      }
-    }
-
-    // Interaction proximity (elder talk).
-    let near: Interactive | null = null
-    let best = INTERACT_RADIUS
-    for (const it of layout.interactives) {
-      if (it.type !== 'villager') continue
-      const d = Math.hypot(p.x - it.pos[0], p.z - it.pos[1])
-      if (d < best) {
-        best = d
-        near = it
-      }
-    }
-    nearRef.current = near
+    // Nearest actionable interactive for the Space use key (design.md §2.3):
+    // the elder within the interact radius, or the functional building at whose
+    // door the traveller stands. Door proximity only ARMS the key + shows the
+    // prompt now — entry is the discrete Space press (which reselects against
+    // the live position through the same helper), never walking in.
+    const near = nearestActionable(layout, p.x, p.z)
     const strings = getStrings()
     const prompt = near ? strings.prompts.interact(interactiveLabel(strings, near.type)) : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
@@ -1922,7 +1977,16 @@ export function PlaceScene() {
 
       <Fences fences={layout.fences} mats={mats} />
 
-      {!isPort && <FirePit x={-3.5} z={2.5} blaze={fireBlaze} />}
+      {!isPort && (
+        <FirePit
+          x={-3.5}
+          z={2.5}
+          blaze={fireBlaze}
+          rainRef={placeWetness}
+          thatchMat={mats.thatch}
+          sheltered={fireHasCookShelter(place.peopleId)}
+        />
+      )}
 
       <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
