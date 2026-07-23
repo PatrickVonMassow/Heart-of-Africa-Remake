@@ -9843,7 +9843,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`/`wildlifeBehavior.ts` — same files as 257 (croc, running) and 258;
   queue after 257 to avoid the file overlap.
 
-- [ ] 260. TRAMPLE CRUNCH SOUND (user 23.07.2026). Play a CRACK/CRUNCH sound the
+- [x] 260. TRAMPLE CRUNCH SOUND (user 23.07.2026). Play a CRACK/CRUNCH sound the
   moment an animal is crushed under an elephant's feet (the §19.5/§19.8 trample
   kill, including the point-259 forward-moving-elephant kill and the parent grief-
   trample). A single short one-shot SFX at the trample event's world position,
