@@ -10370,7 +10370,7 @@ the remaining open points in their numeric order.
   DEPENDS on point 244 (the Space-entry mechanism) landing first; a big feature for v0.3.
   The RESEARCH half is a standalone Fable pass, safe to run now; the BUILD follows 244.
 
-- [ ] 274. CROCODILE BODY STILL VISIBLE IN THE WATER — the point-246 fix is
+- [x] 274. CROCODILE BODY STILL VISIBLE IN THE WATER — the point-246 fix is
   INSUFFICIENT (user 23.07.2026, screenshot, deployed main). A lurking (non-striking)
   Nile crocodile still shows its whole body as a clear dark silhouette in the river; only
   the eye knobs should break the surface. Point 246 added an opacity fade
