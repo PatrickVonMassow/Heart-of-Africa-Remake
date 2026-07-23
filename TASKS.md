@@ -10027,6 +10027,61 @@ the remaining open points in their numeric order.
   RESEARCH half (the docs file + the species table) is a standalone Fable pass with no
   code, safe to run in parallel; the build follows on the researched species.
 
+- [ ] 265. ELDERLY (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
+  species, visibly aged AND behaviourally distinct, plus natural death of old age
+  (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
+  feature before the 203 visual bug-finder). RESEARCH FIRST (a standalone Fable pass,
+  no code, safe to run in parallel): realistic geriatric APPEARANCE and BEHAVIOUR for
+  the game's fauna (the savanna grazers, elephants, the predators) and a realistic
+  natural-DEATH process — recorded, cited, in a new `docs/fauna-behaviour-1890.md`
+  (matching the citation/marker discipline of `docs/peoples-1890.md`; if a fauna doc
+  already exists, extend it). What to establish: the visible senescence cues (thinner/
+  sway-backed body, duller/greyer or worn coat, prominent shoulder/hip bones, worn or
+  broken tusks and sunken temples on old elephants, a stiffer/limping gait); the
+  behavioural shifts (moves slower; old males ousted from the herd and turning
+  SOLITARY — the classic old buffalo/elephant bull; withdrawal from intraspecies
+  contests: an elder no longer INITIATES a §264 fight and always LOSES to a younger
+  adult, fleeing an impending conspecific conflict); and the real basis for a
+  "dying" pattern (an old elephant's last molars wear out, so it seeks soft forage
+  near water/marsh and dies there — the grounded kernel the §4.4 "elephant graveyard"
+  folklore romanticizes; vultures do gather around a visibly dying/weak animal). Add
+  any further fitting, game-appropriate geriatric traits the research turns up. BUILD
+  (per the research): (a) APPEARANCE — an elderly-adult build schema analogous to the
+  point-169 baby schema (`buildLionCub`/the grazer calves) in `src/render/fauna.ts`
+  (`buildElderly*`/an age flag on the adult build): clearly-old cues per the research,
+  pure-tested for its proportions/part markers like the calf schema. (b) BEHAVIOUR —
+  pure helpers in `src/scenes/travel/wildlifeBehavior.ts`: an elderly adult moves at a
+  calibratable reduced speed factor, never initiates §264 intraspecies combat and
+  ALWAYS loses to a younger adult (the §264/§125 outcome matrix returns the elder as
+  loser; the elder flees an impending conspecific conflict), and — where the research
+  supports it — an old male withdraws from the herd (solitary). (c) NATURAL DEATH —
+  an elderly animal occasionally dies with NO external cause, at a calibratable low
+  rate; the DYING PROCESS is depicted (`Wildlife.tsx` + a pure state helper): the
+  animal slows progressively, the §19.6 vultures begin to circle the dying animal, it
+  eventually falls dead, and the vultures descend and consume it through the existing
+  carcass system; an ELEPHANT that begins dying instead walks toward the §4.4 elephant
+  graveyard and dies THERE (the folklore nod, grounded in the water/soft-forage
+  research). (d) CALIBRATION — the elderly fraction of adults, the elderly speed
+  factor, the natural-death rate, and the dying-slowdown duration are `balance.ts`
+  values, debug-editable (§21). Ties to point 264 (the elder always loses a fight),
+  point 169 (the analogous age schema), §4.4 (the graveyard death) and §19.6 (the
+  vultures). VERIFIABLE: pure tests (`src/render/fauna.test.ts` — the elderly schema's
+  aged proportions/markers, built alongside the calves; `src/scenes/travel/
+  wildlifeBehavior.test.ts` — elderly speed factor strictly below the adult, elder
+  never initiates and always loses §264 combat, the natural-death roll boundaries, the
+  dying-slowdown curve, and the elephant-dying-target picking the graveyard); a live
+  check in `scripts/verify/enrichments.mjs` (a forced elderly natural death: slows →
+  vultures circle → falls → consumed; a dying elephant heads to the graveyard) with a
+  screenshot, picture-verified on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
+  (research, in the SAME branch/commit as the build it informs), design.md §19 (a new
+  subsection: elderly variants, their behaviour, natural death and the elephant
+  graveyard death), the balance values. Any new sighting/death journal text in BOTH
+  languages with voice markup. NOTE: heavy `wildlifeBehavior.ts`/`Wildlife.tsx`/
+  `fauna.ts`/`balance` overlap — do NOT delegate the BUILD concurrently with another
+  wildlife point; the RESEARCH half and the pure schema/behaviour helpers (in new
+  files) can start in parallel, the scene wiring waits for the wildlife cluster to be
+  free. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
