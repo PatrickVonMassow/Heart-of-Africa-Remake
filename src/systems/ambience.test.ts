@@ -17,6 +17,7 @@ import {
   thunderClapPlan,
   trampleCrunchFires,
   trampleCrunchGain,
+  trampleCrunchPlan,
   PROXIMITY_AUDIBLE,
 } from './ambience'
 import { thunderDelaySeconds } from './season'
@@ -99,6 +100,73 @@ describe('trampleCrunchFires (point 260 — an edge, one crunch per kill)', () =
     expect(trampleCrunchFires(true, true)).toBe(false) // body already down: silent every later frame
     expect(trampleCrunchFires(false, false)).toBe(false) // still alive
     expect(trampleCrunchFires(true, false)).toBe(false) // never revives
+  })
+})
+
+describe('trampleCrunchPlan (the crush is bone-crack micro-crackles over a wet squelch, not one dull thud)', () => {
+  // Deterministic rand sources so the plan's shape is pinned, not sampled.
+  const half = () => 0.5
+  const seq = (...vals: number[]) => {
+    let i = 0
+    return () => vals[i++ % vals.length]
+  }
+
+  it('keeps the unchanged §19.1 gain curve as its overall peak', () => {
+    expect(trampleCrunchPlan(10, 0.1, half).peak).toBeCloseTo(trampleCrunchGain(10, 0.1), 10)
+    expect(trampleCrunchPlan(0, 0.3, half).peak).toBeCloseTo(trampleCrunchGain(0, 0.3), 10)
+  })
+
+  it('lays several fast micro-crackles: hard attacks, short, bright, fused into one moment', () => {
+    const plan = trampleCrunchPlan(0, 1, half)
+    expect(plan.crackles.length).toBeGreaterThanOrEqual(4) // several snaps, never a single burst
+    expect(plan.crackles[0].startOffset).toBe(0) // the lead crack lands on the impact
+    for (let i = 1; i < plan.crackles.length; i++) {
+      expect(plan.crackles[i].startOffset).toBeGreaterThan(plan.crackles[i - 1].startOffset)
+    }
+    for (const c of plan.crackles) {
+      expect(c.attack).toBeLessThanOrEqual(0.005) // hard attack: a snap edge, not a swell
+      expect(c.duration).toBeLessThan(0.06) // micro: each burst is a blink
+      expect(c.frequency).toBeGreaterThanOrEqual(1500) // bright — bone, not body
+      expect(c.startOffset).toBeLessThan(0.2) // the whole crunch stays one moment
+      expect(c.peak).toBeGreaterThan(0)
+    }
+    // The lead crack is the loudest snap; the follow-up crackles decay under it.
+    for (let i = 1; i < plan.crackles.length; i++) {
+      expect(plan.crackles[i].peak).toBeLessThan(plan.crackles[0].peak)
+    }
+  })
+
+  it('adds a wet squelch: lower, softer-attacked and longer-damped than every bone snap', () => {
+    const plan = trampleCrunchPlan(0, 1, half)
+    const s = plan.squelch
+    for (const c of plan.crackles) {
+      expect(s.frequency).toBeLessThan(c.frequency) // the tissue band sits under the bone band
+      expect(s.attack).toBeGreaterThan(c.attack) // softer envelope: a squish, not a snap
+      expect(s.duration).toBeGreaterThan(c.duration) // damped, longer tail
+    }
+    expect(s.frequencyEnd).toBeLessThan(s.frequency) // the sweep falls — a give, not a ring
+    expect(s.q).toBeGreaterThan(1) // resonant: the wet formant
+    expect(s.peak).toBeGreaterThan(0)
+    expect(s.peak).toBeLessThan(plan.crackles[0].peak) // the crack leads, the squelch underlies
+  })
+
+  it('scales every layer with the §19.1 curve — silent muted or out of earshot', () => {
+    const muted = trampleCrunchPlan(10, 0, half)
+    expect(muted.peak).toBe(0)
+    for (const c of muted.crackles) expect(c.peak).toBe(0)
+    expect(muted.squelch.peak).toBe(0)
+    expect(trampleCrunchPlan(PROXIMITY_AUDIBLE + 5, 1, half).peak).toBe(0)
+    // Distance scales both layers through the one shared curve.
+    const near = trampleCrunchPlan(0, 0.5, half)
+    const mid = trampleCrunchPlan(PROXIMITY_AUDIBLE / 2, 0.5, half)
+    expect(mid.crackles[0].peak / near.crackles[0].peak).toBeCloseTo(proximityGain(PROXIMITY_AUDIBLE / 2), 10)
+    expect(mid.squelch.peak / near.squelch.peak).toBeCloseTo(proximityGain(PROXIMITY_AUDIBLE / 2), 10)
+  })
+
+  it('is deterministic under a fixed rand source', () => {
+    const a = trampleCrunchPlan(3, 0.2, seq(0.1, 0.9, 0.4, 0.7))
+    const b = trampleCrunchPlan(3, 0.2, seq(0.1, 0.9, 0.4, 0.7))
+    expect(b).toEqual(a)
   })
 })
 
