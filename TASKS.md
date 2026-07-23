@@ -10135,6 +10135,26 @@ the remaining open points in their numeric order.
   meshes), so coordinate with the wildlife-render cluster; the ground-tint approach may
   share code with the settlement wet-ground path. Implementation-ready.
 
+- [ ] 268. CROCODILE FEEDING — the prey lies at the croc's MOUTH and the croc moves
+  as if eating (user 23.07.2026). When a crocodile catches/consumes a victim (§19.16,
+  point 130), the seized animal currently sits ON the crocodile's body; it should lie at
+  the crocodile's JAWS/MOUTH end, and the crocodile should animate as if FEEDING —
+  e.g. the classic death-roll / head thrash and gulp, so it reads as eating rather than
+  a body just resting on the croc. FIX in `src/scenes/travel/Wildlife.tsx` (the
+  crocodile catch/feed depiction from point 130): position the caught victim at the
+  crocodile's mouth (front/jaw anchor, derived from the croc's facing) for the struggle
+  and consume phases, and give the crocodile a feeding motion during consumption (a
+  periodic head-thrash/roll pose and/or a gulp bob) so the meal is legible. Keep the
+  §19.16 catch/grip/sink logic, the shared §19.8 family-drama resolution (`caughtBy`),
+  the grip deadline and the water-only placement UNCHANGED — only the victim ANCHOR and
+  the eating ANIMATION change. VERIFIABLE: pure-test the mouth-anchor offset (the victim
+  sits ahead of the croc along its heading, not on its centre) and the feeding-motion
+  phase if parameterised (`src/scenes/travel/wildlifeBehavior.test.ts`); a live check /
+  screenshot at a forced crocodile catch shows the prey at the jaws with the croc
+  thrashing, on BOTH backends. DOCS: design.md §19.16 if the depiction wording changes.
+  No player-visible text. NOTE: rendering/behaviour — touches Wildlife.tsx (+ maybe a
+  pure pose helper in wildlifeBehavior.ts), the wildlife-render cluster. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
