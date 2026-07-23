@@ -120,9 +120,13 @@ export function capturePanorama(
       const ctx = cnv.getContext('2d')
       if (!ctx) return 'no-ctx'
       const img = ctx.createImageData(width, SECTOR_PX)
-      // Flip vertically (readback is bottom-up).
+      // Readback row order is BACKEND-dependent (point 227): the WebGL2 path
+      // returns rows bottom-up (GL convention, flip for the image), the WebGPU
+      // path top-down (origin top-left, copy as is). Only this DEV readback
+      // differs — the rendered band samples the texture identically on both.
+      const topDown = (renderer.backend as { isWebGPUBackend?: boolean } | undefined)?.isWebGPUBackend === true
       for (let y = 0; y < SECTOR_PX; y++) {
-        const src = (SECTOR_PX - 1 - y) * width * 4
+        const src = (topDown ? y : SECTOR_PX - 1 - y) * width * 4
         img.data.set(buf.subarray(src, src + width * 4), y * width * 4)
       }
       ctx.putImageData(img, 0, 0)
