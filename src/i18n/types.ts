@@ -287,6 +287,8 @@ export interface Strings {
     calfGambolRange: string
     calfGambolBout: string
     crocStrikeRadius: string
+    juvenilePreyBias: string
+    juvenileDrinkCrocBias: string
     crocGripSeconds: string
     huntLeaveOvertime: string
     waterCrossMax: string

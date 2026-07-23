@@ -190,11 +190,9 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.calfFollowRadius, read: () => balance.family.followRadius, value: 7 },
     { label: en.debug.calfGambolRange, read: () => balance.family.gambolRange, value: 15 },
     { label: en.debug.calfGambolBout, read: () => balance.family.gambolBoutSeconds, value: 10 },
-    // Juvenile-prey preferences (design.md §19.8/§19.16, point 245). The labels
-    // are literals (i18n keys pending — see DebugMenu.tsx), so they are matched
-    // directly rather than through en.debug.
-    { label: 'Juvenile prey bias', read: () => balance.family.juvenilePreyBias, value: 0.9 },
-    { label: 'Croc juvenile-drink bias', read: () => balance.family.juvenileDrinkCrocBias, value: 8 },
+    // Juvenile-prey preferences (design.md §19.8/§19.16, point 245).
+    { label: en.debug.juvenilePreyBias, read: () => balance.family.juvenilePreyBias, value: 0.9 },
+    { label: en.debug.juvenileDrinkCrocBias, read: () => balance.family.juvenileDrinkCrocBias, value: 8 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
   ]

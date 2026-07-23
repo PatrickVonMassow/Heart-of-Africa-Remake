@@ -367,6 +367,8 @@ export const de: Strings = {
     calfGambolRange: 'Jungtier-Spielradius',
     calfGambolBout: 'Jungtier-Spielphase (s)',
     crocStrikeRadius: 'Krokodil: Angriffsradius am Ufer',
+    juvenilePreyBias: 'Bevorzugung von Jungtieren als Beute',
+    juvenileDrinkCrocBias: 'Krokodil: Vorzug trinkender Jungtiere',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     huntLeaveOvertime: 'Jagd: Abzugs-Überzeit (s)',
     waterCrossMax: 'Wasser-Querung: max. Breite',

@@ -271,14 +271,10 @@ export function DebugMenu() {
         onChange={(v) => { balance.family.gambolRange = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.calfGambolBout} value={balance.family.gambolBoutSeconds} step={0.5}
         onChange={(v) => { balance.family.gambolBoutSeconds = Math.max(0.5, v); bump() }} />
-      {/* Juvenile-prey preferences (design.md §19.8, point 245). The labels are
-          literals pending language-file keys — the i18n files were outside this
-          change's allowed scope; add `debug.juvenilePreyBias` /
-          `debug.juvenileDrinkCrocBias` to both languages on merge and swap them
-          in here. */}
-      <NumberField label="Juvenile prey bias" value={balance.family.juvenilePreyBias} step={0.05}
+      {/* Juvenile-prey preferences (design.md §19.8, point 245). */}
+      <NumberField label={t.debug.juvenilePreyBias} value={balance.family.juvenilePreyBias} step={0.05}
         onChange={(v) => { balance.family.juvenilePreyBias = Math.max(0, Math.min(1, v)); bump() }} />
-      <NumberField label="Croc juvenile-drink bias" value={balance.family.juvenileDrinkCrocBias} step={0.5}
+      <NumberField label={t.debug.juvenileDrinkCrocBias} value={balance.family.juvenileDrinkCrocBias} step={0.5}
         onChange={(v) => { balance.family.juvenileDrinkCrocBias = Math.max(1, v); bump() }} />
       <NumberField label={t.debug.crocStrikeRadius} value={balance.crocodile.strikeRadius} step={0.5}
         onChange={(v) => { balance.crocodile.strikeRadius = Math.max(0.5, v); bump() }} />
