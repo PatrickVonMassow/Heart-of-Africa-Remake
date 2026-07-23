@@ -505,6 +505,35 @@ export function trampleKills(
 }
 
 /**
+ * Whether an elephant would trample an animal THIS step (design.md §19.5,
+ * points 259/261/263): the animal is within `trampleRadius` of the elephant AND
+ * the `trampleKills` direction condition holds (the elephant is moving toward
+ * it). This is the SINGLE predicate shared by the trample-kill site and the
+ * body-collider exemption: the point-261 body collider must NOT slide a free
+ * animal AROUND the body when the elephant is bearing down on it, because that
+ * lateral deflection turns the elephant→victim vector perpendicular to the
+ * elephant's velocity (dot → 0) and the point-259 directional trample can never
+ * fire — the elephant would trample nothing, no stain is laid and the §19.8
+ * calf-trample grief chain never starts. The collider therefore EXEMPTS an
+ * animal this predicate flags for that elephant (the step lands, the trample
+ * catches it); an animal near a NON-trampling elephant (stationary, or not
+ * moving toward it) still slides around the body (no walk-through).
+ */
+export function elephantWouldTrample(
+  velX: number,
+  velZ: number,
+  elephantX: number,
+  elephantZ: number,
+  victimX: number,
+  victimZ: number,
+  trampleRadius: number,
+  speedEps = 1e-4,
+): boolean {
+  if (Math.hypot(victimX - elephantX, victimZ - elephantZ) >= trampleRadius) return false
+  return trampleKills(velX, velZ, elephantX, elephantZ, victimX, victimZ, speedEps)
+}
+
+/**
  * Playful gambolling of a herd calf (design.md §19): on a per-calf cycle the
  * calf breaks into a short bout of scampering hops around its parent. Returns
  * the bout's current heading and hop height (0..1), or `null` outside a bout.
