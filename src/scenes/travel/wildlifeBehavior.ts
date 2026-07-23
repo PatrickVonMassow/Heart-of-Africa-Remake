@@ -344,7 +344,8 @@ export function guardEngagement(
 /**
  * Target for a parent whose calf was trampled (design.md §19): it throws itself
  * before the feet of the nearest LIVING elephant and lets itself be trampled
- * too. Returns that elephant's position, or `null` when none is left — the
+ * too. Returns that elephant's position AND its heading of travel (point 259 —
+ * the caller aims at the elephant's FRONT), or `null` when none is left — the
  * caller then ends the grief instead of charging a target that can no longer
  * trample it (a drive with no resolution is a stuck animal).
  *
@@ -355,19 +356,61 @@ export function guardEngagement(
 export function griefTarget(
   x: number,
   z: number,
-  elephants: ReadonlyArray<{ x: number; z: number; dead?: boolean }>,
-): { x: number; z: number } | null {
-  let best: { x: number; z: number } | null = null
+  elephants: ReadonlyArray<{ x: number; z: number; dead?: boolean; heading?: number }>,
+): { x: number; z: number; heading: number } | null {
+  let best: { x: number; z: number; heading: number } | null = null
   let bestD = Infinity
   for (const e of elephants) {
     if (e.dead) continue
     const d = Math.hypot(e.x - x, e.z - z)
     if (d < bestD) {
       bestD = d
-      best = { x: e.x, z: e.z }
+      best = { x: e.x, z: e.z, heading: e.heading ?? 0 }
     }
   }
   return best
+}
+
+/**
+ * A point `reach` ahead of an elephant along its heading (design.md §19.8,
+ * point 259). A grieving parent must reach the elephant's FRONT to be crushed:
+ * with the parent standing ahead along the heading `(sin h, cos h)`, an elephant
+ * that keeps walking forward is travelling TOWARD the parent, so the direction
+ * condition (`trampleKills`) holds and it goes under the feet. A parent that only
+ * reaches the flank or rear is NOT trampled and keeps re-aiming at the front.
+ */
+export function frontInterceptTarget(
+  elephantX: number,
+  elephantZ: number,
+  heading: number,
+  reach: number,
+): { x: number; z: number } {
+  return { x: elephantX + Math.sin(heading) * reach, z: elephantZ + Math.cos(heading) * reach }
+}
+
+/**
+ * The trample direction condition (design.md §19.5, point 259): an animal caught
+ * in the §19.5 elephant-overlap exception is killed ONLY when the elephant is
+ * actively moving with a positive component TOWARD it — its per-frame movement
+ * vector `(velX, velZ)` has `dot(vel, victim − elephant) > 0` and a magnitude
+ * above `speedEps`. Consequences: a STANDING elephant (near-zero velocity) that
+ * another animal walks into does NOT kill it, and an animal that runs into an
+ * elephant FROM BEHIND (behind its heading of travel, dot < 0) is NOT killed.
+ * Only an elephant driving into/over the animal tramples it; the §19.5
+ * body-separation parts a harmless overlap otherwise. Boundary: dot = 0 (a
+ * purely lateral pass) does not kill.
+ */
+export function trampleKills(
+  velX: number,
+  velZ: number,
+  elephantX: number,
+  elephantZ: number,
+  victimX: number,
+  victimZ: number,
+  speedEps = 1e-4,
+): boolean {
+  if (Math.hypot(velX, velZ) <= speedEps) return false
+  return velX * (victimX - elephantX) + velZ * (victimZ - elephantZ) > 0
 }
 
 /**

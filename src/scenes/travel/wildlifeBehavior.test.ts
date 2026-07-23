@@ -25,6 +25,8 @@ import {
   segPointDist,
   gambolState,
   griefTarget,
+  frontInterceptTarget,
+  trampleKills,
   groundNormal,
   leashedGambolDir,
   separationPush,
@@ -1119,21 +1121,25 @@ describe('rescueSpeed (design.md §19.8, point 127 — the parental adrenaline b
 })
 
 describe('griefTarget (design.md §19 — the parent charges the elephant that trampled its calf)', () => {
-  it('picks the nearest living elephant', () => {
+  it('picks the nearest living elephant and carries its heading (point 259)', () => {
     const near = griefTarget(0, 0, [
-      { x: 20, z: 0 },
-      { x: 4, z: 3 }, // distance 5 — the nearest
-      { x: 0, z: 12 },
+      { x: 20, z: 0, heading: 1 },
+      { x: 4, z: 3, heading: 2 }, // distance 5 — the nearest
+      { x: 0, z: 12, heading: 3 },
     ])
-    expect(near).toEqual({ x: 4, z: 3 })
+    expect(near).toEqual({ x: 4, z: 3, heading: 2 })
+  })
+
+  it('defaults a missing heading to 0', () => {
+    expect(griefTarget(0, 0, [{ x: 4, z: 3 }])).toEqual({ x: 4, z: 3, heading: 0 })
   })
 
   it('ignores a dead elephant and takes the next living one', () => {
     const t = griefTarget(0, 0, [
       { x: 1, z: 0, dead: true },
-      { x: 9, z: 0 },
+      { x: 9, z: 0, heading: 0.5 },
     ])
-    expect(t).toEqual({ x: 9, z: 0 })
+    expect(t).toEqual({ x: 9, z: 0, heading: 0.5 })
   })
 
   it('returns null with no elephants at all — the grief must end, not chase nothing', () => {
@@ -1147,36 +1153,44 @@ describe('griefTarget (design.md §19 — the parent charges the elephant that t
   it('breaks an exact distance tie by taking the first element (point 173 hardening)', () => {
     // Both at distance 5 from the origin — a strict "<" comparison means the
     // FIRST one encountered keeps the pick, never the later tied one.
-    const first = { x: 3, z: 4 }
-    const second = { x: 4, z: 3 }
+    const first = { x: 3, z: 4, heading: 0 }
+    const second = { x: 4, z: 3, heading: 0 }
     expect(griefTarget(0, 0, [first, second])).toEqual(first)
     // Reversed order: the (now-first) second element wins instead — proving
     // the result really tracks list order, not some other tiebreak.
     expect(griefTarget(0, 0, [second, first])).toEqual(second)
   })
 
-  it('the charge reaches the trampling feet well inside the grief window', () => {
+  it('the parent reaches the elephant FRONT and is trampled well inside the grief window (point 259)', () => {
     // Mini-simulation of the contract; the numbers mirror Wildlife.tsx
     // (TRAMPLE_GRIEF_SPEED 6.5, ELEPHANT_SPEED 1.5, TRAMPLE_GRIEF_SECONDS 12,
-    // TRAMPLE_RADIUS 1.5). The parent must catch an elephant WALKING AWAY from
-    // it — otherwise the window would expire and the sacrifice would silently
-    // never happen.
+    // TRAMPLE_RADIUS 1.5, GRIEF_FRONT_REACH 1). The parent must get IN FRONT of
+    // an elephant walking straight AT it and be crushed only by the direction
+    // condition — otherwise the window would expire and the sacrifice would
+    // silently never happen.
     const dt = 1 / 60
     let px = 0
     let pz = 0
-    const eleph = { x: 10, z: 0 }
+    const eleph = { x: 10, z: 0, heading: -Math.PI / 2 } // heading (sin,cos)=(-1,0): moving toward the parent along -x
     let grief = 12
     let trampled = false
     while (grief > 0) {
-      eleph.x += 1.5 * dt // roaming straight away from the parent
+      const evx = Math.sin(eleph.heading) * 1.5 * dt
+      const evz = Math.cos(eleph.heading) * 1.5 * dt
+      eleph.x += evx
+      eleph.z += evz
       const t = griefTarget(px, pz, [eleph])
       expect(t).not.toBeNull()
-      const dx = t!.x - px
-      const dz = t!.z - pz
+      const front = frontInterceptTarget(t!.x, t!.z, t!.heading, 1)
+      const dx = front.x - px
+      const dz = front.z - pz
       const d = Math.hypot(dx, dz) || 1
       px += (dx / d) * 6.5 * dt
       pz += (dz / d) * 6.5 * dt
-      if (Math.hypot(eleph.x - px, eleph.z - pz) < 1.5) {
+      if (
+        Math.hypot(eleph.x - px, eleph.z - pz) < 1.5 &&
+        trampleKills(evx, evz, eleph.x, eleph.z, px, pz)
+      ) {
         trampled = true
         break
       }
@@ -1184,6 +1198,95 @@ describe('griefTarget (design.md §19 — the parent charges the elephant that t
     }
     expect(trampled).toBe(true)
     expect(grief).toBeGreaterThan(6) // reached with the window barely touched
+  })
+
+  it('resolves via the deadline when the front can never be reached (invariant I4)', () => {
+    // A parent slower than the elephant can never get in front, so the trample
+    // never fires — but the grief drama STILL resolves at the deadline (the
+    // parent stops and rejoins), never a drive with no exit.
+    const dt = 1 / 60
+    let px = 0
+    let pz = 0
+    const eleph = { x: 5, z: 0, heading: Math.PI / 2 } // (sin,cos)=(1,0): fleeing along +x
+    let grief = 12
+    let trampled = false
+    let resolved = false
+    // Parent SLOWER than the fleeing elephant — the front stays out of reach.
+    const parentSpeed = 1.0
+    const elephSpeed = 6.0
+    while (grief > 0) {
+      const evx = Math.sin(eleph.heading) * elephSpeed * dt
+      const evz = Math.cos(eleph.heading) * elephSpeed * dt
+      eleph.x += evx
+      eleph.z += evz
+      const t = griefTarget(px, pz, [eleph])
+      const front = frontInterceptTarget(t!.x, t!.z, t!.heading, 1)
+      const dx = front.x - px
+      const dz = front.z - pz
+      const d = Math.hypot(dx, dz) || 1
+      px += (dx / d) * parentSpeed * dt
+      pz += (dz / d) * parentSpeed * dt
+      if (
+        Math.hypot(eleph.x - px, eleph.z - pz) < 1.5 &&
+        trampleKills(evx, evz, eleph.x, eleph.z, px, pz)
+      ) {
+        trampled = true
+        break
+      }
+      grief -= dt
+      if (grief <= 0) resolved = true
+    }
+    expect(trampled).toBe(false)
+    expect(resolved).toBe(true) // the deadline backstop ended the grief
+  })
+})
+
+describe('frontInterceptTarget (design.md §19.8 — the grief parent aims at the elephant FRONT, point 259)', () => {
+  it('returns a point ahead of the elephant along its heading, at the given reach', () => {
+    const heading = 0.7
+    const reach = 4
+    const p = frontInterceptTarget(10, -2, heading, reach)
+    // Ahead along the heading unit (sin, cos): the offset dotted with the
+    // heading direction is > 0 and equals the reach.
+    const dx = p.x - 10
+    const dz = p.z - -2
+    const dot = dx * Math.sin(heading) + dz * Math.cos(heading)
+    expect(dot).toBeGreaterThan(0)
+    expect(dot).toBeCloseTo(reach, 10)
+    expect(Math.hypot(dx, dz)).toBeCloseTo(reach, 10)
+  })
+
+  it('points straight ahead for a zero heading', () => {
+    const p = frontInterceptTarget(0, 0, 0, 5) // (sin,cos)=(0,1) → +z
+    expect(p.x).toBeCloseTo(0, 10)
+    expect(p.z).toBeCloseTo(5, 10)
+  })
+})
+
+describe('trampleKills (design.md §19.5 — the trample direction condition, point 259)', () => {
+  it('kills when the elephant moves with a positive component toward the victim', () => {
+    // Elephant at origin moving +x; victim ahead at +x → dot > 0.
+    expect(trampleKills(0.02, 0, 0, 0, 3, 0)).toBe(true)
+  })
+
+  it('does NOT kill a victim a STANDING elephant is bumped into (speed ~0)', () => {
+    expect(trampleKills(0, 0, 0, 0, 1, 0)).toBe(false)
+    expect(trampleKills(1e-6, 0, 0, 0, 1, 0)).toBe(false) // below the epsilon
+  })
+
+  it('does NOT kill a victim hit from BEHIND the heading of travel (dot < 0)', () => {
+    // Elephant moving +x; victim BEHIND at -x → dot < 0.
+    expect(trampleKills(0.02, 0, 0, 0, -3, 0)).toBe(false)
+  })
+
+  it('does NOT kill on a purely lateral pass (dot = 0, the boundary)', () => {
+    // Elephant moving +x; victim off to the side at +z → dot = 0.
+    expect(trampleKills(0.02, 0, 0, 0, 0, 3)).toBe(false)
+  })
+
+  it('kills a victim in the forward arc (partial positive component)', () => {
+    // Moving +x, victim ahead-and-to-the-side: dot still > 0.
+    expect(trampleKills(0.02, 0, 0, 0, 2, 5)).toBe(true)
   })
 })
 
