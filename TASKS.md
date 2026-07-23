@@ -10089,7 +10089,7 @@ the remaining open points in their numeric order.
   files) can start in parallel, the scene wiring waits for the wildlife cluster to be
   free. Implementation-ready.
 
-- [ ] 266. TRAMPLE CRUSH SOUND — BONE-CRUNCH + SOFT-TISSUE SQUELCH, not a dull
+- [x] 266. TRAMPLE CRUSH SOUND — BONE-CRUNCH + SOFT-TISSUE SQUELCH, not a dull
   "plomp" (user 23.07.2026). The point-260 elephant-trample crush sound currently
   reads as a soft "plomp"; the user wants it to sound like CRUNCHING/CRACKING BONE
   plus a WET soft-tissue squelch. Improve the procedural synthesis of the crunch —
