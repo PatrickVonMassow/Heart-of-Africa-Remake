@@ -344,7 +344,8 @@ export function guardEngagement(
 /**
  * Target for a parent whose calf was trampled (design.md §19): it throws itself
  * before the feet of the nearest LIVING elephant and lets itself be trampled
- * too. Returns that elephant's position, or `null` when none is left — the
+ * too. Returns that elephant's position AND its heading of travel (point 259 —
+ * the caller aims at the elephant's FRONT), or `null` when none is left — the
  * caller then ends the grief instead of charging a target that can no longer
  * trample it (a drive with no resolution is a stuck animal).
  *
@@ -355,19 +356,181 @@ export function guardEngagement(
 export function griefTarget(
   x: number,
   z: number,
-  elephants: ReadonlyArray<{ x: number; z: number; dead?: boolean }>,
-): { x: number; z: number } | null {
-  let best: { x: number; z: number } | null = null
+  elephants: ReadonlyArray<{ x: number; z: number; dead?: boolean; heading?: number }>,
+): { x: number; z: number; heading: number } | null {
+  let best: { x: number; z: number; heading: number } | null = null
   let bestD = Infinity
   for (const e of elephants) {
     if (e.dead) continue
     const d = Math.hypot(e.x - x, e.z - z)
     if (d < bestD) {
       bestD = d
-      best = { x: e.x, z: e.z }
+      best = { x: e.x, z: e.z, heading: e.heading ?? 0 }
     }
   }
   return best
+}
+
+/**
+ * A point `reach` ahead of an elephant along its heading (design.md §19.8,
+ * point 259). A grieving parent must reach the elephant's FRONT to be crushed:
+ * with the parent standing ahead along the heading `(sin h, cos h)`, an elephant
+ * that keeps walking forward is travelling TOWARD the parent, so the direction
+ * condition (`trampleKills`) holds and it goes under the feet. A parent that only
+ * reaches the flank or rear is NOT trampled and keeps re-aiming at the front.
+ */
+export function frontInterceptTarget(
+  elephantX: number,
+  elephantZ: number,
+  heading: number,
+  reach: number,
+): { x: number; z: number } {
+  return { x: elephantX + Math.sin(heading) * reach, z: elephantZ + Math.cos(heading) * reach }
+}
+
+/**
+ * Deflect one animal's per-frame step so it SLIDES AROUND an elephant's body
+ * instead of walking through it (design.md §19.5, point 261). An elephant is a
+ * solid obstacle to every other animal's LOCOMOTION: a step from `(fromX,fromZ)`
+ * to `(toX,toZ)` whose straight path would enter the body circle
+ * `(obstX,obstZ,radius)` is redirected to the circle's tangent — the returned
+ * end point is never inside the circle and always keeps moving forward along the
+ * surface (never a dead stop, even for a shot aimed straight at the centre), so
+ * the mover rounds the body toward its goal. A step that never touches the
+ * circle is returned unchanged.
+ *
+ * The collider guards only the mover's OWN step (radius = the elephant body
+ * radius, no self-radius added) so a deflected animal rests AT the body edge —
+ * still inside the wider §19.5 trample reach. It therefore never blocks the
+ * designed contacts: the elephant may still step over a pinned animal to
+ * trample it, and a grief parent rounds the body to the front and is crushed
+ * there (points 259/261). It is not applied to the elephant itself.
+ */
+export function deflectAroundCircle(
+  fromX: number,
+  fromZ: number,
+  toX: number,
+  toZ: number,
+  obstX: number,
+  obstZ: number,
+  radius: number,
+): [number, number] {
+  const mx = toX - fromX
+  const mz = toZ - fromZ
+  const segLen = Math.hypot(mx, mz)
+  const fdx = fromX - obstX
+  const fdz = fromZ - obstZ
+  const fromDist = Math.hypot(fdx, fdz)
+  // Closest approach of the step segment to the body centre. If it stays outside
+  // the circle the straight step is free — the common case (no elephant in the
+  // way) returns untouched.
+  let closest2: number
+  if (segLen < 1e-9) {
+    closest2 = fromDist * fromDist
+  } else {
+    let tc = -(fdx * mx + fdz * mz) / (segLen * segLen)
+    tc = Math.max(0, Math.min(1, tc))
+    const px = fromX + mx * tc - obstX
+    const pz = fromZ + mz * tc - obstZ
+    closest2 = px * px + pz * pz
+  }
+  if (closest2 >= radius * radius) return [toX, toZ]
+  // The step enters the body: slide along the surface instead. Anchor on the
+  // boundary at the side the mover approaches FROM, then advance tangentially by
+  // the intended step length toward `to`. A centre-aimed shot (no radial side)
+  // falls back to the reverse of the motion, then a fixed axis, so it still
+  // picks a tangent and slides rather than stalling.
+  let rx: number
+  let rz: number
+  if (fromDist > 1e-6) {
+    rx = fdx / fromDist
+    rz = fdz / fromDist
+  } else if (segLen > 1e-6) {
+    rx = -mx / segLen
+    rz = -mz / segLen
+  } else {
+    rx = 1
+    rz = 0
+  }
+  // The two surface tangents; take the one that carries the mover toward `to`.
+  const t1x = -rz
+  const t1z = rx
+  const dirx = segLen > 1e-6 ? mx / segLen : t1x
+  const dirz = segLen > 1e-6 ? mz / segLen : t1z
+  const useFirst = t1x * dirx + t1z * dirz >= 0
+  const tx = useFirst ? t1x : -t1x
+  const tz = useFirst ? t1z : -t1z
+  let ex = obstX + rx * radius + tx * segLen
+  let ez = obstZ + rz * radius + tz * segLen
+  // Guarantee the result rests outside the body (round-off / a long step's
+  // chord could dip in): push it back out to the edge radially if needed.
+  const edx = ex - obstX
+  const edz = ez - obstZ
+  const ed = Math.hypot(edx, edz)
+  if (ed < radius) {
+    if (ed < 1e-6) {
+      ex = obstX + rx * radius
+      ez = obstZ + rz * radius
+    } else {
+      ex = obstX + (edx / ed) * radius
+      ez = obstZ + (edz / ed) * radius
+    }
+  }
+  return [ex, ez]
+}
+
+/**
+ * The trample direction condition (design.md §19.5, point 259): an animal caught
+ * in the §19.5 elephant-overlap exception is killed ONLY when the elephant is
+ * actively moving with a positive component TOWARD it — its per-frame movement
+ * vector `(velX, velZ)` has `dot(vel, victim − elephant) > 0` and a magnitude
+ * above `speedEps`. Consequences: a STANDING elephant (near-zero velocity) that
+ * another animal walks into does NOT kill it, and an animal that runs into an
+ * elephant FROM BEHIND (behind its heading of travel, dot < 0) is NOT killed.
+ * Only an elephant driving into/over the animal tramples it; the §19.5
+ * body-separation parts a harmless overlap otherwise. Boundary: dot = 0 (a
+ * purely lateral pass) does not kill.
+ */
+export function trampleKills(
+  velX: number,
+  velZ: number,
+  elephantX: number,
+  elephantZ: number,
+  victimX: number,
+  victimZ: number,
+  speedEps = 1e-4,
+): boolean {
+  if (Math.hypot(velX, velZ) <= speedEps) return false
+  return velX * (victimX - elephantX) + velZ * (victimZ - elephantZ) > 0
+}
+
+/**
+ * Whether an elephant would trample an animal THIS step (design.md §19.5,
+ * points 259/261/263): the animal is within `trampleRadius` of the elephant AND
+ * the `trampleKills` direction condition holds (the elephant is moving toward
+ * it). This is the SINGLE predicate shared by the trample-kill site and the
+ * body-collider exemption: the point-261 body collider must NOT slide a free
+ * animal AROUND the body when the elephant is bearing down on it, because that
+ * lateral deflection turns the elephant→victim vector perpendicular to the
+ * elephant's velocity (dot → 0) and the point-259 directional trample can never
+ * fire — the elephant would trample nothing, no stain is laid and the §19.8
+ * calf-trample grief chain never starts. The collider therefore EXEMPTS an
+ * animal this predicate flags for that elephant (the step lands, the trample
+ * catches it); an animal near a NON-trampling elephant (stationary, or not
+ * moving toward it) still slides around the body (no walk-through).
+ */
+export function elephantWouldTrample(
+  velX: number,
+  velZ: number,
+  elephantX: number,
+  elephantZ: number,
+  victimX: number,
+  victimZ: number,
+  trampleRadius: number,
+  speedEps = 1e-4,
+): boolean {
+  if (Math.hypot(victimX - elephantX, victimZ - elephantZ) >= trampleRadius) return false
+  return trampleKills(velX, velZ, elephantX, elephantZ, victimX, victimZ, speedEps)
 }
 
 /**
@@ -905,6 +1068,22 @@ export function crocodileLungeReady(distToPrey: number, preyAtBank: boolean, str
 }
 
 /**
+ * The resting crocodile's subtle idle yaw (design.md §19.16, points 242/257): a
+ * hidden crocodile WAITS — it lies submerged, it does not roam. Its faint life is
+ * a BOUNDED oscillation about a FIXED rest heading, an ABSOLUTE value that always
+ * returns to centre. It must NEVER be an increment added to the live heading each
+ * frame (point 257 regression): steering the persistent facing toward a heading
+ * that was itself `heading + sway` fed the sway back in every frame, summing a
+ * running integral of the sine that grew into a full-circle rotation. Anchoring
+ * the sway to a FIXED restYaw breaks that feedback loop. The amplitude is a few
+ * degrees; the per-crocodile phase desynchronises neighbours on the same water.
+ */
+export const CROCODILE_IDLE_SWAY_AMP = 0.03
+export function crocodileIdleYaw(restYaw: number, t: number, phase: number): number {
+  return restYaw + Math.sin(t * 0.3 + phase * Math.PI * 2) * CROCODILE_IDLE_SWAY_AMP
+}
+
+/**
  * The gripped lunge's hard deadline (point 186): the grip normally ends when the
  * victim's caught-countdown runs out, but a victim REMOVED mid-grip (streamed out
  * in a chunk despawn, taken by another system) freezes that countdown and would pin
@@ -1233,6 +1412,44 @@ export function offscreenRingSpawn(
 }
 
 /**
+ * Streaming despawn verdict for one ground animal (design.md §19.4): judge
+ * the animal by where it STANDS, never only by its birth chunk. Roamers and
+ * fleers drift chunks away from where they spawned (elephant roam, flight,
+ * water crossings), and a zoom-in collapses the despawn ring in one frame —
+ * culling by birth-chunk membership deleted animals still in sight beside the
+ * player (the sporadic mid-view vanish; its TRAA ghost read as scattered
+ * body parts). Verdict:
+ *  1. dead carcasses (they dissolve on screen) and untagged animals (e.g.
+ *     injected by the verification) are always kept — unchanged;
+ *  2. birth chunk still live — kept, no re-home;
+ *  3. birth chunk gone but the chunk under its feet is live — kept AND
+ *     re-homed there, so future culls judge it where it stands;
+ *  4. outside every live chunk — kept while within the despawn ring of the
+ *     player OR while the LIVE frustum shows it (`onScreen` projects through
+ *     the real camera, never an assumed radius — the point-172 doctrine; this
+ *     backstop covers the debug wide-zoom corner where the ring lies inside
+ *     the frame);
+ *  5. otherwise dropped.
+ */
+export function keepStreamedAnimal(
+  a: { dead?: boolean; chunk?: string; x: number; z: number },
+  liveChunkHas: (key: string) => boolean,
+  chunkSize: number,
+  playerX: number,
+  playerZ: number,
+  despawnR: number,
+  onScreen: (x: number, z: number) => boolean,
+): { keep: boolean; rehomeTo?: string } {
+  if (a.dead || a.chunk === undefined) return { keep: true }
+  if (liveChunkHas(a.chunk)) return { keep: true }
+  const cur = `${Math.floor(a.x / chunkSize)},${Math.floor(a.z / chunkSize)}`
+  if (liveChunkHas(cur)) return { keep: true, rehomeTo: cur }
+  if (Math.hypot(a.x - playerX, a.z - playerZ) <= despawnR) return { keep: true }
+  if (onScreen(a.x, a.z)) return { keep: true }
+  return { keep: false }
+}
+
+/**
  * One step of a scripted walk under the land constraint (design.md §19.5,
  * point 83): the predator's walk-off must never enter the open ocean — like
  * every streamed animal, it deflects along the coast instead. Tries the
@@ -1483,6 +1700,28 @@ export function pickOffscreenLandAnchor(
     if (isLand(c[0], c[1]) && !onScreen(c[0], c[1])) return c // off-screen land — the only spot
   }
   return null // no off-screen land — the caller defers (point 183), never pops on-screen
+}
+
+/**
+ * The vicinity top-up's per-ATTEMPT rand seed (design.md §2.5, point 102): each
+ * seeding attempt for a place draws a FRESH candidate set. The old frozen seed
+ * `(worldSeed ^ placeHash) + 0x102` was rebuilt identically every frame, so the
+ * seeder re-tested the SAME 14 bearings forever — and with a STATIC camera (an
+ * idle player right after leaving a settlement: the travel camera mounts
+ * already settled and nothing moves it) a frame whose candidates all landed
+ * on-screen or on water deferred identically on every later frame, and the
+ * vicinity guarantee stalled below its minimum (the point-249 WebGPU flake:
+ * count pinned one short across a full 25 sim-second poll). Striding the
+ * attempt index by a golden-ratio constant decorrelates consecutive attempts'
+ * whole candidate sets, so the seeder EXPLORES the ring over successive frames;
+ * every attempt stays reproducible, and attempt 0 is the historical seed.
+ */
+export function vicinityAttemptSeed(
+  worldSeed: number,
+  placeHash: number,
+  attempt: number,
+): number {
+  return (((worldSeed ^ placeHash) + 0x102 + Math.imul(attempt, 0x9e3779b1)) >>> 0)
 }
 
 /**

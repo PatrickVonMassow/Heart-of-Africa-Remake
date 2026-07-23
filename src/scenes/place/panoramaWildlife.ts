@@ -50,6 +50,21 @@ export function luminance(rgb: readonly [number, number, number]): number {
   return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
 }
 
+/**
+ * Arc length a drifting silhouette has travelled along its panorama ring after
+ * `elapsedSeconds` (point 255): radius × |angular drift rate| × time. Feeding
+ * this distance into the shared distance-driven gait (fauna `gaitPhase` →
+ * `legSwingAngle`, or a minimal body sway `sin(gaitPhase(dist))`) makes a far
+ * silhouette read as WALKING along the horizon rather than gliding — the swing
+ * rides the ground it covers, exactly as the settlement goats' does, so a
+ * slower-drifting silhouette steps slower and a stalled one not at all. Kept
+ * three-free (like the rest of this module) so the drift→walk coupling is pure-
+ * testable; the render wiring in the panorama drift mover reads it each frame.
+ */
+export function panoramaDriftDistance(radius: number, driftRate: number, elapsedSeconds: number): number {
+  return Math.abs(radius * driftRate * elapsedSeconds)
+}
+
 /** An azimuth interval on the panorama ring, centred at `center` (radians,
  *  atan2(z, x)) with a half-width `half`. */
 export interface AzimuthSpan {

@@ -31,7 +31,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # Retry npm ci: the native deps (sharp/onnxruntime-node) fetch prebuilt
+        # binaries in their install scripts, so a transient registry/network
+        # hiccup can fail a single attempt. Retry up to 3x; a genuine failure
+        # (all attempts) still exits non-zero.
+        run: |
+          n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done
 
       # GITHUB_ACTIONS is set on the runner, so vite.config.ts picks the
       # /Heart-of-Africa-Remake/ base path for correct Pages asset URLs.

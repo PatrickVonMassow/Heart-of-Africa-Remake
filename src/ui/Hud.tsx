@@ -16,6 +16,7 @@ import { JournalPanel } from './JournalPanel'
 import { Dialogs } from './Dialogs'
 import { DebugMenu } from './DebugMenu'
 import { MapOverlay } from './MapOverlay'
+import { StateDump } from './StateDump'
 import { TouchControls } from './TouchControls'
 import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
 import { getStrings, useStrings } from '../i18n'
@@ -425,6 +426,8 @@ export function Hud() {
     })
     // F4 toggles the canoe in and out of the pack (design.md §21).
     const offF4 = onKeyPress('F4', () => useGame.getState().debugToggleCanoe())
+    // F5 toggles the state-dump popup for bug reports (design.md §21.1).
+    const offF5 = onKeyPress('F5', () => useUi.getState().toggleStateDump())
     // The twelve keys of the number row jump to the twelve months of the
     // current year, for stepping through the seasons (design.md §21.1).
     // PHYSICAL codes, so the row reads 1..0 ß ´ on a German keyboard and
@@ -455,14 +458,17 @@ export function Hud() {
       }),
     )
     const offEsc = onKeyPress('Escape', () => {
-      if (useUi.getState().dialog) setDialog(null)
+      if (useUi.getState().stateDumpOpen) useUi.getState().toggleStateDump()
+      else if (useUi.getState().dialog) setDialog(null)
       else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
       else if (useGame.getState().journalOpen) setJournalOpen(false)
     })
-    // Function keys trigger browser actions by default (F1 help, F3 find) —
-    // prevent that for the keys the game uses.
+    // Function keys trigger browser actions by default (F1 help, F3 find,
+    // F5 page reload) — prevent that for the keys the game uses, so F5 opens
+    // the state-dump popup instead of reloading; a real reload stays available
+    // via Ctrl+R and the browser UI.
     const preventFn = (e: KeyboardEvent) => {
-      if (e.code === 'F1' || e.code === 'F3') e.preventDefault()
+      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F5') e.preventDefault()
     }
     window.addEventListener('keydown', preventFn)
     return () => {
@@ -472,6 +478,7 @@ export function Hud() {
       offF2()
       offF3()
       offF4()
+      offF5()
       offMonths.forEach((off) => off())
       offYears.forEach((off) => off())
       offH()
@@ -520,6 +527,8 @@ export function Hud() {
       <MapOverlay />
       <Dialogs />
       <DebugMenu />
+      {/* After Dialogs/DebugMenu so the state dump stacks above them (§17.4). */}
+      <StateDump />
       {/* Above panels and dialogs so it stays clickable; below the modal overlays. */}
       <SunblindVeil />
       <RendererWarning />

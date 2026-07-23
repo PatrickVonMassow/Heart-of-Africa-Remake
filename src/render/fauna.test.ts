@@ -35,9 +35,14 @@ import {
   buildZebra,
   buildZebraCalf,
   calfProportions,
+  createCrocodileMaterial,
   createFaunaMaterial,
+  CROCODILE_FADE_BAND,
   CROCODILE_LAYOUT,
   CROCODILE_SUBMERGE_DEPTH,
+  CROCODILE_WATERLINE_NONE,
+  crocodileSubmergedAlpha,
+  crocodileWaterlineLocal,
   CROCODILE_LUNGE_LIFT,
   crocodileBodyY,
   FAUNA_TESSELLATION,
@@ -558,6 +563,74 @@ describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
   })
 })
 
+// The crocodile submersion fade (design.md §19.16, point 246): the water sheets
+// are alpha-blended and depthWrite-off (point 233), and the croc body draws in
+// the opaque pass BEFORE them — so a submerged body read as a crisp silhouette
+// straight through the water. The croc's own material now fades every fragment
+// below the instance's local waterline, so the body vanishes into the murk
+// while the eye knobs above the sheet stay crisp.
+describe('crocodile submersion fade (design.md §19.16, point 246)', () => {
+  const geo = buildCrocodile()
+  geo.computeBoundingBox()
+  const eyeKnobTopY = geo.boundingBox!.max.y
+
+  it('the local waterline sits at the submerge depth over the instance scale', () => {
+    expect(crocodileWaterlineLocal(1, true)).toBeCloseTo(CROCODILE_SUBMERGE_DEPTH, 12)
+    // A larger croc is scaled up, so the same world-space depth is a SMALLER
+    // local height (the fragment compares pre-scale positionLocal.y).
+    expect(crocodileWaterlineLocal(1.2, true)).toBeCloseTo(CROCODILE_SUBMERGE_DEPTH / 1.2, 12)
+    expect(crocodileWaterlineLocal(1.2, true)).toBeLessThan(crocodileWaterlineLocal(0.9, true))
+  })
+
+  it('riding out drops the waterline far below the geometry — the strike shows the whole body', () => {
+    const wl = crocodileWaterlineLocal(1, false)
+    expect(wl).toBe(CROCODILE_WATERLINE_NONE)
+    // The sentinel plus the fade band still lies below the lowest vertex, so
+    // nothing on the body can fade during a strike.
+    expect(wl + CROCODILE_FADE_BAND).toBeLessThan(geo.boundingBox!.min.y)
+    expect(crocodileSubmergedAlpha(geo.boundingBox!.min.y, wl)).toBe(1)
+    expect(crocodileSubmergedAlpha(0, wl)).toBe(1)
+  })
+
+  it('hidden: eye knobs stay opaque, belly and legs vanish, the back just under the sheet only hints', () => {
+    const wl = crocodileWaterlineLocal(1, true)
+    // The eye knobs rise above the waterline — fully opaque, the lurking marker.
+    expect(eyeKnobTopY).toBeGreaterThan(wl)
+    expect(crocodileSubmergedAlpha(eyeKnobTopY, wl)).toBe(1)
+    // At the waterline itself the fade is continuous with the exposed part.
+    expect(crocodileSubmergedAlpha(wl, wl)).toBe(1)
+    // Belly and feet (local y near 0) lie a full band below — invisible.
+    expect(crocodileSubmergedAlpha(0.02, wl)).toBe(0)
+    expect(crocodileSubmergedAlpha(geo.boundingBox!.min.y, wl)).toBe(0)
+    // Just under the line the back reads only as a faint hint, strictly between.
+    const hint = crocodileSubmergedAlpha(wl - CROCODILE_FADE_BAND / 2, wl)
+    expect(hint).toBeGreaterThan(0)
+    expect(hint).toBeLessThan(1)
+    // Monotone with depth: deeper is never more visible.
+    let prev = 1
+    for (let y = wl; y >= 0; y -= 0.02) {
+      const a = crocodileSubmergedAlpha(y, wl)
+      expect(a).toBeLessThanOrEqual(prev + 1e-12)
+      prev = a
+    }
+  })
+
+  it('the croc material carries the fade and keeps the shared fauna look', () => {
+    const m = createCrocodileMaterial()
+    // Transparent with an opacity node: the fade needs alpha blending...
+    expect(m.transparent).toBe(true)
+    expect(m.opacityNode).toBeTruthy()
+    // ...but keeps writing depth so the body self-occludes within its own draw
+    // (the water sheets render after it at renderOrder 1 and lie above, so
+    // their point-233 depthWrite-off crossfade is untouched).
+    expect(m.depthWrite).toBe(true)
+    // The shared fauna look (point 214): vertex colors, smooth shading.
+    expect(m.vertexColors).toBe(true)
+    expect(m.roughness).toBeCloseTo(0.9, 12)
+    expect(m.flatShading).toBe(false)
+  })
+})
+
 describe('animal gait (design.md §19, point 228 — no foot-slide, no backward glide)', () => {
   it('the leg-swing phase is a pure function of DISTANCE travelled, not time', () => {
     // Zero distance → zero phase: a standing animal's legs never move.
@@ -573,6 +646,56 @@ describe('animal gait (design.md §19, point 228 — no foot-slide, no backward 
       expect(p).toBeGreaterThanOrEqual(prev)
       prev = p
     }
+  })
+
+  it('the gait cadence reads as a real walk — ~1.5-2 strides per metre, not the old shuffle (point 255)', () => {
+    // A full swing cycle is 2π rad, so the cadence is strides-per-world-unit ×
+    // 2π. The complaint was that the legs shuffled far too slowly for the speed;
+    // the cadence must land in a plausible walking band (~1.2-2.5 strides/m),
+    // clearly above the old 3.4 rad/unit (0.54 strides/m — under one per metre).
+    const stridesPerUnit = GAIT_CADENCE / (2 * Math.PI)
+    expect(stridesPerUnit).toBeGreaterThanOrEqual(1.2)
+    expect(stridesPerUnit).toBeLessThanOrEqual(2.5)
+    expect(stridesPerUnit).toBeGreaterThan(0.54) // strictly faster than the old shuffle
+    // One metre walked completes well over a full stride cycle.
+    expect(gaitPhase(1)).toBeGreaterThan(2 * Math.PI)
+    expect(gaitPhase(1) / (2 * Math.PI)).toBeCloseTo(stridesPerUnit, 12)
+  })
+
+  it('advances the gait over a CURVED path — any displacement, not only a straight heading (point 255)', () => {
+    // Walk a quarter circle as many short chords: the heading TURNS every step,
+    // yet the phase must ride the accumulated PATH LENGTH — the gait is driven by
+    // raw distance travelled, never gated on a straight/velocity-aligned heading
+    // (the "legs stop on a turn" complaint). Compare the curved path to its own
+    // net (straight-line) displacement: the phase reflects the longer path, so it
+    // keeps advancing while the animal turns.
+    const R = 5
+    const steps = 90
+    let dist = 0
+    let px = R
+    let pz = 0
+    let prevYaw = faceVelocity(0, 1, 0)
+    let turned = false
+    for (let k = 1; k <= steps; k++) {
+      const ang = (k / steps) * (Math.PI / 2)
+      const nx = Math.cos(ang) * R
+      const nz = Math.sin(ang) * R
+      const vx = nx - px
+      const vz = nz - pz
+      dist += Math.hypot(vx, vz) // accumulates on ANY displacement, curve included
+      const yaw = faceVelocity(vx, vz, prevYaw)
+      if (Math.abs(yaw - prevYaw) > 1e-6) turned = true
+      prevYaw = yaw
+      px = nx
+      pz = nz
+    }
+    expect(turned).toBe(true) // the path genuinely turns throughout
+    const net = Math.hypot(px - R, pz - 0) // start→end chord
+    expect(dist).toBeGreaterThan(net) // the arc is longer than its chord
+    // The phase rides the full curved path length, not the net displacement —
+    // so it advances over a turn instead of freezing.
+    expect(gaitPhase(dist)).toBeGreaterThan(gaitPhase(net))
+    expect(gaitPhase(dist)).toBeCloseTo(dist * GAIT_CADENCE, 9)
   })
 
   it('every leg is at neutral at rest (phase 0), and diagonal legs trot in antiphase', () => {

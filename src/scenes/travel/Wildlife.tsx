@@ -18,7 +18,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
-import { setAmbienceAnimals } from '../../systems/ambience'
+import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
 import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
@@ -34,6 +34,9 @@ import {
   blockHeading,
   guardEngagement,
   griefTarget,
+  frontInterceptTarget,
+  elephantWouldTrample,
+  deflectAroundCircle,
   fleesFromPlayer,
   fleeCrossing,
   resolveFleeTarget,
@@ -72,6 +75,7 @@ import {
   type PredatorKind,
   type PreyKind,
   vicinitySeedBounds,
+  vicinityAttemptSeed,
   seasonFlowFactor,
   shouldMourn,
   mournDeadline,
@@ -87,6 +91,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileIdleYaw,
   crocodileGripExpired,
   crocodileHoldsCatch,
   grassFireEligible,
@@ -97,6 +102,7 @@ import {
   vigilBlocksLanding,
   vigilDrawReady,
   offscreenRingSpawn,
+  keepStreamedAnimal,
   waterStruggleFate,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
@@ -123,8 +129,11 @@ import {
   buildWildebeestCalf,
   buildZebra,
   buildZebraCalf,
+  createCrocodileMaterial,
   createFaunaMaterial,
   crocodileBodyY,
+  crocodileWaterlineLocal,
+  CROCODILE_WATERLINE_NONE,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
@@ -287,6 +296,11 @@ interface Animal {
    *  slinking back home. Its own state — the scripted LION hunt is never
    *  touched by an ambush. */
   lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  /** A hidden crocodile's FIXED rest heading (point 257): captured once when it
+   *  settles to waiting, the anchor its subtle idle yaw oscillates about. Held
+   *  absolute so the sway can never accumulate into a rotation; cleared when the
+   *  croc lunges so the post-attack slink-home heading re-anchors it. */
+  restYaw?: number
   /** Spawned dead as rinderpest toll (point 133) — lets the verify count the
    *  plague's own carrion apart from ordinary hunt/trample deaths. */
   plague?: true
@@ -634,7 +648,21 @@ const STRUGGLE_SELF_RESCUE = 25 // s after which an unaided calf clambers out
 // saves nobody and stays on its own speed, off the rescue burst. So does the
 // point-121 vigil walk (YOUNG_FOLLOW_SPEED in the vigil pre-pass).
 const TRAMPLE_GRIEF_SPEED = 6.5 // a parent rushing the elephant that trampled its calf
-const TRAMPLE_GRIEF_SECONDS = 12 // grief window; an unresolved charge clears here
+// Grief window; an unresolved charge clears here (the I4 "every drama resolves"
+// backstop). Widened from 12 s (point 261): the elephant is now a solid body the
+// grieving parent must ROUTE AROUND to reach the front-intercept point instead
+// of clipping straight through its legs, which lengthens the path — so the
+// deadline is doubled to comfortably cover circling the body (~π·bodyRadius at
+// TRAMPLE_GRIEF_SPEED, plus the chase after a walking elephant) before it fires.
+const TRAMPLE_GRIEF_SECONDS = 24
+// How far ahead of the elephant (along its heading) the grieving parent aims
+// (point 259): it must reach the elephant's FRONT to be crushed, so the moving
+// elephant travels toward it (the trampleKills direction condition). Kept BELOW
+// TRAMPLE_RADIUS (1.5) so a parent standing on the front point is already inside
+// the trample reach AND ahead of the feet — reaching a flank or the rear does
+// not kill, the parent keeps steering to get in front, and the
+// TRAMPLE_GRIEF_SECONDS deadline still resolves the grief regardless.
+const GRIEF_FRONT_REACH = 1
 // OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
 // light animal escaping up a kopje/tree) and further new species/birds beyond
 // the current roster and the added calves are not yet implemented.
@@ -1158,6 +1186,11 @@ function placeGroup(
  * rules. A clearance keeps them off the leave point so the player never
  * materialises inside a herd.
  */
+// Per-place seeding-attempt counter (point 102): advances once per frame in
+// which that place's vicinity needed a top-up, so every attempt draws a fresh
+// candidate set via vicinityAttemptSeed — a deferring frame (all bearings
+// on-screen or wet) never re-tests the same frozen candidates forever.
+const vicinitySeedAttempt = new Map<string, number>()
 function seedSettlementVicinity(
   herds: Record<Species, Animal[]>,
   pos: { x: number; z: number },
@@ -1191,10 +1224,17 @@ function seedSettlementVicinity(
     }
     if (count >= min) continue
     const deficit = min - count
-    // Deterministic placement from the settlement id + world seed.
+    // Deterministic placement from the settlement id + world seed + attempt
+    // index: the attempt stride makes each frame's draw EXPLORE fresh ring
+    // bearings (see vicinityAttemptSeed) instead of re-testing one frozen set —
+    // the old fixed seed let an idle player's static camera pin a deferring
+    // draw (or a member offset on wet/low ground) in place forever, stalling
+    // the guarantee one animal short (point 249).
     let h = 0
     for (const c of place.id) h = (h * 31 + c.charCodeAt(0)) | 0
-    const rand = mulberry32(((seed ^ h) + 0x102) >>> 0)
+    const attempt = vicinitySeedAttempt.get(place.id) ?? 0
+    vicinitySeedAttempt.set(place.id, attempt + 1)
+    const rand = mulberry32(vicinityAttemptSeed(seed, h, attempt))
     // Rotate through the pool from a deterministic start until a species has
     // instance capacity left (point 135a): picking ONE and giving up at its
     // cap silently starved the guarantee once the test scenarios had filled
@@ -1372,6 +1412,9 @@ interface WildlifeMeshPool {
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
   stain: THREE.InstancedMesh
   material: THREE.MeshStandardMaterial
+  /** Per-instance local waterline feeding the croc submersion fade (point 246),
+   *  written each frame beside the instance matrix. */
+  crocWaterline: THREE.InstancedBufferAttribute
   vultureGeo: THREE.BufferGeometry
 }
 let wildlifeMeshCache: WildlifeMeshPool | null = null
@@ -1406,10 +1449,24 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   // Shared smooth-shaded fauna material (point 214): flat shading would fold
   // the rounded bodies back into hard polygon panels.
   const material = createFaunaMaterial()
+  // The crocodile draws through its own material (point 246): same fauna look
+  // plus the submersion fade below the per-instance 'crocWaterline' attribute,
+  // so a hidden croc's body vanishes under the alpha-blended water sheets
+  // instead of reading through them. Module singleton like everything here.
+  const crocMaterial = createCrocodileMaterial()
+  const crocWaterline = new THREE.InstancedBufferAttribute(
+    new Float32Array(MAX_INSTANCES.crocodile).fill(CROCODILE_WATERLINE_NONE),
+    1,
+  )
+  crocWaterline.setUsage(THREE.DynamicDrawUsage)
+  geometries.crocodile.setAttribute('crocWaterline', crocWaterline)
   const adult = {} as Record<Species, THREE.InstancedMesh>
   for (const sp of SPECIES) {
-    const m = new THREE.InstancedMesh(geometries[sp], material, MAX_INSTANCES[sp])
-    m.castShadow = true
+    const m = new THREE.InstancedMesh(geometries[sp], sp === 'crocodile' ? crocMaterial : material, MAX_INSTANCES[sp])
+    // No croc cast shadow (point 246): a submerged body threw a crisp shadow
+    // onto the river bed, which read through the ~0.9-alpha sheet exactly like
+    // the body itself. The flat-on-the-water croc loses nothing visible.
+    m.castShadow = sp !== 'crocodile'
     m.frustumCulled = false
     m.count = 0
     adult[sp] = m
@@ -1429,7 +1486,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
   )
   stain.frustumCulled = false
   stain.count = 0
-  wildlifeMeshCache = { adult, calf, stain, material, vultureGeo: buildVulture() }
+  wildlifeMeshCache = { adult, calf, stain, material, crocWaterline, vultureGeo: buildVulture() }
   return wildlifeMeshCache
 }
 
@@ -1666,10 +1723,21 @@ function Herds() {
       }
     }
     if (despawned) {
-      // Keep dead carcasses (they dissolve on screen) and untagged animals
-      // (e.g. injected by the verification) even when their chunk streams out.
+      // Cull each animal by where it STANDS, never only by its birth chunk:
+      // roamers/fleers drift chunks away from their spawn, so the old
+      // birth-chunk filter deleted animals still in sight (a zoom-in collapses
+      // despawnR in one frame and mass-culled them). keepStreamedAnimal
+      // re-homes a drifted animal into the live chunk under its feet and
+      // backstops with the rendered frame. Known pre-existing property: a
+      // re-homed animal plus a later deterministic respawn of its origin
+      // chunk can duplicate — inherent to deterministic chunk respawn.
+      const liveChunkHas = (key: string) => spawnedChunks.current.has(key)
       for (const sp of SPECIES) {
-        herds[sp] = herds[sp].filter((a) => a.dead || a.chunk === undefined || spawnedChunks.current.has(a.chunk))
+        herds[sp] = herds[sp].filter((a) => {
+          const v = keepStreamedAnimal(a, liveChunkHas, CHUNK_SIZE, pos.x, pos.z, despawnR, isOnScreen)
+          if (v.rehomeTo !== undefined) a.chunk = v.rehomeTo
+          return v.keep
+        })
       }
       for (const hid of [...herdState.current.keys()]) {
         if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
@@ -1688,6 +1756,17 @@ function Herds() {
           (a, b) => Math.hypot(a.x - pos.x, a.z - pos.z) - Math.hypot(b.x - pos.x, b.z - pos.z),
         )
       }
+    }
+
+    // Frame-start positions for the elephant body collider (design.md §19.5,
+    // point 261): every non-elephant animal's step this frame is later swept
+    // against the elephants' bodies so it slides AROUND them rather than through.
+    // Snapshotted here, before any drive moves an animal, so the sweep sees the
+    // whole frame's displacement (no tunnelling through the ~2.6 m-wide body).
+    const stepFrom = new Map<Animal, [number, number]>()
+    for (const sp of SPECIES) {
+      if (sp === 'elephant') continue
+      for (const a of herds[sp]) stepFrom.set(a, [a.x, a.z])
     }
 
     // Calf predation resolution (design.md §19), over the FULL herd lists — not
@@ -2121,9 +2200,15 @@ function Herds() {
           a.grief = undefined
           continue
         }
-        a.trampleTo = target
-        const dx = target.x - a.x
-        const dz = target.z - a.z
+        // Aim at the elephant's FRONT (point 259): only a touch from ahead —
+        // where the moving elephant is travelling toward the parent — triggers
+        // the trample (the trampleKills direction condition in the render loop).
+        // A parent that only reaches the flank/rear is not crushed and keeps
+        // re-aiming; the grief window (deadline above) still always resolves it.
+        const front = frontInterceptTarget(target.x, target.z, target.heading, GRIEF_FRONT_REACH)
+        a.trampleTo = front
+        const dx = front.x - a.x
+        const dz = front.z - a.z
         const d = Math.hypot(dx, dz) || 1
         a.x += (dx / d) * TRAMPLE_GRIEF_SPEED * dt
         a.z += (dz / d) * TRAMPLE_GRIEF_SPEED * dt
@@ -2707,11 +2792,9 @@ function Herds() {
     // nearest live animal of each voice group so their sounds rise as the
     // player draws near, all under the single ambience volume.
     {
-      const AUDIBLE = 48
       const near = { elephant: 0, lion: 0, grazer: 0, flock: 0 }
       const consider = (dx: number, dz: number, key: keyof typeof near) => {
-        const d = Math.hypot(dx, dz)
-        if (d < AUDIBLE) near[key] = Math.max(near[key], 1 - d / AUDIBLE)
+        near[key] = Math.max(near[key], proximityGain(Math.hypot(dx, dz)))
       }
       for (const a of herds.elephant) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'elephant')
       for (const sp of ['zebra', 'wildebeest', 'antelope', 'warthog', 'giraffe'] as const)
@@ -2778,12 +2861,19 @@ function Herds() {
             tgZ = m.z
           }
         }
-        if (st.mourn && t >= st.mourn.until) {
+        // The vigil window runs on the SIM clock, like every other drama timer
+        // (grief, keeper vigil, caught countdowns — all `dt`-driven): the herd
+        // WALKS at sim speed, so a wall-clock deadline expires mid-walk-in
+        // whenever frames run long (the dt clamp lets sim time fall behind wall
+        // time) and the herd would release before it ever held at the bones —
+        // the measured point-126 miss under load, and the same degradation a
+        // player on a weak machine would see.
+        if (st.mourn && simTimeRef.current >= st.mourn.until) {
           st.mourn = undefined
           st.mourned = true // vigil over — move on; not again until the herd has left the radius
         }
         if (!st.mourn && shouldMourn(tgD, bm.radius, st.mourned === true)) {
-          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(t, tgD, bm.seconds, ELEPHANT_SPEED) }
+          st.mourn = { x: tgX, z: tgZ, until: mournDeadline(simTimeRef.current, tgD, bm.seconds, ELEPHANT_SPEED) }
         }
         if (st.mourned && tgD > bm.radius) st.mourned = undefined
         if (st.mourn) {
@@ -2849,12 +2939,22 @@ function Herds() {
       return false
     }
     const elephantPos: Array<[number, number]> = []
+    // Parallel to elephantPos: this frame's movement vector per elephant (0,0
+    // when it held). Drives the trample DIRECTION condition (trampleKills,
+    // point 259) — a standing elephant tramples nothing.
+    const elephantVel: Array<[number, number]> = []
+    // This frame's movement vector per elephant, keyed by the animal, so the
+    // point-261 body collider can read the SAME velocity the trample uses and
+    // EXEMPT an animal this elephant would trample this step (point 263).
+    const elephantVelMap = new Map<Animal, [number, number]>()
     {
       const list = herds.elephant
       const n = Math.min(list.length, MAX_INSTANCES.elephant)
       for (let i = 0; i < n; i++) {
         const a = list[i]
         if (a.dead) continue
+        const ex0 = a.x
+        const ez0 = a.z
         if (a.heading === undefined) a.heading = a.rot
         const info = a.herd !== undefined ? herdCentre.get(a.herd) : undefined
         const mournInfo = a.herd !== undefined ? herdState.current.get(a.herd)?.mourn : undefined
@@ -2932,6 +3032,65 @@ function Herds() {
           // Else hold position this frame and keep turning gently next frame.
         }
         elephantPos.push([a.x, a.z])
+        elephantVel.push([a.x - ex0, a.z - ez0])
+        elephantVelMap.set(a, [a.x - ex0, a.z - ez0])
+      }
+    }
+
+    // Elephant body collider (design.md §19.5, point 261): an elephant is a
+    // SOLID obstacle to every OTHER animal's locomotion. Each non-elephant
+    // animal's whole step this frame (frame-start → now) is swept around every
+    // live elephant body so it slides AROUND the body instead of walking through
+    // it — the grief parent must ROUTE AROUND the body to reach the front
+    // (points 259/261), and no animal clips an elephant in general. The collider
+    // radius is the elephant body radius alone (no self radius added), so a
+    // deflected animal rests AT the body edge — still inside the wider
+    // TRAMPLE_RADIUS (1.5 > 1.3), so the designed §19.5 trample and the
+    // grief-crush at the front are never blocked. The elephant's own movement
+    // (its trample step) is never deflected here — only the other animals'.
+    // A trample the elephant is ABOUT to make is EXEMPT (point 263): an animal
+    // this elephant would trample this step (in range AND moving toward it) is
+    // NOT slid around the body, or the lateral deflection would rotate the
+    // elephant→victim vector perpendicular to the elephant's velocity and the
+    // point-259 directional trample could never fire — so the elephant would
+    // catch nothing, no stain would be laid and the §19.8 calf-trample grief
+    // chain could not start. Each body carries this frame's elephant velocity.
+    {
+      const bodies: Array<[number, number, number, number, number]> = []
+      for (const e of herds.elephant) {
+        if (e.dead) continue
+        const v = elephantVelMap.get(e) ?? [0, 0]
+        bodies.push([e.x, e.z, BODY_RADIUS.elephant * e.scale, v[0], v[1]])
+      }
+      if (bodies.length > 0) {
+        for (const sp of SPECIES) {
+          if (sp === 'elephant') continue
+          for (const a of herds[sp]) {
+            if (a.dead) continue
+            const from = stepFrom.get(a)
+            if (from === undefined) continue
+            let nx = a.x
+            let nz = a.z
+            // deflectAroundCircle returns the step unchanged when it never
+            // touches a body, so a far grazer is untouched; only a step that
+            // would enter a body is slid to its edge (never a dead stop) —
+            // UNLESS this elephant is about to trample the animal (point 263),
+            // in which case the step lands and the trample catches it.
+            for (const [ex, ez, r, evx, evz] of bodies) {
+              if (elephantWouldTrample(evx, evz, ex, ez, nx, nz, TRAMPLE_RADIUS)) continue
+              ;[nx, nz] = deflectAroundCircle(from[0], from[1], nx, nz, ex, ez, r)
+            }
+            if (nx !== a.x || nz !== a.z) {
+              a.x = nx
+              a.z = nz
+              // Ground-follow (point 203(A)): carry the standing height onto the
+              // slid spot; land only, water occupants are owned by their dramas.
+              const gfl = worldToLatLon(a.x, a.z)
+              const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
+              if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+            }
+          }
+        }
       }
     }
 
@@ -3107,13 +3266,32 @@ function Herds() {
           wobTarget = 0
           const hidden = a.lunge === undefined
           const striking = a.lunge !== undefined && !a.lunge.retreat && !(a.lunge.victim?.dead ?? false)
-          // Subtle idle life (point 242c) only while fully at rest: a slow float
-          // bob and a few-degree sway so a hidden croc never reads as a frozen
-          // prop — never applied mid-attack or mid-sink (that would look jittery).
-          const sway = hidden ? Math.sin(t * 0.3 + a.phase * 6.283) * 0.03 : 0
-          const bob = hidden ? Math.sin(t * 0.5 + a.phase * 6.283) * 0.008 : 0
-          yaw = a.rot + sway
-          bodyY = crocodileBodyY(a.y, !striking) + bob
+          // Submersion fade (point 246): carry this instance's local waterline
+          // to the croc material so the body below the sheet fades out instead
+          // of reading through the alpha-blended water. aIdx is the index this
+          // croc gets in write() below — nothing between here and there skips a
+          // living croc, and crocs are never young or dead (structurally
+          // unkillable, §19.16). Submerged in every pose except the live strike
+          // — exactly the crocodileBodyY submerge flag.
+          pool.crocWaterline.setX(aIdx, crocodileWaterlineLocal(a.scale, !striking))
+          // Subtle idle life (point 242) only while fully at rest: a slow float
+          // bob and a few-degree yaw sway so a hidden croc never reads as a frozen
+          // prop. The sway is a BOUNDED oscillation about a FIXED rest heading
+          // (point 257) — captured once here, never the live `a.rot`: with yaw set
+          // to `a.rot + sway` the facing-steer below wrote the swayed heading back
+          // into a.rot, so the sway summed frame over frame into a full-circle
+          // rotation (the reported "croc slowly spins"). Anchoring to restYaw keeps
+          // it an absolute value that returns to centre; a hidden croc WAITS, it
+          // does not roam (§19.16). The bob/sway are dropped mid-attack or mid-sink.
+          if (hidden) {
+            if (a.restYaw === undefined) a.restYaw = a.rot
+            yaw = crocodileIdleYaw(a.restYaw, t, a.phase)
+            bodyY = crocodileBodyY(a.y, true) + Math.sin(t * 0.5 + a.phase * 6.283) * 0.008
+          } else {
+            a.restYaw = undefined
+            yaw = a.rot
+            bodyY = crocodileBodyY(a.y, !striking)
+          }
         }
         // The broken-wing act (point 145b): the luring plover tilts hard onto
         // one wing and flutters; the return flight lifts it in a low arc.
@@ -3816,9 +3994,17 @@ function Herds() {
         // must never carry an animal under a trample. (A calf killed by a
         // predator above is already dead; skip the scan and just re-render.)
         if (sp !== 'elephant') {
+          const wasDead = a.dead
           if (!a.dead) {
-            for (const [ex, ez] of elephantPos) {
-              if (Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS) {
+            for (let ei = 0; ei < elephantPos.length; ei++) {
+              const [ex, ez] = elephantPos[ei]
+              const [evx, evz] = elephantVel[ei]
+              // A trample kills only when the elephant is MOVING toward the
+              // animal (point 259): a standing elephant a grazer bumps into, or
+              // a hit from behind its heading of travel, leaves it unharmed —
+              // the §19.5 body-separation parts that overlap instead. Only an
+              // elephant driving into/over the animal crushes it.
+              if (elephantWouldTrample(evx, evz, ex, ez, a.x, a.z, TRAMPLE_RADIUS)) {
                 a.dead = true
                 pushStain(a.x, a.z)
                 // A trampled CALF takes its parent with it (design.md §19): the
@@ -3835,6 +4021,18 @@ function Herds() {
                 break
               }
             }
+          }
+          // The trample crunch (design.md §19.1/§19.5, point 260): one short
+          // CRACK/CRUNCH at the victim's world position the frame it is crushed
+          // — the ordinary trample above AND the parent grief-trample (the
+          // charging parent is trampled by this same check on arrival). An EDGE,
+          // not a level: gated on the alive->dead transition so it fires exactly
+          // once per kill and never per frame while the carcass lies here; a
+          // predator kill (already dead on entry) draws no crunch. Positional —
+          // the shared §19.1 proximity fade makes a near trample loud, a far one
+          // faint (via the single ambience volume, one audio path).
+          if (trampleCrunchFires(!!wasDead, !!a.dead)) {
+            playTrampleCrunch(Math.hypot(a.x - pos.x, a.z - pos.z))
           }
           if (a.dead) {
             i-- // re-render this animal in its dead pose immediately
@@ -3914,6 +4112,7 @@ function Herds() {
       }
       mesh.count = aIdx
       mesh.instanceMatrix.needsUpdate = true
+      if (sp === 'crocodile') pool.crocWaterline.needsUpdate = true // point 246
       if (calfMesh) {
         calfMesh.count = cIdx
         calfMesh.instanceMatrix.needsUpdate = true

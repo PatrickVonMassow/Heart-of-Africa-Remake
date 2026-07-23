@@ -2,7 +2,7 @@
 // far silhouettes stay small (bounded subtended angle) and hazed toward the
 // sky, never looming black monuments.
 import { describe, it, expect } from 'vitest'
-import { silhouetteScale, apparentAngleDeg, hazeColor, luminance, excludedAzimuthSpan, isAzimuthExcluded } from './panoramaWildlife'
+import { silhouetteScale, apparentAngleDeg, hazeColor, luminance, excludedAzimuthSpan, isAzimuthExcluded, panoramaDriftDistance } from './panoramaWildlife'
 
 describe('silhouetteScale', () => {
   it('shrinks an oversized scale so the subtended angle stays within the cap', () => {
@@ -57,6 +57,33 @@ describe('hazeColor', () => {
   it('clamps the mix to [0,1]', () => {
     expect(hazeColor(base, sky, -1)).toEqual(base)
     closeTriplet(hazeColor(base, sky, 2), sky)
+  })
+})
+
+describe('panoramaDriftDistance (point 255 — walking silhouettes, not gliding)', () => {
+  it('is zero at rest and grows linearly with elapsed drift time', () => {
+    // No time elapsed → no distance → the fed gait phase is 0 (still legs).
+    expect(panoramaDriftDistance(80, 0.006, 0)).toBe(0)
+    const d1 = panoramaDriftDistance(80, 0.006, 1)
+    const d2 = panoramaDriftDistance(80, 0.006, 2)
+    expect(d1).toBeGreaterThan(0)
+    // Twice the time → twice the arc walked (so the gait swings twice as far):
+    // the swing advances WITH the drift distance.
+    expect(d2).toBeCloseTo(2 * d1, 12)
+  })
+
+  it('scales with the ring radius and ignores the drift sign (either way is walking)', () => {
+    // A silhouette on a wider ring covers more ground for the same angular drift.
+    expect(panoramaDriftDistance(160, 0.006, 3)).toBeCloseTo(2 * panoramaDriftDistance(80, 0.006, 3), 12)
+    // Drifting left or right is the same amount of walking.
+    expect(panoramaDriftDistance(80, -0.006, 3)).toBeCloseTo(panoramaDriftDistance(80, 0.006, 3), 12)
+  })
+
+  it('a faster-drifting silhouette walks further (steps faster) and a stalled one not at all', () => {
+    const slow = panoramaDriftDistance(80, 0.004, 1)
+    const fast = panoramaDriftDistance(80, 0.01, 1)
+    expect(fast).toBeGreaterThan(slow)
+    expect(panoramaDriftDistance(80, 0, 5)).toBe(0) // no drift → no swing
   })
 })
 

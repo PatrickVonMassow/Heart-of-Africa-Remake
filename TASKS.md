@@ -6110,24 +6110,24 @@ the remaining open points in their numeric order.
       fully (198/0), confirming they are timing flakes, not regressions. Their
       deterministic stabilisation is filed as point 177.
 
-- [ ] 174. Tag the demo build v0.2 and publish /v0.2/.
-  GATE (user, 19.07.2026): tag v0.2 only after ALL of these are green — 175 (the
+- [ ] 174. Tag the demo build `v0.3` and publish it at
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
+  GATE (user, 19.07.2026): tag v0.3 only after ALL of these are green — 175 (the
   jumping trees, user-confirmed on WebGPU), 177 (deterministic suite), 176 (drought
   drink-reach cap), the play-test bugs 178/179/180/181/183, 184 (the pre-tag
   hardening pass), AND a final closing run (Vitest + LARGE regression, dead-code/.md
-  audit, lint/CVE clean) at that verified HEAD. v0.2 must ship none of those bugs
+  audit, lint/CVE clean) at that verified HEAD. v0.3 must ship none of those bugs
   nor any regression the closing catches.
-  FINAL TAG HELD FOR THE USER (default, user away 19.07.2026): the tag + /v0.2/
+  FINAL TAG HELD FOR THE USER (default, user away 19.07.2026): the tag + /v0.3/
   publish is the one irreversible, outward-facing step — do ALL the work up to it,
   then report "ready to tag" and WAIT for the user's go, unless the user has
-  explicitly authorized auto-tagging. When authorized / on the user's return: tag
-  `v0.2` at that HEAD and serve it at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/ — mirror how
-  /v0.1/ and /poc/ are wired (the `.github/workflows` Pages build + the tag/deploy
-  trigger; a tag push may not trigger the deploy, so use the same mechanism v0.1
-  used). Then FREEZE it: never re-point or change v0.2 unless the user elaborately
-  asks (tags-only-on-request memory). The v0.2 content is the 175/177/176/178-183/
-  184-closed, closing-verified HEAD; 182 and 163/166/170 come AFTER the tag.
+  explicitly authorized auto-tagging. When authorized: tag `v0.3` at that HEAD and
+  serve it at /v0.3/ — mirror how the other tags are wired (the `.github/workflows`
+  Pages build + its tag loop `for tag in v0.1 v0.2 v0.3 poc`; a tag push may not
+  trigger the deploy, so use the same mechanism v0.1 used). Then FREEZE it: never
+  re-point or change v0.3 unless the user elaborately asks (tags-only-on-request
+  memory). The v0.3 content is the 175/177/176/178-183/184-closed, closing-verified
+  HEAD; 182 and 163/166/170 come AFTER the tag.
 
 - [x] 175. Plants STILL jump while driving — a WebGPU-specific crown jitter.
   REOPENED 18.07.2026: the shipped fix (5421e46, baked per-instance seasonTint +
@@ -8778,26 +8778,29 @@ the remaining open points in their numeric order.
   design.md §19.13; update the peoples/climate implementation sections in lockstep.
   A Fable-5 plausibility pass fits this audit.
 
-- [ ] 224. DEMO CHECKPOINT — full closing run → re-point the `poc` tag to the
-  then-current main → publish that state playable at
-  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/ (user request
-  22.07.2026). GATE/POSITION: the user wants this as the NEXT milestone right
-  AFTER the current terrain task (215) once everything is stable and 215 is done —
-  i.e. a visible demo update for the terrain smoothing, NOT waiting for every open
-  bug. Run it when 215 is finished + the tree is stable (build/lint/CVE clean,
-  full Vitest + the LARGE browser regression on BOTH backends green — the §7.2
-  closing cycle per docs/maximale-qs.md's closing steps). STEPS: (1) full closing
-  cycle (Vitest + LARGE regression both backends, dead-code/stale-doc pass, lint/
-  audit clean) — only proceed if GREEN; (2) re-point the EXISTING `poc` tag to the
-  current main HEAD (this is an explicit, authorized re-tag per the user — the only
-  standing exception to [[tags-only-on-request]], for THIS request) and push the
-  moved tag; (3) the GH-Pages deploy builds the poc tag into the `/poc/` path
-  (deploy-pages.yml, guarded, worktree --base=/…/poc/) — verify the deploy is green
-  and BOTH URLs resolve 200 (root = main, /poc/ = the moved tag) with correctly
+- [ ] 224. DEMO CHECKPOINT — full closing run → publish the checkpoint as `v0.2` at
+  /v0.2/ and re-point the `poc` tag, both playable (user request 22.07.2026).
+  GATE/POSITION: the NEXT milestone right AFTER the terrain task (215) once
+  everything is stable and 215 is done — a visible demo update for the terrain
+  smoothing, NOT waiting for every open bug. Run it when 215 is finished + the tree
+  is stable (build/lint/CVE clean, full Vitest + the LARGE browser regression on
+  BOTH backends green — the §7.2 closing cycle per docs/maximale-qs.md's closing
+  steps). STEPS: (1) full closing cycle (Vitest + LARGE regression both backends,
+  dead-code/stale-doc pass, lint/audit clean) — only proceed if GREEN; (2) at that
+  verified GREEN main HEAD, create the `v0.2` release tag and re-point the `poc` tag
+  to it, and push both tags (these are the explicit, authorized tag ops per the user
+  — the standing exception to [[tags-only-on-request]] for THIS request; do NOT touch
+  v0.1); (3) the GH-Pages deploy builds each tag into its path (deploy-pages.yml,
+  guarded, worktree --base=/…/<tag>/) — the workflow's tag loop is
+  `for tag in v0.1 v0.2 poc` (v0.3 joins it when 174 ships) so the same Pages
+  artifact serves them — verify the deploy is green and ALL URLs resolve 200: root =
+  main, /poc/ = the poc tag, and /v0.2/ =
+  https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.2/, all with correctly
   based asset URLs (the MSYS-mangling Git-Bash trap is documented). This is
-  outward-facing: run only after the closing is GREEN; report the result. DOCS:
-  README version section if wording changes. Do NOT touch the v0.1 tag; 174 (v0.2)
-  is a separate later release.
+  outward-facing: run only after the closing is GREEN; report the result. Then FREEZE
+  v0.2 (never re-point unless the user elaborately asks). DOCS: README version
+  section. Do NOT touch the v0.1 tag; 174 (v0.3, at /v0.3/) is a separate later
+  release.
 
 - [x] 225. WET GROUND WHEN IT RAINS (user 22.07.2026, position: AFTER 224). When
   it rains the ground must visibly get WET — in BOTH the bird's-eye/outdoor terrain
@@ -9429,7 +9432,7 @@ the remaining open points in their numeric order.
   242/237/217/228; do NOT delegate concurrently with those wildlife points; can be
   bundled with 242 (both are crocodile/wildlife on the same files).
 
-- [ ] 246. CROCODILE SHOWS THROUGH THE WATER — the user reports (22.07.2026,
+- [x] 246. CROCODILE SHOWS THROUGH THE WATER — the user reports (22.07.2026,
   screenshot) that a SUBMERGED crocodile's BODY is clearly visible THROUGH the water
   surface (a sharp silhouette), although its eyes correctly sit above the water (the
   submerge pose is right). A submerged body should be OBSCURED/murky under the water,
@@ -9497,7 +9500,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx` — same files as 239/245/247/242/237; bundles with 247 (both are
   239 flee refinements); do NOT delegate concurrently with the other wildlife points.
 
-- [ ] 249. ENRICHMENTS STAGED-DRAMA ASSERTIONS ARE TIMING-FRAGILE (rotating flakes,
+- [x] 249. ENRICHMENTS STAGED-DRAMA ASSERTIONS ARE TIMING-FRAGILE (rotating flakes,
   WebGPU-amplified) — NOT a crash. Measured over full clean runs (23.07.2026):
   `VERIFY_GL=webgl run-all enrichments` passes 214/0/0 (green, no retry needed); the
   earlier "crash twice" reading was a wrapper-`timeout` kill (the slow suite) plus
@@ -9665,6 +9668,687 @@ the remaining open points in their numeric order.
   strip through the lake, the outflow still reads). DOCS: none. No player-visible
   text. NOTE: same river-render files as 232-234/246 — bundle with the river-render
   follow-ups (246 depthWrite + this).
+
+- [ ] 255. ANIMAL GAIT: TOO SLOW, ONLY ON STRAIGHT WALK, AND ABSENT ON THE SKYLINE
+  (user 23.07.2026, follow-up to point 228). Three observations on the deployed
+  gait: (1) the leg swing is TOO SLOW overall — it must plausibly MATCH the movement
+  speed so a walking animal reads as striding on its FEET, not shuffling; (2) the
+  legs seem to move only while the animal walks STRAIGHT (they appear to stop on a
+  turn / curved path); (3) the SKYLINE / §2.5 panorama-band animals (the distant
+  silhouettes drifting past the settlement horizon — the "gliding animal" of
+  point 227) still GLIDE with no leg motion at all. DIAGNOSE + FIX: (1) the gait
+  cadence — `GAIT_CADENCE` in `src/render/fauna.ts` (phase = distance × cadence,
+  point 228) is too low; raise it so the stride FREQUENCY reads as a real walk at
+  the settlement walk speed (a goat takes ~1.5-2 visible strides per metre), still a
+  pure function of distance travelled so stride length tracks speed (faster → longer/
+  quicker steps, none at rest) — pure-tested against a plausible strides-per-metre
+  bound. (2) confirm the phase advances on ANY displacement, not just a straight
+  heading — a goat on a curved errand path still accumulates distance, so its legs
+  must swing; if the gait is gated on a straight/aligned-velocity condition, remove
+  that gate (leg swing follows distance travelled regardless of turn). (3) give the
+  panorama-band skyline animals the SAME distance-driven leg gait (or, if a full
+  gait is too heavy for the tiny hazed silhouettes, at least stop the glide — advance
+  a simple leg swing with their drift so they read as walking, not sliding);
+  this closes the point-227 "gliding animal on the skyline" observation for the
+  fauna half. Anchors: `src/render/fauna.ts` (`GAIT_CADENCE`/`gaitPhase`/
+  `legSwingAngle`/`buildGoatParts` from point 228), `src/scenes/place/PlaceLife.tsx`
+  (settlement walkers), and the §2.5 panorama-wildlife band in `src/scenes/place/`
+  (the skyline silhouette movers — search for the panorama/backdrop wildlife drift).
+  VERIFIABLE: a pure test that the leg-swing phase advances fast enough per metre to
+  read as a walk (strides-per-metre within a plausible band) and advances on a curved
+  path (any displacement, not only straight); a live check in
+  `scripts/verify/polish.mjs` that a walking settlement animal AND a skyline-band
+  animal both swing their legs while moving (no foot-slide); the parent
+  picture-verifies the walk on BOTH backends (legs visibly stride, matching speed).
+  DOCS: design.md §19 (locomotion) / §2.5 (panorama wildlife) if wording changes. No
+  player-visible text. NOTE: `fauna.ts`/`PlaceLife.tsx`/place panorama — same gait
+  files as point 228 (now merged); relates to point 227 (skyline gliding animal — 255
+  covers the fauna leg-motion half).
+
+- [ ] 256. THE VILLAGE FIRE BURNS ON IN THE RAIN — RESEARCH + A REALISTIC SHELTER
+  (user 23.07.2026). The user reports that the §19.10 village fire keeps burning
+  unprotected in the rain, which reads wrong, and asks: did ~1890 African
+  settlements have a real solution to keep a fire going through rain (e.g. roofing
+  it over)? RESEARCH FIRST (record the finding in `docs/peoples-1890.md`, a new
+  short subsection, cited): how period sub-Saharan settlements kept a hearth/cooking
+  fire alight in the rains — the well-attested answers include a dedicated ROOFED
+  COOKING SHELTER / open-sided thatch canopy on posts (a common separate cook-house
+  or lean-to over the hearth), the central hearth kept INSIDE the dwelling under the
+  thatch with a smoke vent, a raised/banked fire under eaves, and windbreaks; pick
+  the option(s) that fit the peoples the game shows and are cheap to render. FIX
+  (realistic): give the village fire a visible SHELTER so its burning in rain is
+  plausible — the most legible is a small open-sided thatched CANOPY on posts over
+  the fire (a cook-shelter), present at the fire site; and gate the §19.10 firelight/
+  flame so in rain the OPEN fire does not simply blaze unaffected — under the shelter
+  it burns on (a touch lower/steamier), and any UNSHELTERED flame is visibly damped
+  by the rain. Keep it cheap (a simple roofed-post primitive + the existing fire),
+  gated on the place's rain state (the §19.13/point-225 rain factor). Anchors: the
+  village fire + §19.10 firelight (search `src/scenes/place/` for the fire/flame and
+  the firelight — likely `PlaceLife.tsx` or a fire component), the rain state
+  (`__placeSeason`/the point-225 wetness), `src/render/` for the canopy primitive,
+  `docs/peoples-1890.md` (the research subsection). VERIFIABLE: a pure test that the
+  fire is sheltered / its rain-response is a function of the rain factor (open flame
+  damped in rain, sheltered flame persists); a live check in `scripts/verify/
+  polish.mjs` that in a rainy settlement the fire shows its shelter and the picture
+  reads plausibly; the parent picture-verifies on both backends (a rainy village
+  fire under its canopy). DOCS: `docs/peoples-1890.md` (research, in the SAME
+  branch/commit), design.md §19.10 (the fire shelter + rain response). No
+  player-visible text unless a label is added (then both languages). Research fits a
+  Fable pass. NOTE: touches `src/scenes/place/` (the fire) — do NOT delegate
+  concurrently with point 255 (PlaceLife.tsx) or 244 (PlaceScene.tsx); queue after
+  they merge, or scope it to a fire-only file that does not overlap.
+
+- [x] 257. IDLE CROCODILE TURNS IN CIRCLES (user 23.07.2026, screenshot, West river
+  — regression from point 242). The resting/lurking crocodile slowly rotates in a
+  full circle instead of waiting still. §19.16 is explicit: "Hidden, it lies
+  submerged … It waits; it does NOT roam." Point 242 added an OPTIONAL subtle idle
+  motion (a float bob ±0.008 and a yaw sway ±0.03 rad on a fully-resting croc) — that
+  yaw sway is evidently ACCUMULATING into a continuous rotation (or an idle drift is
+  circling the croc), rather than a bounded back-and-forth. DIAGNOSE: find the croc
+  idle-motion from 242 in `src/scenes/travel/Wildlife.tsx` (the resting-croc bob/
+  yaw-sway) and any idle drift/heading update — is the sway added to the heading
+  cumulatively each frame (heading += sway → unbounded rotation) instead of an
+  absolute bounded oscillation? FIX: a resting/hidden crocodile HOLDS its position
+  and heading (it waits, does not roam). If a subtle idle motion is kept at all, it
+  must be a BOUNDED OSCILLATION about a fixed rest heading — e.g. `yaw = restYaw +
+  sin(t·ω)·amp` (returns to centre, never accumulates), and NO net positional drift
+  (or a tiny bounded bob only). It must NOT rotate through a full circle or wander.
+  Keep the lunge/ambush + the point-242 submerge pose + water-only placement
+  unchanged. Anchors: `src/scenes/travel/Wildlife.tsx` (the 242 resting-croc idle
+  motion), `src/scenes/travel/wildlifeBehavior.ts` (croc idle/hidden state if the
+  heading lives there). VERIFIABLE: a pure test that the idle croc's heading stays
+  BOUNDED about its rest heading over time (never accumulates past a small amplitude)
+  and its position holds (no net drift); a live check in `scripts/verify/
+  enrichments.mjs` that a resting croc does not rotate through a large angle over a
+  window. DOCS: design.md §19.16 if wording changes. No player-visible text. NOTE:
+  `Wildlife.tsx`/`wildlifeBehavior.ts` — croc files (same as 242/250, both merged);
+  small focused fix, non-conflicting with 244 (place/input) and the 249b harness.
+
+- [ ] 258. DEBUG EVENT-TRIGGER DROPDOWN (user 23.07.2026). The §19.8/§19.16 wildlife
+  dramas + §14 events are RARE BY DESIGN and have NO deployed-build force (the
+  `window.__wildlife.igniteFire` hook is `import.meta.env.DEV`-gated, absent on the
+  GH-Pages build) — e.g. the grass fire (point 145a) attempts ignition only once per
+  `FIRE_COOLDOWN_SECONDS` (300 s) and only on savanna 45 units ahead, so it is nearly
+  impossible to observe on demand. ADD A DROPDOWN SELECTOR to the debug menu
+  (design.md §21.3), MODELLED ON THE JUMP-TO MENU: the player picks WHICH event to
+  trigger and it fires at/near the traveller. Requirements: (1) entries STRUCTURED BY
+  CATEGORY and, WITHIN each category, sorted ALPHABETICALLY (exactly like the jump-to
+  dropdown's grouped+sorted structure — reuse that grouping/sort helper). (2) Include
+  AS MANY triggerable events as possible, each firing its real drama state via the
+  existing entry points (promoted from DEV-only to a shipped debug action): the
+  WILDLIFE DRAMAS — grass fire (`igniteFire`), crocodile ambush/lunge, lion hunt
+  (`LION_STATE`), calf predation + parent rescue/sacrifice, elephant trample + parent
+  grief, calf water drowning/rescue, vulture flock on a carcass, elephant-graveyard
+  mourning — AND the §14 RANDOM EVENTS the debug menu can already fire (predator
+  attacks per species, snakebite, etc.), grouped in their own category. (3)
+  PRECONDITION HANDLING — the user's question (what if I pick a crocodile attack but
+  am not near water?): the trigger STAGES the event where its precondition is
+  satisfiable near the traveller — the fire ignites ahead on the nearest savanna, a
+  crocodile lunge finds the NEAREST WATER in range and stages the croc+victim there,
+  a lion hunt spawns predator+prey on nearby suitable ground, etc. If the precondition
+  CANNOT be met within range (no water for a croc, no savanna for a fire, no valid
+  prey), the trigger does NOTHING except a localized TOAST telling the user what is
+  missing (e.g. "No water nearby — move closer to a bank for the crocodile attack" /
+  "Kein Wasser in der Nähe …"), so it is never a silent no-op. Localized labels +
+  toasts in BOTH languages. Anchors: `src/ui/DebugMenu.tsx` (the new dropdown, reuse
+  the jump-to `groupBy`+alphabetical-sort helper), the drama/event entry points in
+  `src/scenes/travel/Wildlife.tsx` (`igniteFire`, `LION_STATE`/`FIRE_STATE`, the croc/
+  calf starters — expose a NON-DEV-gated debug action, e.g. a debug-store command or a
+  `__debug.triggerEvent(kind)` that is not `import.meta.env.DEV`-gated) and the §14
+  event system, `src/state/`/`src/systems/` for the precondition-locate + toast, and
+  `src/i18n/en.ts`/`de.ts`/`types.ts`. VERIFIABLE: `src/ui/DebugMenu.test.tsx` that the
+  dropdown renders its categories grouped + alphabetically sorted with localized
+  labels and firing an entry dispatches its trigger; a pure test of the
+  precondition-locate (returns the nearest valid staging spot, or null → the toast);
+  a live check in `scripts/verify/enrichments.mjs` that selecting the grass-fire entry
+  ignites the fire and selecting the crocodile entry away from water shows the "no
+  water" toast. DOCS: design.md §21.3 (the event-trigger dropdown). Localized text
+  both languages. NOTE: `DebugMenu.tsx`/`Wildlife.tsx`/`state`/i18n — coordinate with
+  the other wildlife/debug points (do not delegate concurrently with a Wildlife.tsx
+  point). The grass fire + the precondition/toast pattern is the minimum; the fuller
+  event roster is the target.
+
+- [x] 259. ELEPHANT TRAMPLE NEEDS A DIRECTION CONDITION (user design change,
+  23.07.2026). Currently an animal caught in the §19.5 elephant-overlap exception is
+  trampled/killed on ANY contact. NEW RULE: an animal only DIES from the elephant on
+  collision when the elephant's MOVEMENT VECTOR points at least PARTIALLY TOWARD that
+  animal — i.e. the trample kill requires `dot(elephantVelocity, (victimPos −
+  elephantPos)) > 0` (a positive component toward the victim). So: a STANDING
+  elephant (near-zero velocity) that another animal walks into does NOT kill it, and
+  an animal that runs into an elephant FROM BEHIND (victim behind the elephant's
+  heading of travel) is NOT killed. Only an elephant actively moving into/over the
+  animal tramples it. The §19.5 body-separation still parts a harmless overlap
+  otherwise (a bump without a forward-moving elephant just resolves). EXTEND THE
+  PARENT ELEPHANT-SUICIDE (§19.8 calf trample grief, the trample-throw drive)
+  ACCORDINGLY: it is no longer enough that the grieving parent walks TO the elephant
+  — the parent must TOUCH IT FROM THE FRONT (get in front of the elephant's line of
+  travel, in its forward arc, so the elephant is moving toward the parent) to be
+  crushed under its feet. So the grief drive must steer the parent to intercept the
+  elephant's FRONT (position ahead of the elephant along its heading), and the
+  trample resolves only when the same direction condition holds (elephant moving
+  toward the parent); a parent that only reaches the elephant's flank/rear is not
+  trampled and keeps trying to get in front (with the existing hard-deadline
+  backstop so the grief still always resolves — point I4). DIAGNOSE + FIX in
+  `src/scenes/travel/Wildlife.tsx` (the elephant trample collision + the parent
+  trample-throw grief drive) and `src/scenes/travel/wildlifeBehavior.ts` (extract the
+  direction test as a pure helper, e.g. `trampleKills(elephantVel, elephantPos,
+  victimPos)` and a `frontInterceptTarget(elephantPos, elephantHeading, reach)` for
+  the parent). Keep the trample POSSIBLE (it must still happen when the elephant
+  moves over a pinned animal) and every started grief drama still RESOLVES.
+  VERIFIABLE: pure tests — `trampleKills` true only for a forward-moving elephant
+  toward the victim, false for a stationary elephant and for a victim behind the
+  heading; the parent grief intercept aims at the elephant's front and the trample
+  fires only on a front contact; a live check in `scripts/verify/enrichments.mjs`
+  that a standing elephant does not kill a bumping animal, a forward-moving one does,
+  and the parent grief-trample still resolves (parent crushed from the front) within
+  the deadline. DOCS: design.md §19.5 (the trample direction condition) and §19.8
+  (the parent must reach the elephant's front). No player-visible text. NOTE:
+  `Wildlife.tsx`/`wildlifeBehavior.ts` — same files as 257 (croc, running) and 258;
+  queue after 257 to avoid the file overlap.
+
+- [x] 260. TRAMPLE CRUNCH SOUND (user 23.07.2026). Play a CRACK/CRUNCH sound the
+  moment an animal is crushed under an elephant's feet (the §19.5/§19.8 trample
+  kill, including the point-259 forward-moving-elephant kill and the parent grief-
+  trample). A single short one-shot SFX at the trample event's world position,
+  scaled like the other §19.1 proximity sounds — by the single ambience volume and
+  by distance to the traveller (louder up close, fading with distance), so a far-off
+  trample is faint and a near one is clearly heard. Reuse the existing ambience/SFX
+  pipeline (the proximity-call playback in `src/systems/ambience.ts` and how
+  `Wildlife.tsx` already emits positional wildlife calls) — do NOT build a second
+  audio path. The sound may be a short synthesized crunch (a filtered noise burst /
+  low crack, consistent with the game's other synth SFX) or a tiny asset; keep it
+  cheap and gated so it fires exactly ONCE per trample kill (not per frame while the
+  body is down). Anchors: `src/scenes/travel/Wildlife.tsx` (fire the SFX at the
+  trample-kill site — both the ordinary trample and the parent grief-trample),
+  `src/systems/ambience.ts` (the crunch SFX + its distance/volume scaling), and the
+  balance value if a per-source volume is wanted (`balance` + the debug menu, like
+  the birdsong slider). VERIFIABLE: a pure test that the crunch gain follows the
+  distance/ambience-volume curve (like the existing proximity-call test) and fires
+  once per kill (an edge, not a level); a live check in `scripts/verify/settings.mjs`
+  or `enrichments.mjs` that a staged trample plays the crunch once. DOCS: design.md
+  §19.1 (proximity sounds) / §19.5 (the trample) — the crunch on a trample kill; and
+  §21.2 if a volume slider is added. No player-visible text unless a debug label is
+  added (then both languages). NOTE: `Wildlife.tsx`/`ambience.ts` — the trample site
+  is the same code area as point 259 (running); queue after 259 (or fold the SFX call
+  into 259's trample resolution if convenient), do not delegate concurrently with a
+  Wildlife.tsx point.
+
+- [x] 261. ANIMALS WALK THROUGH AN ELEPHANT — NEED A BODY COLLIDER (user 23.07.2026,
+  follow-up to 259). During the elephant-suicide the grief parent runs from BEHIND
+  THROUGH the elephant's legs to reach the front-intercept point (point 259) instead
+  of routing AROUND the body. Root: an elephant body is not a solid obstacle to other
+  animals' movement — a mover's step is not deflected by the elephant, so it passes
+  straight through. FIX: give the elephant a BODY COLLIDER that other animals cannot
+  pass through — an animal's movement step deflects/slides AROUND an elephant's body
+  circle (reuse the existing bird's-eye obstacle-resolve — the §11/§19 swept
+  collision against trees/animals in `src/systems/movement.ts` / the mover step, or
+  the §19.5 body-separation geometry — treat the elephant as a circular obstacle of
+  its body radius). So the grief parent must ROUTE AROUND the elephant to reach its
+  front (it circles the body rather than clipping through it), and no animal walks
+  through an elephant in general. KEEP the trample POSSIBLE: the designed §19.5
+  overlap exception (an elephant stepping onto/over a PINNED animal to trample it, and
+  the point-259 directional kill) must still work — the collider is for the OTHER
+  animals' locomotion (they cannot enter the elephant), not a block on the elephant's
+  own trample; the caught/pinned victim and the parent being crushed at the front are
+  the intended contacts. DIAGNOSE + FIX in `src/scenes/travel/Wildlife.tsx` (the
+  per-animal movement step, the grief drive path) and `src/scenes/travel/
+  wildlifeBehavior.ts` (a pure obstacle-deflection helper, or reuse
+  `src/systems/movement.ts`'s swept-obstacle resolve with the elephant as the
+  obstacle). VERIFIABLE: a pure test that an animal step aimed through an elephant is
+  deflected to slide around the body circle (never ends inside it), while a step that
+  is the trample contact still resolves; a live check in `scripts/verify/
+  enrichments.mjs` that the grief parent reaches the elephant's front by going around
+  (does not pass through the body) and the grief still resolves. DOCS: design.md §19.5
+  (animals cannot pass through an elephant body; the trample overlap exception is
+  unchanged). No player-visible text. NOTE: `Wildlife.tsx`/`wildlifeBehavior.ts`/
+  possibly `movement.ts` — wildlife-movement files; do NOT delegate concurrently with
+  another Wildlife.tsx point (258/etc.).
+
+- [ ] 262. AN ORPHANED JUVENILE IS ADOPTED BY A NEARBY ADULT (user 23.07.2026). When
+  a juvenile's parent DIES (by any cause — predator, crocodile, trample, drowning),
+  the juvenile is ADOPTED by another adult within reach: the nearest eligible adult
+  becomes its new parent, and the §19.8 family dramas (parent defence/shield/
+  sacrifice, the grief-trample, the water rescue) then apply to that new pairing — so
+  the sacrifice and grief dramas recur more often instead of a one-off orphaning.
+  BEHAVIOUR: on a parent's death, scan for the nearest ELIGIBLE adopter within a
+  calibratable adoption radius and re-link the juvenile to it as its parent; the
+  juvenile resumes following/leashing to the new parent (points 238/245) and the new
+  parent takes on the defence/rescue/grief roles for it. Eligibility: an ADULT
+  (non-juvenile) of a species that can parent this juvenile — the same species as the
+  juvenile (a grazer calf adopted by a grazer of its kind), NOT a predator and NOT the
+  hunter that just killed the parent; if the juvenile is itself part of a mixed herd,
+  prefer the same species, else the nearest suitable herd-mate adult. If NO eligible
+  adopter is within the radius, the juvenile stays orphaned (unchanged current
+  behaviour) until one comes into range (re-check as adults move near), OR it simply
+  remains parentless — pick the simpler that keeps the drama invariants (no crash, no
+  dangling parent reference). The adoption radius (and any re-check cadence) is a
+  calibratable balance value in `balance.family`, debug-editable. Guard against
+  degenerate links: a juvenile never adopts itself, a dead adult, or a predator; the
+  new parent's own calf-count/relations stay consistent (an adult can shield more than
+  one juvenile, or cap it — pick per the existing family-relation model). Anchors:
+  `src/scenes/travel/Wildlife.tsx` (the calf→parent link / family relations, the
+  death handling where a parent is removed, the follow/leash + defence drives that
+  read the parent), `src/scenes/travel/wildlifeBehavior.ts` (a pure
+  `findAdopter(juvenile, adults, radius)` helper — nearest eligible adult or null),
+  `src/config/balance.ts` (`family.adoptionRadius`) + `src/ui/DebugMenu.tsx`. VERIFIABLE:
+  a pure test of `findAdopter` — returns the nearest eligible ADULT of the right
+  species within the radius, skips predators/dead/self/juveniles, returns null when
+  none in range; a live check in `scripts/verify/enrichments.mjs` that killing a
+  calf's parent with an eligible adult nearby re-links the calf to that adult (via the
+  dev hook) and the family drama can then fire again; the debug value writes through.
+  DOCS: design.md §19.8 (orphan adoption → recurring family dramas), §21.2 (the
+  adoption radius). No player-visible text. NOTE: `Wildlife.tsx`/`wildlifeBehavior.ts`/
+  `balance`/`DebugMenu` — wildlife/family files; do NOT delegate concurrently with
+  another Wildlife.tsx point (258/etc.); bundles naturally with the family-drama
+  points.
+
+- [x] 263. THE 261 COLLIDER BREAKS THE 259 TRAMPLE — AN ELEPHANT NO LONGER TRAMPLES A
+  FREE ANIMAL (regression found by the both-backend enrichments verification, 23.07.
+  2026). Point 261's elephant body collider deflects other animals AROUND the
+  elephant, but point 259's directional trample requires the elephant to REACH the
+  animal's body (dot>0 and within TRAMPLE_RADIUS). The two conflict: as the elephant
+  moves toward a free animal, the collider slides the animal around the body, so the
+  overlap the trample needs never happens — the elephant tramples nothing, no blood
+  stain is laid, and the §19.8 calf-trample grief chain never starts (its step 1, the
+  calf being trampled, cannot fire). The enrichments checks caught it: "Elephant
+  tramples a smaller animal — no trample within 8s", "blood stains carry a unit ground
+  normal — []" (empty: no stain because no trample), and "a parent whose calf is
+  trampled throws itself before the elephant (point 119)" (calfDead:false — the calf
+  is never trampled). FIX (product, do NOT weaken the checks): the collider must NOT
+  prevent an intended trample. When the elephant is within trample range of an animal
+  AND the 259 direction condition holds (moving toward it) — i.e. `trampleKills` is
+  about to fire — that animal is TRAMPLED (the elephant catches it), not deflected
+  around the body. So EXEMPT the trample victim from `deflectAroundCircle` for that
+  elephant (skip the deflection when this elephant would trample this animal this
+  step), so a free animal the elephant bears down on is caught and trampled, the
+  calf-trample grief chain starts, and the parent's front-intercept grief still
+  resolves. Everything else 261 keeps: an animal walking near a NON-trampling elephant
+  (stationary, or not moving toward it) still slides around the body (no walk-through).
+  Also RE-VERIFY the staged enrichments trample checks match the new 259/261 semantics
+  (the elephant must move toward the victim; the victim must be catchable) — update the
+  STAGING (how the check drives the elephant/victim) to the real behaviour, never the
+  assertion, so the check proves a real trample. Anchors: `src/scenes/travel/
+  Wildlife.tsx` (the 261 deflection application — add the trample-exempt condition
+  using the existing `trampleKills`/trample-range test), `src/scenes/travel/
+  wildlifeBehavior.ts` (a pure predicate for "this elephant would trample this animal
+  this step" if helpful), and `scripts/verify/enrichments.mjs` (the trample + stain +
+  point-119 grief staged checks). VERIFIABLE: a pure test that an animal the elephant
+  bears down on (within range, dot>0) is NOT deflected (it is trampled), while an
+  animal near a non-trampling elephant IS deflected; the enrichments trample / stain /
+  point-119 grief checks pass on BOTH backends (0 fail). DOCS: design.md §19.5 (the
+  collider yields to an intended trample). No player-visible text. NOTE: same files as
+  the wildlife/trample points (259/261, merged); do NOT delegate concurrently with
+  another Wildlife.tsx point — this is the top-priority wildlife fix (a core mechanic
+  is currently broken on main).
+
+- [ ] 264. INTRASPECIES COMBAT — TERRITORIAL/DOMINANCE FIGHTS WITHIN A SPECIES (user
+  23.07.2026; queue position: directly AFTER point 224). Animals of the SAME species
+  fight each other. RESEARCH FIRST (Fable-5 pass, recorded in a new
+  `docs/intraspecies-combat-1890.md`, cited): which of the game's ~1890 African
+  species realistically engage in intraspecific fighting (territorial disputes,
+  dominance/rut, resource/mate competition) and how — e.g. male antelope/wildebeest
+  horn-clashes in the rut, hippo territorial battles (often lethal), male lion
+  dominance fights, crocodile territorial combat, elephant musth clashes — so the
+  mechanic applies to the species it truly fits and not to those that do not (map
+  each of the game's species to fights / does-not-fight, with the driver and lethality
+  from the research). BUILD the mechanic on the researched species: some individuals
+  carry a "wants to fight" disposition. Two interaction paths — (a) BOTH want to
+  fight: they RUN TOWARD each other (converge to contact); (b) ONE wants to fight and
+  targets another: it HUNTS/chases the other — the chase resolves either as a DRIVE-OFF
+  (the aggressor is satisfied once the other flees far enough, breaks off, no kill) or
+  a CATCH (it runs the other down). When two same-species animals COLLIDE and at least
+  one wants to fight, a FIGHT happens: it lasts a few (calibratable) seconds — a visible
+  clash — and ENDS with ONE of the two DYING (the loser dies; its body enters the
+  ordinary carcass system so scavengers/vultures work it like any death). The
+  loser/winner outcome is a calibratable roll (may weight by species/size). All timings
+  and chances (fight duration, drive-off distance/chance, per-species fight
+  disposition rate, catch vs drive-off) are balance values, debug-editable (§21.2).
+  Reuse the existing chase/flee + collision + carcass machinery (the §19 hunt/flee
+  steps, `deflectAroundCircle`/collision, the caught/stain/carcass system) — do NOT
+  build a parallel path; the intraspecies fight is a new state layered on the shared
+  drama/hunt core (like the §19.8 dramas resolving through one core). Every started
+  fight/chase RESOLVES (a hard deadline backstop, like the other dramas — invariant
+  I4). Anchors: `src/scenes/travel/wildlifeBehavior.ts` (the fight/chase state, a pure
+  outcome/drive-off resolver + the per-species fight table), `src/scenes/travel/
+  Wildlife.tsx` (the converge/chase/fight drives + the clash pose + the loser death →
+  carcass), `src/render/fauna.ts` (a fight/clash pose if needed), `src/config/
+  balance.ts` + `src/ui/DebugMenu.tsx` (the calibratable values), `docs/intraspecies-
+  combat-1890.md` (the research). VERIFIABLE: pure tests — the per-species fight table
+  (a fighting species fights, a non-fighting one never does), the converge-vs-hunt
+  decision, the drive-off-vs-catch resolver (bounded, deterministic per roll), the
+  fight outcome (exactly one of two dies, loser → carcass), and every fight resolves by
+  the deadline; a live check in `scripts/verify/enrichments.mjs` that a staged pair of
+  a fighting species clashes and one dies (body scavenged). DOCS: `docs/intraspecies-
+  combat-1890.md` (research, same branch as the build or a preceding research commit),
+  design.md §19 (the intraspecies-combat behaviour), §21.2 (the new balance values).
+  No player-visible text unless a journal/debug label is added (then both languages).
+  NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx`/`fauna`/`balance` — the wildlife-behaviour
+  cluster; do NOT delegate the BUILD concurrently with another Wildlife.tsx point. The
+  RESEARCH half (the docs file + the species table) is a standalone Fable pass with no
+  code, safe to run in parallel; the build follows on the researched species.
+
+- [ ] 265. ELDERLY (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
+  species, visibly aged AND behaviourally distinct, plus natural death of old age
+  (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
+  feature before the 203 visual bug-finder). RESEARCH FIRST (a standalone Fable pass,
+  no code, safe to run in parallel): realistic geriatric APPEARANCE and BEHAVIOUR for
+  the game's fauna (the savanna grazers, elephants, the predators) and a realistic
+  natural-DEATH process — recorded, cited, in a new `docs/fauna-behaviour-1890.md`
+  (matching the citation/marker discipline of `docs/peoples-1890.md`; if a fauna doc
+  already exists, extend it). What to establish: the visible senescence cues (thinner/
+  sway-backed body, duller/greyer or worn coat, prominent shoulder/hip bones, worn or
+  broken tusks and sunken temples on old elephants, a stiffer/limping gait); the
+  behavioural shifts (moves slower; old males ousted from the herd and turning
+  SOLITARY — the classic old buffalo/elephant bull; withdrawal from intraspecies
+  contests: an elder no longer INITIATES a §264 fight and always LOSES to a younger
+  adult, fleeing an impending conspecific conflict); and the real basis for a
+  "dying" pattern (an old elephant's last molars wear out, so it seeks soft forage
+  near water/marsh and dies there — the grounded kernel the §4.4 "elephant graveyard"
+  folklore romanticizes; vultures do gather around a visibly dying/weak animal). Add
+  any further fitting, game-appropriate geriatric traits the research turns up. BUILD
+  (per the research): (a) APPEARANCE — an elderly-adult build schema analogous to the
+  point-169 baby schema (`buildLionCub`/the grazer calves) in `src/render/fauna.ts`
+  (`buildElderly*`/an age flag on the adult build): clearly-old cues per the research,
+  pure-tested for its proportions/part markers like the calf schema. (b) BEHAVIOUR —
+  pure helpers in `src/scenes/travel/wildlifeBehavior.ts`: an elderly adult moves at a
+  calibratable reduced speed factor, never initiates §264 intraspecies combat and
+  ALWAYS loses to a younger adult (the §264/§125 outcome matrix returns the elder as
+  loser; the elder flees an impending conspecific conflict), and — for GRAZERS and
+  the big cats (NOT elephants) — an ousted old male withdraws from the herd/pride and
+  turns solitary (per `docs/fauna-behaviour-1890.md`: old elephant BULLS keep high
+  status, so no ostracism for them; the crocodile gets NO elderly variant — no legible
+  aged cues). (c) NATURAL DEATH — an elderly animal occasionally dies with NO external
+  cause, at a calibratable low rate; the DYING PROCESS is depicted (`Wildlife.tsx` + a
+  pure state helper): the animal slows progressively, the §19.6/§22 poor-condition
+  vultures GATHER over it and descend as it collapses (the ground-truth reuse of the
+  pt-22 omen — the "patient circling of a doomed animal" is embellished, so key the
+  flock on the distressed/downed animal, not a long pre-death circle), it falls dead,
+  and the vultures consume it through the existing carcass system. An ELEPHANT that
+  begins dying instead drifts toward WATER (its worn last molars can no longer grind
+  coarse forage, so it seeks soft riverside/aquatic vegetation) and dies THERE — the
+  REAL mechanic per the research; the §4.4 elephant graveyard is framed as WHERE these
+  water-side deaths accumulate (folklore landmark + accurate mechanic coexisting), and
+  the mass death-pilgrimage is MYTH and is NOT built. (d) CALIBRATION — the elderly fraction of adults, the elderly speed
+  factor, the natural-death rate, and the dying-slowdown duration are `balance.ts`
+  values, debug-editable (§21). Ties to point 264 (the elder always loses a fight),
+  point 169 (the analogous age schema), §4.4 (the graveyard death) and §19.6 (the
+  vultures). VERIFIABLE: pure tests (`src/render/fauna.test.ts` — the elderly schema's
+  aged proportions/markers, built alongside the calves; `src/scenes/travel/
+  wildlifeBehavior.test.ts` — elderly speed factor strictly below the adult, elder
+  never initiates and always loses §264 combat, the natural-death roll boundaries, the
+  dying-slowdown curve, and the elephant-dying-target picking the graveyard); a live
+  check in `scripts/verify/enrichments.mjs` (a forced elderly natural death: slows →
+  vultures circle → falls → consumed; a dying elephant heads to the graveyard) with a
+  screenshot, picture-verified on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
+  (research, in the SAME branch/commit as the build it informs), design.md §19 (a new
+  subsection: elderly variants, their behaviour, natural death and the elephant
+  graveyard death), the balance values. Any new sighting/death journal text in BOTH
+  languages with voice markup. NOTE: heavy `wildlifeBehavior.ts`/`Wildlife.tsx`/
+  `fauna.ts`/`balance` overlap — do NOT delegate the BUILD concurrently with another
+  wildlife point; the RESEARCH half and the pure schema/behaviour helpers (in new
+  files) can start in parallel, the scene wiring waits for the wildlife cluster to be
+  free. Implementation-ready.
+
+- [x] 266. TRAMPLE CRUSH SOUND — BONE-CRUNCH + SOFT-TISSUE SQUELCH, not a dull
+  "plomp" (user 23.07.2026). The point-260 elephant-trample crush sound currently
+  reads as a soft "plomp"; the user wants it to sound like CRUNCHING/CRACKING BONE
+  plus a WET soft-tissue squelch. Improve the procedural synthesis of the crunch —
+  the WebAudio node graph that builds the trample-crush waveform (anchor:
+  `src/systems/ambience.ts`, the `trampleCrunch*` helpers and wherever the crunch
+  buffer/nodes are actually built for playback — trace the play path from
+  `src/scenes/travel/Wildlife.tsx` where the trample fires the sound). Layer two
+  timbres: (a) a sharp BONE-CRACK transient — a bright, hard-attack noise burst with
+  several fast micro-crackles so it reads as bones crunching, not a single thud; and
+  (b) a wet SQUELCH — a lower, damped, resonant-filtered noise/tone with a softer
+  envelope for the soft-tissue matsch. Keep the §19.1 distance + single-ambience-volume
+  gain curve (`trampleCrunchGain`) and the edge-firing (`trampleCrunchFires`, exactly
+  one crunch per kill) UNCHANGED — only the TIMBRE changes. Cheap, procedural WebAudio,
+  no audio asset. VERIFIABLE: the existing pure tests (`trampleCrunchGain`/`Fires`) stay
+  green; add a pure test for the new synthesis if it is parameterised (the two layers'
+  presence / envelope shape); the existing point-260 live check still fires the crunch
+  once per trample with no console errors. DOCS: design.md §19.5/§19.1 if the sound
+  description changes. No player-visible text. NOTE: audio synthesis — a different
+  concern than the wildlife-behaviour cluster, so it can be done independently of the
+  Wildlife.tsx/wildlifeBehavior.ts points (it only reads the trample trigger, doesn't
+  change it). Implementation-ready.
+
+- [ ] 267. BLOOD POOL SHOWS THE GROUND THROUGH IT — TINT THE GROUND, don't float a
+  decal (user 23.07.2026, screenshot). The kill/trample blood stain currently renders
+  as a flat pool laid ON TOP of the height-profiled ground, so the terrain relief pokes
+  through it (a hole where the ground rises through the flat decal). Raising the whole
+  pool would make it float over the rest of the ground; conforming a mesh to the relief
+  is costly. FIX (user's proposal): instead of a separate stain decal on top, colour the
+  round affected GROUND AREA red so it follows the terrain exactly — reuse the technique
+  the villages use for RAIN-WET GROUND (a ground-surface tint/overlay that conforms to
+  the terrain, `PlaceRain`/the wet-ground darkening path), applied as a red blood tint
+  over the stain's radius, optionally with a matching micro-structure. So the stain
+  becomes a property of the ground surface (a red patch that hugs the relief), not a
+  floating plane. Keep the stain's existing placement, radius, fade/lifetime and the
+  §19.5/§19.8 trigger logic UNCHANGED — only the RENDERING changes from a decal to a
+  ground tint. Anchor: the stain rendering in `src/scenes/travel/Wildlife.tsx` (the
+  `stains` meshes) and the rain-wet-ground tint technique (`src/scenes/place/PlaceRain`
+  / the ground wetness path) as the reference. VERIFIABLE: a screenshot at a fresh
+  kill/trample stain on sloped ground shows the red area following the relief with NO
+  see-through hole, on BOTH backends; the stain still appears/fades on the same trigger
+  (existing stain checks stay green). DOCS: design.md §19.5 if the stain description
+  changes. No player-visible text. NOTE: rendering — touches Wildlife.tsx (the stain
+  meshes), so coordinate with the wildlife-render cluster; the ground-tint approach may
+  share code with the settlement wet-ground path. Implementation-ready.
+
+- [ ] 268. CROCODILE FEEDING — the prey lies at the croc's MOUTH and the croc moves
+  as if eating (user 23.07.2026). When a crocodile catches/consumes a victim (§19.16,
+  point 130), the seized animal currently sits ON the crocodile's body; it should lie at
+  the crocodile's JAWS/MOUTH end, and the crocodile should animate as if FEEDING —
+  e.g. the classic death-roll / head thrash and gulp, so it reads as eating rather than
+  a body just resting on the croc. FIX in `src/scenes/travel/Wildlife.tsx` (the
+  crocodile catch/feed depiction from point 130): position the caught victim at the
+  crocodile's mouth (front/jaw anchor, derived from the croc's facing) for the struggle
+  and consume phases, and give the crocodile a feeding motion during consumption (a
+  periodic head-thrash/roll pose and/or a gulp bob) so the meal is legible. Keep the
+  §19.16 catch/grip/sink logic, the shared §19.8 family-drama resolution (`caughtBy`),
+  the grip deadline and the water-only placement UNCHANGED — only the victim ANCHOR and
+  the eating ANIMATION change. VERIFIABLE: pure-test the mouth-anchor offset (the victim
+  sits ahead of the croc along its heading, not on its centre) and the feeding-motion
+  phase if parameterised (`src/scenes/travel/wildlifeBehavior.test.ts`); a live check /
+  screenshot at a forced crocodile catch shows the prey at the jaws with the croc
+  thrashing, on BOTH backends. DOCS: design.md §19.16 if the depiction wording changes.
+  No player-visible text. NOTE: rendering/behaviour — touches Wildlife.tsx (+ maybe a
+  pure pose helper in wildlifeBehavior.ts), the wildlife-render cluster. Implementation-ready.
+
+- [ ] 269. BIRDS FLEE BY FLYING + REGION-APPROPRIATE AERIAL PREDATORS (research-gated)
+  (user 23.07.2026). Two linked additions, BOTH gated on a Fable research pass first.
+  (A) FLIGHT-CAPABLE BIRDS ESCAPE BY FLYING: every bird species that can fly gets a
+  GROUND (perched/sitting/feeding) state and an IN-AIR (flying) state; when it flees a
+  ground predator (or an approaching elephant) it TAKES OFF and flies, which puts it
+  OUT OF REACH of ground predators and elephants (they can no longer catch it in the
+  air). A ground predator can catch a bird ONLY if it SURPRISES it while the bird is
+  still ON THE GROUND (took off too late) — an airborne bird is safe from ground
+  hunters. So the existing bird fauna (the shore/scavenger birds, the plover, vultures,
+  etc.) needs the ground↔air state and a takeoff-on-flee transition.
+  (B) AERIAL PREDATORS (research settled — docs/fauna-behaviour-1890.md §B): add
+  region-appropriate FLYING predators (raptors) that hunt prey birds and catch them IN
+  THE AIR, per the researched per-region table (§B2.1): falcons (peregrine/lanner/
+  barbary) and the two hawk-eagles (African, Ayres's) attack by a STOOP/DESCEND, while
+  the accipiter/harrier/fish-eagle majority use an air-catch tail-chase or an ambush
+  from cover (no height). The stoop is BUILT — but as a SCRIPTED "descend-and-strike"
+  EVENT (the raptor enters high, plunges onto a flying bird, strikes, resolves), NOT a
+  persistent 3D flight-height simulation (the research explicitly warns against a full
+  altitude-band layer, since most raptors don't use height). So there is at most a
+  simple two-state high/low for the stoop event itself, not a per-bird altitude field.
+  RESEARCH FIRST (Fable pass, docs-only, extend `docs/fauna-behaviour-1890.md`): which
+  African raptors/aerial hunters (~1890, by region) take BIRDS as prey; their hunting
+  mode (stoop/dive vs. tail-chase), typical prey birds, whether flight-height layering
+  and a surprise-from-above are realistic, and whether "a ground predator only gets a
+  bird caught on the ground" matches real behaviour. Produce a cited per-region aerial-
+  predator + prey-bird table with the same PERIOD/INFERRED/MYTH markers, and a short
+  "Implementation brief" (§B4 — already delivered; the research half is DONE). BUILD
+  (after the wildlife cluster is free): the bird ground/air state machine +
+  takeoff-on-flee (pure flee helpers in `src/scenes/travel/wildlifeBehavior.ts`, wired
+  in `src/scenes/travel/Wildlife.tsx`) — with the researched fly/no-fly split (small
+  birds and flamingos fly to escape, the flamingo with a laborious running take-off as
+  a vulnerable window; plover CHICKS crouch/freeze and can be caught, the adult flies
+  and does the broken-wing distraction); the aerial-predator species (build in
+  `src/render/fauna.ts`, seeded from a new region-keyed aerial-predator pool per §B2.1)
+  with an air-catch tail-chase for the ambush guild and the SCRIPTED descend-and-strike
+  for the falcon/hawk-eagle guild; ground predators lose the airborne target. Reuse the
+  existing hunt/flee/carcass machinery; every started drama resolves (I4). All
+  calibratable (takeoff trigger distance, the stoop's high/low band, dive chance/speed,
+  aerial-hunt rate) and debug-editable. VERIFIABLE: pure tests — a fleeing bird
+  transitions to air and a ground predator's reach excludes an airborne bird while a
+  still-grounded (surprised) one is catchable; the aerial predator's air-catch and (if
+  built) the height-gated dive; region pools sane. Live check / screenshot: a forced
+  ground-predator approach makes birds take off and escape, and (if built) an aerial
+  predator stoops on a flying bird — on BOTH backends. DOCS: `docs/fauna-behaviour-1890.md`
+  (research); design.md §19 (bird flight escape + aerial predators). Any new
+  sighting/journal text both languages with voice markup. NOTE: wildlife-render/behaviour
+  cluster (Wildlife.tsx/wildlifeBehavior.ts/fauna.ts) — the RESEARCH runs in parallel
+  now; the BUILD waits for the cluster to be free and does NOT run concurrently with
+  another Wildlife.tsx point. Implementation-ready once the research lands.
+
+- [x] 270. F5 STATE-DUMP POPUP FOR BUG REPORTS (user 23.07.2026 — do this as the NEXT
+  task). Add an F5 shortcut that opens a popup/overlay showing the COMPLETE game state
+  in a suitable encoding, with a DOWNLOAD-as-file option, so the user can attach it to
+  bug reports and make diagnosis easier. DETAILS: (1) a new `dumpGameState()` that
+  serialises the WHOLE store to pretty-printed JSON — the entire `useGame` state (seed,
+  mode, placeId, position, day, money/food/gifts, inventory + capacity, health +
+  afflictions + canteen, hints/deciphered legs, camps, reputation, discovered places/
+  landmarks, all flags, balance overrides, ui-relevant state) — reuse/extend the §18
+  save-snapshot serialisation but capture EVERYTHING, not just the port-snapshot fields;
+  include an app version/build marker and the current date so a dump is self-describing.
+  (2) F5 toggles a MODAL overlay (a §17.4 top-most modal, styled like the debug menu)
+  that shows the JSON in a scrollable, selectable read-only text area, with a DOWNLOAD
+  button (Blob → a `.json` file, filename like `hoa-state-<date>-<seed>.json`), a COPY
+  button, and close on F5/Esc. F5 is the browser refresh key, so the keydown handler
+  MUST `preventDefault()` when the game has focus (note it in the debug shortcuts list
+  §21.1). (3) Localised title/buttons in BOTH languages. ANCHORS: the key handler where
+  the F1-F4 shortcuts live (`src/systems/` input / the debug shortcut wiring), the store
+  (`src/state/store.ts` — a `dumpGameState` selector/serialiser), the save/load
+  serialisation (`src/state/store.saveload*` — reuse the field capture), a new overlay
+  component in `src/ui/` (e.g. `StateDump.tsx`), `src/i18n/en.ts`/`de.ts`/`types.ts`,
+  DebugMenu/§21. VERIFIABLE: a pure test that `dumpGameState` returns valid JSON
+  capturing the key store fields (non-empty, parses, includes seed/mode/day/inventory/
+  health) and stays stable/round-trippable; a component test (`src/ui/StateDump.test.tsx`)
+  that the overlay renders the JSON text + DOWNLOAD/COPY/close controls and that F5
+  toggles it without shifting focus onto a control; a live check in a browser suite that
+  pressing F5 opens the popup showing the state and the download control is present, no
+  console errors. DOCS: design.md §21 (the F5 state-dump popup + the shortcut). Localised
+  text both languages. NOTE: touches the store + a new UI overlay + input/i18n — a
+  different concern than the wildlife cluster, so it can be built independently and in
+  parallel; keep the serialiser central (one `dumpGameState`). Implementation-ready.
+
+- [x] 271. ANIMALS SPORADICALLY VANISH IN VIEW (rare; maybe zoom- or mountain-related)
+  (user 23.07.2026, screenshot, East region). Bird's-eye animals occasionally DISAPPEAR
+  before the player's eyes — rare, and the user suspects it follows having changed the
+  ZOOM level, or being near MOUNTAINS. The screenshot also shows an animal rendered with
+  DETACHED/SCATTERED parts (a floating blob above a separated body) — possibly the same
+  animal caught mid-glitch or mid-despawn. TWO things to diagnose (they may be the same
+  bug or two): (a) an on-screen animal being DESPAWNED — this is the zoom-aware
+  streaming-despawn territory (points 164/165/171/172): the despawn must PROJECT each
+  animal through the CURRENT camera frustum (`__camera.onScreen`/the shared `isOnScreen`)
+  and never cull one still inside the rendered frame; a STALE zoom (the despawn ring/
+  radius computed from an old zoom after the player changed it) or a fog.far/assumed-
+  radius shortcut would wrongly drop a visible animal — re-check that the despawn reads
+  the LIVE zoom/frustum, not a cached value, and that a zoom change updates it
+  immediately. (b) a fauna-MESH glitch — an animal whose parts detach/scatter for a frame
+  (an instance-matrix/rebuild race like the point-175 crown jitter, or a build reading a
+  stale transform) near a chunk/LOD boundary or a terrain feature (mountains). DIAGNOSE
+  by reproducing: drive with a changed non-default zoom and near mountains, watch
+  `__wildlife` for an animal that despawns while `__camera.onScreen` says it is in-frame,
+  and watch for a one-frame detached-parts render. FIX per cause: make the despawn read
+  the live frustum/zoom so no on-screen animal is culled; and/or stabilise the fauna
+  transform so parts never detach. ANCHORS: `src/scenes/travel/Wildlife.tsx` (the
+  streaming despawn + `isOnScreen`), `src/scenes/travel/wildlifeBehavior.ts` (the despawn
+  ring/zoom helpers), `src/render/fauna.ts` (the mesh build, for the detached-parts case),
+  the terrain-LOD/streaming near mountains. VERIFIABLE: a pure test that the despawn
+  predicate keeps any animal the live frustum projects on-screen (across zoom levels) and
+  only culls off-frame ones; a live driven pass at a changed zoom near mountains asserts
+  NO on-screen animal (projected via `__camera.onScreen`) despawns, with a screenshot; if
+  it is the mesh glitch, a pure/live check that the fauna parts stay attached across a
+  rebuild. DOCS: design.md §19 if the streaming rule wording changes. No player-visible
+  text. NOTE: wildlife-streaming/render cluster (Wildlife.tsx/wildlifeBehavior.ts/
+  fauna.ts) — do NOT build concurrently with another Wildlife.tsx point. Implementation-ready.
+
+- [x] 272. OCCASIONAL FRAME HITCHES WHILE DRIVING CONTINUOUSLY (bird's-eye) — profile
+  and smooth (user 23.07.2026). Walking/driving continuously in one direction in the
+  bird's-eye view produces occasional short HITCHES (frame stalls). The user suggests
+  clever PRELOADING off the main thread (a worker) to avoid sudden load spikes. ANALYSE
+  FIRST with Fable (the user asked for it): profile what work happens on the spike —
+  the likely culprits are the per-chunk STREAMING done synchronously on a chunk-boundary
+  crossing (terrain chunk build/LOD refine, the flora instance-buffer rebuild — points
+  164/171, the wildlife restock, the water/ribbon rebuild), all of which fire in a burst
+  when the traveller crosses into a new chunk and can stall a frame. Establish, with
+  evidence (which function, how long, on which event), the biggest main-thread spike;
+  read `src/scenes/travel/` (the chunk streaming, `floraStreaming`, terrain LOD, the
+  wildlife/water rebuilds) and any existing worker usage. RECOMMEND + IMPLEMENT a fix
+  that smooths the spike without changing what the player sees — options to weigh:
+  AMORTISE the per-chunk work across several frames (a small time-budget per frame,
+  building N instances/chunks per frame instead of all at once) and/or PREFETCH the next
+  chunks slightly ahead of the crossing (predict from the heading) so the build is spread
+  out before it is needed; move genuinely heavy pure computation to a Web Worker if it is
+  worker-safe (no three.js objects across the boundary — pass plain data, build meshes on
+  the main thread from the worker's output), the way the TTS worker is structured. Keep
+  the visible result identical (no popping/edge regressions — the point-164/171 frustum
+  rules still hold) and keep it deterministic under the fixed seed. ANCHORS: the chunk
+  streaming + `floraStreaming` + terrain LOD + wildlife/water rebuild in
+  `src/scenes/travel/`, any worker pattern (`src/journal/ttsWorker.ts` as the reference).
+  VERIFIABLE: a profiling finding recorded (the measured spike + the fix), a pure test of
+  any new amortise/prefetch scheduler (it covers the same chunks over a few frames, drops
+  nothing), and a live check that a continuous driven pass shows no per-chunk instance
+  pop and no dropped-frame spike above a budget (measure frame times over a straight
+  drive); on BOTH backends. DOCS: design.md §2.4/§19 if the streaming approach changes.
+  No player-visible text. NOTE: touches the travel-scene streaming — coordinate with the
+  flora/wildlife streaming points (164/171/271); the ANALYSIS is read-only and can run in
+  parallel now, the fix lands on its own branch. Implementation-ready after the analysis.
+
+- [ ] 273. WALKABLE PYRAMIDS — an enterable first-person "pyramid settlement" at Giza
+  (user 23.07.2026). PRIORITY/POSITION: a NEW FEATURE → v0.3, queued AFTER 224 (per the
+  ordering rule: before 224 only bugfixes + almost-done points; new features go to v0.3).
+  Make the Giza pyramids + Sphinx ENTERABLE in first-person like a settlement: the
+  traveller stands right in front and can walk AROUND them, with the pyramids and the
+  Sphinx as GIANT "buildings". Entry is via the SPACE key exactly like the future §2.3
+  settlement entry (point 244): walking into the site's radius shows a "Space to enter
+  <name>" hint, and pressing Space enters. NO interior functionality at first (no trade/
+  elder/etc.) — it is a walkable monument space. RESEARCH DONE — the authoritative brief
+  is `docs/giza-1890.md` (read it before building). Load-bearing period cues the build
+  MUST honour: Khafre's surviving pale limestone CAP near the apex (the one casing left,
+  the cue that tells Khafre apart — the game doesn't render it yet); the Sphinx BURIED
+  TO THE SHOULDERS in sand in 1890 and noseless (rendering the modern fully-cleared
+  monument is a ~35-year anachronism — bury it in BOTH the walkable site and the point-82
+  bird's-eye/skyline); the stepped/blunt-topped cores of Khufu (biggest) and Menkaure
+  (smaller, red-granite skirt); the Giza-vs-Meroë contrast (Giza few huge ~52° masses vs
+  Meroë dense small ~70° cones — the code's slope ratios already encode it, add Meroë's
+  offering chapels and keep it smaller); and sparse Thomas-Cook-era ambient PEOPLE at the
+  site (robed guides/dragomen, Bedouin cameleers, donkey-boys, a few 1890s tourists, plus
+  camels/donkeys — reuse the settlement walker system, a handful). Myths excluded
+  (pharaoh's curse, mystic alignment, Napoleon's-cannon nose). The ORIGINAL research
+  scope was: how the Giza pyramids + Sphinx actually
+  LOOK (the three pyramids Khufu/Khafre/Menkaure with their relative sizes, Khafre's
+  casing cap, the Sphinx's proportions and its ~1890 state — how much was excavated vs
+  sand-buried then, the causeways, any queens' pyramids), and the DIFFERENCES between the
+  Giza pyramids and the OTHER pyramids the game shows (Meroë §4.4 Nubian pyramids —
+  smaller, steeper, different profile) so the two read distinct; and whether those
+  differences should also be reflected in the BIRD'S-EYE view and in Cairo's SKYLINE
+  (point 82, the Giza skyline + buildSphinx) — fold that in if the research supports it.
+  If the research shows people/workers/visitors were about the site in ~1890, add ambient
+  walkers accordingly. BUILD (after the research + after 244's Space-entry mechanism is
+  live): a new enterable place/scene for Giza rendered like a settlement, where the
+  pyramids and Sphinx are giant COLLIDABLE structures the player walks around (reuse the
+  §2.6 collision + the first-person walk), SPACE-entry via the point-244 `settlementEntry`
+  pattern (radius → "Space to enter" hint → Space), listed as a special map point;
+  optional ambient walkers if researched; the improved Giza/Sphinx model shared with the
+  point-82 Cairo skyline if the research refines it. ANCHORS: `src/scenes/place/` (the
+  settlement scene + entry), `src/scenes/travel/settlementEntry.ts` (point 244 Space
+  entry), `src/render/landmarks.ts` (the Giza pyramids + `buildSphinx`, point 82), the
+  Cairo skyline (point 82), the place/map-point roster, docs for the research. VERIFIABLE:
+  the research doc; pure tests for the Giza place definition + its Space-enter candidate
+  (radius/hint) reusing point 244's helpers, and for the pyramid/Sphinx model proportions
+  (like `buildSphinx`); a live check that walking into the Giza radius shows the hint and
+  Space enters a walkable scene with the pyramids as collidable structures, on BOTH
+  backends, with a screenshot; if the skyline model changed, re-check the point-82 Cairo
+  skyline. DOCS: design.md §4.4/§2.5/§17.3 (the walkable Giza site + its entry). Any new
+  place name / hint text in BOTH languages with voice markup where applicable. NOTE:
+  DEPENDS on point 244 (the Space-entry mechanism) landing first; a big feature for v0.3.
+  The RESEARCH half is a standalone Fable pass, safe to run now; the BUILD follows 244.
 
 ## Closing (only after all points)
 

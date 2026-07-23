@@ -229,6 +229,14 @@ export const de: Strings = {
     back: 'Zurück',
   },
 
+  stateDump: {
+    title: 'Spielzustand',
+    download: 'Herunterladen',
+    copy: 'Kopieren',
+    copied: 'Spielzustand in die Zwischenablage kopiert.',
+    close: 'Schließen (F5)',
+  },
+
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
     mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich — ein Fehltritt, und ich stürze. Langsam und vorsichtig!',

@@ -5,6 +5,7 @@ import {
   mireFate,
   mireRoll,
   vicinitySeedBounds,
+  vicinityAttemptSeed,
   pickOffscreenLandAnchor,
   calvesForGroup,
   seasonFlowFactor,
@@ -25,6 +26,10 @@ import {
   segPointDist,
   gambolState,
   griefTarget,
+  frontInterceptTarget,
+  trampleKills,
+  elephantWouldTrample,
+  deflectAroundCircle,
   groundNormal,
   leashedGambolDir,
   separationPush,
@@ -56,6 +61,8 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileIdleYaw,
+  CROCODILE_IDLE_SWAY_AMP,
   crocodileGripExpired,
   crocodileHoldsCatch,
   grassFireEligible,
@@ -67,6 +74,7 @@ import {
   vigilDrawReady,
   ambientSavannaSpecies,
   claimedByAnotherDrama,
+  keepStreamedAnimal,
   offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
@@ -82,6 +90,7 @@ import {
   REGION_PREY,
 } from './wildlifeBehavior'
 import { balance } from '../../config/balance'
+import { mulberry32 } from '../../world/noise'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -801,6 +810,57 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
   })
 })
 
+// A resting crocodile WAITS — it lies submerged, it does not roam (design.md
+// §19.16). The point-242 idle life must stay a BOUNDED oscillation about a FIXED
+// rest heading, never accumulate: point 257 reported the croc slowly rotating
+// through a full circle because the sway was added to the LIVE heading and fed
+// back in each frame (a running sum of the sine that grew without bound).
+describe('crocodileIdleYaw (design.md §19.16, points 242/257 — a hidden croc waits, it does not spin)', () => {
+  it('stays strictly within the sway amplitude about its fixed rest heading, forever', () => {
+    const restYaw = 1.234
+    const phase = 0.37
+    // A long window (many minutes of play, hundreds of sway periods): the
+    // accumulating bug grew past a full turn within seconds; the absolute
+    // oscillation never leaves the ±amp band no matter how long it runs.
+    for (let t = 0; t < 20000; t += 0.25) {
+      const offset = crocodileIdleYaw(restYaw, t, phase) - restYaw
+      expect(Math.abs(offset)).toBeLessThanOrEqual(CROCODILE_IDLE_SWAY_AMP + 1e-9)
+    }
+  })
+
+  it('oscillates — it returns toward the rest heading rather than growing without bound', () => {
+    const restYaw = -0.5
+    const phase = 0
+    let maxOffset = -Infinity
+    let minOffset = Infinity
+    let signChanges = 0
+    let prevSign = 0
+    // Sample one full period of the 0.3 rad/s sine and a bit beyond.
+    for (let t = 0; t < 30; t += 0.05) {
+      const offset = crocodileIdleYaw(restYaw, t, phase) - restYaw
+      maxOffset = Math.max(maxOffset, offset)
+      minOffset = Math.min(minOffset, offset)
+      const sign = Math.sign(offset)
+      if (sign !== 0 && prevSign !== 0 && sign !== prevSign) signChanges++
+      if (sign !== 0) prevSign = sign
+    }
+    // It swings both ways about centre (returns through it), reaching near ±amp.
+    expect(signChanges).toBeGreaterThan(1)
+    expect(maxOffset).toBeGreaterThan(CROCODILE_IDLE_SWAY_AMP * 0.9)
+    expect(minOffset).toBeLessThan(-CROCODILE_IDLE_SWAY_AMP * 0.9)
+  })
+
+  it('is absolute in restYaw: shifting the rest heading shifts the yaw one-for-one, no drift', () => {
+    // The value depends ONLY on the fixed anchor and the clock — never on a prior
+    // yaw — so it can never integrate a per-frame offset into a rotation.
+    for (const t of [0, 3.3, 51.7]) {
+      const a = crocodileIdleYaw(0, t, 0.2)
+      const b = crocodileIdleYaw(2, t, 0.2)
+      expect(b - a).toBeCloseTo(2, 12)
+    }
+  })
+})
+
 // The crocodile stays COUPLED to its catch (design.md §19.16, point 250): the
 // reported bug was a snapped catch after which the croc swam away while the prey
 // still dissolved on its own — the removal was decoupled from the croc. A
@@ -1066,21 +1126,25 @@ describe('rescueSpeed (design.md §19.8, point 127 — the parental adrenaline b
 })
 
 describe('griefTarget (design.md §19 — the parent charges the elephant that trampled its calf)', () => {
-  it('picks the nearest living elephant', () => {
+  it('picks the nearest living elephant and carries its heading (point 259)', () => {
     const near = griefTarget(0, 0, [
-      { x: 20, z: 0 },
-      { x: 4, z: 3 }, // distance 5 — the nearest
-      { x: 0, z: 12 },
+      { x: 20, z: 0, heading: 1 },
+      { x: 4, z: 3, heading: 2 }, // distance 5 — the nearest
+      { x: 0, z: 12, heading: 3 },
     ])
-    expect(near).toEqual({ x: 4, z: 3 })
+    expect(near).toEqual({ x: 4, z: 3, heading: 2 })
+  })
+
+  it('defaults a missing heading to 0', () => {
+    expect(griefTarget(0, 0, [{ x: 4, z: 3 }])).toEqual({ x: 4, z: 3, heading: 0 })
   })
 
   it('ignores a dead elephant and takes the next living one', () => {
     const t = griefTarget(0, 0, [
       { x: 1, z: 0, dead: true },
-      { x: 9, z: 0 },
+      { x: 9, z: 0, heading: 0.5 },
     ])
-    expect(t).toEqual({ x: 9, z: 0 })
+    expect(t).toEqual({ x: 9, z: 0, heading: 0.5 })
   })
 
   it('returns null with no elephants at all — the grief must end, not chase nothing', () => {
@@ -1094,36 +1158,44 @@ describe('griefTarget (design.md §19 — the parent charges the elephant that t
   it('breaks an exact distance tie by taking the first element (point 173 hardening)', () => {
     // Both at distance 5 from the origin — a strict "<" comparison means the
     // FIRST one encountered keeps the pick, never the later tied one.
-    const first = { x: 3, z: 4 }
-    const second = { x: 4, z: 3 }
+    const first = { x: 3, z: 4, heading: 0 }
+    const second = { x: 4, z: 3, heading: 0 }
     expect(griefTarget(0, 0, [first, second])).toEqual(first)
     // Reversed order: the (now-first) second element wins instead — proving
     // the result really tracks list order, not some other tiebreak.
     expect(griefTarget(0, 0, [second, first])).toEqual(second)
   })
 
-  it('the charge reaches the trampling feet well inside the grief window', () => {
+  it('the parent reaches the elephant FRONT and is trampled well inside the grief window (point 259)', () => {
     // Mini-simulation of the contract; the numbers mirror Wildlife.tsx
     // (TRAMPLE_GRIEF_SPEED 6.5, ELEPHANT_SPEED 1.5, TRAMPLE_GRIEF_SECONDS 12,
-    // TRAMPLE_RADIUS 1.5). The parent must catch an elephant WALKING AWAY from
-    // it — otherwise the window would expire and the sacrifice would silently
-    // never happen.
+    // TRAMPLE_RADIUS 1.5, GRIEF_FRONT_REACH 1). The parent must get IN FRONT of
+    // an elephant walking straight AT it and be crushed only by the direction
+    // condition — otherwise the window would expire and the sacrifice would
+    // silently never happen.
     const dt = 1 / 60
     let px = 0
     let pz = 0
-    const eleph = { x: 10, z: 0 }
+    const eleph = { x: 10, z: 0, heading: -Math.PI / 2 } // heading (sin,cos)=(-1,0): moving toward the parent along -x
     let grief = 12
     let trampled = false
     while (grief > 0) {
-      eleph.x += 1.5 * dt // roaming straight away from the parent
+      const evx = Math.sin(eleph.heading) * 1.5 * dt
+      const evz = Math.cos(eleph.heading) * 1.5 * dt
+      eleph.x += evx
+      eleph.z += evz
       const t = griefTarget(px, pz, [eleph])
       expect(t).not.toBeNull()
-      const dx = t!.x - px
-      const dz = t!.z - pz
+      const front = frontInterceptTarget(t!.x, t!.z, t!.heading, 1)
+      const dx = front.x - px
+      const dz = front.z - pz
       const d = Math.hypot(dx, dz) || 1
       px += (dx / d) * 6.5 * dt
       pz += (dz / d) * 6.5 * dt
-      if (Math.hypot(eleph.x - px, eleph.z - pz) < 1.5) {
+      if (
+        Math.hypot(eleph.x - px, eleph.z - pz) < 1.5 &&
+        trampleKills(evx, evz, eleph.x, eleph.z, px, pz)
+      ) {
         trampled = true
         break
       }
@@ -1131,6 +1203,214 @@ describe('griefTarget (design.md §19 — the parent charges the elephant that t
     }
     expect(trampled).toBe(true)
     expect(grief).toBeGreaterThan(6) // reached with the window barely touched
+  })
+
+  it('resolves via the deadline when the front can never be reached (invariant I4)', () => {
+    // A parent slower than the elephant can never get in front, so the trample
+    // never fires — but the grief drama STILL resolves at the deadline (the
+    // parent stops and rejoins), never a drive with no exit.
+    const dt = 1 / 60
+    let px = 0
+    let pz = 0
+    const eleph = { x: 5, z: 0, heading: Math.PI / 2 } // (sin,cos)=(1,0): fleeing along +x
+    let grief = 12
+    let trampled = false
+    let resolved = false
+    // Parent SLOWER than the fleeing elephant — the front stays out of reach.
+    const parentSpeed = 1.0
+    const elephSpeed = 6.0
+    while (grief > 0) {
+      const evx = Math.sin(eleph.heading) * elephSpeed * dt
+      const evz = Math.cos(eleph.heading) * elephSpeed * dt
+      eleph.x += evx
+      eleph.z += evz
+      const t = griefTarget(px, pz, [eleph])
+      const front = frontInterceptTarget(t!.x, t!.z, t!.heading, 1)
+      const dx = front.x - px
+      const dz = front.z - pz
+      const d = Math.hypot(dx, dz) || 1
+      px += (dx / d) * parentSpeed * dt
+      pz += (dz / d) * parentSpeed * dt
+      if (
+        Math.hypot(eleph.x - px, eleph.z - pz) < 1.5 &&
+        trampleKills(evx, evz, eleph.x, eleph.z, px, pz)
+      ) {
+        trampled = true
+        break
+      }
+      grief -= dt
+      if (grief <= 0) resolved = true
+    }
+    expect(trampled).toBe(false)
+    expect(resolved).toBe(true) // the deadline backstop ended the grief
+  })
+})
+
+describe('frontInterceptTarget (design.md §19.8 — the grief parent aims at the elephant FRONT, point 259)', () => {
+  it('returns a point ahead of the elephant along its heading, at the given reach', () => {
+    const heading = 0.7
+    const reach = 4
+    const p = frontInterceptTarget(10, -2, heading, reach)
+    // Ahead along the heading unit (sin, cos): the offset dotted with the
+    // heading direction is > 0 and equals the reach.
+    const dx = p.x - 10
+    const dz = p.z - -2
+    const dot = dx * Math.sin(heading) + dz * Math.cos(heading)
+    expect(dot).toBeGreaterThan(0)
+    expect(dot).toBeCloseTo(reach, 10)
+    expect(Math.hypot(dx, dz)).toBeCloseTo(reach, 10)
+  })
+
+  it('points straight ahead for a zero heading', () => {
+    const p = frontInterceptTarget(0, 0, 0, 5) // (sin,cos)=(0,1) → +z
+    expect(p.x).toBeCloseTo(0, 10)
+    expect(p.z).toBeCloseTo(5, 10)
+  })
+})
+
+describe('deflectAroundCircle (design.md §19.5 — the elephant body collider, point 261)', () => {
+  const R = 1.3 // an elephant body radius
+
+  it('slides a step aimed straight THROUGH the body around it (never inside, keeps moving)', () => {
+    // From directly behind the body to directly ahead of it — the straight path
+    // passes through the centre. The result must NOT land inside the circle and
+    // must make lateral (tangential) progress rather than stopping dead.
+    const [ex, ez] = deflectAroundCircle(0, -2, 0, 2, 0, 0, R)
+    expect(Math.hypot(ex, ez)).toBeGreaterThanOrEqual(R)
+    // Slid sideways off the centre line (went AROUND), and did not just rest at
+    // the start point.
+    expect(Math.abs(ex)).toBeGreaterThan(0.1)
+    expect(Math.hypot(ex - 0, ez - -2)).toBeGreaterThan(0.1)
+  })
+
+  it('leaves a step that never touches the body unchanged', () => {
+    // A step well to the side of the body: returned verbatim.
+    const [ex, ez] = deflectAroundCircle(5, -1, 5, 3, 0, 0, R)
+    expect(ex).toBe(5)
+    expect(ez).toBe(3)
+  })
+
+  it('leaves a step that only grazes past (closest approach ≥ radius) unchanged', () => {
+    // Passes at x = R exactly — tangent, does not enter.
+    const [ex, ez] = deflectAroundCircle(R, -2, R, 2, 0, 0, R)
+    expect(ex).toBe(R)
+    expect(ez).toBe(2)
+  })
+
+  it('de-penetrates a step that ENDS inside the body out to its edge', () => {
+    // The elephant walked onto a nearly-still grazer: its tiny step ends inside
+    // the body. The collider pushes it back out to the surface (never inside).
+    const [ex, ez] = deflectAroundCircle(0.4, -0.4, 0.5, -0.3, 0, 0, R)
+    expect(Math.hypot(ex, ez)).toBeGreaterThanOrEqual(R - 1e-9)
+  })
+
+  it('lets the grief parent ROUTE AROUND the body to the front and be crushable — no stall', () => {
+    // Replays the grief charge (points 259/261): the parent starts BEHIND the
+    // elephant and each frame aims at the front-intercept point (reach 1, which
+    // is INSIDE the body circle), stepping at the grief speed. With the collider
+    // it must round the body and, at some frame, stand within the trample reach
+    // AHEAD of the elephant (where the moving elephant would crush it) — proving
+    // it neither clips through nor stalls behind. It never enters the body.
+    const SPEED = 6.5 // TRAMPLE_GRIEF_SPEED
+    const REACH = 1 // GRIEF_FRONT_REACH
+    const TRAMPLE = 1.5 // TRAMPLE_RADIUS
+    const dt = 0.1
+    let px = 0
+    let pz = -3 // behind an elephant at the origin heading +z (sin,cos)=(0,1)
+    let crushable = false
+    for (let i = 0; i < 400; i++) {
+      const front = frontInterceptTarget(0, 0, 0, REACH) // (0, 1)
+      const dx = front.x - px
+      const dz = front.z - pz
+      const d = Math.hypot(dx, dz) || 1
+      const tx = px + (dx / d) * SPEED * dt
+      const tz = pz + (dz / d) * SPEED * dt
+      ;[px, pz] = deflectAroundCircle(px, pz, tx, tz, 0, 0, R)
+      // Never inside the body.
+      expect(Math.hypot(px, pz)).toBeGreaterThanOrEqual(R - 1e-6)
+      // Within the trample reach AND ahead of the elephant → the moving elephant
+      // (travelling +z) would crush it here (trampleKills holds for a +z victim).
+      if (Math.hypot(px, pz) <= TRAMPLE && pz > 0) crushable = true
+    }
+    expect(crushable).toBe(true)
+  })
+})
+
+describe('trampleKills (design.md §19.5 — the trample direction condition, point 259)', () => {
+  it('kills when the elephant moves with a positive component toward the victim', () => {
+    // Elephant at origin moving +x; victim ahead at +x → dot > 0.
+    expect(trampleKills(0.02, 0, 0, 0, 3, 0)).toBe(true)
+  })
+
+  it('does NOT kill a victim a STANDING elephant is bumped into (speed ~0)', () => {
+    expect(trampleKills(0, 0, 0, 0, 1, 0)).toBe(false)
+    expect(trampleKills(1e-6, 0, 0, 0, 1, 0)).toBe(false) // below the epsilon
+  })
+
+  it('does NOT kill a victim hit from BEHIND the heading of travel (dot < 0)', () => {
+    // Elephant moving +x; victim BEHIND at -x → dot < 0.
+    expect(trampleKills(0.02, 0, 0, 0, -3, 0)).toBe(false)
+  })
+
+  it('does NOT kill on a purely lateral pass (dot = 0, the boundary)', () => {
+    // Elephant moving +x; victim off to the side at +z → dot = 0.
+    expect(trampleKills(0.02, 0, 0, 0, 0, 3)).toBe(false)
+  })
+
+  it('kills a victim in the forward arc (partial positive component)', () => {
+    // Moving +x, victim ahead-and-to-the-side: dot still > 0.
+    expect(trampleKills(0.02, 0, 0, 0, 2, 5)).toBe(true)
+  })
+})
+
+describe('elephantWouldTrample (design.md §19.5 — the collider trample exemption, point 263)', () => {
+  const TRAMPLE = 1.5 // TRAMPLE_RADIUS
+  const R = 1.3 // an elephant body radius
+
+  it('is true for an animal in range the elephant is moving TOWARD (it is about to trample it)', () => {
+    // Elephant at origin moving +x; victim 1 unit ahead, inside the reach.
+    expect(elephantWouldTrample(0.02, 0, 0, 0, 1, 0, TRAMPLE)).toBe(true)
+  })
+
+  it('is false outside the trample reach even when moving toward the animal', () => {
+    // Same +x drive, but the animal is 2 units away — beyond 1.5.
+    expect(elephantWouldTrample(0.02, 0, 0, 0, 2, 0, TRAMPLE)).toBe(false)
+  })
+
+  it('is false in range when the elephant is STANDING (no bearing-down velocity)', () => {
+    expect(elephantWouldTrample(0, 0, 0, 0, 1, 0, TRAMPLE)).toBe(false)
+    expect(elephantWouldTrample(1e-6, 0, 0, 0, 1, 0, TRAMPLE)).toBe(false)
+  })
+
+  it('is false in range when the elephant moves AWAY from the animal (dot ≤ 0)', () => {
+    expect(elephantWouldTrample(0.02, 0, 0, 0, -1, 0, TRAMPLE)).toBe(false) // behind
+    expect(elephantWouldTrample(0.02, 0, 0, 0, 0, 1, TRAMPLE)).toBe(false) // lateral, dot = 0
+  })
+
+  it('EXEMPTS the bearing-down victim from the collider while a non-trampling elephant still deflects', () => {
+    // The point-263 fix as the render loop applies it: an animal the elephant
+    // WOULD trample this step keeps its step (no deflection → the trample fires);
+    // an animal near a NON-trampling (here stationary) elephant is still slid
+    // AROUND the body (no walk-through). One free animal, two elephant states.
+    const from: [number, number] = [0, -1]
+    const to: [number, number] = [0, 0.5] // a step that would pass through the body at the origin
+
+    // (a) The elephant bears down on it (moving +z toward the animal's end point,
+    //     which sits within the trample reach). Exempt → the step lands unchanged.
+    const drivingVel: [number, number] = [0, 0.02]
+    const exempt = elephantWouldTrample(drivingVel[0], drivingVel[1], 0, 0, to[0], to[1], TRAMPLE)
+    expect(exempt).toBe(true)
+    const kept = exempt ? to : deflectAroundCircle(from[0], from[1], to[0], to[1], 0, 0, R)
+    expect(kept).toEqual(to) // NOT deflected — stays where the trample catches it
+
+    // (b) The same animal near a STANDING elephant: not a trample → it slides
+    //     around the body and never rests inside it.
+    const stillVel: [number, number] = [0, 0]
+    const notTrample = elephantWouldTrample(stillVel[0], stillVel[1], 0, 0, to[0], to[1], TRAMPLE)
+    expect(notTrample).toBe(false)
+    const slid = notTrample ? to : deflectAroundCircle(from[0], from[1], to[0], to[1], 0, 0, R)
+    expect(slid).not.toEqual(to) // deflected
+    expect(Math.hypot(slid[0], slid[1])).toBeGreaterThanOrEqual(R - 1e-9) // outside the body
   })
 })
 
@@ -2224,6 +2504,43 @@ describe('pickOffscreenLandAnchor (points 165/183 — a seeded guarantee never p
   })
 })
 
+describe('vicinityAttemptSeed (point 102 — a deferring vicinity top-up EXPLORES instead of re-testing frozen bearings)', () => {
+  // The seeder draws its 14 candidate bearings/distances (plus the species
+  // rotation start) from mulberry32(seed); a fresh seed per attempt means a
+  // fresh candidate set, so a static camera can never pin a deferring draw.
+  const draw = (s: number) => {
+    const r = mulberry32(s)
+    return Array.from({ length: 29 }, () => r())
+  }
+
+  it('consecutive attempts yield different seeds AND different whole candidate draws', () => {
+    const s0 = vicinityAttemptSeed(1234, 5678, 0)
+    const s1 = vicinityAttemptSeed(1234, 5678, 1)
+    const s2 = vicinityAttemptSeed(1234, 5678, 2)
+    expect(new Set([s0, s1, s2]).size).toBe(3)
+    expect(draw(s1)).not.toEqual(draw(s0))
+    expect(draw(s2)).not.toEqual(draw(s1))
+  })
+
+  it('is reproducible: the same (seed, place, attempt) always draws the same set', () => {
+    expect(vicinityAttemptSeed(99, 7, 3)).toBe(vicinityAttemptSeed(99, 7, 3))
+    expect(draw(vicinityAttemptSeed(99, 7, 3))).toEqual(draw(vicinityAttemptSeed(99, 7, 3)))
+  })
+
+  it('attempt 0 keeps the historical fixed seed, so first placements are unchanged', () => {
+    expect(vicinityAttemptSeed(4, 11, 0)).toBe(((4 ^ 11) + 0x102) >>> 0)
+  })
+
+  it('stays a valid unsigned 32-bit seed across large attempt counts', () => {
+    for (const attempt of [1, 1000, 123456]) {
+      const s = vicinityAttemptSeed(0xdeadbeef, -12345, attempt)
+      expect(s).toBeGreaterThanOrEqual(0)
+      expect(s).toBeLessThanOrEqual(0xffffffff)
+      expect(Number.isInteger(s)).toBe(true)
+    }
+  })
+})
+
 describe('calvesForGroup (point 169 — a calibratable fraction of the herd, distinct parents)', () => {
   it('raises none below the family-life threshold of three', () => {
     expect(calvesForGroup(0, 0.25)).toBe(0)
@@ -2562,5 +2879,74 @@ describe('claimedByAnotherDrama (point 197 — one actor per emergent drama)', (
     // caught/mired/fireTrapped use `!== undefined`, so a 0 counter still counts.
     expect(claimedByAnotherDrama({ ...base, caught: 0 })).toBe(true)
     expect(claimedByAnotherDrama({ ...base, fireTrapped: 0 })).toBe(true)
+  })
+})
+
+describe('keepStreamedAnimal (the streaming cull judges the animal where it STANDS, never only its birth chunk)', () => {
+  const CHUNK = 24 // Wildlife.tsx CHUNK_SIZE
+  const chunkKeyAt = (x: number, z: number) => `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`
+  const never = () => false
+  const always = () => true
+  const noChunks = () => false
+
+  it('keeps and re-homes an animal standing inside a live chunk after its birth chunk dropped', () => {
+    const a = { chunk: '-9,0', x: 30, z: 5 } // birth chunk long gone, standing in "1,0"
+    const live = new Set(['1,0'])
+    const v = keepStreamedAnimal(a, (k) => live.has(k), CHUNK, 0, 0, 110, never)
+    expect(v.keep).toBe(true)
+    expect(v.rehomeTo).toBe('1,0')
+    expect(v.rehomeTo).toBe(chunkKeyAt(a.x, a.z))
+  })
+
+  it('keeps an animal outside all live chunks while it is within despawnR of the player', () => {
+    const a = { chunk: '-9,0', x: 50, z: 0 }
+    const v = keepStreamedAnimal(a, noChunks, CHUNK, 0, 0, 110, never)
+    expect(v.keep).toBe(true)
+    expect(v.rehomeTo).toBeUndefined()
+  })
+
+  it('keeps an on-screen animal regardless of the despawn radius (swept across zoom levels)', () => {
+    // The projection backstop wins at every ring size (point-172 doctrine):
+    // despawnR = 100*zoom + 60, the animal parked well beyond each ring.
+    for (const zoom of [0.125, 0.5, 1.5, 2.2]) {
+      const despawnR = 100 * zoom + 60
+      const a = { chunk: '-9,0', x: despawnR + 40, z: 0 }
+      const v = keepStreamedAnimal(a, noChunks, CHUNK, 0, 0, despawnR, always)
+      expect(v.keep).toBe(true)
+    }
+  })
+
+  it('drops an animal that is off-screen, beyond despawnR and outside every live chunk', () => {
+    const a = { chunk: '-9,0', x: 200, z: 0 }
+    const v = keepStreamedAnimal(a, noChunks, CHUNK, 0, 0, 110, never)
+    expect(v.keep).toBe(false)
+  })
+
+  it('always keeps dead carcasses and untagged animals', () => {
+    // Dead: dissolves on screen; untagged: e.g. injected by the verification.
+    expect(keepStreamedAnimal({ dead: true, chunk: '-9,0', x: 500, z: 0 }, noChunks, CHUNK, 0, 0, 110, never).keep).toBe(true)
+    expect(keepStreamedAnimal({ x: 500, z: 0 }, noChunks, CHUNK, 0, 0, 110, never).keep).toBe(true)
+  })
+
+  it('regression: a fled animal on-screen beside the player survives the zoom-in that culls its birth chunk', () => {
+    // The reported vanish: the animal fled ~120 units from its birth chunk and
+    // stands ~30 units ahead of the player, in view. Zooming 0.5 -> 0.125
+    // collapses despawnR 110 -> 72.5 in one frame and streams the birth chunk
+    // out; the old birth-chunk filter deleted the animal mid-frame (its TRAA
+    // ghost read as scattered body parts).
+    const a = { chunk: chunkKeyAt(-120, 0), x: 30, z: 0 } // birth "-5,0", standing in "1,0"
+    const liveAt = (despawnR: number) => (key: string) => {
+      const [kx, kz] = key.split(',').map(Number)
+      return Math.hypot((kx + 0.5) * CHUNK, (kz + 0.5) * CHUNK) <= despawnR // player at origin
+    }
+    // Zoom 0.5: the birth chunk is still live — kept without re-homing.
+    const before = keepStreamedAnimal(a, liveAt(100 * 0.5 + 60), CHUNK, 0, 0, 100 * 0.5 + 60, always)
+    expect(before.keep).toBe(true)
+    expect(before.rehomeTo).toBeUndefined()
+    // Zoom 0.125: the birth chunk streams out (centre -108 beyond 72.5) while
+    // the chunk under its feet stays live — kept AND re-homed, never culled.
+    const after = keepStreamedAnimal(a, liveAt(100 * 0.125 + 60), CHUNK, 0, 0, 100 * 0.125 + 60, always)
+    expect(after.keep).toBe(true)
+    expect(after.rehomeTo).toBe('1,0')
   })
 })

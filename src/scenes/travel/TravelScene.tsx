@@ -27,8 +27,8 @@ import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { settlementEnterCandidate, shouldEnterSettlement } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
-import { landFractionAt } from '../../world/geodata'
-import { chunkIsMountainous, refinedSegments } from './terrainLod'
+import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments } from './terrainLod'
+import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
@@ -50,7 +50,7 @@ import {
   type TrailPoint,
 } from './canoeDrag'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
-import { chunkOffsetsByDistance, FLORA_FOG, floraChunkRange, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
+import { chunkOffsetsByDistance, FLORA_FOG, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { TRAVELLER_PACK } from '../../render/figures'
 import { getStrings, useStrings } from '../../i18n'
@@ -82,6 +82,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
+import { PERF, maxFrameMs, recordBurst, recordFrame, resetPerf } from './perfProbe'
 import { Climate } from './Climate'
 import { setFrameVisibilityTest } from './frameVisibility'
 import { RegionBorders } from './RegionBorders'
@@ -112,26 +113,9 @@ const SKIRT_DROP = 1.6 // vertical skirt hiding cracks between LOD levels
 // doubling for coastal and mountainous chunks) live in terrainLod.ts so they
 // are unit-testable (terrainShading.test.ts).
 
-// point 209: a chunk straddling the sea coast gets a finer mesh, so the smooth
-// vector shoreline (terrain.ts derives the near-coast land fraction from the
-// vector signed distance) is not re-quantized to blocky steps by the coarse
-// LOD vertex spacing. Detected cheaply from the raster land mask at a 5x5 grid
-// — a mix of sea and land in the chunk means the coast crosses it.
-function chunkIsCoastal(cx: number, cz: number): boolean {
-  const x0 = cx * CHUNK_SIZE
-  const z0 = cz * CHUNK_SIZE
-  let sea = false
-  let land = false
-  for (let iz = 0; iz <= 4; iz++) {
-    for (let ix = 0; ix <= 4; ix++) {
-      const { lat, lon } = worldToLatLon(x0 + (ix / 4) * CHUNK_SIZE, z0 + (iz / 4) * CHUNK_SIZE)
-      if (landFractionAt(lat, lon) < 0.5) sea = true
-      else land = true
-      if (sea && land) return true
-    }
-  }
-  return false
-}
+// The coast/mountain refine probes live in terrainLod.ts (point 209), memoised
+// per chunk there so a crossing never re-probes long-known ground
+// (docs/perf-driving-hitches.md).
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.5, 0.62, 0.38]
@@ -295,14 +279,23 @@ export function buildChunkGeometry(
     }
   }
 
-  const indices: number[] = []
+  // Preallocated index buffer (docs/perf-driving-hitches.md): the former
+  // number[] push built ~37k-150k elements of GC garbage per chunk — the
+  // largest single allocation of the crossing burst.
+  const indexArray = new Uint32Array(segments * segments * 6 + 4 * (n - 1) * 6)
+  let ii = 0
   for (let iz = 0; iz < segments; iz++) {
     for (let ix = 0; ix < segments; ix++) {
       const a = iz * n + ix
       const b = a + 1
       const c = a + n
       const d = c + 1
-      indices.push(a, c, b, b, c, d)
+      indexArray[ii++] = a
+      indexArray[ii++] = c
+      indexArray[ii++] = b
+      indexArray[ii++] = b
+      indexArray[ii++] = c
+      indexArray[ii++] = d
     }
   }
 
@@ -332,7 +325,12 @@ export function buildChunkGeometry(
     for (let i = 0; i < n - 1; i++) {
       const a = edgeIndex(e, i)
       const b = edgeIndex(e, i + 1)
-      indices.push(a, b, base + i, b, base + i + 1, base + i)
+      indexArray[ii++] = a
+      indexArray[ii++] = b
+      indexArray[ii++] = base + i
+      indexArray[ii++] = b
+      indexArray[ii++] = base + i + 1
+      indexArray[ii++] = base + i
     }
   }
 
@@ -343,6 +341,7 @@ export function buildChunkGeometry(
   geo.setAttribute('splat', new THREE.BufferAttribute(splats, 4))
   geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
   geo.setAttribute('seasonUV', new THREE.BufferAttribute(seasonUVs, 2))
+  const indices = new THREE.BufferAttribute(indexArray, 1)
   geo.setIndex(indices)
   return geo
 }
@@ -455,13 +454,39 @@ function createTerrainMaterial(): THREE.MeshStandardNodeMaterial {
 // re-entry (no rebuild either). Seed-keyed — a new run disposes and restarts.
 const chunkGeometryCache = new Map<string, THREE.BufferGeometry>()
 let chunkCacheSeed: number | null = null
+// Latest BUILT geometry key per chunk `cx,cz` (any resolution): while a merely
+// re-keyed chunk (its LOD or a neighbour's stitch resolution changed) waits in
+// the build queue, its previous geometry keeps drawing as a stand-in — a stale
+// LOD for a few frames is invisible, a hole is not
+// (docs/perf-driving-hitches.md).
+const chunkLatestKey = new Map<string, string>()
+
+// Per-frame terrain build budget (ms): the queue drains until the budget is
+// spent, at least one chunk per frame so it always progresses. A refined
+// 112-seg chunk can overshoot on its own — its build is atomic; splitting it
+// into a Web Worker is the documented follow-up (docs/perf-driving-hitches.md).
+const TERRAIN_BUILD_BUDGET_MS = 5
+// Prefetch lookahead (wu): once the drive heading puts a point this far ahead
+// into the next chunk, that window's builds start early, so the crossing
+// usually finds its chunks already built.
+const PREFETCH_LOOKAHEAD = CHUNK_SIZE / 2
 
 function TerrainChunks() {
   const seed = useGame((s) => s.seed)
   const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
+  const activeSig = useRef('')
   const lastCenter = useRef<string | null>(null)
   const material = useMemo(() => createTerrainMaterial(), [])
+  // Budgeted build queue (docs/perf-driving-hitches.md): the boundary crossing
+  // used to build every changed chunk of the window synchronously in one frame
+  // (~40-60 geometries, the tallest driving hitch). It now enqueues the missing
+  // builds and the loop below drains a few per frame; stand-ins cover re-keyed
+  // chunks meanwhile (chunkLatestKey above).
+  const queueRef = useRef<ChunkJob[]>([])
+  const desiredRef = useRef<ChunkJob[]>([])
+  const prefetchRef = useRef<{ center: string; keys: Set<string>; queue: ChunkJob[] } | null>(null)
+  const prevPos = useRef<{ x: number; z: number } | null>(null)
 
   // Reset the cache when a new run (seed) starts — NOT on remount.
   useEffect(() => {
@@ -469,71 +494,137 @@ function TerrainChunks() {
     chunkCacheSeed = seed
     cache.current.forEach((g) => g.dispose())
     cache.current.clear()
+    chunkLatestKey.clear()
     lastCenter.current = null
+    queueRef.current = []
+    desiredRef.current = []
+    prefetchRef.current = null
+    activeSig.current = ''
     setActive([])
   }, [seed])
 
   useFrame(() => {
+    const t0 = performance.now()
     const pos = useGame.getState().pos
     const cx = Math.floor(pos.x / CHUNK_SIZE)
     const cz = Math.floor(pos.z / CHUNK_SIZE)
     const center = chunkKey(cx, cz)
-    if (center === lastCenter.current) return
-    lastCenter.current = center
+    let worked = false
 
-    // Segment count for the chunk at camera-relative offset (dx,dz), memoized
-    // so the seam stitch can read a chunk's four neighbours (some just outside
-    // the render window) without repeating the 5x5 coast/mountain probes.
-    // Near-ring quality doubling (terrainLod.ts): coast-crossing chunks
-    // (point 209 — the smooth vector shoreline must not re-quantize to mesh
-    // steps) and mountainous chunks (the smooth bicubic relief must not fold
-    // into polyline facets) share one capped doubling. The gates OR together —
-    // either refines once, never twice — and short-circuit so far rings and
-    // flat inland chunks skip the probes.
-    const segsCache = new Map<string, number>()
-    const segsAt = (dx: number, dz: number): number => {
-      const k = `${dx},${dz}`
-      const hit = segsCache.get(k)
-      if (hit !== undefined) return hit
-      const ring = Math.max(Math.abs(dx), Math.abs(dz))
-      const refine =
-        ring <= 4 && (chunkIsCoastal(cx + dx, cz + dz) || chunkIsMountainous(cx + dx, cz + dz))
-      const s = refinedSegments(ring, refine)
-      segsCache.set(k, s)
-      return s
+    // Plan the window around a centre: segment count per offset, memoized so
+    // the seam stitch can read a chunk's four neighbours (some just outside
+    // the render window) cheaply. Near-ring quality doubling (terrainLod.ts):
+    // coast-crossing chunks (point 209 — the smooth vector shoreline must not
+    // re-quantize to mesh steps) and mountainous chunks (the smooth bicubic
+    // relief must not fold into polyline facets) share one capped doubling
+    // behind the persistent per-chunk probe memo.
+    const planWindow = (ccx: number, ccz: number): ChunkJob[] => {
+      const segsCache = new Map<string, number>()
+      const segsAt = (dx: number, dz: number): number => {
+        const k = `${dx},${dz}`
+        const hit = segsCache.get(k)
+        if (hit !== undefined) return hit
+        const ring = Math.max(Math.abs(dx), Math.abs(dz))
+        const refine = ring <= REFINE_RING_MAX && chunkNeedsRefine(ccx + dx, ccz + dz)
+        const s = refinedSegments(ring, refine)
+        segsCache.set(k, s)
+        return s
+      }
+      return planChunkWindow(ccx, ccz, CHUNK_RADIUS, segsAt)
+    }
+    const hasStandIn = (chunk: string): boolean => {
+      const k = chunkLatestKey.get(chunk)
+      return k !== undefined && cache.current.has(k)
+    }
+    const buildJob = (job: ChunkJob): void => {
+      if (cache.current.has(job.key)) return
+      cache.current.set(job.key, buildChunkGeometry(job.cx, job.cz, seed, job.segments, job.edgeSegs))
+      chunkLatestKey.set(job.chunk, job.key)
     }
 
-    const keys: string[] = []
-    for (let dz = -CHUNK_RADIUS; dz <= CHUNK_RADIUS; dz++) {
-      for (let dx = -CHUNK_RADIUS; dx <= CHUNK_RADIUS; dx++) {
-        const segments = segsAt(dx, dz)
-        // Stitch each shared edge to the coarser neighbour (min of the two res)
-        // so no T-junction crack opens where LOD levels meet (point 220). Order
-        // matches edgeIndex: north/-z, south/+z, west/-x, east/+x.
-        const edgeSegs: [number, number, number, number] = [
-          Math.min(segments, segsAt(dx, dz - 1)),
-          Math.min(segments, segsAt(dx, dz + 1)),
-          Math.min(segments, segsAt(dx - 1, dz)),
-          Math.min(segments, segsAt(dx + 1, dz)),
-        ]
-        const key = `${chunkKey(cx + dx, cz + dz)}:${segments}:${edgeSegs.join(',')}`
-        keys.push(key)
-        if (!cache.current.has(key)) {
-          cache.current.set(key, buildChunkGeometry(cx + dx, cz + dz, seed, segments, edgeSegs))
+    if (center !== lastCenter.current) {
+      const prevCenter = lastCenter.current
+      lastCenter.current = center
+      const jobs = planWindow(cx, cz)
+      desiredRef.current = jobs
+      prefetchRef.current = null // superseded by the real crossing
+      const missing = jobs.filter((j) => !cache.current.has(j.key))
+      // A one-chunk step is the DRIVING case: spread the builds over the
+      // coming frames (stand-ins cover meanwhile, and the prefetch has usually
+      // built ahead already). Any larger jump — teleport, scene entry, first
+      // frame — builds synchronously as before: no stand-ins exist there, and
+      // a progressive fill would show holes.
+      const [pcx, pcz] = prevCenter === null ? [NaN, NaN] : prevCenter.split(',').map(Number)
+      const adjacent = prevCenter !== null && Math.max(Math.abs(cx - pcx), Math.abs(cz - pcz)) === 1
+      if (adjacent) {
+        queueRef.current = orderChunkJobs(missing, hasStandIn)
+      } else {
+        for (const job of missing) buildJob(job)
+        queueRef.current = []
+      }
+      worked = true
+    } else if (queueRef.current.length === 0 && prevPos.current !== null) {
+      // Idle between crossings: prefetch the predicted next window along the
+      // drive heading so the crossing finds its chunks already built.
+      const predicted = predictedNextCenter(pos, prevPos.current, CHUNK_SIZE, PREFETCH_LOOKAHEAD)
+      if (predicted !== null) {
+        const pKey = chunkKey(predicted.cx, predicted.cz)
+        if (prefetchRef.current?.center !== pKey) {
+          const jobs = planWindow(predicted.cx, predicted.cz)
+          prefetchRef.current = {
+            center: pKey,
+            keys: new Set(jobs.map((j) => j.key)),
+            queue: orderChunkJobs(jobs.filter((j) => !cache.current.has(j.key)), hasStandIn),
+          }
         }
       }
     }
-    // Bound the cache: drop non-active geometries once it grows large.
-    if (cache.current.size > 700) {
-      const activeSet = new Set(keys)
-      for (const [key, geo] of cache.current) {
-        if (!activeSet.has(key)) {
-          geo.dispose()
-          cache.current.delete(key)
+    prevPos.current = { x: pos.x, z: pos.z }
+
+    // Drain under the frame budget: the current window first (it fills real
+    // gaps), then the prefetch queue.
+    const q = queueRef.current.length > 0 ? queueRef.current : prefetchRef.current?.queue
+    if (q !== undefined && q.length > 0) {
+      drainChunkQueue(q, TERRAIN_BUILD_BUDGET_MS, () => performance.now(), buildJob)
+      worked = true
+    }
+
+    if (worked) {
+      // Resolve the drawn set: the desired key where built, else the chunk's
+      // latest older geometry (a stale LOD beats a hole; a never-built chunk
+      // waits at the queue front — it has hole priority).
+      const resolved: string[] = []
+      for (const job of desiredRef.current) {
+        if (cache.current.has(job.key)) {
+          resolved.push(job.key)
+        } else {
+          const fallback = chunkLatestKey.get(job.chunk)
+          if (fallback !== undefined && cache.current.has(fallback)) resolved.push(fallback)
         }
       }
+      const sig = resolved.join('|')
+      if (sig !== activeSig.current) {
+        activeSig.current = sig
+        // Bound the cache: drop geometries neither drawn nor about to be
+        // needed (desired still queued, or prefetched for the next window).
+        if (cache.current.size > 700) {
+          const keep = new Set(resolved)
+          for (const job of desiredRef.current) keep.add(job.key)
+          if (prefetchRef.current !== null) for (const k of prefetchRef.current.keys) keep.add(k)
+          for (const [key, geo] of cache.current) {
+            if (!keep.has(key)) {
+              geo.dispose()
+              cache.current.delete(key)
+            }
+          }
+          for (const [chunk, key] of chunkLatestKey) {
+            if (!cache.current.has(key)) chunkLatestKey.delete(chunk)
+          }
+        }
+        setActive(resolved)
+      }
+      if (import.meta.env.DEV) recordBurst(PERF.terrain, performance.now() - t0)
     }
-    setActive(keys)
   })
 
   return (
@@ -874,7 +965,10 @@ interface PlacedFlora {
  * placement logic than the render. The instance-cap overflow is the only
  * render-only concern the collider skips.
  */
-function placedFloraAt(ccx: number, ccz: number, i: number, seed: number): PlacedFlora | null {
+// Exported for the placement-cache equality test (floraPlacementCache.test.ts);
+// not a component.
+// eslint-disable-next-line react/only-export-components
+export function placedFloraAt(ccx: number, ccz: number, i: number, seed: number): PlacedFlora | null {
   const rx = hashChunk(ccx, ccz, i * 4, seed)
   const rz = hashChunk(ccx, ccz, i * 4 + 1, seed)
   const roll = hashChunk(ccx, ccz, i * 4 + 2, seed)
@@ -908,13 +1002,65 @@ function placedFloraAt(ccx: number, ccz: number, i: number, seed: number): Place
   return { species, x, z, height: s.height, r4, roll }
 }
 
+// Per-chunk placement cache (docs/perf-driving-hitches.md): the placement
+// decision is deterministic per (chunk, candidate, seed) and calendar-
+// independent (the season tint is read separately at bake time), so the
+// every-16-wu rescan of ~841 chunks only computes the chunks it has never
+// decided — the rest are lookups. The render fill AND the collider read the
+// SAME cached arrays, which keeps the point-129 render/collider lockstep by
+// construction: one decision, one storage. Seed-keyed like the terrain chunk
+// cache; bounded by evicting chunks far outside the current scan square.
+const floraChunkCache = new Map<string, ReadonlyArray<PlacedFlora>>()
+let floraChunkCacheSeed: number | null = null
+let floraPlacementComputeCount = 0
+const FLORA_CHUNK_CACHE_MAX = 4096
+
+/** Every placed plant of one chunk, in candidate order (the fill's insertion
+ *  order — the buffer-cap drop order must not change), cached per chunk. */
+// Exported for the placement-cache tests (floraPlacementCache.test.ts).
+// eslint-disable-next-line react/only-export-components
+export function placedFloraChunk(ccx: number, ccz: number, seed: number): ReadonlyArray<PlacedFlora> {
+  if (floraChunkCacheSeed !== seed) {
+    floraChunkCacheSeed = seed
+    floraChunkCache.clear()
+  }
+  const key = `${ccx},${ccz}`
+  const hit = floraChunkCache.get(key)
+  if (hit) return hit
+  floraPlacementComputeCount += 1
+  const placed: PlacedFlora[] = []
+  for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
+    const p = placedFloraAt(ccx, ccz, i, seed)
+    if (p) placed.push(p)
+  }
+  floraChunkCache.set(key, placed)
+  return placed
+}
+
+/** How many chunk placement scans have actually computed (cache misses) — the
+ *  test/probe witness that a rescan recomputes only the genuinely new chunks. */
+// eslint-disable-next-line react/only-export-components
+export function floraPlacementComputes(): number {
+  return floraPlacementComputeCount
+}
+
+function evictFloraChunkCache(cx: number, cz: number, range: number): void {
+  if (floraChunkCache.size <= FLORA_CHUNK_CACHE_MAX) return
+  for (const key of floraChunkCache.keys()) {
+    const comma = key.indexOf(',')
+    const dx = Number(key.slice(0, comma)) - cx
+    const dz = Number(key.slice(comma + 1)) - cz
+    if (Math.max(Math.abs(dx), Math.abs(dz)) > range + 2) floraChunkCache.delete(key)
+  }
+}
+
 /**
  * Collidable dressing near a point as circles `[x, z, radius]` — derived from
- * the SAME placement the renderer draws (`placedFloraAt`), so a suppressed or
- * unrendered plant never leaves a phantom collider, and restricted to the
- * player's chunk neighbourhood and the LARGE collidable species only (small or
- * sparse dressing never blocks — "no getting stuck on a blade of grass",
- * user decision, point 129).
+ * the SAME placement the renderer draws (`placedFloraChunk`, one shared cache
+ * over `placedFloraAt`), so a suppressed or unrendered plant never leaves a
+ * phantom collider, and restricted to the player's chunk neighbourhood and the
+ * LARGE collidable species only (small or sparse dressing never blocks — "no
+ * getting stuck on a blade of grass", user decision, point 129).
  */
 function collidableFloraNear(px: number, pz: number, seed: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = []
@@ -923,11 +1069,7 @@ function collidableFloraNear(px: number, pz: number, seed: number): Array<[numbe
   const QUERY = 3 // only dressing this close can block the traveller
   for (let dz = -1; dz <= 1; dz++) {
     for (let dx = -1; dx <= 1; dx++) {
-      const ccx = pcx + dx
-      const ccz = pcz + dz
-      for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-        const placed = placedFloraAt(ccx, ccz, i, seed)
-        if (!placed) continue
+      for (const placed of placedFloraChunk(pcx + dx, pcz + dz, seed)) {
         const baseR = COLLIDABLE_FLORA[placed.species]
         if (baseR === undefined) continue
         if (Math.abs(placed.x - px) > QUERY + 1.2 || Math.abs(placed.z - pz) > QUERY + 1.2) continue
@@ -1017,6 +1159,140 @@ function getVegetationMeshes(): VegetationMeshes {
   return vegetationMeshCache
 }
 
+// --- Amortised, double-buffered flora fill (docs/perf-driving-hitches.md) ----
+// The every-16-wu rebuild used to run its whole 841-chunk scan and matrix bake
+// in one frame. A movement-step rebuild now fills SCRATCH buffers over a few
+// frames (floraFillBatchSize bounds them) and swaps the completed result into
+// the instance buffers atomically — the previously completed circle keeps
+// drawing during the fill, and by floraStreaming's margin bound its edge stays
+// beyond the fog-visible ground the whole time (points 164/171 no-pop).
+
+interface FloraScratch {
+  base: Float32Array
+  crown: Float32Array | null
+  tint: Float32Array
+}
+// Module singletons like the meshes (point 96): allocated once at the caps;
+// fills never overlap (one fill at a time, restarted on a new trigger).
+let floraScratchCache: Record<Species, FloraScratch> | null = null
+function getFloraScratch(): Record<Species, FloraScratch> {
+  if (floraScratchCache) return floraScratchCache
+  const out = {} as Record<Species, FloraScratch>
+  for (const sp of SPECIES) {
+    out[sp] = {
+      base: new Float32Array(MAX_INSTANCES[sp] * 16),
+      crown: CROWN_SPECIES.has(sp) ? new Float32Array(MAX_INSTANCES[sp] * 16) : null,
+      tint: new Float32Array(MAX_INSTANCES[sp]),
+    }
+  }
+  floraScratchCache = out
+  return out
+}
+
+interface FloraFill {
+  /** The fill's anchor — the player position at fill START (the hysteresis
+   *  anchor too, so movement during the fill counts against the margin). */
+  anchorX: number
+  anchorZ: number
+  spawnR: number
+  cx: number
+  cz: number
+  range: number
+  offsets: ReadonlyArray<readonly [number, number]>
+  next: number
+  batch: number
+  counts: Record<Species, number>
+  collapseEnabled: boolean
+}
+
+const FILL_MTX = new THREE.Matrix4()
+const FILL_CROWN_MTX = new THREE.Matrix4()
+const FILL_CROWN_LOCAL = new THREE.Matrix4()
+const FILL_QUAT = new THREE.Quaternion()
+const FILL_UP = new THREE.Vector3(0, 1, 0)
+const FILL_SCL = new THREE.Vector3()
+const FILL_POS = new THREE.Vector3()
+
+function zeroSpeciesCounts(): Record<Species, number> {
+  return {
+    acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0,
+    baobab: 0, termite: 0, deadtree: 0, papyrus: 0, kopje: 0,
+  }
+}
+
+/** Process up to `limit` chunk offsets of the fill into the scratch buffers. */
+function stepFloraFill(fill: FloraFill, seed: number, limit: number): void {
+  const scratch = getFloraScratch()
+  let processed = 0
+  while (fill.next < fill.offsets.length && processed < limit) {
+    const [dx, dz] = fill.offsets[fill.next]
+    fill.next += 1
+    processed += 1
+    // ONE placement decision shared with collidableFloraNear (point 129):
+    // whatever is not placed here also carries no collider.
+    for (const placed of placedFloraChunk(fill.cx + dx, fill.cz + dz, seed)) {
+      const { species, x, z, height, r4, roll } = placed
+      // Circular streaming edge at fog far + margin (points 164/171): a plant
+      // beyond it is not drawn, so the edge sits in the fog, out of sight.
+      if (!floraInSpawnCircle(x, z, fill.anchorX, fill.anchorZ, fill.spawnR)) continue
+      const idx = fill.counts[species]
+      if (idx >= MAX_INSTANCES[species]) continue
+      // This plant's own dry-season state (points 151/175): its field tint
+      // drives both the baked colour and — on the CPU here, never a
+      // vertex-shader attribute — the matrix-borne deformation, gated by the
+      // debug toggle. dryness 0 leaves the plant at its full shape.
+      const ll = worldToLatLon(x, z)
+      const tintV = seasonFieldTintAt(ll.lat, ll.lon)
+      const dryness = fill.collapseEnabled ? drynessFromTint(tintV) : 0
+      FILL_QUAT.setFromAxisAngle(FILL_UP, r4 * Math.PI * 2)
+      const sc = 0.75 + r4 * 0.55
+      const yf = 0.85 + roll * 0.3
+      // Ground flora (bush/papyrus, foliage class 2) sprouts from the soil: its
+      // whole matrix scale withdraws toward the base in the dry season.
+      const sprout = GROUND_SPECIES.has(species) ? groundSprout(dryness) : 1
+      FILL_SCL.set(sc * sprout, sc * yf * sprout, sc * sprout)
+      FILL_POS.set(x, height, z)
+      FILL_MTX.compose(FILL_POS, FILL_QUAT, FILL_SCL)
+      const s = scratch[species]
+      FILL_MTX.toArray(s.base, idx * 16)
+      s.tint[idx] = tintV
+      if (s.crown) {
+        // Bare branches (point 144) via the matrix (point 175): the crown
+        // shrinks x/z toward the trunk axis and drops in y — Scale(shrink,1,
+        // shrink) then a y-drop in the plant's local frame (plant × collapse).
+        const { shrink, drop } = crownCollapse(dryness)
+        FILL_CROWN_LOCAL.makeScale(shrink, 1, shrink)
+        FILL_CROWN_LOCAL.elements[13] = -drop
+        FILL_CROWN_MTX.multiplyMatrices(FILL_MTX, FILL_CROWN_LOCAL)
+        FILL_CROWN_MTX.toArray(s.crown, idx * 16)
+      }
+      fill.counts[species] = idx + 1
+    }
+  }
+}
+
+/** Copy the completed scratch fill into the live instance buffers — one atomic
+ *  swap, one GPU re-upload, never a partially filled circle on screen. */
+function swapFloraFill(fill: FloraFill, meshes: VegetationMeshes): void {
+  const scratch = getFloraScratch()
+  for (const sp of SPECIES) {
+    const nInst = fill.counts[sp]
+    const s = scratch[sp]
+    const apply = (mesh: THREE.InstancedMesh, source: Float32Array) => {
+      ;(mesh.instanceMatrix.array as Float32Array).set(source.subarray(0, nInst * 16))
+      mesh.count = nInst
+      mesh.instanceMatrix.needsUpdate = true
+      const tintAttr = mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute
+      ;(tintAttr.array as Float32Array).set(s.tint.subarray(0, nInst))
+      tintAttr.needsUpdate = true
+    }
+    apply(meshes.base[sp], s.base)
+    const crownMesh = meshes.crown[sp]
+    if (crownMesh && s.crown) apply(crownMesh, s.crown)
+  }
+  evictFloraChunkCache(fill.cx, fill.cz, fill.range)
+}
+
 function Vegetation() {
   const seed = useGame((s) => s.seed)
   const meshes = getVegetationMeshes()
@@ -1029,9 +1305,12 @@ function Vegetation() {
   // The dry-season deformation is baked into the matrices at each rebuild
   // (point 175), so flipping the debug collapse toggle forces one re-bake.
   const lastCollapseRef = useRef(true)
+  // The in-progress amortised fill (docs/perf-driving-hitches.md), if any.
+  const fillRef = useRef<FloraFill | null>(null)
 
   useEffect(() => {
     lastBuild.current = null // force rebuild on new run
+    fillRef.current = null
   }, [seed])
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
@@ -1054,10 +1333,8 @@ function Vegetation() {
         const drawn: Array<{ x: number; z: number; species: Species }> = []
         for (let dz = -1; dz <= 1; dz++)
           for (let dx = -1; dx <= 1; dx++)
-            for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-              const placed = placedFloraAt(pcx + dx, pcz + dz, i, seed)
-              if (placed) drawn.push({ x: placed.x, z: placed.z, species: placed.species })
-            }
+            for (const placed of placedFloraChunk(pcx + dx, pcz + dz, seed))
+              drawn.push({ x: placed.x, z: placed.z, species: placed.species })
         return drawn
       },
       // The field's tint at the traveller (point 151) — the scene has no
@@ -1175,86 +1452,64 @@ function Vegetation() {
     // per-frame rebuild re-uploaded the seasonTint buffer and raced the crown
     // collapse on WebGPU ("jumping trees").
     const fogFar = FLORA_FOG.far
-    if (!floraShouldRebuild(pos, lastBuild.current, fogFar)) return
-    lastBuild.current = { x: pos.x, z: pos.z, fogFar }
-    rebuildCountRef.current++
-    const spawnR = floraSpawnRadius(fogFar)
-    const cx = Math.floor(pos.x / CHUNK_SIZE)
-    const cz = Math.floor(pos.z / CHUNK_SIZE)
-    const rC = floraChunkRange(fogFar, CHUNK_SIZE)
-
-    const counts: Record<Species, number> = {
-      acacia: 0, jungle: 0, palm: 0, bush: 0, rock: 0,
-      baobab: 0, termite: 0, deadtree: 0, papyrus: 0, kopje: 0,
-    }
-    const mtx = new THREE.Matrix4()
-    const crownMtx = new THREE.Matrix4()
-    const crownLocal = new THREE.Matrix4()
-    const quat = new THREE.Quaternion()
-    const up = new THREE.Vector3(0, 1, 0)
-    const scl = new THREE.Vector3()
-    const posV = new THREE.Vector3()
-
-    // Nearest-chunk-first (point 171): when a species' instance buffer fills,
-    // the plants dropped are the FARTHEST ones, so the drawn edge stays a fogged
-    // circle instead of a ragged, chunk-order boundary that would fray in view.
-    for (const [dx, dz] of chunkOffsetsByDistance(rC)) {
-      const ccx = cx + dx
-      const ccz = cz + dz
-      for (let i = 0; i < CANDIDATES_PER_CHUNK; i++) {
-        // ONE placement decision shared with collidableFloraNear (point 129):
-        // whatever is not drawn here also carries no collider.
-        const placed = placedFloraAt(ccx, ccz, i, seed)
-        if (!placed) continue
-        const { species, x, z, height, r4, roll } = placed
-        // Circular streaming edge at fog far + margin (points 164/171): a plant
-        // beyond it is not drawn, so the edge sits in the fog, out of sight.
-        if (!floraInSpawnCircle(x, z, pos.x, pos.z, spawnR)) continue
-        const idx = counts[species]
-        if (idx >= MAX_INSTANCES[species]) continue
-        // This plant's own dry-season state (points 151/175): its field tint
-        // drives both the baked colour (below) and — on the CPU here, never a
-        // vertex-shader attribute — the matrix-borne deformation, gated by the
-        // debug toggle. dryness 0 leaves the plant at its full shape.
-        const ll = worldToLatLon(x, z)
-        const tintV = seasonFieldTintAt(ll.lat, ll.lon)
-        const dryness = collapseEnabled ? drynessFromTint(tintV) : 0
-        quat.setFromAxisAngle(up, r4 * Math.PI * 2)
-        const sc = 0.75 + r4 * 0.55
-        const yf = 0.85 + roll * 0.3
-        // Ground flora (bush/papyrus, foliage class 2) sprouts from the soil: its
-        // whole matrix scale withdraws toward the base in the dry season.
-        const sprout = GROUND_SPECIES.has(species) ? groundSprout(dryness) : 1
-        scl.set(sc * sprout, sc * yf * sprout, sc * sprout)
-        posV.set(x, height, z)
-        mtx.compose(posV, quat, scl)
-        const baseMesh = meshes.base[species]
-        baseMesh.setMatrixAt(idx, mtx)
-        ;(baseMesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).setX(idx, tintV)
-        const crownMesh = meshes.crown[species]
-        if (crownMesh) {
-          // Bare branches (point 144) via the matrix (point 175): the crown
-          // shrinks x/z toward the trunk axis and drops in y — Scale(shrink,1,
-          // shrink) then a y-drop in the plant's local frame, i.e. plant × collapse.
-          const { shrink, drop } = crownCollapse(dryness)
-          crownLocal.makeScale(shrink, 1, shrink)
-          crownLocal.elements[13] = -drop
-          crownMtx.multiplyMatrices(mtx, crownLocal)
-          crownMesh.setMatrixAt(idx, crownMtx)
-          ;(crownMesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).setX(idx, tintV)
-        }
-        counts[species] = idx + 1
+    const t0 = performance.now()
+    let worked = false
+    if (floraShouldRebuild(pos, lastBuild.current, fogFar)) {
+      // Amortised vs synchronous (docs/perf-driving-hitches.md): the plain
+      // DRIVING step spreads the refill across a bounded few frames — the
+      // completed old circle keeps drawing meanwhile and, by the margin bound
+      // in floraStreaming.test.ts, still covers everything the fog shows. A
+      // radius change (zoom/region fog), a run's first build, a remount and
+      // any long jump swap synchronously as before: there the old circle no
+      // longer covers (or does not exist).
+      const last = lastBuild.current
+      const amortise =
+        last !== null &&
+        Math.abs(floraSpawnRadius(fogFar) - floraSpawnRadius(last.fogFar)) < 1 &&
+        Math.hypot(pos.x - last.x, pos.z - last.z) <= floraAmortiseMaxStep()
+      // Anchor at fill START (the hysteresis anchor too): movement during the
+      // fill counts against FLORA_SPAWN_MARGIN, not against a stale origin.
+      lastBuild.current = { x: pos.x, z: pos.z, fogFar }
+      rebuildCountRef.current++
+      const rC = floraChunkRange(fogFar, CHUNK_SIZE)
+      // Nearest-chunk-first (point 171): when a species' instance buffer
+      // fills, the plants dropped are the FARTHEST ones, so the drawn edge
+      // stays a fogged circle, not a ragged chunk-order boundary.
+      const offsets = chunkOffsetsByDistance(rC)
+      const fill: FloraFill = {
+        anchorX: pos.x,
+        anchorZ: pos.z,
+        spawnR: floraSpawnRadius(fogFar),
+        cx: Math.floor(pos.x / CHUNK_SIZE),
+        cz: Math.floor(pos.z / CHUNK_SIZE),
+        range: rC,
+        offsets,
+        next: 0,
+        batch: floraFillBatchSize(offsets.length),
+        counts: zeroSpeciesCounts(),
+        collapseEnabled,
       }
-    }
-
-    for (const sp of SPECIES) {
-      for (const mesh of [meshes.base[sp], meshes.crown[sp]]) {
-        if (!mesh) continue
-        mesh.count = counts[sp]
-        mesh.instanceMatrix.needsUpdate = true
-        ;(mesh.geometry.getAttribute('seasonTint') as THREE.InstancedBufferAttribute).needsUpdate = true
+      fillRef.current = fill
+      if (!amortise) {
+        stepFloraFill(fill, seed, Infinity)
+        swapFloraFill(fill, meshes)
+        fillRef.current = null
       }
+      worked = true
     }
+    // Advance the in-progress fill by one bounded batch per frame; swap the
+    // completed result in atomically (double-buffered — the drawn circle
+    // never regresses mid-fill).
+    const fill = fillRef.current
+    if (fill) {
+      stepFloraFill(fill, seed, fill.batch)
+      if (fill.next >= fill.offsets.length) {
+        swapFloraFill(fill, meshes)
+        fillRef.current = null
+      }
+      worked = true
+    }
+    if (worked && import.meta.env.DEV) recordBurst(PERF.flora, performance.now() - t0)
   })
 
   return (
@@ -2297,6 +2552,25 @@ export function TravelScene() {
     }
   }, [])
 
+  // DEV attribution probe (docs/perf-driving-hitches.md): the per-burst cost
+  // of the terrain/flora streaming work plus a frame-delta ring, for the
+  // driven verification and manual profiling of the driving hitches.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__perf = {
+      terrain: PERF.terrain,
+      flora: PERF.flora,
+      frames: () => PERF.frames.slice(),
+      maxFrameMs: (sinceT?: number) => maxFrameMs(sinceT ?? 0),
+      now: () => performance.now(),
+      reset: resetPerf,
+    }
+    return () => {
+      delete w.__perf
+    }
+  }, [])
+
   // Digging is done by clicking the shovel item (design.md §17); the G key
   // remains as a convenience/gamepad binding for digging on the spot.
   useEffect(() => {
@@ -2329,6 +2603,7 @@ export function TravelScene() {
   }, [])
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV) recordFrame(performance.now(), rawDt * 1000)
     const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
 

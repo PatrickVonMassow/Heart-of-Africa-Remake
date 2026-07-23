@@ -405,6 +405,180 @@ export function emitFootstep(surface: 'ground' | 'stone') {
   src.stop(t0 + dur + 0.02)
 }
 
+/** Audible radius (world units) of the §19.1 proximity wildlife sounds — the
+ *  distance at which a call or a trample crunch fades to silence. Shared by the
+ *  looped proximity calls (Wildlife.tsx) and the trample-crunch gain curve so
+ *  both fall off over the same range. */
+export const PROXIMITY_AUDIBLE = 48
+
+/** The §19.1 proximity gain curve: 1 right beside the traveller, a linear fall
+ *  to 0 at `audible`, clamped outside. The single shared distance->loudness
+ *  helper for the proximity calls and the trample crunch — pure, so both the
+ *  curve and its reuse are unit-testable. */
+export function proximityGain(distance: number, audible = PROXIMITY_AUDIBLE): number {
+  if (distance <= 0) return 1
+  if (distance >= audible) return 0
+  return 1 - distance / audible
+}
+
+// Peak envelope of the trample crunch (pre-bus). Like the thunder peaks it
+// compensates the ambient-bus (0.5) x master (0.5) attenuation so a near
+// trample reads clearly over the beds; calibratable (design.md §21).
+const CRUNCH_PEAK = 2.2
+
+/** Peak gain of the trample crunch (design.md §19.1/§19.5, point 260): the
+ *  shared proximity curve times the single ambience volume times the crunch
+ *  peak — clearly heard up close, faint far off, silent beyond the audible
+ *  radius or at volume 0. Pure, so the distance + volume scaling is pinned. */
+export function trampleCrunchGain(distance: number, volume: number): number {
+  return CRUNCH_PEAK * proximityGain(distance) * Math.max(0, volume)
+}
+
+/** Whether the trample crunch fires this frame (design.md §19.5, point 260): an
+ *  EDGE, not a level — true only on the alive->dead transition, so the crunch
+ *  sounds once at the kill and never again while the carcass lies there. Pure,
+ *  so the once-per-kill latch is testable without the scene. */
+export function trampleCrunchFires(prevDead: boolean, nowDead: boolean): boolean {
+  return !prevDead && nowDead
+}
+
+/** One micro-crackle of the crunch's bone layer: a short, bright, hard-attack
+ *  band-passed noise snap. Several of these a few ms apart read as bones
+ *  crunching rather than one thud. */
+export interface CrunchCrackle {
+  /** Seconds after the impact this snap starts. */
+  startOffset: number
+  /** Attack time — hard (a couple of ms): the snap edge. */
+  attack: number
+  /** Total length — a blink, far shorter than the squelch. */
+  duration: number
+  /** Envelope peak (pre-bus), already §19.1 distance/volume scaled. */
+  peak: number
+  /** Bandpass centre — bright (bone), well above the squelch band. */
+  frequency: number
+  q: number
+}
+
+/** The trample crunch's pure synthesis plan (design.md §19.1/§19.5): two
+ *  layered timbres — (a) a sharp BONE-CRACK transient of fast micro-crackles
+ *  and (b) a wet soft-tissue SQUELCH — with every level scaled by the
+ *  UNCHANGED trampleCrunchGain curve. Pure (rand injectable), so the layers'
+ *  presence and envelope shapes are unit-testable without WebAudio. */
+export interface TrampleCrunchPlan {
+  /** The §19.1 distance + ambience-volume peak (trampleCrunchGain, unchanged). */
+  peak: number
+  /** (a) The bone layer: a loud lead crack plus fast decaying micro-crackles. */
+  crackles: CrunchCrackle[]
+  /** (b) The wet squelch: lower, damped, resonant, softer-enveloped than any snap. */
+  squelch: {
+    startOffset: number
+    /** Soft attack — a squish, not a snap. */
+    attack: number
+    /** Long damped tail — the tissue gives and settles. */
+    duration: number
+    peak: number
+    /** Resonant-lowpass start frequency; sweeps down to `frequencyEnd`. */
+    frequency: number
+    frequencyEnd: number
+    /** Resonance — the wet formant of the squelch. */
+    q: number
+  }
+}
+
+export function trampleCrunchPlan(
+  distance: number,
+  volume: number,
+  rand: () => number = Math.random,
+): TrampleCrunchPlan {
+  const peak = trampleCrunchGain(distance, volume)
+  // (a) The bone layer: a hard lead crack at the impact, then 3-5 decaying
+  // micro-crackles a few ms apart — fast enough to fuse into one crunch, spaced
+  // enough to read as breaking, never a single thud.
+  const crackles: CrunchCrackle[] = []
+  const count = 4 + Math.floor(rand() * 3) // 4..6 snaps
+  let t = 0
+  for (let i = 0; i < count; i++) {
+    crackles.push({
+      startOffset: t,
+      attack: 0.002,
+      duration: 0.02 + rand() * 0.025,
+      peak: peak * (i === 0 ? 1.2 : (0.85 - i * 0.1) * (0.8 + rand() * 0.4)),
+      frequency: 1700 + rand() * 1600,
+      q: 1.4,
+    })
+    t += 0.012 + rand() * 0.024
+  }
+  return {
+    peak,
+    crackles,
+    // (b) The squelch starts as the first bone gives, swells softly and damps
+    // out over a downward resonant sweep — the wet matsch under the snaps.
+    squelch: {
+      startOffset: 0.012,
+      attack: 0.035,
+      duration: 0.3,
+      peak: peak * 0.8,
+      frequency: 460,
+      frequencyEnd: 200,
+      q: 6,
+    },
+  }
+}
+
+/**
+ * The trample crunch one-shot (design.md §19.1/§19.5, point 260): the moment an
+ * animal is crushed under an elephant's feet — the ordinary trample and the
+ * parent grief-trample alike. A positional §19.1 proximity SFX, scaled by the
+ * distance to the traveller (the shared proximityGain curve) and the single
+ * ambience volume, through the SAME ambient bus as every other wildlife sound —
+ * no second audio path. Cheap procedural synth (no asset) from the pure
+ * trampleCrunchPlan: (a) a sharp bone-crack transient — a hard-attack bright
+ * lead snap with fast micro-crackles so it reads as bones crunching, not one
+ * dull "plomp" — over (b) a wet squelch: normalized brown noise through a
+ * resonant lowpass sweeping down under a soft, damped envelope for the
+ * soft-tissue give. Silent far off or when muted.
+ */
+export function playTrampleCrunch(distance: number): void {
+  if (!ctx || !master) return
+  const plan = trampleCrunchPlan(distance, balance.ambienceVolume)
+  if (plan.peak <= 0) return // beyond the audible radius or muted: nothing to play
+  const ac = ctx
+  const dest = ambientBus ?? master
+  const t0 = ac.currentTime
+  // (a) The bone layer: bright band-passed white-noise snaps, hard attacks.
+  for (const c of plan.crackles) {
+    const at = t0 + c.startOffset
+    clapVoice(ac, dest, at, c.duration, false, 'bandpass', c.frequency, c.q, (gain) => {
+      gain.setValueAtTime(0.0001, at)
+      gain.linearRampToValueAtTime(c.peak, at + c.attack)
+      gain.exponentialRampToValueAtTime(0.0001, at + c.duration)
+    })
+  }
+  // (b) The wet squelch: deep brown noise, resonant lowpass falling through the
+  // tail — the damped soft-tissue matsch under the snaps.
+  const s = plan.squelch
+  const st = t0 + s.startOffset
+  clapVoice(
+    ac,
+    dest,
+    st,
+    s.duration,
+    true,
+    'lowpass',
+    s.frequency,
+    s.q,
+    (gain) => {
+      gain.setValueAtTime(0.0001, st)
+      gain.linearRampToValueAtTime(s.peak, st + s.attack)
+      gain.exponentialRampToValueAtTime(0.0001, st + s.duration)
+    },
+    (frequency) => {
+      frequency.setValueAtTime(s.frequency, st)
+      frequency.exponentialRampToValueAtTime(s.frequencyEnd, st + s.duration)
+    },
+  )
+}
+
 /**
  * The thunderclap's pure timing/level plan (design.md §19.13, point 166): the
  * clap starts exactly `delaySeconds` after the flash (the pure
@@ -464,7 +638,9 @@ function noiseBuffer(ac: AudioContext, dur: number, brown: boolean): AudioBuffer
   return buffer
 }
 
-/** One clap voice: normalized noise -> filter -> envelope -> the ambient bus. */
+/** One noise voice (thunder claps, the trample crunch): normalized noise ->
+ *  filter -> envelope -> the ambient bus. `shapeFilter` optionally schedules a
+ *  frequency sweep on top of the static `freq` (the squelch's falling formant). */
 function clapVoice(
   ac: AudioContext,
   dest: AudioNode,
@@ -475,6 +651,7 @@ function clapVoice(
   freq: number,
   q: number,
   shape: (gain: AudioParam) => void,
+  shapeFilter?: (frequency: AudioParam) => void,
 ) {
   const src = ac.createBufferSource()
   src.buffer = noiseBuffer(ac, dur, brown)
@@ -482,6 +659,7 @@ function clapVoice(
   filter.type = filterType
   filter.frequency.value = freq
   filter.Q.value = q
+  shapeFilter?.(filter.frequency)
   const g = ac.createGain()
   shape(g.gain)
   src.connect(filter)

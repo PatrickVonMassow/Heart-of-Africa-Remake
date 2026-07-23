@@ -55,6 +55,18 @@
           },
           {
             "type": "command",
+            "command": "node scripts/tasks-spec-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/dashboard-conciseness-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/dashboard-card-topic-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-integrity-guard.mjs"
           },
           {
