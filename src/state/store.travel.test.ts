@@ -322,6 +322,55 @@ describe('debugJumpTo (design.md §21)', () => {
   })
 })
 
+// design.md §2.5 / CLAUDE.md §7.1 pt. 15 (point 99): the travel panorama band
+// is captured on APPROACH and cached as a module singleton keyed by place+seed,
+// so it outlives its visit. `enteredFromTravel` is the freshness signal the
+// place scene gates the capture on — without it a direct re-enter of a place
+// captured earlier in the run wrongly showed the stale band (the WebGPU-only
+// polish red of the backend sweep).
+describe('panorama freshness flag (design.md §2.5)', () => {
+  it('is true only when the place is entered out of the travel scene', () => {
+    expect(g().enteredFromTravel).toBe(false) // the run opens inside Cairo
+    g().debugJumpTo(...COORD.savanna)
+    expect(g().enteredFromTravel).toBe(false) // travelling: no place entered
+    g().enterPlace('maasai-village')
+    expect(g().enteredFromTravel).toBe(true)
+  })
+
+  it('is false on a direct place→place enter, even of a place entered from travel before', () => {
+    g().debugJumpTo(...COORD.savanna)
+    g().enterPlace('maasai-village') // from travel: fresh
+    expect(g().enteredFromTravel).toBe(true)
+    g().enterPlace('cairo') // place→place, no travel scene in between
+    expect(g().enteredFromTravel).toBe(false)
+    // …and re-entering the earlier place directly stays stale-proof.
+    g().enterPlace('maasai-village')
+    expect(g().enteredFromTravel).toBe(false)
+  })
+
+  it('is false after a ferry passage (the port is reached by sea, not overland)', () => {
+    g().debugJumpTo(...COORD.savanna)
+    g().enterPlace('cairo') // from travel: fresh
+    expect(g().enteredFromTravel).toBe(true)
+    g().debugSet({ money: 100000 })
+    g().bookFerry('zanzibar')
+    expect(g().placeId).toBe('zanzibar')
+    expect(g().enteredFromTravel).toBe(false)
+  })
+
+  it('clears on leaving a settlement and on a debug jump', () => {
+    g().debugJumpTo(...COORD.savanna)
+    g().enterPlace('maasai-village')
+    expect(g().enteredFromTravel).toBe(true)
+    g().leavePlace()
+    expect(g().enteredFromTravel).toBe(false)
+    g().enterPlace('maasai-village')
+    expect(g().enteredFromTravel).toBe(true)
+    g().debugJumpTo(...COORD.desert)
+    expect(g().enteredFromTravel).toBe(false)
+  })
+})
+
 describe('enterPlace region (design.md §4.5)', () => {
   it("adopts the place's declared region, overriding the current position's", () => {
     const place = placeById('maasai-village') // declared region: east

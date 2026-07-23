@@ -959,7 +959,13 @@ verify suite that proves it.
     samples the mirrored column, and a magenta probe injected due west
     of the capture point proves the rendered horizon compass-true
     seed-independently; a direct place-to-place enter falls back to the
-    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
+    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99) — the
+    capture is a module singleton that OUTLIVES its visit, so the freshness
+    gate is the store's `enteredFromTravel` (true only for an enter out of the
+    bird's-eye view; false on a place→place enter, a ferry passage, a resumed
+    snapshot and while travelling), without which a place captured earlier in
+    the run wrongly re-showed its stale band; pure-tested in
+    `src/state/store.travel.test.ts`; the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
     Cairo mounts the Giza pyramids as its western skyline (point 82) —

@@ -101,6 +101,16 @@ export interface GameState {
   seed: number
   mode: GameMode
   placeId: string | null
+  /**
+   * Was the CURRENT place entered out of the bird's-eye travel scene
+   * (design.md §2.5)? Only then does a travel panorama capture belong to this
+   * visit: the capture is a module singleton keyed by place+seed that survives
+   * the scene switch, so a DIRECT enter (place→place, ferry, snapshot) would
+   * otherwise re-use a stale band captured earlier in the run. False on a
+   * direct enter and while travelling — the place scene then falls back to the
+   * geometry backdrop, as §2.5 requires.
+   */
+  enteredFromTravel: boolean
   /** Travel position in world units. */
   pos: { x: number; z: number }
   /** In-game days since 1. Januar 1890 (fractional). */
@@ -405,6 +415,9 @@ function startState(seed: number) {
     seed,
     mode: 'place' as GameMode,
     placeId: 'cairo',
+    // The run opens inside Cairo without a travel scene ever having captured
+    // its horizon — the geometry backdrop stands (design.md §2.5).
+    enteredFromTravel: false,
     pos,
     day: 0,
     money: START_MONEY,
@@ -1210,6 +1223,11 @@ export const useGame = create<GameState>()((set, get) => ({
     set({
       mode: 'place',
       placeId: id,
+      // §2.5: only an enter OUT of the bird's-eye view has a fresh panorama
+      // capture of this settlement's horizon. A place→place enter, a ferry
+      // passage and a resumed snapshot all start from inside a place — they
+      // fall back to the geometry backdrop instead of a stale earlier band.
+      enteredFromTravel: s.mode !== 'place',
       // Place membership defines the region shown/used while inside (§4.5).
       // Every current place already sits in its declared region (place.region
       // === regionAt); this stays authoritative if a future place is off-band.
@@ -1355,6 +1373,7 @@ export const useGame = create<GameState>()((set, get) => ({
     set({
       mode: 'travel',
       placeId: null,
+      enteredFromTravel: false,
       pos: { x: p.x, z: p.z + balance.placeEnterRadius + 0.5 },
       bazaarQuotes: {},
     })
@@ -1946,6 +1965,8 @@ export const useGame = create<GameState>()((set, get) => ({
         defeat: null,
         deathCause: null,
         mode: 'place',
+        // A resumed snapshot never comes out of the travel scene (§2.5).
+        enteredFromTravel: false,
         victory: false,
         toast: null,
         journalOpen: false,
@@ -2047,7 +2068,7 @@ export const useGame = create<GameState>()((set, get) => ({
   debugJumpTo: (lat, lon) => {
     const p = latLonToWorld(lat, lon)
     const ex = withExplored(get().explored, lat, lon)
-    set({ mode: 'travel', placeId: null, pos: p, region: regionAt(lat, lon), ...(ex ? { explored: ex } : {}) })
+    set({ mode: 'travel', placeId: null, enteredFromTravel: false, pos: p, region: regionAt(lat, lon), ...(ex ? { explored: ex } : {}) })
   },
   debugJumpYear: (delta) => {
     set({ day: dayOfYearJump(get().day, delta, START_YEAR) })
