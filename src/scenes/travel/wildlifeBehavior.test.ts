@@ -56,6 +56,8 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileIdleYaw,
+  CROCODILE_IDLE_SWAY_AMP,
   crocodileGripExpired,
   crocodileHoldsCatch,
   grassFireEligible,
@@ -798,6 +800,57 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
     expect(pd.predatorFlight.crocodile).toBeGreaterThan(0)
     expect(defendChance('giraffe', 'crocodile', pd)).toBeGreaterThan(defendChance('antelope', 'crocodile', pd))
     expect(killChance('giraffe', 'crocodile', pd)).toBe(0)
+  })
+})
+
+// A resting crocodile WAITS — it lies submerged, it does not roam (design.md
+// §19.16). The point-242 idle life must stay a BOUNDED oscillation about a FIXED
+// rest heading, never accumulate: point 257 reported the croc slowly rotating
+// through a full circle because the sway was added to the LIVE heading and fed
+// back in each frame (a running sum of the sine that grew without bound).
+describe('crocodileIdleYaw (design.md §19.16, points 242/257 — a hidden croc waits, it does not spin)', () => {
+  it('stays strictly within the sway amplitude about its fixed rest heading, forever', () => {
+    const restYaw = 1.234
+    const phase = 0.37
+    // A long window (many minutes of play, hundreds of sway periods): the
+    // accumulating bug grew past a full turn within seconds; the absolute
+    // oscillation never leaves the ±amp band no matter how long it runs.
+    for (let t = 0; t < 20000; t += 0.25) {
+      const offset = crocodileIdleYaw(restYaw, t, phase) - restYaw
+      expect(Math.abs(offset)).toBeLessThanOrEqual(CROCODILE_IDLE_SWAY_AMP + 1e-9)
+    }
+  })
+
+  it('oscillates — it returns toward the rest heading rather than growing without bound', () => {
+    const restYaw = -0.5
+    const phase = 0
+    let maxOffset = -Infinity
+    let minOffset = Infinity
+    let signChanges = 0
+    let prevSign = 0
+    // Sample one full period of the 0.3 rad/s sine and a bit beyond.
+    for (let t = 0; t < 30; t += 0.05) {
+      const offset = crocodileIdleYaw(restYaw, t, phase) - restYaw
+      maxOffset = Math.max(maxOffset, offset)
+      minOffset = Math.min(minOffset, offset)
+      const sign = Math.sign(offset)
+      if (sign !== 0 && prevSign !== 0 && sign !== prevSign) signChanges++
+      if (sign !== 0) prevSign = sign
+    }
+    // It swings both ways about centre (returns through it), reaching near ±amp.
+    expect(signChanges).toBeGreaterThan(1)
+    expect(maxOffset).toBeGreaterThan(CROCODILE_IDLE_SWAY_AMP * 0.9)
+    expect(minOffset).toBeLessThan(-CROCODILE_IDLE_SWAY_AMP * 0.9)
+  })
+
+  it('is absolute in restYaw: shifting the rest heading shifts the yaw one-for-one, no drift', () => {
+    // The value depends ONLY on the fixed anchor and the clock — never on a prior
+    // yaw — so it can never integrate a per-frame offset into a rotation.
+    for (const t of [0, 3.3, 51.7]) {
+      const a = crocodileIdleYaw(0, t, 0.2)
+      const b = crocodileIdleYaw(2, t, 0.2)
+      expect(b - a).toBeCloseTo(2, 12)
+    }
   })
 })
 
