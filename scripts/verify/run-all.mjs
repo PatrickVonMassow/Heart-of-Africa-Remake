@@ -161,13 +161,25 @@ async function launchServer(npmScript, label, cwd) {
   }
 }
 
+// Per-suite wall timeout (point 249): a GENEROUS backstop so a genuinely hung
+// suite (a frozen renderer, a dead server) is killed and reported rather than
+// hanging the whole regression forever — but high enough that a slow-but-green
+// run (the staged-drama suites poll until state on a slow WebGPU backend) is
+// NEVER killed for merely being slow. Configurable via VERIFY_SUITE_TIMEOUT_MS.
+const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
 function runSuite(name, baseUrl) {
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
     encoding: 'utf8',
     // The suites read BASE_URL (default :5173/:4173); pass the actual server
     // URL so they hit the regression's own server, not a manual dev server.
     env: baseUrl ? { ...process.env, BASE_URL: baseUrl } : process.env,
+    timeout: SUITE_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   })
+  if (res.error && res.error.code === 'ETIMEDOUT') {
+    console.log(`FAIL  ${name.padEnd(12)} — KILLED after ${Math.round(SUITE_TIMEOUT_MS / 60000)} min wall timeout (hung, not slow — raise VERIFY_SUITE_TIMEOUT_MS if this was a genuine slow-green run)`)
+    return false
+  }
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   const pass = (out.match(/^PASS/gm) ?? []).length
   const fail = (out.match(/^FAIL/gm) ?? []).length

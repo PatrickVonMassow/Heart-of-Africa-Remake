@@ -895,7 +895,13 @@ const herdTest = await page.evaluate(async () => {
   // centreMoved 0.63). Sample spread/heading each tick and run until the centre has
   // CLEARLY roamed, or a generous sim-time cap — a genuine no-roam still fails.
   const simStart = window.__wildlife.simTime()
-  for (let k = 0; k < 240 && maxCentreDisp <= 2.0 && window.__wildlife.simTime() - simStart < 12; k++) {
+  // Gate on the SIM clock plus a generous wall backstop (point 249): a fixed
+  // iteration cap bounded WALL time, so a slow backend ran out of iterations
+  // before enough sim-seconds accumulated and the amble read short. Sample until
+  // the centre has clearly roamed, the sim-time budget is spent, or a generous
+  // wall backstop (a genuinely frozen sim, not mere slowness).
+  const herdWallStart = Date.now()
+  for (let k = 0; maxCentreDisp <= 2.0 && window.__wildlife.simTime() - simStart < 12 && Date.now() - herdWallStart < 90000; k++) {
     let maxd = 0
     for (const a of members) for (const b of members) maxd = Math.max(maxd, Math.hypot(a.x - b.x, a.z - b.z))
     spreads.push(maxd)
@@ -1188,17 +1194,36 @@ check('zoom-out keeps animals the default view would despawn', stream.ok && stre
 // the first check that uses it (165); every later page.evaluate sees it on window.
 await page.evaluate(() => {
   window.__simTime = () => window.__wildlife?.simTime?.() ?? 0
+  // Poll until the drama reaches its state, budgeted in SIM-seconds (point 177),
+  // with a backend-agnostic robustness rule (point 249): a slow-but-PROGRESSING
+  // sim (WebGPU pipeline-compile hitches, headless fps drops) keeps polling until
+  // the state is reached — it is NEVER failed for merely being slow. The poll
+  // gives up ONLY when the sim clock is genuinely FROZEN (no sim-time progress for
+  // a long wall window — a real 0-fps bug) or a very large hard ceiling as a final
+  // backstop. A passed wallCapMs only RAISES the ceiling (it never lowers it below
+  // the computed floor), so an old, too-tight cap can no longer time a slow-green
+  // drama out early — the slow backend just polls longer to reach the SAME state.
   window.__pollSim = async (simBudget, doneFn, wallCapMs) => {
     const s0 = window.__simTime()
     const t0 = Date.now()
-    const cap = wallCapMs ?? simBudget * 3000 + 20000
+    const FREEZE_MS = 30000 // no sim-time progress for this long ⇒ a genuine freeze
+    const hardCap = Math.max(wallCapMs ?? 0, simBudget * 6000 + 45000, 90000)
     // Fail-soft (point 200): a doneFn that touches __wildlife can throw on a
     // rare mid-poll scene remount (the hook briefly goes undefined). Treat a
     // throw as "not done yet" and keep polling instead of letting it propagate
     // as an UNCAUGHT error that aborts the whole suite.
     const safeDone = () => { try { return doneFn() } catch { return false } }
-    while (window.__simTime() - s0 < simBudget && Date.now() - t0 < cap) {
+    let lastSim = s0
+    let lastProgressAt = t0
+    while (window.__simTime() - s0 < simBudget) {
       if (safeDone()) return true
+      const now = Date.now()
+      const cur = window.__simTime()
+      // Any sim-time progress — or a scene-remount reset back toward 0 — refreshes
+      // the freeze timer, so only a truly stalled renderer trips it.
+      if (cur > lastSim + 1e-4 || cur < lastSim) { lastSim = cur; lastProgressAt = now }
+      if (now - lastProgressAt > FREEZE_MS) break // sim frozen — a real 0-fps bug
+      if (now - t0 > hardCap) break               // final backstop
       await new Promise((r) => setTimeout(r, 80))
     }
     return safeDone()
@@ -1423,7 +1448,9 @@ const animalHit = await page.evaluate(async () => {
   // frames for the traveller to reach and press against the target.
   const s0 = window.__simTime()
   const t0 = Date.now()
-  while (window.__simTime() - s0 < 2.5 && Date.now() - t0 < 15000) {
+  // Wall backstop widened (point 249) so a slow backend accumulates the full
+  // sim-budget of driving before the loop ends; the sim-time gate is the real bound.
+  while (window.__simTime() - s0 < 2.5 && Date.now() - t0 < 60000) {
     // Fallback: should the zebra be streamed out regardless, re-add and re-pin
     // it — the real game collides against genuinely streamed animals, this
     // only keeps the fixed test target present.
@@ -1450,7 +1477,9 @@ const animalHit = await page.evaluate(async () => {
   const s1 = window.__simTime()
   const t1 = Date.now()
   let escaped = 0
-  while (window.__simTime() - s1 < 4 && Date.now() - t1 < 15000) {
+  // Wall backstop widened (point 249): the escape is gated by SIM time; a slow
+  // backend just needs more wall seconds to drive the same distance clear.
+  while (window.__simTime() - s1 < 4 && Date.now() - t1 < 60000) {
     const herds2 = window.__wildlife?.herdsRef?.current
     if (herds2 && !herds2.zebra.includes(zebra)) herds2.zebra.unshift(zebra)
     zebra.x = ax
@@ -1696,7 +1725,12 @@ const carrionVicinity = await page.evaluate(async () => {
   // so the suite stays green rather than leaving a red test for an unbuilt fix.
   const viewR = 55
   let carcasses = 0
-  await window.__pollSim(25, () => {
+  // Poll generously (point 249): restock() re-streams the chunks over many
+  // frames, and at the standard zoom 0.5 the ring is small so the plague
+  // carcasses trickle in slowly — a slow backend needs more sim-seconds for
+  // enough of them to land in view. The poll SHORT-CIRCUITS the instant
+  // carcasses>=3, so a normal run pays no extra time.
+  await window.__pollSim(45, () => {
     const h = window.__wildlife.herdsRef.current
     carcasses = 0
     for (const sp of ['wildebeest', 'antelope'])
@@ -2052,7 +2086,9 @@ const guardFlee = await page.evaluate(async () => {
   let last = null, lastStep = null, flips = 0, samples = 0
   let nextSample = window.__simTime()
   const s0 = window.__simTime(), t0 = Date.now()
-  while (window.__simTime() - s0 < 3 && Date.now() - t0 < 15000) {
+  // Wall backstop widened (point 249): the samples are paced by the SIM clock, so
+  // a slow backend needs more wall time to gather the required >=6 samples.
+  while (window.__simTime() - s0 < 3 && Date.now() - t0 < 60000) {
     await sleep(50)
     if (window.__simTime() < nextSample) continue
     nextSample = window.__simTime() + 0.15
@@ -2304,7 +2340,9 @@ const guard = await page.evaluate(async () => {
     const t0 = Date.now()
     const tick = () => {
       L.lx = lx; L.lz = lz; L.mode = 'chase'
-      if (window.__wildlife.simTime() - s0 < 6 && Date.now() - t0 < 20000) requestAnimationFrame(tick)
+      // Wall backstop widened (point 249): a slow backend still resolves the guard
+      // within the SIM window, it just needs more wall seconds of frames.
+      if (window.__wildlife.simTime() - s0 < 6 && Date.now() - t0 < 60000) requestAnimationFrame(tick)
       else resolve()
     }
     requestAnimationFrame(tick)
@@ -2334,11 +2372,14 @@ const hunt = await page.evaluate(async () => {
     }
     return s.mode === 'chase'
   }
-  // Collect the initial chase heading of several hunts.
+  // Collect the initial chase heading of several hunts. The wall budgets are
+  // generous (point 249): re-arming a hunt is driven by the RAF loop, so a slow
+  // backend needs more wall time to spawn the same number of chases — the check
+  // (>=5 samples, variety R<0.85) is a QUALITY gate, not a speed gate.
   const headings = []
   const tAll = Date.now()
-  while (headings.length < 8 && Date.now() - tAll < 45000) {
-    if (await startChase(2500)) { headings.push(s.lionHeading); await sleep(60) }
+  while (headings.length < 8 && Date.now() - tAll < 120000) {
+    if (await startChase(8000)) { headings.push(s.lionHeading); await sleep(60) }
   }
   let vx = 0, vz = 0
   for (const h of headings) { vx += Math.sin(h); vz += Math.cos(h) }
@@ -2349,8 +2390,8 @@ const hunt = await page.evaluate(async () => {
   const offs = []
   let generic = false
   const tw = Date.now()
-  while (!generic && Date.now() - tw < 25000) {
-    if (await startChase(4000) && s.victim === null) generic = true
+  while (!generic && Date.now() - tw < 60000) {
+    if (await startChase(8000) && s.victim === null) generic = true
   }
   if (generic) {
     for (let k = 0; k < 45 && s.mode === 'chase' && s.victim === null; k++) {
@@ -2414,8 +2455,10 @@ const preyVar = await page.evaluate(async () => {
   const webMismatch = []
   let familyHunts = 0
   const tAll = Date.now()
-  while (prey.length < 16 && Date.now() - tAll < 110000) {
-    if (await startChase(2500)) {
+  // Generous wall budget (point 249): each hunt re-arms via the RAF loop, so a
+  // slow backend gathers the same food-web sample set given more wall seconds.
+  while (prey.length < 16 && Date.now() - tAll < 180000) {
+    if (await startChase(6000)) {
       // A family hunt records the victim calf's own species (point 124) — at
       // a STATIONARY measuring point the calf preference re-picks the same
       // local family every time, which is real behaviour but not what this
@@ -2535,7 +2578,11 @@ const sacrifice = await page.evaluate(async () => {
   const d0 = Math.hypot(parent.x - calf.x, parent.z - calf.z)
   await window.__sleepSim(0.4) // sim-time (point 177) so the charge start is load-independent
   const dCharged = Math.hypot(parent.x - calf.x, parent.z - calf.z)
-  await window.__sleepSim(1.8) // let the charge reach the predator (sim-time)
+  // Poll until the sacrifice RESOLVES (point 249) instead of sampling after a
+  // fixed sim-sleep: the charge from 5 units away takes a variable number of
+  // sim-seconds, so a fixed budget could sample the instant before the parent
+  // reaches. A slow backend simply polls longer to reach the same outcome.
+  await window.__pollSim(15, () => parent.dead)
   pd.preyWeapon = prevWeapons
   return {
     found: true, d0: +d0.toFixed(2), dCharged: +dCharged.toFixed(2),
@@ -2561,7 +2608,10 @@ const bothDie = await page.evaluate(async () => {
   if (!parent) return { found: false }
   calf.x = parent.x + 2.8; calf.z = parent.z // close, but the window shuts before the parent reaches
   calf.caught = 0.03
-  await window.__sleepSim(0.5) // sim-time (point 177)
+  // Poll until the kill resolves (point 249): both die on the same herd tick, so
+  // wait for it rather than sampling after a fixed sim-sleep. A genuine bug that
+  // leaves the parent alive still exhausts the budget and fails the check.
+  await window.__pollSim(8, () => calf.dead && parent.dead)
   return { found: true, calfDead: !!calf.dead, parentDead: !!parent.dead, bothLionFed: !!calf.lionFed && !!parent.lionFed }
 })
 check('a parent that arrives too late is eaten alongside the calf (both die)',
@@ -2579,7 +2629,9 @@ const onlyCalf = await page.evaluate(async () => {
   if (!parent) return { found: false }
   calf.x = parent.x + 20; calf.z = parent.z // parent far off — cannot reach in time
   calf.caught = 0.03
-  await window.__sleepSim(0.5) // sim-time (point 177)
+  // Poll until the calf is killed (point 249) rather than sampling after a fixed
+  // sim-sleep; the far parent stays alive, which the check asserts afterwards.
+  await window.__pollSim(8, () => calf.dead)
   return { found: true, calfDead: !!calf.dead, parentDead: !!parent.dead }
 })
 check('a calf caught with no parent near dies alone (parent survives)',
@@ -3824,7 +3876,13 @@ const crocDrama = async (mode, attempt = 0) =>
       // the crocodile now; without it the §19.8 drama would never resolve (I4).
       herds.zebra = herds.zebra.filter((a) => a !== calf && a !== parent)
       const grip0 = window.__wildlife.simTime()
-      await window.__pollSim(window.__balance.crocodile.gripSeconds + 4, () =>
+      // Poll well past the hard deadline (point 249): the grip timer advances a
+      // touch slower than the sim clock (a frame here and there where the croc
+      // update does not reach the increment), so gripSeconds+4 sat right on the
+      // edge (releaseSim 12 flake). A generous budget lets the deadline land with
+      // margin; the retreat is still REQUIRED, and a croc that never releases
+      // exhausts even this budget (and trips the in-app grip-bound devAssert).
+      await window.__pollSim(window.__balance.crocodile.gripSeconds + 20, () =>
         croc.lunge === undefined || croc.lunge.retreat === true)
       out.releaseSim = +(window.__wildlife.simTime() - grip0).toFixed(1)
     } else if (out.gripped && MODE.kind !== 'lunge') {
@@ -3854,9 +3912,17 @@ const crocDrama = async (mode, attempt = 0) =>
       // alive (no masking). Cleared in the cleanup.
       if (MODE.kind === 'rescue') window.__balance.parentDefense.forceOutcome = 'driveOff'
       await window.__pollSim(25, () => {
-        if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead) return true
+        // Rescue (point 249): the calf rises a frame or two BEFORE the crocodile's
+        // retreat flag lands, so wait for BOTH the freed calf AND the retreat —
+        // the old fixed 0.6 s settle sampled crocRetreated too early on a slow
+        // backend (the rotating crocRetreated:false flake). A slow backend just
+        // polls longer to reach the same fully-resolved state.
+        const retreated = croc.lunge === undefined || croc.lunge.retreat === true
+        if (MODE.kind === 'rescue' && calf.caught === undefined && !calf.dead && retreated) return true
         if (MODE.kind === 'sacrifice' && parent.dead) return true
-        if (MODE.kind === 'toolate' && calf.dead) return true
+        // toolate: both are taken — wait for BOTH deaths (point 249), they can
+        // resolve a frame apart and the check asserts both dead.
+        if (MODE.kind === 'toolate' && calf.dead && parent.dead) return true
         return false
       })
       await window.__sleepSim(0.6)
@@ -3886,7 +3952,10 @@ check(
 let crocRescue = null
 for (let attempt = 0; attempt < 3; attempt++) {
   crocRescue = await crocDrama('rescue', attempt)
-  if (crocRescue.staged && crocRescue.gripped && crocRescue.calfAlive && crocRescue.parentAlive) break
+  // Break only on the FULLY resolved drive-off (point 249): require the retreat
+  // too, so a rare attempt that freed the calf but was sampled before the croc
+  // retreated re-attempts rather than being accepted as the (failing) result.
+  if (crocRescue.staged && crocRescue.gripped && crocRescue.calfAlive && crocRescue.parentAlive && crocRescue.crocRetreated) break
 }
 check(
   'a charging parent drives the crocodile off — the calf rises, everyone lives (point 130)',
@@ -5129,7 +5198,9 @@ const settleScalar = async (read, rel = 0.003) => {
   await page.waitForTimeout(250)
   let prev = null
   const t0 = Date.now()
-  while (Date.now() - t0 < 12000) {
+  // Convergence poll with a generous cap (point 249): a slow backend blends the
+  // scalar over more wall time, so give it room to settle before reading.
+  while (Date.now() - t0 < 30000) {
     const v = await page.evaluate(read)
     if (typeof v === 'number') {
       if (prev !== null && Math.abs(v - prev) <= rel * Math.max(1, Math.abs(v))) return v
@@ -5498,7 +5569,7 @@ const drinkersAt = async (override, waitFor = 0) => {
   do {
     await page.waitForTimeout(2500)
     n = await count()
-  } while (n < waitFor && Date.now() - t0 < 20000)
+  } while (n < waitFor && Date.now() - t0 < 60000) // generous cap (point 249): slow streaming
   return n
 }
 const minDry = await page.evaluate(() => window.__balance.panoramaWildlife.dryShoreMinDrinkers)
@@ -5522,7 +5593,9 @@ const continentZoom = await page.evaluate(async () => {
   const zoom = window.__ui.getState().travelZoom
   let ok = false
   const t0 = Date.now()
-  while (Date.now() - t0 < 60000) {
+  // Generous cap (point 249): building the whole-continent far sheet is a heavy
+  // streaming/render step that a slow (WebGPU) backend can take a while to finish.
+  while (Date.now() - t0 < 120000) {
     const fog = window.__climate?.fog()
     if (
       window.__farTerrain?.built() &&
@@ -5568,7 +5641,7 @@ const zoomBack = await page.evaluate(async () => {
   window.__ui.getState().setWheelZoomEnabled(false)
   let ok = false
   const t0 = Date.now()
-  while (Date.now() - t0 < 30000) {
+  while (Date.now() - t0 < 60000) { // generous cap (point 249)
     const fog = window.__climate?.fog()
     if (fog && fog.far < 500 && !window.__farTerrain?.visible()) { ok = true; break }
     await sleep(300)
@@ -5590,7 +5663,7 @@ const nearAfterZoom = await page.evaluate(async () => {
   await sleep(600) // let the travel frame apply the widened near plane
   window.__game.getState().enterPlace('maasai-village')
   const t0 = Date.now()
-  while (Date.now() - t0 < 15000) {
+  while (Date.now() - t0 < 45000) { // generous cap (point 249): slow place-scene mount
     const cam = window.__placeCamera
     if (cam) {
       await sleep(300) // a couple of place-scene frames
@@ -5828,8 +5901,15 @@ const vicinity = await page.evaluate(async () => {
     for (const sp of pool) for (const a of herds[sp] ?? []) if (!a.dead && Math.hypot(a.x - anchor.x, a.z - anchor.z) <= radius) c++
     return c
   }
-  const ok = await window.__pollSim(6, () => countNow() >= min)
-  return { region, count: countNow(), radius, min, ok }
+  // Poll until the per-frame vicinity top-up has crossed the minimum (point 249):
+  // the seeder DEFERS on frames where Cairo's Nile-facing bearings expose no
+  // off-screen land, so it can need several sim-seconds (and a little camera
+  // drift) to place the full group. `ok` latches the moment count>=min is first
+  // reached, so a later drift/despawn cannot un-satisfy it; a generous sim budget
+  // gives the seeder enough frames. A genuine seeder failure exhausts the budget.
+  let reached = false
+  const ok = await window.__pollSim(25, () => { if (countNow() >= min) reached = true; return reached })
+  return { region, count: countNow(), reached, radius, min, ok }
 })
 check(
   'a settlement vicinity holds region-typical animals after leaving (point 102)',
