@@ -4499,7 +4499,10 @@ const crocGrazerAmbush = await page.evaluate(async () => {
   // be taken — the ambush stays occasional and never reaches up the shore.
   herds.zebra = herds.zebra.filter((a) => a !== grazer)
   croc.lunge = undefined
-  const far = bc.ambushBankBand + 2 // clearly beyond the reach
+  // Clearly beyond the reach — and by MORE than the drift the pin below
+  // tolerates, or a grazer that wanders toward the water reaches the band's
+  // inclusive edge on its own and the check fails on the animal's own roaming.
+  const far = bc.ambushBankBand + 6
   const fx = croc.x + bankDir.x * far
   const fz = croc.z + bankDir.z * far
   // Only run the far check where that spot is still land (else skip, not fail).
@@ -4507,7 +4510,9 @@ const crocGrazerAmbush = await page.evaluate(async () => {
     const farGrazer = { x: fx, z: fz, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined }
     herds.zebra.push(farGrazer)
     await window.__pollSim(6, () => {
-      if (farGrazer.caught === undefined && Math.hypot(farGrazer.x - fx, farGrazer.z - fz) > 2) { farGrazer.x = fx; farGrazer.z = fz }
+      // Pinned HARD every step (not only past a tolerance): the point of the
+      // check is the distance, so the distance must not drift at all.
+      if (farGrazer.caught === undefined) { farGrazer.x = fx; farGrazer.z = fz }
       if (croc.lunge !== undefined) { out.farBalked = false; return true }
       return false
     })
