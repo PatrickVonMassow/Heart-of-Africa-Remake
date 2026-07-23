@@ -6475,6 +6475,65 @@ check(
 await page.screenshot({ path: `${OUT}104-region-border-river.png` })
 console.log('shot 104-region-border-river.png')
 
+// --- Point 258: the debug menu's event-trigger dropdown ----------------------
+// The §19.8/§19.16 dramas are rare by design, so the debug menu stages the
+// picked one at the traveller (design.md §21.3). Live: picking the grass-fire
+// entry on savanna IGNITES the fire, and picking the crocodile entry deep in
+// the Sahara raises the localized "no water" toast instead of silently doing
+// nothing. Driven through the REAL <select> (the shipped, non-DEV-gated
+// trigger), not the DEV window hook.
+const stageEvent = async (value) =>
+  page.evaluate((v) => {
+    const sel = [...document.querySelectorAll('.debug-menu select')].find((s) =>
+      [...s.options].some((o) => o.value.startsWith('drama:')),
+    )
+    if (!sel) return { error: 'no event-trigger select' }
+    const opt = [...sel.options].find((o) => o.value === v)
+    if (!opt) return { error: `no option ${v}` }
+    // React tracks the DOM value node-side; set it through the prototype setter
+    // so the change event carries the picked value.
+    Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set.call(sel, v)
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+    return { ok: true, label: opt.textContent }
+  }, value)
+
+await page.evaluate(() => { if (!window.__ui.getState().debugOpen) window.__ui.getState().toggleDebug() })
+await page.waitForSelector('.debug-menu', { timeout: 15000 })
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+await waitForHerds()
+await page.evaluate(() => { window.__wildlife.fire.mode = 'idle'; window.__game.getState().setToast(null) })
+const firePick = await stageEvent('drama:grassFire')
+await page.evaluate(() => window.__sleepSim(0.6))
+const firedFromMenu = await page.evaluate(() => ({
+  mode: window.__wildlife.fire.mode,
+  toast: window.__game.getState().toast,
+}))
+check(
+  'the debug event-trigger dropdown ignites the grass fire on savanna (point 258)',
+  firePick.ok === true && firedFromMenu.mode === 'burning' && firedFromMenu.toast === null,
+  JSON.stringify({ firePick, firedFromMenu }),
+)
+// Away from any water: the crocodile entry must SAY what is missing.
+await page.evaluate(() => {
+  window.__wildlife.fire.mode = 'idle'
+  window.__game.getState().setToast(null)
+  window.__game.getState().debugJumpTo(23.0, 12.0) // deep Sahara, no river or lake
+})
+await page.evaluate(() => window.__sleepSim(1.5))
+const crocPick = await stageEvent('drama:crocodileAmbush')
+await page.evaluate(() => window.__sleepSim(0.4))
+const crocToast = await page.evaluate(() => window.__game.getState().toast)
+check(
+  'picking the crocodile ambush away from water toasts the missing water (point 258)',
+  crocPick.ok === true && typeof crocToast === 'string' && crocToast.length > 0,
+  JSON.stringify({ crocPick, crocToast }),
+)
+await page.evaluate(() => {
+  window.__game.getState().setToast(null)
+  window.__wildlife.fire.mode = 'idle'
+  if (window.__ui.getState().debugOpen) window.__ui.getState().toggleDebug()
+})
+
 // Point 163: the opened map must clear the inventory bar even when a full F3
 // loadout WRAPS it to a second row — the map anchors its bottom to the live bar
 // height (--inv-bar-height, published by a ResizeObserver), not a fixed 56px.
