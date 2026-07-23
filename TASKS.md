@@ -9500,7 +9500,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx` — same files as 239/245/247/242/237; bundles with 247 (both are
   239 flee refinements); do NOT delegate concurrently with the other wildlife points.
 
-- [ ] 249. ENRICHMENTS STAGED-DRAMA ASSERTIONS ARE TIMING-FRAGILE (rotating flakes,
+- [x] 249. ENRICHMENTS STAGED-DRAMA ASSERTIONS ARE TIMING-FRAGILE (rotating flakes,
   WebGPU-amplified) — NOT a crash. Measured over full clean runs (23.07.2026):
   `VERIFY_GL=webgl run-all enrichments` passes 214/0/0 (green, no retry needed); the
   earlier "crash twice" reading was a wrapper-`timeout` kill (the slow suite) plus
