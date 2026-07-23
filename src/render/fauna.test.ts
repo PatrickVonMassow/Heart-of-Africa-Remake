@@ -35,9 +35,14 @@ import {
   buildZebra,
   buildZebraCalf,
   calfProportions,
+  createCrocodileMaterial,
   createFaunaMaterial,
+  CROCODILE_FADE_BAND,
   CROCODILE_LAYOUT,
   CROCODILE_SUBMERGE_DEPTH,
+  CROCODILE_WATERLINE_NONE,
+  crocodileSubmergedAlpha,
+  crocodileWaterlineLocal,
   CROCODILE_LUNGE_LIFT,
   crocodileBodyY,
   FAUNA_TESSELLATION,
@@ -555,6 +560,74 @@ describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
 
   it('hidden sits markedly lower than striking — the pose actually changes', () => {
     expect(crocodileBodyY(surfaceY, true)).toBeLessThan(crocodileBodyY(surfaceY, false) - 0.2)
+  })
+})
+
+// The crocodile submersion fade (design.md §19.16, point 246): the water sheets
+// are alpha-blended and depthWrite-off (point 233), and the croc body draws in
+// the opaque pass BEFORE them — so a submerged body read as a crisp silhouette
+// straight through the water. The croc's own material now fades every fragment
+// below the instance's local waterline, so the body vanishes into the murk
+// while the eye knobs above the sheet stay crisp.
+describe('crocodile submersion fade (design.md §19.16, point 246)', () => {
+  const geo = buildCrocodile()
+  geo.computeBoundingBox()
+  const eyeKnobTopY = geo.boundingBox!.max.y
+
+  it('the local waterline sits at the submerge depth over the instance scale', () => {
+    expect(crocodileWaterlineLocal(1, true)).toBeCloseTo(CROCODILE_SUBMERGE_DEPTH, 12)
+    // A larger croc is scaled up, so the same world-space depth is a SMALLER
+    // local height (the fragment compares pre-scale positionLocal.y).
+    expect(crocodileWaterlineLocal(1.2, true)).toBeCloseTo(CROCODILE_SUBMERGE_DEPTH / 1.2, 12)
+    expect(crocodileWaterlineLocal(1.2, true)).toBeLessThan(crocodileWaterlineLocal(0.9, true))
+  })
+
+  it('riding out drops the waterline far below the geometry — the strike shows the whole body', () => {
+    const wl = crocodileWaterlineLocal(1, false)
+    expect(wl).toBe(CROCODILE_WATERLINE_NONE)
+    // The sentinel plus the fade band still lies below the lowest vertex, so
+    // nothing on the body can fade during a strike.
+    expect(wl + CROCODILE_FADE_BAND).toBeLessThan(geo.boundingBox!.min.y)
+    expect(crocodileSubmergedAlpha(geo.boundingBox!.min.y, wl)).toBe(1)
+    expect(crocodileSubmergedAlpha(0, wl)).toBe(1)
+  })
+
+  it('hidden: eye knobs stay opaque, belly and legs vanish, the back just under the sheet only hints', () => {
+    const wl = crocodileWaterlineLocal(1, true)
+    // The eye knobs rise above the waterline — fully opaque, the lurking marker.
+    expect(eyeKnobTopY).toBeGreaterThan(wl)
+    expect(crocodileSubmergedAlpha(eyeKnobTopY, wl)).toBe(1)
+    // At the waterline itself the fade is continuous with the exposed part.
+    expect(crocodileSubmergedAlpha(wl, wl)).toBe(1)
+    // Belly and feet (local y near 0) lie a full band below — invisible.
+    expect(crocodileSubmergedAlpha(0.02, wl)).toBe(0)
+    expect(crocodileSubmergedAlpha(geo.boundingBox!.min.y, wl)).toBe(0)
+    // Just under the line the back reads only as a faint hint, strictly between.
+    const hint = crocodileSubmergedAlpha(wl - CROCODILE_FADE_BAND / 2, wl)
+    expect(hint).toBeGreaterThan(0)
+    expect(hint).toBeLessThan(1)
+    // Monotone with depth: deeper is never more visible.
+    let prev = 1
+    for (let y = wl; y >= 0; y -= 0.02) {
+      const a = crocodileSubmergedAlpha(y, wl)
+      expect(a).toBeLessThanOrEqual(prev + 1e-12)
+      prev = a
+    }
+  })
+
+  it('the croc material carries the fade and keeps the shared fauna look', () => {
+    const m = createCrocodileMaterial()
+    // Transparent with an opacity node: the fade needs alpha blending...
+    expect(m.transparent).toBe(true)
+    expect(m.opacityNode).toBeTruthy()
+    // ...but keeps writing depth so the body self-occludes within its own draw
+    // (the water sheets render after it at renderOrder 1 and lie above, so
+    // their point-233 depthWrite-off crossfade is untouched).
+    expect(m.depthWrite).toBe(true)
+    // The shared fauna look (point 214): vertex colors, smooth shading.
+    expect(m.vertexColors).toBe(true)
+    expect(m.roughness).toBeCloseTo(0.9, 12)
+    expect(m.flatShading).toBe(false)
   })
 })
 
