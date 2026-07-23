@@ -9870,7 +9870,7 @@ the remaining open points in their numeric order.
   into 259's trample resolution if convenient), do not delegate concurrently with a
   Wildlife.tsx point.
 
-- [ ] 261. ANIMALS WALK THROUGH AN ELEPHANT — NEED A BODY COLLIDER (user 23.07.2026,
+- [x] 261. ANIMALS WALK THROUGH AN ELEPHANT — NEED A BODY COLLIDER (user 23.07.2026,
   follow-up to 259). During the elephant-suicide the grief parent runs from BEHIND
   THROUGH the elephant's legs to reach the front-intercept point (point 259) instead
   of routing AROUND the body. Root: an elephant body is not a solid obstacle to other
