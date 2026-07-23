@@ -16,6 +16,14 @@ import { useUi } from '../state/ui'
 import { freshGame, withWorld, useGame } from '../test/store'
 import { MOUNTAINS } from '../world/data/landmarks'
 import { latLonToWorld } from '../world/geo'
+import { EVENT_KINDS } from '../systems/events'
+import {
+  DRAMA_PREFIX,
+  EVENT_PREFIX,
+  HAZARD_PREFIX,
+  WILDLIFE_DRAMA_KINDS,
+  setWildlifeDramaTrigger,
+} from '../systems/debugEvents'
 
 withWorld()
 
@@ -453,5 +461,114 @@ describe('DebugMenu jump-to covers every named map point (design.md §21.3, poin
     const pos = useGame.getState().pos
     expect(pos.x).toBeCloseTo(expected.x, 4)
     expect(pos.z).toBeCloseTo(expected.z, 4)
+  })
+})
+
+// --- The event-trigger dropdown (design.md §21.3, point 258) ----------------
+// The §19.8/§19.16 wildlife dramas, the §14 random events and the §11 hazard
+// fired on demand, in the jump-to dropdown's grouped + alphabetically sorted
+// structure. The staged dramas themselves need the travel scene; asserted here
+// is the wiring — grouping, localization, dispatch and the missing-precondition
+// toast that keeps a trigger from ever being a silent no-op.
+describe('DebugMenu event-trigger dropdown (design.md §21.3, point 258)', () => {
+  const stageSelect = () => selectWithOption(`${DRAMA_PREFIX}grassFire`) as HTMLSelectElement
+  const stageGroupLabels = () => [...stageSelect().querySelectorAll('optgroup')].map((g) => g.label)
+  const stageOptionsOf = (groupLabel: string) => {
+    const grp = [...stageSelect().querySelectorAll('optgroup')].find((g) => g.label === groupLabel)
+    return [...(grp?.querySelectorAll('option') ?? [])].map((o) => o.textContent ?? '')
+  }
+
+  afterEach(() => setWildlifeDramaTrigger(null))
+
+  it('carries its own labelled selector beside the existing dropdowns', () => {
+    render(<DebugMenu />)
+    expect(screen.getByText(en.debug.stageEvent)).toBeInTheDocument()
+    expect(stageSelect()).toBeDefined()
+  })
+
+  it('groups the entries by category in the fixed order', () => {
+    render(<DebugMenu />)
+    expect(stageGroupLabels()).toEqual([
+      en.debug.stageGroups.wildlife,
+      en.debug.stageGroups.random,
+      en.debug.stageGroups.hazards,
+    ])
+  })
+
+  it('offers every wildlife drama, every random event and the mountain fall', () => {
+    render(<DebugMenu />)
+    const values = [...stageSelect().options].map((o) => o.value)
+    for (const k of WILDLIFE_DRAMA_KINDS) expect(values, k).toContain(`${DRAMA_PREFIX}${k}`)
+    for (const k of EVENT_KINDS) expect(values, k).toContain(`${EVENT_PREFIX}${k}`)
+    expect(values).toContain(`${HAZARD_PREFIX}mountainFall`)
+  })
+
+  it('sorts each group alphabetically by localized name in English', () => {
+    render(<DebugMenu />)
+    const dramas = stageOptionsOf(en.debug.stageGroups.wildlife)
+    expect(dramas.length).toBeGreaterThan(1)
+    expect(dramas).toContain(en.debug.dramaNames.grassFire)
+    expect([...dramas].sort((a, b) => a.localeCompare(b, 'en'))).toEqual(dramas)
+  })
+
+  it('renders localized labels and sorts alphabetically in German', () => {
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    expect(screen.getByText(de.debug.stageEvent)).toBeInTheDocument()
+    expect(stageGroupLabels()).toEqual([
+      de.debug.stageGroups.wildlife,
+      de.debug.stageGroups.random,
+      de.debug.stageGroups.hazards,
+    ])
+    const dramas = stageOptionsOf(de.debug.stageGroups.wildlife)
+    expect(dramas).toContain(de.debug.dramaNames.grassFire)
+    expect([...dramas].sort((a, b) => a.localeCompare(b, 'de'))).toEqual(dramas)
+  })
+
+  it('dispatches the picked drama to the registered scene trigger', () => {
+    const staged: string[] = []
+    setWildlifeDramaTrigger((k) => {
+      staged.push(k)
+      return null
+    })
+    render(<DebugMenu />)
+    fireEvent.change(stageSelect(), { target: { value: `${DRAMA_PREFIX}crocodileAmbush` } })
+    expect(staged).toEqual(['crocodileAmbush'])
+    expect(useGame.getState().toast).toBeNull()
+  })
+
+  it('toasts the missing precondition instead of failing silently', () => {
+    setWildlifeDramaTrigger(() => 'noWater')
+    render(<DebugMenu />)
+    fireEvent.change(stageSelect(), { target: { value: `${DRAMA_PREFIX}crocodileAmbush` } })
+    expect(useGame.getState().toast).toBe(en.debug.stageFailures.noWater)
+  })
+
+  it('toasts the missing precondition in German too', () => {
+    useLocale.getState().setLang('de')
+    setWildlifeDramaTrigger(() => 'noSavanna')
+    render(<DebugMenu />)
+    fireEvent.change(stageSelect(), { target: { value: `${DRAMA_PREFIX}grassFire` } })
+    expect(useGame.getState().toast).toBe(de.debug.stageFailures.noSavanna)
+  })
+
+  it('says so when no travel scene is mounted (no registered trigger)', () => {
+    render(<DebugMenu />)
+    fireEvent.change(stageSelect(), { target: { value: `${DRAMA_PREFIX}grassFire` } })
+    expect(useGame.getState().toast).toBe(en.debug.stageFailures.noScene)
+  })
+
+  it('fires a §14 random event through the store trigger', () => {
+    render(<DebugMenu />)
+    const before = useGame.getState().journal.length
+    fireEvent.change(stageSelect(), { target: { value: `${EVENT_PREFIX}snakeBite` } })
+    expect(useGame.getState().journal.length).toBeGreaterThan(before)
+  })
+
+  it('fires the ropeless mountain fall through the store trigger', () => {
+    render(<DebugMenu />)
+    const before = useGame.getState().journal.length
+    fireEvent.change(stageSelect(), { target: { value: `${HAZARD_PREFIX}mountainFall` } })
+    expect(useGame.getState().journal.length).toBeGreaterThan(before)
   })
 })

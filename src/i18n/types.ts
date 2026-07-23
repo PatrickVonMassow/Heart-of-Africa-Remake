@@ -323,6 +323,20 @@ export interface Strings {
     randomEvents: string
     triggerEvent: string
     eventNames: Record<string, string>
+    /** Label of the event-trigger dropdown (design.md §21.3, point 258). */
+    stageEvent: string
+    /** optgroup labels of the event-trigger dropdown. */
+    stageGroups: {
+      wildlife: string
+      random: string
+      hazards: string
+    }
+    /** Names of the stageable §19.8/§19.16 wildlife dramas. */
+    dramaNames: Record<string, string>
+    /** Names of the stageable §11 traveller hazards. */
+    hazardNames: Record<string, string>
+    /** Toasts for a trigger whose precondition cannot be met near the traveller. */
+    stageFailures: Record<string, string>
     showHidden: string
     fpsCounter: string
     /** TRAA toggle (design.md §2.7/§21), default on. */

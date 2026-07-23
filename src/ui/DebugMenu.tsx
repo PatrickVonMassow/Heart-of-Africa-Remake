@@ -5,7 +5,8 @@
 import { balance } from '../config/balance'
 import { refreshAmbienceVolume } from '../systems/ambience'
 import { totalGifts, useGame, type EquipmentId } from '../state/store'
-import { EVENT_KINDS } from '../systems/events'
+import { EVENT_KINDS, type EventKind } from '../systems/events'
+import { debugEventGroups, fireDebugEvent, sortByLabel } from '../systems/debugEvents'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
 import { PLACES, type Material } from '../world/geo'
@@ -150,8 +151,7 @@ export function DebugMenu() {
       jumpCoords.set(value, { lat, lon })
       return { value, label }
     })
-    options.sort((a, b) => a.label.localeCompare(b.label, lang))
-    return options
+    return sortByLabel(options, lang)
   }
   jumpCoords.set('#graveyard', { lat: ELEPHANT_GRAVEYARD.lat, lon: ELEPHANT_GRAVEYARD.lon })
   const jumpGroups = [
@@ -164,12 +164,28 @@ export function DebugMenu() {
     { label: t.debug.jumpGroups.natural, options: namedGroup(NATURAL_SITES, (n) => ({ value: n.id, label: t.landmarks[n.id], lat: n.lat, lon: n.lon })) },
     {
       label: t.debug.jumpGroups.other,
-      options: [
-        { value: '#graveyard', label: t.landmarks['elephant-graveyard'] },
-        { value: '#grave', label: t.debug.grave },
-      ].sort((a, b) => a.label.localeCompare(b.label, lang)),
+      options: sortByLabel(
+        [
+          { value: '#graveyard', label: t.landmarks['elephant-graveyard'] },
+          { value: '#grave', label: t.debug.grave },
+        ],
+        lang,
+      ),
     },
   ]
+
+  // Event-trigger targets (design.md §21.3, point 258): the §19.8/§19.16
+  // wildlife dramas, the §14 random events and the §11 traveller hazards, in
+  // the jump-to dropdown's grouped + alphabetically sorted structure.
+  const stageGroups = debugEventGroups(
+    {
+      groups: t.debug.stageGroups,
+      drama: t.debug.dramaNames,
+      event: t.debug.eventNames,
+      hazard: t.debug.hazardNames,
+    },
+    lang,
+  )
 
   const set = <K extends keyof typeof balance>(key: K, v: (typeof balance)[K]) => {
     balance[key] = v
@@ -456,6 +472,20 @@ export function DebugMenu() {
           placeholder={t.debug.choose}
           options={EVENT_KINDS.map((k) => ({ value: k, label: t.debug.eventNames[k] ?? k }))}
           onPick={(v) => game.debugTriggerEvent(v as (typeof EVENT_KINDS)[number])}
+        />
+        <GroupedActionSelect
+          label={t.debug.stageEvent}
+          placeholder={t.debug.choose}
+          groups={stageGroups}
+          onPick={(v) => {
+            const missing = fireDebugEvent(v, {
+              randomEvent: (k: EventKind) => game.debugTriggerEvent(k),
+              mountainFall: () => game.debugTriggerMountainFall(),
+            })
+            // Never a silent no-op: an unmeetable precondition says what is
+            // missing (design.md §21.3).
+            if (missing) game.setToast(t.debug.stageFailures[missing])
+          }}
         />
         <ActionSelect
           label={t.debug.addGift}
