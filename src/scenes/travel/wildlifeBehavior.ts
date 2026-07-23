@@ -905,6 +905,22 @@ export function crocodileLungeReady(distToPrey: number, preyAtBank: boolean, str
 }
 
 /**
+ * The resting crocodile's subtle idle yaw (design.md §19.16, points 242/257): a
+ * hidden crocodile WAITS — it lies submerged, it does not roam. Its faint life is
+ * a BOUNDED oscillation about a FIXED rest heading, an ABSOLUTE value that always
+ * returns to centre. It must NEVER be an increment added to the live heading each
+ * frame (point 257 regression): steering the persistent facing toward a heading
+ * that was itself `heading + sway` fed the sway back in every frame, summing a
+ * running integral of the sine that grew into a full-circle rotation. Anchoring
+ * the sway to a FIXED restYaw breaks that feedback loop. The amplitude is a few
+ * degrees; the per-crocodile phase desynchronises neighbours on the same water.
+ */
+export const CROCODILE_IDLE_SWAY_AMP = 0.03
+export function crocodileIdleYaw(restYaw: number, t: number, phase: number): number {
+  return restYaw + Math.sin(t * 0.3 + phase * Math.PI * 2) * CROCODILE_IDLE_SWAY_AMP
+}
+
+/**
  * The gripped lunge's hard deadline (point 186): the grip normally ends when the
  * victim's caught-countdown runs out, but a victim REMOVED mid-grip (streamed out
  * in a chunk despawn, taken by another system) freezes that countdown and would pin

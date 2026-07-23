@@ -87,6 +87,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileIdleYaw,
   crocodileGripExpired,
   crocodileHoldsCatch,
   grassFireEligible,
@@ -287,6 +288,11 @@ interface Animal {
    *  slinking back home. Its own state — the scripted LION hunt is never
    *  touched by an ambush. */
   lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  /** A hidden crocodile's FIXED rest heading (point 257): captured once when it
+   *  settles to waiting, the anchor its subtle idle yaw oscillates about. Held
+   *  absolute so the sway can never accumulate into a rotation; cleared when the
+   *  croc lunges so the post-attack slink-home heading re-anchors it. */
+  restYaw?: number
   /** Spawned dead as rinderpest toll (point 133) — lets the verify count the
    *  plague's own carrion apart from ordinary hunt/trample deaths. */
   plague?: true
@@ -3107,13 +3113,24 @@ function Herds() {
           wobTarget = 0
           const hidden = a.lunge === undefined
           const striking = a.lunge !== undefined && !a.lunge.retreat && !(a.lunge.victim?.dead ?? false)
-          // Subtle idle life (point 242c) only while fully at rest: a slow float
-          // bob and a few-degree sway so a hidden croc never reads as a frozen
-          // prop — never applied mid-attack or mid-sink (that would look jittery).
-          const sway = hidden ? Math.sin(t * 0.3 + a.phase * 6.283) * 0.03 : 0
-          const bob = hidden ? Math.sin(t * 0.5 + a.phase * 6.283) * 0.008 : 0
-          yaw = a.rot + sway
-          bodyY = crocodileBodyY(a.y, !striking) + bob
+          // Subtle idle life (point 242) only while fully at rest: a slow float
+          // bob and a few-degree yaw sway so a hidden croc never reads as a frozen
+          // prop. The sway is a BOUNDED oscillation about a FIXED rest heading
+          // (point 257) — captured once here, never the live `a.rot`: with yaw set
+          // to `a.rot + sway` the facing-steer below wrote the swayed heading back
+          // into a.rot, so the sway summed frame over frame into a full-circle
+          // rotation (the reported "croc slowly spins"). Anchoring to restYaw keeps
+          // it an absolute value that returns to centre; a hidden croc WAITS, it
+          // does not roam (§19.16). The bob/sway are dropped mid-attack or mid-sink.
+          if (hidden) {
+            if (a.restYaw === undefined) a.restYaw = a.rot
+            yaw = crocodileIdleYaw(a.restYaw, t, a.phase)
+            bodyY = crocodileBodyY(a.y, true) + Math.sin(t * 0.5 + a.phase * 6.283) * 0.008
+          } else {
+            a.restYaw = undefined
+            yaw = a.rot
+            bodyY = crocodileBodyY(a.y, !striking)
+          }
         }
         // The broken-wing act (point 145b): the luring plover tilts hard onto
         // one wing and flutters; the return flight lifts it in a low arc.
