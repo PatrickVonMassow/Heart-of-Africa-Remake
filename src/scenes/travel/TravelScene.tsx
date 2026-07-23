@@ -81,6 +81,7 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
   buildWetland,
 } from '../../render/landmarks'
 import { mulberry32, hashChunk } from '../../world/noise'
+import { PERF, maxFrameMs, recordFrame, resetPerf } from './perfProbe'
 import { Climate } from './Climate'
 import { setFrameVisibilityTest } from './frameVisibility'
 import { RegionBorders } from './RegionBorders'
@@ -2287,6 +2288,25 @@ export function TravelScene() {
     }
   }, [])
 
+  // DEV attribution probe (docs/perf-driving-hitches.md): the per-burst cost
+  // of the terrain/flora streaming work plus a frame-delta ring, for the
+  // driven verification and manual profiling of the driving hitches.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__perf = {
+      terrain: PERF.terrain,
+      flora: PERF.flora,
+      frames: () => PERF.frames.slice(),
+      maxFrameMs: (sinceT?: number) => maxFrameMs(sinceT ?? 0),
+      now: () => performance.now(),
+      reset: resetPerf,
+    }
+    return () => {
+      delete w.__perf
+    }
+  }, [])
+
   // Digging is done by clicking the shovel item (design.md §17); the G key
   // remains as a convenience/gamepad binding for digging on the spot.
   useEffect(() => {
@@ -2300,6 +2320,7 @@ export function TravelScene() {
   }, [setPrompt])
 
   useFrame((_, rawDt) => {
+    if (import.meta.env.DEV) recordFrame(performance.now(), rawDt * 1000)
     const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
 
