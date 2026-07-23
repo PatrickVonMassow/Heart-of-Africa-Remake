@@ -577,6 +577,57 @@ export function turnToward(current: number, target: number, maxStep: number): nu
   return current + Math.max(-maxStep, Math.min(maxStep, dh))
 }
 
+/** Angular margin (radians) a fresh flee pick must beat the held heading by
+ *  before the commit-and-hold releases (design.md §19.8, point 237). */
+export const FLEE_COMMIT_MARGIN = 0.9
+
+/**
+ * Commit-and-hold for a fleeing animal's escape heading (design.md §19.8,
+ * point 237). A calf ringed by a herd sees `fleeHeading`'s summed-repulsion
+ * resultant go near-zero, and its ANGLE then flips ~180° between two
+ * comparably-good escapes frame to frame; feeding that jitter straight into the
+ * capped `turnToward` trembled the calf's facing between two directions (the
+ * user's oscillating-calf report). This keeps the committed heading and accepts
+ * a fresh pick only once it diverges past `switchMargin` — the same "commit to
+ * one corridor, re-pick only when it closes" discipline `escapeCorridorHeading`/
+ * `calfFleeStep` use for the coast flight — so a transient flip can never flap
+ * the escape. The caller still `turnToward`s the returned target under its own
+ * turn cap, which smooths a genuine switch. Divergence is measured across the
+ * ±π seam.
+ */
+export function committedFleeHeading(
+  held: number | undefined,
+  pick: number,
+  switchMargin: number = FLEE_COMMIT_MARGIN,
+): number {
+  if (held === undefined) return pick
+  let d = pick - held
+  while (d > Math.PI) d -= Math.PI * 2
+  while (d < -Math.PI) d += Math.PI * 2
+  return Math.abs(d) <= switchMargin ? held : pick
+}
+
+/**
+ * Crocodile ambush target preference (design.md §19.16/§19.8, point 245): a
+ * drinking JUVENILE at the bank is the strongly-preferred lunge target so the
+ * §19.8 sacrifice/rescue drama fires more often — its weight is `bias` (≫ 1),
+ * an adult's is 1. The crocodile only ever lunges at a drinker genuinely
+ * standing at the bank, so the sole discriminator here is young-vs-adult.
+ */
+export function crocodileTargetWeight(isJuvenile: boolean, bias: number): number {
+  return isJuvenile ? bias : 1
+}
+
+/**
+ * Whether a fresh hunt seeks a nearby JUVENILE over a generic grazer (design.md
+ * §19.8, point 245): juveniles are the preferred prey of every predator, so the
+ * calibratable `bias` (balance.family.juvenilePreyBias) is raised well above
+ * half — a 0..1 `roll` below it picks the calf hunt.
+ */
+export function prefersJuvenilePrey(roll: number, bias: number): boolean {
+  return roll < bias
+}
+
 /**
  * Leashed gambol direction (design.md §19.8): damp the OUTWARD component of
  * the bout heading toward zero at the play range's edge — the tangential

@@ -29,6 +29,10 @@ import {
   leashedGambolDir,
   separationPush,
   turnToward,
+  committedFleeHeading,
+  FLEE_COMMIT_MARGIN,
+  crocodileTargetWeight,
+  prefersJuvenilePrey,
   type FlightState,
   killFlockMayDescend,
   killFlockActive,
@@ -175,6 +179,122 @@ describe('fleeHeading (design.md §19 — stable prey escape)', () => {
     }
     expect(maxDelta).toBeLessThan(0.35) // no ~90° snap
     expect(reversals).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('committedFleeHeading (design.md §19.8, point 237 — commit to one escape)', () => {
+  it('adopts the first pick when nothing is held', () => {
+    expect(committedFleeHeading(undefined, 1.2, 0.9)).toBe(1.2)
+  })
+
+  it('holds the committed heading against a sub-margin jitter (either side)', () => {
+    expect(committedFleeHeading(1.0, 1.0 + 0.8, 0.9)).toBe(1.0) // 0.8 < 0.9 → hold
+    expect(committedFleeHeading(1.0, 1.0 - 0.8, 0.9)).toBe(1.0)
+  })
+
+  it('switches once a fresh pick diverges past the margin', () => {
+    expect(committedFleeHeading(1.0, 1.0 + 1.2, 0.9)).toBeCloseTo(2.2, 10) // 1.2 > 0.9 → switch
+  })
+
+  it('measures the divergence across the ±π seam', () => {
+    // held just under +π, pick just over −π: the true divergence is ~0.2 → hold.
+    const held = Math.PI - 0.1
+    const pick = -Math.PI + 0.1
+    expect(committedFleeHeading(held, pick, 0.9)).toBe(held)
+  })
+
+  it('the shipped margin is a real angular commitment (not a hair-trigger)', () => {
+    expect(FLEE_COMMIT_MARGIN).toBeGreaterThan(0.5)
+  })
+})
+
+describe('a fleeing calf holds ONE elephant escape (design.md §7.1 pt.12, point 237)', () => {
+  // The reported bug: a calf ringed by a herd on OPPOSITE sides sees
+  // fleeHeading's summed-repulsion resultant go near-zero and its ANGLE flip
+  // ~180° between two comparably-good escapes each frame. Feeding that jitter
+  // straight into the capped turnToward trembled the calf's facing between two
+  // directions. The scene now COMMITS the held heading (committedFleeHeading)
+  // and only re-picks past FLEE_COMMIT_MARGIN — the point-157/188 sticky
+  // discipline applied to the elephant dart — while turnToward still smooths it.
+  const elephants: [number, number][] = [
+    [0, 2],
+    [0, -2.1],
+  ] // flanking on OPPOSITE sides — the near-cancelling resultant
+  const dt = 1 / 60
+  const cap = 8 * dt // PREY_DODGE_TURN · dt (Wildlife.tsx)
+
+  it('the RAW summed pick oscillates — the regression witness', () => {
+    let x = 0
+    let z = 0
+    let prev = fleeHeading(x, z, elephants, 5) as number
+    let reversals = 0
+    let prevD = 0
+    for (let i = 0; i < 60; i++) {
+      const h = fleeHeading(x, z, elephants, 5)
+      if (h === null) break
+      let d = h - prev
+      while (d > Math.PI) d -= Math.PI * 2
+      while (d < -Math.PI) d += Math.PI * 2
+      if (i > 1 && d * prevD < -1e-6) reversals++
+      prevD = d
+      prev = h
+      x += Math.sin(h) * 0.2
+      z += Math.cos(h) * 0.2
+    }
+    expect(reversals).toBeGreaterThan(5) // the raw pick flips back and forth — the bug
+  })
+
+  it('the committed held heading holds ONE direction — no ~90° flip', () => {
+    // Drive the exact call-site loop: the resolved pick fed into the held
+    // dodgeHeading via committedFleeHeading + the capped turnToward.
+    let x = 0
+    let z = 0
+    let held: number | undefined
+    let prev: number | null = null
+    let maxDelta = 0
+    let reversals = 0
+    let prevD = 0
+    for (let i = 0; i < 60; i++) {
+      const pick = fleeHeading(x, z, elephants, 5)
+      if (pick === null) break
+      const target = committedFleeHeading(held, pick, FLEE_COMMIT_MARGIN)
+      held = held === undefined ? pick : turnToward(held, target, cap)
+      if (prev !== null) {
+        let d = held - prev
+        while (d > Math.PI) d -= Math.PI * 2
+        while (d < -Math.PI) d += Math.PI * 2
+        maxDelta = Math.max(maxDelta, Math.abs(d))
+        if (i > 1 && d * prevD < -1e-6) reversals++
+        prevD = d
+      }
+      prev = held
+      x += Math.sin(held) * 0.2
+      z += Math.cos(held) * 0.2
+    }
+    expect(maxDelta).toBeLessThanOrEqual(cap + 1e-9) // never a snap — capped by the turn rate
+    expect(reversals).toBeLessThanOrEqual(1) // committed to one direction
+  })
+})
+
+describe('juvenile prey preference (design.md §19.8/§19.16, point 245)', () => {
+  it('crocodileTargetWeight strongly prefers a drinking juvenile over an adult', () => {
+    const bias = balance.family.juvenileDrinkCrocBias
+    expect(crocodileTargetWeight(true, bias)).toBe(bias)
+    expect(crocodileTargetWeight(false, bias)).toBe(1)
+    expect(crocodileTargetWeight(true, bias)).toBeGreaterThan(crocodileTargetWeight(false, bias))
+    expect(bias).toBeGreaterThan(1) // ≫ an adult's weight, so the juvenile always wins
+  })
+
+  it('prefersJuvenilePrey is the calibratable roll gate, boundary-exact', () => {
+    const bias = balance.family.juvenilePreyBias
+    expect(prefersJuvenilePrey(bias - 1e-9, bias)).toBe(true)
+    expect(prefersJuvenilePrey(bias, bias)).toBe(false) // strict `<`
+    expect(prefersJuvenilePrey(0, bias)).toBe(true)
+  })
+
+  it('the shipped juvenile prey bias is raised above the earlier 0.6', () => {
+    expect(balance.family.juvenilePreyBias).toBeGreaterThan(0.6)
+    expect(balance.family.juvenilePreyBias).toBeLessThanOrEqual(1)
   })
 })
 
@@ -1221,9 +1341,11 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
   const PERIOD = balance.family.gambolBoutSeconds + GAMBOL_IDLE_SECONDS
   const ACTIVE = balance.family.gambolBoutSeconds / PERIOD
 
-  it('ships the widened leash: 3× the original follow radius and play range', () => {
-    expect(balance.family.followRadius).toBeCloseTo(3 * 1.8, 10)
-    expect(balance.family.gambolRange).toBeCloseTo(3 * 4, 10)
+  it('ships the widened leash: 1.5× the point-238 follow radius and play range (point 245)', () => {
+    // Point 245 scales both by ×1.5 again, from the point-238 values (3× the
+    // originals): followRadius 5.4 → 8.1, gambolRange 12 → 18.
+    expect(balance.family.followRadius).toBeCloseTo(1.5 * 5.4, 10) // 8.1
+    expect(balance.family.gambolRange).toBeCloseTo(1.5 * 12, 10) // 18
   })
 
   it('a hop-bout runs the full calibratable length — longer than the old 4 s bout', () => {
@@ -1239,16 +1361,21 @@ describe('leashedGambolDir (design.md §19 — the scamper orbits its parent)', 
     expect(gambolState(balance.family.gambolBoutSeconds + 0.2, 0, PERIOD, ACTIVE)).toBeNull()
   })
 
-  it('the rescue burst still closes the widened leash within the caught window', () => {
+  it('the rescue burst still closes the widened leash within the caught window (point 245)', () => {
     // Worst case: the calf is caught at the far edge of the play range with the
     // parent on the opposite side. The charge must cover that gap — plus the
     // too-late band as slack — well inside the 5 s struggle window
     // (CAUGHT_DURATION / PARENT_TOO_LATE_DIST in Wildlife.tsx), so the
-    // sacrifice/shield/too-late outcomes all stay reachable at 3× spacing.
+    // sacrifice/shield/too-late outcomes all stay reachable at the wider spacing.
+    // At gambolRange 18 the worst gap is 18 + 3.2 = 21.2, still well inside the
+    // burst-cover 6 units/s × 5 s = 30 (the point-238 head-room was 15.2 vs 30;
+    // point 245 leaves ~30% margin), so no reach distance needs widening.
     const CAUGHT_DURATION = 5
     const PARENT_TOO_LATE_DIST = 3.2
     const worstGap = balance.family.gambolRange + PARENT_TOO_LATE_DIST
-    expect(rescueSpeed(balance.family.rescueBurst) * CAUGHT_DURATION).toBeGreaterThan(worstGap * 1.5)
+    const burstCover = rescueSpeed(balance.family.rescueBurst) * CAUGHT_DURATION
+    expect(burstCover).toBeGreaterThan(worstGap) // the charge closes the gap
+    expect(burstCover).toBeGreaterThan(worstGap * 1.3) // …with a real safety margin
   })
 
   it('plays freely near the parent (the leash barely bends the heading)', () => {
