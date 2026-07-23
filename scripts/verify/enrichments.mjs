@@ -3965,7 +3965,18 @@ check(
 // settle burst 2-3 units out of every pre-computed rect, so all three rects
 // read as plain water), the rects are RE-DERIVED from the croc's LIVE x/z/y at
 // every sample (never once up front), and `lunge === undefined` is asserted at
-// the hidden sample. Sampled at an ACHIEVABLE gameplay zoom (point 172 —
+// the hidden sample. The CURRENT DRIFT is frozen too (balance.currentDrift = 0
+// — debug-editable, restored in the cleanup): the idle canoeing player is
+// swept ~2 units/s downstream, so over the sampling waits the DARK-BROWN CANOE
+// drifted onto the staged croc's cell and into the body rect — the reference
+// and hidden frames then compared the boat at two positions, not water vs
+// water, and the render-correct hidden body false-failed (bodyDiff ~32 was the
+// canoe's hull, picture-confirmed). With the drift frozen the player stands
+// still, the cell search's minimum radius (6 > canoe reach ~2.5 + body-rect
+// reach ~1.35 + margin) holds through every sample, and `playerClear`
+// (player-croc distance > 4 at the hidden sample) is asserted and logged so a
+// pass PROVES the body rect held pure water-over-the-submerged-croc.
+// Sampled at an ACHIEVABLE gameplay zoom (point 172 —
 // the non-debug wheel range is 0.125–0.5): the closest candidate at which both
 // rects project fully on screen, preferring 0.25 where the two ~0.06-unit
 // eye-knob caps are a readable pixel patch rather than a few pixels; every
@@ -3986,7 +3997,7 @@ const crocStage = await page.evaluate(() => {
   const U = 10
   const p0 = window.__game.getState().pos
   let water = null
-  outer: for (let r = 4; r <= 45 && !water; r += 2) {
+  outer: for (let r = 6; r <= 45 && !water; r += 2) {
     for (let k = 0; k < 24; k++) {
       const ang = (k / 24) * Math.PI * 2
       const x = p0.x + Math.cos(ang) * r
@@ -4004,6 +4015,11 @@ const crocStage = await page.evaluate(() => {
   // Freeze the ambush while the croc is sampled (restored in the cleanup).
   window.__stagedCrocPrevStrike = window.__balance.crocodile.strikeRadius
   window.__balance.crocodile.strikeRadius = 0
+  // Freeze the river's downstream drift so the canoeing player (and the
+  // camera that follows him) stands STILL through every sample — the swept
+  // canoe used to drift into the body rect and false-fail the hidden read.
+  window.__stagedCrocPrevDrift = window.__balance.currentDrift
+  window.__balance.currentDrift = 0
   window.__stagedCrocBackup = { crocodile: herds.crocodile.splice(0), flamingo: herds.flamingo.splice(0) }
   // Anchor at the visibly DRAWN sheet (point 274): sheetAt, never the canoe
   // float height surfaceAt — its local-bed floor can stand ~0.22 proud of the
@@ -4059,6 +4075,10 @@ const crocClips = (live) => page.evaluate((liveIn) => {
   // the surface (their crisp cap), a touch wider than the ±0.095·scale knob span.
   const eyeClip = clipFor(cx, cz + 0.55 * SCALE, 0.24 * SCALE, 0.14 * SCALE, [cy + 0.03 * SCALE], 2)
   const ndc = window.__camera.ndc(cx, cz, cy)
+  // The player's spot proves the canoe sat clear of the rects: with the drift
+  // frozen he stands still, so dist > 4 keeps the ~2.5-unit canoe reach out of
+  // the ~1.35-unit body-rect reach with margin.
+  const pp = window.__game.getState().pos
   return {
     bodyClip, eyeClip,
     croc: {
@@ -4066,6 +4086,7 @@ const crocClips = (live) => page.evaluate((liveIn) => {
       ndc: { x: +ndc.x.toFixed(3), y: +ndc.y.toFixed(3) },
       lunging: c ? c.lunge !== undefined : null,
     },
+    player: { x: +pp.x.toFixed(2), z: +pp.z.toFixed(2), dist: +Math.hypot(pp.x - cx, pp.z - cz).toFixed(2) },
   }
 }, live)
 // (2) Zoom to the closest achievable level that keeps both rects on screen.
@@ -4152,6 +4173,10 @@ if (
     // lunging (the frozen strikeRadius) and at its staged spot — else the
     // rects, live-derived or not, would compare different water.
     notLunged: hiddenClips.croc.lunging === false,
+    // The canoeing player (drift-frozen) stood clear of the body rect: the
+    // sampled pixels were water over the submerged croc, never the boat.
+    player: hiddenClips.player,
+    playerClear: hiddenClips.player.dist > 4,
     waterMean: waterMean.map((v) => +v.toFixed(1)),
     bodyHidden: bodyHidden.mean.map((v) => +v.toFixed(1)), bodyStrike: bodyStrike.mean.map((v) => +v.toFixed(1)),
     bodyDiff: +bodyDiff.toFixed(1), strikeDiff: +strikeDiff.toFixed(1),
@@ -4169,9 +4194,11 @@ if (crocStage.staged) {
     herds.crocodile.push(...bk.crocodile)
     herds.flamingo.push(...bk.flamingo)
     if (window.__stagedCrocPrevStrike !== undefined) window.__balance.crocodile.strikeRadius = window.__stagedCrocPrevStrike
+    if (window.__stagedCrocPrevDrift !== undefined) window.__balance.currentDrift = window.__stagedCrocPrevDrift
     delete window.__stagedCrocBackup
     delete window.__stagedCrocPos
     delete window.__stagedCrocPrevStrike
+    delete window.__stagedCrocPrevDrift
   })
 }
 check(
@@ -4179,6 +4206,8 @@ check(
   crocHiddenResult.staged &&
     // the staging held: the croc lay still (no auto-lunge) under the sampled rects
     crocHiddenResult.notLunged === true &&
+    // and the drift-frozen player's canoe stood provably clear of the body rect
+    crocHiddenResult.playerClear === true &&
     // (1) eye knobs present — the croc is there, not an empty frame (a false
     // pass): an absolute two-digit-ish pixel patch, clearly above the water-
     // noise floor of the same rect sampled croc-free
