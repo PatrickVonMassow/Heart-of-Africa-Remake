@@ -42,6 +42,7 @@ import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
+import { panoramaCaptureReady } from './panoramaMath'
 import {
   updateTrailPoint,
   canoeDragPose,
@@ -461,6 +462,13 @@ let chunkCacheSeed: number | null = null
 // (docs/perf-driving-hitches.md).
 const chunkLatestKey = new Map<string, string>()
 
+// Terrain chunks whose meshes are COMMITTED to the scene (the active set after
+// React flushed it). The panorama capture gates on this (panoramaCaptureReady):
+// the first travel frame after leaving a settlement runs before the chunk
+// meshes mount, and a capture that frame baked a terrainless band — the
+// point-227 grey horizon line on re-entry.
+let committedTerrainChunks: ReadonlySet<string> = new Set()
+
 // Per-frame terrain build budget (ms): the queue drains until the budget is
 // spent, at least one chunk per frame so it always progresses. A refined
 // 112-seg chunk can overshoot on its own — its build is atomic; splitting it
@@ -502,6 +510,16 @@ function TerrainChunks() {
     activeSig.current = ''
     setActive([])
   }, [seed])
+
+  // Publish the committed chunk set AFTER the React flush (effects run
+  // post-commit): the panorama-capture gate must see exactly the chunks whose
+  // meshes the scene actually draws, never the mid-frame planned set.
+  useEffect(() => {
+    committedTerrainChunks = new Set(active.map((key) => key.slice(0, key.indexOf(':'))))
+    return () => {
+      committedTerrainChunks = new Set()
+    }
+  }, [active])
 
   useFrame(() => {
     const t0 = performance.now()
@@ -1609,6 +1627,12 @@ function PanoramaCaptureTrigger() {
       const w = latLonToWorld(p.lat, p.lon)
       if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) > ring) continue
       if (hasPanoramaCapture(p.id, s.seed)) return
+      // Point 227: never capture before the terrain around the capture point
+      // is committed — a band shot on the first frame after leaving (or right
+      // after a teleport) has no chunk meshes yet and bakes a terrainless
+      // horizon (a grey line over water sheets). Retry on a later frame; the
+      // traveller is still inside the ring when the chunks land.
+      if (!panoramaCaptureReady(committedTerrainChunks, w.x, w.z, CHUNK_SIZE)) return
       const h = Math.max(0, sampleTerrain(p.lat, p.lon, s.seed).height)
       // DEV probe (point 90 verification): a loud magenta pillar injected at
       // a known offset for exactly this capture — the place scene then

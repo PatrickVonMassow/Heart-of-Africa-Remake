@@ -376,6 +376,41 @@ if (mosque) {
   })
   check('leaving after several settlement visits stays fluid (point 96)', leaveMs < 3000, `${leaveMs} ms`)
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 15000 })
+  // Point 227: the LEAVE capture (the traveller stands inside his own place's
+  // approach ring on the first travel frames) must contain the surrounding
+  // TERRAIN. It used to fire before the streamed chunk meshes mounted and
+  // baked a terrainless band — only water sheets and landmarks — which a
+  // re-entry then drew as a hard grey horizon line over the backdrop. The
+  // capture is now gated on the committed chunk set, so the band's bottom
+  // quarter (near ground at an inland village) must be opaque ground.
+  {
+    await page.waitForFunction(() => window.__placePanorama?.placeId === 'maasai-village', null, { timeout: 45000 }).catch(() => {})
+    const leaveBand = await page.evaluate(async () => {
+      if (window.__placePanorama?.placeId !== 'maasai-village' || !window.__panoCaptureForDump) return null
+      const url = await window.__panoCaptureForDump()
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = url
+      })
+      const cnv = document.createElement('canvas')
+      cnv.width = img.width
+      cnv.height = img.height
+      const ctx = cnv.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+      const data = ctx.getImageData(0, Math.floor(img.height * 0.75), img.width, Math.floor(img.height * 0.25)).data
+      let opaque = 0
+      const total = data.length / 4
+      for (let i = 0; i < total; i++) if (data[i * 4 + 3] > 200) opaque++
+      return { frac: opaque / total }
+    })
+    check(
+      'the leave capture bakes the surrounding terrain into the band (point 227)',
+      !!leaveBand && leaveBand.frac > 0.7,
+      leaveBand ? `bottom-quarter opaque ${leaveBand.frac.toFixed(3)}` : 'no maasai capture',
+    )
+  }
   // Compass probe (point 90): a magenta pillar is injected due WEST of the
   // capture point for exactly this capture — seed-independent orientation
   // proof (real water shifts with each seed's dune cover).

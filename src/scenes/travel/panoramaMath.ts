@@ -60,3 +60,29 @@ export const SECTOR_COMPASS = ['N', 'W', 'S', 'E'] as const
 export function bandHeightAt(radius: number): number {
   return 2 * radius * Math.tan(((BAND_V_FOV_DEG / 2) * Math.PI) / 180)
 }
+
+/** Terrain-chunk grid id `cx,cz` for a world point (the travel chunk grid). */
+export function chunkIdAt(x: number, z: number, chunkSize: number): string {
+  return `${Math.floor(x / chunkSize)},${Math.floor(z / chunkSize)}`
+}
+
+/**
+ * Gate for the settlement panorama capture (point 227): the band may only be
+ * captured once the terrain chunk under the capture point is COMMITTED to the
+ * scene (its mesh mounted). The first travel frame after leaving a settlement
+ * runs before the streamed chunk meshes mount — their set is React state,
+ * flushed only after that frame — so a capture on that frame baked a
+ * TERRAINLESS band (only the water sheets, landmarks and markers). Re-entering
+ * the same settlement then drew that junk band over the backdrop: a hard grey
+ * horizon line with a thin blue-grey water band below it, with the §2.5
+ * silhouettes gliding along it. The trigger simply retries on a later frame;
+ * the traveller is still inside the approach ring when the chunks land.
+ */
+export function panoramaCaptureReady(
+  committedChunks: ReadonlySet<string>,
+  x: number,
+  z: number,
+  chunkSize: number,
+): boolean {
+  return committedChunks.has(chunkIdAt(x, z, chunkSize))
+}
