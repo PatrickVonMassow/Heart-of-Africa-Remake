@@ -23,7 +23,10 @@ import { devAssert } from '../../systems/devAssert'
 import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
-import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
+// Behaviour queries only need height/elevation/type — the light sampler skips
+// the colour/splat maths (framerate lever N1). The terrain RENDER path keeps
+// the full sampleTerrain; nothing in this module reads colour or splat.
+import { RIVER_WIDTH_DEG, sampleTerrainHeightType as sampleTerrain } from '../../world/terrain'
 import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
@@ -104,6 +107,11 @@ import {
   offscreenRingSpawn,
   keepStreamedAnimal,
   waterStruggleFate,
+  behaviorLodExempt,
+  behaviorLodOffset,
+  behaviorTickDue,
+  BEHAVIOR_LOD_MAX_STEP,
+  BEHAVIOR_LOD_NEAR_FACTOR,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
@@ -339,6 +347,21 @@ interface Animal {
    *  weapon — the parent rears and strikes out at the departing predator,
    *  then settles. The field keeps its 124 name. */
   kick?: number
+  /** Behaviour LOD (framerate lever N1): true = this frame re-renders the
+   *  cached pose and skips the behaviour maths — far off-screen, no drama.
+   *  Near/on-screen animals and every drama participant keep it false. */
+  lodSkip?: boolean
+  /** Sim-seconds accumulated across skipped frames, consumed by the next
+   *  ticked behaviour step so far behaviour advances at the same average
+   *  rate as unthrottled (no slow-motion off-screen herds). */
+  lodPend?: number
+  /** Effective dt of this frame's ticked behaviour step (= dt + consumed
+   *  pending time, clamped like the frame dt). Equals the plain frame dt for
+   *  every near/on-screen/drama animal — their behaviour is bit-identical. */
+  lodStep?: number
+  /** Rendered pose cached on every full behaviour pass; the skipped frames
+   *  re-compose the instance matrix from it unchanged. */
+  lodPose?: { x: number; y: number; z: number; yaw: number; pitch: number }
 }
 
 /**
@@ -407,6 +430,26 @@ function dramaStateOf(a: Animal, isHunted: boolean): DramaState {
     isLionVictim: a === LION_STATE.victim,
     isHunted,
   }
+}
+
+/** A child of this parent is in peril — the §19.8 rescue/defence drives key on
+ *  it, so the parent is drama-exempt from the behaviour LOD (invariant I4). */
+function childInPeril(a: Animal): boolean {
+  const c = a.child
+  return (
+    c !== undefined && !c.dead &&
+    (c.caught !== undefined || c.inWater !== undefined || c.mired !== undefined ||
+      c.fireTrapped !== undefined || c === LION_STATE.victim)
+  )
+}
+
+/** Allocation-free in-loop drama re-check for the behaviour LOD (framerate
+ *  lever N1): the pre-pass decision was taken at frame start, but a drama can
+ *  START later in the same frame (a fresh crocodile grip, a fire trap) — such
+ *  an animal must render live at once, never a frame stale. One source of
+ *  truth: the shared behaviorLodExempt flag list. */
+function inActiveDrama(a: Animal): boolean {
+  return behaviorLodExempt(a, childInPeril(a), a === LION_STATE.victim, false)
 }
 
 /** Pointer to the herds of the mounted <Herds>, so <LionHunt> can pick a nearby
@@ -1766,6 +1809,64 @@ function Herds() {
       }
     }
 
+    // Behaviour LOD (framerate lever N1): decide per animal whether the FULL
+    // behaviour update runs this frame. Near/on-screen animals and every
+    // §19.8/§19.16 drama participant tick every frame with lodStep === dt —
+    // their behaviour is bit-identical to unthrottled, so the picture cannot
+    // change. A far, free-roaming animal ticks only on its round-robin frame
+    // (re-rendering its cached pose in between) and its next step consumes the
+    // skipped sim-time, so off-screen behaviour advances at the same average
+    // rate. Membership is judged by BOTH the zoom-scaled near ring AND the
+    // frame projection (the point-172 lesson: never a radius alone).
+    {
+      const nearR = viewR * BEHAVIOR_LOD_NEAR_FACTOR
+      const frame = frameCountRef.current
+      const lionOn = LION_STATE.mode !== 'idle'
+      // Animals REFERENCED by a drama that has not (yet) set a flag on them:
+      // the scripted hunt's victim, a crocodile's staged lunge victim, the
+      // grass-fire pair. Membership exempts them (invariant I4).
+      const dramaTargets = new Set<Animal>()
+      if (LION_STATE.victim) dramaTargets.add(LION_STATE.victim)
+      if (FIRE_STATE.victim) dramaTargets.add(FIRE_STATE.victim)
+      if (FIRE_STATE.keeper) dramaTargets.add(FIRE_STATE.keeper)
+      for (const c of herds.crocodile) if (c.lunge && c.lunge.victim) dramaTargets.add(c.lunge.victim)
+      for (const sp of SPECIES) {
+        // The crocodile is pure ambush drama and rare — never throttled.
+        const alwaysTick = sp === 'crocodile'
+        for (const a of herds[sp]) {
+          if (a.dead) {
+            // Carcasses run no behaviour maths — the dead render branch is
+            // cheap and dissolve is driven by the scavengers; never throttle.
+            a.lodSkip = false
+            a.lodStep = dt
+            a.lodPend = 0
+            continue
+          }
+          const pend = (a.lodPend ?? 0) + dt
+          const exempt =
+            alwaysTick ||
+            behaviorLodExempt(
+              a,
+              childInPeril(a) || (a.child !== undefined && dramaTargets.has(a.child)),
+              dramaTargets.has(a),
+              lionOn && Math.hypot(a.x - LION_STATE.lx, a.z - LION_STATE.lz) < FLEE_RADIUS * 1.5,
+            )
+          const near =
+            exempt ||
+            Math.hypot(a.x - pos.x, a.z - pos.z) <= nearR ||
+            isOnScreen(a.x, a.z)
+          if (behaviorTickDue(near, exempt, frame, behaviorLodOffset(a.phase))) {
+            a.lodSkip = false
+            a.lodStep = Math.min(pend, BEHAVIOR_LOD_MAX_STEP)
+            a.lodPend = 0
+          } else {
+            a.lodSkip = true
+            a.lodPend = pend
+          }
+        }
+      }
+    }
+
     // Frame-start positions for the elephant body collider (design.md §19.5,
     // point 261): every non-elephant animal's step this frame is later swept
     // against the elephants' bodies so it slides AROUND them rather than through.
@@ -2300,6 +2401,11 @@ function Herds() {
       for (const sp of SPECIES) {
         for (const a of herds[sp]) {
           if (inDrama(a)) continue
+          // Behaviour LOD (framerate lever N1): a far off-screen animal computes
+          // its separation push only on its ticked frames. It stays IN the grid
+          // above, so near neighbours still part from it every frame; its own
+          // half of an overlap resolves on its tick.
+          if (a.lodSkip === true) continue
           const ra = BODY_RADIUS[sp] * a.scale
           const gx = Math.floor(a.x / SEPARATION_CELL)
           const gz = Math.floor(a.z / SEPARATION_CELL)
@@ -2344,7 +2450,7 @@ function Herds() {
             // bunch (dodging an elephant, playing calves). As a bounded
             // force the pair still parts within moments, just smoothly.
             const m = Math.hypot(dx, dz)
-            const cap = SEPARATION_MAX_SPEED * dt
+            const cap = SEPARATION_MAX_SPEED * (a.lodStep ?? dt) // LOD: ticked step consumes the skipped time
             const k = m > cap ? cap / m : 1
             a.x += dx * k
             a.z += dz * k
@@ -2969,6 +3075,18 @@ function Herds() {
         if (a.heading === undefined) a.heading = a.rot
         const info = a.herd !== undefined ? herdCentre.get(a.herd) : undefined
         const mournInfo = a.herd !== undefined ? herdState.current.get(a.herd)?.mourn : undefined
+        // Behaviour LOD (framerate lever N1): a far off-screen elephant holds
+        // its position on skipped frames — its slot still feeds elephantPos/
+        // elephantVel/elephantVelMap so the trample, repulsion and collider
+        // arrays stay aligned — and walks its accumulated step on the ticked
+        // frame. A mourning herd's members always tick (the §19.8 vigil).
+        if (a.lodSkip === true && mournInfo === undefined) {
+          elephantPos.push([a.x, a.z])
+          elephantVel.push([0, 0])
+          elephantVelMap.set(a, [0, 0])
+          continue
+        }
+        const edt = a.lodStep ?? dt
         // Follow the herd heading; steer back toward the centre if drifting off.
         let desired = a.heading
         let mournHold = false
@@ -3011,7 +3129,7 @@ function Herds() {
             const bll = worldToLatLon(bx, bz)
             return !elephantStepAllowed(sampleTerrain(bll.lat, bll.lon, seed).type, mournInfo !== undefined, standT)
           }
-          const def = deflectedStep(a.x, a.z, a.heading, ELEPHANT_SPEED * dt, blockedStep, 6)
+          const def = deflectedStep(a.x, a.z, a.heading, ELEPHANT_SPEED * edt, blockedStep, 6)
           if (def.moved) {
             desired = def.heading
           } else {
@@ -3027,12 +3145,12 @@ function Herds() {
         while (dh > Math.PI) dh -= Math.PI * 2
         while (dh < -Math.PI) dh += Math.PI * 2
         // Gentle arc only — clamp the per-frame turn (never a sharp turn).
-        a.heading += Math.max(-ELEPHANT_TURN * dt, Math.min(ELEPHANT_TURN * dt, dh))
+        a.heading += Math.max(-ELEPHANT_TURN * edt, Math.min(ELEPHANT_TURN * edt, dh))
         // An arrived mourner stands at the bones (point 126) — no step, only
         // the soft turn above; the vigil's deadline moves it on again.
         if (!mournHold) {
-          const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * dt
-          const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * dt
+          const nx = a.x + Math.sin(a.heading) * ELEPHANT_SPEED * edt
+          const nz = a.z + Math.cos(a.heading) * ELEPHANT_SPEED * edt
           const ll = worldToLatLon(nx, nz)
           const ter = sampleTerrain(ll.lat, ll.lon, seed)
           if (elephantStepAllowed(ter.type, mournInfo !== undefined, standT)) {
@@ -3078,6 +3196,10 @@ function Herds() {
           if (sp === 'elephant') continue
           for (const a of herds[sp]) {
             if (a.dead) continue
+            // Behaviour LOD (framerate lever N1): a skipped animal made no step
+            // this frame (behaviour, separation and its drama-free status all
+            // gated), so there is nothing to sweep; drama animals re-check live.
+            if (a.lodSkip === true && !inActiveDrama(a)) continue
             const from = stepFrom.get(a)
             if (from === undefined) continue
             let nx = a.x
@@ -3254,6 +3376,32 @@ function Herds() {
           write(a)
           continue
         }
+        // Behaviour LOD (framerate lever N1): a far off-screen animal outside
+        // every drama re-renders its cached pose on the skipped frames — the
+        // instance stays drawn (same counts, same slot routing), only the
+        // per-animal decision maths (drink slide, family branches, flee/dodge
+        // arbitration, terrain probes) is skipped. Elephants are excluded:
+        // their render slot must consume elephantPos every frame (the
+        // throttle for them lives in the movement loop above). inActiveDrama
+        // re-checks live so a drama STARTED later in this same frame (a fresh
+        // crocodile grip, a fire trap) never renders a frame stale.
+        if (a.lodSkip === true && a.lodPose !== undefined && sp !== 'elephant' && !inActiveDrama(a)) {
+          const lp = a.lodPose
+          vpos.set(lp.x, lp.y, lp.z)
+          if (lp.pitch !== 0) {
+            euler.set(lp.pitch, lp.yaw, 0, 'YXZ')
+            quat.setFromEuler(euler)
+          } else {
+            quat.setFromAxisAngle(up, lp.yaw)
+          }
+          vscl.setScalar(a.scale)
+          mtx.compose(vpos, quat, vscl)
+          write(a)
+          continue
+        }
+        // The per-animal behaviour step: dt plus any skipped sim-time. Equals
+        // the plain frame dt for every near/on-screen/drama animal.
+        const adt = a.lodStep ?? dt
         const wob = Math.sin(t * 0.25 + a.phase)
         let px: number
         let pz: number
@@ -3394,15 +3542,15 @@ function Herds() {
             // speed, chest-deep ON the rendered surface; landing — or the
             // resolve deadline (invariant I4) — ends it.
             const c = a.crossing
-            c.time += dt
+            c.time += adt
             const cdx = c.tx - a.x
             const cdz = c.tz - a.z
             const cd = Math.hypot(cdx, cdz)
             const bw2 = balance.waterDrama
             const swim = wadeSpeed(CROSS_SWIM_SPEED, seasonFlowFactor(CURRENT_WEATHER.wetness, bw2.dryFlowFactor, bw2.wetFlowFactor))
             if (cd > 0.05) {
-              a.x += (cdx / cd) * Math.min(cd, swim * dt)
-              a.z += (cdz / cd) * Math.min(cd, swim * dt)
+              a.x += (cdx / cd) * Math.min(cd, swim * adt)
+              a.z += (cdz / cd) * Math.min(cd, swim * adt)
             }
             const cll2 = worldToLatLon(a.x, a.z)
             const ct2 = sampleTerrain(cll2.lat, cll2.lon, seed)
@@ -3513,8 +3661,8 @@ function Herds() {
             const dzm = a.child.z - a.z
             const dm = Math.hypot(dxm, dzm)
             if (dm > 1.6) {
-              a.x += (dxm / dm) * YOUNG_FOLLOW_SPEED * dt
-              a.z += (dzm / dm) * YOUNG_FOLLOW_SPEED * dt
+              a.x += (dxm / dm) * YOUNG_FOLLOW_SPEED * adt
+              a.z += (dzm / dm) * YOUNG_FOLLOW_SPEED * adt
               { // ground-follow (point 203(A))
                 const gfl = worldToLatLon(a.x, a.z)
                 const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
@@ -3641,8 +3789,8 @@ function Herds() {
               a.dodgeHeading =
                 a.dodgeHeading === undefined
                   ? shyPick.heading
-                  : turnToward(a.dodgeHeading, shyPick.heading, PREY_DODGE_TURN * dt)
-              const shyStep = deflectedStep(a.x, a.z, a.dodgeHeading, PLAYER_SHY_SPEED * dt, waterBlockedAt, 0.8)
+                  : turnToward(a.dodgeHeading, shyPick.heading, PREY_DODGE_TURN * adt)
+              const shyStep = deflectedStep(a.x, a.z, a.dodgeHeading, PLAYER_SHY_SPEED * adt, waterBlockedAt, 0.8)
               // Boxed against the water by the approaching traveller (point
               // 248): cross the river/lake like the predator-fleeing prey
               // does (point 192) instead of pinning at the waterline. The
@@ -3714,8 +3862,8 @@ function Herds() {
                 const [sx, sz] = leashedGambolDir(heading, toX, toZ, d, GAMBOL_RANGE)
                 const beforeX = a.x
                 const beforeZ = a.z
-                a.x += sx * GAMBOL_SPEED * dt
-                a.z += sz * GAMBOL_SPEED * dt
+                a.x += sx * GAMBOL_SPEED * adt
+                a.z += sz * GAMBOL_SPEED * adt
                 const llp = worldToLatLon(a.x, a.z)
                 const terp = sampleTerrain(llp.lat, llp.lon, seed)
                 if (terp.type === 'water') {
@@ -3742,8 +3890,8 @@ function Herds() {
               } else if (d > YOUNG_FOLLOW_RADIUS) {
                 a.hop = undefined
                 a.boutDetour = undefined
-                a.x += (toX / d) * YOUNG_FOLLOW_SPEED * dt
-                a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * dt
+                a.x += (toX / d) * YOUNG_FOLLOW_SPEED * adt
+                a.z += (toZ / d) * YOUNG_FOLLOW_SPEED * adt
                 { // ground-follow (point 203(A)) — THE main calf mover: every
                   // background calf tails its drifting parent through this step,
                   // and without the height update they sank into every slope
@@ -3787,8 +3935,8 @@ function Herds() {
             if (eng.engaged) {
               const h = blockHeading(a.x, a.z, calf.x, calf.z, LION_STATE.lx, LION_STATE.lz, GUARD_STANDOFF)
               if (h !== null) {
-                a.x += Math.sin(h) * RESCUE_SPEED * dt
-                a.z += Math.cos(h) * RESCUE_SPEED * dt
+                a.x += Math.sin(h) * RESCUE_SPEED * adt
+                a.z += Math.cos(h) * RESCUE_SPEED * adt
                 { // ground-follow (point 203(A)): a mover carries its own standing height
                   const gfl = worldToLatLon(a.x, a.z)
                   const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
@@ -3832,7 +3980,7 @@ function Herds() {
             // the walk-on resolves it). Point 192 will later allow choosing the
             // water on purpose — this only swaps the blocked predicate then.
             const fleeH = Math.atan2(dx, dz)
-            const fleeStep = deflectedStep(a.x, a.z, fleeH, FLEE_SPEED * urgency * dt, waterBlockedAt, 0.8)
+            const fleeStep = deflectedStep(a.x, a.z, fleeH, FLEE_SPEED * urgency * adt, waterBlockedAt, 0.8)
             // Boxed against the water with the predator behind (point 192):
             // flee INTO the water — predators do not follow into the deep.
             // Shared fleeCrossing rule (river/lake only, never the ocean).
@@ -3927,7 +4075,7 @@ function Herds() {
               ? committedFleeHeading(a.dodgeHeading, pick.heading, FLEE_COMMIT_MARGIN)
               : pick.heading
             a.dodgeHeading =
-              a.dodgeHeading === undefined ? pick.heading : turnToward(a.dodgeHeading, fleeTarget, PREY_DODGE_TURN * dt)
+              a.dodgeHeading === undefined ? pick.heading : turnToward(a.dodgeHeading, fleeTarget, PREY_DODGE_TURN * adt)
             // The elephant dart stays deliberately slower than the herd (the
             // trample must remain possible); a pure player flight runs.
             const spd = pick.source === 'elephant' ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
@@ -3940,7 +4088,7 @@ function Herds() {
               a.x,
               a.z,
               a.dodgeHeading,
-              spd * dt,
+              spd * adt,
               sp === 'flamingo' ? oceanBlockedAt : waterBlockedAt,
               0.8,
             )
@@ -3984,9 +4132,9 @@ function Herds() {
           // Birds fly off (design.md §19): the climb ramps while the shy
           // flight is engaged and settles once it ends — blended, never a pop.
           if (sp === 'flamingo') {
-            if (pick !== null) a.flyLift = Math.min(1, (a.flyLift ?? 0) + dt * 1.5)
+            if (pick !== null) a.flyLift = Math.min(1, (a.flyLift ?? 0) + adt * 1.5)
             else if (a.flyLift !== undefined) {
-              a.flyLift -= dt * 0.8
+              a.flyLift -= adt * 0.8
               if (a.flyLift <= 0) a.flyLift = undefined
             }
             if (a.flyLift !== undefined) bodyY += a.flyLift * BIRD_FLY_LIFT
@@ -4003,7 +4151,7 @@ function Herds() {
         // the amplitude fades between the behaviours' targets over ~0.4 s).
         if (sp !== 'elephant') {
           const cur = a.wobAmp ?? wobTarget
-          const amp = cur + (wobTarget - cur) * Math.min(1, dt * 2.5)
+          const amp = cur + (wobTarget - cur) * Math.min(1, adt * 2.5)
           a.wobAmp = amp
           px += wob * amp
           pz += Math.cos(t * 0.2 + a.phase) * amp
@@ -4068,7 +4216,7 @@ function Herds() {
           (a.caught !== undefined && a.caught > 0) ||
           (a.inWater !== undefined && !a.rescued) ||
           a.mired !== undefined
-        const face = thrashing ? yaw : turnToward(a.face ?? yaw, yaw, FACE_TURN * dt)
+        const face = thrashing ? yaw : turnToward(a.face ?? yaw, yaw, FACE_TURN * adt)
         a.face = face
         if (sp !== 'elephant' && !thrashing && yaw !== idleYaw) a.rot = face
         vpos.set(px, bodyY, pz)
@@ -4126,6 +4274,17 @@ function Herds() {
             )
             devAssert(!(persistent && floating), 'animal-floating', () => `${sp} bodyY=${bodyY.toFixed(2)} ground=${ground.toFixed(2)}`)
           }
+        }
+        // Behaviour LOD (framerate lever N1): remember the rendered pose so a
+        // skipped frame re-renders it unchanged. Elephants never take the
+        // cached-pose path (their render slot is consumed above), so no cache.
+        if (sp !== 'elephant') {
+          const lp = a.lodPose ?? (a.lodPose = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 })
+          lp.x = px
+          lp.y = bodyY
+          lp.z = pz
+          lp.yaw = face
+          lp.pitch = pitch
         }
         write(a)
       }

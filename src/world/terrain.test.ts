@@ -10,8 +10,9 @@
 // smooth sampler plus only the bounded C1 micro-relief noise — never a
 // re-quantized height.
 import { describe, it, expect, beforeAll } from 'vitest'
-import { sampleTerrain } from './terrain'
+import { sampleTerrain, sampleTerrainHeightType } from './terrain'
 import { elevationAt, getDemMeta, getDemPixels } from './geodata'
+import { PLACES } from './geo'
 import { setupGeodata } from '../test/geodata'
 
 const SEED = 42
@@ -140,4 +141,60 @@ describe('sampleTerrain reads the smooth sampler (no re-quantized mountain heigh
       }
     })
   }
+})
+
+describe('sampleTerrainHeightType (framerate lever N1) matches the full sampler exactly', () => {
+  // The light path shares the full sampler's core with only the colour/splat
+  // arithmetic gated off — height, elevation and type must be BIT-identical.
+  // Swept over every place (all ports and villages) and a continent-wide grid
+  // that crosses ocean, coast, desert, savanna, jungle, mountain and carved
+  // river/lake water.
+  it('every settlement coordinate agrees on height, elevation and type', () => {
+    for (const p of PLACES) {
+      const full = sampleTerrain(p.lat, p.lon, SEED)
+      const light = sampleTerrainHeightType(p.lat, p.lon, SEED)
+      expect(light.height).toBe(full.height)
+      expect(light.elevation).toBe(full.elevation)
+      expect(light.type).toBe(full.type)
+    }
+  })
+
+  it('a continent-wide grid agrees on height, elevation and type — every terrain type covered', () => {
+    const seen = new Set<string>()
+    for (let lat = -36; lat <= 36; lat += 2.4) {
+      for (let lon = -19; lon <= 52; lon += 2.7) {
+        const full = sampleTerrain(lat, lon, SEED)
+        const light = sampleTerrainHeightType(lat, lon, SEED)
+        expect(light.height).toBe(full.height)
+        expect(light.elevation).toBe(full.elevation)
+        expect(light.type).toBe(full.type)
+        seen.add(full.type)
+      }
+    }
+    // The sweep genuinely exercised the branchy land path, not just open sea.
+    for (const ty of ['ocean', 'desert', 'savanna', 'jungle', 'mountain']) {
+      expect(seen.has(ty)).toBe(true)
+    }
+  })
+
+  it('carved river water and the coast band agree too (the type-mutating branches)', () => {
+    // Nile at Aswan (river carve → water) and the delta coast (coast band).
+    const spots = [
+      { lat: 24.09, lon: 32.9 }, // Nile channel
+      { lat: 31.4, lon: 30.4 }, // Mediterranean delta coast
+      { lat: -0.5, lon: 33.0 }, // Lake Victoria (lake carve)
+      { lat: -3.07, lon: 37.35 }, // Kilimanjaro (ice massif, mountain)
+    ]
+    for (const p of spots) {
+      for (let dLat = -0.3; dLat <= 0.3; dLat += 0.06) {
+        for (let dLon = -0.3; dLon <= 0.3; dLon += 0.06) {
+          const full = sampleTerrain(p.lat + dLat, p.lon + dLon, SEED)
+          const light = sampleTerrainHeightType(p.lat + dLat, p.lon + dLon, SEED)
+          expect(light.height).toBe(full.height)
+          expect(light.elevation).toBe(full.elevation)
+          expect(light.type).toBe(full.type)
+        }
+      }
+    }
+  })
 })

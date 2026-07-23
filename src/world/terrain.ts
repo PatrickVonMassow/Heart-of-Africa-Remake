@@ -40,6 +40,15 @@ export interface TerrainSample {
   splat: SplatWeights
 }
 
+/** The geometry/gameplay subset of a terrain sample (framerate lever N1): what
+ *  the wildlife behaviour probes (drink/bank/ground-follow/step checks) read.
+ *  Served by `sampleTerrainHeightType`, which skips the colour/splat maths. */
+export interface TerrainHeightType {
+  height: number
+  elevation: number
+  type: TerrainType
+}
+
 /** River half-width in degrees for terrain carving. */
 import { RIVER_WIDTH_DEG } from './riverWidth'
 export { RIVER_WIDTH_DEG }
@@ -209,7 +218,7 @@ function lakeBasinLevel(li: number, seed: number): number {
     const olat = plat + (dy / n) * 0.5
     const olon = plon + (dx / n) * 0.5
     if (lakeIndexAt(olat, olon) >= 0) continue // still inside a lake — skip
-    lo = Math.min(lo, sampleTerrain(olat, olon, seed).height)
+    lo = Math.min(lo, sampleTerrainCore(olat, olon, seed, false).height) // height-only (same field, framerate lever N1)
   }
   if (!Number.isFinite(lo)) lo = 0.3 // degenerate polygon: a safe lowland level
   basinLevelCache.set(key, lo)
@@ -217,6 +226,26 @@ function lakeBasinLevel(li: number, seed: number): number {
 }
 
 export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSample {
+  return sampleTerrainCore(lat, lon, seed, true)
+}
+
+/**
+ * Height/elevation/type-only terrain sample (framerate lever N1): identical to
+ * `sampleTerrain` for those three fields BY CONSTRUCTION (one shared core, the
+ * colour/splat/region-weight arithmetic gated off), for the wildlife behaviour
+ * probes that never read colour or splat. The render path keeps the full
+ * `sampleTerrain`. Equality is pinned in `src/world/terrain.test.ts`.
+ */
+export function sampleTerrainHeightType(lat: number, lon: number, seed: number): TerrainHeightType {
+  return sampleTerrainCore(lat, lon, seed, false)
+}
+
+// Placeholder colour/splat of the light path (never read by its callers — the
+// TerrainHeightType return type does not expose them).
+const LIGHT_COLOR: [number, number, number] = [0, 0, 0]
+const LIGHT_SPLAT: SplatWeights = [1, 0, 0, 0]
+
+function sampleTerrainCore(lat: number, lon: number, seed: number, full: boolean): TerrainSample {
   let land = landFractionAt(lat, lon)
   // point 209: the bilinear BINARY land mask crosses 0.5 only along the DEM
   // texel grid, so the sea coast staircased at close zoom. Near the coast,
@@ -303,6 +332,7 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
 
   if (land < 0.5) {
     const height = Math.min(-0.02, hOcean + (hLandBase - hOcean) * shoreT)
+    if (!full) return { height, elevation, type: 'ocean', color: LIGHT_COLOR, splat: LIGHT_SPLAT }
     // Depth-driven color following the continuous height field. It converges
     // quickly to one deep tone, so coarse far-LOD triangles show no banding;
     // the animated water plane above provides the visible ocean surface.
@@ -359,71 +389,78 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     type = 'savanna'
   }
 
-  // Soft region weights: the same boundaries as regionAt (geo.ts), but with
-  // smoothstep transitions of ~2-3 degrees, so neither color nor texture
-  // shows hard bands at region borders. The discrete `type` above keeps
-  // driving gameplay and vegetation.
-  const wNorth = Math.max(
-    sstep(15.5, 18.5, wlat),
-    Math.min(sstep(13.2, 15.5, wlat), sstep(23, 26.5, wlon)),
-  )
-  const wSouth = 1 - sstep(-13.5, -10.5, wlat)
-  const wEast = Math.min(sstep(30, 33, wlon), 1 - wNorth, 1 - wSouth)
-  const wCentral = Math.min(sstep(10.5, 13.5, wlon), 1 - sstep(6.2, 8.8, wlat), 1 - wEast, 1 - wNorth, 1 - wSouth)
-  const wWest = Math.max(0, 1 - wNorth - wSouth - wEast - wCentral)
+  // Colour and splat are display-only — the light path (framerate lever N1)
+  // skips this whole arithmetic block; every height/type computation below
+  // stays OUTSIDE the `full` gates so both paths agree by construction.
+  let color: [number, number, number] = LIGHT_COLOR
+  let splat: SplatWeights = LIGHT_SPLAT
+  if (full) {
+    // Soft region weights: the same boundaries as regionAt (geo.ts), but with
+    // smoothstep transitions of ~2-3 degrees, so neither color nor texture
+    // shows hard bands at region borders. The discrete `type` above keeps
+    // driving gameplay and vegetation.
+    const wNorth = Math.max(
+      sstep(15.5, 18.5, wlat),
+      Math.min(sstep(13.2, 15.5, wlat), sstep(23, 26.5, wlon)),
+    )
+    const wSouth = 1 - sstep(-13.5, -10.5, wlat)
+    const wEast = Math.min(sstep(30, 33, wlon), 1 - wNorth, 1 - wSouth)
+    const wCentral = Math.min(sstep(10.5, 13.5, wlon), 1 - sstep(6.2, 8.8, wlat), 1 - wEast, 1 - wNorth, 1 - wSouth)
+    const wWest = Math.max(0, 1 - wNorth - wSouth - wEast - wCentral)
 
-  // Per-region ground colors (before relief/river/coast overlays).
-  const colDesert = biomeColor('desert', detail)
-  const colSavanna = biomeColor('savanna', detail)
-  const colJungle = biomeColor('jungle', detail)
-  const colMountain = biomeColor('mountain', detail)
-  const colWest =
-    wlat < 8 && wlon < 2 ? mix(colSavanna, colJungle, sstep(0.28, 0.45, n)) : colSavanna
-  const colEast = mix(colSavanna, colMountain, Math.max(mountainT, sstep(0.5, 0.68, n) * 0.6))
-  // Namib/Kalahari strip toward the west coast, softly bounded.
-  const southDesertT = Math.min(1 - sstep(17.5, 19.8, wlon), sstep(-32.5, -30, wlat))
-  const colSouth = mix(colSavanna, colDesert, southDesertT)
+    // Per-region ground colors (before relief/river/coast overlays).
+    const colDesert = biomeColor('desert', detail)
+    const colSavanna = biomeColor('savanna', detail)
+    const colJungle = biomeColor('jungle', detail)
+    const colMountain = biomeColor('mountain', detail)
+    const colWest =
+      wlat < 8 && wlon < 2 ? mix(colSavanna, colJungle, sstep(0.28, 0.45, n)) : colSavanna
+    const colEast = mix(colSavanna, colMountain, Math.max(mountainT, sstep(0.5, 0.68, n) * 0.6))
+    // Namib/Kalahari strip toward the west coast, softly bounded.
+    const southDesertT = Math.min(1 - sstep(17.5, 19.8, wlon), sstep(-32.5, -30, wlat))
+    const colSouth = mix(colSavanna, colDesert, southDesertT)
 
-  let color: [number, number, number] = [0, 0, 0]
-  const acc = (c: [number, number, number], w: number) => {
-    color[0] += c[0] * w
-    color[1] += c[1] * w
-    color[2] += c[2] * w
-  }
-  acc(colWest, wWest)
-  acc(colJungle, wCentral)
-  acc(colEast, wEast)
-  acc(colSouth, wSouth)
-  acc(colDesert, wNorth)
+    color = [0, 0, 0]
+    const acc = (c: [number, number, number], w: number) => {
+      color[0] += c[0] * w
+      color[1] += c[1] * w
+      color[2] += c[2] * w
+    }
+    acc(colWest, wWest)
+    acc(colJungle, wCentral)
+    acc(colEast, wEast)
+    acc(colSouth, wSouth)
+    acc(colDesert, wNorth)
 
-  // Real relief drives a rocky tint toward the peaks in every region.
-  color = mix(color, colMountain, mountainT)
+    // Real relief drives a rocky tint toward the peaks in every region.
+    color = mix(color, colMountain, mountainT)
 
-  // Splat weights blended with the same soft region weights.
-  const forestW = wCentral + (wlat < 8 && wlon < 2 ? wWest * sstep(0.28, 0.45, n) : 0)
-  const sandW = wNorth + wSouth * southDesertT
-  const splat: SplatWeights = [
-    sandW + 0.12,
-    Math.max(0, 1 - forestW - sandW),
-    mountainT * 2.5,
-    forestW,
-  ]
+    // Splat weights blended with the same soft region weights.
+    const forestW = wCentral + (wlat < 8 && wlon < 2 ? wWest * sstep(0.28, 0.45, n) : 0)
+    const sandW = wNorth + wSouth * southDesertT
+    splat = [
+      sandW + 0.12,
+      Math.max(0, 1 - forestW - sandW),
+      mountainT * 2.5,
+      forestW,
+    ]
 
-  // Lush banks along rivers and lakes (visual only).
-  const bankT = 1 - Math.min(1, riverD / 0.5)
-  if (bankT > 0 && type !== 'mountain') {
-    const lush = sstep(0.15, 0.9, bankT) * 0.65
-    color = mix(color, LUSH, lush)
-    splat[1] += lush * 0.8
-  }
+    // Lush banks along rivers and lakes (visual only).
+    const bankT = 1 - Math.min(1, riverD / 0.5)
+    if (bankT > 0 && type !== 'mountain') {
+      const lush = sstep(0.15, 0.9, bankT) * 0.65
+      color = mix(color, LUSH, lush)
+      splat[1] += lush * 0.8
+    }
 
-  // Permanent ice caps (point 141): massif-gated, never a bare threshold —
-  // Ras Dashen is higher than Mount Cameroon and still carries none.
-  const massif = iceMassifAt(lat, lon)
-  if (massif) {
-    const snowT = sstep(massif.lineM - 150, massif.lineM + 250, elevation)
-    if (snowT > 0) {
-      color = mix(color, SNOW, snowT)
+    // Permanent ice caps (point 141): massif-gated, never a bare threshold —
+    // Ras Dashen is higher than Mount Cameroon and still carries none.
+    const massif = iceMassifAt(lat, lon)
+    if (massif) {
+      const snowT = sstep(massif.lineM - 150, massif.lineM + 250, elevation)
+      if (snowT > 0) {
+        color = mix(color, SNOW, snowT)
+      }
     }
   }
 
@@ -434,8 +471,10 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     const t = coastD / 0.6
     if (elevation < 400) {
       height = Math.min(height, 0.04 + coastD * 1.3 + detail * 0.06)
-      color = mix(biomeColor('coast', detail), color, sstep(0.08, 0.5, t))
-      splat[0] += (1 - sstep(0.08, 0.4, t)) * 2
+      if (full) {
+        color = mix(biomeColor('coast', detail), color, sstep(0.08, 0.5, t))
+        splat[0] += (1 - sstep(0.08, 0.4, t)) * 2
+      }
       if (coastD < 0.15) type = 'coast'
     } else {
       height = height * (0.45 + 0.55 * t) // real cliffs, just softened
@@ -492,7 +531,7 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     if (pb === null) height -= carve
     else height += (pb - height) * (carve / 0.5)
   }
-  if (type === 'water') {
+  if (full && type === 'water') {
     // Sandy bank fading into water-blue with channel depth; the river/lake
     // surface meshes above add the actual water.
     const depth = sstep(0.1, 0.5, Math.max(carve, lakeDrop))
@@ -500,6 +539,7 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     splat[0] += 1.5
   }
 
+  if (!full) return { height, elevation, type, color: LIGHT_COLOR, splat: LIGHT_SPLAT }
   return { height, elevation, type, color: vary(color, shade), splat: normalizeSplat(splat) }
 }
 

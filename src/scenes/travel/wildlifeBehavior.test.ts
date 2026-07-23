@@ -77,6 +77,11 @@ import {
   keepStreamedAnimal,
   offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
+  behaviorLodExempt,
+  behaviorLodOffset,
+  behaviorTickDue,
+  BEHAVIOR_LOD_EVERY,
+  type BehaviorLodDramaView,
   deflectedStep,
   escapeCorridorHeading,
   guardEngagement,
@@ -2948,5 +2953,84 @@ describe('keepStreamedAnimal (the streaming cull judges the animal where it STAN
     const after = keepStreamedAnimal(a, liveAt(100 * 0.125 + 60), CHUNK, 0, 0, 100 * 0.125 + 60, always)
     expect(after.keep).toBe(true)
     expect(after.rehomeTo).toBe('1,0')
+  })
+})
+
+describe('behaviour LOD (framerate lever N1): far/off-screen throttle with the I4 drama exemption', () => {
+  it('a near or on-screen animal ticks on EVERY frame — the picture is never throttled', () => {
+    for (let frame = 0; frame < BEHAVIOR_LOD_EVERY * 4; frame++) {
+      for (let offset = 0; offset < BEHAVIOR_LOD_EVERY; offset++) {
+        expect(behaviorTickDue(true, false, frame, offset)).toBe(true)
+      }
+    }
+  })
+
+  it('a far, drama-free animal ticks exactly on its round-robin frame — one fixed fraction per frame', () => {
+    for (let offset = 0; offset < BEHAVIOR_LOD_EVERY; offset++) {
+      let ticks = 0
+      for (let frame = 0; frame < BEHAVIOR_LOD_EVERY * 10; frame++) {
+        const due = behaviorTickDue(false, false, frame, offset)
+        expect(due).toBe((frame + offset) % BEHAVIOR_LOD_EVERY === 0)
+        if (due) ticks++
+      }
+      expect(ticks).toBe(10) // exactly 1/N of the frames
+    }
+    // Two animals with different offsets never tick on all the same frames.
+    const framesA: number[] = []
+    const framesB: number[] = []
+    for (let frame = 0; frame < BEHAVIOR_LOD_EVERY * 3; frame++) {
+      if (behaviorTickDue(false, false, frame, 0)) framesA.push(frame)
+      if (behaviorTickDue(false, false, frame, 1)) framesB.push(frame)
+    }
+    expect(framesA).not.toEqual(framesB)
+  })
+
+  it('a far animal IN a drama ticks on every frame — swept over every drama flag (invariant I4)', () => {
+    const flagged: BehaviorLodDramaView[] = [
+      { caught: 3 },
+      { caughtBy: 'crocodile' },
+      { fireTrapped: 2 },
+      { inWater: 1 },
+      { wadeTime: 0.5 },
+      { rescued: true },
+      { mired: 0 },
+      { crossing: { tx: 1, tz: 2, time: 0 } },
+      { vigil: { x: 0, z: 0, time: 1 } },
+      { kick: 0.4 },
+      { plungeTo: { x: 1, z: 1 } },
+      { trampleTo: { x: 2, z: 2 } },
+      { grief: 10 },
+      { lunge: { victim: null } },
+      { lure: { timer: 0 } },
+    ]
+    for (const view of flagged) {
+      expect(behaviorLodExempt(view, false, false, false)).toBe(true)
+      for (let frame = 0; frame < BEHAVIOR_LOD_EVERY * 3; frame++) {
+        expect(behaviorTickDue(false, behaviorLodExempt(view, false, false, false), frame, 1)).toBe(true)
+      }
+    }
+    // The zero-valued timers count too (0 is an ACTIVE state, undefined is not).
+    expect(behaviorLodExempt({ mired: 0 }, false, false, false)).toBe(true)
+    expect(behaviorLodExempt({ kick: 0 }, false, false, false)).toBe(true)
+  })
+
+  it('a child in peril, a drama-target reference and the active-hunt ring each exempt an unflagged animal', () => {
+    expect(behaviorLodExempt({}, true, false, false)).toBe(true) // rescue/defence drives key on the child
+    expect(behaviorLodExempt({}, false, true, false)).toBe(true) // hunt victim / staged croc victim / fire pair
+    expect(behaviorLodExempt({}, false, false, true)).toBe(true) // being-hunted flee must fire the frame it closes
+    expect(behaviorLodExempt({}, false, false, false)).toBe(false) // free-roaming: throttle applies
+  })
+
+  it('the round-robin offset is stable per phase and covers the whole cycle', () => {
+    for (const phase of [0, 0.1, 0.33, 0.5, 0.66, 0.99, 1, 1.7, -0.2]) {
+      const o = behaviorLodOffset(phase)
+      expect(o).toBeGreaterThanOrEqual(0)
+      expect(o).toBeLessThan(BEHAVIOR_LOD_EVERY)
+      expect(behaviorLodOffset(phase)).toBe(o) // deterministic
+    }
+    // A uniform phase population spreads over every offset slot.
+    const slots = new Set<number>()
+    for (let p = 0; p < 1; p += 0.05) slots.add(behaviorLodOffset(p))
+    expect(slots.size).toBe(BEHAVIOR_LOD_EVERY)
   })
 })

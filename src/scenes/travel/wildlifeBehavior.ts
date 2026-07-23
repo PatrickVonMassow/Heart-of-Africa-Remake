@@ -1938,3 +1938,107 @@ export function parentAttackOutcome(
   if (roll < defendChance(prey, predator, weights)) return 'driveOff'
   return 'taken'
 }
+
+// --- Behaviour LOD (framerate lever N1) --------------------------------------
+// The travel scene runs the FULL per-animal behaviour update every frame only
+// for animals the player can SEE (projected onto the rendered frame, or inside
+// the zoom-scaled near ring) and for every drama participant. A FAR, off-screen
+// animal that no drama owns re-renders its last pose on the skipped frames and
+// takes its behaviour step only every BEHAVIOR_LOD_EVERY-th frame — with the
+// skipped frames' sim-time handed to that step, so far behaviour advances at
+// the same average rate (no slow-motion herds drifting off-screen).
+// HARD EXEMPTION (invariant I4 — every started drama resolves): an animal in
+// ANY active §19.8/§19.16 drama always updates every frame. When in doubt it
+// ticks — correctness beats the skipped maths' tiny cost.
+
+/** Far/off-screen animals take their behaviour step every Nth frame. */
+export const BEHAVIOR_LOD_EVERY = 3
+/** "Near" reaches this factor past the zoom-scaled view radius — the ring
+ *  always encloses the default frame with margin; the on-screen PROJECTION is
+ *  checked BESIDES it (the point-172 lesson: the frustum, never a radius
+ *  alone, judges what is in view). */
+export const BEHAVIOR_LOD_NEAR_FACTOR = 1.2
+/** Cap on one accumulated behaviour step — the frame loop's own dt clamp. */
+export const BEHAVIOR_LOD_MAX_STEP = 0.1
+
+/** Stable per-animal round-robin offset derived from its immutable phase
+ *  (0..1), so ~1/N of the far animals tick on any given frame instead of all
+ *  bunching onto the same one. */
+export function behaviorLodOffset(phase: number, every: number = BEHAVIOR_LOD_EVERY): number {
+  const p = ((phase % 1) + 1) % 1
+  const o = Math.floor(p * every)
+  return o >= every ? every - 1 : o
+}
+
+/** The drama-claim fields the LOD exemption reads off an animal — every flag a
+ *  running §19.8/§19.16 drama can set on a participant. */
+export interface BehaviorLodDramaView {
+  caught?: number
+  caughtBy?: string
+  fireTrapped?: number
+  inWater?: number
+  wadeTime?: number
+  rescued?: boolean
+  mired?: number
+  crossing?: unknown
+  vigil?: unknown
+  kick?: number
+  plungeTo?: unknown
+  trampleTo?: unknown
+  grief?: number
+  lunge?: unknown
+  lure?: unknown
+}
+
+/**
+ * Invariant-I4 exemption for the behaviour LOD: an animal claimed by ANY
+ * running drama — or merely REFERENCED by one that carries no flag of its own
+ * yet (`dramaTarget`: the scripted hunt's victim, a crocodile's staged lunge
+ * victim, the fire pair), or whose CHILD is in peril (the rescue/defence
+ * drives key on the child's state), or standing inside an active hunt's flee
+ * ring (`nearActiveHunt` — the being-hunted flee must fire the frame the
+ * predator closes) — always updates every frame.
+ */
+export function behaviorLodExempt(
+  a: BehaviorLodDramaView,
+  childInDrama: boolean,
+  dramaTarget: boolean,
+  nearActiveHunt: boolean,
+): boolean {
+  return (
+    a.caught !== undefined ||
+    a.caughtBy !== undefined ||
+    a.fireTrapped !== undefined ||
+    a.inWater !== undefined ||
+    a.wadeTime !== undefined ||
+    a.rescued === true ||
+    a.mired !== undefined ||
+    a.crossing !== undefined ||
+    a.vigil !== undefined ||
+    a.kick !== undefined ||
+    a.plungeTo !== undefined ||
+    a.trampleTo !== undefined ||
+    a.grief !== undefined ||
+    a.lunge !== undefined ||
+    a.lure !== undefined ||
+    childInDrama ||
+    dramaTarget ||
+    nearActiveHunt
+  )
+}
+
+/**
+ * Does this animal take its FULL behaviour step this frame? On-screen/near
+ * animals and drama participants always do (the picture is never throttled);
+ * a far, free animal only on its round-robin frame.
+ */
+export function behaviorTickDue(
+  nearOrOnScreen: boolean,
+  exempt: boolean,
+  frame: number,
+  offset: number,
+  every: number = BEHAVIOR_LOD_EVERY,
+): boolean {
+  if (nearOrOnScreen || exempt) return true
+  return (frame + offset) % every === 0
+}
