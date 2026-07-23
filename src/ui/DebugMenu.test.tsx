@@ -43,6 +43,7 @@ const DEFAULTS = {
   juvenileDrinkCrocBias: balance.family.juvenileDrinkCrocBias,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
+  crocMouthOffset: balance.crocodile.mouthOffsetLocal,
   wetGroundStrength: balance.season.wetGroundStrength,
   placeStrafeFactor: balance.placeStrafeFactor,
   inventoryCapacity: balance.inventoryCapacity,
@@ -106,6 +107,7 @@ afterEach(() => {
   balance.family.juvenileDrinkCrocBias = DEFAULTS.juvenileDrinkCrocBias
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
+  balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
   balance.season.wetGroundStrength = DEFAULTS.wetGroundStrength
   balance.placeStrafeFactor = DEFAULTS.placeStrafeFactor
   balance.inventoryCapacity = DEFAULTS.inventoryCapacity
@@ -199,8 +201,9 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.juvenileDrinkCrocBias, read: () => balance.family.juvenileDrinkCrocBias, value: 8 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
-    // The broadened waterline ambush band (point 275).
+    // The broadened waterline ambush band and the mouth anchor (points 275/268).
     { label: en.debug.crocAmbushBankBand, read: () => balance.crocodile.ambushBankBand, value: 3 },
+    { label: en.debug.crocMouthOffset, read: () => balance.crocodile.mouthOffsetLocal, value: 1.4 },
     // The wet-ground strength (design.md §19.13, point 225).
     { label: en.debug.wetGroundStrength, read: () => balance.season.wetGroundStrength, value: 0.5 },
   ]

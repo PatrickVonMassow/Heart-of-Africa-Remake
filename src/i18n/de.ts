@@ -376,6 +376,7 @@ export const de: Strings = {
     calfGambolBout: 'Jungtier-Spielphase (s)',
     crocStrikeRadius: 'Krokodil: Angriffsradius am Ufer',
     crocAmbushBankBand: 'Krokodil: Hinterhalt-Uferband',
+    crocMouthOffset: 'Krokodil: Maul-Ankerabstand',
     juvenilePreyBias: 'Bevorzugung von Jungtieren als Beute',
     juvenileDrinkCrocBias: 'Krokodil: Vorzug trinkender Jungtiere',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',

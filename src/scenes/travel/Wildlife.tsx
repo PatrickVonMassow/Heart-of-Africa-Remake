@@ -92,6 +92,8 @@ import {
   crocodileAllowedAt,
   crocodileLungeReady,
   crocodileWaterlinePrey,
+  crocodileMouthAnchor,
+  crocodileFeedPose,
   crocodileIdleYaw,
   crocodileGripExpired,
   crocodileHoldsCatch,
@@ -2441,6 +2443,10 @@ function Herds() {
     // grips its victim through the EXISTING §19.8 struggle window (a parent
     // has those seconds to save it) and the kill sinks — the river takes the
     // body. Per-crocodile state; the single scripted lion hunt is untouched.
+    // A gripping croc that holds a caught victim registers itself here so the
+    // render can draw the victim AT the croc's mouth (point 268), not on its
+    // back — a pure render lookup that never touches the drama resolution.
+    const crocByVictim = new Map<Animal, Animal>()
     {
       const bc = balance.crocodile
       for (const c of herds.crocodile) {
@@ -2607,6 +2613,11 @@ function Herds() {
             } else {
               c.x = v.x - Math.sin(c.rot) * 0.6
               c.z = v.z - Math.cos(c.rot) * 0.6
+              // The victim renders AT the jaws (point 268): register this croc as
+              // its holder so the render draws it at the mouth anchor, not on the
+              // back. Purely a render lookup — the drama-driving v.x/v.z (which the
+              // parent charge measures) is untouched.
+              crocByVictim.set(v, c)
             }
           }
           // SINK phase (v.caught === undefined, v.dead): hold position over the
@@ -3339,6 +3350,19 @@ function Herds() {
             a.restYaw = undefined
             yaw = a.rot
             bodyY = crocodileBodyY(a.y, !striking, a.scale)
+            // Feeding (design.md §19.16, point 268): while the croc GRIPS a caught
+            // victim it animates as EATING — the death-roll head thrash and a gulp
+            // bob — so the meal reads as eating rather than a body resting on the
+            // croc. Driven off the grip timer (reset to 0 at the seize), so the
+            // motion runs through the whole struggle+consume window. A drive-off /
+            // sink leaves the croc still (retreat clears the gripped hold).
+            const feeding = a.lunge?.gripped === true && (a.lunge.victim?.caught !== undefined)
+            if (feeding) {
+              const fp = crocodileFeedPose(a.lunge!.timer, a.phase)
+              yaw += fp.rollYaw
+              pitch += fp.pitch
+              bodyY += fp.bobY
+            }
           }
         }
         // The broken-wing act (point 145b): the luring plover tilts hard onto
@@ -3412,8 +3436,24 @@ function Herds() {
             // still reach the predator and save it (§19). Not young-gated:
             // the seized vigil-keeper (point 121 (f)) is the one ADULT that
             // can be caught, and it thrashes like any taken prey.
-            px = a.x + Math.sin(t * 13 + a.phase) * 0.14
-            pz = a.z + Math.cos(t * 11 + a.phase) * 0.14
+            // Point 268: a crocodile's catch lies AT ITS JAWS. When a gripping
+            // croc holds this victim, anchor the thrash at the croc's mouth
+            // (ahead of the croc along its facing) instead of the victim's own
+            // spot on the water — so the prey reads as being eaten in the mouth,
+            // not resting on the croc's back. Land prey (lion/fire) is unchanged.
+            const holdingCroc = a.caughtBy === 'crocodile' ? crocByVictim.get(a) : undefined
+            if (holdingCroc) {
+              const [mx, mz] = crocodileMouthAnchor(
+                holdingCroc.x, holdingCroc.z, holdingCroc.rot, holdingCroc.scale,
+                balance.crocodile.mouthOffsetLocal,
+              )
+              px = mx + Math.sin(t * 13 + a.phase) * 0.1
+              pz = mz + Math.cos(t * 11 + a.phase) * 0.1
+              bodyY = holdingCroc.y + 0.05 // riding at the croc's waterline, gripped
+            } else {
+              px = a.x + Math.sin(t * 13 + a.phase) * 0.14
+              pz = a.z + Math.cos(t * 11 + a.phase) * 0.14
+            }
             yaw = a.rot + Math.sin(t * 16 + a.phase) * 0.7
             pitch = Math.PI / 2.3 // thrown on its side, thrashing
             familyHeld = true

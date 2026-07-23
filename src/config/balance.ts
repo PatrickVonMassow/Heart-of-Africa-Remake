@@ -298,6 +298,10 @@ export interface BalanceConfig {
      *  can be ambushed. Kept small so the croc never snatches a grazer far up the
      *  shore — the ambush stays occasional and never clears the whole bank. */
     ambushBankBand: number
+    /** Feed mouth anchor (point 268): the local forward reach along the crocodile's
+     *  +z axis at which the seized victim lies — its JAWS end, not its back. Scaled
+     *  by the instance size and rotated by the croc's facing to place the victim. */
+    mouthOffsetLocal: number
     /** Speed of the lunge burst (units/s) — visible motion, never a teleport. */
     lungeSpeed: number
     /** Hard cap on the gripped hold (s, point 186): the grip normally ends with the
@@ -628,6 +632,7 @@ export const balance: BalanceConfig = {
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
     ambushBankBand: 4, // calibratable (point 275): a prey at the waterline within this of a hidden croc is a legal target even without drinking — kept < strikeRadius so the ambush stays occasional
+    mouthOffsetLocal: 1.15, // calibratable (point 268): local forward reach to the jaws (snout tip ~1.5), so the seized victim lies IN the mouth, gripped
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
   },

@@ -62,6 +62,10 @@ import {
   crocodileAllowedAt,
   crocodileLungeReady,
   crocodileWaterlinePrey,
+  crocodileMouthAnchor,
+  crocodileFeedPose,
+  CROCODILE_FEED_THRASH_AMP,
+  CROCODILE_FEED_GULP_PITCH,
   crocodileIdleYaw,
   CROCODILE_IDLE_SWAY_AMP,
   crocodileGripExpired,
@@ -823,6 +827,66 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
     expect(pd.predatorFlight.crocodile).toBeGreaterThan(0)
     expect(defendChance('giraffe', 'crocodile', pd)).toBeGreaterThan(defendChance('antelope', 'crocodile', pd))
     expect(killChance('giraffe', 'crocodile', pd)).toBe(0)
+  })
+})
+
+// The seized victim lies at the crocodile's JAWS and the croc animates as
+// FEEDING (design.md §19.16, point 268) — the prey no longer rests on the
+// croc's back, and the death-roll thrash + gulp bob read the meal as eating.
+describe('crocodile feed depiction (design.md §19.16, point 268)', () => {
+  it('the mouth anchor sits AHEAD of the croc along its heading, not on its centre', () => {
+    // Facing +z (rot 0): the mouth is out at +z, x unchanged.
+    const [x0, z0] = crocodileMouthAnchor(10, 20, 0, 0.55, 1.15)
+    expect(x0).toBeCloseTo(10, 6)
+    expect(z0).toBeGreaterThan(20) // ahead of the croc's centre
+    expect(z0).toBeCloseTo(20 + 1.15 * 0.55, 6)
+    // Facing +x (rot π/2): the mouth is out at +x, z unchanged.
+    const [x1, z1] = crocodileMouthAnchor(10, 20, Math.PI / 2, 0.55, 1.15)
+    expect(x1).toBeGreaterThan(10)
+    expect(x1).toBeCloseTo(10 + 1.15 * 0.55, 6)
+    expect(z1).toBeCloseTo(20, 6)
+    // A larger croc reaches its jaws further out (scale-derived).
+    const [, zBig] = crocodileMouthAnchor(10, 20, 0, 1.2, 1.15)
+    const [, zSmall] = crocodileMouthAnchor(10, 20, 0, 0.55, 1.15)
+    expect(zBig - 20).toBeGreaterThan(zSmall - 20)
+    // The anchor is never the croc's own centre — the victim is at the jaws.
+    expect(Math.hypot(x0 - 10, z0 - 20)).toBeGreaterThan(0.3)
+  })
+
+  it('the feed pose thrashes and gulps within bounded amplitudes (a death-roll + gulp)', () => {
+    let maxRoll = 0
+    let maxPitch = 0
+    let minPitch = Infinity
+    let rollSignChanges = 0
+    let prevSign = 0
+    for (let t = 0; t < 20; t += 0.02) {
+      const p = crocodileFeedPose(t, 0.3)
+      maxRoll = Math.max(maxRoll, Math.abs(p.rollYaw))
+      maxPitch = Math.max(maxPitch, p.pitch)
+      minPitch = Math.min(minPitch, p.pitch)
+      expect(p.pitch).toBeGreaterThanOrEqual(0) // the gulp only ever tips the snout UP
+      expect(p.bobY).toBeGreaterThanOrEqual(0)
+      const s = Math.sign(p.rollYaw)
+      if (s !== 0 && prevSign !== 0 && s !== prevSign) rollSignChanges++
+      if (s !== 0) prevSign = s
+    }
+    // The thrash is a real side-to-side wrench (sign flips), bounded by its amp.
+    expect(rollSignChanges).toBeGreaterThan(5)
+    expect(maxRoll).toBeLessThanOrEqual(CROCODILE_FEED_THRASH_AMP + 1e-9)
+    expect(maxRoll).toBeGreaterThan(CROCODILE_FEED_THRASH_AMP * 0.9)
+    // The gulp reaches its full nose-up and returns to flat.
+    expect(maxPitch).toBeLessThanOrEqual(CROCODILE_FEED_GULP_PITCH + 1e-9)
+    expect(maxPitch).toBeGreaterThan(CROCODILE_FEED_GULP_PITCH * 0.9)
+    expect(minPitch).toBeCloseTo(0, 2)
+  })
+
+  it('stripping the feed motion leaves the plain gripping pose (additive, small)', () => {
+    // At t=0 with phase 0 the pose is (essentially) neutral — the motion is an
+    // additive overlay, so a base render without it is well-formed.
+    const p0 = crocodileFeedPose(0, 0)
+    expect(p0.rollYaw).toBeCloseTo(0, 6)
+    expect(p0.pitch).toBeCloseTo(0, 6)
+    expect(p0.bobY).toBeCloseTo(0, 6)
   })
 })
 

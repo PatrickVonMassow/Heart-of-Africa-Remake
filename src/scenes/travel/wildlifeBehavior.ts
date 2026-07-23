@@ -1097,6 +1097,60 @@ export function crocodileWaterlinePrey(
 }
 
 /**
+ * The crocodile's mouth anchor in world space (design.md §19.16, point 268): a
+ * seized victim lies at the crocodile's JAWS, not on its back. The jaw tip sits
+ * a fixed distance AHEAD of the body origin along the local +z axis in the
+ * crocodile mesh (the snout reaches well past the skull, `snoutBaseZ` ~0.87 with
+ * the jaw tubes and nostril out near local z ~1.5); scaling by the instance
+ * `scale` and rotating by the croc's facing `rot` places the mouth in world
+ * space. `mouthOffsetLocal` is that local forward reach (a shade behind the very
+ * snout tip so the victim sits IN the jaws, gripped, not floating off the nose).
+ * Returns the world `[x, z]` at which the caught victim (and its thrash) render.
+ */
+export function crocodileMouthAnchor(
+  cx: number,
+  cz: number,
+  rot: number,
+  scale: number,
+  mouthOffsetLocal: number,
+): [number, number] {
+  const reach = mouthOffsetLocal * scale
+  return [cx + Math.sin(rot) * reach, cz + Math.cos(rot) * reach]
+}
+
+/**
+ * The feeding motion of a crocodile that has seized a victim (design.md §19.16,
+ * point 268): while it grips and consumes, the croc animates as EATING — the
+ * classic death-roll / head thrash paired with a gulp bob — so the meal reads as
+ * eating rather than a body resting on the croc. Returns the pose deltas to add
+ * to the gripping croc's render this frame, driven purely by the elapsed feed
+ * time `t` and the per-croc `phase` (desynchronising neighbours):
+ *  - `rollYaw`  — a side-to-side wrench of the head/jaws (the thrash), a bounded
+ *                 oscillation added to the facing.
+ *  - `pitch`    — a periodic gulp: the snout tips up as the croc throws its head
+ *                 back to swallow, then drops (always ≥ 0, a nose-up bob).
+ *  - `bobY`     — a small vertical heave of the whole body with each gulp.
+ * All amplitudes are small and bounded, so stripping the motion leaves the plain
+ * gripping pose. Pure over (t, phase) so it is unit-testable.
+ */
+export const CROCODILE_FEED_THRASH_AMP = 0.35
+export const CROCODILE_FEED_GULP_PITCH = 0.22
+export const CROCODILE_FEED_BOB_AMP = 0.05
+export function crocodileFeedPose(t: number, phase: number): { rollYaw: number; pitch: number; bobY: number } {
+  const ph = phase * Math.PI * 2
+  // The thrash: a brisk side-to-side wrench of the jaws (a fast sine).
+  const rollYaw = Math.sin(t * 8 + ph) * CROCODILE_FEED_THRASH_AMP
+  // The gulp: a slower nose-up heave to work the prey down — rectified so the
+  // snout only ever tips UP (a swallow), never buries into the water.
+  const gulp = Math.max(0, Math.sin(t * 2.4 + ph))
+  return {
+    rollYaw,
+    pitch: gulp * CROCODILE_FEED_GULP_PITCH,
+    bobY: gulp * CROCODILE_FEED_BOB_AMP,
+  }
+}
+
+/**
  * The resting crocodile's subtle idle yaw (design.md §19.16, points 242/257): a
  * hidden crocodile WAITS — it lies submerged, it does not roam. Its faint life is
  * a BOUNDED oscillation about a FIXED rest heading, an ABSOLUTE value that always
