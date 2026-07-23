@@ -342,6 +342,11 @@ interface Animal {
    *  weapon — the parent rears and strikes out at the departing predator,
    *  then settles. The field keeps its 124 name. */
   kick?: number
+  /** DEV-ONLY (point 268): the last rendered world (x,z) of a crocodile's
+   *  seized victim — its jaws anchor — so the enrichments check can read the
+   *  jaws placement back without a render-matrix probe. Set only in the
+   *  caught-by-crocodile render branch; never read by the sim. */
+  jawAnchor?: [number, number]
 }
 
 /**
@@ -3450,6 +3455,7 @@ function Herds() {
               px = mx + Math.sin(t * 13 + a.phase) * 0.1
               pz = mz + Math.cos(t * 11 + a.phase) * 0.1
               bodyY = holdingCroc.y + 0.05 // riding at the croc's waterline, gripped
+              a.jawAnchor = [px, pz] // dev observability (point 268)
             } else {
               px = a.x + Math.sin(t * 13 + a.phase) * 0.14
               pz = a.z + Math.cos(t * 11 + a.phase) * 0.14

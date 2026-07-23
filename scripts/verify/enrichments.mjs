@@ -4441,6 +4441,154 @@ check(
   crocVanish.staged && crocVanish.gripped && crocVanish.crocRetreated,
   JSON.stringify(crocVanish),
 )
+
+// --- Point 275: the BROADENED waterline ambush --------------------------------
+// A wandering GRAZER (no drink pose) that steps to the bank within the ambush
+// band is now a legal target; one just OUTSIDE the band (but still within the
+// strike radius) is not. Staged like crocDrama: a croc on water, a grazer on
+// the true bank beside it — but the grazer never drinks, proving the trigger
+// no longer needs a formal drink pose.
+const crocGrazerAmbush = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const U = 10
+  const p0 = window.__game.getState().pos
+  let water = null
+  let bank = null
+  let bankDir = null
+  outer: for (let r = 4; r <= 40 && !water; r += 3) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2
+      const x = p0.x + Math.cos(ang) * r
+      const z = p0.z + Math.sin(ang) * r
+      if (window.__terrainType(-z / U, x / U, seed) !== 'water') continue
+      for (let n = 0; n < 8; n++) {
+        const na = (n / 8) * Math.PI * 2
+        const nx = x + Math.cos(na) * 1.8
+        const nz = z + Math.sin(na) * 1.8
+        const nt = window.__terrainType(-nz / U, nx / U, seed)
+        if (nt !== 'water' && nt !== 'ocean') {
+          water = { x, z }; bank = { x: nx, z: nz }
+          bankDir = { x: Math.cos(na), z: Math.sin(na) } // water -> land unit
+          break outer
+        }
+      }
+    }
+  }
+  if (!water || !bank) return { staged: false, noWater: true }
+  const naturals = herds.crocodile.splice(0)
+  const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
+  const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
+  herds.crocodile.push(croc)
+  // Park the scripted lion hunt (the two systems never claim one animal).
+  const lion = window.__lionHunt.state
+  lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+  const bc = window.__balance.crocodile
+  // A grazer at the bank, NO drink pose — inside the ambush band of the croc.
+  const grazer = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 1, phase: 0.2, chunk: undefined }
+  herds.zebra.push(grazer)
+  const out = { staged: true, inBandLunged: false, farBalked: true, hasDrink: false }
+  out.hasDrink = grazer.drink !== undefined // must stay false — no drink pose
+  await window.__pollSim(20, () => {
+    // Keep it pinned at the bank (nothing sheds it there pre-grip).
+    if (grazer.caught === undefined && Math.hypot(grazer.x - bank.x, grazer.z - bank.z) > 2) { grazer.x = bank.x; grazer.z = bank.z }
+    if (croc.lunge !== undefined) { out.inBandLunged = true; return true }
+    return false
+  })
+  // The croc retires; now a FAR grazer (just past the band, on land) must NOT
+  // be taken — the ambush stays occasional and never reaches up the shore.
+  herds.zebra = herds.zebra.filter((a) => a !== grazer)
+  croc.lunge = undefined
+  const far = bc.ambushBankBand + 2 // clearly beyond the reach
+  const fx = croc.x + bankDir.x * far
+  const fz = croc.z + bankDir.z * far
+  // Only run the far check where that spot is still land (else skip, not fail).
+  if (window.__terrainType(-fz / U, fx / U, seed) !== 'water') {
+    const farGrazer = { x: fx, z: fz, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined }
+    herds.zebra.push(farGrazer)
+    await window.__pollSim(6, () => {
+      if (farGrazer.caught === undefined && Math.hypot(farGrazer.x - fx, farGrazer.z - fz) > 2) { farGrazer.x = fx; farGrazer.z = fz }
+      if (croc.lunge !== undefined) { out.farBalked = false; return true }
+      return false
+    })
+    herds.zebra = herds.zebra.filter((a) => a !== farGrazer)
+  }
+  herds.crocodile = naturals
+  return out
+})
+check(
+  'the broadened trigger: a grazer at the waterline (no drink pose) is ambushed, one past the band is not (point 275)',
+  crocGrazerAmbush.staged && crocGrazerAmbush.inBandLunged && !crocGrazerAmbush.hasDrink && crocGrazerAmbush.farBalked,
+  JSON.stringify(crocGrazerAmbush),
+)
+
+// --- Point 268: the caught victim lies at the crocodile's JAWS ----------------
+// A forced gripped catch: the seized victim must render AHEAD of the croc along
+// its facing (at the mouth anchor), not on the croc's centre/back. Read the
+// victim's rendered thrash position back and project it onto the croc heading.
+const crocJaws = await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const U = 10
+  const p0 = window.__game.getState().pos
+  let water = null
+  outer: for (let r = 4; r <= 40 && !water; r += 3) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2
+      const x = p0.x + Math.cos(ang) * r
+      const z = p0.z + Math.sin(ang) * r
+      if (window.__terrainType(-z / U, x / U, seed) !== 'water') continue
+      for (let n = 0; n < 8; n++) {
+        const na = (n / 8) * Math.PI * 2
+        const nx = x + Math.cos(na) * 1.8
+        const nz = z + Math.sin(na) * 1.8
+        const nt = window.__terrainType(-nz / U, nx / U, seed)
+        if (nt !== 'water' && nt !== 'ocean') { water = { x, z }; break outer }
+      }
+    }
+  }
+  if (!water) return { staged: false, noWater: true }
+  const naturals = herds.crocodile.splice(0)
+  const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
+  // Croc facing +z (rot 0). Its victim, gripped, must sit AHEAD along +z.
+  const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
+  const victim = { x: water.x, z: water.z + 0.6, y: croc.y, rot: 0, scale: 0.5, phase: 0.2, chunk: undefined, young: true, caught: 5, caughtBy: 'crocodile' }
+  croc.lunge = { victim, timer: 0, gripped: true, retreat: false, homeX: water.x, homeZ: water.z }
+  herds.crocodile.push(croc)
+  herds.zebra.push(victim)
+  const lion = window.__lionHunt.state
+  lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+  // Read the RENDERED victim position back over a few frames (the thrash jitters
+  // it a touch): its mean offset from the croc must lie AHEAD along the heading.
+  let aheadSum = 0, lateralSum = 0, n = 0, gripped = false
+  await window.__pollSim(3, () => {
+    if (croc.lunge && croc.lunge.gripped && victim.caught !== undefined) {
+      gripped = true
+      const r = victim.jawAnchor // dev hook: the last RENDERED jaws position
+      if (r) {
+        // Project onto the croc heading (rot 0 -> +z is "ahead").
+        const dx = r[0] - croc.x
+        const dz = r[1] - croc.z
+        aheadSum += dz // ahead component (sin0,cos0 => (0,1))
+        lateralSum += Math.abs(dx)
+        n++
+      }
+    }
+    return false
+  })
+  croc.lunge = undefined
+  herds.zebra = herds.zebra.filter((a) => a !== victim)
+  herds.crocodile = naturals
+  return { staged: true, gripped, n, ahead: n ? +(aheadSum / n).toFixed(2) : null, lateral: n ? +(lateralSum / n).toFixed(2) : null, mouthOffset: window.__balance.crocodile.mouthOffsetLocal, scale: croc.scale }
+})
+check(
+  'the caught victim renders at the crocodile\'s jaws (ahead of its centre along the heading) (point 268)',
+  crocJaws.staged && crocJaws.gripped && crocJaws.n > 0 &&
+    // The mouth anchor is mouthOffset*scale ahead; require the victim clearly
+    // ahead (well past the croc's centre), not sitting on the back.
+    crocJaws.ahead !== null && crocJaws.ahead > 0.4,
+  JSON.stringify(crocJaws),
+)
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
