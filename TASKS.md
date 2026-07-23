@@ -9666,6 +9666,42 @@ the remaining open points in their numeric order.
   text. NOTE: same river-render files as 232-234/246 — bundle with the river-render
   follow-ups (246 depthWrite + this).
 
+- [ ] 255. ANIMAL GAIT: TOO SLOW, ONLY ON STRAIGHT WALK, AND ABSENT ON THE SKYLINE
+  (user 23.07.2026, follow-up to point 228). Three observations on the deployed
+  gait: (1) the leg swing is TOO SLOW overall — it must plausibly MATCH the movement
+  speed so a walking animal reads as striding on its FEET, not shuffling; (2) the
+  legs seem to move only while the animal walks STRAIGHT (they appear to stop on a
+  turn / curved path); (3) the SKYLINE / §2.5 panorama-band animals (the distant
+  silhouettes drifting past the settlement horizon — the "gliding animal" of
+  point 227) still GLIDE with no leg motion at all. DIAGNOSE + FIX: (1) the gait
+  cadence — `GAIT_CADENCE` in `src/render/fauna.ts` (phase = distance × cadence,
+  point 228) is too low; raise it so the stride FREQUENCY reads as a real walk at
+  the settlement walk speed (a goat takes ~1.5-2 visible strides per metre), still a
+  pure function of distance travelled so stride length tracks speed (faster → longer/
+  quicker steps, none at rest) — pure-tested against a plausible strides-per-metre
+  bound. (2) confirm the phase advances on ANY displacement, not just a straight
+  heading — a goat on a curved errand path still accumulates distance, so its legs
+  must swing; if the gait is gated on a straight/aligned-velocity condition, remove
+  that gate (leg swing follows distance travelled regardless of turn). (3) give the
+  panorama-band skyline animals the SAME distance-driven leg gait (or, if a full
+  gait is too heavy for the tiny hazed silhouettes, at least stop the glide — advance
+  a simple leg swing with their drift so they read as walking, not sliding);
+  this closes the point-227 "gliding animal on the skyline" observation for the
+  fauna half. Anchors: `src/render/fauna.ts` (`GAIT_CADENCE`/`gaitPhase`/
+  `legSwingAngle`/`buildGoatParts` from point 228), `src/scenes/place/PlaceLife.tsx`
+  (settlement walkers), and the §2.5 panorama-wildlife band in `src/scenes/place/`
+  (the skyline silhouette movers — search for the panorama/backdrop wildlife drift).
+  VERIFIABLE: a pure test that the leg-swing phase advances fast enough per metre to
+  read as a walk (strides-per-metre within a plausible band) and advances on a curved
+  path (any displacement, not only straight); a live check in
+  `scripts/verify/polish.mjs` that a walking settlement animal AND a skyline-band
+  animal both swing their legs while moving (no foot-slide); the parent
+  picture-verifies the walk on BOTH backends (legs visibly stride, matching speed).
+  DOCS: design.md §19 (locomotion) / §2.5 (panorama wildlife) if wording changes. No
+  player-visible text. NOTE: `fauna.ts`/`PlaceLife.tsx`/place panorama — same gait
+  files as point 228 (now merged); relates to point 227 (skyline gliding animal — 255
+  covers the fauna leg-motion half).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
