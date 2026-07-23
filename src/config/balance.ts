@@ -346,6 +346,17 @@ export interface BalanceConfig {
      *  around before a bout ends; the idle gap between bouts stays fixed in
      *  the scene. Calibratable/debug-editable. */
     gambolBoutSeconds: number
+    /** Juvenile prey preference (design.md §19.8, point 245): the chance a
+     *  fresh hunt seeks a nearby JUVENILE (over a generic grazer) so the family
+     *  sacrifice/shield/flight drama plays out on screen. Juveniles are the
+     *  preferred prey of EVERY predator; raised well above half.
+     *  Calibratable/debug-editable. */
+    juvenilePreyBias: number
+    /** Crocodile drinking-juvenile bias (design.md §19.16/§19.8, point 245): a
+     *  calf/foal drinking at a bank is the STRONGLY preferred lunge target
+     *  (weight, ≫ 1 = an adult's), so the §19.8 sacrifice/rescue drama fires
+     *  more often. Calibratable/debug-editable. */
+    juvenileDrinkCrocBias: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -586,18 +597,25 @@ export const balance: BalanceConfig = {
     // group of 8 raises 2 and a group of 4 raises 1 (floor(N/2) caps it so every
     // calf keeps its own distinct parent). Was effectively one calf per group.
     calfFraction: 0.25,
-    // Calibratable (user decision: 3× the old 1.8 leash): the wider roam makes
-    // the sacrifice/shield/flight dramas readable as separate bodies. The
-    // rescue burst still closes this gap well inside the caught window
-    // (6 units/s × 5 s = 30 ≫ gambolRange + the too-late distance).
-    followRadius: 5.4,
-    // Calibratable (scaled 3× with the leash, was the fixed 4): the scamper
-    // orbit's outer edge. The leash damping has no cancellation point at any
-    // range, so widening it cannot reintroduce the play/follow jitter.
-    gambolRange: 12,
-    // Calibratable: one hop-bout now runs 8 s (was 16 s × 0.25 = 4 s), so the
+    // Calibratable (point 245: ×1.5 again, from the point-238 5.4 = 3×1.8): the
+    // still-wider roam makes the sacrifice/shield/flight dramas read as clearly
+    // separate bodies. The rescue burst still closes this gap well inside the
+    // caught window — worst gap = gambolRange(18) + the too-late 3.2 ≈ 21.2 <
+    // burst-cover 6 units/s × 5 s = 30 (re-asserted in wildlifeBehavior.test.ts).
+    followRadius: 8.1,
+    // Calibratable (scaled with the leash: point-238 12 = 3×4, ×1.5 = 18): the
+    // scamper orbit's outer edge. The leash damping has no cancellation point at
+    // any range, so widening it cannot reintroduce the play/follow jitter.
+    gambolRange: 18,
+    // Calibratable: one hop-bout runs 8 s (was 16 s × 0.25 = 4 s), so the
     // young visibly hop around before settling; the 12 s idle gap is unchanged.
     gambolBoutSeconds: 8,
+    // Calibratable (point 245): juveniles are the preferred prey — raised from
+    // the earlier 0.6 so the family drama fires more often near the player.
+    juvenilePreyBias: 0.85,
+    // Calibratable (point 245): a drinking calf is ≫ 6× the lunge weight of an
+    // adult drinker, so the crocodile ambush overwhelmingly picks the juvenile.
+    juvenileDrinkCrocBias: 6,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

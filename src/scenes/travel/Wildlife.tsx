@@ -45,6 +45,10 @@ import {
   leashedGambolDir,
   separationPush,
   turnToward,
+  committedFleeHeading,
+  FLEE_COMMIT_MARGIN,
+  crocodileTargetWeight,
+  prefersJuvenilePrey,
   killFlockMayDescend,
   killFlockActive,
   assignPerCarcassFlocks,
@@ -547,7 +551,7 @@ const GUARD_STANDOFF = 2.2
 const CAUGHT_DURATION = 5
 // Rotating throttle for the 203(A) anchoring asserts (~1/13 of animals per frame).
 let ASSERT_TICK = 0
-const CALF_HUNT_CHANCE = 0.6 // chance a hunt targets a calf near the player over a generic grazer
+// The juvenile hunt bias (point 245) is the calibratable balance.family.juvenilePreyBias.
 const CALF_HUNT_SEEK = 45 // radius around the player within which a huntable calf is picked
 const CALF_CATCH_DIST = 0.9 // the predator catches the chased calf within this
 /** The hunted calf bolts instead of standing at its parent, but slower than its
@@ -2324,6 +2328,13 @@ function Herds() {
         }
         if (!c.lunge) {
           // Hidden: wait for a drinker standing at a bank inside the radius.
+          // A drinking JUVENILE is the strongly-preferred target (point 245),
+          // so the §19.8 sacrifice/rescue drama fires more often — score every
+          // eligible bank drinker by crocodileTargetWeight (young ≫ adult) and
+          // take the best (nearer breaks a same-weight tie), rather than the
+          // first one found.
+          let bestVictim: Animal | null = null
+          let bestScore = -Infinity
           for (const sp of CALF_HUNT_SPECIES) {
             for (const a of herds[sp]) {
               // Skip any animal already owned by another drama or not actually
@@ -2341,13 +2352,17 @@ function Herds() {
               const cycle = ((clock.elapsedTime + a.phase * 40) % 75) / 75
               const atBank = cycle > 0.1 && cycle < 0.4 // rendered standing at the water
               const d = Math.hypot(a.drink.tx - c.x, a.drink.tz - c.z)
-              if (crocodileLungeReady(d, atBank, bc.strikeRadius)) {
-                c.lunge = { victim: a, timer: 0, homeX: c.x, homeZ: c.z, gripped: false }
-                break
+              if (!crocodileLungeReady(d, atBank, bc.strikeRadius)) continue
+              // Weight dominates (gap ≥ 1); the tiny distance term only breaks
+              // ties between two same-age drinkers, so a juvenile always wins.
+              const score = crocodileTargetWeight(a.young === true, balance.family.juvenileDrinkCrocBias) - d * 1e-3
+              if (score > bestScore) {
+                bestScore = score
+                bestVictim = a
               }
             }
-            if (c.lunge) break
           }
+          if (bestVictim) c.lunge = { victim: bestVictim, timer: 0, homeX: c.x, homeZ: c.z, gripped: false }
         } else if (
           c.lunge.retreat ||
           c.lunge.victim === null ||
@@ -3660,8 +3675,18 @@ function Herds() {
             shyRing,
           )
           if (pick !== null) {
+            // Steady escape for a JUVENILE (point 237): a calf ringed by a herd
+            // sees the summed-repulsion pick flip ~180° between two comparably-
+            // good escapes frame to frame; committing to the held heading until
+            // a fresh pick diverges past FLEE_COMMIT_MARGIN keeps ONE direction
+            // (the escapeCorridorHeading/calfFleeStep sticky-corridor discipline),
+            // while the capped turnToward still smooths a genuine switch. Adults
+            // already read steady off the summed pick, so the commit is calf-only.
+            const fleeTarget = a.young
+              ? committedFleeHeading(a.dodgeHeading, pick.heading, FLEE_COMMIT_MARGIN)
+              : pick.heading
             a.dodgeHeading =
-              a.dodgeHeading === undefined ? pick.heading : turnToward(a.dodgeHeading, pick.heading, PREY_DODGE_TURN * dt)
+              a.dodgeHeading === undefined ? pick.heading : turnToward(a.dodgeHeading, fleeTarget, PREY_DODGE_TURN * dt)
             // The elephant dart stays deliberately slower than the herd (the
             // trample must remain possible); a pure player flight runs.
             const spd = pick.source === 'elephant' ? PREY_PANIC_SPEED : PLAYER_SHY_SPEED
@@ -4040,7 +4065,7 @@ function LionHunt() {
           }
         }
       }
-      if (!vigilKeeper && !calf && herds && Math.random() < CALF_HUNT_CHANCE) {
+      if (!vigilKeeper && !calf && herds && prefersJuvenilePrey(Math.random(), balance.family.juvenilePreyBias)) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {
@@ -4061,7 +4086,7 @@ function LionHunt() {
       // is outside the food-web prey pools, so it is sought directly here; the
       // lioness (its .parent) defends through the same shared core. Found only
       // when no grazer calf was — the drama is a rare apex-family scene.
-      if (!vigilKeeper && !calf && herds && Math.random() < CALF_HUNT_CHANCE) {
+      if (!vigilKeeper && !calf && herds && prefersJuvenilePrey(Math.random(), balance.family.juvenilePreyBias)) {
         let bd = CALF_HUNT_SEEK
         for (const c of herds.lion) {
           if (!c.young || c.dead || c.caught !== undefined || !c.parent || c.parent.dead) continue
