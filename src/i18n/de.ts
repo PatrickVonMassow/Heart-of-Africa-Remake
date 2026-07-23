@@ -381,6 +381,7 @@ export const de: Strings = {
     juvenilePreyBias: 'Bevorzugung von Jungtieren als Beute',
     juvenileDrinkCrocBias: 'Krokodil: Vorzug trinkender Jungtiere',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
+    crocDriveOffRest: 'Krokodil: Ruhe nach Vertreiben (s)',
     huntLeaveOvertime: 'Jagd: Abzugs-Überzeit (s)',
     waterCrossMax: 'Wasser-Querung: max. Breite',
     waterCrossChance: 'Wasser-Querung: Chance',

@@ -91,6 +91,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileAmbushResting,
   crocodileWaterlinePrey,
   crocodileMouthAnchor,
   crocodileFeedPose,
@@ -297,6 +298,11 @@ interface Animal {
    *  slinking back home. Its own state — the scripted LION hunt is never
    *  touched by an ambush. */
   lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  /** Elapsed time a DRIVEN-OFF crocodile's rest expires at (point 130 under the
+   *  broadened waterline trigger): while it holds, this crocodile takes no new
+   *  ambush target, so a repelled ambusher truly withdraws instead of re-seizing
+   *  the calf standing where it was just rescued. */
+  ambushRestUntil?: number
   /** A hidden crocodile's FIXED rest heading (point 257): captured once when it
    *  settles to waiting, the anchor its subtle idle yaw oscillates about. Held
    *  absolute so the sway can never accumulate into a rotation; cleared when the
@@ -1865,7 +1871,13 @@ function Herds() {
                 // impossible (killFlight.crocodile = 0) — nothing breaks the
                 // armoured ambusher.
                 const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
-                if (cc && cc.lunge) cc.lunge.retreat = true
+                if (cc && cc.lunge) {
+                  cc.lunge.retreat = true
+                  // And it stays off the bank for a while: the freed victim is
+                  // standing right there, so without this rest the broadened
+                  // waterline trigger would hand it straight back.
+                  cc.ambushRestUntil = clock.elapsedTime + balance.crocodile.driveOffRestSeconds
+                }
                 calf.caughtBy = undefined
               } else if (LION_STATE.victim === calf) {
                 LION_STATE.victim = null
@@ -1906,7 +1918,13 @@ function Herds() {
                 // takes the charging parent under in the calf's place.
                 takeAnimal(a, { sink: true })
                 const cc = herds.crocodile.find((k) => k.lunge && k.lunge.victim === calf)
-                if (cc && cc.lunge) cc.lunge.retreat = true
+                if (cc && cc.lunge) {
+                  cc.lunge.retreat = true
+                  // And it stays off the bank for a while: the freed victim is
+                  // standing right there, so without this rest the broadened
+                  // waterline trigger would hand it straight back.
+                  cc.ambushRestUntil = clock.elapsedTime + balance.crocodile.driveOffRestSeconds
+                }
                 calf.caughtBy = undefined
               } else {
                 takeAnimal(a, { stain: true })
@@ -2479,6 +2497,9 @@ function Herds() {
           }
         }
         if (!c.lunge) {
+          // A crocodile still resting off a DRIVE-OFF takes no target at all, so
+          // the victim it just released is not seized back the next frame.
+          if (!crocodileAmbushResting(clock.elapsedTime, c.ambushRestUntil)) {
           // Hidden: wait for a prey standing at the waterline inside the reach.
           // Two ways in (point 275 broadens the point-130 trigger, which fired
           // only on a formal drink pose and so read as inert whenever no drinker
@@ -2543,6 +2564,7 @@ function Herds() {
             }
           }
           if (bestVictim) c.lunge = { victim: bestVictim, timer: 0, homeX: c.x, homeZ: c.z, gripped: false }
+          }
         } else if (
           c.lunge.retreat ||
           c.lunge.victim === null ||

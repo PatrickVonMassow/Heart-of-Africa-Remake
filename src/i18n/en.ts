@@ -382,6 +382,7 @@ export const en: Strings = {
     juvenilePreyBias: 'Juvenile prey preference',
     juvenileDrinkCrocBias: 'Crocodile: drinking-juvenile preference',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
+    crocDriveOffRest: 'Crocodile: rest after being driven off (s)',
     huntLeaveOvertime: 'Hunt: walk-off overtime (s)',
     waterCrossMax: 'Water crossing: max width',
     waterCrossChance: 'Water crossing: chance',

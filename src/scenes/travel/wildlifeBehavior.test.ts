@@ -61,6 +61,7 @@ import {
   CROCODILE_REGIONS,
   crocodileAllowedAt,
   crocodileLungeReady,
+  crocodileAmbushResting,
   crocodileWaterlinePrey,
   crocodileMouthAnchor,
   crocodileFeedPose,
@@ -803,6 +804,18 @@ describe('crocodile placement and ambush trigger (design.md §19.16, point 130)'
     // radius never lets the croc snatch a grazer far up the shore.
     expect(crocodileWaterlinePrey(4.5, true, 8, 4)).toBe(false)
     expect(crocodileWaterlinePrey(4.5, true, 4, 8)).toBe(false)
+  })
+
+  it('a driven-off crocodile rests before it may ambush again (point 130 under the broadened trigger)', () => {
+    // Never repelled: no rest, the ambush is armed as before.
+    expect(crocodileAmbushResting(12, undefined)).toBe(false)
+    // Repelled at t=10 with a 20 s rest: it stays off the bank through the
+    // window, so the calf it just released is not handed straight back.
+    expect(crocodileAmbushResting(10, 30)).toBe(true)
+    expect(crocodileAmbushResting(29.99, 30)).toBe(true)
+    // Boundary: the rest ENDS at its expiry — the ambusher is armed again.
+    expect(crocodileAmbushResting(30, 30)).toBe(false)
+    expect(crocodileAmbushResting(31, 30)).toBe(false)
   })
 
   it('the gripped lunge expires after gripSeconds so a vanished victim never pins it (point 186)', () => {

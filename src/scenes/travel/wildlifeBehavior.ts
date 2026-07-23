@@ -1097,6 +1097,22 @@ export function crocodileWaterlinePrey(
 }
 
 /**
+ * Whether a crocodile just DRIVEN OFF a seized victim is still resting, and so
+ * may not take a new ambush target (design.md §19.16, point 130 read against the
+ * broadened waterline trigger). Under the drinker-only trigger a repelled croc
+ * rarely found a fresh target, because the freed calf had to enter a drink pose
+ * again; now that any bank-stander is catchable, the SAME calf standing where it
+ * was rescued is legal the very next frame — the croc would re-seize it at once
+ * and never actually retreat, so the parent's defence would read as failed. A
+ * repelled crocodile therefore keeps to its water for a calibratable rest.
+ * `restUntil` is the elapsed time the rest expires at (undefined = never
+ * repelled); pure over (now, restUntil) so it is unit-testable.
+ */
+export function crocodileAmbushResting(now: number, restUntil: number | undefined): boolean {
+  return restUntil !== undefined && now < restUntil
+}
+
+/**
  * The crocodile's mouth anchor in world space (design.md §19.16, point 268): a
  * seized victim lies at the crocodile's JAWS, not on its back. The jaw tip sits
  * a fixed distance AHEAD of the body origin along the local +z axis in the

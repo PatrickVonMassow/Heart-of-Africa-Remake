@@ -307,6 +307,12 @@ export interface BalanceConfig {
      *  "every started drama resolves" rule. Above the ~5 s caught window so a normal
      *  kill is never cut short. */
     gripSeconds: number
+    /** Rest after a DRIVE-OFF (s, point 130 under the broadened waterline
+     *  trigger): a crocodile the parent repelled keeps to its water this long
+     *  before it may take a new ambush target. Without it the freed victim,
+     *  still standing at the bank, is a legal target again the very next frame
+     *  and the croc re-seizes it at once — the rescue would read as failed. */
+    driveOffRestSeconds: number
   }
   /** Purposeful water crossings (point 192 — the user's water-rule revision:
    *  animals may cross rivers/lakes and flee into them; never the ocean). */
@@ -637,6 +643,7 @@ export const balance: BalanceConfig = {
     mouthOffsetLocal: 1.15, // calibratable (point 268): local forward reach to the jaws (snout tip ~1.5), so the seized victim lies IN the mouth, gripped
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
+    driveOffRestSeconds: 20, // calibratable: a repelled crocodile keeps to its water this long — long enough for the freed victim to leave the bank, so a rescue is not undone the next frame
   },
   waterCross: {
     maxUnits: 6, // calibratable: swimmable channel width (point 192) — the widened rivers span ~2-4 units
