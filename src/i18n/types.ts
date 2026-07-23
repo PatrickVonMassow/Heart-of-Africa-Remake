@@ -148,6 +148,50 @@ export interface Strings {
     close: string
   }
 
+  /** In-game render benchmark (design.md §21.1, F8). */
+  benchmark: {
+    title: string
+    /** Line naming the running config, e.g. "Config 3/10: ssao-off". */
+    config: (name: string, index: number, count: number) => string
+    /** The discarded warm-up pass ahead of the sweep. */
+    warmup: string
+    /** Line naming the measured route section. */
+    phase: (name: string) => string
+    /** The three route sections (CLAUDE.md §7.1 pt. 20). */
+    phases: {
+      savannaStanding: string
+      desertStanding: string
+      savannaDriving: string
+    }
+    /** Estimated time left, `m:ss`. */
+    remaining: (time: string) => string
+    /** How to abort (Esc), with the promise that everything is restored. */
+    abortHint: string
+    doneTitle: string
+    /** Shown instead of the result when the run was aborted. */
+    abortedNote: string
+    /** Which of the three measured series is the trustworthy result here. */
+    headline: {
+      /** Real GPU timestamps were measured — the headline number. */
+      gpu: string
+      /** No GPU timestamps AND a vsync-capped wall clock: only the CPU column
+       *  carries information, and pure GPU cost is not measured at all. */
+      cpu: (reason: string) => string
+      /** No GPU timestamps, but the wall clock is not capped. */
+      wall: string
+    }
+    /** Save the report as a .json file. */
+    download: string
+    copy: string
+    /** Toast confirming the report went to the clipboard. */
+    copied: string
+    close: string
+    /** Toast when the renderer is not ready yet. */
+    unavailable: string
+    /** Toast when the run failed. */
+    failed: (message: string) => string
+  }
+
   toasts: {
     oceanBlocked: string
     /** Warning when starting to climb a mountain without a rope (design.md §11). */
@@ -326,6 +370,20 @@ export interface Strings {
     randomEvents: string
     triggerEvent: string
     eventNames: Record<string, string>
+    /** Label of the event-trigger dropdown (design.md §21.3, point 258). */
+    stageEvent: string
+    /** optgroup labels of the event-trigger dropdown. */
+    stageGroups: {
+      wildlife: string
+      random: string
+      hazards: string
+    }
+    /** Names of the stageable §19.8/§19.16 wildlife dramas. */
+    dramaNames: Record<string, string>
+    /** Names of the stageable §11 traveller hazards. */
+    hazardNames: Record<string, string>
+    /** Toasts for a trigger whose precondition cannot be met near the traveller. */
+    stageFailures: Record<string, string>
     showHidden: string
     fpsCounter: string
     /** TRAA toggle (design.md §2.7/§21), default on. */

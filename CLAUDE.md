@@ -959,7 +959,24 @@ verify suite that proves it.
     samples the mirrored column, and a magenta probe injected due west
     of the capture point proves the rendered horizon compass-true
     seed-independently; a direct place-to-place enter falls back to the
-    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99); the §4.4 port skyline landmarks
+    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). TWO
+    gates keep that band honest. Freshness: the capture is a module
+    singleton that OUTLIVES its visit, so the store's `enteredFromTravel`
+    (true only for an enter out of the bird's-eye view; false on a
+    place→place enter, a ferry passage, a resumed snapshot and while
+    travelling) decides whether it may be shown at all, without which a
+    place captured earlier in the run wrongly re-showed its stale band
+    (pure-tested in `src/state/store.travel.test.ts`). Completeness: the
+    capture never fires before the terrain chunk under the capture point
+    is COMMITTED to the scene (point 227) — the first travel frame after
+    leaving a settlement runs before the streamed chunk meshes mount, and
+    a capture that frame baked a TERRAINLESS band (only water sheets,
+    landmarks and markers) which a re-entry drew over the backdrop as a
+    hard grey horizon line with a thin blue-grey water band below it; the
+    gate (`panoramaCaptureReady`) is pure-tested in
+    `src/scenes/travel/panoramaMath.test.ts` and the leave-capture's band
+    is live-checked to bake the surrounding terrain (bottom-quarter
+    opacity) in `scripts/verify/polish.mjs`; the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
     Cairo mounts the Giza pyramids as its western skyline (point 82) —
@@ -1083,7 +1100,41 @@ verify suite that proves it.
     every data field, drops the actions, stays deterministic) and
     `src/ui/StateDump.test.tsx` (hidden by default, F6/Esc toggle without
     moving focus onto a control, the F6 browser default prevented, F5
-    left untouched)); the
+    left untouched) — F8 the in-game render benchmark (point 277), the one
+    debug tool that SHIPS IN THE DELIVERED BUILD (the levers of point 276
+    must be priced on the USER's hardware, not on the headless one), its
+    runner LAZILY imported on the keypress so it stays out of the eager
+    startup chunks: it sweeps the ten graphics configs of §21.1 over one
+    identical route (dense savanna standing, empty desert standing,
+    driving out of the savanna — the anchors of `scripts/perf-bench.mjs`)
+    and DETERMINISTICALLY — a seeded PRNG installed over `Math.random` for
+    the run, world seed/date/position/travel speed/zoom/journal and the
+    event+deadline switches reset before every section, and a FIXED
+    simulation timestep (1/60 s) stepped a FIXED number of frames, so the
+    path and every roll repeat and only the measured wall-clock varies —
+    then offers the report (environment incl. backend/adapter/build
+    commit; per config THREE series — the REAL GPU time from the WebGPU
+    backend's timestamp queries, the CPU time inside the frame and the
+    wall-clock frame time, each median/p95/p99/max — plus fps,
+    `renderer.info` draw calls/triangles and a scene-graph triangle count
+    per system) as a downloadable JSON with a readable digest plus a copy
+    button, behind a localized modal whose Esc aborts and restores every
+    setting. The GPU series is the point: a page cannot disable vsync, so
+    a config 40 % dearer on the GPU moves NEITHER a capped wall clock NOR
+    the CPU time — exactly the geometry lever of point 276 would look
+    free. Where timestamps are unavailable (WebGL 2, or an adapter
+    without `timestamp-query`) the series is FLAGGED with its reason,
+    never fabricated, and the report names which series is the
+    trustworthy one (`headline`, in the digest and in the result panel);
+    verifiable via
+    `src/systems/benchmark.test.ts` (sweep plan, route, fixed-timestep
+    clock, statistics, breakdown, report shaping),
+    `src/ui/BenchmarkOverlay.test.tsx` (F8 starts the lazy runner and
+    prevents the browser default, Esc aborts/closes, both languages) and
+    `scripts/verify/benchmark.mjs` (a live `?bench=short` run: one row per
+    config × phase, the progress modal, the GPU series measured on WebGPU
+    and flagged-with-reason on WebGL 2, and every setting —
+    `Math.random` included — restored afterwards)); the
     canteen's consumption
     rates and capacity are editable (§21.2), as is the parental rescue
     burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's
@@ -1479,6 +1530,24 @@ After completion and after every major system:
   hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
   so no radius stands in for the picture. A green assertion against a computed
   radius can hide a real bug the player sees (points 164/171/172).
+- **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
+  the player's real backend and WebGL 2 the shipped fallback, so both are
+  verified, not just the one that happens to launch:
+  - Every browser suite launches through `launchVerifyBrowser()` and asserts the
+    backend it actually got (`assertBackend`, right after the `window.__renderer`
+    wait). A `VERIFY_GL=webgpu` run that silently fell back to WebGL 2 — or a
+    `webgl` run that came up on WebGPU — FAILS LOUD instead of giving false
+    confidence. The only exceptions are `docs` (pure Node, no browser) and
+    `preview` (production build, where `__renderer` is dev-only).
+  - A LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) covers
+    BOTH backends in one command: the whole LARGE on WebGL 2 (with preflight and
+    prod preview), then the render suites on WebGPU. A pinned `VERIFY_GL`, the
+    SMALL tier and a bare suite filter stay single-backend. `touch` and `voice`
+    are the documented WebGL2-only skip (headless WebGPU drives neither the CDP
+    touch events nor the TTS speak state; both were verified on WebGL 2).
+  - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
+    pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
+    there and in `scripts/verify/README.md` together.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 

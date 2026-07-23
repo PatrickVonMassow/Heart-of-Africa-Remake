@@ -7743,7 +7743,7 @@ the remaining open points in their numeric order.
   the tripwire armed; build+lint+vitest+audit clean. (B)-(N) and the visual
   sweep (C) remain open above.
 
-- [ ] 204. Make WebGPU coverage UNIVERSAL where it is possible (user request
+- [x] 204. Make WebGPU coverage UNIVERSAL where it is possible (user request
   20.07.2026, from the sweep-on-WebGL2 gap: "Analysiere alle Tests daraufhin,
   dass — wo immer möglich — auch WebGPU abgedeckt ist"). ANALYSIS (done
   20.07.2026): the Vitest layer (1941) is jsdom / pure logic → backend-agnostic,
@@ -8875,7 +8875,7 @@ the remaining open points in their numeric order.
   geometry). Coordinate with 210 (same Cairo coast — the sea-pocket geometry that
   traps the calf is partly the very sea-arm 210 is removing).
 
-- [ ] 227. A HORIZONTAL LINE / BAND ARTIFACT IN THE FIRST-PERSON SKYLINE (user
+- [x] 227. A HORIZONTAL LINE / BAND ARTIFACT IN THE FIRST-PERSON SKYLINE (user
   report 22.07.2026, real-WebGPU screenshot inside Cairo looking at the desert
   skyline: between the near dune and the Giza pyramid a horizontal grey line runs
   across the horizon with a thin blue/grey band below it — reads as a graphics
@@ -9784,7 +9784,7 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`/`wildlifeBehavior.ts` — croc files (same as 242/250, both merged);
   small focused fix, non-conflicting with 244 (place/input) and the 249b harness.
 
-- [ ] 258. DEBUG EVENT-TRIGGER DROPDOWN (user 23.07.2026). The §19.8/§19.16 wildlife
+- [x] 258. DEBUG EVENT-TRIGGER DROPDOWN (user 23.07.2026). The §19.8/§19.16 wildlife
   dramas + §14 events are RARE BY DESIGN and have NO deployed-build force (the
   `window.__wildlife.igniteFire` hook is `import.meta.env.DEV`-gated, absent on the
   GH-Pages build) — e.g. the grass fire (point 145a) attempts ignition only once per
@@ -10506,7 +10506,7 @@ the remaining open points in their numeric order.
   But that GPU is not geometry-bound (115-238 fps), so which lever actually pays MUST be
   decided on the user's hardware — point 277 delivers those numbers first.
 
-- [ ] 277. IN-GAME BENCHMARK ON A FUNCTION KEY, IN THE DELIVERED BUILD (user 24.07.2026).
+- [x] 277. IN-GAME BENCHMARK ON A FUNCTION KEY, IN THE DELIVERED BUILD (user 24.07.2026).
   The headless numbers cannot decide the point-276 levers: that machine is not
   geometry-bound, so the doubled geometry costs it 8 % while the user's GPU may pay far
   more. So the game itself must measure, on the user's real hardware, in the DEPLOYED
@@ -10556,6 +10556,39 @@ the remaining open points in their numeric order.
   setting afterwards, and leaves `Math.random` the original function.
   DOCS: design.md §21.1 (the F-key list gains F8) and CLAUDE.md §7.1 pt. 20; record the
   method in `docs/perf-276-findings.md`. Implementation-ready.
+
+- [ ] 278. THE DRESSING GROWS OVER A SESSION — A COST THAT RISES THE LONGER ONE PLAYS
+  (found 24.07.2026 while proving out the point-277 benchmark; numbers in
+  `docs/perf-276-findings.md`). At a FIXED anchor, with a fixed seed and a fixed
+  date, the instanced flora/dressing triangle count CLIMBS as the session goes on:
+  235 808 -> 327 808 over five round trips between two anchors, and 252 766 ->
+  354 958 across one benchmark run — while the mesh count stays constant (37) and
+  terrain, water and sky stay bit-stable. Reproduced OUTSIDE the benchmark with
+  plain debug jumps, so it is the game's own behaviour, not a measurement artifact.
+  Same regression family as point 276, and worse in kind: point 276's surcharge is
+  constant, this one accumulates, so a long session degrades steadily. It also
+  biases any sweep (~+2 % scene triangles per config — later configs are
+  handicapped), which is why the point-277 report carries a per-row
+  `sceneTriangles` for normalisation.
+  DIAGNOSE FIRST, do not guess: instrument the flora streaming rebuild
+  (`src/scenes/travel/floraStreaming.ts`, the rebuild in `TravelScene.tsx`) and
+  find WHY the instance count per rebuild grows — candidates: instances not
+  released when a chunk leaves the spawn circle (the per-instance buffer keeps
+  stale entries), the nearest-first fill writing past the previous count without
+  truncating, a per-rebuild accumulation in the seasonTint bake, or the hysteresis
+  step (point 171) letting two overlapping fills coexist. The scene-graph
+  breakdown of `scripts/perf-breakdown.mjs` and the count probe used above are the
+  instruments; the point-277 in-game report shows it on real hardware too.
+  FIX so that returning to the SAME anchor with the same seed and date yields the
+  SAME instance count, however long the session has run.
+  TESTS: a pure test over the streaming rules that a repeated
+  fill/rebuild cycle at one position converges to a constant instance count (the
+  regression witness — it must FAIL against today's behaviour); a live check in
+  `scripts/verify/enrichments.mjs` that after several jumps back and forth the
+  dressing triangle count at a fixed anchor is unchanged within a small tolerance.
+  DOCS: record the resolution in `docs/perf-276-findings.md`. No player-visible
+  text. NOTE: touches the flora streaming — coordinate with any point-276 lever
+  work on the same files. Implementation-ready.
 
 ## Closing (only after all points)
 

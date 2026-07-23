@@ -5,6 +5,26 @@ import type { TreasureId } from '../systems/economy'
 
 export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 'agency' | 'chief'
 
+/** Progress of the running in-game benchmark (design.md §21.1, F8). */
+export interface BenchProgress {
+  /** Config name, or null while the discarded warm-up pass runs. */
+  config: string | null
+  configIndex: number
+  configCount: number
+  /** Route phase id (localized in the overlay). */
+  phase: string
+  framesDone: number
+  framesTotal: number
+  remainingMs: number
+}
+
+/** A finished benchmark report, ready to download or copy. */
+export interface BenchReportFile {
+  filename: string
+  json: string
+  aborted: boolean
+}
+
 /** Building types trading with the flat goods list (design.md §9). */
 export type TradeBuilding = 'shop' | 'weapons' | 'tools' | 'market'
 
@@ -81,6 +101,12 @@ interface UiState {
   seasonCollapseEnabled: boolean
   /** F6 state-dump popup (design.md §21.1): the full game state for bug reports. */
   stateDumpOpen: boolean
+  /** Live in-game benchmark (design.md §21.1, F8); null while none runs. */
+  benchProgress: BenchProgress | null
+  /** Finished benchmark report awaiting download/copy; null when none. */
+  benchReport: BenchReportFile | null
+  /** Esc during a run raises this; the runner polls it and unwinds. */
+  benchAbort: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
@@ -105,6 +131,10 @@ interface UiState {
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
   toggleStateDump: () => void
+  setBenchProgress: (progress: BenchProgress | null) => void
+  setBenchReport: (report: BenchReportFile | null) => void
+  requestBenchAbort: () => void
+  clearBenchAbort: () => void
 }
 
 // Default bird's-eye zoom (design.md §21.4): the game starts here, and without
@@ -133,6 +163,9 @@ export const useUi = create<UiState>()((set) => ({
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
   stateDumpOpen: false,
+  benchProgress: null,
+  benchReport: null,
+  benchAbort: false,
   bazaarBid: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
   // Closing or switching a dialog always discards a pending bazaar bid.
@@ -168,6 +201,10 @@ export const useUi = create<UiState>()((set) => ({
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
   toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
+  setBenchProgress: (benchProgress) => set({ benchProgress }),
+  setBenchReport: (benchReport) => set({ benchReport }),
+  requestBenchAbort: () => set({ benchAbort: true }),
+  clearBenchAbort: () => set({ benchAbort: false }),
 }))
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).

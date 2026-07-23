@@ -17,6 +17,7 @@ import { Dialogs } from './Dialogs'
 import { DebugMenu } from './DebugMenu'
 import { MapOverlay } from './MapOverlay'
 import { StateDump } from './StateDump'
+import { BenchmarkOverlay } from './BenchmarkOverlay'
 import { TouchControls } from './TouchControls'
 import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
 import { getStrings, useStrings } from '../i18n'
@@ -430,6 +431,17 @@ export function Hud() {
     // the browser reloads before preventDefault runs). F7 is RESERVED for the
     // future "Low Details" performance mode — do not bind it to anything else.
     const offF6 = onKeyPress('F6', () => useUi.getState().toggleStateDump())
+    // F8 = in-game render benchmark (design.md §21.1). It SHIPS in the
+    // delivered build — the numbers must come from the player's own hardware —
+    // so the runner is not dev-gated but imported LAZILY here, keeping it out
+    // of the eager startup chunks (like the TTS stack).
+    const offF8 = onKeyPress('F8', () => {
+      const ui = useUi.getState()
+      if (ui.benchProgress || ui.benchReport) return
+      void import('../systems/benchmarkRun')
+        .then((m) => m.startBenchmark())
+        .catch(() => useGame.getState().setToast(getStrings().benchmark.unavailable))
+    })
     // The twelve keys of the number row jump to the twelve months of the
     // current year, for stepping through the seasons (design.md §21.1).
     // PHYSICAL codes, so the row reads 1..0 ß ´ on a German keyboard and
@@ -460,18 +472,22 @@ export function Hud() {
       }),
     )
     const offEsc = onKeyPress('Escape', () => {
-      if (useUi.getState().stateDumpOpen) useUi.getState().toggleStateDump()
+      // A running benchmark comes first: Esc aborts it and the runner restores
+      // every setting it changed (design.md §21.1).
+      if (useUi.getState().benchProgress) useUi.getState().requestBenchAbort()
+      else if (useUi.getState().benchReport) useUi.getState().setBenchReport(null)
+      else if (useUi.getState().stateDumpOpen) useUi.getState().toggleStateDump()
       else if (useUi.getState().dialog) setDialog(null)
       else if (useUi.getState().mapOpen) useUi.getState().toggleMap()
       else if (useGame.getState().journalOpen) setJournalOpen(false)
     })
     // Function keys trigger browser actions by default (F1 help, F3 find) —
-    // prevent that for the keys the game uses, F6 (state-dump) included so any
-    // browser default stays suppressed. F5 stays with the browser: its reload
-    // fires before preventDefault can stop it, which is why the state-dump
-    // moved to F6.
+    // prevent that for the keys the game uses, F6 (state-dump) and F8
+    // (benchmark) included so any browser default stays suppressed. F5 stays
+    // with the browser: its reload fires before preventDefault can stop it,
+    // which is why the state-dump moved to F6.
     const preventFn = (e: KeyboardEvent) => {
-      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F6') e.preventDefault()
+      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F6' || e.code === 'F8') e.preventDefault()
     }
     window.addEventListener('keydown', preventFn)
     return () => {
@@ -482,6 +498,7 @@ export function Hud() {
       offF3()
       offF4()
       offF6()
+      offF8()
       offMonths.forEach((off) => off())
       offYears.forEach((off) => off())
       offH()
@@ -532,6 +549,8 @@ export function Hud() {
       <DebugMenu />
       {/* After Dialogs/DebugMenu so the state dump stacks above them (§17.4). */}
       <StateDump />
+      {/* The benchmark's progress/result modal (design.md §21.1, F8). */}
+      <BenchmarkOverlay />
       {/* Above panels and dialogs so it stays clickable; below the modal overlays. */}
       <SunblindVeil />
       <RendererWarning />

@@ -6,7 +6,7 @@
 // language switch driven through the live UI and the five localization
 // screenshots (54-58) that are the §7.2 acceptance evidence, plus the
 // console-error gate. Dev server only (dev hooks).
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -24,6 +24,8 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.waitForTimeout(5000)
 
 // --- English is the default: capture the status bar + journal ----------------

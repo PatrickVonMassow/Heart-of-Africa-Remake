@@ -2,7 +2,7 @@
 // design.md §17.5, point 84). A touch-capable context is used and real touch
 // events are driven through CDP so pointer capture and multi-touch behave like
 // hardware. Dev server only.
-import { launchVerifyBrowser, waitForStable } from './_browser.mjs'
+import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 let failures = 0
@@ -34,6 +34,8 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game && window.__balance && window.__ui, null, { timeout: 60000 })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: this suite is WebGL2-only — prove the lane really is WebGL 2
 await page.waitForTimeout(4000)
 await page.evaluate(() => {
   window.__balance.randomEventsEnabled = false

@@ -30,13 +30,47 @@ export const REFINE_RING_MAX = 4
 export const REFINE_SEGMENT_CAP = 112
 
 /**
+ * Runtime overrides for the two refinement levers, so the in-game benchmark
+ * (design.md §21.1, F8) can price point 209's near-ring refinement on the
+ * player's own hardware. NOT player-facing options and not persisted: the
+ * benchmark sets them for one config and restores the defaults afterwards.
+ * A changed override changes the chunk geometry KEYS, so the next window plan
+ * rebuilds — no extra invalidation needed.
+ */
+let refineEnabled = true
+let refineSegmentCap = REFINE_SEGMENT_CAP
+
+export interface TerrainRefineOverride {
+  enabled: boolean
+  segmentCap: number
+}
+
+export function setTerrainRefine(override: Partial<TerrainRefineOverride>): void {
+  if (override.enabled !== undefined) refineEnabled = override.enabled
+  if (override.segmentCap !== undefined) refineSegmentCap = Math.max(1, Math.floor(override.segmentCap))
+}
+
+export function getTerrainRefine(): TerrainRefineOverride {
+  return { enabled: refineEnabled, segmentCap: refineSegmentCap }
+}
+
+/** Back to the shipped defaults (the benchmark's restore path). */
+export function resetTerrainRefine(): void {
+  refineEnabled = true
+  refineSegmentCap = REFINE_SEGMENT_CAP
+}
+
+/**
  * Segments for a chunk after the near-ring quality gates. `refine` is the
  * OR of the per-chunk gates (coast-crossing, mountainous); either doubles
  * the base resolution once — never twice — and only inside the near rings.
  */
 export function refinedSegments(ring: number, refine: boolean): number {
   const base = lodSegments(ring)
-  return refine && ring <= REFINE_RING_MAX ? Math.min(REFINE_SEGMENT_CAP, base * 2) : base
+  if (!refineEnabled || !refine || ring > REFINE_RING_MAX) return base
+  // A cap below the base resolution would COARSEN the chunk instead of
+  // refining it — the refinement never makes a chunk cheaper than its ring.
+  return Math.max(base, Math.min(refineSegmentCap, base * 2))
 }
 
 // point 209: a chunk straddling the sea coast gets a finer mesh, so the smooth

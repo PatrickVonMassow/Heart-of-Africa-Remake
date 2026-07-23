@@ -13,13 +13,19 @@
 // open ocean. Only walking into the lion attacks the player (§14);
 // otherwise no gameplay effect.
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { healthState, useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { setAmbienceAnimals, playTrampleCrunch, proximityGain, trampleCrunchFires } from '../../systems/ambience'
 import { devAssert } from '../../systems/devAssert'
+import {
+  nearestStagingSpot,
+  setWildlifeDramaTrigger,
+  type DebugEventFailure,
+  type WildlifeDramaKind,
+} from '../../systems/debugEvents'
 import { setAnimalCollider } from './wildlifeCollision'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
@@ -389,6 +395,11 @@ interface LionHuntState {
   /** Sim-seconds spent in the leave phase (point 188): past the calibratable
    *  overtime a still-ringbound predator retires the moment it is off-frame. */
   leaveT?: number
+  /** Debug-menu forced hunt (design.md §21.3, point 258): consumed by the next
+   *  idle frame, which skips the cooldown and the ambient dice and stages the
+   *  named hunt at this spot. `generic` runs a scripted-prey hunt there, `calf`
+   *  takes a nearby herd calf, `cub` a lion cub (always a hyena's hunt). */
+  force?: { x: number; z: number; kind: 'generic' | 'calf' | 'cub' }
 }
 const LION_STATE: LionHuntState = {
   mode: 'idle', lx: 0, lz: 0, px: 0, pz: 0, timer: 0, heading: 0, lionHeading: 0, preyHeading: 0,
@@ -513,6 +524,19 @@ const FIRE_STATE = {
   timer: 90, // first ignition chance ~a minute and a half in
   victim: null as Animal | null,
   keeper: null as Animal | null,
+}
+/** Light the fire line at (x, z) walking along `heading`. Module scope (point
+ *  258): the DEV-only `window.__wildlife.igniteFire` hook and the SHIPPED
+ *  debug-menu trigger light exactly the same fire — the deployed build has no
+ *  window hook, so the ignition entry point cannot live inside one. */
+function igniteFireAt(x: number, z: number, heading: number): void {
+  FIRE_STATE.mode = 'burning'
+  FIRE_STATE.x = x
+  FIRE_STATE.z = z
+  FIRE_STATE.heading = heading
+  FIRE_STATE.front = 2
+  FIRE_STATE.victim = null
+  FIRE_STATE.keeper = null
 }
 const FIRE_FRONT_SPEED = 1.4
 const FIRE_MAX_FRONT = 45
@@ -1602,7 +1626,9 @@ function Herds() {
   // horizontal disc on a hillside got wedges swallowed by the ground and read
   // as a Pac-Man (design.md §19).
   const stains = useRef<Array<{ x: number; y: number; z: number; nx: number; ny: number; nz: number }>>([])
-  const pushStain = (x: number, z: number) => {
+  // Stable per seed (point 258): the debug event trigger registers it in an
+  // effect, so a fresh closure per render would re-register every time.
+  const pushStain = useCallback((x: number, z: number) => {
     if (stains.current.length >= MAX_STAINS) return
     const heightAt = (px: number, pz: number) => {
       const ll = worldToLatLon(px, pz)
@@ -1610,7 +1636,7 @@ function Herds() {
     }
     const [nx, ny, nz] = groundNormal(x, z, heightAt)
     stains.current.push({ x, y: Math.max(0.02, heightAt(x, z)), z, nx, ny, nz })
-  }
+  }, [seed])
 
   // The one death the §19.8 dramas share (Closing pass): the resolution
   // logic grew by accretion across eight sites — this is its single
@@ -1661,20 +1687,232 @@ function Herds() {
       herdState.current.clear()
       for (const f of scavengers.current) f.target = null
     }
-    const igniteFire = (x: number, z: number, heading: number) => {
-      FIRE_STATE.mode = 'burning'
-      FIRE_STATE.x = x
-      FIRE_STATE.z = z
-      FIRE_STATE.heading = heading
-      FIRE_STATE.front = 2
-      FIRE_STATE.victim = null
-      FIRE_STATE.keeper = null
-    }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, lion: LION_STATE, igniteFire, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
     return () => {
       delete w.__wildlife
     }
   }, [])
+
+  // Debug-menu event trigger (design.md §21.3, point 258). The §19.8/§19.16
+  // dramas are RARE BY DESIGN — the grass fire attempts ignition once per five
+  // minutes, a crocodile waits for a drinker — so the menu stages the picked
+  // one at the traveller. Registered UNCONDITIONALLY, unlike the DEV-only
+  // window hooks above: the deployed build has no `window.__wildlife`, and the
+  // trigger must work there. Every entry locates the ground its drama needs
+  // (savanna, a river bank, a herd calf) and reports the MISSING precondition
+  // instead of failing silently — the caller turns it into a localized toast.
+  useEffect(() => {
+    const terrainAt = (x: number, z: number) => {
+      const ll = worldToLatLon(x, z)
+      return sampleTerrain(ll.lat, ll.lon, seed)
+    }
+    const savannaNear = (x: number, z: number) =>
+      nearestStagingSpot(x, z, (sx, sz) => terrainAt(sx, sz).type === 'savanna', {
+        maxRadius: 90,
+        ringStep: 6,
+        // Beyond the traveller's own step so the staged drama has room to run.
+        minRadius: 18,
+      })
+    const waterNear = (x: number, z: number) =>
+      nearestStagingSpot(x, z, (sx, sz) => terrainAt(sx, sz).type === 'water', {
+        maxRadius: 60,
+        ringStep: 3,
+      })
+    /** Nearest herd animal free to take a staged drama: alive, not already
+     *  owned by another one, and (for the family dramas) a juvenile with a
+     *  living parent. */
+    const pickAnimal = (opts: {
+      young: boolean
+      radius: number
+      species?: readonly Species[]
+    }): Animal | null => {
+      const h = herdsRef.current
+      if (!h) return null
+      const p = useGame.getState().pos
+      let best: Animal | null = null
+      let bd = opts.radius
+      for (const sp of opts.species ?? CALF_HUNT_SPECIES) {
+        for (const a of h[sp]) {
+          if (a.dead || (a.young === true) !== opts.young) continue
+          if (opts.young && (!a.parent || a.parent.dead)) continue
+          if (a.vigil !== undefined || a.crossing !== undefined) continue
+          if (claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })) continue
+          const d = Math.hypot(a.x - p.x, a.z - p.z)
+          if (d < bd) {
+            bd = d
+            best = a
+          }
+        }
+      }
+      return best
+    }
+    /** Re-arm the single global hunt on the picked spot (the §19.8 claim rule:
+     *  a hunt is claimed from idle only, so the force is consumed there). */
+    const forceHunt = (x: number, z: number, kind: 'generic' | 'calf' | 'cub') => {
+      LION_STATE.mode = 'idle'
+      LION_STATE.timer = 0
+      LION_STATE.victim = null
+      LION_STATE.victimHunt = false
+      LION_STATE.force = { x, z, kind }
+    }
+
+    const trigger = (kind: WildlifeDramaKind): DebugEventFailure | null => {
+      const h = herdsRef.current
+      if (!h) return 'noScene'
+      const p = useGame.getState().pos
+      switch (kind) {
+        case 'grassFire': {
+          const spot = savannaNear(p.x, p.z)
+          if (!spot) return 'noSavanna'
+          // The line walks TOWARD the traveller, so it is seen coming.
+          igniteFireAt(spot.x, spot.z, Math.atan2(p.x - spot.x, p.z - spot.z))
+          return null
+        }
+        case 'huntGeneric': {
+          const spot = savannaNear(p.x, p.z)
+          if (!spot) return 'noSavanna'
+          forceHunt(spot.x, spot.z, 'generic')
+          return null
+        }
+        case 'huntCalf': {
+          const calf = pickAnimal({ young: true, radius: CALF_HUNT_SEEK })
+          if (!calf) return 'noCalf'
+          forceHunt(calf.x, calf.z, 'calf')
+          return null
+        }
+        case 'lionCubDefence': {
+          const cub = pickAnimal({ young: true, radius: CALF_HUNT_SEEK, species: ['lion'] })
+          if (!cub) return 'noCub'
+          forceHunt(cub.x, cub.z, 'cub')
+          return null
+        }
+        case 'crocodileAmbush': {
+          const water = waterNear(p.x, p.z)
+          if (!water) return 'noWater'
+          const victim =
+            pickAnimal({ young: true, radius: 70 }) ?? pickAnimal({ young: false, radius: 70 })
+          if (!victim) return 'noPrey'
+          // The victim takes its drink at the nearest bank of that water; the
+          // ambusher lies on the water itself and lunges through the ORDINARY
+          // §19.16 burst — no second attack path.
+          const bank = findLandNear(water.x, water.z, seed)
+          victim.x = bank.x
+          victim.z = bank.z
+          victim.y = Math.max(0.02, terrainAt(bank.x, bank.z).height)
+          victim.drink = { tx: bank.x, tz: bank.z }
+          const wll = worldToLatLon(water.x, water.z)
+          const wt = sampleTerrain(wll.lat, wll.lon, seed)
+          if (h.crocodile.length >= MAX_INSTANCES.crocodile) h.crocodile.shift()
+          h.crocodile.push({
+            x: water.x,
+            z: water.z,
+            // The drawn sheet, never the carved bed (point 274): anchored low
+            // the hidden body would sit under the ribbon instead of in it.
+            y:
+              renderedSheetY(wll.lat, wll.lon, seed) ??
+              waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ??
+              wt.height + 0.3,
+            rot: Math.atan2(bank.x - water.x, bank.z - water.z),
+            scale: 1,
+            phase: 0.2,
+            lunge: { victim, timer: 0, homeX: water.x, homeZ: water.z, gripped: false },
+          })
+          return null
+        }
+        case 'calfDrowning': {
+          const water = waterNear(p.x, p.z)
+          if (!water) return 'noWater'
+          const calf = pickAnimal({ young: true, radius: CALF_HUNT_SEEK })
+          if (!calf) return 'noCalf'
+          // Set onto open water: the §19.8 water drama picks it up on the next
+          // frame (struggle, drift, the parent wading in) — the same entry the
+          // gambol bout takes when a calf plays into the river.
+          calf.drink = undefined
+          calf.bouted = undefined
+          calf.hop = undefined
+          calf.rescueEntry = findLandNear(water.x, water.z, seed)
+          calf.x = water.x
+          calf.z = water.z
+          return null
+        }
+        case 'calfMired': {
+          const calf = pickAnimal({ young: true, radius: CALF_HUNT_SEEK })
+          if (!calf) return 'noCalf'
+          calf.drink = undefined
+          calf.mired = 0
+          return null
+        }
+        case 'elephantTrample': {
+          const victim =
+            pickAnimal({ young: true, radius: CALF_HUNT_SEEK }) ??
+            pickAnimal({ young: false, radius: CALF_HUNT_SEEK })
+          if (!victim) return 'noPrey'
+          // Bear an elephant down on the victim from just inside trample range
+          // and HEADED at it: the point-259 direction condition kills only
+          // while the elephant moves toward its victim, so a parked one would
+          // (correctly) trample nothing. A calf victim takes its parent with
+          // it through the §19.8 grief-trample.
+          if (h.elephant.length >= MAX_INSTANCES.elephant) h.elephant.shift()
+          const ex = victim.x + 0.7
+          const ez = victim.z
+          const heading = Math.atan2(victim.x - ex, victim.z - ez)
+          h.elephant.push({
+            x: ex,
+            z: ez,
+            y: Math.max(0.02, terrainAt(ex, ez).height),
+            rot: heading,
+            heading,
+            scale: 1,
+            phase: 0,
+          })
+          return null
+        }
+        case 'elephantMourning': {
+          // The vigil generalised over a dead herd-mate (point 126): a herd of
+          // at least two takes one loss and the rest gather over the body.
+          let herdId: number | undefined
+          let victim: Animal | null = null
+          let bd = 90
+          for (const e of h.elephant) {
+            if (e.dead || e.herd === undefined) continue
+            const mates = h.elephant.filter((m) => !m.dead && m.herd === e.herd).length
+            if (mates < 2) continue
+            const d = Math.hypot(e.x - p.x, e.z - p.z)
+            if (d < bd) {
+              bd = d
+              victim = e
+              herdId = e.herd
+            }
+          }
+          if (!victim || herdId === undefined) return 'noElephant'
+          victim.dead = true
+          victim.lionFed = true // the herd keeps its own — no vulture over it
+          pushStain(victim.x, victim.z)
+          const st = herdState.current.get(herdId)
+          if (st) {
+            st.mourn = undefined
+            st.mourned = undefined // let the herd be drawn in again at once
+          }
+          return null
+        }
+        case 'vultureFlock': {
+          const carrion = pickAnimal({ young: false, radius: 60 })
+          if (!carrion) return 'noPrey'
+          // A NON-lion carcass (lionFed stays false): the ground scavengers
+          // fly in for it exactly as they do for a trampled animal.
+          carrion.dead = true
+          carrion.lionFed = false
+          carrion.drink = undefined
+          pushStain(carrion.x, carrion.z)
+          return null
+        }
+      }
+    }
+    setWildlifeDramaTrigger(trigger)
+    return () => setWildlifeDramaTrigger(null)
+    // pushStain is rebuilt per render; re-registering the trigger is cheap and
+    // keeps it bound to the current seed's terrain sampling.
+  }, [seed, pushStain])
 
   // Drop the shared herd pointer when this scene unmounts so a stale reference
   // never outlives it (design.md §19).
@@ -4378,7 +4616,12 @@ function LionHunt() {
       // s.prey reports the truth for the region/web fit checks.
       let victimSpecies: PreyKind | null = null
       let vigilKeeper: Animal | null = null
-      if (herds) {
+      // The debug menu's forced hunt (design.md §21.3, point 258): consumed
+      // here, it preempts the cooldown and the ambient dice so the picked
+      // drama stages at once — the ordinary paths below are untouched.
+      const force = s.force
+      s.force = undefined
+      if (!force && herds) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const k of herds[csp]) {
@@ -4393,7 +4636,7 @@ function LionHunt() {
           }
         }
       }
-      if (!vigilKeeper) {
+      if (!vigilKeeper && !force) {
         s.timer -= dt
         if (s.timer > 0) return
       }
@@ -4412,7 +4655,7 @@ function LionHunt() {
       // The drying waterhole draws the predators (point 123): a MIRED calf
       // in seek range is always the hunt's target — the pair at the last
       // water is genuinely found, not left to the calf-hunt dice.
-      if (!vigilKeeper && herds) {
+      if (!vigilKeeper && !force && herds) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {
@@ -4429,7 +4672,10 @@ function LionHunt() {
           }
         }
       }
-      if (!vigilKeeper && !calf && herds && prefersJuvenilePrey(Math.random(), balance.family.juvenilePreyBias)) {
+      if (
+        !vigilKeeper && !calf && herds &&
+        (force ? force.kind === 'calf' : prefersJuvenilePrey(Math.random(), balance.family.juvenilePreyBias))
+      ) {
         let bd = CALF_HUNT_SEEK
         for (const csp of CALF_HUNT_SPECIES) {
           for (const c of herds[csp]) {
@@ -4450,7 +4696,10 @@ function LionHunt() {
       // is outside the food-web prey pools, so it is sought directly here; the
       // lioness (its .parent) defends through the same shared core. Found only
       // when no grazer calf was — the drama is a rare apex-family scene.
-      if (!vigilKeeper && !calf && herds && prefersJuvenilePrey(Math.random(), balance.family.juvenilePreyBias)) {
+      if (
+        !vigilKeeper && !calf && herds &&
+        (force ? force.kind === 'cub' : prefersJuvenilePrey(Math.random(), balance.family.juvenilePreyBias))
+      ) {
         let bd = CALF_HUNT_SEEK
         for (const c of herds.lion) {
           if (!c.young || c.dead || c.caught !== undefined || !c.parent || c.parent.dead) continue
@@ -4477,6 +4726,13 @@ function LionHunt() {
         ll = worldToLatLon(px, pz)
         s.victim = calf
         s.victimHunt = true
+      } else if (force) {
+        // Forced generic hunt (point 258): the debug trigger already located a
+        // savanna spot near the traveller, so neither the biome retry nor the
+        // off-frame rule applies — the picked drama must fire, not roll again.
+        px = force.x
+        pz = force.z
+        ll = worldToLatLon(px, pz)
       } else {
         // Generic hunt: a random savanna spot beyond the frame (point 195). The
         // spot must be OFF the rendered frame so the scripted prey mesh is never
