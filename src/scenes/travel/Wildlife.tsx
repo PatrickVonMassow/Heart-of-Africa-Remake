@@ -25,7 +25,7 @@ import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { waterSurfaceY } from './waterSurface'
-import { drinkWalkDistance } from './waterEdgeRules'
+import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
 import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
@@ -82,6 +82,7 @@ import {
   crocodileAllowedAt,
   crocodileLungeReady,
   crocodileGripExpired,
+  crocodileHoldsCatch,
   grassFireEligible,
   ploverShouldLure,
   ploverLureHeading,
@@ -117,6 +118,7 @@ import {
   buildZebra,
   buildZebraCalf,
   createFaunaMaterial,
+  crocodileBodyY,
 } from '../../render/fauna'
 
 const CHUNK_SIZE = 24
@@ -741,6 +743,24 @@ function findLandNear(x: number, z: number, seed: number): { x: number; z: numbe
     }
   }
   return { x, z } // mid-lake with no bank in reach — hold position
+}
+
+/** Nearest river/lake WATER cell to (x, z) — the inverse of findLandNear, for
+ *  re-anchoring a beached crocodile back onto its home water (design.md §19.16,
+ *  point 242). Skips the ocean (never a crocodile's home); returns null when no
+ *  river/lake water is within reach so the caller can hold position rather than
+ *  teleport the croc across dry land. */
+function findWaterNear(x: number, z: number, seed: number): { x: number; z: number } | null {
+  for (let r = 1; r <= 14; r += 1.5) {
+    for (let k = 0; k < 12; k++) {
+      const ang = (k / 12) * Math.PI * 2
+      const nx = x + Math.cos(ang) * r
+      const nz = z + Math.sin(ang) * r
+      const ll = worldToLatLon(nx, nz)
+      if (sampleTerrain(ll.lat, ll.lon, seed).type === 'water') return { x: nx, z: nz }
+    }
+  }
+  return null
 }
 
 /** Walk-off direction after a kill: straight away from the traveller, so the
@@ -2280,6 +2300,25 @@ function Herds() {
       const bc = balance.crocodile
       for (const c of herds.crocodile) {
         if (c.dead) continue
+        // Keep every RESTING crocodile ON water (design.md §19.16, point 242): a
+        // mask edit (the point-218 river widening) can leave a once-water spawn
+        // cell reading as bank/sand, beaching the ambusher flat and fully exposed.
+        // A hidden croc off water re-anchors to the nearest river/lake cell and
+        // re-seats on that water surface (so the submerge pose sinks it correctly);
+        // a lunging/gripping croc is left to its working attack, never relocated.
+        if (!c.lunge) {
+          const cll = worldToLatLon(c.x, c.z)
+          if (crocodileNeedsReanchor(sampleTerrain(cll.lat, cll.lon, seed).type)) {
+            const w = findWaterNear(c.x, c.z, seed)
+            if (w) {
+              c.x = w.x
+              c.z = w.z
+              const wll = worldToLatLon(w.x, w.z)
+              const wt = sampleTerrain(wll.lat, wll.lon, seed)
+              c.y = waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ?? wt.height + 0.3
+            }
+          }
+        }
         if (!c.lunge) {
           // Hidden: wait for a drinker standing at a bank inside the radius.
           for (const sp of CALF_HUNT_SPECIES) {
@@ -2309,9 +2348,15 @@ function Herds() {
         } else if (
           c.lunge.retreat ||
           c.lunge.victim === null ||
-          c.lunge.victim.dead ||
           c.lunge.victim.gone === true ||
-          (c.lunge.gripped && c.lunge.victim.caught === undefined)
+          // Gripping: slink home only once the catch is fully RESOLVED — the croc
+          // stays coupled to its victim through the struggle AND the sink that
+          // follows the kill (point 250: no swimming away while the prey still
+          // dissolves on its own). Mid-burst (not yet gripped): a victim that died
+          // or vanished before contact ends the run.
+          (c.lunge.gripped
+            ? !crocodileHoldsCatch(true, c.lunge.victim.caught, c.lunge.victim.dead === true, c.lunge.victim.dissolve)
+            : c.lunge.victim.dead)
         ) {
           // Meal taken, victim freed or moment passed: slink back and submerge.
           const dx = c.lunge.homeX - c.x
@@ -2350,25 +2395,35 @@ function Herds() {
             c.rot = Math.atan2(dx, dz)
           }
         } else {
-          // Gripping: hold at the struggling victim while the window runs. A hard
-          // deadline (point 186) releases the crocodile once the grip outlasts
-          // gripSeconds: a victim that VANISHES mid-grip (streamed out in a chunk
-          // despawn, taken by another system) freezes its caught-countdown, and
-          // without this cap the crocodile would stay gripped forever — violating
-          // the §19.8 "every started drama resolves" rule (invariant I4).
-          c.lunge.timer += dt
-          // Point 207(i): the grip deadline is a hard invariant — a timer past
-          // it means the release above failed and the drama is pinned.
-          devAssert(c.lunge.timer <= bc.gripSeconds + 2, 'croc-grip-bounded', () => `grip ${c.lunge?.timer.toFixed(1)}s`)
-          if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
-            c.lunge.retreat = true
-          } else {
-            const v = c.lunge.victim
-            if (v.caught !== undefined) {
+          // Gripping — two coupled phases, the croc holding its victim throughout
+          // (point 250), so the prey's removal is the croc's own feed:
+          //  (1) STRUGGLE (caught still counting): hold the thrashing victim at
+          //      the waterline. The point-186 hard deadline releases a VANISHED
+          //      victim whose countdown froze (streamed out in a chunk despawn,
+          //      taken by another system) so the drama can never pin the croc —
+          //      the §19.8 "every started drama resolves" rule (invariant I4).
+          //  (2) SINK (the kill resolved, caught cleared, the body dissolving in
+          //      the water): the croc drags it under through the dissolve
+          //      (design.md §19.16 — the river keeps the body, no bank carcass);
+          //      the retreat branch above releases the croc only once the body is
+          //      gone. The dissolve is self-bounded (CARCASS_DISSOLVE_SECONDS), so
+          //      the grip deadline is not applied here (it would cut the croc loose
+          //      mid-sink and re-decouple the carcass — the point-250 bug).
+          const v = c.lunge.victim
+          if (v.caught !== undefined) {
+            c.lunge.timer += dt
+            // Point 207(i): the grip deadline is a hard invariant — a timer past
+            // it (while still struggling) means the release below failed.
+            devAssert(c.lunge.timer <= bc.gripSeconds + 2, 'croc-grip-bounded', () => `grip ${c.lunge?.timer.toFixed(1)}s`)
+            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
+              c.lunge.retreat = true
+            } else {
               c.x = v.x - Math.sin(c.rot) * 0.6
               c.z = v.z - Math.cos(c.rot) * 0.6
             }
           }
+          // SINK phase (v.caught === undefined, v.dead): hold position over the
+          // sinking body — no move, no deadline; released by the retreat branch.
         }
       }
     }
@@ -2981,12 +3036,23 @@ function Herds() {
         let yaw = idleYaw
         let pitch = 0
         let bodyY = a.y
-        // The crocodile (design.md §19.16): submerged to the eye knobs while
-        // hidden, riding fully out on the lunge; it never idle-shuffles.
+        // The crocodile (design.md §19.16, points 130/242/250): sunk to the eye
+        // knobs — the armoured back UNDER the water sheet — while hidden, slinking
+        // home, or dragging a kill under as it sinks; riding fully out only during
+        // the live STRIKE at prey. bodyY comes from the shared crocodileBodyY so
+        // the submerge depth stays tied to the mesh (the old inline 0.24 left the
+        // back riding above the water — the exposed prop the user hit, point 242).
         if (sp === 'crocodile') {
           wobTarget = 0
-          yaw = a.rot
-          bodyY = a.y - (a.lunge && !a.lunge.retreat ? 0.02 : 0.24)
+          const hidden = a.lunge === undefined
+          const striking = a.lunge !== undefined && !a.lunge.retreat && !(a.lunge.victim?.dead ?? false)
+          // Subtle idle life (point 242c) only while fully at rest: a slow float
+          // bob and a few-degree sway so a hidden croc never reads as a frozen
+          // prop — never applied mid-attack or mid-sink (that would look jittery).
+          const sway = hidden ? Math.sin(t * 0.3 + a.phase * 6.283) * 0.03 : 0
+          const bob = hidden ? Math.sin(t * 0.5 + a.phase * 6.283) * 0.008 : 0
+          yaw = a.rot + sway
+          bodyY = crocodileBodyY(a.y, !striking) + bob
         }
         // The broken-wing act (point 145b): the luring plover tilts hard onto
         // one wing and flutters; the return flight lifts it in a low arc.

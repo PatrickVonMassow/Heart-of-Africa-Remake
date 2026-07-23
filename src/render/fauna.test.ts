@@ -32,6 +32,9 @@ import {
   calfProportions,
   createFaunaMaterial,
   CROCODILE_LAYOUT,
+  CROCODILE_SUBMERGE_DEPTH,
+  CROCODILE_LUNGE_LIFT,
+  crocodileBodyY,
   FAUNA_TESSELLATION,
   type QuadrupedSpec,
 } from './fauna'
@@ -476,5 +479,53 @@ describe('crocodile silhouette (design.md §19.16, point 243)', () => {
     // Short legs on a low belly: feet at the ground, nothing sunk into it.
     expect(bb.min.y).toBeGreaterThan(-0.05)
     expect(bb.min.y).toBeLessThan(0.03)
+  })
+})
+
+// The hidden-crocodile submerge pose (design.md §19.16, point 242): a resting
+// crocodile sits SUNK to the eye knobs on the water sheet — its armoured back
+// below the surface, only the raised eyes breaking it. The old inline 0.24
+// render offset left the back riding above the water, beaching the ambusher as a
+// flat, lifeless prop; the pose is now derived from the mesh via crocodileBodyY.
+describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
+  // Reuse the built mesh from the silhouette block: its eye-knob crown (the
+  // highest vertex) is what breaks the surface when the croc lies hidden.
+  const geo = buildCrocodile()
+  geo.computeBoundingBox()
+  const eyeKnobTopY = geo.boundingBox!.max.y // the raised eyes, the crown of the build
+  const surfaceY = 3 // an arbitrary water-sheet height to pose against
+
+  it('the submerge depth drops the whole armoured BACK below the water sheet', () => {
+    const bodyY = crocodileBodyY(surfaceY, true)
+    // The group origin sits below the surface...
+    expect(bodyY).toBeLessThan(surfaceY)
+    // ...far enough that the torso's top line (the back) sits at or below the
+    // sheet — nothing of the low back rides proud of the water.
+    expect(bodyY + CROCODILE_LAYOUT.backTopY).toBeLessThanOrEqual(surfaceY + 1e-9)
+    expect(CROCODILE_SUBMERGE_DEPTH).toBe(CROCODILE_LAYOUT.backTopY) // derived from the mesh
+  })
+
+  it('only the raised eye knobs break the surface while hidden', () => {
+    const bodyY = crocodileBodyY(surfaceY, true)
+    // The eye knobs — the crown of the build — rise above the sheet...
+    expect(bodyY + eyeKnobTopY).toBeGreaterThan(surfaceY)
+    // ...and they are the ONLY thing above it: the back top is at/below the water,
+    // so the exposed part is just the eye region (higher than the back line).
+    expect(eyeKnobTopY).toBeGreaterThan(CROCODILE_LAYOUT.backTopY)
+  })
+
+  it('striking at prey it rides fully out — the body clears the sheet', () => {
+    const bodyY = crocodileBodyY(surfaceY, false)
+    expect(bodyY).toBe(surfaceY - CROCODILE_LUNGE_LIFT)
+    // The origin sits just under the surface, so the whole raft of the body
+    // (belly at the origin, legs a bare dip below) rides essentially out of the
+    // water rather than submerged — only the short feet graze the sheet.
+    expect(bodyY + geo.boundingBox!.min.y).toBeGreaterThan(surfaceY - 0.05)
+    // The exposed back rides well clear of the water (not the hidden ~0 margin).
+    expect(bodyY + CROCODILE_LAYOUT.backTopY).toBeGreaterThan(surfaceY + 0.2)
+  })
+
+  it('hidden sits markedly lower than striking — the pose actually changes', () => {
+    expect(crocodileBodyY(surfaceY, true)).toBeLessThan(crocodileBodyY(surfaceY, false) - 0.2)
   })
 })

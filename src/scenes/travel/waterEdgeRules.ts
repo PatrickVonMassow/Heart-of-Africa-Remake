@@ -35,6 +35,21 @@ export function solidDressingAllowed(terrainType: string, riverD: number, lakeSh
 }
 
 /**
+ * A crocodile's resting anchor must be ON river/lake water (design.md §19.16,
+ * point 242): its home IS the water, where the submerge pose sinks it to the eye
+ * knobs. The point-218 river-width widening (and mask edits generally) can leave
+ * a once-water spawn cell now reading as bank/sand, beaching the ambusher flat
+ * and fully exposed — a lifeless prop. This rule decides whether a resting
+ * crocodile on a cell of the given terrain must be RE-ANCHORED to the nearest
+ * water: true for any non-water cell (bank, sand, land) and for the ocean (never
+ * its home), false only on river/lake water. Mirrors `crocodileAllowedAt` in
+ * wildlifeBehavior.ts (a crocodile exists only where terrain === 'water').
+ */
+export function crocodileNeedsReanchor(terrainType: string): boolean {
+  return terrainType !== 'water'
+}
+
+/**
  * How far a drinking animal walks down the water-distance gradient: to the
  * BANK — a step short of the waterline — and for a bather a small wade past
  * it into the shallow edge. Never into the channel.

@@ -657,6 +657,30 @@ export const CROCODILE_LAYOUT = {
   torsoHalfWidth: 0.345,
 } as const
 
+/**
+ * Hidden-crocodile submerge depth (design.md §19.16, point 242): a resting
+ * crocodile drops its group origin by the torso's TOP line so the whole armoured
+ * back sits at/below the water sheet and only the higher eye knobs break the
+ * surface (the point-243 silhouette's crown). The old inline 0.24 render offset
+ * left the back riding ~0.03 ABOVE the water — the exposed, flat-on-the-water
+ * reading the user hit at the Giza Nile. Derived from CROCODILE_LAYOUT so a mesh
+ * rebuild can never silently drift the pose off the geometry.
+ */
+export const CROCODILE_SUBMERGE_DEPTH = CROCODILE_LAYOUT.backTopY
+/** Ride-out lift while lunging/striking (point 130): the origin sits just under
+ *  the surface so the whole body clears the sheet — the burst rides fully out. */
+export const CROCODILE_LUNGE_LIFT = 0.02
+
+/**
+ * Rendered body-origin y of a crocodile floating on a water surface (design.md
+ * §19.16, points 130/242): hidden, slinking home, or dragging a kill under it
+ * submerges to the eye knobs (body below the sheet); striking at live prey it
+ * rides fully out. The single source of the render's crocodile bodyY.
+ */
+export function crocodileBodyY(surfaceY: number, submerged: boolean): number {
+  return surfaceY - (submerged ? CROCODILE_SUBMERGE_DEPTH : CROCODILE_LUNGE_LIFT)
+}
+
 /** Nile crocodile (design.md §19.16, points 130/243): the classic silhouette —
  *  a long LOW raft of a body under a double row of low dorsal scutes (the old
  *  build's tall thin ridge rod is gone), a long TAPERED two-jaw snout meeting

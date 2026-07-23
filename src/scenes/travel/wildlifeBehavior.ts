@@ -780,6 +780,36 @@ export function crocodileGripExpired(gripHeldSeconds: number, gripSeconds: numbe
   return gripHeldSeconds > gripSeconds
 }
 
+/**
+ * Whether a gripping crocodile still holds an UNRESOLVED catch and must keep
+ * holding — it may NOT slink home, idle or roam while this is true (design.md
+ * §19.16, point 250). A crocodile owns its victim through the whole §19.8
+ * struggle window AND the sink that follows the kill (the river keeps the body,
+ * no bank carcass): the prey's dissolve/removal is DRIVEN BY the croc's feed,
+ * never a decoupled carcass the croc swam away from while it dissolved on its
+ * own (the reported bug — a snapped catch, the croc gone, the prey still
+ * consuming itself). Resolved (returns false) only once the victim is freed (a
+ * drive-off clears the grip via the retreat flag) or its sinking body has fully
+ * gone.
+ *
+ *   struggle: caught still counting down            -> held
+ *   sink:     killed, body dissolving in the water  -> held (the croc drags it under)
+ *   done:     freed, or the body fully dissolved    -> released
+ *
+ * Pure over the victim's state fields so the coupling is unit-testable.
+ */
+export function crocodileHoldsCatch(
+  gripped: boolean,
+  caught: number | undefined,
+  dead: boolean,
+  dissolve: number | undefined,
+): boolean {
+  if (!gripped) return false
+  if (caught !== undefined) return true
+  if (dead && dissolve !== undefined && dissolve > 0) return true
+  return false
+}
+
 /** A landed vulture's hover above its own ground (point 128): clears the
  *  body sphere's ~0.096 reach below the group origin (buildVulture,
  *  src/render/fauna.ts) with margin, so the pecking body never clips. */
