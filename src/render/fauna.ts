@@ -52,13 +52,21 @@ export function createFaunaMaterial(): THREE.MeshStandardMaterial {
 }
 
 /**
- * Walk-cycle gait (design.md §19, point 228 — the animal foot-slide fix). A
+ * Walk-cycle gait (design.md §19, points 228/255 — the animal foot-slide fix). A
  * walking animal must swing its legs, and the swing must ride the DISTANCE it
  * covers rather than wall-clock time, so the stride matches the speed and is
  * exactly zero at rest (no glide with still legs). rad of swing-cycle per world
  * unit walked.
+ *
+ * Calibrated as strides-per-metre (point 255): a full swing cycle is 2π rad, so
+ * the cadence yields GAIT_CADENCE / 2π strides per world unit. At 11.0 that is
+ * ~1.75 strides/m — a plausible walking cadence that reads as striding on the
+ * FEET. The old 3.4 (0.54 strides/m — under one stride per metre) read as a slow
+ * shuffle, the strongest of the point-255 complaints: it also made the SLOW
+ * (near-turn) segments of the drift look frozen, so the legs seemed to move only
+ * on the straight stretches even though the phase already rode raw distance.
  */
-export const GAIT_CADENCE = 3.4
+export const GAIT_CADENCE = 11.0
 /** Amplitude (rad) a leg swings fore/aft about its hip. */
 export const GAIT_SWING = 0.5
 
