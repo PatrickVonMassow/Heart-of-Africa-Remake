@@ -7,7 +7,16 @@
 //
 // Usage: start a dev server (npm run dev), then:
 //   VERIFY_GL=webgpu node scripts/perf-bench.mjs
-import { launchVerifyBrowser } from './verify/_browser.mjs'
+import { chromium } from 'playwright'
+
+// VSYNC DISABLED so the measured frame time is the TRUE per-frame cost, not a
+// 60 Hz cap that masks it. WebGPU = system Chrome (headless=new); WebGL2 = ANGLE.
+const VSYNC_OFF = ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-unsafe-webgpu', '--enable-gpu']
+function launchBenchBrowser() {
+  const backend = (process.env.VERIFY_GL ?? 'webgl').toLowerCase()
+  if (backend === 'webgpu') return chromium.launch({ channel: 'chrome', args: ['--headless=new', ...VSYNC_OFF] })
+  return chromium.launch({ args: ['--use-angle=d3d11', ...VSYNC_OFF] })
+}
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const SAMPLE_MS = Number(process.env.BENCH_SAMPLE_MS ?? 9000)
@@ -68,7 +77,7 @@ async function measurePoint(page, label, setup) {
 async function main() {
   const backend = (process.env.VERIFY_GL ?? 'webgl').toLowerCase()
   console.log(`# perf-bench on ${backend}, zoom 0.5, sample ${SAMPLE_MS}ms/point, settle ${SETTLE_MS}ms`)
-  const browser = await launchVerifyBrowser()
+  const browser = await launchBenchBrowser()
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   const errors = []
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
