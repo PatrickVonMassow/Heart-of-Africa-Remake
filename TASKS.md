@@ -9735,6 +9735,32 @@ the remaining open points in their numeric order.
   concurrently with point 255 (PlaceLife.tsx) or 244 (PlaceScene.tsx); queue after
   they merge, or scope it to a fire-only file that does not overlap.
 
+- [ ] 257. IDLE CROCODILE TURNS IN CIRCLES (user 23.07.2026, screenshot, West river
+  — regression from point 242). The resting/lurking crocodile slowly rotates in a
+  full circle instead of waiting still. §19.16 is explicit: "Hidden, it lies
+  submerged … It waits; it does NOT roam." Point 242 added an OPTIONAL subtle idle
+  motion (a float bob ±0.008 and a yaw sway ±0.03 rad on a fully-resting croc) — that
+  yaw sway is evidently ACCUMULATING into a continuous rotation (or an idle drift is
+  circling the croc), rather than a bounded back-and-forth. DIAGNOSE: find the croc
+  idle-motion from 242 in `src/scenes/travel/Wildlife.tsx` (the resting-croc bob/
+  yaw-sway) and any idle drift/heading update — is the sway added to the heading
+  cumulatively each frame (heading += sway → unbounded rotation) instead of an
+  absolute bounded oscillation? FIX: a resting/hidden crocodile HOLDS its position
+  and heading (it waits, does not roam). If a subtle idle motion is kept at all, it
+  must be a BOUNDED OSCILLATION about a fixed rest heading — e.g. `yaw = restYaw +
+  sin(t·ω)·amp` (returns to centre, never accumulates), and NO net positional drift
+  (or a tiny bounded bob only). It must NOT rotate through a full circle or wander.
+  Keep the lunge/ambush + the point-242 submerge pose + water-only placement
+  unchanged. Anchors: `src/scenes/travel/Wildlife.tsx` (the 242 resting-croc idle
+  motion), `src/scenes/travel/wildlifeBehavior.ts` (croc idle/hidden state if the
+  heading lives there). VERIFIABLE: a pure test that the idle croc's heading stays
+  BOUNDED about its rest heading over time (never accumulates past a small amplitude)
+  and its position holds (no net drift); a live check in `scripts/verify/
+  enrichments.mjs` that a resting croc does not rotate through a large angle over a
+  window. DOCS: design.md §19.16 if wording changes. No player-visible text. NOTE:
+  `Wildlife.tsx`/`wildlifeBehavior.ts` — croc files (same as 242/250, both merged);
+  small focused fix, non-conflicting with 244 (place/input) and the 249b harness.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
