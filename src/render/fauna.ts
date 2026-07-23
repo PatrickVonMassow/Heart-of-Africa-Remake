@@ -7,7 +7,7 @@
 // reads as a soft gradient instead of hard polygon panels.
 
 import * as THREE from 'three/webgpu'
-import { float, positionLocal, smoothstep } from 'three/tsl'
+import { float, positionGeometry, smoothstep } from 'three/tsl'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../world/noise'
 
@@ -779,7 +779,8 @@ export const CROCODILE_FADE_BAND = 0.03
 /**
  * CPU mirror of createCrocodileMaterial's opacity node (the seasonTint.ts
  * precedent): smoothstep from 0 a full fade band below the waterline to 1 at
- * the line. Keep both in lockstep.
+ * the line, over the RAW geometry-local y (positionGeometry — see the
+ * material doc for why never positionLocal). Keep both in lockstep.
  */
 export function crocodileSubmergedAlpha(yLocal: number, waterlineLocal: number): number {
   const t = Math.min(1, Math.max(0, (yLocal - (waterlineLocal - CROCODILE_FADE_BAND)) / CROCODILE_FADE_BAND))
@@ -815,6 +816,21 @@ export const CROCODILE_ALPHA_TEST = 0.5
  * above it, so their blend is untouched by the croc's depth — and the
  * alphaTest (CROCODILE_ALPHA_TEST) discards the fully-faded fragments so the
  * submerged body can never depth-punch those later-drawn sheets.
+ *
+ * The fade reads positionGeometry — NEVER positionLocal (point 274, the
+ * WebGPU body-still-visible bug). `positionLocal` is a mutable varying that
+ * the INSTANCING node overwrites with the instance-transformed position
+ * (three's Instance.js: `positionLocal.assign(instanceMatrix.mul(
+ * positionLocal))`), and which value the fragment stage snapshots — raw
+ * attribute or post-assign — depends on the backend builder's flow order:
+ * WebGL2 happened to capture the raw geometry-local y (the fade worked),
+ * WebGPU captured the instance-transformed WORLD y, far above the 0.30
+ * waterline everywhere, so every fragment read opacity 1 and the whole body
+ * rendered as a solid silhouette — the point-175 class of backend-dependent
+ * per-instance races. `positionGeometry` is the raw immutable 'position'
+ * attribute (three's own documented pre-transform accessor), assigned by
+ * nothing on any backend — the geometry-local cut binds identically on
+ * WebGPU and WebGL2.
  */
 export function createCrocodileMaterial(): THREE.MeshStandardNodeMaterial {
   const m = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.9, flatShading: false })
@@ -823,7 +839,7 @@ export function createCrocodileMaterial(): THREE.MeshStandardNodeMaterial {
   m.opacityNode = smoothstep(
     float(CROCODILE_WATERLINE_LOCAL - CROCODILE_FADE_BAND),
     float(CROCODILE_WATERLINE_LOCAL),
-    positionLocal.y,
+    positionGeometry.y,
   )
   return m
 }

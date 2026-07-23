@@ -645,6 +645,33 @@ describe('crocodile submersion fade (design.md §19.16, points 246/274)', () => 
     expect(m.flatShading).toBe(false)
   })
 
+  it('the fade reads the RAW geometry position — never the instance-mutated positionLocal (point 274, WebGPU)', () => {
+    // The WebGPU body-still-visible bug: `positionLocal` is a mutable varying
+    // that the INSTANCING node overwrites with the instance-transformed
+    // position (three's Instance.js: positionLocal.assign(instanceMatrix ·
+    // positionLocal)), and which value the fragment stage snapshots — raw
+    // attribute or post-assign — depends on the backend builder's flow order.
+    // WebGL2 happened to capture the raw geometry-local y (the fade worked);
+    // WebGPU captured the instance-transformed WORLD y, far above the 0.30
+    // waterline everywhere, so every fragment read opacity 1 and the "hidden"
+    // croc rendered as a solid silhouette (the point-175 class). The material
+    // must key the cut off `positionGeometry` — the raw immutable 'position'
+    // attribute, three's documented pre-transform accessor, assigned by
+    // nothing on any backend — so the geometry-local cut binds identically on
+    // WebGPU and WebGL2. This walks the compiled opacity node graph and pins
+    // exactly that: the raw attribute is read, the mutable varying never.
+    const m = createCrocodileMaterial()
+    let readsRawPositionAttribute = false
+    let readsPositionLocalVarying = false
+    m.opacityNode!.traverse((n) => {
+      const node = n as unknown as { _attributeName?: string; isVaryingNode?: boolean; name?: string }
+      if (node._attributeName === 'position') readsRawPositionAttribute = true
+      if (node.isVaryingNode === true && node.name === 'positionLocal') readsPositionLocalVarying = true
+    })
+    expect(readsRawPositionAttribute).toBe(true)
+    expect(readsPositionLocalVarying).toBe(false)
+  })
+
   it('fully-faded fragments are CUT OUT — no colour, no depth punch into the water (point 274)', () => {
     // With depthWrite on, an alpha-blended-to-0 fragment still wrote DEPTH, and
     // the later-drawn water sheets (renderOrder 1, depthWrite off) were
