@@ -9947,7 +9947,7 @@ the remaining open points in their numeric order.
   another Wildlife.tsx point (258/etc.); bundles naturally with the family-drama
   points.
 
-- [ ] 263. THE 261 COLLIDER BREAKS THE 259 TRAMPLE — AN ELEPHANT NO LONGER TRAMPLES A
+- [x] 263. THE 261 COLLIDER BREAKS THE 259 TRAMPLE — AN ELEPHANT NO LONGER TRAMPLES A
   FREE ANIMAL (regression found by the both-backend enrichments verification, 23.07.
   2026). Point 261's elephant body collider deflects other animals AROUND the
   elephant, but point 259's directional trample requires the elephant to REACH the
