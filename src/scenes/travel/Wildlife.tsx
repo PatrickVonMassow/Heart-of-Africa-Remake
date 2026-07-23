@@ -102,6 +102,7 @@ import {
   vigilBlocksLanding,
   vigilDrawReady,
   offscreenRingSpawn,
+  keepStreamedAnimal,
   waterStruggleFate,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
@@ -1722,10 +1723,21 @@ function Herds() {
       }
     }
     if (despawned) {
-      // Keep dead carcasses (they dissolve on screen) and untagged animals
-      // (e.g. injected by the verification) even when their chunk streams out.
+      // Cull each animal by where it STANDS, never only by its birth chunk:
+      // roamers/fleers drift chunks away from their spawn, so the old
+      // birth-chunk filter deleted animals still in sight (a zoom-in collapses
+      // despawnR in one frame and mass-culled them). keepStreamedAnimal
+      // re-homes a drifted animal into the live chunk under its feet and
+      // backstops with the rendered frame. Known pre-existing property: a
+      // re-homed animal plus a later deterministic respawn of its origin
+      // chunk can duplicate — inherent to deterministic chunk respawn.
+      const liveChunkHas = (key: string) => spawnedChunks.current.has(key)
       for (const sp of SPECIES) {
-        herds[sp] = herds[sp].filter((a) => a.dead || a.chunk === undefined || spawnedChunks.current.has(a.chunk))
+        herds[sp] = herds[sp].filter((a) => {
+          const v = keepStreamedAnimal(a, liveChunkHas, CHUNK_SIZE, pos.x, pos.z, despawnR, isOnScreen)
+          if (v.rehomeTo !== undefined) a.chunk = v.rehomeTo
+          return v.keep
+        })
       }
       for (const hid of [...herdState.current.keys()]) {
         if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)

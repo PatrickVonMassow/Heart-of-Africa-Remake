@@ -1412,6 +1412,44 @@ export function offscreenRingSpawn(
 }
 
 /**
+ * Streaming despawn verdict for one ground animal (design.md §19.4): judge
+ * the animal by where it STANDS, never only by its birth chunk. Roamers and
+ * fleers drift chunks away from where they spawned (elephant roam, flight,
+ * water crossings), and a zoom-in collapses the despawn ring in one frame —
+ * culling by birth-chunk membership deleted animals still in sight beside the
+ * player (the sporadic mid-view vanish; its TRAA ghost read as scattered
+ * body parts). Verdict:
+ *  1. dead carcasses (they dissolve on screen) and untagged animals (e.g.
+ *     injected by the verification) are always kept — unchanged;
+ *  2. birth chunk still live — kept, no re-home;
+ *  3. birth chunk gone but the chunk under its feet is live — kept AND
+ *     re-homed there, so future culls judge it where it stands;
+ *  4. outside every live chunk — kept while within the despawn ring of the
+ *     player OR while the LIVE frustum shows it (`onScreen` projects through
+ *     the real camera, never an assumed radius — the point-172 doctrine; this
+ *     backstop covers the debug wide-zoom corner where the ring lies inside
+ *     the frame);
+ *  5. otherwise dropped.
+ */
+export function keepStreamedAnimal(
+  a: { dead?: boolean; chunk?: string; x: number; z: number },
+  liveChunkHas: (key: string) => boolean,
+  chunkSize: number,
+  playerX: number,
+  playerZ: number,
+  despawnR: number,
+  onScreen: (x: number, z: number) => boolean,
+): { keep: boolean; rehomeTo?: string } {
+  if (a.dead || a.chunk === undefined) return { keep: true }
+  if (liveChunkHas(a.chunk)) return { keep: true }
+  const cur = `${Math.floor(a.x / chunkSize)},${Math.floor(a.z / chunkSize)}`
+  if (liveChunkHas(cur)) return { keep: true, rehomeTo: cur }
+  if (Math.hypot(a.x - playerX, a.z - playerZ) <= despawnR) return { keep: true }
+  if (onScreen(a.x, a.z)) return { keep: true }
+  return { keep: false }
+}
+
+/**
  * One step of a scripted walk under the land constraint (design.md §19.5,
  * point 83): the predator's walk-off must never enter the open ocean — like
  * every streamed animal, it deflects along the coast instead. Tries the
