@@ -575,6 +575,56 @@ describe('animal gait (design.md §19, point 228 — no foot-slide, no backward 
     }
   })
 
+  it('the gait cadence reads as a real walk — ~1.5-2 strides per metre, not the old shuffle (point 255)', () => {
+    // A full swing cycle is 2π rad, so the cadence is strides-per-world-unit ×
+    // 2π. The complaint was that the legs shuffled far too slowly for the speed;
+    // the cadence must land in a plausible walking band (~1.2-2.5 strides/m),
+    // clearly above the old 3.4 rad/unit (0.54 strides/m — under one per metre).
+    const stridesPerUnit = GAIT_CADENCE / (2 * Math.PI)
+    expect(stridesPerUnit).toBeGreaterThanOrEqual(1.2)
+    expect(stridesPerUnit).toBeLessThanOrEqual(2.5)
+    expect(stridesPerUnit).toBeGreaterThan(0.54) // strictly faster than the old shuffle
+    // One metre walked completes well over a full stride cycle.
+    expect(gaitPhase(1)).toBeGreaterThan(2 * Math.PI)
+    expect(gaitPhase(1) / (2 * Math.PI)).toBeCloseTo(stridesPerUnit, 12)
+  })
+
+  it('advances the gait over a CURVED path — any displacement, not only a straight heading (point 255)', () => {
+    // Walk a quarter circle as many short chords: the heading TURNS every step,
+    // yet the phase must ride the accumulated PATH LENGTH — the gait is driven by
+    // raw distance travelled, never gated on a straight/velocity-aligned heading
+    // (the "legs stop on a turn" complaint). Compare the curved path to its own
+    // net (straight-line) displacement: the phase reflects the longer path, so it
+    // keeps advancing while the animal turns.
+    const R = 5
+    const steps = 90
+    let dist = 0
+    let px = R
+    let pz = 0
+    let prevYaw = faceVelocity(0, 1, 0)
+    let turned = false
+    for (let k = 1; k <= steps; k++) {
+      const ang = (k / steps) * (Math.PI / 2)
+      const nx = Math.cos(ang) * R
+      const nz = Math.sin(ang) * R
+      const vx = nx - px
+      const vz = nz - pz
+      dist += Math.hypot(vx, vz) // accumulates on ANY displacement, curve included
+      const yaw = faceVelocity(vx, vz, prevYaw)
+      if (Math.abs(yaw - prevYaw) > 1e-6) turned = true
+      prevYaw = yaw
+      px = nx
+      pz = nz
+    }
+    expect(turned).toBe(true) // the path genuinely turns throughout
+    const net = Math.hypot(px - R, pz - 0) // start→end chord
+    expect(dist).toBeGreaterThan(net) // the arc is longer than its chord
+    // The phase rides the full curved path length, not the net displacement —
+    // so it advances over a turn instead of freezing.
+    expect(gaitPhase(dist)).toBeGreaterThan(gaitPhase(net))
+    expect(gaitPhase(dist)).toBeCloseTo(dist * GAIT_CADENCE, 9)
+  })
+
   it('every leg is at neutral at rest (phase 0), and diagonal legs trot in antiphase', () => {
     // At a standing phase (0) each leg — offset 0 or π — reads sin 0 = sin π = 0:
     // no twitch while the animal holds still.
