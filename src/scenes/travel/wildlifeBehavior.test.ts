@@ -28,6 +28,7 @@ import {
   groundNormal,
   leashedGambolDir,
   separationPush,
+  edgeSeparationPush,
   turnToward,
   committedFleeHeading,
   FLEE_COMMIT_MARGIN,
@@ -1198,6 +1199,66 @@ describe('separationPush (design.md §19 — animal body separation)', () => {
       if (Math.abs(bx - ax) >= 1.4) break
     }
     expect(Math.abs(bx - ax)).toBeGreaterThanOrEqual(1.4 - 1e-6)
+  })
+})
+
+describe('edgeSeparationPush (design.md §19.5, point 222 — parting a pair pinned at a water edge)', () => {
+  // The reported bug: two animals overlap at a waterline and STAY, because the
+  // water setback reverts any push that points into the water every frame. Model
+  // a thin shore strip [-0.4, 0] on the x axis: impassable water fills x > 0
+  // (inward normal (1,0)) and an inland wall fills x < -0.4. Two animals trapped
+  // in the strip are too close along x to part along the normal — they must
+  // resolve along the shore tangent (z) or stay interpenetrating.
+  const minD = 1.0
+  const clampToStrip = (x: number): number => Math.max(-0.4, Math.min(0, x))
+
+  it('a plain separation STALLS at the edge — the setback reverts every blocked push', () => {
+    let a = { x: 0, z: 0 } // at the waterline
+    let b = { x: -0.4, z: 0 } // against the inland wall
+    for (let f = 0; f < 400; f++) {
+      const [pax, paz] = separationPush(a.x, a.z, [[b.x, b.z, minD]])
+      const [pbx, pbz] = separationPush(b.x, b.z, [[a.x, a.z, minD]])
+      a = { x: clampToStrip(a.x + pax), z: a.z + paz }
+      b = { x: clampToStrip(b.x + pbx), z: b.z + pbz }
+    }
+    // Never parts: both pushes are along x, both reverted by the strip clamp.
+    expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeLessThan(minD)
+  })
+
+  it('resolves along the shore tangent so the pinned pair parts within bounded steps', () => {
+    let a = { x: 0, z: 0 }
+    let b = { x: -0.4, z: 0 }
+    let parted = -1
+    for (let f = 0; f < 400; f++) {
+      // The waterline animal sees water beside it (normal (1,0)); the wall animal
+      // has no water beside it (null → plain push, clamped by the wall).
+      const [pax, paz] = edgeSeparationPush(a.x, a.z, [[b.x, b.z, minD]], [1, 0])
+      const [pbx, pbz] = edgeSeparationPush(b.x, b.z, [[a.x, a.z, minD]], null)
+      a = { x: clampToStrip(a.x + pax), z: a.z + paz }
+      b = { x: clampToStrip(b.x + pbx), z: b.z + pbz }
+      if (Math.hypot(a.x - b.x, a.z - b.z) >= minD - 1e-6) {
+        parted = f
+        break
+      }
+    }
+    expect(parted).toBeGreaterThanOrEqual(0) // parted…
+    expect(parted).toBeLessThan(400) // …within the bounded step budget
+  })
+
+  it('leaves an away-from-water push unchanged (only the into-water half is redirected)', () => {
+    // Neighbour at +x pushes the subject toward -x; the water is at +x, so the
+    // push already leads away from it — identical to the plain separationPush.
+    const plain = separationPush(0, 0, [[1, 0, 2]])
+    const edged = edgeSeparationPush(0, 0, [[1, 0, 2]], [1, 0])
+    expect(edged).toEqual(plain)
+  })
+
+  it('redirects a purely into-water push onto the tangent (never zero, never into the water)', () => {
+    // Neighbour directly inland (−x): the raw push is straight +x, into the water.
+    const n: [number, number] = [1, 0]
+    const [dx, dz] = edgeSeparationPush(0, 0, [[-1, 0, 2]], n)
+    expect(dx * n[0] + dz * n[1]).toBeLessThanOrEqual(1e-9) // no into-water component left
+    expect(Math.hypot(dx, dz)).toBeGreaterThan(0.1) // and it still moves (along the shore)
   })
 })
 
