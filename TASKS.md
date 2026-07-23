@@ -10053,15 +10053,22 @@ the remaining open points in their numeric order.
   pure helpers in `src/scenes/travel/wildlifeBehavior.ts`: an elderly adult moves at a
   calibratable reduced speed factor, never initiates §264 intraspecies combat and
   ALWAYS loses to a younger adult (the §264/§125 outcome matrix returns the elder as
-  loser; the elder flees an impending conspecific conflict), and — where the research
-  supports it — an old male withdraws from the herd (solitary). (c) NATURAL DEATH —
-  an elderly animal occasionally dies with NO external cause, at a calibratable low
-  rate; the DYING PROCESS is depicted (`Wildlife.tsx` + a pure state helper): the
-  animal slows progressively, the §19.6 vultures begin to circle the dying animal, it
-  eventually falls dead, and the vultures descend and consume it through the existing
-  carcass system; an ELEPHANT that begins dying instead walks toward the §4.4 elephant
-  graveyard and dies THERE (the folklore nod, grounded in the water/soft-forage
-  research). (d) CALIBRATION — the elderly fraction of adults, the elderly speed
+  loser; the elder flees an impending conspecific conflict), and — for GRAZERS and
+  the big cats (NOT elephants) — an ousted old male withdraws from the herd/pride and
+  turns solitary (per `docs/fauna-behaviour-1890.md`: old elephant BULLS keep high
+  status, so no ostracism for them; the crocodile gets NO elderly variant — no legible
+  aged cues). (c) NATURAL DEATH — an elderly animal occasionally dies with NO external
+  cause, at a calibratable low rate; the DYING PROCESS is depicted (`Wildlife.tsx` + a
+  pure state helper): the animal slows progressively, the §19.6/§22 poor-condition
+  vultures GATHER over it and descend as it collapses (the ground-truth reuse of the
+  pt-22 omen — the "patient circling of a doomed animal" is embellished, so key the
+  flock on the distressed/downed animal, not a long pre-death circle), it falls dead,
+  and the vultures consume it through the existing carcass system. An ELEPHANT that
+  begins dying instead drifts toward WATER (its worn last molars can no longer grind
+  coarse forage, so it seeks soft riverside/aquatic vegetation) and dies THERE — the
+  REAL mechanic per the research; the §4.4 elephant graveyard is framed as WHERE these
+  water-side deaths accumulate (folklore landmark + accurate mechanic coexisting), and
+  the mass death-pilgrimage is MYTH and is NOT built. (d) CALIBRATION — the elderly fraction of adults, the elderly speed
   factor, the natural-death rate, and the dying-slowdown duration are `balance.ts`
   values, debug-editable (§21). Ties to point 264 (the elder always loses a fight),
   point 169 (the analogous age schema), §4.4 (the graveyard death) and §19.6 (the
