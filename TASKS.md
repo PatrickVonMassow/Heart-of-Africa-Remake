@@ -10089,6 +10089,29 @@ the remaining open points in their numeric order.
   files) can start in parallel, the scene wiring waits for the wildlife cluster to be
   free. Implementation-ready.
 
+- [ ] 266. TRAMPLE CRUSH SOUND — BONE-CRUNCH + SOFT-TISSUE SQUELCH, not a dull
+  "plomp" (user 23.07.2026). The point-260 elephant-trample crush sound currently
+  reads as a soft "plomp"; the user wants it to sound like CRUNCHING/CRACKING BONE
+  plus a WET soft-tissue squelch. Improve the procedural synthesis of the crunch —
+  the WebAudio node graph that builds the trample-crush waveform (anchor:
+  `src/systems/ambience.ts`, the `trampleCrunch*` helpers and wherever the crunch
+  buffer/nodes are actually built for playback — trace the play path from
+  `src/scenes/travel/Wildlife.tsx` where the trample fires the sound). Layer two
+  timbres: (a) a sharp BONE-CRACK transient — a bright, hard-attack noise burst with
+  several fast micro-crackles so it reads as bones crunching, not a single thud; and
+  (b) a wet SQUELCH — a lower, damped, resonant-filtered noise/tone with a softer
+  envelope for the soft-tissue matsch. Keep the §19.1 distance + single-ambience-volume
+  gain curve (`trampleCrunchGain`) and the edge-firing (`trampleCrunchFires`, exactly
+  one crunch per kill) UNCHANGED — only the TIMBRE changes. Cheap, procedural WebAudio,
+  no audio asset. VERIFIABLE: the existing pure tests (`trampleCrunchGain`/`Fires`) stay
+  green; add a pure test for the new synthesis if it is parameterised (the two layers'
+  presence / envelope shape); the existing point-260 live check still fires the crunch
+  once per trample with no console errors. DOCS: design.md §19.5/§19.1 if the sound
+  description changes. No player-visible text. NOTE: audio synthesis — a different
+  concern than the wildlife-behaviour cluster, so it can be done independently of the
+  Wildlife.tsx/wildlifeBehavior.ts points (it only reads the trample trigger, doesn't
+  change it). Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
