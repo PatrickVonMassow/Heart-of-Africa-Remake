@@ -229,6 +229,14 @@ export const en: Strings = {
     back: 'Back',
   },
 
+  stateDump: {
+    title: 'Game State',
+    download: 'Download',
+    copy: 'Copy',
+    copied: 'Game state copied to the clipboard.',
+    close: 'Close (F5)',
+  },
+
   toasts: {
     oceanBlocked: 'The ocean is impassable — there is no leaving the continent.',
     mountainNoRopeWarn: 'Without a rope this climb is dangerous — one slip and I fall. Slowly and carefully!',

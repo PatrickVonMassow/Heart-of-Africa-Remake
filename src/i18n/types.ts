@@ -133,6 +133,18 @@ export interface Strings {
     back: string
   }
 
+  /** F5 state-dump popup (design.md §21.1): the full game state for bug reports. */
+  stateDump: {
+    title: string
+    /** Save the JSON as a .json file. */
+    download: string
+    /** Copy the JSON to the clipboard. */
+    copy: string
+    /** Toast confirming the JSON went to the clipboard. */
+    copied: string
+    close: string
+  }
+
   toasts: {
     oceanBlocked: string
     /** Warning when starting to climb a mountain without a rope (design.md §11). */
