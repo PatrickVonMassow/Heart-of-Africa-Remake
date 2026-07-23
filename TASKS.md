@@ -8737,7 +8737,7 @@ the remaining open points in their numeric order.
   the player cannot reach deep water. DOCS: design.md §11.2; keep every
   redSea.test.ts verdict.
 
-- [ ] 222. ANIMALS STUCK INSIDE EACH OTHER — two animals overlap/interpenetrate and
+- [x] 222. ANIMALS STUCK INSIDE EACH OTHER — two animals overlap/interpenetrate and
   stay (user 22.07.2026, screenshot at a waterline). The §19.5 body separation
   should push them apart but fails here — likely because both are pinned against
   the water by the ocean/edge backstop, so the separation force can't resolve.
@@ -8881,7 +8881,7 @@ the remaining open points in their numeric order.
   water strip, tie it into the 210/211 water-edge checks. DOCS: design.md §2.5 if
   the panorama band wording changes.
 
-- [ ] 228. ANIMALS FOOT-SLIDE (glide without moving their legs), and can even
+- [x] 228. ANIMALS FOOT-SLIDE (glide without moving their legs), and can even
   glide BACKWARD (user report 22.07.2026, likely SETTLEMENT/first-person only —
   the user saw it in-town; confirm whether the bird's-eye travel fauna already
   animate). A walking animal must play a LEG/WALK CYCLE synced to its movement so
