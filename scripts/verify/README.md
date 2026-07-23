@@ -39,7 +39,7 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 | Tier | Command | Browser suites | Preview |
 |------|---------|----------------|---------|
 | **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 14** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings`) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 16** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings`), `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) and `benchmark` (the F8 in-game benchmark, driven in its `?bench=short` mode) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES` in `run-all.mjs`; keep it that way. New heavy or flaky browser
@@ -95,6 +95,13 @@ ported asserts now live in Vitest:
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
 
+Purely new (no Vitest predecessor): `benchmark.mjs` — F8 drives the in-game
+render benchmark (design.md §21.1) over the live scene in `?bench=short` mode:
+one report row per config × phase, the progress modal, and the restore of every
+setting incl. `Math.random`. Its plan/statistics/report shaping are pure-tested
+in `src/systems/benchmark.test.ts`, the key binding and the localized overlay in
+`src/ui/BenchmarkOverlay.test.tsx`.
+
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
 `handwriting.mjs` (the writing animation is timing/DOM-sensitive and stays
@@ -107,7 +114,7 @@ doc-structure check), `preview.mjs` (production build acceptance).
 Every render-dependent browser suite calls `assertBackend(page)` right after the
 renderer initialises (`window.__renderer`): a run launched with
 `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a `webgl` run that came
-up on WebGPU) fails LOUD instead of giving false confidence. Covered: collision,
+up on WebGPU) fails LOUD instead of giving false confidence. Covered: benchmark, collision,
 enrichments, events, flow, gamepad, handwriting, health, invariants, polish,
 settings, visualsweep. The pure-data suites (docs, world, i18n) read files/state,
 not pixels, so a backend assertion adds nothing; touch and voice are the

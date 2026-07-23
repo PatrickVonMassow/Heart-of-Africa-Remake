@@ -14,11 +14,15 @@ import {
   chunkIsCoastal,
   chunkIsMountainous,
   chunkNeedsRefine,
+  getTerrainRefine,
   lodSegments,
   refinedSegments,
+  resetTerrainRefine,
+  setTerrainRefine,
   REFINE_RING_MAX,
   REFINE_SEGMENT_CAP,
 } from './terrainLod'
+import { BENCH_CONFIGS } from '../../systems/benchmark'
 import { buildChunkGeometry, stitchedEdgeHeights } from './TravelScene'
 import { setupGeodata } from '../../test/geodata'
 
@@ -146,6 +150,60 @@ describe('mountain-chunk tessellation gate (silhouette smoothness)', () => {
       // The memoised second read must return the identical decision.
       expect(chunkNeedsRefine(cx, cz)).toBe(expected)
     }
+  })
+
+  // The in-game benchmark (design.md §21.1, F8) prices point 209's refinement
+  // on the player's own hardware, so both levers are switchable at runtime.
+  // Not player-facing: the benchmark sets them for one config and restores.
+  it('the runtime override can switch the refinement off and cap its segments', () => {
+    try {
+      setTerrainRefine({ enabled: false })
+      expect(getTerrainRefine().enabled).toBe(false)
+      // Refine off reproduces the pre-209 histogram: every ring at base cost.
+      for (const ring of [0, 1, 2, 3, 4]) expect(refinedSegments(ring, true)).toBe(lodSegments(ring))
+
+      resetTerrainRefine()
+      setTerrainRefine({ segmentCap: 84 })
+      expect(getTerrainRefine().segmentCap).toBe(84)
+      for (const ring of [0, 1, 2]) expect(refinedSegments(ring, true)).toBe(84)
+      // Below the ring's base resolution the cap must not COARSEN the chunk.
+      setTerrainRefine({ segmentCap: 8 })
+      expect(refinedSegments(0, true)).toBe(lodSegments(0))
+    } finally {
+      resetTerrainRefine()
+    }
+  })
+
+  // WIRING, not just plan: the benchmark's config objects are handed to
+  // setTerrainRefine unchanged, so a mis-named key would leave the lever fully
+  // ON while the report claimed it off — which is exactly what happened
+  // (`{ refine: false }` vs the setter's `enabled`), invisible to a test that
+  // only compared the config object with itself. Assert the EFFECT instead.
+  it("each benchmark terrain config actually changes what refinedSegments returns", () => {
+    try {
+      for (const name of ['terrain-refine-off', 'all-off']) {
+        resetTerrainRefine()
+        const config = BENCH_CONFIGS.find((c) => c.name === name)
+        expect(config?.terrain, name).toBeDefined()
+        setTerrainRefine(config!.terrain!)
+        // Refinement off = the pre-209 histogram: base cost on every ring.
+        expect(refinedSegments(0, true), name).toBe(lodSegments(0))
+      }
+      resetTerrainRefine()
+      const cap = BENCH_CONFIGS.find((c) => c.name === 'terrain-cap-84')
+      setTerrainRefine(cap!.terrain!)
+      expect(refinedSegments(0, true)).toBe(84)
+      expect(refinedSegments(0, true)).toBeLessThan(REFINE_SEGMENT_CAP)
+    } finally {
+      resetTerrainRefine()
+    }
+  })
+
+  it('resetting restores the shipped defaults exactly', () => {
+    setTerrainRefine({ enabled: false, segmentCap: 40 })
+    resetTerrainRefine()
+    expect(getTerrainRefine()).toEqual({ enabled: true, segmentCap: REFINE_SEGMENT_CAP })
+    for (const ring of [0, 1, 2]) expect(refinedSegments(ring, true)).toBe(112)
   })
 })
 

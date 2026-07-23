@@ -1,5 +1,18 @@
+import { execSync } from 'node:child_process'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+
+/** Short commit the bundle was built from. The in-game benchmark report
+ *  (design.md §21.1, F8) names it, so a measurement sent back from the
+ *  deployed build can be tied to the exact build it was taken on. */
+function buildCommit(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7)
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'unknown'
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -8,6 +21,9 @@ export default defineConfig({
   // dev server and preview run at the root.
   base: process.env.GITHUB_ACTIONS ? '/Heart-of-Africa-Remake/' : '/',
   plugins: [react()],
+  define: {
+    'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(buildCommit()),
+  },
   // The TTS stack resolves its WASM/worker assets at runtime; esbuild
   // pre-bundling breaks those URLs in dev.
   optimizeDeps: {

@@ -237,6 +237,34 @@ export const de: Strings = {
     close: 'Schließen (F6)',
   },
 
+  benchmark: {
+    title: 'Grafik-Benchmark',
+    config: (name, index, count) => `Einstellung ${index}/${count}: ${name}`,
+    warmup: 'Aufwärmdurchlauf (wird nicht gemessen)',
+    phase: (name) => `Abschnitt: ${name}`,
+    phases: {
+      savannaStanding: 'Stehend in dichter Savanne',
+      desertStanding: 'Stehend in leerer Wüste',
+      savannaDriving: 'Fahrt durch die Savanne',
+    },
+    remaining: (time) => `Noch etwa ${time}`,
+    abortHint: 'Esc bricht den Benchmark ab und stellt alle Einstellungen wieder her.',
+    doneTitle: 'Benchmark abgeschlossen',
+    abortedNote: 'Der Lauf wurde abgebrochen — der Bericht enthält nur die fertigen Einstellungen.',
+    headline: {
+      gpu: 'Maßgeblich ist die GPU-Spalte: echte GPU-Zeiten vom Grafiktreiber, unabhängig von der Bildwiederholrate.',
+      cpu: (reason) =>
+        `Keine GPU-Zeiten verfügbar (${reason}), und die Bildzeiten sind durch die Bildwiederholrate gedeckelt. Nur die CPU-Spalte ist aussagekräftig — die Kosten der Grafikkarte selbst misst dieser Lauf nicht.`,
+      wall: 'Maßgeblich ist die Bildzeit-Spalte: sie ist hier nicht durch die Bildwiederholrate gedeckelt und misst das ganze Bild.',
+    },
+    download: 'Bericht herunterladen',
+    copy: 'Kopieren',
+    copied: 'Benchmark-Bericht in die Zwischenablage kopiert.',
+    close: 'Schließen',
+    unavailable: 'Der Benchmark braucht die laufende 3D-Ansicht.',
+    failed: (message) => `Benchmark abgebrochen: ${message}`,
+  },
+
   toasts: {
     oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
     mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich — ein Fehltritt, und ich stürze. Langsam und vorsichtig!',
