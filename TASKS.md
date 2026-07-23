@@ -9140,7 +9140,7 @@ the remaining open points in their numeric order.
   panorama silhouettes) — coordinate/sequence these place-backdrop points so their
   shared files never collide.
 
-- [ ] 237. FLEEING CALF OSCILLATES BETWEEN TWO DIRECTIONS — the user reports
+- [x] 237. FLEEING CALF OSCILLATES BETWEEN TWO DIRECTIONS — the user reports
   (22.07.2026) that a calf fleeing an elephant rapidly OSCILLATED between two
   directions as it ran. §7.1 pt.12 already requires a fleeing prey to hold ONE
   steady escape direction "rather than oscillating ~90° between two flanking
@@ -9395,7 +9395,7 @@ the remaining open points in their numeric order.
   branches, but it edits CLAUDE.md §7.1 (a documented acceptance criterion), so
   keep the numbering/references intact per the doc rules.
 
-- [ ] 245. JUVENILES ROAM FURTHER + ARE THE PREFERRED PREY (esp. crocodiles at the
+- [x] 245. JUVENILES ROAM FURTHER + ARE THE PREFERRED PREY (esp. crocodiles at the
   drink) — user follow-up 22.07.2026 to points 238/239. THREE tweaks: (1) multiply
   the max juvenile↔parent distance by 1.5 AGAIN — `balance.family.followRadius`
   5.4 → 8.1 and `balance.family.gambolRange` 12 → 18 (scale together; keep the
