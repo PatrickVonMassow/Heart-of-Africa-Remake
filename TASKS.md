@@ -10308,8 +10308,20 @@ the remaining open points in their numeric order.
   Sphinx as GIANT "buildings". Entry is via the SPACE key exactly like the future §2.3
   settlement entry (point 244): walking into the site's radius shows a "Space to enter
   <name>" hint, and pressing Space enters. NO interior functionality at first (no trade/
-  elder/etc.) — it is a walkable monument space. RESEARCH FIRST (Fable pass, docs — extend
-  the landmarks/peoples research or a new doc): how the Giza pyramids + Sphinx actually
+  elder/etc.) — it is a walkable monument space. RESEARCH DONE — the authoritative brief
+  is `docs/giza-1890.md` (read it before building). Load-bearing period cues the build
+  MUST honour: Khafre's surviving pale limestone CAP near the apex (the one casing left,
+  the cue that tells Khafre apart — the game doesn't render it yet); the Sphinx BURIED
+  TO THE SHOULDERS in sand in 1890 and noseless (rendering the modern fully-cleared
+  monument is a ~35-year anachronism — bury it in BOTH the walkable site and the point-82
+  bird's-eye/skyline); the stepped/blunt-topped cores of Khufu (biggest) and Menkaure
+  (smaller, red-granite skirt); the Giza-vs-Meroë contrast (Giza few huge ~52° masses vs
+  Meroë dense small ~70° cones — the code's slope ratios already encode it, add Meroë's
+  offering chapels and keep it smaller); and sparse Thomas-Cook-era ambient PEOPLE at the
+  site (robed guides/dragomen, Bedouin cameleers, donkey-boys, a few 1890s tourists, plus
+  camels/donkeys — reuse the settlement walker system, a handful). Myths excluded
+  (pharaoh's curse, mystic alignment, Napoleon's-cannon nose). The ORIGINAL research
+  scope was: how the Giza pyramids + Sphinx actually
   LOOK (the three pyramids Khufu/Khafre/Menkaure with their relative sizes, Khafre's
   casing cap, the Sphinx's proportions and its ~1890 state — how much was excavated vs
   sand-buried then, the causeways, any queens' pyramids), and the DIFFERENCES between the
