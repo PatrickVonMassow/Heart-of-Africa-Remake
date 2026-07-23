@@ -9843,6 +9843,33 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`/`wildlifeBehavior.ts` — same files as 257 (croc, running) and 258;
   queue after 257 to avoid the file overlap.
 
+- [ ] 260. TRAMPLE CRUNCH SOUND (user 23.07.2026). Play a CRACK/CRUNCH sound the
+  moment an animal is crushed under an elephant's feet (the §19.5/§19.8 trample
+  kill, including the point-259 forward-moving-elephant kill and the parent grief-
+  trample). A single short one-shot SFX at the trample event's world position,
+  scaled like the other §19.1 proximity sounds — by the single ambience volume and
+  by distance to the traveller (louder up close, fading with distance), so a far-off
+  trample is faint and a near one is clearly heard. Reuse the existing ambience/SFX
+  pipeline (the proximity-call playback in `src/systems/ambience.ts` and how
+  `Wildlife.tsx` already emits positional wildlife calls) — do NOT build a second
+  audio path. The sound may be a short synthesized crunch (a filtered noise burst /
+  low crack, consistent with the game's other synth SFX) or a tiny asset; keep it
+  cheap and gated so it fires exactly ONCE per trample kill (not per frame while the
+  body is down). Anchors: `src/scenes/travel/Wildlife.tsx` (fire the SFX at the
+  trample-kill site — both the ordinary trample and the parent grief-trample),
+  `src/systems/ambience.ts` (the crunch SFX + its distance/volume scaling), and the
+  balance value if a per-source volume is wanted (`balance` + the debug menu, like
+  the birdsong slider). VERIFIABLE: a pure test that the crunch gain follows the
+  distance/ambience-volume curve (like the existing proximity-call test) and fires
+  once per kill (an edge, not a level); a live check in `scripts/verify/settings.mjs`
+  or `enrichments.mjs` that a staged trample plays the crunch once. DOCS: design.md
+  §19.1 (proximity sounds) / §19.5 (the trample) — the crunch on a trample kill; and
+  §21.2 if a volume slider is added. No player-visible text unless a debug label is
+  added (then both languages). NOTE: `Wildlife.tsx`/`ambience.ts` — the trample site
+  is the same code area as point 259 (running); queue after 259 (or fold the SFX call
+  into 259's trample resolution if convenient), do not delegate concurrently with a
+  Wildlife.tsx point.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
