@@ -9761,6 +9761,34 @@ the remaining open points in their numeric order.
   `Wildlife.tsx`/`wildlifeBehavior.ts` — croc files (same as 242/250, both merged);
   small focused fix, non-conflicting with 244 (place/input) and the 249b harness.
 
+- [ ] 258. DEBUG-MENU TRIGGERS FOR THE WILDLIFE DRAMAS (grass fire first) — user
+  23.07.2026. The §19.8/§19.16 wildlife dramas are RARE BY DESIGN and have NO
+  deployed-build force (the `window.__wildlife.igniteFire` hook is `import.meta.env.
+  DEV`-gated, so it is absent on the GH-Pages build). The grass fire (point 145a) in
+  particular attempts ignition only once every `FIRE_COOLDOWN_SECONDS` (300 s) and
+  only if a hashed spot 45 units ahead is savanna — so it is nearly impossible to
+  observe on demand while playtesting the deployed build. ADD DEBUG-MENU BUTTONS
+  (design.md §21.3, the debug menu is available on the deployed build unlike the DEV
+  hooks) that TRIGGER a wildlife drama at/near the traveller on click: FIRST the
+  GRASS FIRE (ignite the fire front just ahead of the traveller, bypassing the 300 s
+  timer + the savanna/zone gate for the debug trigger — or nudging the timer to 0 and
+  forcing eligibility), and — same pattern, as far as cheap — the other on-demand
+  dramas the player wants to see (a crocodile lunge, a lion hunt, a calf-predation/
+  rescue, an elephant trample). Each button sets the relevant drama state directly
+  (reuse the existing `igniteFire`/`LION_STATE`/`FIRE_STATE`/croc-lunge entry points,
+  promoted from DEV-only to a debug-menu action so they ship). Localized button
+  labels in BOTH languages. Anchors: `src/ui/DebugMenu.tsx` (new trigger section),
+  the wildlife drama entry points in `src/scenes/travel/Wildlife.tsx` (`igniteFire`,
+  the lion/croc/calf drama starters — expose them off the debug store or a
+  `window.__wildlife`-style action that is NOT DEV-gated for these debug triggers),
+  `src/i18n/en.ts`/`de.ts`/`types.ts`. VERIFIABLE: `src/ui/DebugMenu.test.tsx` that
+  the trigger buttons render with localized labels and fire their action; a live
+  check in `scripts/verify/enrichments.mjs` (or settings.mjs) that clicking the
+  grass-fire trigger ignites the fire in the scene. DOCS: design.md §21.3 (the new
+  drama triggers). NOTE: `DebugMenu.tsx`/`Wildlife.tsx`/i18n — coordinate with the
+  other wildlife/debug points; the fire trigger alone is the minimum, the rest are a
+  bonus if cheap.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
