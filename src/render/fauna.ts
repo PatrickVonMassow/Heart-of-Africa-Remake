@@ -51,6 +51,48 @@ export function createFaunaMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: false })
 }
 
+/**
+ * Walk-cycle gait (design.md §19, point 228 — the animal foot-slide fix). A
+ * walking animal must swing its legs, and the swing must ride the DISTANCE it
+ * covers rather than wall-clock time, so the stride matches the speed and is
+ * exactly zero at rest (no glide with still legs). rad of swing-cycle per world
+ * unit walked.
+ */
+export const GAIT_CADENCE = 3.4
+/** Amplitude (rad) a leg swings fore/aft about its hip. */
+export const GAIT_SWING = 0.5
+
+/**
+ * Leg-swing phase from the distance travelled (point 228): a pure function of
+ * DISTANCE, never of time — a stopped animal's legs are still, a faster one
+ * strides faster. The caller accumulates the ground distance and reads the
+ * phase back each frame.
+ */
+export function gaitPhase(distanceTravelled: number, cadence = GAIT_CADENCE): number {
+  return distanceTravelled * cadence
+}
+
+/**
+ * Fore/aft swing angle (rad) of one leg at a gait phase (point 228). Diagonal
+ * legs carry a phaseOffset of π (a trot). At phase 0 — a standing animal —
+ * every leg is at neutral (sin 0 = sin π = 0), so a resting animal never
+ * twitches its legs.
+ */
+export function legSwingAngle(phase: number, phaseOffset: number, amp = GAIT_SWING): number {
+  return Math.sin(phase + phaseOffset) * amp
+}
+
+/**
+ * Facing yaw (rad) that tracks the velocity direction (point 228): an animal
+ * turns to face where it MOVES, so it can never glide backward. Below the
+ * epsilon speed the previous facing is held (no spin when standing still). Uses
+ * the codebase's atan2(vx, vz) yaw convention (yaw 0 = +z forward).
+ */
+export function faceVelocity(vx: number, vz: number, prevYaw: number, eps = 1e-4): number {
+  if (Math.hypot(vx, vz) < eps) return prevYaw
+  return Math.atan2(vx, vz)
+}
+
 function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): THREE.BufferGeometry {
   const base = new THREE.Color(hex)
   const rand = mulberry32(seed)
@@ -809,20 +851,95 @@ export function buildVulture(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Goat for village life (design.md §19 village life), ~0.7 units tall. */
+const GOAT_SPEC: QuadrupedSpec = {
+  bodyLen: 0.65,
+  bodyR: 0.2,
+  legH: 0.35,
+  legR: 0.035,
+  neckLen: 0.3,
+  neckTilt: 0.55,
+  headSize: 0.1,
+  bodyColor: '#9a8a72',
+  horns: true,
+  seed: 171,
+}
+
+/** Goat for village life (design.md §19 village life), ~0.7 units tall — the
+ *  merged single-draw geometry for any static use. */
 export function buildGoat(): THREE.BufferGeometry {
-  return merge(
-    buildQuadruped({
-      bodyLen: 0.65,
-      bodyR: 0.2,
-      legH: 0.35,
-      legR: 0.035,
-      neckLen: 0.3,
-      neckTilt: 0.55,
-      headSize: 0.1,
-      bodyColor: '#9a8a72',
-      horns: true,
-      seed: 171,
-    }),
-  )
+  return merge(buildQuadruped(GOAT_SPEC))
+}
+
+/** One pivoted goat leg (point 228). `geo` has its HIP (top) at the local
+ *  origin, so a render group placed at `hip` and rotated about X swings the
+ *  foot fore/aft. `phaseOffset` (0 or π) puts diagonal legs on opposite beats
+ *  (a trot). */
+export interface GoatLeg {
+  geo: THREE.BufferGeometry
+  hip: [number, number, number]
+  phaseOffset: number
+}
+
+/**
+ * The goat split into a body (everything but the legs) and four separately
+ * pivoted legs (design.md §19, point 228). The settlement gait rotates each leg
+ * about its hip so a walking goat no longer foot-slides. Same geometry as
+ * buildGoat — just not merged across the hip joints. Village goats stand at
+ * first-person range, where a legless glide reads plainly; the far bird's-eye
+ * herds keep the cheaper merged build.
+ */
+export function buildGoatParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+  const s = GOAT_SPEC
+  const backY = s.legH + s.bodyR * 0.8
+  const bodyParts: THREE.BufferGeometry[] = []
+
+  const body = new THREE.SphereGeometry(s.bodyR, ...FAUNA_TESSELLATION.body)
+  body.scale(0.8, 0.8, s.bodyLen / (2 * s.bodyR) + 0.55)
+  body.translate(0, backY, 0)
+  bodyParts.push(tint(body, s.bodyColor, 0.1, s.seed))
+
+  const neck = new THREE.CylinderGeometry(s.bodyR * 0.32, s.bodyR * 0.45, s.neckLen, FAUNA_TESSELLATION.limb)
+  neck.rotateX(-s.neckTilt)
+  const nz = s.bodyLen * 0.5 + Math.sin(s.neckTilt) * s.neckLen * 0.4
+  const ny = backY + Math.cos(s.neckTilt) * s.neckLen * 0.4
+  neck.translate(0, ny, nz)
+  bodyParts.push(tint(neck, s.bodyColor, 0.1, s.seed + 2))
+
+  const head = new THREE.SphereGeometry(s.headSize, ...FAUNA_TESSELLATION.head)
+  head.scale(0.8, 0.85, 1.35)
+  const hz = nz + Math.sin(s.neckTilt) * s.neckLen * 0.35 + s.headSize * 0.5
+  const hy = ny + Math.cos(s.neckTilt) * s.neckLen * 0.35
+  head.translate(0, hy, hz)
+  bodyParts.push(tint(head, s.headColor ?? s.bodyColor, 0.1, s.seed + 3))
+
+  if (s.horns) {
+    for (const hx of [-0.5, 0.5]) {
+      const horn = new THREE.ConeGeometry(s.headSize * 0.16, s.headSize * 1.6, FAUNA_TESSELLATION.spike)
+      horn.rotateX(-0.5)
+      horn.translate(hx * s.headSize, hy + s.headSize * 0.9, hz - s.headSize * 0.4)
+      bodyParts.push(tint(horn, '#4a3a26', 0.1, s.seed + 4))
+    }
+  }
+
+  const legLen = s.legH + s.bodyR * 0.4
+  const legs: GoatLeg[] = []
+  for (const [lx, lz] of [
+    [-0.4, 0.75],
+    [0.4, 0.75],
+    [-0.4, -0.75],
+    [0.4, -0.75],
+  ]) {
+    const leg = new THREE.CylinderGeometry(s.legR, s.legR * 0.8, legLen, FAUNA_TESSELLATION.limb)
+    // Shift the cylinder down so its TOP sits at the local origin — the pivot.
+    leg.translate(0, -legLen / 2, 0)
+    // Diagonal legs (front-left+back-right vs front-right+back-left) trot in
+    // antiphase: they share a beat when lx and lz have the same sign.
+    const phaseOffset = Math.sign(lx) === Math.sign(lz) ? Math.PI : 0
+    legs.push({
+      geo: tint(leg, s.bodyColor, 0.12, s.seed + 1),
+      hip: [lx * s.bodyR, legLen, lz * s.bodyLen * 0.5],
+      phaseOffset,
+    })
+  }
+  return { body: merge(bodyParts), legs }
 }

@@ -422,6 +422,41 @@ export function separationPush(
   return [px, pz]
 }
 
+/**
+ * Body separation at a water/coast edge (design.md §19.5, point 222): a pair
+ * pinned against impassable water cannot part along the straight centre-line,
+ * because the water setback reverts the component pointing INTO the water every
+ * frame — the two animals stay interpenetrating (the reported waterline bug).
+ * Given the inward water normal `waterDir` (unit, pointing into the forbidden
+ * water), the push is resolved along the SHORE TANGENT instead: the into-water
+ * component is removed, and when the raw push is (almost) purely into the water
+ * — so simply removing it would leave nothing and stall — the whole magnitude is
+ * redirected along the shore tangent so the animals still slide apart. With
+ * `waterDir` null (no water nearby) it is exactly separationPush.
+ */
+export function edgeSeparationPush(
+  x: number,
+  z: number,
+  neighbors: ReadonlyArray<readonly [number, number, number]>,
+  waterDir: readonly [number, number] | null,
+): [number, number] {
+  const [px, pz] = separationPush(x, z, neighbors)
+  if (!waterDir) return [px, pz]
+  const [nx, nz] = waterDir
+  const into = px * nx + pz * nz
+  if (into <= 0) return [px, pz] // already leads away from the water
+  let tx = px - nx * into
+  let tz = pz - nz * into
+  const mag = Math.hypot(px, pz)
+  if (Math.hypot(tx, tz) < 0.05 * mag) {
+    // Push is (almost) purely into the water: redirect the full magnitude along
+    // the shore tangent (the water normal turned 90°) so the pair still parts.
+    tx = -nz * mag
+    tz = nx * mag
+  }
+  return [tx, tz]
+}
+
 /** Vulture flight (design.md §19): where a flight spawns beyond the view ring
  *  and how far out it must be before it may despawn ("well outside" the view). */
 export const FLIGHT_SPAWN_OUT = 20

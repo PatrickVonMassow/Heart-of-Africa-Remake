@@ -16,6 +16,11 @@ import {
   buildFlamingo,
   buildGiraffe,
   buildGoat,
+  buildGoatParts,
+  faceVelocity,
+  gaitPhase,
+  legSwingAngle,
+  GAIT_CADENCE,
   buildHyena,
   buildLeopard,
   buildLion,
@@ -550,5 +555,74 @@ describe('crocodile submerge pose (design.md §19.16, point 242)', () => {
 
   it('hidden sits markedly lower than striking — the pose actually changes', () => {
     expect(crocodileBodyY(surfaceY, true)).toBeLessThan(crocodileBodyY(surfaceY, false) - 0.2)
+  })
+})
+
+describe('animal gait (design.md §19, point 228 — no foot-slide, no backward glide)', () => {
+  it('the leg-swing phase is a pure function of DISTANCE travelled, not time', () => {
+    // Zero distance → zero phase: a standing animal's legs never move.
+    expect(gaitPhase(0)).toBe(0)
+    // The phase scales with the distance covered (stride matches speed): walking
+    // twice as far advances the cycle twice as much.
+    expect(gaitPhase(2)).toBeCloseTo(2 * gaitPhase(1), 12)
+    expect(gaitPhase(1)).toBeCloseTo(GAIT_CADENCE, 12)
+    // Strictly monotone in distance.
+    let prev = -1
+    for (let d = 0; d <= 5; d += 0.25) {
+      const p = gaitPhase(d)
+      expect(p).toBeGreaterThanOrEqual(prev)
+      prev = p
+    }
+  })
+
+  it('every leg is at neutral at rest (phase 0), and diagonal legs trot in antiphase', () => {
+    // At a standing phase (0) each leg — offset 0 or π — reads sin 0 = sin π = 0:
+    // no twitch while the animal holds still.
+    expect(legSwingAngle(0, 0)).toBeCloseTo(0, 12)
+    expect(legSwingAngle(0, Math.PI)).toBeCloseTo(0, 12)
+    // The two diagonal beats are opposite as the phase advances (a trot).
+    for (let ph = 0.1; ph < Math.PI; ph += 0.3) {
+      expect(legSwingAngle(ph, 0)).toBeCloseTo(-legSwingAngle(ph, Math.PI), 12)
+    }
+    // The swing stays bounded (never flails past the amplitude).
+    for (let ph = 0; ph < 20; ph += 0.37) expect(Math.abs(legSwingAngle(ph, 0))).toBeLessThanOrEqual(0.5 + 1e-9)
+  })
+
+  it("the walker's facing tracks its velocity — it never glides backward", () => {
+    // For any travel direction, the resulting facing points the SAME way as the
+    // velocity (facing·velocity ≥ 0): a goat can never face forward while sliding
+    // back. Yaw convention: forward = (sin yaw, cos yaw) in (x, z).
+    for (let ang = 0; ang < Math.PI * 2; ang += Math.PI / 12) {
+      const vx = Math.cos(ang)
+      const vz = Math.sin(ang)
+      const yaw = faceVelocity(vx, vz, 999)
+      const fx = Math.sin(yaw)
+      const fz = Math.cos(yaw)
+      expect(fx * vx + fz * vz).toBeGreaterThan(0) // faces INTO the motion
+    }
+  })
+
+  it('holds the previous facing when standing still (no spin at rest)', () => {
+    expect(faceVelocity(0, 0, 1.234)).toBe(1.234)
+    expect(faceVelocity(1e-9, -1e-9, 0.5)).toBe(0.5)
+  })
+
+  it('the goat parts build gives a body and four hip-pivoted legs', () => {
+    const { body, legs } = buildGoatParts()
+    expect(body.attributes.position.count).toBeGreaterThan(0)
+    expect(legs).toHaveLength(4)
+    for (const leg of legs) {
+      expect(leg.geo.attributes.position.count).toBeGreaterThan(0)
+      // The leg hangs BELOW its hip (top at the local origin), so rotating the
+      // group about its hip swings the foot — the leg's own top sits at ~0.
+      leg.geo.computeBoundingBox()
+      expect(leg.geo.boundingBox!.max.y).toBeCloseTo(0, 6)
+      expect(leg.geo.boundingBox!.min.y).toBeLessThan(0)
+      expect(leg.hip[1]).toBeGreaterThan(0) // the hip sits up on the body
+    }
+    // Two diagonal beats, two legs each (a trot).
+    const zeros = legs.filter((l) => l.phaseOffset === 0).length
+    expect(zeros).toBe(2)
+    expect(legs.filter((l) => l.phaseOffset === Math.PI)).toHaveLength(2)
   })
 })

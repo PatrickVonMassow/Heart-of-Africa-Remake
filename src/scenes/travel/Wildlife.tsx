@@ -44,6 +44,7 @@ import {
   groundNormal,
   leashedGambolDir,
   separationPush,
+  edgeSeparationPush,
   turnToward,
   committedFleeHeading,
   FLEE_COMMIT_MARGIN,
@@ -748,6 +749,33 @@ function findLandNear(x: number, z: number, seed: number): { x: number; z: numbe
     }
   }
   return { x, z } // mid-lake with no bank in reach — hold position
+}
+
+/** Inward water normal at (x, z): a unit vector pointing toward nearby
+ *  impassable water (river/lake/ocean), or null when no water is close
+ *  (design.md §19.5, point 222). A cheap 8-point ring sample, called only when a
+ *  separation push is about to shove an animal toward water — the pinned-at-edge
+ *  pair then parts along the shore tangent instead of being reverted by the
+ *  water setback every frame. */
+function waterNormalAt(x: number, z: number, seed: number): [number, number] | null {
+  let nx = 0
+  let nz = 0
+  let hits = 0
+  const r = 2.5
+  for (let k = 0; k < 8; k++) {
+    const ang = (k / 8) * Math.PI * 2
+    const ll = worldToLatLon(x + Math.cos(ang) * r, z + Math.sin(ang) * r)
+    const t = sampleTerrain(ll.lat, ll.lon, seed).type
+    if (t === 'water' || t === 'ocean') {
+      nx += Math.cos(ang)
+      nz += Math.sin(ang)
+      hits++
+    }
+  }
+  if (hits === 0) return null
+  const m = Math.hypot(nx, nz)
+  if (m < 1e-6) return null
+  return [nx / m, nz / m]
 }
 
 /** Nearest river/lake WATER cell to (x, z) — the inverse of findLandNear, for
@@ -2199,7 +2227,23 @@ function Herds() {
             }
           }
           if (neighbors.length === 0) continue
-          const [dx, dz] = separationPush(a.x, a.z, neighbors)
+          let [dx, dz] = separationPush(a.x, a.z, neighbors)
+          // Pinned-at-a-water-edge resolve (point 222): if the raw push would
+          // shove this animal toward impassable water, the water setback reverts
+          // it every frame and the pair never parts — resolve along the shore
+          // tangent instead. The water-dwellers (flamingo wader, crocodile) are
+          // exempt; they belong at the water. Cheap: the ring sample runs only
+          // when a non-zero push actually points at water.
+          if ((dx !== 0 || dz !== 0) && sp !== 'flamingo' && sp !== 'crocodile') {
+            const m0 = Math.hypot(dx, dz)
+            const reach = ra + 0.6
+            const pll = worldToLatLon(a.x + (dx / m0) * reach, a.z + (dz / m0) * reach)
+            const pt = sampleTerrain(pll.lat, pll.lon, seed).type
+            if (pt === 'water' || pt === 'ocean') {
+              const wn = waterNormalAt(a.x, a.z, seed)
+              if (wn) [dx, dz] = edgeSeparationPush(a.x, a.z, neighbors, wn)
+            }
+          }
           if (dx !== 0 || dz !== 0) {
             // Clamp the correction to a walking pace: the full geometric
             // half-overlap per frame acted as a teleport that the behaviours
