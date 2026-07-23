@@ -9373,7 +9373,7 @@ the remaining open points in their numeric order.
   then 242 (the behaviour/pose) builds on it; do NOT delegate 243 concurrently with
   any other `fauna.ts` point.
 
-- [ ] 244. SPACE IS THE USE KEY; FUNCTIONAL BUILDINGS NEED THE KEY (no walk-in
+- [x] 244. SPACE IS THE USE KEY; FUNCTIONAL BUILDINGS NEED THE KEY (no walk-in
   auto-open) — user decision 22.07.2026. TWO coupled changes: (A) the interaction/
   use key changes from E to SPACE everywhere; (B) entering a FUNCTIONAL building
   (the highlighted enterable huts — shops, bazaar, ferry/trade, the chief's/elder
