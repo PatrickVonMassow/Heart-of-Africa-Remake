@@ -4511,8 +4511,12 @@ const crocGrazerAmbush = await page.evaluate(async () => {
     herds.zebra.push(farGrazer)
     await window.__pollSim(6, () => {
       // Pinned HARD every step (not only past a tolerance): the point of the
-      // check is the distance, so the distance must not drift at all.
-      if (farGrazer.caught === undefined) { farGrazer.x = fx; farGrazer.z = fz }
+      // check is the distance, so the distance must not drift at all. The
+      // DRINK errand is cleared with it: a grazer that picks up a drink target
+      // at the bank is eligible through the ORIGINAL drinker path (which reads
+      // the target's distance, not the animal's), and the croc taking it then
+      // proves nothing about the broadened trigger this check is isolating.
+      if (farGrazer.caught === undefined) { farGrazer.x = fx; farGrazer.z = fz; farGrazer.drink = undefined }
       if (croc.lunge !== undefined) { out.farBalked = false; return true }
       return false
     })
