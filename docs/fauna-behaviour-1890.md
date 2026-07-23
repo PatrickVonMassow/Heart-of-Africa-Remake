@@ -516,3 +516,361 @@ Vultures & dying/downed animals:
 - [Slate — Vultures know where animals go to die](https://slate.com/technology/2014/02/vultures-know-where-animals-go-to-die-feeding-strategies-by-season.html)
 - [Missouri Dept. of Conservation — Vulture facts](https://mdc.mo.gov/wildlife/wildlife-facts/bird-facts/vulture-facts)
 - [Avian Report — Black vulture food habits](https://avianreport.com/black-vulture-food-habits/)
+
+---
+---
+
+# Bird flight, escape and aerial predators (design.md §19)
+
+A second, self-contained fauna-behaviour research topic hosted in this file
+(the geriatric research above is §§1–9; this is a distinct study, so it carries
+its own section numbering B1–B6 and its own sources). Written before any code so
+the **bird-flight-escape** and **aerial-predator** mechanics are built from a
+researched per-species/per-region table rather than by assumption. It reuses the
+**FIELD / REVIEW / INFERRED / MYTH / GAP** marker discipline defined in the
+table near the top of this file, and the same accuracy bar: a hedged answer
+beats a confident wrong one, myth is labelled myth, inference is labelled
+inference.
+
+The birds the game renders today are **ground / shore / scavenger** types:
+**vultures** (soaring scavengers), a **ground-nesting plover with chicks**,
+**shore/wading birds (flamingos)**, and **general small grazing-area birds**.
+The two mechanics under study are: (1) making flight-capable prey birds **escape
+ground predators and large mammals by flying off**, and (2) adding
+**region-appropriate aerial predators (raptors) that hunt birds** — but only
+where realistic. The ornithology below is stable on a century scale (flight
+mechanics, raptor hunting modes, predator–prey aerodynamics are mechanisms, not
+1890-specific facts); every species named was present in its African range in
+the ~1890 wild state, so — as in the geriatric study — there is no
+modern-vs-period split for the biology, only the game's ~1890 framing. Modern
+ornithology is used for the biology and cited honestly.
+
+---
+
+## B1. Bird flight escape — do prey birds fly off, and is the "caught only on the ground" model right?
+
+**The core model the game proposes — "a ground predator can only catch a bird it
+surprises still on the ground (a late take-off), not one already airborne" — is
+a sound first-order abstraction of a real principle.** REVIEW/INFERRED (it is a
+game abstraction of well-attested biology, not a single cited law):
+
+- For nearly all **volant** (flight-capable) birds, the primary escape from a
+  terrestrial predator **is flight** — taking to the air is the decisive
+  advantage a bird has over a ground hunter
+  ([Birdfact — how birds avoid predators](https://www.birdfact.com/articles/how-do-birds-avoid-predators);
+  [Stanford — Raptor Hunting](https://web.stanford.edu/group/stanfordbirds/text/uessays/uRaptor_Hunting.html))
+  — REVIEW.
+- Ground predators evolved **stealth and surprise precisely because they cannot
+  catch a flying bird**; the vulnerability window is therefore **on the ground
+  and during take-off** — exactly the game's model
+  ([Birdful — how birds survive predators](https://www.birdful.org/how-do-birds-survive-predators/))
+  — REVIEW. Ground/brush birds (grouse, francolins, quail — the gamebird build)
+  **burst-flush** explosively off the ground thanks to low wing loading, and
+  small birds launch to flight in milliseconds
+  ([Birdful — can birds take off from the ground](https://www.birdful.org/can-birds-take-off-from-the-ground/))
+  — REVIEW. So "already airborne = safe from the ground predator; the danger is
+  the **late** take-off" is a defensible rule.
+
+**Nuances that the model must respect:**
+
+- **Flightless birds run and kick — they do NOT fly.** The ostrich cannot fly;
+  it escapes by **running** (~70 km/h) and delivers a dangerous **kick** in
+  defence. INFERRED/REVIEW (textbook ratite biology). *No ostrich is in the
+  rendered roster today* — flagged as the archetype **if a flightless bird is
+  ever added**: give it run/kick, never fly-to-escape.
+- **The nest is the exception to "just fly away."** Ground-nesters cannot abandon
+  eggs/immobile chicks by flying, so they switch to **active nest defence**:
+  loud alarm-calling, **low swooping/mobbing** attacks with the feet, and the
+  classic **broken-wing distraction display** that lures a predator away
+  ([Johnston & Jeff — ground-nesting birds](https://johnstonandjeff.co.uk/ground-nesting-birds/);
+  [EarthLife — lapwings](https://earthlife.net/lapwings/);
+  [Behavioral Ecology — distraction behaviour & nest survival](https://academic.oup.com/beheco/article/28/1/260/2453523);
+  [Cornell — Piping Plover life history](https://www.allaboutbirds.org/guide/Piping_Plover/lifehistory))
+  — FIELD/REVIEW.
+- **Chicks and eggs can be caught; the incubating adult can be surprised at the
+  nest.** Precocial wader/plover chicks cannot yet fly and instead **crouch,
+  freeze and rely on camouflage**; eggs are cryptic; and an adult flushed **late
+  off the nest** is the very "surprised on the ground" case
+  ([EarthLife — lapwings](https://earthlife.net/lapwings/))
+  — FIELD/REVIEW.
+- **A laborious take-off is a longer vulnerable window.** Big, heavy waterbirds
+  (flamingos) need a **running start** across water/ground before they are
+  airborne — a real, extended "late take-off" exposure that raptors and eagles
+  exploit at colonies (§B2). INFERRED from flight-mechanics + the colony-
+  predation records below.
+
+**Which game bird types fly to escape vs. don't:**
+
+| Game bird | Flies to escape a ground predator? | Model |
+| --- | --- | --- |
+| **Small grazing-area birds** | **Yes** — fast burst launch | Airborne = safe from ground hunters; catchable only on a surprised/late take-off |
+| **Flamingo (shore/wading)** | **Yes**, but with a **laborious running take-off** | Give it a slower escape flush → a real vulnerable window; the main threat is aerial (fish eagle / falcon), §B2 |
+| **Ground-nesting plover — ADULT** | **Yes**, and additionally **mobs / broken-wing displays** at the nest | Flies off normally; at the nest switches to active defence rather than fleeing |
+| **Ground-nesting plover — CHICKS / eggs** | **No** — chicks **crouch/freeze**, eggs are cryptic | Catchable by a ground predator; parent defends via distraction, not flight |
+| **Vulture** | Flies, but **not a prey subject** — huge soaring scavenger | Not a fly-to-escape target; leave as-is |
+| **(Ostrich — not in roster)** | **No — runs and kicks** | The flightless archetype if ever added; never fly-to-escape |
+
+---
+
+## B2. Aerial predators (raptors) that take birds — hunting modes and per-region table
+
+Bird-hunting raptors fall into **three attack modes**, and the distinction is
+what decides whether a "surprise from above the prey doesn't see in time" is
+realistic for a given species:
+
+1. **STOOP / DIVE from height (the peregrine style).** The raptor climbs **above**
+   its prey, then plunges in a near-vertical high-speed dive to strike a bird
+   **in flight** from above. This is the mode for which "attack from above,
+   unseen in time" is **literally accurate**: high-speed cinematography and
+   physics simulation confirm the peregrine ascends, tucks and stoops at
+   200+ mph, striking from above with the dive itself maximising catch success
+   against agile prey and giving the element of surprise
+   ([PLOS Comput. Biol. — physics of peregrine stoops (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5896925/);
+   [Physics World — falcon dive forces](https://physicsworld.com/a/falcons-high-speed-dive-generates-forces-needed-to-catch-agile-prey/);
+   [Audubon — why peregrines are so deadly](https://www.audubon.org/news/research-reveals-exactly-why-peregrine-falcons-are-so-deadly);
+   [Stanford — Raptor Hunting](https://web.stanford.edu/group/stanfordbirds/text/uessays/uRaptor_Hunting.html))
+   — FIELD/REVIEW. **Falcons** (peregrine, barbary, lanner, taita) and two
+   **bird-hunting eagles** (Ayres's hawk-eagle, African hawk-eagle) use it.
+2. **TAIL-CHASE / AMBUSH FROM COVER (the accipiter style).** The hawk waits on a
+   **concealed perch**, then bursts out in a fast, agile **level dash** and
+   tail-chases the prey, often into cover. The surprise is **from concealment at
+   the prey's own level**, NOT from high above — so a stoop-from-the-sky model is
+   *wrong* for these species
+   ([Peregrine Fund — Gabar Goshawk](https://peregrinefund.org/explore-raptors-species/hawks/gabar-goshawk);
+   [avibirds — Black Sparrowhawk](https://avibirds.com/black-sparrowhawk/);
+   [Britannica — sparrowhawk](https://www.britannica.com/animal/sparrowhawk))
+   — FIELD/REVIEW. **Accipiters** (black sparrowhawk, African goshawk, gabar
+   goshawk, the small sparrowhawks/shikra) use it.
+3. **LOW QUARTERING / SURFACE SNATCH (harriers; fish eagle at colonies).** True
+   harriers **quarter low** over ground and reeds and flush/grab small birds and
+   nestlings; the African fish eagle **snatches waterbirds (incl. flamingos)
+   from the water surface** in a fast low glide. Surprise from **low and fast**,
+   not from height ([SafariBookings — African Fish Eagle facts](https://www.safaribookings.com/blog/5-fascinating-facts-about-the-african-fish-eagle);
+   [A-Z Animals — African Fish Eagle](https://a-z-animals.com/animals/african-fish-eagle/))
+   — REVIEW (harrier quartering is general/REVIEW here, not deeply sourced —
+   treat as the lighter recommendation).
+
+**Is "surprise from above the prey doesn't see in time" realistic?** **Yes for
+the falcon guild and the two bird-hunting hawk-eagles** (mode 1) — that is
+exactly the peregrine stoop, and Ayres's hawk-eagle uses a "falcon-like highly
+aerial method... stoops to intercept [birds] in mid-air"
+([Wikipedia — Ayres's hawk-eagle](https://en.wikipedia.org/wiki/Hieraaetus_ayresii);
+[Peregrine Fund — Ayres's Hawk-eagle](https://peregrinefund.org/explore-raptors-species/eagles/ayres-hawk-eagle);
+[animalia — African hawk-eagle (stooping flight)](https://animalia.bio/african-hawk-eagle))
+— FIELD/REVIEW. **No** for the accipiters (surprise is from cover, not height)
+and the harriers/fish eagle (low, not high).
+
+### B2.1 Per-region aerial-predator table (game regions: North / West / Central / East / South)
+
+Assigns each raptor to the game's five regions with its typical **prey birds**
+and **attack mode**. Ranges are REVIEW from the species accounts cited; a species
+listed in a region means it realistically occurs and hunts birds there in the
+~1890 wild state. Where a range edge is uncertain it is marked.
+
+| Region | Aerial predator | Prey birds it takes | Attack mode |
+| --- | --- | --- | --- |
+| **North** (Sahara/Maghreb/Nile) | **Barbary falcon** | doves, larks, migrant passerines, small waders | **STOOP** — takes birds mid-flight at high speed in semi-desert ([earthlife](https://earthlife.net/barbary-falcons/); [europeanraptors](https://europeanraptors.org/barbary-falcon/)) |
+| | **Peregrine falcon** (resident + migrant) | pigeons, doves, waders, ducks | **STOOP** |
+| | **Lanner falcon** | doves, larks, small–medium birds, gamebirds | **STOOP + level chase** ([Peregrine Fund — Lanner](https://peregrinefund.org/explore-raptors-species/falcons/lanner-falcon)) |
+| | **Eleonora's falcon** (coastal/island, seasonal) | **migrating passerines over the sea** | mostly **level manoeuvring**, also climbs/dives ([Animal Diversity Web](https://animaldiversity.org/accounts/Falco_eleonorae/); [Behav. Ecol. aerial hunting](https://academic.oup.com/beheco/article/12/2/150/239902)) |
+| | **Bonelli's eagle** (Atlas/Maghreb) | gamebirds, pigeons, medium birds (+ mammals) | fast **dashing** attack ([Wikipedia](https://en.wikipedia.org/wiki/Bonelli's_eagle)) |
+| **West** (Sahel/Guinea savanna & forest) | **Peregrine**, **Lanner** | doves, small birds, gamebirds | **STOOP** (Lanner also level chase) |
+| | **African hawk-eagle** | francolins, guineafowl, doves (gamebirds) | **STOOP/dash**, often cooperative pairs ([animalia](https://animalia.bio/african-hawk-eagle)) |
+| | **Ayres's hawk-eagle** | doves, pigeons, small birds | **STOOP / aerial intercept** (bird specialist) |
+| | **Black sparrowhawk**, **African goshawk**, **Gabar goshawk** | doves, pigeons, weavers, waxbills, small birds | **AMBUSH from cover + tail-chase** ([Peregrine Fund — African Goshawk](https://peregrinefund.org/explore-raptors-species/hawks/african-goshawk)) |
+| | **African fish eagle** (rivers) | ducks, waterbirds snatched from surface | **low glide snatch** |
+| **Central** (Congo forest & clearings) | **Ayres's hawk-eagle** | forest doves/pigeons, small birds | **STOOP / aerial intercept** |
+| | **African goshawk**, **Black sparrowhawk** | forest doves, pigeons, small birds | **AMBUSH from cover** (canopy favours ambush over the open stoop) |
+| | **African fish eagle** (rivers/lakes) | waterbirds from the surface | **low glide snatch** |
+| | *(deep-forest raptor specialists — GAP, not named to avoid over-assertion)* | — | — |
+| **East** (Rift, savanna, soda lakes) | **Peregrine**, **Lanner** | doves, gamebirds, small–medium birds | **STOOP** (Lanner also level chase) |
+| | **Taita falcon** (cliffs, **rare/localised**) | swifts, doves, small birds | **STOOP** |
+| | **African hawk-eagle**, **Ayres's hawk-eagle** | francolins, guineafowl, doves, pigeons | **STOOP/dash** |
+| | **Black / African / Gabar goshawks** | doves, pigeons, small birds | **AMBUSH from cover + tail-chase** |
+| | **African fish eagle** | **flamingos** & waterbirds at soda lakes (Nakuru/Bogoria) | **low glide snatch** ([SafariBookings](https://www.safaribookings.com/blog/5-fascinating-facts-about-the-african-fish-eagle); [A-Z Animals](https://a-z-animals.com/animals/african-fish-eagle/)) |
+| | *(wintering harriers — quarter low over wetlands, lighter/REVIEW)* | small birds, nestlings | **LOW QUARTER** |
+| **South** (highveld, bushveld, Cape, wetlands) | **Peregrine**, **Lanner**, **Taita** (rare) | doves, gamebirds, small–medium birds | **STOOP** |
+| | **African hawk-eagle**, **Ayres's hawk-eagle** | francolins, guineafowl, doves, pigeons | **STOOP/dash** |
+| | **Black sparrowhawk** (very characteristic), **Gabar / African goshawk** | doves, pigeons, small birds | **AMBUSH from cover + tail-chase** |
+| | **African marsh harrier** (wetlands, lighter/REVIEW) | small birds, nestlings | **LOW QUARTER** |
+| | **African fish eagle** | ducks, waterbirds from the surface | **low glide snatch** |
+
+**Reading of the table for the game:** the **stoop guild** (falcons + Ayres's/
+African hawk-eagle) is the one that fits a dramatic dive-from-above; it spans
+**all five regions** (with Barbary/Eleonora's/Bonelli's the North-only
+additions, and the hawk-eagles absent from the deep North desert). The
+**ambush/tail-chase guild** (accipiters) spans West/Central/East/South and is
+the accurate model wherever there is cover. The **fish eagle** is the honest way
+to give **flamingos** an aerial predator (surface snatch), and is the standout
+East-African soda-lake fact.
+
+---
+
+## B3. Flight-height layering and the stoop-dive mechanic — is it plausible, and should the game build it?
+
+**Is it plausible that prey fly in a lower band while a raptor attacks from a
+higher one?** For the **falcon guild, yes and it is well-supported** — the
+peregrine literally **climbs above its prey and stoops down** on it, and the
+physics of the high-speed near-vertical dive are exactly why the attack works
+([PLOS Comput. Biol. (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5896925/);
+[Physics World](https://physicsworld.com/a/falcons-high-speed-dive-generates-forces-needed-to-catch-agile-prey/))
+— FIELD/REVIEW. The prey side is symmetric: smaller birds **out-climb** larger
+predators, so **climbing is a common escape**, and prey near cover **dive to
+shelter**; level tail-chases usually favour the falcon
+([Behav. Ecol. — aerial hunting & escape strategies](https://academic.oup.com/beheco/article/12/2/150/239902);
+[Behav. Ecol. — escape tactics, ecology & aerodynamics](https://academic.oup.com/beheco/article/21/1/16/179705))
+— REVIEW. So a **vertical layering** (raptor high → prey lower → dive) is
+biologically real for falcons, **not** a myth.
+
+**But the engineering question is separate from the biology.** The game's birds
+are currently simple ground/shore actors with no altitude dimension. Building a
+**true 3D flight-height simulation** — persistent altitude bands for every bird,
+a raptor circling above, a physically-modelled stoop — is heavy machinery for a
+niche interaction, and **the majority of the region table (accipiters, harriers,
+fish eagle) does not use height at all** — they ambush from cover or snatch low.
+
+**Verdict — build the stoop, but not a full flight-height physics layer.** The
+dive-from-above is well-supported enough that it should **not** be discarded for
+the falcon guild — but it should be built as a **scripted "descend-and-strike"
+attack event** (the raptor enters from high/off the top of the frame, plunges on
+the airborne prey, strikes, and the drama resolves), **not** as a persistent
+altitude coordinate simulated for every bird. For the **accipiter/harrier/fish-
+eagle majority**, model an **air-catch tail-chase / low ambush** instead — that
+is the accurate mode for them and is simpler. If the team wants only **one**
+mechanic across all raptors, keep the simpler **air-catch chase** and merely
+render the falcon's approach as a steep dive — do **not** invest in a full
+flight-height level system.
+
+---
+
+## B4. Recommendation and implementation brief
+
+**Per-region aerial-predator recommendation (short):**
+- **North:** Barbary falcon + Peregrine + Lanner (all **stoop**); Eleonora's
+  falcon as a seasonal **coastal** migrant-hunter; Bonelli's eagle (dash) in the
+  Atlas. No hawk-eagles in the deep desert.
+- **West:** Peregrine/Lanner (stoop) + African & Ayres's hawk-eagle (stoop/dash,
+  gamebirds & doves) + black/African/gabar goshawk (**ambush**) + fish eagle on
+  rivers.
+- **Central (forest):** ambush dominates — African goshawk + black sparrowhawk;
+  Ayres's hawk-eagle for the aerial intercept in clearings; fish eagle on the
+  rivers. (Deep-forest specialists left as a GAP.)
+- **East:** Peregrine/Lanner (+ rare Taita) stoop; African & Ayres's hawk-eagle;
+  goshawks ambush; and the signature **African fish eagle taking flamingos** at
+  the soda lakes.
+- **South:** Peregrine/Lanner (+ rare Taita) stoop; African & Ayres's hawk-eagle;
+  black sparrowhawk very characteristic (ambush); African marsh harrier over
+  wetlands (light); fish eagle.
+
+**Verdict on the stoop-dive-from-above:** **BUILD IT** for the **falcon guild +
+Ayres's/African hawk-eagle** — the evidence (peregrine stoop physics, Ayres's
+falcon-like mid-air intercept) is **strong, not thin** — but build it as a
+**scripted descend-and-strike event, NOT a full 3D flight-height/altitude-band
+simulation**. Use an **air-catch tail-chase / low ambush** for the accipiters,
+harriers and fish eagle (their accurate mode). Do **not** simulate persistent
+per-bird altitude.
+
+**Implementation brief (docs-only spec; no code here):**
+1. **Fly-to-escape flag** on volant prey birds: small grazing-area birds and
+   flamingos flee a nearby ground predator/elephant by **taking off**; once
+   airborne they are safe from that ground hunter. The ground predator catches
+   only a bird **surprised late on the ground** (a short take-off window).
+2. **Flamingo** gets a **laborious take-off** (running start → a longer
+   vulnerable window), and its real threat is aerial (fish eagle / falcon).
+3. **Plover keeps its ground-nester rules:** adult **flies + mobs / broken-wing
+   distraction** at the nest; **chicks crouch/freeze** and eggs are cryptic and
+   **catchable**; the incubating adult can be surprised at the nest. Do **not**
+   give the plover a plain flee-only escape.
+4. **Ostrich stays flightless if ever added:** run + kick, never fly-to-escape
+   (not in the current roster — flagged only).
+5. **Aerial predators seeded per the §B2.1 region table**, respecting the
+   region pools so a raptor only appears where it realistically hunts; each
+   carries its **attack mode** (stoop vs ambush vs low snatch).
+6. **Stoop guild** (peregrine/barbary/lanner/taita + Ayres's/African hawk-eagle):
+   a scripted **descend-and-strike** on an **airborne** prey bird — enters from
+   high, plunges, strikes, resolves; prey may escape by **out-climbing** or
+   **diving to cover**.
+7. **Ambush guild** (accipiters) and **fish eagle/harrier:** an **air-catch
+   tail-chase / low surface-snatch / low quarter** — surprise from cover or from
+   low, **no** dive-from-height. Fish eagle is the way to give **flamingos** an
+   aerial predator.
+8. **Reuse existing invariants:** route any kill through the ordinary carcass
+   system where applicable, and honour the "every started drama resolves" rule
+   (I4, point 186) with a hard deadline so a stoop/chase that loses its target
+   (streamed out, prey reaches cover) always resolves and never pins.
+9. **All rates/thresholds** (stoop trigger radius, take-off window, escape
+   chance, per-region raptor spawn weights) stay **low, debug-editable** balance
+   values (CLAUDE §2/§21).
+10. **Do NOT build** a 3D flight-height/altitude-band system — the stoop is a
+    scripted trajectory, not a simulated altitude.
+
+---
+
+## B5. Known unknowns — do not invent these
+
+- **Exact ~1890 range edges** per raptor per game region are REVIEW from modern
+  species accounts; treat the table as "realistically occurs and hunts birds
+  here," not as a surveyed distribution. Range-uncertain entries (Taita rare;
+  Eleonora's coastal/seasonal; harriers) are marked.
+- **True harriers' low-quartering** on small birds is asserted at REVIEW level
+  from general raptor behaviour, not a deep per-species source in this pass —
+  the lighter recommendation. (Do not confuse the true harriers, *Circus*, with
+  the **African harrier-hawk**, *Polyboroides*, a canopy/cliff nest-raider — a
+  different bird, deliberately not used here.)
+- **Deep-forest Central-African raptor specialists** are a **GAP** — left
+  unnamed rather than over-asserted; Ayres's hawk-eagle, African goshawk and
+  black sparrowhawk are the well-sourced Central choices.
+- **Peregrine resident vs. migrant status** in sub-Saharan Africa (resident
+  *F. p. minor* plus Palearctic migrants) is REVIEW; the game only needs
+  "present and hunts birds," which holds.
+- **Escape probabilities, take-off windows and stoop trigger radii** are
+  game-calibration guesses, not measured field rates — keep them debug-editable
+  and never present them as data.
+
+---
+
+## B6. Sources
+
+Bird flight escape / take-off / ground-predator surprise:
+- [Birdfact — How do birds avoid predators?](https://www.birdfact.com/articles/how-do-birds-avoid-predators)
+- [Birdful — How do birds survive predators?](https://www.birdful.org/how-do-birds-survive-predators/)
+- [Birdful — Can birds take off from the ground?](https://www.birdful.org/can-birds-take-off-from-the-ground/)
+- [Stanford — Raptor Hunting (stoop vs tail-chase; accipiter surprise)](https://web.stanford.edu/group/stanfordbirds/text/uessays/uRaptor_Hunting.html)
+
+Peregrine stoop / high-speed dive physics:
+- [PLOS Computational Biology — physics-based simulations of peregrine stoops (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC5896925/)
+- [Physics World — falcon's high-speed dive generates the forces to catch agile prey](https://physicsworld.com/a/falcons-high-speed-dive-generates-forces-needed-to-catch-agile-prey/)
+- [Audubon — research reveals why peregrine falcons are so deadly](https://www.audubon.org/news/research-reveals-exactly-why-peregrine-falcons-are-so-deadly)
+- [Forbes — how peregrines manoeuvre at nearly 225 mph](https://www.forbes.com/sites/fionamcmillan/2018/04/13/falcon-attack-how-peregrine-falcons-maneuver-at-nearly-225-mph/)
+
+Aerial hunting & escape strategy (stoop vs level chase; out-climbing):
+- [Behavioral Ecology — Predator versus prey: aerial hunting & escape strategies in birds](https://academic.oup.com/beheco/article/12/2/150/239902)
+- [Behavioral Ecology — Predator escape tactics: ecology & aerodynamics](https://academic.oup.com/beheco/article/21/1/16/179705)
+
+Ground-nester (plover/lapwing) nest defence, distraction & chick crouch:
+- [Johnston & Jeff — Ground-nesting birds](https://johnstonandjeff.co.uk/ground-nesting-birds/)
+- [EarthLife — Lapwings](https://earthlife.net/lapwings/)
+- [Behavioral Ecology — Deceiving predators: distraction behaviour & nest survival](https://academic.oup.com/beheco/article/28/1/260/2453523)
+- [Cornell Lab — Piping Plover life history](https://www.allaboutbirds.org/guide/Piping_Plover/lifehistory)
+
+Falcons (peregrine, barbary, lanner, eleonora's) & bird-hunting eagles:
+- [Peregrine Fund — Lanner Falcon](https://peregrinefund.org/explore-raptors-species/falcons/lanner-falcon)
+- [EarthLife — Barbary Falcon](https://earthlife.net/barbary-falcons/)
+- [European Raptors — Barbary Falcon](https://europeanraptors.org/barbary-falcon/)
+- [Animal Diversity Web — Eleonora's falcon](https://animaldiversity.org/accounts/Falco_eleonorae/)
+- [Wikipedia — Bonelli's eagle](https://en.wikipedia.org/wiki/Bonelli's_eagle)
+- [Wikipedia — Ayres's hawk-eagle](https://en.wikipedia.org/wiki/Hieraaetus_ayresii)
+- [Peregrine Fund — Ayres's Hawk-eagle](https://peregrinefund.org/explore-raptors-species/eagles/ayres-hawk-eagle)
+- [animalia — African hawk-eagle (stooping flight, gamebirds)](https://animalia.bio/african-hawk-eagle)
+
+Accipiters (ambush from cover / tail-chase):
+- [Peregrine Fund — Gabar Goshawk](https://peregrinefund.org/explore-raptors-species/hawks/gabar-goshawk)
+- [Peregrine Fund — African Goshawk](https://peregrinefund.org/explore-raptors-species/hawks/african-goshawk)
+- [avibirds — Black Sparrowhawk](https://avibirds.com/black-sparrowhawk/)
+- [Britannica — Sparrowhawk](https://www.britannica.com/animal/sparrowhawk)
+- [Kruger Park Birding — Goshawks & Sparrowhawks](https://birding.krugerpark.co.za/birding-in-kruger-raptor-hawks.html)
+
+Fish eagle & flamingo/waterbird predation:
+- [SafariBookings — 5 facts about the African Fish Eagle](https://www.safaribookings.com/blog/5-fascinating-facts-about-the-african-fish-eagle)
+- [A-Z Animals — African Fish Eagle](https://a-z-animals.com/animals/african-fish-eagle/)
+- [Peregrine Fund — African Fish-eagle](https://peregrinefund.org/explore-raptors-species/eagles/african-fish-eagle)
