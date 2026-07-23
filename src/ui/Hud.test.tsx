@@ -369,22 +369,22 @@ describe('Touch controls mount only with ui.touchActive (design.md §17.5, point
   })
 
   it('leaves the prompt a plain label on desktop and makes it tappable on touch', () => {
-    useUi.setState({ prompt: 'E — Elder' })
+    useUi.setState({ prompt: 'Space — Elder' })
     const { rerender } = render(<Hud />)
     // Desktop: a non-interactive div, no tappable button.
     expect(document.querySelector('.prompt')?.tagName).toBe('DIV')
     expect(document.querySelector('.prompt-tappable')).toBeNull()
-    // Touch: the prompt becomes a button that dispatches the E interaction key.
+    // Touch: the prompt becomes a button that dispatches the Space use key.
     useUi.setState({ touchActive: true })
     rerender(<Hud />)
     const tappable = document.querySelector('.prompt-tappable') as HTMLButtonElement
     expect(tappable).not.toBeNull()
-    let sawKeyE = false
-    const onKey = (e: KeyboardEvent) => { if (e.code === 'KeyE') sawKeyE = true }
+    let sawSpace = false
+    const onKey = (e: KeyboardEvent) => { if (e.code === 'Space') sawSpace = true }
     window.addEventListener('keydown', onKey)
     fireEvent.click(tappable)
     window.removeEventListener('keydown', onKey)
-    expect(sawKeyE).toBe(true)
+    expect(sawSpace).toBe(true)
   })
 })
 

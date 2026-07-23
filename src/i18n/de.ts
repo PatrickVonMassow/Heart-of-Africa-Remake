@@ -190,8 +190,9 @@ export const de: Strings = {
   },
 
   prompts: {
-    interact: (label) => `E — ${label}`,
+    interact: (label) => `Space — ${label}`,
     openCamp: 'C — Lager öffnen',
+    enterPlace: (name) => `Space — ${name} betreten`,
   },
 
   labels: {

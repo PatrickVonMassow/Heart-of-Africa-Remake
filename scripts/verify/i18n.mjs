@@ -39,13 +39,16 @@ console.log('shot 55-i18n-german-journal.png')
 // --- German trade dialog -------------------------------------------------------
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
-// Open the trade dialog by walking onto the shop's entrance door (design.md §2).
+// Open the trade dialog by standing at the shop's door and pressing the Space
+// use key (design.md §2.3).
 await page.evaluate(() => {
   const shop = window.__placeLayout.interactives.find((b) => b.type === 'shop')
   const p = window.__placePlayer
   p.x = shop.door[0]
   p.z = shop.door[1]
 })
+await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 8000 }).catch(() => {})
+await page.keyboard.press('Space')
 await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
 await page.waitForTimeout(300)
 await page.screenshot({ path: `${OUT}56-i18n-german-trade.png` })

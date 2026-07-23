@@ -115,10 +115,10 @@ const tpos1 = await page.evaluate(() => ({ ...window.__game.getState().pos }))
 const travelled = Math.hypot(tpos1.x - tpos0.x, tpos1.z - tpos0.z)
 check("left stick travels in the bird's-eye view", travelledOk, `moved ${travelled.toFixed(2)} units`)
 
-// --- A interacts (E): addresses the elder in a village -----------------------------------------
-// Places are entered by walking now (design.md §2), so A no longer "enters":
-// it maps to the E interaction, which addresses the village elder. The
-// northern Nubian village keeps the following position query in the North.
+// --- A interacts (Space): addresses the elder in a village -------------------------------------
+// The A button maps to the Space use key (design.md §17.5), which addresses the
+// village elder when standing by him. The northern Nubian village keeps the
+// following position query in the North.
 await page.evaluate(() => window.__game.getState().enterPlace('nubian-village'))
 await page
   .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "nubian-village", { timeout: 30000 })
@@ -132,7 +132,7 @@ await page.evaluate(() => {
   p.z = el.pos[1] + 2
 })
 await page.waitForTimeout(500)
-await pulseButtonUntil(0, () => window.__game.getState().languagesLearned.north === true) // A → KeyE → talk
+await pulseButtonUntil(0, () => window.__game.getState().languagesLearned.north === true) // A → Space → talk
 const talked = await page.evaluate(() => window.__game.getState().languagesLearned.north)
 check('A interacts: the elder is addressed (language lesson)', talked === true, '')
 

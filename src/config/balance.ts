@@ -90,10 +90,6 @@ export interface BalanceConfig {
   /** How far (degrees) off the coast the sea stays swimmable (design.md
    *  §11.2); beyond it the open ocean blocks movement even inside bays. */
   oceanSwimMarginDeg: number
-  /** Extra clearance (world units) beyond the enter radius the traveller must
-   *  reach after leaving a settlement before it can be re-entered, so walking
-   *  straight back in does not immediately re-enter it (design.md §2). */
-  placeReentryMargin: number
   /** Goodwill points required before the chief reveals the location hint. */
   goodwillForHint: number
   /** Goodwill gained per culturally revered gift. */
@@ -460,7 +456,6 @@ export const balance: BalanceConfig = {
   digRadius: 3,
   placeEnterRadius: 2.5,
   oceanSwimMarginDeg: 1.0, // calibratable: swimmable coastal band width in degrees (point 221: narrowed from 1.2 so the traveller cannot wade ~1.18 deg out into deep blue while the ~0.89 deg nearshore stays swimmable)
-  placeReentryMargin: 1, // small clearance beyond the enter radius before re-entry re-arms (user: shrunk from 2)
   goodwillForHint: 2,
   goodwillRevered: 2,
   goodwillNeutral: 1,

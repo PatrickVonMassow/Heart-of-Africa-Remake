@@ -119,6 +119,7 @@ const POSITIONAL: Record<string, unknown[]> = {
   'health.report': ['weakened', ['fever']],
   'hud.fps': [60],
   'prompts.interact': ['Trade'],
+  'prompts.enterPlace': ['Cairo'],
   'mapOverlay.explored': ['North', 50],
   'mapOverlay.plan': ['Cairo'],
   'toasts.bought': ['Machete'],
@@ -168,10 +169,10 @@ collectFunctionPaths(en, '', FUNCTION_PATHS)
 
 describe('template-function callability (de and en behave alike)', () => {
   it('finds the expected number of function leaves', () => {
-    // Guards the walk itself: 25 positional + 36 journal templates (the +2 are
+    // Guards the walk itself: 26 positional + 36 journal templates (the +2 are
     // the point-170 villageReturn title and vignette resolver). A drift here
     // means a template was added/removed and this suite should follow.
-    expect(FUNCTION_PATHS.length).toBe(61)
+    expect(FUNCTION_PATHS.length).toBe(62)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

@@ -25,6 +25,7 @@ import { useGame } from '../../state/store'
 import { useUi } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
+import { settlementEnterCandidate, shouldEnterSettlement } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { landFractionAt } from '../../world/geodata'
 import { chunkIsMountainous, refinedSegments } from './terrainLod'
@@ -90,6 +91,13 @@ import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_RADIUS = 6 // chunks kept around the player in each direction (terrain LOD)
+
+// World positions of every settlement marker, precomputed once for the
+// per-frame enter-candidate test (design.md §2.3, settlementEnterCandidate).
+const PLACE_WORLD_POSITIONS = PLACES.map((p) => {
+  const w = latLonToWorld(p.lat, p.lon)
+  return { id: p.id, x: w.x, z: w.z }
+})
 // Flora streaming rules (point 164) live in floraStreaming.ts so they are
 // unit-testable; the render loop below consumes them.
 // Beyond this debug-zoom factor the chunk-bound dressing (trees, rocks …)
@@ -1389,14 +1397,19 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   // A place's name is revealed only once it has been visited (design.md §17);
   // until then it shows a question mark.
   const discovered = useGame((s) => s.visitedPlaces.includes(place.id))
+  // While the traveller stands within this settlement's enter radius, the
+  // "Space to enter" hint takes over and the name-label is hidden (design.md §2.3).
+  const enterHintShown = useUi((s) => s.enterPlaceId === place.id)
   const p = latLonToWorld(place.lat, place.lon)
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
   return (
     <group position={[p.x, y, p.z]} name={`place-marker-${place.id}`}>
       {place.kind === 'port' ? <PortMarker /> : <VillageMarker />}
-      <Html center position={[0, 2.9, 0]} distanceFactor={60}>
-        <div className={`map-label${discovered ? '' : ' undiscovered'}`}>{discovered ? t.places[place.id] : '?'}</div>
-      </Html>
+      {!enterHintShown && (
+        <Html center position={[0, 2.9, 0]} distanceFactor={60}>
+          <div className={`map-label${discovered ? '' : ' undiscovered'}`}>{discovered ? t.places[place.id] : '?'}</div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -2170,9 +2183,6 @@ function Player() {
 
 export function TravelScene() {
   const camera = useThree((s) => s.camera)
-  // Id of the place currently walked into; blocks re-entry until the player
-  // has left its radius again (design.md §2 walk-in entry).
-  const enterLatchRef = useRef<string | null>(null)
   const setPrompt = useUi((s) => s.setPrompt)
 
   // Snap the camera to the follow pose on mount (no visible flight from the
@@ -2299,6 +2309,25 @@ export function TravelScene() {
     }
   }, [setPrompt])
 
+  // Space enters the settlement the traveller stands within (design.md §2.3):
+  // movement-based approach, confirmed with the use key — never automatic on
+  // reaching the enter radius. The candidate + water guard are computed each
+  // frame into ui.enterPlaceId; entering a finished/defeated run is blocked so
+  // a dead traveller never overwrites the checkpoint.
+  useEffect(() => {
+    const off = onKeyPress('Space', () => {
+      const ui = useUi.getState()
+      const g = useGame.getState()
+      const id = ui.enterPlaceId
+      const blocked = !!ui.dialog || !!g.defeat || g.victory
+      if (id !== null && shouldEnterSettlement(id, true, blocked)) g.enterPlace(id)
+    })
+    return () => {
+      off()
+      useUi.getState().setEnterPlaceId(null)
+    }
+  }, [])
+
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const s = useGame.getState()
@@ -2358,47 +2387,32 @@ export function TravelScene() {
       camera.updateProjectionMatrix()
     }
 
-    // Walking into a place enters it (design.md §2): no key press. The latch
-    // guards against re-entering the same frame; the store's re-entry
-    // suppression (set on leaving) keeps the just-left settlement closed until
-    // the traveller has moved clear of it, so walking straight back in does not
-    // immediately re-enter.
-    let near: PlaceDef | null = null
-    for (const p of PLACES) {
-      const w = latLonToWorld(p.lat, p.lon)
-      if (Math.hypot(pos.x - w.x, pos.z - w.z) <= balance.placeEnterRadius) {
-        near = p
-        break
-      }
-    }
-    // Do not auto-enter a settlement while travelling water: a riverside village
-    // reaches near the channel, and a canoe passage would otherwise drift the
-    // traveller in by accident (design.md §2.3). Stepping onto land enters it.
-    if (near) {
-      const ell = worldToLatLon(pos.x, pos.z)
-      if (sampleTerrain(ell.lat, ell.lon, s.seed).type === 'water') near = null
-    }
-    if (near && near.id === useGame.getState().reentrySuppressedId) {
-      // Suppressed until the traveller clears this settlement — do not enter.
-    } else if (near && enterLatchRef.current !== near.id) {
-      enterLatchRef.current = near.id
-      // Do not walk into a settlement once the expedition is over (defeat/
-      // victory) — otherwise a dead traveler would still enter and overwrite
-      // the checkpoint.
-      if (!useUi.getState().dialog && !s.defeat && !s.victory) {
-        useGame.getState().enterPlace(near.id)
-        return
-      }
-    } else if (!near && enterLatchRef.current) {
-      enterLatchRef.current = null
-    }
+    // Settlement entry (design.md §2.3): reaching the enter radius no longer
+    // enters on its own — the "Space to enter <name>" hint shows and a Space
+    // press (handled above) confirms. A river/lake passage never offers entry:
+    // a riverside village reaches near the channel, so a canoe drift must not
+    // pull the traveller in (water guard kept from the auto-enter era).
+    const ll = worldToLatLon(pos.x, pos.z)
+    const onWater = sampleTerrain(ll.lat, ll.lon, s.seed).type === 'water'
+    const enterId = settlementEnterCandidate(
+      pos.x,
+      pos.z,
+      PLACE_WORLD_POSITIONS,
+      balance.placeEnterRadius,
+      onWater,
+    )
+    if (useUi.getState().enterPlaceId !== enterId) useUi.getState().setEnterPlaceId(enterId)
 
     const strings = getStrings()
-    const ll = worldToLatLon(pos.x, pos.z)
     const nearCamp = s.freeCamps.some(
       (c) => !c.looted && Math.hypot(c.lat - ll.lat, c.lon - ll.lon) <= balance.camps.campRadiusDeg,
     )
-    const prompt = nearCamp ? strings.prompts.openCamp : null
+    // The enter hint takes precedence over the camp prompt when both are in range.
+    const prompt = enterId
+      ? strings.prompts.enterPlace(strings.places[enterId])
+      : nearCamp
+        ? strings.prompts.openCamp
+        : null
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 

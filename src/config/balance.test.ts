@@ -24,10 +24,9 @@ describe('terrain relief factors (design.md §11)', () => {
   })
 })
 
-describe('canteen and re-entry (design.md §6/§2)', () => {
-  it('canteen capacity and the re-entry clearance margin', () => {
+describe('canteen (design.md §6)', () => {
+  it('canteen capacity', () => {
     expect(balance.health.canteenCapacity).toBe(500)
-    expect(balance.placeReentryMargin).toBe(1)
   })
 })
 
