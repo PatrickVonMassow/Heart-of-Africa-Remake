@@ -75,7 +75,7 @@ interface UiState {
    *  keeps the flora at its full shape (the season colour stays) to isolate
    *  whether that per-instance vertex deformation causes a WebGPU-only jump. */
   seasonCollapseEnabled: boolean
-  /** F5 state-dump popup (design.md §21.1): the full game state for bug reports. */
+  /** F6 state-dump popup (design.md §21.1): the full game state for bug reports. */
   stateDumpOpen: boolean
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null

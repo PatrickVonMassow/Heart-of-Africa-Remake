@@ -1,4 +1,4 @@
-// State dump for bug reports (design.md §21.1, F5): serialises the COMPLETE
+// State dump for bug reports (design.md §21.1, F6): serialises the COMPLETE
 // game state to pretty-printed JSON — every data field of the useGame store
 // (unlike the §18 port snapshot, which captures only the checkpoint fields),
 // the full balance object (so every debug override is visible), the transient
