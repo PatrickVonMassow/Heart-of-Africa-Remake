@@ -2,6 +2,7 @@
 // the in-module-graph data checks of scripts/verify/world.mjs — same coverage,
 // no browser. The characteristic bird's-eye screenshots stay a Playwright §7.2
 // proof.
+import * as THREE from 'three'
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
@@ -21,8 +22,12 @@ import { buildWetland } from '../render/landmarks'
 // must exceed so no part of the mesh floats over the widened water band
 // (point 129/156: the clearance derives from the same placement the renderer
 // draws). Used to pin the Sudd marsh's clearance to its actual reach.
-function meshFootprintDeg(geo: { computeBoundingBox: () => void; attributes: { position: { count: number; getX: (i: number) => number; getZ: (i: number) => number } } }): number {
-  const pos = geo.attributes.position
+// Typed against three's own BufferGeometry: the structural shape this used to
+// declare no longer matches NormalBufferAttributes' index signature, and the
+// mismatch failed `typecheck:test` — which is the fail-fast preflight of the
+// LARGE regression, so it stopped every browser suite before one could run.
+function meshFootprintDeg(geo: THREE.BufferGeometry): number {
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute
   let maxR = 0
   for (let i = 0; i < pos.count; i++) maxR = Math.max(maxR, Math.hypot(pos.getX(i), pos.getZ(i)))
   return maxR / 10 // world units → degrees
