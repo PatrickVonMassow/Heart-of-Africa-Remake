@@ -10236,7 +10236,7 @@ the remaining open points in their numeric order.
   different concern than the wildlife cluster, so it can be built independently and in
   parallel; keep the serialiser central (one `dumpGameState`). Implementation-ready.
 
-- [ ] 271. ANIMALS SPORADICALLY VANISH IN VIEW (rare; maybe zoom- or mountain-related)
+- [x] 271. ANIMALS SPORADICALLY VANISH IN VIEW (rare; maybe zoom- or mountain-related)
   (user 23.07.2026, screenshot, East region). Bird's-eye animals occasionally DISAPPEAR
   before the player's eyes — rare, and the user suspects it follows having changed the
   ZOOM level, or being near MOUNTAINS. The screenshot also shows an animal rendered with
