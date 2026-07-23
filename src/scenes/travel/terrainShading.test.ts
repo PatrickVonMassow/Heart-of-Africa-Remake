@@ -11,7 +11,9 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
+  chunkIsCoastal,
   chunkIsMountainous,
+  chunkNeedsRefine,
   lodSegments,
   refinedSegments,
   REFINE_RING_MAX,
@@ -57,7 +59,10 @@ describe('travel terrain shading (source witness on the unexported chunk builder
   })
 
   it('the chunk loop applies the testable LOD rules (gate wired through, not forked)', () => {
-    expect(src).toMatch(/chunkIsCoastal\(cx \+ dx, cz \+ dz\) \|\| chunkIsMountainous\(cx \+ dx, cz \+ dz\)/)
+    // The refine gate rides through the memoised probe (terrainLod.ts) — the
+    // OR of the coastal and mountain gates, cached per chunk so a crossing
+    // never re-probes known ground (docs/perf-driving-hitches.md).
+    expect(src).toMatch(/chunkNeedsRefine\(ccx \+ dx, ccz \+ dz\)/)
     expect(src).toMatch(/refinedSegments\(ring, refine\)/)
   })
 })
@@ -118,6 +123,29 @@ describe('mountain-chunk tessellation gate (silhouette smoothness)', () => {
     expect(refinedSegments(0, chunkIsMountainous(cx, cz))).toBe(112)
     const [fx, fz] = chunkOf(15, 5) // flat sahel at ring 0
     expect(refinedSegments(0, chunkIsMountainous(fx, fz))).toBe(56)
+  })
+
+  it('the coastal gate marks a shoreline chunk and leaves the deep inland alone', () => {
+    // Moved to terrainLod.ts with the memoised refine probe — re-pinned here.
+    const [ax, az] = chunkOf(31.2, 29.9) // Alexandria: the Mediterranean coast
+    expect(chunkIsCoastal(ax, az)).toBe(true)
+    const [sx, sz] = chunkOf(23, 10) // central Sahara, no coast for hundreds of km
+    expect(chunkIsCoastal(sx, sz)).toBe(false)
+  })
+
+  it('chunkNeedsRefine equals the OR of the pure gates and is stable across reads (memo)', () => {
+    for (const [lat, lon] of [
+      [-3.07, 37.35], // mountainous (kilimanjaro)
+      [31.2, 29.9], // coastal (alexandria)
+      [15, 5], // neither (sahel plain)
+      [0, -15], // open ocean
+    ] as const) {
+      const [cx, cz] = chunkOf(lat, lon)
+      const expected = chunkIsCoastal(cx, cz) || chunkIsMountainous(cx, cz)
+      expect(chunkNeedsRefine(cx, cz)).toBe(expected)
+      // The memoised second read must return the identical decision.
+      expect(chunkNeedsRefine(cx, cz)).toBe(expected)
+    }
   })
 })
 

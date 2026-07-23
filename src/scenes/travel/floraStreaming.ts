@@ -89,6 +89,41 @@ export function floraShouldRebuild(
   return Math.hypot(pos.x - last.x, pos.z - last.z) >= FLORA_REBUILD_STEP
 }
 
+// --- Amortised fill rules (docs/perf-driving-hitches.md) ---------------------
+// The every-16-wu rebuild used to re-decide all ~841 chunks and re-upload every
+// instance buffer in ONE frame. The placement is now cached per chunk and the
+// fill spread across frames into scratch buffers, swapped in atomically when
+// complete — the previously completed circle keeps drawing meanwhile. These
+// pure rules bound the spread so the frozen old circle still covers everything
+// the fog lets the player see (the points-164/171 no-pop invariant).
+
+/** A movement-step fill completes within at most this many frames — the batch
+ *  size below guarantees it by construction. */
+export const FLORA_FILL_MAX_FRAMES = 10
+
+/** Chunk offsets processed per fill frame so a fill of `totalOffsets` chunks
+ *  completes in ≤ FLORA_FILL_MAX_FRAMES frames. */
+export function floraFillBatchSize(totalOffsets: number): number {
+  return Math.max(1, Math.ceil(totalOffsets / FLORA_FILL_MAX_FRAMES))
+}
+
+/** Worst-case player drift (wu) during one amortised fill: the frame bound at
+ *  the given frame rate, times the travel speed. */
+export function floraFillWorstDriftWu(speed: number, fps: number): number {
+  return (FLORA_FILL_MAX_FRAMES / fps) * speed
+}
+
+/** A step rebuild is amortised only when the anchor moved at most this far
+ *  since the previous build; farther (a teleport, a load, one very long stall
+ *  frame) swaps synchronously as before. Derived so the total recession of the
+ *  still-drawn old circle — trigger distance plus the worst drift during the
+ *  fill (F3 speed 25 at a heavy-load 30 fps) — never exceeds
+ *  FLORA_SPAWN_MARGIN: the old edge stays beyond the fog-visible ground for
+ *  the whole fill. */
+export function floraAmortiseMaxStep(speed = 25, fps = 30): number {
+  return FLORA_SPAWN_MARGIN - floraFillWorstDriftWu(speed, fps)
+}
+
 const offsetCache = new Map<number, ReadonlyArray<readonly [number, number]>>()
 
 /** Chunk offsets (dx,dz) within ±range, ordered by squared distance from the

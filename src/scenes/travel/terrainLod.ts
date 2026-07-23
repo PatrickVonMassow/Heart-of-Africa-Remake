@@ -12,7 +12,7 @@
 // ~1 texel while the flat basins keep the base cost.
 
 import { worldToLatLon } from '../../world/geo'
-import { elevationAt } from '../../world/geodata'
+import { elevationAt, landFractionAt } from '../../world/geodata'
 
 /** Chunk edge length in world units — must match TravelScene.tsx (and
  *  Wildlife.tsx, which duplicates it the same way). */
@@ -37,6 +37,27 @@ export const REFINE_SEGMENT_CAP = 112
 export function refinedSegments(ring: number, refine: boolean): number {
   const base = lodSegments(ring)
   return refine && ring <= REFINE_RING_MAX ? Math.min(REFINE_SEGMENT_CAP, base * 2) : base
+}
+
+// point 209: a chunk straddling the sea coast gets a finer mesh, so the smooth
+// vector shoreline (terrain.ts derives the near-coast land fraction from the
+// vector signed distance) is not re-quantized to blocky steps by the coarse
+// LOD vertex spacing. Detected cheaply from the raster land mask at a 5x5 grid
+// — a mix of sea and land in the chunk means the coast crosses it.
+export function chunkIsCoastal(cx: number, cz: number): boolean {
+  const x0 = cx * CHUNK_SIZE
+  const z0 = cz * CHUNK_SIZE
+  let sea = false
+  let land = false
+  for (let iz = 0; iz <= 4; iz++) {
+    for (let ix = 0; ix <= 4; ix++) {
+      const { lat, lon } = worldToLatLon(x0 + (ix / 4) * CHUNK_SIZE, z0 + (iz / 4) * CHUNK_SIZE)
+      if (landFractionAt(lat, lon) < 0.5) sea = true
+      else land = true
+      if (sea && land) return true
+    }
+  }
+  return false
 }
 
 /** A chunk peaking above this is mountain terrain (terrain.ts MOUNTAIN_M). */
@@ -73,4 +94,24 @@ export function chunkIsMountainous(cx: number, cz: number): boolean {
   }
   if (max <= 0) return false
   return max > MOUNTAIN_CHUNK_PEAK_M || max - Math.max(min, 0) > MOUNTAIN_CHUNK_RELIEF_M
+}
+
+/**
+ * The OR of the two near-ring refine gates, memoised per chunk in a module
+ * map: both probes are pure per chunk and seed-independent (raster/DEM reads),
+ * but cost ~25 samples each — and the crossing loop used to re-probe ~80
+ * chunks every crossing even over long-known ground, a measurable slice of
+ * the crossing burst (docs/perf-driving-hitches.md). Bounded: cleared
+ * wholesale once it exceeds a long drive's worth of booleans.
+ */
+const refineCache = new Map<string, boolean>()
+const REFINE_CACHE_MAX = 20000
+export function chunkNeedsRefine(cx: number, cz: number): boolean {
+  const key = `${cx},${cz}`
+  const hit = refineCache.get(key)
+  if (hit !== undefined) return hit
+  const refine = chunkIsCoastal(cx, cz) || chunkIsMountainous(cx, cz)
+  if (refineCache.size >= REFINE_CACHE_MAX) refineCache.clear()
+  refineCache.set(key, refine)
+  return refine
 }

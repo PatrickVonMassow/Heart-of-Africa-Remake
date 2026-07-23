@@ -1367,6 +1367,10 @@ const noPop = await page.evaluate(async () => {
   // mid-sweep on a slow backend and the sweep itself reveals animals as pops.
   await window.__pollSim(20, () => window.__camera.settled())
   await sleep(300)
+  // Frame-time probe (docs/perf-driving-hitches.md): measure the terrain/flora
+  // streaming bursts over THIS driven pass only — the teleport above builds
+  // its window synchronously by design, so the ledger starts after it.
+  window.__perf.reset()
   const herds = () => window.__wildlife.herdsRef.current
   const seen = new Set()
   for (const sp of SP) for (const a of herds()[sp] ?? []) seen.add(a)
@@ -1415,9 +1419,27 @@ const noPop = await page.evaluate(async () => {
   window.__balance.travelSpeed = prevSpeed
   window.__ui.getState().setTravelZoom(0.5)
   window.__ui.getState().setSeasonWetnessOverride(null)
-  return { pops: hits.length, hits }
+  const perf = {
+    terrain: { count: window.__perf.terrain.count, maxMs: +window.__perf.terrain.maxMs.toFixed(1) },
+    flora: { count: window.__perf.flora.count, maxMs: +window.__perf.flora.maxMs.toFixed(1) },
+    maxFrameMs: +window.__perf.maxFrameMs().toFixed(1),
+  }
+  return { pops: hits.length, hits, perf }
 })
 check('no ground animal appears inside the rendered frame while driving (point 165)', noPop.pops === 0, JSON.stringify(noPop))
+// Driving-hitch regression (docs/perf-driving-hitches.md): the drive above
+// crossed several chunk boundaries and flora rebuild steps over fresh ground,
+// so both streaming systems must have worked — and neither burst may run
+// anywhere near the old one-frame storms (terrain ~50-300 ms, flora
+// ~40-100 ms on real hardware; more headless). The bounds are generous for
+// the headless CPU: the terrain drain can still overshoot by ONE atomic
+// refined-chunk build (the documented Web Worker follow-up would shrink it),
+// the flora fill by one batched bake step. The strict no-pop guarantees
+// stay gated above and in the pure margin tests (floraStreaming.test.ts).
+check('the terrain build queue worked the drive in budgeted slices (no crossing storm)',
+  noPop.perf.terrain.count > 0 && noPop.perf.terrain.maxMs < 150, JSON.stringify(noPop.perf))
+check('the flora rebuild worked the drive in amortised batches (no rescan storm)',
+  noPop.perf.flora.count > 0 && noPop.perf.flora.maxMs < 100, JSON.stringify(noPop.perf))
 
 // Point 169: a herd raises a calibratable FRACTION of its group as calves (was
 // one per group). Same seed/groups, two fractions: a higher calfFraction must
