@@ -3,7 +3,7 @@
 // moved to the fast Vitest suite (src/world/world.test.ts); what stays here
 // needs a real browser: console-error-free rendering and screenshots of the
 // bird's-eye view at characteristic locations. Dev server only.
-import { chromium } from 'playwright'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync } from 'node:fs'
 
@@ -11,7 +11,11 @@ const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 mkdirSync(OUT, { recursive: true })
 
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--enable-unsafe-webgpu'] })
+// Point 204: the shared launcher, so VERIFY_GL selects the backend these
+// acceptance screenshots are taken on (this suite used to hard-launch the
+// bundled Chromium with ANGLE, so its pictures were WebGL 2 whatever the run
+// asked for).
+const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
 
 const errors = []
@@ -19,6 +23,8 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
 page.on('pageerror', (e) => errors.push(String(e)))
 
 await page.goto(BASE, { waitUntil: 'networkidle' })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: fail loud if the requested backend silently fell back
 await page.waitForTimeout(2500)
 
 // --- Screenshots of the travel view at characteristic locations ------------

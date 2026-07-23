@@ -11,7 +11,7 @@
 // WebGPU adapter, and WASM is what stays live (on Chromium hardware the engine
 // runs the faster WebGPU path, whose cold load the game pre-warms; point 117).
 // Dev server only (dev hooks).
-import { launchVerifyBrowser } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { fileURLToPath } from 'node:url'
 
@@ -45,6 +45,8 @@ await page.goto(BASE)
 await page.evaluate(() => localStorage.clear())
 await page.reload()
 await page.waitForFunction(() => window.__game, null, { timeout: 60000 })
+await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
+await assertBackend(page) // point 204: this suite is WebGL2-only — prove the lane really is WebGL 2
 await page.waitForTimeout(4000)
 
 // --- Movement continues while the journal is open (design.md §16) -----------
