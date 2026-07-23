@@ -2485,6 +2485,15 @@ const hunt = await page.evaluate(async () => {
   // hunt spawns and runs in the RAF loop, so wall-clock budgets starve the
   // sample counts on a slow backend. The quality gates (>=5 headings, weave
   // sign changes) are unchanged — a slow backend just polls longer.
+  // Suppress the juvenile-prey preference for the sampling (point 249): these
+  // checks measure the GENERIC scripted hunt (heading variety, the weaving
+  // scripted prey), but at a stationary point rich in calf families the
+  // calibratable bias made nearly every spawned hunt a FAMILY hunt, starving
+  // the generic samples out of the budget (the measured 393-family-hunt run).
+  // Pinning the debug-editable bias to 0 stages pure generic hunts — nothing
+  // about the hunts themselves is weakened — and it is restored right after.
+  const prevBias = window.__balance.family.juvenilePreyBias
+  window.__balance.family.juvenilePreyBias = 0
   const startChase = async (simBudget) => {
     // Force a fresh hunt: drop to idle and keep re-arming the spawn until a new
     // chase begins (the spawn picks a random savanna spot and lion approach).
@@ -2536,6 +2545,7 @@ const hunt = await page.evaluate(async () => {
   for (let i = 1; i < offs.length; i++) if (offs[i] * offs[i - 1] < 0) signChanges++
   const amp = offs.length ? Math.max(...offs.map(Math.abs)) : 0
   s.mode = 'idle'; s.timer = 60
+  window.__balance.family.juvenilePreyBias = prevBias
   return { count: headings.length, R: Math.round(R * 100) / 100, weaveSamples: offs.length, signChanges, amp: Math.round(amp * 100) / 100 }
 })
 check('lion hunts run in varied directions (not always the same way)', hunt.count >= 5 && hunt.R < 0.85, JSON.stringify(hunt))
@@ -2572,6 +2582,16 @@ const preyVar = await page.evaluate(async () => {
   }
   // Budget on the SIM clock (point 249): each hunt re-arms via the RAF loop, so
   // a wall-clock budget starves the food-web sample count on a slow backend.
+  // And suppress the juvenile-prey preference for the sampling (point 249):
+  // this check measures the GENERIC food-web pick (family hunts re-pick the
+  // same local family and are skipped below), but at this stationary point the
+  // calibratable bias made nearly every spawn a family hunt — 393 of them ate
+  // the budget and left only 5 generic samples (the measured strict-run miss).
+  // Pinning the debug-editable bias to 0 stages pure generic hunts; restored
+  // right after. The victimHunt skip below stays as a belt (a vigil keeper
+  // does not roll the bias).
+  const prevBias = window.__balance.family.juvenilePreyBias
+  window.__balance.family.juvenilePreyBias = 0
   const startChase = async (simBudget) => {
     s.mode = 'idle'; s.timer = 0
     await window.__pollSim(simBudget, () => {
@@ -2618,6 +2638,7 @@ const preyVar = await page.evaluate(async () => {
     }
   }
   s.mode = 'idle'; s.timer = 60
+  window.__balance.family.juvenilePreyBias = prevBias
   return {
     count: prey.length,
     familyHunts,
