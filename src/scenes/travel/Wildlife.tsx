@@ -34,6 +34,8 @@ import {
   blockHeading,
   guardEngagement,
   griefTarget,
+  frontInterceptTarget,
+  trampleKills,
   fleesFromPlayer,
   fleeCrossing,
   resolveFleeTarget,
@@ -641,6 +643,14 @@ const STRUGGLE_SELF_RESCUE = 25 // s after which an unaided calf clambers out
 // point-121 vigil walk (YOUNG_FOLLOW_SPEED in the vigil pre-pass).
 const TRAMPLE_GRIEF_SPEED = 6.5 // a parent rushing the elephant that trampled its calf
 const TRAMPLE_GRIEF_SECONDS = 12 // grief window; an unresolved charge clears here
+// How far ahead of the elephant (along its heading) the grieving parent aims
+// (point 259): it must reach the elephant's FRONT to be crushed, so the moving
+// elephant travels toward it (the trampleKills direction condition). Kept BELOW
+// TRAMPLE_RADIUS (1.5) so a parent standing on the front point is already inside
+// the trample reach AND ahead of the feet — reaching a flank or the rear does
+// not kill, the parent keeps steering to get in front, and the
+// TRAMPLE_GRIEF_SECONDS deadline still resolves the grief regardless.
+const GRIEF_FRONT_REACH = 1
 // OPEN (design.md §19, CLAUDE.md §7.1 pt.12): tree-climbing-to-flee (e.g. a
 // light animal escaping up a kopje/tree) and further new species/birds beyond
 // the current roster and the added calves are not yet implemented.
@@ -2127,9 +2137,15 @@ function Herds() {
           a.grief = undefined
           continue
         }
-        a.trampleTo = target
-        const dx = target.x - a.x
-        const dz = target.z - a.z
+        // Aim at the elephant's FRONT (point 259): only a touch from ahead —
+        // where the moving elephant is travelling toward the parent — triggers
+        // the trample (the trampleKills direction condition in the render loop).
+        // A parent that only reaches the flank/rear is not crushed and keeps
+        // re-aiming; the grief window (deadline above) still always resolves it.
+        const front = frontInterceptTarget(target.x, target.z, target.heading, GRIEF_FRONT_REACH)
+        a.trampleTo = front
+        const dx = front.x - a.x
+        const dz = front.z - a.z
         const d = Math.hypot(dx, dz) || 1
         a.x += (dx / d) * TRAMPLE_GRIEF_SPEED * dt
         a.z += (dz / d) * TRAMPLE_GRIEF_SPEED * dt
@@ -2855,12 +2871,18 @@ function Herds() {
       return false
     }
     const elephantPos: Array<[number, number]> = []
+    // Parallel to elephantPos: this frame's movement vector per elephant (0,0
+    // when it held). Drives the trample DIRECTION condition (trampleKills,
+    // point 259) — a standing elephant tramples nothing.
+    const elephantVel: Array<[number, number]> = []
     {
       const list = herds.elephant
       const n = Math.min(list.length, MAX_INSTANCES.elephant)
       for (let i = 0; i < n; i++) {
         const a = list[i]
         if (a.dead) continue
+        const ex0 = a.x
+        const ez0 = a.z
         if (a.heading === undefined) a.heading = a.rot
         const info = a.herd !== undefined ? herdCentre.get(a.herd) : undefined
         const mournInfo = a.herd !== undefined ? herdState.current.get(a.herd)?.mourn : undefined
@@ -2938,6 +2960,7 @@ function Herds() {
           // Else hold position this frame and keep turning gently next frame.
         }
         elephantPos.push([a.x, a.z])
+        elephantVel.push([a.x - ex0, a.z - ez0])
       }
     }
 
@@ -3834,8 +3857,18 @@ function Herds() {
         // predator above is already dead; skip the scan and just re-render.)
         if (sp !== 'elephant') {
           if (!a.dead) {
-            for (const [ex, ez] of elephantPos) {
-              if (Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS) {
+            for (let ei = 0; ei < elephantPos.length; ei++) {
+              const [ex, ez] = elephantPos[ei]
+              const [evx, evz] = elephantVel[ei]
+              // A trample kills only when the elephant is MOVING toward the
+              // animal (point 259): a standing elephant a grazer bumps into, or
+              // a hit from behind its heading of travel, leaves it unharmed —
+              // the §19.5 body-separation parts that overlap instead. Only an
+              // elephant driving into/over the animal crushes it.
+              if (
+                Math.hypot(a.x - ex, a.z - ez) < TRAMPLE_RADIUS &&
+                trampleKills(evx, evz, ex, ez, a.x, a.z)
+              ) {
                 a.dead = true
                 pushStain(a.x, a.z)
                 // A trampled CALF takes its parent with it (design.md §19): the
