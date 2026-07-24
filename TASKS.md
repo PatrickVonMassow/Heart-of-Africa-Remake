@@ -11059,7 +11059,7 @@ the remaining open points in their numeric order.
   decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
   grows.)
 
-- [ ] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
+- [x] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
   hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
   hooks run every turn end) and the memory files (contradictory/tempering pairs like
   deploy-fable-proactively ↔ fable-sparingly): list each guard/memory with last-modified,
