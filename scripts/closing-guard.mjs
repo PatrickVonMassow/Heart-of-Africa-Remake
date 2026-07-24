@@ -15,7 +15,7 @@
 //
 // The checklist state lives in .claude/closing-state.json, keyed to the exact
 // commit — a closing is per-commit, so a new tagged commit needs a fresh pass.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

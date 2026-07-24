@@ -3,7 +3,7 @@
 Shared boot helpers for suites and probes live in `_boot.mjs` (bootGame,
 enterTravel, jumpAndEnter) — new scripts use them instead of repeating the
 launch/clear/wait boilerplate. Per-point runs are SCOPED (Vitest always,
-browser suites by the diff mapping in TASKS.md); the full 13-suite chain runs
+browser suites by the diff mapping in TASKS.md); the full 16-suite chain runs
 at scene-core diffs, every ~4th point, and before every Closing.
 
 The regression is split in two layers so the bulk runs in **seconds** and can
