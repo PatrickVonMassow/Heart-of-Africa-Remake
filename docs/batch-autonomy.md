@@ -24,11 +24,14 @@ outside the agent's control.
    instruction — so a freshly opened session auto-resumes the batch.
 4. **OS Scheduled Task `HoA-Batch-Autostart`** (survives crashes AND reboots). Runs
    `scripts/batch-autostart.mjs` every 15 min (indefinite) with `StartWhenAvailable`.
-   The launcher spawns a headless `claude -p` to resume the batch **only** when no
-   live session is working it. Liveness = the lock's `claimedAt` heartbeat, plus a
-   **boot-time check**: a lock claimed before the machine booted belongs to a dead
-   session, so a reboot is detected deterministically and resurrected at once.
-   Guards: skips while paused, while the batch is complete, and while a session is
+   The launcher spawns a headless `claude -p` to resume the batch **only** when the
+   owner is PROVABLY dead per the hard singleton (`scripts/batch-singleton.mjs`):
+   heartbeat AND a real OS pid check — a live claude process blocks takeover no
+   matter how stale the heartbeat (a long tool call starves the heartbeat, not the
+   process), and a reboot alone is never death while a fresh post-boot heartbeat
+   exists. The spawn itself goes through the SAME atomic acquire (a
+   `pending-spawn` lock is won BEFORE spawning; losing the race means no spawn).
+   Guards: skips while paused, while the batch is complete, and while the owner is
    alive; a debounce marker avoids double-spawns; it finds the newest bundled
    `claude.exe` dynamically (survives app updates).
 
@@ -43,23 +46,44 @@ outside the agent's control.
 | 5 | Normal reboot, user logs in | (4) task persists + `StartWhenAvailable` + boot-time check → resurrects promptly after login | none beyond the login itself |
 | 6 | **Forced Windows-Update reboot** | same as #5: the task survives the update; after the user logs back in it resurrects promptly (boot-time check makes the stale-but-recent lock read as dead) | **the user must log in** — see the one true residual below |
 | 7 | Power loss / hard crash | same as #5/#6 (boot-time check) | user login |
-| 8 | Two sessions (scheduler + a manually opened one) | lock heartbeat + launcher liveness skip + SessionStart lock-contention handling + `MultipleInstances IgnoreNew` | slight redundancy at worst, never a stop |
+| 8 | Two sessions (scheduler + a manually opened one) | the HARD SINGLETON (`scripts/batch-singleton.mjs`, 24.07.2026): atomic test-and-set acquire (exactly one winner, proven by real process races), pid-backed liveness (no false-dead under long tool calls), stand-down gates in EVERY guard for non-owners, and the active parallel-session detector with auto-remediation (launcher kills its own rogue spawn; the owner is blocked into `scripts/batch-doctor.mjs` verification). Full analysis: `docs/batch-singleton-analysis.md` | none — a second session refuses to act even if it exists |
 | 9 | A guard has a bug / throws | all guards are **fail-open** (error → allow) so they can never freeze the session; the scheduler still backstops the idle case | none |
 | 10 | `claude.exe` moved by an app update | launcher globs `claude-code\*\claude.exe` and picks the newest | none |
 | 11 | Batch stuck on one item (needs data / a user decision) | the guard says "pick a DIFFERENT open item"; only if ALL are user-blocked does it pause with a `Von dir zu klären` card | correct behaviour — nothing to do without the user |
 | 12 | Scheduled task deleted (by the user or a cleanup tool) | — | not recoverable by the agent; re-create with the command below |
 
-## Extra hardening after the reboot/visibility probing (22.07)
+## The hard singleton (24.07.2026 — replaces the advisory lock)
 
-- **Resurrection actually resumes.** The launcher spawns at 12-min lock staleness,
-  but the SessionStart hook treats a lock as "held by another live session" until
-  45-min `STALE_MS` — so a spawned session would have refused to resume in that
-  window. The launcher now writes a one-shot `autostart-authorized` marker;
-  SessionStart, seeing it, claims the lock and resumes regardless of lock age.
-- **A live lock never falsely reads dead.** `scripts/lock-heartbeat-hook.mjs`
-  (PostToolUse, every tool) refreshes `claimedAt` continuously, so a long working
-  turn cannot age the lock past the launcher's window and trigger a redundant
-  (now-authorized, colliding) spawn.
+After the e9407cae incident (two sessions drove the batch concurrently; full
+root-cause chain in `docs/batch-singleton-analysis.md`), coordination moved
+from advisory claim-and-check to a HARD mutual exclusion in
+`scripts/batch-singleton.mjs`:
+
+- **Real liveness.** The lock records the owning claude process's OS pid (+
+  start time, pid-reuse-proof); dead = provably dead (dead/reused pid,
+  heartbeat predating the boot, or a very stale legacy lock). A live pid with a
+  stale heartbeat is ALIVE — the old 12-min age window read exactly that state
+  as dead and double-spawned.
+- **Atomic acquisition.** First claim by exclusive `'wx'` create; takeover of a
+  dead lock under an mkdir reap-mutex with re-verification inside — two racing
+  starters resolve to exactly one winner (tested with real processes).
+- **Stand-down.** Every Stop/prompt guard treats a non-owner as paused
+  (`heldByOtherLiveOwner`); the PostToolUse heartbeat refreshes ONLY the
+  owner's lock and never claims. A second session refuses to act even if it
+  exists. The SessionStart hook prints an explicit STAND-DOWN instruction to a
+  losing session.
+- **Launcher discipline.** The autostart wins a `pending-spawn` lock BEFORE
+  spawning (losing the race = no spawn); the spawned session converts that lock
+  to itself pid-bound. The one-shot `autostart-authorized` marker only helps the
+  binding — it can no longer override a live lock.
+- **Active detector + remediation.** Top-level sessions and per-session tool
+  activity are recorded (`sessions-seen.json` / `session-activity.json`);
+  a second live top-level session (never a subagent) is detected each turn end
+  AND each launcher tick. The launcher kills its own rogue spawn; the owner is
+  blocked into `scripts/batch-doctor.mjs`, which verifies the repo (merge
+  state, dirty tree, conflict markers, main↔origin divergence, TASKS.md) and
+  remediates recoverably (abort half-merge, quarantine stash, rescue branch +
+  reset to origin/main), logging everything to `.claude/doctor.log`.
 - **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
   the allow-list (a permission prompt would hang the unattended run). The launcher
   sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.
