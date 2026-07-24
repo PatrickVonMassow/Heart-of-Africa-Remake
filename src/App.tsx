@@ -41,7 +41,7 @@ export default function App() {
   const mode = useGame((s) => s.mode)
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
-  // Graphics level (design.md §21, F7 / point 276 part B): the low preset caps
+  // Graphics level (design.md §21, F9 / point 276 part B): the low preset caps
   // the device pixel ratio to 1.0 — the biggest fill-rate lever on the user's
   // real hardware (~35 % GPU, point 277). null keeps R3F's native dpr (medium/
   // high). R3F re-applies the ratio when this prop changes.

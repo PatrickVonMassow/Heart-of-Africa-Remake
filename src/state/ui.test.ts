@@ -138,7 +138,7 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
   })
 })
 
-describe('graphics quality level (design.md §21, F7 / point 276 part B)', () => {
+describe('graphics quality level (design.md §21, F9 / point 276 part B)', () => {
   it('defaults to medium and reads that preset through every effective selector', () => {
     expect(u().detailLevel).toBe('medium')
     const m = QUALITY_PRESETS.medium

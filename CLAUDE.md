@@ -1119,8 +1119,10 @@ verify suite that proves it.
     toggle — F6 state-dump popup for bug reports: the complete game
     state incl. balance and UI as pretty JSON in a top-most modal with
     download/copy; F5 stays the browser's reload (it fires before
-    preventDefault can stop it, hence F6) and F7 cycles the GRAPHICS QUALITY
-    LEVEL — low / medium / high (design.md §2.7/§21, point 276 part B),
+    preventDefault can stop it, hence F6; the lower F-key that Windows Chrome
+    binds to Caret-Browsing is likewise left to the browser) and F9 cycles the
+    GRAPHICS QUALITY LEVEL — low / medium / high (design.md §2.7/§21, point 276
+    part B),
     default MEDIUM. Each press steps DOWN one level, wrapping the bottom to
     the top: medium → low → high → medium. A `detailLevel` in `useUi` maps
     through the `QUALITY_PRESETS` registry (`src/config/quality.ts`) to a
@@ -1139,13 +1141,19 @@ verify suite that proves it.
     ENFORCEMENT: a pure completeness gate (`src/config/quality.test.ts`)
     asserts every level defines every quality key, so a new optical feature
     added without low/medium/high entries FAILS (the §21 sort-into-levels
-    convention). The preset reads per level, the F7 cycle order and the
-    completeness gate are pure-tested in `src/state/ui.test.ts` +
-    `src/config/quality.test.ts` (with `floraFogFar` in
-    `src/scenes/travel/floraStreaming.test.ts`), the F7 cycle +
-    preventDefault + non-clobber in `src/ui/Hud.test.tsx`, the localized
-    picker in `src/ui/DebugMenu.test.tsx`, and the live F7 cycle + effective
-    flips in `scripts/verify/settings.mjs`;
+    convention), and the per-level values are tabulated in
+    `docs/graphics-detail-levels.md`, kept in sync with the registry by
+    `src/config/qualityDoc.test.ts` (it fails if a preset value changes or a
+    key is added without updating the doc). The preset reads per level, the F9
+    cycle order and the completeness gate are pure-tested in
+    `src/state/ui.test.ts` + `src/config/quality.test.ts` (with `floraFogFar`
+    in `src/scenes/travel/floraStreaming.test.ts`), the F9 cycle +
+    preventDefault + non-clobber in `src/ui/Hud.test.tsx`; the debug menu's
+    graphics section is now a SINGLE localized detail-level dropdown — the
+    per-setting graphics allow-flags (TRAA/SSAO/half/full/campfire shadows) are
+    no longer exposed there but remain internal store fields for the touch
+    preset and the F8 benchmark — asserted in `src/ui/DebugMenu.test.tsx`, and
+    the live F9 cycle + effective flips in `scripts/verify/settings.mjs`;
     verifiable via `src/state/stateDump.test.ts` (the serialiser captures
     every data field, drops the actions, stays deterministic) and
     `src/ui/StateDump.test.tsx` (hidden by default, F6/Esc toggle without
@@ -1512,7 +1520,10 @@ verify suite that proves it.
     prompt a tappable button firing the SPACE use key; `src/state/ui.test.ts` that
     `activateTouch` arms the layer with the preset and is idempotent (a
     debug re-enable is not clobbered); `src/ui/DebugMenu.test.tsx` the
-    localized SSAO and half-shadow checkboxes writing through to the store;
+    localized graphics detail-level dropdown writing `detailLevel` through to
+    the store (the per-setting graphics allow-flags the touch preset sets —
+    SSAO, half shadows — are internal store fields, no longer surfaced as
+    debug-menu checkboxes after the point-276 declutter);
     `scripts/verify/touch.mjs` (a `hasTouch` context, real CDP touch
     events) that no overlay shows before the first touch, the first touch
     mounts it and applies the preset, the stick walks the character (and
@@ -1599,13 +1610,16 @@ verify suite that proves it.
     non-black frame without console errors on the WebGL 2 path (with
     screenshot 69), and gates the rebuild leak on a flat renderer texture
     count across repeated toggle cycles; `src/ui/DebugMenu.test.tsx`
-    asserts the localized TRAA checkbox (default on) writing through to
-    the UI store. The post pipeline (TRAA, SSAO, bloom) reads its enable
-    through the graphics-level effective selectors (`effectiveTraa` etc.,
-    pt. 20 / point 276): TRAA stays independently debug-toggleable within a
-    level, but the level itself drives the post chain — SSAO on only at
-    high, TRAA + bloom off only on low — without touching the player's own
-    flags; `settings.mjs` gates the F7 cycle and the effective flips.
+    asserts that the graphics-level dropdown drives TRAA via the preset —
+    TRAA on in medium/high, off in low (the individual TRAA checkbox was
+    removed from the debug menu with the point-276 declutter; the
+    `traaEnabled` store field remains, set internally by the touch preset
+    and the F8 benchmark). The post pipeline (TRAA, SSAO, bloom) reads its
+    enable through the graphics-level effective selectors (`effectiveTraa`
+    etc., pt. 20 / point 276): the level drives the post chain — SSAO on only
+    at high, TRAA + bloom off only on low — combined with the internal flags
+    without ever clobbering them; `settings.mjs` gates the F9 cycle and the
+    effective flips.
 
 ### 7.2 Self-Verification (mandatory)
 

@@ -209,7 +209,7 @@ export interface Strings {
     villagerNod: string
     journalDndOn: string
     journalDndOff: string
-    /** F7 graphics quality level, named per level (design.md §21, point 276). */
+    /** F9 graphics quality level, named per level (design.md §21, point 276). */
     graphicsLevel: { low: string; medium: string; high: string }
     /** Debug F3: full loadout granted. */
     debugLoadout: string
@@ -396,7 +396,7 @@ export interface Strings {
     /** Half-size shadow maps toggle; on in the touch quality preset (point 84). */
     shadowMapHalf: string
     shadows: string
-    /** Graphics quality level picker + option labels (design.md §21, F7 /
+    /** Graphics quality level picker + option labels (design.md §21, F9 /
      *  point 276). */
     detailLevel: string
     detailLow: string

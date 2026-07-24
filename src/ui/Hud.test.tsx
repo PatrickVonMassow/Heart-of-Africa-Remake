@@ -365,21 +365,21 @@ describe('F3 unlocks the extended zoom alongside the loadout (design.md §21.1)'
   })
 })
 
-describe('F7 cycles the graphics quality level (design.md §21, point 276)', () => {
+describe('F9 cycles the graphics quality level (design.md §21, point 276)', () => {
   it('steps DOWN one level, wrapping the bottom to the top: medium → low → high → medium', () => {
     useUi.setState({ detailLevel: 'medium' })
     render(<Hud />)
-    fireEvent.keyDown(window, { code: 'F7' })
+    fireEvent.keyDown(window, { code: 'F9' })
     expect(useUi.getState().detailLevel).toBe('low')
-    fireEvent.keyDown(window, { code: 'F7' })
+    fireEvent.keyDown(window, { code: 'F9' })
     expect(useUi.getState().detailLevel).toBe('high')
-    fireEvent.keyDown(window, { code: 'F7' })
+    fireEvent.keyDown(window, { code: 'F9' })
     expect(useUi.getState().detailLevel).toBe('medium')
   })
 
   it('is in the preventDefault set (the browser default is suppressed)', () => {
     render(<Hud />)
-    const e = new KeyboardEvent('keydown', { code: 'F7', cancelable: true, bubbles: true })
+    const e = new KeyboardEvent('keydown', { code: 'F9', cancelable: true, bubbles: true })
     window.dispatchEvent(e)
     expect(e.defaultPrevented).toBe(true)
   })
@@ -387,7 +387,7 @@ describe('F7 cycles the graphics quality level (design.md §21, point 276)', () 
   it('leaves the individual debug flags untouched (read derived)', () => {
     useUi.setState({ detailLevel: 'medium', ssaoEnabled: true, shadowsEnabled: true })
     render(<Hud />)
-    fireEvent.keyDown(window, { code: 'F7' })
+    fireEvent.keyDown(window, { code: 'F9' })
     expect(useUi.getState().detailLevel).toBe('low')
     expect(useUi.getState().ssaoEnabled).toBe(true) // not clobbered
     expect(useUi.getState().shadowsEnabled).toBe(true)

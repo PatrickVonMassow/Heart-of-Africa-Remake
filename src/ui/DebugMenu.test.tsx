@@ -263,23 +263,8 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(balance.showHiddenObjects).toBe(false)
   })
 
-  it('shadows, flat ground, wheel zoom and journal do-not-disturb (UI store) toggle on click', () => {
-    useUi.setState({ shadowsEnabled: true, fireShadowsEnabled: true }) // pin the defaults
+  it('flat ground, wheel zoom and journal do-not-disturb (UI store) toggle on click', () => {
     render(<DebugMenu />)
-    const shadows = screen.getByText(en.debug.shadows).closest('label')?.querySelector('input') as HTMLInputElement
-    expect(shadows.checked).toBe(true)
-    fireEvent.click(shadows)
-    expect(useUi.getState().shadowsEnabled).toBe(false)
-
-    // Campfire-shadow allow-flag (design.md §19.10, point 289): default ON —
-    // medium/high enable it via the level preset; a player can tune it off.
-    const fire = screen.getByText(en.debug.fireShadows).closest('label')?.querySelector('input') as HTMLInputElement
-    expect(fire.checked).toBe(true)
-    fireEvent.click(fire)
-    expect(useUi.getState().fireShadowsEnabled).toBe(false)
-    fireEvent.click(fire)
-    expect(useUi.getState().fireShadowsEnabled).toBe(true)
-
     const flat = screen.getByText(en.debug.flatGround).closest('label')?.querySelector('input') as HTMLInputElement
     expect(flat.checked).toBe(false)
     fireEvent.click(flat)
@@ -318,6 +303,51 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
   })
 })
 
+// The graphics section is now a SINGLE detail-level dropdown (design.md §21.3,
+// point 276 correction). The per-setting graphics allow-flags (TRAA, SSAO,
+// half/full shadows, campfire shadows) are no longer exposed in the menu — they
+// remain internal, driven by the touch preset (§17.5) and the F8 benchmark.
+describe('DebugMenu graphics section = only the detail-level dropdown (design.md §21.3, point 276)', () => {
+  it('exposes NO per-setting graphics checkbox — no TRAA, SSAO, half-shadow, shadows or campfire-shadow control', () => {
+    render(<DebugMenu />)
+    expect(screen.queryByText(en.debug.traa)).toBeNull()
+    expect(screen.queryByText(en.debug.ssao)).toBeNull()
+    expect(screen.queryByText(en.debug.shadowMapHalf)).toBeNull()
+    expect(screen.queryByText(en.debug.shadows)).toBeNull()
+    expect(screen.queryByText(en.debug.fireShadows)).toBeNull()
+    // The single dropdown is present.
+    const picker = screen.getByText(en.debug.detailLevel).closest('label')?.querySelector('select')
+    expect(picker).not.toBeNull()
+  })
+
+  it('selecting each level (low/medium/high) writes detailLevel through — English', () => {
+    useLocale.getState().setLang('en')
+    useUi.setState({ detailLevel: 'medium' })
+    render(<DebugMenu />)
+    const picker = screen.getByText(en.debug.detailLevel).closest('label')?.querySelector('select') as HTMLSelectElement
+    fireEvent.change(picker, { target: { value: 'low' } })
+    expect(useUi.getState().detailLevel).toBe('low')
+    fireEvent.change(picker, { target: { value: 'high' } })
+    expect(useUi.getState().detailLevel).toBe('high')
+    fireEvent.change(picker, { target: { value: 'medium' } })
+    expect(useUi.getState().detailLevel).toBe('medium')
+  })
+
+  it('selecting each level writes detailLevel through — German, and no graphics checkbox is shown', () => {
+    useLocale.getState().setLang('de')
+    useUi.setState({ detailLevel: 'medium' })
+    render(<DebugMenu />)
+    expect(screen.queryByText(de.debug.traa)).toBeNull()
+    expect(screen.queryByText(de.debug.ssao)).toBeNull()
+    expect(screen.queryByText(de.debug.shadowMapHalf)).toBeNull()
+    const picker = screen.getByText(de.debug.detailLevel).closest('label')?.querySelector('select') as HTMLSelectElement
+    fireEvent.change(picker, { target: { value: 'low' } })
+    expect(useUi.getState().detailLevel).toBe('low')
+    fireEvent.change(picker, { target: { value: 'high' } })
+    expect(useUi.getState().detailLevel).toBe('high')
+  })
+})
+
 describe('DebugMenu season selector (design.md §19/§21, point 120c)', () => {
   it('renders the localized selector, defaulting to the calendar', () => {
     render(<DebugMenu />)
@@ -353,54 +383,6 @@ describe('DebugMenu season selector (design.md §19/§21, point 120c)', () => {
   })
 })
 
-describe('DebugMenu TRAA toggle (design.md §2.7/§21)', () => {
-  it('renders the localized TRAA checkbox, default on', () => {
-    render(<DebugMenu />)
-    const row = screen.getByText(en.debug.traa).closest('label')
-    const box = row?.querySelector('input[type="checkbox"]') as HTMLInputElement | null
-    expect(box).not.toBeNull()
-    expect(box?.checked).toBe(true)
-    expect(useUi.getState().traaEnabled).toBe(true)
-  })
-
-  it('toggling the checkbox writes through to the UI store and back', () => {
-    render(<DebugMenu />)
-    const row = screen.getByText(en.debug.traa).closest('label')
-    const box = row?.querySelector('input[type="checkbox"]') as HTMLInputElement
-    fireEvent.click(box)
-    expect(useUi.getState().traaEnabled).toBe(false)
-    fireEvent.click(box)
-    expect(useUi.getState().traaEnabled).toBe(true)
-  })
-
-  it('carries a German label after the language switch', () => {
-    useLocale.getState().setLang('de')
-    render(<DebugMenu />)
-    expect(screen.getByText(de.debug.traa)).toBeInTheDocument()
-  })
-})
-
-describe('DebugMenu quality-preset toggles (design.md §17.5, point 84)', () => {
-  it('renders the SSAO and half-shadow checkboxes reflecting their store defaults', () => {
-    useUi.setState({ ssaoEnabled: true, shadowMapHalf: false })
-    render(<DebugMenu />)
-    const ssao = screen.getByText(en.debug.ssao).closest('label')?.querySelector('input') as HTMLInputElement
-    const shadow = screen.getByText(en.debug.shadowMapHalf).closest('label')?.querySelector('input') as HTMLInputElement
-    expect(ssao.checked).toBe(true)
-    expect(shadow.checked).toBe(false)
-  })
-
-  it('re-enabling SSAO / toggling shadows writes through to the UI store', () => {
-    useUi.setState({ ssaoEnabled: false, shadowMapHalf: true })
-    render(<DebugMenu />)
-    const ssao = screen.getByText(en.debug.ssao).closest('label')?.querySelector('input') as HTMLInputElement
-    fireEvent.click(ssao)
-    expect(useUi.getState().ssaoEnabled).toBe(true)
-    const shadow = screen.getByText(en.debug.shadowMapHalf).closest('label')?.querySelector('input') as HTMLInputElement
-    fireEvent.click(shadow)
-    expect(useUi.getState().shadowMapHalf).toBe(false)
-  })
-})
 
 describe('DebugMenu renderer row and dropdown selectors (enrichments.mjs)', () => {
   it('shows the read-only renderer row with the active backend', () => {

@@ -442,11 +442,12 @@ export function Hud() {
     // F6 = state-dump popup for bug reports (design.md §21.1; F5 is unusable —
     // the browser reloads before preventDefault runs).
     const offF6 = onKeyPress('F6', () => useUi.getState().toggleStateDump())
-    // F7 = graphics quality level (design.md §21, point 276). Each press steps
+    // F9 = graphics quality level (design.md §21, point 276). Each press steps
     // DOWN one level, wrapping the bottom to the top: medium → low → high →
     // medium. Read DERIVED (the effective* selectors), so it never clobbers the
-    // individual debug flags.
-    const offF7 = onKeyPress('F7', () => {
+    // individual debug flags. (F9, not the neighbouring key Windows Chrome binds
+    // to its Caret-Browsing dialog.)
+    const offF9 = onKeyPress('F9', () => {
       useUi.getState().cycleDetailLevel()
       const s = getStrings()
       useGame.getState().setToast(s.toasts.graphicsLevel[useUi.getState().detailLevel])
@@ -496,12 +497,13 @@ export function Hud() {
       else if (useGame.getState().journalOpen) setJournalOpen(false)
     })
     // Function keys trigger browser actions by default (F1 help, F3 find) —
-    // prevent that for the keys the game uses, F6 (state-dump) and F8
-    // (benchmark) included so any browser default stays suppressed. F5 stays
-    // with the browser: its reload fires before preventDefault can stop it,
-    // which is why the state-dump moved to F6.
+    // prevent that for the keys the game uses, F6 (state-dump), F8 (benchmark)
+    // and F9 (graphics level) included so any browser default stays suppressed.
+    // F5 stays with the browser: its reload fires before preventDefault can stop
+    // it, which is why the state-dump moved to F6. The graphics level uses F9
+    // (not F-seven, which Windows Chrome binds to Caret-Browsing).
     const preventFn = (e: KeyboardEvent) => {
-      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F6' || e.code === 'F7' || e.code === 'F8') e.preventDefault()
+      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F6' || e.code === 'F8' || e.code === 'F9') e.preventDefault()
     }
     window.addEventListener('keydown', preventFn)
     return () => {
@@ -512,7 +514,7 @@ export function Hud() {
       offF3()
       offF4()
       offF6()
-      offF7()
+      offF9()
       offF8()
       offMonths.forEach((off) => off())
       offYears.forEach((off) => off())

@@ -85,7 +85,7 @@ export interface UiState {
    */
   touchActive: boolean
   /**
-   * Graphics quality level — low / medium / high (design.md §21, F7 / point 276
+   * Graphics quality level — low / medium / high (design.md §21, F9 / point 276
    * part B), DEFAULT 'medium'. Each level maps through QUALITY_PRESETS
    * (src/config/quality.ts) to a value for every quality-relevant render lever;
    * every consumer reads its EFFECTIVE value through the selectors below
@@ -147,7 +147,7 @@ export interface UiState {
   /** Set the graphics quality level directly (debug-menu picker). Reads DERIVED
    *  through the effective* selectors; never clobbers the individual debug flags. */
   setDetailLevel: (level: DetailLevel) => void
-  /** Step the graphics level one DOWN, wrapping the bottom to the top (F7):
+  /** Step the graphics level one DOWN, wrapping the bottom to the top (F9):
    *  medium → low → high → medium. */
   cycleDetailLevel: () => void
   setSsaoEnabled: (enabled: boolean) => void
@@ -230,7 +230,7 @@ export const useUi = create<UiState>()((set) => ({
   // The graphics level is read DERIVED (the effective* selectors below), so —
   // unlike activateTouch — changing it writes ONLY the level and never touches
   // the player's individual debug flags, which stay available to tune within a
-  // level. The F7 cycle steps DOWN (medium → low → high → medium).
+  // level. The F9 cycle steps DOWN (medium → low → high → medium).
   setDetailLevel: (detailLevel) => set({ detailLevel }),
   cycleDetailLevel: () => set((s) => ({ detailLevel: nextDetailLevel(s.detailLevel) })),
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
@@ -246,7 +246,7 @@ export const useUi = create<UiState>()((set) => ({
   clearBenchAbort: () => set({ benchAbort: false }),
 }))
 
-// --- Effective render levers (design.md §21, F7 / point 276 part B) ----------
+// --- Effective render levers (design.md §21, F9 / point 276 part B) ----------
 // Every render consumer reads its effective value through one of these
 // selectors, which combine the current level's preset (QUALITY_PRESETS) with the
 // individual debug allow-flags. The preset decides the level's baseline; the

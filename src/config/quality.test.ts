@@ -1,4 +1,4 @@
-// Quality-preset completeness + the F7 cycle order (design.md §21, point 276
+// Quality-preset completeness + the F9 cycle order (design.md §21, point 276
 // part B). The completeness gate is the "sichere Mechanik": every future optical
 // feature added as a preset key MUST carry a low/medium/high value or this test
 // fails — so a level can never silently miss a setting.
@@ -74,7 +74,7 @@ describe('preset calibration invariants (a clear, visible low→high climb)', ()
   })
 })
 
-describe('F7 cycle order (design.md §21): medium → low → high → medium', () => {
+describe('F9 cycle order (design.md §21): medium → low → high → medium', () => {
   it('steps DOWN one level, wrapping the bottom back to the top', () => {
     expect(nextDetailLevel('medium')).toBe('low')
     expect(nextDetailLevel('low')).toBe('high')

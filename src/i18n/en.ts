@@ -477,7 +477,7 @@ export const en: Strings = {
     ssao: 'SSAO (ambient occlusion)',
     shadowMapHalf: 'Half-resolution shadows',
     shadows: 'Sun shadows',
-    detailLevel: 'Graphics detail (F7)',
+    detailLevel: 'Graphics detail (F9)',
     detailLow: 'Low',
     detailMedium: 'Medium',
     detailHigh: 'High',

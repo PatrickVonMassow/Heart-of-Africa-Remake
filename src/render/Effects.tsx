@@ -51,7 +51,7 @@ export function Effects() {
     }
   }, [scene])
 
-  // The effective render levers (design.md §21, F7 / point 276 part B): the
+  // The effective render levers (design.md §21, F9 / point 276 part B): the
   // graphics level drives SSAO/TRAA/bloom through these selectors — SSAO on only
   // at high, TRAA+bloom off only at low — without touching the player's own debug
   // flags. Post is the single biggest GPU lever on the user's real hardware

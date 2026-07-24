@@ -85,7 +85,7 @@ near-universal. Switching it off reproduces v0.1's histogram exactly.
 ### Consequences
 
 - **The render features are not the problem.** Everything the debug menu can
-  switch off is worth almost nothing here; an F7 "Low Details" mode built out of
+  switch off is worth almost nothing here; an F9 "Low Details" mode built out of
   those switches would buy the user nothing on hardware like this.
 - **The p99 "hitch" trail was a measurement artifact.** A short 6 s sample once
   showed p99 38 ms; 12 s samples put every config at 12-13 ms with a single

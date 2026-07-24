@@ -441,10 +441,10 @@ const msaaSamples = await page.evaluate(() => window.__scenePass.renderTarget.sa
 check('TRAA scene pass renders single-sampled (MSAA pass keeps 4)',
   traaSamples === 0 && msaaSamples === 4, `traa ${traaSamples}, msaa ${msaaSamples}`)
 
-// --- Graphics quality levels (design.md §21, F7 / point 276 part B) ------------
-// F7 cycles the `detailLevel` (medium → low → high → medium); every render lever
+// --- Graphics quality levels (design.md §21, F9 / point 276 part B) ------------
+// F9 cycles the `detailLevel` (medium → low → high → medium); every render lever
 // reads DERIVED from that level's QUALITY_PRESET without clobbering the player's
-// debug allow-flags. Assert the F7 cycle order and that the EFFECTIVE reads flip
+// debug allow-flags. Assert the F9 cycle order and that the EFFECTIVE reads flip
 // with the level, computed the same way the ui.ts selectors do (their maths is
 // pure-tested in src/state/ui.test.ts). The FPS win is priced live by the main
 // session on both backends.
@@ -486,8 +486,8 @@ const effective = () => page.evaluate(() => {
     baseFire: s.fireShadowsEnabled, baseHalf: s.shadowMapHalf,
   }
 })
-const cycleF7 = async () => {
-  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F7', bubbles: true })))
+const cycleF9 = async () => {
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F9', bubbles: true })))
   await page.waitForTimeout(900)
   return effective()
 }
@@ -496,26 +496,26 @@ check('graphics level defaults to medium: SSAO off, TRAA+Bloom on, 2048 shadows,
   atMedium.level === 'medium' && atMedium.ssao === false && atMedium.traa && atMedium.bloom &&
   atMedium.shadows && atMedium.shadowRes === 2048 && atMedium.fireShadows === true,
   JSON.stringify(atMedium))
-// F7 #1: medium → low (every fill-rate lever forced DOWN).
-const atLow = await cycleF7()
-check('F7 → low: post off, shadows low-res, no campfire shadows',
+// F9 #1: medium → low (every fill-rate lever forced DOWN).
+const atLow = await cycleF9()
+check('F9 → low: post off, shadows low-res, no campfire shadows',
   atLow.level === 'low' && atLow.ssao === false && atLow.traa === false && atLow.bloom === false &&
   atLow.shadowRes === PRESETS.low.shadowRes && atLow.fireShadows === false, JSON.stringify(atLow))
 const lowMean = await meanLuma(await page.screenshot())
-check('F7 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
-// F7 #2: low → high (wraps to the top; SSAO on, sharper shadows).
-const atHigh = await cycleF7()
-check('F7 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',
+check('F9 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
+// F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
+const atHigh = await cycleF9()
+check('F9 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',
   atHigh.level === 'high' && atHigh.ssao === true && atHigh.shadowRes === 4096 &&
   atHigh.fireShadows === true, JSON.stringify(atHigh))
-// F7 #3: high → medium (back to the default).
-const atMediumAgain = await cycleF7()
-check('F7 → medium: a full cycle returns to the default in three presses',
+// F9 #3: high → medium (back to the default).
+const atMediumAgain = await cycleF9()
+check('F9 → medium: a full cycle returns to the default in three presses',
   atMediumAgain.level === 'medium' && atMediumAgain.shadowRes === 2048, JSON.stringify(atMediumAgain))
 check('graphics levels: the debug allow-flags stay untouched across the cycle (read derived)',
   atHigh.baseSsao && atHigh.baseTraa && atHigh.baseShadows && atHigh.baseFire && atHigh.baseHalf === false,
   JSON.stringify(atHigh))
-check('Graphics levels: no new console errors across the F7 cycle', errors.length === errsBeforeLow,
+check('Graphics levels: no new console errors across the F9 cycle', errors.length === errsBeforeLow,
   errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 
 console.log('console errors:', errors.length)

@@ -1,4 +1,4 @@
-// Three graphics quality levels — low / medium / high (design.md §21, F7 /
+// Three graphics quality levels — low / medium / high (design.md §21, F9 /
 // point 276 part B). This module is the SINGLE registry the effective* render
 // selectors in state/ui.ts read: each level maps to a value for EVERY
 // quality-relevant setting, so a new optical feature declares its low/medium/
@@ -128,7 +128,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
 export const QUALITY_KEYS = Object.keys(QUALITY_PRESETS.medium) as Array<keyof QualityPreset>
 
 /**
- * The F7 cycle: each press steps one level DOWN, and from the bottom it wraps to
+ * The F9 cycle: each press steps one level DOWN, and from the bottom it wraps to
  * the TOP — medium → low → high → medium (user decision 24.07.2026). Written as
  * an explicit map so the order is unmistakable and pure-testable.
  */

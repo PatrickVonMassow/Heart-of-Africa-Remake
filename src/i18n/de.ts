@@ -476,7 +476,7 @@ export const de: Strings = {
     ssao: 'SSAO (Umgebungsverdeckung)',
     shadowMapHalf: 'Schatten in halber Auflösung',
     shadows: 'Sonnenschatten',
-    detailLevel: 'Grafikdetails (F7)',
+    detailLevel: 'Grafikdetails (F9)',
     detailLow: 'Niedrig',
     detailMedium: 'Mittel',
     detailHigh: 'Hoch',

@@ -122,13 +122,11 @@ export function DebugMenu() {
   const setLang = useLocale((s) => s.setLang)
   const open = useUi((s) => s.debugOpen)
   const fpsVisible = useUi((s) => s.fpsVisible)
-  const traaEnabled = useUi((s) => s.traaEnabled)
   const seasonWetnessOverride = useUi((s) => s.seasonWetnessOverride)
-  const ssaoEnabled = useUi((s) => s.ssaoEnabled)
-  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
-  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
+  // The graphics allow-flags (traa/ssao/shadowMapHalf/shadows/fireShadows) live
+  // in the store but are no longer exposed in this menu (design.md §21.3, point
+  // 276 correction) — the graphics section is a single detail-level dropdown.
   const detailLevel = useUi((s) => s.detailLevel)
-  const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
@@ -374,38 +372,11 @@ export function DebugMenu() {
           onChange={(e) => useUi.getState().setFpsVisible(e.target.checked)}
         />
       </label>
-      <label>
-        <span>{t.debug.traa}</span>
-        <input
-          type="checkbox"
-          checked={traaEnabled}
-          onChange={(e) => useUi.getState().setTraaEnabled(e.target.checked)}
-        />
-      </label>
-      <label>
-        <span>{t.debug.ssao}</span>
-        <input
-          type="checkbox"
-          checked={ssaoEnabled}
-          onChange={(e) => useUi.getState().setSsaoEnabled(e.target.checked)}
-        />
-      </label>
-      <label>
-        <span>{t.debug.shadowMapHalf}</span>
-        <input
-          type="checkbox"
-          checked={shadowMapHalf}
-          onChange={(e) => useUi.getState().setShadowMapHalf(e.target.checked)}
-        />
-      </label>
-      <label>
-        <span>{t.debug.shadows}</span>
-        <input
-          type="checkbox"
-          checked={shadowsEnabled}
-          onChange={(e) => useUi.getState().setShadowsEnabled(e.target.checked)}
-        />
-      </label>
+      {/* The graphics section is a SINGLE detail-level dropdown (design.md
+          §21.3, point 276 correction). The per-setting graphics allow-flags
+          (TRAA, SSAO, half/full shadows, campfire shadows) are no longer
+          exposed here — they stay internal, set by the touch quality preset
+          (§17.5) and the F8 benchmark, and combined by the effective* selectors. */}
       <label>
         <span>{t.debug.detailLevel}</span>
         <select
@@ -416,14 +387,6 @@ export function DebugMenu() {
           <option value="medium">{t.debug.detailMedium}</option>
           <option value="high">{t.debug.detailHigh}</option>
         </select>
-      </label>
-      <label>
-        <span>{t.debug.fireShadows}</span>
-        <input
-          type="checkbox"
-          checked={fireShadowsEnabled}
-          onChange={(e) => useUi.getState().setFireShadowsEnabled(e.target.checked)}
-        />
       </label>
       <label>
         <span>{t.debug.flatGround}</span>
