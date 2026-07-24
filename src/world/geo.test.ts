@@ -74,6 +74,7 @@ describe('place lookup', () => {
   it('resolves a known place and throws on an unknown id', () => {
     expect(placeById('cairo').kind).toBe('port')
     expect(placeById('nubian-village').kind).toBe('village')
+    expect(placeById('giza').kind).toBe('monument')
     expect(() => placeById('atlantis')).toThrow()
   })
 })

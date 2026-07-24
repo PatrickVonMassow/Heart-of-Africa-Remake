@@ -1667,6 +1667,26 @@ function VillageMarker() {
   )
 }
 
+/** Marker for a monument site (design.md §4.4, point 273): a small three-pyramid
+ *  glyph in the SW-diagonal row, so Giza reads as the pyramids on the map. */
+function MonumentMarker() {
+  const pyramids: Array<[number, number, number]> = [
+    [0.7, -0.7, 0.95], // Khufu, largest, NE
+    [0, 0, 0.85], // Khafre, centre
+    [-0.7, 0.7, 0.55], // Menkaure, smallest, SW
+  ]
+  return (
+    <group>
+      {pyramids.map(([px, pz, r], i) => (
+        <mesh key={i} position={[px, r * 0.5, pz]} rotation={[0, Math.PI / 4, 0]} castShadow>
+          <coneGeometry args={[r, r * 1.28, 4]} />
+          <meshStandardMaterial color="#cdb079" roughness={0.95} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
 /**
  * Panorama capture on settlement APPROACH (design.md §2.5, point 81): a few
  * strides before the enter radius, the travel scene renders the 360° horizon
@@ -1743,7 +1763,7 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
   return (
     <group position={[p.x, y, p.z]} name={`place-marker-${place.id}`}>
-      {place.kind === 'port' ? <PortMarker /> : <VillageMarker />}
+      {place.kind === 'port' ? <PortMarker /> : place.kind === 'monument' ? <MonumentMarker /> : <VillageMarker />}
       {!enterHintShown && (
         <Html center position={[0, 2.9, 0]} distanceFactor={60}>
           <div className={`map-label${discovered ? '' : ' undiscovered'}`}>{discovered ? t.places[place.id] : '?'}</div>

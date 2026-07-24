@@ -124,8 +124,35 @@ await page.evaluate(() => {
     p.pitch = 0.02
   })
   await page.waitForTimeout(700)
-  await page.screenshot({ path: `${OUT}100-cairo-giza-skyline.png` })
+  const skyBuf = await page.screenshot()
+  await sharp(skyBuf).toFile(`${OUT}100-cairo-giza-skyline.png`)
   console.log('shot 100-cairo-giza-skyline.png')
+
+  // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
+  // BAND at this distant skyline scale, so it was removed (kept only at the
+  // walkable site). Prove no strongly red-dominant pixels remain over the
+  // pyramid silhouette — a red-granite stripe would light many up. The sky is
+  // warm haze (r≈g≈b-ish) and the pyramids are tawny (r>g>b but not RED), so a
+  // true red band (r well above BOTH g and b) is the error signature.
+  {
+    const { data, info } = await sharp(skyBuf).raw().toBuffer({ resolveWithObject: true })
+    let redBand = 0
+    let total = 0
+    for (let i = 0; i < info.width * info.height; i++) {
+      const r = data[i * info.channels]
+      const g = data[i * info.channels + 1]
+      const b = data[i * info.channels + 2]
+      total++
+      // A saturated brick-red: red clearly dominates green AND blue.
+      if (r > 90 && r > g * 1.6 && r > b * 1.9) redBand++
+    }
+    const frac = redBand / total
+    check(
+      'no red granite error band on the Cairo skyline pyramids (point 273)',
+      frac < 0.002,
+      `red-dominant pixel fraction ${frac.toFixed(5)}`,
+    )
+  }
 
   // Point 102 (a): in Cairo no VISIBLE panorama silhouette may fall inside the
   // Giza skyline's excluded azimuth span — otherwise an animal drifts across the
@@ -700,6 +727,104 @@ for (const [placeId, shot] of [
   await page.screenshot({ path: `${OUT}103-giza-sphinx-travel.png` })
   console.log('shot 103-giza-sphinx-travel.png')
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+}
+
+// --- Walkable Giza monument site (design.md §4.4, point 273) -------------------
+// Jump onto the Giza marker so the "Space to enter" hint arms, confirm entry
+// with the Space use key, then check that the three great pyramids and the
+// sand-buried Sphinx render as collidable masses on the walkable plateau —
+// with a screenshot standing back from the cluster.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
+  // Giza's river-cleared position (src/world/geo.ts). Jumping onto the marker
+  // arms the enter hint; a Space press then confirms entry (design.md §2.3).
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
+  await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'giza', null, { timeout: 15000 })
+  const gizaPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
+  check('the enter hint arms and names Giza (discovered, localized)', /Giza|Gizeh/.test(gizaPrompt), gizaPrompt)
+  // Re-set the live position right before the press (Space re-derives from it).
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
+  await page.keyboard.press('Space')
+  await page.waitForFunction(
+    () => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeMonuments,
+    null,
+    { timeout: 30000 },
+  )
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await waitForStable(page)
+  const site = await page.evaluate(() => ({
+    mode: window.__game.getState().mode,
+    monuments: window.__placeMonuments,
+    colliders: window.__placeLayout?.colliders?.length ?? 0,
+    interactives: window.__placeLayout?.interactives?.length ?? 0,
+  }))
+  check('Space enters the walkable Giza site', site.mode === 'place', JSON.stringify({ mode: site.mode }))
+  check(
+    'the three great pyramids and the buried Sphinx render',
+    site.monuments?.pyramids === 3 && site.monuments?.sphinxBuried === true,
+    JSON.stringify(site.monuments),
+  )
+  check(
+    'the monuments are collidable and the site has no trade/elder',
+    site.colliders >= 4 && site.interactives === 0,
+    JSON.stringify({ colliders: site.colliders, interactives: site.interactives }),
+  )
+  // Stand back near the southern spawn, look north over the cluster, and shoot.
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    const r = window.__placeLayout?.radius ?? 60
+    p.x = 0
+    p.z = r - 12
+    p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
+  })
+  await page.waitForTimeout(1000)
+  const siteBuf = await page.screenshot()
+  await sharp(siteBuf).toFile(`${OUT}139-giza-walkable-site.png`)
+  console.log('shot 139-giza-walkable-site.png')
+
+  // Point 273: the plateau must read as warm DESERT SAND, not a pale, cool,
+  // wavy parchment. Sample the near foreground (the bottom-centre strip, always
+  // ground) and assert the mean is a warm sand tone: clearly warm (r > g > b, a
+  // real r−b spread) and not the washed-out pale grey the old port-earth ground
+  // showed on the open disc.
+  {
+    const meta = await sharp(siteBuf).metadata()
+    const W = meta.width
+    const H = meta.height
+    const cw = Math.round(W * 0.4)
+    const { data, info } = await sharp(siteBuf)
+      .extract({
+        left: Math.round(W / 2 - cw / 2),
+        top: Math.round(H * 0.84),
+        width: cw,
+        height: Math.round(H * 0.12),
+      })
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    let rs = 0
+    let gs = 0
+    let bs = 0
+    const n = info.width * info.height
+    for (let i = 0; i < n; i++) {
+      rs += data[i * info.channels]
+      gs += data[i * info.channels + 1]
+      bs += data[i * info.channels + 2]
+    }
+    const r = rs / n
+    const g = gs / n
+    const b = bs / n
+    check(
+      'the walkable Giza ground reads as warm desert sand (point 273)',
+      r > g && g > b && r - b > 22 && r > 120,
+      `mean ground rgb ${r.toFixed(0)}/${g.toFixed(0)}/${b.toFixed(0)}`,
+    )
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 // --- Cold-weather dress (design.md §19.13, point 120g) ---
 // LAST in the file on purpose: it hops between settlements, and each leave

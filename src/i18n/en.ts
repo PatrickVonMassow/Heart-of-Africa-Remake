@@ -46,6 +46,7 @@ const PLACES: Record<string, string> = {
   'pedi-village': 'Pedi Village',
   'zulu-village': 'Zulu Village',
   'san-village': 'San Village',
+  giza: 'The Pyramids of Giza',
 }
 
 const PEOPLES: Record<string, string> = {
@@ -494,6 +495,7 @@ export const en: Strings = {
     jumpGroups: {
       ports: 'Ports',
       villages: 'Villages',
+      monuments: 'Monuments',
       mountains: 'Mountains',
       waterfalls: 'Waterfalls',
       lakes: 'Lakes',

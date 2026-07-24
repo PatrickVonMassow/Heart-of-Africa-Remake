@@ -10,6 +10,7 @@ import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
+import { buildGizaLayout } from './gizaSite'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -146,6 +147,10 @@ export function isOnLane(x: number, z: number, paths: PathDef[]): boolean {
 
 export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
+  // Monument sites (design.md §4.4, point 273) are a bare walkable disc with the
+  // giant collidable monuments and a handful of ambient anchors — no trade,
+  // elder, dwellings, lanes or props. Their fixed layout lives in gizaSite.ts.
+  if (place.kind === 'monument') return buildGizaLayout(seed)
   const style = REGION_PLACE_STYLES[place.region]
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0

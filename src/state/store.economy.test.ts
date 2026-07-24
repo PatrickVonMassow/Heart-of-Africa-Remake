@@ -177,8 +177,11 @@ describe('discovery bounties (design.md §10)', () => {
     const ports = PLACES.filter((p) => p.kind === 'port').map((p) => p.id)
     expect(ports.length).toBe(10)
     for (const id of ports) expect(g().visitedPlaces).toContain(id)
-    // The known-set constant matches the port list exactly.
-    expect([...KNOWN_FROM_START_PLACES].sort()).toEqual([...ports].sort())
+    // The known set is the ten ports plus the Giza monument site (point 273):
+    // a world-famous landmark beside Cairo is known from the outset.
+    const monuments = PLACES.filter((p) => p.kind === 'monument').map((p) => p.id)
+    expect([...KNOWN_FROM_START_PLACES].sort()).toEqual([...ports, ...monuments].sort())
+    for (const id of monuments) expect(g().visitedPlaces).toContain(id)
     // Ordinary villages are NOT known from the start (still discovery-gated).
     for (const v of PLACES.filter((p) => p.kind === 'village'))
       expect(g().visitedPlaces).not.toContain(v.id)

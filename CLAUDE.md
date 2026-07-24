@@ -1008,7 +1008,22 @@ verify suite that proves it.
     nemes (proportions and part count pure-tested via `buildSphinx` in
     `src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
     Timbuktu builds the Djinguereber mosque as a collidable dwelling
-    (`scripts/verify/polish.mjs`, screenshots 96/97/100). The §19.10
+    (`scripts/verify/polish.mjs`, screenshots 96/97/100); and the Giza
+    plateau is an ENTERABLE first-person monument site (§4.4, point 273):
+    its own map point south-west of Cairo, known from the start and reached
+    with the SPACE use key like a settlement (the enter candidate + the
+    Giza-vs-Cairo disc separation pure-tested in
+    `src/scenes/travel/settlementEntry.test.ts`), where the traveller walks
+    AROUND the three great pyramids and the sand-buried Sphinx as giant
+    COLLIDABLE monuments on a bare desert disc — the layout, the collidable
+    masses, a clear spawn standpoint, the Giza-vs-Meroë slope contrast and
+    the ~1890 casing cues (blunt Khufu, Khafre's pale cap, Menkaure's
+    granite skirt, the buried Sphinx) pure-tested in
+    `src/scenes/place/gizaSite.test.ts`, and the live enter-with-SPACE, the
+    three pyramids + buried Sphinx rendering and the sparse Thomas-Cook-era
+    ambient walkers gated in `scripts/verify/polish.mjs` (screenshot 139);
+    the same period casing cap and half-buried Sphinx carry into Cairo's
+    western skyline (point 82). The §19.10
     campfire can CAST SHADOWS (point 289, level-driven per point 276 part B):
     the fire light renders a cube shadow map (remounted on the variant, also
     behind the global shadow switch), with an invisible player-body proxy so

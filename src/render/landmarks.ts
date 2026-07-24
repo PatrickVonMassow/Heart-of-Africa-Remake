@@ -11,6 +11,7 @@ import * as THREE from 'three/webgpu'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../world/noise'
 import { buildPapyrus } from './flora'
+import { GIZA_PYRAMIDS, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
 function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): THREE.BufferGeometry {
@@ -216,17 +217,17 @@ export function buildGizaPyramids(): THREE.BufferGeometry {
     parts.push(tint(cap, '#e8dcc2', 0.03, 8203))
   }
   {
-    // Menkaure: the smallest, its point intact, but the lower courses cased
-    // in red Aswan granite — a darker band ringing the base, a hair proud of
-    // the core face so the two never z-fight.
+    // Menkaure: the smallest, its point intact. Its lower courses ARE cased in
+    // red Aswan granite in reality (docs/giza-1890.md §1.1), but at this distant
+    // skyline / bird's-eye scale the smallest pyramid subtends only a few pixels
+    // and a red base band read as a floating error stripe rather than granite
+    // casing (user report, point 273). The casing is a close-range cue, so it is
+    // carried ONLY by the walkable-site geometry (gizaSitePyramidParts), where
+    // Menkaure is a giant the traveller stands beside; the distant silhouette
+    // relies on the three-pyramid row and Khafre's cap for recognition.
     const [x, z, b] = [-1.2, 1.2, 0.8]
     const h = b * 0.64 * 2
     parts.push(pyramid(x, z, b, h, 8202))
-    const skirtTop = 0.22 // fraction of the height the granite casing reaches
-    const skirt = new THREE.CylinderGeometry(b * (1 - skirtTop) * 1.02, b * 1.02, h * skirtTop, 4, 1, true)
-    skirt.rotateY(Math.PI / 4)
-    skirt.translate(x, (h * skirtTop) / 2, z)
-    parts.push(tint(skirt, '#96604b', 0.06, 8204))
   }
   // Sphinx east of Khafre, facing east like the real one.
   const sphinx = buildSphinx()
@@ -298,26 +299,125 @@ export function buildSphinx(): THREE.BufferGeometry {
   nemes.rotateY(Math.PI / 4)
   nemes.translate(0.24, 0.55, 0)
   put(nemes, sand, 8218)
-  // Face block proud of the nemes front.
-  const head = new THREE.BoxGeometry(0.14, 0.16, 0.15)
-  head.translate(0.3, 0.55, 0)
+  // Nemes lappets: the two headcloth flaps that hang down each side of the
+  // face. They FRAME the face and are the single most recognisable Sphinx cue
+  // — without them the nemes read as a plain tan block at the walkable site's
+  // 11x scale (point 273). They sit forward and to each side, sloping outward
+  // down to the chest; they widen the head across (in z), never along x, so the
+  // couchant "longer than wide" silhouette and the buried-to-the-shoulders
+  // profile (only the head clears the sand) are untouched.
+  for (const side of [-1, 1]) {
+    const lappet = new THREE.BoxGeometry(0.17, 0.28, 0.08)
+    lappet.rotateX(side * -0.12)
+    lappet.translate(0.28, 0.49, side * 0.17)
+    put(lappet, sand, side < 0 ? 8222 : 8223)
+  }
+  // Face block, set below the crown and between the lappets, proud of the
+  // nemes front — enlarged so it reads as a face, not a bump.
+  const head = new THREE.BoxGeometry(0.16, 0.19, 0.16)
+  head.translate(0.31, 0.53, 0)
   put(head, '#b8905c', 8219)
-  // Flat nemes crown.
-  const crown = new THREE.BoxGeometry(0.14, 0.05, 0.14)
-  crown.translate(0.24, 0.68, 0)
+  // Flat, wide nemes crown capping the headdress.
+  const crown = new THREE.BoxGeometry(0.15, 0.05, 0.17)
+  crown.translate(0.24, 0.685, 0)
   put(crown, sand, 8220)
   // Sink the lion: what remains above the sand is the head under its nemes,
-  // with the shoulders just breaking the surface (see SPHINX_BURIAL_DEPTH).
+  // with the shoulders and upper chest just breaking the surface (see
+  // SPHINX_BURIAL_DEPTH).
   const buried = merge(parts)
   buried.translate(0, -SPHINX_BURIAL_DEPTH, 0)
-  // The drift the body lies in — a low tapered dune, banked ALONG the lion
-  // (squashed across it) so the sand line reads as blown sand rather than as
-  // the lion cut off flat, while the silhouette stays longer than it is wide.
-  // Kept low enough that the shoulders still break its surface.
-  const drift = new THREE.CylinderGeometry(0.38, 0.62, 0.11, 12, 1)
-  drift.scale(1, 1, 0.45)
-  drift.translate(0.05, 0.005, 0)
-  return merge([buried, tint(drift, '#c9a670', 0.05, 8221)])
+  // The wind-blown sand the body lies in — a soft, low dune banked ALONG the
+  // lion (squashed across it, so the mound stays longer than it is wide) that
+  // rises to meet the emerging chest and FEATHERS to nothing at its rim. It is
+  // a CONE whose base circle sits exactly at ground level (y = 0) and whose low
+  // apex hides behind the chest: the old build was a flat-topped cylinder whose
+  // vertical rim read as a hard disc with a seam (the "looks like an error"
+  // lower part, point 273). With no vertical face there is no seam and nothing
+  // to z-fight, and the 28-segment rim reads as a smooth dune edge. Tinted to
+  // the walkable site's warm desert-sand ground so the drift is of a piece with
+  // the surrounding sand rather than a foreign-coloured patch.
+  const drift = new THREE.ConeGeometry(0.74, 0.07, 28, 1, true)
+  drift.translate(0, 0.035, 0) // base circle down to y = 0, apex at y = 0.07
+  drift.scale(1, 1, 0.35) // banked ALONG the lion (clearly longer than wide)
+  drift.translate(0.04, 0, 0) // centred just forward, under the chest/shoulders
+  return merge([buried, tint(drift, '#dcc48a', 0.05, 8221)])
+}
+
+/** One great pyramid at the WALKABLE Giza site (design.md §4.4, point 273):
+ *  the same ~1890 casing cues as buildGizaPyramids — Khufu's blunt flat summit
+ *  (missing apex), Khafre's pale Tura-limestone cap on the stepped core,
+ *  Menkaure's red-granite skirt — but at site scale so the traveller walks
+ *  around the mass as a giant building, and lifted onto its own bedrock plinth
+ *  (Khafre stands on higher rock and so reads as tall as Khufu). */
+function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = []
+  const core = '#c9a76a'
+  const { x, z, base: b, height: h, ground: y0 } = p
+  if (y0 > 0) {
+    // The bedrock plateau Khafre stands on — a low, wide rock plinth so the
+    // lifted pyramid does not float and reads as raised on higher ground.
+    const rock = new THREE.CylinderGeometry(b * 1.05, b * 1.14, y0, 4)
+    rock.rotateY(Math.PI / 4)
+    rock.translate(x, y0 / 2, z)
+    parts.push(tint(rock, '#b0895a', 0.09, seed + 5))
+  }
+  if (p.standing < 1) {
+    // Blunt top: the cone cut flat where the apex and top courses are gone.
+    const stand = h * p.standing
+    const frustum = new THREE.CylinderGeometry(b * (1 - p.standing), b, stand, 4)
+    frustum.rotateY(Math.PI / 4)
+    frustum.translate(x, y0 + stand / 2, z)
+    parts.push(tint(frustum, core, 0.09, seed))
+  } else if (p.cap) {
+    // Stepped tawny core with the pale smooth casing cap near the apex.
+    const capStart = 0.8
+    const coreH = h * capStart
+    const coreG = new THREE.CylinderGeometry(b * (1 - capStart), b, coreH, 4)
+    coreG.rotateY(Math.PI / 4)
+    coreG.translate(x, y0 + coreH / 2, z)
+    parts.push(tint(coreG, core, 0.09, seed))
+    const cap = new THREE.ConeGeometry(b * (1 - capStart) * 1.06, h - coreH, 4)
+    cap.rotateY(Math.PI / 4)
+    cap.translate(x, y0 + coreH + (h - coreH) / 2, z)
+    parts.push(tint(cap, '#e8dcc2', 0.03, seed + 3))
+  } else {
+    const cone = new THREE.ConeGeometry(b, h, 4)
+    cone.rotateY(Math.PI / 4)
+    cone.translate(x, y0 + h / 2, z)
+    parts.push(tint(cone, core, 0.09, seed))
+  }
+  if (p.skirt) {
+    // The red Aswan-granite lower casing (docs/giza-1890.md §1.1): a SOLID
+    // seated base course, not an open ringing band. It follows the pyramid's
+    // own slope (its radii match the core at the ground and at its top edge) and
+    // stands a hair proud so it reads as the cased outer face — capped, so it
+    // has a real top course rather than a floating shell edge that z-fights or
+    // reads as an error stripe (point 273). This close-range cue is the ONLY
+    // place the granite is drawn; the distant skyline/bird's-eye Menkaure omits
+    // it (see buildGizaPyramids).
+    const skirtTop = 0.22
+    const skirt = new THREE.CylinderGeometry(b * (1 - skirtTop) * 1.02, b * 1.02, h * skirtTop, 4, 1, false)
+    skirt.rotateY(Math.PI / 4)
+    skirt.translate(x, y0 + (h * skirtTop) / 2, z)
+    parts.push(tint(skirt, '#96604b', 0.06, seed + 7))
+  }
+  return parts
+}
+
+/** The walkable Giza plateau's monuments (design.md §4.4, point 273): the three
+ *  great pyramids in their SW-diagonal row at site scale, each carrying its
+ *  ~1890 casing cue, plus the Great Sphinx buried to the shoulders east of
+ *  Khafre (the shared buildSphinx, scaled up — its burial and noseless face
+ *  come along). One merged, vertex-colored geometry; the collidable masses are
+ *  derived from the SAME GIZA_PYRAMIDS/GIZA_SPHINX constants in gizaSite.ts. */
+export function buildGizaSiteMonuments(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  GIZA_PYRAMIDS.forEach((p, i) => parts.push(...gizaSitePyramidParts(p, 8300 + i * 10)))
+  const sphinx = buildSphinx()
+  sphinx.scale(GIZA_SPHINX.scale, GIZA_SPHINX.scale, GIZA_SPHINX.scale)
+  sphinx.translate(GIZA_SPHINX.x, 0, GIZA_SPHINX.z)
+  parts.push(sphinx)
+  return merge(parts)
 }
 
 /** Great Zimbabwe: a curved mortarless dry-stone wall (segmented boxes) and a

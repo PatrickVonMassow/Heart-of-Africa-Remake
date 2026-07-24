@@ -418,6 +418,7 @@ export interface Strings {
     jumpGroups: {
       ports: string
       villages: string
+      monuments: string
       mountains: string
       waterfalls: string
       lakes: string

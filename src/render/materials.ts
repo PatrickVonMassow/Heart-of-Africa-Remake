@@ -295,7 +295,14 @@ export function createGroundMaterial(
   alt: string,
   patch: string,
   paths?: GroundPathOptions,
+  opts?: { sand?: boolean },
 ): THREE.MeshStandardNodeMaterial {
+  // Desert-sand ground (the walkable Giza plateau, point 273) reads as even,
+  // warm, granular sand — NOT the blotchy pebbled earth the settlements use.
+  // Over a large open disc that earth mottling read as wavy pale parchment
+  // (user report), so for sand the broad tonal drift and the dark Worley patch
+  // are muted and the baked relief is softened to a fine even grain.
+  const sand = opts?.sand ?? false
   const m = new THREE.MeshStandardNodeMaterial()
   m.roughness = 1
   m.metalness = 0
@@ -308,7 +315,7 @@ export function createGroundMaterial(
   // WebGL 2 path never showed (point 111).
   const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0)).clamp(0, 1)
   let col = mix(color(base), color(alt), large.clamp(0, 1))
-  col = mix(col, color(patch), cells.oneMinus().pow(3).mul(0.5))
+  col = mix(col, color(patch), cells.oneMinus().pow(3).mul(sand ? 0.14 : 0.5))
   const pathMask = (() => {
     if (!paths) return float(0)
     // Mask canvas maps the square ±extent around the place origin.
@@ -332,8 +339,9 @@ export function createGroundMaterial(
   // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform.
   m.colorNode = wetGroundColor(seasonTintNode(col).mul(surfaceStructure('ground')))
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
-  // fades where the mask is strong).
-  m.normalNode = surfaceNormal('ground', pathMask.oneMinus().mul(0.85).add(0.15))
+  // fades where the mask is strong). Sand keeps a softer, finer grain so the
+  // open plateau reads as smooth desert sand rather than a pebbled field.
+  m.normalNode = surfaceNormal('ground', pathMask.oneMinus().mul(sand ? 0.4 : 0.85).add(0.15))
   // Wet gloss: the base roughness (1) pulls down toward a sheen with the wet
   // factor, so the micro-relief normals catch a highlight. `m.roughness` stays
   // its scalar default — the node overrides it.

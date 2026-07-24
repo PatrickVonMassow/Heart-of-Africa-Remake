@@ -59,7 +59,8 @@ import { PORT_SKY, VILLAGE_SKY } from '../../render/skyPresets'
 import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from '../../render/materials'
 import { TESSELLATION } from '../../render/figures'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
-import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
+import { buildTableMountain, buildGizaPyramids, buildGizaSiteMonuments } from '../../render/landmarks'
+import { GIZA_AMBIENT, GIZA_PYRAMIDS, type GizaAmbientRole } from './gizaSite'
 import {
   buildAntelopeParts,
   buildElephantParts,
@@ -167,7 +168,12 @@ function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
   }, [paths])
 }
 
-function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: THREE.Texture | null) {
+function usePlaceMaterials(
+  isPort: boolean,
+  isMonument: boolean,
+  style: RegionPlaceStyle,
+  pathTex: THREE.Texture | null,
+) {
   // Debug diagnosis (point 111): swap the ground for a plain material to see
   // whether a WebGPU-only black patch comes from the TSL ground node material.
   const flatGround = useUi((s) => s.groundDebugFlat)
@@ -186,12 +192,21 @@ function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: TH
       ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }
       : undefined
     const ground = flatGround
-      ? new THREE.MeshStandardMaterial({ color: isPort ? '#dcc99c' : style.ground[0], roughness: 1, metalness: 0 })
-      : isPort
-        ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
-        : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
+      ? new THREE.MeshStandardMaterial({
+          color: isMonument ? '#e0c489' : isPort ? '#dcc99c' : style.ground[0],
+          roughness: 1,
+          metalness: 0,
+        })
+      : isMonument
+        ? // The walkable Giza plateau: warm, granular DESERT SAND (matched to
+          // the travel desert biome), not the port's pebbled sandy earth
+          // (point 273) — the `sand` mode mutes the earth mottling.
+          createGroundMaterial('#e0c489', '#d3b578', '#c2a05e', pathOpts, { sand: true })
+        : isPort
+          ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
+          : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
     return { plaster, plasterDark, mud, thatch, wood, cloth, ground }
-  }, [isPort, style, pathTex, flatGround])
+  }, [isPort, isMonument, style, pathTex, flatGround])
 }
 
 type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
@@ -1590,6 +1605,211 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
   return <mesh geometry={geometry} material={material} receiveShadow />
 }
 
+// --- Giza monument site (design.md §4.4, point 273) ---------------------------
+
+/**
+ * The three great pyramids and the buried Sphinx at the walkable Giza site,
+ * as giant collidable masses the traveller walks around (the collision comes
+ * from gizaSite.ts; this is the visible geometry). One merged, vertex-colored
+ * mesh carrying the ~1890 casing cues — Khufu's blunt top, Khafre's pale cap,
+ * Menkaure's granite skirt, and the Sphinx buried to the shoulders.
+ */
+function GizaMonuments() {
+  const geometry = useMemo(() => buildGizaSiteMonuments(), [])
+  const material = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }), [])
+  useEffect(() => () => geometry.dispose(), [geometry])
+  useEffect(() => () => material.dispose(), [material])
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    geometry.computeBoundingBox()
+    const bb = geometry.boundingBox
+    w.__placeMonuments = {
+      pyramids: GIZA_PYRAMIDS.length,
+      // The Sphinx is buried, so the merged field reaches below the sand line.
+      sphinxBuried: bb ? bb.min.y < 0 : false,
+      maxY: bb ? bb.max.y : 0,
+    }
+    return () => {
+      delete w.__placeMonuments
+    }
+  }, [geometry])
+  return <mesh geometry={geometry} material={material} castShadow receiveShadow />
+}
+
+/** A robed human figure for the plateau's ambient life — a guide/dragoman,
+ *  a Bedouin cameleer, a donkey-boy, or a pith-helmeted 1890s tourist. */
+function RobedFigure({
+  robe,
+  head = '#7a5232',
+  helmet = false,
+  scarf = false,
+  scale = 1,
+}: {
+  robe: string
+  head?: string
+  helmet?: boolean
+  scarf?: boolean
+  scale?: number
+}) {
+  return (
+    <group scale={[scale, scale, scale]}>
+      <mesh position={[0, 0.62, 0]} castShadow>
+        <coneGeometry args={[0.32, 1.25, TESSELLATION.figureBody]} />
+        <meshStandardMaterial color={robe} roughness={0.95} />
+      </mesh>
+      <mesh position={[0, 1.32, 0]} castShadow>
+        <sphereGeometry args={[0.15, ...TESSELLATION.figureHead]} />
+        <meshStandardMaterial color={head} roughness={0.85} />
+      </mesh>
+      {scarf && (
+        <mesh position={[0, 1.4, 0]} castShadow>
+          <sphereGeometry args={[0.18, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 1.7]} />
+          <meshStandardMaterial color="#efe6d0" roughness={0.9} />
+        </mesh>
+      )}
+      {helmet && (
+        <mesh position={[0, 1.42, 0]} castShadow>
+          <sphereGeometry args={[0.18, ...TESSELLATION.figureCap, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <meshStandardMaterial color="#e9e1c6" roughness={0.9} />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
+/** A standing camel (Bedouin mount): humped body, long neck, four legs. */
+function Camel() {
+  const tan = '#b89468'
+  return (
+    <group>
+      <mesh position={[0, 1.15, 0]} castShadow>
+        <boxGeometry args={[1.4, 0.6, 0.55]} />
+        <meshStandardMaterial color={tan} roughness={0.95} />
+      </mesh>
+      <mesh position={[0.05, 1.55, 0]} castShadow>
+        <sphereGeometry args={[0.34, 10, 8]} />
+        <meshStandardMaterial color={tan} roughness={0.95} />
+      </mesh>
+      <mesh position={[0.75, 1.55, 0]} rotation={[0, 0, -0.7]} castShadow>
+        <cylinderGeometry args={[0.12, 0.17, 1.0, 8]} />
+        <meshStandardMaterial color={tan} roughness={0.95} />
+      </mesh>
+      <mesh position={[1.02, 2.0, 0]} castShadow>
+        <boxGeometry args={[0.38, 0.26, 0.22]} />
+        <meshStandardMaterial color={tan} roughness={0.95} />
+      </mesh>
+      {(
+        [
+          [0.55, 0.3],
+          [0.55, -0.3],
+          [-0.55, 0.3],
+          [-0.55, -0.3],
+        ] as const
+      ).map(([lx, lz], i) => (
+        <mesh key={i} position={[lx, 0.5, lz]} castShadow>
+          <cylinderGeometry args={[0.08, 0.07, 1.05, 6]} />
+          <meshStandardMaterial color={tan} roughness={0.95} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** A standing donkey (the donkey-boys' mounts): smaller, grey, long ears. */
+function Donkey() {
+  const grey = '#9c968c'
+  return (
+    <group>
+      <mesh position={[0, 0.78, 0]} castShadow>
+        <boxGeometry args={[0.95, 0.42, 0.4]} />
+        <meshStandardMaterial color={grey} roughness={0.95} />
+      </mesh>
+      <mesh position={[0.5, 1.0, 0]} rotation={[0, 0, -0.6]} castShadow>
+        <cylinderGeometry args={[0.09, 0.12, 0.55, 7]} />
+        <meshStandardMaterial color={grey} roughness={0.95} />
+      </mesh>
+      <mesh position={[0.66, 1.24, 0]} castShadow>
+        <boxGeometry args={[0.28, 0.2, 0.18]} />
+        <meshStandardMaterial color={grey} roughness={0.95} />
+      </mesh>
+      {[-0.09, 0.09].map((ez) => (
+        <mesh key={ez} position={[0.6, 1.42, ez]} rotation={[0, 0, 0.2]} castShadow>
+          <coneGeometry args={[0.05, 0.22, 5]} />
+          <meshStandardMaterial color={grey} roughness={0.95} />
+        </mesh>
+      ))}
+      {(
+        [
+          [0.35, 0.16],
+          [0.35, -0.16],
+          [-0.35, 0.16],
+          [-0.35, -0.16],
+        ] as const
+      ).map(([lx, lz], i) => (
+        <mesh key={i} position={[lx, 0.32, lz]} castShadow>
+          <cylinderGeometry args={[0.06, 0.05, 0.66, 6]} />
+          <meshStandardMaterial color="#6f6a61" roughness={0.95} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/**
+ * The sparse Thomas-Cook-era ambient life at the Giza plateau (docs/
+ * giza-1890.md §4): a handful of robed guides/dragomen, a Bedouin cameleer,
+ * a donkey-boy, a few 1890s tourists, and their camels and donkeys — no throng.
+ * Positions come from the layout's validated ambient anchors (free of the
+ * monuments), paired with GIZA_AMBIENT's roles; each figure idles and looks
+ * slowly around (no mechanics).
+ */
+function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role: GizaAmbientRole }> }) {
+  const refs = useRef<Array<THREE.Group | null>>([])
+  const phases = useMemo(() => anchors.map((_, i) => i * 1.7 + 0.3), [anchors])
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    anchors.forEach((a, i) => {
+      const g = refs.current[i]
+      if (!g) return
+      g.rotation.y = phases[i] + Math.sin(t * 0.3 + phases[i]) * 0.5
+      const person = a.role === 'guide' || a.role === 'tourist' || a.role === 'cameleer' || a.role === 'donkeyboy'
+      g.position.y = person ? Math.max(0, Math.sin(t * 1.6 + phases[i])) * 0.03 : 0
+    })
+  })
+  const figureFor = (role: GizaAmbientRole) => {
+    switch (role) {
+      case 'camel':
+        return <Camel />
+      case 'donkey':
+        return <Donkey />
+      case 'tourist':
+        return <RobedFigure robe="#c9bfa2" head="#c99f78" helmet />
+      case 'guide':
+        return <RobedFigure robe="#d8cba8" scarf />
+      case 'cameleer':
+        return <RobedFigure robe="#b89a63" scarf />
+      default: // donkeyboy: a smaller robed youth
+        return <RobedFigure robe="#9a7b4e" scale={0.82} />
+    }
+  }
+  return (
+    <>
+      {anchors.map((a, i) => (
+        <group
+          key={i}
+          position={[a.x, 0, a.z]}
+          ref={(el) => {
+            refs.current[i] = el
+          }}
+        >
+          {figureFor(a.role)}
+        </group>
+      ))}
+    </>
+  )
+}
+
 // --- Scene --------------------------------------------------------------------
 
 export function PlaceScene() {
@@ -1619,6 +1839,11 @@ export function PlaceScene() {
     [placeId, seed],
   )
   const isPort = place?.kind === 'port'
+  const isMonument = place?.kind === 'monument'
+  const isVillage = place?.kind === 'village'
+  // The monument plateau reads as desert sand, like a port's ground (design.md
+  // §4.4), not a village's soil.
+  const sandy = isPort || isMonument
   const style = REGION_PLACE_STYLES[place?.region ?? 'west']
   // The settlement's cold-weather dress (§19.13). Shared with PlaceLife so the
   // elder and the villagers dress for the same season.
@@ -1647,7 +1872,7 @@ export function PlaceScene() {
     return marketPlentyAt(place.peopleId, useGame.getState().day, START_YEAR)
   }, [placeId])
   const pathTex = usePathTexture(layout?.paths ?? null)
-  const mats = usePlaceMaterials(!!isPort, style, pathTex)
+  const mats = usePlaceMaterials(sandy, isMonument, style, pathTex)
   const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
     () => ({ palm: buildPalm(true), acacia: buildAcacia(), jungle: buildJungleTree(), bush: buildBush() }),
     [],
@@ -1934,7 +2159,7 @@ export function PlaceScene() {
       // lit by the preset alone and would stay sunny behind a rained-out village.
       const fog = scene.fog as THREE.Fog | null
       if (fog) {
-        placeFogColor.set(isPort ? PORT_SKY.horizon : VILLAGE_SKY.horizon)
+        placeFogColor.set(sandy ? PORT_SKY.horizon : VILLAGE_SKY.horizon)
         placeFogColor.lerp(placeRainColor, sky.grayMix)
         fog.color.lerp(placeFogColor, k)
         if (scene.background instanceof THREE.Color) scene.background.lerp(placeFogColor, k)
@@ -2070,7 +2295,7 @@ export function PlaceScene() {
   })
 
   if (!place || !layout) return null
-  const sky = isPort ? PORT_SKY : VILLAGE_SKY
+  const sky = sandy ? PORT_SKY : VILLAGE_SKY
 
   return (
     <>
@@ -2078,7 +2303,7 @@ export function PlaceScene() {
       <fog attach="fog" args={[sky.horizon, 42, 320]} />
       <SkyDome preset={sky} sunDirection={SUN_DIR} radius={400} />
       <PlaceRain wetness={placeWetness} />
-      <hemisphereLight ref={hemiRef} args={[isPort ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />
+      <hemisphereLight ref={hemiRef} args={[sandy ? '#cfe2ee' : '#d8e2c2', '#8f7a55', PLACE_HEMI_INTENSITY]} />
       <directionalLight
         // Remount the light when shadows toggle so the shadow map is rebuilt from
         // scratch: flipping castShadow in place left the WebGPU shadow pipeline in
@@ -2142,7 +2367,17 @@ export function PlaceScene() {
 
       <Fences fences={layout.fences} mats={mats} />
 
-      {!isPort && (
+      {/* The walkable Giza plateau (design.md §4.4, point 273): the three great
+          pyramids and the buried Sphinx as giant collidable monuments, and the
+          sparse Thomas-Cook-era ambient life around them. */}
+      {isMonument && <GizaMonuments />}
+      {isMonument && (
+        <GizaAmbient
+          anchors={layout.errands.map(([x, z], i) => ({ x, z, role: GIZA_AMBIENT[i]?.role ?? 'tourist' }))}
+        />
+      )}
+
+      {isVillage && (
         <FirePit
           x={-3.5}
           z={2.5}
@@ -2155,27 +2390,31 @@ export function PlaceScene() {
       {/* The player's own occluder body, only while campfire shadows are on
           (design.md §19.10) — absent, the light passes straight through the
           viewer standing between the fire and the ground. */}
-      {!isPort && fireShadowsEnabled && shadowsEnabled && <PlayerShadowProxy player={player} />}
+      {isVillage && fireShadowsEnabled && shadowsEnabled && <PlayerShadowProxy player={player} />}
 
-      <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
+      <PlaceFlora slots={layout.flora} style={sandy ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
-      <GroundScatter placeId={place.id} seed={seed} isPort={!!isPort} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} />
+      <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} />
 
-      <PlaceLife
-        kind={isPort ? 'port' : 'village'}
-        size={place.size ?? 1}
-        seed={seed}
-        placeId={place.id}
-        style={style}
-        buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
-        firePos={[-3.5, 2.5]}
-        homes={layout.dwellings
-          .filter((d) => d.kind === 'hut' || d.kind === 'box')
-          .map((d) => ({ x: d.x, z: d.z, door: d.door }))}
-        errands={layout.errands}
-        pen={layout.pen}
-        colliders={layout.colliders}
-      />
+      {/* Ambient settlement life — ports and villages only; a monument has its
+          own sparse crowd (above) and no bustle/hints. */}
+      {(isPort || isVillage) && (
+        <PlaceLife
+          kind={isPort ? 'port' : 'village'}
+          size={place.size ?? 1}
+          seed={seed}
+          placeId={place.id}
+          style={style}
+          buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
+          firePos={[-3.5, 2.5]}
+          homes={layout.dwellings
+            .filter((d) => d.kind === 'hut' || d.kind === 'box')
+            .map((d) => ({ x: d.x, z: d.z, door: d.door }))}
+          errands={layout.errands}
+          pen={layout.pen}
+          colliders={layout.colliders}
+        />
+      )}
     </>
   )
 }

@@ -420,6 +420,20 @@ export function MapOverlay() {
       ctx.globalAlpha = 0.95
       if (place.kind === 'port') {
         ctx.fillRect(x - 3, y - 3, 6, 6)
+      } else if (place.kind === 'monument') {
+        // A small pyramid outline for a monument site (point 273).
+        ctx.strokeStyle = INK
+        ctx.lineWidth = 1.4
+        ctx.beginPath()
+        ctx.moveTo(x, y - 4)
+        ctx.lineTo(x + 4, y + 3)
+        ctx.lineTo(x - 4, y + 3)
+        ctx.closePath()
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(x - 4, y + 3)
+        ctx.lineTo(x + 4, y + 3)
+        ctx.stroke()
       } else {
         ctx.beginPath()
         ctx.moveTo(x, y - 4)

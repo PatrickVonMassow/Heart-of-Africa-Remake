@@ -110,7 +110,7 @@ export function regionBorderLabelAnchors(
   return out
 }
 
-export type PlaceKind = 'port' | 'village'
+export type PlaceKind = 'port' | 'village' | 'monument'
 
 export interface PlaceDef {
   /** Place id; display names come from the language files (i18n). */
@@ -246,7 +246,21 @@ const CLEARED_PORTS: PlaceDef[] = PORTS.map((p) => ({
   ...clearedOfRivers(p.lat, p.lon, PORT_RIVER_CLEARANCE_DEG),
 }))
 
-export const PLACES: PlaceDef[] = [...CLEARED_PORTS, ...VILLAGES]
+// Enterable monument sites (design.md §4.4, point 273): world-famous landmarks
+// the traveller walks around in first person like a settlement, but with no
+// trade, elder or hints — a walkable monument space. Giza sits a short way
+// south-west of Cairo: the map scale (10 units/°) cannot resolve the real 13 km
+// between them, so the plateau is placed clear of the city's enter radius — the
+// same symbolic compaction the point-82 Giza skyline uses.
+const MONUMENT_SITES: PlaceDef[] = [
+  { id: 'giza', kind: 'monument', lat: 29.75, lon: 30.85, region: 'north' },
+]
+const MONUMENTS: PlaceDef[] = MONUMENT_SITES.map((m) => ({
+  ...m,
+  ...clearedOfRivers(m.lat, m.lon),
+}))
+
+export const PLACES: PlaceDef[] = [...CLEARED_PORTS, ...VILLAGES, ...MONUMENTS]
 
 export function placeById(id: string): PlaceDef {
   const p = PLACES.find((p) => p.id === id)
@@ -259,8 +273,9 @@ export function placeById(id: string): PlaceDef {
 // map labels show their names from the start (never "?", §17.2) and returning to
 // them credits no discovery bounty (design.md §10). Every period-famous inland
 // centre in the model is itself one of these ports (Timbuktu, Khartoum on the
-// caravan/Nile routes), so the known set is exactly the ten ports; the ordinary
-// ethnic villages stay discovery-gated as before.
+// caravan/Nile routes). The Giza monument site is likewise world-famous and
+// beside Cairo, so it is known too; the known set is the ten ports plus Giza,
+// while the ordinary ethnic villages stay discovery-gated as before.
 export const KNOWN_FROM_START_PLACES: readonly string[] = PLACES.filter(
-  (p) => p.kind === 'port',
+  (p) => p.kind === 'port' || p.kind === 'monument',
 ).map((p) => p.id)
