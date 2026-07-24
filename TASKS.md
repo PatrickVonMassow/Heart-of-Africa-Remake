@@ -11274,6 +11274,30 @@ the remaining open points in their numeric order.
   unenforced and why. No player-visible text. (This is the systematic enforcement of the
   mechanism-first principle — vibe-coding guide rule 5 / retrospective §3.16.)
 
+- [ ] 309. SERVING-MODEL DEGRADATION: REPAIR + TRIPWIRE (user 25.07.2026). REPAIR: the
+  late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
+  commit trailers) and merged three deliveries that missed their specs; main is RESTORED
+  to the last pre-degradation state fd85464 on every touched path — the placebo
+  proximity-call fix incl. its assert-nothing tests (expect(true)) reverted (292
+  reopens), the unwired detect-load stub removed (296 reopens), the rubber-stamp
+  guard-chain audit removed (297 reopens), the load-corrupted verification PNGs
+  restored, the three TASKS ticks undone — while the legitimately recorded
+  .claude/closing-state.json is kept; the load-tainted working-tree churn (PNGs, retro
+  appendix, ineffective settings additionalDirectories, untracked pre-push stub) and the
+  unauthorized local .git/hooks/pre-push are discarded. TRIPWIRE (mechanism-first): a
+  Stop-hook guard (pure core scripts/model-guard-core.mjs + fail-open wrapper
+  scripts/model-guard.mjs, wired FIRST in the Stop chain) parses the recent commits'
+  Co-Authored-By trailers; any commit after the committed baseline
+  (.claude/model-guard-baseline.json) authored by a Haiku-class model BLOCKS the turn
+  end with a pause-the-batch instruction and pings ntfy — a degraded session is caught
+  at its FIRST commit. The guard stands down while .claude/batch-paused exists (no
+  block loop once paused); the batch-resume hook names the model policy on every
+  session start. VERIFIABLE: model-guard-core Vitest sweep (trailer parse incl.
+  malformed lines, Haiku match across case/format variants, non-Haiku models pass,
+  baseline cutoff boundary, empty log); the repaired state passes the full LARGE
+  regression on a quiet machine (both backends), which also re-validates the four Opus
+  points merged before the degradation (262/273/293/305).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
