@@ -60,10 +60,14 @@ export const VILLAGE_PLANS: Record<string, VillagePlanKind> = {
   swahili: 'coastrow',
   sidama: 'compound',
   baganda: 'compound',
-  // South: the Central Cattle Pattern; San camps.
+  // South: the Central Cattle Pattern; San camps. The Bemba are the exception
+  // — they lived in the tsetse belt on citemene millet and kept NO cattle
+  // (docs/peoples-1890.md §5.1), so a central cattle kraal is the wrong plan
+  // for them; their 30-50 wattle-and-daub huts stood as family clusters
+  // around an open central meeting ground (the insaka), which is `compound`.
   zulu: 'ring',
   pedi: 'ring',
-  bemba: 'ring',
+  bemba: 'compound',
   wayeyi: 'scatter',
   san: 'scatter',
 }

@@ -67,6 +67,14 @@ describe('village plan mapping (design.md §4.5)', () => {
       expect(VILLAGE_PLANS[v.peopleId ?? ''], v.id).toBeTruthy()
     }
   })
+
+  it('the Bemba get no cattle plan (docs/peoples-1890.md §5.1)', () => {
+    // They lived in the tsetse belt by citemene finger millet and kept no
+    // cattle, so the Central Cattle Pattern ring — which the game mapped them
+    // to, kraal and all — was the wrong organising principle for them.
+    expect(VILLAGE_PLANS.bemba).not.toBe('ring')
+    expect(VILLAGE_PLANS.bemba).toBe('compound')
+  })
 })
 
 describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
@@ -241,6 +249,14 @@ describe.each(SEEDS)('layout invariants (seed %i)', (seed) => {
         if (id === 'hausa-village' || id === 'mandinka-village') {
           expect(layout.fences.length, `${id}: walled compounds`).toBeGreaterThanOrEqual(3)
           expect(layout.dwellings.some((d) => d.kind === 'granary'), `${id}: granaries inside`).toBe(true)
+        }
+        if (id === 'bemba-village') {
+          // docs/peoples-1890.md §5.1: tsetse belt, citemene millet — no
+          // cattle, so no kraal; and no wall either, since the stockade is
+          // attested for their VICTIMS, not for Bemba villages themselves.
+          expect(layout.pen, `${id}: no livestock pen`).toBeNull()
+          expect(layout.fences.length, `${id}: no invented stockade`).toBe(0)
+          expect(layout.dwellings.some((d) => d.kind === 'granary'), `${id}: millet granaries`).toBe(true)
         }
       }
     },

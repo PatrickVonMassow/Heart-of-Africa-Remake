@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { describe, it, expect } from 'vitest'
 import {
   buildMeroePyramids,
+  MEROE_PYRAMIDS,
   buildGizaPyramids,
   buildSphinx,
   SPHINX_BURIAL_DEPTH,
@@ -14,6 +15,8 @@ import {
   buildCoastalRuins,
   buildStelae,
   buildCastles,
+  GONDAR_PARAPET,
+  GONDAR_TOWER_HEIGHTS,
   buildCliffDwellings,
   buildCrater,
   buildVolcano,
@@ -157,6 +160,78 @@ describe('landmark builders', () => {
     const footprint = Math.max(b.max.x - b.min.x, b.max.z - b.min.z)
     expect(footprint).toBeGreaterThan(6)
     expect(footprint).toBeLessThan(14)
+    geo.dispose()
+  })
+
+  it('most of Meroë stands broken-topped, as the treasure hunters left it (point 279)', () => {
+    // Ferlini dismantled Amanishakheto's pyramid from the top down in 1834 and
+    // Lepsius recorded in 1844 that the treasure fever "has brought many a
+    // pyramid to ruin" — ~40 Nubian pyramids lost their tops, and the pointed
+    // apexes of the modern photograph are 20th-century reconstruction. The
+    // regression this pins is the six clean sharp cones the builder used to
+    // make.
+    const broken = MEROE_PYRAMIDS.filter((p) => p.standing < 1)
+    expect(broken.length).toBeGreaterThanOrEqual(4) // most, not all
+    expect(MEROE_PYRAMIDS.length - broken.length).toBeGreaterThanOrEqual(1) // some left whole
+    // None cut so low that the steep Nubian silhouette stops reading.
+    for (const p of broken) expect(p.standing).toBeGreaterThan(0.5)
+
+    // And the geometry really is cut: nothing over a broken pyramid's own
+    // footprint reaches its original apex height (not the crown blocks, not
+    // the standing corner), while an untouched one still carries its point.
+    const geo = buildMeroePyramids()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    const topOver = (p: (typeof MEROE_PYRAMIDS)[number]) => {
+      let top = 0
+      for (let i = 0; i < pos.count; i++) {
+        if (Math.hypot(pos.getX(i) - p.x, pos.getZ(i) - p.z) > p.base * 0.6) continue
+        top = Math.max(top, pos.getY(i))
+      }
+      return top
+    }
+    for (const p of broken) {
+      const label = `broken pyramid at ${p.x.toFixed(1)}/${p.z.toFixed(1)}`
+      expect(topOver(p), label).toBeLessThan(p.height - 0.3)
+      // The stump is still a pyramid, not a stub.
+      expect(topOver(p), label).toBeGreaterThan(p.height * 0.5)
+    }
+    for (const p of MEROE_PYRAMIDS.filter((q) => q.standing >= 1)) {
+      expect(topOver(p), `intact pyramid at ${p.x.toFixed(1)}/${p.z.toFixed(1)}`).toBeGreaterThan(p.height - 0.01)
+    }
+    geo.dispose()
+  })
+
+  it('Gondar stands as the burnt ruin the Mahdists left in 1888 (point 279)', () => {
+    // Mahdist forces sacked and burned Gondar in January 1888, two years
+    // before the expedition sets out; the intact parapets and conical tower
+    // caps of the modern photograph are 20th-century restoration. The
+    // regression this pins is the maintained castle the builder used to make:
+    // a solid keep, an unbroken eight-merlon parapet, both tower roofs on.
+    expect(GONDAR_PARAPET.some((m) => m === 0), 'merlons knocked out').toBe(true)
+    const standing = GONDAR_PARAPET.filter((m) => m > 0)
+    expect(new Set(standing).size, 'the surviving merlons stand unevenly').toBeGreaterThan(1)
+
+    const geo = buildCastles()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    const topOver = (x: number, z: number, r: number) => {
+      let top = 0
+      for (let i = 0; i < pos.count; i++) {
+        if (Math.hypot(pos.getX(i) - x, pos.getZ(i) - z) > r) continue
+        top = Math.max(top, pos.getY(i))
+      }
+      return top
+    }
+    // The keep is open to the sky: over its middle there is only the burnt-out
+    // floor, no roof slab and no solid block reaching the wall tops.
+    expect(topOver(0, 0, 0.3), 'the keep has no roof').toBeLessThan(0.3)
+    // Neither tower carries a cap: nothing rises over the tower axis beyond
+    // its own broken rim (the removed cones added 0.42 above the shell).
+    GONDAR_TOWER_HEIGHTS.forEach((h, i) => {
+      const [tx, tz] = i === 0 ? [0.95, 0.55] : [-0.95, -0.55]
+      expect(topOver(tx, tz, 0.12), `tower ${i} is roofless`).toBeLessThan(h + 0.05)
+    })
+    // The two towers do not stand level — one lost its upper courses.
+    expect(GONDAR_TOWER_HEIGHTS[0]).not.toBe(GONDAR_TOWER_HEIGHTS[1])
     geo.dispose()
   })
 

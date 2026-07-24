@@ -562,6 +562,10 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     } else if (plan === 'compound') {
       // Sahel compound cluster: walled family enclosures around the meeting
       // ground, granaries inside, a lane to each compound ENTRANCE.
+      // The Bemba cluster the same way but WITHOUT a wall: a stockade is
+      // attested for their victims (Mambwe, Lungu), not for Bemba villages
+      // themselves (docs/peoples-1890.md §5.1), so none is invented here.
+      const walled = style.fence !== 'none' && place.peopleId !== 'bemba'
       const baseAngles = [0.1, 2.3, 3.35, 4.15, 5.5]
       const compounds = Math.min(4 + (rand() < 0.7 ? 1 : 0), baseAngles.length)
       for (let c = 0; c < compounds; c++) {
@@ -584,7 +588,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
           addDwelling('granary', cx + 2, cz + 2, faceTo(cx + 2, cz + 2, cx, cz), 0.85, 1.1)
         }
         const openingAngle = Math.atan2(-cz, -cx)
-        if (style.fence !== 'none') {
+        if (walled) {
           // Fence around the compound, opening toward the plaza.
           fences.push({
             kind: style.fence === 'stone' ? 'stone' : 'woven',
