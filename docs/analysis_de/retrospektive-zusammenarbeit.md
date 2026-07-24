@@ -152,6 +152,10 @@ Bisher kam ein zweites Modell (Fable) in genau zwei Situationen: bei Audits/Revi
 
 Der Anlass war konkret: die vier neuen QA-Mechanismen (294–297) und der 276-WebGPU-Leak zeigten, dass gerade *selbst gebaute, immer-funktionieren-müssende* Mechanismen ein Single-Model-Blindfleck-Risiko tragen — ein Guard, der falsch blockiert oder still durchlässt, ist schlimmer als kein Guard. *Übertragung, und der Kern der Lehre:* Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und wie jede Zusage in diesem Projekt hält sie nur als **Mechanismus**, nicht als Vorsatz: eine Kritikalitäts-Triage als Konvention plus ein Stop-Hook-Guard, der einen Hoch-Kritikalitäts-Merge ohne aufgezeichnetes Diversitäts-Review blockiert (Punkt 298, selbst unter seiner eigenen Regel gebaut).
 
+### 3.14 Fast-Gate ≠ Release-Gate (24.07.)
+
+Beim v0.2-Tag zeigte der verpflichtende volle Closing-Lauf sofort seinen Wert: Er fing einen strikten TypeScript-Typfehler (implizite `any`-Parameter in einer Gangart-Testdatei), den die schnelle Vitest-Schicht durchgelassen hatte — weil diese Testdateien mit esbuild transpiliert, ohne den vollen `tsc`. Ein Fehler kann also im schnellen Layer grün sein und erst der Release-Closing (`tsc -p tsconfig.vitest.json` in der LARGE-Regression) deckt ihn auf. *Übertragung:* Die schnelle, ständig laufende Prüfung ist bewusst lax genug, um schnell zu sein — deshalb ist die letzte, strengste Prüfung UNMITTELBAR vor der Auslieferung nicht verhandelbar und gehört fest in den Release-Mechanismus (CLAUDE.md §6 / Maximum-QA Phase 9), nicht als optionaler Extra-Schritt. Genau der Grund, warum der Nutzer den vollen Closing-Lauf als Teil jedes Tags festschrieb.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -210,6 +214,7 @@ Legende Lösungsversuche: Anzahl erkennbarer Anläufe/Generationen, bis die Lös
 | 19 | Verifikations-Blockschleife (Zweig-HEAD statt main-HEAD; merge-before-verify) | 1 | mittel (~30 Züge Zeitverlust) | `verify-before-merge-not-after`-Memory; nach Merge zügig gegen main verifizieren (ruhige Maschine) | Maschinell getrackte Nachweise sind zustandsgebunden — immer gegen den Zielzustand (main-HEAD) führen, nicht gegen einen Zweig-/Zwischenstand | ◐ (frisch) |
 | 20 | Test kodiert eine veränderliche Vorgabe fest → Konfig-Entscheidung lässt ihn fehlschlagen ohne Produkt-Regress (Boden-Kantenenergie „SSAO an"-kalibriert; 276-Entscheidung „SSAO aus") | 1 | niedrig-mittel (sieht aus wie Regress) | Schwelle auf ausgelieferten Default rekalibriert, gegen Vor-Änderungs-Baseline abgegrenzt, am Bild verifiziert | Stale-Check-Annahme vs. echten Regress per Baseline auf dem Vor-Änderungs-Stand trennen; Prüfschwellen an den SHIPPED-Default binden, per Bild kalibrieren | ◐ (frisch) |
 | 21 | Modell-Diversität nur reaktiv (Audits, Festgefahrenheit), nicht proaktiv nach Kritikalität | — (Prozesslücke, vom Nutzer benannt) | mittel (Single-Model-Blindfleck bei kritischen Mechanismen) | Kritikalitäts-Triage vor dem Bau + erzwingender Stop-Hook-Guard (Punkt 298); Fable-Sandwich für Hoch-Kritikalität | Modell-Diversität = Funktion der Kritikalität, nicht Audit-Sonderfall; als Mechanismus erzwingen, nicht als Vorsatz | ○ (spezifiziert, Bau 298) |
+| 22 | Schneller Test-Layer typecheckt Testdateien nicht — ein Typfehler bleibt dort grün und fällt erst im vollen Closing (strikter tsc) vor dem Release auf | 1 | niedrig (vor Release gefangen) | Voller Closing-Lauf vor JEDEM Versions-Tag verpflichtend (Release-Mechanismus, CLAUDE.md §6 / Maximum-QA Phase 9); Typ gefixt, Lauf wiederholt | Fast-Gate ≠ Release-Gate; die strengste Prüfung gehört unmittelbar vor die Auslieferung, nicht als optionaler Extra-Schritt | ✔ (Mechanismus) |
 
 ---
 
@@ -260,7 +265,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 24.07.2026, 18:09 · Quellen-Fingerprint: `952594f77580…`
+Zuletzt aktualisiert: Freitag, 24.07.2026, 19:06 · Quellen-Fingerprint: `b1c353fce268…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -310,7 +315,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | When Opus (the default model) has failed ~2 attempts on the same problem, hand it to Fable for fresh eyes — a different model sees different blind spots | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| The v0.1/poc release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| The v0.1/poc release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-spec-guard.mjs, timestamp-guard.mjs, timestamp-posttool-hook.mjs | ✔ Mechanismus |
@@ -323,13 +328,14 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Wildlife/atmosphere verify suites produce ROTATING false failures under parallel agent load — judge a red only on a quiet machine | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
+| The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 60 Feedback-/Projekt-Memories · 23 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 9 Prozess-/Meta-TASKS-Punkte (davon 4 offen).
+Erfasste Quellen: 61 Feedback-/Projekt-Memories · 23 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 9 Prozess-/Meta-TASKS-Punkte (davon 4 offen).
 
-<!-- RETRO-FINGERPRINT: 952594f775801be287ec4789b740236f27a0c9131954a2558af59882c5c0faed -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-24T16:09:17.488Z -->
+<!-- RETRO-FINGERPRINT: b1c353fce26834ea016a3ad88ff58696921122f95d69ae287b7930a640463872 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-24T17:06:31.348Z -->
 <!-- AUTO-GENERATED:END -->

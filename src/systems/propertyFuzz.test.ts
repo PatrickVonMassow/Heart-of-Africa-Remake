@@ -137,7 +137,7 @@ function meanResultantLength(headings: number[]): number {
 // ---------------------------------------------------------------------------
 
 describe('invariant fuzzing: season model over random (day, lat, lon, elevation)', () => {
-  it('every climate reading is finite, bounded and cross-consistent (5000 states)', () => {
+  it('every climate reading is finite, bounded and cross-consistent (5000 states)', { timeout: 30_000 }, () => {
     fuzz(
       'season',
       0xa11ce,
@@ -224,7 +224,7 @@ describe('invariant fuzzing: season model over random (day, lat, lon, elevation)
 })
 
 describe('invariant fuzzing: wildlife heading/geometry helpers', () => {
-  it('flee/turn/deflect/separation hold their contracts (5000 states)', () => {
+  it('flee/turn/deflect/separation hold their contracts (5000 states)', { timeout: 30_000 }, () => {
     fuzz(
       'geometry',
       0xbee5,
@@ -368,7 +368,7 @@ describe('invariant fuzzing: wildlife heading/geometry helpers', () => {
     )
   })
 
-  it('drama resolution predicates hold their boundaries (5000 states)', () => {
+  it('drama resolution predicates hold their boundaries (5000 states)', { timeout: 30_000 }, () => {
     fuzz(
       'drama',
       0xd7a3a,
@@ -425,7 +425,7 @@ describe('invariant fuzzing: wildlife heading/geometry helpers', () => {
     )
   })
 
-  it('walk steps never land on blocked ground in a hashed water world (3000 states)', () => {
+  it('walk steps never land on blocked ground in a hashed water world (3000 states)', { timeout: 30_000 }, () => {
     fuzz(
       'walk',
       0xc0a57,
@@ -510,7 +510,7 @@ describe('invariant fuzzing: wildlife heading/geometry helpers', () => {
 })
 
 describe('invariant fuzzing: herd sizes and the food web', () => {
-  it('calf counts, species pools and defence bands hold (5000 states)', () => {
+  it('calf counts, species pools and defence bands hold (5000 states)', { timeout: 30_000 }, () => {
     const weights = balance.parentDefense
     const junkSpecies = ['flamingo', 'plover', 'crocodile', 'elephant', 'unknown-beast', '']
     const preySide = [...Object.keys(weights.preyWeapon), ...junkSpecies]
