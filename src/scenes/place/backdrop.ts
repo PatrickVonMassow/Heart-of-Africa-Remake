@@ -78,15 +78,56 @@ export function backdropHeightAt(
 }
 
 /**
- * Standing height for a panorama-wildlife silhouette. Past the ground-disc edge
- * the backdrop base is flush with the settlement's ground disc (point 236), but a
- * flat plain's relief can still dip just below it, and the disc edge acts as a
- * false horizon from eye height: an animal standing down there is horizon-clipped
- * to a black back-and-horns sliver "lying on the sand" (user-reported artifact).
- * Clamp to just above the disc plane so the whole silhouette stays visible; where
- * the relief genuinely rises (dunes, ridges) the animal keeps following it.
+ * Height at which the eye's line over the settlement's GROUND-DISC EDGE passes
+ * the point (x, z) — the drawn ground line in that direction (point 181).
+ *
+ * The walkable disc is the nearest hard horizon from eye height: past its edge
+ * the backdrop relief can dip out of sight (a plain like Cairo's dips below the
+ * disc plane), and through that gap the far panorama band shows. A silhouette
+ * anchored above this line therefore stands on nothing at all — the surface
+ * behind its feet is the band cylinder, tens of units further out, and it hangs
+ * in the sky over whatever the band happens to show there (the reported Cairo
+ * pyramid). Anchored ON the line, its feet meet the last drawn ground.
+ *
+ * Camera-relative on purpose: the disc edge is CLOSE, so its horizon drops
+ * steeply as the player walks toward it. Evaluated from the live camera, the
+ * feet stay glued to the ground line from wherever the settlement is viewed.
  */
-export function panoramaGroundY(
+export function discHorizonY(
+  x: number,
+  z: number,
+  camX: number,
+  camZ: number,
+  eyeHeight: number,
+  discRadius: number,
+): number {
+  const dx = x - camX
+  const dz = z - camZ
+  const toTarget = Math.hypot(dx, dz) || 1
+  const ux = dx / toTarget
+  const uz = dz / toTarget
+  // Where the sight ray leaves the disc: |cam + t·u| = discRadius.
+  const b = camX * ux + camZ * uz
+  const c = camX * camX + camZ * camZ - discRadius * discRadius
+  const toEdge = Math.max(1e-3, -b + Math.sqrt(Math.max(0, b * b - c)))
+  // The disc plate lies at y = 0, so the grazing line drops eyeHeight over
+  // toEdge and keeps dropping at that rate out to the target.
+  return eyeHeight * (1 - toTarget / toEdge)
+}
+
+/**
+ * Where a §2.5 panorama silhouette's FEET belong (point 181): on the ground the
+ * frame actually draws under them — the higher of the relief at its own spot and
+ * the drawn ground line over the disc edge.
+ *
+ * Both failure modes of the old anchors are covered: the hard EYE_HEIGHT horizon
+ * left the animal hanging over the captured band (nothing under its feet), while
+ * the bare heightfield buried it inside a dune where the relief rises and, with
+ * the old `panoramaGroundY` clamp, lifted it off the ground again where the
+ * relief dips. On a dune it now walks the ridge; on a plain that falls away it
+ * stands exactly on the visible ground line.
+ */
+export function panoramaStandY(
   x: number,
   z: number,
   lat: number,
@@ -94,6 +135,11 @@ export function panoramaGroundY(
   seed: number,
   centerH: number,
   r0: number,
+  camX: number,
+  camZ: number,
+  eyeHeight: number,
 ): number {
-  return Math.max(0.02, backdropHeightAt(x, z, lat, lon, seed, centerH, r0))
+  const own = backdropHeightAt(x, z, lat, lon, seed, centerH, r0)
+  const line = discHorizonY(x, z, camX, camZ, eyeHeight, r0 + BACKDROP_DISC_OVERLAP)
+  return Math.max(own, line)
 }
