@@ -282,7 +282,10 @@ verify suite that proves it.
    is likewise movement-based but confirmed with SPACE: within the enter
    radius the localized hint "Space to enter <name>" shows (the map name-label
    hidden while it does) and a SPACE press enters; reaching the radius alone
-   never enters. The accidental-entry debounce/clearance is removed (no
+   never enters. The hint honours the §17.2 discovery gate (point 287): an
+   UNDISCOVERED settlement's name stays hidden — the hint reads "?" (matching
+   its "?" map label) until the place is discovered, while a known-from-start
+   port always names itself. The accidental-entry debounce/clearance is removed (no
    just-left re-entry lock, no move-clear timing). A SPACE press while the
    traveller is on a water cell still does not enter, so a river passage never
    pulls him in. Entering focuses the controls without an extra click per
@@ -292,8 +295,12 @@ verify suite that proves it.
    building's door and presses SPACE to enter it, and walks past the
    settlement edge to leave (no key); walking a door WITHOUT a key does not
    enter; on entering, no HUD control (button/input) retains focus
-   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate and
-   the water guard are pure-tested (`src/scenes/travel/settlementEntry.test.ts`). The leave transition stays FLUID: the
+   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate,
+   the water guard and the discovery-gated enter-hint name (`?` for an
+   undiscovered place, the name for a discovered one) are pure-tested
+   (`src/scenes/travel/settlementEntry.test.ts`), with `flow.mjs` live-checking
+   that an undiscovered village's enter hint shows no proper name while Cairo's
+   names it. The leave transition stays FLUID: the
    travel scene's shared materials/meshes survive remounts as module
    singletons (surgical dispose opt-outs — a full remount used to re-link
    the whole travel program set synchronously, freezing the main thread
@@ -305,7 +312,10 @@ verify suite that proves it.
    §4, graphically elaborate with fine-grained land outlines and river
    courses. Region borders carry the localized region name on each side of
    the line in both views (§3.2); map-point labels are discovery-gated
-   (§17.2); coordinates are read out on demand via the position query
+   (§17.2) EXCEPT the ten port cities, which are known from the start and
+   show their names from the outset (never "?"), a legacy save migrating
+   to mark them discovered (§3.2/§17.2, point 288); coordinates are read
+   out on demand via the position query
    (§3.2, pt. 30), never shown permanently. The exploration map is
    implemented per §19.11 (an engraved ~1890 atlas plate on worn paper —
    graticule, blue water ink, hachures, each region named once in spaced
@@ -984,7 +994,20 @@ verify suite that proves it.
     nemes (proportions and part count pure-tested via `buildSphinx` in
     `src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
     Timbuktu builds the Djinguereber mosque as a collidable dwelling
-    (`scripts/verify/polish.mjs`, screenshots 96/97/100).
+    (`scripts/verify/polish.mjs`, screenshots 96/97/100). The §19.10
+    campfire can CAST SHADOWS (point 289, opt-in): the debug menu's
+    "Campfire shadows" toggle — OFF by default, so the shipped picture is
+    unchanged until the user prices the cost (~+1.5 ms headless: six extra
+    cube-face passes; map resolution nearly free) on their own hardware —
+    makes the fire light render a 256² cube shadow map (remounted on
+    toggle, also behind the global shadow switch), with an invisible
+    player-body proxy so the viewer occludes the firelight too.
+    Verifiable: with the toggle ON the ground directly behind a fire-ring
+    stone reads measurably darker in pixels than its lit twin at the same
+    radius, and with it OFF that contrast stays flat
+    (`scripts/verify/polish.mjs`, screenshot 138, both backends); the
+    toggle default and write-through are pure-tested
+    (`src/state/ui.test.ts`, `src/ui/DebugMenu.test.tsx`).
 16. **Collision inside settlements.** The collision rules of `design.md`
     §2.6 are implemented (impenetrable buildings and solid objects,
     sliding movement, inhabitants never permanently stuck, reachable
@@ -1330,7 +1353,9 @@ verify suite that proves it.
     per-port quote (§10); the travel agency's ferry passages between all
     ports with distance-based fare and duration (Zanzibar reachable);
     discovery bounties credited on the next port visit as a telegraphic
-    transfer whose journal entry names the discoveries and the amount, and
+    transfer whose journal entry names the discoveries and the amount (the
+    ten ports are known from the start and earn no bounty for themselves,
+    §17.2/point 288), and
     kind-flavored first-sighting entries for landmarks (§10, once per
     landmark, both languages, voice markup) — including the eight built
     cultural landmarks of §4.4 (Meroë, Giza, Great Zimbabwe, Lalibela,
@@ -1345,7 +1370,9 @@ verify suite that proves it.
     refusal and auto-raise, the regional bid ordering and rejection, the
     stable re-offer quote (identical price across re-offers, cleared on
     leaving the port), the ferry to Zanzibar (fare, days, checkpoint),
-    the bounty crediting, the graveyard's random ivory haul (range 1..9,
+    the bounty crediting, that a port is discovered from the start and
+    credits no bounty for itself while an ordinary village still discovers
+    and bounties, the graveyard's random ivory haul (range 1..9,
     mean ~5) and its cap by the remaining supply, digging a treasure
     cache and the statue site, both valuable reactions, the baseline
     goods in every settlement, buying food in a village against gifts
@@ -1487,7 +1514,15 @@ verify suite that proves it.
     (`gaitPhase`/`legSwingAngle`) fed by the arc they drift along their ring, so
     a faster one steps faster and a stalled one stands still — a wall-clock bob
     is never the driver, and at horizon range a body-level bob alone would move
-    barely a pixel. Verifiable: `scripts/verify/polish.mjs`
+    barely a pixel. They only ever walk FORWARD (point 286): the facing is
+    DERIVED from the ring velocity tangent (`panoramaDriftYaw`, the codebase's
+    atan2(vx,vz) convention the settlement goats face on), so a silhouette can
+    never reverse — the former hand-written `−a + (drift>0 ? π : 0)` sat exactly
+    π off the tangent and moonwalked every one — and the stride phase rides the
+    arc expressed in the silhouette's OWN rendered frame (`panoramaGaitDistance`,
+    the world arc ÷ its enlargement `scale`), so the leg cadence stays consistent
+    with the rendered body's slow horizon crawl instead of flailing at the raw
+    world-arc rate. Verifiable: `scripts/verify/polish.mjs`
     asserts no markers before and markers after the gift plus the toast,
     their persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village; plus that
@@ -1500,8 +1535,12 @@ verify suite that proves it.
     and WITH one at the Nubian village and in Cairo under the Giza skyline,
     screenshot 136), and that each silhouette's stride phase advances in step
     with the ground it covers — the same phase-per-unit-walked for all of them,
-    which a clock-driven bob could not produce (point 255) — the stride pose and
-    its distance coupling pure-tested in
+    which a clock-driven bob could not produce (point 255) — and that every
+    visible silhouette WALKS FORWARD (its displacement over an interval projects
+    positively onto its facing, never backward — point 286); the stride pose and
+    its distance coupling, the forward-only facing derived from the ring velocity
+    (with the reverted π-off formula pinned as a regression witness) and the
+    scale-normalised gait distance pure-tested in
     `src/scenes/place/panoramaWildlife.test.ts`, the ground-line math in
     `src/scenes/place/backdrop.test.ts` (the sight-line geometry, the drop as
     the viewer nears, relief-following on a dune, and both old failure modes

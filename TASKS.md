@@ -7468,6 +7468,18 @@ the remaining open points in their numeric order.
   closing root-cause set: poll the point-129 driven move on the SIM clock / its
   own arrival condition rather than a fixed frame budget. The point-102 vicinity
   check (this session's anchor fix) PASSED first try, confirming that fix.
+  OBSERVED 24.07 (a WebGL enrichments run under CPU overload during the 278
+  verify): the point-121 check "a feed that ends without a kill leaves no remnant"
+  failed `{deadBefore:4,deadAfter:5,calfAlive:true}` — a NEW rotating-flake entry.
+  It counts GLOBAL dead animals over a 2.5-sim-second window during which OTHER
+  dramas keep running, so any unrelated concurrent predation in that window fails
+  it even though the STAGED feed left the calf alive and no remnant. Confirmed a
+  load flake, not a real bug: the same check PASSED on a quiet-machine re-run
+  (222 pass, 0 fail). ROOT-CAUSE FIX for the closing: scope the assertion to the
+  staged feed — count only deaths of the feed's own actors (or freeze other hunts
+  for the window), not the global dead-count, so a concurrent drama can't fail it.
+  LESSON reinforced (memory `verify-suites-need-a-quiet-machine`): never run a
+  verify suite while a worktree agent builds — evaluate a red only on a quiet box.
 
 - [x] 201. DONE 20.07.2026: the generic FLEE step (radial away from an active
   lion) and the elephant DODGE step both moved RAW — onto a water cell, where
@@ -10557,7 +10569,7 @@ the remaining open points in their numeric order.
   DOCS: design.md §21.1 (the F-key list gains F8) and CLAUDE.md §7.1 pt. 20; record the
   method in `docs/perf-276-findings.md`. Implementation-ready.
 
-- [ ] 278. THE DRESSING GROWS OVER A SESSION — A COST THAT RISES THE LONGER ONE PLAYS
+- [x] 278. THE DRESSING GROWS OVER A SESSION — A COST THAT RISES THE LONGER ONE PLAYS
   (found 24.07.2026 while proving out the point-277 benchmark; numbers in
   `docs/perf-276-findings.md`). At a FIXED anchor, with a fixed seed and a fixed
   date, the instanced flora/dressing triangle count CLIMBS as the session goes on:
@@ -10742,6 +10754,163 @@ the remaining open points in their numeric order.
   checkpoint seeded, NO start overlay appears and the game runs (the mouse-look
   fresh-start check is unchanged). Docs: design.md §18 and CLAUDE.md §7.1 pt. 28
   carry the temporary-suspension note. Committed to main.
+
+- [ ] 285. HUNT ACCUMULATION BUGS AND MEMORY LEAKS — A REPEATABLE FABLE ANALYSIS
+  (user 24.07.2026, learning from point 278: a fixed anchor drew ever more animals
+  because streamed wildlife re-seeded on every return without releasing the
+  re-homed originals — an UNBOUNDED growth that a normal test never caught because
+  it only checks one moment, not a trend). Establish a proactive, REPEATABLE method
+  — like point 205 is for world plausibility — that finds this whole bug class
+  before the user does. Use MODEL DIVERSITY: a thorough FABLE analysis (different
+  eyes than the Opus authors, per the audit rule), delivered in TWO prongs.
+  PRONG A — CODE REVIEW for the leak/accumulation classes: resources created but
+  never disposed (three.js geometries/materials/textures/render targets, instanced
+  buffers — `renderer.info.memory` should be flat at a fixed state); growing
+  collections never pruned (module-level Map/Set/array caches, the `refineCache`/
+  `chunkLatestKey`/`spawnedChunks`-style maps, event/subscription registries);
+  streaming or respawn that re-adds without truncating the previous fill (the 278
+  class — re-seed keyed on distance while a re-homed entity outlives its key);
+  React effects whose cleanup is missing or wrong (listeners, RAF, timers,
+  observers); per-frame allocations that feed GC pressure. Produce a findings list,
+  each with the file/line and the mechanism.
+  PRONG B — RUNTIME TESTS that catch a TREND, not a moment: a reusable probe/harness
+  (build on `scripts/perf-breakdown.mjs` + the point-277 count probes) that drives
+  the real game over TIME — repeated jumps/round-trips between anchors, long driving,
+  repeated place enter/leave (scene mount/unmount) cycles — and asserts that the
+  measured quantities CONVERGE rather than grow: scene-graph triangle/mesh counts
+  per system, `renderer.info.memory.geometries`/`.textures`, `performance.memory`
+  JS heap (Chromium), instanced counts, and listener counts. A monotonic rise beyond
+  a small tolerance over N cycles is a finding. Make it a script that can be re-run
+  each release (a `scripts/verify/leaks.mjs` or a documented harness), on BOTH
+  backends where the metric is backend-relevant.
+  DELIVERABLE: the findings (evidence = the growth curve per finding), ranked by
+  severity; propose fixes. Land the clear, self-contained fixes as their own atomic
+  commits/points; file the larger ones as follow-up TASKS points. VERIFY each fix
+  the point-278 way — a pure convergence test that FAILS on the old behaviour and a
+  live trend check. DOCS: record the method and the run recipe (design.md where a
+  system changes, plus a short `docs/leak-hunt.md` or a section in
+  `docs/perf-276-findings.md`). This is analysis-first: diagnose and propose before
+  changing load-bearing streaming/render code. Budget the fan-out (per the
+  workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
+  harness. Implementation-ready.
+
+- [x] 286. SKYLINE PANORAMA ANIMAL WALKS BACKWARD + LEG-SPEED MISMATCH (user report
+  24.07.2026, deployed build, Cairo desert view). A §2.5 panorama-wildlife silhouette
+  on the horizon moves slowly BACKWARD while its legs swing WILDLY (a fast-forward-run
+  gait). Two faults, both to fix: (1) it must NEVER move backward — a silhouette only
+  ever drifts FORWARD along its facing; (2) the leg swing rate must be PHYSICALLY
+  CONSISTENT with the actual travel speed (slow drift = slow steps; fast = fast), not
+  a wild flail over a near-stationary body. This is exactly the point-255 "Skyline-Teil
+  offen" gap. ANCHORS: `src/scenes/place/panoramaWildlife.ts` (the stride pose +
+  distance coupling: `gaitPhase`/`legSwingAngle` fed by the arc walked along the drift
+  ring) and `src/scenes/place/backdrop.ts`. DIAGNOSE (picture-first, BOTH backends):
+  why the along-ring drift is negative/backward (sign error in the ring-arc step or the
+  facing derived opposite to the drift direction), and why `gaitPhase` advances fast
+  while the body barely moves (the phase must be driven by the SIGNED forward distance
+  actually covered, so a near-zero drift yields near-zero leg swing). FIX so the
+  rendered silhouette walks forward with legs whose swing frequency scales with its
+  real ground speed, and can never reverse. TESTS: extend `src/scenes/place/
+  panoramaWildlife.test.ts` — the drift step is forward-only (facing·velocity ≥ 0, no
+  backward component) and the leg-swing-per-unit-walked is constant so a slower
+  silhouette steps proportionally slower (a stalled one stands still); a live check in
+  `scripts/verify/polish.mjs` that the sampled silhouette advances (never regresses)
+  and its stride phase tracks its covered distance. DOCS: CLAUDE.md §7.1 pt. 31 (the
+  point-255 stride wording), design.md §2.5 if the rule text changes. Implementation-ready.
+
+- [x] 287. THE "SPACE TO ENTER <name>" HINT MUST NOT REVEAL AN UNDISCOVERED SETTLEMENT'S
+  NAME (user report 24.07.2026, deployed build). Within a settlement's enter radius the
+  localized hint "Space to enter <name>" shows (acceptance pt. 2, design.md §2.3). But
+  when the place is NOT yet discovered — its map-label reads "?" (discovery-gated,
+  §17.2) — the hint must NOT leak the real name: show "?" (or a generic "Space to
+  enter" with no proper name) until the place is discovered, matching the map label.
+  ANCHOR: the settlement-entry hint text in `src/scenes/travel/` (the enter-candidate
+  hint that builds "Space to enter <name>") and the discovery state that gates the
+  §17.2 map labels (the same predicate the `.map-label` "?" uses). FIX: the hint reads
+  the discovery flag and substitutes "?" / the generic form for an undiscovered place;
+  a discovered place (e.g. Cairo, or one already visited) still shows its name.
+  NOTE: interacts with point 288 — ports/known large settlements are discovered from
+  the start, so their hint always shows the name. TESTS: pure test that the hint text
+  helper returns the name for a discovered place and "?"/generic for an undiscovered
+  one (`src/scenes/travel/settlementEntry.test.ts` or the i18n layer); a live check in
+  `scripts/verify/flow.mjs` that an undiscovered place's enter hint shows no proper
+  name while a discovered one does. DOCS: design.md §2.3/§17.2, CLAUDE.md §7.1 pt. 2.
+  Both languages. Implementation-ready.
+
+- [x] 288. PORTS AND KNOWN LARGE SETTLEMENTS ARE KNOWN FROM THE START — NO "DISCOVERY"
+  AND NO DISCOVERY BOUNTY FOR THEM (user report 24.07.2026, deployed build). The port
+  cities and the well-known large settlements were period-famous places an explorer of
+  ~1890 already knew; they must start DISCOVERED (their map labels show their names from
+  the outset, §17.2) rather than being "discovered" on first sighting, and returning to
+  a port must credit NO discovery bounty for them (§10/acceptance pt. 25). Define the
+  set precisely: all 10 port cities (design.md §3.1) are known from the start; the
+  "known large settlements" are the period-notable ones — at minimum the major inland
+  centres already modelled as landmarks/large places (e.g. Timbuktu, Khartoum; decide
+  the list against design.md §4.1 settlement importance and record it). Ordinary
+  villages stay discovery-gated as now. ANCHORS: the initial discovery state (which
+  places begin discovered — the store/discovery init), the §17.2 label gate, and the
+  discovery-bounty crediting (§10, `src/state`/economy — the bounty that names
+  discoveries on the next port visit). FIX: seed the known set as discovered at new-game
+  init and exclude them from bounty accrual; a legacy save without the flag migrates to
+  mark them discovered. TESTS: pure tests that a fresh game starts with the ports (and
+  the defined known settlements) discovered and that entering/returning to a port
+  credits no bounty for them, while an ordinary village still discovers + bounties
+  normally (`src/state/store.*.test.ts`, `src/state/store.economy.test.ts`); the §17.2
+  label test that a port label shows its name from the start. DOCS: design.md §3.2/§10/
+  §17.2 and CLAUDE.md §7.1 pt. 3/25 (the discovery-gating wording gains the known-from-
+  start exemption). Implementation-ready.
+
+- [x] 289. FIRE CASTS SHADOWS — OCCLUDERS BETWEEN THE CAMPFIRE AND THE GROUND (user
+  report 24.07.2026, deployed build; QUEUED AFTER 224). In a settlement the campfire
+  (§19.10 firelight) lights the ground in FRONT of the player even though the player
+  figure and a wood log stand BETWEEN the fire and that ground — implausible, they must
+  block the light and cast a shadow. FEASIBILITY-GATED: only build it if the effort is
+  reasonable AND the performance hit is acceptable — BENCHMARK it (the point-277 in-game
+  benchmark on real hardware; the fire light is a POINT light and point-light shadow
+  maps are among the priciest GPU features, so measure before committing). ANCHORS: the
+  settlement fire light in `src/scenes/place/` (the §19.10 firelight source) and the
+  PlaceScene lighting/shadow setup. APPROACH options to weigh: (a) make the fire light
+  a shadow-casting point light (a cube shadow map) with a tight radius and low
+  resolution so only near occluders (figure, log, stall props) cast — measure the cost;
+  (b) a cheaper approximation if a full point-light shadow map is too dear (e.g. a
+  blob/contact shadow under the figure and log toward the fire, or gating the shadow
+  map to only the fire's immediate neighbourhood). If NEITHER is affordable within the
+  perf budget, record that as the finding and leave it out (do not ship a stutter).
+  Gate it behind Low Details (point 276) so weak GPUs can drop it. TESTS: a live check
+  in `scripts/verify/polish.mjs` that with the fire lit, the ground directly behind an
+  occluder (figure/log) is DARKER than the unoccluded lit ground beside it (measured in
+  pixels, both backends), plus a before/after benchmark row. DOCS: design.md §19.10 and
+  CLAUDE.md §7.1 pt. 15 if the firelight rule changes; record the benchmark verdict in
+  docs/perf-276-findings.md. Implementation-ready; feasibility+perf gated.
+
+- [ ] 290. A RELIABLE MECHANISM TO KEEP THE RETROSPECTIVE DOCUMENT CURRENT (user
+  24.07.2026: "verankere mit einem sicheren Mechanismus, das Retrospektive-Dokument
+  immer aktuell zu halten"). The retrospective lives at
+  `local/retrospektive-zusammenarbeit.md` (git-ignored, on Deutsch). It must stay
+  current by ENFORCEMENT, not a reminder (the document's own lesson #1). Build TWO
+  parts:
+  (1) REFRESH SCRIPT `scripts/retro-refresh.mjs`: scans the durable sources that
+    define the problem/solution history — the feedback-type memories in the memory
+    dir, the guard scripts in `scripts/` (each guard = a solution to a recurring
+    problem), git reverts / fix-of-fix trails, and the process/meta TASKS points —
+    and regenerates a clearly-delimited AUTO-GENERATED section of the doc (a
+    machine-maintained table: problem class, #solution-attempts, severity, implemented
+    measure, status), LEAVING the human/agent-authored analysis prose intact. It
+    records a SOURCES FINGERPRINT (a hash over those sources) + a "last refreshed"
+    timestamp inside the doc.
+  (2) STOP-HOOK GUARD `scripts/retro-currency-guard.mjs` (registered in the Stop-hook
+    chain like the others): recompute the sources fingerprint; if it differs from the
+    doc's recorded one (sources changed since the last refresh), BLOCK with a reason
+    ("the retrospective is stale — run scripts/retro-refresh.mjs and review whether a
+    NEW problem class needs its own row + a prose paragraph"). Fail-OPEN on any
+    internal error (never trap the session), exactly like the other guards. If the doc
+    is absent, no-op.
+  So a new feedback-memory, a new guard, or a revert trail forces the retrospective to
+  be brought current before the turn can end. The doc stays git-ignored; the scripts +
+  guard + the settings.json hook registration are committed (main session applies the
+  settings edit). TESTS: pure tests for the source-scan + fingerprint (a changed source
+  changes the hash) and the guard's stale/fresh decision (`scripts/*.test.mjs`, run in
+  the Vitest layer). DOCS: a short section in `docs/maximale-qs.md` (the QA process
+  gains "keep the retrospective current") and a pointer memory. Implementation-ready.
 
 ## Closing (only after all points)
 

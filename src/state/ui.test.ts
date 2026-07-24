@@ -20,7 +20,7 @@ beforeEach(() => {
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
     traaEnabled: true, touchActive: false, lowDetails: false, ssaoEnabled: true, shadowMapHalf: false,
-    shadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
+    shadowsEnabled: true, fireShadowsEnabled: false, groundDebugFlat: false, seasonCollapseEnabled: true,
   })
 })
 
@@ -120,6 +120,11 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
     expect(u().seasonCollapseEnabled).toBe(true) // default on (point 175 diagnostic)
     u().setSeasonCollapseEnabled(false)
     expect(u().seasonCollapseEnabled).toBe(false)
+    // Campfire shadows (design.md §19.10): OFF by default — picture-neutral
+    // until the user enables and prices them on their own hardware.
+    expect(u().fireShadowsEnabled).toBe(false)
+    u().setFireShadowsEnabled(true)
+    expect(u().fireShadowsEnabled).toBe(true)
   })
 })
 

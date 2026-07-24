@@ -175,12 +175,13 @@ check(
 await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
 // Their stride phase rides the ground they cover on the ring, so over the same
-// interval each one's phase advance divided by its ground speed is the SAME
-// constant — a wall-clock bob would advance them all alike whatever their speed.
+// interval each one's phase advance divided by its (scale-normalised, point 286)
+// gait speed is the SAME constant — a wall-clock bob would advance them all
+// alike whatever their speed.
 {
   const sample = () =>
     page.evaluate(() =>
-      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.groundSpeed })),
+      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.gaitSpeed })),
     )
   const before = await sample()
   await page.waitForTimeout(1200)
@@ -194,6 +195,37 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
     'the panorama silhouettes stride with the ground they cover, not the clock (point 255)',
     rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
     `phase per unit walked [${rates.map((r) => r.toFixed(2)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`,
+  )
+}
+// Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
+// derived from the ring velocity, so each visible silhouette's displacement over
+// an interval must project POSITIVELY onto its facing (forward = (sin yaw,
+// cos yaw)), and a moving one must actually advance. The reverted bug set the
+// yaw exactly π off the tangent, so every silhouette moonwalked.
+{
+  const snap = () =>
+    page.evaluate(() => {
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      const out = {}
+      for (const k of Object.keys(info)) out[k] = { x: info[k].x, z: info[k].z, yaw: info[k].yaw, visible: info[k].visible }
+      return out
+    })
+  const b0 = await snap()
+  await page.waitForTimeout(1200)
+  const b1 = await snap()
+  const along = []
+  for (const k of Object.keys(b0)) {
+    const p = b0[k]
+    const q = b1[k]
+    if (!q || p.visible === false || q.visible === false) continue
+    const dx = q.x - p.x
+    const dz = q.z - p.z
+    along.push({ a: dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw), d: Math.hypot(dx, dz) })
+  }
+  check(
+    'every panorama silhouette walks forward along its facing, never backward (point 286)',
+    along.length >= 3 && along.every((r) => r.a >= -1e-3) && along.some((r) => r.d > 1e-3 && r.a > 0),
+    `along-facing displacement [${along.map((r) => r.a.toFixed(3)).join(', ')}]`,
   )
 }
 check(
@@ -837,6 +869,105 @@ for (const [placeId, shot] of [
     'the dome-dweller village has no canopy — its open fire is damped by the rain (point 256)',
     maasaiFire.sheltered === false && maasaiFire.rainFactor < bembaFire.rainFactor,
     `maasai sheltered=${maasaiFire.sheltered} factor=${maasaiFire.rainFactor.toFixed(2)} vs bemba ${bembaFire.rainFactor.toFixed(2)}`,
+  )
+}
+
+// --- Campfire shadows (design.md §19.10): with the debug toggle ON, an occluder
+// between the fire and the ground measurably darkens the ground behind it -------
+{
+  // A dry, weather-free village at a fixed standpoint facing the fire pit.
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.evaluate(() => {
+    window.__ui.getState().setSeasonWetnessOverride(0)
+    window.__game.getState().enterPlace('maasai-village')
+  })
+  await page.waitForFunction(() => !!window.__placePlayer && !!window.__placeCamera, null, { timeout: 30000 })
+  await page.evaluate(() => {
+    window.__game.getState().setJournalOpen(false)
+    const p = window.__placePlayer
+    p.x = -3.5
+    p.z = 8.0
+    p.yaw = 0 // facing the fire pit at (-3.5, 2.5)
+  })
+  await page.waitForTimeout(1500)
+
+  // The fire ring's stones ARE the visible occluders (light at the pit centre,
+  // 1.1 m up): each stone's fire-shadow lands radially outward at ~1.2 m from
+  // the pit centre, and its LIT twin sits at the SAME radius on the mid-angle
+  // between two stones — same sun, same AO, same fire falloff, so the only
+  // difference is the blocked light. All points lie inside the pit collider
+  // (r 1.3), where no walker can stand on them; judging the WITHIN-frame
+  // contrast (lit twin minus shadow point) makes the gate immune to global
+  // frame drift (flame flicker, TRAA settling). Three stone pairs, 2-of-3
+  // majority, so one walker crossing a sight line cannot flip the verdict.
+  const firePairs = await page.evaluate(() => {
+    const FIRE = [-3.5, 2.5]
+    const R = 1.2
+    const cam = window.__placeCamera
+    const proj = (p) => {
+      const v = cam.matrixWorldInverse.elements
+      const x = v[0] * p[0] + v[4] * p[1] + v[8] * p[2] + v[12]
+      const y = v[1] * p[0] + v[5] * p[1] + v[9] * p[2] + v[13]
+      const z = v[2] * p[0] + v[6] * p[1] + v[10] * p[2] + v[14]
+      const e = cam.projectionMatrix.elements
+      const w = e[3] * x + e[7] * y + e[11] * z + e[15]
+      return [
+        ((e[0] * x + e[4] * y + e[8] * z + e[12]) / w) * 0.5 + 0.5,
+        1 - (((e[1] * x + e[5] * y + e[9] * z + e[13]) / w) * 0.5 + 0.5),
+      ]
+    }
+    // Stones 1..3 of the 7-stone ring: their outward shadows face the camera.
+    return [1, 2, 3].map((i) => {
+      const a = (i / 7) * Math.PI * 2
+      const m = ((i + 0.5) / 7) * Math.PI * 2
+      return {
+        stone: i,
+        shadow: proj([FIRE[0] + Math.cos(a) * R, 0, FIRE[1] + Math.sin(a) * R]),
+        lit: proj([FIRE[0] + Math.cos(m) * R, 0, FIRE[1] + Math.sin(m) * R]),
+      }
+    })
+  })
+  const lumAt = (raw, info, [nx, ny]) => {
+    const px = Math.round(nx * info.width)
+    const py = Math.round(ny * info.height)
+    let sum = 0
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const i = ((py + dy) * info.width + (px + dx)) * info.channels
+        sum += (raw[i] + raw[i + 1] + raw[i + 2]) / 3
+      }
+    return sum / 9
+  }
+  const fireContrasts = async () => {
+    const { data, info } = await sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true })
+    return firePairs.map((p) => +(lumAt(data, info, p.lit) - lumAt(data, info, p.shadow)).toFixed(1))
+  }
+
+  const contrastOff = await fireContrasts() // toggle defaults OFF
+  await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(true))
+  await page.waitForTimeout(1500) // cube map + TRAA settle
+  const contrastOn = await fireContrasts()
+  await page.screenshot({ path: `${OUT}138-fire-shadows-on.png` })
+  console.log('shot 138-fire-shadows-on.png')
+  await page.evaluate(() => {
+    window.__ui.getState().setFireShadowsEnabled(false)
+    window.__ui.getState().setSeasonWetnessOverride(null)
+  })
+
+  // Measured on both backends: OFF contrast 3-12, ON contrast 42-57.
+  const majority = (xs, ok) => xs.filter(ok).length >= 2
+  check(
+    'fire shadows OFF (default): the ground behind a ring stone is as lit as beside it',
+    majority(contrastOff, (c) => c < 20),
+    `lit-minus-shadow per stone [${contrastOff.join(', ')}]`,
+  )
+  check(
+    'fire shadows ON: the ground behind a ring stone is measurably darker than beside it (design.md §19.10)',
+    majority(contrastOn, (c) => c >= 25),
+    `lit-minus-shadow per stone [${contrastOn.join(', ')}]`,
   )
 }
 

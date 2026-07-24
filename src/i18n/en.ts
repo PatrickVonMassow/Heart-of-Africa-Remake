@@ -475,6 +475,7 @@ export const en: Strings = {
     shadowMapHalf: 'Half-resolution shadows',
     shadows: 'Sun shadows',
     lowDetails: 'Low details (performance, F7)',
+    fireShadows: 'Campfire shadows',
     flatGround: 'Flat ground (debug)',
     foliageCollapse: 'Dry-season foliage collapse (debug)',
     health: 'Health',

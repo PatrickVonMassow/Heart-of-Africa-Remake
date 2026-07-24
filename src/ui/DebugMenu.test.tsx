@@ -270,6 +270,14 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     fireEvent.click(shadows)
     expect(useUi.getState().shadowsEnabled).toBe(false)
 
+    // Campfire shadows (design.md §19.10): default OFF, enabled through the store.
+    const fire = screen.getByText(en.debug.fireShadows).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(fire.checked).toBe(false)
+    fireEvent.click(fire)
+    expect(useUi.getState().fireShadowsEnabled).toBe(true)
+    fireEvent.click(fire)
+    expect(useUi.getState().fireShadowsEnabled).toBe(false)
+
     const flat = screen.getByText(en.debug.flatGround).closest('label')?.querySelector('input') as HTMLInputElement
     expect(flat.checked).toBe(false)
     fireEvent.click(flat)

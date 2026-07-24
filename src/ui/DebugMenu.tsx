@@ -127,6 +127,7 @@ export function DebugMenu() {
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
   const lowDetails = useUi((s) => s.lowDetails)
+  const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
@@ -410,6 +411,14 @@ export function DebugMenu() {
           type="checkbox"
           checked={lowDetails}
           onChange={(e) => useUi.getState().setLowDetails(e.target.checked)}
+        />
+      </label>
+      <label>
+        <span>{t.debug.fireShadows}</span>
+        <input
+          type="checkbox"
+          checked={fireShadowsEnabled}
+          onChange={(e) => useUi.getState().setFireShadowsEnabled(e.target.checked)}
         />
       </label>
       <label>

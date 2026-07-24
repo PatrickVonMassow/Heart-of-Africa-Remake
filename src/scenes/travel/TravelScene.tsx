@@ -25,7 +25,7 @@ import { useGame } from '../../state/store'
 import { useUi, effectiveShadows, effectiveShadowMapHalf } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
-import { settlementEnterCandidate, settlementToEnter } from './settlementEntry'
+import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
@@ -2738,8 +2738,11 @@ export function TravelScene() {
       (c) => !c.looted && Math.hypot(c.lat - ll.lat, c.lon - ll.lon) <= balance.camps.campRadiusDeg,
     )
     // The enter hint takes precedence over the camp prompt when both are in range.
+    // An UNDISCOVERED settlement's name stays hidden (point 287): the hint reads
+    // "?" to match its §17.2 "?" map label, using the SAME discovery flag
+    // (visitedPlaces) the map-label gate reads.
     const prompt = enterId
-      ? strings.prompts.enterPlace(strings.places[enterId])
+      ? strings.prompts.enterPlace(enterHintName(s.visitedPlaces.includes(enterId), strings.places[enterId]))
       : nearCamp
         ? strings.prompts.openCamp
         : null

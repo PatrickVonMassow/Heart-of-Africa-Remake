@@ -13,6 +13,7 @@ import { balance } from '../config/balance'
 import { g, freshGame, withWorld, jumpTo, useGame, TEST_SEED } from '../test/store'
 import { totalGifts, VILLAGE_TRADE_GOODS, usedInventory } from './store'
 import { generateTreasureSites } from '../systems/economy'
+import { KNOWN_FROM_START_PLACES, PLACES } from '../world/geo'
 import { useUi } from './ui'
 import { getStrings } from '../i18n'
 
@@ -168,6 +169,42 @@ describe('discovery bounties (design.md §10)', () => {
     const params = bountyEntry?.text.params
     expect(String(params?.landmarks ?? '')).toContain('kilimanjaro')
     expect(String(params?.villages ?? '')).toContain('maasai-village')
+  })
+
+  // Point 288: the famous ~1890 ports are known from the start — discovered
+  // (their §17.2 labels name them at once) and never bounty-worthy.
+  it('starts with every port discovered while ordinary villages stay hidden', () => {
+    const ports = PLACES.filter((p) => p.kind === 'port').map((p) => p.id)
+    expect(ports.length).toBe(10)
+    for (const id of ports) expect(g().visitedPlaces).toContain(id)
+    // The known-set constant matches the port list exactly.
+    expect([...KNOWN_FROM_START_PLACES].sort()).toEqual([...ports].sort())
+    // Ordinary villages are NOT known from the start (still discovery-gated).
+    for (const v of PLACES.filter((p) => p.kind === 'village'))
+      expect(g().visitedPlaces).not.toContain(v.id)
+  })
+
+  it('credits no discovery bounty for a port — entering or returning to one', () => {
+    expect(g().pendingBounties.length).toBe(0)
+    const moneyPre = g().money
+    // Enter a port never visited this run (Zanzibar): known from the start, so
+    // it accrues no bounty and pays out nothing.
+    g().enterPlace('zanzibar')
+    expect(g().pendingBounties.length).toBe(0)
+    expect(g().money).toBe(moneyPre)
+    expect(journalKeys()).not.toContain('journal.bounty')
+    // Leaving and returning still credits nothing.
+    g().leavePlace()
+    g().enterPlace('zanzibar')
+    expect(g().money).toBe(moneyPre)
+    expect(journalKeys()).not.toContain('journal.bounty')
+  })
+
+  it('still discovers and bounties an ordinary village on first visit', () => {
+    expect(g().visitedPlaces).not.toContain('maasai-village')
+    g().enterPlace('maasai-village')
+    expect(g().visitedPlaces).toContain('maasai-village')
+    expect(g().pendingBounties.some((b) => b.kind === 'village' && b.id === 'maasai-village')).toBe(true)
   })
 })
 

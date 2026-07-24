@@ -147,13 +147,80 @@ render features:
    under a mis-named key, so the lever silently did nothing while every test
    stayed green. The gate now asserts the RENDERED triangle drop, not the
    config object.)
-2. **OPEN — the dressing creeps upward over a session.** At a FIXED desert
-   anchor, with a fixed seed and a fixed date, the instanced dressing grows
-   with every flora rebuild: 235 808 → 327 808 triangles over five round trips
-   between two anchors (mesh count constant at 37), and 252 766 → 354 958
-   across one full benchmark run. Terrain, water and sky stay bit-stable
-   meanwhile, so it is the flora instance counts alone. Reproduced OUTSIDE the
-   benchmark (plain debug jumps), so it is the game's own behaviour, not a
-   measurement artifact — a growing per-frame cost the longer one plays, and a
-   candidate for the same regression family as this document. Not diagnosed
-   further here; it needs its own point.
+2. **RESOLVED (point 278) — the dressing crept upward over a session, and it
+   was WILDLIFE, not flora.** At a FIXED desert anchor, with a fixed seed and a
+   fixed date, the instanced dressing under `travel-dressing` grew every round
+   trip: 235 808 → 327 808 triangles over five round trips (mesh count constant),
+   252 766 → 354 958 across one benchmark run.
+
+   **Diagnosis (measured, not guessed).** The `travel-dressing` group holds TWO
+   instanced-mesh families: the flora streaming (`MeshStandardNodeMaterial`, 14
+   meshes) and the wildlife pools (`MeshStandardMaterial`, ~22 meshes). The
+   point-276 breakdown groups by named ancestor, so both landed in one
+   "flora/dressing" row and the growth read as flora. Splitting them by material
+   at a fixed anchor over six round trips showed the **flora bit-stable** (206 946
+   tris / 2 742 instances, IDENTICAL every trip) and the **wildlife instance count
+   climbing monotonically** (live animals 7 → 11 → 14 → 17 → 22, ~+12 per round
+   trip; the live enrichments check reproduced it as `samples:[7,11,14,17,22]`).
+
+   **Root cause.** `keepStreamedAnimal` (design.md §19.4) re-homes a roamer whose
+   birth chunk despawned into the live cell under its feet — it OUTLIVES its birth
+   chunk. The despawn pass then freed that birth chunk's key by DISTANCE alone, so
+   a later return re-entered the spawn ring and `spawnChunk` re-seeded the SAME
+   deterministic animals — a second copy, while the re-homed original still lived.
+   Over a session of ordinary back-and-forth this duplicates ~one animal per
+   re-home per round trip: unbounded growth at a fixed anchor. The code had flagged
+   exactly this as a "known pre-existing property … inherent to deterministic
+   chunk respawn".
+
+   **Fix.** Animals carry an immutable `origin` (birth chunk, pinned at the first
+   re-home); the pure `retainedSpawnChunks` (wildlifeBehavior.ts) keeps a chunk key
+   in the spawned set as long as ANY living animal still originates there, so the
+   respawn never re-seeds a chunk whose animals are already alive. The animal CULL
+   still judges membership by the IN-RANGE set (`has(key) && !beyondDespawn`),
+   identical to before, so a chunk retained only for its origin never stalls a
+   legitimate despawn. Returning to a fixed anchor now converges to a constant
+   count (live check `spread:0`). Pure regression witness:
+   `retainedSpawnChunks` in `src/scenes/travel/wildlifeBehavior.test.ts` (the
+   pre-278 path grows without bound, the fix converges); live gate: "the streamed
+   dressing does not grow over a session at a fixed anchor (point 278)" in
+   `scripts/verify/enrichments.mjs`.
+
+## The campfire shadow map (point 289) — measured verdict, 24.07.2026
+
+The village fire light can cast a cube shadow map (design.md §19.10, debug
+toggle "Campfire shadows", OFF by default). Measured with the perf-bench
+method (vsync off, warm dev server, SOLO) but in the FIRST-PERSON Maasai
+village, standing at the fire pit — the state the feature affects; the travel
+anchors above never mount a fire. Wall-clock frame medians, 6 s samples,
+repeated runs (the usual ±1.2 ms machine noise applies):
+
+| config | WebGPU | WebGL 2 | draw calls |
+| --- | --- | --- | --- |
+| fire shadows off | 2.1–3.6 ms (median ~2.9) | 3.1–3.5 ms | ~220–240 |
+| on, 128² cube map | +1.4 ms | — | ~390 |
+| on, 256² cube map (shipped) | +1.4–1.6 ms | +1.3 ms | ~400 |
+| on, 512² cube map | +1.5 ms | — | ~400 |
+
+Findings:
+
+1. **The map resolution is NOT the cost.** 128/256/512 are indistinguishable
+   within noise — the price is the ~170 extra draw calls of the SIX cube-face
+   shadow passes (per-face frustum culling over the casters within the light's
+   14 m range), not map fill. The shipped size is therefore 256 (quality is
+   free); a "cheap blob-shadow approximation" would buy nothing measurable and
+   was not built.
+2. **Both backends carry it, zero console errors**, and the picture gate holds
+   on both (`scripts/verify/polish.mjs`, screenshot 138: behind-stone vs
+   beside-stone contrast 3–12 off, 40–58 on).
+3. **Affordability verdict (headless): acceptable as an OPT-IN, not as a
+   default.** +1.5 ms is real money on this rig (~8 % of a driving travel
+   frame), but it applies only inside villages, where the scene is otherwise
+   cheap (place scene ran 280–450 fps here with shadows off, ~190–270 fps on).
+4. **The user's hardware gives the real verdict** — its budget is fill-rate and
+   post (see docs/perf-277-user-hardware.md), and six small cube-face passes
+   are draw/geometry work, exactly what that GPU shrugs at, so the expected
+   real-world cost is well under the headless number. The F8 benchmark routes
+   only bird's-eye states and cannot price a settlement feature: judge it with
+   the FPS counter standing at a village fire, toggle on vs off. If it proves
+   cheap, making it the default is a one-flag change (`fireShadowsEnabled`).

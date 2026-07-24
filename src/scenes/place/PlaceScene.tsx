@@ -20,7 +20,7 @@ import {
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
-import { useUi, effectiveShadows, effectiveShadowMapHalf } from '../../state/ui'
+import { useUi, effectiveShadows, effectiveShadowMapHalf, effectiveFireShadows } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { playThunder } from '../../systems/ambience'
@@ -72,7 +72,8 @@ import {
   apparentAngleDeg,
   hazeColor,
   luminance,
-  panoramaDriftDistance,
+  panoramaDriftYaw,
+  panoramaGaitDistance,
   panoramaGaitBob,
   panoramaGaitNod,
   excludedAzimuthSpan,
@@ -96,6 +97,15 @@ const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
 // (design.md §19.13, point 120g).
 const PLACE_SUN_INTENSITY = 2.4
 const PLACE_HEMI_INTENSITY = 0.8
+// Campfire cube-shadow map (design.md §19.10, debug toggle, default OFF): a
+// low-resolution map suffices — the firelight shadow reads soft anyway, and
+// measured 128/256/512 cost the same (the price is the six cube-face render
+// passes, not map fill; docs/perf-276-findings.md), so 256 keeps the quality.
+const FIRE_SHADOW_MAP_SIZE = 256
+// Point-light cube faces need a larger bias than the sun's 2D map: the low
+// resolution plus near-source geometry (stones centimetres from the flame)
+// otherwise stripe the ground with acne.
+const FIRE_SHADOW_BIAS = -0.005
 // Frame scratch for the seasonal fog tint (no per-frame allocation).
 const placeFogColor = new THREE.Color()
 const placeRainColor = new THREE.Color(RAIN_GRAY)
@@ -900,6 +910,12 @@ function FirePit({
 }) {
   const light = useRef<THREE.PointLight>(null)
   const flame = useRef<THREE.Mesh>(null)
+  // Campfire shadows (design.md §19.10): debug-gated, default off, and also
+  // behind the global shadow switch — the fire is one more cast-shadow source.
+  // Both read DERIVED so Low Details (point 276) forces the extra shadow source off.
+  const fireShadowsEnabled = useUi(effectiveFireShadows)
+  const shadowsEnabled = useUi(effectiveShadows)
+  const castFireShadow = fireShadowsEnabled && shadowsEnabled
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     // Under the cook-shelter the fire burns on through the rain — only a touch
@@ -944,9 +960,45 @@ function FirePit({
         <coneGeometry args={[0.3, 0.75, 8]} />
         <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
       </mesh>
-      <pointLight ref={light} position={[0, 1.1, 0]} color="#ffab4a" distance={14} decay={2} castShadow={false} />
+      <pointLight
+        // Remounted on toggle like the sun light (point 111): flipping
+        // castShadow on a mounted light leaves the WebGPU shadow pipeline in a
+        // broken state, so the key swap rebuilds the light from scratch.
+        key={castFireShadow ? 'fire-shadowed' : 'fire-plain'}
+        ref={light}
+        position={[0, 1.1, 0]}
+        color="#ffab4a"
+        distance={14}
+        decay={2}
+        castShadow={castFireShadow}
+        shadow-mapSize={[FIRE_SHADOW_MAP_SIZE, FIRE_SHADOW_MAP_SIZE]}
+        shadow-camera-near={0.2}
+        shadow-bias={FIRE_SHADOW_BIAS}
+      />
       {sheltered && <CookShelter thatchMat={thatchMat} />}
     </group>
+  )
+}
+
+/**
+ * Invisible first-person body proxy so the PLAYER blocks the campfire light too
+ * (design.md §19.10 — the reported case: the player standing between the fire
+ * and the lit ground). Draws nothing (color and depth writes off; from inside,
+ * the front-side cylinder is backface-culled anyway) but renders into the
+ * shadow maps. Mounted only while campfire shadows are enabled, so the default
+ * picture stays untouched; while mounted the player also gains a sun shadow,
+ * which reads consistent rather than wrong.
+ */
+function PlayerShadowProxy({ player }: { player: MutableRefObject<{ x: number; z: number; yaw: number }> }) {
+  const mesh = useRef<THREE.Mesh>(null)
+  useFrame(() => {
+    mesh.current?.position.set(player.current.x, 0.85, player.current.z)
+  })
+  return (
+    <mesh ref={mesh} castShadow>
+      <cylinderGeometry args={[0.3, 0.34, 1.7, 10]} />
+      <meshBasicMaterial colorWrite={false} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -1242,31 +1294,39 @@ function PanoramaWildlife({
         panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
         pw.sinkEpsilon
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
-      // wall-clock bob. The stride now rides the ground they cover along the
-      // ring, through the same distance-driven gait phase the settlement goats
-      // walk on, so a faster-drifting animal steps faster and a stalled one
-      // stands still. Single merged meshes have no leg joints at this range, so
-      // the stride reads as the body's own rise and rock.
-      const phase = gaitPhase(panoramaDriftDistance(it.radius, it.drift, t)) + it.phase
+      // wall-clock bob. The stride rides the ground they cover along the ring,
+      // through the same distance-driven gait phase the settlement goats walk
+      // on, so a faster-drifting animal steps faster and a stalled one stands
+      // still. Point 286: the ENLARGED silhouettes (scale ~3) over-drove that
+      // phase at the raw world-arc rate — a run-in-place flail over a body whose
+      // apparent horizon motion is a fraction of a degree per second — so the
+      // arc is expressed in the silhouette's OWN rendered frame (÷ scale), which
+      // makes the leg cadence consistent with the rendered body's slow crawl.
+      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t)) + it.phase
       const y = groundY + panoramaGaitBob(phase, it.worldHeight)
+      // Point 286: face where it MOVES along the ring tangent (derived from the
+      // velocity), so a silhouette can never walk backward — the former
+      // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
+      const yaw = panoramaDriftYaw(a, it.drift)
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
         // y vs the ground line it stands on; the apparent size and the hazed
         // luminance for the point-92/94 live gates; azimuth/visible for the
         // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
-        // which ray-probes the surface drawn behind the feet.
-        // `gait`/`groundSpeed` prove the point-255 stride live: the phase must
-        // advance in step with the ground each silhouette covers, so the ratio
-        // is the same constant for all of them — a wall-clock bob would advance
-        // them all equally regardless of speed.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, radius: it.radius, worldHeight: it.worldHeight, gait: phase, groundSpeed: Math.abs(it.radius * it.drift) }
+        // which ray-probes the surface drawn behind the feet. `yaw` + x/z prove
+        // the point-286 forward-only walk (displacement projects positively onto
+        // the facing). `gait`/`gaitSpeed` prove the point-255/286 stride live:
+        // the phase advances in step with the SCALE-NORMALISED ground each
+        // silhouette covers, so the ratio is the same constant for all of them —
+        // a wall-clock bob would advance them all equally regardless of speed.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1) }
       }
       g.position.set(x, y, z)
-      // Face the drift direction along the ring tangent, then nod fore/aft in
-      // the body's own frame (YXZ: yaw first, so x is the walking pitch).
+      // Nod fore/aft in the body's own frame (YXZ: yaw first, so x is the
+      // walking pitch).
       g.rotation.order = 'YXZ'
-      g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
+      g.rotation.y = yaw
       g.rotation.x = panoramaGaitNod(phase)
       // The stride itself: diagonal legs swing in antiphase about their hips.
       const legs = legRefs.current[i]
@@ -1611,8 +1671,10 @@ export function PlaceScene() {
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
   // Low Details (point 276) forces half-size shadow maps and drops cast shadows,
   // read derived so the player's own flags are untouched (off = today's picture).
+  // The campfire shadows (point 289) are likewise forced off under Low Details.
   const shadowMapHalf = useUi(effectiveShadowMapHalf)
   const shadowsEnabled = useUi(effectiveShadows)
+  const fireShadowsEnabled = useUi(effectiveFireShadows)
   const shadowSize = shadowMapHalf ? 1024 : 2048
   useEffect(() => {
     const map = sunRef.current?.shadow.map
@@ -2075,6 +2137,10 @@ export function PlaceScene() {
           sheltered={fireHasCookShelter(place.peopleId)}
         />
       )}
+      {/* The player's own occluder body, only while campfire shadows are on
+          (design.md §19.10) — absent, the light passes straight through the
+          viewer standing between the fire and the ground. */}
+      {!isPort && fireShadowsEnabled && shadowsEnabled && <PlayerShadowProxy player={player} />}
 
       <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 

@@ -399,6 +399,8 @@ export interface Strings {
     shadows: string
     /** "Low Details" performance mode toggle (design.md §21, F7 / point 276). */
     lowDetails: string
+    /** Campfire cube-shadow toggle (design.md §19.10), default off. */
+    fireShadows: string
     flatGround: string
     /** Debug toggle for the dry-season flora deformation (point 175), default on. */
     foliageCollapse: string

@@ -57,3 +57,6 @@ scripts/.tile-cache
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/
+
+# Local, non-versioned artefacts (retrospectives, scratch notes) — never on git
+/local/
