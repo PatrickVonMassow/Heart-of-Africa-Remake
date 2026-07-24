@@ -10,6 +10,9 @@ import {
   excludedAzimuthSpan,
   isAzimuthExcluded,
   panoramaDriftDistance,
+  panoramaDriftVelocity,
+  panoramaDriftYaw,
+  panoramaGaitDistance,
   panoramaGaitBob,
   panoramaGaitNod,
   PANORAMA_GAIT_BOB,
@@ -145,6 +148,80 @@ describe('panorama silhouette gait pose (point 255 — walking, not sliding)', (
     for (let i = 0; i <= 60; i++) maxNod = Math.max(maxNod, Math.abs(panoramaGaitNod((i / 60) * 4 * Math.PI)))
     expect(maxNod).toBeGreaterThan(0)
     expect(maxNod).toBeLessThan(0.09) // ≈5°, invisible as a tilt but alive
+  })
+})
+
+describe('panorama silhouette faces its motion (point 286 — forward-only, never backward)', () => {
+  // Codebase yaw convention (atan2(vx, vz), yaw 0 = +z): the forward vector of a
+  // body at yaw is (sin yaw, cos yaw).
+  const forward = (yaw: number): [number, number] => [Math.sin(yaw), Math.cos(yaw)]
+
+  it('the facing agrees with the ring velocity for either drift direction and any angle', () => {
+    for (const drift of [0.006, -0.006, 0.01, -0.004]) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * 2 * Math.PI
+        const [vx, vz] = panoramaDriftVelocity(a, 120, drift)
+        const [fx, fz] = forward(panoramaDriftYaw(a, drift))
+        // Facing parallel to the velocity → the forward component IS the full
+        // speed, so there is never a backward component (the point-286 bug).
+        const along = (vx * fx + vz * fz) / Math.hypot(vx, vz)
+        expect(along).toBeGreaterThan(0.999)
+      }
+    }
+  })
+
+  it('rejects the reverted π-off formula that walked every silhouette backward', () => {
+    // The bug: yaw = −a + (drift>0 ? π : 0). It points AGAINST the velocity, so
+    // guarding the fix against a regression is meaningful.
+    for (const drift of [0.006, -0.006]) {
+      const a = 0.9
+      const [vx, vz] = panoramaDriftVelocity(a, 120, drift)
+      const [fx, fz] = forward(-a + (drift > 0 ? Math.PI : 0))
+      const along = (vx * fx + vz * fz) / Math.hypot(vx, vz)
+      expect(along).toBeLessThan(0) // backward — the reported moonwalk
+    }
+  })
+
+  it('holds a sane heading at zero drift (falls back to the +tangent, no NaN)', () => {
+    const yaw = panoramaDriftYaw(1.1, 0)
+    expect(Number.isFinite(yaw)).toBe(true)
+    // +tangent at ring-angle a is −a in this convention.
+    expect(yaw).toBeCloseTo(-1.1, 9)
+  })
+})
+
+describe('panorama silhouette gait rate (point 286 — consistent with rendered travel, no flail)', () => {
+  const phaseAt = (radius: number, drift: number, scale: number, t: number) =>
+    gaitPhase(panoramaGaitDistance(radius, drift, scale, t))
+
+  it("drives the stride by the arc in the silhouette's own rendered frame (÷ scale)", () => {
+    // Same world arc, larger enlargement → the legs step SLOWER (the flail fix):
+    // a 3× silhouette must not swing 3× faster than a 1× one over the same
+    // world ground.
+    const small = phaseAt(120, 0.006, 1, 3)
+    const big = phaseAt(120, 0.006, 3, 3)
+    expect(big).toBeCloseTo(small / 3, 12)
+  })
+
+  it('leg-swing-per-unit-distance covered is constant — a slower silhouette steps proportionally slower', () => {
+    // phase / (effective distance the legs ride) is the fixed cadence for every
+    // silhouette, whatever its drift, ring or scale: the point-255 invariant, now
+    // on the scale-normalised distance.
+    const cases: Array<[number, number, number, number]> = [
+      [120, 0.006, 3, 2],
+      [160, 0.004, 2.5, 5],
+      [90, 0.01, 4, 1.5],
+    ]
+    const ratios = cases.map(([r, d, s, t]) => phaseAt(r, d, s, t) / panoramaGaitDistance(r, d, s, t))
+    for (const x of ratios) expect(x).toBeCloseTo(ratios[0], 9)
+  })
+
+  it('still holds a stalled silhouette dead still and steps a faster drift faster', () => {
+    expect(phaseAt(120, 0, 3, 900)).toBe(0)
+    expect(phaseAt(120, 0.01, 3, 4)).toBeGreaterThan(phaseAt(120, 0.004, 3, 4))
+    // Scale ≤ 0 is safe (falls back to 1 → the raw arc).
+    expect(panoramaGaitDistance(120, 0.006, 0, 2)).toBeCloseTo(panoramaDriftDistance(120, 0.006, 2), 12)
+    expect(panoramaGaitDistance(120, 0.006, -3, 2)).toBeCloseTo(panoramaDriftDistance(120, 0.006, 2), 12)
   })
 })
 

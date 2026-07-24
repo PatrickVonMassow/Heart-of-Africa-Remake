@@ -175,12 +175,13 @@ check(
 await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
 // Their stride phase rides the ground they cover on the ring, so over the same
-// interval each one's phase advance divided by its ground speed is the SAME
-// constant — a wall-clock bob would advance them all alike whatever their speed.
+// interval each one's phase advance divided by its (scale-normalised, point 286)
+// gait speed is the SAME constant — a wall-clock bob would advance them all
+// alike whatever their speed.
 {
   const sample = () =>
     page.evaluate(() =>
-      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.groundSpeed })),
+      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.gaitSpeed })),
     )
   const before = await sample()
   await page.waitForTimeout(1200)
@@ -194,6 +195,37 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
     'the panorama silhouettes stride with the ground they cover, not the clock (point 255)',
     rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
     `phase per unit walked [${rates.map((r) => r.toFixed(2)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`,
+  )
+}
+// Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
+// derived from the ring velocity, so each visible silhouette's displacement over
+// an interval must project POSITIVELY onto its facing (forward = (sin yaw,
+// cos yaw)), and a moving one must actually advance. The reverted bug set the
+// yaw exactly π off the tangent, so every silhouette moonwalked.
+{
+  const snap = () =>
+    page.evaluate(() => {
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      const out = {}
+      for (const k of Object.keys(info)) out[k] = { x: info[k].x, z: info[k].z, yaw: info[k].yaw, visible: info[k].visible }
+      return out
+    })
+  const b0 = await snap()
+  await page.waitForTimeout(1200)
+  const b1 = await snap()
+  const along = []
+  for (const k of Object.keys(b0)) {
+    const p = b0[k]
+    const q = b1[k]
+    if (!q || p.visible === false || q.visible === false) continue
+    const dx = q.x - p.x
+    const dz = q.z - p.z
+    along.push({ a: dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw), d: Math.hypot(dx, dz) })
+  }
+  check(
+    'every panorama silhouette walks forward along its facing, never backward (point 286)',
+    along.length >= 3 && along.every((r) => r.a >= -1e-3) && along.some((r) => r.d > 1e-3 && r.a > 0),
+    `along-facing displacement [${along.map((r) => r.a.toFixed(3)).join(', ')}]`,
   )
 }
 check(
