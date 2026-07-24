@@ -51,8 +51,13 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
 // --- First-person surface detail (§7.1 pt. 11/15, design.md §2.6) -------------
 // The ground at eye height must carry visible micro-structure (grain, pebble
 // relief), not a soft wash: measure the mean edge energy (Laplacian) of a
-// ground crop from the start position. The flat pre-detail ground measured
-// ~0.5 here; the structured ground clears 1.5 with headroom.
+// ground crop from the start position. Reference points: the flat pre-detail
+// ground measured ~0.5; the normal-map surface relief at the SHIPPED DEFAULT
+// (medium, SSAO off per point 276) measures ~1.23 — clearly structured, ~2.5x
+// the flat floor. (Screen-space AO, high-only now, adds contact-shadow
+// contrast that used to push this above 1.5; the bar tracks the default look,
+// not the AO bonus.) The threshold guards "structured vs soft wash" at the
+// level the player actually ships with.
 {
   const shot = await page.screenshot()
   const crop = await sharp(shot).extract({ left: 500, top: 700, width: 600, height: 170 }).greyscale().raw().toBuffer({ resolveWithObject: true })
@@ -68,7 +73,7 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
     }
   }
   const mean = energy / n
-  check('first-person ground shows micro-detail (edge energy)', mean > 1.5, `laplacian mean ${mean.toFixed(2)}`)
+  check('first-person ground shows micro-detail (edge energy)', mean > 1.1, `laplacian mean ${mean.toFixed(2)}`)
 }
 
 // --- Temporal stability of the distant ground (§7.1 pt. 15) -------------------
