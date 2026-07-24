@@ -10590,7 +10590,7 @@ the remaining open points in their numeric order.
   text. NOTE: touches the flora streaming — coordinate with any point-276 lever
   work on the same files. Implementation-ready.
 
-- [x] 279. THE 1890 PICTURE, NOT THE MODERN POSTCARD — correct the objectively wrong
+- [ ] 279. THE 1890 PICTURE, NOT THE MODERN POSTCARD — correct the objectively wrong
   monuments and the cattle contradiction (from the point-205 research pass,
   `docs/205-world-accuracy-findings.md`, 24.07.2026). Six of that pass's findings are
   objective errors against a documented record — two of them against THIS repo's own
