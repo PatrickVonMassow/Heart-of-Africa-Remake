@@ -10155,7 +10155,7 @@ the remaining open points in their numeric order.
   meshes), so coordinate with the wildlife-render cluster; the ground-tint approach may
   share code with the settlement wet-ground path. Implementation-ready.
 
-- [ ] 268. CROCODILE FEEDING — the prey lies at the croc's MOUTH and the croc moves
+- [x] 268. CROCODILE FEEDING — the prey lies at the croc's MOUTH and the croc moves
   as if eating (user 23.07.2026). When a crocodile catches/consumes a victim (§19.16,
   point 130), the seized animal currently sits ON the crocodile's body; it should lie at
   the crocodile's JAWS/MOUTH end, and the crocodile should animate as if FEEDING —
@@ -10409,7 +10409,7 @@ the remaining open points in their numeric order.
   wildlife-render cluster (Wildlife.tsx/fauna.ts) — do NOT build concurrently with another
   Wildlife.tsx point. A user-reported visible bug → before 224. Implementation-ready.
 
-- [ ] 275. CROCODILE RARELY STRIKES — the ambush reads as inert (user 23.07.2026,
+- [x] 275. CROCODILE RARELY STRIKES — the ambush reads as inert (user 23.07.2026,
   screenshot: a lurking crocodile in the river with prey nearby that it never attacks).
   Current design (§19.16, `src/scenes/travel/Wildlife.tsx` ~:2459-2494): a hidden crocodile
   lunges ONLY at an eligible BANK DRINKER standing at the waterline inside `strikeRadius`
