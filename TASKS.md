@@ -11049,7 +11049,7 @@ the remaining open points in their numeric order.
   player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
   (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
 
-- [ ] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
+- [x] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
   retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
   agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
   polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
