@@ -39,6 +39,29 @@ Evidence markers, extending the sibling docs' discipline:
 The accuracy bar is the sibling docs': a hedged answer beats a confident wrong
 one, myth is labelled myth, and inference is labelled inference.
 
+> **⏩ FORWARD-POINTER (added by the point-265 second research pass, 24.07.2026).**
+> §10 went back over the primary literature and the ~1890 record. It **overturns
+> one recommendation** and **closes three of §8's gaps**, so read §2/§6 alongside
+> it:
+> - **§2.1/§6 say "duller, greyer coat" for all ungulates — that is WRONG for the
+>   giraffe.** Male giraffes darken toward black with age, they do not grey
+>   (§10.2). Greying a giraffe would render the one species that visibly ages in
+>   the opposite direction.
+> - **§2.3's "specific ageing literature is thinner" GAP for the carnivores is
+>   partly closed** with measured tooth-fracture rates per species (§10.3).
+> - **§2.2's elephant cue list gains its best single cue** — asymmetric
+>   master/slave tusk wear, attested both in 1894 and in modern data (§10.4).
+> - **§1 gains the answer to the obvious objection** ("wild animals never live
+>   long enough to grow old") — they do, and senescence in the wild is the rule
+>   (§10.1).
+> - **The ~1890 period layer this doc's intro says it does not need is supplied
+>   in §10.5** — a traveller of 1890 had a rich and specific set of beliefs about
+>   old animals, which matters for journal voice even where the biology is
+>   unchanged.
+>
+> §10.7 supersedes §6's table with an implementation-facing version that names
+> the carrying repo system per cue.
+
 ---
 
 ## 1. What actually makes a wild animal look and act old
@@ -87,7 +110,9 @@ The legible cues, ranked by how well they render at the game's bird's-eye scale:
   zebra; it comes from muscle and connective-tissue loss over the back. Directly
   attested in domestic equids; **INFERRED** for wild zebra by homology — mark as
   inference, but it is a low-risk, high-legibility cue.
-- **Duller, rougher, greyer coat.** Loss of coat gloss and condition, greying
+- **Duller, rougher, greyer coat.** ⚠️ NOT for the giraffe — see §10: male
+  giraffes DARKEN with age, and even that tracks status rather than age, so a
+  giraffe must never be aged by colour. Loss of coat gloss and condition, greying
   around the muzzle/face, a staring (rough, un-sleek) coat. General mammalian
   ageing; **REVIEW/INFERRED** for the specific species. Grey muzzle is a real,
   commonly-noted cue in aged mammals.
@@ -104,7 +129,7 @@ The legible cues, ranked by how well they render at the game's bird's-eye scale:
 
 **Legibility verdict for the game:** render old ungulates by (1) a **leaner,
 more angular body** (the dominant cue), (2) a **sway-backed / dropped topline**,
-(3) a **duller, greyer coat tint**, and optionally (4) **slower, stiffer
+(3) a **duller, greyer coat tint** (⚠️ giraffe excepted — §10), and optionally (4) **slower, stiffer
 movement**. Horn/tusk wear is a nice-to-have silhouette detail. Do **not** rely
 on tooth wear as a visual — it is the *cause*, not something the player can see.
 
@@ -516,6 +541,331 @@ Vultures & dying/downed animals:
 - [Slate — Vultures know where animals go to die](https://slate.com/technology/2014/02/vultures-know-where-animals-go-to-die-feeding-strategies-by-season.html)
 - [Missouri Dept. of Conservation — Vulture facts](https://mdc.mo.gov/wildlife/wildlife-facts/bird-facts/vulture-facts)
 - [Avian Report — Black vulture food habits](https://avianreport.com/black-vulture-food-habits/)
+
+---
+
+## 10. Second research pass (point 265, 24.07.2026)
+
+This pass re-checked the primary literature on the points §8 flagged as gaps, and
+added the ~1890 period layer the intro had waived. It **overturns one
+recommendation** (giraffe coat colour), **closes three gaps** with measured data,
+and **adds a period section**. One marker is added to the table, matching
+`peoples-1890.md`:
+
+| Marker | Meaning |
+| --- | --- |
+| **PERIOD** | pre-1910 eyewitness or contemporary account — evidence for what an 1890 traveller *saw and believed*, not necessarily for the biology |
+
+### 10.1 Do wild animals live long enough to grow old? — YES, and this matters
+
+The obvious objection to the whole mechanic is the folk belief that wild animals
+are killed long before they can age, so a "geriatric animal" is a zoo phenomenon.
+**That belief is outdated and the literature has explicitly reversed it.** The
+traditional view that "wild animals simply do not live old enough to grow old" is
+now described as at odds with the evidence, and the current position is that
+**actuarial and reproductive senescence is the rule rather than the exception in
+free-ranging vertebrate populations**
+([Nussey et al. 2008, *Functional Ecology*, measuring senescence in wild populations](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/j.1365-2435.2008.01408.x);
+[Nussey et al. 2013, *Ageing Research Reviews*, senescence in natural populations](https://www.sciencedirect.com/science/article/abs/pii/S1568163712000980);
+[Senescence is more important in the natural lives of long- than short-lived mammals, PMC2917356](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2917356/))
+— REVIEW/FIELD. Long-lived ungulates specifically show low adult mortality with
+**senescence onset delayed until many years after maturity**, which is exactly the
+shape the game wants: a small, visible minority of clearly old animals in an
+otherwise prime-adult population.
+
+**Design consequence.** The elderly variant is not a novelty — it is the
+demographically correct thing to render, and it also justifies keeping the
+elderly *fraction* low (§10.7) rather than ageing a quarter of every herd. It is
+also the honest answer if the mechanic is ever questioned as unrealistic.
+
+### 10.2 CORRECTION — the giraffe does not grey, it BLACKENS (and even that is not an age cue)
+
+§2.1 and §6 recommend "duller, greyer coat" for all ungulates including giraffe.
+**For the giraffe this is backwards**, and the correction comes with a second,
+more important caveat.
+
+**The darkening is real and well documented.** In Thornicroft's giraffe (Luangwa
+Valley, Zambia, 33 years of observation), male coat blotches darken from brown
+toward coal-black beginning at **7–8 years**, reaching fully black at a mean of
+**9.4 years**, with the transition taking about **1.8 years**
+([Berry & Bercovitch 2012, *Journal of Zoology*, darkening coat colour in male Thornicroft's giraffes](https://zslpublications.onlinelibrary.wiley.com/doi/abs/10.1111/j.1469-7998.2012.00904.x);
+[Live Science — Aging male giraffes go black, not gray](https://www.livescience.com/19686-aging-male-giraffes-black-spots.html))
+— FIELD. So **a greying giraffe is the one clearly wrong ageing cue** the doc
+could have shipped.
+
+**But do not simply invert it, because black ≠ old.** A 12-year, 66-male study at
+Etosha found colour tracks **social status more than age**: "male giraffes tend to
+increase in darkness as they age, **but some males never darken and others even
+lose pigmentation**", and colour *variation* increases with age
+([Castles et al. 2019, *Animal Behaviour*, male giraffes' colour, age and sociability](https://www.sciencedirect.com/science/article/abs/pii/S0003347219302453);
+[Sci.News summary](https://www.sci.news/biology/male-giraffe-spots-07653.html);
+[Smithsonian — Colour reflects social status, not age](https://www.smithsonianmag.com/smart-news/color-giraffes-spots-reflects-social-status-not-age-180973243/))
+— FIELD. Full blackness is reached at ~9.4 yr, which is **prime**, not senescence
+(giraffes live into their mid-20s), so black marks a dominant mature bull, and
+some genuinely old males are **pale**.
+
+**The behavioural half is the useful find.** The same study reports that **darker
+males are more solitary** — roaming between groups for oestrous females — while
+**lighter males, both young AND old pale ones, are more gregarious**, staying with
+female groups. Dark coat functions like a lion's mane: an honest signal of
+competitive ability.
+
+**Recommendation for the game (replaces §6's giraffe row):**
+- **Do not tint an old giraffe grey.** Use **frame and condition** (leaner, more
+  angular, dropped topline) as the giraffe's ageing cue, not coat colour.
+- A **very dark, solitary bull** is a real and renderable savanna sight, but frame
+  it as a **dominant mature male**, not an elderly one — it is a prime-adult
+  variant, not a geriatric one, and confusing the two would render dominance as
+  decrepitude.
+- A **pale, solitary-*ish*, visibly gaunt** old giraffe is the defensible elderly
+  depiction. INFERRED as a combination, but each half is attested.
+
+### 10.3 GAP CLOSED — measured dental damage in the big carnivores
+
+§2.3 marked per-species carnivore ageing cues a GAP and fell back to "the lion
+template." Hard numbers exist. A study of naturally-occurring tooth wear and
+fracture in Zambian large carnivores (Luangwa Valley and Greater Kafue) gives
+**per-individual** rates of animals carrying at least one broken tooth:
+
+| Species | Individuals with a broken tooth | Per-tooth fracture rate |
+| --- | --- | --- |
+| **Spotted hyena** | **77 %** | 12 % |
+| **Lion** | **53 %** | 4 % |
+| **Leopard** | **44 %** | 2 % |
+
+([Naturally-occurring tooth wear, fracture and cranial injuries in large carnivores from Zambia, PMC8063872](https://pmc.ncbi.nlm.nih.gov/articles/PMC8063872/))
+— FIELD. Cheetah was **not** studied — that part of the gap stays open. Hyena
+tops the table exactly as predicted by bone-cracking; the ordering
+hyena > lion > leopard is now measured rather than assumed.
+
+**Two honesty caveats the numbers force.**
+1. These are **population-wide** rates across all ages, **not** age-specific ones.
+   They establish that broken teeth are *common* in wild carnivores; they do not
+   by themselves prove "old cats have broken teeth."
+2. The study explicitly found that **prey type, not age alone**, drove the
+   regional difference (Luangwa lions 62 % of individuals vs Kafue 44 % at similar
+   age distributions), and suggested wear increases when "food becomes limiting" —
+   i.e. **poor condition may cause dental damage as much as the reverse.** Do not
+   present the game's tooth-wear→starvation chain as a clean one-way arrow in any
+   player-facing text.
+
+**Design consequence.** Broken/worn teeth are not legible at bird's-eye scale
+anyway (§2.3), so this mostly serves as **journal/flavour warrant** (§7's "broken
+canine = death sentence" beat is well supported for hyena and lion) and as
+justification for making the hyena the carnivore whose elderly variant is most
+strongly condition-driven.
+
+### 10.4 The elephant's best cue — ASYMMETRIC tusk wear (master and slave tusk)
+
+§2.2 lists "worn or broken tusks" generically. The specific, far more legible form
+is **asymmetry**, and it is attested twice over:
+
+- **Modern:** elephants are individually **left- or right-tusked**, like
+  handedness. The favoured **"master" tusk** is used for digging, bark-stripping
+  and levering, so it wears **shorter, blunter, more rounded and notched** than
+  the idle "slave" tusk. Survey data on tusk pairs found **~95 % of African
+  elephants had uneven tusks**, and heavier (older, larger) pairs were **more**
+  uneven
+  ([Discover — Worn-down tusks show most African elephants are righties](https://www.discovermagazine.com/planet-earth/worn-down-tusks-show-most-african-elephants-are-righties);
+  [Lateralization of trunk use and tusk wear in African elephants](https://www.researchgate.net/publication/322116594_Lateralization_Preference_of_Trunk_Use_and_Tusk_Wear_in_African_Elephants_Loxodonta_africana);
+  [Global Elephants — Right or left?](https://globalelephants.org/elefact-friday-right-or-left/))
+  — REVIEW/FIELD. ⚠️ The dataset is largely **hunter-collected tusk pairs**, which
+  the sources themselves flag as a biased sample; and asymmetry accumulates with
+  *use*, so it reads as "mature-to-old", not "geriatric" precisely.
+- **Period, 1894:** the same observation, made by eye and stated as universal —
+  "**Nobody, however, ever saw a pair of these developed front teeth that were
+  symmetrical; one is invariably more worn away than the other on account of its
+  having been used by preference in digging up roots, bulbs, etc.**"
+  ([J. Hampden Porter, *Wild Beasts*, 1894, Project Gutenberg](https://www.gutenberg.org/files/71639/71639-h/71639-h.htm))
+  — PERIOD.
+
+**This is the single best elephant ageing cue for the game**: it is a pure
+*silhouette* difference (one tusk visibly shorter and blunter than the other),
+legible at bird's-eye scale where sunken temples and skin wrinkles are not, cheap
+to build as a per-side scale on the existing tusk geometry, and it is one of the
+very few cues attested in both 1890s and modern sources.
+
+### 10.5 The ~1890 period layer — what the traveller SAW and BELIEVED
+
+The intro states there is no modern-vs-period split because the biology is
+unchanged. That is right about the biology and wrong about the *game*: the player
+is an 1890 explorer, and the period record has a specific, well-formed set of
+beliefs about old animals that should shape journal voice even where modern
+biology agrees.
+
+**The old bull's seclusion — period and modern AGREE, with one telling
+difference.** Porter (1894) states it directly: "**When they grow old, there is
+more or less tendency towards seclusion in all bulls. Retirement, however, when
+prompted by age, apathy, or loss of the incitements towards association, is not at
+all like exile while physical powers and feelings are in force**" — PERIOD. Note
+how carefully he separates **voluntary retirement** from **exile/eviction**, which
+is precisely the distinction §3.1 draws from modern sources (old elephant bulls
+are *not* ousted; they keep status). Period observation and modern ethology land in
+the same place here, which is a good sign for both.
+
+**The "rogue" belief — period, and NOT to be built as stated.** Porter records the
+era's conviction that "**years bring moroseness upon elephants, and that any evil
+tendencies they exhibit in youth are aggravated by age**", the belief behind the
+period's "rogue elephant" — the dangerous solitary bull — PERIOD. Modern reading:
+solitary bulls are a **normal life stage** (§3.1) and aggression is far better
+explained by **musth** than by age-soured temperament. So the rogue is **period
+belief, not biology**: excellent material for an in-world journal line or a
+villager's warning, and *not* a licence to make old elephants attack the player.
+
+**The elephant graveyard as an 1890 treasure legend.** The graveyard was not a
+vague myth in this era — it was a live, debated proposition and a **motivator for
+ivory hunters**: the existence of a collective cemetery had been argued since the
+**mid-19th century**, was **mentioned by Livingstone**, circulated in Europe into
+the early 20th century, and was imagined as a hoard of ivory that would make its
+finder rich — with the suggestion that the story was partly kept alive to send
+hunters off into the wilderness and away from villages
+([Wikipedia — Elephants' graveyard](https://en.wikipedia.org/wiki/Elephants%27_graveyard);
+[Bizzarro Bazar — The elephants' graveyard](https://bizzarrobazar.com/en/2015/06/15/il-cimitero-degli-elefanti/);
+[Ripley's — Elephant graveyards: the El Dorado of Africa](https://www.ripleys.com/stories/elephant-graveyards))
+— PERIOD/REVIEW.
+
+**This is a gift for the game and it costs nothing.** The §4.4 graveyard landmark
+and its ivory hauls (§7.1 pt. 25) are **exactly what an 1890 explorer would have
+been hunting for**, and §4.3's verdict (no such cemetery; bones accumulate at
+water) is **also period-plausible** — the debate was live in 1890, so a sceptical
+and a credulous journal voice are both era-authentic. The game does not need to
+resolve it; a traveller of 1890 could not.
+
+### 10.6 How long dying takes, and what happens to the body
+
+The task asks for duration. Split it honestly:
+
+- **Duration of terminal decline — GAP.** No field figure was found for how long
+  an aged wild animal takes to die once decline sets in, and this is unsurprising:
+  the animal is usually **killed by a predator partway through** (§5 stage 1), so
+  an uninterrupted natural death is rarely observed start to finish. The
+  starvation endpoint implies **days to weeks**, not minutes — INFERRED. Model it
+  as a **calibratable game duration** and never present a number as fact. §8's
+  instruction to key the "failing" stage on a **condition threshold rather than an
+  age counter** is the right call and this pass reinforces it.
+- **What happens to the body — well documented and fast.** A vulture can eat more
+  than **two pounds of meat in a minute**, and a sizable vulture crowd can strip a
+  **zebra, nose to tail, in about 30 minutes**
+  ([National Geographic — Vultures are revolting; here's why we need to save them](https://www.nationalgeographic.com/magazine/article/vultures-endangered-scavengers);
+  [Angama — Under vulture-less skies](https://angama.com/the-mara/vulture-less-skies))
+  — REVIEW/FIELD. Vultures are the rate-limiting step: **excluding vultures halves
+  large-carcass decomposition rates** and doubles fly abundance
+  ([Vulture exclusion halves large carcass decomposition rates, PMC12061450](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12061450/))
+  — FIELD.
+
+**Design consequence.** The game's existing carcass lifetime is defensible at the
+**tens-of-minutes** scale for a grazer — a fast strip is realistic, not a
+shortcut. ⚠️ An **elephant** carcass is a different case: the hide alone defeats
+most scavengers for a long time and the bones persist for years (which is *why*
+§4.2's bone accumulations exist at all). No verified elephant-specific figure was
+found — **GAP** — but a much longer elephant carcass/bone persistence than a
+zebra's is a safe INFERRED asymmetry, and it is the mechanism the §4.4 graveyard
+framing rests on.
+
+### 10.7 Implementation table — ages / does not visibly age, with the carrying system
+
+Supersedes §6's table by adding the **repo system that would carry each cue**.
+Anchors verified against the tree (24.07.2026).
+
+**The precedent is closer than expected.** `src/render/fauna.ts` already has both
+halves of the pattern: `calfProportions(spec)` is a pure **`QuadrupedSpec` →
+`QuadrupedSpec` transform** (shrinks body/neck, enlarges head, drops horns), and
+`buildElephant(calf = false)` / `buildGiraffe(calf = false)` already take an **age
+flag parameter**. An `elderlyProportions(spec)` transform plus an `elderly` flag
+on those two builders is a direct, like-for-like extension — no new architecture.
+
+| Species | Ages visibly? | Renderable cues | Behaviour | Carrying system |
+| --- | --- | --- | --- | --- |
+| **Elephant** | **Yes — flagship** | **asymmetric master/slave tusk** (§10.4, best cue), gaunt bony frame, sunken temples, ragged ears | keeps status, **never ousted** (§3.1); on failing, drifts to water | `buildElephant(calf)` → add `elderly` flag; per-side tusk scale; drift target reuses the river/lake water-cell lookup |
+| **Giraffe** | **Yes, but NOT by colour** | leaner angular frame, dropped topline, worn ossicone tops — **no greying** (§10.2) | slower; loses necking contests; more catchable | `buildGiraffe(calf)` → add `elderly` flag; `parentAttackOutcome`-style matrix for contests |
+| **Zebra** | **Yes** | lean/angular body, **sway-backed topline**, duller greyer coat | slower; lags at herd rear; preferred predator target | `elderlyProportions(ZEBRA_SPEC)` — mirrors `calfProportions`; sway-back needs a **new spec field** (`buildQuadruped` derives `backY` from `legH + bodyR`, so a scalar alone will not bend the topline) |
+| **Wildebeest** | **Yes** | lean/angular, duller coat, worn horn silhouette | as zebra; old males lose harem, drift to bachelor | `elderlyProportions(WILDEBEEST_SPEC)` |
+| **Antelope** | **Yes (light)** | lean/angular, duller coat | as zebra | `elderlyProportions(ANTELOPE_SPEC)` |
+| **Warthog** | **Yes (light)** | leaner, duller, chipped tusks | slower; loses boar shoving | `elderlyProportions(WARTHOG_SPEC)` |
+| **Lion** | **Yes** | **thinning mane** (males), greyer/mottled nose, slack jowls, scars, gaunt | ousted male → nomad, hunts poorly alone; declines pride contests | `buildLion` + `elderly` flag (mane is already a distinct part); `REGION_PREDATORS` gating |
+| **Hyena** | **Yes** — best carnivore case (§10.3) | greyer muzzle, leaner, scarred | slower; withdraws from contests | `buildHyena` via `buildCatPredator` colour/scale args |
+| **Leopard** | **Yes (light)** | greyer muzzle, leaner, scarred | solitary anyway — no social shift to render | `buildCatPredator` |
+| **Cheetah** | **Yes (light)** — dental data absent (§10.3) | greyer muzzle, leaner | slower; loses kills | `buildCatPredator` |
+| **Crocodile** | **NO** (§2.4) | — indeterminate grower, no legible cues | — | none — explicitly excluded |
+| **Vulture, flamingo, plover** | **NO** | — | vultures act *on* the dying animal | `killFlockActive` / carcass system (already built) |
+| **Buffalo** | *(not in `PreyKind`)* | archetype only — port the dagga-boy pattern | — | not rendered; do not build |
+
+**Cross-cutting system mapping:**
+- **Elderly fraction per herd** → mirror `calvesForGroup(n, fraction)` in
+  `wildlifeBehavior.ts` (point 169's calibratable calf fraction) as an
+  `eldersForGroup` with its own low `balance` fraction.
+- **Region correctness** → gate through the existing `REGION_PREY` /
+  `REGION_PREDATORS` pools (point 208 A2/A3) so an elderly individual only appears
+  where its species lives.
+- **Losing every contest** → extend the `parentAttackOutcome`-style outcome matrix
+  rather than adding a second combat path (the points 121(f)/130/146 "one shared
+  core" architecture line).
+- **Death** → route into the **ordinary carcass system**; the vulture gather/descend
+  is already built (`killFlockActive`, the pt-22 poor-condition omen).
+- **Invariant I4** (point 186) → the dying sequence needs a **hard deadline** so a
+  streamed-out or predator-claimed dying animal always resolves.
+
+### 10.8 The three most implementable cues
+
+Ranked by legibility-per-unit-work at the game's bird's-eye scale:
+
+1. **Asymmetric elephant tusks** (§10.4) — pure silhouette, attested in 1894 *and*
+   modern data, a per-side scale on existing geometry, and it distinguishes the
+   flagship species at a glance.
+2. **Lean/angular body via an `elderlyProportions` spec transform** (§10.7) — one
+   pure function covering five grazer species at once, exactly mirroring the
+   proven `calfProportions` precedent, and body condition is the
+   best-supported cue in the whole document (§2.1).
+3. **Reduced movement speed** (§3.2) — no art at all, reads immediately in motion,
+   behaviourally load-bearing (it is *why* predators take the old), and a single
+   calibratable `balance` factor.
+
+### 10.9 What this pass could NOT establish
+
+- **Duration of natural terminal decline** — GAP (§10.6); no field figure exists
+  because predators interrupt it. Must be a calibrated game value.
+- **Cheetah dental/ageing data** — the Zambia study excluded cheetah (§10.3); the
+  species-specific gap stays open.
+- **Elephant carcass/bone persistence timescale** — GAP (§10.6); the long
+  persistence is INFERRED from hide/bone durability, not a cited figure.
+- **Sway-back in wild zebra** — still INFERRED from domestic-equine homology
+  (§8); this pass found no wild-zebra observation.
+- **Giraffe ossicone balding** — carried over from §2.1 at REVIEW; not
+  re-verified in this pass, so do not upgrade its marker.
+- **Age-specific (as opposed to population-wide) carnivore tooth damage rates** —
+  the numbers in §10.3 are all-ages (§10.3 caveat 1).
+
+### 10.10 Sources added by this pass
+
+Senescence in the wild:
+- [Nussey et al. 2008, *Functional Ecology* — Measuring senescence in wild animal populations](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/j.1365-2435.2008.01408.x)
+- [Nussey et al. 2013, *Ageing Research Reviews* — Senescence in natural populations of animals](https://www.sciencedirect.com/science/article/abs/pii/S1568163712000980)
+- [Senescence is more important in the natural lives of long- than short-lived mammals, PMC2917356](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2917356/)
+
+Giraffe coat colour, age and sociability:
+- [Berry & Bercovitch 2012, *Journal of Zoology* — Darkening coat colour in male Thornicroft's giraffes](https://zslpublications.onlinelibrary.wiley.com/doi/abs/10.1111/j.1469-7998.2012.00904.x)
+- [Castles et al. 2019, *Animal Behaviour* — Relationships between male giraffes' colour, age and sociability](https://www.sciencedirect.com/science/article/abs/pii/S0003347219302453)
+- [Sci.News — Darker male giraffes are less social](https://www.sci.news/biology/male-giraffe-spots-07653.html)
+- [Smithsonian — Colour of giraffes' spots reflects social status, not age](https://www.smithsonianmag.com/smart-news/color-giraffes-spots-reflects-social-status-not-age-180973243/)
+- [Live Science — Aging male giraffes go black, not gray](https://www.livescience.com/19686-aging-male-giraffes-black-spots.html)
+
+Carnivore tooth wear and fracture:
+- [Naturally-occurring tooth wear, tooth fracture and cranial injuries in large carnivores from Zambia, PMC8063872](https://pmc.ncbi.nlm.nih.gov/articles/PMC8063872/)
+
+Elephant tusk lateralization:
+- [Discover — Worn-down tusks show most African elephants are righties](https://www.discovermagazine.com/planet-earth/worn-down-tusks-show-most-african-elephants-are-righties)
+- [Lateralization preference of trunk use and tusk wear in African elephants](https://www.researchgate.net/publication/322116594_Lateralization_Preference_of_Trunk_Use_and_Tusk_Wear_in_African_Elephants_Loxodonta_africana)
+- [Global Elephants — EleFact Friday: right or left?](https://globalelephants.org/elefact-friday-right-or-left/)
+
+Period sources (~1890):
+- [J. Hampden Porter, *Wild Beasts*, 1894 — Project Gutenberg](https://www.gutenberg.org/files/71639/71639-h/71639-h.htm)
+- [Bizzarro Bazar — The elephants' graveyard (legend history, Livingstone)](https://bizzarrobazar.com/en/2015/06/15/il-cimitero-degli-elefanti/)
+- [Ripley's — Elephant graveyards: the El Dorado of Africa](https://www.ripleys.com/stories/elephant-graveyards)
+
+Carcass consumption rates:
+- [National Geographic — Vultures are revolting. Here's why we need to save them](https://www.nationalgeographic.com/magazine/article/vultures-endangered-scavengers)
+- [Angama — Under vulture-less skies](https://angama.com/the-mara/vulture-less-skies)
+- [Vulture exclusion halves large carcass decomposition rates, PMC12061450](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12061450/)
 
 ---
 ---
