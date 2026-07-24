@@ -472,6 +472,7 @@ export const en: Strings = {
     ssao: 'SSAO (ambient occlusion)',
     shadowMapHalf: 'Half-resolution shadows',
     shadows: 'Sun shadows',
+    fireShadows: 'Campfire shadows',
     flatGround: 'Flat ground (debug)',
     foliageCollapse: 'Dry-season foliage collapse (debug)',
     health: 'Health',

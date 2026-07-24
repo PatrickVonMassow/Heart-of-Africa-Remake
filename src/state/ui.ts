@@ -90,6 +90,11 @@ interface UiState {
   /** Directional sun shadows (design.md §2.7/§21); a debug switch to turn cast
    *  shadows off entirely (default on). */
   shadowsEnabled: boolean
+  /** Campfire shadows (design.md §19.10): the village fire light casts a cube
+   *  shadow map so figures/logs between the fire and the ground block its
+   *  light. OFF by default — picture-neutral until enabled; the user prices the
+   *  GPU cost on their own hardware before it can become a default. */
+  fireShadowsEnabled: boolean
   /** Debug diagnosis (point 111): render the settlement ground with a plain
    *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
    *  patch. Default off. */
@@ -128,6 +133,7 @@ interface UiState {
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
+  setFireShadowsEnabled: (enabled: boolean) => void
   setGroundDebugFlat: (flat: boolean) => void
   setSeasonCollapseEnabled: (enabled: boolean) => void
   toggleStateDump: () => void
@@ -160,6 +166,7 @@ export const useUi = create<UiState>()((set) => ({
   ssaoEnabled: true,
   shadowMapHalf: false,
   shadowsEnabled: true,
+  fireShadowsEnabled: false,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
   stateDumpOpen: false,
@@ -198,6 +205,7 @@ export const useUi = create<UiState>()((set) => ({
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
+  setFireShadowsEnabled: (fireShadowsEnabled) => set({ fireShadowsEnabled }),
   setGroundDebugFlat: (groundDebugFlat) => set({ groundDebugFlat }),
   setSeasonCollapseEnabled: (seasonCollapseEnabled) => set({ seasonCollapseEnabled }),
   toggleStateDump: () => set((s) => ({ stateDumpOpen: !s.stateDumpOpen })),
