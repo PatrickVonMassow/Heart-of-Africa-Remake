@@ -40,7 +40,7 @@ import {
   BACKDROP_SEGS,
   backdropBase,
   backdropTaper,
-  panoramaGroundY,
+  panoramaStandY,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
@@ -53,7 +53,15 @@ import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from
 import { TESSELLATION } from '../../render/figures'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
-import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
+import {
+  buildAntelopeParts,
+  buildElephantParts,
+  buildGiraffeParts,
+  buildZebraParts,
+  gaitPhase,
+  legSwingAngle,
+  type GoatLeg,
+} from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
@@ -64,6 +72,9 @@ import {
   apparentAngleDeg,
   hazeColor,
   luminance,
+  panoramaDriftDistance,
+  panoramaGaitBob,
+  panoramaGaitNod,
   excludedAzimuthSpan,
   isAzimuthExcluded,
   type AzimuthSpan,
@@ -1083,12 +1094,16 @@ function skylineExclusionSpans(placeId: string): AzimuthSpan[] {
 // the arid north carries only antelope, the plains east/south the full herd mix,
 // the wooded west/centre a narrower range. Every entry is a species the
 // bird's-eye view also spawns in that region.
-const PANORAMA_FAUNA: Record<RegionId, Array<() => THREE.BufferGeometry>> = {
-  north: [buildAntelope],
-  west: [buildZebra, buildAntelope],
-  central: [buildElephant, buildAntelope],
-  east: [buildElephant, buildGiraffe, buildZebra, buildAntelope],
-  south: [buildElephant, buildGiraffe, buildZebra, buildAntelope],
+// Built SPLIT into body and pivoted legs (point 255): the silhouettes walk the
+// horizon on their own legs — at this range a body-level bob moves barely a
+// pixel, so only a real leg swing stops the glide.
+type FaunaParts = { body: THREE.BufferGeometry; legs: GoatLeg[] }
+const PANORAMA_FAUNA: Record<RegionId, Array<() => FaunaParts>> = {
+  north: [buildAntelopeParts],
+  west: [buildZebraParts, buildAntelopeParts],
+  central: [buildElephantParts, buildAntelopeParts],
+  east: [buildElephantParts, buildGiraffeParts, buildZebraParts, buildAntelopeParts],
+  south: [buildElephantParts, buildGiraffeParts, buildZebraParts, buildAntelopeParts],
 }
 
 /**
@@ -1133,18 +1148,19 @@ function PanoramaWildlife({
 }) {
   const centerH = useMemo(() => sampleTerrain(lat, lon, seed).height, [lat, lon, seed])
   // Region-typical species aligned to the bird's-eye pool (point 102, part c).
-  const geos = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
+  const builds = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
   // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
   // into one is hidden so it never crosses the monument (point 102, part a).
   const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
   // World height of each mesh, for the apparent-size clamp (point 94).
   const geoHeights = useMemo(
-    () => geos.map((g) => {
-      g.computeBoundingBox()
-      const b = g.boundingBox
-      return b ? b.max.y - b.min.y : 2
+    () => builds.map((p) => {
+      p.body.computeBoundingBox()
+      const b = p.body.boundingBox
+      // The legs reach the ground at y = 0, so the body's top IS the height.
+      return b ? b.max.y : 2
     }),
-    [geos],
+    [builds],
   )
   const baseRgb = useMemo(() => {
     const c = new THREE.Color('#4d4639')
@@ -1165,7 +1181,7 @@ function PanoramaWildlife({
     // (stronger for farther rings) so it reads as distance, not a black blob.
     return Array.from({ length: 5 }, (_, i) => {
       const radius = innerRadius + pw.ringInner + rand() * pw.ringSpread
-      const gi = i % geos.length
+      const gi = i % builds.length
       const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, 2.6 + rand() * 1.6)
       // Farther rings haze a touch more (ringInner..ringInner+spread → +0..0.15).
       const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
@@ -1175,20 +1191,22 @@ function PanoramaWildlife({
         radius,
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
-        geo: geos[gi],
+        parts: builds[gi],
         material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
+        worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
         hazeLum: luminance(rgb),
         phase: rand() * Math.PI * 2,
       }
     })
-  }, [placeId, seed, innerRadius, geos, geoHeights, baseRgb, skyRgb, pw])
+  }, [placeId, seed, innerRadius, builds, geoHeights, baseRgb, skyRgb, pw])
   useEffect(
     () => () => items.forEach((it) => it.material.dispose()),
     [items],
   )
   const refs = useRef<Array<THREE.Group | null>>([])
-  const capture = useFreshPanoramaCapture(placeId, seed)
+  // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
+  const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1203,17 +1221,8 @@ function PanoramaWildlife({
     }
   }, [items, exclusionSpans])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }) => {
     const t = clock.elapsedTime
-    // With a capture active the visible horizon IS the captured band cylinder,
-    // whose horizon line sits at EYE_HEIGHT by construction (TravelPanorama's
-    // v-mapping). Standing on the geometry heightfield (panoramaGroundY)
-    // disagreed with it — the silhouettes hovered above or sank below into
-    // black clipped slivers (points 73/92). So place the feet on that visible
-    // horizon line (minus a small sink) whenever a capture stands; without one
-    // (snapshot/ferry) the geometry backdrop is the horizon, so keep the clamp.
-    const captureActive = !!capture
-    const horizonY = EYE_HEIGHT - pw.sinkEpsilon
     items.forEach((it, i) => {
       const g = refs.current[i]
       if (!g) return
@@ -1225,21 +1234,48 @@ function PanoramaWildlife({
       g.visible = !hidden
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
-      const groundY = captureActive
-        ? horizonY
-        : panoramaGroundY(x, z, lat, lon, seed, centerH, innerRadius)
-      const y = groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12
+      // Point 181: the feet go on the ground the frame DRAWS under them — the
+      // higher of this spot's relief and the ground line over the town's disc
+      // edge, seen from the live camera — never the hard EYE_HEIGHT horizon at
+      // infinity, which left them hanging over the captured band's content.
+      const groundY =
+        panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
+        pw.sinkEpsilon
+      // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
+      // wall-clock bob. The stride now rides the ground they cover along the
+      // ring, through the same distance-driven gait phase the settlement goats
+      // walk on, so a faster-drifting animal steps faster and a stalled one
+      // stands still. Single merged meshes have no leg joints at this range, so
+      // the stride reads as the body's own rise and rock.
+      const phase = gaitPhase(panoramaDriftDistance(it.radius, it.drift, t)) + it.phase
+      const y = groundY + panoramaGaitBob(phase, it.worldHeight)
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
-        // y vs the visible horizon line (EYE_HEIGHT); the apparent size and the
-        // hazed luminance for the point-92/94 live gates; azimuth/visible for
-        // the point-102 skyline-exclusion gate.
-        info[i] = { y, visibleY: captureActive ? EYE_HEIGHT : groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden }
+        // y vs the ground line it stands on; the apparent size and the hazed
+        // luminance for the point-92/94 live gates; azimuth/visible for the
+        // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
+        // which ray-probes the surface drawn behind the feet.
+        // `gait`/`groundSpeed` prove the point-255 stride live: the phase must
+        // advance in step with the ground each silhouette covers, so the ratio
+        // is the same constant for all of them — a wall-clock bob would advance
+        // them all equally regardless of speed.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, radius: it.radius, worldHeight: it.worldHeight, gait: phase, groundSpeed: Math.abs(it.radius * it.drift) }
       }
       g.position.set(x, y, z)
-      // Face the drift direction along the ring tangent.
+      // Face the drift direction along the ring tangent, then nod fore/aft in
+      // the body's own frame (YXZ: yaw first, so x is the walking pitch).
+      g.rotation.order = 'YXZ'
       g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
+      g.rotation.x = panoramaGaitNod(phase)
+      // The stride itself: diagonal legs swing in antiphase about their hips.
+      const legs = legRefs.current[i]
+      if (legs) {
+        for (let li = 0; li < it.parts.legs.length; li++) {
+          const lg = legs[li]
+          if (lg) lg.rotation.x = legSwingAngle(phase, it.parts.legs[li].phaseOffset)
+        }
+      }
     })
   })
 
@@ -1253,7 +1289,19 @@ function PanoramaWildlife({
             refs.current[i] = el
           }}
         >
-          <mesh geometry={it.geo} material={it.material} />
+          <mesh name="panorama-silhouette" geometry={it.parts.body} material={it.material} />
+          {it.parts.legs.map((leg, li) => (
+            <group
+              key={li}
+              position={leg.hip}
+              ref={(el) => {
+                if (!legRefs.current[i]) legRefs.current[i] = []
+                legRefs.current[i][li] = el
+              }}
+            >
+              <mesh name="panorama-silhouette" geometry={leg.geo} material={it.material} />
+            </group>
+          ))}
         </group>
       ))}
     </>
@@ -1471,6 +1519,7 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
 
 export function PlaceScene() {
   const camera = useThree((s) => s.camera)
+  const r3fScene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
@@ -1593,6 +1642,22 @@ export function PlaceScene() {
     w.__placeLayout = layout
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
+    w.__placeScene = r3fScene
+    // Ray probe for the §2.5 silhouette gate: what surface does the frame
+    // actually draw at a world point, and how far away is it? Excludes the
+    // silhouettes themselves so a float reports the surface BEHIND them.
+    w.__placeRayHit = (x: number, y: number, z: number) => {
+      const target = new THREE.Vector3(x, y, z)
+      const dir = target.clone().sub(camera.position).normalize()
+      const rc = new THREE.Raycaster(camera.position.clone(), dir, 0.1, 4000)
+      const hits = rc.intersectObject(r3fScene, true)
+      const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+      return {
+        targetDistance: target.distanceTo(camera.position),
+        hitDistance: hit ? hit.distance : null,
+        hitName: hit ? hit.object.name || (hit.object as THREE.Mesh).geometry?.type || 'mesh' : null,
+      }
+    }
     w.__placeSeason = () => ({
       wetness: placeWetness.current,
       sun: sunRef.current?.intensity ?? 0,
@@ -1618,8 +1683,10 @@ export function PlaceScene() {
       delete w.__placeLayout
       delete w.__placeColliders
       delete w.__placeCamera
+      delete w.__placeScene
+      delete w.__placeRayHit
     }
-  }, [layout, camera, fireBlaze, place])
+  }, [layout, camera, r3fScene, fireBlaze, place])
 
   // Focus + mouse-look. On entering a settlement any lingering HUD button is
   // blurred so keyboard input goes straight to the game without an extra click

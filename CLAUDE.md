@@ -1464,18 +1464,41 @@ verify suite that proves it.
     persisted per settlement, announced by a localized toast), as does the
     §2.5 panorama wildlife (region-typical silhouettes drifting beyond the
     settlement edge — far and small, hazed toward the sky, standing on the
-    VISIBLE horizon line rather than a monument looming or clipping to a
-    black sliver; points 92/94; their species the region's own bird's-eye
-    pool and never crossing a fixed skyline landmark, point 102).
-    Verifiable: `scripts/verify/polish.mjs`
+    ground the frame DRAWS under them rather than a monument looming or
+    clipping to a black sliver; points 92/94; their species the region's own
+    bird's-eye pool and never crossing a fixed skyline landmark, point 102).
+    The footing is the higher of the backdrop relief at the silhouette's own
+    spot and the settlement's visible ground line — the sight line over the
+    walkable ground disc's edge from the live camera (`panoramaStandY` /
+    `discHorizonY`, point 181). The former hard EYE_HEIGHT anchor (the
+    captured band's horizon at infinity) put NOTHING under the feet: past the
+    disc edge the plain drops out of sight and the band shows through the gap,
+    so the animals hung in the sky over the band's content (reported on
+    WebGPU in Cairo, over a pyramid flank) — and where relief rose they were
+    buried inside it. The silhouettes WALK rather than glide (point 255): built
+    with pivoted legs, they swing them on the shared distance-driven gait phase
+    (`gaitPhase`/`legSwingAngle`) fed by the arc they drift along their ring, so
+    a faster one steps faster and a stalled one stands still — a wall-clock bob
+    is never the driver, and at horizon range a body-level bob alone would move
+    barely a pixel. Verifiable: `scripts/verify/polish.mjs`
     asserts no markers before and markers after the gift plus the toast,
     their persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village; plus that
     every silhouette reads small (bounded subtended angle), is hazed (not
-    flat black), stands at/above the ground plane without a capture, and
-    sits on the band's horizon line (`|y − visibleY|` bounded) with a
-    capture active — the sizing/haze math pure-tested in
-    `src/scenes/place/panoramaWildlife.test.ts`; and that in Cairo no
+    flat black), and — the point-181 gate, measured on the RENDERED scene
+    rather than against the anchor constant that made the old
+    `|y − visibleY|` check pass while the picture was wrong — that the first
+    surface behind every silhouette's feet is no further away than the feet
+    themselves (`__placeRayHit`, run without a capture at the Maasai village
+    and WITH one at the Nubian village and in Cairo under the Giza skyline,
+    screenshot 136), and that each silhouette's stride phase advances in step
+    with the ground it covers — the same phase-per-unit-walked for all of them,
+    which a clock-driven bob could not produce (point 255) — the stride pose and
+    its distance coupling pure-tested in
+    `src/scenes/place/panoramaWildlife.test.ts`, the ground-line math in
+    `src/scenes/place/backdrop.test.ts` (the sight-line geometry, the drop as
+    the viewer nears, relief-following on a dune, and both old failure modes
+    swept round Cairo); and that in Cairo no
     visible silhouette's azimuth lies inside the Giza skyline span
     (`__placeSkylineExclusion`/`__placePanoramaWildlifeInfo`, point 102),
     the azimuth-exclusion helper (span from placement, margin, inside/

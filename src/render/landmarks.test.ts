@@ -2,11 +2,13 @@
 // non-empty, vertex-colored geometry; the two shape-critical ones are pinned
 // by their proportions (Table Mountain's flat wide profile, the minaret is
 // covered live via the mosque dwelling in the polish suite).
+import * as THREE from 'three'
 import { describe, it, expect } from 'vitest'
 import {
   buildMeroePyramids,
   buildGizaPyramids,
   buildSphinx,
+  SPHINX_BURIAL_DEPTH,
   buildStoneCity,
   buildRockChurches,
   buildCoastalRuins,
@@ -68,7 +70,10 @@ describe('landmark builders', () => {
     const b = geo.boundingBox
     expect(b).toBeTruthy()
     if (!b) return
-    expect(b.min.y).toBeGreaterThanOrEqual(-0.1) // grounded
+    // The field reaches BELOW the ground now: the Sphinx it embeds lies buried
+    // to the shoulders as it did in 1890 (point 279), so the floor is its sunk
+    // body rather than the pyramids' bases.
+    expect(b.min.y).toBeGreaterThanOrEqual(-SPHINX_BURIAL_DEPTH - 0.1)
     // Khufu (base half-extent 1.6, Old-Kingdom slope) peaks at ~2 — a compact
     // symbol: the field stands only ~4 world units from Cairo's marker.
     expect(b.max.y).toBeGreaterThan(1.7)
@@ -85,21 +90,56 @@ describe('landmark builders', () => {
     const b = geo.boundingBox
     expect(b).toBeTruthy()
     if (!b) return
-    expect(b.min.y).toBeGreaterThanOrEqual(-0.05) // grounded
     const length = b.max.x - b.min.x
     const width = b.max.z - b.min.z
-    const height = b.max.y
-    // Couchant: clearly longer than tall, and longer than wide.
-    expect(length / height).toBeGreaterThan(1.6)
+    // Couchant: clearly longer than tall, and longer than wide. Measured over
+    // the WHOLE lion, buried body included — that is the shape this builder
+    // describes, whether or not the sand happens to cover it.
+    const bodyHeight = b.max.y - b.min.y
+    expect(length / bodyHeight).toBeGreaterThan(1.6)
     expect(length / width).toBeGreaterThan(2)
     // The fore paws stretch forward well beyond the chest front (chest face
     // at x ≈ 0.39): the +x extreme is the paw tips.
     expect(b.max.x).toBeGreaterThan(0.7)
-    // Head under the nemes crowns the silhouette at a bounded height.
-    expect(height).toBeGreaterThan(0.6)
-    expect(height).toBeLessThan(0.85)
     // Distinctly more parts than the old three-box stand-in (72 vertices).
     expect(geo.attributes.position.count).toBeGreaterThan(200)
+    geo.dispose()
+  })
+
+  it('the Sphinx stands buried to the shoulders, as it did in 1890 (point 279)', () => {
+    // Until Baraize's 1925-36 excavation the body lay under the sand: Caviglia
+    // cleared the chest in 1817 and Mariette in 1853, and both times the sand
+    // took it back. A ~1890 expedition sees a head and nemes out of a drift.
+    // The regression this pins is the modern postcard — the freestanding lion
+    // the builder used to make, which also mounted at 13x as Cairo's skyline.
+    const geo = buildSphinx()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    let minY = Infinity
+    let maxY = -Infinity
+    let aboveMinX = Infinity
+    let aboveMaxX = -Infinity
+    let above = 0
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+      // Count only what genuinely clears the sand, not the drift's own rim.
+      if (y > 0.09) {
+        above += 1
+        if (x < aboveMinX) aboveMinX = x
+        if (x > aboveMaxX) aboveMaxX = x
+      }
+    }
+    // The body really is sunk, not merely shortened.
+    expect(minY).toBeLessThanOrEqual(-SPHINX_BURIAL_DEPTH + 1e-6)
+    // Something still stands proud — the head under its nemes.
+    expect(above).toBeGreaterThan(0)
+    expect(maxY).toBeGreaterThan(0.2)
+    // And it is only the HEAD: what clears the sand spans a small part of the
+    // lion's length, near the front, nowhere near the paws out at x > 0.7.
+    expect(aboveMaxX - aboveMinX).toBeLessThan(0.35)
+    expect(aboveMaxX).toBeLessThan(0.6)
     geo.dispose()
   })
 

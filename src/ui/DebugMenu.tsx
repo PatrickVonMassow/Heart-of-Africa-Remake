@@ -9,6 +9,7 @@ import { EVENT_KINDS, type EventKind } from '../systems/events'
 import { debugEventGroups, fireDebugEvent, sortByLabel } from '../systems/debugEvents'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
+import { startBenchmarkSafely } from '../systems/startBenchmark'
 import { PLACES, type Material } from '../world/geo'
 import {
   CULTURAL_LANDMARKS,
@@ -200,6 +201,16 @@ export function DebugMenu() {
         <span>{t.debug.renderer}</span>
         {/* Proper names, not localized. */}
         <span>{webglFallback ? 'WebGL 2' : 'WebGPU'}</span>
+      </label>
+
+      {/* Starting the benchmark must not depend on a function key (point 280):
+          on many keyboards F8 needs Fn and never reaches the page at all. This
+          button is the entry point the user is actually pointed at. */}
+      <label>
+        <span>{t.debug.benchmarkStart}</span>
+        <span>
+          <button onClick={() => void startBenchmarkSafely()}>{t.benchmark.title}</button>
+        </span>
       </label>
 
       <label>

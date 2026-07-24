@@ -6497,7 +6497,7 @@ the remaining open points in their numeric order.
   spreads out and keeps moving rather than locking. Docs: design.md §19.4/§19.5,
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
-- [ ] 181. Panorama/skyline wildlife silhouettes sometimes FLOAT with their feet
+- [x] 181. Panorama/skyline wildlife silhouettes sometimes FLOAT with their feet
   far above the ground instead of standing on the visible horizon line. DIAGNOSED
   20.07.2026 — LOGIC IS CORRECT, so this is WebGPU-specific and needs the WebGPU
   lane to reproduce: the anchor (PlaceScene.tsx ~1136-1160) with a capture active
@@ -9689,7 +9689,7 @@ the remaining open points in their numeric order.
   text. NOTE: same river-render files as 232-234/246 — bundle with the river-render
   follow-ups (246 depthWrite + this).
 
-- [ ] 255. ANIMAL GAIT: TOO SLOW, ONLY ON STRAIGHT WALK, AND ABSENT ON THE SKYLINE
+- [x] 255. ANIMAL GAIT: TOO SLOW, ONLY ON STRAIGHT WALK, AND ABSENT ON THE SKYLINE
   (user 23.07.2026, follow-up to point 228). Three observations on the deployed
   gait: (1) the leg swing is TOO SLOW overall — it must plausibly MATCH the movement
   speed so a walking animal reads as striding on its FEET, not shuffling; (2) the
@@ -10589,6 +10589,99 @@ the remaining open points in their numeric order.
   DOCS: record the resolution in `docs/perf-276-findings.md`. No player-visible
   text. NOTE: touches the flora streaming — coordinate with any point-276 lever
   work on the same files. Implementation-ready.
+
+- [ ] 279. THE 1890 PICTURE, NOT THE MODERN POSTCARD — correct the objectively wrong
+  monuments and the cattle contradiction (from the point-205 research pass,
+  `docs/205-world-accuracy-findings.md`, 24.07.2026). Six of that pass's findings are
+  objective errors against a documented record — two of them against THIS repo's own
+  research docs — and each is small. Do them in this order, each its own commit,
+  each with the finding's evidence quoted in the commit message:
+  (a) THE SPHINX IS BURIED (finding A1, the user's own exemplar). It lay buried to the
+    neck/shoulders through the whole 19th century — Caviglia cleared the chest in 1817
+    and it re-covered, Mariette in 1853 likewise, and only the 1925-36 Baraize
+    excavation freed the body for good. `buildSphinx()` in `src/render/landmarks.ts`
+    builds the complete couchant lion standing clear of the ground, and
+    `buildGizaPyramids()` mounts that geometry BOTH on the travel map and — at 13x
+    scale — as Cairo's western first-person skyline (`PlaceScene.tsx`), so the
+    anachronism is at its most visible on the STARTING city's horizon. Bury the body
+    inside `buildSphinx()` itself (sand up to the neck/shoulders, head and nemes
+    proud, the sand collar reading as drift rather than a clean cut) so both views are
+    fixed at once — do NOT wait for the walkable-pyramids point, which is a v0.3
+    feature behind the demo checkpoint. Pure-test the buried proportions the way
+    `src/render/landmarks.test.ts` already pins the couchant profile; screenshot both
+    views on BOTH backends (the travel field and the Cairo skyline).
+  (b) MEROE'S PYRAMIDS ARE BROKEN-TOPPED (finding A2, same class, nobody had looked).
+    Ferlini dismantled Amanishakheto's pyramid from the top down in 1834 and Lepsius
+    recorded in 1844 that the treasure fever "has brought many a pyramid to ruin" —
+    ~40 Nubian pyramids lost their tops, and today's pointed apexes are 20th-century
+    reconstruction. The game builds six clean sharp cones. Truncate most of them with
+    ragged tops, leaving the field legible as pyramids.
+  (c) GONDAR IS A BURNT RUIN (finding A3). The Mahdists sacked and burned Gondar in
+    January 1888 — two years BEFORE the game starts — while the game renders an
+    intact keep with unbroken crenellations and both tower roofs on. Break the
+    silhouette: roofless towers, gapped crenellations, no intact keep.
+  (d) THE BEMBA KEEP NO CATTLE (finding A15, an internal contradiction).
+    `src/scenes/place/regionStyles.ts` maps `bemba: 'ring'` commented as "the Central
+    Cattle Pattern" and `layout.ts` therefore builds them a livestock pen — but
+    `docs/peoples-1890.md` §5.1 states in bold that the Bemba were NOT a cattle
+    people: they lived in the tsetse belt by citemene millet cultivation. Give them
+    the plan their own research supports and drop the kraal; extend the per-village
+    plan test in `src/scenes/place/layout.test.ts` accordingly.
+  (e) THE REMAINING SEVERITY-1/2 FINDINGS of the document that are objective errors,
+    each judged on its own evidence.
+  DO NOT "correct" anything the document lists under the deliberately-exempt homage
+  carve-outs (design.md §8, point 208 B3) — the `$` currency, the treasure value
+  matrix and Khartoum as a welcoming port are DESIGN decisions, not mistakes.
+  DOCS: update `docs/205-world-accuracy-findings.md` with the resolution of each
+  finding as it lands, and design.md §4.4 where a monument's description changes.
+  No player-visible text changes unless a finding demands one (then de+en).
+  Implementation-ready.
+
+- [x] 280. THE BENCHMARK MUST BE STARTABLE WITHOUT A FUNCTION KEY (user report
+  24.07.2026: "Benchmark lässt sich nicht per F8 starten", on the DEPLOYED build).
+  The handler itself is live and correct — a headless check against the published
+  page opens the overlay on F8 and closes it on Esc — so the key is not reaching the
+  page on the user's machine. That is a whole CLASS of failure the game must not
+  depend on: on many laptops F8 is a hardware/media key that needs Fn and never
+  produces a keydown at all, browser extensions and DevTools bind it, and a cached
+  build would show the same symptom. A single function key is therefore the wrong
+  sole entry point for something the user is asked to run.
+  FIX — give it paths that cannot be intercepted, all reaching the SAME runner:
+  (a) A BUTTON in the debug menu (F1), the canonical place every other debug action
+    lives (design.md §21.3), localized de+en. This is the primary fix.
+  (b) A URL PARAMETER (`?bench=1`) that starts the run once the scene is ready —
+    immune to every keyboard and focus question, and the easiest thing to hand a
+    remote tester as a link.
+  (c) Keep F8 as the shortcut it was meant to be.
+  Also make a FAILURE VISIBLE rather than silent: if the lazy import or the start
+  throws, the existing localized toast must fire — verify it does, since a silent
+  no-op is indistinguishable from a key that never arrived.
+  TESTS: component test that the debug-menu button starts the runner and is
+  localized in both languages; a pure/route test for the query parameter; and a live
+  check against a PRODUCTION preview build (not the dev server — the dev hooks the
+  suites usually lean on are stripped there, which is exactly the build the user
+  runs) that the parameter starts a short benchmark. DOCS: design.md §21.1/§21.3 and
+  CLAUDE.md §7.1 pt. 20. Implementation-ready.
+
+- [ ] 281. THE SETTLEMENT BACKDROP RIDGE READS AS A STAIRCASE (spotted 24.07.2026 in
+  `verification/136-cairo-silhouette-footing.png`, WebGL2, Cairo looking at the dune
+  ridge). The near backdrop relief shows a row of hard rectangular STEPS along the
+  ridge crest — a stair-stepped silhouette against the sky, unmistakably a rendering
+  artifact rather than a dune. §2.5 requires the backdrop relief to shade SMOOTH ("no
+  flat facets"), and `src/scenes/place/backdrop.test.ts` already pins the material as
+  non-flat-shaded with a resolution-independent inner-rim taper — so the stepping is
+  in the HEIGHTFIELD sampling, not the shading: the crest is quantised to the source
+  grid where the terrain rises steeply, and the taper does not cover it.
+  DIAGNOSE by rendering the same view with the heightfield sampled at increasing
+  resolutions to confirm the steps are quantisation, then fix at the sampling
+  (interpolate the crest rather than snapping to grid rows), NOT by blurring the
+  whole backdrop, which would flatten real relief.
+  VERIFIABLE: the same Cairo view on BOTH backends shows a continuous ridge line; a
+  pure test over the heightfield asserts the crest's second difference stays bounded
+  (no repeated flat-then-jump pattern) along a steep profile. Keep the §2.5 bounds
+  the existing tests pin (elevation angle, standing heights). No player-visible text.
+  NOTE: this is the "looks wrong but passes" class — every existing backdrop test is
+  green while the picture is visibly wrong. Implementation-ready.
 
 ## Closing (only after all points)
 

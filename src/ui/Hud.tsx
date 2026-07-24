@@ -20,6 +20,7 @@ import { StateDump } from './StateDump'
 import { BenchmarkOverlay } from './BenchmarkOverlay'
 import { TouchControls } from './TouchControls'
 import { dispatchSyntheticKey, onKeyPress, onTouchEngage } from '../systems/input'
+import { benchmarkFromUrl, startBenchmarkSafely } from '../systems/startBenchmark'
 import { getStrings, useStrings } from '../i18n'
 
 function InventoryBar() {
@@ -435,13 +436,7 @@ export function Hud() {
     // delivered build — the numbers must come from the player's own hardware —
     // so the runner is not dev-gated but imported LAZILY here, keeping it out
     // of the eager startup chunks (like the TTS stack).
-    const offF8 = onKeyPress('F8', () => {
-      const ui = useUi.getState()
-      if (ui.benchProgress || ui.benchReport) return
-      void import('../systems/benchmarkRun')
-        .then((m) => m.startBenchmark())
-        .catch(() => useGame.getState().setToast(getStrings().benchmark.unavailable))
-    })
+    const offF8 = onKeyPress('F8', () => void startBenchmarkSafely())
     // The twelve keys of the number row jump to the twelve months of the
     // current year, for stepping through the seasons (design.md §21.1).
     // PHYSICAL codes, so the row reads 1..0 ß ´ on a German keyboard and
@@ -508,6 +503,16 @@ export function Hud() {
       window.removeEventListener('keydown', preventFn)
     }
   }, [setJournalOpen, toggleDebug, setDialog])
+
+  // ?bench=1 starts the benchmark without any key at all (point 280) — the
+  // entry point to hand a remote tester as a link. Fires once, after a short
+  // settle so the scene and its streamed chunks are up.
+  useEffect(() => {
+    const { start, short } = benchmarkFromUrl(window.location.search)
+    if (!start) return
+    const timer = window.setTimeout(() => void startBenchmarkSafely({ short }), 4000)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   return (
     <>

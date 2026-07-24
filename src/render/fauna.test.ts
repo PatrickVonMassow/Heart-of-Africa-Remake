@@ -17,6 +17,10 @@ import {
   buildGiraffe,
   buildGoat,
   buildGoatParts,
+  buildAntelopeParts,
+  buildZebraParts,
+  buildGiraffeParts,
+  buildElephantParts,
   faceVelocity,
   gaitPhase,
   legSwingAngle,
@@ -806,5 +810,36 @@ describe('animal gait (design.md §19, point 228 — no foot-slide, no backward 
     const zeros = legs.filter((l) => l.phaseOffset === 0).length
     expect(zeros).toBe(2)
     expect(legs.filter((l) => l.phaseOffset === Math.PI)).toHaveLength(2)
+  })
+
+  it('every §2.5 panorama species builds the same hip-pivoted walking rig (point 255)', () => {
+    // The horizon silhouettes used to glide as one merged mesh. Each species now
+    // splits the same way as the goat, so the shared distance-driven gait can
+    // swing its legs — the only stride cue that reads at horizon range.
+    const builds = {
+      antelope: buildAntelopeParts(),
+      zebra: buildZebraParts(),
+      giraffe: buildGiraffeParts(),
+      elephant: buildElephantParts(),
+    }
+    for (const [name, { body, legs }] of Object.entries(builds)) {
+      expect(body.attributes.position.count, name).toBeGreaterThan(0)
+      expect(legs, name).toHaveLength(4)
+      body.computeBoundingBox()
+      const top = body.boundingBox!.max.y
+      for (const leg of legs) {
+        leg.geo.computeBoundingBox()
+        // Top of the leg at the local origin: the group's hip is the pivot.
+        expect(leg.geo.boundingBox!.max.y, name).toBeCloseTo(0, 6)
+        expect(leg.geo.boundingBox!.min.y, name).toBeLessThan(0)
+        // The hip sits under the body, and the foot reaches the ground (y ≈ 0)
+        // so the silhouette stands on the ground line, not above or through it.
+        expect(leg.hip[1], name).toBeGreaterThan(0)
+        expect(leg.hip[1], name).toBeLessThan(top)
+        expect(leg.hip[1] + leg.geo.boundingBox!.min.y, name).toBeCloseTo(0, 2)
+      }
+      expect(legs.filter((l) => l.phaseOffset === 0), name).toHaveLength(2)
+      expect(legs.filter((l) => l.phaseOffset === Math.PI), name).toHaveLength(2)
+    }
   })
 })

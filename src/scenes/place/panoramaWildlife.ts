@@ -65,6 +65,36 @@ export function panoramaDriftDistance(radius: number, driftRate: number, elapsed
   return Math.abs(radius * driftRate * elapsedSeconds)
 }
 
+/** Body bob as a fraction of the silhouette's own height — the walking rise and
+ *  fall of the barrel, the cheapest legible stride cue at this distance. */
+export const PANORAMA_GAIT_BOB = 0.028
+/** Fore/aft nod (rad) of the body over a stride: a slight rocking, never a
+ *  seesaw — the silhouette is only a couple of degrees tall. */
+export const PANORAMA_GAIT_NOD = 0.05
+
+/**
+ * Vertical offset of a drifting silhouette's body at a gait phase (point 255).
+ * `|sin|` puts TWO rises in each stride cycle — one per footfall, as a walking
+ * quadruped's barrel does — and is exactly 0 at phase 0, so a silhouette that
+ * covers no ground stands dead still instead of bobbing on a wall clock.
+ *
+ * The silhouettes are single merged meshes with no leg joints (the settlement
+ * goats' pivoted rig would be invisible detail at this range), so the stride
+ * reads through the body itself — but off the same distance-driven `gaitPhase`,
+ * never off elapsed time: a faster-drifting animal steps faster, a stalled one
+ * not at all.
+ */
+export function panoramaGaitBob(phase: number, bodyHeight: number): number {
+  return Math.abs(Math.sin(phase)) * bodyHeight * PANORAMA_GAIT_BOB
+}
+
+/** Fore/aft body nod (rad) at a gait phase (point 255): one rock per stride,
+ *  zero at rest, in antiphase to the bob so the animal dips as it rises onto
+ *  the next step. */
+export function panoramaGaitNod(phase: number): number {
+  return Math.sin(phase) * PANORAMA_GAIT_NOD
+}
+
 /** An azimuth interval on the panorama ring, centred at `center` (radians,
  *  atan2(z, x)) with a half-width `half`. */
 export interface AzimuthSpan {

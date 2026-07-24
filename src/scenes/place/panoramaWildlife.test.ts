@@ -2,7 +2,19 @@
 // far silhouettes stay small (bounded subtended angle) and hazed toward the
 // sky, never looming black monuments.
 import { describe, it, expect } from 'vitest'
-import { silhouetteScale, apparentAngleDeg, hazeColor, luminance, excludedAzimuthSpan, isAzimuthExcluded, panoramaDriftDistance } from './panoramaWildlife'
+import {
+  silhouetteScale,
+  apparentAngleDeg,
+  hazeColor,
+  luminance,
+  excludedAzimuthSpan,
+  isAzimuthExcluded,
+  panoramaDriftDistance,
+  panoramaGaitBob,
+  panoramaGaitNod,
+  PANORAMA_GAIT_BOB,
+} from './panoramaWildlife'
+import { gaitPhase } from '../../render/fauna'
 
 describe('silhouetteScale', () => {
   it('shrinks an oversized scale so the subtended angle stays within the cap', () => {
@@ -84,6 +96,55 @@ describe('panoramaDriftDistance (point 255 — walking silhouettes, not gliding)
     const fast = panoramaDriftDistance(80, 0.01, 1)
     expect(fast).toBeGreaterThan(slow)
     expect(panoramaDriftDistance(80, 0, 5)).toBe(0) // no drift → no swing
+  })
+})
+
+describe('panorama silhouette gait pose (point 255 — walking, not sliding)', () => {
+  /** Exactly what PlaceScene feeds the pose: the ring arc walked → gait phase. */
+  const phaseAt = (radius, drift, t) => gaitPhase(panoramaDriftDistance(radius, drift, t))
+
+  it('advances the stride with the distance covered, and holds it at zero displacement', () => {
+    // A drifting silhouette walks: the phase grows as it covers arc.
+    const p1 = phaseAt(120, 0.006, 1)
+    const p2 = phaseAt(120, 0.006, 2)
+    expect(p1).toBeGreaterThan(0)
+    expect(p2).toBeGreaterThan(p1)
+    // A silhouette that covers no ground never moves a muscle, however long
+    // the clock runs — the whole point of a distance-driven gait.
+    expect(phaseAt(120, 0, 900)).toBe(0)
+    expect(panoramaGaitBob(phaseAt(120, 0, 900), 5)).toBe(0)
+    expect(panoramaGaitNod(phaseAt(120, 0, 900))).toBe(0)
+  })
+
+  it('steps faster for a faster drift, at the same instant', () => {
+    expect(phaseAt(120, 0.01, 3)).toBeGreaterThan(phaseAt(120, 0.004, 3))
+    // ... and on a wider ring, where the same angular drift covers more ground.
+    expect(phaseAt(160, 0.006, 3)).toBeGreaterThan(phaseAt(100, 0.006, 3))
+  })
+
+  it('bobs twice per stride, scaled to the body, and never sinks the animal', () => {
+    const h = 5
+    // |sin| — two rises per 2π cycle (one per footfall), never negative, so the
+    // bob only ever lifts the body off the ground line it stands on.
+    expect(panoramaGaitBob(0, h)).toBe(0)
+    expect(panoramaGaitBob(Math.PI, h)).toBeCloseTo(0, 12)
+    expect(panoramaGaitBob(Math.PI / 2, h)).toBeCloseTo(h * PANORAMA_GAIT_BOB, 12)
+    expect(panoramaGaitBob((3 * Math.PI) / 2, h)).toBeCloseTo(h * PANORAMA_GAIT_BOB, 12)
+    for (let i = 0; i <= 40; i++) {
+      const b = panoramaGaitBob((i / 40) * 6 * Math.PI, h)
+      expect(b).toBeGreaterThanOrEqual(0)
+      expect(b).toBeLessThanOrEqual(h * PANORAMA_GAIT_BOB + 1e-12)
+    }
+    // A taller animal bobs proportionally more, so the cue reads the same.
+    expect(panoramaGaitBob(Math.PI / 2, 10)).toBeCloseTo(2 * panoramaGaitBob(Math.PI / 2, 5), 12)
+  })
+
+  it('nods gently fore and aft — a rock, never a seesaw', () => {
+    expect(panoramaGaitNod(0)).toBe(0)
+    let maxNod = 0
+    for (let i = 0; i <= 60; i++) maxNod = Math.max(maxNod, Math.abs(panoramaGaitNod((i / 60) * 4 * Math.PI)))
+    expect(maxNod).toBeGreaterThan(0)
+    expect(maxNod).toBeLessThan(0.09) // ≈5°, invisible as a tilt but alive
   })
 })
 

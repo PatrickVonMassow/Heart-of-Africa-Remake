@@ -151,8 +151,8 @@ src/
 
 ## Status
 
-The autonomous build batch reports its live progress — current point, queue,
-per-point runtimes and pending manual checks — on the
+The autonomous build batch reports its live progress — what it is working on,
+what needs a decision, the queue and what is done — on the
 [batch dashboard](https://claude.ai/code/artifact/fe669d50-9b71-43a3-bf82-2fce7abe774b).
 
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
