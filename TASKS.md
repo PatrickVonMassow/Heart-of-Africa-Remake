@@ -11180,6 +11180,38 @@ the remaining open points in their numeric order.
   `scripts/verify/*.mjs`. VERIFIABLE: a written report per reviewed area with a verdict
   (valid / stale→fixed), each stale test fixed with its correction. No player-visible text.
 
+- [ ] 304. VOICE WASM COLD-LOAD RENDER-LIVENESS — ~16 s freeze in the headless verify (found
+  24.07.2026 in the v0.2 closing; the TTS/worker/speech code is UNCHANGED since v0.1 → this is
+  PRE-EXISTING, not a v0.2 regression). `scripts/verify/voice.mjs` asserts the max rAF gap stays
+  < 1500 ms through the cold TTS load on the WASM path (point 117 — the WASM fallback must keep
+  the game rendering); on the loaded headless Windows machine it measures ~16283 ms. The model
+  load IS correctly offloaded to a Web Worker (`src/journal/speech.ts` new Worker + `ttsWorker.ts`),
+  so the code does not block the main thread — the gap is CPU STARVATION during the worker's
+  onnxruntime-WASM cold compile on a resource-limited headless machine (a real multi-core browser,
+  and real Chromium users on the pre-warmed WebGPU path, do not hit it). INVESTIGATE: is it a
+  genuine main-thread stall to FIX, or a headless-CPU-starvation artifact to make the LIVENESS
+  CHECK robust to a loaded machine (measure real main-thread work, not worker CPU contention) —
+  and confirm the real-browser WASM cold-load stays live. Do NOT weaken the bound to hide a real
+  15 s stall (the point-117 defect it guards). VERIFIABLE: the voice cold-load liveness passes on
+  a quiet AND a loaded machine, or is documented as a headless limitation with a real-browser
+  confirmation. No player-visible text.
+
+- [ ] 305. OPTIMIZE THE LOW DETAIL PRESET FOR THE M1 PRO (user 24.07.2026; do it with Fable). The
+  user's F8 benchmark on a MacBook Pro 16 M1 Pro (2021; `local/m1pro-bench.json`, WebGPU/Firefox,
+  REAL GPU timestamps) shows the machine is heavily GPU-bound at HIGH — baseline (all on) 142–229 ms
+  GPU/frame — and the dominant levers are DPR (dpr 1 → 44 ms, ~70 % saving) and the POST pipeline
+  (SSAO ~73 ms, TRAA ~52 ms), both already off/reduced in LOW. The next lever for LOW is SHADOWS
+  (shadows-off drops 952→72 draw calls and 3 M→1 M triangles) and geometry (terrain refine /
+  terrain cap / flora radius / wildlife density). TUNE the LOW `QUALITY_PRESET` (`src/config/quality.ts`,
+  point 276) so the game runs DEUTLICH faster on the M1 Pro: candidate cuts for LOW — sun shadows
+  OFF entirely (not just 1024), a harder terrain segment cap, tighter flora radius, lower wildlife
+  density — chosen by the benchmark's per-config GPU numbers for the highest-value reductions while
+  keeping LOW playable and recognizable. Keep the completeness gate + `docs/graphics-detail-levels.md`
+  + `qualityDoc.test.ts` in sync. METHOD: Fable-5 (user's explicit choice). ANCHORS:
+  `src/config/quality.ts`, `local/m1pro-bench.json`, `docs/graphics-detail-levels.md`. VERIFIABLE:
+  `quality.test.ts` + `qualityDoc.test.ts` green; the changed LOW values pinned; a note on the
+  expected M1-Pro GPU saving from the benchmark deltas. No player-visible text (numbers only).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
