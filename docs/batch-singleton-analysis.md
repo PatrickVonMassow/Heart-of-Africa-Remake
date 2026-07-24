@@ -179,10 +179,11 @@ Remediation, automatic and logged:
 
 ## Apply steps (for the main session — in this order)
 
-1. **Kill the rogue session** (STILL RUNNING at analysis time):
-   `Stop-Process -Id 25848 -Force` — verify first with
-   `Get-Process -Id 25848 | Select-Object ProcessName,StartTime`
-   (expect `claude`, started 24.07.2026 06:51:16).
+1. **Confirm the rogue session is gone.** pid 25848 (e9407cae's claude) was
+   still alive during the analysis but exited on its own by 09:12 local.
+   Verify: `Get-Process -Id 25848` must error ("no longer running"); if a
+   process with that id exists, check its StartTime — only `claude` started
+   24.07.2026 06:51:16 would be the rogue (`Stop-Process -Id 25848 -Force`).
 2. **Merge** `feat/batch-singleton` into `main`; run the fast gate
    (`npx vitest run scripts/` + `npm run lint`).
 3. **Delete the stale old-format lock and alert state** so the new code starts
