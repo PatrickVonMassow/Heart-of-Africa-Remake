@@ -10707,6 +10707,28 @@ the remaining open points in their numeric order.
   with the reason recorded. NOTE: belongs to the point-200 flake umbrella but is
   filed separately because it is no longer believed to be a flake.
 
+- [ ] 283. AN ANIMAL SINKS INTO THE GROUND — the in-game assert channel caught it
+  (24.07.2026, WebGPU, quiet machine). The game's own dev-mode invariant fired during
+  an ordinary enrichments run:
+  `[ASSERT] animal-buried — warthog bodyY=0.41 ground=1.39 y=0.41 young=false
+  bathe=false drink=false dodge=false hop=false chunk=14,3 shoreSeed=false
+  parent=false child=true dPlayer=74`
+  — a warthog standing a full world unit BELOW its own terrain height, i.e. buried up
+  to the back, 74 units from the traveller. The flags rule out every pose that
+  legitimately lowers a body (no bathing, no drinking, no dodge, no hop), and the
+  animal is not young, so it is not a calf-schema height either. It DOES have a child,
+  which points at the family drives as the place to look first.
+  INVESTIGATE where the y is written: a mover that sets the body height from a stale
+  or differently-sampled ground (the family/leash drives are the suspect given
+  `child=true`), or a chunk boundary where the terrain sample and the render sample
+  disagree — chunk 14,3 is recorded above, so the spot is reproducible.
+  This is exactly what the assert channel exists for, so the fix must keep the assert
+  ARMED and add the missing height clamp at the source rather than silencing it.
+  VERIFIABLE: a pure test that the body height derives from the same ground sample the
+  renderer draws for every drive that moves an animal; a full enrichments run on both
+  backends with ZERO console errors. NOTE: console errors are a hard gate, so this
+  currently red-flags every run it fires in. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
