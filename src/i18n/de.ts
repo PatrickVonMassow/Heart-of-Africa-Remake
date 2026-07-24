@@ -78,7 +78,7 @@ const LANDMARKS: Record<string, string> = {
   'thabana-ntlenyana': 'Thabana Ntlenyana',
   'stanley-falls': 'Stanley-Fälle',
   'livingstone-falls': 'Livingstone-Fälle',
-  'kabalega-falls': 'Kabalega-Fälle',
+  'murchison-falls': 'Murchison-Fälle',
   'victoria-falls': 'Victoria-Fälle',
   'augrabies-falls': 'Augrabies-Fälle',
   'elephant-graveyard': 'Elefantenfriedhof',

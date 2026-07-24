@@ -10933,6 +10933,17 @@ the remaining open points in their numeric order.
   the Vitest layer). DOCS: a short section in `docs/maximale-qs.md` (the QA process
   gains "keep the retrospective current") and a pointer memory. Implementation-ready.
 
+- [x] 291. USE THE 1890-VALID NAME FOR LANDMARKS — the White Nile falls are MURCHISON
+  FALLS, not Kabalega (user decision 24.07.2026). Kabalega is a 1970s Ugandan renaming;
+  a Victorian explorer of 1864–1890 wrote "Murchison Falls". Renamed the landmark id
+  `kabalega-falls`→`murchison-falls` (`src/world/data/landmarks.ts`), both-language
+  labels (`Murchison Falls` / `Murchison-Fälle`) and design.md §4. GENERAL RULE (the
+  standing principle behind this): every place/landmark/settlement name in the game uses
+  the name that was VALID IN 1890 — the other four falls and all lakes already do
+  (Stanley, Livingstone, Victoria, Augrabies; Rudolf, Albert, Edward, Nyasa). Recorded as
+  the memory `use-1890-valid-names`; the point-205 plausibility audit enforces it. Fast
+  gate green (2867 tests). Committed to main.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this

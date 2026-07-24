@@ -6843,7 +6843,7 @@ check(
 // --- Region border near a river renders a legible tone, not a black slab -------
 // (point 101) A transparent border ribbon wrote no valid MRT normal, so the
 // screen-space AO blackened it into "black bars near rivers". Park on land by
-// Kabalega Falls, project a near-player border vertex to screen and sample the
+// Murchison Falls, project a near-player border vertex to screen and sample the
 // ribbon pixels: they must be a mid-tone sepia, never near-black (nor white).
 await page.evaluate(() => {
   window.__balance.randomEventsEnabled = false

@@ -44,7 +44,7 @@ export interface WaterfallDef {
 export const WATERFALLS: WaterfallDef[] = [
   { id: 'stanley-falls', lon: 25.2, lat: 0.5, river: 'congo' },
   { id: 'livingstone-falls', lon: 14.35, lat: -5.15, river: 'congo' },
-  { id: 'kabalega-falls', lon: 31.68, lat: 2.28, river: 'white-nile' },
+  { id: 'murchison-falls', lon: 31.68, lat: 2.28, river: 'white-nile' },
   { id: 'victoria-falls', lon: 25.86, lat: -17.93, river: 'zambezi' },
   { id: 'augrabies-falls', lon: 20.34, lat: -28.59, river: 'orange' },
 ]
