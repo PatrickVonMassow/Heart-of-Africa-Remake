@@ -161,7 +161,12 @@ function usePathTexture(paths: PathDef[] | null): THREE.CanvasTexture | null {
   }, [paths])
 }
 
-function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: THREE.Texture | null) {
+function usePlaceMaterials(
+  isPort: boolean,
+  isMonument: boolean,
+  style: RegionPlaceStyle,
+  pathTex: THREE.Texture | null,
+) {
   // Debug diagnosis (point 111): swap the ground for a plain material to see
   // whether a WebGPU-only black patch comes from the TSL ground node material.
   const flatGround = useUi((s) => s.groundDebugFlat)
@@ -180,12 +185,21 @@ function usePlaceMaterials(isPort: boolean, style: RegionPlaceStyle, pathTex: TH
       ? { mask: pathTex, color: isPort ? '#bfa070' : style.pathColor, extent: PATH_MASK_EXTENT }
       : undefined
     const ground = flatGround
-      ? new THREE.MeshStandardMaterial({ color: isPort ? '#dcc99c' : style.ground[0], roughness: 1, metalness: 0 })
-      : isPort
-        ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
-        : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
+      ? new THREE.MeshStandardMaterial({
+          color: isMonument ? '#e0c489' : isPort ? '#dcc99c' : style.ground[0],
+          roughness: 1,
+          metalness: 0,
+        })
+      : isMonument
+        ? // The walkable Giza plateau: warm, granular DESERT SAND (matched to
+          // the travel desert biome), not the port's pebbled sandy earth
+          // (point 273) — the `sand` mode mutes the earth mottling.
+          createGroundMaterial('#e0c489', '#d3b578', '#c2a05e', pathOpts, { sand: true })
+        : isPort
+          ? createGroundMaterial('#dcc99c', '#c4ad7c', '#b59a6b', pathOpts)
+          : createGroundMaterial(style.ground[0], style.ground[1], style.ground[2], pathOpts)
     return { plaster, plasterDark, mud, thatch, wood, cloth, ground }
-  }, [isPort, style, pathTex, flatGround])
+  }, [isPort, isMonument, style, pathTex, flatGround])
 }
 
 type PlaceMaterials = ReturnType<typeof usePlaceMaterials>
@@ -1842,7 +1856,7 @@ export function PlaceScene() {
     return marketPlentyAt(place.peopleId, useGame.getState().day, START_YEAR)
   }, [placeId])
   const pathTex = usePathTexture(layout?.paths ?? null)
-  const mats = usePlaceMaterials(sandy, style, pathTex)
+  const mats = usePlaceMaterials(sandy, isMonument, style, pathTex)
   const floraGeos = useMemo<Record<FloraSpecies, THREE.BufferGeometry>>(
     () => ({ palm: buildPalm(true), acacia: buildAcacia(), jungle: buildJungleTree(), bush: buildBush() }),
     [],

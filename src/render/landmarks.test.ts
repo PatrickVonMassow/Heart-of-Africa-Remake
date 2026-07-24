@@ -91,14 +91,17 @@ describe('landmark builders', () => {
     geo.dispose()
   })
 
-  it("Giza carries its 1890 casing cues: blunt Khufu, Khafre's pale cap, Menkaure's granite base (point 279)", () => {
+  it("Giza carries its 1890 casing cues at skyline scale: blunt Khufu, Khafre's pale cap, no Menkaure error band (point 273)", () => {
     // docs/giza-1890.md §1.1-§1.2/§3: all three lost their smooth Tura casing
     // to centuries of quarrying; Khufu's apex and top courses are gone (a
     // small flat platform, not a point); Khafre ALONE keeps a cap of original
     // smooth casing near its apex — the single most useful visual cue on the
-    // plateau; and Menkaure's lower courses are cased in darker red Aswan
-    // granite. The regression this pins is the three identical tawny sharp
-    // cones the builder used to make.
+    // plateau. Menkaure's lower courses ARE red Aswan granite in reality, but
+    // at this distant skyline / bird's-eye scale the smallest pyramid subtends
+    // a few pixels and a red base band read as a floating error stripe (user
+    // report, point 273), so it is carried ONLY by the close-range walkable-
+    // site geometry. This test pins BOTH the original regression (three
+    // identical tawny sharp cones) and the new one (no red band at skyline).
     const geo = buildGizaPyramids()
     const pos = geo.getAttribute('position') as THREE.BufferAttribute
     const col = geo.getAttribute('color') as THREE.BufferAttribute
@@ -133,19 +136,17 @@ describe('landmark builders', () => {
       expect(pos.getY(i), 'pale casing only near the apex').toBeGreaterThan(khafreH * 0.7)
     }
     expect(pale, 'the casing cap exists').toBeGreaterThan(0)
-    // Menkaure (SW, smallest): the red-granite band exists — red-dominant,
-    // and ONLY around Menkaure's base (linear sums again: granite tops out
-    // ~0.52 while the darkest other part, the Sphinx face, stays above 0.8).
-    let granite = 0
+    // Menkaure (SW, smallest): NO dark red band at skyline scale — the granite
+    // casing is a close-range cue only (it read as a floating error stripe out
+    // here). Nothing on the whole skyline is both dark (linear sum < 0.6) and
+    // red-dominant; the tawny cores and the Sphinx face all sit brighter.
+    let redBand = 0
     for (let i = 0; i < pos.count; i++) {
       const bright = col.getX(i) + col.getY(i) + col.getZ(i)
       if (bright >= 0.6) continue
-      granite++
-      expect(Math.hypot(pos.getX(i) + 1.2, pos.getZ(i) - 1.2), 'granite only on Menkaure').toBeLessThan(1.0)
-      expect(pos.getY(i), 'granite only at the base').toBeLessThan(0.3)
-      expect(col.getX(i), 'red granite, not soot').toBeGreaterThan(col.getZ(i) * 1.5)
+      if (col.getX(i) > col.getZ(i) * 1.5) redBand++
     }
-    expect(granite, 'the granite band exists').toBeGreaterThan(0)
+    expect(redBand, 'no red granite error band at skyline scale').toBe(0)
     geo.dispose()
   })
 

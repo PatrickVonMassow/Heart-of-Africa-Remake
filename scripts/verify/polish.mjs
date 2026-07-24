@@ -124,8 +124,35 @@ await page.evaluate(() => {
     p.pitch = 0.02
   })
   await page.waitForTimeout(700)
-  await page.screenshot({ path: `${OUT}100-cairo-giza-skyline.png` })
+  const skyBuf = await page.screenshot()
+  await sharp(skyBuf).toFile(`${OUT}100-cairo-giza-skyline.png`)
   console.log('shot 100-cairo-giza-skyline.png')
+
+  // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
+  // BAND at this distant skyline scale, so it was removed (kept only at the
+  // walkable site). Prove no strongly red-dominant pixels remain over the
+  // pyramid silhouette — a red-granite stripe would light many up. The sky is
+  // warm haze (r≈g≈b-ish) and the pyramids are tawny (r>g>b but not RED), so a
+  // true red band (r well above BOTH g and b) is the error signature.
+  {
+    const { data, info } = await sharp(skyBuf).raw().toBuffer({ resolveWithObject: true })
+    let redBand = 0
+    let total = 0
+    for (let i = 0; i < info.width * info.height; i++) {
+      const r = data[i * info.channels]
+      const g = data[i * info.channels + 1]
+      const b = data[i * info.channels + 2]
+      total++
+      // A saturated brick-red: red clearly dominates green AND blue.
+      if (r > 90 && r > g * 1.6 && r > b * 1.9) redBand++
+    }
+    const frac = redBand / total
+    check(
+      'no red granite error band on the Cairo skyline pyramids (point 273)',
+      frac < 0.002,
+      `red-dominant pixel fraction ${frac.toFixed(5)}`,
+    )
+  }
 
   // Point 102 (a): in Cairo no VISIBLE panorama silhouette may fall inside the
   // Giza skyline's excluded azimuth span — otherwise an animal drifts across the
@@ -755,8 +782,47 @@ for (const [placeId, shot] of [
     p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
   })
   await page.waitForTimeout(1000)
-  await page.screenshot({ path: `${OUT}139-giza-walkable-site.png` })
+  const siteBuf = await page.screenshot()
+  await sharp(siteBuf).toFile(`${OUT}139-giza-walkable-site.png`)
   console.log('shot 139-giza-walkable-site.png')
+
+  // Point 273: the plateau must read as warm DESERT SAND, not a pale, cool,
+  // wavy parchment. Sample the near foreground (the bottom-centre strip, always
+  // ground) and assert the mean is a warm sand tone: clearly warm (r > g > b, a
+  // real r−b spread) and not the washed-out pale grey the old port-earth ground
+  // showed on the open disc.
+  {
+    const meta = await sharp(siteBuf).metadata()
+    const W = meta.width
+    const H = meta.height
+    const cw = Math.round(W * 0.4)
+    const { data, info } = await sharp(siteBuf)
+      .extract({
+        left: Math.round(W / 2 - cw / 2),
+        top: Math.round(H * 0.84),
+        width: cw,
+        height: Math.round(H * 0.12),
+      })
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+    let rs = 0
+    let gs = 0
+    let bs = 0
+    const n = info.width * info.height
+    for (let i = 0; i < n; i++) {
+      rs += data[i * info.channels]
+      gs += data[i * info.channels + 1]
+      bs += data[i * info.channels + 2]
+    }
+    const r = rs / n
+    const g = gs / n
+    const b = bs / n
+    check(
+      'the walkable Giza ground reads as warm desert sand (point 273)',
+      r > g && g > b && r - b > 22 && r > 120,
+      `mean ground rgb ${r.toFixed(0)}/${g.toFixed(0)}/${b.toFixed(0)}`,
+    )
+  }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
