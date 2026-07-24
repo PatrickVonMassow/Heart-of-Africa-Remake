@@ -27,7 +27,7 @@ import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
-import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments } from './terrainLod'
+import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
@@ -52,7 +52,7 @@ import {
   type TrailPoint,
 } from './canoeDrag'
 import { inReedBelt, solidDressingAllowed } from './waterEdgeRules'
-import { chunkOffsetsByDistance, FLORA_FOG, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
+import { chunkOffsetsByDistance, floraAmortiseMaxStep, floraChunkRange, floraFillBatchSize, floraFogFar, floraInSpawnCircle, floraShouldRebuild, floraSpawnRadius } from './floraStreaming'
 import { farTerrainColor } from './farColor'
 import { TRAVELLER_PACK } from '../../render/figures'
 import { getStrings, useStrings } from '../../i18n'
@@ -491,6 +491,7 @@ const PREFETCH_LOOKAHEAD = CHUNK_SIZE / 2
 
 function TerrainChunks() {
   const seed = useGame((s) => s.seed)
+  const lowDetails = useUi((s) => s.lowDetails)
   const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
   const activeSig = useRef('')
@@ -520,6 +521,21 @@ function TerrainChunks() {
     activeSig.current = ''
     setActive([])
   }, [seed])
+
+  // Low Details (point 276, secondary lever — cheap on a fast GPU, a win on weak
+  // ones): drop the near-ring terrain refinement (point 209's coast/mountain
+  // doubling) by driving the same runtime override the F8 benchmark uses. Reset
+  // `lastCenter` so the next frame re-plans the window at the new segment counts
+  // rather than waiting for a chunk crossing. Off = the shipped default (enabled),
+  // so `lowDetails === false` is picture-identical to today.
+  useEffect(() => {
+    setTerrainRefine({ enabled: !lowDetails })
+    lastCenter.current = null
+    return () => {
+      // On unmount restore the shipped default so a later benchmark/scene is clean.
+      setTerrainRefine({ enabled: true })
+    }
+  }, [lowDetails])
 
   // Publish the committed chunk set AFTER the React flush (effects run
   // post-commit): the panorama-capture gate must see exactly the chunks whose
@@ -936,6 +952,9 @@ const CANDIDATES_PER_CHUNK = 22
 // into their single plant matrix; the rest never deform.
 const CROWN_SPECIES: ReadonlySet<Species> = new Set<Species>(['acacia', 'jungle', 'palm', 'baobab'])
 const GROUND_SPECIES: ReadonlySet<Species> = new Set<Species>(['bush', 'papyrus'])
+// Low Details (point 276, lever 5): the low, dense dressing stops casting shadows
+// — thinning the shadow pass at a barely visible cost. Trees keep their shadows.
+const LOW_DETAILS_NO_SHADOW_SPECIES: ReadonlySet<Species> = new Set<Species>(['bush', 'papyrus', 'rock'])
 
 /**
  * Species choice per terrain type; roll decides density. Region/period
@@ -1349,6 +1368,19 @@ function Vegetation() {
     fillRef.current = null
   }, [seed])
 
+  // Low Details (point 276, lever 5): drop cast shadows on the low, dense
+  // dressing (bush/papyrus/rock) to thin the shadow pass. Off restores the
+  // shipped `castShadow = true`, so `lowDetails === false` is picture-identical.
+  const lowDetails = useUi((s) => s.lowDetails)
+  useEffect(() => {
+    for (const sp of SPECIES) {
+      const cast = !(lowDetails && LOW_DETAILS_NO_SHADOW_SPECIES.has(sp))
+      meshes.base[sp].castShadow = cast
+      const cm = meshes.crown[sp]
+      if (cm) cm.castShadow = cast
+    }
+  }, [meshes, lowDetails])
+
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1487,7 +1519,10 @@ function Vegetation() {
     // ZOOM/region changed the far, NOT on the season's per-frame fog drift — that
     // per-frame rebuild re-uploaded the seasonTint buffer and raced the crown
     // collapse on WebGPU ("jumping trees").
-    const fogFar = FLORA_FOG.far
+    // Low Details (point 276, lever 5): a tighter flora fog radius drops the
+    // instance count quadratically. Off = FLORA_FOG.far exactly (picture-neutral).
+    // A changed factor moves the spawn radius, so floraShouldRebuild re-streams.
+    const fogFar = floraFogFar(useUi.getState().lowDetails)
     const t0 = performance.now()
     let worked = false
     if (floraShouldRebuild(pos, lastBuild.current, fogFar)) {

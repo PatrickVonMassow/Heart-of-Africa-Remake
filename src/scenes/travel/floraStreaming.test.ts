@@ -8,13 +8,16 @@ import {
   FLORA_FILL_MAX_FRAMES,
   FLORA_RANGE_MAX,
   FLORA_REBUILD_STEP,
+  FLORA_FOG,
   FLORA_SPAWN_HARD_CAP,
   FLORA_SPAWN_MARGIN,
+  LOW_DETAILS_FLORA_FOG_FACTOR,
   chunkOffsetsByDistance,
   floraAmortiseMaxStep,
   floraChunkRange,
   floraFillBatchSize,
   floraFillWorstDriftWu,
+  floraFogFar,
   floraInSpawnCircle,
   floraShouldRebuild,
   floraSpawnRadius,
@@ -48,6 +51,24 @@ describe('floraSpawnRadius (point 171 — the edge sits in the fog, beyond the v
       expect(floraSpawnRadius(fogFar) - FLORA_REBUILD_STEP).toBeGreaterThan(fogFar)
     }
     expect(FLORA_REBUILD_STEP).toBeLessThan(FLORA_SPAWN_MARGIN)
+  })
+})
+
+describe('floraFogFar (point 276 lever 5 — Low Details tightens the flora circle)', () => {
+  it('is the plain fog far when the mode is off (picture-identical to today)', () => {
+    expect(floraFogFar(false)).toBe(FLORA_FOG.far)
+  })
+
+  it('shrinks the fog far by the factor when on, so the instance count falls quadratically', () => {
+    expect(floraFogFar(true)).toBe(FLORA_FOG.far * LOW_DETAILS_FLORA_FOG_FACTOR)
+    expect(LOW_DETAILS_FLORA_FOG_FACTOR).toBeGreaterThan(0)
+    expect(LOW_DETAILS_FLORA_FOG_FACTOR).toBeLessThan(1)
+    // The tighter circle is still fog-COUPLED (radius = fogFar + margin), so the
+    // no-pop rebuild logic is unchanged, just a smaller circle.
+    const on = floraSpawnRadius(floraFogFar(true))
+    const off = floraSpawnRadius(floraFogFar(false))
+    expect(on).toBeLessThan(off)
+    expect(on).toBeGreaterThan(floraFogFar(true)) // edge still beyond its own fog
   })
 })
 
