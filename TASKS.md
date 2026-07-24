@@ -10882,6 +10882,36 @@ the remaining open points in their numeric order.
   CLAUDE.md §7.1 pt. 15 if the firelight rule changes; record the benchmark verdict in
   docs/perf-276-findings.md. Implementation-ready; feasibility+perf gated.
 
+- [ ] 290. A RELIABLE MECHANISM TO KEEP THE RETROSPECTIVE DOCUMENT CURRENT (user
+  24.07.2026: "verankere mit einem sicheren Mechanismus, das Retrospektive-Dokument
+  immer aktuell zu halten"). The retrospective lives at
+  `local/retrospektive-zusammenarbeit.md` (git-ignored, on Deutsch). It must stay
+  current by ENFORCEMENT, not a reminder (the document's own lesson #1). Build TWO
+  parts:
+  (1) REFRESH SCRIPT `scripts/retro-refresh.mjs`: scans the durable sources that
+    define the problem/solution history — the feedback-type memories in the memory
+    dir, the guard scripts in `scripts/` (each guard = a solution to a recurring
+    problem), git reverts / fix-of-fix trails, and the process/meta TASKS points —
+    and regenerates a clearly-delimited AUTO-GENERATED section of the doc (a
+    machine-maintained table: problem class, #solution-attempts, severity, implemented
+    measure, status), LEAVING the human/agent-authored analysis prose intact. It
+    records a SOURCES FINGERPRINT (a hash over those sources) + a "last refreshed"
+    timestamp inside the doc.
+  (2) STOP-HOOK GUARD `scripts/retro-currency-guard.mjs` (registered in the Stop-hook
+    chain like the others): recompute the sources fingerprint; if it differs from the
+    doc's recorded one (sources changed since the last refresh), BLOCK with a reason
+    ("the retrospective is stale — run scripts/retro-refresh.mjs and review whether a
+    NEW problem class needs its own row + a prose paragraph"). Fail-OPEN on any
+    internal error (never trap the session), exactly like the other guards. If the doc
+    is absent, no-op.
+  So a new feedback-memory, a new guard, or a revert trail forces the retrospective to
+  be brought current before the turn can end. The doc stays git-ignored; the scripts +
+  guard + the settings.json hook registration are committed (main session applies the
+  settings edit). TESTS: pure tests for the source-scan + fingerprint (a changed source
+  changes the hash) and the guard's stale/fresh decision (`scripts/*.test.mjs`, run in
+  the Vitest layer). DOCS: a short section in `docs/maximale-qs.md` (the QA process
+  gains "keep the retrospective current") and a pointer memory. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
