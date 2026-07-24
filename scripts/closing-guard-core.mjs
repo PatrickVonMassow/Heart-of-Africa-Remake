@@ -58,7 +58,12 @@ export function isVersionTagCommand(command) {
   // mistaken for a release (the real false-positive that blocked this very
   // commit). Order: heredoc bodies, then single/double-quoted strings.
   let c = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, ' ')
-  c = c.replace(/'[^']*'/g, ' ').replace(/"[^"]*"/g, ' ')
+  // Only strip quotes from -m/--message values, which cannot be version tags.
+  // DO NOT blanket-strip quotes — version tokens may be wrapped (git tag "v0.3").
+  // Apostrophes in double-quoted strings would match with ' regex, consuming
+  // unintended spans ("Don't ..." matches 't' to another quote).
+  c = c.replace(/(-m|--message)\s+"[^"]*"/g, '$1 MESSAGE')
+  c = c.replace(/(-m|--message)\s+'[^']*'/g, '$1 MESSAGE')
   // Evaluate each command SEGMENT on its own — a `git push origin main` segment
   // must not inherit a `poc`/`vX.Y` token from a sibling segment.
   const segments = c.split(/&&|\|\||;|\||\n/)
@@ -68,9 +73,12 @@ export function isVersionTagCommand(command) {
   const pocArg = /(^|[\s=/])poc($|[\s^~:])/
   for (const seg of segments) {
     const s = ` ${seg.trim()} `
-    const isTag = /\bgit\s+tag\b/.test(s)
-    const isPush = /\bgit\s+push\b/.test(s)
-    if (!isTag && !isPush) continue
+    // git may have options before the verb: git -C <path> tag, git -c user=x tag, git --no-pager push
+    const gitOptionsMatcher = '(?:\\s+(?:-[cC]|-{1,2}\\S+))*'
+    const isTag = new RegExp(`\\bgit${gitOptionsMatcher}\\s+tag\\b`).test(s)
+    const isPush = new RegExp(`\\bgit${gitOptionsMatcher}\\s+push\\b`).test(s)
+    const isGhRelease = /\bgh\s+release\s+create\b/.test(s)
+    if (!isTag && !isPush && !isGhRelease) continue
     if (/\s--(tags|follow-tags)\b/.test(s)) return true
     if (versionArg.test(s) || pocArg.test(s)) return true
   }
