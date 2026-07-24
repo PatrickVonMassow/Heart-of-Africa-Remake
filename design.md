@@ -562,7 +562,7 @@ English (default) and German. The language can be switched at runtime (POC: via 
 - Successor: when the character dies, a successor takes over instead. He resumes at the most recent checkpoint, loses a configured number of days (balance value), silently inherits the already-passed deadline warning stage, and opens his part of the journal with a takeover entry.
 - Procedural per game: the position of the tomb and of caches, the concrete appearance of the landscape, and the look of the villages including the distribution of their huts. The geographic location of the landscape elements (jungle, mountains, rivers etc.) remains fixed. Special find sites: the Elephant Graveyard, camps/caches.
 - Saving: automatic on visiting a port city. The port cities act as checkpoints; manual saving is omitted.
-- Loading: on loading, an overview of all port visits appears as a table with one row per visit. Shown are port city, date (in-game), money, food, gifts and health state; from these the player picks the state to continue from.
+- Loading: on loading, an overview of all port visits appears as a table with one row per visit. Shown are port city, date (in-game), money, food, gifts and health state; from these the player picks the state to continue from. TEMPORARY (user decision 24.07.2026): loading is SUSPENDED for the PoC — the startup prompt that offered to load a saved game is disabled, so every launch begins a fresh expedition with no popup. Saving and the successor resume are untouched; re-enabling loading is a one-value flip (`SAVE_LOAD_ENABLED` in `src/ui/Hud.tsx`).
 
 | Port city | Date | Money | Food | Gifts | Health |
 |---|---|---|---|---|---|

@@ -389,27 +389,23 @@ check(
   'a fresh start (no overlay) engages mouse-look (the view turns on a mouse move)',
   !fresh.overlay && fresh.yaw !== null && fresh.yaw !== yawBefore,
 )
-// Seed a checkpoint (entering a port saves one) and reload → the StartOverlay shows.
+// Save-load is DISABLED for the PoC (user decision 24.07.2026): even with a
+// checkpoint seeded (entering a port saves one), NO start-choice overlay appears
+// on reload — the game begins directly, so there is no blocking popup to grab
+// against. Assert the overlay stays absent and the game is live.
 await page2.evaluate(() => window.__game.getState().enterPlace('cairo'))
 await page2.waitForTimeout(200)
 await page2.reload()
 await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
 await page2.waitForTimeout(700)
-const withCp = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), calls: window.__plCalls }))
-check('with a checkpoint the start-choice overlay shows and the pointer is NOT grabbed', withCp.overlay && withCp.calls === 0)
-// Choosing an option dismisses the start overlay and hands control back to the
-// game. The last button starts a new expedition → the bird's-eye view, which has
-// no pointer lock at all, and under automation the real pointer lock is skipped
-// anyway (see the fresh check above), so assert the meaningful outcome — the
-// overlay is gone and the game is live — not a grab call. That the freed
-// first-person view turns on a mouse move is already covered by the fresh check.
-await page2.evaluate(() => [...document.querySelectorAll('.overlay .actions button')].pop()?.click())
-await page2.waitForTimeout(400)
-const afterChoice = await page2.evaluate(() => ({
+const withCp = await page2.evaluate(() => ({
   overlay: !!document.querySelector('.overlay'),
   mode: window.__game?.getState().mode ?? null,
 }))
-check('after the choice the start overlay is dismissed and the game runs', !afterChoice.overlay && afterChoice.mode !== null)
+check(
+  'with a checkpoint present, no start overlay appears (save-load disabled for the PoC) and the game runs',
+  !withCp.overlay && withCp.mode !== null,
+)
 await page2.close()
 
 console.log('---')

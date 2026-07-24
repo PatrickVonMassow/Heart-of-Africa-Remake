@@ -10729,6 +10729,20 @@ the remaining open points in their numeric order.
   backends with ZERO console errors. NOTE: console errors are a hard gate, so this
   currently red-flags every run it fires in. Implementation-ready.
 
+- [x] 284. DISABLE SAVE LOADING FOR THE PoC — NO "LOAD A SAVED GAME?" STARTUP POPUP
+  (user 24.07.2026: as long as it is a PoC, loading old saves is not needed, and
+  the prompt appeared on every launch). The startup `StartOverlay` (`src/ui/Hud.tsx`)
+  offered "load checkpoint / new expedition" whenever a checkpoint existed. It is
+  now suppressed behind a module const `SAVE_LOAD_ENABLED = false`: `hadCheckpoint`
+  is gated by it, so the overlay never renders and every launch begins a fresh
+  expedition with no popup. The LOAD code (LoadMenu, `loadCheckpoint`, the port
+  snapshots) is left intact and still referenced, so re-enabling is a one-value
+  flip; saving and the §18 successor resume are untouched. Tests: `scripts/verify/
+  flow.mjs` now asserts the INVERSE of the old point-59 behaviour — with a
+  checkpoint seeded, NO start overlay appears and the game runs (the mouse-look
+  fresh-start check is unchanged). Docs: design.md §18 and CLAUDE.md §7.1 pt. 28
+  carry the temporary-suspension note. Committed to main.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this

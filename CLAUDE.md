@@ -1413,6 +1413,13 @@ verify suite that proves it.
     visit, resuming an older visit restores that state, the successor
     using the latest snapshot, and the legacy migration;
     `src/ui/Hud.test.tsx` the table columns incl. the health state.
+    TEMPORARY (user decision 24.07.2026): the LOAD side is SUSPENDED for the
+    PoC — the startup "a saved game was found — load it?" prompt is disabled
+    (`SAVE_LOAD_ENABLED = false` in `src/ui/Hud.tsx`), so every launch begins a
+    fresh expedition with no popup. Saving still runs (the snapshots and the
+    successor flow are untouched and tested), and re-enabling is the one-value
+    flip. `scripts/verify/flow.mjs` asserts the inverse of the old behaviour:
+    with a checkpoint seeded, NO start overlay appears and the game runs.
 29. **Animated handwriting.** The animated handwriting of `design.md`
     §16.3 is implemented (stroke-by-stroke reveal behind the pen hand,
     click-to-finish, the wound level on the hand, persistent blood traces

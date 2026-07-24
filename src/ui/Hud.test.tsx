@@ -5,7 +5,7 @@
 // (three-free; the R3F scene is never mounted here).
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, fireEvent } from '@testing-library/react'
-import { Hud } from './Hud'
+import { Hud, LoadMenu } from './Hud'
 import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
 import { useGame, canCampHere } from '../state/store'
@@ -166,11 +166,10 @@ describe('load menu table (design.md §18)', () => {
     g().enterPlace('zanzibar')
     expect(g().hasCheckpoint).toBe(true)
 
-    render(<Hud />)
-    // The start overlay offers to load; click through to the table.
-    const loadBtn = [...document.querySelectorAll('button')].find((b) => b.textContent === en.overlays.loadCheckpoint)
-    expect(loadBtn).toBeTruthy()
-    fireEvent.click(loadBtn!)
+    // The startup overlay that reaches the load table is suspended for the PoC
+    // (SAVE_LOAD_ENABLED, pt. 284), so render the LoadMenu directly — the load
+    // code is kept intact for a one-flip revert, so its columns stay covered.
+    render(<LoadMenu onDone={() => {}} onBack={() => {}} />)
 
     const table = document.querySelector('table.load-menu')
     expect(table).toBeInTheDocument()
@@ -182,6 +181,18 @@ describe('load menu table (design.md §18)', () => {
     // The health state renders as a localized word (healthy/weakened/poor).
     const states = Object.values(en.health.states)
     expect(states.some((w) => table!.textContent?.includes(w))).toBe(true)
+  })
+
+  it('the startup load prompt is suppressed for the PoC even with a checkpoint (pt. 284)', () => {
+    // A checkpoint exists, but SAVE_LOAD_ENABLED is false, so the HUD must NOT
+    // render the start overlay / "load a saved game?" popup — the game begins
+    // directly. Guards the user-requested disable against a regression.
+    g().enterPlace('cairo')
+    expect(g().hasCheckpoint).toBe(true)
+    render(<Hud />)
+    const loadBtn = [...document.querySelectorAll('button')].find((b) => b.textContent === en.overlays.loadCheckpoint)
+    expect(loadBtn).toBeUndefined()
+    expect(document.querySelector('table.load-menu')).not.toBeInTheDocument()
   })
 })
 

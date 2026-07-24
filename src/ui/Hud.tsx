@@ -269,7 +269,9 @@ function VictoryOverlay() {
  * port city, date, money, food, gifts and health state — from which the
  * player picks the state to continue from.
  */
-function LoadMenu({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+// Exported so the load-table columns stay unit-tested even though the startup
+// overlay that reaches it is suspended for the PoC (SAVE_LOAD_ENABLED, pt. 284).
+export function LoadMenu({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const t = useStrings()
   const loadCheckpoint = useGame((s) => s.loadCheckpoint)
   const [rows] = useState(() => listCheckpoints())
@@ -318,12 +320,21 @@ function LoadMenu({ onDone, onBack }: { onDone: () => void; onBack: () => void }
   )
 }
 
-/** Shown once at startup when checkpoints exist (design.md §18). */
+/** Save-load is DISABLED for the PoC (user decision 24.07.2026): the game does
+ *  not need to load old saves yet, and the startup "a saved game was found —
+ *  load it?" prompt was an unwanted popup on every launch. Flipping this back to
+ *  true restores the checkpoint prompt — all the load code (LoadMenu,
+ *  loadCheckpoint, the port snapshots) is left intact, so it is a one-line
+ *  revert. */
+const SAVE_LOAD_ENABLED = false
+
+/** Shown once at startup when checkpoints exist (design.md §18); suppressed
+ *  entirely while SAVE_LOAD_ENABLED is false. */
 function StartOverlay() {
   const t = useStrings()
   const [decided, setDecided] = useState(false)
   const [showLoad, setShowLoad] = useState(false)
-  const [hadCheckpoint] = useState(() => useGame.getState().hasCheckpoint)
+  const [hadCheckpoint] = useState(() => SAVE_LOAD_ENABLED && useGame.getState().hasCheckpoint)
   if (decided || !hadCheckpoint) return null
   if (showLoad) return <LoadMenu onDone={() => setDecided(true)} onBack={() => setShowLoad(false)} />
   return (
