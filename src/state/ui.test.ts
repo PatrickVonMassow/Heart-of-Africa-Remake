@@ -2,7 +2,15 @@
 // zoom clamp/unlock, dialog handling with the bazaar-bid discard, and the
 // toggles. No browser needed.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useUi, DEFAULT_TRAVEL_ZOOM } from './ui'
+import {
+  useUi,
+  DEFAULT_TRAVEL_ZOOM,
+  effectiveSsao,
+  effectiveTraa,
+  effectiveBloom,
+  effectiveShadows,
+  effectiveShadowMapHalf,
+} from './ui'
 
 const u = () => useUi.getState()
 
@@ -11,7 +19,7 @@ beforeEach(() => {
     dialog: null, prompt: null, debugOpen: false, mapOpen: false,
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
-    traaEnabled: true, touchActive: false, ssaoEnabled: true, shadowMapHalf: false,
+    traaEnabled: true, touchActive: false, lowDetails: false, ssaoEnabled: true, shadowMapHalf: false,
     shadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
   })
 })
@@ -112,5 +120,77 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
     expect(u().seasonCollapseEnabled).toBe(true) // default on (point 175 diagnostic)
     u().setSeasonCollapseEnabled(false)
     expect(u().seasonCollapseEnabled).toBe(false)
+  })
+})
+
+describe('Low Details performance mode (design.md §21, F7 / point 276 part B)', () => {
+  it('defaults off and is picture-neutral: every effective lever matches its base', () => {
+    expect(u().lowDetails).toBe(false)
+    expect(effectiveSsao(u())).toBe(u().ssaoEnabled)
+    expect(effectiveTraa(u())).toBe(u().traaEnabled)
+    expect(effectiveBloom(u())).toBe(true) // bloom on today
+    expect(effectiveShadows(u())).toBe(u().shadowsEnabled)
+    expect(effectiveShadowMapHalf(u())).toBe(u().shadowMapHalf)
+  })
+
+  it('derives the render levers DOWN when on (effective = base && !lowDetails)', () => {
+    // Player leaves everything at its default (on / full-res).
+    u().setLowDetails(true)
+    expect(effectiveSsao(u())).toBe(false)
+    expect(effectiveTraa(u())).toBe(false)
+    expect(effectiveBloom(u())).toBe(false)
+    expect(effectiveShadows(u())).toBe(false)
+    expect(effectiveShadowMapHalf(u())).toBe(true) // Low Details FORCES half-size
+  })
+
+  it('does NOT clobber the individual debug flags — off restores them exactly', () => {
+    // The player has a specific mix of settings.
+    u().setSsaoEnabled(true)
+    u().setTraaEnabled(false)
+    u().setShadowsEnabled(true)
+    u().setShadowMapHalf(false)
+    u().setLowDetails(true)
+    // The base flags are untouched by the mode…
+    expect(u().ssaoEnabled).toBe(true)
+    expect(u().traaEnabled).toBe(false)
+    expect(u().shadowsEnabled).toBe(true)
+    expect(u().shadowMapHalf).toBe(false)
+    // …only the EFFECTIVE reads are forced down while it is on.
+    expect(effectiveSsao(u())).toBe(false)
+    expect(effectiveShadows(u())).toBe(false)
+    // Turning it off restores the player's exact picture.
+    u().setLowDetails(false)
+    expect(effectiveSsao(u())).toBe(true)
+    expect(effectiveTraa(u())).toBe(false) // the player had TRAA off; still off
+    expect(effectiveShadows(u())).toBe(true)
+    expect(effectiveShadowMapHalf(u())).toBe(false)
+  })
+
+  it('setLowDetails is idempotent', () => {
+    u().setLowDetails(true)
+    u().setLowDetails(true)
+    expect(u().lowDetails).toBe(true)
+    u().setLowDetails(false)
+    u().setLowDetails(false)
+    expect(u().lowDetails).toBe(false)
+  })
+
+  it('the touch preset stays a SUBSET — Low Details never regresses touch', () => {
+    // Touch drops SSAO/TRAA off and shadow maps to half; Low Details is a
+    // superset, so with either on those levers read the low value.
+    u().activateTouch()
+    expect(effectiveSsao(u())).toBe(false)
+    expect(effectiveTraa(u())).toBe(false)
+    expect(effectiveShadowMapHalf(u())).toBe(true)
+    // Adding Low Details on top keeps them low and forces bloom/shadows off too.
+    u().setLowDetails(true)
+    expect(effectiveSsao(u())).toBe(false)
+    expect(effectiveShadowMapHalf(u())).toBe(true)
+    expect(effectiveBloom(u())).toBe(false)
+    expect(effectiveShadows(u())).toBe(false)
+    // Low Details off leaves the touch preset intact (still a valid subset).
+    u().setLowDetails(false)
+    expect(effectiveSsao(u())).toBe(false) // touch still has it off
+    expect(effectiveShadowMapHalf(u())).toBe(true) // touch still half
   })
 })

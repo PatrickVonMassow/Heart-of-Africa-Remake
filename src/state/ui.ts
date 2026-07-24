@@ -38,7 +38,7 @@ export type Dialog =
   | { kind: 'camp'; scope: 'village'; placeId: string }
   | null
 
-interface UiState {
+export interface UiState {
   dialog: Dialog
   /** Interaction prompt shown at the bottom of the screen, e.g. "Space — Laden". */
   prompt: string | null
@@ -83,6 +83,20 @@ interface UiState {
    * the on-screen controls and applies the mobile quality preset.
    */
   touchActive: boolean
+  /**
+   * "Low Details" performance mode (design.md §21, F7 / point 276 part B). A
+   * SUPERSET of the touch quality preset: while on it derives the render levers
+   * DOWN — dpr cap, post off (SSAO/Bloom/TRAA), shadows off, terrain refine off,
+   * a tighter flora radius — for a large win on weak GPUs, at some visible
+   * quality loss. Unlike `activateTouch` it NEVER writes the individual debug
+   * flags: every lever reads its EFFECTIVE value through the selectors below
+   * (`effectiveSsao` etc.), so turning it off restores exactly the player's
+   * chosen settings, and `lowDetails === false` is picture-identical to today.
+   * Default off — the mechanism is picture-neutral until the player enables it.
+   * The lever PRIORITY follows the real-hardware benchmark (point 277,
+   * docs/perf-277-user-hardware.md): fill-rate first (dpr, post), geometry last.
+   */
+  lowDetails: boolean
   /** Screen-space ambient occlusion (design.md §2.7); off in the touch preset. */
   ssaoEnabled: boolean
   /** Half-size shadow maps (1024²) for the touch preset; full (2048²) otherwise. */
@@ -125,6 +139,9 @@ interface UiState {
   setJournalDnd: (dnd: boolean) => void
   /** Arm the touch layer and apply the mobile quality preset (once). */
   activateTouch: () => void
+  /** Toggle the "Low Details" performance mode (F7); reads DERIVED, never
+   *  clobbers the individual debug flags. */
+  setLowDetails: (on: boolean) => void
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
@@ -157,6 +174,7 @@ export const useUi = create<UiState>()((set) => ({
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
   touchActive: false,
+  lowDetails: false,
   ssaoEnabled: true,
   shadowMapHalf: false,
   shadowsEnabled: true,
@@ -195,6 +213,10 @@ export const useUi = create<UiState>()((set) => ({
   // a no-op so a debug re-enable is not clobbered.
   activateTouch: () =>
     set((s) => (s.touchActive ? s : { touchActive: true, traaEnabled: false, ssaoEnabled: false, shadowMapHalf: true })),
+  // Low Details is read DERIVED (the effective* selectors below), so — unlike
+  // activateTouch — it writes ONLY its own flag and never touches the player's
+  // individual debug settings; toggling it off restores them untouched.
+  setLowDetails: (lowDetails) => set({ lowDetails }),
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
@@ -206,6 +228,26 @@ export const useUi = create<UiState>()((set) => ({
   requestBenchAbort: () => set({ benchAbort: true }),
   clearBenchAbort: () => set({ benchAbort: false }),
 }))
+
+// --- Effective render levers (design.md §21, F7 / point 276 part B) ----------
+// Low Details is a SUPERSET of the touch quality preset, read DERIVED so it
+// never clobbers the individual debug flags: every render consumer reads its
+// effective value through one of these selectors, so `lowDetails === false` is
+// picture-identical to today and the touch preset (a subset) is never regressed.
+// Each is `base && !lowDetails` (a lever the player left on is forced off in the
+// mode); the shadow-map lever is the inverse (Low Details FORCES half-size), and
+// bloom — which has no player flag — is simply on unless Low Details is on.
+
+/** SSAO renders unless the player switched it off OR Low Details is on. */
+export const effectiveSsao = (s: UiState): boolean => s.ssaoEnabled && !s.lowDetails
+/** TRAA renders unless the player switched it off OR Low Details is on. */
+export const effectiveTraa = (s: UiState): boolean => s.traaEnabled && !s.lowDetails
+/** Bloom renders unless Low Details is on (no player-facing bloom flag). */
+export const effectiveBloom = (s: UiState): boolean => !s.lowDetails
+/** Sun shadows cast unless the player switched them off OR Low Details is on. */
+export const effectiveShadows = (s: UiState): boolean => s.shadowsEnabled && !s.lowDetails
+/** Half-size shadow maps: the player's choice, but Low Details FORCES half. */
+export const effectiveShadowMapHalf = (s: UiState): boolean => s.shadowMapHalf || s.lowDetails
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
