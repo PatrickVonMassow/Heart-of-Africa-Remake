@@ -80,6 +80,7 @@ import {
   ambientSavannaSpecies,
   claimedByAnotherDrama,
   keepStreamedAnimal,
+  retainedSpawnChunks,
   groundedBodyY,
   groundFollowY,
   GROUND_BODY_MIN_Y,
@@ -3014,6 +3015,108 @@ describe('keepStreamedAnimal (the streaming cull judges the animal where it STAN
     const after = keepStreamedAnimal(a, liveAt(100 * 0.125 + 60), CHUNK, 0, 0, 100 * 0.125 + 60, always)
     expect(after.keep).toBe(true)
     expect(after.rehomeTo).toBe('1,0')
+  })
+})
+
+describe('retainedSpawnChunks (point 278 — the streamed dressing must NOT grow over a session)', () => {
+  const CHUNK = 24
+  type A = { origin?: string; chunk?: string; x: number; z: number; dead?: boolean }
+
+  // A minimal, faithful model of the Wildlife.tsx streaming lifecycle that
+  // reproduces the real leak. Every in-range chunk deterministically seeds one
+  // animal at its centre (as spawnChunk does). Each frame the animals ROAM a
+  // little toward the player (as the elephant roam / flee / shore walk do), so
+  // one drifts off its birth chunk. The player OSCILLATES by ~one chunk (the
+  // ordinary back-and-forth driving / re-approach), so an origin chunk leaves
+  // the despawn ring while its roamer re-homes inward and survives — and, on the
+  // pre-278 path, that origin chunk re-seeds the next time it re-enters. This is
+  // the exact respawn-duplication captured live at a fixed desert/savanna anchor
+  // (docs/perf-276-findings.md): the animal count climbs while chunk keys do not.
+  const roamAndStream = (retain: boolean, steps: number): number[] => {
+    const spawnR = 40
+    const despawnR = 44
+    const base = 100.5 * CHUNK
+    let animals: A[] = []
+    let spawned = new Set<string>()
+    const counts: number[] = []
+    for (let i = 0; i < steps; i++) {
+      const px = base + (i % 2 ? 1 : -1) * CHUNK * 0.9 // back-and-forth of ~one chunk
+      const cx = Math.floor(px / CHUNK)
+      // Roam every animal toward the player (drifts it off its birth chunk).
+      for (const a of animals) a.x += Math.sign(px - a.x) * 6
+      // Seed each in-range chunk not already live.
+      for (let dx = -1; dx <= 1; dx++) {
+        const key = `${cx + dx},0`
+        if (spawned.has(key)) continue
+        const chx = (cx + dx + 0.5) * CHUNK
+        if (Math.abs(chx - px) > spawnR) continue
+        animals.push({ chunk: key, x: chx, z: 0 })
+        spawned.add(key)
+      }
+      // Despawn pass (matches Wildlife.tsx): re-home by feet, free by distance,
+      // and — with the fix — retain a chunk whose animal still lives.
+      const beyond = (key: string) => {
+        const kx = Number(key.split(',')[0])
+        return Math.abs((kx + 0.5) * CHUNK - px) > despawnR
+      }
+      const liveChunkHas = (key: string) => spawned.has(key) && !beyond(key)
+      animals = animals.filter((a) => {
+        const v = keepStreamedAnimal(a, liveChunkHas, CHUNK, px, 0, despawnR, () => false)
+        if (v.rehomeTo !== undefined) {
+          if (a.origin === undefined) a.origin = a.chunk // pin the birth chunk
+          a.chunk = v.rehomeTo
+        }
+        return v.keep
+      })
+      spawned = retain
+        ? retainedSpawnChunks(spawned, animals, beyond)
+        : new Set([...spawned].filter((k) => !beyond(k)))
+      counts.push(animals.length)
+    }
+    return counts
+  }
+
+  it('WITNESS: without retention the animal count grows without bound at a fixed anchor (the pre-278 leak)', () => {
+    const counts = roamAndStream(false, 12)
+    // Monotone, unbounded growth — the duplication accumulates every cycle.
+    for (let i = 1; i < counts.length; i++) expect(counts[i]).toBeGreaterThanOrEqual(counts[i - 1])
+    expect(counts[counts.length - 1]).toBeGreaterThan(counts[3] + 3)
+  })
+
+  it('with retention the animal count converges to a constant at a fixed anchor (the fix)', () => {
+    const counts = roamAndStream(true, 12)
+    // After the warm-up the count is flat — returning to the anchor re-seeds
+    // nothing that is already alive, however long the session runs.
+    const tail = counts.slice(3)
+    for (const c of tail) expect(c).toBe(tail[0])
+    expect(tail[0]).toBeGreaterThan(0)
+  })
+
+  it('frees a chunk key only once no living animal still originates there', () => {
+    const spawned = new Set(['0,0', '5,0'])
+    // An animal born in 0,0 has re-homed into a far cell but still lives.
+    const animals = [{ origin: '0,0', chunk: '9,9', x: 999, z: 999 } as A]
+    // Both keys are beyond the ring; 0,0 is retained (its animal lives), 5,0 freed.
+    const out = retainedSpawnChunks(spawned, animals, () => true)
+    expect(out.has('0,0')).toBe(true)
+    expect(out.has('5,0')).toBe(false)
+  })
+
+  it('keeps every in-range chunk and retains an out-of-range chunk whose animal lives', () => {
+    const spawned = new Set(['0,0', '1,0', '2,0'])
+    const animals = [{ origin: '2,0', chunk: '2,0', x: 60, z: 0 } as A]
+    const beyond = (k: string) => k === '2,0'
+    const out = retainedSpawnChunks(spawned, animals, beyond)
+    expect(out.has('0,0')).toBe(true) // in range
+    expect(out.has('1,0')).toBe(true) // in range
+    expect(out.has('2,0')).toBe(true) // out of range but its animal lives
+  })
+
+  it('falls back to the current chunk for a legacy animal with no origin', () => {
+    const spawned = new Set(['3,3'])
+    const animals = [{ chunk: '3,3', x: 0, z: 0 } as A] // no origin (untagged/legacy)
+    const out = retainedSpawnChunks(spawned, animals, () => true)
+    expect(out.has('3,3')).toBe(true)
   })
 })
 

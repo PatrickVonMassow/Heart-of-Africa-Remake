@@ -147,13 +147,41 @@ render features:
    under a mis-named key, so the lever silently did nothing while every test
    stayed green. The gate now asserts the RENDERED triangle drop, not the
    config object.)
-2. **OPEN — the dressing creeps upward over a session.** At a FIXED desert
-   anchor, with a fixed seed and a fixed date, the instanced dressing grows
-   with every flora rebuild: 235 808 → 327 808 triangles over five round trips
-   between two anchors (mesh count constant at 37), and 252 766 → 354 958
-   across one full benchmark run. Terrain, water and sky stay bit-stable
-   meanwhile, so it is the flora instance counts alone. Reproduced OUTSIDE the
-   benchmark (plain debug jumps), so it is the game's own behaviour, not a
-   measurement artifact — a growing per-frame cost the longer one plays, and a
-   candidate for the same regression family as this document. Not diagnosed
-   further here; it needs its own point.
+2. **RESOLVED (point 278) — the dressing crept upward over a session, and it
+   was WILDLIFE, not flora.** At a FIXED desert anchor, with a fixed seed and a
+   fixed date, the instanced dressing under `travel-dressing` grew every round
+   trip: 235 808 → 327 808 triangles over five round trips (mesh count constant),
+   252 766 → 354 958 across one benchmark run.
+
+   **Diagnosis (measured, not guessed).** The `travel-dressing` group holds TWO
+   instanced-mesh families: the flora streaming (`MeshStandardNodeMaterial`, 14
+   meshes) and the wildlife pools (`MeshStandardMaterial`, ~22 meshes). The
+   point-276 breakdown groups by named ancestor, so both landed in one
+   "flora/dressing" row and the growth read as flora. Splitting them by material
+   at a fixed anchor over six round trips showed the **flora bit-stable** (206 946
+   tris / 2 742 instances, IDENTICAL every trip) and the **wildlife instance count
+   climbing monotonically** (live animals 7 → 11 → 14 → 17 → 22, ~+12 per round
+   trip; the live enrichments check reproduced it as `samples:[7,11,14,17,22]`).
+
+   **Root cause.** `keepStreamedAnimal` (design.md §19.4) re-homes a roamer whose
+   birth chunk despawned into the live cell under its feet — it OUTLIVES its birth
+   chunk. The despawn pass then freed that birth chunk's key by DISTANCE alone, so
+   a later return re-entered the spawn ring and `spawnChunk` re-seeded the SAME
+   deterministic animals — a second copy, while the re-homed original still lived.
+   Over a session of ordinary back-and-forth this duplicates ~one animal per
+   re-home per round trip: unbounded growth at a fixed anchor. The code had flagged
+   exactly this as a "known pre-existing property … inherent to deterministic
+   chunk respawn".
+
+   **Fix.** Animals carry an immutable `origin` (birth chunk, pinned at the first
+   re-home); the pure `retainedSpawnChunks` (wildlifeBehavior.ts) keeps a chunk key
+   in the spawned set as long as ANY living animal still originates there, so the
+   respawn never re-seeds a chunk whose animals are already alive. The animal CULL
+   still judges membership by the IN-RANGE set (`has(key) && !beyondDespawn`),
+   identical to before, so a chunk retained only for its origin never stalls a
+   legitimate despawn. Returning to a fixed anchor now converges to a constant
+   count (live check `spread:0`). Pure regression witness:
+   `retainedSpawnChunks` in `src/scenes/travel/wildlifeBehavior.test.ts` (the
+   pre-278 path grows without bound, the fix converges); live gate: "the streamed
+   dressing does not grow over a session at a fixed anchor (point 278)" in
+   `scripts/verify/enrichments.mjs`.

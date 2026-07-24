@@ -1561,6 +1561,46 @@ export function keepStreamedAnimal(
 }
 
 /**
+ * Which chunk keys must stay in the spawned-chunks set after a despawn pass
+ * (design.md §19.4, point 278 — the dressing must NOT grow over a session).
+ *
+ * The streaming despawn frees a chunk key by DISTANCE alone, and `spawnChunk`
+ * re-seeds a chunk deterministically whenever it re-enters the spawn ring. But
+ * `keepStreamedAnimal` re-homes a roamer whose birth chunk despawned into the
+ * live cell under its feet, so the roamer OUTLIVES its birth chunk's key. When
+ * the player returns, that birth chunk re-seeds — a SECOND copy of the same
+ * deterministic animals — while the re-homed original still lives. Over a
+ * session of back-and-forth that duplicates ~one animal per re-home per round
+ * trip: the instanced wildlife count (and its triangles) climbs without bound
+ * at a fixed anchor, the point-276/278 regression.
+ *
+ * Root fix: a birth chunk's key is retained as long as ANY living animal still
+ * originates there, so `spawnChunk` never re-seeds a chunk whose animals are
+ * already alive. Distance still frees a chunk once its animals have genuinely
+ * despawned. Returning to a fixed anchor therefore converges to a constant
+ * count. Animals carry an immutable `origin` (their birth chunk); a legacy or
+ * untagged animal falls back to its current `chunk`.
+ */
+export function retainedSpawnChunks(
+  spawned: Iterable<string>,
+  animals: Iterable<{ dead?: boolean; origin?: string; chunk?: string }>,
+  despawned: (key: string) => boolean,
+): Set<string> {
+  const alive = new Set<string>()
+  for (const a of animals) {
+    const key = a.origin ?? a.chunk
+    if (key !== undefined) alive.add(key)
+  }
+  const out = new Set<string>()
+  for (const key of spawned) {
+    // Keep a chunk in range as before; keep an out-of-range chunk only while it
+    // still owns a living (re-homed) animal, so its respawn cannot duplicate.
+    if (!despawned(key) || alive.has(key)) out.add(key)
+  }
+  return out
+}
+
+/**
  * One step of a scripted walk under the land constraint (design.md §19.5,
  * point 83): the predator's walk-off must never enter the open ocean — like
  * every streamed animal, it deflects along the coast instead. Tries the
