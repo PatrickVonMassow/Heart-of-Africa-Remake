@@ -31,13 +31,24 @@ const progress = {
   remainingMs: 65000,
 }
 
-const reportFile = (aborted = false, headline = 'gpu', reason = '') => ({
+const lowProfile = {
+  preset: {},
+  headlinePhase: 'savanna-standing',
+  phases: [],
+  dominant: [
+    { system: 'terrain', tris: 5000, meshes: 1, pct: 0.5 },
+    { system: 'flora', tris: 3000, meshes: 1, pct: 0.3 },
+  ],
+}
+
+const reportFile = (aborted = false, headline = 'gpu', reason = '', withLowProfile = false) => ({
   filename: 'hoa-bench-2026-07-24-webgpu.json',
   json: JSON.stringify({
     summary: ['line one', 'line two'],
     headline,
     gpuTiming: { available: headline === 'gpu', reason },
     rows: [],
+    lowProfile: withLowProfile ? lowProfile : null,
   }),
   aborted,
 })
@@ -165,6 +176,26 @@ describe('benchmark overlay (design.md §21.1, §17.4)', () => {
     expect(note).toContain(reason)
     act(() => useUi.getState().setBenchReport(reportFile(false, 'wall')))
     expect(document.querySelector('.bench-headline')?.textContent).toBe(en.benchmark.headline.wall)
+  })
+
+  it('surfaces the low-preset cost ranking in the result panel, in both languages (point 293)', () => {
+    render(<BenchmarkOverlay />)
+    act(() => useUi.getState().setBenchReport(reportFile(false, 'gpu', '', true)))
+    expect(document.querySelector('.bench-low-title')?.textContent).toBe(en.benchmark.lowProfile.title)
+    const line = document.querySelector('.bench-low-dominant')?.textContent ?? ''
+    expect(line).toBe(en.benchmark.lowProfile.dominatedBy('terrain 50 %, flora 30 %'))
+    expect(line).toContain('terrain 50 %')
+    act(() => useLocale.getState().setLang('de'))
+    expect(document.querySelector('.bench-low-title')?.textContent).toBe(de.benchmark.lowProfile.title)
+    expect(document.querySelector('.bench-low-dominant')?.textContent).toBe(
+      de.benchmark.lowProfile.dominatedBy('terrain 50 %, flora 30 %'),
+    )
+  })
+
+  it('shows no low-profile block when the report carries none', () => {
+    render(<BenchmarkOverlay />)
+    act(() => useUi.getState().setBenchReport(reportFile()))
+    expect(document.querySelector('.bench-low-profile')).toBeNull()
   })
 
   it('the close button clears the report', () => {

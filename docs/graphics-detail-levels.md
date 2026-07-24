@@ -91,3 +91,21 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
 > present in every preset (so the completeness gate passes and future work has a
 > per-level value to read) but no render consumer reads them yet. They are listed
 > honestly here as declared registry keys, not shipped behaviour.
+
+## Profiling the low preset (F8 benchmark, point 293)
+
+The in-game render benchmark (**F8** / `?bench`, design.md §21.1) exists to price
+these levers on the player's own hardware. Its config sweep forces the **high**
+level so every lever stays measurable, but a slow-PC player wants the opposite
+question: *at the low level, where does the frame cost still sit, and what should
+I cut next?* So the benchmark runs one extra **low-preset profiling pass** that
+applies the actual `low` values above and reports, per route section at low, the
+per-system scene-graph triangle count, the `renderer.info` draw calls/triangles
+and the GPU/CPU/wall series — **ranked most-expensive-first** — with a digest line
+naming the dominant remaining systems (e.g. *"at LOW the frame is dominated by:
+terrain 42 %, flora 28 %, wildlife 12 % …"*), echoed as a localized line in the
+result panel. The per-system split is by rendered-triangle share (GPU timestamps
+resolve per render pass, not per object group, so a per-system GPU cost cannot be
+measured and is never fabricated); the frame series give the absolute cost the
+ranking sits inside. The applied `low` preset is echoed into the report file so it
+records exactly which values were profiled.

@@ -263,6 +263,10 @@ export const de: Strings = {
     close: 'Schließen',
     unavailable: 'Der Benchmark braucht die laufende 3D-Ansicht.',
     failed: (message) => `Benchmark abgebrochen: ${message}`,
+    lowProfile: {
+      title: 'Kostenrangliste auf Niedrig — wo als Nächstes kürzen:',
+      dominatedBy: (list) => `Auf der niedrigen Grafikstufe dominiert das Bild: ${list}.`,
+    },
   },
 
   toasts: {

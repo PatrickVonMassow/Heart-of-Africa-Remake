@@ -1038,6 +1038,30 @@ textarea {
   color: #d8b26a;
 }
 
+/* The point-293 low-preset cost ranking — where to cut next at the low level. */
+.bench-low-profile {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  background: rgba(30, 22, 10, 0.55);
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+}
+
+.bench-low-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #d8b26a;
+}
+
+.bench-low-dominant {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .bench-summary {
   margin: 8px 0 0;
   max-height: 55vh;

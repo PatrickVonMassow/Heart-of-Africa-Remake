@@ -264,6 +264,10 @@ export const en: Strings = {
     close: 'Close',
     unavailable: 'The benchmark needs the running 3D view.',
     failed: (message) => `Benchmark aborted: ${message}`,
+    lowProfile: {
+      title: 'Low-level cost ranking — where to cut next:',
+      dominatedBy: (list) => `At the low graphics level the frame is dominated by: ${list}.`,
+    },
   },
 
   toasts: {

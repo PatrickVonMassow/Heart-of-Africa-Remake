@@ -167,6 +167,59 @@ check(
   /^hoa-bench-\d{4}-\d{2}-\d{2}-(webgpu|webgl2)\.json$/.test(result.filename),
   result.filename,
 )
+// --- point 293: the LOW-preset per-system cost ranking -----------------------
+const low = report.lowProfile
+const lowRows = report.rows.filter((r) => r.config === 'low-preset')
+check(
+  'the sweep includes the low-preset profiling pass (one row per phase)',
+  lowRows.length === phases.length,
+  `${lowRows.length} low-preset rows`,
+)
+check(
+  'the report carries a low-preset cost profile with a ranked phase for every low row',
+  !!low && Array.isArray(low.phases) && low.phases.length === lowRows.length && typeof low.headlinePhase === 'string',
+  low ? `${low.phases.length} phases, headline ${low.headlinePhase}` : 'no lowProfile',
+)
+check(
+  'every low-profile phase ranks its systems most-expensive-first with valid shares',
+  !!low &&
+    low.phases.every((p) => {
+      const r = p.ranking
+      const sortedDesc = r.every((e, i) => i === 0 || r[i - 1].tris >= e.tris)
+      const shares = r.reduce((s, e) => s + e.pct, 0)
+      return r.length > 0 && sortedDesc && (r.length === 0 || Math.abs(shares - 1) < 1e-6)
+    }),
+  low ? JSON.stringify(low.phases.map((p) => p.ranking.slice(0, 3).map((e) => `${e.system} ${Math.round(e.pct * 100)}%`))) : 'no lowProfile',
+)
+check(
+  'the low profile names the dominant remaining systems for the digest',
+  !!low && Array.isArray(low.dominant) && low.dominant.length > 0 && low.dominant.every((e) => typeof e.system === 'string' && e.pct >= 0),
+  low ? low.dominant.map((e) => `${e.system} ${Math.round(e.pct * 100)}%`).join(', ') : 'no lowProfile',
+)
+check(
+  'the digest states the low-preset dominance line',
+  report.summary.some((l) => l.includes('dominated by')),
+)
+// The GPU series on the low rows follows the same honesty rule as the sweep:
+// measured on WebGPU, flagged (null) with a reason on the WebGL 2 lane.
+if (report.env.backend === 'webgl2') {
+  check(
+    'WebGL 2: the low-preset rows flag GPU time unavailable, none fabricated',
+    lowRows.every((r) => r.gpu === null) && low?.phases.every((p) => p.gpu === null),
+    `${lowRows.filter((r) => r.gpu !== null).length} low rows with gpu`,
+  )
+} else {
+  check(
+    'WebGPU: real GPU timestamps were measured for the low-preset rows too',
+    lowRows.every((r) => r.gpu !== null && r.gpu.median > 0) && !!low && low.phases.every((p) => p.gpu !== null),
+    `${lowRows.filter((r) => r.gpu !== null).length}/${lowRows.length} low rows with gpu`,
+  )
+}
+check(
+  'the result panel surfaces the low-level cost ranking to the player',
+  (await page.locator('.bench-low-dominant').count()) === 1,
+)
+
 check('the report leads with a human-readable digest', Array.isArray(report.summary) && report.summary.length > 3)
 check(
   'the run was deterministic by construction (fixed seed, date, timestep)',
