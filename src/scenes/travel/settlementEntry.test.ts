@@ -2,7 +2,7 @@
 // helpers. Entering is movement-based but confirmed with the Space use key —
 // reaching the enter radius never enters on its own, and a water cell blocks it.
 import { describe, it, expect } from 'vitest'
-import { settlementEnterCandidate, settlementToEnter, shouldEnterSettlement, type EnterablePlace } from './settlementEntry'
+import { enterHintName, settlementEnterCandidate, settlementToEnter, shouldEnterSettlement, UNDISCOVERED_PLACE_LABEL, type EnterablePlace } from './settlementEntry'
 
 const PLACES: EnterablePlace[] = [
   { id: 'cairo', x: 0, z: 0 },
@@ -45,6 +45,20 @@ describe('shouldEnterSettlement (design.md §2.3)', () => {
 
   it('is blocked while a dialog is open or the run is over (checkpoint safety)', () => {
     expect(shouldEnterSettlement('cairo', true, true)).toBe(false)
+  })
+})
+
+describe('enterHintName — the enter hint hides an undiscovered name (point 287)', () => {
+  it('shows the name for a discovered place', () => {
+    expect(enterHintName(true, 'Cairo')).toBe('Cairo')
+    expect(enterHintName(true, 'Maasai Village')).toBe('Maasai Village')
+  })
+
+  it('reads "?" for an undiscovered place, matching its §17.2 map label', () => {
+    expect(enterHintName(false, 'Maasai Village')).toBe(UNDISCOVERED_PLACE_LABEL)
+    expect(enterHintName(false, 'Maasai Village')).toBe('?')
+    // The real name never leaks through the hint while undiscovered.
+    expect(enterHintName(false, 'Maasai Village')).not.toContain('Maasai')
   })
 })
 

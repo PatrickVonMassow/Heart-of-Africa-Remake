@@ -282,7 +282,10 @@ verify suite that proves it.
    is likewise movement-based but confirmed with SPACE: within the enter
    radius the localized hint "Space to enter <name>" shows (the map name-label
    hidden while it does) and a SPACE press enters; reaching the radius alone
-   never enters. The accidental-entry debounce/clearance is removed (no
+   never enters. The hint honours the §17.2 discovery gate (point 287): an
+   UNDISCOVERED settlement's name stays hidden — the hint reads "?" (matching
+   its "?" map label) until the place is discovered, while a known-from-start
+   port always names itself. The accidental-entry debounce/clearance is removed (no
    just-left re-entry lock, no move-clear timing). A SPACE press while the
    traveller is on a water cell still does not enter, so a river passage never
    pulls him in. Entering focuses the controls without an extra click per
@@ -292,8 +295,12 @@ verify suite that proves it.
    building's door and presses SPACE to enter it, and walks past the
    settlement edge to leave (no key); walking a door WITHOUT a key does not
    enter; on entering, no HUD control (button/input) retains focus
-   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate and
-   the water guard are pure-tested (`src/scenes/travel/settlementEntry.test.ts`). The leave transition stays FLUID: the
+   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate,
+   the water guard and the discovery-gated enter-hint name (`?` for an
+   undiscovered place, the name for a discovered one) are pure-tested
+   (`src/scenes/travel/settlementEntry.test.ts`), with `flow.mjs` live-checking
+   that an undiscovered village's enter hint shows no proper name while Cairo's
+   names it. The leave transition stays FLUID: the
    travel scene's shared materials/meshes survive remounts as module
    singletons (surgical dispose opt-outs — a full remount used to re-link
    the whole travel program set synchronously, freezing the main thread
