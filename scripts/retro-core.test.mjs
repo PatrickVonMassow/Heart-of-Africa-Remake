@@ -324,8 +324,15 @@ describe('collectSources / collectMemories (fs-level, temp fixtures)', () => {
     expect(computeFingerprint({ ...partsA, memories: collectMemories(mem) })).not.toBe(a)
   })
 
-  it('defaultMemoryDir munges the repo path like the harness (drive lowered, separators to dashes)', () => {
-    const dir = defaultMemoryDir('C:\\Users\\Patri\\Documents\\Developing\\hoa').replace(/\\/g, '/')
-    expect(dir).toMatch(/\/\.claude\/projects\/c--Users-Patri-Documents-Developing-hoa\/memory$/)
-  })
+  // Windows-only: the harness path munging this pins is the Windows form
+  // (`c--Users-Patri-…`), and `resolve()` of a Windows literal on a POSIX CI
+  // runner prepends the runner cwd, so the assertion only holds on win32 — which
+  // is the only platform the retrospective mechanism actually runs on.
+  it.skipIf(process.platform !== 'win32')(
+    'defaultMemoryDir munges the repo path like the harness (drive lowered, separators to dashes)',
+    () => {
+      const dir = defaultMemoryDir('C:\\Users\\Patri\\Documents\\Developing\\hoa').replace(/\\/g, '/')
+      expect(dir).toMatch(/\/\.claude\/projects\/c--Users-Patri-Documents-Developing-hoa\/memory$/)
+    },
+  )
 })
