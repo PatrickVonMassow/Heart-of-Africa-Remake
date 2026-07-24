@@ -10683,7 +10683,7 @@ the remaining open points in their numeric order.
   NOTE: this is the "looks wrong but passes" class — every existing backdrop test is
   green while the picture is visibly wrong. Implementation-ready.
 
-- [ ] 282. AN ANIMAL DOES NOT DESPAWN AFTER A FAR JUMP ON WEBGL 2 (found 24.07.2026).
+- [x] 282. AN ANIMAL DOES NOT DESPAWN AFTER A FAR JUMP ON WEBGL 2 (found 24.07.2026).
   The enrichments check "an animal despawns once well outside the view" reports
   `goneWhenFar: false` — the marked animal is still in the herds after the traveller
   jumps 600 world units away, far past any despawn radius. Two facts make this a
