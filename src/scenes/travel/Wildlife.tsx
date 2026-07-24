@@ -113,6 +113,8 @@ import {
   offscreenRingSpawn,
   keepStreamedAnimal,
   waterStruggleFate,
+  groundedBodyY,
+  groundFollowY,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
@@ -1935,6 +1937,23 @@ function Herds() {
     // sim-seconds so they stay deterministic when headless load drops the fps.
     simTimeRef.current += dt
     frameCountRef.current++
+    // Ground-follow for a mover (point 283): re-derive the standing height at the
+    // animal's CURRENT position through the SAME clamp the renderer draws, so a
+    // drive that moves a.x/a.z can never leave the body sunk under fresh, higher
+    // ground (the buried-warthog assert). Water cells are left untouched — those
+    // occupants ride their own drama/sheet rules. Every pre-pass drive that moves
+    // a parent/adult calls this right after the step.
+    const groundFollow = (a: Animal) => {
+      const y = groundFollowY(
+        a.x,
+        a.z,
+        (x, z) => {
+          const ll = worldToLatLon(x, z)
+          return sampleTerrain(ll.lat, ll.lon, seed)
+        },
+      )
+      if (y !== null) a.y = y
+    }
     // The one burst-derived speed of all four rescue drives (point 127),
     // read fresh so a debug edit of balance.family.rescueBurst applies live.
     const RESCUE_SPEED = rescueSpeed(balance.family.rescueBurst)
@@ -2085,7 +2104,7 @@ function Herds() {
           { // ground-follow (point 203(A)): a mover carries its own standing height
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
           }
           if (d < PARENT_SACRIFICE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146): ONE
@@ -2193,6 +2212,7 @@ function Herds() {
           if (h !== null) {
             a.x += Math.sin(h) * RESCUE_SPEED * dt
             a.z += Math.cos(h) * RESCUE_SPEED * dt
+            groundFollow(a) // point 283: the shield renders at a.y — re-ground it after the burst
           }
           // SWEPT (point 179): the hunter's last MOVE SEGMENT vs the interposing
           // parent, not its current point — a big clamped-dt step must not carry
@@ -2488,6 +2508,7 @@ function Herds() {
         const d = Math.hypot(dx, dz) || 1
         a.x += (dx / d) * TRAMPLE_GRIEF_SPEED * dt
         a.z += (dz / d) * TRAMPLE_GRIEF_SPEED * dt
+        groundFollow(a) // point 283: the grief charge renders at a.y — re-ground it after the step
       }
     }
 
@@ -2518,7 +2539,7 @@ function Herds() {
           { // ground-follow (point 203(A)): a mover carries its standing height
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
           }
         }
       }
@@ -2622,7 +2643,7 @@ function Herds() {
             // earth. Land only; water occupants are owned by their dramas.
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
           }
         }
       }
@@ -2683,7 +2704,7 @@ function Herds() {
           // current ground (the sweep already sampled it); the eased step over
           // a few sweep visits avoids a visible snap.
           if (ter !== 'ocean' && ter !== 'water') {
-            a.y = Math.max(0.02, terSample.height)
+            a.y = groundedBodyY(terSample.height)
             a.grounded = true // seen by the sweep at least once (203(A) gate)
           }
           if (ter === 'ocean' || ter === 'water') {
@@ -2691,7 +2712,7 @@ function Herds() {
             a.x = back.x
             a.z = back.z
             const l2 = worldToLatLon(a.x, a.z)
-            a.y = Math.max(0.02, sampleTerrain(l2.lat, l2.lon, seed).height)
+            a.y = groundedBodyY(sampleTerrain(l2.lat, l2.lon, seed).height)
             // Clear the dodge heading: after the land teleport the escape
             // direction must re-engage exactly (re-seeding it from the old
             // facing sent the prey RUNNING at the threat until the turn cap
@@ -3407,7 +3428,7 @@ function Herds() {
               // slid spot; land only, water occupants are owned by their dramas.
               const gfl = worldToLatLon(a.x, a.z)
               const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type !== 'water' && gft.type !== 'ocean') a.y = Math.max(0.02, gft.height)
+              if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
             }
           }
         }
@@ -3557,7 +3578,7 @@ function Herds() {
           const df = a.dissolve === undefined ? 1 : Math.max(0, a.dissolve / CARCASS_DISSOLVE_SECONDS)
           euler.set(0, a.rot, Math.PI / 2.15)
           quat.setFromEuler(euler)
-          vpos.set(a.x, Math.max(0.02, a.y), a.z)
+          vpos.set(a.x, groundedBodyY(a.y), a.z)
           vscl.setScalar(a.scale * df)
           mtx.compose(vpos, quat, vscl)
           write(a)
@@ -3857,7 +3878,7 @@ function Herds() {
               { // ground-follow (point 203(A))
                 const gfl = worldToLatLon(a.x, a.z)
                 const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
               }
             }
             px = a.x
@@ -3912,7 +3933,7 @@ function Herds() {
             { // ground-follow (point 203(A)): a mover carries its own standing height
               const gfl = worldToLatLon(a.x, a.z)
               const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
             }
             px = a.x
             pz = a.z
@@ -4002,7 +4023,7 @@ function Herds() {
               { // ground-follow (point 203(A)): a mover carries its own standing height
                 const gfl = worldToLatLon(a.x, a.z)
                 const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+                if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
               }
               px = a.x
               pz = a.z
@@ -4089,7 +4110,7 @@ function Herds() {
                   // (the tripwire's persistent young=true burials).
                   const gfl = worldToLatLon(a.x, a.z)
                   const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-                  if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+                  if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
                 }
                 px = a.x
                 pz = a.z
@@ -4131,7 +4152,7 @@ function Herds() {
                 { // ground-follow (point 203(A)): a mover carries its own standing height
                   const gfl = worldToLatLon(a.x, a.z)
                   const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-                  if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+                  if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
                 }
                 yaw = h
               } else {
@@ -4192,7 +4213,7 @@ function Herds() {
             { // ground-follow (point 203(A)): a mover carries its own standing height
               const gfl = worldToLatLon(a.x, a.z)
               const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+              if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
             }
             px = a.x
             pz = a.z
@@ -4307,7 +4328,7 @@ function Herds() {
               const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
               if (gft.type === 'water' && sp === 'flamingo')
                 bodyY = a.y = waderStandY(gft.height, waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height))
-              else if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = Math.max(0.02, gft.height)
+              else if (gft.type !== 'water' && gft.type !== 'ocean') bodyY = a.y = groundedBodyY(gft.height)
             }
             px = a.x
             pz = a.z

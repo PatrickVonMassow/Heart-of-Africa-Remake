@@ -80,6 +80,9 @@ import {
   ambientSavannaSpecies,
   claimedByAnotherDrama,
   keepStreamedAnimal,
+  groundedBodyY,
+  groundFollowY,
+  GROUND_BODY_MIN_Y,
   offscreenRingSpawn,
   VULTURE_DESCEND_CLEAR_DIST,
   deflectedStep,
@@ -3011,5 +3014,61 @@ describe('keepStreamedAnimal (the streaming cull judges the animal where it STAN
     const after = keepStreamedAnimal(a, liveAt(100 * 0.125 + 60), CHUNK, 0, 0, 100 * 0.125 + 60, always)
     expect(after.keep).toBe(true)
     expect(after.rehomeTo).toBe('1,0')
+  })
+})
+
+describe('groundedBodyY / groundFollowY (point 283 — a moved body stands on the ground drawn under it)', () => {
+  // The buried warthog: a family drive (the living shield, the trample-grief
+  // charge) moved a parent up a slope but never re-derived its standing height,
+  // so it rendered a full unit below its fresh, higher ground. Both the movers
+  // and the renderer now feed the SAME terrain sample through groundedBodyY, so
+  // a drive that just moved can never leave the body sunk under the surface.
+
+  it('clamps the standing height to the ground floor, never below it', () => {
+    expect(groundedBodyY(1.39)).toBe(1.39)
+    expect(groundedBodyY(0)).toBe(GROUND_BODY_MIN_Y)
+    expect(groundedBodyY(-2)).toBe(GROUND_BODY_MIN_Y)
+    // Above the floor it is exactly the terrain height — the value the renderer
+    // draws the body origin at.
+    expect(groundedBodyY(5.25)).toBe(5.25)
+  })
+
+  it('ground-follows a mover to the height of the SAME cell the renderer would sample', () => {
+    // A synthetic terrain: a slope in x. The renderer draws the body at the
+    // height of the cell the animal STANDS on; a mover must re-derive a.y from
+    // that same sample so the two agree exactly.
+    const sample = (x: number, _z: number) => ({ type: 'savanna', height: 0.4 + x * 0.02 })
+    // The reported burial: a.y cached at the low spot (x=0 -> 0.40), then the
+    // shield burst carries the parent up the slope to x=50 (ground 1.40).
+    const movedX = 50
+    const followed = groundFollowY(movedX, 0, sample)
+    expect(followed).not.toBeNull()
+    // The re-derived height equals the renderer's own sample of the new cell —
+    // no residual gap, so `bodyY < ground - tolerance` (the buried assert) can
+    // never trip on a body that ground-followed its step.
+    expect(followed).toBe(groundedBodyY(sample(movedX, 0).height))
+    expect(followed).toBeCloseTo(1.4, 6)
+  })
+
+  it('leaves a water occupant untouched (null): its drama/sheet rules own the height', () => {
+    // On a river/lake/ocean cell the mover keeps its maintained height — the
+    // §19 water dramas and the chest-deep wade sheet own it, and the buried
+    // assert skips water cells for the same reason.
+    expect(groundFollowY(0, 0, () => ({ type: 'water', height: 0.9 }))).toBeNull()
+    expect(groundFollowY(0, 0, () => ({ type: 'ocean', height: 0 }))).toBeNull()
+  })
+
+  it('regression: re-grounding a step from low to high ground clears the buried assert margin', () => {
+    // Reproduce the exact assert geometry (bodyY=0.41, ground=1.39, scale=1):
+    // buried := bodyY < ground - 0.75*scale. A body that kept its stale height
+    // (0.41) at a 1.39 cell is buried; ground-following the step makes bodyY the
+    // cell height itself, so the margin is positive and the assert never fires.
+    const scale = 1
+    const cellHeight = 1.39
+    const staleY = 0.41
+    expect(staleY < cellHeight - 0.75 * scale).toBe(true) // the buried warthog
+    const regrounded = groundFollowY(0, 0, () => ({ type: 'savanna', height: cellHeight }))!
+    expect(regrounded < cellHeight - 0.75 * scale).toBe(false) // no longer buried
+    expect(regrounded).toBe(cellHeight)
   })
 })
