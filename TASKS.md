@@ -10493,8 +10493,8 @@ the remaining open points in their numeric order.
    (N5 GC pressure in the wildlife separation loop, N6 a coarse terrain-query cache —
      evaluate after N1, per the analysis.)
   PART B — THREE GRAPHICS LEVELS low / medium / high, cycled by **F9** (user decision
-  24.07.2026; F7 was intercepted by the browser — Windows Chrome Caret-Browsing — so the
-  key moved F7→F9; F6 is the state-dump/point 270, F8 the benchmark). A
+  24.07.2026; F9 because F7 is browser-reserved — Chrome Caret Browsing — F6 is the
+  state-dump/point 270, F8 the benchmark). A
   `detailLevel: 'low' | 'medium' | 'high'`
   in `useUi` (NOT a binary flag), DEFAULT `'medium'`, plus a `QUALITY_PRESETS` config
   (its own module, e.g. `src/config/quality.ts`) mapping each level → a value for EVERY
@@ -10504,14 +10504,13 @@ the remaining open points in their numeric order.
   F-keys (`Hud.tsx`, add F9 to the preventDefault list) cycles in EXACTLY this order —
   **medium → low → high → medium** (each press steps DOWN a level; from the bottom it
   jumps to the top): medium⇒low, low⇒high, high⇒medium. A localized toast names the new
-  level ("Grafik: Niedrig/Mittel/Hoch" · "Graphics: Low/Medium/High"). DEBUG MENU (user
-  24.07.2026 — the menu got too full): the graphics section is a SINGLE detail-level
-  dropdown (low/medium/high, de+en) — the individual per-setting graphics checkboxes
-  (TRAA, SSAO, half-resolution shadows, shadows on/off, fire shadows) are REMOVED from the
-  menu; the level IS the control. Their store flags stay INTERNAL (the touch preset and
-  the F8 benchmark still set them; the effective* selectors still read them) — only the
-  debug UI is decluttered. This supersedes the per-checkbox acceptance of points 30 (SSAO/
-  half-shadow) and 32 (TRAA), which now assert the single level dropdown instead.
+  level ("Grafik: Niedrig/Mittel/Hoch" · "Graphics: Low/Medium/High"). DEBUG MENU: the
+  graphics section is a SINGLE detail-level dropdown (low/medium/high, de+en) — the level
+  is the only graphics control, with no per-setting graphics checkboxes. The individual
+  flags (TRAA, SSAO, half-resolution shadows, shadows on/off, fire shadows) are INTERNAL
+  state only (the touch preset and the F8 benchmark set them; the effective* selectors
+  read them), not exposed in the menu. Points 30 (SSAO/half-shadow) and 32 (TRAA) assert
+  this single level dropdown, not per-setting checkboxes.
   THE THREE PRESETS (calibrate for a CLEAR, visible difference; medium ≈ a good look on
   the user's RTX-40-class PC, low usable on very weak GPUs, high the richest):
    - LOW — very frugal: device pixel ratio capped to 1.0; ALL post off (TRAA, SSAO,
