@@ -49,6 +49,7 @@ const DEFAULTS = {
   calfGambolBout: balance.family.gambolBoutSeconds,
   juvenilePreyBias: balance.family.juvenilePreyBias,
   juvenileDrinkCrocBias: balance.family.juvenileDrinkCrocBias,
+  calfAdoptionRadius: balance.family.adoptionRadius,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
   crocMouthOffset: balance.crocodile.mouthOffsetLocal,
@@ -113,6 +114,7 @@ afterEach(() => {
   balance.family.gambolBoutSeconds = DEFAULTS.calfGambolBout
   balance.family.juvenilePreyBias = DEFAULTS.juvenilePreyBias
   balance.family.juvenileDrinkCrocBias = DEFAULTS.juvenileDrinkCrocBias
+  balance.family.adoptionRadius = DEFAULTS.calfAdoptionRadius
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
   balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
@@ -207,6 +209,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // Juvenile-prey preferences (design.md §19.8/§19.16, point 245).
     { label: en.debug.juvenilePreyBias, read: () => balance.family.juvenilePreyBias, value: 0.9 },
     { label: en.debug.juvenileDrinkCrocBias, read: () => balance.family.juvenileDrinkCrocBias, value: 8 },
+    // The orphan adoption radius (design.md §19.8/§21.2, point 262).
+    { label: en.debug.calfAdoptionRadius, read: () => balance.family.adoptionRadius, value: 25 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
     // The broadened waterline ambush band and the mouth anchor (points 275/268).

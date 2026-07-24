@@ -1982,6 +1982,83 @@ export const REGION_PREDATORS: Record<RegionId, PredatorKind[]> = {
   north: ['lion', 'cheetah', 'leopard'],
 }
 
+/** The decorative predators of ~1890 Africa as a species set (design.md §19):
+ *  the four `PredatorKind`s plus the crocodile ambusher (§19.16). Shared so the
+ *  orphan-adoption match can reject a predator as an adopter without importing
+ *  the render module. */
+export const PREDATOR_SPECIES: readonly string[] = ['lion', 'cheetah', 'leopard', 'hyena', 'crocodile']
+/** Is this species a predator (never an eligible adopter for an orphaned
+ *  juvenile, design.md §19.8, point 262)? */
+export function isPredatorSpecies(species: string): boolean {
+  return PREDATOR_SPECIES.includes(species)
+}
+
+/** A minimal structural view of an adult candidate for orphan adoption — kept
+ *  narrow so `findAdopter` is unit-testable without the full render `Animal`
+ *  type. `species` is OPTIONAL because the render `Animal` carries none (its
+ *  kind is the herd array it lives in): the live caller passes a HOMOGENEOUS,
+ *  non-predator herd, so same-species and predator eligibility hold by
+ *  construction; the pure test passes tagged objects so the same checks are
+ *  still exercised. */
+export interface AdoptionAdult {
+  x: number
+  z: number
+  /** The adult's kind, when known — matched against the juvenile's and tested
+   *  for predator-hood. Absent on the render `Animal` (herd-keyed). */
+  species?: string
+  /** A juvenile itself, never an adopter. */
+  young?: boolean
+  /** A dead animal never adopts. */
+  dead?: boolean
+  /** The adult's current calf, if any: an adult already raising a LIVE young is
+   *  skipped so the §19.8 parent↔child relation the dramas read stays 1:1. */
+  child?: { dead?: boolean } | null
+}
+
+/** Orphan adoption (design.md §19.8, point 262): the nearest ELIGIBLE adult
+ *  that can take in `juvenile`, or `null` when none is within `radius`. Eligible
+ *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
+ *  are single-species, so this is the nearest suitable herd-mate — that is NOT a
+ *  predator, NOT the `killer` that just took the parent, NOT the juvenile itself,
+ *  and NOT already raising a live calf (the 1:1 relation cap). Same-species,
+ *  live and non-predator together make re-linking safe: a returned adopter can
+ *  always parent the young and drive its §19.8 defence/rescue/grief roles. The
+ *  species and predator gates only apply where `species` is known on both sides
+ *  (the pure test); the live caller enforces them by passing a homogeneous,
+ *  non-predator herd. */
+export function findAdopter<A extends AdoptionAdult>(
+  juvenile: { species?: string; x: number; z: number },
+  adults: readonly A[],
+  radius: number,
+  opts: { isPredator?: (species: string) => boolean; killer?: A | null } = {},
+): A | null {
+  const isPredator = opts.isPredator ?? isPredatorSpecies
+  const killer = opts.killer ?? null
+  const r2 = radius * radius
+  let best: A | null = null
+  let bestD2 = Infinity
+  for (const a of adults) {
+    if ((a as unknown) === (juvenile as unknown)) continue // never itself
+    if (a === killer) continue // never the hunter that killed the parent
+    if (a.dead) continue // never a dead adult
+    if (a.young) continue // must be an adult, not another juvenile
+    if (a.species !== undefined) {
+      if (isPredator(a.species)) continue // never a predator
+      if (juvenile.species !== undefined && a.species !== juvenile.species) continue // own kind only
+    }
+    if (a.child && !a.child.dead) continue // already raising a live calf → keep 1:1
+    const dx = a.x - juvenile.x
+    const dz = a.z - juvenile.z
+    const d2 = dx * dx + dz * dz
+    if (d2 > r2) continue
+    if (d2 < bestD2) {
+      bestD2 = d2
+      best = a
+    }
+  }
+  return best
+}
+
 /** The ambient savanna herd a chunk seeds (point 208 A2): elephants roam every
  *  savanna broadly, but grazer herds are drawn from the region's own
  *  `REGION_PREY` pool so the visible world matches the hunt/vicinity/food-web

@@ -75,6 +75,8 @@ import {
   mireRoll,
   REGION_PREDATORS,
   parentAttackOutcome,
+  findAdopter,
+  isPredatorSpecies,
   PREDATOR_PREY,
   REGION_PREY,
   type PredatorKind,
@@ -2575,6 +2577,37 @@ function Herds() {
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
             if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
+          }
+        }
+      }
+    }
+
+    // Orphan adoption (design.md §19.8, point 262): a juvenile whose parent has
+    // died — by ANY cause resolved above (predator sacrifice, crocodile, trample
+    // grief, drowning) or streamed out from under it — is taken in by the nearest
+    // eligible ADULT of its own kind within balance.family.adoptionRadius, which
+    // becomes its new parent. The §19.8 family dramas (defence/shield/sacrifice,
+    // the grief-trample, the water rescue) then recur for the new pairing instead
+    // of a one-off orphaning. Runs every frame over the full lists, so it also
+    // acts as the re-check clause: an orphan with no adult in range yet is picked
+    // up the moment a herd-mate roams within reach. The candidate pool is the
+    // young's OWN single-species herd, and findAdopter caps it to live,
+    // non-predator, childless adults — so re-linking never dangles a parent
+    // reference, clobbers another calf's parent, or links a predator/self/dead.
+    {
+      const ADOPTION_RADIUS = balance.family.adoptionRadius
+      for (const sp of SPECIES) {
+        // Predators never adopt (a lion cub whose lioness died stays orphaned);
+        // the pool is thus homogeneous and non-predator, so findAdopter's
+        // same-species/predator gates hold by construction.
+        if (isPredatorSpecies(sp)) continue
+        for (const a of herds[sp]) {
+          if (a.dead || a.young !== true) continue
+          if (a.parent && !a.parent.dead) continue // still has a living parent
+          const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS)
+          if (adopter) {
+            a.parent = adopter
+            adopter.child = a
           }
         }
       }
