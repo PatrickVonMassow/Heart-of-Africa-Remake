@@ -97,6 +97,15 @@ const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
 // (design.md §19.13, point 120g).
 const PLACE_SUN_INTENSITY = 2.4
 const PLACE_HEMI_INTENSITY = 0.8
+// Campfire cube-shadow map (design.md §19.10, debug toggle, default OFF): a
+// low-resolution map suffices — the firelight shadow reads soft anyway, and
+// measured 128/256/512 cost the same (the price is the six cube-face render
+// passes, not map fill; docs/perf-276-findings.md), so 256 keeps the quality.
+const FIRE_SHADOW_MAP_SIZE = 256
+// Point-light cube faces need a larger bias than the sun's 2D map: the low
+// resolution plus near-source geometry (stones centimetres from the flame)
+// otherwise stripe the ground with acne.
+const FIRE_SHADOW_BIAS = -0.005
 // Frame scratch for the seasonal fog tint (no per-frame allocation).
 const placeFogColor = new THREE.Color()
 const placeRainColor = new THREE.Color(RAIN_GRAY)
@@ -901,6 +910,11 @@ function FirePit({
 }) {
   const light = useRef<THREE.PointLight>(null)
   const flame = useRef<THREE.Mesh>(null)
+  // Campfire shadows (design.md §19.10): debug-gated, default off, and also
+  // behind the global shadow switch — the fire is one more cast-shadow source.
+  const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
+  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
+  const castFireShadow = fireShadowsEnabled && shadowsEnabled
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     // Under the cook-shelter the fire burns on through the rain — only a touch
@@ -945,9 +959,45 @@ function FirePit({
         <coneGeometry args={[0.3, 0.75, 8]} />
         <meshStandardMaterial color="#ff9a2e" emissive="#ff6a00" emissiveIntensity={2.4} roughness={0.4} />
       </mesh>
-      <pointLight ref={light} position={[0, 1.1, 0]} color="#ffab4a" distance={14} decay={2} castShadow={false} />
+      <pointLight
+        // Remounted on toggle like the sun light (point 111): flipping
+        // castShadow on a mounted light leaves the WebGPU shadow pipeline in a
+        // broken state, so the key swap rebuilds the light from scratch.
+        key={castFireShadow ? 'fire-shadowed' : 'fire-plain'}
+        ref={light}
+        position={[0, 1.1, 0]}
+        color="#ffab4a"
+        distance={14}
+        decay={2}
+        castShadow={castFireShadow}
+        shadow-mapSize={[FIRE_SHADOW_MAP_SIZE, FIRE_SHADOW_MAP_SIZE]}
+        shadow-camera-near={0.2}
+        shadow-bias={FIRE_SHADOW_BIAS}
+      />
       {sheltered && <CookShelter thatchMat={thatchMat} />}
     </group>
+  )
+}
+
+/**
+ * Invisible first-person body proxy so the PLAYER blocks the campfire light too
+ * (design.md §19.10 — the reported case: the player standing between the fire
+ * and the lit ground). Draws nothing (color and depth writes off; from inside,
+ * the front-side cylinder is backface-culled anyway) but renders into the
+ * shadow maps. Mounted only while campfire shadows are enabled, so the default
+ * picture stays untouched; while mounted the player also gains a sun shadow,
+ * which reads consistent rather than wrong.
+ */
+function PlayerShadowProxy({ player }: { player: MutableRefObject<{ x: number; z: number; yaw: number }> }) {
+  const mesh = useRef<THREE.Mesh>(null)
+  useFrame(() => {
+    mesh.current?.position.set(player.current.x, 0.85, player.current.z)
+  })
+  return (
+    <mesh ref={mesh} castShadow>
+      <cylinderGeometry args={[0.3, 0.34, 1.7, 10]} />
+      <meshBasicMaterial colorWrite={false} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -1620,6 +1670,7 @@ export function PlaceScene() {
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
+  const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
   const shadowSize = shadowMapHalf ? 1024 : 2048
   useEffect(() => {
     const map = sunRef.current?.shadow.map
@@ -2082,6 +2133,10 @@ export function PlaceScene() {
           sheltered={fireHasCookShelter(place.peopleId)}
         />
       )}
+      {/* The player's own occluder body, only while campfire shadows are on
+          (design.md §19.10) — absent, the light passes straight through the
+          viewer standing between the fire and the ground. */}
+      {!isPort && fireShadowsEnabled && shadowsEnabled && <PlayerShadowProxy player={player} />}
 
       <PlaceFlora slots={layout.flora} style={isPort ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 

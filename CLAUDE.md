@@ -994,7 +994,20 @@ verify suite that proves it.
     nemes (proportions and part count pure-tested via `buildSphinx` in
     `src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
     Timbuktu builds the Djinguereber mosque as a collidable dwelling
-    (`scripts/verify/polish.mjs`, screenshots 96/97/100).
+    (`scripts/verify/polish.mjs`, screenshots 96/97/100). The §19.10
+    campfire can CAST SHADOWS (point 289, opt-in): the debug menu's
+    "Campfire shadows" toggle — OFF by default, so the shipped picture is
+    unchanged until the user prices the cost (~+1.5 ms headless: six extra
+    cube-face passes; map resolution nearly free) on their own hardware —
+    makes the fire light render a 256² cube shadow map (remounted on
+    toggle, also behind the global shadow switch), with an invisible
+    player-body proxy so the viewer occludes the firelight too.
+    Verifiable: with the toggle ON the ground directly behind a fire-ring
+    stone reads measurably darker in pixels than its lit twin at the same
+    radius, and with it OFF that contrast stays flat
+    (`scripts/verify/polish.mjs`, screenshot 138, both backends); the
+    toggle default and write-through are pure-tested
+    (`src/state/ui.test.ts`, `src/ui/DebugMenu.test.tsx`).
 16. **Collision inside settlements.** The collision rules of `design.md`
     §2.6 are implemented (impenetrable buildings and solid objects,
     sliding movement, inhabitants never permanently stuck, reachable

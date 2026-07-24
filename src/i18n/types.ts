@@ -394,6 +394,8 @@ export interface Strings {
     /** Half-size shadow maps toggle; on in the touch quality preset (point 84). */
     shadowMapHalf: string
     shadows: string
+    /** Campfire cube-shadow toggle (design.md §19.10), default off. */
+    fireShadows: string
     flatGround: string
     /** Debug toggle for the dry-season flora deformation (point 175), default on. */
     foliageCollapse: string
