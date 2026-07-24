@@ -264,10 +264,11 @@ for (let i = 0; i < 10; i++) {
     return {
       lionVisible: h.lion.current?.visible,
       preyVisible: h.prey.current?.visible,
-      stainVisible: h.stain.current?.visible,
+      // The stain soaks the GROUND (point 267): a tint patch, not a mesh.
+      stainActive: h.stain.active,
       headPitch: h.lion.current?.rotation.x,
       preyOnSide: h.prey.current?.rotation.z,
-      stainScale: h.stain.current?.scale.x,
+      stainRadius: h.stain.r,
     }
   })
   pitches.push(s.headPitch ?? 0)
@@ -281,8 +282,8 @@ check('feeding: lion head lowered', feedA.headPitch > 0.1, `${feedA.headPitch?.t
 check('feeding: tearing movement animates', pitchSwing > 0.005,
   pitches.map((p) => p?.toFixed(3)).join(' -> '))
 check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
-check('feeding: stain beneath the carcass', feedA.stainVisible === true && feedA.stainScale > 0.3,
-  `scale ${feedA.stainScale?.toFixed(2)}`)
+check('feeding: stain beneath the carcass', feedA.stainActive === true && feedA.stainRadius > 0.3,
+  `radius ${feedA.stainRadius?.toFixed(2)}`)
 await page.screenshot({ path: `${OUT}68-lion-feeding.png` })
 console.log('shot 68-lion-feeding.png')
 
