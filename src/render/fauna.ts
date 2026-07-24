@@ -411,6 +411,12 @@ export function buildZebra(): THREE.BufferGeometry {
   return merge(buildQuadruped(ZEBRA_SPEC))
 }
 
+/** The zebra split into body and pivoted legs (point 255): the §2.5 panorama
+ *  silhouettes need a real leg swing to read as walking at horizon range. */
+export function buildZebraParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+  return buildQuadrupedParts(ZEBRA_SPEC)
+}
+
 /** Zebra foal with baby-schema proportions (design.md §19). */
 export function buildZebraCalf(): THREE.BufferGeometry {
   return merge(buildQuadruped(calfProportions(ZEBRA_SPEC)))
@@ -432,6 +438,11 @@ const ANTELOPE_SPEC: QuadrupedSpec = {
 /** Antelope/gazelle, ~1.2 units tall. */
 export function buildAntelope(): THREE.BufferGeometry {
   return merge(buildQuadruped(ANTELOPE_SPEC))
+}
+
+/** The antelope split into body and pivoted legs (point 255). */
+export function buildAntelopeParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+  return buildQuadrupedParts(ANTELOPE_SPEC)
 }
 
 /** Antelope calf: baby schema, hornless (design.md §19). */
@@ -1014,8 +1025,7 @@ export interface GoatLeg {
  * first-person range, where a legless glide reads plainly; the far bird's-eye
  * herds keep the cheaper merged build.
  */
-export function buildGoatParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
-  const s = GOAT_SPEC
+export function buildQuadrupedParts(s: QuadrupedSpec): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
   const backY = s.legH + s.bodyR * 0.8
   const bodyParts: THREE.BufferGeometry[] = []
 
@@ -1065,6 +1075,105 @@ export function buildGoatParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] 
       geo: tint(leg, s.bodyColor, 0.12, s.seed + 1),
       hip: [lx * s.bodyR, legLen, lz * s.bodyLen * 0.5],
       phaseOffset,
+    })
+  }
+  return { body: merge(bodyParts), legs }
+}
+
+/** The goat split into body and pivoted legs — the settlement walkers' rig. */
+export function buildGoatParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+  return buildQuadrupedParts(GOAT_SPEC)
+}
+
+/**
+ * The elephant split into body and four pivoted legs (point 255): the §2.5
+ * panorama silhouettes drift along the settlement horizon, and only a real leg
+ * swing reads at that range — their bodies subtend a couple of degrees, so a
+ * body-level bob would move barely a pixel. Same geometry as `buildElephant`,
+ * just not merged across the hips.
+ */
+export function buildElephantParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+  const bodyParts: THREE.BufferGeometry[] = []
+  const body = new THREE.SphereGeometry(1.05, ...FAUNA_TESSELLATION.body)
+  body.scale(0.95, 0.95, 1.4)
+  body.translate(0, 1.75, 0)
+  bodyParts.push(tint(body, '#8d8680', 0.06, 101))
+
+  const head = new THREE.SphereGeometry(0.62, ...FAUNA_TESSELLATION.head)
+  head.translate(0, 2.15, 1.45)
+  bodyParts.push(tint(head, '#8d8680', 0.06, 103))
+  for (const ex of [-0.72, 0.72]) {
+    const ear = new THREE.BoxGeometry(0.1, 0.75, 0.62)
+    ear.rotateY(ex < 0 ? 0.35 : -0.35)
+    ear.translate(ex, 2.2, 1.3)
+    bodyParts.push(tint(ear, '#7d766f', 0.06, 104))
+  }
+  bodyParts.push(tint(buildElephantTrunk(false), '#847d77', 0.06, 105))
+  for (const tx of [-0.3, 0.3]) {
+    const tusk = new THREE.ConeGeometry(0.07, 0.6, FAUNA_TESSELLATION.spike)
+    tusk.rotateX(1.9)
+    tusk.translate(tx, 1.75, 2.0)
+    bodyParts.push(tint(tusk, '#e8ddc4', 0.05, 108))
+  }
+
+  const legLen = 1.3
+  const legs: GoatLeg[] = []
+  for (const [lx, lz] of [
+    [-0.5, 0.85],
+    [0.5, 0.85],
+    [-0.5, -0.85],
+    [0.5, -0.85],
+  ]) {
+    const leg = new THREE.CylinderGeometry(0.26, 0.3, legLen, FAUNA_TESSELLATION.limb)
+    leg.translate(0, -legLen / 2, 0) // hip at the local origin: the pivot
+    legs.push({
+      geo: tint(leg, '#847d77', 0.06, 102),
+      hip: [lx, legLen, lz],
+      phaseOffset: Math.sign(lx) === Math.sign(lz) ? Math.PI : 0,
+    })
+  }
+  return { body: merge(bodyParts), legs }
+}
+
+/** The giraffe split into body and four pivoted legs (point 255) — same
+ *  geometry as `buildGiraffe`, unmerged across the hips. */
+export function buildGiraffeParts(): { body: THREE.BufferGeometry; legs: GoatLeg[] } {
+  const bodyParts: THREE.BufferGeometry[] = []
+  const body = new THREE.SphereGeometry(0.62, ...FAUNA_TESSELLATION.body)
+  body.scale(0.85, 0.85, 1.35)
+  body.rotateX(-0.18)
+  body.translate(0, 1.9, 0)
+  bodyParts.push(tint(body, '#c89a55', 0.14, 111))
+
+  const neck = new THREE.CylinderGeometry(0.13, 0.2, 1.6, FAUNA_TESSELLATION.limb)
+  neck.rotateX(-0.35)
+  neck.translate(0, 2.85, 0.85)
+  bodyParts.push(tint(neck, '#c89a55', 0.14, 113))
+
+  const head = new THREE.SphereGeometry(0.2, ...FAUNA_TESSELLATION.head)
+  head.scale(0.8, 0.8, 1.4)
+  head.translate(0, 3.55, 1.25)
+  bodyParts.push(tint(head, '#c89a55', 0.12, 114))
+  for (const ox of [-0.08, 0.08]) {
+    const ossicone = new THREE.CylinderGeometry(0.025, 0.025, 0.18, FAUNA_TESSELLATION.spike)
+    ossicone.translate(ox, 3.72, 1.15)
+    bodyParts.push(tint(ossicone, '#8a6a38', 0.1, 115))
+  }
+
+  const legLen = 1.65
+  const legs: GoatLeg[] = []
+  for (const [lx, lz] of [
+    [-0.3, 0.5],
+    [0.3, 0.5],
+    [-0.3, -0.5],
+    [0.3, -0.5],
+  ]) {
+    const leg = new THREE.CylinderGeometry(0.09, 0.07, legLen, FAUNA_TESSELLATION.limb)
+    leg.translate(0, -legLen / 2, 0)
+    legs.push({
+      geo: tint(leg, '#bf9150', 0.14, 112),
+      hip: [lx, 0.82 + legLen / 2, lz],
+      phaseOffset: Math.sign(lx) === Math.sign(lz) ? Math.PI : 0,
     })
   }
   return { body: merge(bodyParts), legs }

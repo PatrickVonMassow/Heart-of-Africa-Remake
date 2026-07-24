@@ -53,7 +53,15 @@ import { createGroundMaterial, createNoisyMaterial, createSurfaceMaterial } from
 import { TESSELLATION } from '../../render/figures'
 import { buildAcacia, buildBush, buildGrassTuft, buildJungleTree, buildPalm, buildRock } from '../../render/flora'
 import { buildTableMountain, buildGizaPyramids } from '../../render/landmarks'
-import { buildAntelope, buildElephant, buildGiraffe, buildZebra } from '../../render/fauna'
+import {
+  buildAntelopeParts,
+  buildElephantParts,
+  buildGiraffeParts,
+  buildZebraParts,
+  gaitPhase,
+  legSwingAngle,
+  type GoatLeg,
+} from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
@@ -64,6 +72,9 @@ import {
   apparentAngleDeg,
   hazeColor,
   luminance,
+  panoramaDriftDistance,
+  panoramaGaitBob,
+  panoramaGaitNod,
   excludedAzimuthSpan,
   isAzimuthExcluded,
   type AzimuthSpan,
@@ -1083,12 +1094,16 @@ function skylineExclusionSpans(placeId: string): AzimuthSpan[] {
 // the arid north carries only antelope, the plains east/south the full herd mix,
 // the wooded west/centre a narrower range. Every entry is a species the
 // bird's-eye view also spawns in that region.
-const PANORAMA_FAUNA: Record<RegionId, Array<() => THREE.BufferGeometry>> = {
-  north: [buildAntelope],
-  west: [buildZebra, buildAntelope],
-  central: [buildElephant, buildAntelope],
-  east: [buildElephant, buildGiraffe, buildZebra, buildAntelope],
-  south: [buildElephant, buildGiraffe, buildZebra, buildAntelope],
+// Built SPLIT into body and pivoted legs (point 255): the silhouettes walk the
+// horizon on their own legs — at this range a body-level bob moves barely a
+// pixel, so only a real leg swing stops the glide.
+type FaunaParts = { body: THREE.BufferGeometry; legs: GoatLeg[] }
+const PANORAMA_FAUNA: Record<RegionId, Array<() => FaunaParts>> = {
+  north: [buildAntelopeParts],
+  west: [buildZebraParts, buildAntelopeParts],
+  central: [buildElephantParts, buildAntelopeParts],
+  east: [buildElephantParts, buildGiraffeParts, buildZebraParts, buildAntelopeParts],
+  south: [buildElephantParts, buildGiraffeParts, buildZebraParts, buildAntelopeParts],
 }
 
 /**
@@ -1133,18 +1148,19 @@ function PanoramaWildlife({
 }) {
   const centerH = useMemo(() => sampleTerrain(lat, lon, seed).height, [lat, lon, seed])
   // Region-typical species aligned to the bird's-eye pool (point 102, part c).
-  const geos = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
+  const builds = useMemo(() => PANORAMA_FAUNA[region].map((b) => b()), [region])
   // Azimuth arcs of this settlement's skyline landmarks: a silhouette drifting
   // into one is hidden so it never crosses the monument (point 102, part a).
   const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
   // World height of each mesh, for the apparent-size clamp (point 94).
   const geoHeights = useMemo(
-    () => geos.map((g) => {
-      g.computeBoundingBox()
-      const b = g.boundingBox
-      return b ? b.max.y - b.min.y : 2
+    () => builds.map((p) => {
+      p.body.computeBoundingBox()
+      const b = p.body.boundingBox
+      // The legs reach the ground at y = 0, so the body's top IS the height.
+      return b ? b.max.y : 2
     }),
-    [geos],
+    [builds],
   )
   const baseRgb = useMemo(() => {
     const c = new THREE.Color('#4d4639')
@@ -1165,7 +1181,7 @@ function PanoramaWildlife({
     // (stronger for farther rings) so it reads as distance, not a black blob.
     return Array.from({ length: 5 }, (_, i) => {
       const radius = innerRadius + pw.ringInner + rand() * pw.ringSpread
-      const gi = i % geos.length
+      const gi = i % builds.length
       const scale = silhouetteScale(geoHeights[gi], radius, pw.maxApparentAngleDeg, 2.6 + rand() * 1.6)
       // Farther rings haze a touch more (ringInner..ringInner+spread → +0..0.15).
       const hazeMix = Math.min(1, pw.hazeMix + ((radius - innerRadius - pw.ringInner) / pw.ringSpread) * 0.15)
@@ -1175,7 +1191,7 @@ function PanoramaWildlife({
         radius,
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
-        geo: geos[gi],
+        parts: builds[gi],
         material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
@@ -1183,12 +1199,14 @@ function PanoramaWildlife({
         phase: rand() * Math.PI * 2,
       }
     })
-  }, [placeId, seed, innerRadius, geos, geoHeights, baseRgb, skyRgb, pw])
+  }, [placeId, seed, innerRadius, builds, geoHeights, baseRgb, skyRgb, pw])
   useEffect(
     () => () => items.forEach((it) => it.material.dispose()),
     [items],
   )
   const refs = useRef<Array<THREE.Group | null>>([])
+  // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
+  const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1223,7 +1241,14 @@ function PanoramaWildlife({
       const groundY =
         panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
         pw.sinkEpsilon
-      const y = groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12
+      // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
+      // wall-clock bob. The stride now rides the ground they cover along the
+      // ring, through the same distance-driven gait phase the settlement goats
+      // walk on, so a faster-drifting animal steps faster and a stalled one
+      // stands still. Single merged meshes have no leg joints at this range, so
+      // the stride reads as the body's own rise and rock.
+      const phase = gaitPhase(panoramaDriftDistance(it.radius, it.drift, t)) + it.phase
+      const y = groundY + panoramaGaitBob(phase, it.worldHeight)
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
@@ -1231,11 +1256,26 @@ function PanoramaWildlife({
         // luminance for the point-92/94 live gates; azimuth/visible for the
         // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
         // which ray-probes the surface drawn behind the feet.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, radius: it.radius, worldHeight: it.worldHeight }
+        // `gait`/`groundSpeed` prove the point-255 stride live: the phase must
+        // advance in step with the ground each silhouette covers, so the ratio
+        // is the same constant for all of them — a wall-clock bob would advance
+        // them all equally regardless of speed.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, radius: it.radius, worldHeight: it.worldHeight, gait: phase, groundSpeed: Math.abs(it.radius * it.drift) }
       }
       g.position.set(x, y, z)
-      // Face the drift direction along the ring tangent.
+      // Face the drift direction along the ring tangent, then nod fore/aft in
+      // the body's own frame (YXZ: yaw first, so x is the walking pitch).
+      g.rotation.order = 'YXZ'
       g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
+      g.rotation.x = panoramaGaitNod(phase)
+      // The stride itself: diagonal legs swing in antiphase about their hips.
+      const legs = legRefs.current[i]
+      if (legs) {
+        for (let li = 0; li < it.parts.legs.length; li++) {
+          const lg = legs[li]
+          if (lg) lg.rotation.x = legSwingAngle(phase, it.parts.legs[li].phaseOffset)
+        }
+      }
     })
   })
 
@@ -1249,7 +1289,19 @@ function PanoramaWildlife({
             refs.current[i] = el
           }}
         >
-          <mesh name="panorama-silhouette" geometry={it.geo} material={it.material} />
+          <mesh name="panorama-silhouette" geometry={it.parts.body} material={it.material} />
+          {it.parts.legs.map((leg, li) => (
+            <group
+              key={li}
+              position={leg.hip}
+              ref={(el) => {
+                if (!legRefs.current[i]) legRefs.current[i] = []
+                legRefs.current[i][li] = el
+              }}
+            >
+              <mesh name="panorama-silhouette" geometry={leg.geo} material={it.material} />
+            </group>
+          ))}
         </group>
       ))}
     </>

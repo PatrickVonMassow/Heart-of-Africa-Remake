@@ -173,6 +173,29 @@ check(
   `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}`).join(', ')}]`,
 )
 await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
+// Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
+// Their stride phase rides the ground they cover on the ring, so over the same
+// interval each one's phase advance divided by its ground speed is the SAME
+// constant — a wall-clock bob would advance them all alike whatever their speed.
+{
+  const sample = () =>
+    page.evaluate(() =>
+      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.groundSpeed })),
+    )
+  const before = await sample()
+  await page.waitForTimeout(1200)
+  const after = await sample()
+  const rates = before
+    .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed }))
+    .filter((r) => r.speed > 0)
+    .map((r) => r.d / r.speed)
+  const spread = rates.length ? (Math.max(...rates) - Math.min(...rates)) / Math.max(...rates) : 1
+  check(
+    'the panorama silhouettes stride with the ground they cover, not the clock (point 255)',
+    rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
+    `phase per unit walked [${rates.map((r) => r.toFixed(2)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`,
+  )
+}
 check(
   'every panorama silhouette reads small (bounded subtended angle, point 94)',
   wInfo.length >= 3 && wInfo.every((w) => w.apparentDeg <= 2.6),

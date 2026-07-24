@@ -1475,7 +1475,12 @@ verify suite that proves it.
     disc edge the plain drops out of sight and the band shows through the gap,
     so the animals hung in the sky over the band's content (reported on
     WebGPU in Cairo, over a pyramid flank) — and where relief rose they were
-    buried inside it. Verifiable: `scripts/verify/polish.mjs`
+    buried inside it. The silhouettes WALK rather than glide (point 255): built
+    with pivoted legs, they swing them on the shared distance-driven gait phase
+    (`gaitPhase`/`legSwingAngle`) fed by the arc they drift along their ring, so
+    a faster one steps faster and a stalled one stands still — a wall-clock bob
+    is never the driver, and at horizon range a body-level bob alone would move
+    barely a pixel. Verifiable: `scripts/verify/polish.mjs`
     asserts no markers before and markers after the gift plus the toast,
     their persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village; plus that
@@ -1486,11 +1491,14 @@ verify suite that proves it.
     surface behind every silhouette's feet is no further away than the feet
     themselves (`__placeRayHit`, run without a capture at the Maasai village
     and WITH one at the Nubian village and in Cairo under the Giza skyline,
-    screenshot 136) — the ground-line math pure-tested in
+    screenshot 136), and that each silhouette's stride phase advances in step
+    with the ground it covers — the same phase-per-unit-walked for all of them,
+    which a clock-driven bob could not produce (point 255) — the stride pose and
+    its distance coupling pure-tested in
+    `src/scenes/place/panoramaWildlife.test.ts`, the ground-line math in
     `src/scenes/place/backdrop.test.ts` (the sight-line geometry, the drop as
     the viewer nears, relief-following on a dune, and both old failure modes
-    swept round Cairo) and the sizing/haze math in
-    `src/scenes/place/panoramaWildlife.test.ts`; and that in Cairo no
+    swept round Cairo); and that in Cairo no
     visible silhouette's azimuth lies inside the Giza skyline span
     (`__placeSkylineExclusion`/`__placePanoramaWildlifeInfo`, point 102),
     the azimuth-exclusion helper (span from placement, margin, inside/
