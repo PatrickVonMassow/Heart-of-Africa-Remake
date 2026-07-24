@@ -77,6 +77,16 @@ backends.
 v0.3 feature queued behind 224 and behind point 244. The *skyline/travel* half is
 a standalone XS fix that need not wait for the walkable scene.
 
+**RESOLVED (point 279a).** `buildSphinx()` in `src/render/landmarks.ts` now
+builds the whole couchant lion and sinks it by `SPHINX_BURIAL_DEPTH` (0.4) so
+only the head, nemes and crown stand proud, with a low sand drift closing the
+seam — the sand line reads as blown drift rather than a clean cut. Both mount
+points (the travel field and Cairo's 13× western skyline) inherit the buried
+state from the one builder. `landmarks.test.ts` pins the sunk body (min y at
+−`SPHINX_BURIAL_DEPTH`) and that what clears the sand is only the head under
+its nemes — a narrow span near the front, nowhere near the paws. Verified by
+the picture at both mount points on both backends.
+
 ---
 
 ### A2 — Meroë's pyramids are built intact; in 1890 most had their tops blown off · SEVERITY 1 · HIGH
@@ -207,6 +217,19 @@ picture at zero extra geometry cost.
 
 **(5) Effort.** **XS–S** (parameter reshuffle in `buildStelae()` plus a test pin).
 
+**RESOLVED (point 279e).** `buildStelae()` in `src/render/landmarks.ts` now
+builds the field the record describes. King Ezana's stele stands alone —
+`AKSUM_EZANA_HEIGHT` 2.6, more slender than anything else upright — over a
+scatter of three low rough uncrowned stelae (`AKSUM_MINOR_HEIGHTS`, all under
+0.4 of the giant). The fallen Great Stele lies clear across the field in two
+broken pieces spanning `AKSUM_FALLEN_LENGTH` 3.4 end to end — the biggest
+object there, thicker than the standing giant and longer than it is tall —
+with the second fallen royal shaft (the one Italy later carried to Rome) and
+the broken stump beside it. `landmarks.test.ts` pins the proportions both
+ways: every minor stele stays well under the lone giant, nothing off the
+giant's own axis rises near its height, the fallen span exceeds the standing
+height, and lying material is really built at both ends of the fall line.
+
 ---
 
 ### A5 — The Bemba village is built on the Central Cattle Pattern, but the Bemba kept no cattle · SEVERITY 2 · HIGH
@@ -283,6 +306,19 @@ at Menkaure's base. All three are cosmetic and change no footprint.
 
 **(5) Effort.** **S**. Note this is *already inside* TASKS 273's scope, but like
 A1 the travel/skyline half is independent of the walkable scene.
+
+**RESOLVED (point 279e).** `buildGizaPyramids()` in `src/render/landmarks.ts`
+now builds the three cues of `docs/giza-1890.md` §3, footprint unchanged.
+Khufu (NE) is cut at `KHUFU_STANDING` 0.945 of its built height — the real
+~146.5→138.5 m loss — and closed with the small flat summit platform; Khafre
+(centre) carries a paler, low-jitter (reading smooth) Tura-casing cap over
+its top fifth — the plateau's one distinguishing cue; Menkaure (SW) wears a
+slightly proud darker red-granite skirt over its lowest courses. Both mount
+points (the travel field and Cairo's 13× western skyline) inherit all three
+from the one builder. `landmarks.test.ts` pins each cue by geometry and
+vertex colour: the blunt top sits below the built apex with a multi-vertex
+off-axis platform, pale vertices exist only near Khafre's apex, and the
+red-dominant dark band exists only around Menkaure's base.
 
 ---
 

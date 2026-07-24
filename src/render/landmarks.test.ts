@@ -14,6 +14,9 @@ import {
   buildRockChurches,
   buildCoastalRuins,
   buildStelae,
+  AKSUM_EZANA_HEIGHT,
+  AKSUM_MINOR_HEIGHTS,
+  AKSUM_FALLEN_LENGTH,
   buildCastles,
   GONDAR_PARAPET,
   GONDAR_TOWER_HEIGHTS,
@@ -77,13 +80,72 @@ describe('landmark builders', () => {
     // to the shoulders as it did in 1890 (point 279), so the floor is its sunk
     // body rather than the pyramids' bases.
     expect(b.min.y).toBeGreaterThanOrEqual(-SPHINX_BURIAL_DEPTH - 0.1)
-    // Khufu (base half-extent 1.6, Old-Kingdom slope) peaks at ~2 — a compact
-    // symbol: the field stands only ~4 world units from Cairo's marker.
+    // Khufu (base half-extent 1.6, Old-Kingdom slope) peaks just under 2 at
+    // its blunt 1890 top — a compact symbol: the field stands only ~4 world
+    // units from Cairo's marker.
     expect(b.max.y).toBeGreaterThan(1.7)
     expect(b.max.y).toBeLessThan(3)
     const footprint = Math.max(b.max.x - b.min.x, b.max.z - b.min.z)
     expect(footprint).toBeGreaterThan(3.5)
     expect(footprint).toBeLessThan(8)
+    geo.dispose()
+  })
+
+  it("Giza carries its 1890 casing cues: blunt Khufu, Khafre's pale cap, Menkaure's granite base (point 279)", () => {
+    // docs/giza-1890.md §1.1-§1.2/§3: all three lost their smooth Tura casing
+    // to centuries of quarrying; Khufu's apex and top courses are gone (a
+    // small flat platform, not a point); Khafre ALONE keeps a cap of original
+    // smooth casing near its apex — the single most useful visual cue on the
+    // plateau; and Menkaure's lower courses are cased in darker red Aswan
+    // granite. The regression this pins is the three identical tawny sharp
+    // cones the builder used to make.
+    const geo = buildGizaPyramids()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    const col = geo.getAttribute('color') as THREE.BufferAttribute
+    // Khufu (NE, largest): cut short of its built apex and closed FLAT — a
+    // summit platform of several vertices OFF the axis, not a single point.
+    const khufuFull = 1.6 * 0.64 * 2
+    let khufuTop = 0
+    let platform = 0
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.hypot(pos.getX(i) - 1.3, pos.getZ(i) + 1.3) > 1.7) continue
+      khufuTop = Math.max(khufuTop, pos.getY(i))
+    }
+    expect(khufuTop, 'the top courses are gone').toBeLessThan(khufuFull - 0.08)
+    expect(khufuTop, 'still nearly full height').toBeGreaterThan(khufuFull * 0.85)
+    for (let i = 0; i < pos.count; i++) {
+      const d = Math.hypot(pos.getX(i) - 1.3, pos.getZ(i) + 1.3)
+      if (d > 0.04 && d < 0.3 && pos.getY(i) > khufuTop - 0.01) platform++
+    }
+    expect(platform, 'a flat platform, not a point').toBeGreaterThanOrEqual(4)
+    // Khafre (centre): the pale smooth casing cap exists — and ONLY near
+    // Khafre's own apex, nowhere else on the plateau. Colours are stored
+    // LINEAR (THREE.Color converts the sRGB hex), so the brightness sums sit
+    // lower than the hex reads: the tawny core peaks ~1.2 with jitter while
+    // the pale cap stays above 2.0.
+    const khafreH = 1.5 * 0.64 * 2
+    let pale = 0
+    for (let i = 0; i < pos.count; i++) {
+      const bright = col.getX(i) + col.getY(i) + col.getZ(i)
+      if (bright <= 1.6) continue
+      pale++
+      expect(Math.hypot(pos.getX(i), pos.getZ(i)), 'pale casing only on Khafre').toBeLessThan(0.5)
+      expect(pos.getY(i), 'pale casing only near the apex').toBeGreaterThan(khafreH * 0.7)
+    }
+    expect(pale, 'the casing cap exists').toBeGreaterThan(0)
+    // Menkaure (SW, smallest): the red-granite band exists — red-dominant,
+    // and ONLY around Menkaure's base (linear sums again: granite tops out
+    // ~0.52 while the darkest other part, the Sphinx face, stays above 0.8).
+    let granite = 0
+    for (let i = 0; i < pos.count; i++) {
+      const bright = col.getX(i) + col.getY(i) + col.getZ(i)
+      if (bright >= 0.6) continue
+      granite++
+      expect(Math.hypot(pos.getX(i) + 1.2, pos.getZ(i) - 1.2), 'granite only on Menkaure').toBeLessThan(1.0)
+      expect(pos.getY(i), 'granite only at the base').toBeLessThan(0.3)
+      expect(col.getX(i), 'red granite, not soot').toBeGreaterThan(col.getZ(i) * 1.5)
+    }
+    expect(granite, 'the granite band exists').toBeGreaterThan(0)
     geo.dispose()
   })
 
@@ -197,6 +259,50 @@ describe('landmark builders', () => {
     }
     for (const p of MEROE_PYRAMIDS.filter((q) => q.standing >= 1)) {
       expect(topOver(p), `intact pyramid at ${p.x.toFixed(1)}/${p.z.toFixed(1)}`).toBeGreaterThan(p.height - 0.01)
+    }
+    geo.dispose()
+  })
+
+  it('Aksum reads as 1890: one lone giant standing among fallen giants (point 279)', () => {
+    // Of the three great royal stelae only King Ezana's still stood — "the
+    // only one of the three major royal obelisks that was never broken"; the
+    // 33 m Great Stele fell in antiquity and lay broken across the field, and
+    // the obelisk the Italians later took to Rome lay fallen beside it. The
+    // regression this pins is the inverted field the builder used to make:
+    // three standing shafts of similar height and one fallen piece SMALLER
+    // than any of them.
+    // The lone giant clearly overtops every other standing stele...
+    for (const mh of AKSUM_MINOR_HEIGHTS) expect(mh).toBeLessThan(AKSUM_EZANA_HEIGHT * 0.4)
+    // ...and the fallen giant outmeasures even the standing one.
+    expect(AKSUM_FALLEN_LENGTH).toBeGreaterThan(AKSUM_EZANA_HEIGHT)
+
+    const geo = buildStelae()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    let top = 0
+    let tallOffAxis = 0
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i)
+      top = Math.max(top, y)
+      if (y > AKSUM_EZANA_HEIGHT * 0.45 && Math.hypot(pos.getX(i), pos.getZ(i)) > 0.35) tallOffAxis++
+    }
+    // The giant really stands at its height, and NOTHING off its own axis
+    // rises anywhere near it — one lone giant, not a group of three.
+    expect(top).toBeGreaterThan(AKSUM_EZANA_HEIGHT - 0.1)
+    expect(tallOffAxis).toBe(0)
+    // The fallen giant really lies built at its full span: lying material
+    // sits at both ends of the fall line (midpoint 0.1/-0.9, bearing 0.5).
+    const half = AKSUM_FALLEN_LENGTH / 2
+    const ends: Array<[number, number]> = [
+      [0.1 + Math.cos(0.5) * half, -0.9 - Math.sin(0.5) * half],
+      [0.1 - Math.cos(0.5) * half, -0.9 + Math.sin(0.5) * half],
+    ]
+    for (const [ex, ez] of ends) {
+      let lying = 0
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getY(i) > 0.45) continue
+        if (Math.hypot(pos.getX(i) - ex, pos.getZ(i) - ez) < 0.3) lying++
+      }
+      expect(lying, `fallen material at ${ex.toFixed(1)}/${ez.toFixed(1)}`).toBeGreaterThan(0)
     }
     geo.dispose()
   })
