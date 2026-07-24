@@ -282,7 +282,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 00:21 · Quellen-Fingerprint: `a749d2973ce7…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 01:48 · Quellen-Fingerprint: `9d7b37369e7d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -330,7 +330,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RESUME/handoff — current batch state, what is merged, the in-flight delegated branches, and the path to the v0.2 (224) demo | 1 | niedrig | batch-resume-hook.mjs | ✔ Mechanismus |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | When Opus (the default model) has failed ~2 attempts on the same problem, hand it to Fable for fresh eyes — a different model sees different blind spots | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -353,8 +353,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 11 Prozess-/Meta-TASKS-Punkte (davon 6 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 12 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: a749d2973ce74fbcbe62e9725c034f5ddb3cdcdad9ad5e06e5e017c33858f0ff -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-24T22:21:57.948Z -->
+<!-- RETRO-FINGERPRINT: 9d7b37369e7d2201e691faf09ab40accf11bea2210add80f49c4aae1643c9d01 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-24T23:48:16.503Z -->
 <!-- AUTO-GENERATED:END -->
