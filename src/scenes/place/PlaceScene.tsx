@@ -20,7 +20,7 @@ import {
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
-import { useUi } from '../../state/ui'
+import { useUi, effectiveShadows, effectiveShadowMapHalf } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { playThunder } from '../../systems/ambience'
@@ -1609,8 +1609,10 @@ export function PlaceScene() {
   const placeStrike = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
   const placeSunBase = useRef(PLACE_SUN_INTENSITY)
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
-  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
-  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
+  // Low Details (point 276) forces half-size shadow maps and drops cast shadows,
+  // read derived so the player's own flags are untouched (off = today's picture).
+  const shadowMapHalf = useUi(effectiveShadowMapHalf)
+  const shadowsEnabled = useUi(effectiveShadows)
   const shadowSize = shadowMapHalf ? 1024 : 2048
   useEffect(() => {
     const map = sunRef.current?.shadow.map

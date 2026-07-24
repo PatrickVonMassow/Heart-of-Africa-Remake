@@ -22,7 +22,7 @@ import {
   vertexColor,
 } from 'three/tsl'
 import { useGame } from '../../state/store'
-import { useUi } from '../../state/ui'
+import { useUi, effectiveShadows, effectiveShadowMapHalf } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { settlementEnterCandidate, settlementToEnter } from './settlementEntry'
@@ -853,9 +853,17 @@ function getSun() {
 
 function Sun() {
   const { light, target } = getSun()
-  // The touch quality preset (point 84) halves the shadow-map resolution.
-  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
+  // The touch quality preset (point 84) halves the shadow-map resolution; Low
+  // Details (point 276) forces it half too and drops cast shadows entirely.
+  const shadowMapHalf = useUi(effectiveShadowMapHalf)
+  const shadowsEnabled = useUi(effectiveShadows)
   const shadowSize = shadowMapHalf ? 1024 : 2048
+
+  // Low Details (point 276, a secondary lever on real hardware): the sun stops
+  // casting shadows. Toggling it on/off is picture-neutral while off (default on).
+  useEffect(() => {
+    light.castShadow = shadowsEnabled
+  }, [light, shadowsEnabled])
 
   // A mapSize change only takes effect once the existing shadow render target
   // is freed, so three rebuilds it at the new resolution.
