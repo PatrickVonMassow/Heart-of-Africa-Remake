@@ -159,6 +159,7 @@ export function DebugMenu() {
   const jumpGroups = [
     { label: t.debug.jumpGroups.ports, options: namedGroup(PLACES.filter((p) => p.kind === 'port'), (p) => ({ value: p.id, label: t.places[p.id], lat: p.lat, lon: p.lon })) },
     { label: t.debug.jumpGroups.villages, options: namedGroup(PLACES.filter((p) => p.kind === 'village'), (p) => ({ value: p.id, label: t.places[p.id], lat: p.lat, lon: p.lon })) },
+    { label: t.debug.jumpGroups.monuments, options: namedGroup(PLACES.filter((p) => p.kind === 'monument'), (p) => ({ value: p.id, label: t.places[p.id], lat: p.lat, lon: p.lon })) },
     { label: t.debug.jumpGroups.mountains, options: namedGroup(MOUNTAINS, (m) => ({ value: m.id, label: t.landmarks[m.id], lat: m.lat, lon: m.lon })) },
     { label: t.debug.jumpGroups.waterfalls, options: namedGroup(WATERFALLS, (w) => ({ value: w.id, label: t.landmarks[w.id], lat: w.lat, lon: w.lon })) },
     { label: t.debug.jumpGroups.lakes, options: namedGroup(LAKES, (l) => ({ value: l.id, label: t.landmarks[l.id], lat: l.center[1], lon: l.center[0] })) },

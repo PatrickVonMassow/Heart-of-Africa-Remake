@@ -485,6 +485,7 @@ export const en: Strings = {
     jumpGroups: {
       ports: 'Ports',
       villages: 'Villages',
+      monuments: 'Monuments',
       mountains: 'Mountains',
       waterfalls: 'Waterfalls',
       lakes: 'Lakes',

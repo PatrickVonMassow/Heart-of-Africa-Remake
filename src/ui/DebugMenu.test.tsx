@@ -424,7 +424,7 @@ describe('DebugMenu jump-to covers every named map point (design.md §21.3, poin
   it('offers a named entry from every category plus the graveyard and grave', () => {
     render(<DebugMenu />)
     const values = [...jumpSelect().options].map((o) => o.value)
-    for (const v of ['cairo', 'nubian-village', 'kilimanjaro', 'victoria-falls', 'lake-victoria', 'meroe', 'ngorongoro', '#graveyard', '#grave']) {
+    for (const v of ['cairo', 'nubian-village', 'giza', 'kilimanjaro', 'victoria-falls', 'lake-victoria', 'meroe', 'ngorongoro', '#graveyard', '#grave']) {
       expect(values, v).toContain(v)
     }
   })
@@ -434,6 +434,7 @@ describe('DebugMenu jump-to covers every named map point (design.md §21.3, poin
     expect(groupLabels()).toEqual([
       en.debug.jumpGroups.ports,
       en.debug.jumpGroups.villages,
+      en.debug.jumpGroups.monuments,
       en.debug.jumpGroups.mountains,
       en.debug.jumpGroups.waterfalls,
       en.debug.jumpGroups.lakes,
