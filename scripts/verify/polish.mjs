@@ -946,7 +946,12 @@ for (const [placeId, shot] of [
     return firePairs.map((p) => +(lumAt(data, info, p.lit) - lumAt(data, info, p.shadow)).toFixed(1))
   }
 
-  const contrastOff = await fireContrasts() // toggle defaults OFF
+  // Campfire shadows are now level-driven (point 276): ON at the medium default,
+  // so the OFF state must be FORCED via the debug flag, not assumed from the
+  // default (which used to be off under point 289 alone).
+  await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(false))
+  await page.waitForTimeout(1500) // cube map tear-down + TRAA settle
+  const contrastOff = await fireContrasts()
   await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(true))
   await page.waitForTimeout(1500) // cube map + TRAA settle
   const contrastOn = await fireContrasts()
@@ -960,7 +965,7 @@ for (const [placeId, shot] of [
   // Measured on both backends: OFF contrast 3-12, ON contrast 42-57.
   const majority = (xs, ok) => xs.filter(ok).length >= 2
   check(
-    'fire shadows OFF (default): the ground behind a ring stone is as lit as beside it',
+    'fire shadows OFF (forced): the ground behind a ring stone is as lit as beside it',
     majority(contrastOff, (c) => c < 20),
     `lit-minus-shadow per stone [${contrastOff.join(', ')}]`,
   )
