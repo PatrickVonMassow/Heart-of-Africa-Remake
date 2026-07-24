@@ -10683,6 +10683,30 @@ the remaining open points in their numeric order.
   NOTE: this is the "looks wrong but passes" class — every existing backdrop test is
   green while the picture is visibly wrong. Implementation-ready.
 
+- [ ] 282. AN ANIMAL DOES NOT DESPAWN AFTER A FAR JUMP ON WEBGL 2 (found 24.07.2026).
+  The enrichments check "an animal despawns once well outside the view" reports
+  `goneWhenFar: false` — the marked animal is still in the herds after the traveller
+  jumps 600 world units away, far past any despawn radius. Two facts make this a
+  PRODUCT question rather than the flake it was long treated as:
+  (a) widening the poll from 6 to 20 sim-seconds (the house value everywhere else in
+  that file) made it pass on WebGPU but did NOT fix WebGL 2, where it now fails
+  TWICE IN A ROW on a quiet machine — the signature this project treats as real;
+  (b) the neighbouring `goneAtZoom1` case, which despawns over a 230-unit move at the
+  same poll length, passes on both backends. So it is specific to the LARGE jump.
+  INVESTIGATE, do not widen the window again: the likely candidates are the chunk
+  window's rebuild hysteresis (point 171) leaving the old chunks "live" so
+  `keepStreamedAnimal` still finds the animal's chunk, or a per-frame cap on how many
+  animals one despawn pass removes — a 600-unit jump strands the entire streamed
+  population at once, which is precisely the case a bounded pass would take longest
+  on. Probe `__wildlife` for the marked animal's chunk membership and the live chunk
+  set right after the jump, and count how many animals the pass removes per frame.
+  If a bounded pass IS the cause, the game is arguably right and the CHECK should
+  jump the way a player can (there is no 600-unit teleport in play) — decide that on
+  the evidence, and say which it was.
+  VERIFIABLE: the check passes twice in a row on BOTH backends on a quiet machine,
+  with the reason recorded. NOTE: belongs to the point-200 flake umbrella but is
+  filed separately because it is no longer believed to be a flake.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
