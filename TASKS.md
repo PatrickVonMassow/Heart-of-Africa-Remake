@@ -8518,13 +8518,13 @@ the remaining open points in their numeric order.
   with the tier — `minimal` (SMALL gate): boots + renderer + no console errors;
   `standard` (LARGE/default): + the ACTUAL backend (Firefox ships WebGPU from FF
   141+, so it reports WebGPU vs the WebGL2 fallback), a sized canvas, a bird's-eye
-  move; `thorough` (maximale QS): + core flows (enter a settlement, open the map &
+  move; `thorough` (maximum QA): + core flows (enter a settlement, open the map &
   journal). `run-all.mjs` runs it once on the WebGL2 Chromium lane (`runCrossBrowser`,
   depth from the tier), on a full tier/default run or `npm test -- crossbrowser`,
   and GRACEFULLY SKIPS (exit 0, notice) if the engines are not installed so a
   runner without them never breaks. REMAINING: run it green on both engines and
-  fix any Gecko/WebKit-only issue found; the maximale-qs.md pass runs it at
-  `thorough`. DOCS: scripts/verify/README.md + maximale-qs.md note the tiered smoke.
+  fix any Gecko/WebKit-only issue found; the maximum-qa.md pass runs it at
+  `thorough`. DOCS: scripts/verify/README.md + maximum-qa.md note the tiered smoke.
   DONE (21.07.2026): green at standard depth on Firefox + WebKit desktop AND
   mobile (WebKit≈iOS + Chromium≈Android touch-layer arming + mobile preset,
   points 84/30). The smoke immediately earned its keep — it caught three real
@@ -8535,7 +8535,7 @@ the remaining open points in their numeric order.
   decode; and a geodata load cancelled mid-fetch leaked an unhandled "Load
   failed" rejection out of boot() — now caught. Wired: minimal on the SMALL
   gate, standard on LARGE/default, thorough via CROSSBROWSER_DEPTH in
-  maximale-qs; graceful skip when the engines are absent.
+  maximum-qa; graceful skip when the engines are absent.
 
 - [x] 214. FIGURES read FACETED — the round organic figures (the bird's-eye
   ANIMALS incl. the elephant, and the first-person town INHABITANTS/people) show
@@ -8816,7 +8816,7 @@ the remaining open points in their numeric order.
   everything is stable and 215 is done — a visible demo update for the terrain
   smoothing, NOT waiting for every open bug. Run it when 215 is finished + the tree
   is stable (build/lint/CVE clean, full Vitest + the LARGE browser regression on
-  BOTH backends green — the §7.2 closing cycle per docs/maximale-qs.md's closing
+  BOTH backends green — the §7.2 closing cycle per docs/maximum-qa.md's closing
   steps). STEPS: (1) full closing cycle (Vitest + LARGE regression both backends,
   dead-code/stale-doc pass, lint/audit clean) — only proceed if GREEN; (2) at that
   verified GREEN main HEAD, create the `v0.2` release tag and re-point the `poc` tag
@@ -10542,7 +10542,7 @@ the remaining open points in their numeric order.
   (`src/config/qualityDoc.test.ts`) reads the doc and FAILS if its table drifts
   from `QUALITY_PRESETS` — the reliable currency mechanism (runs on every
   test:unit, hence every regression/closing). The closing flow (CLAUDE §9 /
-  docs/maximale-qs.md Phase 8) names the doc-current check explicitly.
+  docs/maximum-qa.md Phase 8) names the doc-current check explicitly.
   BUILD ON the existing `feat/276-low-details-mode` branch (all the levers are already
   wired there behind the binary flag) — refactor the binary `lowDetails` into the
   three-level `detailLevel` + presets; do not start from scratch.
@@ -10957,7 +10957,7 @@ the remaining open points in their numeric order.
   guard + the settings.json hook registration are committed (main session applies the
   settings edit). TESTS: pure tests for the source-scan + fingerprint (a changed source
   changes the hash) and the guard's stale/fresh decision (`scripts/*.test.mjs`, run in
-  the Vitest layer). DOCS: a short section in `docs/maximale-qs.md` (the QA process
+  the Vitest layer). DOCS: a short section in `docs/maximum-qa.md` (the QA process
   gains "keep the retrospective current") and a pointer memory. Implementation-ready.
 
 - [x] 291. USE THE 1890-VALID NAME FOR LANDMARKS — the White Nile falls are MURCHISON
@@ -11013,6 +11013,60 @@ the remaining open points in their numeric order.
   live `?bench=short` run (GPU series measured on WebGPU, flagged-with-reason on WebGL 2);
   UI text de+en. Position: v0.3 benchmark/graphics area, after 276/273. DEPENDS ON 276
   (the quality presets) being merged.
+
+- [ ] 294. AUTO-BASELINE CLASSIFICATION FOR VERIFY FAILURES (user 24.07.2026, from the
+  retrospective §3.12/§8). When a browser-verify check (`scripts/verify/*.mjs`) goes RED,
+  automatically re-run THAT failed check against the pre-change BASELINE (the branch's
+  merge-base with main, or main's HEAD) and CLASSIFY the red: "REAL REGRESSION (green on
+  baseline, red now)" vs "PRE-EXISTING / STALE-ASSUMPTION (already red on baseline)". Print
+  the classification in the verify output so a red is triaged instantly instead of by hand.
+  This mechanizes the manual baseline-diff done on 24.07. (the SSAO-off ground-edge check =
+  stale check assumption; the proximity-call-fade = pre-existing — point 292). DESIGN care:
+  re-running a browser suite is expensive and needs the baseline's `node_modules`/checkout —
+  so make it OPT-IN (a flag / on-demand for the failed checks only, not every run), reuse a
+  baseline worktree where possible, and keep the classification core PURE and Vitest-tested.
+  ANCHORS: `scripts/verify/run-all.mjs`, a new `scripts/verify/baseline-classify*.mjs` (pure
+  core + wrapper). VERIFIABLE: a pure test of the classify logic (green→red = regression;
+  red→red = pre-existing) and a live check that a known pre-existing red is labelled
+  pre-existing while an injected fresh regression is labelled real. No player-visible text.
+  PROCESS (user 24.07.2026): BEFORE building, a Fable-5 subagent reviews the PLAN; AFTER
+  building, a Fable-5 subagent evaluates whether it is truly safe, works in ALL cases and has
+  NO negative side effects; merge to main ONLY when everything is green.
+
+- [ ] 295. DEV-BUILD RENDER-RESOURCE LEAK INVARIANT (user 24.07.2026, from the retrospective
+  §3.12/§8 — the in-game-assert principle applied to GPU resources). A `import.meta.env.DEV`
+  invariant that asserts the renderer's render-target / texture counts (`renderer.info`)
+  stay BOUNDED across scene transitions and effect-toggle rebuilds — `console.error` + a
+  probe log when the count grows beyond a threshold across a transition. So a GPU-resource
+  leak like the point-276 WebGPU TRAA render-target leak (47→50 across toggle cycles, caught
+  only because one settings.mjs check happened to run) SCREAMS in EVERY dev session and every
+  test run, not just that one check. Generalize the existing "TRAA toggle stress: no
+  render-target leak" settings.mjs check to more transitions (scene switch travel↔place,
+  detail-level changes, effect toggles). ANCHORS: `src/render/Effects.tsx` / the renderer
+  setup, a new dev-assert module (arm early, extend as systems change); `scripts/verify/
+  settings.mjs`. VERIFIABLE: a pure test of the bound/threshold logic; a live check that a
+  forced leak trips the assert and a normal session/toggle does not (both backends). No
+  player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
+  (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
+
+- [ ] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
+  retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
+  agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
+  polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
+  of emitting an ambiguous red. Mechanizes the "judge a red only on a quiet machine"
+  heuristic so it does not rely on memory. ANCHORS: `scripts/verify/run-all.mjs` (load probe
+  + flag), a pure load-classification helper. VERIFIABLE: a pure test of the load-detect/flag
+  decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
+  grows.)
+
+- [ ] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
+  hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
+  hooks run every turn end) and the memory files (contradictory/tempering pairs like
+  deploy-fable-proactively ↔ fable-sparingly): list each guard/memory with last-modified,
+  flag redundancy/contradiction, consolidate — same spirit as the `.md` docs audit. Keeps the
+  guard "immune system" from becoming an autoimmune disease. ANCHORS: a checklist doc + an
+  enumerating script (guards in `scripts/`, memories in the memory dir). VERIFIABLE: the audit
+  produces a report; no runtime invariant. (Lighter point.)
 
 ## Closing (only after all points)
 

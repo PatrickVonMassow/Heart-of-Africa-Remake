@@ -7,7 +7,7 @@
 //   minimal  (SMALL gate): desktop boots, renderer initialises, no console errors.
 //   standard (LARGE gate): + the actual backend, a sized canvas, a bird's-eye move,
 //                          AND a mobile/tablet pass (touch layer arms on first touch).
-//   thorough (maximale QS): + core flows (enter a settlement, open the map & journal).
+//   thorough (maximum QA): + core flows (enter a settlement, open the map & journal).
 //
 // Desktop: Firefox (Gecko) + WebKit (Safari's engine). Mobile: WebKit ~ iOS Safari
 // and Chromium ~ Android Chrome (Firefox has no Playwright touch/mobile emulation).

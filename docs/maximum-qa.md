@@ -1,11 +1,11 @@
-# Maximale QS — the maximum quality-assurance pass
+# Maximum QA — the maximum quality-assurance pass
 
 A single, repeatable, **token-frugal** quality gate that bundles every QA
 technique the project has built up (points 173, 184, 195–200, 203/203A, 204,
 205, 207). It is the pass to run before promoting a build to a public demo.
 
 **No ultracode / no large agent fan-outs.** Ultracode workflows burn the
-session/weekly token budget in minutes. Maximale QS runs as ordinary inline
+session/weekly token budget in minutes. Maximum QA runs as ordinary inline
 work: sequential checks, the driven visual sweep inspected in the main loop, and
 at most a *single* background subagent for model-diverse audit (Fable vs. the
 author) whose findings are always harvested and verified inline. See the memory
