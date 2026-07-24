@@ -91,6 +91,13 @@ must pass clean before any tag.
   single Fable subagent when the batch runs on Opus, or vice versa) — fresh
   blind spots find more (memory `audit-with-model-diversity`). ONE agent,
   harvested and every finding re-verified inline before it is filed.
+- **Leak & accumulation code-review class (point 285, prong A):** the same
+  fresh-model pass explicitly sweeps for the dispose/prune/re-seed/effect-cleanup
+  bug family — three.js resources created but never disposed (`renderer.info.memory`
+  must be flat at a fixed state), module-level Map/Set/array caches that only grow,
+  streaming/respawn that re-adds without truncating the previous fill (the point-278
+  class), and React effects with missing/wrong cleanup. Each finding gets a pure
+  convergence test that FAILS on the old behaviour.
 - File each confirmed bug as its own point; add the missing tests.
 
 ## Phase 6 — The systematic bug-finder (203)
@@ -138,10 +145,19 @@ Cheap automated classes first, then the visual sweep:
 - **(iii) Property fuzzing + distribution checks** — thousands of random states
   through the cheap invariants; assert distributions (hunt directions, calf
   ratios, outcomes, spawn counts) are not degenerate.
-- **(iv) Soak/endurance** — a long fast-forward sim with the invariants live;
-  watch for leaks, herd ballooning, drama accumulation, slowdown, drift.
-- **(v) Metamorphic relations** — A→B→A returns to the same state; the same
-  scene at two zooms shows the same animals; month X and X+12 match;
+- **(iv) Soak/endurance — the leak & accumulation runtime harness (point 285,
+  prong B).** A long fast-forward sim with the invariants live, driving the game
+  over TIME (repeated jumps/round-trips, long driving, repeated place enter/leave
+  mount-unmount cycles) and asserting the measured quantities CONVERGE rather than
+  grow: scene-graph triangle/mesh counts per system, `renderer.info.memory`
+  geometries/textures, `performance.memory` JS heap, instanced and listener counts.
+  A monotonic rise beyond a small tolerance over N cycles is a finding (this is what
+  would have caught point 278 — the count grew while every one-moment test passed).
+  A re-runnable script (`scripts/verify/leaks.mjs` or the documented harness), on
+  both backends where the metric is backend-relevant.
+- **(v) Metamorphic relations** — A→B→A returns to the same state (the point-278
+  witness: same anchor, same seed, same instance count however long the session ran);
+  the same scene at two zooms shows the same animals; month X and X+12 match;
   leave-and-re-enter is stable.
 - **(vi) Automated player-journey** — many seeds/strategies; the goal stays
   reachable, the hint cascade leads there, no softlock, the deadline beatable.
