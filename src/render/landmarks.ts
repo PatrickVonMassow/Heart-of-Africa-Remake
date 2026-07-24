@@ -384,32 +384,99 @@ export function buildStelae(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Gondar (Fasil Ghebbi): a compact crenellated keep plus two round corner
- *  towers with conical caps — grey stone. */
+/**
+ * What is left of the keep's parapet, slot by slot along each long wall: the
+ * merlon height, or 0 where the merlon is gone. Mahdist forces stormed and
+ * burned Gondar in JANUARY 1888 — two years before the expedition sets out —
+ * torching most of its churches; Fasil Ghebbi itself "fell into ruins" as the
+ * city declined, and the unbroken parapets and conical tower caps a visitor
+ * photographs today are mid-20th-century Italian and Haile Selassie
+ * restoration plus a 1999-2002 UNESCO campaign. So the parapet stands gapped
+ * and uneven, never as a complete row.
+ */
+export const GONDAR_PARAPET: readonly number[] = [0.18, 0, 0.11, 0.16, 0, 0.15]
+
+/** Tower heights: neither carries a roof. Gondarine tower caps were largely
+ *  gone by the period, and the sack left the shells open to the sky — one
+ *  tower stands lower than the other, its upper courses collapsed. */
+export const GONDAR_TOWER_HEIGHTS: readonly number[] = [1.35, 1.0]
+
+/** Gondar (Fasil Ghebbi) as a ~1890 expedition found it, two years after the
+ *  Mahdist sack: a burnt-out keep — walls standing around a dark, roofless
+ *  interior, one long wall collapsed to half height — a gapped parapet, two
+ *  roofless tower shells with broken rims, and rubble at the foot of the
+ *  breach. Grey stone, sooted where the fire ran. */
 export function buildCastles(): THREE.BufferGeometry {
+  const rand = mulberry32(4700)
   const parts: THREE.BufferGeometry[] = []
-  const keep = new THREE.BoxGeometry(1.5, 1.1, 1.0)
-  keep.translate(0, 0.55, 0)
-  parts.push(tint(keep, '#9a938a', 0.07, 4700))
-  // Notched parapet: merlons along the keep's front and back edges.
-  for (let i = 0; i < 4; i++) {
-    for (const zs of [-0.42, 0.42]) {
-      const merlon = new THREE.BoxGeometry(0.18, 0.18, 0.16)
-      merlon.translate(-0.56 + i * 0.375, 1.19, zs)
-      parts.push(tint(merlon, '#9a938a', 0.07, 4710 + i))
-    }
+  const stone = '#8d857b' // fire-darkened, not the restored parapet grey
+  const sooted = '#6d645b'
+  const W = 1.5
+  const D = 1.0
+  const T = 0.16
+  const H = 1.1
+  // The burnt-out interior: the roof is gone, so from above the keep reads as
+  // an open, blackened shell rather than a solid block.
+  const floor = new THREE.BoxGeometry(W - T * 2, 0.12, D - T * 2)
+  floor.translate(0, 0.06, 0)
+  parts.push(tint(floor, '#463f39', 0.07, 4701))
+  // Four walls at uneven heights; the south wall is breached to half.
+  const walls: Array<[number, number, number, number, number, string]> = [
+    [0, -(D / 2 - T / 2), W, T, H, stone],
+    [0, D / 2 - T / 2, W, T, H * 0.46, sooted], // the breach
+    [-(W / 2 - T / 2), 0, T, D - T * 2, H * 0.86, sooted],
+    [W / 2 - T / 2, 0, T, D - T * 2, H, stone],
+  ]
+  walls.forEach(([cx, cz, w, d, h, hex], i) => {
+    const wall = new THREE.BoxGeometry(w, h, d)
+    wall.translate(cx, h / 2, cz)
+    parts.push(tint(wall, hex, 0.09, 4702 + i))
+  })
+  // Gapped parapet on the two walls still standing high enough to carry one.
+  GONDAR_PARAPET.forEach((mh, i) => {
+    if (mh <= 0) return
+    const merlon = new THREE.BoxGeometry(0.18, mh, T)
+    merlon.translate(-0.6 + i * 0.24, H + mh / 2, -(D / 2 - T / 2))
+    parts.push(tint(merlon, stone, 0.08, 4710 + i))
+  })
+  for (const [dz, mh] of [[-0.24, 0.15], [0.2, 0.1]] as const) {
+    const merlon = new THREE.BoxGeometry(T, mh, 0.2)
+    merlon.translate(W / 2 - T / 2, H + mh / 2, dz)
+    parts.push(tint(merlon, stone, 0.08, 4716 + (dz > 0 ? 1 : 0)))
   }
-  // Two round corner towers with conical caps.
-  for (const [tx, tz, si] of [
-    [0.95, 0.55, 0],
-    [-0.95, -0.55, 1],
-  ] as const) {
-    const tower = new THREE.CylinderGeometry(0.28, 0.32, 1.35, 9)
-    tower.translate(tx, 0.675, tz)
-    parts.push(tint(tower, '#a29b91', 0.07, 4720 + si))
-    const cap = new THREE.ConeGeometry(0.34, 0.42, 9)
-    cap.translate(tx, 1.35 + 0.21, tz)
-    parts.push(tint(cap, '#6f5b47', 0.08, 4730 + si))
+  // Two roofless tower shells, their rims broken.
+  const towers: Array<[number, number]> = [
+    [0.95, 0.55],
+    [-0.95, -0.55],
+  ]
+  towers.forEach(([tx, tz], si) => {
+    const h = GONDAR_TOWER_HEIGHTS[si]
+    const tower = new THREE.CylinderGeometry(0.28, 0.32, h, 9)
+    tower.translate(tx, h / 2, tz)
+    parts.push(tint(tower, si ? sooted : '#968e84', 0.08, 4720 + si))
+    // Open, blackened top: the cap burnt off, the shell hollow.
+    const hollow = new THREE.CylinderGeometry(0.21, 0.21, 0.06, 9)
+    hollow.translate(tx, h - 0.03, tz)
+    parts.push(tint(hollow, '#443d38', 0.06, 4724 + si))
+    // Broken rim: uneven wall stubs where the parapet stood.
+    for (let i = 0; i < 5; i++) {
+      if (rand() < 0.3) continue // a gap in the rim
+      const a = (i / 5) * Math.PI * 2 + rand() * 0.5
+      const sh = 0.05 + rand() * 0.12
+      const stub = new THREE.BoxGeometry(0.11, sh, 0.07)
+      stub.rotateY(-a)
+      stub.translate(tx + Math.cos(a) * 0.235, h + sh / 2 - 0.02, tz + Math.sin(a) * 0.235)
+      parts.push(tint(stub, sooted, 0.1, 4726 + si * 8 + i))
+    }
+  })
+  // Rubble spilled from the breach and burnt beams thrown down beside it.
+  for (let i = 0; i < 8; i++) {
+    const s = 0.08 + rand() * 0.11
+    const block = new THREE.BoxGeometry(s * (1 + rand()), s * 0.4, s * (0.6 + rand() * 0.5))
+    block.rotateY(rand() * Math.PI)
+    block.rotateZ((rand() - 0.5) * 0.5) // fallen, not stacked
+    block.translate(-0.45 + rand() * 0.95, s * 0.2, D / 2 + 0.1 + rand() * 0.3)
+    parts.push(tint(block, i % 3 === 0 ? '#4f463f' : '#877d72', 0.12, 4750 + i))
   }
   return merge(parts)
 }

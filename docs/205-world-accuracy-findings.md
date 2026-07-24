@@ -161,6 +161,20 @@ visible, and fits the game's existing rinderpest/famine layer.
 **(5) Effort.** **S** for the geometry; **+S** if the journal text is rewritten
 (both languages, voice markup).
 
+**RESOLVED (point 279c) — geometry only.** `buildCastles()` no longer builds a
+solid keep. Four walls stand at uneven heights around a blackened, roofless
+interior — the south wall breached to under half — under a parapet that is
+gapped and uneven by construction (`GONDAR_PARAPET`, zeros where a merlon is
+gone). Both conical caps are removed: the towers are open shells with a dark
+hollow top and broken rim stubs, one standing lower than the other
+(`GONDAR_TOWER_HEIGHTS`), and rubble lies at the foot of the breach. The stone
+tone was darkened off the restored parapet grey. `landmarks.test.ts` pins the
+ruin: merlons missing and the survivors uneven, nothing solid over the keep's
+middle, and nothing over either tower axis beyond its own rim. Verified by the
+picture at travel zoom on both backends. The STRONGER half of the proposal —
+Gondar's discovery-journal entry naming the two-year-old Mahdist burning — is
+NOT done and stays OPEN (it would need both languages with voice markup).
+
 ---
 
 ### A4 — Aksum's stelae field is inverted: three standing, one fallen · SEVERITY 2 · MEDIUM
