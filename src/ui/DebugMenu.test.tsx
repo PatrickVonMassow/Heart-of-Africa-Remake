@@ -292,6 +292,20 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     fireEvent.click(dnd)
     expect(useUi.getState().journalDnd).toBe(true)
   })
+
+  it('the Low-Details checkbox writes through to the store (design.md §21, point 276)', () => {
+    useUi.setState({ lowDetails: false })
+    render(<DebugMenu />)
+    const low = screen.getByText(en.debug.lowDetails).closest('label')?.querySelector('input') as HTMLInputElement
+    expect(low.checked).toBe(false)
+    fireEvent.click(low)
+    expect(useUi.getState().lowDetails).toBe(true)
+    // It must not clobber the individual debug flags (read derived).
+    expect(useUi.getState().ssaoEnabled).toBe(true)
+    expect(useUi.getState().shadowsEnabled).toBe(true)
+    fireEvent.click(low)
+    expect(useUi.getState().lowDetails).toBe(false)
+  })
 })
 
 describe('DebugMenu season selector (design.md §19/§21, point 120c)', () => {

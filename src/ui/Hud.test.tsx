@@ -365,6 +365,33 @@ describe('F3 unlocks the extended zoom alongside the loadout (design.md §21.1)'
   })
 })
 
+describe('F7 toggles the Low-Details performance mode (design.md §21, point 276)', () => {
+  it('flips lowDetails on and off', () => {
+    useUi.setState({ lowDetails: false })
+    render(<Hud />)
+    fireEvent.keyDown(window, { code: 'F7' })
+    expect(useUi.getState().lowDetails).toBe(true)
+    fireEvent.keyDown(window, { code: 'F7' })
+    expect(useUi.getState().lowDetails).toBe(false)
+  })
+
+  it('is in the preventDefault set (the browser default is suppressed)', () => {
+    render(<Hud />)
+    const e = new KeyboardEvent('keydown', { code: 'F7', cancelable: true, bubbles: true })
+    window.dispatchEvent(e)
+    expect(e.defaultPrevented).toBe(true)
+  })
+
+  it('leaves the individual debug flags untouched (read derived)', () => {
+    useUi.setState({ lowDetails: false, ssaoEnabled: true, shadowsEnabled: true })
+    render(<Hud />)
+    fireEvent.keyDown(window, { code: 'F7' })
+    expect(useUi.getState().lowDetails).toBe(true)
+    expect(useUi.getState().ssaoEnabled).toBe(true) // not clobbered
+    expect(useUi.getState().shadowsEnabled).toBe(true)
+  })
+})
+
 describe('Touch controls mount only with ui.touchActive (design.md §17.5, point 84)', () => {
   it('renders no .touch-controls on desktop (touchActive false)', () => {
     render(<Hud />)

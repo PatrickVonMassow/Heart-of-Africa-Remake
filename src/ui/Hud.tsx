@@ -440,9 +440,17 @@ export function Hud() {
     // F4 toggles the canoe in and out of the pack (design.md §21).
     const offF4 = onKeyPress('F4', () => useGame.getState().debugToggleCanoe())
     // F6 = state-dump popup for bug reports (design.md §21.1; F5 is unusable —
-    // the browser reloads before preventDefault runs). F7 is RESERVED for the
-    // future "Low Details" performance mode — do not bind it to anything else.
+    // the browser reloads before preventDefault runs).
     const offF6 = onKeyPress('F6', () => useUi.getState().toggleStateDump())
+    // F7 = "Low Details" performance mode (design.md §21, point 276). Read
+    // DERIVED (the effective* selectors), so it never clobbers the individual
+    // debug flags; off is picture-identical to today.
+    const offF7 = onKeyPress('F7', () => {
+      const ui = useUi.getState()
+      ui.setLowDetails(!ui.lowDetails)
+      const s = getStrings()
+      useGame.getState().setToast(!ui.lowDetails ? s.toasts.lowDetailsOn : s.toasts.lowDetailsOff)
+    })
     // F8 = in-game render benchmark (design.md §21.1). It SHIPS in the
     // delivered build — the numbers must come from the player's own hardware —
     // so the runner is not dev-gated but imported LAZILY here, keeping it out
@@ -493,7 +501,7 @@ export function Hud() {
     // with the browser: its reload fires before preventDefault can stop it,
     // which is why the state-dump moved to F6.
     const preventFn = (e: KeyboardEvent) => {
-      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F6' || e.code === 'F8') e.preventDefault()
+      if (e.code === 'F1' || e.code === 'F3' || e.code === 'F6' || e.code === 'F7' || e.code === 'F8') e.preventDefault()
     }
     window.addEventListener('keydown', preventFn)
     return () => {
@@ -504,6 +512,7 @@ export function Hud() {
       offF3()
       offF4()
       offF6()
+      offF7()
       offF8()
       offMonths.forEach((off) => off())
       offYears.forEach((off) => off())

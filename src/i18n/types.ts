@@ -209,6 +209,9 @@ export interface Strings {
     villagerNod: string
     journalDndOn: string
     journalDndOff: string
+    /** F7 "Low Details" performance mode toggle (design.md §21, point 276). */
+    lowDetailsOn: string
+    lowDetailsOff: string
     /** Debug F3: full loadout granted. */
     debugLoadout: string
     /** Debug F4: canoe added/removed. */
@@ -394,6 +397,8 @@ export interface Strings {
     /** Half-size shadow maps toggle; on in the touch quality preset (point 84). */
     shadowMapHalf: string
     shadows: string
+    /** "Low Details" performance mode toggle (design.md §21, F7 / point 276). */
+    lowDetails: string
     flatGround: string
     /** Debug toggle for the dry-season flora deformation (point 175), default on. */
     foliageCollapse: string
