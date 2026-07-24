@@ -10340,7 +10340,18 @@ the remaining open points in their numeric order.
   Sphinx as GIANT "buildings". Entry is via the SPACE key exactly like the future §2.3
   settlement entry (point 244): walking into the site's radius shows a "Space to enter
   <name>" hint, and pressing Space enters. NO interior functionality at first (no trade/
-  elder/etc.) — it is a walkable monument space. RESEARCH DONE — the authoritative brief
+  elder/etc.) — it is a walkable monument space.
+  VISUAL FIXES (user 24.07.2026, folded into the branch BEFORE merge): (a) the buried
+  Sphinx must read at eye level as a couchant lion buried to the shoulders in SAND — not a
+  pale rounded blob on a box; the sand-meets-body transition must not look like a
+  z-fight/clipping error. (b) the walkable site ground must read as warm granular DESERT
+  SAND (reuse the game's existing desert/sand surface material), not a wavy pale
+  fabric/parchment. (c) the DEPLOYED point-279 Menkaure red-granite casing skirt in the
+  bird's-eye Cairo skyline currently reads as a floating red ERROR band — make it an
+  integrated granite casing course on the pyramid base (or remove it if it cannot read at
+  skyline scale); anchor `buildGizaPyramids` in `landmarks.ts`. Picture-verify the
+  walkable Sphinx/sand and the skyline base in `polish.mjs`, both backends.
+  RESEARCH DONE — the authoritative brief
   is `docs/giza-1890.md` (read it before building). Load-bearing period cues the build
   MUST honour: Khafre's surviving pale limestone CAP near the apex (the one casing left,
   the cue that tells Khafre apart — the game doesn't render it yet); the Sphinx BURIED
@@ -10481,18 +10492,26 @@ the remaining open points in their numeric order.
      `RegionBorders.tsx:56` pattern.
    (N5 GC pressure in the wildlife separation loop, N6 a coarse terrain-query cache —
      evaluate after N1, per the analysis.)
-  PART B — THREE GRAPHICS LEVELS low / medium / high, cycled by **F7** (user decision
-  24.07.2026; F6 is the state-dump/point 270). A `detailLevel: 'low' | 'medium' | 'high'`
+  PART B — THREE GRAPHICS LEVELS low / medium / high, cycled by **F9** (user decision
+  24.07.2026; F7 was intercepted by the browser — Windows Chrome Caret-Browsing — so the
+  key moved F7→F9; F6 is the state-dump/point 270, F8 the benchmark). A
+  `detailLevel: 'low' | 'medium' | 'high'`
   in `useUi` (NOT a binary flag), DEFAULT `'medium'`, plus a `QUALITY_PRESETS` config
   (its own module, e.g. `src/config/quality.ts`) mapping each level → a value for EVERY
   quality-relevant setting. The `effective*` selectors read the current level's preset
   value (never clobbering the individual debug flags the way `activateTouch` does; those
-  debug toggles still override within a level for tuning). F7 handler beside the existing
-  F-keys (`Hud.tsx`, add F7 to the preventDefault list) cycles in EXACTLY this order —
+  debug toggles still override within a level for tuning). F9 handler beside the existing
+  F-keys (`Hud.tsx`, add F9 to the preventDefault list) cycles in EXACTLY this order —
   **medium → low → high → medium** (each press steps DOWN a level; from the bottom it
   jumps to the top): medium⇒low, low⇒high, high⇒medium. A localized toast names the new
-  level ("Grafik: Niedrig/Mittel/Hoch" · "Graphics: Low/Medium/High"); the debug menu
-  shows the current level and lets you pick it directly (de+en).
+  level ("Grafik: Niedrig/Mittel/Hoch" · "Graphics: Low/Medium/High"). DEBUG MENU (user
+  24.07.2026 — the menu got too full): the graphics section is a SINGLE detail-level
+  dropdown (low/medium/high, de+en) — the individual per-setting graphics checkboxes
+  (TRAA, SSAO, half-resolution shadows, shadows on/off, fire shadows) are REMOVED from the
+  menu; the level IS the control. Their store flags stay INTERNAL (the touch preset and
+  the F8 benchmark still set them; the effective* selectors still read them) — only the
+  debug UI is decluttered. This supersedes the per-checkbox acceptance of points 30 (SSAO/
+  half-shadow) and 32 (TRAA), which now assert the single level dropdown instead.
   THE THREE PRESETS (calibrate for a CLEAR, visible difference; medium ≈ a good look on
   the user's RTX-40-class PC, low usable on very weak GPUs, high the richest):
    - LOW — very frugal: device pixel ratio capped to 1.0; ALL post off (TRAA, SSAO,
@@ -10520,11 +10539,12 @@ the remaining open points in their numeric order.
   BUILD ON the existing `feat/276-low-details-mode` branch (all the levers are already
   wired there behind the binary flag) — refactor the binary `lowDetails` into the
   three-level `detailLevel` + presets; do not start from scratch.
-  TESTS: pure tests for the preset reads (each `effective*` per level), the F7 cycle order
-  (medium→low→high→medium, exact), the debug-menu picker, and the preset-completeness
-  invariant; a `settings.mjs` live check that F7 cycles the level and flips the effective
-  flags, on BOTH backends. DOCS: design.md §2.7/§21 (the three levels + F7 cycle + the
-  sort-into-levels rule), CLAUDE §7.1 pt.20/32; all UI text de+en. Verify on the branch,
+  TESTS: pure tests for the preset reads (each `effective*` per level), the F9 cycle order
+  (medium→low→high→medium, exact), the debug-menu single level dropdown (write-through, no
+  per-setting checkboxes), and the preset-completeness invariant; a `settings.mjs` live
+  check that F9 cycles the level and flips the effective flags, on BOTH backends. DOCS:
+  design.md §2.7/§21 (the three levels + F9 cycle + the sort-into-levels rule), CLAUDE
+  §7.1 pt.20/30/32; all UI text de+en. Verify on the branch,
   both backends, on a QUIET machine, before the merge. Implementation-ready.
   MEASURED STATE (24.07.2026, `docs/perf-276-findings.md` — read it before building):
   the regression is GEOMETRY, not the render features. Against v0.1 the frame cost rose
@@ -10544,8 +10564,8 @@ the remaining open points in their numeric order.
   geometry-bound, so the doubled geometry costs it 8 % while the user's GPU may pay far
   more. So the game itself must measure, on the user's real hardware, in the DEPLOYED
   build — and hand back a file to analyse.
-  KEY: **F8** (F5 is the browser's reload, F6 the state dump/point 270, F7 is reserved
-  for Low Details/point 276). Add F8 to the `Hud.tsx` F-key handler and its
+  KEY: **F8** (F5 is the browser's reload, F6 the state dump/point 270, F9 is the graphics
+  detail level/point 276 — F7 is browser-reserved). Add F8 to the `Hud.tsx` F-key handler and its
   preventDefault list.
   SHIPS IN PRODUCTION. Unlike `window.__game` and friends this must NOT be
   `import.meta.env.DEV`-gated — the user tests the delivery build. Keep the module
