@@ -11,6 +11,7 @@ import * as THREE from 'three/webgpu'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../world/noise'
 import { buildPapyrus } from './flora'
+import { GIZA_PYRAMIDS, GIZA_SPHINX, type GizaPyramid } from '../scenes/place/gizaSite'
 
 /** Paint a geometry with a base color plus deterministic per-vertex jitter. */
 function tint(geo: THREE.BufferGeometry, hex: string, jitter = 0.08, seed = 1): THREE.BufferGeometry {
@@ -318,6 +319,77 @@ export function buildSphinx(): THREE.BufferGeometry {
   drift.scale(1, 1, 0.45)
   drift.translate(0.05, 0.005, 0)
   return merge([buried, tint(drift, '#c9a670', 0.05, 8221)])
+}
+
+/** One great pyramid at the WALKABLE Giza site (design.md §4.4, point 273):
+ *  the same ~1890 casing cues as buildGizaPyramids — Khufu's blunt flat summit
+ *  (missing apex), Khafre's pale Tura-limestone cap on the stepped core,
+ *  Menkaure's red-granite skirt — but at site scale so the traveller walks
+ *  around the mass as a giant building, and lifted onto its own bedrock plinth
+ *  (Khafre stands on higher rock and so reads as tall as Khufu). */
+function gizaSitePyramidParts(p: GizaPyramid, seed: number): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = []
+  const core = '#c9a76a'
+  const { x, z, base: b, height: h, ground: y0 } = p
+  if (y0 > 0) {
+    // The bedrock plateau Khafre stands on — a low, wide rock plinth so the
+    // lifted pyramid does not float and reads as raised on higher ground.
+    const rock = new THREE.CylinderGeometry(b * 1.05, b * 1.14, y0, 4)
+    rock.rotateY(Math.PI / 4)
+    rock.translate(x, y0 / 2, z)
+    parts.push(tint(rock, '#b0895a', 0.09, seed + 5))
+  }
+  if (p.standing < 1) {
+    // Blunt top: the cone cut flat where the apex and top courses are gone.
+    const stand = h * p.standing
+    const frustum = new THREE.CylinderGeometry(b * (1 - p.standing), b, stand, 4)
+    frustum.rotateY(Math.PI / 4)
+    frustum.translate(x, y0 + stand / 2, z)
+    parts.push(tint(frustum, core, 0.09, seed))
+  } else if (p.cap) {
+    // Stepped tawny core with the pale smooth casing cap near the apex.
+    const capStart = 0.8
+    const coreH = h * capStart
+    const coreG = new THREE.CylinderGeometry(b * (1 - capStart), b, coreH, 4)
+    coreG.rotateY(Math.PI / 4)
+    coreG.translate(x, y0 + coreH / 2, z)
+    parts.push(tint(coreG, core, 0.09, seed))
+    const cap = new THREE.ConeGeometry(b * (1 - capStart) * 1.06, h - coreH, 4)
+    cap.rotateY(Math.PI / 4)
+    cap.translate(x, y0 + coreH + (h - coreH) / 2, z)
+    parts.push(tint(cap, '#e8dcc2', 0.03, seed + 3))
+  } else {
+    const cone = new THREE.ConeGeometry(b, h, 4)
+    cone.rotateY(Math.PI / 4)
+    cone.translate(x, y0 + h / 2, z)
+    parts.push(tint(cone, core, 0.09, seed))
+  }
+  if (p.skirt) {
+    // The red Aswan-granite lower casing: a darker band ringing the base, a
+    // hair proud of the core face so the two never z-fight.
+    const skirtTop = 0.22
+    const skirt = new THREE.CylinderGeometry(b * (1 - skirtTop) * 1.02, b * 1.02, h * skirtTop, 4, 1, true)
+    skirt.rotateY(Math.PI / 4)
+    skirt.translate(x, y0 + (h * skirtTop) / 2, z)
+    parts.push(tint(skirt, '#96604b', 0.06, seed + 7))
+  }
+  return parts
+}
+
+/** The walkable Giza plateau's monuments (design.md §4.4, point 273): the three
+ *  great pyramids in their SW-diagonal row at site scale, each carrying its
+ *  ~1890 casing cue, plus the Great Sphinx buried to the shoulders east of
+ *  Khafre (the shared buildSphinx, scaled up — its burial and noseless face
+ *  come along). One merged, vertex-colored geometry; the collidable masses are
+ *  derived from the SAME GIZA_PYRAMIDS/GIZA_SPHINX constants in gizaSite.ts. */
+export function buildGizaSiteMonuments(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  GIZA_PYRAMIDS.forEach((p, i) => parts.push(...gizaSitePyramidParts(p, 8300 + i * 10)))
+  const sphinx = buildSphinx()
+  sphinx.scale(GIZA_SPHINX.scale, GIZA_SPHINX.scale, GIZA_SPHINX.scale)
+  sphinx.translate(GIZA_SPHINX.x, 0, GIZA_SPHINX.z)
+  parts.push(sphinx)
+  return merge(parts)
 }
 
 /** Great Zimbabwe: a curved mortarless dry-stone wall (segmented boxes) and a
