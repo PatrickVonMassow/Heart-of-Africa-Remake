@@ -10637,6 +10637,32 @@ the remaining open points in their numeric order.
   No player-visible text changes unless a finding demands one (then de+en).
   Implementation-ready.
 
+- [ ] 280. THE BENCHMARK MUST BE STARTABLE WITHOUT A FUNCTION KEY (user report
+  24.07.2026: "Benchmark lässt sich nicht per F8 starten", on the DEPLOYED build).
+  The handler itself is live and correct — a headless check against the published
+  page opens the overlay on F8 and closes it on Esc — so the key is not reaching the
+  page on the user's machine. That is a whole CLASS of failure the game must not
+  depend on: on many laptops F8 is a hardware/media key that needs Fn and never
+  produces a keydown at all, browser extensions and DevTools bind it, and a cached
+  build would show the same symptom. A single function key is therefore the wrong
+  sole entry point for something the user is asked to run.
+  FIX — give it paths that cannot be intercepted, all reaching the SAME runner:
+  (a) A BUTTON in the debug menu (F1), the canonical place every other debug action
+    lives (design.md §21.3), localized de+en. This is the primary fix.
+  (b) A URL PARAMETER (`?bench=1`) that starts the run once the scene is ready —
+    immune to every keyboard and focus question, and the easiest thing to hand a
+    remote tester as a link.
+  (c) Keep F8 as the shortcut it was meant to be.
+  Also make a FAILURE VISIBLE rather than silent: if the lazy import or the start
+  throws, the existing localized toast must fire — verify it does, since a silent
+  no-op is indistinguishable from a key that never arrived.
+  TESTS: component test that the debug-menu button starts the runner and is
+  localized in both languages; a pure/route test for the query parameter; and a live
+  check against a PRODUCTION preview build (not the dev server — the dev hooks the
+  suites usually lean on are stripped there, which is exactly the build the user
+  runs) that the parameter starts a short benchmark. DOCS: design.md §21.1/§21.3 and
+  CLAUDE.md §7.1 pt. 20. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
