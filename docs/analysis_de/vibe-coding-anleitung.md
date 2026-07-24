@@ -42,11 +42,20 @@ Fast alles Folgende ist eine Anwendung davon.
    > (null Fehler/Warnungen/bekannte Lücken). Überdecke nie einen Fehlschlag — melde ihn
    > mit dem konkreten Output."
 
-5. **Die Selbstheilungs-Regel etablieren.**
-   > „Wenn dir derselbe Fehler ein zweites Mal passiert (oder ich dich zum zweiten Mal
-   > auf dasselbe hinweise), baue einen automatischen Mechanismus, der ihn künftig
-   > verhindert — einen Test, einen Git-Hook oder einen Stop-Hook, der abbricht, wenn die
-   > Regel verletzt wird. Ein Vorsatz reicht nicht."
+5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
+   Sich darauf zu verlassen, dass das Modell sich an eine nur *niedergeschriebene* Regel
+   hält, ist erwiesenermaßen unzuverlässig — auch bei bester Absicht fällt unter Druck genau
+   der nicht-erzwungene Schritt weg. Warte deshalb **nicht**, bis derselbe Fehler ein zweites
+   Mal passiert.
+   > „Für **jede** Regel, die wirklich gelten soll, baue von Anfang an einen **Mechanismus**,
+   > der ihre Verletzung unmöglich macht — einen Test, einen Git-Hook oder einen Stop-/
+   > PreToolUse-Hook, der abbricht bzw. die Aktion verweigert, wenn die Regel gebrochen würde.
+   > Der Aufwand des Mechanismus soll zur Wichtigkeit passen (ein leichter Guard für eine
+   > leichte Regel), aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — und
+   > selbst eine ausführlich niedergeschriebene Regel — reicht nicht."
+
+   *(Die frühere, schwächere Form „baue den Mechanismus erst beim zweiten Auftreten" ist damit
+   überholt: das zweite Auftreten ist bereits ein vermeidbarer Schaden.)*
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite), das **immer den

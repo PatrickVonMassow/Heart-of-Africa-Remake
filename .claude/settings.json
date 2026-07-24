@@ -93,6 +93,15 @@
             "command": "node scripts/worktree-reminder.mjs"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/closing-guard.mjs"
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -188,6 +188,12 @@ Cheap automated classes first, then the visual sweep:
   run (Phase 8 — LARGE regression on BOTH backends, flake-free) is green on the
   exact commit; (2) the user has given explicit approval for THIS tag (per
   `tags-only-on-request`). No tag without both.
+- **ENFORCED (point 306):** the closing checklist is machine-checked — the
+  PreToolUse guard `scripts/closing-guard.mjs` DENIES the tag/poc create-or-push
+  until EVERY closing step (Phase 8, incl. the dead-code/stale-doc/stale-comment
+  cleanup + `.md` audit) is recorded done for the commit
+  (`node scripts/closing-guard.mjs --status` / `--step <id> --evidence "…"`). A
+  closing can no longer silently skip a step, which is what happened at v0.2.
 - Increment the trailing version digit (v0.1 → v0.2 → v0.3, …).
 - Tag the release, and **MOVE the `poc` tag to the SAME commit** — `poc` always
   mirrors the NEWEST version tag (user decision 24.07.2026), playable at
