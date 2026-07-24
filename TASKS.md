@@ -10971,6 +10971,49 @@ the remaining open points in their numeric order.
   the memory `use-1890-valid-names`; the point-205 plausibility audit enforces it. Fast
   gate green (2867 tests). Committed to main.
 
+- [ ] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
+  24.07.2026 during the 276 verify; PRE-EXISTING on main, independent of 276/273).
+  design.md §19.1 / §7.1 pt.20: a nearby animal's own call rises and AUDIBLY FADES with
+  distance. Currently it does not fade back: in `scripts/verify/settings.mjs` the
+  "animal call fades once the player moves away" check fails deterministically —
+  after the injected elephant is removed, `window.__ambience.animalProx().elephant`
+  decays only from ~0.87 to ~0.83 over the 1600 ms window (expected < 0.1). So the
+  proximity call effectively stays up after the source is gone. BEHAVIOUR: the per-animal
+  proximity level must decay to near-silence within a short, perceptible window once no
+  such animal is near (the rise already works — near/prox climb correctly). INVESTIGATE
+  whether the decay time-constant is simply too slow (a real product regression — some
+  merged point likely slowed or froze it; note `prox` and `gone` are nearly identical, so
+  the value barely moves) OR the proximity is not recomputed at all after the herd list
+  changes. Fix the behaviour so the call fades, and if the check's 1600 ms window is
+  genuinely too short for an intended gentle fade, widen it — but the default must reach
+  clear silence in a natural time. ANCHORS: `src/systems/ambience.ts` (`animalProx`, the
+  per-source proximity decay), `scripts/verify/settings.mjs` (the check). VERIFIABLE: a
+  pure test of the proximity decay in `src/systems/ambience.test.ts` (rises near, decays
+  to ~0 within the window after the source leaves), and the settings.mjs check green on
+  BOTH backends. QA-finder-class regression (points 200/285). No player-visible text.
+
+- [ ] 293. EXTEND THE IN-GAME BENCHMARK TO GUIDE FURTHER LOW-LEVEL REDUCTION (user
+  24.07.2026). The user runs the F8 / `?bench` benchmark (point 277) on a SLOW PC to find
+  what MORE can be cut at the LOW graphics level (point 276) to gain performance. Extend
+  the benchmark to serve THIS use case: profile the LOW detail preset and surface WHERE
+  the remaining cost sits at low — a per-system / per-lever cost RANKING so the user can
+  see the dominant remaining systems and decide the next reduction. Account for the
+  point-276 quality presets: the config sweep forces 'high' to keep every lever
+  measurable, so ADD a low-preset profiling pass (the low `QUALITY_PRESETS` values
+  applied) that reports, at low, the per-system scene-graph triangle count, the
+  `renderer.info` draw calls / triangles, and the GPU (WebGPU timestamp) / CPU / wall
+  series per system, ranked most-expensive-first, with a readable digest line naming the
+  top remaining cost centres ("at LOW the frame is dominated by: terrain 42 %, flora
+  28 %, wildlife 12 % …"). Keep it deterministic (the point-277 seeded PRNG + fixed
+  timestep) and restore every setting afterwards. ANCHORS: `src/systems/benchmark.ts`
+  (sweep plan + report shaping), `src/ui/BenchmarkOverlay.tsx`, `scripts/verify/
+  benchmark.mjs`, docs (design.md §21.1, `docs/graphics-detail-levels.md` cross-link).
+  VERIFIABLE: `src/systems/benchmark.test.ts` covers the low-preset breakdown + the
+  ranking; `scripts/verify/benchmark.mjs` asserts the low-level per-system ranking on the
+  live `?bench=short` run (GPU series measured on WebGPU, flagged-with-reason on WebGL 2);
+  UI text de+en. Position: v0.3 benchmark/graphics area, after 276/273. DEPENDS ON 276
+  (the quality presets) being merged.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
