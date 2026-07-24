@@ -102,6 +102,15 @@
             "command": "node scripts/closing-guard.mjs"
           }
         ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/closing-guard.mjs"
+          }
+        ]
       }
     ],
     "PostToolUse": [

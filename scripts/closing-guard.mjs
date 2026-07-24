@@ -112,7 +112,7 @@ try {
   } catch {
     process.exit(0)
   }
-  if (!payload || payload.tool_name !== 'Bash') process.exit(0)
+  if (!payload || (payload.tool_name !== 'Bash' && payload.tool_name !== 'PowerShell')) process.exit(0)
   const command = payload.tool_input && payload.tool_input.command
   const decision = evaluate({ command, state: readState(), headSha: headSha() })
   if (decision.block) {
