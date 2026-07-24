@@ -125,6 +125,14 @@ Zwei Regeln, die das Netz ehrlich halten:
   jedes Schritts** immer ein Schritt an der Aufgabe. Baue einen Mechanismus, der ein
   stilles Anhalten verhindert, statt dich darauf zu verlassen."
 
+- **Auf eine Rückfrage warten, statt weiterzuarbeiten.** Genauso schlimm wie ein stiller
+  Stopp: der Assistent stellt eine Frage und bleibt stehen, obwohl er weiterarbeiten
+  könnte — gerade wenn du weg bist.
+  → *Prompt:* „Wenn ich weg bin, arbeite die Aufgabenliste **eigenständig** weiter und
+  bleib **nie mit einer Rückfrage an mich stehen**. Triff bei Unklarheit die vernünftigste
+  Annahme und mach weiter; nur was wirklich meine Entscheidung braucht, hältst du kurz an
+  sichtbarer Stelle fest und **gehst zum nächsten offenen Punkt über**, statt zu warten."
+
 - **Kommunikation verfehlt.** Zu technisch, zu lang, falsche Sprache, an der Zielgruppe
   vorbei.
   → *Prompt:* „Beschreibe Bugs/Status in der Sprache der Zielgruppe (Symptom zuerst, kurz,

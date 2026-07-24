@@ -56,6 +56,8 @@ Das langlebigste Prozessproblem. Symptom: Der Batch stoppte still, sobald eine N
 
 **Lösungsgenerationen (≥6):** Verhaltensregel → ScheduleWakeup-Re-Arm am Turn-Ende → In-Session-Cron-Heartbeat → Stop-Hook `batch-progress-guard` (hartes Blockieren des Idle-Stops) → SessionStart-Resume-Hook → OS-Scheduled-Task `HoA-Batch-Autostart` (überlebt Crash/Reboot). Dokumentiert als vollständige Failure-Mode-Tabelle in `docs/batch-autonomy.md` — der Übergang von „ein Loch flicken" zu „alle Löcher systematisch aufzählen" war selbst eine Lehre.
 
+**Verschärfung (24.07., Nutzer geht weg und erwartet Durcharbeiten):** Der Batch bleibt auch nie mit einer *Rückfrage* an den Nutzer stehen. Eine Nutzernachricht ist ein Interrupt, keine Blockade; bei Unklarheit wird die vernünftigste Annahme getroffen und weitergearbeitet, und nur ein echt entscheidungsbedürftiger Punkt wird als „Von dir zu klären" festgehalten und übersprungen — der nächste offene Punkt wird bearbeitet, statt zu warten. Erzwungen durch denselben `batch-progress-guard` (Idle-Stop UND Blockieren-auf-Rückfrage sind beide illegitime Turn-Enden) plus `defer-for-user`.
+
 **Aber:** Genau diese Redundanz-Schichten erzeugten das nächste Problem (3.2).
 
 ### 3.2 Fix-of-Fix auf Prozessebene: Parallele Sessions
