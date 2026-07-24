@@ -207,6 +207,19 @@ picture at zero extra geometry cost.
 
 **(5) Effort.** **XS–S** (parameter reshuffle in `buildStelae()` plus a test pin).
 
+**RESOLVED (point 279e).** `buildStelae()` in `src/render/landmarks.ts` now
+builds the field the record describes. King Ezana's stele stands alone —
+`AKSUM_EZANA_HEIGHT` 2.6, more slender than anything else upright — over a
+scatter of three low rough uncrowned stelae (`AKSUM_MINOR_HEIGHTS`, all under
+0.4 of the giant). The fallen Great Stele lies clear across the field in two
+broken pieces spanning `AKSUM_FALLEN_LENGTH` 3.4 end to end — the biggest
+object there, thicker than the standing giant and longer than it is tall —
+with the second fallen royal shaft (the one Italy later carried to Rome) and
+the broken stump beside it. `landmarks.test.ts` pins the proportions both
+ways: every minor stele stays well under the lone giant, nothing off the
+giant's own axis rises near its height, the fallen span exceeds the standing
+height, and lying material is really built at both ends of the fall line.
+
 ---
 
 ### A5 — The Bemba village is built on the Central Cattle Pattern, but the Bemba kept no cattle · SEVERITY 2 · HIGH

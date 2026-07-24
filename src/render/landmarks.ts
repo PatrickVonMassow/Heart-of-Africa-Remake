@@ -353,34 +353,82 @@ export function buildCoastalRuins(): THREE.BufferGeometry {
   return merge(parts)
 }
 
-/** Aksum: 3–4 tall thin tapered obelisks with rounded caps, one fallen —
- *  weathered granite grey. */
+/**
+ * The Aksum field as a ~1890 traveller found it — the opposite of the modern
+ * postcard. Of the three great royal stelae only King Ezana's (~21 m) still
+ * stood: it is "the only one of the three major royal obelisks that was never
+ * broken". The 33 m Great Stele collapsed in antiquity (coins beneath it date
+ * the fall to the late 4th century) and lay broken across the field — the
+ * biggest object there — and the 24 m obelisk the Italians took to Rome in
+ * 1937 (re-erected in Aksum only in 2008) lay fallen beside it. Around them a
+ * scatter of smaller, rough, undecorated stelae.
+ */
+export const AKSUM_EZANA_HEIGHT = 2.6
+/** The small rough stelae still upright: low and plain, none rivalling Ezana's. */
+export const AKSUM_MINOR_HEIGHTS: readonly number[] = [0.8, 0.55, 0.65]
+/** End-to-end span of the fallen Great Stele's broken pieces — the biggest
+ *  object in the field, longer than the lone standing giant is tall. */
+export const AKSUM_FALLEN_LENGTH = 3.4
+
+/** Aksum: ONE lone giant standing — King Ezana's stele, tall, slender, still
+ *  crowned — among FALLEN giants: the broken Great Stele lying clear across
+ *  the field and a second fallen royal shaft, with a scatter of low rough
+ *  stelae between and the broken stump at the fall's foot. Weathered granite
+ *  grey (see AKSUM_* above for the record). */
 export function buildStelae(): THREE.BufferGeometry {
-  const rand = mulberry32(4600)
   const parts: THREE.BufferGeometry[] = []
-  const spots: Array<[number, number]> = [
-    [0, 0],
-    [0.8, 0.4],
-    [-0.7, 0.55],
+  // King Ezana's stele: clearly the tallest thing in the field and more
+  // slender than anything else standing.
+  const eh = AKSUM_EZANA_HEIGHT
+  const ezana = new THREE.CylinderGeometry(0.055, 0.11, eh, 6)
+  ezana.translate(0, eh / 2, 0)
+  parts.push(tint(ezana, '#8f8a80', 0.08, 4600))
+  const cap = new THREE.SphereGeometry(0.08, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2)
+  cap.translate(0, eh, 0)
+  parts.push(tint(cap, '#8f8a80', 0.08, 4601))
+  // The scatter of small rough stelae: squat five-sided shafts, uncrowned.
+  const minorSpots: Array<[number, number]> = [
+    [0.85, 0.5],
+    [-0.75, 0.6],
+    [0.35, 1.05],
   ]
-  spots.forEach(([x, z], i) => {
-    const h = 1.6 + rand() * 0.9
-    const shaft = new THREE.CylinderGeometry(0.07, 0.14, h, 6)
-    shaft.translate(x, h / 2, z)
-    parts.push(tint(shaft, '#8f8a80', 0.08, 4600 + i))
-    const cap = new THREE.SphereGeometry(0.1, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2)
-    cap.translate(x, h, z)
-    parts.push(tint(cap, '#8f8a80', 0.08, 4610 + i))
+  AKSUM_MINOR_HEIGHTS.forEach((mh, i) => {
+    const [x, z] = minorSpots[i]
+    const shaft = new THREE.CylinderGeometry(0.05, 0.13, mh, 5)
+    shaft.translate(x, mh / 2, z)
+    parts.push(tint(shaft, '#8a857c', 0.1, 4610 + i))
   })
-  // The fallen giant, lying across the field in two broken pieces.
-  const fallen = new THREE.CylinderGeometry(0.13, 0.18, 1.6, 6)
-  fallen.rotateZ(Math.PI / 2)
-  fallen.rotateY(0.5)
-  fallen.translate(0.2, 0.15, -0.9)
-  parts.push(tint(fallen, '#87827a', 0.08, 4620))
+  // The fallen Great Stele: two broken pieces lying almost in line, thicker
+  // than the standing giant and spanning AKSUM_FALLEN_LENGTH end to end.
+  const dir = 0.5 // lie of the fall, radians about y
+  const dx = Math.cos(dir)
+  const dz = -Math.sin(dir)
+  const cx = 0.1
+  const cz = -0.9
+  const pieces: Array<[number, number]> = [
+    // [piece length, axial centre offset from the fall's midpoint]
+    [1.9, -(AKSUM_FALLEN_LENGTH / 2 - 1.9 / 2)],
+    [1.4, AKSUM_FALLEN_LENGTH / 2 - 1.4 / 2],
+  ]
+  pieces.forEach(([len, off], i) => {
+    const r = 0.2
+    const piece = new THREE.CylinderGeometry(r * 0.85, r, len, 6)
+    piece.rotateZ(Math.PI / 2)
+    piece.rotateY(dir)
+    piece.translate(cx + dx * off, r, cz + dz * off)
+    parts.push(tint(piece, '#87827a', 0.08, 4620 + i))
+  })
+  // The second fallen giant — the shaft Italy later carried to Rome.
+  const r2 = 0.15
+  const second = new THREE.CylinderGeometry(r2 * 0.85, r2, 2.2, 6)
+  second.rotateZ(Math.PI / 2)
+  second.rotateY(-0.9)
+  second.translate(-1.05, r2, -0.15)
+  parts.push(tint(second, '#87827a', 0.08, 4623))
+  // The broken stump the Great Stele left standing at its base.
   const stump = new THREE.CylinderGeometry(0.16, 0.18, 0.35, 6)
-  stump.translate(-0.9, 0.17, -0.8)
-  parts.push(tint(stump, '#87827a', 0.08, 4621))
+  stump.translate(-1.55, 0.17, -0.2)
+  parts.push(tint(stump, '#87827a', 0.08, 4624))
   return merge(parts)
 }
 

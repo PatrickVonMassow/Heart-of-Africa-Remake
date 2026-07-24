@@ -14,6 +14,9 @@ import {
   buildRockChurches,
   buildCoastalRuins,
   buildStelae,
+  AKSUM_EZANA_HEIGHT,
+  AKSUM_MINOR_HEIGHTS,
+  AKSUM_FALLEN_LENGTH,
   buildCastles,
   GONDAR_PARAPET,
   GONDAR_TOWER_HEIGHTS,
@@ -197,6 +200,50 @@ describe('landmark builders', () => {
     }
     for (const p of MEROE_PYRAMIDS.filter((q) => q.standing >= 1)) {
       expect(topOver(p), `intact pyramid at ${p.x.toFixed(1)}/${p.z.toFixed(1)}`).toBeGreaterThan(p.height - 0.01)
+    }
+    geo.dispose()
+  })
+
+  it('Aksum reads as 1890: one lone giant standing among fallen giants (point 279)', () => {
+    // Of the three great royal stelae only King Ezana's still stood — "the
+    // only one of the three major royal obelisks that was never broken"; the
+    // 33 m Great Stele fell in antiquity and lay broken across the field, and
+    // the obelisk the Italians later took to Rome lay fallen beside it. The
+    // regression this pins is the inverted field the builder used to make:
+    // three standing shafts of similar height and one fallen piece SMALLER
+    // than any of them.
+    // The lone giant clearly overtops every other standing stele...
+    for (const mh of AKSUM_MINOR_HEIGHTS) expect(mh).toBeLessThan(AKSUM_EZANA_HEIGHT * 0.4)
+    // ...and the fallen giant outmeasures even the standing one.
+    expect(AKSUM_FALLEN_LENGTH).toBeGreaterThan(AKSUM_EZANA_HEIGHT)
+
+    const geo = buildStelae()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    let top = 0
+    let tallOffAxis = 0
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i)
+      top = Math.max(top, y)
+      if (y > AKSUM_EZANA_HEIGHT * 0.45 && Math.hypot(pos.getX(i), pos.getZ(i)) > 0.35) tallOffAxis++
+    }
+    // The giant really stands at its height, and NOTHING off its own axis
+    // rises anywhere near it — one lone giant, not a group of three.
+    expect(top).toBeGreaterThan(AKSUM_EZANA_HEIGHT - 0.1)
+    expect(tallOffAxis).toBe(0)
+    // The fallen giant really lies built at its full span: lying material
+    // sits at both ends of the fall line (midpoint 0.1/-0.9, bearing 0.5).
+    const half = AKSUM_FALLEN_LENGTH / 2
+    const ends: Array<[number, number]> = [
+      [0.1 + Math.cos(0.5) * half, -0.9 - Math.sin(0.5) * half],
+      [0.1 - Math.cos(0.5) * half, -0.9 + Math.sin(0.5) * half],
+    ]
+    for (const [ex, ez] of ends) {
+      let lying = 0
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getY(i) > 0.45) continue
+        if (Math.hypot(pos.getX(i) - ex, pos.getZ(i) - ez) < 0.3) lying++
+      }
+      expect(lying, `fallen material at ${ex.toFixed(1)}/${ez.toFixed(1)}`).toBeGreaterThan(0)
     }
     geo.dispose()
   })
