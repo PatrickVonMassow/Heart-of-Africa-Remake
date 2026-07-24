@@ -206,10 +206,24 @@ old→new coverage map live in `scripts/verify/README.md`.
   - Keep branches SHORT. If `main` moved substantially, merge `main` INTO the
     branch before the final verify, and run that verify on the synced state, so
     what is verified is what lands.
-  - Point 224 tag re-point: the `/poc/` rebuild does not trigger on a tag push —
-    after moving the `poc` tag, run the deploy via `workflow_dispatch` (or ensure
-    the closing-cycle `main` push lands AFTER the tag move), else the deploy
-    builds the old tag.
+  - **Release/tag mechanism (binding, user decision 24.07.2026).** Creating a
+    version tag (`vX.Y`) is a delivery, and every delivery obeys the same rules:
+    1. **Full closing run FIRST.** The complete closing cycle (§7.2 / Maximum-QA
+       Phase 8 — LARGE regression on BOTH backends, flake-free) must be green on
+       the exact commit to be tagged. No tag on an unclosed state.
+    2. **User approval FIRST.** Tagging/publishing is outward-facing — it happens
+       ONLY after the user's explicit go for that specific tag (per
+       `tags-only-on-request`). "The current state is fine, you may tag" is such a
+       go.
+    3. **`poc` mirrors the newest version tag.** On every new `vX.Y` tag, MOVE the
+       `poc` tag to the SAME commit, so `poc` is always identical to the newest
+       version, playable at `…/Heart-of-Africa-Remake/poc/`. Both `/vX.Y/` and
+       `/poc/` are served (the deploy workflow enumerates every `v*` tag + `poc`
+       dynamically — no workflow edit per release).
+    4. The `/poc/` (and `/vX.Y/`) rebuild does NOT trigger on a tag push — after
+       moving/creating the tags, run the deploy via `workflow_dispatch` (or ensure
+       a `main` push lands AFTER the tag moves), else the deploy builds the old
+       tag. Then VERIFY the `/poc/` and `/vX.Y/` URLs serve the new state.
   - **User-facing judgment is always against DEPLOYED `main`, never a branch.**
     The user tests only the GH-Pages URL (which serves `main`) — never a feature
     branch, never a local checkout. So a render/GUI fix that needs the user's

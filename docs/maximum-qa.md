@@ -183,13 +183,19 @@ Cheap automated classes first, then the visual sweep:
   per engine (that multiplies the runtime by the engine count), only the tiered
   core-flow subset. Skips gracefully if the engines are not installed.
 
-## Phase 9 — Tag & publish the demo (only on an explicit "new demo" instruction)
-- Increment the trailing version digit (v0.2 → v0.3, etc.).
-- Tag the release like the prior tags, build, and publish to GitHub Pages at
-  `https://patrickvonmassow.github.io/Heart-of-Africa-Remake/<version>/` (same
-  wiring as the earlier `/v0.1/`, `/poc/` pages), then freeze.
-- Per `tags-only-on-request`: only tag/publish on the user's explicit demo
-  instruction; hold the final tag for the user unless told to publish it.
+## Phase 9 — Tag & publish the demo (binding release mechanism, user 24.07.2026)
+- **Preconditions, both required before ANY version tag:** (1) the full closing
+  run (Phase 8 — LARGE regression on BOTH backends, flake-free) is green on the
+  exact commit; (2) the user has given explicit approval for THIS tag (per
+  `tags-only-on-request`). No tag without both.
+- Increment the trailing version digit (v0.1 → v0.2 → v0.3, …).
+- Tag the release, and **MOVE the `poc` tag to the SAME commit** — `poc` always
+  mirrors the NEWEST version tag (user decision 24.07.2026), playable at
+  `…/Heart-of-Africa-Remake/poc/`. Both `/<version>/` and `/poc/` are served (the
+  deploy workflow enumerates every `v*` tag + `poc` dynamically).
+- The `/poc/` and `/<version>/` rebuild does NOT trigger on a tag push — after the
+  tag moves, run the deploy (`workflow_dispatch`) or land a `main` push AFTER the
+  tags, then VERIFY both URLs serve the new state. Then freeze.
 
 ---
 

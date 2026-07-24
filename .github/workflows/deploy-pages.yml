@@ -43,15 +43,19 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Frozen playable builds of each tag under /v0.1/ and /poc/ (TASKS point
-      # 103): the same Pages site serves main at the root and each tag at its
-      # subpath — GitHub allows one Pages site per repository, so every frozen
-      # build is a subdirectory of the same artifact, rebuilt from its immutable
-      # tag on every deploy. Each tag is guarded so the workflow still deploys
+      # Frozen playable builds of each tag under /Heart-of-Africa-Remake/<tag>/
+      # (TASKS point 103): the same Pages site serves main at the root and each
+      # tag at its subpath — GitHub allows one Pages site per repository, so
+      # every frozen build is a subdirectory of the same artifact, rebuilt from
+      # its immutable tag on every deploy. The set is EVERY version tag (vX.Y)
+      # plus `poc` (which always mirrors the NEWEST version tag, user decision
+      # 24.07.2026) — version tags are enumerated DYNAMICALLY so a new release
+      # needs no workflow edit. Each tag is guarded so the workflow still deploys
       # the ones that exist while another does not.
-      - name: Build each tag's frozen site (v0.1, poc)
+      - name: Build each tag's frozen site (all version tags + poc)
         run: |
-          for tag in v0.1 poc; do
+          VERSION_TAGS=$(git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##' | grep -vE '\^\{\}$' | sort -u)
+          for tag in $VERSION_TAGS poc; do
             if [ -z "$(git ls-remote --tags origin "$tag")" ]; then
               echo "tag $tag does not exist yet — skipping"
               continue
