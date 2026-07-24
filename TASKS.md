@@ -10637,7 +10637,7 @@ the remaining open points in their numeric order.
   No player-visible text changes unless a finding demands one (then de+en).
   Implementation-ready.
 
-- [ ] 280. THE BENCHMARK MUST BE STARTABLE WITHOUT A FUNCTION KEY (user report
+- [x] 280. THE BENCHMARK MUST BE STARTABLE WITHOUT A FUNCTION KEY (user report
   24.07.2026: "Benchmark lässt sich nicht per F8 starten", on the DEPLOYED build).
   The handler itself is live and correct — a headless check against the published
   page opens the overlay on F8 and closes it on Esc — so the key is not reaching the
