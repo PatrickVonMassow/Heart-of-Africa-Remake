@@ -11236,6 +11236,32 @@ the remaining open points in their numeric order.
   instruction have Fable-5 verify the mechanism is 100 % RELIABLE (it cannot let an incomplete
   closing through) before it counts as done. No player-visible text.
 
+- [ ] 307. AUDIT ALL ESTABLISHED RULES FOR MISSING ENFORCEMENT — build a mechanism for each
+  rule that lacks one (user 24.07.2026, the mechanism-first principle). Relying on the model
+  to follow a merely-WRITTEN rule has proven unreliable (the v0.2 closing-skip is the latest
+  proof), so every rule the user established that is NOT yet backed by an enforcing mechanism
+  (a test, git hook, Stop-hook or PreToolUse guard) is a gap to close — do NOT wait for a
+  second violation. SCAN the full corpus of established rules — the user-feedback MEMORIES
+  (`…/memory/*.md`, type: feedback), CLAUDE.md, design.md process rules, the `docs/analysis_de`
+  docs, and the standing batch instructions — and for EACH rule: (a) is it already
+  mechanism-enforced, and by which guard? (b) if not, SHOULD it be, proportionate to its
+  importance and how often my compliance has slipped? (c) if yes, design + BUILD the enforcing
+  mechanism to the project guard schema (pure core + Vitest + fail-open wrapper + settings
+  wiring). Deliver a TABLE: rule → current enforcement (or none) → verdict (enforce / leave,
+  with reason) → mechanism built. Look hard at the UNGUARDED rules, e.g.: push-after-every-
+  commit, one-atomic-commit-per-point, both-languages-for-every-player-text, voice-markup-in-
+  every-journal-text, 1890-valid-names, English-no-germanisms, commit-messages-no-point-number,
+  new-tasks-append-and-defer, tasks-spec-final-state-only — several of these are pure-checkable.
+  (Already guarded, confirm not regress: timestamp, dashboard family, render-verify, ci-status,
+  queue-order, retro-currency, closing-completeness/306.) METHOD: FOUR-EYES / two-model (Opus +
+  Fable) for the SCAN, the PLANNING of each proposed mechanism, AND the EVALUATION of each
+  implementation — the two models cross-check the rule inventory (nothing missed), the
+  necessity call, and each guard's reliability. ANCHORS: the memory corpus, `scripts/*guard*`,
+  `.claude/settings.json`. VERIFIABLE: the rule→enforcement table with a per-rule verdict; each
+  new guard has a passing Vitest core test and is wired; a short report of what was left
+  unenforced and why. No player-visible text. (This is the systematic enforcement of the
+  mechanism-first principle — vibe-coding guide rule 5 / retrospective §3.16.)
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
