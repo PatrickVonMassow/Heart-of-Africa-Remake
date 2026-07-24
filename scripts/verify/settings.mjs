@@ -441,6 +441,67 @@ const msaaSamples = await page.evaluate(() => window.__scenePass.renderTarget.sa
 check('TRAA scene pass renders single-sampled (MSAA pass keeps 4)',
   traaSamples === 0 && msaaSamples === 4, `traa ${traaSamples}, msaa ${msaaSamples}`)
 
+// --- Low Details performance mode (design.md §21, F7 / point 276 part B) ------
+// F7 flips a single `lowDetails` flag read DERIVED by every render lever, so the
+// individual debug flags stay untouched (off = today's picture). Assert F7 flips
+// the flag and that the EFFECTIVE reads flip with it, computed the same way the
+// ui.ts selectors do (their maths is pure-tested in src/state/ui.test.ts). The
+// FPS win is priced live by the main session on both backends.
+const errsBeforeLow = errors.length
+// Start from a known state: every base lever on, the mode off.
+await page.evaluate(() => {
+  const u = window.__ui.getState()
+  u.setLowDetails(false)
+  u.setSsaoEnabled(true)
+  u.setTraaEnabled(true)
+  u.setShadowsEnabled(true)
+  u.setFireShadowsEnabled(true)
+  u.setShadowMapHalf(false)
+})
+const effective = () => page.evaluate(() => {
+  const s = window.__ui.getState()
+  return {
+    lowDetails: s.lowDetails,
+    ssao: s.ssaoEnabled && !s.lowDetails,
+    traa: s.traaEnabled && !s.lowDetails,
+    bloom: !s.lowDetails,
+    shadows: s.shadowsEnabled && !s.lowDetails,
+    fireShadows: s.fireShadowsEnabled && !s.lowDetails,
+    shadowMapHalf: s.shadowMapHalf || s.lowDetails,
+    // Base flags — must be UNTOUCHED by the mode.
+    baseSsao: s.ssaoEnabled, baseTraa: s.traaEnabled, baseShadows: s.shadowsEnabled,
+    baseFire: s.fireShadowsEnabled, baseHalf: s.shadowMapHalf,
+  }
+})
+const lowOff = await effective()
+check('Low Details off: effective levers match their base (picture-neutral)',
+  lowOff.lowDetails === false && lowOff.ssao && lowOff.traa && lowOff.bloom &&
+  lowOff.shadows && lowOff.fireShadows && lowOff.shadowMapHalf === false,
+  JSON.stringify(lowOff))
+// F7 turns the mode on.
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F7', bubbles: true })))
+await page.waitForTimeout(1200)
+const lowOn = await effective()
+check('F7 on: every effective render lever is forced DOWN',
+  lowOn.lowDetails === true && lowOn.ssao === false && lowOn.traa === false &&
+  lowOn.bloom === false && lowOn.shadows === false && lowOn.fireShadows === false &&
+  lowOn.shadowMapHalf === true, JSON.stringify(lowOn))
+check('F7 on: the individual debug flags stay untouched (read derived, not clobbered)',
+  lowOn.baseSsao && lowOn.baseTraa && lowOn.baseShadows && lowOn.baseFire && lowOn.baseHalf === false,
+  JSON.stringify(lowOn))
+const lowMean = await meanLuma(await page.screenshot())
+check('F7 on: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
+// F7 again restores the player's exact settings.
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F7', bubbles: true })))
+await page.waitForTimeout(1200)
+const lowBack = await effective()
+check('F7 off again: the effective levers return to the base picture',
+  lowBack.lowDetails === false && lowBack.ssao && lowBack.traa && lowBack.bloom &&
+  lowBack.shadows && lowBack.fireShadows && lowBack.shadowMapHalf === false,
+  JSON.stringify(lowBack))
+check('Low Details: no new console errors across the toggle', errors.length === errsBeforeLow,
+  errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

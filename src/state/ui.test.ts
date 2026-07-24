@@ -9,6 +9,7 @@ import {
   effectiveTraa,
   effectiveBloom,
   effectiveShadows,
+  effectiveFireShadows,
   effectiveShadowMapHalf,
 } from './ui'
 
@@ -135,16 +136,24 @@ describe('Low Details performance mode (design.md §21, F7 / point 276 part B)',
     expect(effectiveTraa(u())).toBe(u().traaEnabled)
     expect(effectiveBloom(u())).toBe(true) // bloom on today
     expect(effectiveShadows(u())).toBe(u().shadowsEnabled)
+    // Fire shadows read derived too, so the point-289 flag is untouched off.
+    u().setFireShadowsEnabled(true)
+    expect(effectiveFireShadows(u())).toBe(true)
+    u().setFireShadowsEnabled(false)
+    expect(effectiveFireShadows(u())).toBe(false)
     expect(effectiveShadowMapHalf(u())).toBe(u().shadowMapHalf)
   })
 
   it('derives the render levers DOWN when on (effective = base && !lowDetails)', () => {
     // Player leaves everything at its default (on / full-res).
+    u().setFireShadowsEnabled(true) // even a player who turned fire shadows ON
     u().setLowDetails(true)
     expect(effectiveSsao(u())).toBe(false)
     expect(effectiveTraa(u())).toBe(false)
     expect(effectiveBloom(u())).toBe(false)
     expect(effectiveShadows(u())).toBe(false)
+    expect(effectiveFireShadows(u())).toBe(false) // …loses them in the mode
+    expect(u().fireShadowsEnabled).toBe(true) // but the base flag is untouched
     expect(effectiveShadowMapHalf(u())).toBe(true) // Low Details FORCES half-size
   })
 
