@@ -50,7 +50,6 @@ import {
   flightStep,
   segPointDist,
   gambolState,
-  groundNormal,
   leashedGambolDir,
   separationPush,
   edgeSeparationPush,
@@ -139,6 +138,7 @@ import {
   createFaunaMaterial,
   crocodileBodyY,
 } from '../../render/fauna'
+import { setGroundStains } from '../../render/groundStains'
 
 const CHUNK_SIZE = 24
 
@@ -473,6 +473,15 @@ const CROSS_SWIM_SPEED = 2.6
  *  accumulates into the animal's position so it never teleports (design.md §19). */
 const FLEE_SPEED = 5
 const MAX_STAINS = 60
+/** Radius (world units) of the blood patch a kill or a trample soaks into the
+ *  ground (design.md §19.5) — the radius the old decal disc had. */
+const STAIN_RADIUS = 0.9
+/** Radius of the scripted hunt's stain at full spread; it grows into this while
+ *  the predator feeds. */
+const HUNT_STAIN_RADIUS = 1.1
+/** The scripted hunt's own ground stain (point 267): module state, because it is
+ *  <Herds> that uploads every stain to the terrain material each frame. */
+const HUNT_STAIN = { active: false, x: 0, z: 0, r: 0 }
 /** Elephant herd roaming (design.md §19): a slow amble that only ever moves
  *  forward, turning in gentle arcs. Herd-mates keep together (cohesion); they
  *  do not hunt prey — a smaller animal is only trampled if it happens to be in
@@ -1436,7 +1445,6 @@ function seedDryShoreDrinkers(
 interface WildlifeMeshPool {
   adult: Record<Species, THREE.InstancedMesh>
   calf: Record<(typeof CALF_SPECIES)[number], THREE.InstancedMesh>
-  stain: THREE.InstancedMesh
   material: THREE.MeshStandardMaterial
   /** STRIKING crocodiles' mesh (point 274): same geometry as the hidden pool
    *  mesh but the ordinary OPAQUE fauna material — the two croc poses draw
@@ -1511,14 +1519,7 @@ function getWildlifeMeshes(): WildlifeMeshPool {
     m.count = 0
     calf[sp] = m
   }
-  const stain = new THREE.InstancedMesh(
-    new THREE.CircleGeometry(0.9, 16),
-    new THREE.MeshStandardMaterial({ color: '#a51512', roughness: 1, transparent: true, opacity: 0.8 }),
-    MAX_STAINS,
-  )
-  stain.frustumCulled = false
-  stain.count = 0
-  wildlifeMeshCache = { adult, calf, stain, material, crocStrike, vultureGeo: buildVulture() }
+  wildlifeMeshCache = { adult, calf, material, crocStrike, vultureGeo: buildVulture() }
   return wildlifeMeshCache
 }
 
@@ -1595,33 +1596,36 @@ function Herds() {
     spawnedChunks.current.clear()
     herdState.current.clear()
     for (const f of scavengers.current) f.target = null
+    // The ground-tint slots are module state (point 267) and outlive a remount:
+    // clear them so no blood from the last run shows on the first frame.
+    stains.current.length = 0
+    HUNT_STAIN.active = false
+    setGroundStains([], 0, 0)
   }, [seed])
 
   const mtx = useMemo(() => new THREE.Matrix4(), [])
   const quat = useMemo(() => new THREE.Quaternion(), [])
-  const quat2 = useMemo(() => new THREE.Quaternion(), [])
   const euler = useMemo(() => new THREE.Euler(), [])
   const up = useMemo(() => new THREE.Vector3(0, 1, 0), [])
-  const nrm = useMemo(() => new THREE.Vector3(), [])
   const vpos = useMemo(() => new THREE.Vector3(), [])
   const vscl = useMemo(() => new THREE.Vector3(), [])
-  const stainMesh = useRef<THREE.InstancedMesh>(pool.stain)
   const fireFlames = useRef<THREE.InstancedMesh>(null)
   const fireBand = useRef<THREE.InstancedMesh>(null)
-  // Each stain lies in the local slope plane (position + ground normal): a
-  // horizontal disc on a hillside got wedges swallowed by the ground and read
-  // as a Pac-Man (design.md §19).
-  const stains = useRef<Array<{ x: number; y: number; z: number; nx: number; ny: number; nz: number }>>([])
+  // A stain is a round patch of GROUND the terrain material tints red (point
+  // 267, render/groundStains.ts) — no mesh of its own, so it follows the relief
+  // exactly. It used to be a disc laid into the local slope plane, which on a
+  // slope still let the rising ground poke a hole through the middle. `y` is the
+  // ground height at the spot, kept for the verification's projection only.
+  const stains = useRef<Array<{ x: number; y: number; z: number; r: number }>>([])
+  /** Scratch list (herd stains + the scripted hunt's) uploaded each frame. */
+  const stainUpload = useRef<Array<{ x: number; z: number; r: number }>>([])
   // Stable per seed (point 258): the debug event trigger registers it in an
   // effect, so a fresh closure per render would re-register every time.
   const pushStain = useCallback((x: number, z: number) => {
     if (stains.current.length >= MAX_STAINS) return
-    const heightAt = (px: number, pz: number) => {
-      const ll = worldToLatLon(px, pz)
-      return sampleTerrain(ll.lat, ll.lon, seed).height
-    }
-    const [nx, ny, nz] = groundNormal(x, z, heightAt)
-    stains.current.push({ x, y: Math.max(0.02, heightAt(x, z)), z, nx, ny, nz })
+    const ll = worldToLatLon(x, z)
+    const y = Math.max(0.02, sampleTerrain(ll.lat, ll.lon, seed).height)
+    stains.current.push({ x, y, z, r: STAIN_RADIUS })
   }, [seed])
 
   // The one death the §19.8 dramas share (Closing pass): the resolution
@@ -4380,23 +4384,16 @@ function Herds() {
       }
     }
 
-    // Blood stains under kills of every kind, laid into the local slope so no
-    // wedge is swallowed by rising ground (design.md §19).
-    const sm = stainMesh.current
-    if (sm) {
-      stains.current.forEach((st, i) => {
-        euler.set(-Math.PI / 2, 0, 0)
-        quat2.setFromEuler(euler)
-        nrm.set(st.nx, st.ny, st.nz)
-        quat.setFromUnitVectors(up, nrm).multiply(quat2)
-        vpos.set(st.x + st.nx * 0.08, st.y + st.ny * 0.08, st.z + st.nz * 0.08)
-        vscl.setScalar(1)
-        mtx.compose(vpos, quat, vscl)
-        sm.setMatrixAt(i, mtx)
-      })
-      sm.count = stains.current.length
-      sm.instanceMatrix.needsUpdate = true
-    }
+    // Blood stains under kills of every kind (design.md §19.5, point 267): the
+    // ground itself is tinted red over the patch, so it hugs the relief and
+    // nothing can poke through it. <Herds> owns the upload for BOTH sources —
+    // its own kill/trample stains and the scripted hunt's — since the terrain
+    // material reads one shared set of slots.
+    const patches = stainUpload.current
+    patches.length = 0
+    for (const st of stains.current) patches.push(st)
+    if (HUNT_STAIN.active) patches.push(HUNT_STAIN)
+    setGroundStains(patches, pos.x, pos.z)
 
     // Remove carcasses a scavenger has fully consumed, and cull any left far
     // off-screen: a single scavenger cannot keep up with every kill, so an
@@ -4427,7 +4424,6 @@ function Herds() {
         <primitive key={`${sp}-calf`} object={pool.calf[sp]} dispose={null} />
       ))}
       <primitive object={pool.crocStrike} dispose={null} />
-      <primitive object={pool.stain} dispose={null} />
       <instancedMesh ref={fireFlames} args={[fireFlameGeo, fireFlameMat, FIRE_FLAME_COUNT]} visible={false} frustumCulled={false} />
       <instancedMesh ref={fireBand} args={[fireBandGeo, fireBandMat, FIRE_BAND_SEGMENTS]} visible={false} frustumCulled={false} />
       {scavengers.current.map((_, si) => (
@@ -4464,7 +4460,6 @@ function LionHunt() {
   const predatorMesh = useRef<THREE.Mesh>(null)
   const prey = useRef<THREE.Group>(null)
   const preyMesh = useRef<THREE.Mesh>(null)
-  const stain = useRef<THREE.Mesh>(null)
   // Module-shared state so the herds and vultures can react to the hunt.
   const state = useRef(LION_STATE)
 
@@ -4474,16 +4469,13 @@ function LionHunt() {
   // useMemo would leak a fresh geometry set on every place visit.
   const { predator: predatorGeo, prey: preyGeo } = getHuntGeos()
   const material = getWildlifeMeshes().material
-  const stainUp = useMemo(() => new THREE.Vector3(0, 1, 0), [])
-  const stainNrm = useMemo(() => new THREE.Vector3(), [])
-  const stainFlat = useMemo(() => new THREE.Quaternion(), [])
-  const stainEuler = useMemo(() => new THREE.Euler(), [])
 
-  // Dev hook for the headless verification (CLAUDE.md §7.2).
+  // Dev hook for the headless verification (CLAUDE.md §7.2). `stain` is the
+  // hunt's ground-tint patch (point 267), not a mesh: active/centre/radius.
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__lionHunt = { state: state.current, lion, prey, stain, predatorMesh }
+    w.__lionHunt = { state: state.current, lion, prey, stain: HUNT_STAIN, predatorMesh }
     return () => {
       delete w.__lionHunt
     }
@@ -4965,26 +4957,17 @@ function LionHunt() {
         prey.current.scale.setScalar(Math.max(0.06, 1 - eaten * 0.96))
       }
     }
-    if (stain.current) {
-      // The red stain stays behind while the lion walks off. A calf kill's stain
-      // is drawn by <Herds> at the victim, so the scripted stain stays hidden.
-      stain.current.visible = (feeding || s.mode === 'leave') && !s.victimHunt
-      if (stain.current.visible) {
-        const heightAt = (px: number, pz: number) => {
-          const l = worldToLatLon(px, pz)
-          return sampleTerrain(l.lat, l.lon, seed).height
-        }
-        // Laid into the local slope plane — a horizontal disc on a hillside
-        // got wedges swallowed by the ground (design.md §19).
-        const [nx, ny, nz] = groundNormal(s.px, s.pz, heightAt)
-        const y = Math.max(0.02, heightAt(s.px, s.pz))
-        stain.current.position.set(s.px + nx * 0.08, y + ny * 0.08, s.pz + nz * 0.08)
-        stainFlat.setFromEuler(stainEuler.set(-Math.PI / 2, 0, 0))
-        stain.current.quaternion.setFromUnitVectors(stainUp, stainNrm.set(nx, ny, nz)).multiply(stainFlat)
-        // The stain spreads while the lion feeds.
-        const spread = feeding ? Math.min(1, (FEED_DURATION - s.timer) / 6) : 1
-        stain.current.scale.setScalar(0.4 + spread * 0.9)
-      }
+    // The red stain stays behind while the lion walks off. A calf kill's stain
+    // is laid by <Herds> at the victim, so the scripted one stays off. It is a
+    // ground tint (point 267): only its centre and radius are set here, and
+    // <Herds> uploads it with its own patches.
+    HUNT_STAIN.active = (feeding || s.mode === 'leave') && !s.victimHunt
+    if (HUNT_STAIN.active) {
+      HUNT_STAIN.x = s.px
+      HUNT_STAIN.z = s.pz
+      // The stain spreads while the lion feeds.
+      const spread = feeding ? Math.min(1, (FEED_DURATION - s.timer) / 6) : 1
+      HUNT_STAIN.r = HUNT_STAIN_RADIUS * (0.4 + spread * 0.9)
     }
   })
 
@@ -4996,10 +4979,6 @@ function LionHunt() {
       <group ref={prey} visible={false}>
         <mesh ref={preyMesh} geometry={preyGeo.zebra} material={material} castShadow dispose={null} />
       </group>
-      <mesh ref={stain} visible={false} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[1.1, 20]} />
-        <meshStandardMaterial color="#a51512" roughness={1} transparent opacity={0.8} />
-      </mesh>
     </>
   )
 }

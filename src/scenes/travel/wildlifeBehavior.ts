@@ -746,26 +746,6 @@ export function flightStep(
   return s
 }
 
-/**
- * Ground normal at a point from central height differences (design.md §19):
- * decals like the blood stain are tilted into the local slope with it — a
- * horizontal disc on a hillside gets wedges swallowed by the ground and reads
- * as a Pac-Man. `heightAt` samples the terrain height at world (x, z).
- * Returns a unit vector `[nx, ny, nz]` with ny > 0.
- */
-export function groundNormal(
-  x: number,
-  z: number,
-  heightAt: (x: number, z: number) => number,
-  e = 0.9, // sample across the decal's footprint, so the plane averages curvature
-): [number, number, number] {
-  const nx = heightAt(x - e, z) - heightAt(x + e, z)
-  const nz = heightAt(x, z - e) - heightAt(x, z + e)
-  const ny = 2 * e
-  const inv = 1 / Math.hypot(nx, ny, nz)
-  return [nx * inv, ny * inv, nz * inv]
-}
-
 /** Turn `current` toward `target` (both radians) by at most `maxStep`, taking the
  *  shorter way around. Used to cap per-frame turns so a facing never snaps. */
 export function turnToward(current: number, target: number, maxStep: number): number {

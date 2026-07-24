@@ -859,14 +859,15 @@ const leave = await page.evaluate(() => {
   return {
     mode: h.state.mode,
     preyVisible: h.prey.current?.visible,
-    stainVisible: h.stain.current?.visible,
+    // The stain is a GROUND TINT (point 267), not a mesh: active + radius.
+    stainActive: h.stain.active,
     lionVisible: h.lion.current?.visible,
   }
 })
 check(
   'Lion moves on once the carcass is consumed (stain remains)',
-  leave.mode === 'leave' && leave.preyVisible === false && leave.stainVisible === true && leave.lionVisible === true,
-  `mode ${leave.mode}, prey ${leave.preyVisible}, stain ${leave.stainVisible}`,
+  leave.mode === 'leave' && leave.preyVisible === false && leave.stainActive === true && leave.lionVisible === true,
+  `mode ${leave.mode}, prey ${leave.preyVisible}, stain ${leave.stainActive}`,
 )
 await page.evaluate(() => {
   window.__lionHunt.state.mode = 'idle'
@@ -933,20 +934,214 @@ check(
   trample.ok === true && trample.stains >= 1,
   trample.ok ? `${trample.species}, ${trample.stains} stain(s)` : trample.why,
 )
-// TASKS pt. 12: every stain lies in the local slope plane (position + unit
-// ground normal) — a horizontal disc on a hillside read as a Pac-Man.
-const stainNormals = await page.evaluate(() => {
-  const list = window.__wildlife.stains.current
-  return list.map((st) => ({
-    unit: +Math.hypot(st.nx, st.ny, st.nz).toFixed(3),
-    nyPositive: st.ny > 0,
-  }))
-})
+// TASKS pt. 12 / point 267: the blood soaks the GROUND, it is not a disc laid
+// over it. The old decal was a plane; on a slope the rising terrain poked
+// through its middle and the pool showed a see-through hole. Judged by the
+// PICTURE (CLAUDE.md §7.2), on SLOPED ground and at an in-game-achievable zoom:
+// the same clip is sampled with and without the stain, and EVERY pixel of the
+// soaked core must change — a hole would leave the bare ground standing there.
+const stainPixels = await (async () => {
+  const VW = 1440, VH = 900
+  // Freeze the weather for the pair of shots: falling rain would change pixels
+  // everywhere and tell us nothing about the stain.
+  const prevState = await page.evaluate(() => {
+    const u = window.__ui.getState()
+    const prev = { wet: u.seasonWetnessOverride, zoom: u.travelZoom }
+    u.setSeasonWetnessOverride(0)
+    // Clear the staged trample cast off the patch too: the two shots must differ
+    // by the stain alone, not by an elephant that walked through the clip. The
+    // streaming does not refill an already-spawned chunk, so the ground stays
+    // empty for the pair; the next check stages its own herd anyway.
+    const herds = window.__wildlife.herdsRef.current
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) a.gone = true // releases any bound vulture flight
+      herds[sp].length = 0
+    }
+    return prev
+  })
+  // The steepest patch of CLEAR land near the traveller — the stain must be
+  // judged on relief, not on a flat plate where any decal would have looked
+  // fine. Clear means: no rendered plant or rock and not the traveller's own
+  // figure/canoe near it, so the two shots differ by the stain and nothing else.
+  const spots = await page.evaluate(async (R) => {
+    const terr = await import('/src/world/terrain.ts')
+    const geo = await import('/src/world/geo.ts')
+    const seed = window.__game.getState().seed
+    const p = window.__game.getState().pos
+    const at = (x, z) => {
+      const l = geo.worldToLatLon(x, z)
+      return terr.sampleTerrain(l.lat, l.lon, seed)
+    }
+    const found = []
+    for (let dx = -5; dx <= 5; dx += 0.5) {
+      for (let dz = -5; dz <= 5; dz += 0.5) {
+        const x = p.x + dx, z = p.z + dz
+        const fromPlayer = Math.hypot(dx, dz)
+        if (fromPlayer < 3.5 || fromPlayer > 5) continue
+        let lo = Infinity, hi = -Infinity, land = true
+        for (const [ox, oz] of [[0, 0], [R, 0], [-R, 0], [0, R], [0, -R], [R * 0.7, R * 0.7], [-R * 0.7, -R * 0.7]]) {
+          const s = at(x + ox, z + oz)
+          if (s.type === 'ocean' || s.type === 'water' || s.height < 0.2) land = false
+          lo = Math.min(lo, s.height)
+          hi = Math.max(hi, s.height)
+        }
+        if (!land) continue
+        // A plant or rock standing in the clip would keep its pixels between the
+        // two shots and read as a hole that is not one (its shadow likewise).
+        const drawn = window.__vegetation?.renderedNear(x, z) ?? []
+        if (drawn.some((f) => Math.hypot(f.x - x, f.z - z) < 3.5)) continue
+        found.push({ x, z, y: at(x, z).height, relief: hi - lo })
+      }
+    }
+    // Steepest first — the picture must prove the tint on relief.
+    return found.sort((a, b) => b.relief - a.relief).slice(0, 10)
+  }, 0.9)
+  if (!spots.length) return { staged: false, why: 'no clear land spot near the traveller' }
+  // Closest achievable zoom first (point 172: 0.125..0.5 is what a player can
+  // reach) so the patch covers the most pixels; back off until it is on screen.
+  const clipFor = (cx, cz, cy, r) => page.evaluate(([x, z, y, rr, w, h]) => {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (let a = 0; a < 16; a++) {
+      const ang = (a / 16) * Math.PI * 2
+      const n = window.__camera.ndc(x + Math.cos(ang) * rr, z + Math.sin(ang) * rr, y)
+      const sx = (n.x * 0.5 + 0.5) * w, sy = (0.5 - n.y * 0.5) * h
+      minX = Math.min(minX, sx); maxX = Math.max(maxX, sx)
+      minY = Math.min(minY, sy); maxY = Math.max(maxY, sy)
+    }
+    return {
+      x: Math.round(minX), y: Math.round(minY),
+      width: Math.round(maxX - minX), height: Math.round(maxY - minY),
+      on: minX >= 0 && maxX <= w && minY >= 0 && maxY <= h,
+    }
+  }, [cx, cz, cy, r, VW, VH])
+  let clip = null, box = null, zoomUsed = null, spot = null
+  // The clip must also sit clear of the HUD (status bar, the WebGL notice, the
+  // inventory bar and the button row): an overlay does not change between the
+  // two shots and would read as a hole that is not one.
+  const safe = (c) => c.x >= 20 && c.x + c.width <= VW - 20 && c.y >= 110 && c.y + c.height <= VH - 110
+  for (const zoom of [0.125, 0.2, 0.25, 0.35, 0.5]) {
+    await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoom)
+    await page.evaluate(() => window.__pollSim(20, () => window.__camera.settled()))
+    for (const s of spots) {
+      const c = await clipFor(s.x, s.z, s.y, 0.9)
+      // Sample a WINDOW around the patch, not the patch's computed rect: the
+      // projection is taken at one sampled height while the pool is painted on
+      // the rendered surface, so on a slope it lands a few pixels off. The
+      // no-hole measure below is position-free — it works on the soaked mask
+      // itself — and only needs the whole pool inside the window.
+      const pad = Math.round(Math.max(c.width, c.height) * 0.6) + 8
+      const win = { x: c.x - pad, y: c.y - pad, width: c.width + pad * 2, height: c.height + pad * 2 }
+      if (c.on && safe(win) && c.width >= 14 && c.height >= 10) {
+        clip = win; box = c; zoomUsed = zoom; spot = s
+        break
+      }
+    }
+    if (clip) break
+  }
+  if (!clip) return { staged: false, why: 'stain never projected clear of the HUD at a reachable zoom' }
+  const sample = async () => {
+    const buf = await page.screenshot({ clip })
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
+    return { data, w: info.width, h: info.height, n: info.width * info.height, ch: info.channels }
+  }
+  // Keep the patch clear of wandering fauna for the pair of shots (the herds
+  // restock on their own): sweep them again right before each one.
+  const sweepHerds = () => page.evaluate(() => {
+    const herds = window.__wildlife.herdsRef.current
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) a.gone = true
+      herds[sp].length = 0
+    }
+  })
+  // (a) the bare ground, no stain anywhere
+  await sweepHerds()
+  await page.evaluate(() => { window.__wildlife.stains.current.length = 0 })
+  await page.evaluate(() => window.__pollSim(0.6, () => false))
+  const before = await sample()
+  // (b) the same ground with the stain laid on it
+  await sweepHerds()
+  await page.evaluate((s) => {
+    window.__wildlife.stains.current.length = 0
+    window.__wildlife.stains.current.push({ x: s.x, y: s.y, z: s.z, r: 0.9 })
+  }, spot)
+  await page.evaluate(() => window.__pollSim(0.6, () => false))
+  const after = await sample()
+  // A crop around the patch, so a HUMAN can judge the picture (CLAUDE.md §7.2):
+  // a full frame at the bird's-eye zoom shows the stain a few dozen pixels wide.
+  const shot = {
+    x: Math.min(VW - 420, Math.max(0, Math.round(box.x + box.width / 2 - 210))),
+    y: Math.min(VH - 300, Math.max(0, Math.round(box.y + box.height / 2 - 150))),
+    width: 420, height: 300,
+  }
+  await page.screenshot({ path: `${OUT}137-blood-ground-tint.png`, clip: shot })
+  console.log('shot 137-blood-ground-tint.png')
+  await page.evaluate((prev) => window.__ui.getState().setSeasonWetnessOverride(prev.wet), prevState)
+  // A pixel counts as soaked when the blood REDDENED it — the signature of the
+  // tint and of nothing else on this ground (a strayed animal or its shadow
+  // changes brightness, not red dominance). It survives shade too: under a
+  // tree's shadow the same tint moves few absolute levels but still reddens.
+  const W = before.w, H = before.h
+  const mask = new Uint8Array(before.n)
+  for (let i = 0; i < before.n; i++) {
+    const br = before.data[i * before.ch], bg = before.data[i * before.ch + 1], bb = before.data[i * before.ch + 2]
+    const ar = after.data[i * after.ch], ag = after.data[i * after.ch + 1], ab = after.data[i * after.ch + 2]
+    if ((ar - Math.max(ag, ab)) - (br - Math.max(bg, bb)) > 5) mask[i] = 1
+  }
+  // The POOL is the largest connected run of those pixels; anything else in the
+  // window (a speck of noise, a passing animal caught by the threshold) is a
+  // separate blob and is not what this check is about.
+  const label = new Int32Array(before.n).fill(-1)
+  const stack = new Int32Array(before.n)
+  let poolId = -1, poolSize = 0, blobs = 0
+  for (let seed = 0; seed < before.n; seed++) {
+    if (!mask[seed] || label[seed] >= 0) continue
+    const id = blobs++
+    let top = 0, size = 0
+    stack[top++] = seed
+    label[seed] = id
+    while (top > 0) {
+      const p = stack[--top]
+      size++
+      const x = p % W, y = (p - x) / W
+      const nb = [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1]
+      for (const q of nb) if (q >= 0 && mask[q] && label[q] < 0) { label[q] = id; stack[top++] = q }
+    }
+    if (size > poolSize) { poolSize = size; poolId = id }
+  }
+  // THE no-hole measure, and it does not care where on screen the pool landed:
+  // across every row and column the pool's pixels must be CONTIGUOUS. An
+  // unpainted island inside it — the point-267 bug, ground poking through the
+  // decal — leaves a gap between the first and the last soaked pixel of every
+  // row and column that crosses it.
+  let gaps = 0
+  const scan = (outer, inner, at) => {
+    for (let o = 0; o < outer; o++) {
+      let first = -1, last = -1
+      for (let i = 0; i < inner; i++) if (label[at(o, i)] === poolId) { if (first < 0) first = i; last = i }
+      if (first < 0 || last - first < 4) continue
+      for (let i = first; i <= last; i++) if (label[at(o, i)] !== poolId) gaps++
+    }
+  }
+  scan(H, W, (y, x) => y * W + x)
+  scan(W, H, (x, y) => y * W + x)
+  return {
+    staged: true, zoom: zoomUsed, relief: +spot.relief.toFixed(3), window: clip,
+    soaked: poolSize, blobs, holeFraction: +(gaps / Math.max(1, poolSize)).toFixed(4),
+    restoreZoom: prevState.zoom,
+  }
+})()
 check(
-  'blood stains carry a unit ground normal (slope-conforming decal)',
-  stainNormals.length >= 1 && stainNormals.every((n) => Math.abs(n.unit - 1) < 0.01 && n.nyPositive),
-  JSON.stringify(stainNormals.slice(0, 4)),
+  'a blood stain tints the GROUND on a slope — no see-through hole (point 267)',
+  stainPixels.staged === true &&
+    stainPixels.relief > 0.02 &&
+    stainPixels.soaked >= 200 &&
+    stainPixels.holeFraction <= 0.02,
+  JSON.stringify(stainPixels),
 )
+await page.evaluate((z) => {
+  window.__wildlife.stains.current.length = 0
+  if (typeof z === 'number') window.__ui.getState().setTravelZoom(z)
+}, stainPixels.restoreZoom)
 
 // Elephant herds roam together in gentle arcs; prey dodge only at the last
 // moment (point 4). Set up on an open savanna patch near the player.
