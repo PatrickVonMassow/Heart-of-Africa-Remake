@@ -6497,7 +6497,7 @@ the remaining open points in their numeric order.
   spreads out and keeps moving rather than locking. Docs: design.md §19.4/§19.5,
   CLAUDE §7.1 pt.12. (Reported while play-testing 19.07.2026; queued at the batch end.)
 
-- [ ] 181. Panorama/skyline wildlife silhouettes sometimes FLOAT with their feet
+- [x] 181. Panorama/skyline wildlife silhouettes sometimes FLOAT with their feet
   far above the ground instead of standing on the visible horizon line. DIAGNOSED
   20.07.2026 — LOGIC IS CORRECT, so this is WebGPU-specific and needs the WebGPU
   lane to reproduce: the anchor (PlaceScene.tsx ~1136-1160) with a capture active
@@ -9689,7 +9689,7 @@ the remaining open points in their numeric order.
   text. NOTE: same river-render files as 232-234/246 — bundle with the river-render
   follow-ups (246 depthWrite + this).
 
-- [ ] 255. ANIMAL GAIT: TOO SLOW, ONLY ON STRAIGHT WALK, AND ABSENT ON THE SKYLINE
+- [x] 255. ANIMAL GAIT: TOO SLOW, ONLY ON STRAIGHT WALK, AND ABSENT ON THE SKYLINE
   (user 23.07.2026, follow-up to point 228). Three observations on the deployed
   gait: (1) the leg swing is TOO SLOW overall — it must plausibly MATCH the movement
   speed so a walking animal reads as striding on its FEET, not shuffling; (2) the
@@ -10662,6 +10662,26 @@ the remaining open points in their numeric order.
   suites usually lean on are stripped there, which is exactly the build the user
   runs) that the parameter starts a short benchmark. DOCS: design.md §21.1/§21.3 and
   CLAUDE.md §7.1 pt. 20. Implementation-ready.
+
+- [ ] 281. THE SETTLEMENT BACKDROP RIDGE READS AS A STAIRCASE (spotted 24.07.2026 in
+  `verification/136-cairo-silhouette-footing.png`, WebGL2, Cairo looking at the dune
+  ridge). The near backdrop relief shows a row of hard rectangular STEPS along the
+  ridge crest — a stair-stepped silhouette against the sky, unmistakably a rendering
+  artifact rather than a dune. §2.5 requires the backdrop relief to shade SMOOTH ("no
+  flat facets"), and `src/scenes/place/backdrop.test.ts` already pins the material as
+  non-flat-shaded with a resolution-independent inner-rim taper — so the stepping is
+  in the HEIGHTFIELD sampling, not the shading: the crest is quantised to the source
+  grid where the terrain rises steeply, and the taper does not cover it.
+  DIAGNOSE by rendering the same view with the heightfield sampled at increasing
+  resolutions to confirm the steps are quantisation, then fix at the sampling
+  (interpolate the crest rather than snapping to grid rows), NOT by blurring the
+  whole backdrop, which would flatten real relief.
+  VERIFIABLE: the same Cairo view on BOTH backends shows a continuous ridge line; a
+  pure test over the heightfield asserts the crest's second difference stays bounded
+  (no repeated flat-then-jump pattern) along a steep profile. Keep the §2.5 bounds
+  the existing tests pin (elevation angle, standing heights). No player-visible text.
+  NOTE: this is the "looks wrong but passes" class — every existing backdrop test is
+  green while the picture is visibly wrong. Implementation-ready.
 
 ## Closing (only after all points)
 
