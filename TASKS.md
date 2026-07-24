@@ -10590,7 +10590,7 @@ the remaining open points in their numeric order.
   text. NOTE: touches the flora streaming — coordinate with any point-276 lever
   work on the same files. Implementation-ready.
 
-- [ ] 279. THE 1890 PICTURE, NOT THE MODERN POSTCARD — correct the objectively wrong
+- [x] 279. THE 1890 PICTURE, NOT THE MODERN POSTCARD — correct the objectively wrong
   monuments and the cattle contradiction (from the point-205 research pass,
   `docs/205-world-accuracy-findings.md`, 24.07.2026). Six of that pass's findings are
   objective errors against a documented record — two of them against THIS repo's own
@@ -10663,7 +10663,7 @@ the remaining open points in their numeric order.
   runs) that the parameter starts a short benchmark. DOCS: design.md §21.1/§21.3 and
   CLAUDE.md §7.1 pt. 20. Implementation-ready.
 
-- [ ] 281. THE SETTLEMENT BACKDROP RIDGE READS AS A STAIRCASE (spotted 24.07.2026 in
+- [x] 281. THE SETTLEMENT BACKDROP RIDGE READS AS A STAIRCASE (spotted 24.07.2026 in
   `verification/136-cairo-silhouette-footing.png`, WebGL2, Cairo looking at the dune
   ridge). The near backdrop relief shows a row of hard rectangular STEPS along the
   ridge crest — a stair-stepped silhouette against the sky, unmistakably a rendering
@@ -10707,7 +10707,7 @@ the remaining open points in their numeric order.
   with the reason recorded. NOTE: belongs to the point-200 flake umbrella but is
   filed separately because it is no longer believed to be a flake.
 
-- [ ] 283. AN ANIMAL SINKS INTO THE GROUND — the in-game assert channel caught it
+- [x] 283. AN ANIMAL SINKS INTO THE GROUND — the in-game assert channel caught it
   (24.07.2026, WebGPU, quiet machine). The game's own dev-mode invariant fired during
   an ordinary enrichments run:
   `[ASSERT] animal-buried — warthog bodyY=0.41 ground=1.39 y=0.41 young=false
