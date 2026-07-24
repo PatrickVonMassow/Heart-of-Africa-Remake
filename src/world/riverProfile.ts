@@ -152,7 +152,10 @@ export function chainJunctions(profiles: BedProfile[]): void {
 // --- Per-seed lazy build with a spatial lookup grid --------------------------
 
 interface ProfileIndex {
-  grid: Map<string, Array<{ lat: number; lon: number; v: number }>>
+  /** Spatial buckets of axis samples; each carries its river (`ri`) and index
+   *  (`i`) so the lookup can interpolate ALONG the course between neighbours
+   *  instead of snapping to the nearest sample (point 281). */
+  grid: Map<string, Array<{ lat: number; lon: number; ri: number; i: number }>>
   profiles: BedProfile[]
 }
 
@@ -172,7 +175,8 @@ function buildIndex(seed: number): ProfileIndex {
   })
   chainJunctions(profiles)
   const grid: ProfileIndex['grid'] = new Map()
-  for (const r of profiles) {
+  for (let ri = 0; ri < profiles.length; ri++) {
+    const r = profiles[ri]
     for (let i = 0; i < r.pts.length; i++) {
       const p = r.pts[i]
       const key = `${Math.floor(p.lon / GRID)}:${Math.floor(p.lat / GRID)}`
@@ -181,7 +185,7 @@ function buildIndex(seed: number): ProfileIndex {
         list = []
         grid.set(key, list)
       }
-      list.push({ lat: p.lat, lon: p.lon, v: r.profile[i] })
+      list.push({ lat: p.lat, lon: p.lon, ri, i })
     }
   }
   return { grid, profiles }
@@ -223,20 +227,73 @@ export function rawSampleTerrain(lat: number, lon: number, seed: number): Terrai
   }
 }
 
+/** Whether the profile index is being built right now. During the build the
+ *  bed lookup returns null and the terrain carve must fall back to the plain
+ *  local carve (the raw bed the profile smooths); outside the build a null
+ *  lookup means no river axis is within reach and the carve must vanish, not
+ *  the other way round (point 281). */
+export function buildingProfile(): boolean {
+  return building
+}
+
+/** Nearest point on segment A→B to Q, in (lon,lat) space: the clamped
+ *  parameter t and the squared distance. Used to interpolate the bed profile
+ *  ALONG the course instead of snapping to a sample (point 281). */
+function projectSeg(
+  qLon: number,
+  qLat: number,
+  aLon: number,
+  aLat: number,
+  bLon: number,
+  bLat: number,
+): { t: number; d2: number } {
+  const dLon = bLon - aLon
+  const dLat = bLat - aLat
+  const len2 = dLon * dLon + dLat * dLat
+  let t = len2 > 0 ? ((qLon - aLon) * dLon + (qLat - aLat) * dLat) / len2 : 0
+  t = t < 0 ? 0 : t > 1 ? 1 : t
+  const eLon = qLon - (aLon + dLon * t)
+  const eLat = qLat - (aLat + dLat * t)
+  return { t, d2: eLon * eLon + eLat * eLat }
+}
+
+/** A bed-profile sample: the smoothed bed height and the distance (degrees)
+ *  from the query to the interpolated point on the course. */
+export interface BedSample {
+  bed: number
+  dist: number
+}
+
 /**
- * The smoothed bed height of the nearest river axis sample, or null when no
- * river axis lies within the carve band's reach — or while the profile is
- * being built from the raw terrain (the carve then falls back to the plain
- * local carve, which is exactly the raw bed the profile smooths).
+ * The smoothed bed height and course distance at (lat, lon), or null when no
+ * river axis lies within the carve band's reach — or while the profile is being
+ * built from the raw terrain (the carve then falls back to the plain local
+ * carve, which is exactly the raw bed the profile smooths).
+ *
+ * Point 281, two fixes to the Cairo backdrop staircase:
+ * (1) The bed value is INTERPOLATED linearly along the course between the two
+ *     axis samples the query projects between, not snapped to the single nearest
+ *     sample. Nearest-neighbour made the returned bed a piecewise-constant
+ *     Voronoi field that jumped at every ~0.08° sample boundary. Linear
+ *     interpolation between two monotone-non-increasing samples stays between
+ *     them, so the bed remains monotone and no water-typed sample is lifted
+ *     above its ribbon row (which reads the profile AT the samples, where
+ *     interpolation is a no-op).
+ * (2) The `dist` is returned so the carve can FADE with the true course
+ *     proximity this lookup measures (resolved out to COVER_DEG), instead of the
+ *     range-1 `riverDistance` that caps at 0.45° — SHORTER than the carve band
+ *     edge, which froze the carve at a plateau and stepped it against this
+ *     lookup's null boundary. Carve and profile now vanish together.
  */
-export function riverBedProfileAt(lat: number, lon: number, seed: number): number | null {
+export function riverBedProfileAt(lat: number, lon: number, seed: number): BedSample | null {
   if (building) return null
-  const { grid } = profileIndex(seed)
+  const { grid, profiles } = profileIndex(seed)
   const bx = Math.floor(lon / GRID)
   const by = Math.floor(lat / GRID)
   const coverSq = COVER_DEG * COVER_DEG
   let best = coverSq
-  let v: number | null = null
+  let bri = -1
+  let bi = -1
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const list = grid.get(`${bx + dx}:${by + dy}`)
@@ -247,10 +304,30 @@ export function riverBedProfileAt(lat: number, lon: number, seed: number): numbe
         const d = eLon * eLon + eLat * eLat
         if (d < best) {
           best = d
-          v = p.v
+          bri = p.ri
+          bi = p.i
         }
       }
     }
   }
-  return v
+  if (bri < 0) return null
+  // Interpolate along the course: project the query onto the two segments
+  // adjacent to the nearest sample and take the closer projection's linear
+  // blend of the endpoint profile values (and its distance).
+  const prof = profiles[bri]
+  const pts = prof.pts
+  const pv = prof.profile
+  let vBest = pv[bi]
+  let dBest = best
+  const consider = (j: number) => {
+    if (j < 0 || j + 1 >= pts.length) return
+    const r = projectSeg(lon, lat, pts[j].lon, pts[j].lat, pts[j + 1].lon, pts[j + 1].lat)
+    if (r.d2 < dBest) {
+      dBest = r.d2
+      vBest = pv[j] + (pv[j + 1] - pv[j]) * r.t
+    }
+  }
+  consider(bi - 1)
+  consider(bi)
+  return { bed: vBest, dist: Math.sqrt(dBest) }
 }

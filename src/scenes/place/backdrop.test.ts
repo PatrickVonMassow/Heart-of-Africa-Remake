@@ -77,21 +77,68 @@ describe('backdrop heightfield (design.md §2.5)', () => {
     }
   })
 
-  it('leaves no vertical step where the ground-disc edge meets the backdrop (point 236)', () => {
+  it('leaves no moat or looming wall where the ground-disc edge meets the backdrop (point 236)', () => {
     // At the disc edge the ground plane (y = 0) and the backdrop surface must be
-    // continuous: the only remaining offset is the small, continuous local relief,
-    // never the pre-236 artificial -2 drop that read as a rectangular notch on the
-    // flat delta ports. Sweep the join circle and bound the height step.
+    // continuous: no sunken moat (the pre-236 artificial -2 drop that read as a
+    // rectangular notch on the flat delta ports) and no looming wall. What sits
+    // ON the join is the real surrounding relief — Cairo abuts the Giza/Mokattam
+    // desert plateau — so the positive side allows the genuine ~1-unit rise the
+    // plateau makes here. (Point 281: the former symmetric 0.75 cap reflected a
+    // spurious river carve that never faded far from the channel and
+    // OVER-DEPRESSED the near-Nile-band terrain; correcting it restores the true
+    // relief. The moat guard below is unchanged.)
     const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
     const discEdge = r0 + BACKDROP_DISC_OVERLAP
     for (const a of [0, 1.2, 2.5, 4.1, 5.7]) {
       const x = Math.cos(a) * discEdge
       const z = Math.sin(a) * discEdge
       const y = backdropHeightAt(x, z, lat, lon, SEED, centerH, r0)
-      // No moat: the join stays within a small bound of the ground plane, and
-      // nowhere near the -2 notch it replaced.
-      expect(Math.abs(y)).toBeLessThan(0.75)
-      expect(y).toBeGreaterThan(-0.75)
+      expect(y).toBeGreaterThan(-0.75) // no moat
+      expect(y).toBeLessThan(1.2) // no looming wall (structural cap here is ~1.73)
+    }
+  })
+
+  it('reads as a smooth ridge, not a staircase, across the escarpment (point 281)', () => {
+    // The reported Cairo artifact: a row of hard rectangular steps along the
+    // backdrop ridge. It was NOT the mesh resolution (the crest is captured at
+    // 48 rings) but two heightfield step discontinuities the carve band carried
+    // into the settlement backdrop: the wide-Nile river-bed-profile carve, whose
+    // strength was frozen by the range-1 riverDistance cap and stepped where the
+    // bed-profile lookup dropped out, and the hard elevation<400 coast-ramp
+    // switch. Both are fixed at the SAMPLING (riverProfile.ts / terrain.ts).
+    //
+    // A smooth C1 heightfield's largest per-step change scales DOWN with finer
+    // azimuth sampling (≈¼ for 4× samples); a quantised staircase's fixed jump
+    // (~4.6 units at the carve boundary, ~1 unit at the 400 m notch) does not.
+    const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
+    const azSweep = (R: number, N: number) => {
+      const h: number[] = []
+      for (let si = 0; si < N; si++) {
+        const a = (si / N) * Math.PI * 2
+        h.push(backdropHeightAt(Math.cos(a) * R, Math.sin(a) * R, lat, lon, SEED, centerH, r0))
+      }
+      return h
+    }
+    const maxFirst = (h: number[]) => {
+      let m = 0
+      for (let i = 1; i < h.length; i++) m = Math.max(m, Math.abs(h[i] - h[i - 1]))
+      return m
+    }
+    const maxSecond = (h: number[]) => {
+      let m = 0
+      for (let i = 2; i < h.length; i++) m = Math.max(m, Math.abs(h[i] - 2 * h[i - 1] + h[i - 2]))
+      return m
+    }
+    // The Cairo escarpment radii where the wide-Nile carve band and the 400 m
+    // coast-ramp threshold sit — the steep profile the steps rode.
+    for (const R of [70, 80, 90]) {
+      const coarse = maxFirst(azSweep(R, 720))
+      const fine = azSweep(R, 2880)
+      // Refining 4× cuts the max step to well under half — a staircase would
+      // hold it (its step is a fixed discontinuity, not a sampled slope).
+      expect(maxFirst(fine)).toBeLessThan(coarse * 0.5)
+      // The second difference stays bounded: no isolated flat-then-jump left.
+      expect(maxSecond(fine)).toBeLessThan(0.2)
     }
   })
 
