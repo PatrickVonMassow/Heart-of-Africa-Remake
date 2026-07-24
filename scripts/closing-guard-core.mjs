@@ -68,15 +68,17 @@ export function isVersionTagCommand(command) {
   // must not inherit a `poc`/`vX.Y` token from a sibling segment.
   const segments = c.split(/&&|\|\||;|\||\n/)
   // A version tag as a bare ARGUMENT (v0.1, v1.0, v12.34), or the poc tag, or a
-  // bulk tag push. Word-bounded so `poctest`/`v0.2-rc` refspecs don't false-hit.
-  const versionArg = /(^|[\s=/])v\d+\.\d+($|[\s^~:])/
-  const pocArg = /(^|[\s=/])poc($|[\s^~:])/
+  // bulk tag push. Matches quoted or unquoted. Word-bounded so `poctest`/`v0.2-rc`
+  // refspecs don't false-hit.
+  const versionArg = /(^|[\s=/])['"]?v\d+\.\d+['"]?($|[\s^~:])/
+  const pocArg = /(^|[\s=/])['"]?poc['"]?($|[\s^~:])/
   for (const seg of segments) {
     const s = ` ${seg.trim()} `
-    // git may have options before the verb: git -C <path> tag, git -c user=x tag, git --no-pager push
-    const gitOptionsMatcher = '(?:\\s+(?:-[cC]|-{1,2}\\S+))*'
-    const isTag = new RegExp(`\\bgit${gitOptionsMatcher}\\s+tag\\b`).test(s)
-    const isPush = new RegExp(`\\bgit${gitOptionsMatcher}\\s+push\\b`).test(s)
+    // git may have options before the verb: git -C <path> tag, git -c user=x tag, git --no-pager push.
+    // Match git followed by options (with their args), then the verb.
+    // Options: -C <path>, -c key=val, --no-pager, etc.
+    const isTag = /\bgit(?:\s+(?:-[cC](?:\s+\S+)?|-{1,2}\S+(?:\s+\S+)?))*\s+tag\b/.test(s)
+    const isPush = /\bgit(?:\s+(?:-[cC](?:\s+\S+)?|-{1,2}\S+(?:\s+\S+)?))*\s+push\b/.test(s)
     const isGhRelease = /\bgh\s+release\s+create\b/.test(s)
     if (!isTag && !isPush && !isGhRelease) continue
     if (/\s--(tags|follow-tags)\b/.test(s)) return true

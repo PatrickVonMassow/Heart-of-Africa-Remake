@@ -72,6 +72,58 @@ describe('isVersionTagCommand', () => {
     expect(isVersionTagCommand(42)).toBe(false)
     expect(isVersionTagCommand({})).toBe(false)
   })
+  describe('FN-2: git options between git and verb', () => {
+    it('matches git with -C option before tag/push', () => {
+      expect(isVersionTagCommand('git -C /path/to/repo tag v0.3')).toBe(true)
+      expect(isVersionTagCommand('git -C /path/to/repo push origin v0.3')).toBe(true)
+    })
+    it('matches git with -c option (config) before tag/push', () => {
+      expect(isVersionTagCommand('git -c user.name=Test tag v0.3')).toBe(true)
+      expect(isVersionTagCommand('git -c user.email=test@example.com push origin v0.3')).toBe(true)
+    })
+    it('matches git with long options (--no-pager, etc) before tag/push', () => {
+      expect(isVersionTagCommand('git --no-pager tag v0.3')).toBe(true)
+      expect(isVersionTagCommand('git --no-pager push origin v0.3')).toBe(true)
+    })
+    it('matches git with multiple options before verb', () => {
+      expect(isVersionTagCommand('git -C /repo -c user.name=X tag v0.3')).toBe(true)
+    })
+  })
+  describe('FN-3/4: quoted arguments and apostrophes', () => {
+    it('matches tag when version arg is quoted', () => {
+      expect(isVersionTagCommand('git tag "v0.3"')).toBe(true)
+      expect(isVersionTagCommand("git tag 'v0.3'")).toBe(true)
+    })
+    it('matches when poc is quoted', () => {
+      expect(isVersionTagCommand("git tag 'poc'")).toBe(true)
+      expect(isVersionTagCommand('git tag "poc"')).toBe(true)
+    })
+    it('does NOT consume version tag when apostrophe in a quoted string precedes it', () => {
+      // "Don't ..." has apostrophe; should not match that with the closing quote of 'v0.3'
+      expect(isVersionTagCommand("git commit -m \"Don't forget to tag\" && git tag v0.3")).toBe(true)
+      expect(isVersionTagCommand("git commit -m \"It's time to tag\" && git tag 'v0.3'")).toBe(true)
+    })
+    it('does NOT match when only message is quoted and contains version token', () => {
+      expect(isVersionTagCommand('git commit -m "the v0.3 release"')).toBe(false)
+      expect(isVersionTagCommand('git commit -m "moving poc to main"')).toBe(false)
+    })
+  })
+  describe('FN-5: gh release create detection', () => {
+    it('matches gh release create with version tag', () => {
+      expect(isVersionTagCommand('gh release create v0.3')).toBe(true)
+      expect(isVersionTagCommand('gh release create v0.3 --title "Demo"')).toBe(true)
+    })
+    it('matches gh release create with poc tag', () => {
+      expect(isVersionTagCommand('gh release create poc')).toBe(true)
+    })
+    it('does NOT match gh release without version/poc arg', () => {
+      expect(isVersionTagCommand('gh release create release-1')).toBe(false)
+    })
+    it('does NOT match other gh commands', () => {
+      expect(isVersionTagCommand('gh pr create')).toBe(false)
+      expect(isVersionTagCommand('gh issue create')).toBe(false)
+    })
+  })
 })
 
 describe('missingSteps — per-commit accounting', () => {
