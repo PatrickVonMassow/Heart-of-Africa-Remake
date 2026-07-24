@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import type { TreasureId } from '../systems/economy'
+import { QUALITY_PRESETS, nextDetailLevel, type DetailLevel } from '../config/quality'
 
 export type BuildingType = 'shop' | 'weapons' | 'tools' | 'market' | 'bazaar' | 'agency' | 'chief'
 
@@ -38,7 +39,7 @@ export type Dialog =
   | { kind: 'camp'; scope: 'village'; placeId: string }
   | null
 
-interface UiState {
+export interface UiState {
   dialog: Dialog
   /** Interaction prompt shown at the bottom of the screen, e.g. "Space — Laden". */
   prompt: string | null
@@ -83,17 +84,30 @@ interface UiState {
    * the on-screen controls and applies the mobile quality preset.
    */
   touchActive: boolean
-  /** Screen-space ambient occlusion (design.md §2.7); off in the touch preset. */
+  /**
+   * Graphics quality level — low / medium / high (design.md §21, F9 / point 276
+   * part B), DEFAULT 'medium'. Each level maps through QUALITY_PRESETS
+   * (src/config/quality.ts) to a value for every quality-relevant render lever;
+   * every consumer reads its EFFECTIVE value through the selectors below
+   * (`effectiveSsao` etc.), which combine the level's preset with the individual
+   * debug flags. Unlike `activateTouch`, changing the level NEVER writes those
+   * debug flags — they stay available to override within a level for tuning. The
+   * lever PRIORITY follows the real-hardware benchmark (point 277,
+   * docs/perf-277-user-hardware.md): fill-rate first (dpr, post), geometry last.
+   */
+  detailLevel: DetailLevel
+  /** Screen-space ambient occlusion allow-flag (design.md §2.7): a suppressor
+   *  over the level's preset (a level with SSAO on can be tuned off here). */
   ssaoEnabled: boolean
-  /** Half-size shadow maps (1024²) for the touch preset; full (2048²) otherwise. */
+  /** Extra half-size shadow-map override (touch preset / debug): halves the
+   *  level's sun-shadow resolution again on top of the preset. */
   shadowMapHalf: boolean
   /** Directional sun shadows (design.md §2.7/§21); a debug switch to turn cast
    *  shadows off entirely (default on). */
   shadowsEnabled: boolean
-  /** Campfire shadows (design.md §19.10): the village fire light casts a cube
-   *  shadow map so figures/logs between the fire and the ground block its
-   *  light. OFF by default — picture-neutral until enabled; the user prices the
-   *  GPU cost on their own hardware before it can become a default. */
+  /** Campfire-shadow allow-flag (design.md §19.10, point 289): a suppressor over
+   *  the level's preset. Default ON — medium/high enable campfire shadows, and a
+   *  player can tune them off here; low never casts them regardless. */
   fireShadowsEnabled: boolean
   /** Debug diagnosis (point 111): render the settlement ground with a plain
    *  material (no TSL surface structure/normal) to isolate a WebGPU-only black
@@ -130,6 +144,12 @@ interface UiState {
   setJournalDnd: (dnd: boolean) => void
   /** Arm the touch layer and apply the mobile quality preset (once). */
   activateTouch: () => void
+  /** Set the graphics quality level directly (debug-menu picker). Reads DERIVED
+   *  through the effective* selectors; never clobbers the individual debug flags. */
+  setDetailLevel: (level: DetailLevel) => void
+  /** Step the graphics level one DOWN, wrapping the bottom to the top (F9):
+   *  medium → low → high → medium. */
+  cycleDetailLevel: () => void
   setSsaoEnabled: (enabled: boolean) => void
   setShadowMapHalf: (half: boolean) => void
   setShadowsEnabled: (enabled: boolean) => void
@@ -163,10 +183,11 @@ export const useUi = create<UiState>()((set) => ({
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
   touchActive: false,
+  detailLevel: 'medium',
   ssaoEnabled: true,
   shadowMapHalf: false,
   shadowsEnabled: true,
-  fireShadowsEnabled: false,
+  fireShadowsEnabled: true,
   groundDebugFlat: false,
   seasonCollapseEnabled: true,
   stateDumpOpen: false,
@@ -201,7 +222,17 @@ export const useUi = create<UiState>()((set) => ({
   // individually re-enablable in the debug menu. Idempotent — later touches are
   // a no-op so a debug re-enable is not clobbered.
   activateTouch: () =>
-    set((s) => (s.touchActive ? s : { touchActive: true, traaEnabled: false, ssaoEnabled: false, shadowMapHalf: true })),
+    set((s) =>
+      s.touchActive
+        ? s
+        : { touchActive: true, traaEnabled: false, ssaoEnabled: false, shadowMapHalf: true, fireShadowsEnabled: false },
+    ),
+  // The graphics level is read DERIVED (the effective* selectors below), so —
+  // unlike activateTouch — changing it writes ONLY the level and never touches
+  // the player's individual debug flags, which stay available to tune within a
+  // level. The F9 cycle steps DOWN (medium → low → high → medium).
+  setDetailLevel: (detailLevel) => set({ detailLevel }),
+  cycleDetailLevel: () => set((s) => ({ detailLevel: nextDetailLevel(s.detailLevel) })),
   setSsaoEnabled: (ssaoEnabled) => set({ ssaoEnabled }),
   setShadowMapHalf: (shadowMapHalf) => set({ shadowMapHalf }),
   setShadowsEnabled: (shadowsEnabled) => set({ shadowsEnabled }),
@@ -214,6 +245,48 @@ export const useUi = create<UiState>()((set) => ({
   requestBenchAbort: () => set({ benchAbort: true }),
   clearBenchAbort: () => set({ benchAbort: false }),
 }))
+
+// --- Effective render levers (design.md §21, F9 / point 276 part B) ----------
+// Every render consumer reads its effective value through one of these
+// selectors, which combine the current level's preset (QUALITY_PRESETS) with the
+// individual debug allow-flags. The preset decides the level's baseline; the
+// allow-flags (ssao/traa/shadows/fire, all default ON) are suppressors that let
+// a player tune a feature OFF within a level without the level clobbering them.
+// So a fresh install at 'medium' reads exactly the medium preset, and 'low'/
+// 'high' shift every lever together.
+
+/** The quality preset for the current graphics level. */
+export const currentQuality = (s: UiState) => QUALITY_PRESETS[s.detailLevel]
+
+/** Device-pixel-ratio cap for the current level; null keeps the native ratio. */
+export const effectiveDprCap = (s: UiState): number | null => currentQuality(s).dprCap
+/** SSAO renders when the level allows it AND the player has not tuned it off. */
+export const effectiveSsao = (s: UiState): boolean => currentQuality(s).ssao && s.ssaoEnabled
+/** TRAA renders when the level allows it AND the player has not tuned it off. */
+export const effectiveTraa = (s: UiState): boolean => currentQuality(s).traa && s.traaEnabled
+/** Bloom renders when the level allows it (no player-facing bloom flag). */
+export const effectiveBloom = (s: UiState): boolean => currentQuality(s).bloom
+/** Sun shadows cast when the level allows it AND the player has not tuned them off. */
+export const effectiveShadows = (s: UiState): boolean => currentQuality(s).sunShadows && s.shadowsEnabled
+/** Sun shadow-map resolution: the level's value, halved once more if the touch/
+ *  debug half-map override is set (floored so it never reaches 0). */
+export const effectiveShadowResolution = (s: UiState): number =>
+  Math.max(256, Math.round(currentQuality(s).sunShadowResolution / (s.shadowMapHalf ? 2 : 1)))
+/** Campfire shadows (point 289) cast when the level allows it AND the player has
+ *  not tuned them off. */
+export const effectiveFireShadows = (s: UiState): boolean => currentQuality(s).fireShadows && s.fireShadowsEnabled
+/** Campfire cube-shadow map resolution for the current level (0 when off). */
+export const effectiveFireShadowResolution = (s: UiState): number => currentQuality(s).fireShadowResolution
+/** Soft (PCF) campfire shadows — the costlier high-only variant. */
+export const effectiveFireShadowSoft = (s: UiState): boolean => currentQuality(s).fireShadowSoft
+/** Near-ring terrain refinement (point 209) for the current level. */
+export const effectiveTerrainRefine = (s: UiState): boolean => currentQuality(s).terrainRefine
+/** Flora fog-radius factor for the current level (<1 tightens the spawn circle). */
+export const effectiveFloraFogFactor = (s: UiState): number => currentQuality(s).floraFogFactor
+/** Whether ground flora casts sun shadows at the current level. */
+export const effectiveFloraCastShadow = (s: UiState): boolean => currentQuality(s).floraCastShadow
+/** Atmospheric haze/rain intensity factor for the current level (1 = full). */
+export const effectiveWeatherIntensity = (s: UiState): number => currentQuality(s).weatherIntensity
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

@@ -17,7 +17,7 @@
 //
 // OPEN: true water refraction (design.md §2) is not in the POC pipeline.
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { float, max, mix, mrt, normalView, output, pass, smoothstep, vec3, velocity, viewportUV } from 'three/tsl'
@@ -25,7 +25,7 @@ import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture } from './environment'
-import { useUi } from '../state/ui'
+import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui'
 
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
 const IBL_SUN: [number, number, number] = [0.5, 0.65, 0.36]
@@ -51,8 +51,14 @@ export function Effects() {
     }
   }, [scene])
 
-  const traaEnabled = useUi((s) => s.traaEnabled)
-  const ssaoEnabled = useUi((s) => s.ssaoEnabled)
+  // The effective render levers (design.md §21, F9 / point 276 part B): the
+  // graphics level drives SSAO/TRAA/bloom through these selectors — SSAO on only
+  // at high, TRAA+bloom off only at low — without touching the player's own debug
+  // flags. Post is the single biggest GPU lever on the user's real hardware
+  // (~38 %, point 277).
+  const traaEnabled = useUi(effectiveTraa)
+  const ssaoEnabled = useUi(effectiveSsao)
+  const bloomEnabled = useUi(effectiveBloom)
 
   const post = useMemo(() => {
     // The toggle rebuilds the whole pipeline, and three's RenderPipeline
@@ -113,7 +119,19 @@ export function Effects() {
     // declaration file.
     let composed = aoComposed
     if (traaEnabled) {
-      const traaNode = traa(aoComposed, depth, scenePass.getTextureNode('velocity'), camera)
+      // TRAA reads its beauty input from a render target and copies it into its
+      // history buffer. When SSAO is on, aoComposed is an operator node
+      // (color × occlusion), so traa()'s own convertToTexture materialises it
+      // in a dedicated RTT. With SSAO OFF (point 276's medium/low) aoComposed
+      // is the scene pass's OWN output texture; handed straight in, TRAA read
+      // and copied the live scene-pass target and churned/leaked its
+      // history+resolve render targets a texture per rebuild on WebGPU. Force
+      // the beauty to an operator node so it takes the SAME dedicated-RTT path
+      // the SSAO-on branch (and pre-276 main) always did — the `.mul(1)` is a
+      // no-op tint whose only purpose is that materialisation; the RTT it
+      // yields is disposed as `traaNode.beautyNode.renderTarget` below.
+      const beauty = ssaoEnabled ? aoComposed : color.mul(float(1))
+      const traaNode = traa(beauty, depth, scenePass.getTextureNode('velocity'), camera)
       disposables.push(traaNode)
       // traa() wraps the composed input in an RTT node, which owns a
       // full-resolution render target of its own and has no dispose().
@@ -144,10 +162,15 @@ export function Effects() {
       ).getTextureNode()
     }
 
-    // Bloom on bright highlights (sun glints, fire, snow).
-    const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
-    disposables.push(bloomNode)
-    const withBloom = composed.add(bloomNode)
+    // Bloom on bright highlights (sun glints, fire, snow). Off in Low Details
+    // (point 276): the pass is skipped entirely so it costs nothing on a weak
+    // GPU, and the composite passes the plain image straight through.
+    let withBloom = composed
+    if (bloomEnabled) {
+      const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
+      disposables.push(bloomNode)
+      withBloom = composed.add(bloomNode)
+    }
 
     // Color grading: gentle saturation lift and warm highlights.
     const luma = withBloom.rgb.dot(vec3(0.2126, 0.7152, 0.0722))
@@ -175,9 +198,15 @@ export function Effects() {
       }
     }
     return { processing, dispose }
-  }, [gl, scene, camera, traaEnabled, ssaoEnabled])
+  }, [gl, scene, camera, traaEnabled, ssaoEnabled, bloomEnabled])
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect): free the SUPERSEDED pipeline synchronously
+  // at commit, the instant a rebuild replaces it. A passive effect defers the
+  // teardown past the browser paint and, under load, past when a fast TRAA
+  // toggle is next observed, so the old pipeline's render targets linger
+  // alongside the new one's — a spurious per-toggle spike in the leak gate.
+  // Commit-time disposal keeps renderer.info.memory.textures deterministic.
+  useLayoutEffect(() => {
     return () => {
       post.dispose()
     }

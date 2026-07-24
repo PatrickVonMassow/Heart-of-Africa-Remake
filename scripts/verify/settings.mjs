@@ -51,8 +51,13 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
 // --- First-person surface detail (§7.1 pt. 11/15, design.md §2.6) -------------
 // The ground at eye height must carry visible micro-structure (grain, pebble
 // relief), not a soft wash: measure the mean edge energy (Laplacian) of a
-// ground crop from the start position. The flat pre-detail ground measured
-// ~0.5 here; the structured ground clears 1.5 with headroom.
+// ground crop from the start position. Reference points: the flat pre-detail
+// ground measured ~0.5; the normal-map surface relief at the SHIPPED DEFAULT
+// (medium, SSAO off per point 276) measures ~1.23 — clearly structured, ~2.5x
+// the flat floor. (Screen-space AO, high-only now, adds contact-shadow
+// contrast that used to push this above 1.5; the bar tracks the default look,
+// not the AO bonus.) The threshold guards "structured vs soft wash" at the
+// level the player actually ships with.
 {
   const shot = await page.screenshot()
   const crop = await sharp(shot).extract({ left: 500, top: 700, width: 600, height: 170 }).greyscale().raw().toBuffer({ resolveWithObject: true })
@@ -68,7 +73,7 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
     }
   }
   const mean = energy / n
-  check('first-person ground shows micro-detail (edge energy)', mean > 1.5, `laplacian mean ${mean.toFixed(2)}`)
+  check('first-person ground shows micro-detail (edge energy)', mean > 1.1, `laplacian mean ${mean.toFixed(2)}`)
 }
 
 // --- Temporal stability of the distant ground (§7.1 pt. 15) -------------------
@@ -440,6 +445,83 @@ await page.waitForTimeout(800)
 const msaaSamples = await page.evaluate(() => window.__scenePass.renderTarget.samples)
 check('TRAA scene pass renders single-sampled (MSAA pass keeps 4)',
   traaSamples === 0 && msaaSamples === 4, `traa ${traaSamples}, msaa ${msaaSamples}`)
+
+// --- Graphics quality levels (design.md §21, F9 / point 276 part B) ------------
+// F9 cycles the `detailLevel` (medium → low → high → medium); every render lever
+// reads DERIVED from that level's QUALITY_PRESET without clobbering the player's
+// debug allow-flags. Assert the F9 cycle order and that the EFFECTIVE reads flip
+// with the level, computed the same way the ui.ts selectors do (their maths is
+// pure-tested in src/state/ui.test.ts). The FPS win is priced live by the main
+// session on both backends.
+const errsBeforeLow = errors.length
+// Start from a known state: the default level, every allow-flag on.
+await page.evaluate(() => {
+  const u = window.__ui.getState()
+  u.setDetailLevel('medium')
+  u.setSsaoEnabled(true)
+  u.setTraaEnabled(true)
+  u.setShadowsEnabled(true)
+  u.setFireShadowsEnabled(true)
+  u.setShadowMapHalf(false)
+})
+// Read the effective levers the SAME way ui.ts derives them (level preset AND
+// the allow-flag), so the live check matches the pure-tested selectors.
+const PRESETS = {
+  low: { dpr: 1, ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
+  medium: { dpr: null, ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
+  high: { dpr: null, ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
+}
+const effective = () => page.evaluate(() => {
+  const s = window.__ui.getState()
+  const P = {
+    low: { dpr: 1, ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
+    medium: { dpr: null, ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
+    high: { dpr: null, ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
+  }[s.detailLevel]
+  return {
+    level: s.detailLevel,
+    ssao: P.ssao && s.ssaoEnabled,
+    traa: P.traa && s.traaEnabled,
+    bloom: P.bloom,
+    shadows: P.shadows && s.shadowsEnabled,
+    shadowRes: Math.max(256, Math.round(P.shadowRes / (s.shadowMapHalf ? 2 : 1))),
+    fireShadows: P.fire && s.fireShadowsEnabled,
+    // Allow-flags — must be UNTOUCHED by the level cycle.
+    baseSsao: s.ssaoEnabled, baseTraa: s.traaEnabled, baseShadows: s.shadowsEnabled,
+    baseFire: s.fireShadowsEnabled, baseHalf: s.shadowMapHalf,
+  }
+})
+const cycleF9 = async () => {
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F9', bubbles: true })))
+  await page.waitForTimeout(900)
+  return effective()
+}
+const atMedium = await effective()
+check('graphics level defaults to medium: SSAO off, TRAA+Bloom on, 2048 shadows, campfire on',
+  atMedium.level === 'medium' && atMedium.ssao === false && atMedium.traa && atMedium.bloom &&
+  atMedium.shadows && atMedium.shadowRes === 2048 && atMedium.fireShadows === true,
+  JSON.stringify(atMedium))
+// F9 #1: medium → low (every fill-rate lever forced DOWN).
+const atLow = await cycleF9()
+check('F9 → low: post off, shadows low-res, no campfire shadows',
+  atLow.level === 'low' && atLow.ssao === false && atLow.traa === false && atLow.bloom === false &&
+  atLow.shadowRes === PRESETS.low.shadowRes && atLow.fireShadows === false, JSON.stringify(atLow))
+const lowMean = await meanLuma(await page.screenshot())
+check('F9 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
+// F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
+const atHigh = await cycleF9()
+check('F9 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',
+  atHigh.level === 'high' && atHigh.ssao === true && atHigh.shadowRes === 4096 &&
+  atHigh.fireShadows === true, JSON.stringify(atHigh))
+// F9 #3: high → medium (back to the default).
+const atMediumAgain = await cycleF9()
+check('F9 → medium: a full cycle returns to the default in three presses',
+  atMediumAgain.level === 'medium' && atMediumAgain.shadowRes === 2048, JSON.stringify(atMediumAgain))
+check('graphics levels: the debug allow-flags stay untouched across the cycle (read derived)',
+  atHigh.baseSsao && atHigh.baseTraa && atHigh.baseShadows && atHigh.baseFire && atHigh.baseHalf === false,
+  JSON.stringify(atHigh))
+check('Graphics levels: no new console errors across the F9 cycle', errors.length === errsBeforeLow,
+  errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

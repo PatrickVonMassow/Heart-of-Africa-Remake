@@ -20,7 +20,14 @@ import {
 } from 'three/tsl'
 import { FLORA_COLOR_LIFT, SEASON_TINT_U, seasonFoliagePosition, seasonTintNode, setGroundWetness, setSeasonCollapse, setSeasonTint } from '../../render/seasonTint'
 import { useGame } from '../../state/store'
-import { useUi } from '../../state/ui'
+import {
+  useUi,
+  effectiveShadows,
+  effectiveShadowResolution,
+  effectiveFireShadows,
+  effectiveFireShadowResolution,
+  effectiveFireShadowSoft,
+} from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
 import { playThunder } from '../../systems/ambience'
@@ -910,11 +917,17 @@ function FirePit({
 }) {
   const light = useRef<THREE.PointLight>(null)
   const flame = useRef<THREE.Mesh>(null)
-  // Campfire shadows (design.md §19.10): debug-gated, default off, and also
-  // behind the global shadow switch — the fire is one more cast-shadow source.
-  const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
-  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
+  // Campfire shadows (design.md §19.10, point 289): level-driven — off on low,
+  // the 256² variant on medium, the softer 512² variant on high — and also
+  // behind the global shadow switch (the fire is one more cast-shadow source).
+  // All read DERIVED through the graphics level (point 276).
+  const fireShadowsEnabled = useUi(effectiveFireShadows)
+  const shadowsEnabled = useUi(effectiveShadows)
   const castFireShadow = fireShadowsEnabled && shadowsEnabled
+  // The level's campfire-shadow variant: map resolution (256 medium / 512 high)
+  // and soft PCF edges on high. Fall back to the base size when off (unused).
+  const fireShadowSize = useUi(effectiveFireShadowResolution) || FIRE_SHADOW_MAP_SIZE
+  const fireShadowSoft = useUi(effectiveFireShadowSoft)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     // Under the cook-shelter the fire burns on through the rain — only a touch
@@ -962,15 +975,18 @@ function FirePit({
       <pointLight
         // Remounted on toggle like the sun light (point 111): flipping
         // castShadow on a mounted light leaves the WebGPU shadow pipeline in a
-        // broken state, so the key swap rebuilds the light from scratch.
-        key={castFireShadow ? 'fire-shadowed' : 'fire-plain'}
+        // broken state, so the key swap rebuilds the light from scratch. The
+        // variant (map size + soft edges) is in the key too, so a level change
+        // between medium and high rebuilds the shadow map at the new resolution.
+        key={castFireShadow ? `fire-shadowed-${fireShadowSize}-${fireShadowSoft ? 'soft' : 'hard'}` : 'fire-plain'}
         ref={light}
         position={[0, 1.1, 0]}
         color="#ffab4a"
         distance={14}
         decay={2}
         castShadow={castFireShadow}
-        shadow-mapSize={[FIRE_SHADOW_MAP_SIZE, FIRE_SHADOW_MAP_SIZE]}
+        shadow-mapSize={[fireShadowSize, fireShadowSize]}
+        shadow-radius={fireShadowSoft ? 4 : 1}
         shadow-camera-near={0.2}
         shadow-bias={FIRE_SHADOW_BIAS}
       />
@@ -1668,10 +1684,13 @@ export function PlaceScene() {
   const placeStrike = useRef<StrikeSchedulerState>({ nextAt: 0, count: 0, lastOpenAt: 0 })
   const placeSunBase = useRef(PLACE_SUN_INTENSITY)
   const placeHemiBase = useRef(PLACE_HEMI_INTENSITY)
-  const shadowMapHalf = useUi((s) => s.shadowMapHalf)
-  const shadowsEnabled = useUi((s) => s.shadowsEnabled)
-  const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
-  const shadowSize = shadowMapHalf ? 1024 : 2048
+  // The graphics level (point 276) drives the sun shadow-map resolution (low
+  // 1024 / medium 2048 / high 4096, and the half override halves it again) and
+  // whether shadows cast at all; the campfire shadows (point 289) are likewise
+  // level-driven — all read derived so the player's own flags are untouched.
+  const shadowSize = useUi(effectiveShadowResolution)
+  const shadowsEnabled = useUi(effectiveShadows)
+  const fireShadowsEnabled = useUi(effectiveFireShadows)
   useEffect(() => {
     const map = sunRef.current?.shadow.map
     if (map) {

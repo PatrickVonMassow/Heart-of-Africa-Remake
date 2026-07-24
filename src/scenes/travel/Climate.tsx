@@ -10,7 +10,7 @@ import { float, hash, instanceIndex, max, mix, mx_fractal_noise_float, positionL
 import { demElevation, demInlandWater } from '../../render/demElevation'
 import { balance, START_YEAR } from '../../config/balance'
 import { useGame } from '../../state/store'
-import { useUi } from '../../state/ui'
+import { useUi, effectiveWeatherIntensity } from '../../state/ui'
 import { setSkyHarmattan, setSkyOvercast } from '../../render/skyOvercast'
 import { setGroundWetness } from '../../render/seasonTint'
 import { setHail } from '../../render/seasonalSnow'
@@ -305,8 +305,12 @@ export function Climate() {
     flashRef.current *= Math.max(0, 1 - dt * 7) // fast decay (<~0.3 s)
     if (flashRef.current < 0.01) flashRef.current = 0
     CURRENT_WEATHER.flash = flashRef.current
+    // The low graphics level (point 276) thins the haze/rain pall so fewer
+    // full-screen fragments are shaded; medium/high pass 1 (unchanged). Only the
+    // DISPLAYED weather scales — the real rain (groundWet, season) is untouched.
+    const weatherIntensity = effectiveWeatherIntensity(useUi.getState())
     const rainReal = rainAmount(wet, balance.season.weatherStrength)
-    const rainTarget = rainReal * (1 - hazeClear)
+    const rainTarget = rainReal * (1 - hazeClear) * weatherIntensity
     rain.opacityU.value += (rainTarget - rain.opacityU.value) * k
 
     // Wet ground (design.md §19.13, point 225): the ground darkens and glosses
@@ -345,7 +349,7 @@ export function Climate() {
     if (g) {
       hazeTarget.set(preset.hazeColor)
       haze.colorU.value.lerp(hazeTarget, k)
-      haze.opacityU.value += (preset.haze * (1 - hazeClear) - haze.opacityU.value) * k
+      haze.opacityU.value += (preset.haze * (1 - hazeClear) * weatherIntensity - haze.opacityU.value) * k
       g.visible = haze.opacityU.value > 0.01
       if (g.visible) {
         const t = clock.elapsedTime

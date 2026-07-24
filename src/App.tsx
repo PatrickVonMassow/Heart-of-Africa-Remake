@@ -2,7 +2,7 @@ import { Suspense, useEffect } from 'react'
 import { Canvas, extend, useThree, type ThreeToJSXElements } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { useGame } from './state/store'
-import { useUi } from './state/ui'
+import { useUi, effectiveDprCap } from './state/ui'
 import { useLocale } from './i18n'
 import { speechAvailable, warmupSpeech } from './journal/speech'
 import { TravelScene } from './scenes/travel/TravelScene'
@@ -41,6 +41,11 @@ export default function App() {
   const mode = useGame((s) => s.mode)
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
+  // Graphics level (design.md §21, F9 / point 276 part B): the low preset caps
+  // the device pixel ratio to 1.0 — the biggest fill-rate lever on the user's
+  // real hardware (~35 % GPU, point 277). null keeps R3F's native dpr (medium/
+  // high). R3F re-applies the ratio when this prop changes.
+  const dprCap = useUi(effectiveDprCap)
   // Pre-warm the read-aloud model shortly after mount (point 117) so the first
   // narration only synthesizes rather than cold-loading the model, and so the
   // WebGPU cold-load's one-time ~15 s GPU stall (user-accepted, reversing point
@@ -56,6 +61,7 @@ export default function App() {
     <div className={touchActive ? 'game-root touch-active' : 'game-root'}>
       <Canvas
         camera={{ fov: 50, near: 0.1, far: 2000, position: [0, 40, 20] }}
+        dpr={dprCap ?? undefined}
         shadows
         gl={async (props) => {
           // WebGPU primary; the renderer falls back to WebGL 2 automatically
