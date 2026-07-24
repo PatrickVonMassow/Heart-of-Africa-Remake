@@ -148,6 +148,24 @@ Zwei Regeln, die das Netz ehrlich halten:
   fürs Handy lesbar). Halte dich an meine Format- und Sprachvorgaben auf **allen**
   sichtbaren Ausgaben."
 
+- **Parser ist zu streng oder zu fragil bei Eingaben-Varianten.** Ein Tool (z.B. Dashboard-
+  Parser zur Punkt-Nummern-Extraktion) funktioniert nur mit *exakt* einer Input-Form
+  (z.B. Punkt-Nummer als Plain-Text, nicht in HTML-Tags), und versagt lautlos bei
+  Varianten — führt zu Fehler-Zuständen, die schwer zu debuggen sind.
+  → *Mechanismus:* Parser **robust machen**: akzeptieren mehrere Input-Formen (HTML-tags,
+  plain text, beide), oder ein Unit-Test, der bewusst Varianten durchprobiert; ein
+  sichtbarer Fallback, wenn der Parse fehlschlägt (z.B. `point <unknown>` statt falsch
+  `<none>`), damit Fehler nicht stumm bleiben.
+
+- **Timeouts unter Last — Tests, die solo passen, aber parallel zeitraubend sind.** Ein
+  einzelner Test läuft in 10 Sekunden, aber unter Batch-Parallelismus (mehrere Prozesse
+  auf einer Maschine) wartet er unnötig lange und läuft in den 60-/90-Sekunden-Timeout.
+  → *Mechanismus:* Timeouts für Browser-Suiten **dynamisch anpassen** auf Batch-Kontext
+  (z.B. Umgebungsvariable `BATCH_MODE=1` → Timeouts verdoppeln), ODER lokal längere
+  Timeouts für alle Verifikations-Suiten (120-180s statt 90s). Beobachte auch die
+  Parallelisierung selbst: volle dev-server-Parallelität ist oft ein Bottleneck (Port-
+  Contention, I/O), evtl. sequenzielle oder gated Parallelität für intensive Suiten.
+
 - **Doku und Code driften auseinander.** Das ‚Was' im Design-Doc passt nicht mehr zum
   ‚Wie' im Code.
   → *Prompt:* „Wenn eine Änderung das Design berührt, aktualisiere Design-Doc und Code im
