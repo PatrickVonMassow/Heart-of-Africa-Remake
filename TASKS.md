@@ -10132,7 +10132,7 @@ the remaining open points in their numeric order.
   Wildlife.tsx/wildlifeBehavior.ts points (it only reads the trample trigger, doesn't
   change it). Implementation-ready.
 
-- [ ] 267. BLOOD POOL SHOWS THE GROUND THROUGH IT — TINT THE GROUND, don't float a
+- [x] 267. BLOOD POOL SHOWS THE GROUND THROUGH IT — TINT THE GROUND, don't float a
   decal (user 23.07.2026, screenshot). The kill/trample blood stain currently renders
   as a flat pool laid ON TOP of the height-profiled ground, so the terrain relief pokes
   through it (a hole where the ground rises through the flat decal). Raising the whole
