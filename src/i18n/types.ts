@@ -348,6 +348,7 @@ export interface Strings {
     crocStrikeRadius: string
     juvenilePreyBias: string
     juvenileDrinkCrocBias: string
+    benchmarkStart: string
     crocGripSeconds: string
     huntLeaveOvertime: string
     waterCrossMax: string

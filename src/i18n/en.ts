@@ -407,6 +407,7 @@ export const en: Strings = {
     crocStrikeRadius: 'Crocodile: bank strike radius',
     juvenilePreyBias: 'Juvenile prey preference',
     juvenileDrinkCrocBias: 'Crocodile: drinking-juvenile preference',
+    benchmarkStart: 'Start the render benchmark',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
     huntLeaveOvertime: 'Hunt: walk-off overtime (s)',
     waterCrossMax: 'Water crossing: max width',

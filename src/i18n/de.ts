@@ -406,6 +406,7 @@ export const de: Strings = {
     crocStrikeRadius: 'Krokodil: Angriffsradius am Ufer',
     juvenilePreyBias: 'Bevorzugung von Jungtieren als Beute',
     juvenileDrinkCrocBias: 'Krokodil: Vorzug trinkender Jungtiere',
+    benchmarkStart: 'Render-Benchmark starten',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     huntLeaveOvertime: 'Jagd: Abzugs-Überzeit (s)',
     waterCrossMax: 'Wasser-Querung: max. Breite',
