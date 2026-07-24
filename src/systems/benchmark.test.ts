@@ -12,6 +12,7 @@ import {
   BENCH_PHASES,
   BENCH_SEED,
   BENCH_ZOOM,
+  LOW_CONFIG_NAME,
   benchFilename,
   benchFrameCounts,
   benchRemainingMs,
@@ -19,16 +20,22 @@ import {
   benchShortMode,
   benchSummaryLines,
   benchTotalFrames,
+  buildLowProfile,
+  formatDominance,
   formatDuration,
   frameStats,
   headlineNote,
   headlineSeries,
   installFixedClock,
+  lowProfileSummaryLines,
+  rankSystemsByTriangles,
   sceneTriangleBreakdown,
   vsyncLikely,
   type BenchReport,
+  type BenchRow,
   type BenchSceneNode,
 } from './benchmark'
+import { QUALITY_PRESETS } from '../config/quality'
 
 describe('benchmark sweep plan (design.md §21.1)', () => {
   it('sweeps every lever of the point-276 findings, baseline first', () => {
@@ -289,6 +296,127 @@ describe('scene-graph triangle breakdown', () => {
   })
 })
 
+describe('LOW-preset cost profile (point 293)', () => {
+  const lowRow = (phase: BenchRow['phase'], sceneTriangles: BenchRow['sceneTriangles']): BenchRow => ({
+    config: LOW_CONFIG_NAME,
+    phase,
+    frame: frameStats([16, 17, 18]),
+    cpu: frameStats([3, 4, 5]),
+    gpu: frameStats([6, 7, 8]),
+    vsyncLikely: false,
+    drawCalls: 210,
+    triangles: 120000,
+    sceneTriangles,
+  })
+
+  it('ranks the systems of a breakdown most-expensive-first by triangle share', () => {
+    const ranked = rankSystemsByTriangles({
+      flora: { tris: 300, meshes: 12 },
+      terrain: { tris: 420, meshes: 169 },
+      wildlife: { tris: 120, meshes: 8 },
+    })
+    expect(ranked.map((e) => e.system)).toEqual(['terrain', 'flora', 'wildlife'])
+    expect(ranked[0]).toMatchObject({ tris: 420, meshes: 169 })
+    // Shares sum to 1 and read as the expected percentages.
+    expect(ranked.reduce((s, e) => s + e.pct, 0)).toBeCloseTo(1, 10)
+    expect(Math.round(ranked[0].pct * 100)).toBe(50) // 420 / 840
+  })
+
+  it('breaks ties by name so the order is deterministic, and survives an empty scene', () => {
+    const ranked = rankSystemsByTriangles({ b: { tris: 100, meshes: 1 }, a: { tris: 100, meshes: 1 } })
+    expect(ranked.map((e) => e.system)).toEqual(['a', 'b'])
+    expect(rankSystemsByTriangles({})).toEqual([])
+  })
+
+  it('builds the profile from the low rows, choosing the densest phase for the dominance line', () => {
+    // The savanna phase is denser than the desert one, so it heads the digest.
+    const rows: BenchRow[] = [
+      { config: 'baseline', phase: 'savanna-standing' } as unknown as BenchRow,
+      lowRow('savanna-standing', {
+        terrain: { tris: 5000, meshes: 169 },
+        flora: { tris: 3000, meshes: 12 },
+        wildlife: { tris: 2000, meshes: 8 },
+      }),
+      lowRow('desert-standing', { terrain: { tris: 1000, meshes: 169 } }),
+    ]
+    const profile = buildLowProfile(rows, 2)
+    expect(profile).not.toBeNull()
+    // Only the LOW_CONFIG_NAME rows are profiled — the baseline row is ignored.
+    expect(profile?.phases.map((p) => p.phase)).toEqual(['savanna-standing', 'desert-standing'])
+    // The applied low preset is echoed into the report.
+    expect(profile?.preset).toEqual(QUALITY_PRESETS.low)
+    // The densest phase heads the dominance line, capped by topN.
+    expect(profile?.headlinePhase).toBe('savanna-standing')
+    expect(profile?.dominant).toHaveLength(2)
+    expect(profile?.dominant[0]).toMatchObject({ system: 'terrain', tris: 5000 })
+    expect(profile?.phases[0].totalTris).toBe(10000)
+    expect(Math.round((profile?.dominant[0].pct ?? 0) * 100)).toBe(50) // 5000 / 10000
+  })
+
+  it('returns null when no low-preset rows are present', () => {
+    expect(buildLowProfile([{ config: 'baseline' } as unknown as BenchRow])).toBeNull()
+    expect(buildLowProfile([])).toBeNull()
+  })
+
+  it('formats the dominance line as "system pct %" pieces', () => {
+    expect(
+      formatDominance([
+        { system: 'terrain', tris: 5000, meshes: 1, pct: 0.5 },
+        { system: 'flora', tris: 3000, meshes: 1, pct: 0.3 },
+      ]),
+    ).toBe('terrain 50 %, flora 30 %')
+  })
+
+  it('emits a readable low-profile digest naming the dominant systems', () => {
+    const profile = buildLowProfile([
+      lowRow('savanna-standing', {
+        terrain: { tris: 5000, meshes: 169 },
+        flora: { tris: 3000, meshes: 12 },
+      }),
+    ])!
+    const lines = lowProfileSummaryLines(profile)
+    expect(lines.some((l) => l.includes('LOW PRESET PROFILE'))).toBe(true)
+    const dominated = lines.find((l) => l.includes('dominated by'))
+    expect(dominated).toContain('terrain 63 %') // 5000 / 8000
+    expect(dominated).toContain('flora 38 %') // 3000 / 8000
+    // The per-system rows are present under the phase.
+    expect(lines.some((l) => l.includes('terrain') && l.includes('5000'))).toBe(true)
+  })
+
+  it('the report digest appends the low-profile section when a profile is present', () => {
+    const report: BenchReport = {
+      app: BENCH_APP,
+      kind: 'render-benchmark',
+      short: true,
+      seed: BENCH_SEED,
+      day: BENCH_DAY,
+      dt: BENCH_DT,
+      frames: benchFrameCounts(true),
+      env: {
+        userAgent: 'test-agent',
+        backend: 'webgpu',
+        adapter: 'Test Adapter',
+        viewport: { width: 1440, height: 900 },
+        devicePixelRatio: 2,
+        build: 'production',
+        commit: 'abc1234',
+        startedAt: '2026-07-24T10:00:00.000Z',
+      },
+      gpuTiming: { available: true, reason: '' },
+      headline: 'gpu',
+      rows: [lowRow('savanna-standing', { terrain: { tris: 5000, meshes: 1 }, flora: { tris: 3000, meshes: 1 } })],
+      lowProfile: buildLowProfile([
+        lowRow('savanna-standing', { terrain: { tris: 5000, meshes: 1 }, flora: { tris: 3000, meshes: 1 } }),
+      ]),
+      durationMs: 100,
+      aborted: false,
+    }
+    const withProfile = benchSummaryLines(report)
+    expect(withProfile.some((l) => l.includes('LOW PRESET PROFILE'))).toBe(true)
+    expect(withProfile.some((l) => l.includes('dominated by'))).toBe(true)
+  })
+})
+
 describe('report shaping', () => {
   const report = (gpu = true): BenchReport => ({
     app: BENCH_APP,
@@ -323,6 +451,7 @@ describe('report shaping', () => {
         sceneTriangles: { terrain: { tris: 847076, meshes: 169 } },
       },
     ],
+    lowProfile: null,
     durationMs: 12345,
     aborted: false,
   })

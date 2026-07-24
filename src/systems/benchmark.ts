@@ -17,6 +17,8 @@
 // the streaming crossings and every roll repeat exactly while only the
 // measured wall-clock per frame varies.
 
+import { QUALITY_PRESETS, type QualityPreset } from '../config/quality'
+
 /** Simulation timestep every benchmark frame is stepped with (seconds). */
 export const BENCH_DT = 1 / 60
 
@@ -89,6 +91,16 @@ export const BENCH_CONFIGS: readonly BenchConfig[] = [
     terrain: { enabled: false },
   },
 ]
+
+/**
+ * The row name of the point-293 LOW-preset profiling pass. The sweep above
+ * forces the HIGH graphics level so every lever stays measurable; this extra
+ * pass instead applies the actual LOW `QUALITY_PRESETS` values, so the report
+ * can show WHERE the frame cost still sits at low and the player can decide the
+ * next reduction. Kept distinct from the sweep's config names so the rows and
+ * the low profile can be picked apart from one another.
+ */
+export const LOW_CONFIG_NAME = 'low-preset'
 
 export type BenchPhaseName = 'savanna-standing' | 'desert-standing' | 'savanna-driving'
 
@@ -361,11 +373,129 @@ export interface BenchReport {
   /** The series to read as the result (see `headlineSeries`). */
   headline: BenchHeadline
   rows: BenchRow[]
+  /** The point-293 LOW-preset cost profile: the per-system ranking at the low
+   *  graphics level, so the player sees the dominant remaining systems and can
+   *  pick the next cut. null if the low pass produced no rows (e.g. aborted). */
+  lowProfile: BenchLowProfile | null
   /** Wall-clock duration of the whole sweep (ms). */
   durationMs: number
   aborted: boolean
   /** Human-readable digest, kept FIRST in the file (see `benchReportJson`). */
   summary?: string[]
+}
+
+// --- LOW-preset cost profile (point 293) ------------------------------------
+
+/** One system's share of a phase's rendered triangles at the low preset. */
+export interface BenchRankEntry {
+  /** The scene-graph system name (the `sceneTriangleBreakdown` key). */
+  system: string
+  tris: number
+  meshes: number
+  /** Share of the phase's total rendered triangles, 0..1. */
+  pct: number
+}
+
+/** The low-preset cost picture for one route phase. */
+export interface BenchLowPhaseRanking {
+  phase: BenchPhaseName
+  /** Sum of the ranked systems' triangles (the scene-graph total). */
+  totalTris: number
+  /** `renderer.info` draw calls / triangles at the end of the phase's sample. */
+  drawCalls: number
+  triangles: number
+  /** The whole-frame timing series at the low preset (per-system GPU cost is
+   *  NOT attributable — timestamp queries are per render pass, not per object
+   *  group — so the per-system split is by triangle share, and the frame series
+   *  give the absolute cost the ranking sits inside). gpu is null off WebGPU. */
+  frame: FrameStats
+  cpu: FrameStats
+  gpu: FrameStats | null
+  /** Systems ranked most-expensive-first by triangle share. */
+  ranking: BenchRankEntry[]
+}
+
+export interface BenchLowProfile {
+  /** The LOW `QUALITY_PRESETS` values that were applied, echoed into the file. */
+  preset: QualityPreset
+  /** One ranked picture per route phase. */
+  phases: BenchLowPhaseRanking[]
+  /** The densest phase (most rendered triangles) — the worst case the "frame is
+   *  dominated by …" digest line speaks about. */
+  headlinePhase: BenchPhaseName
+  /** The headline phase's top systems, for the digest dominance line. */
+  dominant: BenchRankEntry[]
+}
+
+/**
+ * Rank the systems of one scene-graph breakdown most-expensive-first by triangle
+ * share — the honest per-system cost signal at a fixed preset (point 293).
+ * Geometry is the lever the real-hardware benchmark proved dominant (points
+ * 276/277: terrain 1.99x, dressing 2.41x), and the rendered triangle count is
+ * the per-system attributable proxy for it: GPU timestamps resolve per render
+ * pass, not per object group, so a per-system GPU split cannot be measured and
+ * is never fabricated here. Ties break by name so the order is deterministic.
+ */
+export function rankSystemsByTriangles(breakdown: Record<string, BenchTriGroup>): BenchRankEntry[] {
+  const total = Object.values(breakdown).reduce((sum, g) => sum + g.tris, 0)
+  return Object.entries(breakdown)
+    .map(([system, g]) => ({ system, tris: g.tris, meshes: g.meshes, pct: total > 0 ? g.tris / total : 0 }))
+    .sort((a, b) => b.tris - a.tris || a.system.localeCompare(b.system))
+}
+
+/**
+ * Build the low-preset profile from the sweep's rows: the LOW_CONFIG_NAME rows
+ * ranked per phase, the densest phase chosen for the dominance digest. Returns
+ * null when the low pass produced no rows. `topN` caps the dominance list.
+ */
+export function buildLowProfile(rows: readonly BenchRow[], topN = 5): BenchLowProfile | null {
+  const lowRows = rows.filter((r) => r.config === LOW_CONFIG_NAME)
+  if (lowRows.length === 0) return null
+  const phases: BenchLowPhaseRanking[] = lowRows.map((r) => {
+    const ranking = rankSystemsByTriangles(r.sceneTriangles)
+    return {
+      phase: r.phase,
+      totalTris: ranking.reduce((sum, e) => sum + e.tris, 0),
+      drawCalls: r.drawCalls,
+      triangles: r.triangles,
+      frame: r.frame,
+      cpu: r.cpu,
+      gpu: r.gpu,
+      ranking,
+    }
+  })
+  const headline = phases.reduce((a, b) => (b.totalTris > a.totalTris ? b : a))
+  return {
+    preset: QUALITY_PRESETS.low,
+    phases,
+    headlinePhase: headline.phase,
+    dominant: headline.ranking.slice(0, topN),
+  }
+}
+
+/** "terrain 42 %, flora 28 %, wildlife 12 %" from a ranked list. */
+export function formatDominance(entries: readonly BenchRankEntry[]): string {
+  return entries.map((e) => `${e.system} ${Math.round(e.pct * 100)} %`).join(', ')
+}
+
+/**
+ * Digest lines for the low-preset profile, appended after the sweep table so
+ * the file names the remaining cost centres at a glance (point 293).
+ */
+export function lowProfileSummaryLines(profile: BenchLowProfile): string[] {
+  const lines = [
+    '',
+    'LOW PRESET PROFILE — where the frame cost still sits at the low graphics level:',
+    `at LOW the frame is dominated by: ${formatDominance(profile.dominant)}  (${profile.headlinePhase})`,
+  ]
+  for (const p of profile.phases) {
+    const gpu = p.gpu ? `${p.gpu.median.toFixed(2)}ms gpu` : 'gpu n/a'
+    lines.push(`  ${pad(p.phase, 18)}${padStart(String(p.totalTris), 9)} tris · ${padStart(String(p.drawCalls), 5)} draws · ${gpu} · ${p.cpu.median.toFixed(2)}ms cpu · ${p.frame.median.toFixed(2)}ms frame`)
+    for (const e of p.ranking.slice(0, 6)) {
+      lines.push(`    ${pad(e.system, 22)}${padStart(String(e.tris), 9)}${padStart(`${Math.round(e.pct * 100)}%`, 5)}${padStart(`${e.meshes} mesh`, 10)}`)
+    }
+  }
+  return lines
 }
 
 export const BENCH_APP = 'The Heart of Africa (POC remake)'
@@ -415,6 +545,7 @@ export function benchSummaryLines(report: BenchReport): string[] {
         (r.vsyncLikely ? '  [vsync-capped]' : ''),
     )
   }
+  if (report.lowProfile) lines.push(...lowProfileSummaryLines(report.lowProfile))
   return lines
 }
 

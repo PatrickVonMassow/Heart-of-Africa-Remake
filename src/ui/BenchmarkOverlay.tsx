@@ -8,7 +8,7 @@
 
 import { useGame } from '../state/store'
 import { useUi } from '../state/ui'
-import { formatDuration, type BenchHeadline, type BenchPhaseName } from '../systems/benchmark'
+import { formatDominance, formatDuration, type BenchHeadline, type BenchLowProfile, type BenchPhaseName } from '../systems/benchmark'
 import { getStrings, useStrings } from '../i18n'
 import type { Strings } from '../i18n/types'
 
@@ -23,20 +23,27 @@ function phaseLabel(t: Strings, phase: string): string {
 
 /** The digest the report file carries as its first key — shown for a glance
  *  check before the file is sent on, together with the series to read. */
-function reportDigest(json: string): { summary: string; headline: BenchHeadline | null; gpuReason: string } {
+function reportDigest(json: string): {
+  summary: string
+  headline: BenchHeadline | null
+  gpuReason: string
+  lowProfile: BenchLowProfile | null
+} {
   try {
     const parsed = JSON.parse(json) as {
       summary?: string[]
       headline?: BenchHeadline
       gpuTiming?: { reason?: string }
+      lowProfile?: BenchLowProfile | null
     }
     return {
       summary: (parsed.summary ?? []).join('\n'),
       headline: parsed.headline ?? null,
       gpuReason: parsed.gpuTiming?.reason ?? '',
+      lowProfile: parsed.lowProfile ?? null,
     }
   } catch {
-    return { summary: '', headline: null, gpuReason: '' }
+    return { summary: '', headline: null, gpuReason: '', lowProfile: null }
   }
 }
 
@@ -80,6 +87,14 @@ export function BenchmarkOverlay() {
           <h3>{t.benchmark.doneTitle}</h3>
           {report.aborted && <p className="bench-aborted">{t.benchmark.abortedNote}</p>}
           {headlineNote && <p className="bench-headline">{headlineNote}</p>}
+          {digest.lowProfile && digest.lowProfile.dominant.length > 0 && (
+            <div className="bench-low-profile">
+              <p className="bench-low-title">{t.benchmark.lowProfile.title}</p>
+              <p className="bench-low-dominant">
+                {t.benchmark.lowProfile.dominatedBy(formatDominance(digest.lowProfile.dominant))}
+              </p>
+            </div>
+          )}
           <pre className="bench-summary">{digest.summary}</pre>
           <div className="actions">
             <button className="hud-button bench-download" onClick={download}>

@@ -20,6 +20,7 @@
 
 import { addAfterEffect, addEffect } from '@react-three/fiber'
 import { balance } from '../config/balance'
+import { QUALITY_PRESETS } from '../config/quality'
 import { getStrings } from '../i18n'
 import { getRenderContext } from '../render/renderContext'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
@@ -35,12 +36,14 @@ import {
   BENCH_SEED,
   BENCH_TRAVEL_SPEED,
   BENCH_ZOOM,
+  LOW_CONFIG_NAME,
   benchFilename,
   benchFrameCounts,
   benchRemainingMs,
   benchReportJson,
   benchShortMode,
   benchTotalFrames,
+  buildLowProfile,
   frameStats,
   headlineSeries,
   installFixedClock,
@@ -273,6 +276,32 @@ function applyConfig(config: BenchConfig, defaultPixelRatio: number): void {
   ctx?.gl.setPixelRatio(config.pixelRatio ?? defaultPixelRatio)
 }
 
+/**
+ * Apply the actual LOW `QUALITY_PRESETS` values for the point-293 profiling
+ * pass. Unlike `applyConfig` (which forces HIGH so every lever stays isolable),
+ * this drops the graphics level to 'low' so the effective* selectors read the
+ * low preset for everything reactive (post off, 1024 sun shadows, no campfire
+ * shadows, the tighter flora radius), and applies the two imperative levers the
+ * scene does not re-read on its own — the dpr cap and the terrain refinement —
+ * from the same low preset. The individual debug flags are set neutral so the
+ * preset's own AND-gates decide, and no leaked flag distorts the low picture.
+ */
+function applyLowPreset(defaultPixelRatio: number): void {
+  const low = QUALITY_PRESETS.low
+  useUi.setState({
+    detailLevel: 'low',
+    traaEnabled: true,
+    ssaoEnabled: true,
+    shadowsEnabled: true,
+    shadowMapHalf: false,
+    fireShadowsEnabled: true,
+  })
+  resetTerrainRefine()
+  setTerrainRefine({ enabled: low.terrainRefine })
+  const ctx = getRenderContext()
+  ctx?.gl.setPixelRatio(low.dprCap ?? defaultPixelRatio)
+}
+
 /** Renderer backend and adapter string for the report environment. */
 function describeBackend(gl: unknown): { backend: string; adapter: string } {
   const backend = (gl as { backend?: { isWebGPUBackend?: boolean } }).backend
@@ -313,7 +342,10 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
   running = true
   const short = options.short ?? benchShortMode(typeof location === 'undefined' ? '' : location.search)
   const counts = benchFrameCounts(short)
-  const framesTotal = benchTotalFrames(short)
+  // The sweep configs PLUS the point-293 low-preset profiling pass — one extra
+  // measured config, so the progress bar and the estimate cover it.
+  const measuredConfigs = BENCH_CONFIGS.length + 1
+  const framesTotal = benchTotalFrames(short, measuredConfigs)
 
   // --- everything restored in the finally below ---
   const originalRandom = Math.random
@@ -344,7 +376,7 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     useUi.getState().setBenchProgress({
       config,
       configIndex,
-      configCount: BENCH_CONFIGS.length,
+      configCount: measuredConfigs,
       phase,
       framesDone,
       framesTotal,
@@ -416,6 +448,14 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
       applyConfig(config, defaultPixelRatio)
       for (const phase of BENCH_PHASES) await runPhase(config, i + 1, phase, true)
     }
+
+    // The point-293 LOW-preset profiling pass: the sweep above forced HIGH to
+    // keep every lever isolable — this last measured config applies the real
+    // low QUALITY_PRESETS values, so `buildLowProfile` below can rank WHERE the
+    // frame cost still sits at the low graphics level.
+    const lowConfig: BenchConfig = { name: LOW_CONFIG_NAME, flags: {} }
+    applyLowPreset(defaultPixelRatio)
+    for (const phase of BENCH_PHASES) await runPhase(lowConfig, measuredConfigs, phase, true)
   } catch (error) {
     aborted = true
     if (!(error instanceof BenchAborted)) {
@@ -466,6 +506,9 @@ export async function startBenchmark(options: { short?: boolean } = {}): Promise
     gpuTiming: { available: gpuMeasured, reason: gpuReason },
     headline: headlineSeries(gpuMeasured, capped),
     rows,
+    // The low-preset cost ranking (point 293): where the frame cost still sits
+    // at the low graphics level, so the player can decide the next reduction.
+    lowProfile: buildLowProfile(rows),
     durationMs: Math.round(performance.now() - t0),
     aborted,
   }

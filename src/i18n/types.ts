@@ -190,6 +190,14 @@ export interface Strings {
     unavailable: string
     /** Toast when the run failed. */
     failed: (message: string) => string
+    /** The point-293 LOW-preset cost ranking shown in the result panel: which
+     *  systems still dominate the frame at the low graphics level. */
+    lowProfile: {
+      /** Heading for the low-level cost ranking. */
+      title: string
+      /** "At the low graphics level the frame is dominated by: <list>." */
+      dominatedBy: (list: string) => string
+    }
   }
 
   toasts: {
