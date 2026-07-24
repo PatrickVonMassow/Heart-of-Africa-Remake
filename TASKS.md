@@ -10817,7 +10817,7 @@ the remaining open points in their numeric order.
   and its stride phase tracks its covered distance. DOCS: CLAUDE.md §7.1 pt. 31 (the
   point-255 stride wording), design.md §2.5 if the rule text changes. Implementation-ready.
 
-- [ ] 287. THE "SPACE TO ENTER <name>" HINT MUST NOT REVEAL AN UNDISCOVERED SETTLEMENT'S
+- [x] 287. THE "SPACE TO ENTER <name>" HINT MUST NOT REVEAL AN UNDISCOVERED SETTLEMENT'S
   NAME (user report 24.07.2026, deployed build). Within a settlement's enter radius the
   localized hint "Space to enter <name>" shows (acceptance pt. 2, design.md §2.3). But
   when the place is NOT yet discovered — its map-label reads "?" (discovery-gated,
@@ -10836,7 +10836,7 @@ the remaining open points in their numeric order.
   name while a discovered one does. DOCS: design.md §2.3/§17.2, CLAUDE.md §7.1 pt. 2.
   Both languages. Implementation-ready.
 
-- [ ] 288. PORTS AND KNOWN LARGE SETTLEMENTS ARE KNOWN FROM THE START — NO "DISCOVERY"
+- [x] 288. PORTS AND KNOWN LARGE SETTLEMENTS ARE KNOWN FROM THE START — NO "DISCOVERY"
   AND NO DISCOVERY BOUNTY FOR THEM (user report 24.07.2026, deployed build). The port
   cities and the well-known large settlements were period-famous places an explorer of
   ~1890 already knew; they must start DISCOVERED (their map labels show their names from
