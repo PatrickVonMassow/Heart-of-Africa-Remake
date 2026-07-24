@@ -11236,6 +11236,18 @@ the remaining open points in their numeric order.
   instruction have Fable-5 verify the mechanism is 100 % RELIABLE (it cannot let an incomplete
   closing through) before it counts as done. No player-visible text.
 
+- [ ] 308. DASHBOARD SYNC GUARD — enforce that the »Woran ich gerade arbeite« card stays in sync
+  A written rule (»keep the dashboard current«) has no automation — at point 306, I forgot to update
+  the card while closing work ran in the background. The rule MUST be mechanically enforced: build a
+  Stop-hook guard that BLOCKS a turn-end if the card title does NOT match the real current state
+  (running agents, checked-out Git branch, TASKS.md point state). The guard is READ-ONLY: it does
+  not update the card, only detects and blocks drift. Core decision logic (git branch checks, card
+  title parse, TASKS.md scan) must be pure and Vitest-coverable. Deliverables: pure core logic +
+  15+ test cases (stale-card detection, branch-match, agent-pool polling) + fail-open Stop-hook
+  wrapper + a report of what drifts the guard catches (e.g. card says »306« but HEAD is on
+  »feat/224-…«). This guard exemplifies point 307's mechanism-first principle: instead of relying
+  on memory, a technical gate enforces rule compliance.
+
 - [ ] 307. AUDIT ALL ESTABLISHED RULES FOR MISSING ENFORCEMENT — build a mechanism for each
   rule that lacks one (user 24.07.2026, the mechanism-first principle). Relying on the model
   to follow a merely-WRITTEN rule has proven unreliable (the v0.2 closing-skip is the latest
