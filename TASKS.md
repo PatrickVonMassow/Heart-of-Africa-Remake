@@ -10794,6 +10794,71 @@ the remaining open points in their numeric order.
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
+- [ ] 286. SKYLINE PANORAMA ANIMAL WALKS BACKWARD + LEG-SPEED MISMATCH (user report
+  24.07.2026, deployed build, Cairo desert view). A §2.5 panorama-wildlife silhouette
+  on the horizon moves slowly BACKWARD while its legs swing WILDLY (a fast-forward-run
+  gait). Two faults, both to fix: (1) it must NEVER move backward — a silhouette only
+  ever drifts FORWARD along its facing; (2) the leg swing rate must be PHYSICALLY
+  CONSISTENT with the actual travel speed (slow drift = slow steps; fast = fast), not
+  a wild flail over a near-stationary body. This is exactly the point-255 "Skyline-Teil
+  offen" gap. ANCHORS: `src/scenes/place/panoramaWildlife.ts` (the stride pose +
+  distance coupling: `gaitPhase`/`legSwingAngle` fed by the arc walked along the drift
+  ring) and `src/scenes/place/backdrop.ts`. DIAGNOSE (picture-first, BOTH backends):
+  why the along-ring drift is negative/backward (sign error in the ring-arc step or the
+  facing derived opposite to the drift direction), and why `gaitPhase` advances fast
+  while the body barely moves (the phase must be driven by the SIGNED forward distance
+  actually covered, so a near-zero drift yields near-zero leg swing). FIX so the
+  rendered silhouette walks forward with legs whose swing frequency scales with its
+  real ground speed, and can never reverse. TESTS: extend `src/scenes/place/
+  panoramaWildlife.test.ts` — the drift step is forward-only (facing·velocity ≥ 0, no
+  backward component) and the leg-swing-per-unit-walked is constant so a slower
+  silhouette steps proportionally slower (a stalled one stands still); a live check in
+  `scripts/verify/polish.mjs` that the sampled silhouette advances (never regresses)
+  and its stride phase tracks its covered distance. DOCS: CLAUDE.md §7.1 pt. 31 (the
+  point-255 stride wording), design.md §2.5 if the rule text changes. Implementation-ready.
+
+- [ ] 287. THE "SPACE TO ENTER <name>" HINT MUST NOT REVEAL AN UNDISCOVERED SETTLEMENT'S
+  NAME (user report 24.07.2026, deployed build). Within a settlement's enter radius the
+  localized hint "Space to enter <name>" shows (acceptance pt. 2, design.md §2.3). But
+  when the place is NOT yet discovered — its map-label reads "?" (discovery-gated,
+  §17.2) — the hint must NOT leak the real name: show "?" (or a generic "Space to
+  enter" with no proper name) until the place is discovered, matching the map label.
+  ANCHOR: the settlement-entry hint text in `src/scenes/travel/` (the enter-candidate
+  hint that builds "Space to enter <name>") and the discovery state that gates the
+  §17.2 map labels (the same predicate the `.map-label` "?" uses). FIX: the hint reads
+  the discovery flag and substitutes "?" / the generic form for an undiscovered place;
+  a discovered place (e.g. Cairo, or one already visited) still shows its name.
+  NOTE: interacts with point 288 — ports/known large settlements are discovered from
+  the start, so their hint always shows the name. TESTS: pure test that the hint text
+  helper returns the name for a discovered place and "?"/generic for an undiscovered
+  one (`src/scenes/travel/settlementEntry.test.ts` or the i18n layer); a live check in
+  `scripts/verify/flow.mjs` that an undiscovered place's enter hint shows no proper
+  name while a discovered one does. DOCS: design.md §2.3/§17.2, CLAUDE.md §7.1 pt. 2.
+  Both languages. Implementation-ready.
+
+- [ ] 288. PORTS AND KNOWN LARGE SETTLEMENTS ARE KNOWN FROM THE START — NO "DISCOVERY"
+  AND NO DISCOVERY BOUNTY FOR THEM (user report 24.07.2026, deployed build). The port
+  cities and the well-known large settlements were period-famous places an explorer of
+  ~1890 already knew; they must start DISCOVERED (their map labels show their names from
+  the outset, §17.2) rather than being "discovered" on first sighting, and returning to
+  a port must credit NO discovery bounty for them (§10/acceptance pt. 25). Define the
+  set precisely: all 10 port cities (design.md §3.1) are known from the start; the
+  "known large settlements" are the period-notable ones — at minimum the major inland
+  centres already modelled as landmarks/large places (e.g. Timbuktu, Khartoum; decide
+  the list against design.md §4.1 settlement importance and record it). Ordinary
+  villages stay discovery-gated as now. ANCHORS: the initial discovery state (which
+  places begin discovered — the store/discovery init), the §17.2 label gate, and the
+  discovery-bounty crediting (§10, `src/state`/economy — the bounty that names
+  discoveries on the next port visit). FIX: seed the known set as discovered at new-game
+  init and exclude them from bounty accrual; a legacy save without the flag migrates to
+  mark them discovered. TESTS: pure tests that a fresh game starts with the ports (and
+  the defined known settlements) discovered and that entering/returning to a port
+  credits no bounty for them, while an ordinary village still discovers + bounties
+  normally (`src/state/store.*.test.ts`, `src/state/store.economy.test.ts`); the §17.2
+  label test that a port label shows its name from the start. DOCS: design.md §3.2/§10/
+  §17.2 and CLAUDE.md §7.1 pt. 3/25 (the discovery-gating wording gains the known-from-
+  start exemption). Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
