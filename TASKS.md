@@ -11146,6 +11146,40 @@ the remaining open points in their numeric order.
   panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
   leg pivots). No player-visible text.
 
+- [ ] 302. NEVER PUSH A STATE THAT FAILS CI — a pre-push fast-gate mechanism (user
+  24.07.2026: recurring pipeline-failure emails). The user gets GitHub failure emails when
+  a push lands a state CI rejects (a new npm-audit CVE, a lint/build/test regression); it
+  "works again afterwards" only because I fix + re-push, but the failed run already emailed.
+  ASSURE via a MECHANISM that a failing state never reaches main: a git PRE-PUSH hook (or an
+  equivalent enforced guard) that runs the fast gate — `npm run build && npm run lint &&
+  node scripts/audit-check.mjs && npm run test:unit` — before a push to main and BLOCKS it
+  on any red, so CI only ever sees green. Keep it proportionate: a docs/dashboard-only push
+  (no `src/`/`scripts/` change) may run a lighter subset (lint + audit-check), but
+  audit-check ALWAYS runs (new CVEs are the usual surprise). ANCHORS: `.git/hooks/pre-push`
+  or `scripts/pre-push-gate(-core).mjs` wired via git config / husky, docs (CLAUDE.md §6 —
+  "fast gate before every main push, enforced"). VERIFIABLE: a pure test of the gate
+  decision (red on any gate fail, green on all pass, doc-only fast-path) and a synthetic
+  failing state blocked from pushing. This is a must-work guard → build under the point-298
+  criticality rule (Fable plan-review before, safety-review after, merge only when green).
+  Until built, RUN the fast gate locally before every main push. No player-visible text.
+
+- [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
+  24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
+  incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
+  ASSUMED pre-276 defaults — SSAO on, campfire shadows off — so they measured the wrong
+  state; worst case is a check that stays GREEN while the feature is broken). Do a SYSTEMATIC
+  review of the ENTIRE diff since the `v0.1` tag (code AND tests): for each area, does the
+  test still assert what it claims, at a REACHABLE state, judged by the REAL signal — or has
+  a later change made it stale / tautological / always-green? Focus classes: checks that
+  assume a default a later point changed (the point-276 default flips are the template),
+  pixel/screenshot thresholds calibrated against a since-changed look, and invariants a
+  refactor turned into no-ops. Fix or re-validate each finding. METHOD: a COMBINATION of
+  Opus 5 and Fable 5 (model-diverse review, the point-298 spirit) — the two models review the
+  diff independently and cross-check findings. START ONLY AFTER the user's VS Code restart
+  (so it runs on Opus 5). ANCHORS: `git diff v0.1..HEAD`, all `src/**/*.test.ts[x]` and
+  `scripts/verify/*.mjs`. VERIFIABLE: a written report per reviewed area with a verdict
+  (valid / stale→fixed), each stale test fixed with its correction. No player-visible text.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
