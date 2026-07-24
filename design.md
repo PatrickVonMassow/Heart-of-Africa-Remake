@@ -91,6 +91,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 - Five regions, each with its own landscape, its own peoples and its own value profile: North (desert/Sahara), West (savanna), Central (jungle/Congo basin), East (mountains/lakes/rift), South (high plateau). The boundaries between the regions are visible in the game: as subtle dashed ink lines on the exploration map and as dashed ground markings over land in the bird's-eye view. Along the borders, the name of the region is shown on its respective side of the line (localized), both on the map and in the bird's-eye view.
 - Terrain types: ocean, coast, desert, savanna/open land, jungle/grassland, mountains, water (river/lake).
 - Coordinate system: position in degrees ("latitude … degrees north/south", "longitude … degrees west/east"). This system is the basis of the hints (§13). It is not shown permanently on screen; the current coordinates are read out on demand via the position query (§17).
+- The ten port cities of §3.1 are known from the start: their map-point labels name them from the outset rather than reading "?" until visited (the discovery-gating exemption, §17.2). Ordinary villages stay discovery-gated.
 
 ### 3.3 Real geodata and terrain rendering
 
@@ -292,7 +293,7 @@ Every settlement — port city or native village — offers at least the baselin
 - Bazaar (treasure finds): offer an item → the merchant names a bid → accept or decline. If the item does not fit the regional value profile, it is rejected. The bid is a standing quote for that port: declining and re-offering the same item shows the identical price, not a freshly haggled one. The quote expires only on leaving the port (a different port haggles anew).
 - Price logic: a base price per good; treasure finds additionally carry a regional factor and a buy/sell spread. Profit comes from regional arbitrage.
 - Ferries (travel agency): passage between ports for a fee; saves time compared to overland travel.
-- Discovery bounty: money for reported discoveries (new villages, landmarks), credited on the next port visit as a telegraphic transfer; the chronicle entry names the discoveries and the amount. The first sighting of a landmark is itself a journal moment, with its own entry flavored by what was found — a mountain rising against the sky, a thundering waterfall, a sea-like lake, the elephant graveyard. Entry HEADINGS are specific too: a sighting heads with the landmark's name shaped by its kind, and a dug find heads with the treasure's name — never a generic one-size title like "A Discovery".
+- Discovery bounty: money for reported discoveries (new villages, landmarks), credited on the next port visit as a telegraphic transfer; the chronicle entry names the discoveries and the amount. The ten port cities are known from the start (§17.2) and never count as discoveries, so reaching one — even for the first time — earns no bounty for the port itself. The first sighting of a landmark is itself a journal moment, with its own entry flavored by what was found — a mountain rising against the sky, a thundering waterfall, a sea-like lake, the elephant graveyard. Entry HEADINGS are specific too: a sighting heads with the landmark's name shaped by its kind, and a dug find heads with the treasure's name — never a generic one-size title like "A Discovery".
 
 ---
 
@@ -528,6 +529,8 @@ Players who do not want to be interrupted can turn the automatic presentation of
 ### 17.2 Discovery-gated labels
 
 Map-point labels are gated by discovery: the floating name of a settlement or a natural landmark (village, waterfall, mountain, lake, river) appears only once the traveller has discovered it — a place once it has been visited, a landmark once it has been sighted (the same sighting that earns its discovery bounty, §10). Until then the point carries a muted "?" as its label instead of the name. The exploration overview likewise draws only the places already visited.
+
+**Known from the start (exemption).** The ten port cities of §3.1 (Cairo, Tangier, Khartoum, Saint-Louis, Timbuktu, Lagos, Boma, Berbera, Zanzibar, Cape Town) were famous places an explorer of ~1890 already knew and could name — the great trade and river ports, Timbuktu and Khartoum among them. They begin DISCOVERED: their map labels show their names from the outset (never "?"), they are not "discovered" on first sighting, and reaching one credits no discovery bounty for it (§10). Every period-notable inland centre modelled in the game is itself one of these ports, so the known-from-start set is exactly the ten ports; the ordinary ethnic villages stay discovery-gated as above. A save from before this rule migrates on load by marking the ports discovered.
 
 ### 17.3 First-person UI
 

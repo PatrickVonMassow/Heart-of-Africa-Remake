@@ -253,3 +253,14 @@ export function placeById(id: string): PlaceDef {
   if (!p) throw new Error(`unknown place: ${id}`)
   return p
 }
+
+// Settlements an ~1890 explorer already knew and could name from the outset
+// (design.md §3.2/§17.2): the ten port cities. They start DISCOVERED — their
+// map labels show their names from the start (never "?", §17.2) and returning to
+// them credits no discovery bounty (design.md §10). Every period-famous inland
+// centre in the model is itself one of these ports (Timbuktu, Khartoum on the
+// caravan/Nile routes), so the known set is exactly the ten ports; the ordinary
+// ethnic villages stay discovery-gated as before.
+export const KNOWN_FROM_START_PLACES: readonly string[] = PLACES.filter(
+  (p) => p.kind === 'port',
+).map((p) => p.id)
