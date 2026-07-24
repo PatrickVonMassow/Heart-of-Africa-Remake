@@ -11133,7 +11133,15 @@ the remaining open points in their numeric order.
   is fixed to the ground, the body translates over it; no sliding). Add a PURE test that the
   stride length equals the foot's stance ground-travel (feet planted, not skating), and a LIVE
   screenshot-series check (a skyline silhouette AND a settlement walker) that a tracked foot's
-  screen position stays ~fixed through its stance phase while the body moves forward. ANCHORS: the
+  screen position stays ~fixed through its stance phase while the body moves forward.
+  SLOPE FOOTING (user 24.07.2026, second facet of the same "feet on the ground" system): when an
+  animal walks UP or DOWN a slope, its front (uphill) or back (downhill) feet FLOAT in the air —
+  the body/legs do not conform to the incline (screenshot: a skyline silhouette on a dune with a
+  foot hovering above the terrain). FIX: sample the terrain height under EACH foot (or pitch the
+  body to the local ground slope) so ALL feet contact the sloped ground, not just the ones on the
+  body's reference plane. VERIFY (screenshot): on an up-slope AND a down-slope, no foot hovers
+  above the terrain — every planted foot touches the ground it stands on (panorama silhouette on a
+  dune AND a settlement walker on sloped ground). ANCHORS: the
   panorama gait (`src/scenes/place/panoramaWildlife.ts` — gaitPhase / legSwingAngle /
   panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
   leg pivots). No player-visible text.
