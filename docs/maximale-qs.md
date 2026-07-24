@@ -185,3 +185,33 @@ Cheap automated classes first, then the visual sweep:
   wiring as the earlier `/v0.1/`, `/poc/` pages), then freeze.
 - Per `tags-only-on-request`: only tag/publish on the user's explicit demo
   instruction; hold the final tag for the user unless told to publish it.
+
+---
+
+## Keep the retrospective current — the refresh script + the currency guard
+
+The collaboration retrospective (`local/retrospektive-zusammenarbeit.md`,
+git-ignored, German) records the recurring problem classes and their hardened
+solutions. Its own lesson #1 — reminders do not keep documents current, only
+enforcement does — applies to the document itself, so its currency is
+**enforced**:
+
+- **`scripts/retro-refresh.mjs`** scans the durable problem/solution-history
+  sources — the feedback/project memories in the project memory dir, the
+  guard/hook scripts in `scripts/` (each guard = a hardened solution), the git
+  revert trail, and the process/meta TASKS points — and regenerates the
+  marker-delimited `<!-- AUTO-GENERATED:START/END -->` section of the doc (a
+  machine-maintained table: problem class, #attempts, heuristic severity,
+  matching guard measure, status), recording a sources fingerprint + a
+  "last refreshed" timestamp. The analysis prose outside the markers is never
+  touched; an absent doc gets a minimal skeleton.
+- **`scripts/retro-currency-guard.mjs`** (Stop hook) recomputes the
+  fingerprint at every turn end and BLOCKS while it differs from the doc's
+  recorded one — a new/edited memory, a new guard, a fresh revert or a
+  process TASKS change forces the refresh **plus a review whether a NEW
+  problem class needs its own prose paragraph** before the turn can end.
+  No-ops when the doc is absent or `.claude/batch-paused` exists; stands down
+  for non-owner sessions; fail-OPEN on any internal error.
+- Shared logic: `scripts/retro-core.mjs` (pure, Vitest-covered in
+  `scripts/retro-core.test.mjs`) + `scripts/retro-sources.mjs` (the one
+  fs/git collector both scripts use, so their fingerprints can never drift).
