@@ -1,5 +1,5 @@
 // Stop hook: GUARANTEE the retrospective document
-// (local/retrospektive-zusammenarbeit.md) stays current — enforcement, not a
+// (docs/analysis_de/retrospektive-zusammenarbeit.md) stays current — enforcement, not a
 // reminder (the document's own lesson #1: only blocking mechanisms hold).
 //
 // It recomputes the fingerprint over the durable problem/solution-history

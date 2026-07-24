@@ -1,5 +1,5 @@
 // Refresh the retrospective's auto-generated section
-// (local/retrospektive-zusammenarbeit.md — git-ignored, German).
+// (docs/analysis_de/retrospektive-zusammenarbeit.md — git-ignored, German).
 //
 // Scans the durable problem/solution-history sources (feedback/project
 // memories, guard scripts, git revert trail, process/meta TASKS points — see

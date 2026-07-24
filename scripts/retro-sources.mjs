@@ -37,7 +37,7 @@ export const REPO_ROOT = (() => {
 
 /** The retrospective document (git-ignored; overridable for the test harness). */
 export const DOC_PATH =
-  process.env.RETRO_DOC_PATH || resolve(REPO_ROOT, 'local', 'retrospektive-zusammenarbeit.md')
+  process.env.RETRO_DOC_PATH || resolve(REPO_ROOT, 'docs', 'analysis_de', 'retrospektive-zusammenarbeit.md')
 
 /**
  * The project memory dir under ~/.claude/projects/<munged repo path>/memory.

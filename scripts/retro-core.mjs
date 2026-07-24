@@ -5,7 +5,7 @@
 // the SAME canonical structure — a drift between them would either trap the
 // session (guard stricter) or silently let staleness through (guard laxer).
 //
-// The retrospective (local/retrospektive-zusammenarbeit.md, git-ignored,
+// The retrospective (docs/analysis_de/retrospektive-zusammenarbeit.md, git-ignored,
 // German) records the project's recurring problem classes and their hardened
 // solutions. Its own lesson #1 is that reminders do not keep documents
 // current — only enforcement does — so its currency is enforced by a guard
@@ -311,10 +311,12 @@ export function evaluateCurrency({ docText, currentFingerprint } = {}) {
   return {
     decision: 'block',
     reason:
-      `Retrospective currency: local/retrospektive-zusammenarbeit.md is STALE — ${detail}. ` +
+      `Retrospective currency: docs/analysis_de/retrospektive-zusammenarbeit.md is STALE — ${detail}. ` +
       'Run `node scripts/retro-refresh.mjs` (regenerates only the marker-delimited auto section), ' +
       'then REVIEW the document: does a NEW problem class need its own row in the summary table ' +
       'plus a prose paragraph (German, in the analysis sections)? The prose is never auto-written — ' +
-      'extend it yourself where the new source warrants it, then end the turn.',
+      'extend it yourself where the new source warrants it. THEN, since it is derived from the same ' +
+      'sources, review docs/analysis_de/vibe-coding-anleitung.md too: does the new lesson belong in ' +
+      'that beginner guide (a pitfall + its prompt)? Keep both analysis docs current, then end the turn.',
   }
 }

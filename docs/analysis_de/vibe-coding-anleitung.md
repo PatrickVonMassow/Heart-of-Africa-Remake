@@ -1,0 +1,189 @@
+# Vibe Coding — kurze Anleitung aus einem echten Projekt
+
+Für den Einstieg. Destilliert aus einem mehrwöchigen, weitgehend autonom gebauten
+Projekt (3D-Spiel, zwei Render-Backends, ~1600 Tests). Keine Klick-für-Klick-Schritte,
+sondern **Prompts, die du Claude gibst**, und die Fallstricke, die dich sonst einholen.
+
+---
+
+## Die eine Kernlehre
+
+**Zuverlässigkeit ist eine Infrastrukturfrage, keine Charakterfrage.** Solange ein
+Problem nur „gemerkt" wurde, kam es wieder. Sobald ein **Mechanismus** dastand (ein
+automatischer Check, ein Hook, ein Test), verschwand es. Merksatz:
+
+> *Was zweimal schiefgeht, bekommt einen Mechanismus — nicht ein drittes Versprechen.*
+
+Fast alles Folgende ist eine Anwendung davon.
+
+---
+
+## So setzt du ein Projekt auf (Prompts zum Kopieren)
+
+1. **Zielbild zuerst, als einzige Wahrheit.**
+   > „Wir schreiben zuerst ein `design.md`, das beschreibt, was am Ende existieren soll.
+   > Das ist die alleinige Quelle der Wahrheit. Ändere es nie eigenmächtig; wenn ich
+   > etwas ändere, aktualisiere `design.md` und den Code gemeinsam."
+
+2. **Ein dauerhaftes Arbeitsprotokoll.**
+   > „Lege ein `TASKS.md` an. Jede Änderungsanforderung wird als eigener, klar
+   > umrissener Punkt ans Ende angehängt und der Reihe nach abgearbeitet — niemals
+   > mittendrin abbiegen. Eine abgeschlossene Einheit = ein Commit mit aussagekräftiger
+   > Nachricht. Committe/pushe nur, wenn ich es sage."
+
+3. **Zwei Testschichten von Anfang an.**
+   > „Richte zwei Ebenen ein: eine schnelle, deterministische Schicht ohne Browser für
+   > Logik/Zustand (läuft in Sekunden) und wenige echte Browser-/E2E-Tests nur für das,
+   > was es wirklich braucht (Rendering, Layout, Klick-Flows). **Jedes neue Feature
+   > bekommt einen Test auf der passenden Schicht** — das ist Pflicht, nicht optional."
+
+4. **Sauberer Baum nach jeder Änderung.**
+   > „Nach jeder Änderung müssen Build, Linter und Abhängigkeits-Audit sauber sein
+   > (null Fehler/Warnungen/bekannte Lücken). Überdecke nie einen Fehlschlag — melde ihn
+   > mit dem konkreten Output."
+
+5. **Die Selbstheilungs-Regel etablieren.**
+   > „Wenn dir derselbe Fehler ein zweites Mal passiert (oder ich dich zum zweiten Mal
+   > auf dasselbe hinweise), baue einen automatischen Mechanismus, der ihn künftig
+   > verhindert — einen Test, einen Git-Hook oder einen Stop-Hook, der abbricht, wenn die
+   > Regel verletzt wird. Ein Vorsatz reicht nicht."
+
+6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
+   > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite), das **immer den
+   > echten Stand** zeigt: woran du gerade arbeitest, was offen ist, was erledigt ist.
+   > Halte die Struktur stabil und aktualisiere es sofort nach jeder Änderung."
+
+---
+
+## Automatische Tests — und ihre Tiefe abstufen
+
+Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber
+nicht jede Änderung braucht die volle Batterie — sonst wird Testen so langsam, dass es
+umgangen wird. Bewährt haben sich **abgestufte Umfänge**, aus denen du je nach Änderung
+wählst:
+
+- **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
+  Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern. Hierhin gehört
+  alles, was ohne Browser prüfbar ist.
+- **Klein (bei Sichtbarem/Interaktion):** die schnelle Schicht + ein Kernsatz echter
+  Browser-/E2E-Tests — nur für das, was einen Browser wirklich braucht (Rendering, Layout,
+  Klick-Flows).
+- **Groß (vor jedem Release):** die volle Regression über alle Suiten und **alle
+  Ziel-Backends/Geräte**, mehrfach flakefrei.
+
+> *Prompt:* „Richte drei Test-Stufen ein — schnell (Unit, immer), klein (Unit + Kern-
+> Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
+> passende Stufe und nenn mir kurz warum; die große Stufe läuft immer vor einem Release."
+
+Zwei Regeln, die das Netz ehrlich halten:
+
+> *Prompt:* „Jedes neue Feature bekommt einen Test auf der passenden Stufe — bevorzugt die
+> schnelle, wenn es ohne Browser prüfbar ist. Flakende Browser-Tests dürfen **einmal
+> sichtbar** automatisch wiederholt werden (mit einer ‚auf Wiederholung bestanden —
+> untersuchen'-Zeile), aber der Release-Lauf muss auch strikt ohne Wiederholung grün sein.
+> Warte Tests auf eine Bedingung oder die App-Uhr, nie auf eine feste Wartezeit."
+
+---
+
+## Die häufigsten Fallstricke → und was hilft
+
+- **Grüner Test, falsches Bild.** Der gefährlichste Fehler: Der Test ist grün, aber das
+  Ergebnis ist trotzdem falsch (er prüfte einen Hilfswert, einen unerreichbaren
+  Debug-Zustand, einen geratenen Näherungswert).
+  → *Prompt:* „Beurteile visuelle/UX-Änderungen am **echten gerenderten Bild**
+  (Screenshot), nicht an einem Proxy, und nur unter Bedingungen, die ein Nutzer wirklich
+  erreicht. Frag dich am Screenshot: *Sieht das für einen Menschen richtig aus?*"
+
+- **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das
+  unbeobachtete Y.
+  → *Prompt:* „Für jede Mechanik teste auch den **Ausgangs-/Danach-Zustand** mit. Baue
+  eine Handvoll ‚Invarianten' ein, die im Entwicklungsmodus laut meckern, wenn eine
+  Grundregel verletzt wird — so wird jeder Testlauf zum Detektor. Nach jedem
+  Zusammenführen die schnelle Testschicht laufen lassen."
+
+- **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
+  → *Prompt:* „Ein Fix gilt erst als fertig, wenn du das **Symptom am Ort des Symptoms**
+  als behoben gezeigt hast. Wenn du dich zweimal am selben Problem festbeißt, wechsle die
+  Perspektive (anderes Modell, frische Read-only-Diagnose zuerst)."
+
+- **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller' —
+  ohne Messung.
+  → *Prompt:* „Kommuniziere nur **gemessene** Zahlen (Laufzeiten, Performance,
+  Kostenschätzungen). Bei Performance auf der **Ziel-Hardware** messen, nicht auf der
+  Build-Maschine."
+
+- **Zweites Modell nur bei Audits.** Ein einzelnes Modell hat blinde Flecken — gerade bei
+  Dingen, die *immer* funktionieren müssen.
+  → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** ein. Bei Kritischem
+  (etwas Schwer-Reversibles, ein Sicherheits-/Kern-Mechanismus) lass ein **zweites,
+  anderes Modell** Plan und Ergebnis gegenprüfen (sicher? alle Fälle? keine
+  Seiteneffekte?), bevor es zusammengeführt wird."
+
+- **Der Assistent bleibt still stehen / schläft ein.** Bei langen, autonomen Läufen endet
+  der Fortschritt unbemerkt.
+  → *Prompt:* „Wenn du eine Daueraufgabe autonom abarbeitest, sei die **letzte Aktion
+  jedes Schritts** immer ein Schritt an der Aufgabe. Baue einen Mechanismus, der ein
+  stilles Anhalten verhindert, statt dich darauf zu verlassen."
+
+- **Kommunikation verfehlt.** Zu technisch, zu lang, falsche Sprache, an der Zielgruppe
+  vorbei.
+  → *Prompt:* „Beschreibe Bugs/Status in der Sprache der Zielgruppe (Symptom zuerst, kurz,
+  fürs Handy lesbar). Halte dich an meine Format- und Sprachvorgaben auf **allen**
+  sichtbaren Ausgaben."
+
+- **Doku und Code driften auseinander.** Das ‚Was' im Design-Doc passt nicht mehr zum
+  ‚Wie' im Code.
+  → *Prompt:* „Wenn eine Änderung das Design berührt, aktualisiere Design-Doc und Code im
+  **selben** Commit. Halte Referenz-/Recherche-Dokumente aktuell, wenn sich das Fundament
+  ändert."
+
+- **Messung/Vorschau verunreinigt.** Halbfertiges wird versehentlich als ‚fertig'
+  beurteilt; Popups stören Messungen.
+  → *Prompt:* „Mein Urteil fällt immer am **veröffentlichten/zusammengeführten** Stand,
+  nie an einem Zwischen-Zweig. Halte Messläufe frei von störenden Fenstern."
+
+---
+
+## Drei Meta-Regeln, die alles zusammenhalten
+
+1. **Root-Cause vor Fix.** Die besten Wendepunkte begannen mit einer schonungslosen
+   Analyse des eigenen Versagens. Ausreden-freie Ursachennotizen sind der Rohstoff, aus
+   dem gute Mechanismen entstehen.
+   > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
+   > **mechanische** Ursache — was genau war die Annahme, die brach?"
+
+2. **Nutzer-Artefakte sind Verträge.** Ein Dashboard, ein Ausgabeformat, eine Board-
+   Struktur, die du festgelegt hast: nicht eigenmächtig umbauen. Änderungen nur als
+   Vorschlag.
+   > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
+   > Änderungen vor, setz sie nicht ungefragt um."
+
+3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Viel Delegation ist ein
+   Vervielfacher — aber erst, wenn Isolierung, saubere Zustände und Exklusivität stehen.
+   Sonst vervielfacht sie das Chaos. Das konkrete Werkzeug für parallele Arbeit sind
+   **Feature-Branches**: jede Aufgabe auf ihrem eigenen Zweig von `main`, und wenn mehrere
+   Stränge gleichzeitig laufen, jeweils in einer **eigenen Arbeitskopie** (Git-Worktree),
+   damit sich die Zweige nicht in einem Verzeichnis überschreiben. `main` bleibt dabei
+   immer der fertige, geprüfte Stand — ein Zweig wird erst zusammengeführt, wenn sein Punkt
+   komplett und (bei Sichtbarem: am Bild, auf allen Ziel-Backends) verifiziert ist.
+   Wichtigste Voraussetzung fürs echte Parallelisieren: die gleichzeitigen Stränge dürfen
+   sich **nicht dieselben Dateien** teilen — sonst kollidieren sie beim Zusammenführen.
+   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch von `main` und führe
+   > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
+   > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
+   > Arbeitskopie (Git-Worktree) und teile sie so auf, dass sie **nicht dieselben Dateien**
+   > anfassen. Isolierung und Exklusivität **vor** Redundanz."
+
+---
+
+## Der kürzeste mögliche Start
+
+> „Lies `design.md` als einzige Wahrheit und leg ein `TASKS.md` an. Richte die zwei
+> Testschichten ein. Nach jeder Änderung: Build/Lint/Audit sauber, ein Test auf der
+> passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn dir
+> derselbe Fehler zweimal passiert, bau einen automatischen Check dagegen. Bei Kritischem
+> hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das Zielbild unklar ist — rate
+> nicht."
+
+Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
+Projekts eingebaut, bevor die erste Zeile Code entsteht.

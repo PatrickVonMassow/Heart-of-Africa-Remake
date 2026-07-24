@@ -195,7 +195,7 @@ Cheap automated classes first, then the visual sweep:
 
 ## Keep the retrospective current — the refresh script + the currency guard
 
-The collaboration retrospective (`local/retrospektive-zusammenarbeit.md`,
+The collaboration retrospective (`docs/analysis_de/retrospektive-zusammenarbeit.md`,
 git-ignored, German) records the recurring problem classes and their hardened
 solutions. Its own lesson #1 — reminders do not keep documents current, only
 enforcement does — applies to the document itself, so its currency is
