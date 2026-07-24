@@ -3201,7 +3201,7 @@ function Herds() {
     // nearest live animal of each voice group so their sounds rise as the
     // player draws near, all under the single ambience volume.
     {
-      const near = { elephant: -Infinity, lion: -Infinity, grazer: -Infinity, flock: -Infinity }
+      const near = { elephant: 0, lion: 0, grazer: 0, flock: 0 }
       const consider = (dx: number, dz: number, key: keyof typeof near) => {
         near[key] = Math.max(near[key], proximityGain(Math.hypot(dx, dz)))
       }
@@ -3211,13 +3211,7 @@ function Herds() {
       for (const a of herds.flamingo) if (!a.dead) consider(a.x - pos.x, a.z - pos.z, 'flock')
       if (LION_STATE.mode === 'chase' || LION_STATE.mode === 'feed')
         consider(LION_STATE.lx - pos.x, LION_STATE.lz - pos.z, 'lion')
-      // Convert -Infinity to 0 when no animals present
-      setAmbienceAnimals({
-        elephant: Math.max(0, near.elephant),
-        lion: Math.max(0, near.lion),
-        grazer: Math.max(0, near.grazer),
-        flock: Math.max(0, near.flock),
-      })
+      setAmbienceAnimals(near)
     }
 
     ASSERT_TICK = (ASSERT_TICK + 1) % 13

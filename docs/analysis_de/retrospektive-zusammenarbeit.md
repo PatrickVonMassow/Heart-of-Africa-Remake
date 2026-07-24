@@ -277,7 +277,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 24.07.2026, 23:23 · Quellen-Fingerprint: `2b154f645389…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 00:16 · Quellen-Fingerprint: `7ee259e23eed…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -318,12 +318,14 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 — TWO claude batch sessions ran in the SAME working dir at once (OS autostart duplicated a live session); how to detect + the safe posture | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RESUME/handoff — current batch state, what is merged, the in-flight delegated branches, and the path to the v0.2 (224) demo | 1 | niedrig | batch-resume-hook.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | When Opus (the default model) has failed ~2 attempts on the same problem, hand it to Fable for fresh eyes — a different model sees different blind spots | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -346,8 +348,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 61 Feedback-/Projekt-Memories · 24 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 0 Prozess-/Meta-TASKS-Punkte (davon 0 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 24 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 11 Prozess-/Meta-TASKS-Punkte (davon 6 offen).
 
-<!-- RETRO-FINGERPRINT: 2b154f645389040833ff1748d70a86a0e5979f13664e212c4885715eb166befd -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-24T21:23:29.991Z -->
+<!-- RETRO-FINGERPRINT: 7ee259e23eeda1e6c2ff707eadb4a4a052e689a439de933a14ad95a6217fdd7c -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-24T22:16:39.349Z -->
 <!-- AUTO-GENERATED:END -->

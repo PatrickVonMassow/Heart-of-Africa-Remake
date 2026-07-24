@@ -10971,7 +10971,7 @@ the remaining open points in their numeric order.
   the memory `use-1890-valid-names`; the point-205 plausibility audit enforces it. Fast
   gate green (2867 tests). Committed to main.
 
-- [x] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
+- [ ] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
   24.07.2026 during the 276 verify; PRE-EXISTING on main, independent of 276/273).
   design.md §19.1 / §7.1 pt.20: a nearby animal's own call rises and AUDIBLY FADES with
   distance. Currently it does not fade back: in `scripts/verify/settings.mjs` the
@@ -11049,7 +11049,7 @@ the remaining open points in their numeric order.
   player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
   (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
 
-- [x] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
+- [ ] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
   retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
   agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
   polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
@@ -11059,7 +11059,7 @@ the remaining open points in their numeric order.
   decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
   grows.)
 
-- [x] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
+- [ ] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
   hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
   hooks run every turn end) and the memory files (contradictory/tempering pairs like
   deploy-fable-proactively ↔ fable-sparingly): list each guard/memory with last-modified,
