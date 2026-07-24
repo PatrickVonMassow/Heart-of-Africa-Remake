@@ -161,6 +161,6 @@ refraction, English-only journal read-aloud; screen-space reflections were
 integrated, found visually irrelevant for this game's camera and removed
 again) are recorded as open items in the code (`// OPEN:`) and in
 `TASKS.md`. The full headless regression runs with
-`npm test` — a fast Vitest (jsdom) layer plus 13 Playwright browser suites;
+`npm test` — a fast Vitest (jsdom) layer plus 15 Playwright browser suites;
 the test strategy and coverage map live in
 [`scripts/verify/README.md`](scripts/verify/README.md).
