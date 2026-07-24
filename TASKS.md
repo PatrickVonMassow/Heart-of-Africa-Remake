@@ -10882,7 +10882,7 @@ the remaining open points in their numeric order.
   CLAUDE.md §7.1 pt. 15 if the firelight rule changes; record the benchmark verdict in
   docs/perf-276-findings.md. Implementation-ready; feasibility+perf gated.
 
-- [ ] 290. A RELIABLE MECHANISM TO KEEP THE RETROSPECTIVE DOCUMENT CURRENT (user
+- [x] 290. A RELIABLE MECHANISM TO KEEP THE RETROSPECTIVE DOCUMENT CURRENT (user
   24.07.2026: "verankere mit einem sicheren Mechanismus, das Retrospektive-Dokument
   immer aktuell zu halten"). The retrospective lives at
   `local/retrospektive-zusammenarbeit.md` (git-ignored, on Deutsch). It must stay
