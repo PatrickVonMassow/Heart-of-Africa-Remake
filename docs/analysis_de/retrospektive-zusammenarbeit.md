@@ -277,7 +277,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 24.07.2026, 22:17 · Quellen-Fingerprint: `d19b41d0405b…`
+Zuletzt aktualisiert: Freitag, 24.07.2026, 22:34 · Quellen-Fingerprint: `5a4553e3e4fe…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -346,8 +346,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 61 Feedback-/Projekt-Memories · 24 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 10 Prozess-/Meta-TASKS-Punkte (davon 5 offen).
+Erfasste Quellen: 61 Feedback-/Projekt-Memories · 24 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 11 Prozess-/Meta-TASKS-Punkte (davon 6 offen).
 
-<!-- RETRO-FINGERPRINT: d19b41d0405b4b7f25cf1bbd3078f2e4130830b18af4c7332fed0a33542e944c -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-24T20:17:03.926Z -->
+<!-- RETRO-FINGERPRINT: 5a4553e3e4fe04aa7ae705909416fd240945f9d3e7537fb6d1ad568b43b61831 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-24T20:34:38.963Z -->
 <!-- AUTO-GENERATED:END -->
