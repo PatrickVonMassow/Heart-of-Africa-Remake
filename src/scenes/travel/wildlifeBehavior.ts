@@ -556,6 +556,38 @@ export function gambolState(
 }
 
 /**
+ * Grounded standing height for a body on land (design.md §19, points
+ * 203(A)/283): a small floor keeps the lowest ground from clipping the body
+ * origin under the surface. The renderer draws the body at this height, so
+ * EVERY drive that moves an animal must re-derive `a.y` through this exact
+ * clamp at the animal's new position — the single shared derivation that makes
+ * a moved body stand on precisely the ground drawn under it (the source clamp
+ * the buried-warthog assert is armed for).
+ */
+export const GROUND_BODY_MIN_Y = 0.02
+export function groundedBodyY(terrainHeight: number): number {
+  return Math.max(GROUND_BODY_MIN_Y, terrainHeight)
+}
+
+/**
+ * Ground-follow for a mover (point 283): sample the terrain at the animal's
+ * CURRENT position and return the grounded body height it should stand at, or
+ * `null` on a water cell — water occupants ride their own drama/sheet rules and
+ * keep their maintained height. This is the ONE derivation a moving drive and
+ * the renderer share (both feed the same terrain sample through `groundedBodyY`),
+ * so a body that just moved can never sink under the fresh ground beneath it.
+ */
+export function groundFollowY(
+  x: number,
+  z: number,
+  sampleTerrainAt: (x: number, z: number) => { type: string; height: number },
+): number | null {
+  const t = sampleTerrainAt(x, z)
+  if (t.type === 'water' || t.type === 'ocean') return null
+  return groundedBodyY(t.height)
+}
+
+/**
  * Body-separation push (design.md §19): given neighbours as `[x, z, minDist]`,
  * returns the `[dx, dz]` that moves the subject half-way out of every overlap
  * (each of an overlapping pair resolves its own half, so the pair parts
