@@ -1,0 +1,674 @@
+// HARD batch singleton (user mandate 24.07.2026, after the e9407cae incident:
+// two live sessions drove the batch and committed to main concurrently).
+// This module is the ONE authority on "who may drive the batch":
+//
+//   1. A single OWNER LOCK (.claude/batch-lock.json) with a liveness heartbeat
+//      (timestamp + session id + the owning claude process's OS PID + its start
+//      time). The pid makes liveness REAL: a session mid-40-minute tool call
+//      writes no heartbeat, but its process is provably alive — the old
+//      claimedAt-age-only check declared exactly such a session dead and
+//      double-spawned (the incident's root cause).
+//   2. ATOMIC acquisition (test-and-set, never check-then-set): first claim via
+//      exclusive file create ('wx'); takeover of a dead lock via a reap MUTEX
+//      directory (mkdirSync is atomic) so two racing starters can never both
+//      win, and a racer can never clobber a freshly re-claimed live lock.
+//   3. STAND-DOWN: every guard/hook asks this module before pushing a session
+//      to work. A session that does not hold the live lock is treated as
+//      paused — it refuses to drive the batch even if it exists by mistake.
+//   4. An ACTIVE parallel-session DETECTOR: every top-level session start and
+//      every tool call is recorded per session id; a second top-level session
+//      with fresh tool activity in THIS repo is flagged, the owner is told to
+//      verify repo consistency (scripts/batch-doctor.mjs), and the autostart
+//      launcher kills a rogue spawn of its own making.
+//
+// Legacy compatibility: the lock file keeps the old `sessionId`/`claimedAt`
+// fields (claimedAt doubles as the heartbeat), so a not-yet-updated reader
+// still sees a fresh lock as "held". Pure decision logic is dependency-injected
+// and Vitest-covered in scripts/batch-singleton-core.test.mjs.
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  renameSync,
+  openSync,
+  closeSync,
+  writeSync,
+  rmSync,
+  mkdirSync,
+  rmdirSync,
+  statSync,
+} from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import os from 'node:os'
+
+// --- Constants (exported for tests and callers) -------------------------------
+
+/** A heartbeat younger than this proves life outright — no pid probe needed,
+ *  and a dead-looking pid within this grace is still treated as alive (the
+ *  owner may be mid-acquisition or the probe raced a restart). */
+export const DEAD_CONFIRM_MS = 5 * 60 * 1000
+/** Legacy locks (no pid recorded) fall back to age-only liveness with this
+ *  generous bound (the old STALE_MS). */
+export const LEGACY_STALE_MS = 45 * 60 * 1000
+/** An alive-pid owner whose heartbeat is older than this is flagged "wedged"
+ *  (hung process). It still BLOCKS takeover — a wedged owner is signalled to
+ *  the user, never silently replaced — but the launcher may kill a wedged
+ *  process it spawned itself. */
+export const WEDGED_MS = 4 * 60 * 60 * 1000
+/** A pending-spawn lock (launcher claimed, claude -p still booting) older than
+ *  this with a dead child pid is reapable. */
+export const PENDING_STALE_MS = 10 * 60 * 1000
+/** Tool activity younger than this counts a session as "live" for the
+ *  parallel-session detector. */
+export const PARALLEL_FRESH_MS = 10 * 60 * 1000
+/** A reap-mutex directory older than this belongs to a crashed reaper and may
+ *  be cleared. */
+export const REAP_MUTEX_STALE_MS = 60 * 1000
+/** Start times within this tolerance count as the same process (pid reuse
+ *  detection). */
+export const PID_START_TOLERANCE_MS = 2000
+
+const R = (p) => fileURLToPath(new URL(p, import.meta.url))
+export const LOCK_PATH = R('../.claude/batch-lock.json')
+export const SESSIONS_SEEN_PATH = R('../.claude/sessions-seen.json')
+export const SESSION_ACTIVITY_PATH = R('../.claude/session-activity.json')
+export const PARALLEL_ALERT_PATH = R('../.claude/parallel-alert.json')
+export const DOCTOR_STATE_PATH = R('../.claude/doctor-state.json')
+
+// --- Small IO helpers ----------------------------------------------------------
+
+const readJson = (p) => {
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'))
+  } catch {
+    return null
+  }
+}
+const writeJsonAtomic = (p, obj) => {
+  const tmp = `${p}.tmp-${process.pid}`
+  writeFileSync(tmp, JSON.stringify(obj, null, 2))
+  renameSync(tmp, p)
+}
+
+// --- Pure decision logic (dependency-injected, Vitest-covered) -----------------
+
+/**
+ * Assess whether the owner recorded in `lock` is alive. Conservative: only a
+ * PROVABLY dead owner frees the lock. Inputs:
+ *   lock  — parsed lock file ({ sessionId, claimedAt, pid?, pidStartedAt?, kind? })
+ *   now   — epoch ms
+ *   bootTime — epoch ms this machine booted (claude never survives a reboot)
+ *   probe — { exists: boolean, startedAt: number|null } for lock.pid
+ *           (pass null when no pid is recorded)
+ * Returns { alive, wedged, reason }.
+ */
+export function assessOwner(lock, { now, bootTime, probe }) {
+  if (!lock || typeof lock.claimedAt !== 'number') {
+    return { alive: false, wedged: false, reason: 'no-lock' }
+  }
+  const age = now - lock.claimedAt
+  // Fresh heartbeat proves life — REBOOT IS NOT SUFFICIENT to declare death
+  // when a fresh heartbeat exists (a re-claimed post-boot session writes one).
+  if (age < DEAD_CONFIRM_MS) return { alive: true, wedged: false, reason: 'fresh-heartbeat' }
+  // A heartbeat from BEFORE this boot cannot have a living writer: no claude
+  // process survives a reboot. (A live re-claimed session would have written a
+  // post-boot heartbeat, caught above.)
+  if (typeof bootTime === 'number' && lock.claimedAt < bootTime) {
+    return { alive: false, wedged: false, reason: 'heartbeat-predates-boot' }
+  }
+  const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
+  const pid = typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
+  if (pid === null) {
+    // Legacy lock — age is all we have.
+    const stale = kind === 'pending-spawn' ? PENDING_STALE_MS : LEGACY_STALE_MS
+    return age > stale
+      ? { alive: false, wedged: false, reason: 'legacy-stale' }
+      : { alive: true, wedged: false, reason: 'legacy-fresh' }
+  }
+  if (!probe || probe.exists !== true) {
+    // The owning process no longer exists → provably dead (past the grace).
+    return { alive: false, wedged: false, reason: 'pid-dead' }
+  }
+  if (
+    typeof lock.pidStartedAt === 'number' &&
+    typeof probe.startedAt === 'number' &&
+    Math.abs(probe.startedAt - lock.pidStartedAt) > PID_START_TOLERANCE_MS
+  ) {
+    // A pid exists but it is a DIFFERENT process (pid reuse) → owner dead.
+    return { alive: false, wedged: false, reason: 'pid-reused' }
+  }
+  if (kind === 'pending-spawn' && age > PENDING_STALE_MS && probe.exists !== true) {
+    return { alive: false, wedged: false, reason: 'pending-dead' }
+  }
+  // Pid alive and (as far as verifiable) the same process: ALIVE, no matter how
+  // old the heartbeat — a long tool call starves the heartbeat but not the
+  // process. This is the exact fix for the 24.07 incident (heartbeat 24 min
+  // stale, session mid-turn, launcher double-spawned).
+  return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
+}
+
+/**
+ * Launcher decision: may the autostart spawn a takeover session?
+ * Returns 'spawn' | 'skip-alive' | 'skip-wedged'.
+ */
+export function spawnDecision(assessment) {
+  if (!assessment.alive) return 'spawn'
+  return assessment.wedged ? 'skip-wedged' : 'skip-alive'
+}
+
+/**
+ * Parallel-session classifier. A parallel session is a sid that
+ *   - started as a TOP-LEVEL session (recorded by the SessionStart hook —
+ *     subagents/worktree agents never fire SessionStart, so they can never be
+ *     flagged),
+ *   - is not the owner,
+ *   - has tool activity fresher than PARALLEL_FRESH_MS.
+ * Inputs are plain maps: sessionsSeen { sid: firstSeenAt },
+ * activity { sid: lastToolAt }.
+ */
+export function classifyParallel({ sessionsSeen, activity, ownerSid, now }) {
+  const out = []
+  for (const [sid, lastToolAt] of Object.entries(activity ?? {})) {
+    if (!sid || sid === ownerSid) continue
+    if (!(sessionsSeen && Object.prototype.hasOwnProperty.call(sessionsSeen, sid))) continue
+    if (typeof lastToolAt !== 'number' || now - lastToolAt > PARALLEL_FRESH_MS) continue
+    out.push({ sid, lastToolAt })
+  }
+  return out
+}
+
+/**
+ * The batch-progress-guard's decision, pure. Returns one of:
+ *   'allow'            — paused / batch complete / nothing to enforce
+ *   'stand-down'       — this session must NOT drive the batch (not the owner)
+ *   'block-remediate'  — owner + parallel session detected → verify first
+ *   'block-continue'   — owner + open points → keep working
+ *   'block-format'     — TASKS.md unparseable → warn, never read as complete
+ */
+export function progressGuardDecision({
+  sid,
+  paused,
+  openCount,
+  formatSuspect,
+  ownership, // 'mine' | 'held' | 'acquired' | 'lost-race' | 'none'
+  unhandledAlert,
+}) {
+  if (paused) return 'allow'
+  if (formatSuspect) return 'block-format'
+  if (openCount === 0) return 'allow'
+  // No sid → ownership unprovable → never conscript this session. The OS
+  // launcher is the backstop that guarantees batch progress, so erring toward
+  // stand-down is safe; erring toward blocking conscripted second sessions
+  // (that was one of the incident's advisory holes).
+  if (!sid) return 'stand-down'
+  if (ownership !== 'mine' && ownership !== 'acquired') return 'stand-down'
+  if (unhandledAlert) return 'block-remediate'
+  return 'block-continue'
+}
+
+// --- OS probes -----------------------------------------------------------------
+
+export function bootTimeMs() {
+  return Date.now() - Math.round(os.uptime() * 1000)
+}
+
+/** Does `pid` exist, and when did it start? startedAt is best-effort (null when
+ *  the OS query fails); exists is from a real signal-0 probe. */
+export function probePid(pid) {
+  if (typeof pid !== 'number' || pid <= 0) return { exists: false, startedAt: null }
+  let exists
+  try {
+    process.kill(pid, 0)
+    exists = true
+  } catch (e) {
+    exists = !!(e && e.code === 'EPERM') // EPERM = exists, no permission
+  }
+  if (!exists) return { exists: false, startedAt: null }
+  return { exists: true, startedAt: processStartTime(pid) }
+}
+
+/** Cheap existence-only probe (no OS start-time query) for hot paths like the
+ *  per-turn guard gate: an alive pid counts as alive (no pid-reuse check —
+ *  conservative toward stand-down, which is the safe direction for guards). */
+export function cheapProbePid(pid) {
+  if (typeof pid !== 'number' || pid <= 0) return { exists: false, startedAt: null }
+  try {
+    process.kill(pid, 0)
+    return { exists: true, startedAt: null }
+  } catch (e) {
+    return { exists: !!(e && e.code === 'EPERM'), startedAt: null }
+  }
+}
+
+/** Epoch ms the process started, or null. Windows: PowerShell FileTime. */
+export function processStartTime(pid) {
+  if (process.platform !== 'win32') {
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+      const startJiffies = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19])
+      const uptimeS = Number(readFileSync('/proc/uptime', 'utf8').split(' ')[0])
+      const hz = 100
+      return Date.now() - Math.round((uptimeS - startJiffies / hz) * 1000)
+    } catch {
+      return null
+    }
+  }
+  try {
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-Command', `(Get-Process -Id ${Number(pid)}).StartTime.ToFileTimeUtc()`],
+      { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+    ).trim()
+    const ft = Number(out)
+    if (!Number.isFinite(ft) || ft <= 0) return null
+    return Math.round((ft - 116444736000000000) / 10000)
+  } catch {
+    return null
+  }
+}
+
+/** Find the claude process that owns this hook invocation: walk the parent
+ *  chain (hook = node, spawned by a shell, spawned by claude). Returns
+ *  { pid, startedAt } or null. Called at ACQUISITION only (one PowerShell
+ *  round-trip), never on the per-tool-call heartbeat path. */
+export function findClaudeAncestor() {
+  if (process.platform !== 'win32') {
+    try {
+      let pid = process.ppid
+      for (let i = 0; i < 10 && pid > 1; i++) {
+        const comm = readFileSync(`/proc/${pid}/comm`, 'utf8').trim()
+        if (/claude/i.test(comm)) return { pid, startedAt: processStartTime(pid) }
+        const stat = readFileSync(`/proc/${pid}/stat`, 'utf8')
+        pid = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1])
+      }
+    } catch {
+      /* fall through */
+    }
+    return null
+  }
+  try {
+    const script =
+      `$id=${Number(process.ppid)};` +
+      `for($i=0;$i -lt 10 -and $id -gt 0;$i++){` +
+      `$p=Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue;` +
+      `if(-not $p){break};` +
+      `if($p.Name -match 'claude'){Write-Output ("$($p.ProcessId)|$($p.CreationDate.ToFileTimeUtc())");break};` +
+      `$id=$p.ParentProcessId}`
+    const out = execFileSync('powershell', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    const m = out.match(/^(\d+)\|(\d+)$/m)
+    if (!m) return null
+    return { pid: Number(m[1]), startedAt: Math.round((Number(m[2]) - 116444736000000000) / 10000) }
+  } catch {
+    return null
+  }
+}
+
+// --- The lock ------------------------------------------------------------------
+
+export function readOwnerLock(lockPath = LOCK_PATH) {
+  const lock = readJson(lockPath)
+  if (lock && typeof lock.claimedAt === 'number' && typeof lock.sessionId === 'string') return lock
+  return null
+}
+
+function tryExclusiveCreate(lockPath, payload) {
+  try {
+    const fd = openSync(lockPath, 'wx')
+    writeSync(fd, JSON.stringify(payload, null, 2))
+    closeSync(fd)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function enterReapMutex(mutexPath) {
+  try {
+    mkdirSync(mutexPath)
+    return true
+  } catch {
+    // Held by another reaper. If it is stale (crashed reaper), clear and retry
+    // ONCE — mkdir stays the atomic point, so two clearers still race to one
+    // winner.
+    try {
+      const st = statSync(mutexPath)
+      if (Date.now() - st.mtimeMs > REAP_MUTEX_STALE_MS) {
+        rmdirSync(mutexPath)
+        mkdirSync(mutexPath)
+        return true
+      }
+    } catch {
+      // raced away — one more direct attempt
+      try {
+        mkdirSync(mutexPath)
+        return true
+      } catch {
+        return false
+      }
+    }
+    return false
+  }
+}
+
+function exitReapMutex(mutexPath) {
+  try {
+    rmdirSync(mutexPath)
+  } catch {
+    /* already gone */
+  }
+}
+
+/**
+ * ATOMIC acquisition. Returns 'acquired' | 'mine' | 'held' | 'lost-race'.
+ *   - 'acquired'  — this session now owns the batch.
+ *   - 'mine'      — it already did (heartbeat refreshed).
+ *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
+ *   - 'lost-race' — a concurrent starter won. STAND DOWN.
+ * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
+ */
+export function acquire(sessionId, opts = {}) {
+  if (!sessionId) return 'held'
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const mutexPath = `${lockPath}.reaping`
+  const now = opts.now ?? Date.now()
+  const deps = {
+    bootTime: opts.bootTime ?? bootTimeMs(),
+    probePid: opts.probePidFn ?? probePid,
+    findAncestor: opts.findAncestorFn ?? findClaudeAncestor,
+  }
+  const identity = () => {
+    // Resolve the owning claude process once, at acquisition.
+    const anc = opts.pid ? { pid: opts.pid, startedAt: opts.pidStartedAt ?? null } : deps.findAncestor()
+    return {
+      v: 2,
+      sessionId,
+      kind: opts.kind ?? 'session',
+      startedAt: now,
+      claimedAt: now, // legacy heartbeat field
+      acquiredAt: now,
+      pid: anc ? anc.pid : null,
+      pidStartedAt: anc ? anc.startedAt : null,
+      ...(opts.extra ?? {}),
+    }
+  }
+
+  // Fast path: no lock → exclusive create (test-and-set; one winner).
+  if (!existsSync(lockPath)) {
+    if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
+  }
+
+  const lock = readOwnerLock(lockPath)
+  if (lock && lock.sessionId === sessionId) {
+    heartbeat(sessionId, { lockPath, now })
+    return 'mine'
+  }
+  if (lock) {
+    const probe = lock.pid ? deps.probePid(lock.pid) : null
+    const a = assessOwner(lock, { now, bootTime: deps.bootTime, probe })
+    if (a.alive) return 'held'
+  } else {
+    // Unreadable/corrupt lock file: reap only if it has settled (not mid-write).
+    try {
+      const st = statSync(lockPath)
+      if (now - st.mtimeMs < REAP_MUTEX_STALE_MS) return 'held'
+    } catch {
+      // vanished between the existsSync and here — retry the fast path once
+      if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
+      return 'lost-race'
+    }
+  }
+
+  // Dead owner → takeover under the reap mutex (atomic mkdir): only ONE
+  // process at a time may unlink+recreate, and it re-verifies deadness inside
+  // the mutex so it can never clobber a freshly re-claimed live lock.
+  if (!enterReapMutex(mutexPath)) return 'held'
+  try {
+    const recheck = readOwnerLock(lockPath)
+    if (recheck) {
+      if (recheck.sessionId === sessionId) {
+        heartbeat(sessionId, { lockPath, now })
+        return 'mine'
+      }
+      const probe = recheck.pid ? deps.probePid(recheck.pid) : null
+      const a = assessOwner(recheck, { now, bootTime: deps.bootTime, probe })
+      if (a.alive) return 'held'
+    }
+    try {
+      rmSync(lockPath, { force: true })
+    } catch {
+      return 'lost-race'
+    }
+    if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
+    return 'lost-race'
+  } finally {
+    exitReapMutex(mutexPath)
+  }
+}
+
+/** Refresh the heartbeat — ONLY if this session owns the lock. Never claims.
+ *  Backfills the pid identity once for a lock claimed before the pid existed. */
+export function heartbeat(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.sessionId !== sessionId) return false
+  const now = opts.now ?? Date.now()
+  const next = { ...lock, v: 2, claimedAt: now }
+  // Backfill the pid identity ONCE for a lock claimed before pids were
+  // recorded — and never retry a failed walk on the hot per-tool-call path.
+  if (next.pid == null && !next.pidBackfillFailed && opts.skipBackfill !== true) {
+    const anc = (opts.findAncestorFn ?? findClaudeAncestor)()
+    if (anc) {
+      next.pid = anc.pid
+      next.pidStartedAt = anc.startedAt
+    } else {
+      next.pidBackfillFailed = true
+    }
+  }
+  writeJsonAtomic(lockPath, next)
+  return true
+}
+
+/** Owner-guarded lock update (e.g. the launcher rebinding its pending-spawn
+ *  lock to the just-spawned child pid). No-op unless `sessionId` owns the lock. */
+export function updateOwnLock(sessionId, patch, lockPath = LOCK_PATH) {
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.sessionId !== sessionId) return false
+  writeJsonAtomic(lockPath, { ...lock, ...patch, sessionId, claimedAt: Date.now() })
+  return true
+}
+
+export function isOwner(sessionId, lockPath = LOCK_PATH) {
+  if (!sessionId) return false
+  const lock = readOwnerLock(lockPath)
+  return !!lock && lock.sessionId === sessionId
+}
+
+/**
+ * The guards' stand-down predicate: true when ANOTHER session owns a live
+ * lock — then this session must not be pushed to (or allowed to) drive the
+ * batch. False when the lock is free/dead/mine (the progress-guard may then
+ * acquire). Conservative on errors: an unreadable state reads as held.
+ */
+export function heldByOtherLiveOwner(sessionId, opts = {}) {
+  try {
+    const lockPath = opts.lockPath ?? LOCK_PATH
+    const lock = readOwnerLock(lockPath)
+    if (!lock) return false
+    if (sessionId && lock.sessionId === sessionId) return false
+    const probe = lock.pid ? (opts.probePidFn ?? cheapProbePid)(lock.pid) : null
+    const a = assessOwner(lock, {
+      now: opts.now ?? Date.now(),
+      bootTime: opts.bootTime ?? bootTimeMs(),
+      probe,
+    })
+    return a.alive
+  } catch {
+    return true // fail toward stand-down: never conscript on an error
+  }
+}
+
+/** Release the lock if this session owns it (no-op otherwise). */
+export function release(sessionId, lockPath = LOCK_PATH) {
+  const lock = readOwnerLock(lockPath)
+  if (lock && lock.sessionId === sessionId) {
+    try {
+      rmSync(lockPath, { force: true })
+    } catch {
+      /* already gone */
+    }
+    return true
+  }
+  return false
+}
+
+/**
+ * Convert a launcher 'pending-spawn' lock to this (just-spawned) session.
+ * Succeeds only when the lock is pending AND names this session's claude
+ * process (spawnedPid == our claude ancestor) or a fresh one-shot authorization
+ * exists. Atomic via the same reap mutex. Returns true on success.
+ */
+export function convertPendingSpawn(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const mutexPath = `${lockPath}.reaping`
+  const now = opts.now ?? Date.now()
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.kind !== 'pending-spawn') return false
+  const anc = opts.pid
+    ? { pid: opts.pid, startedAt: opts.pidStartedAt ?? null }
+    : (opts.findAncestorFn ?? findClaudeAncestor)()
+  const pidMatches = anc && typeof lock.spawnedPid === 'number' && anc.pid === lock.spawnedPid
+  if (!pidMatches && !opts.authorized) return false
+  if (!enterReapMutex(mutexPath)) return false
+  try {
+    const recheck = readOwnerLock(lockPath)
+    if (!recheck || recheck.kind !== 'pending-spawn' || recheck.spawnedPid !== lock.spawnedPid) return false
+    writeJsonAtomic(lockPath, {
+      v: 2,
+      sessionId,
+      kind: 'session',
+      startedAt: now,
+      claimedAt: now,
+      acquiredAt: now,
+      pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
+      pidStartedAt: anc ? anc.startedAt : null,
+    })
+    return true
+  } finally {
+    exitReapMutex(mutexPath)
+  }
+}
+
+// --- Parallel-session presence + detection -------------------------------------
+
+/** Record a TOP-LEVEL session start (SessionStart hook only — subagents never
+ *  fire it, which is what makes the classifier subagent-safe). */
+export function noteTopLevelSession(sid, opts = {}) {
+  if (!sid) return
+  try {
+    const path = opts.path ?? SESSIONS_SEEN_PATH
+    const now = opts.now ?? Date.now()
+    const seen = readJson(path) ?? {}
+    seen[sid] = seen[sid] ?? now
+    for (const [k, v] of Object.entries(seen)) if (now - v > 7 * 24 * 3600 * 1000) delete seen[k]
+    writeJsonAtomic(path, seen)
+  } catch {
+    /* best effort */
+  }
+}
+
+/** Record tool activity for a session id (PostToolUse hook, every tool call). */
+export function noteActivity(sid, opts = {}) {
+  if (!sid) return
+  try {
+    const path = opts.path ?? SESSION_ACTIVITY_PATH
+    const now = opts.now ?? Date.now()
+    const act = readJson(path) ?? {}
+    act[sid] = now
+    for (const [k, v] of Object.entries(act)) if (now - v > 24 * 3600 * 1000) delete act[k]
+    writeJsonAtomic(path, act)
+  } catch {
+    /* best effort */
+  }
+}
+
+export function clearActivity(sid, opts = {}) {
+  try {
+    const path = opts.path ?? SESSION_ACTIVITY_PATH
+    const act = readJson(path) ?? {}
+    delete act[sid]
+    writeJsonAtomic(path, act)
+  } catch {
+    /* best effort */
+  }
+}
+
+/** Live parallel sessions right now (excluding `ownerSid`). */
+export function detectParallel(ownerSid, opts = {}) {
+  return classifyParallel({
+    sessionsSeen: readJson(opts.sessionsPath ?? SESSIONS_SEEN_PATH) ?? {},
+    activity: readJson(opts.activityPath ?? SESSION_ACTIVITY_PATH) ?? {},
+    ownerSid,
+    now: opts.now ?? Date.now(),
+  })
+}
+
+/** Raise/read/clear the parallel alert the owner's Stop guard surfaces. */
+export function raiseParallelAlert(info, opts = {}) {
+  try {
+    writeJsonAtomic(opts.path ?? PARALLEL_ALERT_PATH, { at: Date.now(), ...info })
+  } catch {
+    /* best effort */
+  }
+}
+
+export function readUnhandledAlert(opts = {}) {
+  const alert = readJson(opts.path ?? PARALLEL_ALERT_PATH)
+  if (!alert || typeof alert.at !== 'number') return null
+  const state = readJson(opts.statePath ?? DOCTOR_STATE_PATH)
+  if (state && typeof state.handledAt === 'number' && state.handledAt >= alert.at) return null
+  return alert
+}
+
+export function markAlertHandled(opts = {}) {
+  try {
+    const statePath = opts.statePath ?? DOCTOR_STATE_PATH
+    const state = readJson(statePath) ?? {}
+    writeJsonAtomic(statePath, { ...state, handledAt: Date.now() })
+  } catch {
+    /* best effort */
+  }
+}
+
+// --- CLI -----------------------------------------------------------------------
+
+const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
+if (isMain) {
+  const cmd = process.argv[2]
+  if (cmd === 'status') {
+    const lock = readOwnerLock()
+    if (!lock) {
+      console.log('no owner lock — the batch is unclaimed')
+    } else {
+      const probe = lock.pid ? probePid(lock.pid) : null
+      const a = assessOwner(lock, { now: Date.now(), bootTime: bootTimeMs(), probe })
+      console.log(JSON.stringify({ lock, probe, assessment: a }, null, 2))
+    }
+    const parallel = detectParallel(readOwnerLock()?.sessionId ?? '')
+    console.log(`live parallel sessions: ${parallel.length ? JSON.stringify(parallel) : 'none'}`)
+  } else if (cmd === 'release') {
+    const lock = readOwnerLock()
+    if (lock) {
+      rmSync(LOCK_PATH, { force: true })
+      console.log(`released lock held by ${lock.sessionId} (manual override)`)
+    } else {
+      console.log('no lock to release')
+    }
+  } else if (cmd) {
+    console.log('usage: node scripts/batch-singleton.mjs [status|release]')
+  }
+}
