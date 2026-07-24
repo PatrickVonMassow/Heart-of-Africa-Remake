@@ -44,7 +44,7 @@ const tasksMd = (open, done = [209]) =>
 describe('constants', () => {
   it('pin the finder set, the tag exemption and the claim tokens', () => {
     // 181 is a concrete WebGPU BUG (a fix), not a QA-framework finder — excluded.
-    expect([...FINDER_POINTS].sort((a, b) => a - b)).toEqual([184, 203, 204, 205, 207])
+    expect([...FINDER_POINTS].sort((a, b) => a - b)).toEqual([184, 200, 203, 204, 205, 207, 285])
     expect(RELEASE_TAG_POINT).toBe(174)
     expect(DONE_CLAIM_TOKENS).toContain('behoben')
     expect(DONE_CLAIM_TOKENS).toContain('done')

@@ -19,7 +19,9 @@
 // The big bug-FINDING / QA-framework block (worked after the known-bug fixes).
 // 181 is a concrete WebGPU BUG (a fix), not a finder — it is intentionally NOT
 // here, so it may sit among the fixes ahead of the finder/closing block.
-export const FINDER_POINTS = new Set([184, 203, 204, 205, 207])
+// 200 (verify-script robustness) and 285 (leak/accumulation hunt) are QA-framework
+// finders too and belong in this block (added 24.07.2026, user queue-order call).
+export const FINDER_POINTS = new Set([184, 200, 203, 204, 205, 207, 285])
 
 /** The release tag is always last and exempt from the order rule. */
 export const RELEASE_TAG_POINT = 174
