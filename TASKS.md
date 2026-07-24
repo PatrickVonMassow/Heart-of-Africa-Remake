@@ -9936,7 +9936,7 @@ the remaining open points in their numeric order.
   possibly `movement.ts` — wildlife-movement files; do NOT delegate concurrently with
   another Wildlife.tsx point (258/etc.).
 
-- [ ] 262. AN ORPHANED JUVENILE IS ADOPTED BY A NEARBY ADULT (user 23.07.2026). When
+- [x] 262. AN ORPHANED JUVENILE IS ADOPTED BY A NEARBY ADULT (user 23.07.2026). When
   a juvenile's parent DIES (by any cause — predator, crocodile, trample, drowning),
   the juvenile is ADOPTED by another adult within reach: the nearest eligible adult
   becomes its new parent, and the §19.8 family dramas (parent defence/shield/
@@ -10332,7 +10332,7 @@ the remaining open points in their numeric order.
   flora/wildlife streaming points (164/171/271); the ANALYSIS is read-only and can run in
   parallel now, the fix lands on its own branch. Implementation-ready after the analysis.
 
-- [ ] 273. WALKABLE PYRAMIDS — an enterable first-person "pyramid settlement" at Giza
+- [x] 273. WALKABLE PYRAMIDS — an enterable first-person "pyramid settlement" at Giza
   (user 23.07.2026). PRIORITY/POSITION: a NEW FEATURE → v0.3, queued AFTER 224 (per the
   ordering rule: before 224 only bugfixes + almost-done points; new features go to v0.3).
   Make the Giza pyramids + Sphinx ENTERABLE in first-person like a settlement: the
@@ -10992,7 +10992,7 @@ the remaining open points in their numeric order.
   to ~0 within the window after the source leaves), and the settings.mjs check green on
   BOTH backends. QA-finder-class regression (points 200/285). No player-visible text.
 
-- [ ] 293. EXTEND THE IN-GAME BENCHMARK TO GUIDE FURTHER LOW-LEVEL REDUCTION (user
+- [x] 293. EXTEND THE IN-GAME BENCHMARK TO GUIDE FURTHER LOW-LEVEL REDUCTION (user
   24.07.2026). The user runs the F8 / `?bench` benchmark (point 277) on a SLOW PC to find
   what MORE can be cut at the LOW graphics level (point 276) to gain performance. Extend
   the benchmark to serve THIS use case: profile the LOW detail preset and surface WHERE
@@ -11196,7 +11196,7 @@ the remaining open points in their numeric order.
   a quiet AND a loaded machine, or is documented as a headless limitation with a real-browser
   confirmation. No player-visible text.
 
-- [ ] 305. OPTIMIZE THE LOW DETAIL PRESET FOR THE M1 PRO (user 24.07.2026; do it with Fable). The
+- [x] 305. OPTIMIZE THE LOW DETAIL PRESET FOR THE M1 PRO (user 24.07.2026; do it with Fable). The
   user's F8 benchmark on a MacBook Pro 16 M1 Pro (2021; `local/m1pro-bench.json`, WebGPU/Firefox,
   REAL GPU timestamps) shows the machine is heavily GPU-bound at HIGH — baseline (all on) 142–229 ms
   GPU/frame — and the dominant levers are DPR (dpr 1 → 44 ms, ~70 % saving) and the POST pipeline
