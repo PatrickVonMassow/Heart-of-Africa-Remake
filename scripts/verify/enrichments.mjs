@@ -4517,7 +4517,11 @@ const crocGrazerAmbush = await page.evaluate(async () => {
       // the target's distance, not the animal's), and the croc taking it then
       // proves nothing about the broadened trigger this check is isolating.
       if (farGrazer.caught === undefined) { farGrazer.x = fx; farGrazer.z = fz; farGrazer.drink = undefined }
-      if (croc.lunge !== undefined) { out.farBalked = false; return true }
+      // Only a lunge AT THIS grazer refutes the control. The herd's own zebras
+      // are still in the scene, and one of them stepping to the bank is a
+      // perfectly legal catch — reading any lunge as a failure blamed the rule
+      // for the crocodile doing exactly what it is supposed to do.
+      if (croc.lunge !== undefined && croc.lunge.victim === farGrazer) { out.farBalked = false; return true }
       return false
     })
     herds.zebra = herds.zebra.filter((a) => a !== farGrazer)
