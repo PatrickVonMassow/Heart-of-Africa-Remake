@@ -129,7 +129,14 @@ try {
     // user-deferred. Start silently either way.
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0]).join(', ')
-    const header = `[batch-resume] TASKS.md has ${open.length} open point(s): ${nums}.`
+    // Model policy (point 309): the 24.07 session silently degraded to Haiku
+    // and wrecked three points — name the policy at every session start; the
+    // model-guard Stop hook enforces it at the first degraded commit.
+    const header =
+      `[batch-resume] TASKS.md has ${open.length} open point(s): ${nums}. ` +
+      'MODEL POLICY: only an Opus/Fable-class model may run the batch. If the serving ' +
+      'model is Haiku-class, do NOT work: create .claude/batch-paused (reason: degraded ' +
+      'serving model) and send an ntfy alert via scripts/notify.mjs instead.'
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()

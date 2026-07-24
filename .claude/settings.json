@@ -35,6 +35,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node scripts/model-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-guard.mjs"
           },
           {
