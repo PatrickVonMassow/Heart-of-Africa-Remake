@@ -11091,6 +11091,31 @@ the remaining open points in their numeric order.
   high-criticality (a must-work guard) → build it under its OWN rule: Fable-5 plan-review
   BEFORE, Fable-5 safety-review AFTER, merge to main ONLY when all green. No player-visible text.
 
+- [ ] 299. BIRD'S-EYE SETTLEMENT COLLISION — you must not walk THROUGH a settlement (user
+  24.07.2026, screenshot; for AFTER the v0.2 tag). Now that entry is Space-only (point 244),
+  the bird's-eye traveller walks straight THROUGH a village/settlement footprint, which looks
+  wrong. ADD a bird's-eye COLLISION for settlements (like the existing tree/animal collision,
+  §11/§19): the traveller cannot cross a settlement's footprint — sliding movement at its edge,
+  no tunnelling on a fast step. BALANCE WITH ENTRY (the crux): the Space enter-radius
+  (`settlementEntry`) must stay REACHABLE — the collision must NOT stop the traveller BEFORE he
+  reaches the enter-radius, or he can never enter. So the enter-radius must be >= the collision
+  radius: the "Space to enter" prompt arms at or OUTSIDE the collision boundary, so approaching
+  a settlement you always enter the enter-zone (prompt shown, key armed) before/as the collision
+  halts you, and a Space press there enters. Calibratable relation (collision radius vs enter
+  radius) in balance. NON-OVERLAP INVARIANT: no two places' enter-radii may overlap — Cairo and
+  the future walkable Giza pyramids (point 273), adjacent ports/villages — else entry is
+  ambiguous. Enforce a GLOBAL pure test that every pair of enter-radii is disjoint (place
+  positions / clamp radii so they never intersect); point 273 already proves its Giza disc
+  non-overlapping with Cairo — generalise that to ALL places. ANCHORS: the bird's-eye collision
+  (`src/systems/movement.ts` / the travel-scene collider set that already handles trees/animals),
+  `src/scenes/travel/settlementEntry.ts` (enter radius + the collision-radius relation), the
+  world/place roster (positions + radii). VERIFIABLE: pure tests that the settlement collision
+  blocks a straight walk through the footprint while a Space press within the enter-radius still
+  enters (the collisionRadius <= enterRadius invariant), and that all place enter-radii are
+  pairwise disjoint (Cairo / villages / ports / pyramids); a live check (`scripts/verify/flow.mjs`
+  or `enrichments.mjs`) that the traveller is stopped at a settlement edge and cannot cross it,
+  yet still enters with Space. No new player-visible text (reuses the existing prompt).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
