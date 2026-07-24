@@ -147,9 +147,9 @@ seven researched plans:
 
 | Plan | Historical pattern | Peoples |
 |---|---|---|
-| `ring` | Central Cattle Pattern / Maasai enkang: huts on a ring around the central cattle enclosure inside a perimeter fence; thorn rings carry extra gates (one per family head), the chief's great hut sits opposite the south gate | Zulu, Pedi, Bemba, Maasai, Somali |
+| `ring` | Central Cattle Pattern / Maasai enkang: huts on a ring around the central cattle enclosure inside a perimeter fence; thorn rings carry extra gates (one per family head), the chief's great hut sits opposite the south gate | Zulu, Pedi, Maasai, Somali |
 | `street` | Congo-basin street village (documented pre-colonially, e.g. Schweinfurth 1870): ONE cleared, swept axis with two facing house rows and a palaver shelter at its edge | Mongo, Banda, Bambundu, Lunda, Fang |
-| `compound` | Sahel compound architecture (Hausa *gida*): walled family enclosures around a central meeting ground, granaries inside, lanes to each compound entrance | Hausa, Mandinka, Bambara, Sidama, Baganda |
+| `compound` | Sahel compound architecture (Hausa *gida*): walled family enclosures around a central meeting ground, granaries inside, lanes to each compound entrance. The Bemba cluster the same way but carry NO wall: they lived in the tsetse belt on *citemene* millet and kept no cattle, so no kraal, and a stockade is attested for their victims rather than for their own villages | Hausa, Mandinka, Bambara, Sidama, Baganda, Bemba |
 | `scatter` | Dispersed camp: loose family groups of tents or small huts with irregular spacing, no lanes, no shared fence; Tuareg camps add a thornbrush goat pen | Tuareg, Mbuti, Wayeyi, San |
 | `ksar` | Fortified North-African block: small flat-roofed houses packed on narrow winding lanes inside a stone perimeter wall with one south gate; the communal agadir tower rises near the centre | Berbers |
 | `riverstrip` | Nile fellah strip: flat-roofed houses banding one river-parallel lane just above the flood line, a short cross alley to the common ground | Nubians |

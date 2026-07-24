@@ -246,6 +246,18 @@ anchors. Also update design.md §4.5's plan table in the same commit.
 **(5) Effort.** **S** for option (b); **M** for a new plan kind (option (a)),
 because `layout.test.ts` sweeps every place across seeds.
 
+**RESOLVED (point 279d) — option (a), no new plan kind needed.** `bemba` moves
+from `ring` to `compound` in `src/scenes/place/regionStyles.ts`: family hut
+clusters around the open central meeting ground with millet granaries and a lane
+to each cluster, which is the picture the record supports, and — being the
+compound plan — it builds no livestock pen at all. The compound WALL is skipped
+for the Bemba alone (`walled` in `layout.ts`), because this document's own
+warning holds: the stockade is attested for their victims, not for their
+villages, so none is invented. `layout.test.ts` pins the mapping away from
+`ring` and asserts the Bemba village has no pen, no fence and its granaries,
+with every existing layout invariant re-swept across seeds; the town-plan
+screenshot shows the village without a kraal.
+
 ---
 
 ### A6 — Giza's pyramids: no Khafre casing cap, no blunt Khufu apex, no Menkaure granite skirt · SEVERITY 2 · HIGH
