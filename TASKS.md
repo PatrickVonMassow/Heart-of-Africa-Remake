@@ -10971,7 +10971,7 @@ the remaining open points in their numeric order.
   the memory `use-1890-valid-names`; the point-205 plausibility audit enforces it. Fast
   gate green (2867 tests). Committed to main.
 
-- [ ] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
+- [x] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
   24.07.2026 during the 276 verify; PRE-EXISTING on main, independent of 276/273).
   design.md §19.1 / §7.1 pt.20: a nearby animal's own call rises and AUDIBLY FADES with
   distance. Currently it does not fade back: in `scripts/verify/settings.mjs` the
