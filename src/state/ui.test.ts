@@ -157,14 +157,16 @@ describe('graphics quality level (design.md §21, F9 / point 276 part B)', () =>
     expect(effectiveWeatherIntensity(u())).toBe(1)
   })
 
-  it('low is the frugal floor: dpr 1, all post off, no campfire shadows, tight flora', () => {
+  it('low is the frugal floor: dpr 1, all post off, no shadows at all, tight flora', () => {
     u().setDetailLevel('low')
     expect(effectiveDprCap(u())).toBe(1)
     expect(effectiveSsao(u())).toBe(false)
     expect(effectiveTraa(u())).toBe(false)
     expect(effectiveBloom(u())).toBe(false)
-    expect(effectiveShadows(u())).toBe(true) // still cast, just low-res
-    expect(effectiveShadowResolution(u())).toBe(1024)
+    // Point 305 (M1-Pro tuning): no sun shadows on low — the shadow passes were
+    // the benchmark's biggest remaining GPU/draw-call lever after dpr + post.
+    expect(effectiveShadows(u())).toBe(false)
+    expect(effectiveShadowResolution(u())).toBe(1024) // moot while shadows are off
     expect(effectiveFireShadows(u())).toBe(false)
     expect(effectiveTerrainRefine(u())).toBe(false)
     expect(effectiveFloraFogFactor(u())).toBeLessThan(1)

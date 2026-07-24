@@ -63,14 +63,19 @@ export interface QualityPreset {
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
   // LOW — very frugal, usable on very weak GPUs. Lead with the fill-rate levers
-  // (dpr 1.0, all post off), then the geometry cuts that only weak GPUs feel.
+  // (dpr 1.0, all post off), then drop the sun-shadow passes entirely, then the
+  // geometry cuts that only weak GPUs feel. Sun shadows OFF is the point-305
+  // M1-Pro tuning: the real-GPU benchmark (local/m1pro-bench.json) shows the
+  // shadow passes cost ~8.5 ms GPU (resolution-independent — shadow-half moved
+  // nothing), 880 extra draw calls (952→72) and ~2 M extra triangles per frame,
+  // the biggest remaining lever once dpr + post are already minimal.
   low: {
     dprCap: 1,
     ssao: false,
     traa: false,
     bloom: false,
-    sunShadows: true,
-    sunShadowResolution: 1024, // clearly below today's 2048
+    sunShadows: false, // point 305: the M1-Pro benchmark's biggest remaining lever
+    sunShadowResolution: 1024, // moot while sunShadows is off; kept below medium for the strict low<medium<high climb
     fireShadows: false,
     fireShadowResolution: 0,
     fireShadowSoft: false,
