@@ -10859,6 +10859,29 @@ the remaining open points in their numeric order.
   §17.2 and CLAUDE.md §7.1 pt. 3/25 (the discovery-gating wording gains the known-from-
   start exemption). Implementation-ready.
 
+- [ ] 289. FIRE CASTS SHADOWS — OCCLUDERS BETWEEN THE CAMPFIRE AND THE GROUND (user
+  report 24.07.2026, deployed build; QUEUED AFTER 224). In a settlement the campfire
+  (§19.10 firelight) lights the ground in FRONT of the player even though the player
+  figure and a wood log stand BETWEEN the fire and that ground — implausible, they must
+  block the light and cast a shadow. FEASIBILITY-GATED: only build it if the effort is
+  reasonable AND the performance hit is acceptable — BENCHMARK it (the point-277 in-game
+  benchmark on real hardware; the fire light is a POINT light and point-light shadow
+  maps are among the priciest GPU features, so measure before committing). ANCHORS: the
+  settlement fire light in `src/scenes/place/` (the §19.10 firelight source) and the
+  PlaceScene lighting/shadow setup. APPROACH options to weigh: (a) make the fire light
+  a shadow-casting point light (a cube shadow map) with a tight radius and low
+  resolution so only near occluders (figure, log, stall props) cast — measure the cost;
+  (b) a cheaper approximation if a full point-light shadow map is too dear (e.g. a
+  blob/contact shadow under the figure and log toward the fire, or gating the shadow
+  map to only the fire's immediate neighbourhood). If NEITHER is affordable within the
+  perf budget, record that as the finding and leave it out (do not ship a stutter).
+  Gate it behind Low Details (point 276) so weak GPUs can drop it. TESTS: a live check
+  in `scripts/verify/polish.mjs` that with the fire lit, the ground directly behind an
+  occluder (figure/log) is DARKER than the unoccluded lit ground beside it (measured in
+  pixels, both backends), plus a before/after benchmark row. DOCS: design.md §19.10 and
+  CLAUDE.md §7.1 pt. 15 if the firelight rule changes; record the benchmark verdict in
+  docs/perf-276-findings.md. Implementation-ready; feasibility+perf gated.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
