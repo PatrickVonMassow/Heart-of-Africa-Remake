@@ -1993,7 +1993,6 @@ function Herds() {
         spawnedChunks.current.add(key)
       }
     }
-    let despawned = false
     for (const key of spawnedChunks.current) {
       const comma = key.indexOf(',')
       const kx = Number(key.slice(0, comma))
@@ -2002,31 +2001,40 @@ function Herds() {
       const chz = (kz + 0.5) * CHUNK_SIZE
       if (Math.hypot(chx - pos.x, chz - pos.z) > despawnR) {
         spawnedChunks.current.delete(key)
-        despawned = true
       }
     }
-    if (despawned) {
-      // Cull each animal by where it STANDS, never only by its birth chunk:
-      // roamers/fleers drift chunks away from their spawn, so the old
-      // birth-chunk filter deleted animals still in sight (a zoom-in collapses
-      // despawnR in one frame and mass-culled them). keepStreamedAnimal
-      // re-homes a drifted animal into the live chunk under its feet and
-      // backstops with the rendered frame. Known pre-existing property: a
-      // re-homed animal plus a later deterministic respawn of its origin
-      // chunk can duplicate — inherent to deterministic chunk respawn.
-      const liveChunkHas = (key: string) => spawnedChunks.current.has(key)
-      for (const sp of SPECIES) {
-        herds[sp] = herds[sp].filter((a) => {
-          const v = keepStreamedAnimal(a, liveChunkHas, CHUNK_SIZE, pos.x, pos.z, despawnR, isOnScreen)
-          if (v.rehomeTo !== undefined) a.chunk = v.rehomeTo
-          return v.keep
-        })
-      }
-      for (const hid of [...herdState.current.keys()]) {
-        if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
-      }
-      stains.current = stains.current.filter((st) => Math.hypot(st.x - pos.x, st.z - pos.z) <= despawnR)
+    // Cull the herds EVERY frame, not only on a frame that deleted a chunk
+    // (point 282): the cull decision depends on `isOnScreen`, which changes
+    // over frames as the camera EASES to its target (0.12/frame, TravelScene)
+    // — independent of chunk deletions. A large jump removes all the old
+    // chunks in one burst while the camera still looks at the old spot, so the
+    // stranded animals are kept by the on-screen backstop that frame; with no
+    // further chunk deletions the old `if (despawned)` gate never re-ran the
+    // filter, and they were never re-evaluated once the camera caught up
+    // (goneWhenFar:false on WebGL 2). Running each frame re-evaluates them the
+    // frame they fall off-screen. The pass is cheap: the in-live-chunk common
+    // case early-returns keep:true on a Set lookup.
+    //
+    // Cull each animal by where it STANDS, never only by its birth chunk:
+    // roamers/fleers drift chunks away from their spawn, so the old
+    // birth-chunk filter deleted animals still in sight (a zoom-in collapses
+    // despawnR in one frame and mass-culled them). keepStreamedAnimal
+    // re-homes a drifted animal into the live chunk under its feet and
+    // backstops with the rendered frame. Known pre-existing property: a
+    // re-homed animal plus a later deterministic respawn of its origin
+    // chunk can duplicate — inherent to deterministic chunk respawn.
+    const liveChunkHas = (key: string) => spawnedChunks.current.has(key)
+    for (const sp of SPECIES) {
+      herds[sp] = herds[sp].filter((a) => {
+        const v = keepStreamedAnimal(a, liveChunkHas, CHUNK_SIZE, pos.x, pos.z, despawnR, isOnScreen)
+        if (v.rehomeTo !== undefined) a.chunk = v.rehomeTo
+        return v.keep
+      })
     }
+    for (const hid of [...herdState.current.keys()]) {
+      if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
+    }
+    stains.current = stains.current.filter((st) => Math.hypot(st.x - pos.x, st.z - pos.z) <= despawnR)
     // Never leave a settlement's bird's-eye vicinity empty (point 102): top the
     // region-typical presence up to the minimum where the chunk spawn fell short.
     seedSettlementVicinity(herds, pos, seed, spawnedChunks.current)
