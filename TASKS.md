@@ -10481,30 +10481,51 @@ the remaining open points in their numeric order.
      `RegionBorders.tsx:56` pattern.
    (N5 GC pressure in the wildlife separation loop, N6 a coarse terrain-query cache —
      evaluate after N1, per the analysis.)
-  PART B — the "LOW DETAILS" mode, toggled by **F7** (F6 is now the state-dump, point
-  270; reserve F7): a `lowDetails` flag in `useUi` read DERIVED (`effectiveSsao =
-  ssaoEnabled && !lowDetails`, etc. — do NOT clobber the individual debug flags the way
-  `activateTouch` does), a localized debug-menu checkbox (de+en), and the F7 handler
-  beside the existing F-keys (`Hud.tsx:423-471`, add F7 to the preventDefault list).
-  Visible quality loss allowed for a large win on weak GPUs (~2-4×): dpr cap to 1
-  (`App.tsx:38` Canvas — the single biggest GPU lever), post off (TRAA+MSAA off, SSAO
-  off, Bloom off — `Effects.tsx`), shadows 3→2 cascades + half-res then off
-  (`TravelScene.tsx:804-812`, the `shadowsEnabled` flag exists), flora fog-radius factor
-  ~0.55 (spawn radius ~320→180, instance count falls quadratically, no-pop invariant
-  preserved since it stays fog-coupled — `floraStreaming.ts:57`, `Climate.tsx:244`) plus
-  `castShadow=false` for bush/papyrus/rock, terrain refine off + a coarser base LOD
-  (`terrainLod.ts`), water `calm`→1 (`water.ts`), haze layers 5→2 + rain halved
-  (`Climate.tsx`), wildlife spawn density halved. The touch mobile-quality preset is a
-  SUBSET — Low Details is its superset; do not regress touch.
-  TESTS: pure-tests for the derived-flag reads (`ui.test`), the debug checkboxes
-  (`DebugMenu.test`), and a `settings.mjs`/`perf.mjs` live check that F7 flips the
-  effective flags and that each landed lever is a measured FPS win on BOTH backends (the
-  neutral ones must not change the PICTURE — a pixel-diff gate). DOCS: design.md
-  §2.7/§21 (the render pipeline + the Low-Details toggle + F7), CLAUDE §7.1 pt.20/32; all
-  new UI text in de+en. NOTE: touches many render/scene files — sequence the levers as
-  separate commits, each measured; a perf REGRESSION in the game is a bugfix (Part A is
-  before 224), the Low-Details MODE is the new feature (v0.3-ok, but small). Neutral
-  levers must be PICTURE-IDENTICAL. Implementation-ready; measure solo.
+  PART B — THREE GRAPHICS LEVELS low / medium / high, cycled by **F7** (user decision
+  24.07.2026; F6 is the state-dump/point 270). A `detailLevel: 'low' | 'medium' | 'high'`
+  in `useUi` (NOT a binary flag), DEFAULT `'medium'`, plus a `QUALITY_PRESETS` config
+  (its own module, e.g. `src/config/quality.ts`) mapping each level → a value for EVERY
+  quality-relevant setting. The `effective*` selectors read the current level's preset
+  value (never clobbering the individual debug flags the way `activateTouch` does; those
+  debug toggles still override within a level for tuning). F7 handler beside the existing
+  F-keys (`Hud.tsx`, add F7 to the preventDefault list) cycles in EXACTLY this order —
+  **medium → low → high → medium** (each press steps DOWN a level; from the bottom it
+  jumps to the top): medium⇒low, low⇒high, high⇒medium. A localized toast names the new
+  level ("Grafik: Niedrig/Mittel/Hoch" · "Graphics: Low/Medium/High"); the debug menu
+  shows the current level and lets you pick it directly (de+en).
+  THE THREE PRESETS (calibrate for a CLEAR, visible difference; medium ≈ a good look on
+  the user's RTX-40-class PC, low usable on very weak GPUs, high the richest):
+   - LOW — very frugal: device pixel ratio capped to 1.0; ALL post off (TRAA, SSAO,
+     Bloom); sun shadows at LOW resolution (clearly below today's) or off if that is what
+     a very weak GPU needs; NO campfire shadows (point 289); terrain refine OFF; flora
+     fog-radius ×~0.55 (`floraStreaming.ts`) + `castShadow=false` for bush/papyrus/rock;
+     water calm; haze/rain reduced; wildlife spawn density reduced.
+   - MEDIUM (default) — SSAO OFF (user: SSAO only in high), TRAA + Bloom ON; native dpr;
+     sun shadows at the normal resolution; **campfire shadows ON** (the point-289 256²
+     variant); terrain refine ON; flora full radius; water/weather normal.
+   - HIGH — SSAO ON; TRAA + Bloom ON; native dpr; sun shadows at a HIGHER resolution than
+     today's default (the user explicitly wants sharper shadows on high, and lower-res on
+     low); campfire shadows ON, and — if it fits — the MORE REALISTIC / costlier variant
+     (e.g. a larger/higher-res cube map or softer PCF); terrain refine ON; flora full.
+  The point-289 fire shadows and the sun-shadow map resolution are thus level-driven; add
+  a shadow-map-resolution field to the preset. The touch mobile-quality preset stays a
+  SUBSET (≈ low); do not regress touch.
+  ENFORCEMENT — the "sichere Mechanik" the user asked for (sort every FUTURE visual into
+  the levels): a PURE test (`src/config/quality.test.ts`) that enumerates the
+  quality-relevant keys and asserts EACH is defined in ALL THREE presets — so a new
+  graphics feature added without low/medium/high entries FAILS the gate. Plus a design.md
+  §21 convention paragraph: every new optical feature MUST declare its low/medium/high
+  behaviour (and may offer a costlier high-only variant). See the memory
+  `sort-visuals-into-detail-levels`.
+  BUILD ON the existing `feat/276-low-details-mode` branch (all the levers are already
+  wired there behind the binary flag) — refactor the binary `lowDetails` into the
+  three-level `detailLevel` + presets; do not start from scratch.
+  TESTS: pure tests for the preset reads (each `effective*` per level), the F7 cycle order
+  (medium→low→high→medium, exact), the debug-menu picker, and the preset-completeness
+  invariant; a `settings.mjs` live check that F7 cycles the level and flips the effective
+  flags, on BOTH backends. DOCS: design.md §2.7/§21 (the three levels + F7 cycle + the
+  sort-into-levels rule), CLAUDE §7.1 pt.20/32; all UI text de+en. Verify on the branch,
+  both backends, on a QUIET machine, before the merge. Implementation-ready.
   MEASURED STATE (24.07.2026, `docs/perf-276-findings.md` — read it before building):
   the regression is GEOMETRY, not the render features. Against v0.1 the frame cost rose
   by the SAME 1.2 ms in the empty desert as in the dense savanna, and the scene-graph
@@ -10882,7 +10903,7 @@ the remaining open points in their numeric order.
   CLAUDE.md §7.1 pt. 15 if the firelight rule changes; record the benchmark verdict in
   docs/perf-276-findings.md. Implementation-ready; feasibility+perf gated.
 
-- [ ] 290. A RELIABLE MECHANISM TO KEEP THE RETROSPECTIVE DOCUMENT CURRENT (user
+- [x] 290. A RELIABLE MECHANISM TO KEEP THE RETROSPECTIVE DOCUMENT CURRENT (user
   24.07.2026: "verankere mit einem sicheren Mechanismus, das Retrospektive-Dokument
   immer aktuell zu halten"). The retrospective lives at
   `local/retrospektive-zusammenarbeit.md` (git-ignored, on Deutsch). It must stay
