@@ -41,6 +41,11 @@ export default function App() {
   const mode = useGame((s) => s.mode)
   // The touch layer (point 84) tightens the HUD and honours the safe-area insets.
   const touchActive = useUi((s) => s.touchActive)
+  // "Low Details" mode (design.md §21, F7 / point 276 part B): cap the device
+  // pixel ratio to 1.0 — the biggest fill-rate lever on the user's real hardware
+  // (~35 % GPU, point 277). Off (undefined) keeps R3F's default dpr, so the
+  // shipped look is unchanged. R3F re-applies the ratio when this prop changes.
+  const lowDetails = useUi((s) => s.lowDetails)
   // Pre-warm the read-aloud model shortly after mount (point 117) so the first
   // narration only synthesizes rather than cold-loading the model, and so the
   // WebGPU cold-load's one-time ~15 s GPU stall (user-accepted, reversing point
@@ -56,6 +61,7 @@ export default function App() {
     <div className={touchActive ? 'game-root touch-active' : 'game-root'}>
       <Canvas
         camera={{ fov: 50, near: 0.1, far: 2000, position: [0, 40, 20] }}
+        dpr={lowDetails ? 1 : undefined}
         shadows
         gl={async (props) => {
           // WebGPU primary; the renderer falls back to WebGL 2 automatically
