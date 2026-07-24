@@ -282,7 +282,10 @@ verify suite that proves it.
    is likewise movement-based but confirmed with SPACE: within the enter
    radius the localized hint "Space to enter <name>" shows (the map name-label
    hidden while it does) and a SPACE press enters; reaching the radius alone
-   never enters. The accidental-entry debounce/clearance is removed (no
+   never enters. The hint honours the §17.2 discovery gate (point 287): an
+   UNDISCOVERED settlement's name stays hidden — the hint reads "?" (matching
+   its "?" map label) until the place is discovered, while a known-from-start
+   port always names itself. The accidental-entry debounce/clearance is removed (no
    just-left re-entry lock, no move-clear timing). A SPACE press while the
    traveller is on a water cell still does not enter, so a river passage never
    pulls him in. Entering focuses the controls without an extra click per
@@ -292,8 +295,12 @@ verify suite that proves it.
    building's door and presses SPACE to enter it, and walks past the
    settlement edge to leave (no key); walking a door WITHOUT a key does not
    enter; on entering, no HUD control (button/input) retains focus
-   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate and
-   the water guard are pure-tested (`src/scenes/travel/settlementEntry.test.ts`). The leave transition stays FLUID: the
+   (`scripts/verify/flow.mjs`); the settlement-entry candidate + SPACE gate,
+   the water guard and the discovery-gated enter-hint name (`?` for an
+   undiscovered place, the name for a discovered one) are pure-tested
+   (`src/scenes/travel/settlementEntry.test.ts`), with `flow.mjs` live-checking
+   that an undiscovered village's enter hint shows no proper name while Cairo's
+   names it. The leave transition stays FLUID: the
    travel scene's shared materials/meshes survive remounts as module
    singletons (surgical dispose opt-outs — a full remount used to re-link
    the whole travel program set synchronously, freezing the main thread
@@ -305,7 +312,10 @@ verify suite that proves it.
    §4, graphically elaborate with fine-grained land outlines and river
    courses. Region borders carry the localized region name on each side of
    the line in both views (§3.2); map-point labels are discovery-gated
-   (§17.2); coordinates are read out on demand via the position query
+   (§17.2) EXCEPT the ten port cities, which are known from the start and
+   show their names from the outset (never "?"), a legacy save migrating
+   to mark them discovered (§3.2/§17.2, point 288); coordinates are read
+   out on demand via the position query
    (§3.2, pt. 30), never shown permanently. The exploration map is
    implemented per §19.11 (an engraved ~1890 atlas plate on worn paper —
    graticule, blue water ink, hachures, each region named once in spaced
@@ -1330,7 +1340,9 @@ verify suite that proves it.
     per-port quote (§10); the travel agency's ferry passages between all
     ports with distance-based fare and duration (Zanzibar reachable);
     discovery bounties credited on the next port visit as a telegraphic
-    transfer whose journal entry names the discoveries and the amount, and
+    transfer whose journal entry names the discoveries and the amount (the
+    ten ports are known from the start and earn no bounty for themselves,
+    §17.2/point 288), and
     kind-flavored first-sighting entries for landmarks (§10, once per
     landmark, both languages, voice markup) — including the eight built
     cultural landmarks of §4.4 (Meroë, Giza, Great Zimbabwe, Lalibela,
@@ -1345,7 +1357,9 @@ verify suite that proves it.
     refusal and auto-raise, the regional bid ordering and rejection, the
     stable re-offer quote (identical price across re-offers, cleared on
     leaving the port), the ferry to Zanzibar (fare, days, checkpoint),
-    the bounty crediting, the graveyard's random ivory haul (range 1..9,
+    the bounty crediting, that a port is discovered from the start and
+    credits no bounty for itself while an ordinary village still discovers
+    and bounties, the graveyard's random ivory haul (range 1..9,
     mean ~5) and its cap by the remaining supply, digging a treasure
     cache and the statue site, both valuable reactions, the baseline
     goods in every settlement, buying food in a village against gifts

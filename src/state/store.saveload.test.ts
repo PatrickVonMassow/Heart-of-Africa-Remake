@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
 import { listCheckpoints, type CheckpointMeta } from './store'
 import { g, freshGame, withWorld } from '../test/store'
+import { KNOWN_FROM_START_PLACES } from '../world/geo'
 
 withWorld()
 
@@ -132,6 +133,22 @@ describe('loadCheckpoint restores a specific visit (design.md §18)', () => {
   it('loadCheckpoint on empty storage returns false', () => {
     expect(g().loadCheckpoint()).toBe(false)
     expect(g().loadCheckpoint(0)).toBe(false)
+  })
+
+  // Point 288: a save from before the ports were known-from-start migrates so
+  // their §17.2 labels never regress to "?" — the known ports are re-added on
+  // load without dropping the visits the save had.
+  it('a legacy save without the known ports loads them marked discovered', () => {
+    localStorage.setItem(CHECKPOINTS_KEY, JSON.stringify([{
+      placeId: 'cairo', money: 120, foodDays: 12, day: 4, health: 88, seed: 42,
+      // Pre-288 save: only the actually-visited places were recorded.
+      visitedPlaces: ['cairo', 'maasai-village'],
+    }]))
+    expect(g().loadCheckpoint(0)).toBe(true)
+    for (const id of KNOWN_FROM_START_PLACES) expect(g().visitedPlaces).toContain(id)
+    // The visited village is preserved, and nothing is duplicated.
+    expect(g().visitedPlaces).toContain('maasai-village')
+    expect(new Set(g().visitedPlaces).size).toBe(g().visitedPlaces.length)
   })
 })
 

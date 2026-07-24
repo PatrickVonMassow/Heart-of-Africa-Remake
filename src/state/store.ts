@@ -6,7 +6,7 @@ import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR 
 import { rinderpestPhaseAtDay, villageSituationChanged } from '../systems/rinderpest'
 import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
-import { PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
+import { KNOWN_FROM_START_PLACES, PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
@@ -452,7 +452,11 @@ function startState(seed: number) {
     deathCause: null as DeathCause | null,
     region: 'north' as RegionId,
     visitedRegions: ['north' as RegionId],
-    visitedPlaces: ['cairo'],
+    // The ten port cities are famous ~1890 places known from the start
+    // (design.md §3.2/§17.2, point 288): they begin DISCOVERED, so their map
+    // labels name them at once and returning to them earns no bounty. Cairo (the
+    // start) is one of them; ordinary villages stay discovery-gated.
+    visitedPlaces: [...KNOWN_FROM_START_PLACES],
     villagePhases: {} as Record<string, string>,
     explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
     goodwill: {},
@@ -1932,6 +1936,10 @@ export const useGame = create<GameState>()((set, get) => ({
         ...snap,
         equipment: cleanEquipment,
         explored: snap.explored ?? {},
+        // The ten ports are known from the start (point 288): a legacy save from
+        // before this rule migrates by marking them discovered, so their labels
+        // never regress to "?" on load.
+        visitedPlaces: Array.from(new Set([...KNOWN_FROM_START_PLACES, ...(snap.visitedPlaces ?? [])])),
         villagePhases: snap.villagePhases ?? {}, // legacy saves lack it (point 170)
         health: snap.health ?? balance.health.max,
         penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false, canoeOnLand: false },
