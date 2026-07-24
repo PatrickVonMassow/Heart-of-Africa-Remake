@@ -1,0 +1,35 @@
+The Heart of Africa (POC remake) — render benchmark (USER hardware, 24.07.2026)
+2026-07-24T07:23:33.968Z · webgpu · nvidia lovelace · 2752x1152 @dpr 1.25 · build production cc279a9
+fixed timestep 0.01667s · 150 sampled frames per phase · seed 18900701 · day 181
+HEADLINE: gpu — real GPU timestamps, unaffected by vsync.
+config              phase                 fps     gpu   gpu95     cpu   frame     f95   draws      tris
+baseline            savanna-standing    135.1    4.78    5.18    6.60    7.40    8.20     533   3024949
+baseline            desert-standing     126.6    6.95    9.11    5.30    7.90   10.30     270   1242462  [vsync-capped]
+baseline            savanna-driving     122.0    6.42    7.14    7.00    8.20    9.30     529   3097088  [vsync-capped]
+traa-off            savanna-standing    137.0    4.92    5.24    6.60    7.30    8.00     531   3074003  [vsync-capped]
+traa-off            desert-standing     135.1    6.16    7.60    5.10    7.40    9.10     268   1242460
+traa-off            savanna-driving     125.0    5.31    7.86    6.80    8.00    8.70     527   3060094  [vsync-capped]
+ssao-off            savanna-standing    135.1    3.28    3.47    6.50    7.40    8.40     531   3037011
+ssao-off            desert-standing     161.3    5.31    7.41    5.00    6.20    7.60     268   1242460
+ssao-off            savanna-driving     126.6    5.05    5.57    6.70    7.90   12.20     526   3057822  [vsync-capped]
+shadows-off         savanna-standing    138.9    4.78    5.11    6.50    7.20    8.40     534   3065389  [vsync-capped]
+shadows-off         desert-standing     128.2    6.68    8.72    5.20    7.80   10.00     270   1242462
+shadows-off         savanna-driving     122.0    5.18    8.85    6.90    8.20   10.00     521   3083456  [vsync-capped]
+shadow-half         savanna-standing    131.6    4.85    5.11    6.80    7.60    8.30     528   3064417
+shadow-half         desert-standing     119.0    7.01    9.18    5.30    8.40   10.10     270   1242462  [vsync-capped]
+shadow-half         savanna-driving     123.5    5.24    7.41    6.90    8.10    9.10     521   3048064  [vsync-capped]
+post-off            savanna-standing    140.8    2.88    3.15    6.30    7.10    8.10     523   3023018  [vsync-capped]
+post-off            desert-standing     161.3    4.33    4.65    4.90    6.20    6.40     267   1242459
+post-off            savanna-driving     128.2    4.13    4.59    6.60    7.80    8.40     526   3048301
+dpr-1               savanna-standing    137.0    3.15    3.41    6.50    7.30    8.20     533   3020253  [vsync-capped]
+dpr-1               desert-standing     161.3    4.46    4.72    5.20    6.20    6.60     270   1242462
+dpr-1               savanna-driving     120.5    4.19    4.65    7.10    8.30    8.90     520   3057472  [vsync-capped]
+terrain-refine-off  savanna-standing    122.0    4.59    4.78    7.40    8.20    9.60     526   2828941  [vsync-capped]
+terrain-refine-off  desert-standing     129.9    6.68    8.91    5.20    7.70    9.90     270   1049822
+terrain-refine-off  savanna-driving     117.6    6.16    8.32    7.30    8.50   14.80     532   2819462  [vsync-capped]
+terrain-cap-84      savanna-standing    129.9    4.78    5.11    6.90    7.70    8.20     533   2921581
+terrain-cap-84      desert-standing     128.2    6.88    9.37    5.20    7.80   10.00     270   1130462
+terrain-cap-84      savanna-driving     117.6    4.98    7.34    7.30    8.50   21.10     529   2927616  [vsync-capped]
+all-off             savanna-standing    135.1    1.90    2.16    6.60    7.40    8.10     530   2820266
+all-off             desert-standing     158.7    2.75    2.95    4.80    6.30    6.40     267   1049819
+all-off             savanna-driving     125.0    2.49    2.88    6.80    8.00   13.90     533   2820861  [vsync-capped]
