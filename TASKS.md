@@ -10794,7 +10794,7 @@ the remaining open points in their numeric order.
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
-- [ ] 286. SKYLINE PANORAMA ANIMAL WALKS BACKWARD + LEG-SPEED MISMATCH (user report
+- [x] 286. SKYLINE PANORAMA ANIMAL WALKS BACKWARD + LEG-SPEED MISMATCH (user report
   24.07.2026, deployed build, Cairo desert view). A §2.5 panorama-wildlife silhouette
   on the horizon moves slowly BACKWARD while its legs swing WILDLY (a fast-forward-run
   gait). Two faults, both to fix: (1) it must NEVER move backward — a silhouette only
@@ -10859,7 +10859,7 @@ the remaining open points in their numeric order.
   §17.2 and CLAUDE.md §7.1 pt. 3/25 (the discovery-gating wording gains the known-from-
   start exemption). Implementation-ready.
 
-- [ ] 289. FIRE CASTS SHADOWS — OCCLUDERS BETWEEN THE CAMPFIRE AND THE GROUND (user
+- [x] 289. FIRE CASTS SHADOWS — OCCLUDERS BETWEEN THE CAMPFIRE AND THE GROUND (user
   report 24.07.2026, deployed build; QUEUED AFTER 224). In a settlement the campfire
   (§19.10 firelight) lights the ground in FRONT of the player even though the player
   figure and a wood log stand BETWEEN the fire and that ground — implausible, they must
