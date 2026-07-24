@@ -1,22 +1,46 @@
 // OS-scheduler launcher (user mandate 22.07.2026) — resurrects a DEAD batch when
-// nothing else can, and (Fable-5 audit, finding D) VERIFIES its own work and
-// RAISES A SIGNAL when the batch is sick, not just dead. A Windows Scheduled Task
-// runs this every ~15 min. It:
-//   - never disturbs a live session, a paused batch, or a finished one;
-//   - detects a reboot deterministically (lock predates boot) AND a wake-from-
-//     sleep (long gap between ticks) so it neither strands nor double-spawns;
-//   - verifies the PREVIOUS spawn actually took over (lock claimed / a new commit);
-//     kills a zombie `-p` that hung; counts consecutive failures;
-//   - after N failures with NO git progress it PAUSES itself and fires an
-//     out-of-band ntfy notification (works with no claude.ai / no Claude at all);
-//   - writes every marker atomically (temp + rename).
-// Disable: schtasks /delete /tn HoA-Batch-Autostart /f
+// nothing else can, and VERIFIES its own work / RAISES A SIGNAL when the batch
+// is sick, not just dead. A Windows Scheduled Task runs this every few minutes.
+//
+// HARD SINGLETON (24.07.2026, after the e9407cae incident — this launcher
+// double-spawned against a live-but-heartbeat-starved interactive session):
+//   - Liveness is judged by scripts/batch-singleton.mjs: heartbeat age AND a
+//     REAL OS pid check. A session mid-long-tool-call (stale heartbeat, live
+//     claude process) reads ALIVE — the old 12-min claimedAt window read it
+//     dead and spawned the second session. A reboot alone is NOT death: only
+//     a provably dead owner (dead/reused pid, heartbeat predating the boot,
+//     or a legacy lock gone very stale) frees the lock.
+//   - Spawning goes through the SAME ATOMIC acquire as every session: the
+//     launcher first wins a 'pending-spawn' lock (test-and-set); only then
+//     does it spawn, and the spawned session converts that lock to itself
+//     (pid-bound). If the acquire loses (a session claimed in the race
+//     window), NOTHING is spawned. No path overrides a live lock.
+//   - ACTIVE DETECTOR + REMEDIATION: every tick it checks for a second live
+//     top-level session. If its OWN previous spawn is live but is not the
+//     owner, it KILLS that rogue spawn (it created it, it may reap it), logs
+//     it and notifies. A rogue interactive session is never killed — the
+//     guards make it stand down — but the user is notified urgently.
+// Disable: Disable-ScheduledTask -TaskName HoA-Batch-Autostart
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync } from 'node:fs'
 import { spawn, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import os from 'node:os'
 import { notify } from './notify.mjs'
+import {
+  acquire,
+  updateOwnLock,
+  release,
+  readOwnerLock,
+  assessOwner,
+  probePid,
+  bootTimeMs,
+  spawnDecision,
+  detectParallel,
+  raiseParallelAlert,
+  PENDING_STALE_MS,
+} from './batch-singleton.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO = R('..')
@@ -42,8 +66,8 @@ const openPointCount = () => {
     const m = l.match(/^- \[ \] (\d+)\./)
     if (m && !/\bDEFERRED\b/.test(l)) n++
   }
-  // Format sanity (audit #12): checkboxes exist but none parse → treat as unknown,
-  // NOT as "complete" (never silently stop with work left on a reformat).
+  // Format sanity: checkboxes exist but none parse → treat as unknown, NOT as
+  // "complete" (never silently stop with work left on a reformat).
   if (n === 0 && sawCheckbox && !/- \[x\] \d+\./.test(readFileSync(join(REPO, 'TASKS.md'), 'utf8'))) return -1
   return n
 }
@@ -56,61 +80,98 @@ if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); 
 if (open === 0) { log('skip: batch complete (0 open points)'); process.exit(0) }
 
 const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0 }
-const lock = readJson(C('batch-lock.json'))
 const curHead = head()
 
-// --- Verify the previous spawn (audit D/#7/#8/#17) ----------------------------
+// --- Owner liveness (the hard-singleton assessment) ---------------------------
+const lock = readOwnerLock()
+const probe = lock && lock.pid ? probePid(lock.pid) : null
+const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe })
+
+// --- Verify the previous spawn ------------------------------------------------
 if (state.lastSpawnAt > 0) {
   const progressed = (curHead && state.lastHead && curHead !== state.lastHead) ||
     (lock && typeof lock.claimedAt === 'number' && lock.claimedAt > state.lastSpawnAt)
   if (progressed) {
     if (state.failCount > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
     state.failCount = 0
-  } else {
-    if (state.lastPid && pidAlive(state.lastPid) && lock && now - lock.claimedAt > 12 * 60 * 1000) {
-      // Zombie: spawned claude still running but not heart-beating the lock.
-      try { process.kill(state.lastPid) } catch { /* gone */ }
-      log(`killed zombie spawn pid ${state.lastPid} (alive but lock stale)`)
-    }
-    if (!state.lastPid || !pidAlive(state.lastPid)) {
-      state.failCount = (state.failCount || 0) + 1
-      log(`previous spawn did NOT take over (no new commit, lock not claimed, pid gone) — failCount=${state.failCount}`)
-    }
+  } else if (!state.lastPid || !pidAlive(state.lastPid)) {
+    state.failCount = (state.failCount || 0) + 1
+    log(`previous spawn did NOT take over (no new commit, lock not claimed, pid gone) — failCount=${state.failCount}`)
   }
 }
+state.lastTickAt = now
 
-// --- Runaway / stuck watchdog (audit D/#8/#14): pause + signal -----------------
+// --- ACTIVE DETECTOR: a second live session? ----------------------------------
+const ownerSid = lock ? lock.sessionId : ''
+const parallel = assessment.alive ? detectParallel(ownerSid) : []
+if (parallel.length > 0) {
+  raiseParallelAlert({ detectedBy: 'batch-autostart', ownerSid, parallel })
+  log(`PARALLEL SESSIONS DETECTED: owner=${ownerSid} plus ${parallel.map((p) => p.sid).join(', ')}`)
+  await notify(
+    'PARALLEL batch sessions',
+    `A second live session is running tools in the repo beside the owner (${parallel.length} extra). ` +
+      'The non-owner is being stood down by the guards; the owner was told to verify the repo (batch-doctor).',
+    'urgent',
+  )
+}
+// Remediation for a rogue spawn of OUR OWN making: our child is alive but is
+// NOT the owner (its lock conversion failed or another session owns) → kill it.
+if (
+  state.lastPid &&
+  pidAlive(state.lastPid) &&
+  now - state.lastSpawnAt > PENDING_STALE_MS &&
+  assessment.alive &&
+  lock &&
+  lock.pid !== state.lastPid &&
+  !(lock.kind === 'pending-spawn' && lock.spawnedPid === state.lastPid)
+) {
+  try { process.kill(state.lastPid) } catch { /* gone */ }
+  log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
+  await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
+}
+
+// --- Runaway / stuck watchdog: pause + signal ----------------------------------
 if (state.failCount >= 3) {
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch and notifying`)
   try { writeFileSync(C('batch-paused'), `autostart watchdog: ${state.failCount} resurrections made no progress (auth expired? model flag? failing point? push failing?) — investigate, then delete this file.\n`) } catch { /* ignore */ }
   await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-paused. Check auth / git push / the current point.`, 'urgent')
-  writeJsonAtomic(C('autostart-state.json'), { ...state, lastTickAt: now })
+  writeJsonAtomic(C('autostart-state.json'), { ...state })
   process.exit(0)
 }
 
-// --- Liveness: don't disturb a live session -----------------------------------
-const bootTime = now - Math.round(os.uptime() * 1000)
-const lockPredatesBoot = lock && typeof lock.claimedAt === 'number' && lock.claimedAt < bootTime
-// Wake-from-sleep grace (audit #6): a long gap between ticks (task interval is 15
-// min) means the machine slept; give the surviving session one tick to refresh
-// its lock before we conclude it is dead.
-const wokeFromSleep = state.lastTickAt > 0 && now - state.lastTickAt > 25 * 60 * 1000
-state.lastTickAt = now
-if (lock && !lockPredatesBoot && typeof lock.claimedAt === 'number' && now - lock.claimedAt < 12 * 60 * 1000) {
-  log(`skip: a session is alive (lock ${Math.round((now - lock.claimedAt) / 60000)} min old)`)
+// --- Liveness verdict ----------------------------------------------------------
+const verdict = lock ? spawnDecision(assessment) : 'spawn'
+if (verdict === 'skip-alive') {
+  log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'})`)
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
-if (wokeFromSleep && lock && !lockPredatesBoot) {
-  log('skip: likely woke from sleep — one grace tick before deciding the session is dead')
+if (verdict === 'skip-wedged') {
+  log(`WEDGED owner: pid ${lock.pid} alive but heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old`)
+  if (lock.pid && lock.pid === state.lastPid) {
+    try { process.kill(lock.pid) } catch { /* gone */ }
+    log(`killed wedged own spawn pid ${lock.pid} — next tick may take over`)
+  } else {
+    await notify('Batch session WEDGED', `The owning claude process (pid ${lock.pid}) is alive but has not heartbeat in hours. Check the session; the launcher will not kill an interactive window.`, 'urgent')
+  }
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
-if (lockPredatesBoot) log('lock predates this boot — previous session is dead, resurrecting')
-// Debounce (atomic): a spawn less than 10 min ago is still coming up.
+if (lock) log(`owner provably dead (${assessment.reason}) — taking over`)
+
+// Debounce: a spawn less than 10 min ago is still coming up.
 const lastSpawn = readJson(C('autostart-last.json'))
 if (lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < 10 * 60 * 1000) {
   log(`skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock`)
+  writeJsonAtomic(C('autostart-state.json'), state)
+  process.exit(0)
+}
+
+// --- ATOMIC pending acquire: the launcher must WIN the lock before spawning ----
+const launcherSid = `launcher-${randomUUID()}`
+const acq = acquire(launcherSid, { kind: 'pending-spawn', pid: process.pid, pidStartedAt: now - Math.round(process.uptime() * 1000) })
+if (acq !== 'acquired') {
+  log(`skip: atomic acquire returned "${acq}" — a session claimed the lock in the race window; NOT spawning`)
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
@@ -125,7 +186,12 @@ function findClaude() {
   } catch { return null }
 }
 const exe = findClaude()
-if (!exe) { log('FAIL: no bundled claude.exe found'); await notify('claude.exe missing', 'The autostart launcher could not find the bundled claude.exe — resurrection is down.', 'urgent'); process.exit(1) }
+if (!exe) {
+  release(launcherSid)
+  log('FAIL: no bundled claude.exe found')
+  await notify('claude.exe missing', 'The autostart launcher could not find the bundled claude.exe — resurrection is down.', 'urgent')
+  process.exit(1)
+}
 
 // Self-heal trust so a headless -p honours the allow-list (idempotent).
 try {
@@ -150,11 +216,12 @@ const prompt =
   'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
   'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. Dashboard-Guard + ' +
   'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. Halte NICHT still an. Wenn ein git push ' +
-  'scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. Wenn alles erledigt ist: Closing fahren.'
+  'scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn der ' +
+  'SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
+  'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren.'
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
 writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead })
-writeJsonAtomic(C('autostart-authorized.json'), { at: now })
 log(`RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount})`)
 let child
 try {
@@ -164,12 +231,18 @@ try {
   })
   child.unref()
 } catch (e) {
+  release(launcherSid)
   log(`FAIL: could not spawn claude (${e && e.message})`)
   await notify('Spawn failed', `Could not launch claude.exe: ${e && e.message}`, 'urgent')
   process.exit(1)
 }
+// Rebind the pending lock to the child so the singleton's liveness follows the
+// spawned process, and the spawned session may convert it to itself (pid-bound).
+updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt: null })
+// One-shot bind helper for the spawned session's SessionStart hook.
+writeJsonAtomic(C('autostart-authorized.json'), { at: now, pid: child.pid })
 writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead, pid: child.pid })
 writeJsonAtomic(C('autostart-state.json'), { ...state, lastHead: curHead, lastSpawnAt: now, lastPid: child.pid })
-log(`launched pid ${child.pid}`)
+log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
 await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
 process.exit(0)
