@@ -7468,6 +7468,18 @@ the remaining open points in their numeric order.
   closing root-cause set: poll the point-129 driven move on the SIM clock / its
   own arrival condition rather than a fixed frame budget. The point-102 vicinity
   check (this session's anchor fix) PASSED first try, confirming that fix.
+  OBSERVED 24.07 (a WebGL enrichments run under CPU overload during the 278
+  verify): the point-121 check "a feed that ends without a kill leaves no remnant"
+  failed `{deadBefore:4,deadAfter:5,calfAlive:true}` — a NEW rotating-flake entry.
+  It counts GLOBAL dead animals over a 2.5-sim-second window during which OTHER
+  dramas keep running, so any unrelated concurrent predation in that window fails
+  it even though the STAGED feed left the calf alive and no remnant. Confirmed a
+  load flake, not a real bug: the same check PASSED on a quiet-machine re-run
+  (222 pass, 0 fail). ROOT-CAUSE FIX for the closing: scope the assertion to the
+  staged feed — count only deaths of the feed's own actors (or freeze other hunts
+  for the window), not the global dead-count, so a concurrent drama can't fail it.
+  LESSON reinforced (memory `verify-suites-need-a-quiet-machine`): never run a
+  verify suite while a worktree agent builds — evaluate a red only on a quiet box.
 
 - [x] 201. DONE 20.07.2026: the generic FLEE step (radial away from an active
   lion) and the elephant DODGE step both moved RAW — onto a water cell, where
