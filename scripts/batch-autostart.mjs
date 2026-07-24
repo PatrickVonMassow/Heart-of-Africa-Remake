@@ -233,7 +233,10 @@ try {
   // settings.local.json is the proof), and defaultMode "dontAsk" is the settings
   // ceiling. For an autonomous batch on the user's own single-user machine the
   // launch flag is the only thing that guarantees a prompt never blocks the run.
-  child = spawn(exe, ['-p', prompt, '--model', 'claude-opus-4-8[1m]', '--dangerously-skip-permissions'], {
+  // Model per the 25.07.2026 allowlist: Opus 5 is the default, Opus 4.8 the
+  // explicit fallback when Opus 5 is unavailable — never any other model (the
+  // model-guard Stop hook enforces the allowlist from inside the session).
+  child = spawn(exe, ['-p', prompt, '--model', 'claude-opus-5[1m]', '--fallback-model', 'claude-opus-4-8[1m]', '--dangerously-skip-permissions'], {
     cwd: REPO, detached: true, stdio: ['ignore', out, out], windowsHide: true,
   })
   child.unref()

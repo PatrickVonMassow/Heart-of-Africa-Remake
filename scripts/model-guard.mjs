@@ -2,8 +2,9 @@
 // commit. On 24.07.2026 the session degraded to Haiku 4.5 unnoticed and merged
 // three defective deliveries in 14 minutes; no config review could have caught
 // it live, but every commit records its author model in the Co-Authored-By
-// trailer. Any commit after the committed baseline carrying a Haiku-class
-// trailer blocks the turn end with a pause instruction and pings ntfy.
+// trailer. Any commit after the committed baseline authored by a model outside
+// the user's allowlist (Opus 5 / Opus 4.8 / Fable 5 — Sonnet and Haiku are NOT
+// acceptable) blocks the turn end with a pause instruction and pings ntfy.
 //
 // Decision logic: model-guard-core.mjs (pure, Vitest-covered). This wrapper
 // gathers `git log` output and is fail-OPEN — an internal error never traps
@@ -13,7 +14,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { findDegradedCommits } from './model-guard-core.mjs'
+import { findForbiddenCommits } from './model-guard-core.mjs'
 import { notify } from './notify.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
@@ -50,22 +51,24 @@ function recentLog() {
 }
 
 try {
-  const hits = findDegradedCommits(recentLog(), baselineMs())
+  const hits = findForbiddenCommits(recentLog(), baselineMs())
   if (process.argv[2] === '--status') {
     console.log(JSON.stringify({ baseline: new Date(baselineMs()).toISOString(), hits }, null, 2))
     process.exit(0)
   }
   if (hits.length && !existsSync(PAUSE)) {
     const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
-    await notify('DEGRADED MODEL', `Haiku-class commit(s) detected: ${list} — pausing the batch`, 'high')
+    await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
     process.stdout.write(
       JSON.stringify({
         decision: 'block',
         reason:
-          `SERVING-MODEL TRIPWIRE: commit(s) ${list} carry a Haiku-class co-author trailer — ` +
-          'the session is degraded. Do NOT continue batch work: create .claude/batch-paused ' +
-          '(reason: degraded serving model) and stop. Only after the user has confirmed a ' +
-          'full-strength model may .claude/model-guard-baseline.json be advanced past these commits.',
+          `SERVING-MODEL TRIPWIRE: commit(s) ${list} carry a co-author trailer outside the model ` +
+          'allowlist (only Opus 5, Opus 4.8 and Fable 5 may run the batch — Sonnet and Haiku are ' +
+          'NOT acceptable; user policy 25.07.2026). Do NOT continue batch work: create ' +
+          '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user ' +
+          'has confirmed an allowed model may .claude/model-guard-baseline.json be advanced past ' +
+          'these commits.',
       }),
     )
   }

@@ -11284,19 +11284,26 @@ the remaining open points in their numeric order.
   restored, the three TASKS ticks undone — while the legitimately recorded
   .claude/closing-state.json is kept; the load-tainted working-tree churn (PNGs, retro
   appendix, ineffective settings additionalDirectories, untracked pre-push stub) and the
-  unauthorized local .git/hooks/pre-push are discarded. TRIPWIRE (mechanism-first): a
-  Stop-hook guard (pure core scripts/model-guard-core.mjs + fail-open wrapper
-  scripts/model-guard.mjs, wired FIRST in the Stop chain) parses the recent commits'
-  Co-Authored-By trailers; any commit after the committed baseline
-  (.claude/model-guard-baseline.json) authored by a Haiku-class model BLOCKS the turn
-  end with a pause-the-batch instruction and pings ntfy — a degraded session is caught
-  at its FIRST commit. The guard stands down while .claude/batch-paused exists (no
-  block loop once paused); the batch-resume hook names the model policy on every
-  session start. VERIFIABLE: model-guard-core Vitest sweep (trailer parse incl.
-  malformed lines, Haiku match across case/format variants, non-Haiku models pass,
-  baseline cutoff boundary, empty log); the repaired state passes the full LARGE
-  regression on a quiet machine (both backends), which also re-validates the four Opus
-  points merged before the degradation (262/273/293/305).
+  unauthorized local .git/hooks/pre-push are discarded. MODEL ALLOWLIST (user
+  25.07.2026): ONLY Opus 5 (default), Opus 4.8 (fallback when Opus 5 is unavailable)
+  and Fable 5 (occasional four-eyes work) may run the batch — Sonnet, Haiku and every
+  other model are NOT acceptable; if the policy cannot be held, the batch STOPS. The
+  batch autostart therefore launches `--model claude-opus-5[1m] --fallback-model
+  claude-opus-4-8[1m]` (flag verified against the bundled CLI). TRIPWIRE
+  (mechanism-first): a Stop-hook guard (pure core scripts/model-guard-core.mjs +
+  fail-open wrapper scripts/model-guard.mjs, wired FIRST in the Stop chain) parses the
+  recent commits' Co-Authored-By trailers; any commit after the committed baseline
+  (.claude/model-guard-baseline.json) authored by a Claude model OUTSIDE the allowlist
+  BLOCKS the turn end with a pause-the-batch instruction and pings ntfy — a degraded
+  session is caught at its FIRST commit, and an unknown future model name fails
+  closed. The guard stands down while .claude/batch-paused exists (no block loop once
+  paused); the batch-resume hook names the allowlist on every session start.
+  VERIFIABLE: model-guard-core Vitest sweep (trailer parse incl. malformed lines,
+  allowlist pass for Opus 5/Opus 4.8/Fable 5 variants, breach for Haiku AND Sonnet AND
+  unknown models, mixed-co-author flagging, human co-authors and merge commits
+  ignored, baseline cutoff boundary, empty log); the repaired state passes the full
+  LARGE regression on a quiet machine (both backends), which also re-validates the
+  four Opus points merged before the degradation (262/273/293/305).
 
 ## Closing (only after all points)
 
