@@ -1299,9 +1299,14 @@ const stream = await page.evaluate(async () => {
   setPos(p0.x + 36, p0.z)
   await window.__sleepSim(1)
   const survivesCross = hasMark('A')
-  // Move far past the zoom-1 despawn radius (~160 world units).
+  // Move far past the zoom-1 despawn radius (~160 world units). The window is
+  // generous because this expectation LATCHES: waiting longer can never turn a
+  // real failure into a pass — only stop a slow despawn pass from reading as
+  // one. A 600-unit jump strands a great many animals at once, and this check
+  // was the single most frequent first-attempt failure of the whole suite
+  // (point 200) while the despawn itself was never in doubt.
   setPos(p0.x + 600, p0.z + 600)
-  await window.__pollSim(6, () => !hasMark('A'))
+  await window.__pollSim(20, () => !hasMark('A'))
   const goneWhenFar = !hasMark('A')
 
   // At a wider zoom the same distance is still in view and is kept.
