@@ -10536,6 +10536,14 @@ the remaining open points in their numeric order.
   §21 convention paragraph: every new optical feature MUST declare its low/medium/high
   behaviour (and may offer a costlier high-only variant). See the memory
   `sort-visuals-into-detail-levels`.
+  DETAIL-LEVEL DOC + CURRENCY (user 24.07.2026): a git-tracked ENGLISH doc
+  `docs/graphics-detail-levels.md` tabulates which level sets which value for
+  EVERY quality key (derived from `QUALITY_PRESETS`), with a per-setting note and
+  the declared-but-unconsumed keys flagged. A Vitest sync test
+  (`src/config/qualityDoc.test.ts`) reads the doc and FAILS if its table drifts
+  from `QUALITY_PRESETS` — the reliable currency mechanism (runs on every
+  test:unit, hence every regression/closing). The closing flow (CLAUDE §9 /
+  docs/maximale-qs.md Phase 8) names the doc-current check explicitly.
   BUILD ON the existing `feat/276-low-details-mode` branch (all the levers are already
   wired there behind the binary flag) — refactor the binary `lowDetails` into the
   three-level `detailLevel` + presets; do not start from scratch.

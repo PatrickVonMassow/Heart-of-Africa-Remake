@@ -169,6 +169,11 @@ Cheap automated classes first, then the visual sweep:
 - Dead-code / stale-doc / stale-comment cleanup as separate commits; audit every
   `.md` for accreted cruft (preserve section numbers). Keep the implementation
   sections current (`implementation-sections-current`).
+- **Graphics detail-level doc current (user 24.07.2026):** explicitly confirm
+  `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`. The
+  `src/config/qualityDoc.test.ts` sync test enforces it on every Vitest run (a
+  green regression proves it), but name the check here so a preset/doc drift is
+  never assumed away.
 - Full regression again: build + lint + audit + Vitest + the LARGE browser set
   on BOTH backends, **3× flake-free** (a single retry may clear a rotating
   staging flake; a persistent fail is a real regression).

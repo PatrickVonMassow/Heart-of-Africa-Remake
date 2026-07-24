@@ -1642,6 +1642,12 @@ At the end:
 - List the collected open items (`// OPEN: …`).
 - Name the simplifications made and the placeholder values set.
 - No silent extensions beyond §7.1.
+- **Graphics detail-level doc current (user 24.07.2026).** Explicitly confirm
+  `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`
+  (`src/config/quality.ts`). The `src/config/qualityDoc.test.ts` sync test
+  enforces this on every `npm run test:unit` run — so a green regression already
+  proves it — but the closing names it as a deliberate check so a doc drift can
+  never slip past. If the presets changed, the doc must have changed with them.
 
 **Closing freeze (user decision 22.07.2026).** During a closing run the code
 is FROZEN: no parallel agent work may land or merge while the closing runs,
