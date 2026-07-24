@@ -11305,6 +11305,33 @@ the remaining open points in their numeric order.
   LARGE regression on a quiet machine (both backends), which also re-validates the
   four Opus points merged before the degradation (262/273/293/305).
 
+- [ ] 310. LOW-PRESET PERFORMANCE PASS FROM THE S25 BENCHMARK (user 25.07.2026). Input:
+  the user's real-device F8 report local/samsung-s25-bench.json (Galaxy S25, Adreno
+  8xx, WebGPU with real GPU timestamps, production build 4f1d6f4). Findings to work
+  from: LOW holds 60 fps vsync-capped, but the GPU median is 6.95-9.83 ms — thin
+  headroom for thermal throttling or 120 Hz; the LOW frame is dominated by
+  travel-dressing (53 % of triangles, ~535k tris in savanna) and a biome-INDEPENDENT
+  unnamed system ("(unnamed) MeshStandardNodeMaterial", constant 425,118 tris / 180
+  meshes in EVERY phase — 78 % of the desert frame); dpr is the strongest lever
+  overall (baseline GPU 18.55→8.39 ms driving at dpr 1) and LOW already caps it at 1.
+  Deliver: (a) NAME the unnamed breakdown systems (scene-graph group naming, so the F8
+  report attributes every system; the 425k one is suspected to be the river/lake water
+  geometry — verify first), (b) a LOW flora/dressing DENSITY lever (calibratable
+  instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
+  dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
+  identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
+  the water — every §11.3 continuity/never-buried invariant must keep passing), (d)
+  only if a-c leave the headroom short: a touch-preset-only dpr cut below 1 (the touch
+  preset stays a SUBSET of low). EVERY new lever gets entries in ALL THREE
+  QUALITY_PRESETS levels (the src/config/quality.test.ts completeness gate and the
+  docs/graphics-detail-levels.md sync test enforce this), stays debug-tunable within
+  its level, and reads through the point-276 effective-selector pattern. VERIFIABLE:
+  pure tests for each new preset key; the §11.3/§19 suites stay green at LOW (ribbon
+  continuity, dressing-streaming no-pop projection checks); picture checked on BOTH
+  backends at LOW; and a fresh F8 run (headless as smoke, the user's S25 as the real
+  price check) shows a clearly lower LOW GPU median in the dressing-dominated savanna
+  phases without a visual regression the user rejects.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
