@@ -186,7 +186,7 @@ export function Effects() {
       }
     }
     return { processing, dispose }
-  }, [gl, scene, camera, traaEnabled, ssaoEnabled])
+  }, [gl, scene, camera, traaEnabled, ssaoEnabled, bloomEnabled])
 
   useEffect(() => {
     return () => {
