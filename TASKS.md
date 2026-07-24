@@ -10459,7 +10459,7 @@ the remaining open points in their numeric order.
   (Wildlife.tsx) — serialize with 274 and any other Wildlife.tsx point. A user-reported
   behaviour gap → before 224. Implementation-ready once 274 has landed (same file).
 
-- [ ] 276. BIRD'S-EYE FRAMERATE — RECOVER THE v0.1 DROP + a "LOW DETAILS" MODE (user
+- [x] 276. BIRD'S-EYE FRAMERATE — RECOVER THE v0.1 DROP + a "LOW DETAILS" MODE (user
   23.07.2026, chose OPTION C = both, measure after each step). Travel-scene FPS fell
   substantially since v0.1; the post-pipeline is UNCHANGED — the cost is the systems
   added since (Fable's code analysis is the source; a fresh code-analysis before
