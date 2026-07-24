@@ -112,6 +112,7 @@ import {
   vigilDrawReady,
   offscreenRingSpawn,
   keepStreamedAnimal,
+  retainedSpawnChunks,
   waterStruggleFate,
   groundedBodyY,
   groundFollowY,
@@ -202,8 +203,13 @@ interface Animal {
   heading?: number
   /** Herd id shared by elephants placed together, so a herd moves as one. */
   herd?: number
-  /** Chunk key that spawned this animal (for streaming despawn). */
+  /** Chunk key this animal is currently attributed to (for streaming despawn);
+   *  re-homed to the live cell under its feet when its birth chunk despawns. */
   chunk?: string
+  /** IMMUTABLE birth chunk key (point 278): unlike `chunk`, never re-homed, so
+   *  the streaming keeps the birth chunk's key alive while the animal lives and
+   *  a returning respawn cannot duplicate it. */
+  origin?: string
   /** Seconds of carcass left once a scavenger has landed; removed at 0 (design.md §19). */
   dissolve?: number
   /** A juvenile that keeps close to its parent and nurses (design.md §19). */
@@ -1993,17 +1999,19 @@ function Herds() {
         spawnedChunks.current.add(key)
       }
     }
-    let despawned = false
-    for (const key of spawnedChunks.current) {
+    // Chunk keys now beyond the despawn ring (by distance). A key is only
+    // FREED once nothing that was born there still lives (point 278, below).
+    const beyondDespawn = (key: string): boolean => {
       const comma = key.indexOf(',')
       const kx = Number(key.slice(0, comma))
       const kz = Number(key.slice(comma + 1))
       const chx = (kx + 0.5) * CHUNK_SIZE
       const chz = (kz + 0.5) * CHUNK_SIZE
-      if (Math.hypot(chx - pos.x, chz - pos.z) > despawnR) {
-        spawnedChunks.current.delete(key)
-        despawned = true
-      }
+      return Math.hypot(chx - pos.x, chz - pos.z) > despawnR
+    }
+    let despawned = false
+    for (const key of spawnedChunks.current) {
+      if (beyondDespawn(key)) { despawned = true; break }
     }
     if (despawned) {
       // Cull each animal by where it STANDS, never only by its birth chunk:
@@ -2011,17 +2019,38 @@ function Herds() {
       // birth-chunk filter deleted animals still in sight (a zoom-in collapses
       // despawnR in one frame and mass-culled them). keepStreamedAnimal
       // re-homes a drifted animal into the live chunk under its feet and
-      // backstops with the rendered frame. Known pre-existing property: a
-      // re-homed animal plus a later deterministic respawn of its origin
-      // chunk can duplicate — inherent to deterministic chunk respawn.
-      const liveChunkHas = (key: string) => spawnedChunks.current.has(key)
+      // backstops with the rendered frame.
+      //
+      // The re-home used to duplicate the animal on return (point 278, the
+      // point-276/278 "dressing grows over a session" leak): re-homing moved
+      // `chunk` off the birth chunk, whose key then despawned by distance while
+      // the animal lived on — so a later return re-seeded that birth chunk and
+      // added a SECOND deterministic copy. Fix: pin the immutable birth chunk in
+      // `origin` at the first re-home, and retain any chunk key whose animals
+      // are still alive so the respawn never duplicates (retainedSpawnChunks).
+      //
+      // The animal cull uses the IN-RANGE set (a spawned key still within the
+      // despawn ring), exactly as before — a chunk RETAINED only for its origin
+      // (point 278) is beyond the ring and must NOT keep an animal alive here, or
+      // a legitimate despawn would stall. The retention lives only in the
+      // rebuilt spawned-chunk set below, which the RESPAWN reads.
+      const liveChunkHas = (key: string) => spawnedChunks.current.has(key) && !beyondDespawn(key)
       for (const sp of SPECIES) {
         herds[sp] = herds[sp].filter((a) => {
           const v = keepStreamedAnimal(a, liveChunkHas, CHUNK_SIZE, pos.x, pos.z, despawnR, isOnScreen)
-          if (v.rehomeTo !== undefined) a.chunk = v.rehomeTo
+          if (v.rehomeTo !== undefined) {
+            if (a.origin === undefined) a.origin = a.chunk // birth chunk, pre-re-home
+            a.chunk = v.rehomeTo
+          }
           return v.keep
         })
       }
+      // Rebuild the spawned-chunk set: drop a chunk beyond the ring ONLY when no
+      // living animal still originates there, so returning re-seeds nothing that
+      // is already present (point 278 — the count converges at a fixed anchor).
+      const living: Array<{ dead?: boolean; origin?: string; chunk?: string }> = []
+      for (const sp of SPECIES) for (const a of herds[sp]) living.push(a)
+      spawnedChunks.current = retainedSpawnChunks(spawnedChunks.current, living, beyondDespawn)
       for (const hid of [...herdState.current.keys()]) {
         if (!herds.elephant.some((a) => a.herd === hid)) herdState.current.delete(hid)
       }

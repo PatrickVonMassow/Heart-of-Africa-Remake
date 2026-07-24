@@ -1535,6 +1535,53 @@ check('an animal survives a chunk-boundary crossing while in view', stream.ok &&
 check('an animal despawns once well outside the view', stream.ok && stream.goneWhenFar, JSON.stringify(stream))
 check('zoom-out keeps animals the default view would despawn', stream.ok && stream.goneAtZoom1 && stream.keptAtZoom3, JSON.stringify(stream))
 
+// --- The dressing must NOT grow over a session (point 278) -------------------
+// At a FIXED anchor, with a fixed seed and date, the streamed instanced dressing
+// used to CLIMB the longer one played: a roamer re-homed off its birth chunk
+// survived while that chunk despawned by distance, so a later return re-seeded a
+// SECOND deterministic copy (docs/perf-276-findings.md — 235 808 -> 327 808 tris
+// over five round trips). The leak lives in the WILDLIFE instance pools (both
+// they and the flora sit under `travel-dressing`, so the point-276 breakdown
+// lumped them as "flora/dressing"). The fix retains a chunk key while any of its
+// animals still live (retainedSpawnChunks), so the count converges. Here: jump
+// back and forth between two anchors several times and assert the live wildlife
+// instance count at the FIXED first anchor is unchanged within a small tolerance.
+const dressingGrowth = await page.evaluate(async () => {
+  const A = { lat: 23.0, lon: 15.0 } // desert-empty (perf-bench anchor)
+  const B = { lat: -2.5, lon: 34.0 } // savanna-dense (perf-bench anchor)
+  window.__ui.getState().setTravelZoom(0.5)
+  const liveInstances = () => {
+    const h = window.__wildlife?.herdsRef?.current
+    if (!h) return -1
+    let n = 0
+    for (const sp of Object.keys(h)) if (Array.isArray(h[sp])) for (const a of h[sp]) if (!a.dead) n++
+    return n
+  }
+  const visit = async (p) => {
+    window.__game.getState().debugJumpTo(p.lat, p.lon)
+    await window.__sleepSim(6) // let the streaming settle to steady state
+  }
+  await visit(A)
+  await visit(B)
+  const first = liveInstances() >= 0 ? (await visit(A), liveInstances()) : -1
+  const samples = [first]
+  for (let i = 0; i < 4; i++) {
+    await visit(B)
+    await visit(A)
+    samples.push(liveInstances())
+  }
+  const max = Math.max(...samples)
+  const min = Math.min(...samples)
+  return { samples, min, max, spread: max - min }
+})
+// A small tolerance absorbs the ambient wildlife's legitimate arrival jitter; a
+// real leak grew by ~12 per round trip (unbounded), far past this bar.
+check(
+  'the streamed dressing does not grow over a session at a fixed anchor (point 278)',
+  dressingGrowth.min > 0 && dressingGrowth.spread <= 6,
+  JSON.stringify(dressingGrowth),
+)
+
 // (The __pollSim/__sleepSim/__simTime helpers are installed at boot — and
 // re-installed after any crash-reload — see installSimHelpers above.)
 
