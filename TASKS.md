@@ -11212,6 +11212,30 @@ the remaining open points in their numeric order.
   `quality.test.ts` + `qualityDoc.test.ts` green; the changed LOW values pinned; a note on the
   expected M1-Pro GPU saving from the benchmark deltas. No player-visible text (numbers only).
 
+- [ ] 306. CLOSING-COMPLETENESS ENFORCEMENT — a closing must not be able to SKIP a step (user
+  24.07.2026, after the v0.2 closing skipped the dead-code / stale-doc / stale-comment cleanup —
+  the very thing that distinguishes a closing from a plain LARGE regression). ROOT CAUSE: the
+  closing cycle's steps (§7.2 / Maximum-QA Phase 8 / this file) were tracked only by fallible
+  MEMORY; under the pressure of getting the regression green through many stale checks, the
+  regression got done but the cleanup + the .md audit were skipped, and nothing blocked it.
+  MECHANISM (enforced, not remembered): (1) an explicit machine-readable CLOSING CHECKLIST
+  enumerating EVERY closing step (from §7.2 + Maximum-QA Phase 8): full LARGE both-backends
+  flake-free, dead-code cleanup, stale-doc audit, stale-comment audit, `.md` cruft audit (section
+  numbers preserved), implementation-sections current, graphics-detail-doc current, cross-browser/
+  mobile smoke, open-items list, simplifications named. (2) a HEAD-bound CLOSING-STATE record
+  (like `render-verify-guard`) where each step is checked off WITH evidence for the specific
+  closing commit. (3) a Stop-hook guard (pure core + Vitest + fail-open, the project schema) that
+  BLOCKS creating/moving a version tag AND any "closing complete" claim / 224-style tick unless
+  EVERY checklist item is recorded done for the current HEAD — so a version release is impossible
+  with an incomplete closing. Wire it into the version-release process (the `version-release`
+  memory + CLAUDE.md §9 + docs/maximum-qa.md Phase 8/9). ANCHORS: `scripts/closing-guard.mjs` +
+  `-core.mjs` + Vitest, a closing-checklist definition module, `.claude/settings.json` (Stop hook),
+  `.claude/closing-state.json`. VERIFIABLE: pure tests (block on any unchecked step, allow when all
+  checked, fail-open on malformed) and a synthetic version-tag attempt with an incomplete checklist
+  blocked. MUST-WORK guard → build under the point-298 criticality rule, and per the user's explicit
+  instruction have Fable-5 verify the mechanism is 100 % RELIABLE (it cannot let an incomplete
+  closing through) before it counts as done. No player-visible text.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
