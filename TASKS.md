@@ -11068,6 +11068,29 @@ the remaining open points in their numeric order.
   enumerating script (guards in `scripts/`, memories in the memory dir). VERIFIABLE: the audit
   produces a report; no runtime invariant. (Lighter point.)
 
+- [ ] 298. MODEL-DIVERSITY FOR HARD/CRITICAL CHANGES — criticality triage + an ENFORCED
+  diverse review (user 24.07.2026; retrospective lesson). STANDING RULE: before building any
+  feature/point, assess its DIFFICULTY × CRITICALITY — a "must-always-work" change (a guard,
+  the batch singleton, save/load, anything hard to reverse or load-bearing for the whole
+  system) is HIGH-criticality. For a HIGH item, apply MODEL-DIVERSE review: either (a) the
+  primary model (Opus) builds and a Fable-5 subagent reviews the PLAN before and the RESULT
+  after (truly safe / works in ALL cases / no negative side effects), or (b) Fable builds and
+  Opus cross-checks — a second, DIFFERENT pair of eyes on the risky work. Merge only when the
+  diverse review is green. Generalizes the ad-hoc Fable sandwich on points 294/295 into a
+  standing practice; extends the audit-with-model-diversity and switch-to-fable-when-stuck
+  memories from "audits" / "when stuck" to "proactively, by criticality". MECHANISM (enforced,
+  not remembered): (1) a CRITICALITY tag convention on TASKS points ("Criticality:
+  low|med|high" + a one-line rationale); (2) a Stop-hook guard (pure core + Vitest + fail-open,
+  the project's guard schema) that, when a HIGH-criticality point is ticked/merged on main,
+  requires a recorded model-diverse-review marker (HEAD-bound, like render-verify-guard) — a
+  high tick without that record BLOCKS. ANCHORS: a new `scripts/criticality-review-guard.mjs`
+  + `-core.mjs` + Vitest, `.claude/settings.json` (Stop hook), a review-record marker file,
+  docs (the rule in CLAUDE.md working-method + the retrospective). VERIFIABLE: pure test of
+  the guard core (high + no review → block; high + review → allow; low/med → allow; malformed
+  → fail-open) and a synthetic high-criticality tick that fires the guard. This point IS itself
+  high-criticality (a must-work guard) → build it under its OWN rule: Fable-5 plan-review
+  BEFORE, Fable-5 safety-review AFTER, merge to main ONLY when all green. No player-visible text.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
