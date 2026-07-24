@@ -76,8 +76,9 @@ npm test -- build lint  # just the build + lint preflight
 `npm test` exits non-zero if any stage fails or a suite logs a browser console
 error. The Playwright suites are: `docs` (README/CLAUDE.md consistency),
 `world`, `i18n`, `flow`, `health`, `events`, `collision`, `handwriting`,
-`polish`, `gamepad`, `voice`, `settings`, `enrichments`, and `preview` (the
-production build). Each maps to the CLAUDE.md §7.1 criteria named in its
+`polish`, `gamepad`, `touch`, `voice`, `settings`, `enrichments`,
+`invariants`, `benchmark`, and `preview` (the production build). Each maps to
+the CLAUDE.md §7.1 criteria named in its
 header comment. The bulk of the regression (pure logic, store transitions,
 HTML-HUD components) runs in the Vitest layer (`npm run test:unit`); the
 layer split and the old→new coverage map live in
