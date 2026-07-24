@@ -1,39 +1,33 @@
-// Batch coordination state for the autonomous TASKS.md batch, so two Claude
-// instances never work the same repo in parallel (which collides on git and
-// the dev server). Two small git-ignored files under .claude/:
+// Batch PAUSE state + legacy lock reader.
 //
-//   batch-lock.json  — which session owns the batch right now, refreshed as it
-//                      works; a session that has not refreshed within STALE_MS
-//                      (token exhaustion / closed window) is considered dead so
-//                      a fresh session may take over.
-//   batch-paused     — user PAUSE marker; while present no session auto-resumes,
-//                      regardless of the lock (the batch waits for an explicit go).
+// Since 24.07.2026 (hard singleton, after the e9407cae double-session
+// incident) batch OWNERSHIP lives in scripts/batch-singleton.mjs: an atomic
+// test-and-set acquire, a pid-backed liveness heartbeat, and stand-down for
+// non-owners. The old advisory claim-and-check API (lockStatus/claimLock/
+// releaseLock) is deliberately GONE — every claim must go through
+// batch-singleton's acquire, and nothing may "refresh" a lock it does not own.
 //
-// The SessionStart hook (batch-resume-hook.mjs) consults both before emitting
-// its resume instruction; the active instance refreshes the lock as it works
-// and releases it (or sets the pause marker) when it stops.
+// What remains here:
+//   batch-paused    — user PAUSE marker; while present no session auto-resumes,
+//                     regardless of the lock (the batch waits for an explicit go).
+//   readLock()      — read-only view of .claude/batch-lock.json for reporting.
 
-import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs'
+import { readFileSync, existsSync, rmSync, renameSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const LOCK_PATH = fileURLToPath(new URL('../.claude/batch-lock.json', import.meta.url))
 const PAUSE_PATH = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
 
-// Atomic write (Fable-5 audit #18): the lock is rewritten on EVERY tool call by
-// the heartbeat, so a torn read (writeFileSync interrupted) would parse as null
-// and be treated as "no lock". temp-file + rename makes the swap atomic.
+// Atomic write: temp-file + rename, so a torn read can never half-parse.
 function writeAtomic(path, text) {
   const tmp = `${path}.tmp`
   writeFileSync(tmp, text)
   renameSync(tmp, path)
 }
 
-// A lock older than this without a refresh is treated as dead. Generous enough
-// that the per-point work cadence (commit + dashboard, ~10-40 min) keeps a live
-// lock fresh, but a token outage (paused for the refill) goes stale so a
-// legitimate new session can take over.
-export const STALE_MS = 45 * 60 * 1000
-
+/** Read-only view of the owner lock (null when absent/unreadable). Ownership
+ *  decisions belong to batch-singleton.mjs — never derive "may I work?" from
+ *  this alone. */
 export function readLock() {
   try {
     const lock = JSON.parse(readFileSync(LOCK_PATH, 'utf8'))
@@ -42,37 +36,6 @@ export function readLock() {
     // no lock or unreadable
   }
   return null
-}
-
-/**
- * Lock status for `sessionId` at `nowMs`: 'free' (no lock or stale → may claim),
- * 'mine' (this session already owns it), or 'held' (a different, still-fresh
- * session owns it → must not resume).
- */
-export function lockStatus(sessionId, nowMs) {
-  const lock = readLock()
-  if (!lock) return 'free'
-  if (nowMs - lock.claimedAt > STALE_MS) return 'free'
-  return lock.sessionId === sessionId ? 'mine' : 'held'
-}
-
-/** Claim (or refresh) the lock for `sessionId`; keeps the original startedAt. */
-export function claimLock(sessionId, nowMs) {
-  const prev = readLock()
-  const startedAt = prev && prev.sessionId === sessionId ? prev.startedAt : nowMs
-  writeAtomic(LOCK_PATH, JSON.stringify({ sessionId, startedAt, claimedAt: nowMs }, null, 2))
-}
-
-/** Release the lock if this session owns it (no-op otherwise). */
-export function releaseLock(sessionId) {
-  const lock = readLock()
-  if (lock && lock.sessionId === sessionId) {
-    try {
-      rmSync(LOCK_PATH)
-    } catch {
-      // already gone
-    }
-  }
 }
 
 /** The user PAUSE marker: while present, no session auto-resumes the batch. */

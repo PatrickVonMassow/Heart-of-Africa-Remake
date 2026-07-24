@@ -9,19 +9,22 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { evaluate } from './queue-order-guard-core.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
 const DASHBOARD = fileURLToPath(new URL('../.batch-dashboard.html', import.meta.url))
 const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
 
 try {
+  let sid = ''
   try {
-    JSON.parse(readFileSync(0, 'utf8')) // hook stdin (session_id) — unused, tolerated missing
+    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
   } catch {
     /* no/non-JSON stdin (manual run) — the rules are global truth, not session-local */
   }
 
   if (existsSync(PAUSE)) process.exit(0) // user-paused: no batch duty in flight
+  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
   if (!existsSync(DASHBOARD)) process.exit(0) // no board yet — dashboard-guard owns that case
 
   const result = evaluate({

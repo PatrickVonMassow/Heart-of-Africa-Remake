@@ -19,6 +19,7 @@ import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { evaluate, RECENT_COMMIT_COUNT } from './dashboard-integrity-guard-core.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const DASHBOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -55,13 +56,15 @@ function touchedFiles() {
 }
 
 try {
+  let sid = ''
   try {
-    JSON.parse(readFileSync(0, 'utf8')) // hook stdin (session_id) — unused; the rules are global truth
+    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
   } catch {
     /* no/non-JSON stdin (manual run) */
   }
 
   if (existsSync(PAUSE)) process.exit(0) // user-paused: no batch duty in flight
+  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
   if (!existsSync(DASHBOARD)) process.exit(0) // no board yet — dashboard-guard owns that case
 
   const focus = readJson(FOCUS_PATH)

@@ -14,6 +14,7 @@
 // Stop-hook mode (no args): BLOCK while the marker exists and prepped == false.
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const MARKER = R('../.claude/wait-prep.json')
@@ -46,7 +47,14 @@ if (arg === '--clear') {
 
 // Stop-hook mode.
 try {
+  let sid = ''
+  try {
+    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+  } catch {
+    /* no/non-JSON stdin (manual run) */
+  }
   if (existsSync(PAUSE)) process.exit(0) // batch user-paused: no work in flight
+  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
   if (!existsSync(MARKER)) process.exit(0) // no wait armed
   const m = JSON.parse(readFileSync(MARKER, 'utf8'))
   if (m.prepped) process.exit(0) // prep already recorded for this wait

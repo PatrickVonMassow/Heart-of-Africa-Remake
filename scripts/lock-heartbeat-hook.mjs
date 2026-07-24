@@ -1,21 +1,26 @@
-// PostToolUse hook (matcher: every tool). Three observe-only duties, each
-// isolated and never erroring:
+// PostToolUse hook (matcher: every tool). Observe-only duties, each isolated
+// and never erroring:
 //
-// (1) Keep THIS session's batch lock fresh on every tool call, so a live working
-//     session never ages past the launcher's 12-min window (the
-//     batch-progress-guard only refreshes at turn-end; a long turn is the norm
-//     under the anti-idle guard). Ownership-aware (Fable-5 audit #4): it
-//     refreshes/claims the lock only when it is free, stale, or already THIS
-//     session's — it NEVER keeps a different, still-live session's lock warm.
-// (2) Stamp .claude/tool-activity.json — the dashboard Stop guard's
+// (1) OWNER-ONLY lock heartbeat (hard singleton, 24.07.2026): refresh THIS
+//     session's batch lock on every tool call — but ONLY if this session
+//     already owns it. It NEVER claims: the old "claim when free/stale" made
+//     every tool-using session (a chat window, a stale-lock bystander) grab
+//     batch ownership as a side effect — one of the advisory holes behind the
+//     e9407cae double-session incident. Acquisition now happens exclusively in
+//     the SessionStart hook and the batch-progress-guard, through the atomic
+//     acquire in scripts/batch-singleton.mjs.
+// (2) Parallel-session presence: stamp this session id's tool activity into
+//     .claude/session-activity.json — the active detector's raw signal (a
+//     NON-owner top-level session with fresh activity in this repo = a
+//     parallel session).
+// (3) Stamp .claude/tool-activity.json — the dashboard Stop guard's
 //     focus-freshness invariant needs to know that real work happened.
-// (3) Detect a dashboard publish: when the Artifact tool is called on the
+// (4) Detect a dashboard publish: when the Artifact tool is called on the
 //     dashboard file, record the published content's sha256 in
-//     dashboard-state.json. This is what lets the Stop guard tell "published"
-//     from "merely edited" (invariant 9) without trusting a self-report.
+//     dashboard-state.json ("published" vs "merely edited", invariant 9).
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
-import { lockStatus, claimLock } from './batch-lock.mjs'
+import { heartbeat, noteActivity } from './batch-singleton.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -33,21 +38,28 @@ try {
 }
 const sid = data.session_id || ''
 
-// (1) lock heartbeat
+// (1) owner-only lock heartbeat — never claims for a non-owner
 try {
-  if (sid && lockStatus(sid, Date.now()) !== 'held') claimLock(sid, Date.now())
+  if (sid) heartbeat(sid)
 } catch {
   /* no lock dir / unreadable — nothing to do */
 }
 
-// (2) tool-activity stamp
+// (2) per-session presence for the parallel-session detector
+try {
+  if (sid) noteActivity(sid)
+} catch {
+  /* best effort */
+}
+
+// (3) tool-activity stamp
 try {
   writeJsonAtomic(ACTIVITY_PATH, { lastToolAt: Date.now(), sessionId: sid })
 } catch {
   /* best effort */
 }
 
-// (3) dashboard publish detection
+// (4) dashboard publish detection
 try {
   const name = data.tool_name ?? data.toolName ?? ''
   const input = data.tool_input ?? data.toolInput ?? {}

@@ -33,6 +33,7 @@ import {
   sha256File,
 } from './dashboard-state.mjs'
 import { parseTasks, parseNowCardPoint, evaluate } from './dashboard-guard-core.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
@@ -99,6 +100,10 @@ try {
   } catch {
     // no/non-JSON stdin (manual run) — invariant 7 then binds regardless of session
   }
+
+  // Hard singleton: a session that does not own the live batch lock has no
+  // dashboard duty — it must stand down entirely, not be pushed to publish.
+  if (heldByOtherLiveOwner(sessionId)) process.exit(0)
 
   const marker = readJson(STATE_PATH)
   const dashboardFile = marker && marker.dashboardPath ? resolve(REPO_ROOT, marker.dashboardPath) : null

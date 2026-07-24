@@ -9,18 +9,21 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { evaluate } from './tasks-spec-guard-core.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
 const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
 
 try {
+  let sid = ''
   try {
-    JSON.parse(readFileSync(0, 'utf8')) // hook stdin (session_id) — unused, tolerated missing
+    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
   } catch {
     /* no/non-JSON stdin (manual run) — the rule is repo truth, not session-local */
   }
 
   if (existsSync(PAUSE)) process.exit(0) // user-paused: don't trap a paused session
+  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
   if (!existsSync(TASKS)) process.exit(0) // no work log — nothing to hold clean
 
   const result = evaluate({ tasksMd: readFileSync(TASKS, 'utf8') })

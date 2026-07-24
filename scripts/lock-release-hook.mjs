@@ -1,11 +1,11 @@
-// SessionEnd hook (Fable-5 audit #11): when a session ends (the user closes the
-// VS Code window / the -p run finishes), release the batch lock IF this session
-// owned it. Otherwise a closed session's lock looks fresh for up to ~12 min (its
-// heartbeat stopped) before the launcher resurrects — and a re-opened window
-// reads the stale-but-recent lock as "held by another" and refuses to resume,
-// stranding the batch. Releasing frees it instantly for the successor. Never errors.
+// SessionEnd hook: when a session ends (the user closes the VS Code window /
+// the -p run finishes), release the batch lock IF this session owned it — a
+// closed owner's lock would otherwise look alive until its pid check fails,
+// delaying the successor. Also clears this session's entry from the
+// parallel-session activity map so a cleanly ended session can never be
+// flagged as a live parallel session. Never errors.
 import { readFileSync } from 'node:fs'
-import { releaseLock } from './batch-lock.mjs'
+import { release, clearActivity } from './batch-singleton.mjs'
 
 let sid = ''
 try {
@@ -14,7 +14,10 @@ try {
   /* no/!JSON stdin */
 }
 try {
-  if (sid) releaseLock(sid) // no-op unless this session owns the lock
+  if (sid) {
+    release(sid) // no-op unless this session owns the lock
+    clearActivity(sid)
+  }
 } catch {
   /* nothing to release */
 }

@@ -30,6 +30,7 @@ import {
   mergeRenderState,
 } from './render-verify-state.mjs'
 import { isRenderPath, evaluate, BACKENDS, coveringRun, baselineFor } from './render-verify-core.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 function git(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
@@ -216,6 +217,10 @@ try {
   } catch {
     /* no/non-JSON stdin (manual run) — the gate is global truth, not session-local */
   }
+
+  // Hard singleton: a session that does not own the live batch lock stands
+  // down — it neither advances the baseline nor gets blocked into batch work.
+  if (heldByOtherLiveOwner(sessionId)) process.exit(0)
 
   const head = git('git rev-parse HEAD')
   const branch = currentBranch()

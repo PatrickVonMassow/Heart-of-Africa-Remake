@@ -21,6 +21,7 @@ import { request } from 'node:https'
 import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import { classifyRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
@@ -139,13 +140,15 @@ async function notifyCiRed(message) {
 
 /** Returns the block-decision JSON string, or null to allow. */
 async function main() {
+  let sid = ''
   try {
-    JSON.parse(readFileSync(0, 'utf8')) // hook stdin (session_id) — unused, tolerated missing
+    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
   } catch {
     /* no/non-JSON stdin (manual run) — CI state is global truth, not session-local */
   }
 
   if (existsSync(PAUSE)) return null // user-paused: no batch duty in flight
+  if (heldByOtherLiveOwner(sid)) return null // hard singleton: a non-owner session stands down — no batch duty
 
   const head = git(['rev-parse', 'HEAD'])
   if (!isPushed(head)) return null

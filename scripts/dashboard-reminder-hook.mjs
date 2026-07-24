@@ -11,17 +11,29 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { PENDING_PATH, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
+import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+
+// Hard singleton (24.07.2026): a session that does not own the live batch lock
+// has NO dashboard/focus duty — arming the pivot check or issuing the board
+// obligations would conscript it into batch work. It keeps only the timestamp
+// rule (a universal chat rule, not a batch duty).
+let standDown = false
+let sid = ''
+try {
+  sid = JSON.parse(fs.readFileSync(0, 'utf8')).session_id || ''
+} catch {
+  /* no/!JSON stdin */
+}
+try {
+  standDown = heldByOtherLiveOwner(sid)
+} catch {
+  standDown = false
+}
 
 // Arm the pivot check for THIS session (fail-soft: the reminder text below is
 // still the payload if any of this goes wrong).
 try {
-  let sid = ''
-  try {
-    sid = JSON.parse(fs.readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/!JSON stdin */
-  }
-  writeJsonAtomic(PENDING_PATH, { sessionId: sid, at: Date.now() })
+  if (!standDown) writeJsonAtomic(PENDING_PATH, { sessionId: sid, at: Date.now() })
   // Keep the current session's scratchpad target on record so a plain
   // `node scripts/dashboard-publish.mjs` works even without the env variable.
   if (process.env.CLAUDE_SCRATCHPAD_DIR) {
@@ -48,6 +60,13 @@ console.log(
   `Zeitstempel — aktuelle Zeit (Europe/Berlin): ${nowBerlin}.`,
 )
 
+if (standDown) {
+  console.log(
+    '[batch-singleton] Eine ANDERE Session hält den Batch-Lock (lebendig geprüft). STAND DOWN: ' +
+      'Diese Session ist NICHT der Batch-Worker — keine Batch-Arbeit, kein Merge nach main, ' +
+      'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.',
+  )
+} else {
 let mtimeNote = ''
 try {
   const path = process.env.CLAUDE_SCRATCHPAD_DIR
@@ -95,6 +114,7 @@ console.log(
   'focus.mjs set <N> "<was>"` + Karte aktualisieren + `node scripts/dashboard-publish.mjs` + ' +
   'Artifact-Republish + `--synced` (geändert). Der Stop-Guard blockiert sonst das Zug-Ende.',
 )
+}
 
 // Repeat the timestamp obligation LAST — the final line of hook output sits closest
 // to where the reply is generated, so it is the most salient (the top line alone kept

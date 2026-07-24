@@ -46,6 +46,13 @@ scripts/.tile-cache
 .claude/autostart-state.json
 .claude/autostart-run.log
 .claude/ci-status-guard-state.json
+.claude/sessions-seen.json
+.claude/session-activity.json
+.claude/parallel-alert.json
+.claude/doctor-state.json
+.claude/doctor.log
+.claude/batch-lock.json.tmp-*
+.claude/batch-lock.json.reaping
 .claude/timestamp-guard-state.json
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
