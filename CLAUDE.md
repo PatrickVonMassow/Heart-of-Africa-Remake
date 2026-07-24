@@ -1501,7 +1501,15 @@ verify suite that proves it.
     (`gaitPhase`/`legSwingAngle`) fed by the arc they drift along their ring, so
     a faster one steps faster and a stalled one stands still — a wall-clock bob
     is never the driver, and at horizon range a body-level bob alone would move
-    barely a pixel. Verifiable: `scripts/verify/polish.mjs`
+    barely a pixel. They only ever walk FORWARD (point 286): the facing is
+    DERIVED from the ring velocity tangent (`panoramaDriftYaw`, the codebase's
+    atan2(vx,vz) convention the settlement goats face on), so a silhouette can
+    never reverse — the former hand-written `−a + (drift>0 ? π : 0)` sat exactly
+    π off the tangent and moonwalked every one — and the stride phase rides the
+    arc expressed in the silhouette's OWN rendered frame (`panoramaGaitDistance`,
+    the world arc ÷ its enlargement `scale`), so the leg cadence stays consistent
+    with the rendered body's slow horizon crawl instead of flailing at the raw
+    world-arc rate. Verifiable: `scripts/verify/polish.mjs`
     asserts no markers before and markers after the gift plus the toast,
     their persistence across re-entry, and the panorama wildlife count via
     the dev hook, with a screenshot of the highlighted village; plus that
@@ -1514,8 +1522,12 @@ verify suite that proves it.
     and WITH one at the Nubian village and in Cairo under the Giza skyline,
     screenshot 136), and that each silhouette's stride phase advances in step
     with the ground it covers — the same phase-per-unit-walked for all of them,
-    which a clock-driven bob could not produce (point 255) — the stride pose and
-    its distance coupling pure-tested in
+    which a clock-driven bob could not produce (point 255) — and that every
+    visible silhouette WALKS FORWARD (its displacement over an interval projects
+    positively onto its facing, never backward — point 286); the stride pose and
+    its distance coupling, the forward-only facing derived from the ring velocity
+    (with the reverted π-off formula pinned as a regression witness) and the
+    scale-normalised gait distance pure-tested in
     `src/scenes/place/panoramaWildlife.test.ts`, the ground-line math in
     `src/scenes/place/backdrop.test.ts` (the sight-line geometry, the drop as
     the viewer nears, relief-following on a dune, and both old failure modes

@@ -72,7 +72,8 @@ import {
   apparentAngleDeg,
   hazeColor,
   luminance,
-  panoramaDriftDistance,
+  panoramaDriftYaw,
+  panoramaGaitDistance,
   panoramaGaitBob,
   panoramaGaitNod,
   excludedAzimuthSpan,
@@ -1242,31 +1243,39 @@ function PanoramaWildlife({
         panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
         pw.sinkEpsilon
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
-      // wall-clock bob. The stride now rides the ground they cover along the
-      // ring, through the same distance-driven gait phase the settlement goats
-      // walk on, so a faster-drifting animal steps faster and a stalled one
-      // stands still. Single merged meshes have no leg joints at this range, so
-      // the stride reads as the body's own rise and rock.
-      const phase = gaitPhase(panoramaDriftDistance(it.radius, it.drift, t)) + it.phase
+      // wall-clock bob. The stride rides the ground they cover along the ring,
+      // through the same distance-driven gait phase the settlement goats walk
+      // on, so a faster-drifting animal steps faster and a stalled one stands
+      // still. Point 286: the ENLARGED silhouettes (scale ~3) over-drove that
+      // phase at the raw world-arc rate — a run-in-place flail over a body whose
+      // apparent horizon motion is a fraction of a degree per second — so the
+      // arc is expressed in the silhouette's OWN rendered frame (÷ scale), which
+      // makes the leg cadence consistent with the rendered body's slow crawl.
+      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t)) + it.phase
       const y = groundY + panoramaGaitBob(phase, it.worldHeight)
+      // Point 286: face where it MOVES along the ring tangent (derived from the
+      // velocity), so a silhouette can never walk backward — the former
+      // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
+      const yaw = panoramaDriftYaw(a, it.drift)
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
         // y vs the ground line it stands on; the apparent size and the hazed
         // luminance for the point-92/94 live gates; azimuth/visible for the
         // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
-        // which ray-probes the surface drawn behind the feet.
-        // `gait`/`groundSpeed` prove the point-255 stride live: the phase must
-        // advance in step with the ground each silhouette covers, so the ratio
-        // is the same constant for all of them — a wall-clock bob would advance
-        // them all equally regardless of speed.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, radius: it.radius, worldHeight: it.worldHeight, gait: phase, groundSpeed: Math.abs(it.radius * it.drift) }
+        // which ray-probes the surface drawn behind the feet. `yaw` + x/z prove
+        // the point-286 forward-only walk (displacement projects positively onto
+        // the facing). `gait`/`gaitSpeed` prove the point-255/286 stride live:
+        // the phase advances in step with the SCALE-NORMALISED ground each
+        // silhouette covers, so the ratio is the same constant for all of them —
+        // a wall-clock bob would advance them all equally regardless of speed.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1) }
       }
       g.position.set(x, y, z)
-      // Face the drift direction along the ring tangent, then nod fore/aft in
-      // the body's own frame (YXZ: yaw first, so x is the walking pitch).
+      // Nod fore/aft in the body's own frame (YXZ: yaw first, so x is the
+      // walking pitch).
       g.rotation.order = 'YXZ'
-      g.rotation.y = -a + (it.drift > 0 ? Math.PI : 0)
+      g.rotation.y = yaw
       g.rotation.x = panoramaGaitNod(phase)
       // The stride itself: diagonal legs swing in antiphase about their hips.
       const legs = legRefs.current[i]

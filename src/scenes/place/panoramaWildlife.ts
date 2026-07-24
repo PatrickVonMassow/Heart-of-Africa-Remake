@@ -65,6 +65,56 @@ export function panoramaDriftDistance(radius: number, driftRate: number, elapsed
   return Math.abs(radius * driftRate * elapsedSeconds)
 }
 
+/**
+ * Velocity tangent of a silhouette drifting along the panorama ring at
+ * ring-angle `a` with signed angular `driftRate` (point 286). The ring position
+ * is (cos a, sin a)·radius, so d/dt is (−sin a, cos a)·(radius·driftRate): the
+ * animal MOVES along this tangent and its sign flips with the drift direction.
+ * Returned unnormalised (magnitude radius·|driftRate|) — callers take the
+ * direction. Exposed so the facing is derived FROM the motion (never the other
+ * way round), which is what keeps a silhouette from ever walking backward.
+ */
+export function panoramaDriftVelocity(a: number, radius: number, driftRate: number): [number, number] {
+  return [-Math.sin(a) * radius * driftRate, Math.cos(a) * radius * driftRate]
+}
+
+/**
+ * Facing yaw (rad) of a drifting silhouette in the codebase's atan2(vx, vz)
+ * convention (yaw 0 = +z forward — the same rule the settlement goats face on,
+ * `faceVelocity`). Derived straight from the ring velocity tangent, so the body
+ * always faces where it MOVES and can never drift backward (point 286: the
+ * former hand-written `−a + (drift>0 ? π : 0)` sat exactly π off the tangent, so
+ * every silhouette moonwalked). A zero drift falls back to the +tangent so a
+ * paused silhouette keeps a sane heading rather than snapping. radius drops out
+ * of the atan2 (a positive scale), so only the drift sign matters here.
+ */
+export function panoramaDriftYaw(a: number, driftRate: number): number {
+  const dir = driftRate < 0 ? -1 : 1
+  return Math.atan2(-Math.sin(a) * dir, Math.cos(a) * dir)
+}
+
+/**
+ * The gait-driving distance for a drifting panorama silhouette (point 286).
+ * The silhouettes are ENLARGED (render `scale` ~3) so a far animal reads at
+ * person size; feeding the raw world arc (`panoramaDriftDistance`) to the shared
+ * `gaitPhase` therefore over-drove the legs by that factor — a run-in-place
+ * flail over a body whose apparent horizon motion is a fraction of a degree per
+ * second (the point-286 report). Expressing the arc in the silhouette's OWN
+ * rendered frame — the world arc ÷ its scale — makes the leg cadence consistent
+ * with the rendered body's translation (the same relationship the near, scale-1
+ * settlement goats walk on): a slow drift yields slow steps, a stalled one none.
+ * The drift sign is irrelevant (the distance is |·|); scale ≤ 0 falls back to 1.
+ */
+export function panoramaGaitDistance(
+  radius: number,
+  driftRate: number,
+  scale: number,
+  elapsedSeconds: number,
+): number {
+  const s = scale > 0 ? scale : 1
+  return panoramaDriftDistance(radius, driftRate, elapsedSeconds) / s
+}
+
 /** Body bob as a fraction of the silhouette's own height — the walking rise and
  *  fall of the barrel, the cheapest legible stride cue at this distance. */
 export const PANORAMA_GAIT_BOB = 0.028
