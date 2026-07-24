@@ -32,7 +32,7 @@ device pixel ratio is kept (no cap).
 | `ssao` | off | off | on |
 | `traa` | off | on | on |
 | `bloom` | off | on | on |
-| `sunShadows` | on | on | on |
+| `sunShadows` | off | on | on |
 | `sunShadowResolution` | 1024 | 2048 | 4096 |
 | `fireShadows` | off | on | on |
 | `fireShadowResolution` | 0 | 256 | 512 |
@@ -59,10 +59,15 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
   level turns it off, anti-aliasing falls back to the render pass' multisampling.
 - **`bloom`** — Bloom (design.md §2.7). Off only on low.
 - **`sunShadows`** — Whether directional sun shadows are cast at all
-  (design.md §2.7 / §21). On at every level.
+  (design.md §2.7 / §21). Off on low (point 305): the M1-Pro real-GPU benchmark
+  (`local/m1pro-bench.json`) showed the shadow passes cost ~8.5 ms GPU per frame
+  regardless of map resolution (`shadow-half` moved nothing), plus 880 extra
+  draw calls (952 → 72) and ~2 M extra shadow-pass triangles — the biggest
+  remaining lever once low's dpr and post cuts are in.
 - **`sunShadowResolution`** — Sun shadow-map resolution in texels; climbs
   1024 → 2048 → 4096, high deliberately above today's 2048 default for sharper
-  shadows.
+  shadows. Low's 1024 is moot while its `sunShadows` is off; it stays below
+  medium for the strict low < medium < high climb.
 - **`fireShadows`** — Whether the campfire cube shadows are cast at all
   (design.md §19.10, point 289). Off on low.
 - **`fireShadowResolution`** — Campfire cube-shadow map resolution in texels;

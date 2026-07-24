@@ -44,11 +44,14 @@ describe('preset calibration invariants (a clear, visible low→high climb)', ()
     expect(QUALITY_PRESETS.high.sunShadowResolution).toBeGreaterThan(2048)
   })
 
-  it('low is the frugal floor: dpr capped, all post off, no campfire shadows', () => {
+  it('low is the frugal floor: dpr capped, all post off, no shadows at all', () => {
     expect(QUALITY_PRESETS.low.dprCap).toBe(1)
     expect(QUALITY_PRESETS.low.ssao).toBe(false)
     expect(QUALITY_PRESETS.low.traa).toBe(false)
     expect(QUALITY_PRESETS.low.bloom).toBe(false)
+    // Point 305 (M1-Pro tuning): LOW casts NO sun shadows — the benchmark's
+    // biggest remaining lever after dpr + post (952→72 draw calls, ~2 M tris).
+    expect(QUALITY_PRESETS.low.sunShadows).toBe(false)
     expect(QUALITY_PRESETS.low.fireShadows).toBe(false)
     expect(QUALITY_PRESETS.low.terrainRefine).toBe(false)
     expect(QUALITY_PRESETS.low.floraFogFactor).toBeLessThan(1)
