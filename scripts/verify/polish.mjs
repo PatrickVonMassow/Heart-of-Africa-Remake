@@ -810,6 +810,15 @@ for (const [placeId, shot] of [
     // Force a heavy downpour so the rain-response is at full strength, like the
     // settlement-season checks above.
     await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
+    // Poll the quantity the check actually reads. Waiting only for the SUN to
+    // settle raced the override: in a fast-loading village the sun had not yet
+    // started moving, so two successive reads matched, waitForStable returned
+    // at once and the rain was still sampled at 0. Fail soft on the poll — the
+    // assertion below judges the value, so a harness timeout can never mask a
+    // real product failure.
+    await page
+      .waitForFunction(() => window.__placeSeason().rain > 0.5, null, { timeout: 15000 })
+      .catch(() => {})
     await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
     const s = await page.evaluate(() => window.__placeSeason())
     return { sheltered: s.fireSheltered, rain: s.rain, rainFactor: s.fireRainFactor }
