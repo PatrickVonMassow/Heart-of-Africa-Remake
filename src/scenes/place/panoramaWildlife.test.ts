@@ -104,7 +104,7 @@ describe('panoramaDriftDistance (point 255 — walking silhouettes, not gliding)
 
 describe('panorama silhouette gait pose (point 255 — walking, not sliding)', () => {
   /** Exactly what PlaceScene feeds the pose: the ring arc walked → gait phase. */
-  const phaseAt = (radius, drift, t) => gaitPhase(panoramaDriftDistance(radius, drift, t))
+  const phaseAt = (radius: number, drift: number, t: number) => gaitPhase(panoramaDriftDistance(radius, drift, t))
 
   it('advances the stride with the distance covered, and holds it at zero displacement', () => {
     // A drifting silhouette walks: the phase grows as it covers arc.
