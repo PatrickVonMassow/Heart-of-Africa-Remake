@@ -369,6 +369,13 @@ export interface BalanceConfig {
      *  (weight, ≫ 1 = an adult's), so the §19.8 sacrifice/rescue drama fires
      *  more often. Calibratable/debug-editable. */
     juvenileDrinkCrocBias: number
+    /** Orphan adoption reach (design.md §19.8/§21.2, point 262): when a
+     *  juvenile's parent dies (any cause), the nearest eligible ADULT of its
+     *  own kind within this radius (world units) adopts it and becomes its new
+     *  parent, so the §19.8 family dramas recur for the new pairing instead of a
+     *  one-off orphaning. No adult in range → the young stays parentless until
+     *  one roams near. Calibratable/debug-editable. */
+    adoptionRadius: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -636,6 +643,11 @@ export const balance: BalanceConfig = {
     // Calibratable (point 245): a drinking calf is ≫ 6× the lunge weight of an
     // adult drinker, so the crocodile ambush overwhelmingly picks the juvenile.
     juvenileDrinkCrocBias: 6,
+    // Calibratable (point 262): a bereaved juvenile is taken in by an adult of
+    // its kind within this reach. Sized above the calf leash (followRadius 8.1)
+    // so a nearby herd-mate — not only the dead parent's immediate neighbour —
+    // can adopt, yet local enough that the young joins a genuinely close adult.
+    adoptionRadius: 20,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

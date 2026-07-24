@@ -1723,6 +1723,62 @@ const moreCalves = await page.evaluate(async () => {
 check('a higher calfFraction raises more juveniles (point 169)',
   moreCalves.many > moreCalves.few && moreCalves.few >= 1, JSON.stringify(moreCalves))
 
+// Point 262: orphan adoption. When a juvenile's parent DIES (any cause), the
+// nearest eligible ADULT of its kind within balance.family.adoptionRadius takes
+// it in — re-establishing the parent↔child link every §19.8 drama reads, so the
+// sacrifice/grief/rescue dramas RECUR instead of a one-off orphaning. Injected
+// deterministically at a savanna spot; the positive assertion is outcome-based
+// (the calf ends with SOME live adult zebra as its parent) so a streamed
+// herd-mate cannot steal it, while the negative shrinks the radius below reach
+// so the orphan simply stays parentless (no crash, no dangling reference).
+const adoption = await page.evaluate(async () => {
+  window.__game.getState().debugJumpTo(-2.5, 34.0) // Serengeti savanna
+  await window.__sleepSim(0.5)
+  const herds = window.__wildlife.herdsRef.current
+  const clear = () => { for (const sp of Object.keys(herds)) herds[sp].length = 0 }
+  const p = window.__game.getState().pos
+  const mk = (dx, dz, over = {}) => ({ x: p.x + dx, z: p.z + dz, y: 0.2, rot: 0, scale: 1, phase: 0, ...over })
+
+  // --- Positive: an eligible adult in range adopts the orphan ---
+  clear()
+  const parent = mk(0, 0)
+  const calf = mk(1, 0, { young: true, scale: 0.55, parent })
+  parent.child = calf
+  const adopter = mk(3, 0) // a childless zebra adult within adoptionRadius (20)
+  herds.zebra.unshift(parent, calf, adopter)
+  await window.__sleepSim(0.3)
+  parent.dead = true; parent.child = undefined // the parent dies (leaves the calf orphaned)
+  await window.__pollSim(4, () => calf.parent && calf.parent !== parent && calf.parent.dead !== true)
+  const np = calf.parent
+  const adopted = !!np && np !== parent && np.dead !== true && np.young !== true
+  // The parent↔child link is re-established → the §19.8 defence/grief/rescue
+  // loops (which gate on `parent.child`) can fire for the new pairing again.
+  const dramaCanFire = !!np && np.child === calf
+
+  // --- Negative: with the radius below reach, the orphan stays parentless ---
+  const prevR = window.__balance.family.adoptionRadius
+  window.__balance.family.adoptionRadius = 0.001
+  clear()
+  const lone = mk(0, 0)
+  const orphan = mk(1, 0, { young: true, scale: 0.55, parent: lone })
+  const farAdult = mk(6, 0) // eligible, but now far outside the shrunk radius
+  herds.zebra.unshift(lone, orphan, farAdult)
+  await window.__sleepSim(0.3)
+  lone.dead = true; orphan.parent = undefined
+  await window.__pollSim(2, () => false)
+  const stayedOrphan = !orphan.parent // no crash, no dangling reference
+  window.__balance.family.adoptionRadius = prevR
+  clear()
+
+  return { adopted, dramaCanFire, stayedOrphan }
+})
+check('an orphaned calf is adopted by a nearby eligible adult (point 262)',
+  adoption.adopted, JSON.stringify(adoption))
+check('the adoption re-establishes the parent↔child link so a §19.8 drama can recur (point 262)',
+  adoption.dramaCanFire, JSON.stringify(adoption))
+check('with no adult in range the orphan simply stays parentless (point 262)',
+  adoption.stayedOrphan, JSON.stringify(adoption))
+
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
 // flies in, lands and consumes it, dissolving it as a lion kill does.

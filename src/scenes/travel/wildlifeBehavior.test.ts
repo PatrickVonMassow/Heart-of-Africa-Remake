@@ -95,6 +95,9 @@ import {
   killChance,
   parentAttackOutcome,
   parentDefends,
+  findAdopter,
+  isPredatorSpecies,
+  type AdoptionAdult,
   PREDATOR_PREY,
   REGION_PREY,
 } from './wildlifeBehavior'
@@ -3173,5 +3176,72 @@ describe('groundedBodyY / groundFollowY (point 283 — a moved body stands on th
     const regrounded = groundFollowY(0, 0, () => ({ type: 'savanna', height: cellHeight }))!
     expect(regrounded < cellHeight - 0.75 * scale).toBe(false) // no longer buried
     expect(regrounded).toBe(cellHeight)
+  })
+})
+
+describe('findAdopter (design.md §19.8, point 262 — an orphan is taken in by a nearby adult)', () => {
+  const juv = { species: 'zebra', x: 0, z: 0 }
+  const adult = (over: Partial<AdoptionAdult> = {}): AdoptionAdult => ({
+    species: 'zebra', x: 5, z: 0, ...over,
+  })
+
+  it('isPredatorSpecies flags every predator and no grazer', () => {
+    for (const p of ['lion', 'cheetah', 'leopard', 'hyena', 'crocodile']) {
+      expect(isPredatorSpecies(p)).toBe(true)
+    }
+    for (const g of ['zebra', 'wildebeest', 'antelope', 'giraffe', 'warthog', 'elephant', 'plover']) {
+      expect(isPredatorSpecies(g)).toBe(false)
+    }
+  })
+
+  it('returns the NEAREST eligible adult of the right species in range', () => {
+    const near = adult({ x: 4, z: 0 })
+    const far = adult({ x: 15, z: 0 })
+    const got = findAdopter(juv, [far, near], 30)
+    expect(got).toBe(near)
+  })
+
+  it('returns null when no adult is within the radius', () => {
+    const far = adult({ x: 100, z: 0 })
+    expect(findAdopter(juv, [far], 20)).toBeNull()
+    // …and the same adult inside the radius IS found (the radius is the gate).
+    expect(findAdopter(juv, [adult({ x: 10, z: 0 })], 20)).not.toBeNull()
+  })
+
+  it('skips a predator, a dead adult, a juvenile and a wrong-species adult', () => {
+    const predator = adult({ species: 'lion', x: 1, z: 0 })
+    const dead = adult({ x: 1, z: 1, dead: true })
+    const juvenile = adult({ x: 1, z: 2, young: true })
+    const wrongSpecies = adult({ species: 'wildebeest', x: 1, z: 3 })
+    const good = adult({ x: 9, z: 0 })
+    const got = findAdopter(juv, [predator, dead, juvenile, wrongSpecies, good], 30)
+    expect(got).toBe(good) // the only eligible one, though the farthest
+  })
+
+  it('never adopts the juvenile to itself', () => {
+    const self = { species: 'zebra', x: 0, z: 0, young: true } as AdoptionAdult & { x: number; z: number }
+    expect(findAdopter(self, [self], 30)).toBeNull()
+  })
+
+  it('never picks the killer that just took the parent', () => {
+    const killer = adult({ x: 2, z: 0 })
+    const other = adult({ x: 8, z: 0 })
+    expect(findAdopter(juv, [killer, other], 30, { killer })).toBe(other)
+  })
+
+  it('skips an adult already raising a LIVE calf but accepts one whose calf is dead (keeps 1:1)', () => {
+    const busy = adult({ x: 2, z: 0, child: { dead: false } })
+    const free = adult({ x: 9, z: 0 })
+    expect(findAdopter(juv, [busy, free], 30)).toBe(free)
+    // A bereaved adult (its own calf dead) is free to adopt again.
+    const bereaved = adult({ x: 2, z: 0, child: { dead: true } })
+    expect(findAdopter(juv, [bereaved], 30)).toBe(bereaved)
+  })
+
+  it('uses the default predator set when no predicate is passed', () => {
+    // A homogeneous predator pool (a lion cub among lionesses) finds no adopter.
+    const cub = { species: 'lion', x: 0, z: 0 }
+    const lionesses = [{ species: 'lion', x: 2, z: 0 }, { species: 'lion', x: 3, z: 0 }]
+    expect(findAdopter(cub, lionesses, 30)).toBeNull()
   })
 })
