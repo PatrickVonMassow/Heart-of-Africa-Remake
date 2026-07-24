@@ -5,13 +5,21 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   useUi,
   DEFAULT_TRAVEL_ZOOM,
+  effectiveDprCap,
   effectiveSsao,
   effectiveTraa,
   effectiveBloom,
   effectiveShadows,
+  effectiveShadowResolution,
   effectiveFireShadows,
-  effectiveShadowMapHalf,
+  effectiveFireShadowResolution,
+  effectiveFireShadowSoft,
+  effectiveTerrainRefine,
+  effectiveFloraFogFactor,
+  effectiveFloraCastShadow,
+  effectiveWeatherIntensity,
 } from './ui'
+import { QUALITY_PRESETS } from '../config/quality'
 
 const u = () => useUi.getState()
 
@@ -20,8 +28,8 @@ beforeEach(() => {
     dialog: null, prompt: null, debugOpen: false, mapOpen: false,
     webglFallback: false, webglWarningDismissed: false, fpsVisible: true,
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
-    traaEnabled: true, touchActive: false, lowDetails: false, ssaoEnabled: true, shadowMapHalf: false,
-    shadowsEnabled: true, fireShadowsEnabled: false, groundDebugFlat: false, seasonCollapseEnabled: true,
+    traaEnabled: true, touchActive: false, detailLevel: 'medium', ssaoEnabled: true, shadowMapHalf: false,
+    shadowsEnabled: true, fireShadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
   })
 })
 
@@ -96,6 +104,7 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
     expect(u().traaEnabled).toBe(false) // back to render-pass MSAA
     expect(u().ssaoEnabled).toBe(false)
     expect(u().shadowMapHalf).toBe(true)
+    expect(u().fireShadowsEnabled).toBe(false) // touch suppresses campfire shadows
   })
 
   it('is idempotent — a later touch does not clobber a debug re-enable', () => {
@@ -121,90 +130,97 @@ describe('touch layer + mobile quality preset (design.md §17.5, point 84)', () 
     expect(u().seasonCollapseEnabled).toBe(true) // default on (point 175 diagnostic)
     u().setSeasonCollapseEnabled(false)
     expect(u().seasonCollapseEnabled).toBe(false)
-    // Campfire shadows (design.md §19.10): OFF by default — picture-neutral
-    // until the user enables and prices them on their own hardware.
-    expect(u().fireShadowsEnabled).toBe(false)
-    u().setFireShadowsEnabled(true)
+    // Campfire-shadow allow-flag (design.md §19.10, point 289): ON by default —
+    // medium/high enable campfire shadows through the level preset.
     expect(u().fireShadowsEnabled).toBe(true)
+    u().setFireShadowsEnabled(false)
+    expect(u().fireShadowsEnabled).toBe(false)
   })
 })
 
-describe('Low Details performance mode (design.md §21, F7 / point 276 part B)', () => {
-  it('defaults off and is picture-neutral: every effective lever matches its base', () => {
-    expect(u().lowDetails).toBe(false)
-    expect(effectiveSsao(u())).toBe(u().ssaoEnabled)
-    expect(effectiveTraa(u())).toBe(u().traaEnabled)
-    expect(effectiveBloom(u())).toBe(true) // bloom on today
-    expect(effectiveShadows(u())).toBe(u().shadowsEnabled)
-    // Fire shadows read derived too, so the point-289 flag is untouched off.
-    u().setFireShadowsEnabled(true)
-    expect(effectiveFireShadows(u())).toBe(true)
-    u().setFireShadowsEnabled(false)
-    expect(effectiveFireShadows(u())).toBe(false)
-    expect(effectiveShadowMapHalf(u())).toBe(u().shadowMapHalf)
-  })
-
-  it('derives the render levers DOWN when on (effective = base && !lowDetails)', () => {
-    // Player leaves everything at its default (on / full-res).
-    u().setFireShadowsEnabled(true) // even a player who turned fire shadows ON
-    u().setLowDetails(true)
-    expect(effectiveSsao(u())).toBe(false)
-    expect(effectiveTraa(u())).toBe(false)
-    expect(effectiveBloom(u())).toBe(false)
-    expect(effectiveShadows(u())).toBe(false)
-    expect(effectiveFireShadows(u())).toBe(false) // …loses them in the mode
-    expect(u().fireShadowsEnabled).toBe(true) // but the base flag is untouched
-    expect(effectiveShadowMapHalf(u())).toBe(true) // Low Details FORCES half-size
-  })
-
-  it('does NOT clobber the individual debug flags — off restores them exactly', () => {
-    // The player has a specific mix of settings.
-    u().setSsaoEnabled(true)
-    u().setTraaEnabled(false)
-    u().setShadowsEnabled(true)
-    u().setShadowMapHalf(false)
-    u().setLowDetails(true)
-    // The base flags are untouched by the mode…
-    expect(u().ssaoEnabled).toBe(true)
-    expect(u().traaEnabled).toBe(false)
-    expect(u().shadowsEnabled).toBe(true)
-    expect(u().shadowMapHalf).toBe(false)
-    // …only the EFFECTIVE reads are forced down while it is on.
-    expect(effectiveSsao(u())).toBe(false)
-    expect(effectiveShadows(u())).toBe(false)
-    // Turning it off restores the player's exact picture.
-    u().setLowDetails(false)
-    expect(effectiveSsao(u())).toBe(true)
-    expect(effectiveTraa(u())).toBe(false) // the player had TRAA off; still off
+describe('graphics quality level (design.md §21, F7 / point 276 part B)', () => {
+  it('defaults to medium and reads that preset through every effective selector', () => {
+    expect(u().detailLevel).toBe('medium')
+    const m = QUALITY_PRESETS.medium
+    expect(effectiveDprCap(u())).toBe(m.dprCap) // null → native dpr
+    expect(effectiveSsao(u())).toBe(false) // SSAO only in high
+    expect(effectiveTraa(u())).toBe(true)
+    expect(effectiveBloom(u())).toBe(true)
     expect(effectiveShadows(u())).toBe(true)
-    expect(effectiveShadowMapHalf(u())).toBe(false)
+    expect(effectiveShadowResolution(u())).toBe(m.sunShadowResolution) // 2048
+    expect(effectiveFireShadows(u())).toBe(true) // medium enables campfire shadows
+    expect(effectiveFireShadowResolution(u())).toBe(256)
+    expect(effectiveFireShadowSoft(u())).toBe(false)
+    expect(effectiveTerrainRefine(u())).toBe(true)
+    expect(effectiveFloraFogFactor(u())).toBe(1)
+    expect(effectiveFloraCastShadow(u())).toBe(true)
+    expect(effectiveWeatherIntensity(u())).toBe(1)
   })
 
-  it('setLowDetails is idempotent', () => {
-    u().setLowDetails(true)
-    u().setLowDetails(true)
-    expect(u().lowDetails).toBe(true)
-    u().setLowDetails(false)
-    u().setLowDetails(false)
-    expect(u().lowDetails).toBe(false)
-  })
-
-  it('the touch preset stays a SUBSET — Low Details never regresses touch', () => {
-    // Touch drops SSAO/TRAA off and shadow maps to half; Low Details is a
-    // superset, so with either on those levers read the low value.
-    u().activateTouch()
+  it('low is the frugal floor: dpr 1, all post off, no campfire shadows, tight flora', () => {
+    u().setDetailLevel('low')
+    expect(effectiveDprCap(u())).toBe(1)
     expect(effectiveSsao(u())).toBe(false)
     expect(effectiveTraa(u())).toBe(false)
-    expect(effectiveShadowMapHalf(u())).toBe(true)
-    // Adding Low Details on top keeps them low and forces bloom/shadows off too.
-    u().setLowDetails(true)
-    expect(effectiveSsao(u())).toBe(false)
-    expect(effectiveShadowMapHalf(u())).toBe(true)
     expect(effectiveBloom(u())).toBe(false)
-    expect(effectiveShadows(u())).toBe(false)
-    // Low Details off leaves the touch preset intact (still a valid subset).
-    u().setLowDetails(false)
-    expect(effectiveSsao(u())).toBe(false) // touch still has it off
-    expect(effectiveShadowMapHalf(u())).toBe(true) // touch still half
+    expect(effectiveShadows(u())).toBe(true) // still cast, just low-res
+    expect(effectiveShadowResolution(u())).toBe(1024)
+    expect(effectiveFireShadows(u())).toBe(false)
+    expect(effectiveTerrainRefine(u())).toBe(false)
+    expect(effectiveFloraFogFactor(u())).toBeLessThan(1)
+    expect(effectiveFloraCastShadow(u())).toBe(false)
+    expect(effectiveWeatherIntensity(u())).toBeLessThan(1)
+  })
+
+  it('high is the richest: SSAO on, 4096 shadows, the soft campfire variant', () => {
+    u().setDetailLevel('high')
+    expect(effectiveSsao(u())).toBe(true)
+    expect(effectiveShadowResolution(u())).toBe(4096)
+    expect(effectiveFireShadows(u())).toBe(true)
+    expect(effectiveFireShadowResolution(u())).toBe(512)
+    expect(effectiveFireShadowSoft(u())).toBe(true)
+  })
+
+  it('cycleDetailLevel steps DOWN and wraps: medium → low → high → medium', () => {
+    expect(u().detailLevel).toBe('medium')
+    u().cycleDetailLevel()
+    expect(u().detailLevel).toBe('low')
+    u().cycleDetailLevel()
+    expect(u().detailLevel).toBe('high')
+    u().cycleDetailLevel()
+    expect(u().detailLevel).toBe('medium')
+  })
+
+  it('the allow-flags suppress a feature WITHIN a level without the level clobbering them', () => {
+    // At high, SSAO/shadows/fire are on; the player tunes SSAO off for testing.
+    u().setDetailLevel('high')
+    u().setSsaoEnabled(false)
+    expect(effectiveSsao(u())).toBe(false) // suppressed
+    expect(u().ssaoEnabled).toBe(false) // the flag holds
+    // Switching level does NOT rewrite the flag (unlike activateTouch).
+    u().setDetailLevel('medium')
+    expect(u().ssaoEnabled).toBe(false) // untouched by the level change
+    u().setDetailLevel('high')
+    expect(effectiveSsao(u())).toBe(false) // the player's suppression still holds
+  })
+
+  it('the half-map override halves the level shadow resolution again (floored)', () => {
+    u().setDetailLevel('medium')
+    u().setShadowMapHalf(true)
+    expect(effectiveShadowResolution(u())).toBe(1024) // 2048 / 2 — the touch look
+    u().setDetailLevel('high')
+    expect(effectiveShadowResolution(u())).toBe(2048) // 4096 / 2
+  })
+
+  it('the touch preset stays a SUBSET of low without switching the level', () => {
+    // Touch drops SSAO/TRAA/fire off and shadow maps to half, all at the default
+    // medium level — never regressed by the quality-level system.
+    u().activateTouch()
+    expect(u().detailLevel).toBe('medium') // the level itself is untouched
+    expect(effectiveSsao(u())).toBe(false)
+    expect(effectiveTraa(u())).toBe(false)
+    expect(effectiveFireShadows(u())).toBe(false)
+    expect(effectiveShadowResolution(u())).toBe(1024) // half of medium's 2048
+    expect(effectiveBloom(u())).toBe(true) // touch keeps bloom, as before
   })
 })

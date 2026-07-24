@@ -995,13 +995,15 @@ verify suite that proves it.
     `src/render/landmarks.test.ts`; travel-scale screenshot 103) — and
     Timbuktu builds the Djinguereber mosque as a collidable dwelling
     (`scripts/verify/polish.mjs`, screenshots 96/97/100). The §19.10
-    campfire can CAST SHADOWS (point 289, opt-in): the debug menu's
-    "Campfire shadows" toggle — OFF by default, so the shipped picture is
-    unchanged until the user prices the cost (~+1.5 ms headless: six extra
-    cube-face passes; map resolution nearly free) on their own hardware —
-    makes the fire light render a 256² cube shadow map (remounted on
-    toggle, also behind the global shadow switch), with an invisible
-    player-body proxy so the viewer occludes the firelight too.
+    campfire can CAST SHADOWS (point 289, level-driven per point 276 part B):
+    the fire light renders a cube shadow map (remounted on the variant, also
+    behind the global shadow switch), with an invisible player-body proxy so
+    the viewer occludes the firelight too. The graphics quality level drives
+    it — OFF on low, the 256² variant on medium (the default), the softer
+    512² variant on high — and a debug allow-flag still tunes it off within a
+    level. The measured cost was ~+1.5 ms headless (six extra cube-face
+    passes; map resolution nearly free); the medium default is priced on the
+    user's real hardware.
     Verifiable: with the toggle ON the ground directly behind a fire-ring
     stone reads measurably darker in pixels than its lit twin at the same
     radius, and with it OFF that contrast stays flat
@@ -1117,24 +1119,33 @@ verify suite that proves it.
     toggle — F6 state-dump popup for bug reports: the complete game
     state incl. balance and UI as pretty JSON in a top-most modal with
     download/copy; F5 stays the browser's reload (it fires before
-    preventDefault can stop it, hence F6) and F7 toggles the "Low Details"
-    performance mode (design.md §2.7/§21, point 276 part B): one
-    `lowDetails` flag read DERIVED (`effectiveSsao = ssaoEnabled &&
-    !lowDetails`, likewise TRAA/bloom/sun+campfire shadows; shadow maps
-    forced half; a device-pixel-ratio cap to 1; the near-ring terrain
-    refinement and the flora radius dropped, with bush/papyrus/rock cast
-    shadows off) that NEVER clobbers the individual debug flags — a
-    superset of the touch preset, so `lowDetails === false` is
-    picture-identical to today and turning it off restores the player's
-    exact settings; the lever priority follows the real-hardware benchmark
-    (point 277: fill-rate first — dpr, post — geometry last); off by
-    default, a localized toast per switch, a localized debug-menu checkbox;
-    the derived reads and the touch-subset invariant are pure-tested in
-    `src/state/ui.test.ts` (with `floraFogFar` in
-    `src/scenes/travel/floraStreaming.test.ts`), the F7 toggle +
+    preventDefault can stop it, hence F6) and F7 cycles the GRAPHICS QUALITY
+    LEVEL — low / medium / high (design.md §2.7/§21, point 276 part B),
+    default MEDIUM. Each press steps DOWN one level, wrapping the bottom to
+    the top: medium → low → high → medium. A `detailLevel` in `useUi` maps
+    through the `QUALITY_PRESETS` registry (`src/config/quality.ts`) to a
+    value for EVERY quality-relevant lever (dpr cap; SSAO/TRAA/bloom;
+    sun-shadow on/off + map resolution 1024/2048/4096; campfire shadows +
+    the 256²/512² soft variant; terrain refine; flora fog factor + cast
+    shadow; haze/rain intensity); the render consumers read the current
+    level through effective selectors (`effectiveSsao = QUALITY_PRESETS[
+    detailLevel].ssao && ssaoEnabled`, etc.) that NEVER clobber the
+    individual debug allow-flags — those still tune a feature within a level
+    (unlike `activateTouch`, which keeps clobbering; the touch preset stays a
+    SUBSET of low). SSAO is high-only, TRAA+bloom off only on low, campfire
+    shadows off on low; the lever priority follows the real-hardware
+    benchmark (point 277: fill-rate first — dpr, post — geometry last). A
+    localized toast names the new level and a localized debug picker sets it.
+    ENFORCEMENT: a pure completeness gate (`src/config/quality.test.ts`)
+    asserts every level defines every quality key, so a new optical feature
+    added without low/medium/high entries FAILS (the §21 sort-into-levels
+    convention). The preset reads per level, the F7 cycle order and the
+    completeness gate are pure-tested in `src/state/ui.test.ts` +
+    `src/config/quality.test.ts` (with `floraFogFar` in
+    `src/scenes/travel/floraStreaming.test.ts`), the F7 cycle +
     preventDefault + non-clobber in `src/ui/Hud.test.tsx`, the localized
-    checkbox in `src/ui/DebugMenu.test.tsx`, and the live F7 effective-flag
-    flip in `scripts/verify/settings.mjs`;
+    picker in `src/ui/DebugMenu.test.tsx`, and the live F7 cycle + effective
+    flips in `scripts/verify/settings.mjs`;
     verifiable via `src/state/stateDump.test.ts` (the serialiser captures
     every data field, drops the actions, stays deterministic) and
     `src/ui/StateDump.test.tsx` (hidden by default, F6/Esc toggle without
@@ -1590,11 +1601,11 @@ verify suite that proves it.
     count across repeated toggle cycles; `src/ui/DebugMenu.test.tsx`
     asserts the localized TRAA checkbox (default on) writing through to
     the UI store. The post pipeline (TRAA, SSAO, bloom) reads its enable
-    through the Low-Details effective selectors (`effectiveTraa` etc., pt.
-    20 / point 276): TRAA stays independently debug-toggleable, but the
-    "Low Details" mode forces the whole post chain off without touching the
-    player's TRAA flag — `settings.mjs` gates that F7 flip and its
-    restoration.
+    through the graphics-level effective selectors (`effectiveTraa` etc.,
+    pt. 20 / point 276): TRAA stays independently debug-toggleable within a
+    level, but the level itself drives the post chain — SSAO on only at
+    high, TRAA + bloom off only on low — without touching the player's own
+    flags; `settings.mjs` gates the F7 cycle and the effective flips.
 
 ### 7.2 Self-Verification (mandatory)
 

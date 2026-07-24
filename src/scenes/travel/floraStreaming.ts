@@ -51,20 +51,16 @@ export const FLORA_RANGE_MAX = 15
 export const FLORA_FOG = { far: 260 }
 
 /**
- * Low Details (point 276 part B, lever 5): the flora fog radius the spawn circle
- * is sized to is multiplied by this factor, so the instance count falls
- * quadratically (spawn radius ~290 → ~173 wu). The streaming stays fog-COUPLED —
- * the radius is still `fogFar + margin`, just a smaller fogFar — so the no-pop
- * rebuild logic is unchanged; at the achievable zooms (≤0.5) the tighter circle
- * still sits beyond the frustum. A secondary geometry lever for weak GPUs; on a
- * fill-rate-bound GPU (point 277) the win is small. `1` when the mode is off, so
- * `lowDetails === false` draws exactly today's flora. */
-export const LOW_DETAILS_FLORA_FOG_FACTOR = 0.55
-
-/** The fog radius flora sizes its spawn circle to, given the Low-Details mode.
- *  Off = the plain FLORA_FOG.far (picture-identical to today). */
-export function floraFogFar(lowDetails: boolean): number {
-  return FLORA_FOG.far * (lowDetails ? LOW_DETAILS_FLORA_FOG_FACTOR : 1)
+ * The low graphics level (point 276 part B, lever 5) tightens the flora fog
+ * radius the spawn circle is sized to (QUALITY_PRESETS.low.floraFogFactor 0.55),
+ * so the instance count falls quadratically (spawn radius ~290 → ~173 wu). The
+ * streaming stays fog-COUPLED — the radius is still `fogFar + margin`, just a
+ * smaller fogFar — so the no-pop rebuild logic is unchanged; at the achievable
+ * zooms (≤0.5) the tighter circle still sits beyond the frustum. A secondary
+ * geometry lever for weak GPUs; on a fill-rate-bound GPU (point 277) the win is
+ * small. Medium/high pass factor 1, drawing exactly today's flora. */
+export function floraFogFar(fogFactor: number): number {
+  return FLORA_FOG.far * fogFactor
 }
 
 /** The radius (world units) out to which flora is drawn — the fog-limited

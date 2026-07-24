@@ -9,6 +9,7 @@ import { EVENT_KINDS, type EventKind } from '../systems/events'
 import { debugEventGroups, fireDebugEvent, sortByLabel } from '../systems/debugEvents'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
+import type { DetailLevel } from '../config/quality'
 import { startBenchmarkSafely } from '../systems/startBenchmark'
 import { PLACES, type Material } from '../world/geo'
 import {
@@ -126,7 +127,7 @@ export function DebugMenu() {
   const ssaoEnabled = useUi((s) => s.ssaoEnabled)
   const shadowMapHalf = useUi((s) => s.shadowMapHalf)
   const shadowsEnabled = useUi((s) => s.shadowsEnabled)
-  const lowDetails = useUi((s) => s.lowDetails)
+  const detailLevel = useUi((s) => s.detailLevel)
   const fireShadowsEnabled = useUi((s) => s.fireShadowsEnabled)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
@@ -406,12 +407,15 @@ export function DebugMenu() {
         />
       </label>
       <label>
-        <span>{t.debug.lowDetails}</span>
-        <input
-          type="checkbox"
-          checked={lowDetails}
-          onChange={(e) => useUi.getState().setLowDetails(e.target.checked)}
-        />
+        <span>{t.debug.detailLevel}</span>
+        <select
+          value={detailLevel}
+          onChange={(e) => useUi.getState().setDetailLevel(e.target.value as DetailLevel)}
+        >
+          <option value="low">{t.debug.detailLow}</option>
+          <option value="medium">{t.debug.detailMedium}</option>
+          <option value="high">{t.debug.detailHigh}</option>
+        </select>
       </label>
       <label>
         <span>{t.debug.fireShadows}</span>

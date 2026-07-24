@@ -264,19 +264,21 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
   })
 
   it('shadows, flat ground, wheel zoom and journal do-not-disturb (UI store) toggle on click', () => {
+    useUi.setState({ shadowsEnabled: true, fireShadowsEnabled: true }) // pin the defaults
     render(<DebugMenu />)
     const shadows = screen.getByText(en.debug.shadows).closest('label')?.querySelector('input') as HTMLInputElement
     expect(shadows.checked).toBe(true)
     fireEvent.click(shadows)
     expect(useUi.getState().shadowsEnabled).toBe(false)
 
-    // Campfire shadows (design.md §19.10): default OFF, enabled through the store.
+    // Campfire-shadow allow-flag (design.md §19.10, point 289): default ON —
+    // medium/high enable it via the level preset; a player can tune it off.
     const fire = screen.getByText(en.debug.fireShadows).closest('label')?.querySelector('input') as HTMLInputElement
-    expect(fire.checked).toBe(false)
-    fireEvent.click(fire)
-    expect(useUi.getState().fireShadowsEnabled).toBe(true)
+    expect(fire.checked).toBe(true)
     fireEvent.click(fire)
     expect(useUi.getState().fireShadowsEnabled).toBe(false)
+    fireEvent.click(fire)
+    expect(useUi.getState().fireShadowsEnabled).toBe(true)
 
     const flat = screen.getByText(en.debug.flatGround).closest('label')?.querySelector('input') as HTMLInputElement
     expect(flat.checked).toBe(false)
@@ -301,18 +303,18 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(useUi.getState().journalDnd).toBe(true)
   })
 
-  it('the Low-Details checkbox writes through to the store (design.md §21, point 276)', () => {
-    useUi.setState({ lowDetails: false })
+  it('the graphics-level picker writes through to the store (design.md §21, point 276)', () => {
+    useUi.setState({ detailLevel: 'medium', ssaoEnabled: true, shadowsEnabled: true })
     render(<DebugMenu />)
-    const low = screen.getByText(en.debug.lowDetails).closest('label')?.querySelector('input') as HTMLInputElement
-    expect(low.checked).toBe(false)
-    fireEvent.click(low)
-    expect(useUi.getState().lowDetails).toBe(true)
-    // It must not clobber the individual debug flags (read derived).
+    const picker = screen.getByText(en.debug.detailLevel).closest('label')?.querySelector('select') as HTMLSelectElement
+    expect(picker.value).toBe('medium')
+    fireEvent.change(picker, { target: { value: 'high' } })
+    expect(useUi.getState().detailLevel).toBe('high')
+    // Picking a level must not clobber the individual debug flags (read derived).
     expect(useUi.getState().ssaoEnabled).toBe(true)
     expect(useUi.getState().shadowsEnabled).toBe(true)
-    fireEvent.click(low)
-    expect(useUi.getState().lowDetails).toBe(false)
+    fireEvent.change(picker, { target: { value: 'low' } })
+    expect(useUi.getState().detailLevel).toBe('low')
   })
 })
 

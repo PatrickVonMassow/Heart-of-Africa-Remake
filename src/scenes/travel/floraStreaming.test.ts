@@ -4,6 +4,7 @@
 // fill runs nearest-first so a full instance buffer drops the FARTHEST plants.
 // These pure rules are pinned here.
 import { describe, expect, it } from 'vitest'
+import { QUALITY_PRESETS } from '../../config/quality'
 import {
   FLORA_FILL_MAX_FRAMES,
   FLORA_RANGE_MAX,
@@ -11,7 +12,6 @@ import {
   FLORA_FOG,
   FLORA_SPAWN_HARD_CAP,
   FLORA_SPAWN_MARGIN,
-  LOW_DETAILS_FLORA_FOG_FACTOR,
   chunkOffsetsByDistance,
   floraAmortiseMaxStep,
   floraChunkRange,
@@ -54,21 +54,25 @@ describe('floraSpawnRadius (point 171 — the edge sits in the fog, beyond the v
   })
 })
 
-describe('floraFogFar (point 276 lever 5 — Low Details tightens the flora circle)', () => {
-  it('is the plain fog far when the mode is off (picture-identical to today)', () => {
-    expect(floraFogFar(false)).toBe(FLORA_FOG.far)
+describe('floraFogFar (point 276 lever 5 — the low level tightens the flora circle)', () => {
+  const LOW_FACTOR = QUALITY_PRESETS.low.floraFogFactor
+
+  it('is the plain fog far at factor 1 (medium/high — picture-identical to today)', () => {
+    expect(floraFogFar(1)).toBe(FLORA_FOG.far)
+    expect(QUALITY_PRESETS.medium.floraFogFactor).toBe(1)
+    expect(QUALITY_PRESETS.high.floraFogFactor).toBe(1)
   })
 
-  it('shrinks the fog far by the factor when on, so the instance count falls quadratically', () => {
-    expect(floraFogFar(true)).toBe(FLORA_FOG.far * LOW_DETAILS_FLORA_FOG_FACTOR)
-    expect(LOW_DETAILS_FLORA_FOG_FACTOR).toBeGreaterThan(0)
-    expect(LOW_DETAILS_FLORA_FOG_FACTOR).toBeLessThan(1)
+  it('shrinks the fog far by the low factor, so the instance count falls quadratically', () => {
+    expect(floraFogFar(LOW_FACTOR)).toBe(FLORA_FOG.far * LOW_FACTOR)
+    expect(LOW_FACTOR).toBeGreaterThan(0)
+    expect(LOW_FACTOR).toBeLessThan(1)
     // The tighter circle is still fog-COUPLED (radius = fogFar + margin), so the
     // no-pop rebuild logic is unchanged, just a smaller circle.
-    const on = floraSpawnRadius(floraFogFar(true))
-    const off = floraSpawnRadius(floraFogFar(false))
+    const on = floraSpawnRadius(floraFogFar(LOW_FACTOR))
+    const off = floraSpawnRadius(floraFogFar(1))
     expect(on).toBeLessThan(off)
-    expect(on).toBeGreaterThan(floraFogFar(true)) // edge still beyond its own fog
+    expect(on).toBeGreaterThan(floraFogFar(LOW_FACTOR)) // edge still beyond its own fog
   })
 })
 

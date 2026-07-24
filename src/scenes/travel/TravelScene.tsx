@@ -22,7 +22,14 @@ import {
   vertexColor,
 } from 'three/tsl'
 import { useGame } from '../../state/store'
-import { useUi, effectiveShadows, effectiveShadowMapHalf } from '../../state/ui'
+import {
+  useUi,
+  effectiveShadows,
+  effectiveShadowResolution,
+  effectiveTerrainRefine,
+  effectiveFloraFogFactor,
+  effectiveFloraCastShadow,
+} from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
@@ -491,7 +498,7 @@ const PREFETCH_LOOKAHEAD = CHUNK_SIZE / 2
 
 function TerrainChunks() {
   const seed = useGame((s) => s.seed)
-  const lowDetails = useUi((s) => s.lowDetails)
+  const terrainRefine = useUi(effectiveTerrainRefine)
   const cache = useRef(chunkGeometryCache)
   const [active, setActive] = useState<string[]>([])
   const activeSig = useRef('')
@@ -522,20 +529,20 @@ function TerrainChunks() {
     setActive([])
   }, [seed])
 
-  // Low Details (point 276, secondary lever — cheap on a fast GPU, a win on weak
-  // ones): drop the near-ring terrain refinement (point 209's coast/mountain
-  // doubling) by driving the same runtime override the F8 benchmark uses. Reset
-  // `lastCenter` so the next frame re-plans the window at the new segment counts
-  // rather than waiting for a chunk crossing. Off = the shipped default (enabled),
-  // so `lowDetails === false` is picture-identical to today.
+  // The low graphics level (point 276, secondary lever — cheap on a fast GPU, a
+  // win on weak ones): drop the near-ring terrain refinement (point 209's coast/
+  // mountain doubling) by driving the same runtime override the F8 benchmark
+  // uses. Reset `lastCenter` so the next frame re-plans the window at the new
+  // segment counts rather than waiting for a chunk crossing. Medium/high keep it
+  // enabled — the shipped default, picture-identical to today.
   useEffect(() => {
-    setTerrainRefine({ enabled: !lowDetails })
+    setTerrainRefine({ enabled: terrainRefine })
     lastCenter.current = null
     return () => {
       // On unmount restore the shipped default so a later benchmark/scene is clean.
       setTerrainRefine({ enabled: true })
     }
-  }, [lowDetails])
+  }, [terrainRefine])
 
   // Publish the committed chunk set AFTER the React flush (effects run
   // post-commit): the panorama-capture gate must see exactly the chunks whose
@@ -869,14 +876,13 @@ function getSun() {
 
 function Sun() {
   const { light, target } = getSun()
-  // The touch quality preset (point 84) halves the shadow-map resolution; Low
-  // Details (point 276) forces it half too and drops cast shadows entirely.
-  const shadowMapHalf = useUi(effectiveShadowMapHalf)
+  // Sun shadow-map resolution follows the graphics level (design.md §21, point
+  // 276): low 1024, medium 2048, high 4096 — and the touch/debug half override
+  // halves it again. On the low level a very weak GPU can also tune shadows off.
+  const shadowSize = useUi(effectiveShadowResolution)
   const shadowsEnabled = useUi(effectiveShadows)
-  const shadowSize = shadowMapHalf ? 1024 : 2048
 
-  // Low Details (point 276, a secondary lever on real hardware): the sun stops
-  // casting shadows. Toggling it on/off is picture-neutral while off (default on).
+  // The sun stops casting shadows if the level or the player's flag disables them.
   useEffect(() => {
     light.castShadow = shadowsEnabled
   }, [light, shadowsEnabled])
@@ -1368,18 +1374,18 @@ function Vegetation() {
     fillRef.current = null
   }, [seed])
 
-  // Low Details (point 276, lever 5): drop cast shadows on the low, dense
-  // dressing (bush/papyrus/rock) to thin the shadow pass. Off restores the
-  // shipped `castShadow = true`, so `lowDetails === false` is picture-identical.
-  const lowDetails = useUi((s) => s.lowDetails)
+  // The low graphics level (point 276, lever 5): drop cast shadows on the low,
+  // dense dressing (bush/papyrus/rock) to thin the shadow pass. Medium/high keep
+  // `castShadow = true`, so they are picture-identical to today.
+  const floraCastShadow = useUi(effectiveFloraCastShadow)
   useEffect(() => {
     for (const sp of SPECIES) {
-      const cast = !(lowDetails && LOW_DETAILS_NO_SHADOW_SPECIES.has(sp))
+      const cast = floraCastShadow || !LOW_DETAILS_NO_SHADOW_SPECIES.has(sp)
       meshes.base[sp].castShadow = cast
       const cm = meshes.crown[sp]
       if (cm) cm.castShadow = cast
     }
-  }, [meshes, lowDetails])
+  }, [meshes, floraCastShadow])
 
   // Dev hook for the headless verification (CLAUDE.md §7.2).
   useEffect(() => {
@@ -1519,10 +1525,11 @@ function Vegetation() {
     // ZOOM/region changed the far, NOT on the season's per-frame fog drift — that
     // per-frame rebuild re-uploaded the seasonTint buffer and raced the crown
     // collapse on WebGPU ("jumping trees").
-    // Low Details (point 276, lever 5): a tighter flora fog radius drops the
-    // instance count quadratically. Off = FLORA_FOG.far exactly (picture-neutral).
-    // A changed factor moves the spawn radius, so floraShouldRebuild re-streams.
-    const fogFar = floraFogFar(useUi.getState().lowDetails)
+    // The low graphics level (point 276, lever 5): a tighter flora fog radius
+    // drops the instance count quadratically. Medium/high pass factor 1, so the
+    // radius is FLORA_FOG.far exactly (picture-neutral). A changed factor moves
+    // the spawn radius, so floraShouldRebuild re-streams.
+    const fogFar = floraFogFar(effectiveFloraFogFactor(useUi.getState()))
     const t0 = performance.now()
     let worked = false
     if (floraShouldRebuild(pos, lastBuild.current, fogFar)) {

@@ -257,6 +257,11 @@ function resetWorld(phase: BenchPhase): void {
 function applyConfig(config: BenchConfig, defaultPixelRatio: number): void {
   const f = config.flags
   useUi.setState({
+    // Force the HIGH graphics level so every render lever is ON in the baseline
+    // and each config's flag can then suppress its own feature — otherwise the
+    // level's preset (e.g. SSAO off at medium) would gate a flag out and a
+    // config would measure nothing (point 276 part B / point 277).
+    detailLevel: 'high',
     traaEnabled: f.traaEnabled ?? true,
     ssaoEnabled: f.ssaoEnabled ?? true,
     shadowsEnabled: f.shadowsEnabled ?? true,

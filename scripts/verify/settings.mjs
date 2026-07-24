@@ -441,65 +441,81 @@ const msaaSamples = await page.evaluate(() => window.__scenePass.renderTarget.sa
 check('TRAA scene pass renders single-sampled (MSAA pass keeps 4)',
   traaSamples === 0 && msaaSamples === 4, `traa ${traaSamples}, msaa ${msaaSamples}`)
 
-// --- Low Details performance mode (design.md §21, F7 / point 276 part B) ------
-// F7 flips a single `lowDetails` flag read DERIVED by every render lever, so the
-// individual debug flags stay untouched (off = today's picture). Assert F7 flips
-// the flag and that the EFFECTIVE reads flip with it, computed the same way the
-// ui.ts selectors do (their maths is pure-tested in src/state/ui.test.ts). The
-// FPS win is priced live by the main session on both backends.
+// --- Graphics quality levels (design.md §21, F7 / point 276 part B) ------------
+// F7 cycles the `detailLevel` (medium → low → high → medium); every render lever
+// reads DERIVED from that level's QUALITY_PRESET without clobbering the player's
+// debug allow-flags. Assert the F7 cycle order and that the EFFECTIVE reads flip
+// with the level, computed the same way the ui.ts selectors do (their maths is
+// pure-tested in src/state/ui.test.ts). The FPS win is priced live by the main
+// session on both backends.
 const errsBeforeLow = errors.length
-// Start from a known state: every base lever on, the mode off.
+// Start from a known state: the default level, every allow-flag on.
 await page.evaluate(() => {
   const u = window.__ui.getState()
-  u.setLowDetails(false)
+  u.setDetailLevel('medium')
   u.setSsaoEnabled(true)
   u.setTraaEnabled(true)
   u.setShadowsEnabled(true)
   u.setFireShadowsEnabled(true)
   u.setShadowMapHalf(false)
 })
+// Read the effective levers the SAME way ui.ts derives them (level preset AND
+// the allow-flag), so the live check matches the pure-tested selectors.
+const PRESETS = {
+  low: { dpr: 1, ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
+  medium: { dpr: null, ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
+  high: { dpr: null, ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
+}
 const effective = () => page.evaluate(() => {
   const s = window.__ui.getState()
+  const P = {
+    low: { dpr: 1, ssao: false, traa: false, bloom: false, shadows: true, shadowRes: 1024, fire: false },
+    medium: { dpr: null, ssao: false, traa: true, bloom: true, shadows: true, shadowRes: 2048, fire: true },
+    high: { dpr: null, ssao: true, traa: true, bloom: true, shadows: true, shadowRes: 4096, fire: true },
+  }[s.detailLevel]
   return {
-    lowDetails: s.lowDetails,
-    ssao: s.ssaoEnabled && !s.lowDetails,
-    traa: s.traaEnabled && !s.lowDetails,
-    bloom: !s.lowDetails,
-    shadows: s.shadowsEnabled && !s.lowDetails,
-    fireShadows: s.fireShadowsEnabled && !s.lowDetails,
-    shadowMapHalf: s.shadowMapHalf || s.lowDetails,
-    // Base flags — must be UNTOUCHED by the mode.
+    level: s.detailLevel,
+    ssao: P.ssao && s.ssaoEnabled,
+    traa: P.traa && s.traaEnabled,
+    bloom: P.bloom,
+    shadows: P.shadows && s.shadowsEnabled,
+    shadowRes: Math.max(256, Math.round(P.shadowRes / (s.shadowMapHalf ? 2 : 1))),
+    fireShadows: P.fire && s.fireShadowsEnabled,
+    // Allow-flags — must be UNTOUCHED by the level cycle.
     baseSsao: s.ssaoEnabled, baseTraa: s.traaEnabled, baseShadows: s.shadowsEnabled,
     baseFire: s.fireShadowsEnabled, baseHalf: s.shadowMapHalf,
   }
 })
-const lowOff = await effective()
-check('Low Details off: effective levers match their base (picture-neutral)',
-  lowOff.lowDetails === false && lowOff.ssao && lowOff.traa && lowOff.bloom &&
-  lowOff.shadows && lowOff.fireShadows && lowOff.shadowMapHalf === false,
-  JSON.stringify(lowOff))
-// F7 turns the mode on.
-await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F7', bubbles: true })))
-await page.waitForTimeout(1200)
-const lowOn = await effective()
-check('F7 on: every effective render lever is forced DOWN',
-  lowOn.lowDetails === true && lowOn.ssao === false && lowOn.traa === false &&
-  lowOn.bloom === false && lowOn.shadows === false && lowOn.fireShadows === false &&
-  lowOn.shadowMapHalf === true, JSON.stringify(lowOn))
-check('F7 on: the individual debug flags stay untouched (read derived, not clobbered)',
-  lowOn.baseSsao && lowOn.baseTraa && lowOn.baseShadows && lowOn.baseFire && lowOn.baseHalf === false,
-  JSON.stringify(lowOn))
+const cycleF7 = async () => {
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F7', bubbles: true })))
+  await page.waitForTimeout(900)
+  return effective()
+}
+const atMedium = await effective()
+check('graphics level defaults to medium: SSAO off, TRAA+Bloom on, 2048 shadows, campfire on',
+  atMedium.level === 'medium' && atMedium.ssao === false && atMedium.traa && atMedium.bloom &&
+  atMedium.shadows && atMedium.shadowRes === 2048 && atMedium.fireShadows === true,
+  JSON.stringify(atMedium))
+// F7 #1: medium → low (every fill-rate lever forced DOWN).
+const atLow = await cycleF7()
+check('F7 → low: post off, shadows low-res, no campfire shadows',
+  atLow.level === 'low' && atLow.ssao === false && atLow.traa === false && atLow.bloom === false &&
+  atLow.shadowRes === PRESETS.low.shadowRes && atLow.fireShadows === false, JSON.stringify(atLow))
 const lowMean = await meanLuma(await page.screenshot())
-check('F7 on: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
-// F7 again restores the player's exact settings.
-await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F7', bubbles: true })))
-await page.waitForTimeout(1200)
-const lowBack = await effective()
-check('F7 off again: the effective levers return to the base picture',
-  lowBack.lowDetails === false && lowBack.ssao && lowBack.traa && lowBack.bloom &&
-  lowBack.shadows && lowBack.fireShadows && lowBack.shadowMapHalf === false,
-  JSON.stringify(lowBack))
-check('Low Details: no new console errors across the toggle', errors.length === errsBeforeLow,
+check('F7 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
+// F7 #2: low → high (wraps to the top; SSAO on, sharper shadows).
+const atHigh = await cycleF7()
+check('F7 → high (wraps from the bottom): SSAO on, 4096 shadows, campfire on',
+  atHigh.level === 'high' && atHigh.ssao === true && atHigh.shadowRes === 4096 &&
+  atHigh.fireShadows === true, JSON.stringify(atHigh))
+// F7 #3: high → medium (back to the default).
+const atMediumAgain = await cycleF7()
+check('F7 → medium: a full cycle returns to the default in three presses',
+  atMediumAgain.level === 'medium' && atMediumAgain.shadowRes === 2048, JSON.stringify(atMediumAgain))
+check('graphics levels: the debug allow-flags stay untouched across the cycle (read derived)',
+  atHigh.baseSsao && atHigh.baseTraa && atHigh.baseShadows && atHigh.baseFire && atHigh.baseHalf === false,
+  JSON.stringify(atHigh))
+check('Graphics levels: no new console errors across the F7 cycle', errors.length === errsBeforeLow,
   errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 
 console.log('console errors:', errors.length)

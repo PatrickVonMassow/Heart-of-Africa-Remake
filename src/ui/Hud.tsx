@@ -442,14 +442,14 @@ export function Hud() {
     // F6 = state-dump popup for bug reports (design.md §21.1; F5 is unusable —
     // the browser reloads before preventDefault runs).
     const offF6 = onKeyPress('F6', () => useUi.getState().toggleStateDump())
-    // F7 = "Low Details" performance mode (design.md §21, point 276). Read
-    // DERIVED (the effective* selectors), so it never clobbers the individual
-    // debug flags; off is picture-identical to today.
+    // F7 = graphics quality level (design.md §21, point 276). Each press steps
+    // DOWN one level, wrapping the bottom to the top: medium → low → high →
+    // medium. Read DERIVED (the effective* selectors), so it never clobbers the
+    // individual debug flags.
     const offF7 = onKeyPress('F7', () => {
-      const ui = useUi.getState()
-      ui.setLowDetails(!ui.lowDetails)
+      useUi.getState().cycleDetailLevel()
       const s = getStrings()
-      useGame.getState().setToast(!ui.lowDetails ? s.toasts.lowDetailsOn : s.toasts.lowDetailsOff)
+      useGame.getState().setToast(s.toasts.graphicsLevel[useUi.getState().detailLevel])
     })
     // F8 = in-game render benchmark (design.md §21.1). It SHIPS in the
     // delivered build — the numbers must come from the player's own hardware —
