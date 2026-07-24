@@ -164,23 +164,70 @@ export function buildMeroePyramids(): THREE.BufferGeometry {
   return merge(parts)
 }
 
+/** How much of Khufu still stands: built to ~146.5 m, its apex and top
+ *  courses are long quarried away, leaving ~138.5 m and a small flat summit
+ *  platform where the point should be (docs/giza-1890.md §1.1). */
+export const KHUFU_STANDING = 0.945
+
 /** Giza: the three great pyramids in their real southwest-diagonal row —
- *  Khufu, Khafre, Menkaure, flatter-sided than the steep Nubian tombs
- *  (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with the Sphinx
- *  crouching east of Khafre, readable at a glance (design.md §4.4). */
+ *  Khufu NE (largest), Khafre centre, Menkaure SW, flatter-sided than the
+ *  steep Nubian tombs (Old-Kingdom ~52° slope, height ≈ 0.64 · base) — with
+ *  the Sphinx crouching east of Khafre, readable at a glance (design.md
+ *  §4.4), and each core carrying its ~1890 casing cue (docs/giza-1890.md
+ *  §1.1-§1.2/§3): Khufu ends in a blunt flat platform, not a point; Khafre
+ *  alone keeps a paler cap of original smooth Tura casing near its apex —
+ *  the plateau's one distinguishing mark; Menkaure wears the darker band of
+ *  its red Aswan granite lower casing. All three cues are cosmetic; the
+ *  footprint is unchanged. */
 export function buildGizaPyramids(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
-  // [x, z, base half-extent]: the diagonal row, Khufu largest in the NE.
-  // Kept compact: the field stands only ~4 world units west of Cairo (the
-  // real 13 km), so the symbol must not swallow the port marker or the Nile.
-  const row: Array<[number, number, number]> = [
-    [1.3, -1.3, 1.6], // Khufu
-    [0, 0, 1.5], // Khafre
-    [-1.2, 1.2, 0.8], // Menkaure
-  ]
-  row.forEach(([x, z, b], i) => {
-    parts.push(pyramid(x, z, b, b * 0.64 * 2, 8200 + i))
-  })
+  const core = '#c9a76a'
+  // [x, z, base half-extent] per pyramid: the diagonal row, Khufu largest in
+  // the NE. Kept compact: the field stands only ~4 world units west of Cairo
+  // (the real 13 km), so the symbol must not swallow the port marker or the
+  // Nile.
+  {
+    // Khufu: the cone cut at KHUFU_STANDING of its height and closed FLAT —
+    // the small summit platform 19th-century visitors climbed to.
+    const [x, z, b] = [1.3, -1.3, 1.6]
+    const h = b * 0.64 * 2
+    const stand = h * KHUFU_STANDING
+    const frustum = new THREE.CylinderGeometry(b * (1 - KHUFU_STANDING), b, stand, 4)
+    frustum.rotateY(Math.PI / 4)
+    frustum.translate(x, stand / 2, z)
+    parts.push(tint(frustum, core, 0.09, 8200))
+  }
+  {
+    // Khafre: tawny stepped core, and near the apex the pale smooth cap of
+    // surviving Tura-limestone casing — the only casing left on the plateau
+    // and the cue that tells Khafre from Khufu at a glance.
+    const [x, z, b] = [0, 0, 1.5]
+    const h = b * 0.64 * 2
+    const capStart = 0.8 // fraction of the height where the casing survives
+    const coreH = h * capStart
+    const coreG = new THREE.CylinderGeometry(b * (1 - capStart), b, coreH, 4)
+    coreG.rotateY(Math.PI / 4)
+    coreG.translate(x, coreH / 2, z)
+    parts.push(tint(coreG, core, 0.09, 8201))
+    const cap = new THREE.ConeGeometry(b * (1 - capStart) * 1.06, h - coreH, 4)
+    cap.rotateY(Math.PI / 4)
+    cap.translate(x, coreH + (h - coreH) / 2, z)
+    // Low jitter: the casing reads smooth against the weathered core.
+    parts.push(tint(cap, '#e8dcc2', 0.03, 8203))
+  }
+  {
+    // Menkaure: the smallest, its point intact, but the lower courses cased
+    // in red Aswan granite — a darker band ringing the base, a hair proud of
+    // the core face so the two never z-fight.
+    const [x, z, b] = [-1.2, 1.2, 0.8]
+    const h = b * 0.64 * 2
+    parts.push(pyramid(x, z, b, h, 8202))
+    const skirtTop = 0.22 // fraction of the height the granite casing reaches
+    const skirt = new THREE.CylinderGeometry(b * (1 - skirtTop) * 1.02, b * 1.02, h * skirtTop, 4, 1, true)
+    skirt.rotateY(Math.PI / 4)
+    skirt.translate(x, (h * skirtTop) / 2, z)
+    parts.push(tint(skirt, '#96604b', 0.06, 8204))
+  }
   // Sphinx east of Khafre, facing east like the real one.
   const sphinx = buildSphinx()
   sphinx.translate(2.1, 0, 0.3)
