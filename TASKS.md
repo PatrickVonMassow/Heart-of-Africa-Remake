@@ -10569,7 +10569,7 @@ the remaining open points in their numeric order.
   DOCS: design.md §21.1 (the F-key list gains F8) and CLAUDE.md §7.1 pt. 20; record the
   method in `docs/perf-276-findings.md`. Implementation-ready.
 
-- [ ] 278. THE DRESSING GROWS OVER A SESSION — A COST THAT RISES THE LONGER ONE PLAYS
+- [x] 278. THE DRESSING GROWS OVER A SESSION — A COST THAT RISES THE LONGER ONE PLAYS
   (found 24.07.2026 while proving out the point-277 benchmark; numbers in
   `docs/perf-276-findings.md`). At a FIXED anchor, with a fixed seed and a fixed
   date, the instanced flora/dressing triangle count CLIMBS as the session goes on:
