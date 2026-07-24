@@ -158,6 +158,10 @@ Der Anlass war konkret: die vier neuen QA-Mechanismen (294–297) und der 276-We
 
 Beim v0.2-Tag zeigte der verpflichtende volle Closing-Lauf sofort seinen Wert: Er fing einen strikten TypeScript-Typfehler (implizite `any`-Parameter in einer Gangart-Testdatei), den die schnelle Vitest-Schicht durchgelassen hatte — weil diese Testdateien mit esbuild transpiliert, ohne den vollen `tsc`. Ein Fehler kann also im schnellen Layer grün sein und erst der Release-Closing (`tsc -p tsconfig.vitest.json` in der LARGE-Regression) deckt ihn auf. *Übertragung:* Die schnelle, ständig laufende Prüfung ist bewusst lax genug, um schnell zu sein — deshalb ist die letzte, strengste Prüfung UNMITTELBAR vor der Auslieferung nicht verhandelbar und gehört fest in den Release-Mechanismus (CLAUDE.md §6 / Maximum-QA Phase 9), nicht als optionaler Extra-Schritt. Genau der Grund, warum der Nutzer den vollen Closing-Lauf als Teil jedes Tags festschrieb.
 
+### 3.15 Ein übersprungener Prozessschritt — Vollständigkeit braucht ein Gate, nicht Gedächtnis (24.07.)
+
+Direkt beim v0.2-Release trat die Kehrseite von §3.14 auf: Ich habe den Closing-ZYKLUS mit der großen REGRESSION gleichgesetzt und den Aufräum-Teil — Dead-Code, Stale-Doc, Stale-Comment, `.md`-Audit — komplett übersprungen, also genau das, was ein Closing von einer Regression unterscheidet. Der Nutzer, zu Recht: *„Das ist doch der ganze Sinn vom Closing-Zyklus … Wie konnte es passieren, dass du das einfach ignorierst?"* Ursache: Der Closing-Prozess war zwar in TASKS.md/§7.2/Phase 8 vollständig NIEDERGESCHRIEBEN, aber seine EINHALTUNG hing nur an meinem Gedächtnis — und unter dem Druck, die vielen veralteten Checks grün zu bekommen, fiel der nicht-erzwungene Schritt weg. *Übertragung, und der Kern:* Bei einem MEHRSCHRITTIGEN Prozess reichen Einzel-Gates pro Schritt nicht — es braucht einen VOLLSTÄNDIGKEITS-Gate über den ganzen Prozess, der das Ergebnis (hier: den Versions-Tag) blockiert, solange nicht JEDER Schritt mit Beleg abgehakt ist. Genau das ist Punkt 306 (maschinenlesbare Checkliste + HEAD-gebundener Record + Stop-Hook, Fable-verifiziert). Es ist dieselbe Meta-Lehre wie überall in diesem Projekt — „was zweimal (hier: einmal, aber gravierend) schiefgeht, bekommt einen Mechanismus" — angewandt auf die Prozess-Vollständigkeit selbst.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -217,6 +221,7 @@ Legende Lösungsversuche: Anzahl erkennbarer Anläufe/Generationen, bis die Lös
 | 20 | Test kodiert eine veränderliche Vorgabe fest → Konfig-Entscheidung lässt ihn fehlschlagen ohne Produkt-Regress (Boden-Kantenenergie „SSAO an"-kalibriert; 276-Entscheidung „SSAO aus") | 1 | niedrig-mittel (sieht aus wie Regress) | Schwelle auf ausgelieferten Default rekalibriert, gegen Vor-Änderungs-Baseline abgegrenzt, am Bild verifiziert | Stale-Check-Annahme vs. echten Regress per Baseline auf dem Vor-Änderungs-Stand trennen; Prüfschwellen an den SHIPPED-Default binden, per Bild kalibrieren | ◐ (frisch) |
 | 21 | Modell-Diversität nur reaktiv (Audits, Festgefahrenheit), nicht proaktiv nach Kritikalität | — (Prozesslücke, vom Nutzer benannt) | mittel (Single-Model-Blindfleck bei kritischen Mechanismen) | Kritikalitäts-Triage vor dem Bau + erzwingender Stop-Hook-Guard (Punkt 298); Fable-Sandwich für Hoch-Kritikalität | Modell-Diversität = Funktion der Kritikalität, nicht Audit-Sonderfall; als Mechanismus erzwingen, nicht als Vorsatz | ○ (spezifiziert, Bau 298) |
 | 22 | Schneller Test-Layer typecheckt Testdateien nicht — ein Typfehler bleibt dort grün und fällt erst im vollen Closing (strikter tsc) vor dem Release auf | 1 | niedrig (vor Release gefangen) | Voller Closing-Lauf vor JEDEM Versions-Tag verpflichtend (Release-Mechanismus, CLAUDE.md §6 / Maximum-QA Phase 9); Typ gefixt, Lauf wiederholt | Fast-Gate ≠ Release-Gate; die strengste Prüfung gehört unmittelbar vor die Auslieferung, nicht als optionaler Extra-Schritt | ✔ (Mechanismus) |
+| 23 | Closing-Schritt (Dead-Code-/Stale-Doc-/Kommentar-Aufräumung + .md-Audit) beim v0.2-Release ÜBERSPRUNGEN — nur per Gedächtnis getrackt, kein Gate | 1 | mittel (Prozess-Integrität, Nutzer-Vertrauen: „das ist doch der ganze Sinn des Closings") | Closing-Completeness-Guard (Punkt 306): maschinenlesbare Checkliste ALLER Closing-Schritte + HEAD-gebundener Abhak-Record + Stop-Hook, der Tag UND „Closing fertig" ohne alle Schritte blockiert; Fable-verifiziert 100 % | Jeder Schritt eines MEHRSCHRITTIGEN Prozesses braucht einen Vollständigkeits-Gate, nicht nur Einzel-Gates pro Schritt; unter Druck fällt genau der nicht-erzwungene Schritt weg | ○ (spezifiziert, Bau 306) |
 
 ---
 
@@ -267,7 +272,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 24.07.2026, 19:06 · Quellen-Fingerprint: `b1c353fce268…`
+Zuletzt aktualisiert: Freitag, 24.07.2026, 22:00 · Quellen-Fingerprint: `88d0fd3c8af7…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -336,8 +341,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 61 Feedback-/Projekt-Memories · 23 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 9 Prozess-/Meta-TASKS-Punkte (davon 4 offen).
+Erfasste Quellen: 61 Feedback-/Projekt-Memories · 23 Guard-/Hook-Skripte · 1 Revert-/Reapply-Commits · 10 Prozess-/Meta-TASKS-Punkte (davon 5 offen).
 
-<!-- RETRO-FINGERPRINT: b1c353fce26834ea016a3ad88ff58696921122f95d69ae287b7930a640463872 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-24T17:06:31.348Z -->
+<!-- RETRO-FINGERPRINT: 88d0fd3c8af7fa06d1ae320484a8c41eb8e6a974ed64377ee155fc48feb97155 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-24T20:00:04.886Z -->
 <!-- AUTO-GENERATED:END -->
