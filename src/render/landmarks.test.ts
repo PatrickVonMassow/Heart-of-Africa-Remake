@@ -6,6 +6,7 @@ import * as THREE from 'three'
 import { describe, it, expect } from 'vitest'
 import {
   buildMeroePyramids,
+  MEROE_PYRAMIDS,
   buildGizaPyramids,
   buildSphinx,
   SPHINX_BURIAL_DEPTH,
@@ -157,6 +158,44 @@ describe('landmark builders', () => {
     const footprint = Math.max(b.max.x - b.min.x, b.max.z - b.min.z)
     expect(footprint).toBeGreaterThan(6)
     expect(footprint).toBeLessThan(14)
+    geo.dispose()
+  })
+
+  it('most of Meroë stands broken-topped, as the treasure hunters left it (point 279)', () => {
+    // Ferlini dismantled Amanishakheto's pyramid from the top down in 1834 and
+    // Lepsius recorded in 1844 that the treasure fever "has brought many a
+    // pyramid to ruin" — ~40 Nubian pyramids lost their tops, and the pointed
+    // apexes of the modern photograph are 20th-century reconstruction. The
+    // regression this pins is the six clean sharp cones the builder used to
+    // make.
+    const broken = MEROE_PYRAMIDS.filter((p) => p.standing < 1)
+    expect(broken.length).toBeGreaterThanOrEqual(4) // most, not all
+    expect(MEROE_PYRAMIDS.length - broken.length).toBeGreaterThanOrEqual(1) // some left whole
+    // None cut so low that the steep Nubian silhouette stops reading.
+    for (const p of broken) expect(p.standing).toBeGreaterThan(0.5)
+
+    // And the geometry really is cut: nothing over a broken pyramid's own
+    // footprint reaches its original apex height (not the crown blocks, not
+    // the standing corner), while an untouched one still carries its point.
+    const geo = buildMeroePyramids()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    const topOver = (p: (typeof MEROE_PYRAMIDS)[number]) => {
+      let top = 0
+      for (let i = 0; i < pos.count; i++) {
+        if (Math.hypot(pos.getX(i) - p.x, pos.getZ(i) - p.z) > p.base * 0.6) continue
+        top = Math.max(top, pos.getY(i))
+      }
+      return top
+    }
+    for (const p of broken) {
+      const label = `broken pyramid at ${p.x.toFixed(1)}/${p.z.toFixed(1)}`
+      expect(topOver(p), label).toBeLessThan(p.height - 0.3)
+      // The stump is still a pyramid, not a stub.
+      expect(topOver(p), label).toBeGreaterThan(p.height * 0.5)
+    }
+    for (const p of MEROE_PYRAMIDS.filter((q) => q.standing >= 1)) {
+      expect(topOver(p), `intact pyramid at ${p.x.toFixed(1)}/${p.z.toFixed(1)}`).toBeGreaterThan(p.height - 0.01)
+    }
     geo.dispose()
   })
 

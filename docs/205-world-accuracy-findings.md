@@ -1,9 +1,12 @@
 # Point 205 — Research-backed world accuracy findings (~1890)
 
-**Status: ANALYSIS ONLY. Nothing in the game was changed.** This document is the
-research half of TASKS point 205 (the "RESEARCH-BACKED WORLD ACCURACY" pass added
-23.07.2026). Every finding below is a *proposal* for the user to rule on; the
-main session decides what, if anything, lands.
+**Status: the research half; corrections land under TASKS point 279.** This
+document is the research half of TASKS point 205 (the "RESEARCH-BACKED WORLD
+ACCURACY" pass added 23.07.2026). Every finding below started as a *proposal* for
+the user to rule on; the main session decides what, if anything, lands. Findings
+that HAVE landed carry a **RESOLVED** note at the end of their section, naming
+what was built — the finding text itself is left as written, so the record of
+what the game did wrong stays readable.
 
 **The trigger and the exemplar.** The Great Sphinx of Giza was buried to the
 shoulders in wind-blown sand until Baraize's 1925–36 clearance, so a ~1890
@@ -109,6 +112,19 @@ Giza-vs-Meroë read that `docs/giza-1890.md` §2 asks for. While in the file,
 which are still absent.
 
 **(5) Effort.** **S** (geometry + test pin + a travel screenshot).
+
+**RESOLVED (point 279b).** `MEROE_PYRAMIDS` in `src/render/landmarks.ts` now
+carries a `standing` fraction per tomb: four of the six are cut at 0.55–0.72 of
+their height by `brokenPyramid()` — the cone's own frustum, so the flanks keep
+the steep Nubian slope — and finished with one still-standing corner above the
+break, half-sunk loosened blocks along the rim and debris heaped at the foot.
+Two are left whole for contrast, and the tallest of them still carries the
+field's peak, so the "unmistakable at travel zoom" pin holds unchanged.
+`landmarks.test.ts` pins the truncation both ways: most broken but not all,
+none cut below half, and — over each broken tomb's own footprint — nothing
+reaching its original apex, while an untouched one still does. Verified by the
+picture at travel zoom on both backends. The east-side offering chapels
+`docs/giza-1890.md` §2/§6 also asks for remain OPEN.
 
 ---
 

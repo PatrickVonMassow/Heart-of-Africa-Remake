@@ -52,13 +52,80 @@ function pyramid(x: number, z: number, base: number, height: number, seed: numbe
   return tint(g, '#c9a76a', 0.09, seed)
 }
 
-/** Meroë: a cluster of steep-sided Nubian pyramids (steeper than Giza),
- *  sandstone-toned, with slight size/position jitter. Rendered well above
- *  tree height (acacia ~2, baobab ~2.6) so the field is unmistakable at
- *  travel zoom (user request: much larger). */
-export function buildMeroePyramids(): THREE.BufferGeometry {
-  const rand = mulberry32(4201)
+/**
+ * A Nubian pyramid whose top was taken off by the treasure hunters: the same
+ * steep cone cut at `standing` of its height and left with a ragged crown of
+ * loosened masonry, plus the rubble the demolition spilled at its foot. The
+ * frustum keeps the pyramid's own slope, so the flanks still read as a steep
+ * Nubian tomb rather than as a tower.
+ */
+function brokenPyramid(
+  x: number,
+  z: number,
+  base: number,
+  height: number,
+  standing: number,
+  seed: number,
+): THREE.BufferGeometry[] {
+  const rand = mulberry32(seed)
   const parts: THREE.BufferGeometry[] = []
+  const stump = height * standing
+  const topR = base * (1 - standing) // the cone's own radius at the break
+  const frustum = new THREE.CylinderGeometry(topR, base, stump, 4)
+  frustum.rotateY(Math.PI / 4)
+  frustum.translate(x, stump / 2, z)
+  parts.push(tint(frustum, '#c9a76a', 0.09, seed))
+  // One corner of the courses above the break is still standing: the lopsided
+  // silhouette is what makes the top read as torn open rather than sawn flat.
+  const wa = rand() * Math.PI * 2
+  const remnant = new THREE.BoxGeometry(topR * 0.95, topR * 1.2, topR * 0.6)
+  remnant.rotateY(wa)
+  remnant.translate(x + Math.cos(wa) * topR * 0.34, stump + topR * 0.35, z + Math.sin(wa) * topR * 0.34)
+  parts.push(tint(remnant, '#c4a165', 0.1, seed + 30))
+  // Loosened blocks left along the break, half-sunk into it, at uneven
+  // heights — the ragged rim.
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + rand() * 0.8
+    const rr = topR * (0.35 + rand() * 0.6)
+    const w = topR * (0.32 + rand() * 0.28)
+    const bh = topR * (0.3 + rand() * 0.65)
+    const block = new THREE.BoxGeometry(w, bh, w)
+    block.rotateY(rand() * Math.PI)
+    block.rotateZ((rand() - 0.5) * 0.4) // tipped, half-loose
+    block.translate(x + Math.cos(a) * rr, stump - topR * 0.2 + bh / 2, z + Math.sin(a) * rr)
+    parts.push(tint(block, '#bf9a60', 0.13, seed + 40 + i))
+  }
+  // Debris thrown down the flanks and heaped at the base.
+  for (let i = 0; i < 4; i++) {
+    const a = rand() * Math.PI * 2
+    const rr = base * (0.85 + rand() * 0.45)
+    const s = 0.13 + rand() * 0.2
+    const heap = new THREE.CylinderGeometry(s * 0.4, s, s * 0.85, 5)
+    heap.translate(x + Math.cos(a) * rr, s * 0.4, z + Math.sin(a) * rr)
+    parts.push(tint(heap, '#b8935c', 0.12, seed + 60 + i))
+  }
+  return parts
+}
+
+/**
+ * The Meroë field as a ~1890 expedition found it. `standing` is the fraction
+ * of the original height still up: 1 means untouched, anything less means the
+ * top was taken off. In 1834 Giuseppe Ferlini dismantled Kandake
+ * Amanishakheto's pyramid from the top down for its treasure and set off a
+ * wave of imitation — Lepsius recorded in 1844 that the discovery "has brought
+ * many a pyramid to ruin", and ~40 Nubian pyramids lost their tops. The
+ * pointed apexes a modern visitor photographs are 20th-century reconstruction.
+ * So MOST of the field is broken-topped and two are left whole for contrast,
+ * and none is cut so low that the steep Nubian silhouette stops reading.
+ */
+export const MEROE_PYRAMIDS: ReadonlyArray<{
+  x: number
+  z: number
+  base: number
+  height: number
+  standing: number
+}> = (() => {
+  const rand = mulberry32(4201)
   const spots: Array<[number, number]> = [
     [0, 0],
     [2.85, 1.05],
@@ -67,10 +134,32 @@ export function buildMeroePyramids(): THREE.BufferGeometry {
     [-1.5, -2.4],
     [4.5, -1.2],
   ]
-  spots.forEach(([x, z], i) => {
-    const b = 1.0 + rand() * 0.4
-    const h = b * (2.6 + rand() * 0.6) // steep: height well over twice the base
-    parts.push(pyramid(x + (rand() - 0.5) * 0.6, z + (rand() - 0.5) * 0.6, b, h, 4210 + i))
+  // Four of six broken, the deepest cut on the largest tomb (Ferlini worked
+  // the richest one); the two left whole keep the field legible.
+  const standing = [0.66, 1, 0.72, 0.63, 1, 0.55]
+  return spots.map(([x, z], i) => {
+    const base = 1.0 + rand() * 0.4
+    const height = base * (2.6 + rand() * 0.6) // steep: height well over twice the base
+    return {
+      x: x + (rand() - 0.5) * 0.6,
+      z: z + (rand() - 0.5) * 0.6,
+      base,
+      height,
+      standing: standing[i],
+    }
+  })
+})()
+
+/** Meroë: a cluster of steep-sided Nubian pyramids (steeper than Giza),
+ *  sandstone-toned, with slight size/position jitter — most of them
+ *  broken-topped as the treasure hunters left them (see MEROE_PYRAMIDS).
+ *  Rendered well above tree height (acacia ~2, baobab ~2.6) so the field is
+ *  unmistakable at travel zoom (user request: much larger). */
+export function buildMeroePyramids(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  MEROE_PYRAMIDS.forEach((p, i) => {
+    if (p.standing >= 1) parts.push(pyramid(p.x, p.z, p.base, p.height, 4210 + i))
+    else parts.push(...brokenPyramid(p.x, p.z, p.base, p.height, p.standing, 4210 + i))
   })
   return merge(parts)
 }
