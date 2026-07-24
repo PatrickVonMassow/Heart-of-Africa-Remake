@@ -10,7 +10,7 @@ import { coastDistance, lakeDistance, riverDistance } from './geoIndex'
 import { coastDistanceAt, elevationAt, landFractionAt } from './geodata'
 import { coastSignedDistance } from './coastVector'
 import { lakeContains, lakeIndexAt } from './hydro'
-import { riverBedProfileAt } from './riverProfile'
+import { buildingProfile, riverBedProfileAt } from './riverProfile'
 import { fbm2 } from './noise'
 import { boundarySignedDistance, oceanSwimBlocked } from './redSea'
 import { LAND_POLYGONS } from './data/coastline'
@@ -432,13 +432,20 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
   const coastD = coastDistance(lat, lon)
   if (coastD < 0.6) {
     const t = coastD / 0.6
+    // Point 281: the low-land beach-plain clamp and the softened-cliff scaling
+    // used to switch HARD at 400 m elevation, so where the near-coast band
+    // crosses the 400 m contour the relief stepped (~1 unit) — visible as
+    // isolated notches on the settlement backdrop ridge. Blend the two across a
+    // band around 400 m instead, so the coast relief stays continuous.
+    const plainH = Math.min(height, 0.04 + coastD * 1.3 + detail * 0.06)
+    const cliffH = height * (0.45 + 0.55 * t) // real cliffs, just softened
+    const cliffT = sstep(340, 460, elevation)
+    height = plainH + (cliffH - plainH) * cliffT
+    // Beach tint / sand splat / coast type belong to the low plain side only.
     if (elevation < 400) {
-      height = Math.min(height, 0.04 + coastD * 1.3 + detail * 0.06)
       color = mix(biomeColor('coast', detail), color, sstep(0.08, 0.5, t))
       splat[0] += (1 - sstep(0.08, 0.4, t)) * 2
       if (coastD < 0.15) type = 'coast'
-    } else {
-      height = height * (0.45 + 0.55 * t) // real cliffs, just softened
     }
   }
 
@@ -484,13 +491,25 @@ export function sampleTerrain(lat: number, lon: number, seed: number): TerrainSa
     // Longitudinal bed smoothing (riverProfile.ts): the DEM profile along a
     // course is jagged, and the raw carve stairstepped bed and water sheet
     // down the current. Blend the channel toward the smoothed, monotone bed
-    // profile by the carve weight — full at the axis, easing to the local
-    // relief at the banks. Skipped near lakes (the basin-level carve above
-    // owns those beds) and while the profile itself is being built (the
-    // lookup returns null and the plain local carve is the raw bed).
+    // profile — full at the axis, easing to the local relief at the banks.
+    // Skipped near lakes (the basin-level carve above owns those beds).
     const pb = nearLake ? null : riverBedProfileAt(lat, lon, seed)
-    if (pb === null) height -= carve
-    else height += (pb - height) * (carve / 0.5)
+    if (pb === null) {
+      // During the profile build the lookup is suppressed and the plain local
+      // carve IS the raw bed the profile smooths. Outside the build a null means
+      // no river axis lies within reach, so the carve here is spurious — the
+      // range-1 riverD caps at 0.45° and cannot fade the far carve to zero, and
+      // subtracting it stepped the relief against the profile band's null
+      // boundary across the Cairo settlement backdrop (point 281). Leave it be.
+      if (buildingProfile()) height -= carve
+    } else {
+      // Fade the pull to zero at the band edge using the profile's OWN course
+      // distance (resolved out to COVER_DEG), so carve and profile vanish
+      // together instead of stepping where the capped riverD-driven carve
+      // outreaches the lookup (point 281).
+      const w = sstep(RIVER_WIDTH_DEG * 1.6, -RIVER_WIDTH_DEG * 0.6, pb.dist - RIVER_WIDTH_DEG)
+      height += (pb.bed - height) * w
+    }
   }
   if (type === 'water') {
     // Sandy bank fading into water-blue with channel depth; the river/lake
