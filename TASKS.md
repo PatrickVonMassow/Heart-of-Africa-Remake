@@ -10743,6 +10743,45 @@ the remaining open points in their numeric order.
   fresh-start check is unchanged). Docs: design.md §18 and CLAUDE.md §7.1 pt. 28
   carry the temporary-suspension note. Committed to main.
 
+- [ ] 285. HUNT ACCUMULATION BUGS AND MEMORY LEAKS — A REPEATABLE FABLE ANALYSIS
+  (user 24.07.2026, learning from point 278: a fixed anchor drew ever more animals
+  because streamed wildlife re-seeded on every return without releasing the
+  re-homed originals — an UNBOUNDED growth that a normal test never caught because
+  it only checks one moment, not a trend). Establish a proactive, REPEATABLE method
+  — like point 205 is for world plausibility — that finds this whole bug class
+  before the user does. Use MODEL DIVERSITY: a thorough FABLE analysis (different
+  eyes than the Opus authors, per the audit rule), delivered in TWO prongs.
+  PRONG A — CODE REVIEW for the leak/accumulation classes: resources created but
+  never disposed (three.js geometries/materials/textures/render targets, instanced
+  buffers — `renderer.info.memory` should be flat at a fixed state); growing
+  collections never pruned (module-level Map/Set/array caches, the `refineCache`/
+  `chunkLatestKey`/`spawnedChunks`-style maps, event/subscription registries);
+  streaming or respawn that re-adds without truncating the previous fill (the 278
+  class — re-seed keyed on distance while a re-homed entity outlives its key);
+  React effects whose cleanup is missing or wrong (listeners, RAF, timers,
+  observers); per-frame allocations that feed GC pressure. Produce a findings list,
+  each with the file/line and the mechanism.
+  PRONG B — RUNTIME TESTS that catch a TREND, not a moment: a reusable probe/harness
+  (build on `scripts/perf-breakdown.mjs` + the point-277 count probes) that drives
+  the real game over TIME — repeated jumps/round-trips between anchors, long driving,
+  repeated place enter/leave (scene mount/unmount) cycles — and asserts that the
+  measured quantities CONVERGE rather than grow: scene-graph triangle/mesh counts
+  per system, `renderer.info.memory.geometries`/`.textures`, `performance.memory`
+  JS heap (Chromium), instanced counts, and listener counts. A monotonic rise beyond
+  a small tolerance over N cycles is a finding. Make it a script that can be re-run
+  each release (a `scripts/verify/leaks.mjs` or a documented harness), on BOTH
+  backends where the metric is backend-relevant.
+  DELIVERABLE: the findings (evidence = the growth curve per finding), ranked by
+  severity; propose fixes. Land the clear, self-contained fixes as their own atomic
+  commits/points; file the larger ones as follow-up TASKS points. VERIFY each fix
+  the point-278 way — a pure convergence test that FAILS on the old behaviour and a
+  live trend check. DOCS: record the method and the run recipe (design.md where a
+  system changes, plus a short `docs/leak-hunt.md` or a section in
+  `docs/perf-276-findings.md`). This is analysis-first: diagnose and propose before
+  changing load-bearing streaming/render code. Budget the fan-out (per the
+  workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
+  harness. Implementation-ready.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
