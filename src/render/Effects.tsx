@@ -25,7 +25,7 @@ import { ao } from 'three/addons/tsl/display/GTAONode.js'
 import { bloom } from 'three/addons/tsl/display/BloomNode.js'
 import { traa } from 'three/addons/tsl/display/TRAANode.js'
 import { createEnvironmentTexture } from './environment'
-import { useUi } from '../state/ui'
+import { useUi, effectiveSsao, effectiveTraa, effectiveBloom } from '../state/ui'
 
 /** Sun direction used for the IBL texture (matches the scene suns closely). */
 const IBL_SUN: [number, number, number] = [0.5, 0.65, 0.36]
@@ -51,8 +51,14 @@ export function Effects() {
     }
   }, [scene])
 
-  const traaEnabled = useUi((s) => s.traaEnabled)
-  const ssaoEnabled = useUi((s) => s.ssaoEnabled)
+  // The effective render levers (design.md §21, F7 / point 276 part B): "Low
+  // Details" forces SSAO, TRAA and bloom off through these selectors without
+  // touching the player's own debug flags, so `lowDetails === false` rebuilds
+  // exactly today's pipeline. Post is the single biggest GPU lever on the user's
+  // real hardware (~38 %, point 277).
+  const traaEnabled = useUi(effectiveTraa)
+  const ssaoEnabled = useUi(effectiveSsao)
+  const bloomEnabled = useUi(effectiveBloom)
 
   const post = useMemo(() => {
     // The toggle rebuilds the whole pipeline, and three's RenderPipeline
@@ -144,10 +150,15 @@ export function Effects() {
       ).getTextureNode()
     }
 
-    // Bloom on bright highlights (sun glints, fire, snow).
-    const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
-    disposables.push(bloomNode)
-    const withBloom = composed.add(bloomNode)
+    // Bloom on bright highlights (sun glints, fire, snow). Off in Low Details
+    // (point 276): the pass is skipped entirely so it costs nothing on a weak
+    // GPU, and the composite passes the plain image straight through.
+    let withBloom = composed
+    if (bloomEnabled) {
+      const bloomNode = bloom(composed, 0.25, 0.35, 0.88)
+      disposables.push(bloomNode)
+      withBloom = composed.add(bloomNode)
+    }
 
     // Color grading: gentle saturation lift and warm highlights.
     const luma = withBloom.rgb.dot(vec3(0.2126, 0.7152, 0.0722))
