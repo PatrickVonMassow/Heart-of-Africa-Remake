@@ -1494,12 +1494,18 @@ const stream = await page.evaluate(async () => {
   setPos(p0.x + 36, p0.z)
   await window.__sleepSim(1)
   const survivesCross = hasMark('A')
-  // Move far past the zoom-1 despawn radius (~160 world units). The window is
-  // generous because this expectation LATCHES: waiting longer can never turn a
-  // real failure into a pass — only stop a slow despawn pass from reading as
-  // one. A 600-unit jump strands a great many animals at once, and this check
-  // was the single most frequent first-attempt failure of the whole suite
-  // (point 200) while the despawn itself was never in doubt.
+  // Move far past the zoom-1 despawn radius (~160 world units). This LATCHES,
+  // so a longer window can never turn a real failure into a pass. It used to be
+  // the suite's most frequent first-attempt failure and was long treated as a
+  // point-200 flake; point 282 proved it a PRODUCT bug on WebGL 2: the herd
+  // despawn filter ran only on a frame that DELETED a chunk, but the cull
+  // decision hinges on `isOnScreen`, which changes as the camera EASES to its
+  // target (0.12/frame). A large jump removes all the old chunks in one burst
+  // while the camera still looks at the old spot, so the stranded animals are
+  // kept by the on-screen backstop that frame; with no further chunk deletions
+  // the gate never re-ran the filter and they were never re-evaluated once the
+  // camera caught up. Wildlife now culls every frame, so the animal despawns the
+  // frame it falls off-screen — a modest window suffices.
   setPos(p0.x + 600, p0.z + 600)
   await window.__pollSim(20, () => !hasMark('A'))
   const goneWhenFar = !hasMark('A')
