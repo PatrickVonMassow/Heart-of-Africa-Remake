@@ -3,6 +3,8 @@
 // reaching the enter radius never enters on its own, and a water cell blocks it.
 import { describe, it, expect } from 'vitest'
 import { enterHintName, settlementEnterCandidate, settlementToEnter, shouldEnterSettlement, UNDISCOVERED_PLACE_LABEL, type EnterablePlace } from './settlementEntry'
+import { KNOWN_FROM_START_PLACES, PLACES as GEO_PLACES, latLonToWorld, placeById } from '../../world/geo'
+import { balance } from '../../config/balance'
 
 const PLACES: EnterablePlace[] = [
   { id: 'cairo', x: 0, z: 0 },
@@ -83,5 +85,39 @@ describe('settlementToEnter — the press-time decision at the LIVE position (de
 
   it('keeps the block gate: an open dialog or a finished run never enters', () => {
     expect(settlementToEnter(1, 0, PLACES, R, false, true)).toBeNull()
+  })
+})
+
+describe('the Giza monument site enters via the same Space pattern (point 273)', () => {
+  const ENTERABLE: EnterablePlace[] = GEO_PLACES.map((p) => {
+    const w = latLonToWorld(p.lat, p.lon)
+    return { id: p.id, x: w.x, z: w.z }
+  })
+  const RR = balance.placeEnterRadius
+  const world = (id: string) => {
+    const p = latLonToWorld(placeById(id).lat, placeById(id).lon)
+    return { x: p.x, z: p.z }
+  }
+
+  it('is a monument in the roster, discovered (known) from the start', () => {
+    expect(placeById('giza').kind).toBe('monument')
+    expect(KNOWN_FROM_START_PLACES).toContain('giza')
+  })
+
+  it('offers the Giza candidate within its enter radius and a Space press enters', () => {
+    const g = world('giza')
+    expect(settlementEnterCandidate(g.x, g.z, ENTERABLE, RR, false)).toBe('giza')
+    expect(settlementToEnter(g.x, g.z, ENTERABLE, RR, false, false)).toBe('giza')
+    // A water cell still blocks it, like every settlement (design.md §2.3).
+    expect(settlementEnterCandidate(g.x, g.z, ENTERABLE, RR, true)).toBeNull()
+  })
+
+  it('never collides with Cairo: standing at one never enters the other', () => {
+    const g = world('giza')
+    const c = world('cairo')
+    expect(settlementEnterCandidate(g.x, g.z, ENTERABLE, RR, false)).toBe('giza')
+    expect(settlementEnterCandidate(c.x, c.z, ENTERABLE, RR, false)).toBe('cairo')
+    // The two enter discs stay clear of each other (no ambiguous overlap).
+    expect(Math.hypot(g.x - c.x, g.z - c.z)).toBeGreaterThan(2 * RR)
   })
 })

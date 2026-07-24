@@ -45,6 +45,7 @@ const PLACES: Record<string, string> = {
   'pedi-village': 'Dorf der Pedi',
   'zulu-village': 'Dorf der Zulu',
   'san-village': 'Dorf der San',
+  giza: 'Die Pyramiden von Gizeh',
 }
 
 const PEOPLES: Record<string, string> = {

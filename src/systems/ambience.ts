@@ -3,13 +3,14 @@
 // no new dependencies. Layers crossfade on region and perspective changes.
 // The context starts on the first user gesture (browser autoplay policy).
 
-import type { RegionId } from '../world/geo'
+import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 
 export interface AmbienceScene {
   region: RegionId
   mode: 'travel' | 'place'
-  placeKind: 'port' | 'village' | null
+  /** null in travel; a monument uses the region's ambient bed (no bustle). */
+  placeKind: PlaceKind | null
   /** Travel mode: a village is close by (drums carry over, design.md §19). */
   nearVillage: boolean
 }

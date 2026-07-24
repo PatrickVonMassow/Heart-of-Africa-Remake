@@ -1272,9 +1272,10 @@ export const useGame = create<GameState>()((set, get) => ({
         'event',
         'harbor',
       )
-    } else if (first) {
+    } else if (first && place.kind === 'village') {
       // The first visit reads like the place (design.md §16): the entry is
-      // people-specific, drawn from the village's ~1890 way of life.
+      // people-specific, drawn from the village's ~1890 way of life. A monument
+      // site (point 273) has no people, so it never logs a village vignette.
       // The rinderpest years (design.md §16, point 133): the vignette reads
       // the PLAGUE PHASE of the visit date — a Maasai village met in 1890 and
       // one met in 1892 are different worlds.
