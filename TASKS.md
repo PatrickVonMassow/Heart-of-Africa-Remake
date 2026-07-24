@@ -7430,7 +7430,13 @@ the remaining open points in their numeric order.
   until ALL read values are stable. Speeds up every run ~15-20 s AND de-flakes.
   REMAINING drama flakes still rotating (cushioned by the retry, to root-cause
   for the closing's strict 3x gate): point-102 vicinity count, plover 145b,
-  calf-play, parent-guards-calf, the crocodile-spawn cluster.
+  calf-play, parent-guards-calf, the crocodile-spawn cluster. NEW SITES seen in
+  the 25.07 quiet-machine LARGE (point-309 re-validation): flow's FIRST
+  navigation `networkidle` wait times out on a cold dev server (failed twice in
+  the LARGE, then 31/31 green on an isolated retry — wait for the app's own
+  ready signal instead of networkidle); rotating one-off reds in enrichments:
+  the crocodile eye-knobs check (274), the STAGED parent-sacrifice calfFreed
+  flag, and the 121f drawn-predator (each red exactly once across two tries).
   PROGRESS 22.07: the lone-scavenger-185 landing is now DETERMINISTIC (commit
   f76dc3d) — before polling, remove other carcasses from its target pool + shove
   nearby live animals clear + commit the bird to the injected carcass. CLOSING
@@ -11331,6 +11337,25 @@ the remaining open points in their numeric order.
   backends at LOW; and a fresh F8 run (headless as smoke, the user's S25 as the real
   price check) shows a clearly lower LOW GPU median in the dressing-dominated savanna
   phases without a visual regression the user rejects.
+
+- [ ] 311. CALF-ESCAPE REGRESSION AFTER THE PARENT SACRIFICE (found 25.07.2026 by the
+  point-309 re-validation LARGE run; prime suspect: the point-262 orphan adoption,
+  merged 24.07 22:44 and never large-verified). The §19.8 sacrifice ending is broken
+  in the full LionHunt path: the parent is taken in the calf's place (parentDead
+  true, lionFed) but the freed calf never ESCAPES — the enrichments check "a real
+  hunt catches a calf, the parent sacrifices itself and the calf escapes" failed with
+  identical evidence in BOTH tries ({caughtSeen:true, catchEvidenced:true,
+  parentDead:true, calfDead:false, calfEscaped:false}). VERIFY the hypothesis FIRST:
+  the 262 adoption claims the just-freed calf immediately (nearest eligible adult),
+  so it walks to its adoptive parent instead of running the escape leg. Fix so BOTH
+  points hold together: a calf freed by the sacrifice runs its §19.8 escape to
+  completion BEFORE it becomes adoptable (adoption exclusion while the
+  hunt-resolution/escape window is active — calibratable, debug-editable), and the
+  adoption still recurs afterwards (262's delivered guarantee). VERIFIABLE: a pure
+  test in src/scenes/travel/wildlifeBehavior.test.ts pinning that a sacrifice-freed
+  calf is not adoption-eligible until its escape completes AND is adopted afterwards;
+  the staged and full-hunt sacrifice checks in enrichments green on both backends; no
+  other §19.8 ending regresses (every started drama still resolves — invariant I4).
 
 ## Closing (only after all points)
 
