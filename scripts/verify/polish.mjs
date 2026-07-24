@@ -12,6 +12,60 @@ const check = (name, ok, detail) => {
   if (!ok) failures++
 }
 
+/**
+ * Point 181: do the §2.5 panorama silhouettes stand on ground the frame really
+ * DRAWS under them, or hang in the sky?
+ *
+ * The old gate compared each silhouette's y with the EYE_HEIGHT constant it had
+ * just been placed at, so it passed for years while the picture showed animals
+ * dangling over the captured band (the user's Cairo pyramid screenshot). This
+ * one asks the rendered scene instead: stand the player on the silhouette's own
+ * bearing, then ray-probe its feet — the first surface behind them must be no
+ * further than the feet themselves. A floating silhouette finds nothing until
+ * the panorama band or the sky dome, far beyond, and fails loudly.
+ */
+const probeSilhouetteFooting = async (page, check, label) => {
+  const count = await page.evaluate(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length)
+  const rows = []
+  for (let i = 0; i < count; i++) {
+    const stood = await page.evaluate((idx) => {
+      const it = (window.__placePanoramaWildlifeInfo ?? {})[idx]
+      if (!it || !it.visible) return false
+      const p = window.__placePlayer
+      const r = (window.__placeLayout?.radius ?? 40) * 0.9
+      const d = Math.hypot(it.x, it.z) || 1
+      p.x = (it.x / d) * r
+      p.z = (it.z / d) * r
+      p.pitch = 0
+      p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
+      return true
+    }, i)
+    if (!stood) continue
+    // Let the camera follow the teleport before probing from it.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+    const row = await page.evaluate((idx) => {
+      const it = (window.__placePanoramaWildlifeInfo ?? {})[idx]
+      if (!it || !it.visible || !window.__placeRayHit) return null
+      const hit = window.__placeRayHit(it.x, it.y, it.z)
+      return {
+        ratio: hit.hitDistance == null ? Infinity : hit.hitDistance / hit.targetDistance,
+        name: hit.hitName ?? 'sky',
+      }
+    }, i)
+    if (row) rows.push(row)
+  }
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 0
+  })
+  check(
+    `${label}: every panorama silhouette's feet meet drawn ground (point 181)`,
+    rows.length >= 2 && rows.every((r) => r.ratio <= 1.05),
+    `surface behind the feet [${rows.map((r) => `${r.ratio.toFixed(2)}×@${r.name}`).join(', ')}]`,
+  )
+}
+
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
@@ -108,18 +162,17 @@ await page.waitForTimeout(500)
 await page.waitForFunction(() => (window.__placePanoramaWildlife ?? 0) >= 3, null, { timeout: 20000 }).catch(() => {})
 const wildlife = await page.evaluate(() => window.__placePanoramaWildlife ?? 0)
 check('distant wildlife drifts through the panorama', wildlife >= 3, `${wildlife} animals`)
-// No silhouette may stand sunken behind the ground disc's false horizon
-// (user-reported black back-slivers): without a live capture the standing
-// height is clamped to the disc plane. Points 92/94: every silhouette also
-// stays SMALL (bounded subtended angle) and HAZED toward the sky (not a flat
-// near-black blob).
+// Points 92/94: every silhouette stays SMALL (bounded subtended angle) and
+// HAZED toward the sky (not a flat near-black blob), and its feet meet ground
+// the frame draws (point 181) rather than the horizon-at-infinity constant.
 await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 10000 }).catch(() => {})
 const wInfo = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
 check(
-  'no panorama silhouette sinks below the settlement ground plane',
-  wInfo.length >= 3 && wInfo.every((w) => w.y >= 0),
-  `y [${wInfo.map((w) => w.y.toFixed(2)).join(', ')}]`,
+  'every panorama silhouette sits on the ground line it was placed on',
+  wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY && w.y <= w.visibleY + 0.2),
+  `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}`).join(', ')}]`,
 )
+await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 check(
   'every panorama silhouette reads small (bounded subtended angle, point 94)',
   wInfo.length >= 3 && wInfo.every((w) => w.apparentDeg <= 2.6),
@@ -430,17 +483,14 @@ if (mosque) {
     fractions: window.__placePanorama?.waterFractions ?? null,
   }))
   check('entering from the travel scene shows the captured panorama', pano.active === true, JSON.stringify(pano))
-  // Point 92: with a capture active the visible horizon is the band cylinder,
-  // whose horizon line sits at EYE_HEIGHT (1.5). The silhouettes must stand ON
-  // that visible line — not hovering above it and not sunk below into black
-  // clipped slivers. So every y sits close to the horizon (feet just below).
+  // Points 92/181: with a capture active the silhouettes must still stand on
+  // DRAWN ground. Anchoring them to the band's horizon-at-infinity (a hard
+  // EYE_HEIGHT constant) put nothing under their feet — the town's ground disc
+  // and the backdrop relief end below that line and the band showed through the
+  // gap, so the animals hung in the sky. The ray probe measures the rendered
+  // scene, which the old |y − EYE_HEIGHT| comparison never could.
   await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 15000 }).catch(() => {})
-  const capW = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
-  check(
-    'with a capture active, silhouettes stand on the visible horizon line (point 92)',
-    capW.length >= 3 && capW.every((w) => Math.abs(w.y - w.visibleY) < 1.0 && w.y <= w.visibleY + 0.2),
-    `y vs horizon [${capW.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}`).join(', ')}]`,
-  )
+  await probeSilhouetteFooting(page, check, 'nubian-village (capture active)')
   const f = pano.fractions
   // The Nile must show as a clearly DIRECTIONAL water signal: real water
   // pixels overall, concentrated in some sectors while others stay dry
@@ -498,6 +548,49 @@ if (mosque) {
     westProbe > 200 && eastProbe < westProbe / 10,
     `west ${westProbe}px, east ${eastProbe}px`,
   )
+}
+
+// --- Silhouette footing in Cairo, capture active (point 181) -------------------
+// The REPORTED case: Cairo carries the Giza skyline and its captured band shows
+// the pyramids and the Nile below the horizon line, so a silhouette anchored to
+// that line hung in the sky over a pyramid flank. Re-enter Cairo out of the
+// travel scene — the only way to get a live capture — and probe the footing.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
+  await page.evaluate(() => window.__game.getState().debugJumpTo(30.05, 31.55)) // Cairo's approach ring
+  await page.waitForFunction(() => window.__placePanorama?.placeId === 'cairo', null, { timeout: 60000 }).catch(() => {})
+  await page.evaluate(() => window.__game.getState().enterPlace('cairo'))
+  await page.waitForFunction(() => window.__game.getState().placeId === 'cairo' && !!window.__placePlayer, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(2500)
+  const capActive = await page.evaluate(() => window.__placePanoramaActive ?? false)
+  check('re-entering Cairo from the travel scene shows the captured band', capActive === true, `active ${capActive}`)
+  await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 15000 }).catch(() => {})
+  await probeSilhouetteFooting(page, check, 'cairo (capture active, Giza skyline)')
+  // Human-viewable evidence: aim at a silhouette and shoot it against the band.
+  await page.evaluate(() => {
+    const it = Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible)[0]
+    if (!it) return
+    const p = window.__placePlayer
+    const r = (window.__placeLayout?.radius ?? 40) * 0.9
+    const d = Math.hypot(it.x, it.z) || 1
+    p.x = (it.x / d) * r
+    p.z = (it.z / d) * r
+    p.pitch = 0
+    p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
+  })
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: `${OUT}136-cairo-silhouette-footing.png` })
+  console.log('shot 136-cairo-silhouette-footing.png')
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 0
+  })
 }
 
 // --- Settlement fabric per plan (design.md §2.6/§4.5) -------------------------

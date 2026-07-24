@@ -1,15 +1,17 @@
-// Panorama backdrop geometry (design.md §2.5, CLAUDE.md §7.1 pt. 15): the
+// Panorama backdrop geometry (design.md §2.5, CLAUDE.md §7.1 pt. 15/31): the
 // annulus heightfield formula and the panorama-wildlife standing height.
-// Guards the user-reported artifact where silhouettes standing on the sunken
-// inner plain (y ≈ -2) were horizon-clipped by the settlement's ground disc
-// to flat black back-slivers "lying on the sand".
+// Guards both reported artifacts at the settlement horizon — silhouettes on the
+// sunken inner plain horizon-clipped by the ground disc to flat black
+// back-slivers "lying on the sand", and (point 181) silhouettes anchored to the
+// horizon at infinity with nothing at all under their feet.
 import { describe, it, expect, beforeAll } from 'vitest'
 import * as THREE from 'three/webgpu'
 import {
   backdropBase,
   backdropHeightAt,
   backdropTaper,
-  panoramaGroundY,
+  discHorizonY,
+  panoramaStandY,
   BACKDROP_DISC_OVERLAP,
   BACKDROP_MAX_SLOPE,
   BACKDROP_OUTER,
@@ -132,33 +134,82 @@ describe('backdrop material (design.md §2.5 smooth shading)', () => {
   })
 })
 
-describe('panorama-wildlife standing height (user-reported black slivers)', () => {
-  it('clamps a silhouette on the sunken plain to just above the disc plane', () => {
+describe('panorama-wildlife standing height (design.md §2.5, point 181)', () => {
+  const EYE = 1.5
+
+  it('puts the ground line exactly on the sight line over the disc edge', () => {
+    const discR = 62
+    // From the centre, a point twice the disc radius out lies one eye height
+    // below the plate — the straight continuation of the grazing sight line.
+    expect(discHorizonY(discR * 2, 0, 0, 0, EYE, discR)).toBeCloseTo(-EYE, 6)
+    expect(discHorizonY(0, discR * 3, 0, 0, EYE, discR)).toBeCloseTo(-2 * EYE, 6)
+    // On the edge itself the line is the disc plane, and inside it is above.
+    expect(discHorizonY(discR, 0, 0, 0, EYE, discR)).toBeCloseTo(0, 6)
+    expect(discHorizonY(discR / 2, 0, 0, 0, EYE, discR)).toBeCloseTo(EYE / 2, 6)
+  })
+
+  it('drops the ground line as the viewer walks toward the silhouette', () => {
+    const discR = 62
+    const far = discHorizonY(130, 0, 0, 0, EYE, discR)
+    const nearer = discHorizonY(130, 0, 40, 0, EYE, discR)
+    const nearest = discHorizonY(130, 0, 55, 0, EYE, discR)
+    // The disc edge is CLOSE from the town's rim, so its horizon falls away
+    // much faster there — a fixed anchor cannot serve both viewpoints.
+    expect(nearer).toBeLessThan(far)
+    expect(nearest).toBeLessThan(nearer)
+  })
+
+  it('stands a silhouette on drawn ground all round Cairo, never on the horizon constant', () => {
     const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
-    // Sweep the wildlife band (r0+14 .. r0+28): wherever the raw backdrop
-    // height is below the ground disc, the standing height clamps to 0.02;
-    // where the relief genuinely rises it is followed unchanged.
-    let clamped = 0
-    let followed = 0
+    // What the anchor used to be: the band's horizon at infinity.
+    const OLD_ANCHOR = EYE - 0.4
+    let onLine = 0
+    let onRelief = 0
+    let floated = 0
+    let buried = 0
     for (let i = 0; i < 48; i++) {
       const a = (i / 48) * Math.PI * 2
       const r = r0 + 14 + (i % 3) * 7
       const x = Math.cos(a) * r
       const z = Math.sin(a) * r
       const raw = backdropHeightAt(x, z, lat, lon, SEED, centerH, r0)
-      const y = panoramaGroundY(x, z, lat, lon, SEED, centerH, r0)
-      expect(y).toBeGreaterThanOrEqual(0.02)
-      if (raw < 0.02) {
-        expect(y).toBe(0.02)
-        clamped++
-      } else {
-        expect(y).toBe(raw)
-        followed++
-      }
+      const line = discHorizonY(x, z, 0, 0, EYE, r0 + BACKDROP_DISC_OVERLAP)
+      const y = panoramaStandY(x, z, lat, lon, SEED, centerH, r0, 0, 0, EYE)
+      // Never below the drawn ground line (no horizon-clipped black sliver)
+      // and never above the relief it stands on plus that line.
+      expect(y).toBe(Math.max(raw, line))
+      expect(y).toBeGreaterThanOrEqual(line)
+      if (y === line) onLine++
+      else onRelief++
+      // The regression witnesses: the old constant anchor stood ABOVE the
+      // last drawn surface over the sunken plain (feet on nothing — the
+      // float) and BELOW the relief where the ground rises (buried inside a
+      // dune). It was never ON the drawn ground.
+      if (OLD_ANCHOR > y) floated++
+      if (OLD_ANCHOR < y) buried++
     }
-    // Cairo's flat delta surroundings must exercise the clamp; its dunes the
-    // relief-following branch — both paths are real, not vacuous.
-    expect(clamped).toBeGreaterThan(0)
-    expect(followed).toBeGreaterThan(0)
+    // Cairo's sunken delta plain must exercise the ground-line branch, its
+    // dunes the relief branch — both paths are real, not vacuous.
+    expect(onLine).toBeGreaterThan(0)
+    expect(onRelief).toBeGreaterThan(0)
+    expect(floated).toBeGreaterThan(0)
+    expect(buried).toBeGreaterThan(0)
+  })
+
+  it('follows a rising dune instead of burying the silhouette inside it', () => {
+    const { lat, lon, centerH, r0 } = placeParams('cairo', 48)
+    let checked = 0
+    for (let i = 0; i < 96; i++) {
+      const a = (i / 96) * Math.PI * 2
+      const r = r0 + 20
+      const x = Math.cos(a) * r
+      const z = Math.sin(a) * r
+      const raw = backdropHeightAt(x, z, lat, lon, SEED, centerH, r0)
+      if (raw <= 0.5) continue
+      const y = panoramaStandY(x, z, lat, lon, SEED, centerH, r0, 0, 0, EYE)
+      expect(y).toBe(raw) // ON the dune, not sunk into it
+      checked++
+    }
+    expect(checked).toBeGreaterThan(0)
   })
 })

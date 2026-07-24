@@ -40,7 +40,7 @@ import {
   BACKDROP_SEGS,
   backdropBase,
   backdropTaper,
-  panoramaGroundY,
+  panoramaStandY,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
 import { mulberry32 } from '../../world/noise'
@@ -1177,6 +1177,7 @@ function PanoramaWildlife({
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
         geo: geos[gi],
         material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
+        worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
         hazeLum: luminance(rgb),
         phase: rand() * Math.PI * 2,
@@ -1188,7 +1189,6 @@ function PanoramaWildlife({
     [items],
   )
   const refs = useRef<Array<THREE.Group | null>>([])
-  const capture = useFreshPanoramaCapture(placeId, seed)
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1203,17 +1203,8 @@ function PanoramaWildlife({
     }
   }, [items, exclusionSpans])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera }) => {
     const t = clock.elapsedTime
-    // With a capture active the visible horizon IS the captured band cylinder,
-    // whose horizon line sits at EYE_HEIGHT by construction (TravelPanorama's
-    // v-mapping). Standing on the geometry heightfield (panoramaGroundY)
-    // disagreed with it — the silhouettes hovered above or sank below into
-    // black clipped slivers (points 73/92). So place the feet on that visible
-    // horizon line (minus a small sink) whenever a capture stands; without one
-    // (snapshot/ferry) the geometry backdrop is the horizon, so keep the clamp.
-    const captureActive = !!capture
-    const horizonY = EYE_HEIGHT - pw.sinkEpsilon
     items.forEach((it, i) => {
       const g = refs.current[i]
       if (!g) return
@@ -1225,17 +1216,22 @@ function PanoramaWildlife({
       g.visible = !hidden
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
-      const groundY = captureActive
-        ? horizonY
-        : panoramaGroundY(x, z, lat, lon, seed, centerH, innerRadius)
+      // Point 181: the feet go on the ground the frame DRAWS under them — the
+      // higher of this spot's relief and the ground line over the town's disc
+      // edge, seen from the live camera — never the hard EYE_HEIGHT horizon at
+      // infinity, which left them hanging over the captured band's content.
+      const groundY =
+        panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
+        pw.sinkEpsilon
       const y = groundY + Math.abs(Math.sin(t * 1.1 + it.phase)) * 0.12
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
-        // y vs the visible horizon line (EYE_HEIGHT); the apparent size and the
-        // hazed luminance for the point-92/94 live gates; azimuth/visible for
-        // the point-102 skyline-exclusion gate.
-        info[i] = { y, visibleY: captureActive ? EYE_HEIGHT : groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden }
+        // y vs the ground line it stands on; the apparent size and the hazed
+        // luminance for the point-92/94 live gates; azimuth/visible for the
+        // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
+        // which ray-probes the surface drawn behind the feet.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, radius: it.radius, worldHeight: it.worldHeight }
       }
       g.position.set(x, y, z)
       // Face the drift direction along the ring tangent.
@@ -1253,7 +1249,7 @@ function PanoramaWildlife({
             refs.current[i] = el
           }}
         >
-          <mesh geometry={it.geo} material={it.material} />
+          <mesh name="panorama-silhouette" geometry={it.geo} material={it.material} />
         </group>
       ))}
     </>
@@ -1471,6 +1467,7 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
 
 export function PlaceScene() {
   const camera = useThree((s) => s.camera)
+  const r3fScene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
   const placeId = useGame((s) => s.placeId)
   const seed = useGame((s) => s.seed)
@@ -1593,6 +1590,22 @@ export function PlaceScene() {
     w.__placeLayout = layout
     w.__placeColliders = layout?.colliders
     w.__placeCamera = camera
+    w.__placeScene = r3fScene
+    // Ray probe for the §2.5 silhouette gate: what surface does the frame
+    // actually draw at a world point, and how far away is it? Excludes the
+    // silhouettes themselves so a float reports the surface BEHIND them.
+    w.__placeRayHit = (x: number, y: number, z: number) => {
+      const target = new THREE.Vector3(x, y, z)
+      const dir = target.clone().sub(camera.position).normalize()
+      const rc = new THREE.Raycaster(camera.position.clone(), dir, 0.1, 4000)
+      const hits = rc.intersectObject(r3fScene, true)
+      const hit = hits.find((h) => h.object.name !== 'panorama-silhouette' && (h.object as THREE.Mesh).visible)
+      return {
+        targetDistance: target.distanceTo(camera.position),
+        hitDistance: hit ? hit.distance : null,
+        hitName: hit ? hit.object.name || (hit.object as THREE.Mesh).geometry?.type || 'mesh' : null,
+      }
+    }
     w.__placeSeason = () => ({
       wetness: placeWetness.current,
       sun: sunRef.current?.intensity ?? 0,
@@ -1618,8 +1631,10 @@ export function PlaceScene() {
       delete w.__placeLayout
       delete w.__placeColliders
       delete w.__placeCamera
+      delete w.__placeScene
+      delete w.__placeRayHit
     }
-  }, [layout, camera, fireBlaze, place])
+  }, [layout, camera, r3fScene, fireBlaze, place])
 
   // Focus + mouse-look. On entering a settlement any lingering HUD button is
   // blurred so keyboard input goes straight to the game without an extra click
