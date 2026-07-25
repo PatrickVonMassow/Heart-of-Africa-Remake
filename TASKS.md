@@ -11121,7 +11121,28 @@ the remaining open points in their numeric order.
   the future walkable Giza pyramids (point 273), adjacent ports/villages — else entry is
   ambiguous. Enforce a GLOBAL pure test that every pair of enter-radii is disjoint (place
   positions / clamp radii so they never intersect); point 273 already proves its Giza disc
-  non-overlapping with Cairo — generalise that to ALL places. ANCHORS: the bird's-eye collision
+  non-overlapping with Cairo — generalise that to ALL places.
+  THE COLLIDER MUST NEVER TRAP THE TRAVELLER — the failure this point would otherwise
+  CREATE (user 25.07.2026). Several paths put him at a place's exact centre, which is
+  INSIDE the new footprint: the debug jump-to (`debugJumpTo` in `src/state/store.ts`,
+  reached from every named map point in the §21.3 picker) lands on the map point itself,
+  and a resumed snapshot or a successor start restores a position that was recorded at a
+  port. Before Space-only entry, walking out simply re-entered the settlement; with a
+  collider and no automatic entry, he would stand inside a wall he cannot cross. TWO
+  RULES, both required:
+  (1) THE COLLIDER IS ONE-WAY. It blocks CROSSING IN, never getting OUT. A traveller who
+  is already inside the footprint — however he got there — may always move freely to the
+  outside. This is the general invariant and it covers every future teleport nobody has
+  thought of yet, including a save written by an older build.
+  (2) A JUMP LANDS OUTSIDE. `debugJumpTo` (and any other deliberate teleport to a place)
+  sets him just OUTSIDE the footprint but INSIDE the enter radius, facing the place, so
+  the intended next action — press Space — is immediately available. Jumping to a
+  non-place target (a mountain, the graveyard, the tomb) is unchanged.
+  VERIFIABLE additionally: pure — a step from inside the footprint toward the outside is
+  NOT blocked while a step from outside toward the inside is; the jump-to resolver
+  returns a point outside the collision radius, inside the enter radius, for every place
+  in the roster; live — jumping to a village leaves the traveller free to walk away AND
+  able to enter with Space. ANCHORS: the bird's-eye collision
   (`src/systems/movement.ts` / the travel-scene collider set that already handles trees/animals),
   `src/scenes/travel/settlementEntry.ts` (enter radius + the collision-radius relation), the
   world/place roster (positions + radii). VERIFIABLE: pure tests that the settlement collision
@@ -12619,6 +12640,71 @@ the remaining open points in their numeric order.
   shadows off, not the raw field), `?quality=high` likewise, and no console errors.
   DOCS: design.md §21.1 already states it; name the parameter in the README's play
   links if that file lists them, so the shareable form is discoverable.
+
+- [ ] 348. THE VILLAGE FIRE IN THE RAIN (user 25.07.2026, screenshot: the Zulu village
+  under visible rain, the §19.10 fire burning uncovered in the open with the
+  inhabitants standing around it as if the weather were not happening). Point 142
+  already made the fire answer to a place's own COLD, harmattan and karif; RAIN is the
+  driver it never got, and rain is the one that contradicts the picture outright — an
+  open fire in the open does not burn through a downpour.
+  RESEARCH FIRST, then build — this is a people question, not a graphics question.
+  Establish from `docs/peoples-1890.md` (extending it where it is silent) where each
+  people's cooking fire actually SAT around 1890: a hearth inside the dwelling, a
+  roofed cooking shelter beside it, or an open yard fire. The Zulu case in the
+  screenshot is the likely "hearth inside the hut" reading, but it must be confirmed
+  rather than assumed, and the answer will differ by people.
+  THEN THE BEHAVIOUR, decided per people from that evidence — the §19.13 dress rule is
+  the model to follow (six peoples change their dress on real evidence, sixteen do not;
+  a blanket rule for all would be the invention this project refuses): under rain past
+  a calibratable intensity, a village either shelters its fire under a structure that
+  people REALLY built there, or the yard fire is out and the life vignette moves under
+  cover — inhabitants inside or under the eaves, the fire relit when the rain passes.
+  DO NOT put a generic canopy over every village fire. A shelter that no one there
+  built is the same class of error as a garment no one there wore.
+  KEEP: the point-142 cold/harmattan/karif behaviour, and the §19.10 vignette's normal
+  dry-weather life, entirely unchanged.
+  DOCS in the same commit: design.md §19.10 and §19.13 gain the rain driver;
+  `docs/peoples-1890.md` gains the hearth/shelter evidence AND its implementation
+  section is updated in the same commit (the standing rule that research and the game
+  table never drift apart).
+  VERIFIABLE: pure — every people in the roster has a DECIDED rain behaviour (the sweep
+  fails on a people nobody decided about, exactly as the dress sweep does); the rain
+  threshold is a calibratable, debug-editable value and the transition is deterministic;
+  a village whose people keep an indoor hearth shows no yard fire under rain, and lights
+  it again when the rain stops. Live (`scripts/verify/polish.mjs`, BOTH backends,
+  screenshot): the Zulu village forced into heavy rain shows the decided state rather
+  than an uncovered burning fire, and the same village in dry weather is unchanged from
+  today.
+
+- [ ] 349. THE ROOF CLIPS THE CAMERA UNDER THE EAVES (user 25.07.2026, screenshot from
+  the Zulu village: standing under a hut's overhanging roof, the near plane cuts into
+  the roof — the underside fills the view with a hard horizontal edge and open sky
+  above it). The §2.6 clearance rule (§7.1 point 16) was written for WALLS: "pressing
+  against a building must never show its inside", and the collider is the wall body.
+  The OVERHANG is the gap — it reaches out over ground the player may legitimately
+  stand on, and at the 1.5 m eye height the roof underside can sit below the camera's
+  near plane.
+  DO NOT FIX IT BY FENCING THE EAVES OFF. Standing under an overhang out of the rain is
+  exactly what an eave is for, and point 348 may well want the inhabitants there.
+  TARGET — the same kind of invariant the walls already have, extended upward: over
+  EVERY spot the player can stand, the lowest roof surface above him clears the eye
+  height plus the camera's near plane plus a margin. Where a roof's outer rim is lower
+  than that, either the rim is raised or the collider is extended so that the low strip
+  is not standable — decided per building type, and the roofs that read right today
+  must not be reshaped for it.
+  CHECK THE SURFACE ITSELF WHILE THERE: a roof seen from below must be a real surface,
+  not a back face one can see through. If any roof is single-sided, give it an inner
+  face or render it double-sided.
+  ANCHORS: the hut/roof builders and the collider set in `src/scenes/place/` (the
+  layout and collision modules that already pin door reachability and window
+  clearance), and the eye height / near plane in the first-person camera setup.
+  VERIFIABLE: pure (`src/scenes/place/layout.test.ts` or the collision test beside it) —
+  for every place, every building type and several seeds, the minimum roof-underside
+  height over the standable area is at least eye height + near plane + margin; a
+  deliberately lowered rim FAILS the test (the regression witness). Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the player walked to the
+  eaves of a hut in a village AND in a port sees the roof from below as a solid
+  surface, with no sky wedge and no view into the interior; no console errors.
 
 ## Closing (only after all points)
 
