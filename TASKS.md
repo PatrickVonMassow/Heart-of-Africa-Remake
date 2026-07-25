@@ -11462,6 +11462,57 @@ the remaining open points in their numeric order.
   along the coast and gets out alive (enrichments, both backends); the §11.2/redSea
   suite stays green.
 
+- [ ] 317. ENTER-HINT POSITION: SLIGHTLY BELOW SCREEN CENTRE (user 25.07.2026 with
+  screenshot markup). The "Space to enter <name>" hint currently sits at the bottom
+  above the inventory bar; the user wants it a little BELOW the screen centre —
+  close enough to the action to be seen, with enough clearance to the centre that
+  it never blocks the view of the traveller (marked position ≈ 58-62 % of the
+  viewport height). Move the hint's anchor accordingly (CSS positioning of the
+  enter-hint element only — the centred status-bar hints of §17.1 are untouched);
+  both languages unaffected (text unchanged). VERIFIABLE: a live check asserts the
+  hint's bounding-box centre sits in the 55-65 % viewport-height band and clears
+  both the status bar and the inventory bar (flow.mjs or enrichments where the
+  enter hint is already exercised); screenshot on both backends.
+
+- [ ] 318. KIND-AWARE "UNKNOWN" LABELS INSTEAD OF A BARE "?" (user 25.07.2026). An
+  undiscovered place currently labels as "?" on the travel map and in the enter
+  hint; the user wants a meaningful placeholder like "unknown village". Replace the
+  bare "?" with LOCALIZED, kind-aware placeholders from the language files (§17.7):
+  e.g. en "Unknown village" / de "Unbekanntes Dorf" for settlements, and the
+  analogous kind terms for the other discovery-gated map points (mountain,
+  waterfall, lake, cultural landmark, natural site — "Unknown mountain"/
+  "Unbekannter Berg", …). Ports are known from the start and never show a
+  placeholder (§17.2/point 288 unchanged); discovery behaviour itself is unchanged
+  — only the placeholder TEXT. Update design.md §17.2/§3.2 and the CLAUDE.md §7.1
+  acceptance wording (points 2 and 3 currently pin the literal "?") IN THE SAME
+  commit, plus every test that asserts the literal "?" (settlementEntry pure tests,
+  the flow.mjs live check, the enrichments `.map-label` assertions). VERIFIABLE:
+  the updated pure tests pin the localized placeholder per kind in BOTH languages
+  (i18n.test.ts covers the new keys); flow.mjs live-checks an undiscovered village
+  hinting "Space to enter Unknown village" while Cairo names itself; enrichments
+  asserts an undiscovered `.map-label` reads the placeholder, a discovered one its
+  name; both backends.
+
+- [ ] 319. CROCODILE KILL AFTERMATH: PREY DISSOLVES WITHOUT SINK OR VISIBLE SCAVENGER
+  (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
+  point, and the prey then kept slowly dissolving — possibly "eaten" with no vulture
+  visible). Per §19.16 a crocodile KILL must SINK — the river keeps the body, no
+  bank carcass, no vulture; a slow in-place dissolve with no visible actor matches
+  NO legitimate path. INVESTIGATE the victim's state machine after the croc leaves:
+  every crocodile exit path (kill → sink; grip-deadline release → victim freed
+  ALIVE; croc streamed out by the view ring mid-drama) must leave the victim in a
+  consistent, VISIBLE state — either sinking (kill) or alive and walking (release);
+  the carcass-shrink animation must only ever run with a visible feeding/scavenging
+  actor present (lion feed, vulture flock, ground scavenger), never as an invisible
+  decay. Likely suspects to check: the caught victim being handed to the ordinary
+  land-carcass system when the grip ends instead of the sink path, and the shrink
+  timer running detached from any feeder. VERIFIABLE: pure tests over the croc exit
+  paths (kill/sink, deadline-release/alive, ring-despawn — victim state asserted
+  for each); an enrichments stage reproducing the reported sequence (catch → croc
+  leaves → victim must either sink or stand up, and NO shrink without an actor —
+  add a dev-assert for "shrinking carcass has no feeder" so every session detects
+  it); both backends.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
