@@ -12818,15 +12818,32 @@ the remaining open points in their numeric order.
   A BY-PRODUCT worth noting in the commit: pursue-and-evade with stamina is reusable — a
   goat bolting from someone, a dog in a port — so keep it a helper rather than burying it
   in the children.
-  BUILT UNDER FOUR EYES (user 25.07.2026), all three stages: the PLAN is reviewed by the
-  second model before any code is written, the IMPLEMENTATION and the TESTS are reviewed
-  after. The test review is explicitly ADVERSARIAL ABOUT COVERAGE — its question is not
-  "are these tests right" but "which state combination has no test at all", because the
-  risk here is rare interactions rather than wrong arithmetic. Several interacting
-  continuous quantities (reserve, curve, two thresholds, pressure distance, immunity
-  window) plus a role that moves between figures is precisely the shape in which rare
-  states hide.
-  THE EDGE CASES THE REVIEW MUST CONFIRM ARE COVERED, at minimum: a child caught WHILE
+  BUILT UNDER FOUR EYES (user 25.07.2026): the PLAN is reviewed by the second model
+  before any code is written, and the IMPLEMENTATION is reviewed after. Several
+  interacting continuous quantities (reserve, curve, two thresholds, pressure distance,
+  immunity window) plus a role that moves between figures is precisely the shape in
+  which rare states hide.
+  THE TEST SCENARIOS ARE DESIGNED TWICE, INDEPENDENTLY, AND THEN UNITED (user
+  25.07.2026) — not written by one model and reviewed by the other. A reviewer handed a
+  finished list checks THAT LIST; it anchors on what it is shown and produces far less
+  than it would have from a blank page. So:
+  (a) Each model designs its OWN complete set of test scenarios from the same inputs —
+  this specification and the code anchors — and each set is written to its author's own
+  standard of completeness, as if it were the only one.
+  (b) Neither sees the other's set, or any hint of it, until both are finished. A set
+  produced after glimpsing the other is not an independent set and must be discarded.
+  (c) The two sets are then merged into a UNION with duplicates removed. Deduplication
+  is by MEANING, not by wording — two scenarios describing the same state in different
+  words are one — and where it is genuinely unclear whether one subsumes the other, BOTH
+  are kept. Erring toward keeping is cheap; erring toward merging loses exactly the rare
+  case this method exists to find.
+  (d) A scenario that only ONE model thought of is the most valuable item in the whole
+  set. Those are marked as such in the merged list rather than buried, and none may be
+  dropped for being unusual — being unusual is the point.
+  (e) The scenarios in the union are then implemented as the tests.
+  THE EDGE CASES BELOW ARE A FLOOR, NOT THE SET. They are already known, so both models
+  start from them — but a set that merely restates them has added nothing, and each set
+  is judged by what it contributes BEYOND this floor: a child caught WHILE
   recovering; a catch landing exactly on the immunity boundary; two catches resolving in
   the same frame; the group shrinking to two, and to ONE — the transhumant villages of
   point 142 thin seasonally, so the player count genuinely changes with the calendar and
