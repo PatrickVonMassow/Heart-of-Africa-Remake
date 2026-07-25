@@ -110,7 +110,18 @@ export function regionBorderLabelAnchors(
   return out
 }
 
-export type PlaceKind = 'port' | 'village' | 'monument'
+/**
+ * Every kind of enterable place, as a VALUE list the `PlaceKind` union is
+ * derived from (point 335). Rules that must hold for all of them — the §2.5
+ * panorama gates are the reported case — key off this list or a
+ * `Record<PlaceKind, …>`, so a fourth kind cannot be added without deciding
+ * about it: the compiler and the kind sweeps in the tests both fail until it
+ * is entered. The monument site slipped in as a late third kind exactly that
+ * way, which is what point 335 had to rule out first.
+ */
+export const PLACE_KINDS = ['port', 'village', 'monument'] as const
+
+export type PlaceKind = (typeof PLACE_KINDS)[number]
 
 export interface PlaceDef {
   /** Place id; display names come from the language files (i18n). */

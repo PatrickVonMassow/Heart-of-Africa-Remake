@@ -13,7 +13,12 @@ import {
   bandHeightAt,
   chunkIdAt,
   panoramaCaptureReady,
+  panoramaCaptureFar,
+  panoramaBandShown,
+  PANORAMA_BAND_BY_KIND,
+  PANORAMA_CHUNK_RADIUS,
 } from './panoramaMath'
+import { PLACE_KINDS, placeById } from '../../world/geo'
 
 describe('sector sweep (N → E → S → W)', () => {
   it('four 90° sectors close the circle', () => {
@@ -99,6 +104,82 @@ describe('panorama capture gate (point 227: no capture before the terrain is com
     const committed = new Set(['0,0'])
     expect(panoramaCaptureReady(committed, 23.999, 0, CHUNK)).toBe(true)
     expect(panoramaCaptureReady(committed, 24, 0, CHUNK)).toBe(false)
+  })
+})
+
+// --- Point 335: the grey/silver horizon strip on the Giza monument site ------
+// The band the place scene drew carried a hard, flat grey line ABOVE its own
+// horizon, with the geometry backdrop's relief showing through the transparent
+// gap over and under it. Cause: the capture camera's far plane (900 wu) looked
+// far past the streamed terrain window (CHUNK_RADIUS chunks around the
+// traveller), and the sea plane, river ribbons and lake sheets carry no such
+// bound — so they baked into the band FLOATING, with no ground behind them.
+// Point 227 had fixed the same class in TIME (the centre chunk must be
+// committed); this is its SPATIAL half, plus the ring the centre chunk alone
+// left unguarded.
+describe('panorama capture reach (point 335)', () => {
+  const CHUNK = 24
+  /** Every chunk id within Chebyshev `r` of (cx, cz). */
+  const ring = (cx: number, cz: number, r: number) => {
+    const s = new Set<string>()
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) s.add(`${cx + dx},${cz + dz}`)
+    return s
+  }
+
+  it('the far plane never reaches past the committed ring', () => {
+    expect(panoramaCaptureFar(PANORAMA_CHUNK_RADIUS, CHUNK)).toBe(PANORAMA_CHUNK_RADIUS * CHUNK)
+    // The reported failure: 900 wu of reach over a 5-chunk (120 wu) window —
+    // 780 wu of it showing unbounded water sheets with no terrain behind them.
+    expect(panoramaCaptureFar(PANORAMA_CHUNK_RADIUS, CHUNK)).toBeLessThan(900)
+    expect(panoramaCaptureFar(0, CHUNK)).toBeGreaterThan(0) // never a degenerate camera
+  })
+
+  it('stays inside the travel scene\'s own streaming window', () => {
+    // CHUNK_RADIUS in TravelScene is 6 and centred on the TRAVELLER, while the
+    // capture point sits up to one chunk away — so the required ring must be
+    // strictly smaller, or the gate could never be satisfied.
+    expect(PANORAMA_CHUNK_RADIUS).toBeLessThan(6)
+  })
+
+  it('requires the WHOLE ring, not just the centre chunk (the point-227 gap)', () => {
+    const centreOnly = new Set(['12,-1'])
+    // The old gate passed on this set; the far field it let through is the bug.
+    expect(panoramaCaptureReady(centreOnly, 300.5, -10, CHUNK)).toBe(true)
+    expect(panoramaCaptureReady(centreOnly, 300.5, -10, CHUNK, PANORAMA_CHUNK_RADIUS)).toBe(false)
+    // A ring with a single hole in its outer row still refuses.
+    const holed = ring(12, -1, PANORAMA_CHUNK_RADIUS)
+    holed.delete(`${12 + PANORAMA_CHUNK_RADIUS},${-1 - PANORAMA_CHUNK_RADIUS}`)
+    expect(panoramaCaptureReady(holed, 300.5, -10, CHUNK, PANORAMA_CHUNK_RADIUS)).toBe(false)
+    // Complete ring: allowed.
+    expect(panoramaCaptureReady(ring(12, -1, PANORAMA_CHUNK_RADIUS), 300.5, -10, CHUNK, PANORAMA_CHUNK_RADIUS)).toBe(true)
+  })
+})
+
+describe('panorama band gate over EVERY place kind (point 335)', () => {
+  it('the kind map is total over PlaceKind — a new kind must be decided about', () => {
+    expect(Object.keys(PANORAMA_BAND_BY_KIND).sort()).toEqual([...PLACE_KINDS].sort())
+  })
+
+  it('no kind is exempt from the freshness and completeness gates', () => {
+    // Swept over the ENUM, so a fourth place kind joins this sweep by itself.
+    for (const kind of PLACE_KINDS) {
+      expect(panoramaBandShown(kind, true, true)).toBe(true)
+      expect(panoramaBandShown(kind, false, true)).toBe(false) // stale capture (point 99)
+      expect(panoramaBandShown(kind, true, false)).toBe(false) // incomplete capture
+      expect(panoramaBandShown(kind, false, false)).toBe(false)
+    }
+  })
+
+  it('the MONUMENT witness: Giza entered from travel with an uncommitted chunk shows NO band', () => {
+    const giza = placeById('giza')
+    expect(giza.kind).toBe('monument')
+    const CHUNK = 24
+    // Entered out of the bird's-eye view (fresh), but the terrain around the
+    // capture point is not committed — so no capture may exist, and the site
+    // falls back to the geometry backdrop instead of a half-empty band.
+    const captureReady = panoramaCaptureReady(new Set(), 0, 0, CHUNK, PANORAMA_CHUNK_RADIUS)
+    expect(captureReady).toBe(false)
+    expect(panoramaBandShown(giza.kind, true, captureReady)).toBe(false)
   })
 })
 

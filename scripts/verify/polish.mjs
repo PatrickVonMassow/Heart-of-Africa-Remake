@@ -66,6 +66,76 @@ const probeSilhouetteFooting = async (page, check, label) => {
   )
 }
 
+/**
+ * Point 335: is there a FOREIGN flat band lying across the horizon?
+ *
+ * The reported Giza picture had a long grey/silver strip along the horizon line
+ * with the desert's own dunes and ridge showing above AND below it — the
+ * captured panorama band's far field, baked from unbounded water sheets that
+ * had no streamed terrain behind them. Measured on the RENDERED frame the
+ * point-181 way, with no assumed tone and no assumed row:
+ *
+ * The signature is a SANDWICH down a column — ground-warm rows, a run of rows
+ * that are NOT ground-warm, ground-warm rows again. Crossing a real terrain
+ * silhouette can never produce it (a column goes sky → ground once and stays
+ * ground). The warmth reference is read from the viewer's OWN near ground in
+ * the same frame, so the check asserts no colour of its own; and a foreign band
+ * is FLAT, so only sandwiches starting on the same row count. Returns the
+ * fraction of the frame's columns carrying such a flat foreign band.
+ */
+const foreignHorizonBand = async (pngBuffer) => {
+  const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const W = info.width
+  const H = info.height
+  const C = info.channels
+  const warmthAt = (x, y) => {
+    const i = (y * W + x) * C
+    return (data[i] - data[i + 2]) / Math.max(data[i], 1)
+  }
+  // Reference: the near ground under the viewer's feet — unambiguously the
+  // site's own ground, in this very frame.
+  const refs = []
+  for (let x = 0; x < W; x += 4) {
+    let s = 0
+    let n = 0
+    for (let y = Math.round(H * 0.86); y < Math.round(H * 0.92); y++) {
+      s += warmthAt(x, y)
+      n++
+    }
+    refs.push(s / n)
+  }
+  refs.sort((a, b) => a - b)
+  const groundWarmth = refs[Math.floor(refs.length / 2)]
+  const warmCut = groundWarmth * 0.45
+  const top = Math.round(H * 0.3)
+  const bot = Math.round(H * 0.7)
+  const MIN_RUN = 8 // px — below this an edge or a silhouette, not a band
+  const hits = []
+  for (let x = 0; x < W; x++) {
+    const warm = []
+    for (let y = top; y < bot; y++) warm.push(warmthAt(x, y) >= warmCut)
+    let best = null
+    let y = 0
+    while (y < warm.length) {
+      if (warm[y]) {
+        y++
+        continue
+      }
+      const start = y
+      while (y < warm.length && !warm[y]) y++
+      const len = y - start
+      const sandwiched = warm.slice(0, start).some(Boolean) && warm.slice(y).some(Boolean)
+      if (sandwiched && len >= MIN_RUN && (!best || len > best.len)) best = { start: start + top, len }
+    }
+    if (best) hits.push(best)
+  }
+  if (!hits.length) return { fraction: 0, row: null, groundWarmth: +groundWarmth.toFixed(3) }
+  const tops = hits.map((h) => h.start).sort((a, b) => a - b)
+  const median = tops[Math.floor(tops.length / 2)]
+  const flat = hits.filter((h) => Math.abs(h.start - median) <= 3)
+  return { fraction: +(flat.length / W).toFixed(3), row: median, groundWarmth: +groundWarmth.toFixed(3) }
+}
+
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
@@ -746,6 +816,11 @@ for (const [placeId, shot] of [
   await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'giza', null, { timeout: 15000 })
   const gizaPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
   check('the enter hint arms and names Giza (discovered, localized)', /Giza|Gizeh/.test(gizaPrompt), gizaPrompt)
+  // Wait for the approach capture (points 227/335): the band may only be shot
+  // once the terrain ring around the capture point is committed, so entering
+  // before it lands would leave the monument on the geometry backdrop and make
+  // the horizon check below vacuous.
+  await page.waitForFunction(() => window.__placePanorama?.placeId === 'giza', null, { timeout: 60000 }).catch(() => {})
   // Re-set the live position right before the press (Space re-derives from it).
   await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
   await page.keyboard.press('Space')
@@ -821,6 +896,67 @@ for (const [placeId, shot] of [
       'the walkable Giza ground reads as warm desert sand (point 273)',
       r > g && g > b && r - b > 22 && r > 120,
       `mean ground rgb ${r.toFixed(0)}/${g.toFixed(0)}/${b.toFixed(0)}`,
+    )
+  }
+
+  // Point 335: no FOREIGN flat band across the horizon. The reported picture
+  // showed a long grey/silver strip along the horizon line, with the desert's
+  // own dunes above and below it — the captured band's far field, baked from
+  // water sheets that reached past the streamed terrain window. The monument is
+  // a late third place kind, so first pin that it takes the band path at all;
+  // then sweep the horizon and measure the rendered frame (no assumed tone, no
+  // assumed row — the helper reads the viewer's own ground for its reference).
+  {
+    const bandActive = await page.evaluate(() => window.__placePanoramaActive ?? false)
+    check(
+      'the monument site shows its captured travel band like any settlement (point 335)',
+      bandActive === true,
+      `band active ${bandActive}`,
+    )
+    const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+    const posts = [
+      ['south rim', 0, radius * 0.75],
+      ['east rim', radius * 0.7, 0],
+    ]
+    const worst = { fraction: 0, where: 'none', row: null }
+    let shot = 0
+    for (const [label, px, pz] of posts) {
+      for (let k = 0; k < 8; k++) {
+        const yaw = (k * Math.PI) / 4
+        await page.evaluate(
+          ([x, z, y]) => {
+            const p = window.__placePlayer
+            p.x = x
+            p.z = z
+            p.yaw = y
+            p.pitch = 0
+          },
+          [px, pz, yaw],
+        )
+        await page.waitForTimeout(350)
+        const buf = await page.screenshot()
+        const band = await foreignHorizonBand(buf)
+        if (band.fraction > worst.fraction) {
+          worst.fraction = band.fraction
+          worst.where = `${label} yaw ${((yaw * 180) / Math.PI).toFixed(0)}°`
+          worst.row = band.row
+        }
+        // Human-viewable evidence from two standpoints on the site.
+        if (k === 2 && shot < 2) {
+          shot++
+          await sharp(buf).toFile(`${OUT}140-giza-horizon-${shot}.png`)
+          console.log(`shot 140-giza-horizon-${shot}.png`)
+        }
+      }
+    }
+    // Measured: the reported (broken) band covered 0.18-0.23 of the columns as
+    // one flat run; with the capture bounded to the committed terrain the worst
+    // sweep direction stays under 0.07 (near water the band legitimately shows
+    // the Nile at the horizon, which is not sandwiched by a foreign strip).
+    check(
+      'no foreign flat band lies across the Giza horizon (point 335)',
+      worst.fraction < 0.12,
+      `worst ${worst.fraction} of columns at ${worst.where}${worst.row == null ? '' : `, row ${worst.row}`}`,
     )
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
