@@ -12336,6 +12336,64 @@ the remaining open points in their numeric order.
   the calf adopted by a nearby adult or roaming free — never walking at a fixed empty
   spot, never nursing at nothing.
 
+- [ ] 342. HOLD CTRL TO NAME WHAT ACTS ON SCREEN (user 25.07.2026; design.md §17.8
+  states the target). While Ctrl is held, every animal, person and usable object on
+  screen carries a small floating label naming WHAT it is — "Adult giraffe", "Dead
+  giraffe calf" — in both perspectives. Scenery does not: no tree, rock, grass tuft or
+  wall. Ctrl is currently unbound (no `ctrlKey` handler exists in `src/`), so nothing
+  is being taken away from another control.
+  (a) WHAT QUALIFIES — one pure predicate, not a scatter of checks at each call site:
+  a thing is named when it can MOVE or the player can DO something with it. In: the
+  bird's-eye fauna (the 13 species of `Species` in Wildlife.tsx — elephant, giraffe,
+  zebra, wildebeest, antelope, warthog, flamingo, crocodile, plover and the four
+  predators — plus vultures and carcasses), the settlement inhabitants and their
+  animals, and the usable objects (a pitched camp, a set-down canoe). Out: the flora
+  and dressing instances of `SPECIES` in TravelScene.tsx (acacia … kopje), terrain,
+  buildings that are not enterable, and the §2.5 horizon silhouettes — those are
+  backdrop, not actors. Two exclusions carry design weight and must be pure-tested as
+  such: a MAP POINT is never named by this layer (settlements and landmarks keep their
+  own labels under the §17.2 discovery gate, so the layer can never leak an
+  undiscovered name), and a CONCEALED animal is not named while concealed — the
+  submerged crocodile of §19.16 stays silent until it lunges, or the ambush is dead.
+  (b) THE TEXT — kind, then age where the game distinguishes one, then state where it
+  changes what is seen (dead). The fauna roster is NOT yet localized: `src/i18n/de.ts`
+  and `en.ts` carry no species names at all today (`nameCompleteness.test.ts` covers
+  places and landmarks only), so this point ADDS them for the whole roster, plus the
+  inhabitant roles (elder, trader, villager) and the object kinds.
+  GERMAN GRAMMAR IS PART OF THE FEATURE, not a translation afterthought: "Totes
+  Giraffen-Jungtier" is not "tot" + "Giraffen-Jungtier" pasted together, and "Tote
+  Giraffe" inflects differently. Each entry therefore carries what its language needs
+  to inflect — for German the noun's GENDER beside the noun — and the composition is a
+  pure function of (kind, age, state, language). Never build the string by
+  concatenation at the render site.
+  (c) RENDERING AND COST. Project through the live camera with the existing shared
+  `isOnScreen` (the point-172 rule: the true frustum, never an assumed radius) and
+  label only what is really drawn; cap the count at a calibratable nearest-N
+  (`balance.labelOverlay.maxLabels`, debug-editable) so a crowded savanna stays
+  readable and the frame does not fall over. Reuse the existing floating-label
+  machinery of the map/region labels rather than inventing a second one, and mount the
+  layer only while Ctrl is down — an idle hold-free frame must cost nothing.
+  (d) THE KEY. Hold-to-show on keydown/keyup of Control. Do NOT preventDefault: the
+  browser's own Ctrl combinations stay the browser's. Clear the layer on `blur` and on
+  `visibilitychange`, and re-sync from the `ctrlKey` flag of the next input event —
+  a release missed while the player alt-tabbed must never leave labels standing (the
+  bug this rule exists to prevent). Holding Ctrl changes nothing else: no pause, no
+  movement change, no focus shift. Touch and gamepad get no equivalent in this point.
+  DOCS: design.md §17.8 and the §17.5 control line already state it; CLAUDE.md §7.1
+  point 9 (status bar / HUD) gains the built behaviour when this lands.
+  VERIFIABLE: pure — the qualifies predicate sweeps the FULL rosters (every fauna
+  species in, every flora/dressing species out, map points out, a concealed crocodile
+  out while hidden and in once it lunges); the text composition sweeps every (kind ×
+  age × state) in BOTH languages for a non-empty, non-id string, and pins the four
+  reported forms exactly ("Adult giraffe", "Dead giraffe calf", "Erwachsene Giraffe",
+  "Totes Giraffen-Jungtier") plus a feminine/neuter pair proving the gender is really
+  applied; the nearest-N cap keeps the nearest and drops the farthest. Component
+  (`src/ui/`) — the layer renders on Ctrl down, disappears on keyup, and is cleared by
+  a blur without a keyup. Live (`scripts/verify/enrichments.mjs` bird's-eye and
+  `scripts/verify/polish.mjs` settlement, BOTH backends, with screenshots): holding
+  Ctrl labels the animals in view and no plant, every label sits on an on-screen
+  subject, and releasing clears every one.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
