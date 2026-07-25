@@ -23,15 +23,18 @@
 
 import { RIVERS_DATA, type RiverDef } from './data/rivers'
 import { coastSignedDistance } from './coastVector'
+import { balance } from '../config/balance'
 
 /**
  * How far up its own course (degrees) a sea mouth's current is slackened: full
- * pace at this distance upstream, ramping to zero at the course end. ~0.6 deg
- * is ~65 km — the order of a real tidal/backwater reach, and wide enough that
- * the whole coast-locked pocket at a mouth stays swimmable against the drift
- * (see the escapability sweep in world/riverMouths.test.ts).
+ * pace at this distance upstream, ramping to zero at the course end. The
+ * calibratable default ~0.6 deg is ~65 km — the order of a real tidal/backwater
+ * reach, and wide enough that the whole coast-locked pocket at a mouth stays
+ * swimmable against the drift (see the escapability sweep in
+ * world/riverMouths.test.ts). Read at BUILD time like the river width: the flow
+ * index bakes the ramp per segment, so a debug edit applies on the next reload.
  */
-export const MOUTH_SLACK_DEG = 0.6
+export const MOUTH_SLACK_DEG = balance.river.mouthSlackDeg
 
 /**
  * A course END counts as a SEA mouth when it lies this close to (or seaward of)

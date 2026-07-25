@@ -394,6 +394,14 @@ export interface BalanceConfig {
      * applies on the next reload.
      */
     widthFactor: number
+    /**
+     * How far up its own course (degrees) a SEA mouth's current slackens to
+     * nothing (design.md §11.3, point 316) — the tidal/backwater reach that
+     * keeps a mouth from funnelling a swimmer into a coast-locked pocket. Read
+     * at build time (the flow index bakes the ramp per segment); a debug edit
+     * applies on the next reload.
+     */
+    mouthSlackDeg: number
   }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
@@ -680,6 +688,7 @@ export const balance: BalanceConfig = {
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
+    mouthSlackDeg: 0.6, // calibratable: ~65 km of slack water at a sea mouth (point 316)
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable

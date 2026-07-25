@@ -329,12 +329,15 @@ Two seas are never inland water regardless of the outline: everything northeast 
 
 Even inside the outline, swimmable sea reaches only a short band off the coast (a calibratable balance value, debug menu §21); further out the open ocean blocks — there is no swimming far out to sea.
 
+The boundary blocks, but it never pins: a step into impassable water is resolved by SLIDING along the boundary — the move fans out to either side and takes the first free heading, keeping its length — instead of stopping dead, exactly as movement slides along a building or a tree (§2.6/§11). Only a genuinely closed fan, with every direction blocked, reports the blocked notice. The passive current (§11.3) obeys the same resolve, so the water can never press the traveller against a coast he then cannot move along.
+
 ### 11.3 Water, current and waterfalls
 
 Current and gameplay:
 
 - Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4).
 - Moving with the current is faster, against it slower; even an idle traveller on a river is carried downstream. The drift covers real distance and therefore consumes time and provisions like any water travel — the current never moves the traveller for free.
+- A river reaches the sea as SLACK WATER: over the last stretch before a sea mouth the current runs out — the channel fans over its delta, the bed gradient dies against sea level and the sea backs the water up — so the mouth junction is never a one-way funnel. A river ending at a CONFLUENCE keeps its full pace; it flows into another river, not into the sea. This is a gameplay guarantee as much as a piece of realism: inside water the impassable ocean fences in, the current must never be able to hold the traveller faster than he can swim out of it, and every sea mouth is swept for such a pocket (the reported softlock in the Nile's Rosetta mouth).
 - There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
 - Water can also be crossed without a canoe, but slower, more exposed to the current, and at risk of a crocodile attack (injury or death). Out of the canoe the rifle gets wet and is useless — only a machete reduces the risk; in the canoe it stays dry and works as usual. Visually the swimmer floats ON the rendered water surface, chest-deep with a slow swim bob (point 152) — never walking the carved bed under the sheet, however deep it lies (Lake Edward's rift bed made the difference plain).
 
@@ -907,6 +910,7 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Movement-factor tuning for the terrain relief items: the factor by which a canoe speeds up water travel, and the penalty factors by which the jungle without a machete and the mountains without a rope slow the traveller.
 - The swimmable coastal band width (§11.2): how far off the coast the sea can be swum before the open ocean blocks.
 - The river width factor (§11.3): rivers are drawn wider than scale for canoe playability, and carved bed, ribbon, water mask and every clearance derive from this one value. It is a BUILD-time value — the edit persists and takes effect on the next reload.
+- The river mouth's slack water (§11.3): how far up its course a river that empties into the sea runs out of current. Like the width factor it is a BUILD-time value — the flow field bakes the ramp per course segment, so the edit takes effect on the next reload.
 
 **Seasons and weather** (§19.13)
 

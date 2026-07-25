@@ -405,6 +405,7 @@ export const de: Strings = {
     canoeSpeedup: 'Kanu-Tempofaktor (Wasser)',
     junglePenalty: 'Malusfaktor Dschungel (ohne Machete)',
     riverWidthFactor: 'Flussbreiten-Faktor (greift nach Neuladen)',
+    riverMouthSlackDeg: 'Mündungs-Stillwasser in Grad (greift nach Neuladen)',
     drownSeconds: 'Ertrinken: Sekunden in starker Strömung',
     wetFlowFactor: 'Ertrinken: Strömungsfaktor Regenzeit',
     vigilPredatorDelay: 'Totenwache: Sekunden bis ein Räuber kommt',

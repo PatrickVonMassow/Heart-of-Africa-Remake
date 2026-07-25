@@ -94,6 +94,19 @@ describe('the flow field at a sea mouth (design.md §11.3)', () => {
     expect(f.dirLat).toBeGreaterThan(0) // the lower Nile runs north
   })
 
+  it('slackens EVERY sea mouth and no confluence — the per-segment ramp lines up with its own course', () => {
+    // A misaligned slack table would show here first: each river is measured
+    // at its OWN end against the same point without the slack.
+    for (const r of RIVERS_DATA) {
+      const [lon, lat] = r.points[r.points.length - 1]
+      const raw = riverFlowExact(lat, lon, undefined, false).strength
+      if (raw <= 0) continue // the end lies outside the flow band (mouth in the sea)
+      const slacked = riverFlowExact(lat, lon).strength
+      if (isSeaMouthCourse(r)) expect(`${r.id} ${slacked < raw * 0.2}`).toBe(`${r.id} true`)
+      else expect(`${r.id} ${slacked}`).toBe(`${r.id} ${raw}`)
+    }
+  })
+
   it('leaves a tributary that ends at a CONFLUENCE running at full pace', () => {
     // The White Nile joins the Nile at Khartoum: it flows into a river, not
     // into the sea, so nothing about its mouth is slack.
@@ -110,7 +123,7 @@ describe('the flow field at a sea mouth (design.md §11.3)', () => {
 // Sampled with NO canoe — the swimmer is the worst case, and the reported
 // softlock was his.
 const SWEEP_STEP_DEG = 0.03
-const SWEEP_RADIUS_DEG = 0.75
+const SWEEP_RADIUS_DEG = 1.0
 
 function sampleSwim(seed: number) {
   return (lat: number, lon: number): SwimCell => {

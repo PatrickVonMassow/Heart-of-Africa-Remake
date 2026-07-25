@@ -400,8 +400,17 @@ verify suite that proves it.
    from the same `placedFloraAt` placement the renderer draws, so an
    unrendered/suppressed plant can never leave a phantom collider,
    point 129).
+   A blocked boundary never PINS the traveller (§11.2, point 316): a
+   blocked step is resolved by SLIDING along the boundary
+   (`slideAlongBlocked`, the same shape the settlement collision and the
+   tree/animal resolve use), and only a genuinely closed direction fan
+   reports the blocked notice — the passive current obeys the same resolve
+   (pt. 21).
    Verifiable: an automated move on enclosed sea advances the position; a
-   move on open ocean is refused with the blocking notice; a move onto a
+   move on open ocean (mid-Atlantic, every direction blocked) is refused
+   with the blocking notice while a step into the boundary from a coastal
+   pocket slides along it instead of stopping dead
+   (`src/systems/movement.test.ts`, `src/state/store.travel.test.ts`); a move onto a
    mountain without a rope advances (with the warning) while the rope
    makes it faster, and a forced fall wounds the traveler and can drop an
    item. The penalty mapping is pure-tested for each terrain (incl. the
@@ -1365,6 +1374,21 @@ verify suite that proves it.
     `currentWaterfallRadius`), covering real distance so it advances time
     and provisions (and ticks health/deadline) — never free movement.
     Being swept over falls is gameplay via pt. 23 (waterfall-sweep event).
+    The current may never HOLD the traveller (§11.2/§11.3, point 316): a
+    river reaches the sea as SLACK WATER — its push ramps to nothing over
+    the last `balance.river.mouthSlackDeg` of a course that ends at the sea
+    (calibratable and debug-editable, applied on reload like the width
+    factor), while a
+    course ending at a confluence keeps its pace — so a sea mouth is not a
+    one-way funnel into a coast-locked pocket (the reported Nile-mouth
+    softlock: full current 0.32 deg/s against a 0.28 deg/s swim, with the
+    Mediterranean blocking on every side); and the passive drift resolves a
+    blocked boundary through the SAME `slideAlongBlocked` the overland move
+    uses, running along the coast instead of stopping dead, with drift and
+    swim speed derived from one shared formula (`src/systems/current.ts`)
+    so the sweep measures the world the player swims in. Nothing about the
+    ribbon, the mouth bridge, the water mask or the ocean's impassability
+    moves — no new way off the continent.
     Verifiable: `scripts/verify/enrichments.mjs` asserts 5 cascades, at
     least one spring and 8 lake surfaces, that no river has an interior
     gap and no river surface is buried, that every lake surface clears its
@@ -1403,7 +1427,18 @@ verify suite that proves it.
     leaking into normal rivers (the Zambezi keeps its January, the Nile its
     October); live, the delta's water fan reads visibly fuller in July than
     in January via `__naturalSites.deltaFlood`/`deltaWaterScale`
-    (screenshots 119/120).
+    (screenshots 119/120). The sea mouths hold no trap (point 316): EVERY
+    river that empties into the sea is swept cell by cell — from every
+    swimmable cell an exit path must exist on which the current never eats
+    more than half the swim speed — with the pre-316 funnel restored as the
+    sweep's own regression witness (it reproduces the reported Nile pocket),
+    the mouth-vs-confluence split and the slack ramp pure-tested in
+    `src/world/riverMouths.test.ts` and the sweep rule itself on hand-drawn
+    water fields in `src/systems/swimEscape.test.ts`; a swimmer set into the
+    Nile mouth notch works his way out in `src/state/store.travel.test.ts`,
+    and live the staged swim there drifts, slides along the coast where the
+    current would push into the blocked sea and gets back up the river alive
+    (`scripts/verify/enrichments.mjs`, screenshot 142).
 22. **Health and afflictions.** The health system of `design.md` §6 is
     implemented: a health pool drained by starvation and the afflictions
     of §6.2 (fever delirium, dehydration with the canteen fill mechanics
