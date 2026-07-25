@@ -11566,18 +11566,30 @@ the remaining open points in their numeric order.
   sampling rule was wrong.
 
 - [ ] 315. GIZA SITE: THE BURIED SPHINX READS WRONG ON THE GROUND (user 25.07.2026,
-  screenshot from inside the walkable Giza site: the sphinx shows as a blocky brown
-  mass with a pale flat wedge at its base — parts appear to float/clip rather than
-  emerge from a sand drift; the user had expected this fixed after the point-279
-  detail pass, which fixed the SKYLINE cues but not this ground-level read). Rework
-  the sand-buried presentation at SITE scale: the head/neck/back emerge from a
-  proper sand MOUND that hugs the body (a drift envelope meeting the desert floor
-  with no floating slabs, no clipping wedge, matching the ~1890 buried state where
-  only head and upper back stood clear), collidable mass unchanged. VERIFIABLE:
-  buildSphinx/site-layout pure tests keep passing plus a new one for the mound
-  envelope (mound base at ground level, body faces below mound crest except
-  head/upper back); screenshot set from several standpoints inside the site on BOTH
-  backends judged by the picture; the skyline variant (point 82 cues) unchanged.
+  reported TWICE from the deployed build; the second screenshot is the sharper
+  evidence and defines the target). What the player sees standing on the plateau is
+  not a couchant lion half-buried in sand but a **stone TABLE or gate**: a horizontal
+  slab carried on posts, with daylight visible UNDER it, and a pale flat sheet at that
+  same height spreading sideways FAR BEYOND the body rather than hugging it. The
+  point-279 pass fixed the SKYLINE cues (point 82) and left this ground-level read
+  untouched.
+  DIAGNOSE BEFORE RESHAPING — the first spec called the pale sheet "a wedge at its
+  base", and the new picture shows it reaching well past the animal on both sides.
+  Establish WHAT it actually is (the drift geometry itself, the site disc seen from
+  below eye height, or a separate plane) and say so in the commit; reshaping the
+  wrong object would leave the picture unchanged while the tests turn green.
+  TARGET at SITE scale: head, neck and upper back emerge from a sand MOUND that HUGS
+  the body — a drift envelope meeting the desert floor with no floating slab, no
+  daylight under the body from any standpoint a player can reach, and no sheet
+  extending beyond the drift — matching the ~1890 state in which only the head and
+  upper back stood clear of the sand. The collidable mass stays as it is.
+  VERIFIABLE: the existing `buildSphinx` / site-layout pure tests keep passing, plus a
+  new one for the mound envelope — the mound meets the ground plane, every body face
+  except head and upper back sits below the mound crest, and the drift's own footprint
+  does not exceed the body's by more than its skirt (the sideways-sheet witness);
+  live, a screenshot SET from several standpoints inside the site — including one
+  close enough to look under the body — on BOTH backends, judged by the picture; the
+  skyline variant (point 82) unchanged.
 
 - [ ] 316. SWIMMER TRAPPED IN A RIVER-MOUTH NOTCH (user 25.07.2026, screenshot at the
   Nile delta mouth ~31.4N/30.4E: swimming without a canoe, the downstream current
