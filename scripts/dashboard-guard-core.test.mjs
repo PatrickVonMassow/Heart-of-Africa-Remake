@@ -13,6 +13,7 @@ import {
   parseNowCardPoints,
   parseQueuePoints,
   parseKlaerungPoints,
+  nowCardText,
   looksDoubleEncoded,
   sliceSections,
   parseCards,
@@ -621,6 +622,99 @@ describe('auditDashboard — the 25.07 witnesses', () => {
   it('is total on missing/malformed input', () => {
     expect(auditDashboard(null, base)).toEqual([])
     expect(() => auditDashboard(boardHtml(), { open: 'x', done: null, doneSeen: 'nope' })).not.toThrow()
+  })
+})
+
+describe('evaluate — invariant 8c: the now-card TEXT must actually be rewritten', () => {
+  // User mandate 25.07.2026 ("the dashboard is completely out of date — always
+  // write what you are doing RIGHT NOW"): confirming the focus used to satisfy
+  // every check while the card body stayed byte-identical for hours.
+  const withMarker = (extra) => ({
+    dashboardPath: '.batch-dashboard.html',
+    head: 'abc1234',
+    publishedHash: 'hash-1',
+    ...extra,
+  })
+
+  it('blocks when work happened and the body is byte-identical to the reviewed one', () => {
+    const r = evaluate(
+      green({
+        marker: withMarker({ nowCardHash: 'same', syncedAt: 0 }),
+        nowCardHash: 'same',
+        lastToolAt: 1000,
+        now: FOCUS_FRESH_MS + 5000,
+        focus: { point: 210, note: 'x', setAt: 1000, confirmedAt: FOCUS_FRESH_MS + 4000 },
+      }),
+    )
+    expect(r).toMatchObject({ decision: 'block' })
+    expect(r.reason).toMatch(/NOW-CARD TEXT UNCHANGED/)
+    expect(r.reason).toMatch(/SHORT and HIGH-LEVEL/)
+  })
+  it('allows once the body really changed', () => {
+    expect(
+      evaluate(
+        green({
+          marker: withMarker({ nowCardHash: 'old', syncedAt: 0 }),
+          nowCardHash: 'new',
+          lastToolAt: 1000,
+          now: FOCUS_FRESH_MS + 5000,
+          focus: { point: 210, note: 'x', setAt: 1000, confirmedAt: FOCUS_FRESH_MS + 4000 },
+        }),
+      ).decision,
+    ).toBe('allow')
+  })
+  it('never fires on a quiet stretch (no tool work since the review)', () => {
+    expect(
+      evaluate(
+        green({
+          marker: withMarker({ nowCardHash: 'same', syncedAt: 10_000 }),
+          nowCardHash: 'same',
+          lastToolAt: 500,
+          now: FOCUS_FRESH_MS + 20_000,
+          focus: { point: 210, note: 'x', setAt: 1000, confirmedAt: FOCUS_FRESH_MS + 19_000 },
+        }),
+      ).decision,
+    ).toBe('allow')
+  })
+  it('never fires before the freshness window has elapsed', () => {
+    expect(
+      evaluate(
+        green({
+          marker: withMarker({ nowCardHash: 'same', syncedAt: 0 }),
+          nowCardHash: 'same',
+          lastToolAt: 1000,
+          now: 2000,
+        }),
+      ).decision,
+    ).toBe('allow')
+  })
+  it('is inert on a first review (no recorded hash yet)', () => {
+    expect(
+      evaluate(
+        green({
+          marker: withMarker({ syncedAt: 0 }),
+          nowCardHash: 'whatever',
+          lastToolAt: 1000,
+          now: FOCUS_FRESH_MS + 5000,
+          focus: { point: 210, note: 'x', setAt: 1000, confirmedAt: FOCUS_FRESH_MS + 4000 },
+        }),
+      ).decision,
+    ).toBe('allow')
+  })
+})
+
+describe('nowCardText', () => {
+  it('extracts the now-card bodies, tag-free and whitespace-collapsed', () => {
+    const t = nowCardText(boardHtml())
+    expect(t).toMatch(/Status \(Stand 09:00\)/)
+    expect(t).not.toMatch(/</)
+  })
+  it('reads only the now SECTION, not the queue or Erledigt bodies', () => {
+    expect(nowCardText(boardHtml())).not.toMatch(/Kurzstand/)
+  })
+  it('is total on missing input', () => {
+    expect(nowCardText(null)).toBe('')
+    expect(nowCardText('<main>no sections</main>')).toBe('')
   })
 })
 

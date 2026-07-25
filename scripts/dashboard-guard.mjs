@@ -40,14 +40,19 @@ import {
   removeFile,
   sha256File,
 } from './dashboard-state.mjs'
+import { createHash } from 'node:crypto'
 import {
   parseTasks,
   parseNowCardPoint,
   auditDashboard,
   parseCards,
   sliceSections,
+  nowCardText,
   evaluate,
 } from './dashboard-guard-core.mjs'
+
+/** Hash of the now-card BODIES — the text the reader sees (invariant 8c). */
+const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 
@@ -117,7 +122,16 @@ if (process.argv[2] === '--synced') {
     violations.length && prevSeen
       ? [...new Set([...prevSeen, ...done.filter((n) => carded.has(n))])]
       : done
-  mergeState({ dashboardPath: p, head: head(), syncedAt: Date.now(), doneSeen, auditWaived: undefined })
+  mergeState({
+    dashboardPath: p,
+    head: head(),
+    syncedAt: Date.now(),
+    doneSeen,
+    auditWaived: undefined,
+    // The now-card text as reviewed; (8c) blocks when work happens and this
+    // never changes — a stale card cannot pass by confirming the focus alone.
+    nowCardHash: nowHash(readFileSync(p, 'utf8')),
+  })
   console.log(`dashboard registered at HEAD ${head().slice(0, 7)}: ${p}`)
 
   // Record the card/spec drift baselines for the integrity guard (check C):
@@ -193,6 +207,7 @@ try {
     pending: readJson(PENDING_PATH),
     sessionId,
     lastToolAt,
+    nowCardHash: html ? nowHash(html) : null,
     now: Date.now(),
     // Calibratable without a code change: minutes in dashboard-state.json.
     freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,

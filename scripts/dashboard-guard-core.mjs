@@ -62,6 +62,23 @@ export function parseNowCardPoint(html) {
   return null
 }
 
+/**
+ * The now-section's card BODIES as one normalised string — the text the reader
+ * sees, whitespace-collapsed and tag-free, or '' when the section is absent.
+ * Hashed at --synced so invariant (8c) can tell a rewritten card from a merely
+ * re-confirmed one (user 25.07.2026).
+ */
+export function nowCardText(html) {
+  if (typeof html !== 'string') return ''
+  const nowStart = html.indexOf('<h2>Woran ich gerade arbeite')
+  if (nowStart < 0) return ''
+  const nextH2 = html.indexOf('<h2>', nowStart + 1)
+  const section = html.slice(nowStart, nextH2 < 0 ? undefined : nextH2)
+  return [...section.matchAll(/<div class="body[^"]*">([\s\S]*?)<\/details>/g)]
+    .map((m) => m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim())
+    .join(' | ')
+}
+
 /** Point numbers of the Warteschlange cards only (the Erledigt section also uses `.num`). */
 export function parseQueuePoints(html) {
   const queued = new Set()
@@ -366,6 +383,7 @@ export function evaluate(input) {
     lastToolAt = 0,
     now = Date.now(),
     freshMs = FOCUS_FRESH_MS,
+    nowCardHash = null,
   } = input ?? {}
 
   // Batch paused or complete: no dashboard duty in flight.
@@ -514,6 +532,30 @@ export function evaluate(input) {
         'confirmed. Verify the now-card still shows the live sub-state (fresh "Status (Stand HH:MM)" ' +
         'line) — refresh + republish + --synced if not — then run node scripts/focus.mjs confirm.',
     )
+  }
+
+  // (8c) NOW-CARD TEXT ACTUALLY REWRITTEN (user 25.07.2026: "the dashboard is
+  // completely out of date — always write what you are doing RIGHT NOW, short and
+  // high-level"). Invariant (6) only pins the card's POINT NUMBER against the
+  // declared focus and (8) only asks for a re-affirmation, so a card could keep a
+  // stale BODY through hours of work while every check passed — `focus.mjs
+  // confirm` alone satisfied them. This one is about the prose: once real work has
+  // happened since the last review, the card's body must have CHANGED (its hash
+  // recorded at --synced), not merely been confirmed. It never fires on a quiet
+  // stretch — only when tool work followed the last review.
+  if (marker.nowCardHash && nowCardHash && marker.nowCardHash === nowCardHash) {
+    const reviewedAt = Number(marker.syncedAt ?? 0)
+    if (lastToolAt > reviewedAt && now - reviewedAt > freshMs) {
+      const min = Math.round((now - reviewedAt) / 60000)
+      return block(
+        `NOW-CARD TEXT UNCHANGED THROUGH ~${min} min OF WORK: the "Woran ich gerade arbeite" body is ` +
+          'byte-identical to the one reviewed last time, so it cannot be describing what you are doing ' +
+          'RIGHT NOW. Rewrite it SHORT and HIGH-LEVEL — the live sub-state in one or two sentences ' +
+          '("Stand HH:MM: …"), no history, no plan — then republish (dashboard-publish.mjs + Artifact) ' +
+          'and re-run --synced. Confirming the focus alone does NOT satisfy this: the text itself is ' +
+          'the deliverable.',
+      )
+    }
   }
 
   // (8b) FULL-CONSISTENCY AUDIT (point 313) — evaluated BEFORE the publish
