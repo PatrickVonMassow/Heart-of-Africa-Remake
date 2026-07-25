@@ -1,0 +1,12 @@
+{
+  "lastReviewedAt": 1785002538088,
+  "reviewedCount": 87,
+  "evidence": "Vollaudit 25.07.2026 ueber alle Memories und Waechter auf sechs Achsen: zehn Widersprueche, sechs Redundanz-Cluster, mehrere Regeln mit behaupteter, nie gebauter Durchsetzung. Behoben u.a.: Release-Verfahren auf eine Quelle reduziert, zwei Regeln zurueckgezogen, dashboard-reminder-hook von zwei zurueckgezogenen Regeln befreit, batch-resume-hook Selbstwiderspruch entfernt.",
+  "history": [
+    {
+      "at": "2026-07-25T18:02:18.088Z",
+      "entryCount": 87,
+      "evidence": "Vollaudit 25.07.2026 ueber alle Memories und Waechter auf sechs Achsen: zehn Widersprueche, sechs Redundanz-Cluster, mehrere Regeln mit behaupteter, nie gebauter Durchsetzung. Behoben u.a.: Release-Verfahren auf eine Quelle reduziert, zwei Regeln zurueckgezogen, dashboard-reminder-hook von zwei zurueckgezogenen Regeln befreit, batch-resume-hook Selbstwiderspruch entfernt."
+    }
+  ]
+}
