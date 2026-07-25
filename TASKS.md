@@ -12561,6 +12561,15 @@ the remaining open points in their numeric order.
   FETCHED at all, since the runtime cost is one texture lookup but the download and
   video memory are what a weak device actually cannot afford. Entries for all three
   levels in `QUALITY_PRESETS` plus `docs/graphics-detail-levels.md` in the same commit.
+  THE FETCH IS GATED ON THE EFFECTIVE LEVEL, not merely the use of the result: at low
+  the request is never issued, so a `?quality=low` link (point 347) costs the player
+  those megabytes NOTHING — the whole reason that link exists. The gate must therefore
+  sit at the request, never at "load it and ignore it". Two consequences to build for:
+  the load is LAZY and keyed on the level, and RAISING the level at runtime (F9, the
+  debug picker) fetches the maps then and applies them when they arrive, without
+  blocking the frame or stalling the level switch. Pure-test both directions — no
+  request at low, exactly one request when the level rises, and none again on a second
+  rise.
   DOCS: design.md §2.7 already states it; the preprocessing must be documented
   reproducibly like the existing geodata pipeline (§7.1 point 13), and CLAUDE.md §7.1
   point 14 gains the built behaviour when this lands.
@@ -12590,6 +12599,12 @@ the remaining open points in their numeric order.
   but setting it from an effect after the first render would draw a frame at medium and
   then rebuild the whole post chain and shadow maps, a visible hitch on exactly the
   weak hardware the low link is meant for. Seed the store's initial state from the URL.
+  AND IT DECIDES DOWNLOADS, not just looks. Level-gated ASSETS — the horizon maps of
+  point 346 are the first, several megabytes of them — must see the URL level before
+  they decide whether to fetch. A `?quality=low` link that still pulls the high-level
+  assets and then ignores them would defeat its own purpose on the exact connection it
+  was sent to. Whichever of the two points lands second must verify this pairing:
+  loading with `?quality=low` issues NO request for a level-gated asset.
   DELIBERATELY UNCHANGED: the touch preset (§17.5) still applies its own subset-of-low
   flags when the touch layer arms, even if the URL asked for high. That is the existing
   rule — the preset is tied to the touch layer, not to a guess about the device — and a
