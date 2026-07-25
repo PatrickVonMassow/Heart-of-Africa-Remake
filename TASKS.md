@@ -11903,6 +11903,28 @@ the remaining open points in their numeric order.
   cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
   draft; a doc's symbol citations must be checked against the code that shipped.
 
+- [ ] 334. WEBGPU RENDER-TARGET LEAK IS BACK IN THE TRAA TOGGLE STRESS (found
+  25.07.2026 by the assurance pass, WebGPU only, FAILS TWICE — not a flake). The
+  settings.mjs check "TRAA toggle stress: no render-target leak across rebuilds"
+  reports the renderer's texture count climbing 33 -> 47 over the toggle cycles;
+  on WebGL 2 the same suite is fully green (39/39). This is the exact class point
+  276 fixed on 24.07 (commit 35f19a5, "Stop the TRAA post-pipeline leaking WebGPU
+  render targets per toggle", which built on 5e107e4's full-post-chain dispose) —
+  a real leak in the SHIPPED game on the user's own backend, not a test artefact.
+  FIRST ESTABLISH WHETHER IT IS A REGRESSION: run the check against the v0.2 tag
+  (bafd9b2) and against 35f19a5 itself; a leak present there means 276's fix was
+  incomplete for some path (e.g. only the TRAA node's own targets are disposed,
+  not those of the nodes rebuilt alongside it — SSAO/bloom/MRT), a leak absent
+  there names the commit that reintroduced it (bisect the ~30 commits since).
+  THEN fix at the root and prove it: the texture count must return to its starting
+  value across repeated toggles, not merely stop growing. Also make the check
+  report WHICH resources survive (a short type/label breakdown in the failure
+  message) so the next occurrence names its own cause — the current message gives
+  only two numbers. VERIFIABLE: the leak check green on WebGPU AND WebGL 2 across
+  repeated runs; a pure test for whatever disposal rule was wrong; the picture
+  unchanged on both backends (a dispose fix must not blank the post chain — that
+  exact regression is what 5e107e4 had to repair).
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
