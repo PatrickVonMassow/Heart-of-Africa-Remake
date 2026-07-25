@@ -12123,6 +12123,41 @@ the remaining open points in their numeric order.
   is a balance value; the improvement demonstrated on both backends with before/after
   numbers, and no visual regression at first frame.
 
+- [ ] 338. GIZA IS LABELLED TWICE IN THE BIRD'S-EYE VIEW, FROM TWO DEFINITIONS OF THE
+  SAME SITE (user 25.07.2026, screenshot: the italic cultural-landmark label »Pyramids
+  of Giza« and the map-point label »The Pyramids of Giza« overlap each other west of
+  Cairo). ROOT CAUSE — the plateau is declared twice, in two systems that each render
+  their own floating label, and at DIFFERENT coordinates:
+  src/world/data/landmarks.ts:123 `{ id: 'giza', lon: 30.59, lat: 29.98, kind:
+  'giza-pyramids' }` (one of the eight §4.4 cultural landmarks: first-sighting journal
+  entry, discovery bounty, italic landmark label) and src/world/geo.ts:267
+  `{ id: 'giza', kind: 'monument', lat: 29.75, lon: 30.85, region: 'north' }` (the
+  point-273 ENTERABLE monument site: map point, known from start, SPACE to enter,
+  `.map-label`). Both are legitimate FEATURES — the site must stay enterable AND must
+  keep earning its sighting entry — so this is not "delete one".
+  FIX BOTH HALVES: (1) ONE POSITION. The two records place the same real plateau ~0.3°
+  apart. Derive both from a single coordinate constant so they cannot drift again; the
+  §17.2 known-from-start rule, the Giza-vs-Cairo enter-disc separation
+  (src/scenes/travel/settlementEntry.test.ts) and Cairo's western skyline (point 82)
+  must all still hold at the unified position. (2) ONE LABEL. Where a map point and a
+  cultural landmark denote the same site, only ONE floating label renders — the map
+  point's, since it is the one the player can act on (it names the enterable place and
+  obeys the §17.2 discovery gate). Suppress the landmark's own label by that identity,
+  NOT by a distance heuristic: a proximity rule would silently hide a genuinely
+  neighbouring landmark, and the two records already share the id `giza`.
+  KEEP INTACT: the §4.4 count of eight built cultural landmarks and Giza's membership
+  in it, its first-sighting journal entry with its kind-flavoured text in BOTH
+  languages, and the §10 bounty rule (a known-from-start place earns no bounty for
+  itself — point 288).
+  VERIFIABLE: pure — the two records resolve to the SAME coordinate, and a sweep
+  asserts no OTHER cultural landmark shares an id with a map point (so the rule is
+  general, not a Giza special case); pure — the label-suppression predicate hides the
+  landmark label exactly when a map point shares its id and never otherwise;
+  `scripts/verify/enrichments.mjs` — at the Giza plateau exactly ONE label element
+  names the pyramids (currently two), with a screenshot, and the sighting still
+  reveals the landmark and journals it; the existing Giza suites
+  (src/scenes/place/gizaSite.test.ts, settlementEntry, landmarks) stay green.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
