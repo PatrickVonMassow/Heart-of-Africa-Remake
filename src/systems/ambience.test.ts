@@ -281,11 +281,16 @@ class FakeCtx {
   state = 'running'
   destination = new FakeNode()
   sources: FakeSource[] = []
+  /** Every gain the engine ever built — lets a test FIND the node a change
+   *  ramped instead of assuming the graph's build order. */
+  gains: FakeGain[] = []
   constructor() {
     FakeCtx.last = this
   }
   createGain() {
-    return new FakeGain()
+    const g = new FakeGain()
+    this.gains.push(g)
+    return g
   }
   createBuffer(_channels: number, len: number) {
     return new FakeBuffer(len)
@@ -431,5 +436,120 @@ describe('playThunder (point 166 — scheduled on the audio clock, survives to f
     playThunder(2, 0.8)
     expect(probe.count).toBe(count + 2)
     expect(probe.lastPeak).toBe(0)
+  })
+})
+
+// The §19.1 proximity call must RISE with a near animal and FADE BACK once it is
+// gone — the audible half of the report, asserted on the real gain node the
+// engine ramps (found by observation, so the test assumes nothing about the
+// graph's build order or the per-voice scaling constants). The live check in
+// scripts/verify/settings.mjs measures the same behaviour in the browser; this
+// pins it without one, so a future change that leaves a voice standing after its
+// animal left fails in the fast layer.
+describe('setAmbienceAnimals (design.md §19.1 — the proximity call rises and fades back to silence)', () => {
+  const defaultVolume = balance.ambienceVolume
+  /** The engine's crossfade window (ambience.ts FADE) — the perceptible time in
+   *  which a call must reach silence; the live check waits 1600 ms for it. */
+  const FADE = 1.6
+  let ctx: FakeCtx
+
+  beforeAll(() => {
+    vi.useFakeTimers() // the emitters' setTimeout loops never run
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx
+    startAmbience() // a no-op if an earlier block already started the engine
+    const c = FakeCtx.last
+    if (!c) throw new Error('the fake audio context was not created')
+    ctx = c
+    // Travel, not a settlement: in a place every animal voice is forced to 0.
+    setAmbienceScene({ region: 'east', mode: 'travel', placeKind: null, nearVillage: false })
+  })
+  afterAll(() => {
+    vi.useRealTimers()
+    balance.ambienceVolume = defaultVolume
+  })
+
+  /** Raise the elephant voice out of silence and return the ONE layer gain that
+   *  moved — identified by the ramp it received, not by its build position. */
+  const riseElephant = (prox: number): FakeParam => {
+    setAmbienceAnimals({ elephant: 0, lion: 0, grazer: 0, flock: 0 })
+    const before = ctx.gains.map((g) => g.gain.events.length)
+    setAmbienceAnimals({ elephant: prox, lion: 0, grazer: 0, flock: 0 })
+    const moved = ctx.gains.filter((g, i) => g.gain.events.length > before[i])
+    expect(moved).toHaveLength(1) // exactly one voice moved: the elephant's own
+    return moved[0].gain
+  }
+
+  /** The value the last scheduled ramp on a param drives to. */
+  const rampTarget = (p: FakeParam): number => {
+    const ramps = p.events.filter((e) => e.type === 'lin')
+    expect(ramps.length).toBeGreaterThan(0)
+    return ramps[ramps.length - 1].value ?? 0
+  }
+
+  it('ramps the voice up when an animal is near and back to exactly 0 when it is gone', () => {
+    ctx.currentTime = 5
+    const param = riseElephant(1)
+    const up = param.events.filter((e) => e.type === 'lin')
+    expect(rampTarget(param)).toBeGreaterThan(0) // audible while it stands there
+    expect(up[up.length - 1].time).toBeCloseTo(5 + FADE, 6)
+    // The animal is gone: the SAME node must be ramped back down to silence.
+    ctx.currentTime = 9
+    setAmbienceAnimals({ elephant: 0, lion: 0, grazer: 0, flock: 0 })
+    expect(rampTarget(param)).toBe(0)
+    const down = param.events.filter((e) => e.type === 'lin')
+    expect(down[down.length - 1].time).toBeCloseTo(9 + FADE, 6) // silent within the fade window
+    expect(param.value).toBe(0)
+  })
+
+  it('an animal walking out of earshot fades the call the whole way — the report hysteresis strands nothing', () => {
+    ctx.currentTime = 20
+    const param = riseElephant(1) // right beside the traveller
+    let prev = rampTarget(param)
+    expect(prev).toBeGreaterThan(0)
+    // Frame by frame it walks from the traveller's feet past the audible radius.
+    // Each single step moves the proximity by far less than the 0.02 report
+    // hysteresis, so a fade may only ever be quantised by it, never stopped.
+    for (let d = 0; d <= PROXIMITY_AUDIBLE; d += 0.5) {
+      setAmbienceAnimals({ elephant: proximityGain(d), lion: 0, grazer: 0, flock: 0 })
+      const v = rampTarget(param)
+      expect(v).toBeLessThanOrEqual(prev + 1e-12) // never louder as it leaves
+      prev = v
+    }
+    expect(prev).toBe(0) // beyond the audible radius the call is exactly silent
+    expect(param.value).toBe(0)
+  })
+
+  it('fades only the voice that left — an animal still near keeps its own call', () => {
+    ctx.currentTime = 30
+    const elephant = riseElephant(1)
+    // A lion joins; its own voice rises on a DIFFERENT node.
+    const before = ctx.gains.map((g) => g.gain.events.length)
+    setAmbienceAnimals({ elephant: 1, lion: 0.8, grazer: 0, flock: 0 })
+    const lionMoved = ctx.gains.filter((g, i) => g.gain.events.length > before[i])
+    expect(lionMoved).toHaveLength(1)
+    const lion = lionMoved[0].gain
+    expect(lion).not.toBe(elephant)
+    expect(rampTarget(lion)).toBeGreaterThan(0)
+    // The elephant leaves, the lion stays: only the elephant's voice goes down.
+    setAmbienceAnimals({ elephant: 0, lion: 0.8, grazer: 0, flock: 0 })
+    expect(rampTarget(elephant)).toBe(0)
+    expect(rampTarget(lion)).toBeGreaterThan(0)
+  })
+
+  it('scales the call with the single ambience volume and silences it at volume 0', () => {
+    ctx.currentTime = 50
+    balance.ambienceVolume = 0.5
+    const param = riseElephant(1)
+    const loud = rampTarget(param)
+    const reRise = () => {
+      setAmbienceAnimals({ elephant: 0, lion: 0, grazer: 0, flock: 0 })
+      setAmbienceAnimals({ elephant: 1, lion: 0, grazer: 0, flock: 0 })
+      return rampTarget(param)
+    }
+    balance.ambienceVolume = 0.25
+    expect(reRise()).toBeCloseTo(loud / 2, 10)
+    balance.ambienceVolume = 0
+    expect(reRise()).toBe(0) // muted: a near animal schedules no audible level
+    balance.ambienceVolume = defaultVolume
   })
 })
