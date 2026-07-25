@@ -193,6 +193,19 @@ Zwei Regeln, die das Netz ehrlich halten:
   Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
   mein aktueller Stand wirklich oben angekommen ist."
 
+- **Der rote Test klagt den Falschen an.** Ein *grüner* Test kann täuschen — ein
+  *roter* aber auch, und der ist gefährlicher, weil er Dringlichkeit erzeugt: An
+  einem einzigen Tag klagten drei rote Prüfungen das Programm an, und alle drei
+  hatten selbst unrecht (eine Markierung, die ein anderes System überschrieb; eine
+  stillschweigende Abstandsannahme, die unter Last kippte; eine Messung, die einen
+  Zwischenzustand traf). Prüfungen veralten von selbst, wenn sich ihre Umgebung
+  ändert.
+  → *Prompt:* „Bevor du auf einen roten Test hin Programmcode änderst: entscheide
+  mit einem **Experiment**, ob der Befund das Produkt oder die Messung belastet.
+  Miss nur an einem eingeschwungenen Zustand, und lass eine Prüfung auch dann
+  fehlschlagen, wenn ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht
+  nur, wenn er die Grenze überschreitet."
+
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** „Zehn Häfen",
   Vorgabewerte, Tastenbelegungen, Aufzählungen: Wer ein Feature baut, aktualisiert
   die Stelle, an der er gerade schreibt; alle anderen Kopien rotten unbemerkt.
