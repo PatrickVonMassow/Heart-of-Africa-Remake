@@ -39,6 +39,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/push-arrival-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-guard.mjs"
           },
           {
@@ -84,6 +88,10 @@
           {
             "type": "command",
             "command": "node scripts/retro-currency-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/guide-brevity-guard.mjs"
           },
           {
             "type": "command",

@@ -216,6 +216,14 @@ Ein Vier-Augen-Audit über **alle 88 Regeln** und **25 Wächter** förderte zuta
 
 **(4) Halbtote Mechanismen sind gefährlicher als fehlende.** Der Wächter für die Wartezeit-Vorarbeit wird nur von Bash-Aufrufen scharfgeschaltet — die Hauptshell dieses Projekts ist PowerShell. Er *existiert*, also gilt die Regel als abgesichert; er *feuert* aber bei der häufigsten Arbeitsweise nie. Dieselbe Klasse: ein Wächter, der bei jedem Zugende blockiert, erzieht zum Überlesen. **Ein Wächter, der nie auslöst, und einer, der immer auslöst, sind beide kaputt** — die Gesundheit eines Mechanismus ist eine eigene Prüfgröße, nicht seine bloße Existenz.
 
+### 3.25 Ein Dokument driftet in die Rolle des Nachbardokuments (25.07.)
+
+Die Einsteiger-Anleitung `vibe-coding-anleitung.md` und diese Retrospektive haben klar getrennte Aufgaben: die Anleitung gibt einem Anfänger pro Fallstrick zwei Sätze Risiko und den Prompt zur Lösung, die Retrospektive trägt die ausführliche Projekterfahrung. Nach einigen Wochen musste der Nutzer feststellen, dass die Anleitung diese Rolle verlassen hatte — einzelne Fallstricke waren zu Fallstudien angewachsen (mit Datumsangaben, Zählwerten, Namen von Projekt-Systemen), zwei Einträge waren reine Logbuch-Notizen über Zeitgrenzen und einen Parser, und ein Absatz erklärte die Änderungsgeschichte eines Merksatzes *innerhalb* der Anleitung. Sie las sich nicht mehr für jemanden, der dieses Repository nie gesehen hat.
+
+Der Mechanismus dahinter ist banal und deshalb hartnäckig: **Wer eine Lehre aufschreibt, schreibt sie dort hin, wo er gerade ist** — und jede frische Lehre fühlt sich ihres eigenen Absatzes wert. Kein einzelner Schritt war falsch; die Summe war es. Genau das unterscheidet Dokument-Drift vom Doku-Veralten aus §3.21: Hier wird nichts *falsch*, es steht nur am falschen Ort, und deshalb schlägt kein Abgleich gegen den Code an.
+
+Die Konsequenz war, die Kürze **messbar** zu machen statt sie zu wollen: ein Gesamtbudget (Zeilen und Wörter), ein Budget pro Fallstrick, die Forderung, dass jeder Fallstrick in einem umsetzbaren Prompt endet, und ein Detektor für die Marker, an denen Projekterfahrung erkennbar ist — Datumsangaben, Punktnummern, Repository-Pfade, der eigene Technologie-Stack, Spielinhalte, Anekdoten-Einleitungen. Der Prüfer läuft doppelt: als Stop-Hook für die schnelle Rückmeldung und als Unit-Test, damit die gewöhnliche Regression selbst das Tor ist. Wichtig war dabei die Formulierung der Fehlermeldung: Sie nennt ausdrücklich die Retrospektive als Zielort und fordert, **hinüberzukürzen statt das Budget zu erhöhen** — ein Budget ohne diesen Satz wird beim ersten Anstoßen einfach hochgesetzt. Die allgemeine Lehre: **Wo zwei Dokumente sich einen Themenbereich teilen, braucht die Grenze zwischen ihnen einen Wächter** — die Rollenbeschreibung im Vorwort hält sie nicht.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -234,6 +242,8 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `render-verify-guard` (Stop) | Render-Change nur mit grünem Lauf auf BEIDEN Backends (mechanisch aufgezeichnet) | WebGL2-only-„fertig" (3.6) |
 | `model-guard` (Stop) | kein Weiterarbeiten nach dem Commit-Trailer eines nicht freigegebenen Modells (Allowlist Opus/Fable; Pausier-Anweisung + ntfy) | stille Modell-Degradation (3.17) |
 | `ci-status-guard` (Stop) | rote CI wird zuverlässig bemerkt (REST-API) | still gebliebene CI-Fehler |
+| `push-arrival-guard` (Stop) | kein Turn-Ende, solange Commits in KEINER Remote-Ref liegen (Zielzustand statt Erfolgsmeldung) | 13 Commits blieben eine Nacht lokal (3.18) |
+| `guide-brevity-guard` (Stop + Unit-Test) | Einsteiger-Anleitung bleibt kurz und projekt-neutral (Budgets, Prompt-Pflicht, Marker-Detektor) | Anleitung driftete zur Projektchronik (3.25) |
 | `timestamp-guard` (Stop, blockierend) | Antwort beginnt mit gemessenem Berlin-Stempel | 9× vergessene Timestamps |
 | `prep-guard` + `prep-arm-hook` (Stop/PostToolUse) | Wartezeit erzwingt Read-only-Prep (Marker automatisch scharf) | Däumchendrehen bei Hintergrundläufen |
 | `batch-singleton` + `lock-heartbeat/-release` + `batch-doctor` | harte Exklusivität (PID, atomar, Stand-down) + Repo-Heilung | parallele Sessions (3.2) |
@@ -328,7 +338,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 19:09 · Quellen-Fingerprint: `4c91b20320c5…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 19:28 · Quellen-Fingerprint: `a1959f540f0f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -370,7 +380,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | 24.07.2026 — TWO claude batch sessions ran in the SAME working dir at once (OS autostart duplicated a live session); how to detect + the safe posture | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -399,8 +409,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 24 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 26 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: 4c91b20320c503fbd7f9bfbe770e1fff2cd62fdf30b2797df22c9d803b99d078 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T17:09:39.641Z -->
+<!-- RETRO-FINGERPRINT: a1959f540f0f0e63610a46cbd0b6197d429bc38d6ab624cd845727c3f5bfb460 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T17:28:24.324Z -->
 <!-- AUTO-GENERATED:END -->

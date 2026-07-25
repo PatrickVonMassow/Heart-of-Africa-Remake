@@ -1,0 +1,170 @@
+// Pure decision core of the guide-brevity guard.
+//
+// docs/analysis_de/vibe-coding-anleitung.md is a SHORT beginner's guide: per
+// pitfall one or two sentences of risk, then the prompt that solves it. It is
+// not a project logbook — the detailed experience belongs in
+// retrospektive-zusammenarbeit.md. Left to prose alone the guide drifts back
+// into a chronicle, because every new lesson feels worth its own paragraph.
+//
+// So the brevity is MEASURED, not intended: a total budget, a per-pitfall
+// budget, a demand that every pitfall ends in an actionable prompt, and a
+// detector for the project-specific markers that signal a war story leaking in
+// (dates, point numbers, repo paths, the project's own tech and nouns).
+//
+// Side-effect free. The wrapper (guide-brevity-guard.mjs) reads the file and is
+// fail-open; guide-brevity-core.test.mjs pins this logic AND audits the real
+// document on every unit-test run, so the regression itself is the enforcement.
+
+export const LIMITS = {
+  maxLines: 345,
+  maxWords: 2700,
+  // A pitfall entry = the risk lines plus its prompt. Anything longer is a
+  // story, not a tip.
+  maxEntryLines: 11,
+  // The risk half alone: name it, do not narrate it.
+  maxRiskLines: 4,
+}
+
+// Markers of project-specific content. Each one belongs in the retrospective
+// instead — the guide must read for someone who has never seen this repo.
+export const PROJECT_MARKERS = [
+  { re: /\b\d{1,2}\.\d{1,2}\.\d{4}\b/, hint: 'konkretes Datum' },
+  { re: /\b(?:Punkt|point)\s+\d+\b/i, hint: 'Punkt-Nummer aus der Aufgabenliste' },
+  { re: /(?:^|[\s("'`])(?:src|scripts|docs|verification|public|node_modules)\//, hint: 'Pfad aus diesem Repository' },
+  {
+    re: /\b(?:WebGPU|WebGL|three\.js|Playwright|Vitest|oxlint|Kokoro|R3F|TSL|jsdom)\b/i,
+    hint: 'Technologie dieses Projekts (die Anleitung bleibt werkzeug-neutral)',
+  },
+  {
+    re: /\b(?:Krokodil|Elefant|Savanne|Kanu|Dorfältest|Häfen|Karawane)\w*/i,
+    hint: 'Spielinhalt dieses Projekts',
+  },
+  { re: /\bin diesem Projekt\b/i, hint: 'Anekdoten-Einleitung' },
+  { re: /\ban einem einzigen Tag\b/i, hint: 'Anekdoten-Einleitung' },
+]
+
+/**
+ * Return the body of a `## <heading>` section, with the line number each line
+ * had in the full document (1-based), so a violation can be reported at its
+ * real position.
+ */
+export function sliceSection(text, headingRe) {
+  const lines = String(text ?? '').split('\n')
+  const start = lines.findIndex((l) => /^##\s+/.test(l) && headingRe.test(l))
+  if (start < 0) return []
+  const out = []
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i])) break
+    out.push({ line: i + 1, text: lines[i] })
+  }
+  return out
+}
+
+/**
+ * Split a section's lines into top-level `- **…**` entries. A new entry starts
+ * at a line beginning with `- ` at column 0; everything indented under it (and
+ * blank lines inside it) belongs to that entry.
+ */
+export function parseEntries(sectionLines) {
+  const entries = []
+  let cur = null
+  for (const { line, text } of sectionLines) {
+    if (/^-\s+\*\*/.test(text)) {
+      const bold = text.match(/\*\*(.+?)\*\*/)
+      cur = { line, title: bold ? bold[1] : text.trim(), lines: [text] }
+      entries.push(cur)
+      continue
+    }
+    if (!cur) continue
+    if (/^\S/.test(text) && text.trim() !== '') {
+      // Un-indented prose ends the entry (a section footer, say).
+      cur = null
+      continue
+    }
+    if (text.trim() === '' && cur.lines.at(-1)?.trim() === '') continue
+    cur.lines.push(text)
+  }
+  // Trailing blank lines are formatting, not content.
+  for (const e of entries) {
+    while (e.lines.length && e.lines.at(-1).trim() === '') e.lines.pop()
+  }
+  return entries
+}
+
+const ACTION_RE = /→\s*\*(?:Prompt|Mechanismus)\s*:\*/
+
+/**
+ * Audit the guide. Returns { ok, violations: [{ kind, line, detail }] }.
+ *
+ * `limits` is injectable so a test can prove a budget bites without editing the
+ * real document.
+ */
+export function auditGuide(text, limits = LIMITS) {
+  const src = String(text ?? '')
+  const violations = []
+  const push = (kind, line, detail) => violations.push({ kind, line, detail })
+
+  const lines = src.split('\n')
+  // The fingerprint comment is bookkeeping, not content.
+  const body = lines.filter((l) => !/^<!--/.test(l.trim()))
+  const words = body.join(' ').split(/\s+/).filter(Boolean).length
+
+  if (lines.length > limits.maxLines) {
+    push('length', lines.length, `${lines.length} Zeilen > Budget ${limits.maxLines}`)
+  }
+  if (words > limits.maxWords) {
+    push('length', 1, `${words} Wörter > Budget ${limits.maxWords}`)
+  }
+
+  // Project markers are checked over the WHOLE document — a war story leaks in
+  // just as easily through an intro paragraph as through a pitfall.
+  const seen = new Set()
+  lines.forEach((l, i) => {
+    for (const { re, hint } of PROJECT_MARKERS) {
+      const m = l.match(re)
+      if (!m) continue
+      const key = `${i}:${hint}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      push('project-specific', i + 1, `„${m[0].trim()}" — ${hint}; gehört in die Retrospektive`)
+    }
+  })
+
+  for (const entry of parseEntries(sliceSection(src, /Fallstrick/i))) {
+    if (entry.lines.length > limits.maxEntryLines) {
+      push(
+        'entry-too-long',
+        entry.line,
+        `„${entry.title}" braucht ${entry.lines.length} Zeilen > ${limits.maxEntryLines}`,
+      )
+    }
+    const actionIdx = entry.lines.findIndex((l) => ACTION_RE.test(l))
+    if (actionIdx < 0) {
+      push('no-prompt', entry.line, `„${entry.title}" nennt kein „→ *Prompt:*" — Risiko ohne Lösung`)
+    } else if (actionIdx > limits.maxRiskLines) {
+      push(
+        'risk-too-long',
+        entry.line,
+        `„${entry.title}" beschreibt das Risiko in ${actionIdx} Zeilen > ${limits.maxRiskLines}`,
+      )
+    }
+  }
+
+  return { ok: violations.length === 0, violations }
+}
+
+/** Render an audit result as the guard's block message. */
+export function formatViolations(violations) {
+  if (!violations.length) return ''
+  const body = violations
+    .map((v) => `  · Zeile ${v.line} [${v.kind}]: ${v.detail}`)
+    .join('\n')
+  return (
+    'VIBE-CODING-ANLEITUNG ZU LANG / ZU PROJEKTSPEZIFISCH ' +
+    `(${violations.length} Verstoß/Verstöße):\n${body}\n` +
+    'Die Anleitung ist eine KURZE Einsteiger-Anleitung: pro Fallstrick ein bis zwei ' +
+    'Sätze Risiko, dann der Prompt. Ausführliche Projekterfahrung gehört nach ' +
+    'docs/analysis_de/retrospektive-zusammenarbeit.md — kürze dort hinüber, statt das ' +
+    'Budget zu erhöhen. Prüfen mit: node scripts/guide-brevity-guard.mjs --status'
+  )
+}

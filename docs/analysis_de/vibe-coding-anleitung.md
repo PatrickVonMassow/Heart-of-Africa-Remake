@@ -1,8 +1,9 @@
 # Vibe Coding — kurze Anleitung aus einem echten Projekt
 
 Für den Einstieg. Destilliert aus einem mehrwöchigen, weitgehend autonom gebauten
-Projekt (3D-Spiel, zwei Render-Backends, ~1600 Tests). Keine Klick-für-Klick-Schritte,
-sondern **Prompts, die du Claude gibst**, und die Fallstricke, die dich sonst einholen.
+Projekt. Keine Klick-für-Klick-Schritte, sondern **Prompts, die du Claude gibst**,
+und die Fallstricke, die dich sonst einholen. Bewusst kurz gehalten — die
+ausführlichen Erfahrungen dahinter stehen in `retrospektive-zusammenarbeit.md`.
 
 ---
 
@@ -15,12 +16,9 @@ automatischer Check, ein Hook, ein Test), verschwand es. Merksatz:
 > *Jede Regel, die wirklich gelten soll, bekommt von Anfang an einen erzwingenden
 > Mechanismus — nicht ein Versprechen.*
 
-Diese Fassung ist eine **Verschärfung**: Ursprünglich lautete der Satz „Was zweimal
-schiefgeht, bekommt einen Mechanismus". Das erwies sich als zu schwach — es lässt
-jeden Fehler einmal geschehen und verlässt sich bis dahin auf Vorsätze, die
-nachweislich nicht halten. Der Aufwand des Mechanismus richtet sich nach der
-Wichtigkeit der Regel (ein leichter Check für eine leichte Regel), aber die
-Grundhaltung ist **erzwingen statt erinnern**, ab der ersten Formulierung.
+Der Aufwand richtet sich nach der Wichtigkeit der Regel — ein leichter Check für
+eine leichte Regel —, aber die Haltung ist **erzwingen statt erinnern**, und zwar
+ab der ersten Formulierung. Nicht erst beim zweiten Schaden.
 
 Fast alles Folgende ist eine Anwendung davon.
 
@@ -56,12 +54,10 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 > Etabliere einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells
 > erkennt und die Arbeit stoppt, statt sie stillschweigend zu übernehmen."
 
-Der Grund für die Rollentrennung: Ein zweites Modell nützt nicht, weil es *besser*
-wäre, sondern weil es **andere blinde Flecken** hat. Diesen Wert hebt nur eine
-Prüfung — eine bloße Übergabe schwerer Aufgaben hebt ihn nicht. (Warum der Stopp
-bei einem fremden Modell nötig ist: In diesem Projekt lief eine Sitzung
-unbemerkt auf einem viel schwächeren Modell und lieferte in 14 Minuten drei
-Attrappen-Ergebnisse, die alle zurückgenommen werden mussten.)
+Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere
+blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Der Stopp
+bei einem fremden Modell ist wichtig: Ein unbemerkt schwächeres Modell liefert
+selbstbewusst Attrappen.
 
 ---
 
@@ -106,12 +102,8 @@ Attrappen-Ergebnisse, die alle zurückgenommen werden mussten.)
    > leichte Regel), aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — und
    > selbst eine ausführlich niedergeschriebene Regel — reicht nicht."
 
-   *(Die frühere, schwächere Form „baue den Mechanismus erst beim zweiten Auftreten" ist damit
-   überholt: das zweite Auftreten ist bereits ein vermeidbarer Schaden.)*
-
-   Und weil ein Mechanismus selbst falsch gebaut sein kann — in diesem Projekt fand
-   die Gegenprüfung in *jedem* geprüften Guard echte Fehler, vom nie auslösenden
-   Muster bis zur Notbremse mit Nebenwirkung:
+   Ein Mechanismus kann selbst falsch gebaut sein — Gegenprüfungen finden darin
+   erfahrungsgemäß mehr Fehler als in gewöhnlichem Code:
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
@@ -172,28 +164,22 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das
   unbeobachtete Y.
-  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Ausgangs-/Danach-Zustand** prüft, und baue
-  eine Handvoll ‚Invarianten' ein, die im Entwicklungsmodus laut meckern, wenn eine
-  Grundregel verletzt wird — so wird jeder Testlauf zum Detektor. Nach jedem
-  Zusammenführen die schnelle Testschicht laufen lassen."
+  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im
+  **Ausgangs-/Danach-Zustand** prüft und nach jedem Zusammenführen die schnelle
+  Testschicht erzwingt. Bau dazu ‚Invarianten' ein, die im Entwicklungsmodus laut
+  meckern, wenn eine Grundregel verletzt wird — so wird jeder Testlauf zum Detektor."
 
 - **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
-  → *Prompt:* „Etabliere einen Mechanismus, der einen Fix erst als fertig zählt, wenn das **Symptom am Ort des Symptoms**
-  als behoben gezeigt hast. Wenn du dich zweimal am selben Problem festbeißt, wechsle die
-  Perspektive (anderes Modell, frische Read-only-Diagnose zuerst)."
+  → *Prompt:* „Etabliere einen Mechanismus, der einen Fix erst dann als fertig zählt,
+  wenn das **Symptom am Ort des Symptoms** als behoben gezeigt wurde. Beißt du dich
+  zweimal am selben Problem fest, wechsle die Perspektive — anderes Modell, frische
+  Read-only-Diagnose zuerst."
 
 - **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller' —
   ohne Messung.
-  → *Prompt:* „Etabliere einen Mechanismus, der ungemessene Zahlen abfängt — kommuniziert werden nur **gemessene** Werte (Laufzeiten, Performance,
-  Kostenschätzungen). Bei Performance auf der **Ziel-Hardware** messen, nicht auf der
-  Build-Maschine."
-
-- **Zweites Modell nur bei Audits.** Ein einzelnes Modell hat blinde Flecken — gerade bei
-  Dingen, die *immer* funktionieren müssen.
-  → *Prompt:* „Schätze vor dem Bau **Schwierigkeit × Kritikalität** ein. Bei Kritischem
-  (etwas Schwer-Reversibles, ein Sicherheits-/Kern-Mechanismus) lass ein **zweites,
-  anderes Modell** Plan und Ergebnis gegenprüfen (sicher? alle Fälle? keine
-  Seiteneffekte?), bevor es zusammengeführt wird."
+  → *Prompt:* „Etabliere einen Mechanismus, der ungemessene Zahlen abfängt: Laufzeiten,
+  Performance und Kosten werden nur **gemessen** kommuniziert — Performance auf der
+  **Ziel-Hardware**, nicht auf der Build-Maschine."
 
 - **Der Assistent bleibt still stehen / schläft ein.** Bei langen, autonomen Läufen endet
   der Fortschritt unbemerkt.
@@ -215,23 +201,19 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   fürs Handy lesbar). Halte dich an meine Format- und Sprachvorgaben auf **allen**
   sichtbaren Ausgaben."
 
-- **Parser ist zu streng oder zu fragil bei Eingaben-Varianten.** Ein Tool (z.B. Dashboard-
-  Parser zur Punkt-Nummern-Extraktion) funktioniert nur mit *exakt* einer Input-Form
-  (z.B. Punkt-Nummer als Plain-Text, nicht in HTML-Tags), und versagt lautlos bei
-  Varianten — führt zu Fehler-Zuständen, die schwer zu debuggen sind.
-  → *Mechanismus:* Parser **robust machen**: akzeptieren mehrere Input-Formen (HTML-tags,
-  plain text, beide), oder ein Unit-Test, der bewusst Varianten durchprobiert; ein
-  sichtbarer Fallback, wenn der Parse fehlschlägt (z.B. `point <unknown>` statt falsch
-  `<none>`), damit Fehler nicht stumm bleiben.
+- **Ein Werkzeug versteht nur genau eine Eingabeform.** Ein Skript läuft mit dem Format,
+  an dem es gebaut wurde, und scheitert bei jeder Variante **lautlos** — der Folgefehler
+  taucht weit entfernt auf und ist kaum zurückzuverfolgen.
+  → *Prompt:* „Etabliere einen Mechanismus, der jede eingabeverarbeitende Stelle gegen
+  **mehrere Eingabeformen** testet und bei einem gescheiterten Parse **sichtbar**
+  scheitert, statt still einen plausiblen Ersatzwert einzusetzen."
 
-- **Timeouts unter Last — Tests, die solo passen, aber parallel zeitraubend sind.** Ein
-  einzelner Test läuft in 10 Sekunden, aber unter Batch-Parallelismus (mehrere Prozesse
-  auf einer Maschine) wartet er unnötig lange und läuft in den 60-/90-Sekunden-Timeout.
-  → *Mechanismus:* Timeouts für Browser-Suiten **dynamisch anpassen** auf Batch-Kontext
-  (z.B. Umgebungsvariable `BATCH_MODE=1` → Timeouts verdoppeln), ODER lokal längere
-  Timeouts für alle Verifikations-Suiten (120-180s statt 90s). Beobachte auch die
-  Parallelisierung selbst: volle dev-server-Parallelität ist oft ein Bottleneck (Port-
-  Contention, I/O), evtl. sequenzielle oder gated Parallelität für intensive Suiten.
+- **Was solo grün ist, kippt unter Last.** Zeitgrenzen, die auf einer ruhigen Maschine
+  großzügig wirken, reißen, sobald mehrere Läufe parallel arbeiten — und der rote Lauf
+  sieht dann aus wie ein Produktfehler.
+  → *Prompt:* „Etabliere einen Mechanismus, der Last erkennt und Zeitgrenzen daran
+  anpasst, statt sie fest zu verdrahten. Einen roten Lauf bewerte ich erst auf einer
+  ruhigen Maschine — vorher wird kein Code geändert."
 
 - **Doku und Code driften auseinander.** Das ‚Was' im Design-Doc passt nicht mehr zum
   ‚Wie' im Code.
@@ -241,78 +223,69 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Messung/Vorschau verunreinigt.** Halbfertiges wird versehentlich als ‚fertig'
   beurteilt; Popups stören Messungen.
-  → *Prompt:* „Etabliere einen Mechanismus, der mein Urteil immer am **veröffentlichten/zusammengeführten** Stand einholt,
-  nie an einem Zwischen-Zweig. Halte Messläufe frei von störenden Fenstern."
+  → *Prompt:* „Etabliere einen Mechanismus, der mein Urteil immer am
+  **veröffentlichten/zusammengeführten** Stand einholt, nie an einem Zwischen-Zweig,
+  und der Messläufe von störenden Fenstern freihält."
 
-- **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert — der Klassiker: auf einem Nebenzweig entwickelt, aber den
-  Hauptzweig hochgeladen; Git meldet zufrieden „alles aktuell", während die Arbeit nur
-  lokal liegt. Dieselbe Falle wie ein grüner Test am falschen Bild.
-  → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung (Hochladen, Veröffentlichen,
-  Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
-  mein aktueller Stand wirklich oben angekommen ist."
+- **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte
+  ist trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt und
+  zufrieden „alles aktuell" meldet, während die Arbeit nur lokal liegt.
+  → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung
+  (Hochladen, Veröffentlichen, Ausliefern) den **Zielzustand** belegt statt der
+  Erfolgsmeldung — er muss zeigen, dass mein Stand wirklich angekommen ist."
 
-- **Deine Regelsammlung verrottet — nur merkt es niemand.** Regeln wachsen an,
-  werden aber nie durchgesehen. Nach einigen Wochen fand ein Audit über 88 Regeln
-  zehn Widersprüche, sechs Doppelungen und mehrere Regeln, die eine Absicherung
-  *behaupteten*, die nie gebaut wurde. Am schlimmsten: Widersprüche **innerhalb
-  einer Datei** (weil man den Anbau schreibt, ohne den Bestand zu lesen) und
-  falsche Inhalte im Kanal mit der **höchsten Frequenz** — eine Erinnerung, die
-  bei jedem Prompt erscheint, lehrte zwei längst zurückgezogene Regeln.
-  → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Regelbestand periodisch zur Durchsicht zwingt — — nicht nur auf
-  Lücken, sondern auf Sauberkeit, Aktualität, Dopplung, Widerspruch,
-  **Wirkungslosigkeit** und Veralterung. Prüfe jede Regel gegen den Code, nicht
-  gegen die Nachbarregel. Und prüfe zuerst die Texte, die am häufigsten
+- **Deine Regelsammlung verrottet — nur merkt es niemand.** Regeln wachsen an und
+  werden nie durchgesehen: Widersprüche (auch innerhalb *einer* Datei), Doppelungen,
+  und Regeln, die eine Absicherung behaupten, die nie gebaut wurde. Am teuersten sind
+  Fehler in den Texten, die am häufigsten eingeblendet werden.
+  → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Regelbestand periodisch zur
+  Durchsicht zwingt — nicht nur auf Lücken, sondern auf Sauberkeit, Aktualität,
+  Dopplung, Widerspruch, **Wirkungslosigkeit** und Veralterung. Jede Regel wird gegen
+  den Code geprüft, nicht gegen die Nachbarregel; zuerst die Texte, die am häufigsten
   eingeblendet werden."
 
 - **Ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst.**
-  Ein Prüfmechanismus kann existieren und trotzdem wirkungslos sein — etwa weil er
-  nur bei einer Shell anspringt, die man kaum benutzt. Dann *gilt* die Regel als
-  abgesichert, ohne es zu sein. Umgekehrt erzieht ein Wächter, der bei jedem
-  Arbeitsschritt blockiert, zum Überlesen.
+  Ein Mechanismus kann existieren und wirkungslos sein — dann gilt die Regel als
+  abgesichert, ohne es zu sein. Und wer bei jedem Schritt blockiert, erzieht zum
+  Überlesen.
   → *Prompt:* „Etabliere einen Mechanismus, der die Schutzmechanismen selbst mitprüft: Hat jeder je ausgelöst?
   Kann er überhaupt auslösen? Doppelt er einen anderen? Ist seine Meldung
   umsetzbar? Und in welcher Reihenfolge melden sie sich — die brauchbarste
   Meldung muss zuerst kommen."
 
-- **Der rote Test klagt den Falschen an.** Ein *grüner* Test kann täuschen — ein
-  *roter* aber auch, und der ist gefährlicher, weil er Dringlichkeit erzeugt: An
-  einem einzigen Tag klagten drei rote Prüfungen das Programm an, und alle drei
-  hatten selbst unrecht (eine Markierung, die ein anderes System überschrieb; eine
-  stillschweigende Abstandsannahme, die unter Last kippte; eine Messung, die einen
-  Zwischenzustand traf). Prüfungen veralten von selbst, wenn sich ihre Umgebung
-  ändert.
-  → *Prompt:* „Etabliere einen Mechanismus, der vor jeder Code-Änderung auf einen roten Test hin entscheiden lässt —
-  mit einem **Experiment**, ob der Befund das Produkt oder die Messung belastet.
-  Miss nur an einem eingeschwungenen Zustand, und lass eine Prüfung auch dann
-  fehlschlagen, wenn ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht
+- **Der rote Test klagt den Falschen an.** Ein grüner Test kann täuschen — ein roter
+  auch, und der ist gefährlicher, weil er zum schnellen Eingriff verleitet. Prüfungen
+  veralten von selbst, wenn sich ihre Umgebung ändert, und klagen dann gesunden Code an.
+  → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten
+  Test hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die
+  Messung? Gemessen wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt
+  auch dann fehl, wenn ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht
   nur, wenn er die Grenze überschreitet."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** „Zehn Häfen",
-  Vorgabewerte, Tastenbelegungen, Aufzählungen: Wer ein Feature baut, aktualisiert
-  die Stelle, an der er gerade schreibt; alle anderen Kopien rotten unbemerkt.
-  Nachträgliche Doku-Audits *ohne* Code-Abgleich machen es schlimmer, weil sie
-  falsche Aussagen ausformulieren statt sie zu prüfen.
-  → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen Ort zuweist; alle anderen
-  Stellen verweisen darauf statt ihn zu wiederholen. Wo sich eine Wiederholung nicht
-  vermeiden lässt, schreib mir einen Test, der sie gegen den Code prüft, dem der
-  Fakt gehört. Und prüfe Doku immer gegen den **Code**, nie gegen die Nachbarprosa."
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Zählwerte,
+  Vorgabewerte, Tastenbelegungen, Aufzählungen: Wer baut, aktualisiert die Stelle, an
+  der er gerade schreibt; die übrigen Kopien rotten unbemerkt. Doku-Audits *ohne*
+  Code-Abgleich machen es schlimmer.
+  → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen
+  Ort zuweist; alle anderen Stellen verweisen darauf, statt ihn zu wiederholen. Wo sich
+  eine Wiederholung nicht vermeiden lässt, prüft ein Test sie gegen den Code, dem der
+  Fakt gehört — Doku wird immer gegen den **Code** geprüft, nie gegen die Nachbarprosa."
 
 - **„Aufgeräumt" ohne Beweisliste.** Nach einem Zwischenfall räumt man dort auf, wo
-  man den Schaden vermutet — und übersieht den Rest. Der Nutzer findet ihn dann
-  zufällig, was mehr Vertrauen kostet als der Zwischenfall selbst.
-  → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine Beweisliste erzwingt — arbeite eine
-  Liste ab und belege jeden Punkt — liegt alles am Zielort? Gibt es Reste (Kodierung,
-  Waisen-Dateien, Tests ohne echte Prüfung)? Ist jedes zuletzt gebaute Feature samt
-  Tests plausibel? Passen Dokumente und Code noch zusammen? Und am Ende: läuft alles
-  grün?"
+  man den Schaden vermutet, und übersieht den Rest — den dann jemand anders findet.
+  → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine
+  **Beweisliste** erzwingt, deren Punkte einzeln zu belegen sind: Liegt alles am
+  Zielort? Gibt es Reste (kaputte Kodierung, Waisen-Dateien, Tests ohne echte Prüfung)?
+  Ist jedes zuletzt gebaute Feature samt Tests plausibel? Passen Dokumente und Code noch
+  zusammen? Läuft am Ende alles grün?"
 
 - **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft am Ende
-  gegen dieselbe Vorstellung, aus der der Fehler stammt — deshalb übersieht man
-  ausgerechnet die Stelle, an der die Wirklichkeit anders aussieht als gedacht.
-  → *Prompt:* „Etabliere einen Mechanismus, der bei allem, was zuverlässig laufen muss, **ein anderes Modell** erst
-  den Plan und danach das fertige Ergebnis gegenprüfen — und zwar gegen die echten
-  Daten, nicht gegen die Beschreibung."
+  gegen dieselbe Vorstellung, aus der der Fehler stammt. Ein einzelnes Modell hat blinde
+  Flecken — besonders bei Dingen, die *immer* funktionieren müssen.
+  → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit ×
+  Kritikalität** einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und
+  danach das fertige Ergebnis gegenprüfen lässt — gegen die echten Daten, nicht gegen
+  die Beschreibung, und bevor zusammengeführt wird."
 
 ---
 
@@ -331,15 +304,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > Änderungen vor, setz sie nicht ungefragt um."
 
 3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Viel Delegation ist ein
-   Vervielfacher — aber erst, wenn Isolierung, saubere Zustände und Exklusivität stehen.
-   Sonst vervielfacht sie das Chaos. Das konkrete Werkzeug für parallele Arbeit sind
-   **Feature-Branches**: jede Aufgabe auf ihrem eigenen Zweig von `main`, und wenn mehrere
-   Stränge gleichzeitig laufen, jeweils in einer **eigenen Arbeitskopie** (Git-Worktree),
-   damit sich die Zweige nicht in einem Verzeichnis überschreiben. `main` bleibt dabei
-   immer der fertige, geprüfte Stand — ein Zweig wird erst zusammengeführt, wenn sein Punkt
-   komplett und (bei Sichtbarem: am Bild, auf allen Ziel-Backends) verifiziert ist.
-   Wichtigste Voraussetzung fürs echte Parallelisieren: die gleichzeitigen Stränge dürfen
-   sich **nicht dieselben Dateien** teilen — sonst kollidieren sie beim Zusammenführen.
+   Vervielfacher — aber erst, wenn Isolierung und Exklusivität stehen; sonst
+   vervielfacht sie das Chaos. Das Werkzeug dafür sind **Feature-Branches** mit je
+   einer **eigenen Arbeitskopie** (Git-Worktree), und die Bedingung fürs echte
+   Parallelisieren ist, dass die Stränge sich **nicht dieselben Dateien** teilen.
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch von `main` und führe
    > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
    > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
@@ -352,7 +320,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 > „Lies `design.md` als einzige Wahrheit und leg ein `TASKS.md` an. Richte die zwei
 > Testschichten ein. Nach jeder Änderung: Build/Lint/Audit sauber, ein Test auf der
-> passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn dir
+> passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn
 > wir eine Regel festlegen, bau sofort den Check, der sie erzwingt. Bei Kritischem
 > hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das Zielbild unklar ist — rate
 > nicht."
@@ -360,4 +328,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: a61320ca18a3aaf80b4a31e3db10c3a4707de7f48927f535d417950838fc0a97 -->
+<!-- GUIDE-FINGERPRINT: a1959f540f0f0e63610a46cbd0b6197d429bc38d6ab624cd845727c3f5bfb460 -->
