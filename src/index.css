@@ -477,6 +477,19 @@ textarea {
   z-index: 6;
 }
 
+/* The settlement enter hint ("Space to enter <name>", design.md §2.3) sits a
+   little BELOW the screen centre instead of at the bottom bar: close enough to
+   the action to be read at a glance, far enough from the centre that it never
+   covers the traveller's figure. 60 % of the viewport height puts the box's
+   centre in the marked band. Only this variant moves — the ordinary interaction
+   prompts (camp, doors, elder) keep their bottom anchor, as do the centred
+   status-bar hints of §17.1. */
+.prompt.prompt-enter {
+  top: 60%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
 /* On touch the prompt is a tappable button; keep it visually identical to the
    plain label but with a comfortable tap target (design.md §17.5, point 84). */
 .prompt-tappable {

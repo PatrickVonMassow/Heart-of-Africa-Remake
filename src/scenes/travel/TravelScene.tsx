@@ -39,7 +39,7 @@ import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, 
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
-import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress } from '../../systems/input'
+import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress, wheelTargetsScene } from '../../systems/input'
 import { resolveTravelMove } from '../../systems/movement'
 import { CURRENT_WEATHER, nileFloodAt, okavangoFloodAt, seasonalSnowAt, sunDimFactor } from '../../systems/season'
 import { crownCollapse, drynessFromTint, FLORA_COLOR_LIFT, groundSprout, seasonTintNode, wetGroundColor, wetGroundRoughness } from '../../render/seasonTint'
@@ -2644,6 +2644,10 @@ export function TravelScene() {
     const onWheel = (e: WheelEvent) => {
       const ui = useUi.getState()
       if (ui.dialog) return
+      // Point 325: a wheel over a scrollable overlay (debug menu, journal, load
+      // table) scrolls THAT panel only — scrolling the long debug panel must
+      // not zoom the view underneath it.
+      if (!wheelTargetsScene(e.target)) return
       ui.setTravelZoom(ui.travelZoom * Math.exp(e.deltaY * 0.0009))
     }
     window.addEventListener('wheel', onWheel, { passive: true })

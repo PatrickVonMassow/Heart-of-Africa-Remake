@@ -191,19 +191,26 @@ function Prompt() {
   const prompt = useUi((s) => s.prompt)
   const dialog = useUi((s) => s.dialog)
   const touchActive = useUi((s) => s.touchActive)
+  // The settlement enter hint gets its own anchor (a little below the screen
+  // centre, see .prompt-enter in index.css). ui.enterPlaceId is set ONLY by the
+  // bird's-eye scene while the traveller stands in an enter radius, and cleared
+  // when that scene unmounts — so it is exactly the "Space to enter <name>"
+  // case, and never a camp, door or elder prompt.
+  const enterHint = useUi((s) => s.enterPlaceId !== null)
   if (!prompt || dialog) return null
+  const cls = enterHint ? 'prompt prompt-enter' : 'prompt'
   // On touch the prompt is the only interaction affordance, so it becomes
   // tappable: a tap dispatches the same synthetic Space keydown the use key
   // would (design.md §17.5, point 84) — one input path. On desktop it stays a
   // plain, non-interactive label (PC play unchanged).
   if (touchActive) {
     return (
-      <button className="prompt prompt-tappable" onClick={() => dispatchSyntheticKey('Space')}>
+      <button className={`${cls} prompt-tappable`} onClick={() => dispatchSyntheticKey('Space')}>
         {prompt}
       </button>
     )
   }
-  return <div className="prompt">{prompt}</div>
+  return <div className={cls}>{prompt}</div>
 }
 
 

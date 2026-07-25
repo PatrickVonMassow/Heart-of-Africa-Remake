@@ -36,6 +36,28 @@ export function dispatchSyntheticKey(code: string): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new KeyboardEvent('keydown', { code }))
 }
 
+/**
+ * The HUD overlays that scroll on their own (design.md §21 debug menu, §15
+ * journal, §18 load table). The wheel belongs to whichever of these the pointer
+ * sits over — see wheelTargetsScene.
+ */
+export const SCROLLABLE_OVERLAY_SELECTOR = '.debug-menu, .journal, .load-menu'
+
+/**
+ * True when a wheel event should drive the SCENE (the bird's-eye zoom of §21.4)
+ * rather than an overlay's own scrollbar (point 325). The zoom listener sits on
+ * `window`, so a wheel over the long debug panel used to scroll the panel AND
+ * change the view; the panel keeps the wheel to itself now.
+ *
+ * Pure: reads only the event target's DOM ancestry. A non-element target (the
+ * window itself, as the headless suites dispatch it) targets the scene.
+ */
+export function wheelTargetsScene(target: EventTarget | null): boolean {
+  const el = target as Element | null
+  if (!el || typeof el.closest !== 'function') return true
+  return el.closest(SCROLLABLE_OVERLAY_SELECTOR) === null
+}
+
 /** Register a keydown handler for a specific code; returns unsubscribe. */
 export function onKeyPress(code: string, cb: () => void): () => void {
   const handler = (e: KeyboardEvent) => {

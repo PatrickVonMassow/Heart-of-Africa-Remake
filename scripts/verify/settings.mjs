@@ -537,6 +537,56 @@ check('graphics levels: the debug allow-flags stay untouched across the cycle (r
 check('Graphics levels: no new console errors across the F9 cycle', errors.length === errsBeforeLow,
   errors.slice(errsBeforeLow).join(' | ').slice(0, 300))
 
+// --- Point 325: a wheel over the debug panel scrolls it, never the zoom -------
+// The bird's-eye zoom listens on `window`, so a wheel over the long debug menu
+// used to scroll the panel AND zoom the view underneath it. The counter-check
+// matters as much: the same wheel over the canvas must still zoom, so the gate
+// costs the scene nothing. Deliberately LAST — the check moves the camera and
+// briefly opens the debug menu, and no other assertion may inherit that state.
+await page.waitForFunction(() => window.__travelWheelReady === true, null, { timeout: 20000 }).catch(() => {})
+await page.waitForTimeout(300)
+const zoomBefore = await page.evaluate(() => window.__ui.getState().travelZoom)
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
+await page.waitForFunction(() => !!document.querySelector('.debug-menu'), null, { timeout: 10000 }).catch(() => {})
+const wheelOverPanel = await page.evaluate(() => {
+  const before = window.__ui.getState().travelZoom
+  const panel = document.querySelector('.debug-menu')
+  // Dispatch on a NESTED child, the realistic case: the pointer sits over a
+  // label or a field deep inside the panel, not on its outer box.
+  const inner = panel?.querySelector('label span, span, label') ?? panel
+  inner?.dispatchEvent(new WheelEvent('wheel', { deltaY: -600, bubbles: true }))
+  return { before, after: window.__ui.getState().travelZoom, found: !!panel }
+})
+check(
+  'wheel over the debug panel leaves the bird\'s-eye zoom untouched',
+  wheelOverPanel.found && wheelOverPanel.after === wheelOverPanel.before,
+  `${wheelOverPanel.before} → ${wheelOverPanel.after}`,
+)
+await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
+await page.waitForTimeout(300)
+// The control. Retried like the enrichments zoom check: a freshly revealed
+// terrain chunk can briefly Suspend the travel subtree, dropping its window
+// wheel listener until React remounts it.
+let canvasWheel = { before: 0, after: 0 }
+for (let i = 0; i < 10; i++) {
+  const ready = await page.evaluate(() => window.__travelWheelReady === true && window.__game.getState().mode === 'travel')
+  if (ready) {
+    canvasWheel = await page.evaluate(() => {
+      const before = window.__ui.getState().travelZoom
+      document.querySelector('canvas')?.dispatchEvent(new WheelEvent('wheel', { deltaY: -600, bubbles: true }))
+      return { before, after: window.__ui.getState().travelZoom }
+    })
+    if (canvasWheel.after !== canvasWheel.before) break
+  }
+  await page.waitForTimeout(250)
+}
+check(
+  'the same wheel over the canvas still zooms (the gate costs the scene nothing)',
+  canvasWheel.after !== canvasWheel.before,
+  `${canvasWheel.before} → ${canvasWheel.after}`,
+)
+await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

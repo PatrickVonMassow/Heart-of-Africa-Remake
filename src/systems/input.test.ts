@@ -16,6 +16,7 @@ import {
   onTouchEngage,
   isTouchEngaged,
   dispatchSyntheticKey,
+  wheelTargetsScene,
 } from './input'
 
 const press = (code: string) => window.dispatchEvent(new KeyboardEvent('keydown', { code }))
@@ -147,5 +148,66 @@ describe('touch engagement latch (design.md §17.5, point 84 — deliberate-inpu
     expect(cb).toHaveBeenCalledTimes(1) // already armed -> fires synchronously
     window.dispatchEvent(new Event('touchstart')) // a second touch is not the arming one
     expect(isTouchEngaged()).toBe(true)
+  })
+})
+
+// Point 325: the bird's-eye zoom listens on `window`, so without this gate a
+// wheel over the long debug panel scrolled the panel AND zoomed the view.
+describe('wheelTargetsScene — a scrollable overlay keeps the wheel to itself', () => {
+  const mount = (html: string) => {
+    const host = document.createElement('div')
+    host.innerHTML = html
+    document.body.appendChild(host)
+    return host
+  }
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
+  it('lets a wheel over the canvas drive the scene', () => {
+    const host = mount('<canvas id="scene"></canvas>')
+    expect(wheelTargetsScene(host.querySelector('#scene'))).toBe(true)
+  })
+
+  it('keeps a wheel over the debug panel — and any child of it — out of the zoom', () => {
+    const host = mount('<div class="debug-menu"><span id="hd">Debug</span></div>')
+    expect(wheelTargetsScene(host.querySelector('.debug-menu'))).toBe(false)
+    expect(wheelTargetsScene(host.querySelector('#hd'))).toBe(false)
+  })
+
+  it('covers a deeply nested control inside the debug panel', () => {
+    const host = mount(
+      '<div class="debug-menu"><section><label><span>Zoom</span><input id="f" /></label></section></div>',
+    )
+    expect(wheelTargetsScene(host.querySelector('#f'))).toBe(false)
+  })
+
+  it('covers the journal panel and the load table the same way', () => {
+    const host = mount(
+      '<div class="journal"><p id="entry">Entry</p></div>' +
+        '<table class="load-menu"><tbody><tr><td id="cell">Cairo</td></tr></tbody></table>',
+    )
+    expect(wheelTargetsScene(host.querySelector('.journal'))).toBe(false)
+    expect(wheelTargetsScene(host.querySelector('#entry'))).toBe(false)
+    expect(wheelTargetsScene(host.querySelector('.load-menu'))).toBe(false)
+    expect(wheelTargetsScene(host.querySelector('#cell'))).toBe(false)
+  })
+
+  it('is false-positive-free: bare HUD chrome beside a panel still zooms', () => {
+    const host = mount(
+      '<div class="debug-menu"><span>Debug</span></div>' +
+        '<div class="status-bar"><span id="stat">1890</span></div>' +
+        '<div class="inventory-bar"><button id="item">Canoe</button></div>',
+    )
+    expect(wheelTargetsScene(host.querySelector('.status-bar'))).toBe(true)
+    expect(wheelTargetsScene(host.querySelector('#stat'))).toBe(true)
+    expect(wheelTargetsScene(host.querySelector('#item'))).toBe(true)
+    expect(wheelTargetsScene(document.body)).toBe(true)
+  })
+
+  it('treats a non-element target (window, document, null) as the scene', () => {
+    expect(wheelTargetsScene(null)).toBe(true)
+    expect(wheelTargetsScene(window)).toBe(true)
+    expect(wheelTargetsScene(document)).toBe(true)
   })
 })

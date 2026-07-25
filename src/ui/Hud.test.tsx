@@ -23,11 +23,11 @@ beforeEach(() => {
   // newGame() does not reset hasCheckpoint, and the UI store is a singleton —
   // clear both so overlays/prompts from a prior test never leak in.
   useGame.setState({ hasCheckpoint: false })
-  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
+  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
 })
 afterEach(() => {
   useLocale.getState().setLang('en')
-  useUi.setState({ dialog: null, prompt: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
+  useUi.setState({ dialog: null, prompt: null, enterPlaceId: null, mapOpen: false, webglFallback: false, webglWarningDismissed: false, touchActive: false })
 })
 
 const invClass = (eq: string) => document.querySelector(`[data-eq="${eq}"]`)?.className ?? ''
@@ -226,6 +226,30 @@ describe('interaction prompt (design.md §17)', () => {
     useUi.getState().setDialog({ kind: 'bazaar' })
     render(<Hud />)
     expect(document.querySelector('.prompt')).not.toBeInTheDocument()
+  })
+
+  // Point 317: the settlement enter hint carries its own anchor class, which
+  // CSS lifts from the bottom bar to just below the screen centre. Ordinary
+  // prompts (camp, doors, elder) must NOT get it.
+  it('marks only the settlement enter hint with the below-centre anchor class', () => {
+    useUi.setState({ prompt: en.prompts.enterPlace('Cairo'), enterPlaceId: 'cairo' })
+    const { unmount } = render(<Hud />)
+    expect(document.querySelector('.prompt')?.className).toContain('prompt-enter')
+    unmount()
+    // Same prompt text, no enter candidate → the plain bottom-anchored prompt.
+    useUi.setState({ prompt: en.prompts.openCamp, enterPlaceId: null })
+    render(<Hud />)
+    expect(document.querySelector('.prompt')).toBeInTheDocument()
+    expect(document.querySelector('.prompt')?.className).not.toContain('prompt-enter')
+  })
+
+  it('keeps the below-centre anchor on the tappable touch variant', () => {
+    useUi.setState({ prompt: en.prompts.enterPlace('Cairo'), enterPlaceId: 'cairo', touchActive: true })
+    render(<Hud />)
+    const el = document.querySelector('.prompt') as HTMLElement
+    expect(el.tagName).toBe('BUTTON')
+    expect(el.className).toContain('prompt-enter')
+    expect(el.className).toContain('prompt-tappable')
   })
 })
 
