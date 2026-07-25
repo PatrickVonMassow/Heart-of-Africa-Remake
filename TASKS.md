@@ -11350,7 +11350,7 @@ the remaining open points in their numeric order.
   price check) shows a clearly lower LOW GPU median in the dressing-dominated savanna
   phases without a visual regression the user rejects.
 
-- [ ] 311. CALF-ESCAPE REGRESSION AFTER THE PARENT SACRIFICE (found 25.07.2026 by the
+- [x] 311. CALF-ESCAPE REGRESSION AFTER THE PARENT SACRIFICE (found 25.07.2026 by the
   point-309 re-validation LARGE run; prime suspect: the point-262 orphan adoption,
   merged 24.07 22:44 and never large-verified). The §19.8 sacrifice ending is broken
   in the full LionHunt path: the parent is taken in the calf's place (parentDead
@@ -11924,6 +11924,30 @@ the remaining open points in their numeric order.
   repeated runs; a pure test for whatever disposal rule was wrong; the picture
   unchanged on both backends (a dispose fix must not blank the post chain — that
   exact regression is what 5e107e4 had to repair).
+
+- [ ] 335. GREY BAND ACROSS THE HORIZON AT THE GIZA SITE (user 25.07.2026 with a
+  screenshot from the DEPLOYED build, standing on the Giza monument site looking
+  north: a long flat grey/silver strip lies along the horizon line, starting
+  mid-frame and running to the right, clearly foreign to the desert plain; the
+  user recalls a previous bug of this kind and asks whether it was never fixed or
+  the fix was incomplete). THE PRIOR CASE IS POINT 227: a settlement's surrounding
+  panorama band had been CAPTURED before the terrain chunk under the capture point
+  was committed, so the band held only water sheets and landmarks — and on
+  re-entry its water edge drew as a hard grey line above the dunes. That fix added
+  `panoramaCaptureReady` (capture waits for the committed chunk) and is pure-tested
+  in src/scenes/travel/panoramaMath.test.ts. The screenshot's strip has exactly
+  that signature, so START by checking whether the Giza site — a MONUMENT place
+  added later by point 273, not a settlement — takes the same capture/show path:
+  does `enteredFromTravel` gate it, does `panoramaCaptureReady` cover the monument
+  entry, and is the band even the right surface here (rule out the §2.5 geometry
+  backdrop and the far water sheet before blaming the band). Then fix at the root
+  and EXTEND THE GATE to every place kind, so a third place kind cannot reopen it.
+  VERIFIABLE: a pure test pinning the capture/show gate for a MONUMENT place (the
+  regression witness: a monument entered from travel with an uncommitted chunk
+  must not show a band); a live check at Giza asserting no foreign horizontal band
+  in the horizon strip (pixel row analysis like the point-181 footing check, not a
+  guessed constant); screenshots from several standpoints on BOTH backends; the
+  point-227 settlement checks stay green.
 
 ## Closing (only after all points)
 
