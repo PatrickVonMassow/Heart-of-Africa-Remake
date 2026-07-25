@@ -11917,7 +11917,7 @@ the remaining open points in their numeric order.
   cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
   draft; a doc's symbol citations must be checked against the code that shipped.
 
-- [ ] 334. WEBGPU RENDER-TARGET LEAK IS BACK IN THE TRAA TOGGLE STRESS (found
+- [x] 334. WEBGPU RENDER-TARGET LEAK IS BACK IN THE TRAA TOGGLE STRESS (found
   25.07.2026 by the assurance pass, WebGPU only, FAILS TWICE — not a flake). The
   settings.mjs check "TRAA toggle stress: no render-target leak across rebuilds"
   reports the renderer's texture count climbing 33 -> 47 over the toggle cycles;
