@@ -13132,6 +13132,38 @@ the remaining open points in their numeric order.
   DOCS in the same commit: design.md §19.10 and the implementation section of
   `docs/peoples-1890.md` (the standing rule that research and game table never drift).
 
+- [ ] 360. THE INHABITANTS TAKE NOTICE OF EACH OTHER (user 25.07.2026). Every villager
+  runs its errand alone: they pass within a metre of one another and nothing happens.
+  A place where nobody acknowledges anybody reads as a set of independent machines
+  sharing a courtyard.
+  TARGET, three encounters built on what already exists in `src/scenes/place/
+  PlaceLife.tsx`:
+  (a) A MEETING. Two walkers whose paths cross stop for a few seconds, turn to face each
+  other, exchange a small lean — the figures have no arms to raise, so the greeting is
+  carried by facing, a brief bow-like lean and the pause itself — and then go on.
+  (b) A HANDOVER. The errand walkers already carry a `bundle` or a `jar`; sometimes a
+  meeting passes that load to the other, who carries it onward to ITS destination. The
+  object must visibly change owner — one carrier, then the other, never two or none.
+  (c) A GATHERING. More than one figure at the fire at the same time rather than the
+  lone tender: two or three around it, one of them kneeling. This DEPENDS ON POINT 350 —
+  the kneeling pose must be a real pose before several figures use it, or the gathering
+  multiplies a visibly squashed figure.
+  RULES: a meeting always ends (a window, then both resume — the house rule that nothing
+  started runs forever); a pair that has just met is not eligible again for a cooldown,
+  or two figures will greet each other in a loop; a meeting never begins where the pair
+  would stand inside a collider or block a doorway; and the errands still COMPLETE — the
+  village must not become a place where everyone chats and nothing arrives.
+  KEEP: the point-155 guarantees (clear standing circle, escape direction, the pinned-
+  walker nudge) and the ordinary errand rhythm as the backbone.
+  VERIFIABLE: pure — the partner choice takes an available walker within the radius and
+  never one already in an encounter or inside a building; the handover moves the load
+  exactly once (source empty, target carrying); the meeting window expires
+  deterministically and the cooldown blocks an immediate repeat. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): over a sampled interval at
+  least one pair meets, both yaws turn toward each other, they part, and the errand
+  targets are still reached afterwards; no walker is left standing past its window.
+  DOCS: design.md §19.10 beside the existing village vignettes.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
