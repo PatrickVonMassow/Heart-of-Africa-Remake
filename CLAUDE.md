@@ -1008,24 +1008,48 @@ verify suite that proves it.
     samples the mirrored column, and a magenta probe injected due west
     of the capture point proves the rendered horizon compass-true
     seed-independently; a direct place-to-place enter falls back to the
-    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). TWO
-    gates keep that band honest. Freshness: the capture is a module
+    geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). THREE
+    gates keep that band honest, and every one of them applies to EVERY
+    place kind: the band/no-band decision runs through one rule
+    (`panoramaBandShown`) keyed on a map TOTAL over `PlaceKind` — and
+    `PlaceKind` is derived from the `PLACE_KINDS` value list — so a fourth
+    kind cannot compile until it has been decided about, nor slip the kind
+    sweeps in the tests (point 335; the monument site of point 273 was the
+    late third kind that made the question worth pinning). Freshness: the
+    capture is a module
     singleton that OUTLIVES its visit, so the store's `enteredFromTravel`
     (true only for an enter out of the bird's-eye view; false on a
     place→place enter, a ferry passage, a resumed snapshot and while
     travelling) decides whether it may be shown at all, without which a
     place captured earlier in the run wrongly re-showed its stale band
-    (pure-tested in `src/state/store.travel.test.ts`). Completeness: the
-    capture never fires before the terrain chunk under the capture point
-    is COMMITTED to the scene (point 227) — the first travel frame after
-    leaving a settlement runs before the streamed chunk meshes mount, and
-    a capture that frame baked a TERRAINLESS band (only water sheets,
-    landmarks and markers) which a re-entry drew over the backdrop as a
-    hard grey horizon line with a thin blue-grey water band below it; the
-    gate (`panoramaCaptureReady`) is pure-tested in
-    `src/scenes/travel/panoramaMath.test.ts` and the leave-capture's band
-    is live-checked to bake the surrounding terrain (bottom-quarter
-    opacity) in `scripts/verify/polish.mjs`; the §4.4 port skyline landmarks
+    (pure-tested in `src/state/store.travel.test.ts`). Completeness in
+    TIME: the capture never fires before the terrain around the capture
+    point is COMMITTED to the scene (point 227) — the first travel frame
+    after leaving a settlement runs before the streamed chunk meshes
+    mount, and a capture that frame baked a TERRAINLESS band (only water
+    sheets, landmarks and markers) which a re-entry drew over the backdrop
+    as a hard grey horizon line with a thin blue-grey water band below it.
+    The gate covers the whole chunk RING around the capture point
+    (`PANORAMA_CHUNK_RADIUS`, one inside the travel scene's own streaming
+    radius so it stays satisfiable), not just the centre chunk.
+    Completeness in SPACE (point 335): the capture camera's far plane is
+    clipped to that ring's reach (`panoramaCaptureFar`). It used to look
+    900 world units out while terrain streams to ~144, and the sea plane,
+    river ribbons and lake sheets have no such bound — so everything past
+    the window baked in FLOATING with no ground behind it, and the place
+    scene drew a hard, flat grey/silver strip lying ABOVE the band's own
+    horizon with the backdrop's relief showing through the transparent gap
+    over and under it (the reported Giza picture; worst on an open desert
+    plateau, but present at Cairo too). Both gates and the kind rule are
+    pure-tested in
+    `src/scenes/travel/panoramaMath.test.ts` — including the monument
+    witness: Giza entered from travel with an uncommitted chunk shows NO
+    band. Live: the leave-capture's band is checked to bake the surrounding
+    terrain (bottom-quarter opacity), and at the Giza site the band is
+    asserted to hold no floating strip over a HOLE in its surroundings —
+    per pixel row, a column's opaque rows must form ONE run, which real
+    surroundings always do and the far-field artefact never did
+    (`scripts/verify/polish.mjs`, screenshots 141); the §4.4 port skyline landmarks
     hold — Cape Town mounts the Table Mountain massif (`__placeSkyline`,
     its flat wide profile pure-tested in `src/render/landmarks.test.ts`),
     Cairo mounts the Giza pyramids as its western skyline (point 82) —

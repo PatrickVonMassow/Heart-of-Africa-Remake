@@ -746,6 +746,11 @@ for (const [placeId, shot] of [
   await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'giza', null, { timeout: 15000 })
   const gizaPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
   check('the enter hint arms and names Giza (discovered, localized)', /Giza|Gizeh/.test(gizaPrompt), gizaPrompt)
+  // Wait for the approach capture (points 227/335): the band may only be shot
+  // once the terrain ring around the capture point is committed, so entering
+  // before it lands would leave the monument on the geometry backdrop and make
+  // the horizon check below vacuous.
+  await page.waitForFunction(() => window.__placePanorama?.placeId === 'giza', null, { timeout: 60000 }).catch(() => {})
   // Re-set the live position right before the press (Space re-derives from it).
   await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
   await page.keyboard.press('Space')
@@ -822,6 +827,108 @@ for (const [placeId, shot] of [
       r > g && g > b && r - b > 22 && r > 120,
       `mean ground rgb ${r.toFixed(0)}/${g.toFixed(0)}/${b.toFixed(0)}`,
     )
+  }
+
+  // Point 335: no FOREIGN flat band across the horizon. The reported picture
+  // showed a long grey/silver strip along the horizon line, with the desert's
+  // own dunes and ridge visible above AND below it. The monument is a late
+  // third place kind, so first pin that it takes the band path at all.
+  {
+    const bandActive = await page.evaluate(() => window.__placePanoramaActive ?? false)
+    check(
+      'the monument site shows its captured travel band like any settlement (point 335)',
+      bandActive === true,
+      `band active ${bandActive}`,
+    )
+
+    // The gate, measured per PIXEL ROW on the artefact that carries the defect.
+    //
+    // What made the strip foreign was a HOLE: the capture reached 900 wu while
+    // the travel scene streams terrain to ~144, and the sea plane / river
+    // ribbons / lake sheets have no such bound — so a column of the band ran
+    // terrain, then NOTHING (the far field past the window), then a lone water
+    // sheet floating at the top. Drawn over the geometry backdrop that hole let
+    // the backdrop's relief through above and below the sheet, which is exactly
+    // the reported picture. A column of real surroundings can never do that:
+    // ground is contiguous from the horizon down, so every opaque run is ONE
+    // run. Counting columns whose opaque rows are split by a transparent gap
+    // therefore isolates the defect with no assumed tone, row or distance.
+    //
+    // (The frame-level reading — a flat non-ground strip sandwiched between
+    // ground — cannot be the gate: east of Giza the world really does put the
+    // Red Sea and the trimmed Arabian shelf on the horizon, and that reads the
+    // same way while being the surroundings the band is meant to show.)
+    const bandGaps = await page.evaluate(async () => {
+      if (!window.__panoCaptureForDump) return null
+      const url = await window.__panoCaptureForDump()
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = url
+      })
+      const c = document.createElement('canvas')
+      c.width = img.width
+      c.height = img.height
+      const ctx = c.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+      const d = ctx.getImageData(0, 0, c.width, c.height).data
+      const OPAQUE = 40
+      let split = 0
+      let worst = 0
+      for (let x = 0; x < c.width; x++) {
+        let first = -1
+        let last = -1
+        for (let y = 0; y < c.height; y++) {
+          if (d[(y * c.width + x) * 4 + 3] > OPAQUE) {
+            if (first < 0) first = y
+            last = y
+          }
+        }
+        if (first < 0) continue
+        let clear = 0
+        for (let y = first; y <= last; y++) if (d[(y * c.width + x) * 4 + 3] <= OPAQUE) clear++
+        if (clear > 0) {
+          split++
+          if (clear > worst) worst = clear
+        }
+      }
+      return { width: c.width, splitColumns: split, worstGapRows: worst }
+    })
+    // Measured on this very state: with the capture reaching 900 wu the band
+    // split 231/3072 of Giza's columns (and 168/3072 of Cairo's — the defect was
+    // never Giza-only, just most visible on an open plateau), gaps up to 11 rows;
+    // bounded to the committed ring it splits none, and a settlement's worst is
+    // 3 columns of one-row silhouette antialiasing.
+    check(
+      'the Giza band holds no floating strip over a hole in the surroundings (point 335)',
+      bandGaps !== null && bandGaps.splitColumns / bandGaps.width < 0.02,
+      bandGaps === null ? 'no capture to read' : `${bandGaps.splitColumns}/${bandGaps.width} columns split, worst gap ${bandGaps.worstGapRows} rows`,
+    )
+
+    // Human-viewable evidence from two standpoints on the site.
+    const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+    const posts = [
+      ['south rim', 0, radius * 0.75, Math.PI / 2],
+      ['east rim', radius * 0.7, 0, Math.PI],
+    ]
+    let shot = 0
+    for (const [, px, pz, yaw] of posts) {
+      await page.evaluate(
+        ([x, z, y]) => {
+          const p = window.__placePlayer
+          p.x = x
+          p.z = z
+          p.yaw = y
+          p.pitch = 0
+        },
+        [px, pz, yaw],
+      )
+      await page.waitForTimeout(600)
+      shot++
+      await page.screenshot({ path: `${OUT}141-giza-horizon-${shot}.png` })
+      console.log(`shot 141-giza-horizon-${shot}.png`)
+    }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })

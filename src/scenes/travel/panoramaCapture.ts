@@ -51,6 +51,10 @@ export function capturePanorama(
   placeId: string,
   seed: number,
   hideNames: string[] = [],
+  /** Far plane (point 335): must not reach past the streamed terrain window,
+   *  or the unbounded water sheets bake a floating grey horizon strip. The
+   *  caller derives it with `panoramaCaptureFar`. */
+  far = 900,
 ): void {
   // The traveller figure and the entered place's own marker stand AT the
   // capture point — hide them for the shot, restore afterwards.
@@ -73,8 +77,10 @@ export function capturePanorama(
   })
   // Near plane 3: close terrain belongs to the settlement's own scene, but
   // nearby landmarks must stay in (Giza stands ~4 units west of Cairo); the
-  // oversized symbolic dressing is hidden anyway.
-  const cam = new THREE.PerspectiveCamera(BAND_V_FOV_DEG, Math.tan((SECTOR_H_FOV_DEG / 2) * (Math.PI / 180)) / Math.tan((BAND_V_FOV_DEG / 2) * (Math.PI / 180)), 3, 900)
+  // oversized symbolic dressing is hidden anyway. The FAR plane is bounded by
+  // the streamed terrain window (point 335, panoramaCaptureFar): past it only
+  // the unbounded water sheets would draw, floating with no ground behind them.
+  const cam = new THREE.PerspectiveCamera(BAND_V_FOV_DEG, Math.tan((SECTOR_H_FOV_DEG / 2) * (Math.PI / 180)) / Math.tan((BAND_V_FOV_DEG / 2) * (Math.PI / 180)), 3, far)
   cam.position.set(pos.x, pos.y, pos.z)
 
   const prevTarget = renderer.getRenderTarget()

@@ -89,7 +89,7 @@ import {
   type AzimuthSpan,
 } from './panoramaWildlife'
 import { placePlayerPosition } from './playerPosition'
-import { bandHeightAt } from '../travel/panoramaMath'
+import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { emitFootstep } from '../../systems/ambience'
 import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idleSway } from '../../systems/walkFeel'
@@ -1196,14 +1196,17 @@ const PANORAMA_FAUNA: Record<RegionId, Array<() => FaunaParts>> = {
  * signal: only an enter out of the bird's-eye view captured this horizon, so a
  * direct place→place enter, a ferry passage and a resumed snapshot fall back to
  * the geometry backdrop rather than showing a stale band (point 99).
- * One rule, used by every consumer of the capture.
+ * One rule, used by every consumer of the capture — and it runs through
+ * `panoramaBandShown`, whose kind map is total over `PlaceKind` (point 335), so
+ * no place kind can reach the band around the gates. A capture only EXISTS once
+ * the trigger's completeness gate passed, so its presence carries that half.
  */
 function useFreshPanoramaCapture(placeId: string, seed: number) {
   const enteredFromTravel = useGame((s) => s.enteredFromTravel)
-  return useMemo(
-    () => (enteredFromTravel ? getPanoramaCapture(placeId, seed) : null),
-    [enteredFromTravel, placeId, seed],
-  )
+  return useMemo(() => {
+    const capture = getPanoramaCapture(placeId, seed)
+    return panoramaBandShown(placeById(placeId).kind, enteredFromTravel, capture !== null) ? capture : null
+  }, [enteredFromTravel, placeId, seed])
 }
 
 /**

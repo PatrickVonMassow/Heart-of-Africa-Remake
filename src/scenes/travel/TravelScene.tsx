@@ -50,7 +50,12 @@ import { RiversAndLakes } from './Rivers'
 import { waterSurfaceY } from './waterSurface'
 import { seasonFieldGreens, seasonFieldTintAt, seasonFieldTintAttrNode, seasonFieldTintNode, seasonFieldUV, updateSeasonField } from '../../render/seasonField'
 import { capturePanorama, hasPanoramaCapture } from './panoramaCapture'
-import { panoramaCaptureReady } from './panoramaMath'
+import {
+  PANORAMA_BAND_BY_KIND,
+  PANORAMA_CHUNK_RADIUS,
+  panoramaCaptureFar,
+  panoramaCaptureReady,
+} from './panoramaMath'
 import {
   updateTrailPoint,
   canoeDragPose,
@@ -1706,13 +1711,16 @@ function PanoramaCaptureTrigger() {
     for (const p of PLACES) {
       const w = latLonToWorld(p.lat, p.lon)
       if (Math.hypot(w.x - s.pos.x, w.z - s.pos.z) > ring) continue
+      // Kind gate (point 335): a total map over PlaceKind, so a future kind
+      // must be decided about rather than silently inheriting the band.
+      if (!PANORAMA_BAND_BY_KIND[p.kind]) return
       if (hasPanoramaCapture(p.id, s.seed)) return
-      // Point 227: never capture before the terrain around the capture point
-      // is committed — a band shot on the first frame after leaving (or right
-      // after a teleport) has no chunk meshes yet and bakes a terrainless
+      // Points 227/335: never capture before the terrain AROUND the capture
+      // point is committed — a band shot on the first frame after leaving (or
+      // right after a teleport) has no chunk meshes yet and bakes a terrainless
       // horizon (a grey line over water sheets). Retry on a later frame; the
       // traveller is still inside the ring when the chunks land.
-      if (!panoramaCaptureReady(committedTerrainChunks, w.x, w.z, CHUNK_SIZE)) return
+      if (!panoramaCaptureReady(committedTerrainChunks, w.x, w.z, CHUNK_SIZE, PANORAMA_CHUNK_RADIUS)) return
       const h = Math.max(0, sampleTerrain(p.lat, p.lon, s.seed).height)
       // DEV probe (point 90 verification): a loud magenta pillar injected at
       // a known offset for exactly this capture — the place scene then
@@ -1738,6 +1746,7 @@ function PanoramaCaptureTrigger() {
         p.id,
         s.seed,
         ['traveller-root', `place-marker-${p.id}`, 'travel-sky', 'travel-climate', 'travel-dressing', 'travel-markers'],
+        panoramaCaptureFar(PANORAMA_CHUNK_RADIUS, CHUNK_SIZE),
       )
       if (probe) {
         ;(scene as unknown as THREE.Scene).remove(probe)
