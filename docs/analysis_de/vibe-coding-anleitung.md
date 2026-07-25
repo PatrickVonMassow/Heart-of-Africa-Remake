@@ -278,4 +278,4 @@ Zwei Regeln, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: ee2a343c1c845a0cbc7b9cfbc5230282f890c844d4411f98f4e0a20f42c9daad -->
+<!-- GUIDE-FINGERPRINT: cf22cafd6703d46cec626a6ee456c8e245bf55505a073c2509e5e53aa5c882b5 -->

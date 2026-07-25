@@ -196,6 +196,10 @@ Eine Prüfung meldete zuverlässig, der Tierruf klinge beim Weggehen nicht ab �
 
 Gemeinsamer Nenner: **Jede dieser Prüfungen kodierte eine Annahme über die Umgebung, die später nicht mehr galt** — über Markierungen, über Abstände, über den Zeitpunkt einer Messung. Alle drei waren jahrelang richtig und wurden es durch fremde, korrekte Änderungen nicht mehr. Drei Konsequenzen, alle umgesetzt: Erstens gilt vor jedem Fix die Frage „belastet der Befund das Produkt oder die Messung?", entschieden durch ein Experiment, nicht durch Plausibilität — im Leck-Fall genügte dafür ein Blick in die Dateihistorie. Zweitens muss eine Messung an einem **eingeschwungenen Zustand** genommen werden: Der neue Prüfcode erzwingt ein Bild und pollt, bis der Wert sich wiederholt, und wertet eine *fallende* Zahl als unbrauchbare Messung statt als Erfolg — unter der alten einseitigen Regel wäre der Einbruch stillschweigend durchgegangen. Drittens macht die dritte Wiederholung desselben Musters den eingereihten Punkt zur automatischen Rot-Einordnung (echter Regress / vorbestehend / Last) von einer Bequemlichkeit zur Notwendigkeit: Er hätte an diesem Tag drei manuelle Untersuchungen erspart.
 
+### 3.22c Eine Regel zurücknehmen ist Arbeit — und zwar an mehreren Orten (25.07.)
+
+Der Nutzer änderte die Modell-Rollen: Das Zweitmodell wird nicht mehr für *schwere* Aufgaben geholt (das Hauptmodell ist dort inzwischen ebenbürtig), sondern nur noch für das Vier-Augen-Prinzip und als Ausweichstufe. Bemerkenswert ist nicht die Änderung, sondern was sie kostete: Die alte Regel lag in **drei** Memories, in der Projektdoku, im Autostart-Aufruf und in der Session-Start-Meldung — sechs Orte für eine Regel. Zwei der Memories mussten ausdrücklich als *zurückgezogen* markiert werden statt gelöscht (wer die alte Fassung kennt, soll sehen, dass sie bewusst verworfen wurde), und bei beiden war die eigentliche Arbeit, die überlebende Einsicht herauszuschälen: „Nach dem zweiten Fehlversuch übergeben" ist tot, aber *dass wiederholtes Scheitern die Denkweise des handelnden Modells als Hindernis entlarvt*, bleibt richtig — es wird nur anders eingelöst, als Review statt als Übergabe. Und beim Nachziehen der Projektdoku baute ich prompt eine **zweite** Modell-Regel neben die bestehende, also exakt die Dopplung, gegen die §3.21 an diesem Morgen den Mechanismus gefordert hatte; erst beim Gegenlesen fiel es auf. Zwei Lehren: **Eine Regel zurückzunehmen ist teurer als sie aufzustellen** — deshalb lohnt sich der einzige verbindliche Ort doppelt; und **eine frisch beschlossene Regel schützt einen nicht davor, sie im selben Zug zu brechen**, solange kein Mechanismus sie prüft.
+
 ### 3.23 Zweige verfallen — und zwar schnell (25.07.)
 
 Ein Feature-Zweig vom Vortag stand nach 24 Stunden **219 Commits** hinter dem Hauptzweig; seine drei Dateien hatten sich unterdessen über 16, 9 und 1 Commits weiterentwickelt. Damit war er faktisch unmergebar: Das Zusammenführen hätte jede Wildlife-Korrektur der letzten zwei Tage bekämpft — für einen Hebel, der neu gebaut billiger ist als versöhnt. Ich habe ihn stillgelegt und nur die *Idee* in den passenden offenen Punkt übernommen. Dieselbe Erfahrung machte parallel ein Agent, dessen Zweig binnen einer Stunde elf Commits zurückfiel und der einen fremden Fix als eigenen Fehlschlag zu sehen bekam. Bei hoher Merge-Frequenz ist die Halbwertszeit eines Zweigs also *Stunden*, nicht Tage. Die Projektregel „halte Zweige kurz" ist damit keine Stilfrage: Ein Zweig, der eine Nacht liegen bleibt, ist Wegwerfarbeit. Praktisch heißt das: vor der Endverifikation immer den Hauptzweig hereinholen und auf dem synchronisierten Stand prüfen — sonst verifiziert man etwas, das so nie landen wird.
@@ -312,7 +316,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 13:46 · Quellen-Fingerprint: `ee2a343c1c84…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 18:42 · Quellen-Fingerprint: `cf22cafd6703…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -334,10 +338,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| Standing blanket authorization to deploy Fable 5 subagents PROACTIVELY for hard analyses/tasks — do it without being asked, especially when my own context is exhausted | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| RETIRED 25.07.2026 — the blanket authorization to spin up Fable for hard analyses is withdrawn; Opus 5 does that work, Fable only reviews or stands in as fallback | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Use Fable-5 SPARINGLY for hoa delegations — not for every delegated task; the user's Fable volume runs out too fast | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | STANDING RULE: design.md §19.14 (climate) and §19.15 (peoples) — the research→game implementation records — must be updated in the SAME commit whenever the climate or people rendering changes; peoples-1890 §8 / climate-1890 §9 are pointers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -363,7 +367,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| When Opus (the default model) has failed ~2 attempts on the same problem, hand it to Fable for fresh eyes — a different model sees different blind spots | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The v0.1/poc release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
@@ -385,6 +389,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: ee2a343c1c845a0cbc7b9cfbc5230282f890c844d4411f98f4e0a20f42c9daad -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T11:46:45.728Z -->
+<!-- RETRO-FINGERPRINT: cf22cafd6703d46cec626a6ee456c8e245bf55505a073c2509e5e53aa5c882b5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T16:42:03.640Z -->
 <!-- AUTO-GENERATED:END -->
