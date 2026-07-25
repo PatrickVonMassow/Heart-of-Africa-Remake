@@ -12799,6 +12799,43 @@ the remaining open points in their numeric order.
   site, and in both a dry and a wet month; walking straight over the visible band is
   the frame in which the place is left — the truth check; no console errors.
 
+- [ ] 353. SHELTERED GROUND STAYS LESS WET (user 25.07.2026). In the rain the whole
+  settlement floor darkens uniformly, so the earth under a roof overhang or a tree crown
+  soaks exactly like the open yard. Make wetness SPATIAL — and less, not none: ground
+  under cover reads drier than the open ground around it, but never bone dry, because
+  wind-blown rain and splash reach under every eave (the user's own correction, and the
+  realistic reading).
+  WHY IT IS CHEAP, and the reason to build it this way: a settlement's roofs and trees
+  do not move. The coverage is therefore computed ONCE when the place is built — a
+  shelter mask over the ground disc, derived from the layout's known building footprints
+  with their roof overhangs and the tree crown radii — not per frame and not per fragment
+  against a list of obstacles. Prefer that CPU bake over a top-down depth pass: it needs
+  no extra render target, and it is pure-testable, which a GPU pass is not.
+  THE COMBINATION: the existing global ground wetness (`setGroundWetness` /
+  `groundWetnessFactor`, wired through `src/render/seasonTint.ts` and the season module)
+  is multiplied by the mask through a calibratable `balance.rain.shelterStrength` that is
+  strictly BELOW full, so full cover reduces the wetness without ever reaching zero.
+  Edges are soft — a hard-edged dry disc under a tree would look worse than the uniform
+  wetness it replaces.
+  THE DRIP LINE, if it comes cheap: just OUTSIDE the eaves the runoff makes a band
+  WETTER than the open ground. It is the detail that sells the whole effect, and it is
+  the same mask read at its gradient. Calibratable; drop it rather than fake it.
+  KEEP: dry weather completely unchanged — with no rain the mask must make NO visible
+  difference anywhere.
+  A USEFUL BY-PRODUCT to note in the commit: this same mask answers "is this spot under
+  cover", which is what point 348 needs to move village life under a roof.
+  NO QUALITY KEY: a one-time bake plus a texture lookup in a material already drawn, like
+  point 352 — record the reasoning rather than adding a lever for nothing.
+  VERIFIABLE: pure — the mask built from a layout with one hut is high under the roof
+  footprint, falls off across a soft margin and is zero well outside it; a tree crown
+  produces the same under its radius; the combined wetness at full shelter is strictly
+  between zero and the open-ground value (the "less wet, not dry" rule, boundary-tested),
+  and equals the open value everywhere when the shelter strength is zero. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): in a village forced into
+  rain, a ground crop under a hut's eaves reads measurably lighter in PIXELS than a crop
+  in the open yard, while in dry weather the two crops match — judged on the image, not
+  on the uniform.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
