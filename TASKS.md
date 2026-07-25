@@ -11827,6 +11827,26 @@ the remaining open points in their numeric order.
   completeness — an incomplete inventory is the failure mode). VERIFIABLE: the guard
   fails on each of point 332's real drifts when they are re-introduced, and passes
   on the corrected docs; the fact inventory is listed in the guard's header.
+  SCOPE WIDENED (user 25.07.2026: "establish mechanisms that make such
+  inconsistencies and redundancies impossible in future"): the point delivers a
+  STANDING regime, not a one-off sweep. (d) SINGLE SOURCE OF TRUTH as the primary
+  cure: for every fact the audit found duplicated, ONE place states it and the
+  others reference that place — CLAUDE.md §7.1 already follows this convention
+  toward design.md (§7.1 cites sections instead of repeating content, per the
+  claude-71-reference-not-duplicate rule) and it is simply not applied to counts,
+  defaults and enumerations; extend it there, and where a doc must restate a value
+  for readability, mark it as derived and cover it by (a). (e) A DUPLICATION
+  DETECTOR that fails when a NEW redundant statement of a covered fact appears
+  (a count/keybinding/default that the inventory owns showing up in a second
+  place), so the redundancy cannot creep back after (c) removed it. (f) The
+  merge-time check of (b) becomes part of the standing gate, not a review step:
+  a commit that changes a fact-owning constant must touch the doc that owns the
+  fact, or state why not. (g) The regime is documented in CLAUDE.md §4 (docs
+  conventions) so a future contributor — human or model — finds the rule where the
+  documents themselves are described. ACCEPTANCE for the whole point: re-running
+  the 25.07 coherence audit against the finished state reports no drift and no
+  new duplication, and each mechanism fails on a deliberately re-introduced
+  violation.
 
 ## Closing (only after all points)
 
