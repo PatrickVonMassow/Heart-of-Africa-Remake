@@ -12755,14 +12755,28 @@ the remaining open points in their numeric order.
   distance, the caught child becomes the chaser.
   STAMINA IS WHAT MAKES IT LEGIBLE, and it is the heart of the mechanic rather than a
   flourish. Every child carries a sprint reserve that drains while running flat out and
-  refills while moving slowly or standing. A runner who has spent it slows and is run
-  down — so a catch happens for a reason the viewer can SEE, instead of the game being
-  cut short from outside. A chaser who has spent it eases off, catches its breath and
-  picks a nearer victim. Speeds, drain and recovery rates are calibratable
-  (`balance.villageLife.*`, debug-editable). Two shaping rules: a floor below which the
-  pace never falls while a chase runs — a child frozen mid-game reads as a bug, a
-  trotting one reads as winded — and per-child variation in reserve and recovery, so the
-  group never tires in unison.
+  refills at a trot or standing. A runner who has spent it slows and is run down — so a
+  catch happens for a reason the viewer can SEE, instead of the round being cut short
+  from outside.
+  THE SPRINT IS SPENT DELIBERATELY, NEVER CONTINUOUSLY. A child that always runs at
+  whatever its current maximum is can never recover, and a chaser who empties its
+  reserve once would stay a hopeless trotter for the rest of the round — the game would
+  be over without ending. So both roles PACE themselves: a runner sprints only while the
+  chaser is inside a pressure distance and trots when the gap is comfortable; a chaser
+  sprints only while it is actually closing on a target within reach, and cruises
+  otherwise. Sprinting is a decision, not the default.
+  AND RECOVERY IS ITS OWN INTENTION. Below a low reserve a child BREAKS OFF and moves at
+  a deliberate recovery pace — slow enough to actually refill, which the pressure rule
+  above must not override — until its reserve passes a higher resume threshold. Two
+  thresholds, not one: a single boundary would flicker between pressing and recovering
+  frame by frame, the same hysteresis the animals' dodge and guard states already use.
+  For the chaser this reads as the most human moment of the whole game: it gives up the
+  pursuit, trots and puffs, then picks a fresh victim and bursts again.
+  Speeds, drain and recovery rates, the pressure distance and both thresholds are
+  calibratable (`balance.villageLife.*`, debug-editable). Two shaping rules: a floor
+  below which the pace never falls while a chase runs — a child frozen mid-game reads as
+  a bug, a trotting one reads as winded — and per-child variation in reserve and
+  recovery, so the group never tires in unison.
   HOW IT READS, given the figures the game has: the villagers are cones with sphere
   heads and NO legs (only the fauna and the §2.5 silhouettes have a stride), so the
   sprint cannot be shown by leg cadence. It is carried by SPEED and POSTURE — a forward
@@ -12797,7 +12811,11 @@ the remaining open points in their numeric order.
   VERIFIABLE: pure — the reserve drains only at sprint pace and refills below it, never
   leaves its bounds, and the pace never drops below the floor while a chase runs; a
   spent runner is strictly slower than a fresh chaser (so a catch is reachable) while a
-  fresh runner is strictly faster (so it is not immediate); the role swap grants immunity
+  fresh runner is strictly faster (so it is not immediate); a child driven to empty
+  RECOVERS: simulated forward under constant pressure it drops to its recovery pace,
+  its reserve rises past the resume threshold and it sprints again — the exhausted-
+  forever case is the regression witness, and the two thresholds are boundary-tested so
+  no state flickers between them; the role swap grants immunity
   for its window and cannot re-tag inside it (boundary-exact); the chaser's target is the
   nearest catchable runner and never the immune one; a child's step never enters a
   collider or leaves the walkable radius. Live (`scripts/verify/polish.mjs`, BOTH
