@@ -11773,6 +11773,61 @@ the remaining open points in their numeric order.
   the existing 30-case sweep stays green and gains cases for (a)-(c) and (e); the
   documented contract matches the code.
 
+- [ ] 332. FIX THE DOCUMENTATION DRIFT THE 25.07 COHERENCE AUDIT FOUND (all of it
+  predates the degraded session — see the root cause in point 333). Correct, with
+  the CODE as the source of truth: (a) "the TEN port cities are known from the
+  start" is now ELEVEN — point 273 made Giza a known-from-start monument
+  (`KNOWN_FROM_START_PLACES` in src/world/geo.ts filters `kind === 'port' ||
+  'monument'`); fix design.md §3.2, §10 and §17.2 (the §17.2 exemption list
+  enumerates the ten by name and must gain Giza — design.md currently contradicts
+  ITSELF against its own §4.4 line) and CLAUDE.md §7.1 points 3 and 25. (b) LOW has
+  NO sun shadows since point 305 (`QUALITY_PRESETS.low.sunShadows = false`), but
+  design.md §2.7 still says "low-resolution sun shadows", §21 and §21.3 name only
+  the shadow RESOLUTION ladder, and CLAUDE.md §7.1 pt 20's "what LOW turns off"
+  sentence omits it. (c) Point 262's orphan adoption is absent from CLAUDE.md §7.1
+  pt 12's "Calves and family life" bullet (design.md has it) — add it with its
+  `wildlifeBehavior.test.ts` verifiable. (d) Point 293's low-preset profiling pass
+  is absent from §7.1 pt 20's benchmark-report description (design.md §21.1 has
+  it). (e) The debug jump-to "Monuments" group (point 273) is missing from the
+  category lists in CLAUDE.md §7.1 pt 20 and design.md §21.3. (f) Cosmetic:
+  CLAUDE.md §7.1 pt 12 names `panoramaVicinityRadius`/`panoramaVicinityMinAnimals`,
+  the real fields are `balance.panoramaWildlife.vicinityRadius`/`.vicinityMinAnimals`;
+  the §7.1 pt 20 lever list omits `waterCalm` and `wildlifeDensity`. (g) CLAUDE.md
+  §7.1 pt 15 claims polish.mjs gates Giza's "sparse Thomas-Cook-era ambient walkers"
+  — no such assertion exists: either add it or drop the clause. (h) Process
+  surfaces: record the point-309 model allowlist in CLAUDE.md §6, and name the Stop
+  chain guards in §7.2 (six guards now gate a turn end; §7.2 mentions none).
+  VERIFIABLE: each corrected claim matches the code it describes; no doc states a
+  count or behaviour the code contradicts.
+
+- [ ] 333. WHY THE DOCS DRIFT — AND A MECHANISM AGAINST IT (root-cause analysis
+  25.07.2026, user question "where does all this drift come from — were there
+  problems before the degraded session too?"). ANSWER: yes, and it has nothing to do
+  with that session. Measured on the four features merged after v0.2: 262 touched
+  design.md (+2 lines) and NOT CLAUDE.md; 273 touched both (+17/+2) but only ADDED
+  its new paragraphs and left the five older places that state the now-false "ten
+  ports"; 293 touched design.md and the detail-level doc but not CLAUDE.md §7.1; 305
+  touched ONLY docs/graphics-detail-levels.md — the one doc with a SYNC TEST
+  (src/config/qualityDoc.test.ts) — and left design.md §2.7/§21/§21.3 stating the
+  opposite. The pattern is exact: a doc gets updated where a MECHANISM demands it or
+  where the author is already writing; a fact that lives REDUNDANTLY in several
+  places drifts in all the copies nobody was editing. The deeper cause is the
+  redundancy itself — "the ten port cities" is asserted in five places, LOW's shadow
+  behaviour in four. BUILD: (a) a pure DOC-FACT guard that pins the small set of
+  facts stated redundantly across design.md/CLAUDE.md against the CODE that owns
+  them (known-from-start count from `KNOWN_FROM_START_PLACES`, per-level quality
+  values from `QUALITY_PRESETS`, the debug jump-to category list from the menu's own
+  groups, the balance-value names the docs cite) — it fails when a doc's number
+  disagrees with the code's, like qualityDoc.test.ts already does for one doc; (b) a
+  merge-time check that a feature commit touching a §7.1-covered system also touched
+  the doc section that covers it, or says why not; (c) reduce the redundancy where
+  possible — one authoritative statement per fact, referenced elsewhere (the
+  §7.1-references-design.md convention already exists; apply it to the drifted
+  facts). METHOD: model-diverse (a second model reviews the fact inventory for
+  completeness — an incomplete inventory is the failure mode). VERIFIABLE: the guard
+  fails on each of point 332's real drifts when they are re-introduced, and passes
+  on the corrected docs; the fact inventory is listed in the guard's header.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
