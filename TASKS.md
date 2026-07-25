@@ -11955,7 +11955,7 @@ the remaining open points in their numeric order.
   of the question — likely a different attachment strategy per backend, which
   also explains why the point-276 fix could look complete there.
 
-- [ ] 335. GREY BAND ACROSS THE HORIZON AT THE GIZA SITE (user 25.07.2026 with a
+- [x] 335. GREY BAND ACROSS THE HORIZON AT THE GIZA SITE (user 25.07.2026 with a
   screenshot from the DEPLOYED build, standing on the Giza monument site looking
   north: a long flat grey/silver strip lies along the horizon line, starting
   mid-frame and running to the right, clearly foreign to the desert plain; the
