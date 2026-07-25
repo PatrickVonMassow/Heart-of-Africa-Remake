@@ -12444,6 +12444,73 @@ the remaining open points in their numeric order.
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
 
+- [ ] 344. EYE ADAPTATION AND SUN GLARE, HIGHEST QUALITY LEVEL (user 25.07.2026;
+  design.md §2.7 states the target). BUILDS ON POINT 343 — before the sun is low there
+  is nothing to be dazzled by, and with a 50° vertical field of view the first-person
+  camera sees roughly -25°..+25°, so the 16:00 sun (6.7°..37°) sits IN FRAME whenever
+  the traveller turns west over most of the map and year. Both halves belong in ONE
+  point: they share the same tuning pass over the same image, and building them apart
+  would mean turning the same dial twice.
+  (a) EYE ADAPTATION — the effect the player reads as high dynamic range. The exposure
+  follows the frame's mean luminance (from the HDR buffer's mip chain, not a CPU
+  readback): facing the sun darkens the scene, turning into a lane's shade opens it up
+  again. The range is BOUNDED and calibratable around today's fixed
+  `toneMappingExposure` of 1.05 (`src/App.tsx`) — `balance.exposure.*`,
+  debug-editable — and the two directions have their own time constants (brightening
+  fast, darkening slow, as an eye does). A bounded controller, never free-running.
+  FIRST PERSON ONLY. The bird's-eye view keeps its fixed exposure: design.md §2.7
+  forbids post-processing that costs the map view its readability, and a map whose
+  brightness breathes while driving is precisely that. This is a rule, not a
+  performance choice — do not "unify" the two scenes.
+  (b) GLARE. The sun disc in `src/render/sky.tsx` (`disc = pow(s, 1200) * 3.0`) must
+  sit clearly above the bloom threshold so it blooms on its own, plus the upstream
+  `three/addons/tsl/display/LensflareNode.js` WITH an occlusion test: a hut wall or
+  roof edge moving in front of the sun kills the glare in the same frame. Without that
+  test the flare survives its occluder and reads as a sticker on the lens — the single
+  detail that separates a convincing glare from a cheap one.
+  QUALITY: highest level only, with entries for all three levels in `QUALITY_PRESETS`
+  (`src/config/quality.ts`) and `docs/graphics-detail-levels.md` updated in the same
+  commit — the completeness gate and the doc-sync test both fail otherwise.
+  ESTIMATED COST ~0.3-0.8 ms; the real number comes from F8 on the user's hardware.
+  VERIFIABLE: pure — the exposure controller maps luminance to a target within its
+  clamp, converges from both directions, honours its asymmetric time constants and
+  cannot run away from a black or a blown-out frame; the preset completeness and doc
+  sync cover the new keys. Live (BOTH backends, screenshots): in a settlement facing
+  the sun the rendered frame's mean brightness FALLS within a bounded number of frames
+  and recovers when the traveller turns away — measured in PIXELS, never in the
+  uniform (the §7.2 lesson that three rounds of uniform-level checks once passed while
+  the player saw nothing); the glare is present with the sun in the open and gone with
+  a building between; and in the bird's-eye view a driven pass leaves the exposure
+  UNCHANGED, which is the readability guard's own witness.
+  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
+  behaviour when this lands.
+
+- [ ] 345. SUN SHAFTS THROUGH WHAT STANDS IN THE WAY, HIGHEST QUALITY LEVEL (user
+  25.07.2026). With the low afternoon sun of point 343, a palm crown, a roof edge, the
+  Djinguereber minaret or the Giza pyramids finally have something to cast shafts
+  through. Wire the upstream `three/addons/tsl/display/GodraysNode.js`
+  (`godrays(depthNode, camera, light)`) into the post chain in `src/render/Effects.tsx`
+  beside the existing GTAO/bloom/TRAA nodes.
+  FIRST PERSON ONLY, and for a reason worth writing down: screen-space godrays need
+  the light IN the frame, and the bird's-eye camera looks ~60° down while the sun
+  stands at most 37° up — it is never in that frame. Wiring the pass there would cost
+  milliseconds for an effect nobody can see. Do not enable it in the travel scene.
+  QUALITY: highest level only, entries for all three levels in `QUALITY_PRESETS` plus
+  `docs/graphics-detail-levels.md` in the same commit.
+  THIS ONE IS PRICED BEFORE IT IS KEPT. It is the only effect in this family with a
+  real per-pixel cost (estimated +1.5-3 ms; on the measured S25 baseline of ~12.6 ms
+  GPU that is +12-25 %). Run F8 on the user's hardware BEFORE and AFTER on the same
+  build and record both digests in the commit. If the cost is not worth the picture,
+  the point is closed by REMOVING the pass and recording the measurement — that is a
+  legitimate outcome, exactly as the SSR removal was, and it must not drag point 344
+  with it.
+  VERIFIABLE: pure — the preset completeness gate and the doc-sync test cover the new
+  key; the pass is absent from the travel scene's chain by construction. Live (BOTH
+  backends, screenshots): in a settlement with the sun behind a roof edge, the pixels
+  along the sun direction brighten measurably against the same frame with the level
+  stepped down — judged on the image, not on the flag; no console errors; the F8
+  before/after numbers are recorded.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
