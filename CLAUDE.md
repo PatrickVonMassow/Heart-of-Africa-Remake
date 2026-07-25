@@ -1164,8 +1164,11 @@ verify suite that proves it.
     detailLevel].ssao && ssaoEnabled`, etc.) that NEVER clobber the
     individual debug allow-flags — those still tune a feature within a level
     (unlike `activateTouch`, which keeps clobbering; the touch preset stays a
-    SUBSET of low). SSAO is high-only, TRAA+bloom off only on low, campfire
-    shadows off on low; the lever priority follows the real-hardware
+    SUBSET of low). SSAO is high-only; TRAA+bloom, SUN shadows and campfire
+    shadows are all off on low — `QUALITY_PRESETS.low.sunShadows` is FALSE
+    (point 305), so low casts no shadow passes at all and its 1024
+    `sunShadowResolution` is only the ladder's floor, never rendered;
+    the lever priority follows the real-hardware
     benchmark (point 277: fill-rate first — dpr, post — geometry last). A
     localized toast names the new level and a localized debug picker sets it.
     ENFORCEMENT: a pure completeness gate (`src/config/quality.test.ts`)
