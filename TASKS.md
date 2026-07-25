@@ -11185,22 +11185,40 @@ the remaining open points in their numeric order.
   `scripts/verify/*.mjs`. VERIFIABLE: a written report per reviewed area with a verdict
   (valid / stale→fixed), each stale test fixed with its correction. No player-visible text.
 
-- [ ] 304. VOICE WASM COLD-LOAD RENDER-LIVENESS — ~16 s freeze in the headless verify (found
-  24.07.2026 in the v0.2 closing; the TTS/worker/speech code is UNCHANGED since v0.1 → this is
-  PRE-EXISTING, not a v0.2 regression). `scripts/verify/voice.mjs` asserts the max rAF gap stays
-  < 1500 ms through the cold TTS load on the WASM path (point 117 — the WASM fallback must keep
-  the game rendering); on the loaded headless Windows machine it measures ~16283 ms. The model
-  load IS correctly offloaded to a Web Worker (`src/journal/speech.ts` new Worker + `ttsWorker.ts`),
-  so the code does not block the main thread — the gap is CPU STARVATION during the worker's
-  onnxruntime-WASM cold compile on a resource-limited headless machine (a real multi-core browser,
-  and real Chromium users on the pre-warmed WebGPU path, do not hit it). INVESTIGATE: is it a
-  genuine main-thread stall to FIX, or a headless-CPU-starvation artifact to make the LIVENESS
-  CHECK robust to a loaded machine (measure real main-thread work, not worker CPU contention) —
-  and confirm the real-browser WASM cold-load stays live. Do NOT weaken the bound to hide a real
-  15 s stall (the point-117 defect it guards). VERIFIABLE: the voice cold-load liveness passes on
-  a quiet AND a loaded machine, or is documented as a headless limitation with a real-browser
-  confirmation. No player-visible text.
-
+- [x] 304. THE VOICE COLD-LOAD LIVENESS CHECK BLAMED THE WRONG SYSTEM — RESOLVED
+  25.07.2026, and its premise was wrong in BOTH directions. The check "the WASM
+  fallback keeps the game rendering through the cold TTS load" failed with ~15 s rAF
+  gaps; the point previously assumed CPU starvation on a loaded machine, and the
+  closing run disproved that by reproducing it twice on a QUIET machine. The real
+  answer, established by measurement rather than argument:
+  (a) THE TTS IS INNOCENT. With the worker stubbed out entirely — no engine, no
+  model, no worker — the same window still measured a 14616 ms rAF gap. The cold
+  load contributes nothing to the number the gate was reading.
+  (b) THE MAIN THREAD WAS NEVER BLOCKED. A 50 ms timer train run alongside the rAF
+  probe showed a 63 ms maximum timer gap against the 14616 ms rAF gap: the PICTURE
+  stalled, the THREAD did not. A CDP trace named the cause — one startup frame
+  awaiting ~149 shader-program links (27 s of GetProgramiv/Finish waits on real
+  NVIDIA hardware, not SwiftShader), with three.js's async render yielding between
+  awaits, so a single FRAME spans 15 s while ordinary tasks keep flowing.
+  (c) THE SUITE WAS SHOOTING ITSELF. Its "neutral key press" was F8 — which since
+  point 277 STARTS THE IN-GAME BENCHMARK. Measured A/B with TTS off: no key → 63 ms
+  timer gap; F8 → 14840 ms, a genuinely blocked thread, because the benchmark swept
+  ten graphics configs and rebuilt the post pipeline INSIDE the measured window.
+  FIX: a new pure module scripts/verify/liveness.mjs measures liveness on the TIMER
+  train (which needs no compositor) and ATTRIBUTES every stall — the part covered by
+  the page's own rAF callbacks is the renderer's and is REPORTED, the remainder is
+  what the gate binds; 13 Vitest cases pin both witnesses, including a stall wedged
+  between two long frames so a busy renderer cannot launder one. The gesture moved
+  F8 → Insert; the single check became a TRUSTWORTHINESS gate (enough samples on
+  both trains AND the model load provably inside the window) plus the liveness gate;
+  frame-covered stall and raw rAF gap are printed as INFO on every run, since a
+  silent number is how the misattribution survived. A dev-only `__ttsDeferWarmup`
+  holds the pre-warm back so the cold load really falls inside the probe window.
+  PROOF THE GATE STILL BITES: `VOICE_STALL_SELFTEST=5000` injects a real
+  synchronous busy loop and the check goes red with "attributed block 5009 ms";
+  the normal run reads "attributed block 32 ms" and, with F8 gone, a raw rAF gap of
+  17 ms. Verified: voice 7 pass / 0 fail TWICE on WebGL 2 (its documented lane),
+  test:unit 3113 green, build and lint clean.
 - [x] 305. OPTIMIZE THE LOW DETAIL PRESET FOR THE M1 PRO (user 24.07.2026; do it with Fable). The
   user's F8 benchmark on a MacBook Pro 16 M1 Pro (2021; `local/m1pro-bench.json`, WebGPU/Firefox,
   REAL GPU timestamps) shows the machine is heavily GPU-bound at HIGH — baseline (all on) 142–229 ms
@@ -12019,6 +12037,30 @@ the remaining open points in their numeric order.
   regression vs. pre-existing vs. load) would have answered this in seconds instead
   of a manual repeat — and point 296's under-load flag would have labelled the first
   run unusable before it was ever believed.
+
+- [ ] 337. THE STARTUP FRAME STALLS THE PICTURE ~15 s WHILE SHADERS COMPILE (found
+  25.07.2026 by the point-304 measurement, reported-not-gated there because it
+  reproduces with the TTS entirely absent and was out of that point's scope). On the
+  WebGL 2 backend on real NVIDIA hardware, ONE startup frame awaits about 149
+  shader-program links — a CDP trace attributes ~27 s to GetProgramiv /
+  CommandBufferHelper::Finish / WaitForGetOffset plus 508 ANGLE compile jobs — and
+  because three.js's async render yields between the awaits, that single FRAME spans
+  ~15 s. Scripts, timers and promises keep running the whole time (a 50 ms timer
+  train showed a 63 ms maximum gap), so nothing is "blocked" in the usual sense —
+  but the PLAYER sees a frozen picture for a quarter of a minute at load. Same class
+  as the §7.1 pt 2 leave-transition freeze that surgical dispose opt-outs fixed, but
+  at initial load, and currently unguarded. INVESTIGATE: how much of the program set
+  is actually needed for the FIRST frame versus compiled eagerly (material variants
+  for scenes not yet entered, the post chain, flora/fauna instance materials); can
+  the set be warmed progressively across frames, or the first frame drawn with a
+  reduced set and the rest linked behind it? Measure on the user's real hardware
+  (the F8 benchmark's environment block already records adapter and backend) — and
+  on WebGPU too, where the pipeline model differs and the number may be quite
+  different. VERIFIABLE: a live check that the initial-load picture is never frozen
+  longer than a calibratable budget, measured with the point-304 attribution module
+  (scripts/verify/liveness.mjs) so a busy renderer cannot hide the stall; the budget
+  is a balance value; the improvement demonstrated on both backends with before/after
+  numbers, and no visual regression at first frame.
 
 ## Closing (only after all points)
 
