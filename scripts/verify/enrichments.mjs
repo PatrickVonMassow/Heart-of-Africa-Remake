@@ -4693,6 +4693,16 @@ const crocDrama = async (mode, attempt = 0) =>
       // while the parentAlive assertion below still verifies the drive-off keeps it
       // alive (no masking). Cleared in the cleanup.
       if (MODE.kind === 'rescue') window.__balance.parentDefense.forceOutcome = 'driveOff'
+      // TOO-LATE must lose BOTH (25.07.2026): this staging was pinned by TIMING
+      // alone — the parent stands just inside the too-late ring and is meant to
+      // arrive after the catch resolves. On a slow or busy machine it sometimes
+      // arrives in time after all and the crocodile takes it INSTEAD of the calf
+      // (observed: parentAlive false, calfAlive TRUE, i.e. the sacrifice ending),
+      // and the check reads that as a product failure. Timing decides WHEN the
+      // parent arrives; the outcome roll decides what happens when it does — so
+      // pin the roll too, exactly as rescue and lunge do. The both-dead assertion
+      // below still proves the ending, so nothing is masked.
+      if (MODE.kind === 'toolate') window.__balance.parentDefense.forceOutcome = 'taken'
       if (MODE.kind === 'lunge') {
         // Nothing to wait for but the kill: the parent is parked out of reach
         // and the outcome is pinned, so the grip window simply expires.
