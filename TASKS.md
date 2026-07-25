@@ -12746,7 +12746,14 @@ the remaining open points in their numeric order.
   repeatedly bumping into the well rather than as play.
   TARGET: children given a PLAY behaviour that uses the well as its centre instead of
   treating it as an obstacle in the way — circling it at a radius clear of its collider,
-  changing direction now and then, breaking off and rejoining. The §19.10 village life is
+  changing direction now and then, breaking off and rejoining.
+  THE CIRCLE MUST BE WIDE (user 25.07.2026, second look): the ring they run today is
+  tight, and a tight ring reads as trudging around an obstacle rather than as a game of
+  chase. Make the play radius CALIBRATABLE (`balance.villageLife.playRadius`,
+  debug-editable) and default it clearly wider than the well's own collider — as wide as
+  the free ground around the well allows, bounded by the surrounding colliders and the
+  settlement edge so the chase never runs into a hut. Vary it a little per child and per
+  bout so the group does not orbit on one rail. The §19.10 village life is
   the point of these figures; a walker pathing rule that merely avoids the well would
   remove the bumping without producing play, and is not what this asks for.
   KEEP: the ordinary walkers (adults on errands) unchanged, and the point-155 guarantees
@@ -12759,6 +12766,38 @@ the remaining open points in their numeric order.
   backends): over a sampled interval a playing child's positions distribute AROUND the
   well (its bearing from the well changes monotonically for a stretch) rather than
   clustering against one side, and no child is pinned; screenshot.
+
+- [ ] 352. THE SETTLEMENT EDGE PAINTED ON THE GROUND (user 25.07.2026; design.md §2.6
+  states the target). In the first-person view the boundary is invisible until crossing
+  it swaps the scene. Show it in the ground itself: the swept, trodden earth of the
+  settlement giving way to open land across a soft band.
+  IT MUST NOT LIE. The band sits at the SAME radius the leave check uses — `layout.radius`
+  in `src/scenes/place/PlaceScene.tsx` (`if (Math.hypot(p.x, p.z) > layout.radius)`) —
+  read from that one source, never a second constant that can drift from it. A visible
+  edge in the wrong place is worse than none, because the player will trust it.
+  QUIET, AND OF THE WORLD. A tonal and textural change in the ground — swept earth
+  inside, open ground outside — not a drawn ring, not a glow, nothing a traveller of
+  1890 would not have seen underfoot. The outline WANDERS slightly instead of describing
+  a machined circle: reuse the domain-warp the biome borders already use (§3.3) rather
+  than inventing a second noise. The wander is bounded so the visible band never departs
+  from the true radius by more than a small tolerance — it may look natural, it may not
+  mislead.
+  EVERY PLACE KIND: village, port and the Giza monument site. Keyed on `PLACE_KINDS`
+  totality (point 335) so a fourth kind cannot compile without deciding about it.
+  SEASON-PROOF: the ground bleaches and greens with the season through the baked seasonUV
+  field (§19.13), so the edge must stay readable at BOTH ends of the year rather than
+  vanishing into the dry-season straw.
+  NO QUALITY KEY, and the reason belongs in the commit: this is a term in the ground
+  material that is already drawn, not a pass — it has no measurable cost, like the sun
+  model of point 343 and unlike the effects that earn a `QUALITY_PRESETS` entry.
+  VERIFIABLE: pure — the band's radius derives from `layout.radius` for every place in
+  the roster (change the layout radius and the band follows), the warp stays within its
+  bounded tolerance at every sampled angle, and the kind sweep covers all `PLACE_KINDS`.
+  Live (`scripts/verify/polish.mjs`, BOTH backends, screenshots): standing inside a
+  village near the edge, a ground crop AT the boundary differs measurably in pixels from
+  a crop well inside and from one outside; the same holds in a port and at the monument
+  site, and in both a dry and a wet month; walking straight over the visible band is
+  the frame in which the place is left — the truth check; no console errors.
 
 ## Closing (only after all points)
 
