@@ -2015,6 +2015,30 @@ export interface AdoptionAdult {
   child?: { dead?: boolean } | null
 }
 
+/** The escape run of a calf just freed by its parent's sacrifice (design.md
+ *  §19.8, point 311): seconds left of the window in which the freed young runs
+ *  clear of the predator that took its parent — counted down every frame and
+ *  cleared at zero, a HARD deadline so the ending always resolves (invariant
+ *  I4). `undefined` means no escape is running.
+ *
+ *  Exact boundary: the window is OVER once the remaining time has run to zero
+ *  or below (a tick of exactly the remaining time ENDS it), so the escape can
+ *  never outlive its balance value however the frame times fall. */
+export function tickEscapeRun(escape: number | undefined, dt: number): number | undefined {
+  if (escape === undefined) return undefined
+  const left = escape - dt
+  return left > 0 ? left : undefined
+}
+
+/** Is this young still running its §19.8 escape (point 311)? While it is, the
+ *  point-262 adoption must keep its hands off: an adoption the instant the
+ *  parent falls re-parents the calf, which then walks back to its adoptive
+ *  parent — right past the feeding predator — instead of fleeing, and the
+ *  sacrifice ending never reads as an escape. */
+export function inEscapeRun(juvenile: { escape?: number }): boolean {
+  return juvenile.escape !== undefined && juvenile.escape > 0
+}
+
 /** Orphan adoption (design.md §19.8, point 262): the nearest ELIGIBLE adult
  *  that can take in `juvenile`, or `null` when none is within `radius`. Eligible
  *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
@@ -2025,13 +2049,18 @@ export interface AdoptionAdult {
  *  always parent the young and drive its §19.8 defence/rescue/grief roles. The
  *  species and predator gates only apply where `species` is known on both sides
  *  (the pure test); the live caller enforces them by passing a homogeneous,
- *  non-predator herd. */
+ *  non-predator herd.
+ *
+ *  A young still running its ESCAPE (point 311) is not adoptable at all — the
+ *  §19.8 ending owns it until its window closes; afterwards the ordinary
+ *  adoption picks it up, so point 262's guarantee is deferred, never dropped. */
 export function findAdopter<A extends AdoptionAdult>(
-  juvenile: { species?: string; x: number; z: number },
+  juvenile: { species?: string; x: number; z: number; escape?: number },
   adults: readonly A[],
   radius: number,
   opts: { isPredator?: (species: string) => boolean; killer?: A | null } = {},
 ): A | null {
+  if (inEscapeRun(juvenile)) return null // the escape leg runs first (point 311)
   const isPredator = opts.isPredator ?? isPredatorSpecies
   const killer = opts.killer ?? null
   const r2 = radius * radius
