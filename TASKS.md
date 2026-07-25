@@ -11487,6 +11487,20 @@ the remaining open points in their numeric order.
   escapability sweep (pure); a staged swim in the reported notch drifts, slides
   along the coast and gets out alive (enrichments, both backends); the §11.2/redSea
   suite stays green.
+  ANCHORS (read-only prep 25.07, main session — layer (2) is confirmed): in
+  src/state/store.ts the bird's-eye move resolves a blocked step as a HARD STOP —
+  it samples the target cell, and `if (isBlocked(...)) { set({toast: oceanBlocked});
+  return }`, with no tangential retry. Settlement collision has had sliding for a
+  long time; the overland move never got it, so a traveller pressed against the
+  ocean boundary by the current has no lateral escape at all — exactly the
+  reported softlock. The drift itself already refuses to push INTO blocked ocean
+  (the same `isBlocked` guard in the drift step), so the drift is not the trap; the
+  missing slide is. FIX SHAPE for layer (2): on a blocked step, retry along the
+  boundary tangent (project the intended step onto the free direction, the way the
+  settlement resolve does) before giving up, and keep the toast only for the case
+  where every direction is genuinely blocked. That change alone would let the
+  reported situation resolve even before the geometry work of layer (1) lands —
+  worth doing first and verifying separately.
 
 - [x] 317. ENTER-HINT POSITION: SLIGHTLY BELOW SCREEN CENTRE (user 25.07.2026 with
   screenshot markup). The "Space to enter <name>" hint currently sits at the bottom
