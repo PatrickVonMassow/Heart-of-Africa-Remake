@@ -12511,6 +12511,59 @@ the remaining open points in their numeric order.
   stepped down — judged on the image, not on the flag; no console errors; the F8
   before/after numbers are recorded.
 
+- [ ] 346. HORIZON MAPS BAKED FROM THE DEM — SELF-SHADOWING AND SKY OCCLUSION AT
+  PLANETARY RANGE (user 25.07.2026; design.md §2.7 states the target). A new offline
+  step beside `scripts/build-geodata.mjs` measures, per DEM texel, the HORIZON ANGLE —
+  how high the land rises around that point — and the terrain shader reads it. Two
+  effects out of one bake: the land SHADES ITSELF far beyond any shadow map's reach,
+  and every hollow sees less sky than the ridge above it and is lit accordingly.
+  IT ONLY PAYS BECAUSE OF POINT 343, and depends on it: at the old fixed ~45° sun a
+  3000 m massif threw ~3 km of shadow, about one DEM texel. At the 16:00 sun's low end
+  (~9°) the same massif throws ~19 km — nearly seven texels, visible terrain shading
+  across the view.
+  THE ALGORITHM IS THE WHOLE FEASIBILITY QUESTION. Naive ray marching is 8.8 M texels ×
+  directions × ~100 steps ≈ billions of samples and is not an option in Node. Use the
+  standard horizon SWEEP (per direction, march the grid line by line keeping a monotone
+  stack of candidate horizons), which is linear in texels — seconds, not hours. Pin the
+  sweep against a brute-force reference on a SMALL patch in the tests: that comparison
+  is what proves the fast path correct.
+  ONLY SIX DIRECTIONS ARE NEEDED, and the reason is worth keeping: because the hour is
+  FIXED (point 343), the sun's azimuth never leaves a 74° westerly arc — 233°..307°
+  over the entire map and every day of the year. Bake that arc at ~15° steps (6 slices)
+  plus ONE direction-averaged sky-occlusion channel; a full circle would be wasted
+  storage. The fragment interpolates between the two slices bracketing the current
+  azimuth.
+  IF THE DEBUG HOUR LEAVES THE ARC (the `balance.sun.hour` field of point 343 is
+  editable), the shading must CLAMP to the nearest baked slice and say so through the
+  dev channel — never silently shade from the wrong direction. Pure-test that clamp.
+  ASSET BUDGET, to be settled by the PICTURE and recorded: 7 channels (6 + occlusion)
+  in two RGBA textures. At half DEM resolution (1460×1500, ~6 km per texel) that is
+  ~17.5 MB raw, roughly 5-9 MB as PNG; at quarter resolution ~4.4 MB raw, ~1.3-2.2 MB.
+  Start at half, and drop to quarter if the download budget bites — today's whole
+  `dem.png` is 6 MB, so this may not dwarf it. Horizon angles are low-frequency and a
+  soft, kilometre-scale shadow edge is physically right, so a coarse map is not a
+  compromise in the way a coarse shadow map would be.
+  SCOPE: the bird's-eye TERRAIN only. Settlements have their own local scene and ground
+  and are untouched.
+  QUALITY: on at MEDIUM and HIGH, off at LOW — and at low the extra textures are NOT
+  FETCHED at all, since the runtime cost is one texture lookup but the download and
+  video memory are what a weak device actually cannot afford. Entries for all three
+  levels in `QUALITY_PRESETS` plus `docs/graphics-detail-levels.md` in the same commit.
+  DOCS: design.md §2.7 already states it; the preprocessing must be documented
+  reproducibly like the existing geodata pipeline (§7.1 point 13), and CLAUDE.md §7.1
+  point 14 gains the built behaviour when this lands.
+  VERIFIABLE: pure — the sweep matches a brute-force horizon reference on a small
+  synthetic patch (a cone, a ridge, a flat plain: a flat plain yields horizon 0 in
+  every direction, a wall yields the analytic angle); the azimuth arc actually covers
+  every (latitude, day) the game can produce, with a case just outside it clamping and
+  reporting; sky occlusion is monotone (a pit is more occluded than the ridge beside
+  it); the preset completeness and doc-sync gates cover the new keys. Live
+  (`scripts/verify/enrichments.mjs`, BOTH backends, screenshots): at a massif with the
+  low-sun date, the ground on the sun-facing side reads measurably brighter in PIXELS
+  than the ground in its lee at the same elevation band, and that contrast is FLAT with
+  the quality level stepped to low — the effect is judged on the image, never on the
+  flag; no console errors; the build step is reproducible from a clean checkout.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
