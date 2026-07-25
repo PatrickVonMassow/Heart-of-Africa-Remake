@@ -66,6 +66,28 @@ disposed-and-rebuilt pipeline look like a +14 leak on WebGPU only. Any check
 that samples a lazily allocated resource must force a frame and poll until the
 reading repeats.
 
+`scripts/verify/liveness.mjs` is the third: the main-thread block attribution
+behind `voice.mjs`'s TTS cold-load gate, pinned by
+`scripts/verify/liveness.test.mjs`. Its lesson is the point-334 one from the
+other side (point 304): **a stalled picture is not a stalled thread, and the
+system under test is not automatically to blame.** The gate used to measure the
+raw gap between `requestAnimationFrame` timestamps and charge the TTS cold load
+for it. On a quiet machine that read ~15 000 ms — and reproduced unchanged with
+the TTS worker stubbed out entirely: it is the startup frame awaiting the
+scene's shader-program links (`GLES2Implementation::GetProgramiv` →
+`CommandBufferProxyImpl::WaitForGetOffset` in a CDP trace), one ANIMATION FRAME
+spanning 15 s while a 50 ms `setInterval` kept ticking with a 63 ms worst gap —
+the main thread was never blocked. So liveness is measured on a timer train
+(no compositor involved) and each stall is attributed: the part covered by the
+page's own frame callbacks is the renderer's and is reported, the rest is what
+the gate binds. `VOICE_STALL_SELFTEST=5000` injects a real 5 s main-thread busy
+loop into the cold-load window to prove the gate still bites.
+
+The same run found that the suite's "neutral" first-gesture key had stopped
+being neutral: F8 starts the in-game render benchmark (point 277), which swept
+ten graphics configs inside the measurement. A verification's filler inputs need
+re-checking whenever the game binds a new key.
+
 ## Adding tests for a new feature (do this every time)
 
 Every new feature must get a test on **one or both** layers — pick by what the
@@ -113,7 +135,7 @@ ported asserts now live in Vitest:
 | `events.mjs` | touch-a-lion / touch-a-hyena contact (RAF scene) | `src/systems/events.test.ts`, `src/state/store.events.test.ts` |
 | `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
 | `enrichments.mjs` | all wildlife/RAF, drei map/region labels, river/graveyard scene, layout geometry, real WheelEvent, screenshots | `src/systems/movement.test.ts`, `src/state/store.*.test.ts`, `src/ui/{StatusBar,Hud,DebugMenu}.test.tsx` |
-| `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx` |
+| `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), the cold-load main-thread liveness gate (see `liveness.mjs`), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx`, `scripts/verify/liveness.test.mjs` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
 
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +

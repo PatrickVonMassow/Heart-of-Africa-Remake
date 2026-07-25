@@ -52,8 +52,13 @@ export default function App() {
   // 100) happens up front at game start rather than at the first narration.
   // Deferred a moment so the scene is visible first, and only when the current
   // language actually has a voice (English).
+  // `__ttsDeferWarmup` (dev only) holds the pre-warm back so the headless
+  // cold-load liveness probe provably SPANS the model load instead of measuring
+  // a window the warm-up already finished behind its back (point 304); the
+  // first narration then does the cold load itself.
   useEffect(() => {
     if (!speechAvailable(useLocale.getState().lang)) return
+    if (import.meta.env.DEV && (window as unknown as Record<string, unknown>).__ttsDeferWarmup) return
     const t = setTimeout(() => warmupSpeech(), 1200)
     return () => clearTimeout(t)
   }, [])

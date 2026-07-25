@@ -69,7 +69,10 @@ async function ensureServer() {
 export async function installTtsCache(page) {
   mkdirSync(CACHE_DIR, { recursive: true })
   const strict = ttsCacheComplete()
-  const stats = { hits: 0, misses: 0, aborted: 0, strict }
+  // `served` timestamps every model/runtime asset the page asked for (wall
+  // clock), so a suite can PROVE its cold-load probe really spans the load
+  // rather than a window the engine had already finished behind it (point 304).
+  const stats = { hits: 0, misses: 0, aborted: 0, strict, served: [] }
   await page.route('**/*', async (route) => {
     const url = route.request().url()
     let host
@@ -84,6 +87,7 @@ export async function installTtsCache(page) {
       return route.abort()
     }
     const key = keyFor(url)
+    stats.served.push({ url: url.split('?')[0], at: Date.now() })
     const bodyPath = join(CACHE_DIR, `${key}.bin`)
     const metaPath = join(CACHE_DIR, `${key}.json`)
     if (existsSync(bodyPath) && existsSync(metaPath)) {
