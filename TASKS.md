@@ -11979,44 +11979,32 @@ the remaining open points in their numeric order.
   guessed constant); screenshots from several standpoints on BOTH backends; the
   point-227 settlement checks stay green.
 
-- [ ] 336. CROCODILE LUNGE CHECK RED ON WEBGPU AFTER THE CALF-ESCAPE MERGE (found
-  25.07.2026 re-verifying the point-311 merge). `enrichments` is GREEN on WebGL 2
-  (225/0) but on WebGPU the check "the hidden crocodile lunges visibly (no
-  teleport) and grips the bank drinker" fails TWICE with
-  {staged:true, lunged:true, noTeleport:true, gripped:true, calfAlive:TRUE,
-  parentAlive:true, crocRetreated:TRUE}: the staging works, the crocodile lunges
-  and grips — but the calf SURVIVES because the parent drives the crocodile off,
-  while the check demands the plain grip outcome (`!calfAlive`), the rescue being
-  a separate staged case. CAVEAT ON THE EVIDENCE: this run was NOT on a quiet
-  machine — a browser-driving agent was started while it ran, against the project's
-  own load rule, so the first job is to REPEAT it isolated on a quiet machine
-  before believing it. If it holds: the point-311 window (`escapeSeconds`, the
-  adoption hold via `adoptionHeld`) is the prime suspect for shifting the timing of
-  the parent's defence in the lunge staging — the same interaction 311 fixed on the
-  other side. Check whether the lunge case forces its outcome at all
-  (`balance.parentDefense.forceOutcome` is cleared at the end of the drama but may
-  only be SET for the rescue case, leaving the lunge outcome to a roll that the new
-  window can tip). FIX so both stagings are deterministic and independent of the
-  escape window; the rescue and too-late endings must keep working. VERIFIABLE:
-  `enrichments` green on BOTH backends, twice in a row on a quiet machine; a pure
-  test pinning that the lunge staging's outcome does not depend on the escape
-  window.
-  DIAGNOSIS (read-only prep 25.07, main session — it points at the CHECK, as point
-  292 did): in `crocDrama` the entire parent-parking block is gated
-  `else if (out.gripped && MODE.kind !== 'lunge')`, so in the LUNGE case the parent
-  is neither moved away NOR pinned by `forceOutcome` (set only for `rescue`). The
-  lunge case therefore rests on an IMPLICIT assumption — that the staged parent
-  happens to stand too far off to intervene — instead of enforcing it, while every
-  other case pins its outcome explicitly (the point-177 lesson, applied to kill,
-  drive-off and rescue but never to lunge). Anything that gives the parent slightly
-  more opportunity (the point-311 escape window is the obvious candidate, a slower
-  or loaded backend just as much) flips the result into a rescue, and the check
-  reads that as a product failure. LIKELY FIX: park the parent FAR in the lunge
-  case exactly as the rescue case parks it near (same unit-vector maths, opposite
-  intent), and/or pin `forceOutcome = 'taken'` for the lunge staging — then the
-  case tests what it claims (the grip) rather than an ambient distance. Confirm
-  with the isolated quiet-machine repeat FIRST: if that repeat is green, the
-  finding was load, and only the implicit assumption needs hardening.
+- [ ] 336. HARDEN THE CROCODILE LUNGE STAGING (its red was LOAD, confirmed
+  25.07.2026 — the hardening is still worth doing). The finding: after the
+  point-311 merge, `enrichments` was green on WebGL 2 (225/0) but the check "the
+  hidden crocodile lunges visibly (no teleport) and grips the bank drinker" failed
+  TWICE on WebGPU with {gripped:true, calfAlive:TRUE, crocRetreated:TRUE} — the
+  parent drove the crocodile off where the case demands the plain grip. RESOLUTION:
+  that run was NOT on a quiet machine (a browser-driving agent had been started
+  against the project's own load rule); the isolated repeat on a quiet machine is
+  GREEN, 225/0, first try. So it was load, not a regression — and not the point-311
+  window either. WHAT REMAINS WORTH FIXING (the reason this point stays open): the
+  lunge case is the ONLY crocodile staging that does not pin its outcome. The whole
+  parent-parking block in `crocDrama` is gated
+  `else if (out.gripped && MODE.kind !== 'lunge')`, and `forceOutcome` is set only
+  for `rescue` — so the lunge case rests on the IMPLICIT assumption that the staged
+  parent happens to stand too far off to intervene, while kill, drive-off and rescue
+  all pin their outcome explicitly (the point-177 lesson, never applied here). Under
+  load that assumption flips and the check accuses the product. FIX: park the parent
+  FAR in the lunge case exactly as the rescue case parks it near (same unit-vector
+  maths, opposite intent) and/or pin `forceOutcome = 'taken'` for the lunge staging,
+  so the case tests the grip rather than an ambient distance. VERIFIABLE: the lunge
+  check passes with the parent deliberately placed CLOSE (proving the outcome no
+  longer depends on distance); `enrichments` green on both backends; a note in the
+  check naming the pinned assumption. RELATED: point 294 (auto-classify a red as
+  regression vs. pre-existing vs. load) would have answered this in seconds instead
+  of a manual repeat — and point 296's under-load flag would have labelled the first
+  run unusable before it was ever believed.
 
 ## Closing (only after all points)
 
