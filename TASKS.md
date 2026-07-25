@@ -11409,6 +11409,59 @@ the remaining open points in their numeric order.
   reviewed by Opus after build, findings fixed — both reviews' verdicts noted in the
   commit/point tick.
 
+- [ ] 314. DRIFTING PALE PATCHES ON WATER (user 25.07.2026, screenshot: bird's-eye at
+  a river mouth near the ocean — two elongated pale/greenish patches ON the water
+  surface near the shore, which MOVE/CHANGE as the traveller walks; "immer noch
+  gelegentlich", i.e. the class was seen before). DIAGNOSE BY THE PICTURE first
+  (drive the reported shore on both backends, screenshot series), then root-cause —
+  candidate hypotheses to check, not to assume: (1) shore/crest foam sampled in a
+  non-world-anchored space so the mask swims with the camera; (2) the far-sheet vs
+  near-water overlap at the coast (zoom-gated far sheet showing through); (3) the
+  point-211 ribbon-row lift re-evaluating per terrain-chunk LOD so lifted rows pop
+  as chunks stream (matches "changes while walking"); (4) foam from the river mouth
+  bridge (MOUTH_BRIDGE) rows extending into the shelf. FIX the identified cause; the
+  §11.3 continuity/never-buried/mouth-bridge invariants stay green. VERIFIABLE: a
+  driven enrichments check at the reported spot asserts the water pixels stay
+  stable while the traveller moves (frame-diff over the water region bounded, on
+  BOTH backends), plus the screenshot pair before/after; pure test for whichever
+  sampling rule was wrong.
+
+- [ ] 315. GIZA SITE: THE BURIED SPHINX READS WRONG ON THE GROUND (user 25.07.2026,
+  screenshot from inside the walkable Giza site: the sphinx shows as a blocky brown
+  mass with a pale flat wedge at its base — parts appear to float/clip rather than
+  emerge from a sand drift; the user had expected this fixed after the point-279
+  detail pass, which fixed the SKYLINE cues but not this ground-level read). Rework
+  the sand-buried presentation at SITE scale: the head/neck/back emerge from a
+  proper sand MOUND that hugs the body (a drift envelope meeting the desert floor
+  with no floating slabs, no clipping wedge, matching the ~1890 buried state where
+  only head and upper back stood clear), collidable mass unchanged. VERIFIABLE:
+  buildSphinx/site-layout pure tests keep passing plus a new one for the mound
+  envelope (mound base at ground level, body faces below mound crest except
+  head/upper back); screenshot set from several standpoints inside the site on BOTH
+  backends judged by the picture; the skyline variant (point 82 cues) unchanged.
+
+- [ ] 316. SWIMMER TRAPPED IN A RIVER-MOUTH NOTCH (user 25.07.2026, screenshot at the
+  Nile delta mouth ~31.4N/30.4E: swimming without a canoe, the downstream current
+  outruns the swim speed so he cannot go back upstream, and the ocean boundary
+  blocks WITHOUT letting him slide sideways along it — a softlock in the notch
+  between river mouth and coast; user's proposed solution: there must BE no such
+  notch, and every other river-to-ocean transition needs the same check). Fix BOTH
+  layers: (1) GEOMETRY per the user's proposal — at every sea mouth the
+  coast/mouth-bridge junction must not form a concave water pocket that the current
+  pushes into; adjust the mouth-junction shaping (§11.3 point 211) so the water
+  edge meets the coast without a trap notch, and SWEEP all sea-mouth rivers
+  programmatically for such pockets (a pure test walking each mouth's water cells:
+  from every swimmable cell there exists an exit path on which the current does not
+  exceed swim speed); (2) MOVEMENT GUARANTEES as the backstop — the ocean boundary
+  resolves swimming movement by SLIDING tangentially (like settlement collision)
+  instead of a hard stop, and the passive downstream drift never pushes INTO a
+  blocked boundary (drift clamped by the same resolve). The §11.3 continuity,
+  mouth-bridge and never-buried invariants and the ocean-impassable rule stay
+  intact (no new way to leave the continent). VERIFIABLE: the all-mouths
+  escapability sweep (pure); a staged swim in the reported notch drifts, slides
+  along the coast and gets out alive (enrichments, both backends); the §11.2/redSea
+  suite stays green.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
