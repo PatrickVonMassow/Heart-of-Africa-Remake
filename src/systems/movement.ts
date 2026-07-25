@@ -179,6 +179,47 @@ export function resolveTravelMove(
   return [cx, cz]
 }
 
+/**
+ * Slide along a blocked BOUNDARY instead of stopping dead (design.md §11.2).
+ * Settlement collision has slid since point 113, and `resolveTravelMove` slides
+ * around trees and animals — but the overland move treated blocked terrain (the
+ * open ocean) as a hard stop, so a swimmer pressed against the boundary by the
+ * river current had no lateral escape at all: the reported softlock in the Nile
+ * delta's mouth notch, where the current outruns the swim speed upstream and the
+ * coast refuses every step (point 316).
+ *
+ * Tries the intended heading first, then swings alternately outward in `stepDeg`
+ * increments up to ±90°, and returns the first free target — the same shape the
+ * wildlife's coast deflection uses. Returns null only when EVERY direction in
+ * that fan is blocked (a genuine dead end), which is what the blocked notice is
+ * for. Pure: `blockedAt` decides what is impassable.
+ */
+export function slideAlongBlocked(
+  x: number,
+  z: number,
+  dx: number,
+  dz: number,
+  blockedAt: (x: number, z: number) => boolean,
+  stepDeg = 15,
+): { x: number; z: number } | null {
+  const dist = Math.hypot(dx, dz)
+  if (dist < 1e-9) return null
+  const heading = Math.atan2(dx, dz)
+  // Fan a little PAST 90°: a step exactly tangent to the boundary lands on it
+  // to within floating-point noise (cos 90° is 6e-17, not 0), so a fan that
+  // stops at 90° can read its own escape as blocked and report a dead end.
+  const steps = Math.max(1, Math.round(105 / stepDeg))
+  for (let i = 0; i <= steps; i++) {
+    for (const sign of i === 0 ? [1] : [1, -1]) {
+      const h = heading + sign * i * stepDeg * (Math.PI / 180)
+      const tx = x + Math.sin(h) * dist
+      const tz = z + Math.cos(h) * dist
+      if (!blockedAt(tx, tz)) return { x: tx, z: tz }
+    }
+  }
+  return null
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__movement = {
@@ -186,5 +227,6 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     placeWalkVelocity,
     pushOutOfCircles,
     resolveTravelMove,
+    slideAlongBlocked,
   }
 }

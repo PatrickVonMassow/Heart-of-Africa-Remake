@@ -13,7 +13,7 @@ import { WATERFALLS } from '../world/data/landmarks'
 import { lakeDistance, riverDistance, riverFlow } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
-import { movementPenalty } from '../systems/movement'
+import { movementPenalty, slideAlongBlocked } from '../systems/movement'
 import {
   LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
   type TreasureId, type TreasureSite,
@@ -654,11 +654,28 @@ export const useGame = create<GameState>()((set, get) => ({
     const step = speed * dt
     const nx = s.pos.x + (dirX / len) * step
     const nz = s.pos.z + (dirZ / len) * step
-    const next = worldToLatLon(nx, nz)
-    const nextT = sampleTerrain(next.lat, next.lon, s.seed)
+    let next = worldToLatLon(nx, nz)
+    let nextT = sampleTerrain(next.lat, next.lon, s.seed)
+    let tx = nx
+    let tz = nz
     if (isBlocked(nextT.type, next.lat, next.lon)) {
-      set({ toast: getStrings().toasts.oceanBlocked })
-      return
+      // SLIDE along the boundary rather than stopping dead (point 316): a
+      // swimmer pushed against the ocean by the river current had no lateral
+      // escape and was stuck for good in the delta's mouth notch. Only a
+      // genuine dead end — every direction in the fan blocked — still reports
+      // the blocked notice.
+      const slid = slideAlongBlocked(s.pos.x, s.pos.z, nx - s.pos.x, nz - s.pos.z, (px, pz) => {
+        const ll = worldToLatLon(px, pz)
+        return isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)
+      })
+      if (!slid) {
+        set({ toast: getStrings().toasts.oceanBlocked })
+        return
+      }
+      tx = slid.x
+      tz = slid.z
+      next = worldToLatLon(tx, tz)
+      nextT = sampleTerrain(next.lat, next.lon, s.seed)
     }
     // Movement-penalty warning (design.md §11): the first time a missing item
     // slows the traveller — a machete in the jungle, a canoe in water, a rope
@@ -702,7 +719,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const newFood = Math.max(0, s.foodDays - foodDelta)
     const newDay = clampDay(s.day + dayDelta, START_YEAR)
 
-    const patch: Partial<GameState> = { pos: { x: nx, z: nz }, day: newDay, foodDays: newFood }
+    const patch: Partial<GameState> = { pos: { x: tx, z: tz }, day: newDay, foodDays: newFood }
 
     const newRegion = regionAt(next.lat, next.lon)
     if (newRegion !== s.region) patch.region = newRegion
