@@ -247,6 +247,7 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `push-arrival-guard` (Stop) | kein Turn-Ende, solange Commits in KEINER Remote-Ref liegen (Zielzustand statt Erfolgsmeldung) | 13 Commits blieben eine Nacht lokal (3.18) |
 | `guide-brevity-guard` (Stop + Unit-Test) | Einsteiger-Anleitung bleibt kurz und projekt-neutral (Budgets, Prompt-Pflicht, Marker-Detektor) | Anleitung driftete zur Projektchronik (3.25) |
 | `rule-review-guard` (Stop) | periodische Durchsicht des GANZEN Regelbestands, nach Intervall ODER Wachstum; Quittung mit Beleg | Bestand wuchs nur an, wurde nie gelesen (3.24) |
+| `guard-health-guard` (Stop) | kein Durchsetzer im Baum, den nichts aufruft; Test-Schuld als schrumpfende Sperrklinke | zwei Wächter, die nie feuern konnten (3.24 (4)) |
 | `timestamp-guard` (Stop, blockierend) | Antwort beginnt mit gemessenem Berlin-Stempel | 9× vergessene Timestamps |
 | `prep-guard` + `prep-arm-hook` (Stop/PostToolUse) | Wartezeit erzwingt Read-only-Prep (Marker automatisch scharf) | Däumchendrehen bei Hintergrundläufen |
 | `batch-singleton` + `lock-heartbeat/-release` + `batch-doctor` | harte Exklusivität (PID, atomar, Stand-down) + Repo-Heilung | parallele Sessions (3.2) |
@@ -341,7 +342,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 20:06 · Quellen-Fingerprint: `953f81065614…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 20:13 · Quellen-Fingerprint: `cebf47c99133…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -412,8 +413,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 27 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 28 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: 953f81065614249f6c02fdbc93081a3a5cc6128bc37cb3fb87acc8d59b3d1a7d -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T18:06:09.811Z -->
+<!-- RETRO-FINGERPRINT: cebf47c99133e00820557d65ec4ac85b23c8bb9443ffc4489c951a4feee1425c -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T18:13:45.403Z -->
 <!-- AUTO-GENERATED:END -->
