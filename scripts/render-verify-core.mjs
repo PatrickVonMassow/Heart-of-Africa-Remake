@@ -19,7 +19,7 @@ export const BACKENDS = ['webgpu', 'webgl']
 
 // Verify suites that are NOT rendering code (pure-node runner/checks): a change
 // there does not require a dual-backend picture.
-const NON_RENDER_VERIFY = new Set(['run-all.mjs', 'docs.mjs', 'ttsCache.mjs'])
+const NON_RENDER_VERIFY = new Set(['run-all.mjs', 'docs.mjs', 'ttsCache.mjs', 'fixedWaits.mjs'])
 
 /**
  * Is this repo path part of the RENDER SET — code whose change can alter the
@@ -34,6 +34,11 @@ export function isRenderPath(path) {
   if (p.startsWith('src/render/') || p.startsWith('src/scenes/') || p.startsWith('src/ui/')) return true
   if (p === 'src/App.tsx') return true // renderer setup / scene switch
   if (p.includes('.tsl.')) return true // TSL shader modules wherever they live
+  // A *.test.mjs beside the suites is a VITEST file: it runs in jsdom, never
+  // opens a browser and cannot touch a picture. Classifying it as a render path
+  // demanded a two-backend browser run for editing a pure text scanner — and a
+  // guard that sends you on pointless errands is one you learn to wave through.
+  if (/^scripts\/verify\/.+\.test\.mjs$/.test(p)) return false
   const suite = p.match(/^scripts\/verify\/([^/]+\.mjs)$/)
   if (suite && !NON_RENDER_VERIFY.has(suite[1])) return true
   return false

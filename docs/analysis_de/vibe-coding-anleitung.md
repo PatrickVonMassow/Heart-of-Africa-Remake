@@ -33,6 +33,11 @@ Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für ei
 Menschen richtig aus?"), steht das ausdrücklich dabei — dann hält der Merksatz nur
 so gut wie die Aufmerksamkeit des Moments.
 
+Manche Tipps kosten spürbar mehr Token. Die tragen eine grobe **Schätzung** wie
+*(Kosten ≈ 2x)* — gemeint ist der Mehrverbrauch für die betroffene Arbeit, nicht
+fürs ganze Projekt. Sie sind es meist wert; wenn dein Kontingent knapp wird, weißt
+du damit, wo du zuerst drehst.
+
 ### Primäres und sekundäres Modell
 
 Lege **zwei** Modelle fest und gib ihnen klare Rollen:
@@ -112,7 +117,7 @@ selbstbewusst Attrappen.
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
-   > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten."
+   > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten." *(Kosten ≈ 2x)*
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
@@ -127,8 +132,7 @@ selbstbewusst Attrappen.
 
 Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber
 nicht jede Änderung braucht die volle Batterie — sonst wird Testen so langsam, dass es
-umgangen wird. Bewährt haben sich **abgestufte Umfänge**, aus denen du je nach Änderung
-wählst:
+umgangen wird. Bewährt haben sich **abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
   Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern. Hierhin gehört
@@ -142,7 +146,7 @@ wählst:
 > *Prompt:* „Richte drei Test-Stufen ein — schnell (Unit, immer), klein (Unit + Kern-
 > Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
 > passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus, der die große
-> Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert."
+> Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert." *(Kosten ≈ 1,5x)*
 
 Zwei Mechanismen, die das Netz ehrlich halten:
 
@@ -163,7 +167,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
   gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft
   wurde, die ein Nutzer wirklich erreicht — nicht an einem Hilfswert und nicht in einem
-  Debug-Zustand." *(Der letzte Schritt bleibt menschlich und lässt sich nicht
+  Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich und lässt sich nicht
   mechanisieren: Sieh dir den Screenshot an und frag dich, ob das für einen Menschen
   richtig aussieht.)*
 
@@ -247,7 +251,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Durchsicht zwingt — nicht nur auf Lücken, sondern auf Sauberkeit, Aktualität,
   Dopplung, Widerspruch, **Wirkungslosigkeit** und Veralterung. Jede Regel wird gegen
   den Code geprüft, nicht gegen die Nachbarregel; zuerst die Texte, die am häufigsten
-  eingeblendet werden."
+  eingeblendet werden." *(Kosten: einmalig hoch)*
 
 - **Ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst.**
   Ein Mechanismus kann existieren und wirkungslos sein — dann gilt die Regel als
@@ -290,15 +294,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit ×
   Kritikalität** einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und
   danach das fertige Ergebnis gegenprüfen lässt — gegen die echten Daten, nicht gegen
-  die Beschreibung, und bevor zusammengeführt wird."
+  die Beschreibung, und bevor zusammengeführt wird." *(Kosten ≈ 2x)*
 
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
 
-1. **Root-Cause vor Fix.** Die besten Wendepunkte begannen mit einer schonungslosen
-   Analyse des eigenen Versagens. Ausreden-freie Ursachennotizen sind der Rohstoff, aus
-   dem gute Mechanismen entstehen.
+1. **Root-Cause vor Fix.** Ausreden-freie Ursachennotizen sind der Rohstoff, aus dem
+   gute Mechanismen entstehen.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
    > **mechanische** Ursache — was genau war die Annahme, die brach?"
 
@@ -317,7 +320,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
    > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
    > Arbeitskopie (Git-Worktree) und teile sie so auf, dass sie **nicht dieselben Dateien**
-   > anfassen. Isolierung und Exklusivität **vor** Redundanz."
+   > anfassen. Isolierung und Exklusivität **vor** Redundanz." *(Kosten ≈ Zahl der Stränge)*
 
 ---
 
@@ -334,4 +337,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: a1959f540f0f0e63610a46cbd0b6197d429bc38d6ab624cd845727c3f5bfb460 -->
+<!-- GUIDE-FINGERPRINT: cebf47c99133e00820557d65ec4ac85b23c8bb9443ffc4489c951a4feee1425c -->

@@ -57,7 +57,16 @@ describe('isRenderPath', () => {
     expect(isRenderPath('scripts/verify/run-all.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/docs.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/ttsCache.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/fixedWaits.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/README.md')).toBe(false)
+  })
+  // Regression witness: a *.test.mjs beside the suites runs in jsdom and never
+  // opens a browser. Treating it as a render path demanded a two-backend
+  // browser run for editing a pure text scanner.
+  it('never treats a Vitest file beside the suites as a render path', () => {
+    expect(isRenderPath('scripts/verify/fixedWaits.test.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/tiers.test.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/textureLeak.test.mjs')).toBe(false)
   })
   it('ignores logic/store/docs paths (a pure logic change needs no dual picture)', () => {
     expect(isRenderPath('src/state/store.ts')).toBe(false)
