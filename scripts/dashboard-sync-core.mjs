@@ -58,27 +58,59 @@ export function parseTasksPoints(text) {
   return { open, done }
 }
 
+// A point reference at the START of a title: a 1-4 digit number that is not the
+// head of a clock time (`22:29`), a version (`0.2`) or a word (`3D`).
+const POINT_HEAD = /^(\d{1,4})(?![\w%.]|:\d)/
+// What may join two numbers into ONE list of point references.
+const POINT_LIST_SEP = /^\s*(?:[+/,&]|und)\s*/
+
+/**
+ * Collect the run of point references a title OPENS with — `307`, `316/319`,
+ * `121, 130 und 146`, `306 + 308` — stopping at the first token that is not a
+ * number joined by a list separator.
+ *
+ * Deliberately NOT "every number in the string": a card title is prose, and its
+ * prose carries numbers that mean nothing of the sort. Reading them as point
+ * references made this guard call the CURRENT card »337: Ladebild steht ~15
+ * Sekunden still« stale, because it took the 15 for point 15 and found that one
+ * ticked done (25.07.2026). A guard that accuses correct work of being wrong
+ * costs exactly what a guard that stays silent costs.
+ */
+function leadingPointRun(text) {
+  const out = []
+  const first = text.match(POINT_HEAD)
+  if (!first) return out
+  out.push(Number(first[1]))
+  let rest = text.slice(first[0].length)
+  for (;;) {
+    const sep = rest.match(POINT_LIST_SEP)
+    if (!sep) break
+    const after = rest.slice(sep[0].length)
+    const num = after.match(POINT_HEAD)
+    if (!num) break
+    const n = Number(num[1])
+    if (!out.includes(n)) out.push(n)
+    rest = after.slice(num[0].length)
+  }
+  return out
+}
+
 /**
  * Parse one now-card title string into its point references and free-text
  * label. `point` is the LEADING number (`306 — Closing…` → 306, null for a
- * label-only card like `Closing-Aufräum + Fable`); `points` collects every
- * standalone 1-4-digit number in the title (a combined card may name several),
- * excluding version-ish (`v0.2`) and time-ish (`22:29`) fragments.
+ * label-only card like `Closing-Aufräum + Fable`); `points` is the leading RUN
+ * of point references (see leadingPointRun), so a combined card may name
+ * several while numbers inside the prose are ignored.
  */
 export function parseCardTitle(raw) {
   if (typeof raw !== 'string') return null
   const trimmed = raw.trim()
-  const lead = trimmed.match(/^(\d{1,4})\b/)
-  const points = []
-  for (const m of trimmed.matchAll(/(?<![\w.:])(\d{1,4})(?![\w.:%])/g)) {
-    const n = Number(m[1])
-    if (!points.includes(n)) points.push(n)
-  }
+  const points = leadingPointRun(trimmed)
   return {
     raw: trimmed,
-    point: lead ? Number(lead[1]) : null,
+    point: points.length ? points[0] : null,
     points,
-    label: trimmed.replace(/^\d{1,4}\s*[—–-]*\s*/, ''),
+    label: trimmed.replace(/^\d{1,4}\s*[—–:-]*\s*/, ''),
   }
 }
 
