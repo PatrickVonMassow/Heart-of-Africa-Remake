@@ -11939,8 +11939,21 @@ the remaining open points in their numeric order.
   anything it allocates per output node would accumulate; (4) the WebGPU
   backend's own texture cache possibly holding entries the three.js objects have
   already released — that would make the count an OVER-REPORT, i.e. a CHECK bug.
-  Decide (4) FIRST: it is the point-292 lesson (a red check indicting innocent
-  code), and it is the cheapest of the four to settle.
+  (4) IS ALREADY SETTLED (read-only prep 25.07): the check reads
+  `renderer.info.memory.textures`, which is three.js's OWN bookkeeping —
+  incremented on allocation and DECREMENTED by `dispose()`, never a backend
+  cache. A growing count therefore means three.js still holds the objects, so
+  this IS a real leak, not a measurement artefact. That leaves (1)-(3), and the
+  arithmetic points at (1): +14 textures over 5 toggle cycles is ~2.8 per cycle,
+  which matches the THREE MRT attachments the scene pass allocates (output,
+  normal, and — only while TRAA is on — velocity). A toggle changes BOTH the
+  attachment set (velocity appears/disappears) and the sample count (0 vs 4), so
+  each flip builds a fresh target set; if `scenePass.dispose()` frees the
+  colour target but not every MRT attachment, the count grows by roughly that
+  many per cycle. Test that hypothesis first by logging the surviving textures'
+  dimensions/formats before reaching for a fix. Why WebGL 2 stays green is part
+  of the question — likely a different attachment strategy per backend, which
+  also explains why the point-276 fix could look complete there.
 
 - [ ] 335. GREY BAND ACROSS THE HORIZON AT THE GIZA SITE (user 25.07.2026 with a
   screenshot from the DEPLOYED build, standing on the Giza monument site looking
