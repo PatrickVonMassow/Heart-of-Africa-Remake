@@ -926,8 +926,8 @@ for (const [placeId, shot] of [
       )
       await page.waitForTimeout(600)
       shot++
-      await page.screenshot({ path: `${OUT}140-giza-horizon-${shot}.png` })
-      console.log(`shot 140-giza-horizon-${shot}.png`)
+      await page.screenshot({ path: `${OUT}141-giza-horizon-${shot}.png` })
+      console.log(`shot 141-giza-horizon-${shot}.png`)
     }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
