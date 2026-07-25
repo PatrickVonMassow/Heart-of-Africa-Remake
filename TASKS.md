@@ -13003,6 +13003,14 @@ the remaining open points in their numeric order.
   independently. Those keep the ordinary review — with one borrowed refinement: the
   reviewer reads the ARTEFACT before the author's rationale, so it is not anchored by
   the justification either.
+  WHO THE SECOND AUTHOR IS MATTERS, and the rule says so: the two sets are worth what
+  their errors are UNCORRELATED. Two runs of the SAME model, kept blind from each other,
+  are independent in what they saw but not in how they think — they sample different
+  paths through the same prior, which is a genuine second look and no more. Two
+  DIFFERENT models are independent in both, and that is where the method earns its
+  cost. So cross-model is the default pairing (§6 allowlist); same-model blind parallel
+  is the acceptable fallback when the second model is unavailable, recorded as the
+  weaker variant rather than passed off as the full method.
   COST AND WHEN IT APPLIES: the generative stage runs twice, so roughly double for that
   stage. It therefore applies where four-eyes already applies by the criticality triage
   (point 298), not everywhere.
