@@ -11461,7 +11461,11 @@ the remaining open points in their numeric order.
   (a) NO SPAWN, NO LINGERING — unchanged, and the reason the rule exists. An animal
   never spawns in water and never idles, grazes, rests or waits in it; one that comes
   to rest on water makes for the nearest bank. A channel the player canoes must never
-  be blocked by a parked animal. This half must stay demonstrably intact.
+  be blocked by a parked animal. This half must stay demonstrably intact — and it is
+  what ENDS every water passage: the moment a flight stops, the animal turns for the
+  NEAREST bank and SWIMS out under its own power. It is never snapped back onto land,
+  which is how the old setback behaved; shyness must read as shyness, not as a
+  teleport.
   (b) CROSSING IS ORDINARY: a ROAMING animal may take on a channel rather than turn
   from it, governed by the calibratable `balance.waterCross.*` (width, readiness).
   (c) FLIGHT IS UNRESTRICTED. Fleeing anything — a predator, an oncoming elephant, the
@@ -11495,9 +11499,11 @@ the remaining open points in their numeric order.
   afterwards; an idle animal that ends up on water heads for the nearest bank. Live
   (`scripts/verify/enrichments.mjs`, both backends): an elephant driven at a grazer on
   a STRAIGHT bank — where an along-shore slide IS available — sends it into the water
-  and out the far side; the staged swept calf reaches mid-channel and its drama
-  resolves; and across a driven pass no animal is found standing in a channel, so the
-  canoe lane stays clear.
+  and out the far side; an animal the PLAYER drives into a river and then leaves alone
+  is out of the water within moments — swimming to the nearest bank, its path sampled
+  so it is a swim and not a jump; the staged swept calf reaches mid-channel and its
+  drama resolves; and across a driven pass no animal is found standing in a channel, so
+  the canoe lane stays clear.
 
 - [x] 313. FULL DASHBOARD-CONSISTENCY ENFORCEMENT (user 25.07.2026; four-eyes Opus +
   Fable on BOTH the plan and the implementation). The 25.07 morning audit found real
