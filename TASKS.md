@@ -12158,6 +12158,51 @@ the remaining open points in their numeric order.
   reveals the landmark and journals it; the existing Giza suites
   (src/scenes/place/gizaSite.test.ts, settlementEntry, landmarks) stay green.
 
+- [ ] 339. F6 BECOMES A COMPLETE BUG REPORT: SCREENSHOT + STATE + DESCRIPTION IN ONE ZIP
+  (user 25.07.2026). Today F6 opens a top-most modal showing the serialised game state
+  as pretty JSON with download/copy (src/ui/StateDump.tsx, src/state/stateDump.ts,
+  bound in src/ui/Hud.tsx:451). TARGET: pressing F6 captures the CURRENT PICTURE as
+  well, offers a free-text field for what went wrong, and hands all three out as ONE
+  downloadable `.zip` the user can pass on unopened.
+  CONTENTS of the archive, named from the same stem as today's dump filename
+  (`dumpFilename`): the PNG screenshot, the state JSON (unchanged serialiser —
+  `dumpGameState` already captures every data field deterministically and drops the
+  actions), and the description as a readable `.txt` that also repeats the environment
+  header the JSON carries (build commit, backend, adapter, language, quality level), so
+  the text file alone is orientation enough.
+  SCREENSHOT — THE ONE HARD PART. The renderer is constructed WITHOUT
+  `preserveDrawingBuffer` (src/App.tsx:74), so calling `toDataURL()` at an arbitrary
+  moment yields a BLANK image on both backends: the drawing buffer is gone after
+  present. Do NOT "fix" this by switching `preserveDrawingBuffer` on — it costs frame
+  time for every player forever, to serve a key pressed once in a while. Capture INSIDE
+  a rendered tick instead: arm a one-shot request, and in the same tick as a render read
+  the canvas back. Verify by the PICTURE, never by "a data URL came back": a blank
+  capture IS a data URL of the right size and would pass any naive assertion (the §7.2
+  green-test-wrong-picture rule). The check must assert the PNG carries real scene
+  content — decoded pixels with meaningful variance, not a uniform field — and it must
+  run on BOTH backends, because their present/readback paths differ.
+  ZIP — NO NEW RUNTIME DEPENDENCY (CLAUDE.md §3). A STORE-only (uncompressed) zip
+  writer is ~100 lines of pure code — local file headers, a central directory, CRC32 —
+  and a bug-report archive of a PNG and two small text files gains nothing from
+  deflate. Write it as a pure module with its own tests; do not pull in an archiver.
+  UI: the modal keeps its top-most placement and Esc behaviour and gains a description
+  textarea (autofocused, so the user can type immediately) and a single primary
+  "download report" button; the existing JSON view and copy button stay reachable. Esc
+  must still close without leaving focus on a control, and F6's browser default stays
+  prevented while F5 is left to the browser (Hud.tsx:513). All new player-visible text
+  in BOTH languages from the language files.
+  DOCS in the same commits: design.md §21.1 and CLAUDE.md §7.1 point 20 both describe
+  F6 as the state-dump popup and must state the final behaviour instead.
+  VERIFIABLE: pure — the zip writer produces an archive a real unzip accepts (byte
+  layout, CRC32 over known input, several members, an empty member, a UTF-8 filename),
+  and the report assembly names its three members from one stem; component —
+  `src/ui/StateDump.test.tsx` extended: hidden by default, F6 opens with the textarea
+  focused, the typed description reaches the assembled report, Esc closes without
+  focusing a control, both languages; live — `scripts/verify/settings.mjs` (or its own
+  suite) presses F6 in a real scene, types a description, triggers the download and
+  asserts a non-empty zip whose PNG member decodes to a NON-uniform image, on BOTH
+  backends.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
