@@ -178,6 +178,10 @@ Beim Aufräumen der Branches fiel auf, dass eine ganze Nachtschicht Arbeit (13 C
 
 Der Dashboard-Konsistenz-Guard wurde erstmals konsequent nach dem Zweitmodell-Prinzip gebaut: ein Modell entwarf und implementierte, ein anderes prüfte Plan *und* Ergebnis. Der Plan-Review kippte zwei Entwurfsentscheidungen, bevor sie Schaden anrichteten (eine Mojibake-Erkennung per Zeichenkettenliste, die die Hälfte der Fälle verfehlt hätte, und eine Regel, die dem ausdrücklichen Nutzer-Mandat „keine Karte öffnet sich automatisch" widersprochen hätte). Der Ergebnis-Review fand danach vier echte Fehler im fertigen Code — darunter, dass die Sammel-Kartennummern des *realen* Boards („232·233·234") gar nicht gelesen wurden und dass die Notbremse eine fehlende Karte dauerhaft verschluckt hätte. Bemerkenswert ist die Art der Funde: Alle vier waren Lücken zwischen dem Modell im Kopf des Autors und der Wirklichkeit der Daten — genau das, was der Autor selbst nicht sehen kann, weil er beides aus derselben Annahme ableitet. Das rechtfertigt den Aufwand: Der zweite Blick ist kein Qualitätssiegel, sondern eine andere Datenquelle.
 
+### 3.20 Aufräumen ist eine Prüfaufgabe, keine Fleißaufgabe (25.07.)
+
+Nach der Degradation hielt ich das Aufräumen für erledigt — der Nutzer fand danach *zufällig* drei weitere Rückstände: kaputte Umlaute im Board, ein inkonsistentes Board und eine ganze Nachtschicht Arbeit, die nur lokal lag. Sein Urteil („ziemlich unvollständig") traf zu, und die Ursache ist lehrreich: Ich hatte aufgeräumt, *wo ich Schaden vermutete*, statt systematisch **alle Orte zu prüfen, an denen Schaden liegen kann**. Erst der erzwungene Durchlauf mit expliziten Abschnitten — Vollständigkeit (liegt wirklich alles am Zielort?), Rückstände (Kodierung über *alle* 2305 Textdateien, Datei-für-Datei-Diff gegen den letzten gesunden Stand, Waisensuche, Attrappen-Tests), Plausibilität jedes seit dem letzten Tag gebauten Features samt seiner Tests, Kohärenz der Dokumente, und am Ende der grüne Regressionsbeweis — machte die Abdeckung überhaupt beurteilbar. Zwei Nebenbefunde bestätigen den Wert der Systematik: Der Kodierungs-Detektor schlug ausgerechnet auf seine *eigene* Quelldatei an (deren Kommentar die Schadensmuster zitierte), und ein 219 Commits zurückliegender Zweig, den ich zum Bewerten aufgehoben hatte, erwies sich als unmergebar — beides hätte ich ohne die Checkliste nicht angesehen. Übertragbar: **Nach einem Zwischenfall ist „aufgeräumt" eine Behauptung, die eine Beweisliste braucht** — sonst findet der Nutzer die Reste, und das kostet mehr Vertrauen als der Zwischenfall selbst.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -290,7 +294,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 09:16 · Quellen-Fingerprint: `e326e42b2ce6…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 09:34 · Quellen-Fingerprint: `02d1f84015fd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -361,8 +365,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 13 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: e326e42b2ce66db8af5c996da5dc0b5fb5b1e17e8988d01a97971af1dc75753d -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T07:16:48.861Z -->
+<!-- RETRO-FINGERPRINT: 02d1f84015fd25797c431b3918f500387c2697594850cfd240642e9bbfc4ff6a -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T07:34:01.219Z -->
 <!-- AUTO-GENERATED:END -->
