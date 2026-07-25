@@ -12740,57 +12740,72 @@ the remaining open points in their numeric order.
   check is for.
 
 - [ ] 351. THE VILLAGE CHILDREN PLAY A GAME OF TAG (user 25.07.2026). They run wild
-  through the settlement, around the huts and past the fire; one of them is IT and
-  chases the others; on a catch the roles swap and the chase turns around. That is what
-  the §19.10 village life is for — figures that are visibly doing something, not
-  following a path.
-  A PATH IS NOT A GAME, and this is the whole design point: any fixed route — a ring
-  around the well, an orbit at a set radius, a tour of waypoints — is periodic, and the
-  eye recognises it within two passes. A chase is not periodic because its target
-  REACTS. Do not implement this as a path with a moving centre.
-  THE BEHAVIOUR. Each child in the play group is either the chaser or a runner. The
-  chaser steers toward the nearest catchable runner; runners steer away from the chaser,
-  preferring open ground. Speeds are calibratable and close together, with the runner a
-  little quicker than the chaser (`balance.villageLife.*`, debug-editable) so a catch
-  takes real time to happen. On a catch — within a small calibratable distance — the
-  caught child becomes the chaser.
-  USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve
-  obstacles by sliding along a collider and stopping — which is exactly what reads as
-  bumping into things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, already
-  used by every fleeing animal) probes around the heading and CONTINUES the run past an
-  obstacle. A chase wants that one. It is the reason this behaviour is small rather than
-  large: the steering already exists and is pure-tested.
-  FOUR FAILURE MODES THE BUILD MUST CLOSE, each of them a lesson this project has
-  already paid for elsewhere:
+  through the settlement, around the huts and past the fire. One of them is IT and
+  chases the others; whoever is caught becomes the new IT and must catch someone else.
+  Any number plays — one chaser and every other child in the group. That is what the
+  §19.10 village life is for: figures visibly doing something, not following a path.
+  A PATH IS NOT A GAME, and this is the design point the build must not undo: any fixed
+  route — a ring around the well, an orbit at a set radius, a tour of waypoints — is
+  periodic, and the eye recognises it within two passes. A chase is not periodic because
+  its target REACTS. Do not implement it as a path with a moving centre.
+  THE CHASE. The chaser continuously targets the NEAREST catchable runner, so it switches
+  opportunistically when someone crosses its path — the way children really play, and the
+  difference between a game and one long pursuit of a distant child. Runners steer away
+  from the chaser, preferring open ground. On a catch, within a small calibratable
+  distance, the caught child becomes the chaser.
+  STAMINA IS WHAT MAKES IT LEGIBLE, and it is the heart of the mechanic rather than a
+  flourish. Every child carries a sprint reserve that drains while running flat out and
+  refills while moving slowly or standing. A runner who has spent it slows and is run
+  down — so a catch happens for a reason the viewer can SEE, instead of the game being
+  cut short from outside. A chaser who has spent it eases off, catches its breath and
+  picks a nearer victim. Speeds, drain and recovery rates are calibratable
+  (`balance.villageLife.*`, debug-editable). Two shaping rules: a floor below which the
+  pace never falls while a chase runs — a child frozen mid-game reads as a bug, a
+  trotting one reads as winded — and per-child variation in reserve and recovery, so the
+  group never tires in unison.
+  HOW IT READS, given the figures the game has: the villagers are cones with sphere
+  heads and NO legs (only the fauna and the §2.5 silhouettes have a stride), so the
+  sprint cannot be shown by leg cadence. It is carried by SPEED and POSTURE — a forward
+  lean while sprinting, upright and near-still while recovering. Giving human figures
+  legs is NOT part of this point.
+  USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve obstacles
+  by sliding along a collider and stopping — which is exactly what reads as bumping into
+  things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, used by every fleeing
+  animal) probes around the heading and CONTINUES the run past an obstacle. A chase wants
+  that one, and reusing it is why this behaviour is small rather than large.
+  FOUR FAILURE MODES THE BUILD MUST CLOSE, each a lesson this project has already paid
+  for elsewhere:
   (1) INSTANT RE-TAG. Without a guard the two children swap the role every frame and
-  stand jittering together. The new chaser owes the freshly-tagged child a short
-  calibratable immunity, and turns away before resuming. This is the same hysteresis
-  that keeps the animals' dodge and guard states from flapping.
-  (2) STICKING ON GEOMETRY. A chase that pins on a hut corner is worse than the bumping
-  it replaces; the deflected step plus a nudge on a stall keeps them running.
+  stand jittering together — and with several players it would keep the game visually a
+  two-child affair while the others idle. The new chaser owes the freshly-tagged child a
+  short calibratable immunity and turns away before resuming: the same hysteresis that
+  keeps the animals' dodge and guard states from flapping.
+  (2) STICKING ON GEOMETRY. A chase pinned on a hut corner is worse than the bumping it
+  replaces; the deflected step plus a nudge keeps them running.
   (3) LEAVING THE PLAY AREA. Children stay inside the walkable settlement, out of the
-  fire ring, and never inside a collider — playing must not become a way to stand where
-  a walker may not.
-  (4) A CHASE THAT NEVER ENDS. If the chaser fails to catch anyone within a calibratable
-  window, the game resolves: a new chaser is drawn or the group breaks off and returns
-  to its ordinary idling for a while before starting again. This is the §19.8 house
-  rule — every started drama resolves — applied to the village.
+  fire ring, and never inside a collider — playing must not become a way to stand where a
+  walker may not.
+  (4) A GAME THAT NEVER RESOLVES. Stamina is what normally ends a round; a hard cap
+  remains only as the backstop for the §19.8 house rule that nothing runs forever, after
+  which the group breaks off into ordinary idling for a while before starting again.
   KEEP UNCHANGED: the adults' errands, and the point-155 guarantees (an errand target
   needs a clear standing circle and an escape direction; a pinned walker is nudged free
   after its window).
-  A BY-PRODUCT worth noting in the commit: a pursue-and-evade between inhabitants is
-  reusable — a goat bolting from someone, a dog in a port — so keep it a helper rather
-  than burying it in the children.
-  VERIFIABLE: pure — the role swap grants immunity for its window and cannot re-tag
-  inside it (boundary-exact); the chaser's target choice is the nearest catchable runner
-  and never the immune one; the runner's preferred heading leads away from the chaser
-  and into open ground; the unresolved-chase window ends the game deterministically; a
-  child's step never enters a collider or leaves the walkable radius. Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): over a sampled interval the
-  children's paths are NOT periodic — their headings cover a wide spread rather than
-  circling, the pairwise distance between chaser and nearest runner rises and falls
-  repeatedly, and the identity of the chaser changes at least once; no child is pinned
-  against geometry and none stands still for the whole interval.
+  A BY-PRODUCT worth noting in the commit: pursue-and-evade with stamina is reusable — a
+  goat bolting from someone, a dog in a port — so keep it a helper rather than burying it
+  in the children.
+  VERIFIABLE: pure — the reserve drains only at sprint pace and refills below it, never
+  leaves its bounds, and the pace never drops below the floor while a chase runs; a
+  spent runner is strictly slower than a fresh chaser (so a catch is reachable) while a
+  fresh runner is strictly faster (so it is not immediate); the role swap grants immunity
+  for its window and cannot re-tag inside it (boundary-exact); the chaser's target is the
+  nearest catchable runner and never the immune one; a child's step never enters a
+  collider or leaves the walkable radius. Live (`scripts/verify/polish.mjs`, BOTH
+  backends, screenshot): over a sampled interval the children's paths are NOT periodic —
+  their headings cover a wide spread rather than circling — the distance between chaser
+  and nearest runner rises and falls repeatedly, the chaser's identity changes at least
+  once, and at least one child is seen slowing to recover; no child is pinned against
+  geometry and none stands still for the whole interval.
 
 - [ ] 352. THE SETTLEMENT EDGE PAINTED ON THE GROUND (user 25.07.2026; design.md §2.6
   states the target). In the first-person view the boundary is invisible until crossing
