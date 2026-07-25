@@ -12758,6 +12758,16 @@ the remaining open points in their numeric order.
   refills at a trot or standing. A runner who has spent it slows and is run down — so a
   catch happens for a reason the viewer can SEE, instead of the round being cut short
   from outside.
+  THE TOP SPEED FADES, IT DOES NOT SNAP. The pace a child can hold is a CONTINUOUS
+  function of what is left in its reserve — full sprint while fresh, tapering as the
+  reserve empties, reaching the floor pace only at empty. A child therefore visibly runs
+  out of steam over seconds, the way a real one does, and the moment of catching up is a
+  gradual closing rather than a step change nobody can miss reading as a switch.
+  KEEP THE TWO MECHANISMS APART, because collapsing them is the obvious mistake: the
+  CURVE governs what a child CAN do, the two thresholds govern what it CHOOSES to do
+  (press on, or break off and recover). By the time the low threshold sends it into
+  recovery it is already visibly slower — the decision confirms what the picture has
+  been showing, instead of announcing it.
   THE SPRINT IS SPENT DELIBERATELY, NEVER CONTINUOUSLY. A child that always runs at
   whatever its current maximum is can never recover, and a chaser who empties its
   reserve once would stay a hopeless trotter for the rest of the round — the game would
@@ -12809,7 +12819,10 @@ the remaining open points in their numeric order.
   goat bolting from someone, a dog in a port — so keep it a helper rather than burying it
   in the children.
   VERIFIABLE: pure — the reserve drains only at sprint pace and refills below it, never
-  leaves its bounds, and the pace never drops below the floor while a chase runs; a
+  leaves its bounds, and the pace never drops below the floor while a chase runs; the
+  speed cap is MONOTONE in the reserve and CONTINUOUS — full sprint at full, the floor at
+  empty, and no jump between neighbouring reserve levels larger than a bounded step, so a
+  snap cannot creep back in; a
   spent runner is strictly slower than a fresh chaser (so a catch is reachable) while a
   fresh runner is strictly faster (so it is not immediate); a child driven to empty
   RECOVERS: simulated forward under constant pressure it drops to its recovery pace,
