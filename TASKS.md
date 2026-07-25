@@ -11979,6 +11979,29 @@ the remaining open points in their numeric order.
   guessed constant); screenshots from several standpoints on BOTH backends; the
   point-227 settlement checks stay green.
 
+- [ ] 336. CROCODILE LUNGE CHECK RED ON WEBGPU AFTER THE CALF-ESCAPE MERGE (found
+  25.07.2026 re-verifying the point-311 merge). `enrichments` is GREEN on WebGL 2
+  (225/0) but on WebGPU the check "the hidden crocodile lunges visibly (no
+  teleport) and grips the bank drinker" fails TWICE with
+  {staged:true, lunged:true, noTeleport:true, gripped:true, calfAlive:TRUE,
+  parentAlive:true, crocRetreated:TRUE}: the staging works, the crocodile lunges
+  and grips — but the calf SURVIVES because the parent drives the crocodile off,
+  while the check demands the plain grip outcome (`!calfAlive`), the rescue being
+  a separate staged case. CAVEAT ON THE EVIDENCE: this run was NOT on a quiet
+  machine — a browser-driving agent was started while it ran, against the project's
+  own load rule, so the first job is to REPEAT it isolated on a quiet machine
+  before believing it. If it holds: the point-311 window (`escapeSeconds`, the
+  adoption hold via `adoptionHeld`) is the prime suspect for shifting the timing of
+  the parent's defence in the lunge staging — the same interaction 311 fixed on the
+  other side. Check whether the lunge case forces its outcome at all
+  (`balance.parentDefense.forceOutcome` is cleared at the end of the drama but may
+  only be SET for the rescue case, leaving the lunge outcome to a roll that the new
+  window can tip). FIX so both stagings are deterministic and independent of the
+  escape window; the rescue and too-late endings must keep working. VERIFIABLE:
+  `enrichments` green on BOTH backends, twice in a row on a quiet machine; a pure
+  test pinning that the lunge staging's outcome does not depend on the escape
+  window.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
