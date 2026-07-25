@@ -177,6 +177,21 @@ Zwei Regeln, die das Netz ehrlich halten:
   → *Prompt:* „Mein Urteil fällt immer am **veröffentlichten/zusammengeführten** Stand,
   nie an einem Zwischen-Zweig. Halte Messläufe frei von störenden Fenstern."
 
+- **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
+  trotzdem nicht passiert — der Klassiker: auf einem Nebenzweig entwickelt, aber den
+  Hauptzweig hochgeladen; Git meldet zufrieden „alles aktuell", während die Arbeit nur
+  lokal liegt. Dieselbe Falle wie ein grüner Test am falschen Bild.
+  → *Prompt:* „Nach jeder Aktion mit Fernwirkung (Hochladen, Veröffentlichen,
+  Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
+  mein aktueller Stand wirklich oben angekommen ist."
+
+- **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft am Ende
+  gegen dieselbe Vorstellung, aus der der Fehler stammt — deshalb übersieht man
+  ausgerechnet die Stelle, an der die Wirklichkeit anders aussieht als gedacht.
+  → *Prompt:* „Bei allem, was zuverlässig laufen muss: lass **ein anderes Modell** erst
+  den Plan und danach das fertige Ergebnis gegenprüfen — und zwar gegen die echten
+  Daten, nicht gegen die Beschreibung."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
