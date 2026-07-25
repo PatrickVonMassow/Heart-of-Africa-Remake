@@ -12021,33 +12021,32 @@ the remaining open points in their numeric order.
   guessed constant); screenshots from several standpoints on BOTH backends; the
   point-227 settlement checks stay green.
 
-- [ ] 336. HARDEN THE CROCODILE LUNGE STAGING (its red was LOAD, confirmed
-  25.07.2026 — the hardening is still worth doing). The finding: after the
-  point-311 merge, `enrichments` was green on WebGL 2 (225/0) but the check "the
-  hidden crocodile lunges visibly (no teleport) and grips the bank drinker" failed
-  TWICE on WebGPU with {gripped:true, calfAlive:TRUE, crocRetreated:TRUE} — the
-  parent drove the crocodile off where the case demands the plain grip. RESOLUTION:
-  that run was NOT on a quiet machine (a browser-driving agent had been started
-  against the project's own load rule); the isolated repeat on a quiet machine is
-  GREEN, 225/0, first try. So it was load, not a regression — and not the point-311
-  window either. WHAT REMAINS WORTH FIXING (the reason this point stays open): the
-  lunge case is the ONLY crocodile staging that does not pin its outcome. The whole
-  parent-parking block in `crocDrama` is gated
-  `else if (out.gripped && MODE.kind !== 'lunge')`, and `forceOutcome` is set only
-  for `rescue` — so the lunge case rests on the IMPLICIT assumption that the staged
-  parent happens to stand too far off to intervene, while kill, drive-off and rescue
-  all pin their outcome explicitly (the point-177 lesson, never applied here). Under
-  load that assumption flips and the check accuses the product. FIX: park the parent
-  FAR in the lunge case exactly as the rescue case parks it near (same unit-vector
-  maths, opposite intent) and/or pin `forceOutcome = 'taken'` for the lunge staging,
-  so the case tests the grip rather than an ambient distance. VERIFIABLE: the lunge
-  check passes with the parent deliberately placed CLOSE (proving the outcome no
-  longer depends on distance); `enrichments` green on both backends; a note in the
-  check naming the pinned assumption. RELATED: point 294 (auto-classify a red as
-  regression vs. pre-existing vs. load) would have answered this in seconds instead
-  of a manual repeat — and point 296's under-load flag would have labelled the first
-  run unusable before it was ever believed.
-
+- [ ] 336. THE WHOLE CROCODILE STAGING FAMILY IS FRAGILE — REBUILD IT, NOT ONE CASE
+  AT A TIME (escalated 25.07.2026 after four consecutive runs each failed a DIFFERENT
+  crocodile check). History: the lunge case was found resting on an unpinned
+  assumption (its red turned out to be machine load, proven by a quiet-machine
+  repeat) and was pinned; the next run failed the TOO-LATE case, where the parent
+  arrived in time after all and the crocodile took it instead of the calf; that was
+  pinned too; the next run failed the VANISH case with gripped:false — the crocodile
+  never seized at all (diag: drink true, dist 0.1, crocLunge false). Fixing one case
+  per run is a treadmill: the family shares one `crocDrama` helper whose five modes
+  each depend on a different implicit precondition (a distance, an arrival time, a
+  drink state, a lunge that must fire), and every one of them is a separate way for
+  the staging to miss while the GAME behaves correctly.
+  DO INSTEAD — one rebuild of the helper: (a) every mode states its preconditions
+  EXPLICITLY and asserts them before measuring, so a miss reports "staging did not
+  reach its precondition" instead of accusing the product; (b) every mode pins its
+  outcome roll (rescue, lunge and too-late now do; vanish and sacrifice must too);
+  (c) the seizure itself is established deterministically — poll for the grip with a
+  generous sim budget and FAIL THE STAGING, not the behaviour, if it never happens;
+  (d) each mode gets its own tiny setup helper instead of one branching function, so
+  a change to one ending cannot shift another's timing (the point-311 lesson at test
+  level). VERIFIABLE: enrichments green on BOTH backends THREE times in a row on a
+  quiet machine — the flake-free bar the closing gate needs; a staging miss produces
+  a distinct, self-naming failure message; the five §19.16 endings still each assert
+  their real outcome (no masking). RELATED: this is the concrete first slice of point
+  200's flake work, and point 294's auto-classification would have labelled all four
+  reds "staging, not product" without a manual repeat each time.
 - [ ] 337. THE STARTUP FRAME STALLS THE PICTURE ~15 s WHILE SHADERS COMPILE (found
   25.07.2026 by the point-304 measurement, reported-not-gated there because it
   reproduces with the TTS entirely absent and was out of that point's scope). On the
