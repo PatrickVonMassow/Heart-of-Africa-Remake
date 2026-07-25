@@ -11727,6 +11727,43 @@ the remaining open points in their numeric order.
   five candidates the sweep flagged all assert through helper functions
   (`fired()`, `foliageOf()`, `expectRise()`), i.e. scanner false positives. Still
   open in (B): the file-by-file diff against fd85464 and the orphaned-file check.
+  (B) COMPLETED 25.07: the file-by-file diff against fd85464 (excluding the
+  screenshots) shows 16 differences, every one of them accounted for as today's own
+  work — the model tripwire, the dashboard audit, the guard wirings, the two
+  analysis docs, the queued points and the deliberately kept closing-state; nothing
+  unexplained remains. The orphan scan over all 61 scripts found exactly one never
+  imported file, `scripts/check-deployed-benchmark.mjs`, which is a deliberate
+  manual tool (documented "Usage:" header, point 277) and not debris. A
+  model-diverse review of the two guard commits merged this morning
+  (closing-guard fixes + dashboard-sync wiring) additionally verified: the reverted
+  Haiku files are byte-identical to the pre-degradation state, the three stub files
+  are absent, no merge artefacts remain, and the retained closing-state cannot
+  pre-satisfy the tag gate (it is keyed to a different commit; `--status` reports
+  0/11 at HEAD). That review's own findings are queued as point 331.
+
+- [ ] 331. CLOSING-GUARD HARDENING FROM THE 25.07 REVIEW (findings of the
+  model-diverse review that cleared the merged guard commits; all low severity, none
+  blocking, hence one small bundled point). (a) The option-swallowing quantifier in
+  `isVersionTagCommand` (scripts/closing-guard-core.mjs) is exponentially ambiguous
+  over runs of dash-tokens — measured 736 ms on a synthetic 34-flag input, doubling
+  per two flags; unreachable by real git usage (a real subcommand fails the star in
+  O(1), a 20-flag `git log` measured 0 ms) but a PreToolUse HANG is not covered by
+  the wrapper's fail-open, which only catches throws. Fix: drop the redundant
+  `-[cC]` alternative, bound the star (e.g. `{0,10}`), restrict the swallowed
+  argument to `[^-\s]\S*`; add a timing assertion to the test sweep. (b) A `-C
+  <path>` whose PATH ends in a tag name now false-positives (`git -C /build/poc push
+  origin main` blocks) — exclude the `-C`/`--git-dir`/`--work-tree` argument from the
+  segment before the version/poc matching. (c) Real release acts still MISSED
+  (pre-existing, not introduced): `git push origin +v0.3` (force refspec) and `git
+  push origin :v0.3` (tag delete) — add `+` and `:` to the version/poc prefix class;
+  keep the remaining FN-6…FN-12 items recorded as future hardening. (d) DOC DRIFT:
+  three places still say the guard is a PreToolUse(**Bash**) hook although PowerShell
+  — the primary shell here — is matched too (scripts/closing-guard-core.mjs:11,
+  scripts/closing-guard.mjs:5, CLAUDE.md §9); and the `isVersionTagCommand` JSDoc
+  "Matches:" list never gained `gh release create` or the quoted forms. (e) No test
+  covers the wrapper's `tool_name === 'PowerShell'` branch — add one. VERIFIABLE:
+  the existing 30-case sweep stays green and gains cases for (a)-(c) and (e); the
+  documented contract matches the code.
 
 ## Closing (only after all points)
 
