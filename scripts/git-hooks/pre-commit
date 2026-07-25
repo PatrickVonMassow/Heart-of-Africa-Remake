@@ -1,0 +1,5 @@
+#!/bin/sh
+# Versioned git hook (core.hooksPath = scripts/git-hooks), so the rule lives in
+# the repository and is reviewable, rather than in an unversioned .git/hooks.
+# Enable once per clone:  git config core.hooksPath scripts/git-hooks
+exec node scripts/commit-scope-guard.mjs

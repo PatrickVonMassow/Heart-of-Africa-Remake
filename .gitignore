@@ -60,3 +60,9 @@ scripts/.tile-cache
 
 # Local, non-versioned artefacts (retrospectives, scratch notes) — never on git
 /local/
+
+# Personal working material that must not reach the repository (25.07.2026):
+# a voice reference recording and the music sources were swept in by commits
+# that staged everything. scripts/commit-scope-guard now blocks that class.
+/Referenzstimme*.wav
+/music/
