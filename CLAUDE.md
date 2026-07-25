@@ -128,8 +128,9 @@ the change touches design content or the build order — so both documents
 always describe the current target state. `node_modules/` stays out of
 version control (the Vite `.gitignore` covers this).
 
-Game code is organized by topic (e.g. `src/world/`, `src/places/`,
-`src/journal/`, `src/systems/`, `src/ui/`). No monolith file.
+Game code is organized by topic (e.g. `src/world/`, `src/scenes/travel/`,
+`src/scenes/place/`, `src/journal/`, `src/systems/`, `src/render/`,
+`src/state/`, `src/i18n/`, `src/config/`, `src/ui/`). No monolith file.
 
 ---
 
@@ -247,6 +248,19 @@ old→new coverage map live in `scripts/verify/README.md`.
   the picture-verification on BOTH backends, the serial
   merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
+- **Model allowlist (user decision 25.07.2026, point 309).** ONLY Opus 5
+  (the default), Opus 4.8 (the fallback when Opus 5 is unavailable) and
+  Fable 5 (occasional four-eyes/audit work) may author work on this
+  project — Sonnet and Haiku are NOT acceptable, and a session silently
+  degraded to one is a capability breach: the batch STOPS rather than runs
+  on it. Every commit records its author model in the `Co-Authored-By`
+  trailer, so the rule is machine-checkable; `scripts/model-guard-core.mjs`
+  holds the allowlist (`ALLOWED`) and the Stop hook
+  `scripts/model-guard.mjs` blocks the turn end on any commit after its
+  baseline authored outside it. (History: on 24.07.2026 a session degraded
+  to Haiku 4.5 unnoticed and merged three defective deliveries in 14
+  minutes; no config review could have caught it live, the commit trailers
+  could.)
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
@@ -569,8 +583,8 @@ verify suite that proves it.
       in `scripts/verify/enrichments.mjs`, the corridor pick pure-tested in
       `src/scenes/travel/wildlifeBehavior.test.ts`. A settlement's bird's-eye vicinity is
       never empty (point 102): where the normal spawn falls short, the
-      region-typical presence within `panoramaVicinityRadius` of a
-      settlement is seeded up to `panoramaVicinityMinAnimals` — verified
+      region-typical presence within `balance.panoramaWildlife.vicinityRadius`
+      of a settlement is seeded up to `.vicinityMinAnimals` — verified
       in `scripts/verify/enrichments.mjs` (after leaving Cairo, at least
       the minimum region-typical grazers stand within the radius via
       `__wildlife`, deterministic under the fixed seed). No GROUND animal
@@ -620,7 +634,17 @@ verify suite that proves it.
       clamp(round(fraction·n), 1, floor(n/2)), pure-tested via
       `calvesForGroup` in `src/scenes/travel/wildlifeBehavior.test.ts` and
       live-verified (a higher fraction yields strictly more juveniles) in
-      `scripts/verify/enrichments.mjs`. Calf predation
+      `scripts/verify/enrichments.mjs`. A juvenile whose parent dies is
+      ADOPTED (§19.8, point 262): the nearest eligible adult within the
+      calibratable `balance.family.adoptionRadius` takes it on, so the
+      §19.8 dramas recur for the new pairing instead of leaving an inert
+      orphan. Eligible is a live, same-species, non-predator adult that is
+      neither the juvenile itself, nor the killer that just took the
+      parent, nor already raising a live calf (the 1:1 relation cap) —
+      `findAdopter`/`isPredatorSpecies` pure-tested in
+      `src/scenes/travel/wildlifeBehavior.test.ts` (nearest pick, the
+      radius as the gate, each exclusion, and a homogeneous predator pool
+      finding no adopter). Calf predation
       (§19.8): a caught calf struggles alive (no stain or shrink) for a
       few seconds before the kill, a parent that reaches the predator is
       eaten in the calf's place while the calf escapes, a parent that
@@ -1020,9 +1044,12 @@ verify suite that proves it.
     masses, a clear spawn standpoint, the Giza-vs-Meroë slope contrast and
     the ~1890 casing cues (blunt Khufu, Khafre's pale cap, Menkaure's
     granite skirt, the buried Sphinx) pure-tested in
-    `src/scenes/place/gizaSite.test.ts`, and the live enter-with-SPACE, the
-    three pyramids + buried Sphinx rendering and the sparse Thomas-Cook-era
-    ambient walkers gated in `scripts/verify/polish.mjs` (screenshot 139);
+    `src/scenes/place/gizaSite.test.ts` — which also sweeps the sparse
+    Thomas-Cook-era ambient anchors (guides, cameleer, donkey-boy,
+    tourists) for a free standing spot they can also leave — and the live
+    enter-with-SPACE, the three pyramids + buried Sphinx rendering, the
+    collidable-and-no-trade/elder site and the warm desert-sand ground
+    gated in `scripts/verify/polish.mjs` (screenshot 139);
     the same period casing cap and half-buried Sphinx carry into Cairo's
     western skyline (point 82). The §19.10
     campfire can CAST SHADOWS (point 289, level-driven per point 276 part B):
@@ -1159,7 +1186,8 @@ verify suite that proves it.
     value for EVERY quality-relevant lever (dpr cap; SSAO/TRAA/bloom;
     sun-shadow on/off + map resolution 1024/2048/4096; campfire shadows +
     the 256²/512² soft variant; terrain refine; flora fog factor + cast
-    shadow; haze/rain intensity); the render consumers read the current
+    shadow; haze/rain intensity; calm water; wildlife density); the render
+    consumers read the current
     level through effective selectors (`effectiveSsao = QUALITY_PRESETS[
     detailLevel].ssao && ssaoEnabled`, etc.) that NEVER clobber the
     individual debug allow-flags — those still tune a feature within a level
@@ -1216,10 +1244,21 @@ verify suite that proves it.
     free. Where timestamps are unavailable (WebGL 2, or an adapter
     without `timestamp-query`) the series is FLAGGED with its reason,
     never fabricated, and the report names which series is the
-    trustworthy one (`headline`, in the digest and in the result panel);
+    trustworthy one (`headline`, in the digest and in the result panel).
+    The sweep forces the HIGH level so every lever stays measurable; a
+    FINAL profiling pass (point 293, `LOW_CONFIG_NAME`) then applies the
+    actual LOW `QUALITY_PRESETS` values and reports, per route section at
+    low, the per-system scene-graph triangle share, the draw calls and the
+    same GPU/CPU/wall series — ranked most-expensive-first, with a digest
+    line naming the top remaining cost centres ("at LOW the frame is
+    dominated by: terrain 42 %, flora 28 % …") and a localized ranking in
+    the result panel, so a player on a slow PC sees WHERE the cost still
+    sits at low (design.md §21.1);
     verifiable via
     `src/systems/benchmark.test.ts` (sweep plan, route, fixed-timestep
-    clock, statistics, breakdown, report shaping),
+    clock, statistics, breakdown, report shaping, and the low profile —
+    `buildLowProfile` ranking only the low rows, null without them, and
+    the digest lines),
     `src/ui/BenchmarkOverlay.test.tsx` (F8 starts the lazy runner and
     prevents the browser default, Esc aborts/closes, both languages) and
     `scripts/verify/benchmark.mjs` (a live `?bench=short` run: one row per
@@ -1456,9 +1495,10 @@ verify suite that proves it.
     has a localized name and a dedicated discovery flavor in both
     languages, that the sighting entry's heading names the site
     (kind-shaped, markup-free) and that a dug find heads with the
-    treasure's name (§10); `scripts/verify/enrichments.mjs` that all seven travel-map
-    cultural landmarks (`__culturalLandmarks` — Giza is the eighth of §4.4
-    but mounts as Cairo's skyline, pt. 15) and all four natural sites
+    treasure's name (§10); `scripts/verify/enrichments.mjs` that all EIGHT cultural
+    landmarks of §4.4 mount on the travel map (`__culturalLandmarks` — Giza
+    among them, and it ADDITIONALLY stands as Cairo's first-person skyline
+    and as the walkable monument site, pt. 15) and all four natural sites
     (`__naturalSites`) mount in the scene, render a non-black frame at
     their coordinates and reveal their label on sighting (screenshots 91,
     94, 95).
@@ -1545,9 +1585,13 @@ verify suite that proves it.
     a right-half look/steer drag surface with two-finger pinch zoom, a
     tappable interaction prompt (dispatching the key it names — one input
     path), the deliberate-input guard that arms the layer only on the
-    first real touch, and the touch-tied mobile quality preset (TRAA/SSAO
-    off, half-resolution shadows, each debug-re-enablable — never
-    user-agent sniffing). Verifiable: the stick/pinch/latch math is
+    first real touch, and the touch-tied mobile quality preset — FOUR
+    levers written by `activateTouch`: TRAA off, SSAO off, half-resolution
+    sun shadows and campfire shadows off, tied to the touch layer and
+    never to user-agent sniffing. They are internal store fields, no
+    longer per-setting debug-menu checkboxes (point 276): the graphics
+    section is the single detail-level dropdown, and the preset stays a
+    SUBSET of low. Verifiable: the stick/pinch/latch math is
     pure-tested (`src/systems/touchInput.test.ts`); `src/ui/Hud.test.tsx`
     that `touchActive: false` renders no `.touch-controls` while
     `touchActive: true` mounts the stick and look surface and makes the
@@ -1556,8 +1600,9 @@ verify suite that proves it.
     debug re-enable is not clobbered); `src/ui/DebugMenu.test.tsx` the
     localized graphics detail-level dropdown writing `detailLevel` through to
     the store (the per-setting graphics allow-flags the touch preset sets —
-    SSAO, half shadows — are internal store fields, no longer surfaced as
-    debug-menu checkboxes after the point-276 declutter);
+    TRAA, SSAO, half sun shadows, campfire shadows — are internal store
+    fields, no longer surfaced as debug-menu checkboxes after the point-276
+    declutter);
     `scripts/verify/touch.mjs` (a `hasTouch` context, real CDP touch
     events) that no overlay shows before the first touch, the first touch
     mounts it and applies the preset, the stick walks the character (and
@@ -1697,6 +1742,26 @@ After completion and after every major system:
   - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
     pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
     there and in `scripts/verify/README.md` together.
+- **The Stop chain gates the turn end, not only the test run.** Beyond the
+  suites above, a chain of Stop hooks (registered in `.claude/settings.json`,
+  which is the authoritative list) BLOCKS finishing a turn while the working
+  state contradicts a standing rule — the "enforce, don't remind" model, each
+  adopted because a reminder had already failed. Currently: `model-guard`
+  (no commit authored outside the §6 model allowlist), `dashboard-guard`,
+  `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and
+  `dashboard-integrity-guard` (the progress board is published, concise,
+  one-topic-per-card and consistent with the real state), `prep-guard` (no
+  idle wait while a background validation runs), `batch-progress-guard` (no
+  idle stop), `render-verify-guard` (no GUI/render change finished without
+  the both-backend picture check), `queue-order-guard` and `tasks-spec-guard`
+  (the queue order and the final-state-only spec rule), `ci-status-guard` (a
+  red CI is noticed), `timestamp-guard` (the chat timestamp) and
+  `retro-currency-guard` (the retrospective document stays current), followed
+  by `dashboard-sync`. Separately, a PreToolUse(Bash/PowerShell) hook runs
+  `closing-guard` (§9), which denies a version tag until every closing step
+  is recorded. Every one is fail-OPEN — an internal error allows the stop, so
+  a guard bug can never trap the session — and each decision core is pure and
+  Vitest-covered.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 
