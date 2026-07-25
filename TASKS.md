@@ -11530,6 +11530,103 @@ the remaining open points in their numeric order.
   ray/heights check); screenshot pair added to the §7.2 evidence set; the picture
   judged on BOTH backends per the render rule.
 
+- [ ] 321. GRASS FIRE READS WRONG ON EVERY COUNT (user 25.07.2026 with screenshot:
+  the burning-grass event shows a column of flat orange blocks — no recognizable
+  FIRE FRONT, "strange waves" that make no sense, and the burn SCARS do not read as
+  burnt ground). Rebuild the §14/§19 grass-fire depiction: (a) a readable FRONT — a
+  curved, advancing line of flame with a bright leading edge and smoke rising
+  behind it, not a stack of quads; (b) identify and drop/rework whatever produces
+  the wave artefact (likely the animated flame sheet's UV/vertex wobble read at
+  bird's-eye distance); (c) BURN SCARS that read as burnt earth — dark, sooty
+  ground tint following the terrain like the point-267 blood tint, with soft
+  irregular edges, not orange blocks. Calibratable extent/speed under balance,
+  quality entries for all three levels. VERIFIABLE: pure tests for the front
+  geometry (advancing line, bounded curvature, scar polygon trailing the front) and
+  the scar tint sampling; live check that the front's leading pixels read clearly
+  brighter/warmer than the trailing scar and the scar clearly DARKER than unburnt
+  savanna; screenshot 131 refreshed and judged on BOTH backends.
+
+- [ ] 322. STAGED-EVENT FAILURES ARE EASY TO MISS (user 25.07.2026: staging "calf
+  mired at waterfall" appeared to do nothing; the user later suspected an unseen
+  error message). Make every debug stage/trigger outcome UNMISSABLE: a persistent,
+  clearly styled result banner — success names what was staged and where, failure
+  names the missing precondition in plain language ("no waterfall within reach —
+  jump to a waterfall first") — staying until dismissed or superseded, both
+  languages. Also RE-CHECK the mired-at-waterfall staging itself against a
+  realistic debug session: if its precondition search radius is too small, widen it
+  or teleport-stage like the other dramas. VERIFIABLE: pure test of the
+  outcome→message mapping (every stageable event has success AND failure text in
+  both languages, no silent path); settings.mjs live-checks the banner on an unmet
+  precondition and a successful stage; both languages.
+
+- [ ] 323. BLOOD STAINS ARE PERFECT CIRCLES (user 25.07.2026: they should have
+  natural, irregular contours). Point 267 made the stain a terrain-following ground
+  TINT, but its footprint is still a circle. Give it an organic outline: a
+  per-stain seeded noise/domain-warp on the tint's radial falloff (the technique
+  the §3.3 biome borders use), so every stain has its own ragged contour and no
+  circle reads anywhere; size and irregularity calibratable. VERIFIABLE: pure test
+  that the mask radius varies with angle by a bounded but clearly non-zero amount
+  and differs between seeds (no two stains alike, none circular); screenshot 137
+  refreshed, judged on BOTH backends.
+
+- [ ] 324. CALF SWEPT INTO WATER PINS AT THE BANK (user 25.07.2026, restating the
+  standing rule: animals MAY enter water — they must only not idle there, so a
+  canoe passage stays clear). The §19.8 sweep drama never plays out because the
+  calf sticks at the waterline instead of reaching the channel. Root-cause the pin
+  (the §19.5 water setback or a water-blocked step predicate applied to a drama
+  that is SUPPOSED to be in the water) and exempt every water DRAMA from the
+  land-setback while it runs; ordinary roaming/idling stays subject to it. Distinct
+  from point 312 (that is the flight path, this the drama path). VERIFIABLE: pure
+  test that a drama-flagged animal is setback-exempt while its drama runs and
+  subject again afterwards; the staged sweep reaches mid-channel and resolves
+  (drown or rescue) in enrichments; the existing "no animal stands in water" checks
+  stay green; both backends.
+
+- [ ] 325. MOUSE WHEEL OVER THE DEBUG MENU MUST NOT ZOOM (user 25.07.2026). While
+  the pointer is over the debug panel the wheel scrolls the panel only — the
+  bird's-eye zoom must not react (today scrolling the long panel changes the view).
+  Scope the zoom handler to the canvas / stop propagation on the panel, and apply
+  the same rule to every scrollable overlay (journal, load table). VERIFIABLE: pure
+  test of the wheel-target predicate; settings.mjs live-check that a wheel event
+  over the debug panel leaves the `__camera` zoom unchanged while the same event
+  over the canvas changes it.
+
+- [ ] 326. A PARENT DIES WITH NO VISIBLE CAUSE AFTER A CROCODILE KILL (user
+  25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
+  spot and simply fell over dead — reading as suicide). Every §19.8 death must have
+  a VISIBLE cause on screen (a predator that reaches it, a trample, a drowning, a
+  fall). Audit the vigil/grief paths against the crocodile case: a parent standing
+  vigil after a crocodile kill either is taken by a VISIBLE predator (the point-121f
+  draw that spawns beyond the ring and walks in) or survives and rejoins — never
+  dies in place with no actor. Add a dev-assert "death without a visible cause"
+  covering every death path so the class is caught in every session. Related to
+  point 319. VERIFIABLE: pure test enumerating the death causes, each setting a
+  cause field; the assert fires on a synthetic causeless death; a staged
+  croc-kill-then-vigil ends in one of the two legitimate outcomes; both backends.
+
+- [ ] 327. TWO NEARBY CARCASSES MUST SHARE ONE VULTURE FLOCK (user 25.07.2026: a
+  second flock spawns and the two overlap). Give the §19.6 flock a claim over a
+  carcass CLUSTER: a new carcass within a calibratable radius of a flock's current
+  target joins that flock's queue instead of drawing a second flock, and the flock
+  works them in turn, leaving only when the cluster is done. No two flocks may be
+  active within the cluster radius. VERIFIABLE: pure test of the cluster claim (a
+  carcass inside joins, one outside draws its own flock; boundary exact); live
+  check with two staged carcasses close together — exactly one flock, both eaten,
+  no overlap; both backends.
+
+- [ ] 328. VULTURES DO NOT VISIBLY LAND (user 25.07.2026: "they seem to fly one
+  moment and stand the next — is there a landing at all?"). Add a real landing
+  approach to the §19.6 flock AND the lone ground scavenger: a descending glide
+  along the approach heading with slowing forward speed, a flare with raised wings
+  just before touchdown, then the standing pose — over a calibratable window long
+  enough to read at bird's-eye distance; likewise a visible take-off (run/flap into
+  the climb) instead of an instant switch to flight. VERIFIABLE: pure test of the
+  landing profile (height decreases monotonically to the landed height across the
+  window, forward speed decreases, the flare pose fires in the last phase); live
+  check that a landing bird's sampled height passes through intermediate values (no
+  single-frame snap) while the point-128 "stands on its own ground" clearance still
+  holds; screenshot of the flare; both backends.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
