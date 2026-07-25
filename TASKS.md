@@ -11449,28 +11449,55 @@ the remaining open points in their numeric order.
   the staged and full-hunt sacrifice checks in enrichments green on both backends; no
   other §19.8 ending regresses (every started drama still resolves — invariant I4).
 
-- [ ] 312. FLEE-INTO-WATER PRACTICALLY NEVER TRIGGERS (user 25.07.2026: animals
-  fleeing an elephant do not cross the water). The point-192 rule is WIRED for all
-  three flight sources (predator flee, elephant dart, player-shy — `fleeCrossing`
-  call sites in Wildlife.tsx) but its trigger is `deflectedStep(...).moved === false`,
-  and deflectedStep probes ±90° in 15° steps: on any ordinary bank the flight always
-  finds a slide ALONG the shore, `moved` stays true, and the crossing never starts —
-  only a concave dead-end pocket can fire it. The enrichments check stages exactly
-  such a dead-end, so it is green while the emergent in-game behaviour almost never
-  occurs (the green-test-wrong-picture class). FIX — a BOXED trigger replacing the
-  dead-end-only trigger, shared by all three sources: when the RAW escape heading is
-  water-blocked (before deflection) AND the threat is within a calibratable pressure
-  radius behind, attempt `crossingTarget` along the raw heading even though an
-  along-bank slide exists; add hysteresis (a short boxed-persistence window) and/or
-  the existing `waterCross.chance` so a mere bank-graze does not dive in constantly;
-  ocean and over-wide refusal (`waterCross.maxUnits`) unchanged; an active crossing
-  still suppresses a second one. New balance values under `balance.waterCross`
-  (pressure radius, boxed-persistence), debug-editable. VERIFIABLE: the boxed
-  predicate pure-tested in wildlifeBehavior.test.ts (raw-blocked + threat-near fires;
-  threat-far or raw-open does not; hysteresis boundary); an enrichments stage on a
-  STRAIGHT bank (slide available) with an elephant bearing down asserts the crossing
-  starts, swims and lands; the §19.5 setback and I4 deadline invariants stay green;
-  both backends.
+- [ ] 312. ANIMALS ARE WATER-SHY, NOT WATER-BARRED (user 25.07.2026, revising the
+  point-192 rule; former point 324 is folded in here). The rule was read far too
+  strictly: "animals must not stand around in water" — so that a canoe passage stays
+  clear — hardened into "water is off limits to them". What the player sees is a
+  fleeing animal PRESSING against the waterline or skating along the bank hunting for
+  a way around, instead of simply swimming across; and a calf swept into the water
+  sticking at the bank so its drama never plays out.
+  THE RULE IS STATED IN ONE PLACE — design.md §19.5. This point BUILDS it; do not
+  restate it elsewhere.
+  (a) NO SPAWN, NO LINGERING — unchanged, and the reason the rule exists. An animal
+  never spawns in water and never idles, grazes, rests or waits in it; one that comes
+  to rest on water makes for the nearest bank. A channel the player canoes must never
+  be blocked by a parked animal. This half must stay demonstrably intact.
+  (b) CROSSING IS ORDINARY: a ROAMING animal may take on a channel rather than turn
+  from it, governed by the calibratable `balance.waterCross.*` (width, readiness).
+  (c) FLIGHT IS UNRESTRICTED. Fleeing anything — a predator, an oncoming elephant, the
+  traveller, fire — the animal enters the water the moment its escape leads there: no
+  dead-end precondition, no pressure radius, no width limit, no chance roll.
+  CONCRETELY: the along-shore deflection (`deflectedStep`) applies to the OCEAN edge
+  ONLY, so a flight meeting a river or lake goes IN rather than sliding along the bank.
+  A juvenile returning to its parent (§19.8) moves under the same freedom.
+  (d) A WATER DRAMA OWNS ITS ACTOR (the folded 324): while a §19.8 water drama runs —
+  the swept calf, the wading rescuer, a crocodile's victim — no leave-the-water rule
+  may pull the animal out. The exemption keys on the DRAMA STATE, not on the species.
+  (e) TWO INVARIANTS UNTOUCHED: the open sea of §11 stays the world's edge (the ocean
+  setback is exactly as it is), and every water passage RESOLVES — a bank is reached or
+  the deadline grounds the animal there (invariant I4), so nothing swims forever.
+  ANCHORS: `fleeCrossing`, `crossingTarget`, `deflectedStep` and the water setback in
+  `src/scenes/travel/wildlifeBehavior.ts`, with their call sites in
+  `src/scenes/travel/Wildlife.tsx` (the three flight sources — predator flee, elephant
+  dart, player-shy — and the calf follow branch); `waterEdgeRules.ts` holds the
+  drinker/bather bank targeting, which does NOT change.
+  WHAT SHRINKS RATHER THAN GROWS: the boxed-trigger machinery this point once called
+  for (a pressure radius, a boxed-persistence hysteresis, a crossing chance for
+  flights) is NOT to be built — under (c) a flight needs no trigger at all. Add no
+  balance values for it.
+  DOCS in the same commit: design.md §19.5 already states the target; CLAUDE.md §7.1
+  point 12 currently carries a forward-pointer at the superseded claim and must be
+  rewritten to the built state when this lands, dropping that pointer.
+  VERIFIABLE: pure — a flight step whose heading meets river or lake water is NOT
+  deflected along the bank, while the same step at an ocean edge still is; a roaming
+  crossing still honours its width and readiness values while a flight ignores both; a
+  drama-flagged animal is setback-exempt while its drama runs and subject to it again
+  afterwards; an idle animal that ends up on water heads for the nearest bank. Live
+  (`scripts/verify/enrichments.mjs`, both backends): an elephant driven at a grazer on
+  a STRAIGHT bank — where an along-shore slide IS available — sends it into the water
+  and out the far side; the staged swept calf reaches mid-channel and its drama
+  resolves; and across a driven pass no animal is found standing in a channel, so the
+  canoe lane stays clear.
 
 - [x] 313. FULL DASHBOARD-CONSISTENCY ENFORCEMENT (user 25.07.2026; four-eyes Opus +
   Fable on BOTH the plan and the implementation). The 25.07 morning audit found real
@@ -11692,19 +11719,6 @@ the remaining open points in their numeric order.
   that the mask radius varies with angle by a bounded but clearly non-zero amount
   and differs between seeds (no two stains alike, none circular); screenshot 137
   refreshed, judged on BOTH backends.
-
-- [ ] 324. CALF SWEPT INTO WATER PINS AT THE BANK (user 25.07.2026, restating the
-  standing rule: animals MAY enter water — they must only not idle there, so a
-  canoe passage stays clear). The §19.8 sweep drama never plays out because the
-  calf sticks at the waterline instead of reaching the channel. Root-cause the pin
-  (the §19.5 water setback or a water-blocked step predicate applied to a drama
-  that is SUPPOSED to be in the water) and exempt every water DRAMA from the
-  land-setback while it runs; ordinary roaming/idling stays subject to it. Distinct
-  from point 312 (that is the flight path, this the drama path). VERIFIABLE: pure
-  test that a drama-flagged animal is setback-exempt while its drama runs and
-  subject again afterwards; the staged sweep reaches mid-channel and resolves
-  (drown or rescue) in enrichments; the existing "no animal stands in water" checks
-  stay green; both backends.
 
 - [x] 325. MOUSE WHEEL OVER THE DEBUG MENU MUST NOT ZOOM (user 25.07.2026). While
   the pointer is over the debug panel the wheel scrolls the panel only — the

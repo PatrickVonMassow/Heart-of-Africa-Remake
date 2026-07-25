@@ -772,7 +772,11 @@ verify suite that proves it.
       an open-ocean cell — and, outside the §19.8 water dramas, the wading
       flamingos, a CAUGHT victim at the waterline and a purposeful CROSSING
       (point 192), on any river/lake water cell — is set back to the nearest
-      land; the point-192 water rule holds: an animal may CROSS a river/lake
+      land; the point-192 water rule holds — SUPERSEDED as a TARGET by the
+      §19.5 revision of 25.07.2026 (water is for crossing, not for lingering;
+      a FLIGHT is never restricted by river or lake at all), which this
+      paragraph will state once that lands: what follows pins what is BUILT
+      today, per the §7.1 convention — an animal may CROSS a river/lake
       (chest-deep on the rendered sheet, seasonal wade speed,
       `balance.waterCross.*` calibratable, hard resolve deadline) and a prey
       boxed against the water by a predator or an oncoming elephant flees
