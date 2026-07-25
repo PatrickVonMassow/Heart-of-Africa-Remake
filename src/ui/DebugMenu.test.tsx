@@ -35,6 +35,7 @@ const DEFAULTS = {
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
+  startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
@@ -101,6 +102,7 @@ afterEach(() => {
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
+  balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
@@ -188,6 +190,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
     // The inhabitant unstuck window (point 155).
     { label: en.debug.walkerUnstuck, read: () => balance.walkerUnstuckSeconds, value: 8 },
+    // The loading picture's freeze budget the startup gate binds (point 337).
+    { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },

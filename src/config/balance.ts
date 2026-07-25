@@ -410,6 +410,17 @@ export interface BalanceConfig {
     /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
     openRainDamp: number
   }
+  /** Startup picture liveness (point 337). */
+  startup: {
+    /** How long the loading picture may stand still, in milliseconds — the
+     *  budget the live gate (`scripts/verify/startup.mjs`) binds. It covers the
+     *  WHOLE standstill, both the part a blocked main thread causes and the
+     *  part a busy renderer causes inside one long animation frame, so a busy
+     *  renderer cannot excuse a freeze the player plainly sees. Calibratable:
+     *  raise it only with a measurement that says the slower state is
+     *  acceptable, never to quieten a regression. */
+    pictureFreezeBudgetMs: number
+  }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
     stickRadius: number
@@ -692,6 +703,14 @@ export const balance: BalanceConfig = {
     // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
     shelteredRainDamp: 0.25, // calibratable, debug-editable
     openRainDamp: 0.7, // calibratable, debug-editable
+  },
+  startup: {
+    // Measured post-fix on the headless verify lanes (point 337): the worst
+    // standstill is the renderer's own device/adapter init at ~1.0 s (WebGPU)
+    // and ~2.1 s (WebGL 2), not a shader compile any more. 4 s leaves room for
+    // a loaded machine while still catching the defect this guards, which was
+    // 21 s of blocked thread and 20 s without a painted frame.
+    pictureFreezeBudgetMs: 4000, // calibratable, debug-editable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection

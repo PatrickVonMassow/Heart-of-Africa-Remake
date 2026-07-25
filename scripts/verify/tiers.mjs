@@ -12,7 +12,7 @@
  * Node check that rides along for a single report.
  */
 export const DEV_SUITES = [
-  'docs', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
+  'docs', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
   'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
   'benchmark',
 ]

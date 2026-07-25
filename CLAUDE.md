@@ -956,7 +956,35 @@ verify suite that proves it.
     perspectives show the active effects; the application runs without
     console errors on both the WebGPU and WebGL 2 paths; the remaining
     simplification (true water refraction) is named as an open item (see
-    pt. 32; SSR was tried and removed).
+    pt. 32; SSR was tried and removed). The pipeline's shader programs are
+    built OFF the critical path (§2.7, point 337): three.js linked them
+    synchronously the first frame each was drawn, so the scene's ~62 startup
+    pipelines froze the picture — on WebGL 2 a blocked main thread for 21 s
+    inside two animation frames, on WebGPU a perfectly free thread (worst
+    stall 1.0 s) with nothing PAINTED for 12.4 s. Both backends already carry
+    the asynchronous half (`KHR_parallel_shader_compile` /
+    `createRenderPipelineAsync`) and three.js already SKIPS a not-yet-ready
+    object, so the render path is handed the promise array that switches it
+    over (`src/render/asyncPipelines.ts`); on WebGL 2 the linked programs'
+    first USE — where ANGLE actually compiles — is additionally released one
+    per animation frame, which is what keeps the frames painting (worst
+    unpainted gap 8.5 s → 1.8 s; two per frame measured worse). After:
+    worst standstill 2.1 s (WebGL 2) and 1.1 s (WebGPU), and neither is a
+    shader compile any more. Verifiable: `scripts/verify/startup.mjs` runs a
+    tick train and a painted-frame train from document start, attributes the
+    stalls with the point-304 module (`scripts/verify/liveness.mjs`) and
+    gates their MAXIMUM against the balance value
+    `balance.startup.pictureFreezeBudgetMs` (debug-editable, `design.md`
+    §21.2) — reporting the attribution split rather than subtracting it,
+    because the frame-covered part is exactly how a busy renderer would hide
+    this stall; `STARTUP_STALL_SELFTEST=1` restores the blocking path via
+    `__asyncPipelinesOff` and proves the gate still bites (40 s WebGL 2,
+    8.4 s unpainted WebGPU, attributed block 0.3-0.4 s in both). The wiring —
+    which calls are diverted, that three.js's own `compileAsync` is left
+    alone, the one-per-frame release, its bookkeeping and the drop of a
+    completion whose pipeline was released meanwhile — is pure-tested in
+    `src/render/asyncPipelines.test.ts`, the budget field's write-through in
+    `src/ui/DebugMenu.test.tsx`.
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,
     surface micro-structure at eye height — ground grain/pebble relief,

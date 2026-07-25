@@ -74,6 +74,7 @@ Image quality rests not only on geometry and material quality but on a full ligh
 - Post-processing: screen-space ambient occlusion (SSAO/GTAO), bloom, temporal anti-aliasing, filmic tone mapping with color grading; a subtle vignette and depth of field are permissible but must not reduce the readability of the map view.
 - Water: refraction with depth-dependent absorption (shallow water lighter/greener, deep water dark blue), a wave field (e.g. Gerstner) and foam along shores and wave crests; sky reflections come from the image-based lighting. (Screen-space reflections were integrated once and removed again — with the bird's-eye camera never at grazing angles and the first-person scenes having no water or gloss, no in-game situation makes them read; revisit only if the camera or scene content changes.)
 - Distance fog is replaced by — or combined with — the atmospheric scattering; the regional climate moods of §19 remain as a modulation on top.
+- **The startup picture stays alive.** The shader programs the scene needs are compiled OFF the critical path: the renderer draws the frames whose programs are ready and links the rest behind them, so the picture assembles over a moment instead of standing still while the whole set compiles. The loading picture may stand still no longer than a calibratable budget (§21.2), and that budget counts the whole standstill — a busy renderer inside one long frame is as frozen, to the player, as a blocked one.
 - **Three graphics quality levels — low / medium / high** (cycled with F9 / a debug-menu picker, §21), default **medium**, trade this chain against framerate. Every quality-relevant render setting is mapped per level in one registry (`src/config/quality.ts`, `QUALITY_PRESETS`); the render consumers read the current level's value through effective selectors that never overwrite the player's individual debug settings (those stay available to tune a feature within a level). **Low** is the frugal floor for weak GPUs (device pixel ratio capped to 1, the whole post chain off, NO sun shadows at all — the cast-shadow passes are skipped, not merely shrunk (point 305: on the reference laptop GPU they cost ~8.5 ms and ~880 draw calls per frame, and halving the map moved nothing) —, no campfire shadows, terrain refinement off, a tighter flora radius, thinned haze/rain) — leading with the fill-rate levers the real-hardware benchmark proved dominant (§21.1 F8). **Medium** is the balanced default (SSAO off, TRAA + Bloom on, native resolution, normal 2048 sun shadows, the 256² campfire shadows on, full geometry). **High** is the richest (SSAO on, sharper 4096 sun shadows, the softer/higher-res 512² campfire-shadow variant, everything else full). Because it is a registry, every FUTURE optical feature declares its low/medium/high behaviour there (and may offer a costlier high-only variant) — the completeness gate (§21) fails a preset that omits a setting. See §21.
 
 ---
@@ -886,6 +887,10 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - The strafe/backward factor (§2.2): the fraction of the forward speed at which the character sidesteps or walks backward, so a diagonal is never faster than straight ahead.
 - Mouse-look sensitivity in the first-person view.
 - The inhabitant unstuck window (§2.6): the seconds a settlement walker may stay physically pinned before it is nudged to free ground.
+
+**Loading** (§2.7)
+
+- The loading picture's freeze budget in milliseconds: how long the picture may stand still while the game starts up. The verification binds this value, counting the WHOLE standstill — both a blocked main thread and a renderer stuck inside one long frame — so a busy renderer cannot excuse a freeze the player plainly sees.
 
 **Audio** (§19.1)
 

@@ -19,7 +19,7 @@ describe('tier sets (point 173)', () => {
     expect(new Set(DEV_SUITES).size).toBe(DEV_SUITES.length)
     // The pixel/screenshot-heavy suites are exactly what the WebGPU pass exists
     // for — they must be in the LARGE set, not only in someone's manual run.
-    for (const s of ['enrichments', 'polish', 'settings', 'invariants', 'handwriting', 'gamepad']) {
+    for (const s of ['enrichments', 'polish', 'settings', 'invariants', 'handwriting', 'gamepad', 'startup']) {
       expect(DEV_SUITES).toContain(s)
     }
   })

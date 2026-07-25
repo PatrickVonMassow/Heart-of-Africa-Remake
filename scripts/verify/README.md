@@ -39,7 +39,7 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 | Tier | Command | Browser suites | Preview |
 |------|---------|----------------|---------|
 | **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 16** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 17** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
@@ -82,6 +82,20 @@ the main thread was never blocked. So liveness is measured on a timer train
 page's own frame callbacks is the renderer's and is reported, the rest is what
 the gate binds. `VOICE_STALL_SELFTEST=5000` injects a real 5 s main-thread busy
 loop into the cold-load window to prove the gate still bites.
+
+`startup.mjs` (point 337) is the other side of that same coin, and it uses the
+same module for the opposite verdict. The startup shader compile that point 304
+correctly *excused* is itself the defect — a frozen picture is a frozen picture
+however free the thread is — so this suite measures both trains from document
+start and gates their MAXIMUM against the balance value
+`balance.startup.pictureFreezeBudgetMs`, reporting the attribution split
+instead of subtracting it. That matters because the defect has two different
+shapes: on WebGL 2 it blocked the thread for 21 s inside two animation frames,
+on WebGPU the thread stayed free (worst stall 1.0 s) while nothing was painted
+for 12.4 s. `STARTUP_STALL_SELFTEST=1` restores the old blocking path through
+the dev hook `__asyncPipelinesOff` and asserts the gate goes red — measured 40 s
+(WebGL 2) and 8.4 s unpainted (WebGPU), with the attributed block at 0.3-0.4 s
+in both — exactly the number that must NOT be the one gated.
 
 The same run found that the suite's "neutral" first-gesture key had stopped
 being neutral: F8 starts the in-game render benchmark (point 277), which swept
@@ -129,6 +143,7 @@ ported asserts now live in Vitest:
 
 | Trimmed script | Kept (browser-only) | Moved to Vitest |
 |---|---|---|
+| `startup.mjs` | the loading picture's freeze budget: tick train + painted-frame gaps from document start, attributed via `liveness.mjs`, gated on `balance.startup.pictureFreezeBudgetMs`; screenshot 142 | `src/render/asyncPipelines.test.ts`, `src/ui/DebugMenu.test.tsx` (the budget field), `scripts/verify/liveness.test.mjs` |
 | `world.mjs` | 8 bird's-eye screenshots + console gate | `src/world/world.test.ts` (counts, terrain-on-land, hydrology) |
 | `i18n.mjs` | 5 localization screenshots + console gate | `src/i18n/i18n.test.ts`, `src/ui/{StatusBar,JournalPanel,Dialogs,DebugMenu}.test.tsx` |
 | `health.mjs` | vultures at poor condition (RAF) + console gate | `src/state/store.health.test.ts`, `src/ui/Hud.test.tsx` (veil, defeat) |
