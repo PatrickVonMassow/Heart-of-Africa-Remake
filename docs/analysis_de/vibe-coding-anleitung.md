@@ -24,6 +24,45 @@ Grundhaltung ist **erzwingen statt erinnern**, ab der ersten Formulierung.
 
 Fast alles Folgende ist eine Anwendung davon.
 
+### Wie die Prompts in dieser Anleitung formuliert sind
+
+Die Prompts unten sind bewusst **Aufträge, einen Mechanismus zu bauen** — nicht
+Merksätze. Der Unterschied ist der ganze Punkt dieser Anleitung: „Jedes neue
+Feature bekommt einen Test" ist eine *Regel*, die vergessen wird; „Etabliere
+einen Mechanismus, der garantiert, dass jedes neue Feature einen Test bekommt"
+ist ein *Auftrag*, an dessen Ende etwas steht, das die Regel erzwingt. Formuliere
+deine eigenen Anweisungen genauso.
+
+Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen
+Menschen richtig aus?"), steht das ausdrücklich dabei — dann ist der Merksatz die
+ehrliche Lösung, und du solltest wissen, dass er nur so gut hält wie die
+Aufmerksamkeit des Moments.
+
+### Primäres und sekundäres Modell
+
+Lege **zwei** Modelle fest und gib ihnen klare Rollen:
+
+- Ein **primäres Modell** macht die Arbeit — bei *jeder* Schwierigkeit. Nimm die
+  jeweils stärkste verfügbare Version.
+- Ein **sekundäres, anderes Modell** ist für das **Vier-Augen-Prinzip** da (es
+  prüft Plan und Ergebnis des primären, oder baut selbst und lässt prüfen) und
+  springt als **Ausweichstufe** ein, wenn das primäre nicht in seiner höchsten
+  Version verfügbar ist.
+
+> *Prompt:* „Arbeite grundsätzlich mit **\<primäres Modell\>**, unabhängig davon,
+> wie schwer eine Aufgabe ist. **\<sekundäres Modell\>** setzt du nur für das
+> Vier-Augen-Prinzip ein — es prüft Plan und Ergebnis gegen — oder als
+> Ausweichstufe, wenn das primäre nicht in der höchsten Version verfügbar ist.
+> Etabliere einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells
+> erkennt und die Arbeit stoppt, statt sie stillschweigend zu übernehmen."
+
+Der Grund für die Rollentrennung: Ein zweites Modell nützt nicht, weil es *besser*
+wäre, sondern weil es **andere blinde Flecken** hat. Diesen Wert hebt nur eine
+Prüfung — eine bloße Übergabe schwerer Aufgaben hebt ihn nicht. (Warum der Stopp
+bei einem fremden Modell nötig ist: In diesem Projekt lief eine Sitzung
+unbemerkt auf einem viel schwächeren Modell und lieferte in 14 Minuten drei
+Attrappen-Ergebnisse, die alle zurückgenommen werden mussten.)
+
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
@@ -34,21 +73,26 @@ Fast alles Folgende ist eine Anwendung davon.
    > etwas ändere, aktualisiere `design.md` und den Code gemeinsam."
 
 2. **Ein dauerhaftes Arbeitsprotokoll.**
-   > „Lege ein `TASKS.md` an. Jede Änderungsanforderung wird als eigener, klar
-   > umrissener Punkt ans Ende angehängt und der Reihe nach abgearbeitet — niemals
-   > mittendrin abbiegen. Eine abgeschlossene Einheit = ein Commit mit aussagekräftiger
-   > Nachricht. Committe/pushe nur, wenn ich es sage."
+   > „Lege ein `TASKS.md` an und **etabliere einen Mechanismus, der seine Regeln
+   > erzwingt**: Jede Änderungsanforderung wird als eigener, klar umrissener Punkt ans
+   > Ende angehängt und der Reihe nach abgearbeitet — niemals mittendrin abbiegen; eine
+   > abgeschlossene Einheit = ein Commit mit aussagekräftiger Nachricht; jeder Commit
+   > wird sofort hochgeladen, damit nichts nur lokal liegt."
 
 3. **Zwei Testschichten von Anfang an.**
    > „Richte zwei Ebenen ein: eine schnelle, deterministische Schicht ohne Browser für
    > Logik/Zustand (läuft in Sekunden) und wenige echte Browser-/E2E-Tests nur für das,
-   > was es wirklich braucht (Rendering, Layout, Klick-Flows). **Jedes neue Feature
-   > bekommt einen Test auf der passenden Schicht** — das ist Pflicht, nicht optional."
+   > was es wirklich braucht (Rendering, Layout, Klick-Flows). **Etabliere einen
+   > Mechanismus, der garantiert, dass zu jedem neuen Feature ein Test auf der
+   > passenden Schicht existiert** — der also anschlägt, wenn Produktcode ohne
+   > zugehörigen Test geändert wurde."
 
 4. **Sauberer Baum nach jeder Änderung.**
-   > „Nach jeder Änderung müssen Build, Linter und Abhängigkeits-Audit sauber sein
-   > (null Fehler/Warnungen/bekannte Lücken). Überdecke nie einen Fehlschlag — melde ihn
-   > mit dem konkreten Output."
+   > „Etabliere einen Mechanismus, der einen unsauberen Stand gar nicht erst
+   > durchlässt: Build, Linter und Abhängigkeits-Audit müssen nach jeder Änderung
+   > null Fehler, Warnungen und bekannte Lücken melden, und ein Fehlschlag muss die
+   > Weiterarbeit blockieren statt nur gemeldet zu werden. Überdecke nie einen
+   > Fehlschlag — zeig mir den konkreten Output."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
    Sich darauf zu verlassen, dass das Modell sich an eine nur *niedergeschriebene* Regel
@@ -65,10 +109,20 @@ Fast alles Folgende ist eine Anwendung davon.
    *(Die frühere, schwächere Form „baue den Mechanismus erst beim zweiten Auftreten" ist damit
    überholt: das zweite Auftreten ist bereits ein vermeidbarer Schaden.)*
 
+   Und weil ein Mechanismus selbst falsch gebaut sein kann — in diesem Projekt fand
+   die Gegenprüfung in *jedem* geprüften Guard echte Fehler, vom nie auslösenden
+   Muster bis zur Notbremse mit Nebenwirkung:
+   > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
+   > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
+   > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
+   > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten."
+
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
-   > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite), das **immer den
-   > echten Stand** zeigt: woran du gerade arbeitest, was offen ist, was erledigt ist.
-   > Halte die Struktur stabil und aktualisiere es sofort nach jeder Änderung."
+   > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
+   > Mechanismus, der seine Aktualität erzwingt**: Es zeigt **immer den echten Stand** —
+   > woran du gerade arbeitest, was offen ist, was erledigt ist —, seine Struktur bleibt
+   > stabil, und der Mechanismus muss auch merken, wenn der Text unverändert bleibt,
+   > während sich die Arbeit weiterbewegt hat."
 
 ---
 
@@ -90,15 +144,17 @@ wählst:
 
 > *Prompt:* „Richte drei Test-Stufen ein — schnell (Unit, immer), klein (Unit + Kern-
 > Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
-> passende Stufe und nenn mir kurz warum; die große Stufe läuft immer vor einem Release."
+> passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus, der die große
+> Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert."
 
-Zwei Regeln, die das Netz ehrlich halten:
+Zwei Mechanismen, die das Netz ehrlich halten:
 
-> *Prompt:* „Jedes neue Feature bekommt einen Test auf der passenden Stufe — bevorzugt die
-> schnelle, wenn es ohne Browser prüfbar ist. Flakende Browser-Tests dürfen **einmal
-> sichtbar** automatisch wiederholt werden (mit einer ‚auf Wiederholung bestanden —
-> untersuchen'-Zeile), aber der Release-Lauf muss auch strikt ohne Wiederholung grün sein.
-> Warte Tests auf eine Bedingung oder die App-Uhr, nie auf eine feste Wartezeit."
+> *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht:
+> Ein flakender Browser-Test darf einmal automatisch wiederholt werden, muss dann
+> aber eine ‚auf Wiederholung bestanden — untersuchen'-Zeile hinterlassen, und der
+> Release-Lauf muss strikt ohne Wiederholung grün sein. Etabliere außerdem einen
+> Mechanismus, der feste Wartezeiten in Tests aufspürt — gewartet wird auf eine
+> Bedingung oder die App-Uhr, nie auf die Wanduhr."
 
 ---
 
@@ -107,25 +163,28 @@ Zwei Regeln, die das Netz ehrlich halten:
 - **Grüner Test, falsches Bild.** Der gefährlichste Fehler: Der Test ist grün, aber das
   Ergebnis ist trotzdem falsch (er prüfte einen Hilfswert, einen unerreichbaren
   Debug-Zustand, einen geratenen Näherungswert).
-  → *Prompt:* „Beurteile visuelle/UX-Änderungen am **echten gerenderten Bild**
-  (Screenshot), nicht an einem Proxy, und nur unter Bedingungen, die ein Nutzer wirklich
-  erreicht. Frag dich am Screenshot: *Sieht das für einen Menschen richtig aus?*"
+  → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
+  gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft
+  wurde, die ein Nutzer wirklich erreicht — nicht an einem Hilfswert und nicht in einem
+  Debug-Zustand." *(Der letzte Schritt bleibt menschlich und lässt sich nicht
+  mechanisieren: Sieh dir den Screenshot an und frag dich, ob das für einen Menschen
+  richtig aussieht.)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das
   unbeobachtete Y.
-  → *Prompt:* „Für jede Mechanik teste auch den **Ausgangs-/Danach-Zustand** mit. Baue
+  → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Ausgangs-/Danach-Zustand** prüft, und baue
   eine Handvoll ‚Invarianten' ein, die im Entwicklungsmodus laut meckern, wenn eine
   Grundregel verletzt wird — so wird jeder Testlauf zum Detektor. Nach jedem
   Zusammenführen die schnelle Testschicht laufen lassen."
 
 - **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
-  → *Prompt:* „Ein Fix gilt erst als fertig, wenn du das **Symptom am Ort des Symptoms**
+  → *Prompt:* „Etabliere einen Mechanismus, der einen Fix erst als fertig zählt, wenn das **Symptom am Ort des Symptoms**
   als behoben gezeigt hast. Wenn du dich zweimal am selben Problem festbeißt, wechsle die
   Perspektive (anderes Modell, frische Read-only-Diagnose zuerst)."
 
 - **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller' —
   ohne Messung.
-  → *Prompt:* „Kommuniziere nur **gemessene** Zahlen (Laufzeiten, Performance,
+  → *Prompt:* „Etabliere einen Mechanismus, der ungemessene Zahlen abfängt — kommuniziert werden nur **gemessene** Werte (Laufzeiten, Performance,
   Kostenschätzungen). Bei Performance auf der **Ziel-Hardware** messen, nicht auf der
   Build-Maschine."
 
@@ -182,14 +241,14 @@ Zwei Regeln, die das Netz ehrlich halten:
 
 - **Messung/Vorschau verunreinigt.** Halbfertiges wird versehentlich als ‚fertig'
   beurteilt; Popups stören Messungen.
-  → *Prompt:* „Mein Urteil fällt immer am **veröffentlichten/zusammengeführten** Stand,
+  → *Prompt:* „Etabliere einen Mechanismus, der mein Urteil immer am **veröffentlichten/zusammengeführten** Stand einholt,
   nie an einem Zwischen-Zweig. Halte Messläufe frei von störenden Fenstern."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
   trotzdem nicht passiert — der Klassiker: auf einem Nebenzweig entwickelt, aber den
   Hauptzweig hochgeladen; Git meldet zufrieden „alles aktuell", während die Arbeit nur
   lokal liegt. Dieselbe Falle wie ein grüner Test am falschen Bild.
-  → *Prompt:* „Nach jeder Aktion mit Fernwirkung (Hochladen, Veröffentlichen,
+  → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung (Hochladen, Veröffentlichen,
   Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
   mein aktueller Stand wirklich oben angekommen ist."
 
@@ -200,7 +259,7 @@ Zwei Regeln, die das Netz ehrlich halten:
   einer Datei** (weil man den Anbau schreibt, ohne den Bestand zu lesen) und
   falsche Inhalte im Kanal mit der **höchsten Frequenz** — eine Erinnerung, die
   bei jedem Prompt erscheint, lehrte zwei längst zurückgezogene Regeln.
-  → *Prompt:* „Sieh den ganzen Regelbestand periodisch durch — nicht nur auf
+  → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Regelbestand periodisch zur Durchsicht zwingt — — nicht nur auf
   Lücken, sondern auf Sauberkeit, Aktualität, Dopplung, Widerspruch,
   **Wirkungslosigkeit** und Veralterung. Prüfe jede Regel gegen den Code, nicht
   gegen die Nachbarregel. Und prüfe zuerst die Texte, die am häufigsten
@@ -211,7 +270,7 @@ Zwei Regeln, die das Netz ehrlich halten:
   nur bei einer Shell anspringt, die man kaum benutzt. Dann *gilt* die Regel als
   abgesichert, ohne es zu sein. Umgekehrt erzieht ein Wächter, der bei jedem
   Arbeitsschritt blockiert, zum Überlesen.
-  → *Prompt:* „Prüfe deine Schutzmechanismen selbst mit: Hat jeder je ausgelöst?
+  → *Prompt:* „Etabliere einen Mechanismus, der die Schutzmechanismen selbst mitprüft: Hat jeder je ausgelöst?
   Kann er überhaupt auslösen? Doppelt er einen anderen? Ist seine Meldung
   umsetzbar? Und in welcher Reihenfolge melden sie sich — die brauchbarste
   Meldung muss zuerst kommen."
@@ -223,7 +282,7 @@ Zwei Regeln, die das Netz ehrlich halten:
   stillschweigende Abstandsannahme, die unter Last kippte; eine Messung, die einen
   Zwischenzustand traf). Prüfungen veralten von selbst, wenn sich ihre Umgebung
   ändert.
-  → *Prompt:* „Bevor du auf einen roten Test hin Programmcode änderst: entscheide
+  → *Prompt:* „Etabliere einen Mechanismus, der vor jeder Code-Änderung auf einen roten Test hin entscheiden lässt —
   mit einem **Experiment**, ob der Befund das Produkt oder die Messung belastet.
   Miss nur an einem eingeschwungenen Zustand, und lass eine Prüfung auch dann
   fehlschlagen, wenn ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht
@@ -234,7 +293,7 @@ Zwei Regeln, die das Netz ehrlich halten:
   die Stelle, an der er gerade schreibt; alle anderen Kopien rotten unbemerkt.
   Nachträgliche Doku-Audits *ohne* Code-Abgleich machen es schlimmer, weil sie
   falsche Aussagen ausformulieren statt sie zu prüfen.
-  → *Prompt:* „Jeder Fakt bekommt genau **einen** verbindlichen Ort; alle anderen
+  → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen Ort zuweist; alle anderen
   Stellen verweisen darauf statt ihn zu wiederholen. Wo sich eine Wiederholung nicht
   vermeiden lässt, schreib mir einen Test, der sie gegen den Code prüft, dem der
   Fakt gehört. Und prüfe Doku immer gegen den **Code**, nie gegen die Nachbarprosa."
@@ -242,7 +301,7 @@ Zwei Regeln, die das Netz ehrlich halten:
 - **„Aufgeräumt" ohne Beweisliste.** Nach einem Zwischenfall räumt man dort auf, wo
   man den Schaden vermutet — und übersieht den Rest. Der Nutzer findet ihn dann
   zufällig, was mehr Vertrauen kostet als der Zwischenfall selbst.
-  → *Prompt:* „Nach jedem Zwischenfall: räum nicht nur auf, sondern arbeite eine
+  → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine Beweisliste erzwingt — arbeite eine
   Liste ab und belege jeden Punkt — liegt alles am Zielort? Gibt es Reste (Kodierung,
   Waisen-Dateien, Tests ohne echte Prüfung)? Ist jedes zuletzt gebaute Feature samt
   Tests plausibel? Passen Dokumente und Code noch zusammen? Und am Ende: läuft alles
@@ -251,7 +310,7 @@ Zwei Regeln, die das Netz ehrlich halten:
 - **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft am Ende
   gegen dieselbe Vorstellung, aus der der Fehler stammt — deshalb übersieht man
   ausgerechnet die Stelle, an der die Wirklichkeit anders aussieht als gedacht.
-  → *Prompt:* „Bei allem, was zuverlässig laufen muss: lass **ein anderes Modell** erst
+  → *Prompt:* „Etabliere einen Mechanismus, der bei allem, was zuverlässig laufen muss, **ein anderes Modell** erst
   den Plan und danach das fertige Ergebnis gegenprüfen — und zwar gegen die echten
   Daten, nicht gegen die Beschreibung."
 
@@ -301,4 +360,4 @@ Zwei Regeln, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 4c91b20320c503fbd7f9bfbe770e1fff2cd62fdf30b2797df22c9d803b99d078 -->
+<!-- GUIDE-FINGERPRINT: a61320ca18a3aaf80b4a31e3db10c3a4707de7f48927f535d417950838fc0a97 -->
