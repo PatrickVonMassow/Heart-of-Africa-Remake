@@ -7428,6 +7428,16 @@ the remaining open points in their numeric order.
   failed (161 vs 153). Settle on fogFar (and for the Nile settle on surfaceAt,
   for the Okavango on deltaWaterScale — whatever the check compares), or poll
   until ALL read values are stable. Speeds up every run ~15-20 s AND de-flakes.
+  FLAKE SITES OBSERVED IN THE 25.07 CLOSING RUNS (three LARGE runs, quiet machine — each
+  red was a DIFFERENT check, which is the signature of rotating flakiness rather than a
+  regression): flow fails its FIRST navigation on a cold dev server in every one of the
+  three runs (0 pass / exit 1, the networkidle wait) and passes on retry — the most
+  reproducible site and the best next fix; collision once (19/20); enrichments twice, at
+  DIFFERENT checks — the point-267 blood-stain-on-a-slope check (holeFraction 0 but the
+  blob/soak counts short) and the point-278 dressing-growth check reporting samples
+  [0,0,0,0,0], i.e. a measurement that collected NOTHING rather than a real growth
+  reading (the same class as points 292/334/304 — the check, not the product). Fix these
+  four first: they are what stands between the suite and the flake-free closing gate.
   REMAINING drama flakes still rotating (cushioned by the retry, to root-cause
   for the closing's strict 3x gate): point-102 vicinity count, plover 145b,
   calf-play, parent-guards-calf, the crocodile-spawn cluster. NEW SITES seen in
