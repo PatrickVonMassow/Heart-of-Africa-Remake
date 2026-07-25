@@ -13010,7 +13010,11 @@ the remaining open points in their numeric order.
   DIFFERENT models are independent in both, and that is where the method earns its
   cost. So cross-model is the default pairing (§6 allowlist); same-model blind parallel
   is the acceptable fallback when the second model is unavailable, recorded as the
-  weaker variant rather than passed off as the full method.
+  weaker variant rather than passed off as the full method. WHEN THAT FALLBACK IS USED,
+  DECORRELATE BY FRAMING rather than trusting sampling noise: give the second run a
+  deliberately different vantage — a hostile tester, a maintainer inheriting the code, a
+  player trying to break it — because a re-run of the same prompt varies most where the
+  model is unsure and least where it is confidently blind, which is the wrong way round.
   COST AND WHEN IT APPLIES: the generative stage runs twice, so roughly double for that
   stage. It therefore applies where four-eyes already applies by the criticality triage
   (point 298), not everywhere.
