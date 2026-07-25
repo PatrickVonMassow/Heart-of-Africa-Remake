@@ -11357,6 +11357,29 @@ the remaining open points in their numeric order.
   the staged and full-hunt sacrifice checks in enrichments green on both backends; no
   other §19.8 ending regresses (every started drama still resolves — invariant I4).
 
+- [ ] 312. FLEE-INTO-WATER PRACTICALLY NEVER TRIGGERS (user 25.07.2026: animals
+  fleeing an elephant do not cross the water). The point-192 rule is WIRED for all
+  three flight sources (predator flee, elephant dart, player-shy — `fleeCrossing`
+  call sites in Wildlife.tsx) but its trigger is `deflectedStep(...).moved === false`,
+  and deflectedStep probes ±90° in 15° steps: on any ordinary bank the flight always
+  finds a slide ALONG the shore, `moved` stays true, and the crossing never starts —
+  only a concave dead-end pocket can fire it. The enrichments check stages exactly
+  such a dead-end, so it is green while the emergent in-game behaviour almost never
+  occurs (the green-test-wrong-picture class). FIX — a BOXED trigger replacing the
+  dead-end-only trigger, shared by all three sources: when the RAW escape heading is
+  water-blocked (before deflection) AND the threat is within a calibratable pressure
+  radius behind, attempt `crossingTarget` along the raw heading even though an
+  along-bank slide exists; add hysteresis (a short boxed-persistence window) and/or
+  the existing `waterCross.chance` so a mere bank-graze does not dive in constantly;
+  ocean and over-wide refusal (`waterCross.maxUnits`) unchanged; an active crossing
+  still suppresses a second one. New balance values under `balance.waterCross`
+  (pressure radius, boxed-persistence), debug-editable. VERIFIABLE: the boxed
+  predicate pure-tested in wildlifeBehavior.test.ts (raw-blocked + threat-near fires;
+  threat-far or raw-open does not; hysteresis boundary); an enrichments stage on a
+  STRAIGHT bank (slide available) with an elephant bearing down asserts the crossing
+  starts, swims and lands; the §19.5 setback and I4 deadline invariants stay green;
+  both backends.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
