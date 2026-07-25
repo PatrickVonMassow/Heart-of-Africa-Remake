@@ -24,17 +24,14 @@ Fast alles Folgende ist eine Anwendung davon.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
-Die Prompts unten sind bewusst **Aufträge, einen Mechanismus zu bauen** — nicht
-Merksätze. Der Unterschied ist der ganze Punkt dieser Anleitung: „Jedes neue
-Feature bekommt einen Test" ist eine *Regel*, die vergessen wird; „Etabliere
-einen Mechanismus, der garantiert, dass jedes neue Feature einen Test bekommt"
-ist ein *Auftrag*, an dessen Ende etwas steht, das die Regel erzwingt. Formuliere
-deine eigenen Anweisungen genauso.
+Die Prompts unten sind bewusst **Aufträge, einen Mechanismus zu bauen** — keine
+Merksätze. „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen
+wird; „Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen
+Ende etwas steht, das die Regel erzwingt. Formuliere deine eigenen Anweisungen genauso.
 
 Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen
-Menschen richtig aus?"), steht das ausdrücklich dabei — dann ist der Merksatz die
-ehrliche Lösung, und du solltest wissen, dass er nur so gut hält wie die
-Aufmerksamkeit des Moments.
+Menschen richtig aus?"), steht das ausdrücklich dabei — dann hält der Merksatz nur
+so gut wie die Aufmerksamkeit des Moments.
 
 ### Primäres und sekundäres Modell
 
@@ -63,10 +60,20 @@ selbstbewusst Attrappen.
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
 
-1. **Zielbild zuerst, als einzige Wahrheit.**
-   > „Wir schreiben zuerst ein `design.md`, das beschreibt, was am Ende existieren soll.
-   > Das ist die alleinige Quelle der Wahrheit. Ändere es nie eigenmächtig; wenn ich
-   > etwas ändere, aktualisiere `design.md` und den Code gemeinsam."
+1. **Zielbild zuerst — und nimm dir dafür Zeit.** Bevor die erste Zeile Code entsteht,
+   gehört das Zielbild ausgearbeitet: was das Ergebnis können soll, wie es sich
+   anfühlt, wo die Grenzen liegen. Jede Stunde hier spart ein Vielfaches an Umbau,
+   denn ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
+   ist. Das Ausarbeiten ist dabei selbst eine ideale LLM-Aufgabe: Lass dich befragen,
+   dir Lücken, Widersprüche und offene Entscheidungen zeigen und das Ergebnis
+   ausformulieren — du entscheidest, es schreibt. Jede Zeile des `design.md`, das
+   diesem Projekt zugrunde liegt, stammt von Claude.
+   > „Bevor wir irgendetwas bauen, erarbeiten wir gemeinsam ein `design.md`, das
+   > beschreibt, was am Ende existieren soll. Frag mich so lange aus, bis keine
+   > wesentliche Lücke bleibt, zeig mir Widersprüche und offene Entscheidungen, und
+   > formuliere es dann aus. Danach ist es die alleinige Quelle der Wahrheit: Ändere
+   > es nie eigenmächtig; wenn ich etwas ändere, aktualisiere `design.md` und den
+   > Code gemeinsam."
 
 2. **Ein dauerhaftes Arbeitsprotokoll.**
    > „Lege ein `TASKS.md` an und **etabliere einen Mechanismus, der seine Regeln
@@ -91,10 +98,8 @@ selbstbewusst Attrappen.
    > Fehlschlag — zeig mir den konkreten Output."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
-   Sich darauf zu verlassen, dass das Modell sich an eine nur *niedergeschriebene* Regel
-   hält, ist erwiesenermaßen unzuverlässig — auch bei bester Absicht fällt unter Druck genau
-   der nicht-erzwungene Schritt weg. Warte deshalb **nicht**, bis derselbe Fehler ein zweites
-   Mal passiert.
+   Auch bei bester Absicht fällt unter Druck genau der nicht-erzwungene Schritt weg.
+   Warte deshalb **nicht**, bis derselbe Fehler ein zweites Mal passiert.
    > „Für **jede** Regel, die wirklich gelten soll, baue von Anfang an einen **Mechanismus**,
    > der ihre Verletzung unmöglich macht — einen Test, einen Git-Hook oder einen Stop-/
    > PreToolUse-Hook, der abbricht bzw. die Aktion verweigert, wenn die Regel gebrochen würde.
@@ -318,7 +323,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Der kürzeste mögliche Start
 
-> „Lies `design.md` als einzige Wahrheit und leg ein `TASKS.md` an. Richte die zwei
+> „Erarbeite mit mir zuerst ein `design.md` als einzige Wahrheit — frag mich dafür
+> gründlich aus —, dann leg ein `TASKS.md` an. Richte die zwei
 > Testschichten ein. Nach jeder Änderung: Build/Lint/Audit sauber, ein Test auf der
 > passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn
 > wir eine Regel festlegen, bau sofort den Check, der sie erzwingt. Bei Kritischem
