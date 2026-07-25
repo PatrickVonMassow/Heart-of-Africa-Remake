@@ -12394,6 +12394,56 @@ the remaining open points in their numeric order.
   Ctrl labels the animals in view and no plant, every label sits on an on-screen
   subject, and releasing clears every one.
 
+- [ ] 343. THE SUN STANDS WHERE IT REALLY STOOD — ELEVATION FROM DATE AND LATITUDE
+  (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
+  constant in BOTH scenes — `[0.5, 0.62, 0.38]` in `src/scenes/travel/TravelScene.tsx`
+  and `[0.52, 0.68, 0.34]` in `src/scenes/place/PlaceScene.tsx`, an elevation of ~45°
+  for the whole continent and the whole five-year window. The season only dims and
+  reddens it. That is why the relief reads flat: at that angle a 3000 m massif throws
+  ~3 km of shadow, about ONE DEM texel.
+  TARGET: derive the sun's elevation and azimuth from the real solar geometry —
+  declination from the DATE (the same date that drives §19.13) and the traveller's own
+  LATITUDE — at a FIXED local solar hour. There is no time of day in this game and
+  none is being added; the hour is a calibratable constant, `balance.sun.hour`,
+  DEFAULT 16:00. That default is load-bearing and must not be "tidied" to noon: at
+  local noon the sun stands 90° over the equator in March and 83° over Cairo in June,
+  which casts no usable shadow at all, while at 16:00 the elevation runs about 7°-37°
+  across the entire map and year (Cairo 37° June / 11° December, Cape Town 9° in its
+  June winter). One hour later breaks it — at 17:00 the Cape sun in June is BELOW the
+  horizon, and a fixed hour must never put the sun under the horizon anywhere in the
+  world window (lat -37..38, all 365 days).
+  EVERYTHING THE SUN FEEDS MUST FOLLOW IT, or the picture contradicts itself: the
+  directional light AND its shadow camera in both scenes, the sky dome's disc and halo
+  (`src/render/sky.tsx`, whose `sunDirection` must keep agreeing with the light — its
+  own comment says so), and the baked environment light
+  (`createEnvironmentTexture`/`IBL_SUN` in `src/render/Effects.tsx`), re-derived when
+  the date or the position changes and NEVER per frame.
+  THE SKY PRESETS ARE THE REAL WORK, not the arithmetic. They are authored for a high
+  sun; a low sun under an unchanged noon-blue dome reads as a bug — the same failure
+  the overcast handling already guards against (a dimmed sun under a bright blue sky,
+  sky.tsx). The horizon must warm and redden as the sun drops. Judge this by the
+  PICTURE on both backends, not by the uniform.
+  WATCH THE SHADOW QUALITY at the low end: cascaded shadow maps degrade at grazing sun
+  angles (long shadows, peter-panning, cascade seams). If the 7° end proves ugly, clamp
+  the elevation used for the SHADOW camera to a calibratable floor while the visible
+  sun keeps its true angle — and record that as a deliberate divergence, never silently.
+  NOT A QUALITY LEVER: this is world model like the seasons and applies at EVERY
+  graphics level. It adds no per-frame cost and gets no `QUALITY_PRESETS` key.
+  DEBUG: the sun direction stays inspectable and the hour editable in the debug menu
+  (§21.2), so a tester can walk the whole range without waiting for a date.
+  VERIFIABLE: pure (`src/systems/`) — declination and hour angle produce the known
+  elevations above (Cairo June/December, the equator at equinox, Cape Town June), the
+  hemispheres invert across the year, and a SWEEP over the full world bounds × all 365
+  days asserts the sun never falls to or below the horizon at the default hour (the
+  17:00 counter-case is pinned as the witness that the bound is real); the azimuth is
+  westerly in the afternoon for both hemispheres. Live (`scripts/verify/
+  enrichments.mjs` + `polish.mjs`, BOTH backends, screenshots): the same place rendered
+  in June and in December differs measurably in pixels and in shadow direction; a
+  settlement's shadows agree with its sky-dome sun disc rather than pointing elsewhere;
+  no console errors.
+  DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
+  behaviour when this lands.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
