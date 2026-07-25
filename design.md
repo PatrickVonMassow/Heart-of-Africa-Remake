@@ -875,30 +875,75 @@ A debug menu opened with F1. All settings take effect immediately on the running
 
 ### 21.2 Tunable values
 
+Every estimated balance value is editable here as a number field — that is the
+binding contract of the calibration rule (all estimated values live centrally and
+are adjustable at runtime). The complete set, grouped as the menu presents it:
+
+**Movement and controls**
+
 - Walking speed of the player character inside settlements (villages and port cities).
 - Walking speed of the player character outside settlements (travel across the continent; the default overland pace is calibrated on the calm side).
-- Movement-factor tuning for the terrain relief items (§11): the factor by which a canoe speeds up water travel, and the penalty factors by which the jungle without a machete and the mountains without a rope slow the traveller.
-- The swimmable coastal band width (§11.2): how far off the coast the sea can be swum before the open ocean blocks.
+- The strafe/backward factor (§2.2): the fraction of the forward speed at which the character sidesteps or walks backward, so a diagonal is never faster than straight ahead.
 - Mouse-look sensitivity in the first-person view.
-- Ambience volume (default 0.1): one control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale together.
+- The inhabitant unstuck window (§2.6): the seconds a settlement walker may stay physically pinned before it is nudged to free ground.
+
+**Audio** (§19.1)
+
+- Ambience volume (default 0.1): the master control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale under it.
+- Per-source volumes sitting over that master: footsteps, the general ambient bed and the birdsong.
+- The coastal surf fade: the near radius within which the surf plays at full gain and the cutoff distance from the coast beyond which it is exactly silent, so the sea is heard at the shore and in seaside ports but never inland.
+
+**Provisions, water and health** (§6)
+
 - Speed of food consumption while walking; at 0 the food supply lasts forever.
 - Days of provisions one purchased food unit grants (§9; four weeks by default).
-- Speed of the canteen's water consumption per travelled day, split into the land rate and the (faster) desert rate (§6), and the canteen's capacity — a full canteen lasts capacity ÷ consumption travelled days.
-- Natural wound-healing durations (§6): the days until a light wound closes on its own and until a severe wound eases to a light one.
-- Strength of the seasonal weather look (§19; 0 disables it, 1 full, default 1).
-- Herd family-drama values (§19.8): the parental rescue burst factor, the calf fraction per herd group, the calf leash/play/hop-bout values, the juvenile-prey and drinking-juvenile crocodile preferences, and the orphan adoption radius — the reach within which the nearest eligible adult adopts a juvenile whose parent has died (point 262), so the §19.8 dramas recur for the new pairing.
+- Days of travel one unit of distance costs (the calendar's advance per travelled unit).
+- Speed of the canteen's water consumption per travelled day, split into the land rate and the (faster) desert rate, and the canteen's capacity — a full canteen lasts capacity ÷ consumption travelled days.
+- Natural wound-healing durations: the days until a light wound closes on its own and until a severe wound eases to a light one.
+- The traveller's current health, for putting him directly into any condition.
+
+**Terrain and water** (§11)
+
+- Movement-factor tuning for the terrain relief items: the factor by which a canoe speeds up water travel, and the penalty factors by which the jungle without a machete and the mountains without a rope slow the traveller.
+- The swimmable coastal band width (§11.2): how far off the coast the sea can be swum before the open ocean blocks.
+- The river width factor (§11.3): rivers are drawn wider than scale for canoe playability, and carved bed, ribbon, water mask and every clearance derive from this one value. It is a BUILD-time value — the edit persists and takes effect on the next reload.
+
+**Seasons and weather** (§19.13)
+
+- Strength of the seasonal weather look (0 disables it, 1 full, default 1).
+- Strength of the wet-ground darkening under rain.
+
+**Wildlife dramas** (§19.8)
+
+- Herd family-drama values: the parental rescue burst factor, the calf fraction per herd group, the calf leash/play/hop-bout values, the juvenile-prey and drinking-juvenile crocodile preferences, and the orphan adoption radius — the reach within which the nearest eligible adult adopts a juvenile whose parent has died (point 262), so the §19.8 dramas recur for the new pairing.
+- The vigil delay: the seconds a parent may stand over its eaten calf before the carcass draws a predator to the keeper.
+- The water dramas: the seconds a current may carry an animal before it drowns, and the factor by which the rains swell that current.
+- The predator walk-off overtime (§19.2): how long a leaving predator may stay ring-bound before it retires the moment it is off the rendered frame.
+- Water crossing (§19.5): the widest channel an animal will swim rather than turn from, and how often a water-blocked roam crosses instead of turning aside.
+
+**The crocodile** (§19.16)
+
+- The strike radius that triggers the lunge, the bank band within which a waterline prey is a legal target, the local mouth offset at which the seized victim is held, the hard grip release deadline (so a vanished victim never pins the ambusher) and the rest period a driven-off crocodile keeps to its water.
+
+**Expedition state and economy**
+
 - Input fields for cash, gifts and food.
 - Input field for the inventory capacity.
+- The dig radius (§18): how close to the buried site a dig with the shovel must be to succeed.
+- The goodwill points a chief requires before he parts with the location hint (§12/§13).
 
 ### 21.3 Toggles, tools and view
 
-- Checkbox: random events can occur (§14), on by default.
-- One button per kind of random event (§14) to trigger it immediately.
+- Checkbox: random events can occur (§14), OFF by default — the relaxed exploration preset of §14.3 ships with the whole random-event system disabled, and this checkbox is how it is switched on for testing.
+- Dropdown: trigger any kind of random event (§14) immediately.
 - Checkbox: show all hidden objects (position of treasure/tomb, caches etc.), off by default.
 - Checkbox: frame counter (FPS display in the corner of the screen), on by default.
 - Checkbox: do not disturb with journal entries (§16), off by default; also toggled with F2. New entries then neither open the journal nor auto-narrate.
 - Picker: graphics quality level — low / medium / high (§2.7/§21.1), default medium; also cycled with F9. This is the ONLY graphics control in the menu — selecting a level drives every render lever (resolution/dpr, the whole post pipeline incl. TRAA and SSAO, whether sun shadows are cast at all and at what map resolution, the campfire-shadow variant, then terrain refinement and flora) through effective selectors. The individual per-setting graphics allow-flags (TRAA, SSAO, half/full shadows, campfire shadows) are NO LONGER exposed in the menu — they remain internal store fields, set by the mobile touch-quality preset (§17.5) and the F8 benchmark and combined by the effective selectors, so the menu stays uncluttered while the level still fully determines the look. The per-level value of every quality key is tabulated in `docs/graphics-detail-levels.md`.
-- Instant jump to any NAMED map point via a dropdown selector: ports, villages, mountains, waterfalls, lakes, the built cultural landmarks and the natural sites, plus the elephant graveyard and the tomb. The entries are grouped by category (in that order) and sorted alphabetically by their localized name within each group.
+- Checkbox: flat settlement ground — render the first-person ground with a plain material instead of the surface micro-structure of §2.6, off by default. A diagnosis switch for isolating a backend-specific ground artefact.
+- Checkbox: seasonal foliage deformation (§19.13) — the dry-season crown collapse and ground-flora sprout, ON by default; switching it off keeps the plants at their full shape while the seasonal colour stays, which isolates the shape half from the colour half.
+- Button: start the render benchmark (§21.1 F8) — the menu entry exists because a function key is not reliably reachable on every keyboard, so the benchmark is never gated behind F8 alone.
+- Instant jump to any NAMED map point via a dropdown selector: ports, villages, monument sites (§4.4), mountains, waterfalls, lakes, the built cultural landmarks and the natural sites, plus the elephant graveyard and the tomb. The entries are grouped by category (in that order) and sorted alphabetically by their localized name within each group.
 - Event-trigger dropdown: the wildlife dramas of §19.8/§19.16 and the random events of §14 staged on demand at the traveller. They are rare by design — the grass fire attempts ignition only every few minutes on cured savanna far ahead, a crocodile waits for a drinker at its own bank — so without a forced trigger they are all but impossible to observe. The selector follows the jump-to dropdown's structure: entries grouped by category (wildlife dramas, random events, traveller hazards, in that order) and sorted alphabetically by their localized name within each group. The wildlife category stages the grass fire, a crocodile ambush, a predator hunt (on a grazer, on a calf, and the hyena at a lion cub), an elephant trample with its parent grief, a calf swept into the water, a calf mired at the waterhole, an elephant herd mourning a dead herd-mate, and vultures over a carcass; the random-event category fires each §14 kind; the hazard category the ropeless mountain fall (§11). Each trigger stages its drama where the precondition is satisfiable near the traveller — the fire ignites on the nearest savanna and walks toward him, the crocodile finds the nearest river or lake and stages ambusher and victim there, a hunt spawns its predator on suitable ground. When the precondition cannot be met in range (no water, no savanna, no suitable animal, no herd with young), nothing happens except a localized message naming what is missing, so a trigger is never a silent no-op. The dramas fire in the shipped build, not only in a development one.
 - Add any item to the inventory, via dropdown selectors (equipment, gifts); if this overfills the inventory, the inventory capacity increases automatically to match.
 - Season selector for testing (§19): the seasonal weather follows the calendar by default and can be forced to dry season, transition or rainy season.

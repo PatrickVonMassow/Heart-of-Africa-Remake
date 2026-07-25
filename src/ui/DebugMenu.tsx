@@ -1,6 +1,7 @@
 // Debug menu (design.md §21, F1): runtime tuning of the balance values used
-// by the POC plus the game-language selector (design.md §17: German default,
-// English). Implemented only as far as the POC systems require (CLAUDE.md §8).
+// by the POC plus the game-language selector (design.md §17.7: English is the
+// default game language, German the alternative). Implemented only as far as
+// the POC systems require (CLAUDE.md §8).
 
 import { balance } from '../config/balance'
 import { refreshAmbienceVolume } from '../systems/ambience'
