@@ -11320,9 +11320,14 @@ the remaining open points in their numeric order.
   unnamed system ("(unnamed) MeshStandardNodeMaterial", constant 425,118 tris / 180
   meshes in EVERY phase — 78 % of the desert frame); dpr is the strongest lever
   overall (baseline GPU 18.55→8.39 ms driving at dpr 1) and LOW already caps it at 1.
-  Deliver: (a) NAME the unnamed breakdown systems (scene-graph group naming, so the F8
-  report attributes every system; the 425k one is suspected to be the river/lake water
-  geometry — verify first), (b) a LOW flora/dressing DENSITY lever (calibratable
+  DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
+  water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
+  lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
+  material={riverMat}>` / lake map), so `groupKey` in src/systems/benchmark.ts falls
+  back to the material name `MeshStandardNodeMaterial`; the courses are global and
+  biome-independent, which explains the constant count in every phase. Deliver:
+  (a) NAME those groups (and any other unnamed one) so the F8 report attributes
+  every system, (b) a LOW flora/dressing DENSITY lever (calibratable
   instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
   dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
   identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
@@ -11530,7 +11535,11 @@ the remaining open points in their numeric order.
 - [ ] 320. SPRINGS AS REAL 3D BUBBLING WATER (user 25.07.2026: the springs still
   read as a mere symbol — animated now, but flat; they should LOOK like a spring
   with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
-  travel scale into a small 3D water feature: a low dome/upwelling mesh whose
+  travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
+  current spring is built in `src/scenes/travel/Rivers.tsx` as a stack of FLAT discs
+  — circle meshes rotated `-Math.PI / 2` (the pool, a damp-ground ring and the
+  animated ripple), which is exactly why it reads as a symbol however it animates.
+  Replace that stack with: a low dome/upwelling mesh whose
   surface visibly bubbles (TSL displacement/normal animation — renderer-agnostic,
   both backends), a bright welling centre with concentric ripple rings, a small
   wet pool/outflow meeting the terrain (no floating disc, no billboard), sized to
