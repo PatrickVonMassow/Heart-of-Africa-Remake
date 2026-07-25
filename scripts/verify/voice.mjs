@@ -5,14 +5,16 @@
 // speak-button de vs en" render asserts to src/ui/JournalPanel.test.tsx. What
 // stays here needs a real browser: movement continues while the journal is open
 // (scene), the in-browser Kokoro read-aloud reaching the speaking state, the
-// cold-load render-liveness gate (the WASM fallback keeps the game rendering
-// while the engine loads), the screenshots (64-66) and the console-error gate.
+// cold-load liveness gate (the WASM fallback keeps the main thread free while
+// the engine loads — measured and ATTRIBUTED per liveness.mjs, point 304), the
+// screenshots (64-66) and the console-error gate.
 // This run forces the WASM path via `window.__ttsForceWasm` — headless has no
 // WebGPU adapter, and WASM is what stays live (on Chromium hardware the engine
 // runs the faster WebGPU path, whose cold load the game pre-warms; point 117).
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
+import { attributeBlocks, maxGap } from './liveness.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -36,9 +38,30 @@ page.on('pageerror', (e) => errors.push(String(e)))
 
 // Force the WASM TTS path: headless Chromium has no WebGPU adapter, and WASM
 // keeps the game rendering through the cold load (the liveness gate below). The
-// hook is read on the main thread in speech.ts (point 117).
+// hook is read on the main thread in speech.ts (point 117). `__ttsDeferWarmup`
+// holds the automatic pre-warm back so the cold load happens INSIDE the probe
+// window below rather than minutes earlier (point 304), and the liveness
+// instrument wraps requestAnimationFrame before any page script runs so every
+// frame callback's span is known — see liveness.mjs for why that matters.
 await page.addInitScript(() => {
   window.__ttsForceWasm = true
+  window.__ttsDeferWarmup = true
+  const nativeRaf = window.requestAnimationFrame.bind(window)
+  const S = { frames: [], ticks: [], raf: [], recording: false, timer: 0 }
+  window.requestAnimationFrame = function (cb) {
+    return nativeRaf(function (t) {
+      const start = performance.now()
+      try {
+        return cb(t)
+      } finally {
+        if (S.recording) {
+          S.frames.push({ start, end: performance.now() })
+          if (S.raf[S.raf.length - 1] !== t) S.raf.push(t)
+        }
+      }
+    })
+  }
+  window.__liveness = S
 })
 
 await page.goto(BASE)
@@ -82,22 +105,49 @@ await page.evaluate(() => window.__setLang('en'))
 await page.waitForTimeout(800)
 
 // --- The start entry narrates on the first user gesture (autoplay deferral) --
-// The browser profile is fresh, so this first narration is the COLD engine
-// load. Liveness gate: sample rAF timestamps across it — on this forced-WASM
-// headless path the game must keep RENDERING while the worker loads the model
-// (WASM never touches the GPU process). On Chromium hardware the WebGPU path is
-// used instead, whose cold-load GPU stall the game pre-warms up front (point 117).
+// The browser profile is fresh and the pre-warm is deferred, so this first
+// narration is the COLD engine load, start to finish, inside the probe window.
+//
+// LIVENESS GATE (point 117, rebuilt by point 304). On this forced-WASM path the
+// model load must not cost the game its main thread — WASM never touches the GPU
+// process. The gate therefore runs a 50 ms TICK TRAIN and charges only the
+// stalls that the page's own animation-frame callbacks do NOT account for; see
+// liveness.mjs. The metric it replaces was the raw rAF gap, which read ~15 000 ms
+// on a quiet machine and blamed the TTS load for it — while the same 15 000 ms
+// reproduced with the TTS worker stubbed out entirely: it is the startup frame
+// awaiting the scene's shader-program links, a long FRAME with a perfectly free
+// main thread (tick gap 63 ms). Both numbers are reported below; only the
+// attributed block is binding.
 await page.evaluate(() => {
-  const raf = []
-  window.__rafProbe = { raf, running: true }
-  const loop = (t) => {
-    raf.push(t)
-    if (window.__rafProbe.running) requestAnimationFrame(loop)
-  }
-  requestAnimationFrame(loop)
+  const S = window.__liveness
+  S.frames.length = 0
+  S.ticks.length = 0
+  S.raf.length = 0
+  S.recording = true
+  S.timer = setInterval(() => S.ticks.push(performance.now()), 50)
 })
+const probeStart = Date.now()
 // No trusted gesture has happened yet; a neutral key press is the first one.
-await page.keyboard.press('F8')
+// It must be a key the game does NOT bind: this used to be F8, which since the
+// in-game render benchmark shipped (point 277) starts that benchmark — it swept
+// ten graphics configs, recompiled the post pipeline over and over and blocked
+// the main thread for ~15 s at a time, right inside the measurement it was
+// meant to leave alone. Insert is bound by neither the game nor the browser.
+await page.keyboard.press('Insert')
+// Self-test knob (point 304): VOICE_STALL_SELFTEST=<ms> injects a synchronous
+// main-thread busy loop into the cold-load window, which must turn the gate
+// below RED. That is how the gate is proven to still bite.
+const selfTestMs = Number(process.env.VOICE_STALL_SELFTEST ?? 0)
+if (selfTestMs > 0) {
+  await page.evaluate((ms) => {
+    setTimeout(() => {
+      const end = performance.now() + ms
+      while (performance.now() < end) {
+        /* block the main thread on purpose */
+      }
+    }, 2000)
+  }, selfTestMs)
+}
 let bootSpoke = false
 try {
   await page.waitForFunction(
@@ -114,24 +164,46 @@ try {
   bootSpoke = false
 }
 check('the start entry narrates on the first user gesture', bootSpoke, '')
-// Let it reach the speaking state (the cold engine load runs in between),
-// then read the liveness probe: the whole load must have kept rendering.
+// Let it reach the speaking state — the cold engine load runs in between, so
+// the probe window closes on a load that provably happened inside it.
 await page
   .waitForFunction(() => document.querySelector('.journal .speak')?.textContent === '■', null, { timeout: 300000 })
   .catch(() => {})
-const rafGap = await page.evaluate(() => {
-  const p = window.__rafProbe
-  p.running = false
-  let max = 0
-  for (let i = 1; i < p.raf.length; i++) max = Math.max(max, p.raf[i] - p.raf[i - 1])
-  return { max: Math.round(max), frames: p.raf.length }
+const probe = await page.evaluate(() => {
+  const S = window.__liveness
+  S.recording = false
+  clearInterval(S.timer)
+  return { frames: S.frames, ticks: S.ticks, raf: S.raf }
 })
-// Generous bound against machine load: the defect was a 15 s stall, normal
-// frames run at 16-70 ms even under a loaded suite.
+const probeEnd = Date.now()
+const blocks = attributeBlocks(probe.ticks, probe.frames)
+const rafGapMs = Math.round(maxGap(probe.raf))
+// The measurement must be TRUSTWORTHY before it may accuse anything: enough
+// samples on both trains, and the model load must genuinely have happened
+// inside the window (with the pre-warm deferred, the cache serves the model
+// only once the narration asks for it). A window that missed the cold load
+// proves nothing, and saying so beats a green tick.
+const modelServed = ttsStats.served.filter((s) => /model_quantized\.onnx$/.test(s.url) && s.at >= probeStart && s.at <= probeEnd)
 check(
-  'the WASM fallback keeps the game rendering through the cold TTS load (point 117)',
-  rafGap.frames > 30 && rafGap.max < 1500,
-  `max rAF gap ${rafGap.max} ms over ${rafGap.frames} frames`,
+  'the cold-load liveness probe is trustworthy (spans the model load, both sample trains alive)',
+  probe.raf.length > 30 && probe.ticks.length > 20 && modelServed.length > 0,
+  `${probe.raf.length} frames, ${probe.ticks.length} ticks over ${probeEnd - probeStart} ms, model load in window: ${modelServed.length > 0}`,
+)
+// Generous bound: the defect this guards is a multi-second freeze; ordinary
+// scheduling noise on the tick train is tens of milliseconds.
+check(
+  'the WASM fallback keeps the main thread free through the cold TTS load (point 117)',
+  blocks.blockMs < 1500,
+  `attributed block ${Math.round(blocks.blockMs)} ms (raw tick gap ${Math.round(blocks.tickGapMs)} ms)`,
+)
+// Reported, NOT gated: the renderer's own synchronous frame cost and the
+// picture-level frame gap. Both belong to the scene's startup shader-program
+// compile, reproduce with the TTS worker stubbed out and are not this suite's
+// subject (point 304) — but a silent number is how the last misattribution
+// survived, so they are printed on every run.
+console.log(
+  `INFO  not gated, reported: max frame-covered stall ${Math.round(blocks.frameBlockMs)} ms, max rAF gap ${rafGapMs} ms` +
+    ' — seconds here mean the scene awaited its shader-program set, which reproduces with the TTS worker stubbed out (point 304)',
 )
 await page.locator('.journal .speak').last().click()
 await page.waitForTimeout(500)
@@ -187,9 +259,9 @@ await browser.close()
 // a single CDN request for the TTS assets; the first (recording) run instead
 // proves it captured them.
 if (ttsStats.strict) {
-  check('TTS assets served offline from the local cache', ttsStats.hits > 0 && ttsStats.misses === 0, JSON.stringify(ttsStats))
+  check('TTS assets served offline from the local cache', ttsStats.hits > 0 && ttsStats.misses === 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
 } else {
-  check('TTS assets recorded into the local cache', ttsStats.hits + ttsStats.misses > 0, JSON.stringify(ttsStats))
+  check('TTS assets recorded into the local cache', ttsStats.hits + ttsStats.misses > 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
   if (failures === 0 && errors.length === 0) markTtsCacheComplete()
 }
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)
