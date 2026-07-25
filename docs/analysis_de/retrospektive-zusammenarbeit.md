@@ -208,7 +208,7 @@ Ein Feature-Zweig vom Vortag stand nach 24 Stunden **219 Commits** hinter dem Ha
 
 Ein Vier-Augen-Audit über **alle 88 Regeln** und **25 Wächter** förderte zutage, was Wochen des Anbauens angerichtet hatten: zehn echte Widersprüche, sechs Redundanz-Cluster (das Release-Verfahren steht viermal, die Modell-Regel sechsmal, die Dashboard-Struktur dreimal), mehrere Regeln, die eine Durchsetzung *behaupten*, die nie gebaut wurde, und ein knappes Dutzend Einträge, die einen Zustand von vor zwei Wochen beschreiben. Vier Erkenntnisse, die über dieses Projekt hinausreichen:
 
-**(1) Der Bestand altert wie Code, aber ohne Compiler.** Eine veraltete Funktion fällt beim Bauen auf; eine veraltete Regel schweigt und wird trotzdem befolgt. Kein einziger der 88 Einträge war je Gegenstand einer Durchsicht — es gab nur Anbauten. Ein Regelkorpus braucht periodisches Aufräumen so nötig wie eine Codebasis, und dieselbe Sorgfalt: zusammenführen, verweisen, zurückziehen statt löschen.
+**(1) Der Bestand altert wie Code, aber ohne Compiler.** Eine veraltete Funktion fällt beim Bauen auf; eine veraltete Regel schweigt und wird trotzdem befolgt. Kein einziger der 88 Einträge war je Gegenstand einer Durchsicht — es gab nur Anbauten. Ein Regelkorpus braucht periodisches Aufräumen so nötig wie eine Codebasis, und dieselbe Sorgfalt: zusammenführen, verweisen, zurückziehen statt löschen. Der erste aufgelöste Cluster zeigt das Muster: Das fünfstufige Release-Verfahren stand wortgleich in zwei Memories und zwei Dokumenten, obwohl die beiden Memories verschiedene Fragen beantworten — die eine, *ob* getaggt werden darf, die andere, *wie*. Die Trennung nach Frage statt nach Thema löste die Dopplung auf, ohne dass Wissen verlorenging; die frühere Fassung hätte bei jeder Verfahrensänderung an vier Stellen nachgezogen werden müssen.
 
 **(2) Die gefährlichsten Widersprüche stehen INNERHALB einer Datei.** Die Sitzungsstart-Anweisung sagt in Zeile 104, Arbeit sei an Fable-Agenten zu delegieren, und in Zeile 139, Fable sei ausschließlich fürs Vier-Augen-Prinzip da. Ein Memory meldet „behoben am 24.07." und im nächsten Absatz „Fix in Arbeit". Solche Selbstwidersprüche entstehen, weil man den *Anbau* schreibt und die bestehende Datei nicht mehr liest — und sie sind schlimmer als zwei widersprüchliche Dateien, weil niemand denselben Text zweimal prüft.
 
@@ -338,7 +338,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 19:28 · Quellen-Fingerprint: `a1959f540f0f…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 19:52 · Quellen-Fingerprint: `3be801687b28…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -390,7 +390,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| The v0.1/poc release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
@@ -411,6 +411,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 26 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: a1959f540f0f0e63610a46cbd0b6197d429bc38d6ab624cd845727c3f5bfb460 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T17:28:24.324Z -->
+<!-- RETRO-FINGERPRINT: 3be801687b28b0e3ea7bdba4df7e67116a6b308ca77f13687d53d489e407d185 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T17:52:26.778Z -->
 <!-- AUTO-GENERATED:END -->
