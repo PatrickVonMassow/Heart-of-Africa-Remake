@@ -11320,6 +11320,14 @@ the remaining open points in their numeric order.
   unnamed system ("(unnamed) MeshStandardNodeMaterial", constant 425,118 tris / 180
   meshes in EVERY phase — 78 % of the desert frame); dpr is the strongest lever
   overall (baseline GPU 18.55→8.39 ms driving at dpr 1) and LOW already caps it at 1.
+  SALVAGED IDEA (25.07, from the retired `feat/276-wildlife-lod` branch — see point
+  329): throttling the BEHAVIOUR updates of off-screen animals cuts the driving
+  frame cost. The branch itself was retired unmerged (219 commits behind main, its
+  three files moved on 16/9/1 commits since), but the lever is sound and belongs
+  here: update animals outside the rendered frame at a reduced rate (projected via
+  the shared `isOnScreen`, never an assumed radius — the point-172 rule), keeping
+  every §19 drama deadline in sim time so no drama stalls. Judge it on the CPU
+  series of the F8 report, where the S25 shows 7.6-8.7 ms at LOW.
   DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
   water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
   lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
@@ -11652,18 +11660,73 @@ the remaining open points in their numeric order.
 
 - [ ] 329. DECIDE THE FATE OF THE TWO SURVIVING STRAY BRANCHES (25.07.2026 branch
   cleanup: 133 fully-merged branches and 26 orphaned worktrees were removed; two
-  carry unmerged work whose value must be judged rather than deleted or blindly
-  merged). (a) `feat/276-wildlife-lod` (23.07, 539 lines: off-screen wildlife
-  behaviour throttling plus a terrain.ts rework, with pure tests) — a PERFORMANCE
-  lever that point 310 (the S25 low-preset pass) may want; check whether it still
-  applies after the point-276/278 merges, re-run its tests, and either finish it as
-  part of 310 or record why it is dropped. (b) `feat/278-dressing-growth` (24.07,
-  275 lines: an ALTERNATIVE fix for the wildlife duplication that main solved
-  differently in d9ee271, plus enrichments checks and pure tests) — diff its test
-  coverage against what main has and salvage any check main lacks; then drop the
-  branch. VERIFIABLE: for each branch a written verdict (merged / salvaged-in-part
-  / dropped, with the reason), the branch deleted afterwards, and the regression
-  green on whatever landed.
+  carried unmerged work whose value had to be judged rather than deleted or blindly
+  merged).
+  (a) `feat/276-wildlife-lod` — VERDICT 25.07: RETIRED UNMERGED, idea salvaged into
+  point 310. Reason (user-reported, then measured): the branch stood 219 commits
+  behind main; its three files had moved on 16 (Wildlife.tsx), 9
+  (wildlifeBehavior.ts) and 1 (terrain.ts) commits since — merging a 539-line
+  rework across that gap would fight every wildlife fix of the last two days for a
+  lever that is easier to rebuild than to reconcile. The LEVER (throttling
+  off-screen animal behaviour updates) is now an explicit sub-task of point 310,
+  where it is implemented fresh against current code and priced on the S25 report.
+  (b) `feat/278-dressing-growth` (24.07, 275 lines: an ALTERNATIVE fix for the
+  wildlife duplication that main solved differently in d9ee271, plus enrichments
+  checks and pure tests) — STILL OPEN: diff its test coverage against what main has
+  and salvage any check main lacks; then drop the branch.
+  VERIFIABLE: a written verdict per branch (done for (a)), the branch deleted
+  locally AND on GitHub afterwards, and the regression green on whatever landed.
+
+- [ ] 330. FULL POST-DEGRADATION ASSURANCE PASS — nothing new starts until this is
+  100 % green (user 25.07.2026, after three separate leftovers were found by chance:
+  the board's broken umlauts, the board's inconsistency, and a whole night's work
+  sitting unpushed on a feature branch). The user's verdict on the cleanup so far:
+  incomplete. Do ALL of the following, in this order, and report each with evidence:
+  (A) COMPLETENESS — prove that every piece of work exists on GitHub `origin/main`:
+  no local commit ahead of origin (`git rev-list --count origin/main..HEAD` == 0 on
+  every checkout), no stash, no untracked-but-wanted file, no remote branch holding
+  work that main lacks, and the working tree clean; the deployed page builds from
+  that same commit. (B) RESIDUE HUNT — sweep for further traces of the degraded
+  session beyond the three already found: re-run the mojibake detector over EVERY
+  text file in the repo (not just the board), diff main against the pre-degradation
+  commit fd85464 file-by-file and justify every remaining difference, check for
+  orphaned/never-referenced files added that evening, stale `.claude` state, and any
+  test whose assertions cannot fail (the `expect(true)` class) anywhere in the
+  suite. (C) FEATURE AUDIT SINCE v0.2 — for EVERY feature merged after the v0.2 tag
+  (bafd9b2, 24.07 21:15): 262 orphan adoption, 273 walkable Giza site, 293 benchmark
+  low-preset profiling, 305 LOW sun-shadows-off, 306 closing-completeness guard, 308
+  dashboard-sync guard, 309 model tripwire, 313 dashboard consistency audit — judge
+  the IMPLEMENTATION for plausibility (does it do what its spec claims, at the state
+  a player/operator actually reaches?) and the TESTS for validity (would each test
+  FAIL if the feature were reverted? does it assert the real signal or a proxy?).
+  Use model diversity: a different model than the author reviews. (D) GREEN PROOF —
+  the full LARGE regression on a QUIET machine, both backends, every suite green;
+  build, lint and audit clean; the fast gate green. Any red is either fixed or
+  recorded as a known, justified exception with the user's ruling. (E) COHERENCE —
+  does everything still fit together (user 25.07.2026)? Cross-check, for the whole
+  current state: design.md and CLAUDE.md §7.1 against what the code actually does
+  (every feature merged since v0.2 must be described where the docs describe its
+  system, and no doc may still pin behaviour the code has left behind); the
+  implementations against their tests (every §7.1 "Verifiable" clause names a test
+  that exists and still asserts that clause); the research docs' implementation
+  sections (peoples-1890 §8, climate-1890 §9, graphics-detail-levels) against the
+  code they mirror; the dashboard against TASKS.md (already guarded — confirm the
+  guard covers what the 25.07 audit found by hand); and the memory corpus against
+  the rules actually in force. VERIFIABLE: a written report per section with the
+  commands run and their output; the tick happens only when (D) is genuinely green
+  and (E) reports no unexplained mismatch.
+
+  PROGRESS 25.07 (main session): (A) done — 0 local commits ahead of origin/main,
+  clean tree, no work-bearing remote branch left (13 fully-merged ones deleted on
+  GitHub), the two remaining stashes identified as deliberately parked older work
+  (a dead-session perf-bench edit 23.07, a picture-rejected coast attempt 22.07 —
+  both pre-degradation, left untouched). (B) partly done — a repo-wide sweep of
+  2305 text files found NO double-encoded text outside this guard's own source
+  (a self-reference: the detector flagged the damaged sequences quoted in its own
+  comment; rewritten so it no longer quotes them), and NO assertion-free test: the
+  five candidates the sweep flagged all assert through helper functions
+  (`fired()`, `foliageOf()`, `expectRise()`), i.e. scanner false positives. Still
+  open in (B): the file-by-file diff against fd85464 and the orphaned-file check.
 
 ## Closing (only after all points)
 
