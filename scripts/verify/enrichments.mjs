@@ -4655,14 +4655,26 @@ const crocDrama = async (mode, attempt = 0) =>
       await window.__pollSim(window.__balance.crocodile.gripSeconds + 20, () =>
         croc.lunge === undefined || croc.lunge.retreat === true)
       out.releaseSim = +(window.__wildlife.simTime() - grip0).toFixed(1)
-    } else if (out.gripped && MODE.kind !== 'lunge') {
+    } else if (out.gripped) {
       // Park on the LAND side of the bank (the unit vector water -> bank):
       // a parent parked across the channel got relocated by the water sweep
       // mid-charge and arrived too late in every scenario.
       const lx = bank.x - water.x
       const lz = bank.z - water.z
       const ll2 = Math.hypot(lx, lz) || 1
-      if (MODE.kind === 'toolate') {
+      if (MODE.kind === 'lunge') {
+        // The LUNGE case tests the grip itself, so the parent must not resolve
+        // it either way. Until 25.07.2026 this case was the only staging that
+        // pinned NOTHING — it silently relied on the parent happening to stand
+        // far enough off, and under machine load that assumption flipped: the
+        // parent drove the crocodile off and the check accused the product of a
+        // bug that was not there. Now the distance is ENFORCED (well beyond the
+        // §19.8 charge reach) and the outcome pinned, the way kill, drive-off
+        // and rescue have been pinned since point 177.
+        parent.x = calf.x + (lx / ll2) * 40
+        parent.z = calf.z + (lz / ll2) * 40
+        window.__balance.parentDefense.forceOutcome = 'taken'
+      } else if (MODE.kind === 'toolate') {
         // Too-late needs TIMING, not distance (the lion staging's lesson):
         // wait until the struggle window is nearly spent, then stand the
         // parent just inside the too-late ring (3.2) but too far to cover
@@ -4681,6 +4693,22 @@ const crocDrama = async (mode, attempt = 0) =>
       // while the parentAlive assertion below still verifies the drive-off keeps it
       // alive (no masking). Cleared in the cleanup.
       if (MODE.kind === 'rescue') window.__balance.parentDefense.forceOutcome = 'driveOff'
+      if (MODE.kind === 'lunge') {
+        // Nothing to wait for but the kill: the parent is parked out of reach
+        // and the outcome is pinned, so the grip window simply expires.
+        await window.__pollSim(12, () => calf.dead, 56000)
+        await window.__sleepSim(0.4)
+        out.calfAlive = !calf.dead
+        out.parentAlive = !parent.dead
+        out.crocRetreated = croc.lunge === undefined || croc.lunge.retreat === true
+        out.lionTouched = lion.victim === calf || lion.victim === parent
+        window.__balance.parentDefense.forceOutcome = undefined
+        pf.crocodile = prevPf
+        herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+        herds.crocodile = naturals
+        out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
+        return out
+      }
       await window.__pollSim(25, () => {
         // Rescue (point 249): the calf rises a frame or two BEFORE the crocodile's
         // retreat flag lands, so wait for BOTH the freed calf AND the retreat —
@@ -4696,9 +4724,6 @@ const crocDrama = async (mode, attempt = 0) =>
         return false
       })
       await window.__sleepSim(0.6)
-    } else if (out.gripped) {
-      // No parent interferes: the window expires and the kill sinks.
-      await window.__pollSim(12, () => calf.dead, 56000)
     }
     out.calfAlive = !calf.dead
     out.parentAlive = !parent.dead
