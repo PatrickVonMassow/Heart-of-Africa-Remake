@@ -84,6 +84,10 @@
           {
             "type": "command",
             "command": "node scripts/retro-currency-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/dashboard-sync.mjs"
           }
         ]
       }
