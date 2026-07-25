@@ -326,8 +326,9 @@ verify suite that proves it.
    §4, graphically elaborate with fine-grained land outlines and river
    courses. Region borders carry the localized region name on each side of
    the line in both views (§3.2); map-point labels are discovery-gated
-   (§17.2) EXCEPT the ten port cities, which are known from the start and
-   show their names from the outset (never "?"), a legacy save migrating
+   (§17.2) EXCEPT the known-from-start places of §17.2 — the ten port
+   cities and the Giza monument site (point 273) — which show their names
+   from the outset (never "?"), a legacy save migrating
    to mark them discovered (§3.2/§17.2, point 288); coordinates are read
    out on demand via the position query
    (§3.2, pt. 30), never shown permanently. The exploration map is
@@ -1418,8 +1419,8 @@ verify suite that proves it.
     ports with distance-based fare and duration (Zanzibar reachable);
     discovery bounties credited on the next port visit as a telegraphic
     transfer whose journal entry names the discoveries and the amount (the
-    ten ports are known from the start and earn no bounty for themselves,
-    §17.2/point 288), and
+    known-from-start places of §17.2 — the ten ports and the Giza monument
+    site — earn no bounty for themselves, §17.2/point 288/point 273), and
     kind-flavored first-sighting entries for landmarks (§10, once per
     landmark, both languages, voice markup) — including the eight built
     cultural landmarks of §4.4 (Meroë, Giza, Great Zimbabwe, Lalibela,
@@ -1434,9 +1435,10 @@ verify suite that proves it.
     refusal and auto-raise, the regional bid ordering and rejection, the
     stable re-offer quote (identical price across re-offers, cleared on
     leaving the port), the ferry to Zanzibar (fare, days, checkpoint),
-    the bounty crediting, that a port is discovered from the start and
-    credits no bounty for itself while an ordinary village still discovers
-    and bounties, the graveyard's random ivory haul (range 1..9,
+    the bounty crediting, that the known-from-start set is exactly the ten
+    ports plus the Giza monument site, that such a place is discovered from
+    the start and credits no bounty for itself while an ordinary village
+    still discovers and bounties, the graveyard's random ivory haul (range 1..9,
     mean ~5) and its cap by the remaining supply, digging a treasure
     cache and the statue site, both valuable reactions, the baseline
     goods in every settlement, buying food in a village against gifts
