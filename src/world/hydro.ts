@@ -7,6 +7,7 @@
 import { RIVERS_DATA } from './data/rivers'
 import { RIVER_WIDTH_DEG } from './riverWidth'
 import { LAKES } from './data/lakes'
+import { isSeaMouthCourse, mouthSlackFactor } from './riverMouths'
 
 const DENSIFY_STEP = 0.02 // degrees between generated points
 const BUCKET = 0.5 // degrees per spatial bucket
@@ -15,6 +16,11 @@ const MAX_QUERY = 0.45 // maximum distance the queries need to resolve
 // Flat segment arrays [ax, ay, bx, by, ...] in (lon, lat).
 let riverSegs: Float64Array
 let lakeSegs: Float64Array
+// Per river SEGMENT (one entry per riverSegs quadruple, same order): the
+// point-316 sea-mouth slack factor its flow strength is scaled by — 1 along
+// the free-running course, ramping to 0 over the last MOUTH_SLACK_DEG of a
+// course that ends at the sea.
+let riverSegSlack: Float64Array
 const riverBuckets = new Map<string, number[]>()
 const lakeBuckets = new Map<string, number[]>()
 // Densified closed lake rings for point-in-polygon tests.
@@ -116,10 +122,35 @@ function indexSegments(
   return new Float64Array(segs)
 }
 
+/**
+ * The point-316 slack factor per river segment, in the SAME order
+ * `indexSegments` registers them (paths in order, `path.length - 1` open
+ * segments each) — a river ending at the sea slackens over its last
+ * MOUTH_SLACK_DEG, a river ending at a confluence keeps its pace. Measured as
+ * the along-course distance from the segment's midpoint to the course END, so
+ * the ramp follows the water, not the straight-line distance.
+ */
+function buildRiverSlack(paths: Array<Array<[number, number]>>): Float64Array {
+  const out: number[] = []
+  paths.forEach((path, pi) => {
+    const n = path.length
+    const sea = isSeaMouthCourse(RIVERS_DATA[pi])
+    const toEnd = new Float64Array(n)
+    for (let i = n - 2; i >= 0; i--) {
+      toEnd[i] = toEnd[i + 1] + Math.hypot(path[i + 1][0] - path[i][0], path[i + 1][1] - path[i][1])
+    }
+    for (let i = 0; i < n - 1; i++) {
+      out.push(sea ? mouthSlackFactor((toEnd[i] + toEnd[i + 1]) / 2) : 1)
+    }
+  })
+  return new Float64Array(out)
+}
+
 // Build everything once at module load (pure CPU, ~10 ms).
 {
   const riverPaths = RIVERS_DATA.map((r) => densify(r.points, false))
   riverSegs = indexSegments(riverPaths, false, riverBuckets)
+  riverSegSlack = buildRiverSlack(riverPaths)
   const lakePaths = LAKES.map((l) => densify(l.points, true))
   lakeSegs = indexSegments(lakePaths, true, lakeBuckets)
   lakeRings = lakePaths.map((path) => {
@@ -207,6 +238,9 @@ export function riverFlowExact(
   // Reach past the calibratable channel half-width (point 136): a traveller
   // at the widened bank must still feel the current.
   maxDist = RIVER_WIDTH_DEG + 0.05,
+  // Point 316: the sea-mouth slack. Only the escapability sweep's regression
+  // witness turns it off, to reproduce the funnel that trapped the swimmer.
+  mouthSlack = true,
 ): { dirLat: number; dirLon: number; strength: number } {
   const bx = Math.floor(lon / BUCKET)
   const by = Math.floor(lat / BUCKET)
@@ -231,7 +265,11 @@ export function riverFlowExact(
   const len = Math.hypot(dLon, dLat) || 1
   dLon /= len
   dLat /= len
-  const strength = Math.max(0, 1 - Math.sqrt(best) / maxDist)
+  // The cross-channel fade, times the point-316 sea-mouth slack: the last
+  // reach of a river that empties into the sea runs out of push instead of
+  // funnelling the swimmer into a coast-locked pocket (world/riverMouths.ts).
+  const strength =
+    Math.max(0, 1 - Math.sqrt(best) / maxDist) * (mouthSlack ? riverSegSlack[bestIdx / 4] : 1)
   return { dirLat: dLat, dirLon: dLon, strength }
 }
 

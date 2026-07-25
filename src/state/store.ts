@@ -10,10 +10,11 @@ import { KNOWN_FROM_START_PLACES, PLACES, REGION_VALUES, latLonToWorld, placeByI
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
-import { lakeDistance, riverDistance, riverFlow } from '../world/geoIndex'
+import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
 import { movementPenalty, slideAlongBlocked } from '../systems/movement'
+import { currentDriftDegPerSecond, waterTravelCost } from '../systems/current'
 import {
   LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
   type TreasureId, type TreasureSite,
@@ -639,7 +640,7 @@ export const useGame = create<GameState>()((set, get) => ({
       case 'water':
       // Enclosed sea water (design.md §11) is swum/crossed like inland water.
       case 'ocean':
-        cost = hasCanoe ? tc.water / balance.canoeSpeedup : tc.water
+        cost = waterTravelCost(hasCanoe)
         break
       default: // savanna and the like
         cost = tc.savanna
@@ -809,31 +810,40 @@ export const useGame = create<GameState>()((set, get) => ({
     const ter = sampleTerrain(ll.lat, ll.lon, s.seed)
     // The current only sweeps while the traveller is on the water (design.md §11).
     if (ter.type !== 'water' && ter.type !== 'ocean') return
-    const flow = riverFlow(ll.lat, ll.lon)
-    if (flow.strength <= 0) return
-    // Stronger near the waterfalls (design.md §11/§4.4).
-    let boost = 1
-    for (const wf of WATERFALLS) {
-      const d = Math.hypot(ll.lat - wf.lat, ll.lon - wf.lon)
-      if (d < balance.currentWaterfallRadius) {
-        boost = Math.max(boost, 1 + (balance.currentWaterfallBoost - 1) * (1 - d / balance.currentWaterfallRadius))
-      }
-    }
     // Without a canoe the traveller is far more at the current's mercy; a canoe
-    // rides it under control (design.md §11).
+    // rides it under control (design.md §11). One shared formula with the
+    // sea-mouth escapability sweep (systems/current.ts, point 316).
     const hasCanoe = (s.equipment.canoe ?? 0) > 0
-    const susceptibility = hasCanoe ? 0.5 : 1.6
-    const stepDeg = flow.strength * balance.currentDrift * boost * susceptibility * Math.min(dt, 0.1)
-    const nlat = ll.lat + flow.dirLat * stepDeg
-    const nlon = ll.lon + flow.dirLon * stepDeg
-    const nt = sampleTerrain(nlat, nlon, s.seed)
-    if (isBlocked(nt.type, nlat, nlon)) return // do not sweep into blocked open ocean
+    const drift = currentDriftDegPerSecond(ll.lat, ll.lon, hasCanoe)
+    if (drift.lat === 0 && drift.lon === 0) return
+    const step = Math.min(dt, 0.1)
+    let nlat = ll.lat + drift.lat * step
+    let nlon = ll.lon + drift.lon * step
+    let nt = sampleTerrain(nlat, nlon, s.seed)
+    if (isBlocked(nt.type, nlat, nlon)) {
+      // The current never sweeps INTO blocked open ocean — but it must not stop
+      // dead against it either (point 316): a drift pinned head-on at the coast
+      // used to freeze while the traveller stood in a mouth pocket. The same
+      // resolve the overland move uses lets it run ALONG the boundary instead,
+      // and only a genuinely enclosed direction fan cancels the drift outright.
+      const from = latLonToWorld(ll.lat, ll.lon)
+      const to = latLonToWorld(nlat, nlon)
+      const slid = slideAlongBlocked(from.x, from.z, to.x - from.x, to.z - from.z, (px, pz) => {
+        const p = worldToLatLon(px, pz)
+        return isBlocked(sampleTerrain(p.lat, p.lon, s.seed).type, p.lat, p.lon)
+      })
+      if (!slid) return
+      const ln = worldToLatLon(slid.x, slid.z)
+      nlat = ln.lat
+      nlon = ln.lon
+      nt = sampleTerrain(nlat, nlon, s.seed)
+    }
     const nw = latLonToWorld(nlat, nlon)
     // Being swept covers ground, so time and provisions advance too (design.md
     // §11): otherwise the current would move the traveller for free. The cost
     // matches water travel over the drifted distance.
     const driftDist = Math.hypot(nw.x - s.pos.x, nw.z - s.pos.z)
-    const cost = hasCanoe ? balance.terrainCost.water / balance.canoeSpeedup : balance.terrainCost.water
+    const cost = waterTravelCost(hasCanoe)
     const dayDelta = driftDist * balance.daysPerUnit * cost
     const newDay = clampDay(s.day + dayDelta, START_YEAR)
     set({
