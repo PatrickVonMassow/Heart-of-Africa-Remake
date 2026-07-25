@@ -20,7 +20,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { computeFingerprint, evaluateCurrency } from './retro-core.mjs'
-import { collectSources, DOC_PATH, REPO_ROOT } from './retro-sources.mjs'
+import { collectSources, DOC_PATH, GUIDE_PATH, REPO_ROOT } from './retro-sources.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
@@ -38,6 +38,8 @@ try {
 
   const verdict = evaluateCurrency({
     docText: readFileSync(DOC_PATH, 'utf8'),
+    // Guide absent (worktree, other machine) → undefined, which skips its half.
+    guideText: existsSync(GUIDE_PATH) ? readFileSync(GUIDE_PATH, 'utf8') : undefined,
     currentFingerprint: computeFingerprint(collectSources()),
   })
   if (verdict) process.stdout.write(JSON.stringify(verdict) + '\n')

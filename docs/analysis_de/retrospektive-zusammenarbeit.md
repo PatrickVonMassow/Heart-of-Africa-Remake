@@ -186,6 +186,14 @@ Nach der Degradation hielt ich das Aufräumen für erledigt — der Nutzer fand 
 
 Ein Kohärenz-Audit fand acht Stellen, an denen die Dokumente etwas anderes behaupten als der Code tut; eine Forensik über die gesamte Projekthistorie fand elf weitere, die älteste vom **ersten Projekttag**. Das Muster ist exakt messbar. Von den vier Features nach dem v0.2-Tag aktualisierte eines *nur* das eine Dokument, für das ein Sync-Test existiert — und ließ drei ungeschützte Stellen falsch stehen; ein anderes beschrieb seine Neuerung korrekt, ließ aber die fünf älteren Stellen unberührt, die dasselbe Faktum nun falsch angeben (design.md widerspricht dadurch sich selbst). **Die Ursache ist nicht Nachlässigkeit, sondern Redundanz plus fehlender Mechanismus:** Wer schreibt, aktualisiert die Stelle, an der er gerade ist; jede Kopie desselben Fakts anderswo veraltet unbemerkt. Zwei Verschärfungen kamen aus der Forensik: Ein **Dokumenten-Audit ohne Code-Abgleich macht die Drift schlimmer** — ein solcher Lauf schrieb eine knappe richtige Zeile in eine ausführliche falsche um; und **Dokumente werden gegen die Arbeitsauftrags-Spezifikation geschrieben statt gegen den ausgelieferten Code** — ein in der Doku zitierter Bezeichner existierte in keinem einzigen Commit. Konsequenz nach §3.16: ein einziger verbindlicher Ort je Faktum (die übrigen verweisen darauf), eine Prüfung, die die verbleibenden Angaben gegen den *besitzenden Code* hält, und ein Detektor gegen neu entstehende Dopplungen; die Aufzählungslisten (Debug-Werte, Umschalter, Sprungziele, Dorf-Koordinaten) stehen dabei ganz vorn — sie allein hätten sechs der elf Alt-Drifts gefunden. Übertragbar: **Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man.**
 
+### 3.22 Der rote Test, der den Unschuldigen anklagt (25.07.)
+
+Eine Prüfung meldete zuverlässig, der Tierruf klinge beim Weggehen nicht ab — reproduzierbar, mit stabilen Zahlen, über Tage. Der Fehler lag in der **Prüfung**: Sie setzte ihr Testtier mit einer Markierung ins Bild und wollte es später an dieser Markierung wieder entfernen; das Nachlade-System (aus einem *anderen*, korrekten Fix) schreibt solche Markierungen aber binnen eines Bildes um. Das Tier blieb also stehen und rief völlig zu Recht weiter. Der eigentliche Schaden entstand danach: Die degradierte Nachtsitzung glaubte der Anklage und baute **gesunden Audio-Code** um — ein Placebo-Fix mit Attrappen-Tests, der später zurückgenommen werden musste. Die Klasse ist tückischer als der bekannte „grüner Test, falsches Bild" (§3.5), weil ein *rotes* Ergebnis Dringlichkeit erzeugt und zum schnellen Eingriff verleitet. Zwei Konsequenzen: **Erstens** gehört vor jeden Fix die Frage, ob der Befund das Produkt oder die Messung belastet — bei der Reparatur wurde das durch ein Experiment entschieden (Entfernung per Markierung *und* per Objektidentität im selben Lauf verglichen), nicht durch Plausibilität. **Zweitens** kann ein Test, dessen Annahme über die Umgebung veraltet, ohne eigenes Zutun kippen: Die Prüfung war jahrelang richtig und wurde es durch eine fremde, korrekte Änderung nicht mehr. Genau das automatisiert der eingereihte Punkt zur Rot-Klassifikation (echter Regress vs. veraltete Annahme). Übertragbar: **Ein roter Test ist eine Hypothese über das Produkt, kein Urteil.**
+
+### 3.23 Zweige verfallen — und zwar schnell (25.07.)
+
+Ein Feature-Zweig vom Vortag stand nach 24 Stunden **219 Commits** hinter dem Hauptzweig; seine drei Dateien hatten sich unterdessen über 16, 9 und 1 Commits weiterentwickelt. Damit war er faktisch unmergebar: Das Zusammenführen hätte jede Wildlife-Korrektur der letzten zwei Tage bekämpft — für einen Hebel, der neu gebaut billiger ist als versöhnt. Ich habe ihn stillgelegt und nur die *Idee* in den passenden offenen Punkt übernommen. Dieselbe Erfahrung machte parallel ein Agent, dessen Zweig binnen einer Stunde elf Commits zurückfiel und der einen fremden Fix als eigenen Fehlschlag zu sehen bekam. Bei hoher Merge-Frequenz ist die Halbwertszeit eines Zweigs also *Stunden*, nicht Tage. Die Projektregel „halte Zweige kurz" ist damit keine Stilfrage: Ein Zweig, der eine Nacht liegen bleibt, ist Wegwerfarbeit. Praktisch heißt das: vor der Endverifikation immer den Hauptzweig hereinholen und auf dem synchronisierten Stand prüfen — sonst verifiziert man etwas, das so nie landen wird.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -298,7 +306,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 10:12 · Quellen-Fingerprint: `02d1f84015fd…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 10:35 · Quellen-Fingerprint: `02d1f84015fd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -372,5 +380,5 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
 <!-- RETRO-FINGERPRINT: 02d1f84015fd25797c431b3918f500387c2697594850cfd240642e9bbfc4ff6a -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T08:12:22.160Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T08:35:41.177Z -->
 <!-- AUTO-GENERATED:END -->

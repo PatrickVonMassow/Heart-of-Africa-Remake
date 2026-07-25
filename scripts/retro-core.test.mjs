@@ -274,6 +274,39 @@ describe('evaluateCurrency (the guard decision)', () => {
     expect(verdict).toMatchObject({ decision: 'block' })
     expect(verdict.reason).toContain('no sources fingerprint')
   })
+
+  // The beginner guide is prose only — nothing regenerates it, so its currency
+  // rests on an explicit review stamp. Regression witness (25.07.2026): it kept
+  // teaching a superseded rule for a day while the retrospective was current.
+  const guide = (f) => `Anleitung.\n<!-- GUIDE-FINGERPRINT: ${f} -->\n`
+
+  it('allows when BOTH docs carry the current fingerprint', () => {
+    expect(evaluateCurrency({ docText: doc(fp), guideText: guide(fp), currentFingerprint: fp })).toBeNull()
+  })
+  it('blocks when the retrospective is current but the guide was not reviewed', () => {
+    const stale = computeFingerprint({ guards: ['old.mjs'] })
+    const verdict = evaluateCurrency({ docText: doc(fp), guideText: guide(stale), currentFingerprint: fp })
+    expect(verdict).toMatchObject({ decision: 'block' })
+    expect(verdict.reason).toContain('vibe-coding-anleitung.md')
+    expect(verdict.reason).toContain('--guide-reviewed')
+  })
+  it('blocks when the guide carries no review stamp at all', () => {
+    const verdict = evaluateCurrency({ docText: doc(fp), guideText: 'Anleitung ohne Stempel.', currentFingerprint: fp })
+    expect(verdict).toMatchObject({ decision: 'block' })
+    expect(verdict.reason).toContain('no review stamp')
+  })
+  it('reports the RETROSPECTIVE first — a guide stamp is meaningless while the sources are unreflected', () => {
+    const other = computeFingerprint({ guards: ['a-guard.mjs', 'b-guard.mjs'] })
+    const verdict = evaluateCurrency({ docText: doc(fp), guideText: guide(other), currentFingerprint: other })
+    expect(verdict.reason).toContain('retrospektive-zusammenarbeit.md')
+  })
+  it('skips the guide half when the guide is absent on this machine', () => {
+    expect(evaluateCurrency({ docText: doc(fp), currentFingerprint: fp })).toBeNull()
+  })
+  it('never throws on malformed input (the wrapper fail-open depends on it)', () => {
+    expect(() => evaluateCurrency()).not.toThrow()
+    expect(() => evaluateCurrency({ docText: 42, guideText: {}, currentFingerprint: null })).not.toThrow()
+  })
 })
 
 describe('collectSources / collectMemories (fs-level, temp fixtures)', () => {

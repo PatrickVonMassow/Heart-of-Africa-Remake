@@ -12,7 +12,15 @@ sondern **Prompts, die du Claude gibst**, und die Fallstricke, die dich sonst ei
 Problem nur „gemerkt" wurde, kam es wieder. Sobald ein **Mechanismus** dastand (ein
 automatischer Check, ein Hook, ein Test), verschwand es. Merksatz:
 
-> *Was zweimal schiefgeht, bekommt einen Mechanismus — nicht ein drittes Versprechen.*
+> *Jede Regel, die wirklich gelten soll, bekommt von Anfang an einen erzwingenden
+> Mechanismus — nicht ein Versprechen.*
+
+Diese Fassung ist eine **Verschärfung**: Ursprünglich lautete der Satz „Was zweimal
+schiefgeht, bekommt einen Mechanismus". Das erwies sich als zu schwach — es lässt
+jeden Fehler einmal geschehen und verlässt sich bis dahin auf Vorsätze, die
+nachweislich nicht halten. Der Aufwand des Mechanismus richtet sich nach der
+Wichtigkeit der Regel (ein leichter Check für eine leichte Regel), aber die
+Grundhaltung ist **erzwingen statt erinnern**, ab der ersten Formulierung.
 
 Fast alles Folgende ist eine Anwendung davon.
 
@@ -250,9 +258,11 @@ Zwei Regeln, die das Netz ehrlich halten:
 > „Lies `design.md` als einzige Wahrheit und leg ein `TASKS.md` an. Richte die zwei
 > Testschichten ein. Nach jeder Änderung: Build/Lint/Audit sauber, ein Test auf der
 > passenden Schicht, ein atomarer Commit. Beurteile Sichtbares am Screenshot. Wenn dir
-> derselbe Fehler zweimal passiert, bau einen automatischen Check dagegen. Bei Kritischem
+> wir eine Regel festlegen, bau sofort den Check, der sie erzwingt. Bei Kritischem
 > hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das Zielbild unklar ist — rate
 > nicht."
 
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
+
+<!-- GUIDE-FINGERPRINT: 02d1f84015fd25797c431b3918f500387c2697594850cfd240642e9bbfc4ff6a -->

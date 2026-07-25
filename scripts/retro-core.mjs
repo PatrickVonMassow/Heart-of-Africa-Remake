@@ -28,6 +28,19 @@ export const AUTO_START = '<!-- AUTO-GENERATED:START -->'
 export const AUTO_END = '<!-- AUTO-GENERATED:END -->'
 export const FINGERPRINT_RE = /<!-- RETRO-FINGERPRINT: ([0-9a-f]{64}) -->/
 
+// The BEGINNER GUIDE (vibe-coding-anleitung.md) is derived from the same
+// sources but has no auto-generated section — it is prose all the way down, so
+// nothing can regenerate it. Until 25.07.2026 the guard only NAMED it in its
+// message and checked the retrospective, which let a superseded rule survive
+// there for a day after the retrospective had been sharpened (the user found
+// it: the guide still taught "what goes wrong twice gets a mechanism" after
+// that rule had been replaced by "every rule gets one from the start"). The
+// guide now carries its OWN fingerprint stamp, set only by an explicit
+// `retro-refresh.mjs --guide-reviewed` — a deliberate human/agent attestation
+// that the guide was read against the changed sources, never an automatic
+// side effect of the refresh.
+export const GUIDE_FINGERPRINT_RE = /<!-- GUIDE-FINGERPRINT: ([0-9a-f]{64}) -->/
+
 // ---------------------------------------------------------------------------
 // Source classification (pure helpers over raw file contents / listings).
 
@@ -295,28 +308,57 @@ export function refreshedDoc(existingDocText, sources, { refreshedStamp = '', re
 // ---------------------------------------------------------------------------
 // Guard decision.
 
+/** The guide's review stamp (see GUIDE_FINGERPRINT_RE), or null. */
+export function extractGuideFingerprint(text) {
+  if (typeof text !== 'string') return null
+  const m = text.match(GUIDE_FINGERPRINT_RE)
+  return m ? m[1] : null
+}
+
 /**
- * Stale/fresh verdict for the Stop-hook: null (allow) when the doc's recorded
- * fingerprint equals the current one, else {decision:'block', reason}. A doc
- * WITHOUT a recorded fingerprint is stale by definition (it was never
- * refreshed under this mechanism). The doc-absent and paused no-ops are the
- * wrapper's job — this core only judges an existing doc.
+ * Stale/fresh verdict for the Stop-hook: null (allow) when BOTH analysis docs
+ * are current for the given sources fingerprint, else {decision:'block',
+ * reason}. A doc WITHOUT its stamp is stale by definition (never brought under
+ * the mechanism). The retrospective is judged first — the guide's stamp means
+ * "I read the guide against these sources", which only means anything once the
+ * retrospective actually reflects them. `guideText` undefined (guide absent on
+ * this machine) skips the guide half; the doc-absent and paused no-ops are the
+ * wrapper's job.
  */
-export function evaluateCurrency({ docText, currentFingerprint } = {}) {
+export function evaluateCurrency({ docText, guideText, currentFingerprint } = {}) {
   const recorded = extractFingerprint(docText)
-  if (recorded && recorded === currentFingerprint) return null
-  const detail = recorded
-    ? 'the durable sources (feedback/project memories, guard scripts, revert trail, process TASKS points) changed since its last refresh'
-    : 'it carries no sources fingerprint yet (never refreshed under the currency mechanism)'
-  return {
-    decision: 'block',
-    reason:
-      `Retrospective currency: docs/analysis_de/retrospektive-zusammenarbeit.md is STALE — ${detail}. ` +
-      'Run `node scripts/retro-refresh.mjs` (regenerates only the marker-delimited auto section), ' +
-      'then REVIEW the document: does a NEW problem class need its own row in the summary table ' +
-      'plus a prose paragraph (German, in the analysis sections)? The prose is never auto-written — ' +
-      'extend it yourself where the new source warrants it. THEN, since it is derived from the same ' +
-      'sources, review docs/analysis_de/vibe-coding-anleitung.md too: does the new lesson belong in ' +
-      'that beginner guide (a pitfall + its prompt)? Keep both analysis docs current, then end the turn.',
+  if (!recorded || recorded !== currentFingerprint) {
+    const detail = recorded
+      ? 'the durable sources (feedback/project memories, guard scripts, revert trail, process TASKS points) changed since its last refresh'
+      : 'it carries no sources fingerprint yet (never refreshed under the currency mechanism)'
+    return {
+      decision: 'block',
+      reason:
+        `Retrospective currency: docs/analysis_de/retrospektive-zusammenarbeit.md is STALE — ${detail}. ` +
+        'Run `node scripts/retro-refresh.mjs` (regenerates only the marker-delimited auto section), ' +
+        'then REVIEW the document: does a NEW problem class need its own row in the summary table ' +
+        'plus a prose paragraph (German, in the analysis sections)? The prose is never auto-written — ' +
+        'extend it yourself where the new source warrants it.',
+    }
   }
+
+  if (typeof guideText === 'string') {
+    const guideRecorded = extractGuideFingerprint(guideText)
+    if (!guideRecorded || guideRecorded !== currentFingerprint) {
+      return {
+        decision: 'block',
+        reason:
+          'Beginner-guide currency: docs/analysis_de/vibe-coding-anleitung.md has NOT been reviewed ' +
+          'against the changed sources' +
+          (guideRecorded ? '' : ' (it carries no review stamp yet)') +
+          '. It is prose only — nothing regenerates it, so it silently keeps superseded advice ' +
+          '(observed 25.07.2026: it still taught the old "what goes wrong twice gets a mechanism" ' +
+          'rule a day after that rule had been sharpened in the retrospective, and the user found it). ' +
+          'READ it against the new lesson: does it need a new pitfall + prompt, and does any existing ' +
+          'line now contradict the retrospective? Fix what is stale, then attest: ' +
+          'node scripts/retro-refresh.mjs --guide-reviewed.',
+      }
+    }
+  }
+  return null
 }

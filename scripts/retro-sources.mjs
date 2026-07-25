@@ -39,6 +39,11 @@ export const REPO_ROOT = (() => {
 export const DOC_PATH =
   process.env.RETRO_DOC_PATH || resolve(REPO_ROOT, 'docs', 'analysis_de', 'retrospektive-zusammenarbeit.md')
 
+/** The beginner guide, derived from the same sources but pure prose — kept
+ *  current by an explicit review attestation rather than regeneration. */
+export const GUIDE_PATH =
+  process.env.RETRO_GUIDE_PATH || resolve(REPO_ROOT, 'docs', 'analysis_de', 'vibe-coding-anleitung.md')
+
 /**
  * The project memory dir under ~/.claude/projects/<munged repo path>/memory.
  * The munging mirrors the harness: every ':' '\' '/' becomes '-', the drive
