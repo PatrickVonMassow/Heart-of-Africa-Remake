@@ -190,6 +190,33 @@ check('standing on the marker does not auto-enter (Space required)', (await stat
 await page.waitForFunction(() => (window.__ui.getState().prompt ?? '').includes('Kairo'), null, { timeout: 5000 })
 const cairoPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
 check('discovered port enter hint names it (no "?")', cairoPrompt.includes('Kairo') && !cairoPrompt.includes('?'))
+// Point 317: the enter hint sits a little BELOW the screen centre — close to
+// the action, but clear of the centre so it never covers the traveller — and
+// still clear of the status bar and the inventory bar. Measured on the RENDERED
+// boxes, not on the CSS rule.
+const hintBox = await page.evaluate(() => {
+  const r = (sel) => {
+    const el = document.querySelector(sel)
+    if (!el) return null
+    const b = el.getBoundingClientRect()
+    return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }
+  }
+  return { hint: r('.prompt'), bar: r('.status-bar'), inv: r('.inventory-bar'), vh: window.innerHeight }
+})
+const overlaps = (a, b) =>
+  a !== null && b !== null && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+const hintFrac = hintBox.hint ? (hintBox.hint.top + hintBox.hint.bottom) / 2 / hintBox.vh : -1
+check(
+  'enter hint sits just below the screen centre (55-65 % of the viewport height)',
+  hintFrac >= 0.55 && hintFrac <= 0.65,
+  `${(hintFrac * 100).toFixed(1)} %`,
+)
+check(
+  'enter hint clears the status bar and the inventory bar',
+  hintBox.hint !== null && !overlaps(hintBox.hint, hintBox.bar) && !overlaps(hintBox.hint, hintBox.inv),
+  JSON.stringify(hintBox),
+)
+await shot('140-enter-hint-position')
 // Re-anchor on the marker immediately before the press: the river current's idle
 // drift (design.md §11) sweeps the traveller a little every frame, and Cairo sits
 // on the Nile, so over the wait above it could drift off the marker or onto a
