@@ -53,6 +53,19 @@ LARGE run plans WebGL 2 → WebGPU while a pinned `VERIFY_GL` / SMALL / a bare s
 filter stays single-backend). Change the map in `tiers.mjs` and this README
 together — never only in the runner.
 
+`scripts/verify/textureLeak.mjs` is the second such pure module: the verdict and
+the per-kind survivor breakdown of the TRAA-toggle render-target gate in
+`settings.mjs`, pinned by `scripts/verify/textureLeak.test.mjs`. Its lesson is
+worth generalising (point 334): **a browser reading is only evidence at a steady
+state.** The gate compared two raw `renderer.info.memory.textures` samples taken
+600 ms after a toggle — but a rebuilt post pipeline allocates its render targets
+only on the next RENDERED frame, and a headless page nothing forces to paint
+falls to zero rAF ticks for seconds (36 frames per 600 ms while screenshots
+flow, 0-2 once they stop). Sampling that dip as the baseline made a fully
+disposed-and-rebuilt pipeline look like a +14 leak on WebGPU only. Any check
+that samples a lazily allocated resource must force a frame and poll until the
+reading repeats.
+
 ## Adding tests for a new feature (do this every time)
 
 Every new feature must get a test on **one or both** layers — pick by what the
