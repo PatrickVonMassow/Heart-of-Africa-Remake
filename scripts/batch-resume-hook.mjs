@@ -135,11 +135,12 @@ try {
     // forbidden commit.
     const header =
       `[batch-resume] TASKS.md has ${open.length} open point(s): ${nums}. ` +
-      'MODEL POLICY (allowlist): ONLY Opus 5 (default), Opus 4.8 (fallback) or Fable 5 ' +
-      '(occasional four-eyes work) may run the batch — Sonnet, Haiku and every other model ' +
-      'are NOT acceptable. If the serving model is not on that list, do NOT work: create ' +
-      '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via ' +
-      'scripts/notify.mjs instead.'
+      'MODEL POLICY (25.07.2026): Opus 5 is the WORKER at any difficulty; the fallback chain ' +
+      'is Opus 5 -> Fable 5 -> Opus 4.8. Fable is used ONLY for four-eyes review (one model ' +
+      'plans/builds, the other checks) or as that fallback — never because a task looks hard. ' +
+      'Sonnet, Haiku and every other model are NOT acceptable: if the serving model is not one ' +
+      'of the three, do NOT work — create .claude/batch-paused (reason: forbidden serving ' +
+      'model) and send an ntfy alert via scripts/notify.mjs instead.'
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()

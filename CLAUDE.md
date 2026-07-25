@@ -240,7 +240,7 @@ old→new coverage map live in `scripts/verify/README.md`.
 - **Maximal delegation (user decision 22.07.2026, permanent process).** The
   main session delegates the MAXIMUM to subagents so as little as possible
   bottlenecks at it. Each open TASKS point is implemented by a
-  WORKTREE-ISOLATED Fable subagent on its own `feat/<point>-<slug>` branch
+  WORKTREE-ISOLATED subagent on its own `feat/<point>-<slug>` branch
   (gates green, branch pushed, NOT merged by the agent — the main session
   merges); a POOL of such agents runs in PARALLEL on NON-OVERLAPPING files.
   Infra, guard, doc and dashboard-restructure work is delegated the same
@@ -248,12 +248,17 @@ old→new coverage map live in `scripts/verify/README.md`.
   the picture-verification on BOTH backends, the serial
   merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
-- **Model allowlist (user decision 25.07.2026, point 309).** ONLY Opus 5
-  (the default), Opus 4.8 (the fallback when Opus 5 is unavailable) and
-  Fable 5 (occasional four-eyes/audit work) may author work on this
-  project — Sonnet and Haiku are NOT acceptable, and a session silently
-  degraded to one is a capability breach: the batch STOPS rather than runs
-  on it. Every commit records its author model in the `Co-Authored-By`
+- **Model policy (user decision 25.07.2026, points 309 + the role revision).**
+  ONLY three models may author work on this project, each with its own role:
+  **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
+  four-eyes principle (one model plans and/or builds, the other reviews) or as
+  the first fallback; **Opus 4.8** is the last fallback. The fallback chain is
+  Opus 5 → Fable 5 → Opus 4.8, and `scripts/batch-autostart.mjs` launches
+  accordingly. DIFFICULTY IS NOT A REASON to hand work to Fable — since version 5
+  Opus is equally capable there, and a second model's value lies in its different
+  blind spots, which only a REVIEW realises. Sonnet and Haiku are NOT acceptable,
+  and a session silently degraded to one is a capability breach: the batch STOPS
+  rather than runs on it. Every commit records its author model in the `Co-Authored-By`
   trailer, so the rule is machine-checkable; `scripts/model-guard-core.mjs`
   holds the allowlist (`ALLOWED`) and the Stop hook
   `scripts/model-guard.mjs` blocks the turn end on any commit after its
