@@ -204,6 +204,18 @@ Der Nutzer änderte die Modell-Rollen: Das Zweitmodell wird nicht mehr für *sch
 
 Ein Feature-Zweig vom Vortag stand nach 24 Stunden **219 Commits** hinter dem Hauptzweig; seine drei Dateien hatten sich unterdessen über 16, 9 und 1 Commits weiterentwickelt. Damit war er faktisch unmergebar: Das Zusammenführen hätte jede Wildlife-Korrektur der letzten zwei Tage bekämpft — für einen Hebel, der neu gebaut billiger ist als versöhnt. Ich habe ihn stillgelegt und nur die *Idee* in den passenden offenen Punkt übernommen. Dieselbe Erfahrung machte parallel ein Agent, dessen Zweig binnen einer Stunde elf Commits zurückfiel und der einen fremden Fix als eigenen Fehlschlag zu sehen bekam. Bei hoher Merge-Frequenz ist die Halbwertszeit eines Zweigs also *Stunden*, nicht Tage. Die Projektregel „halte Zweige kurz" ist damit keine Stilfrage: Ein Zweig, der eine Nacht liegen bleibt, ist Wegwerfarbeit. Praktisch heißt das: vor der Endverifikation immer den Hauptzweig hereinholen und auf dem synchronisierten Stand prüfen — sonst verifiziert man etwas, das so nie landen wird.
 
+### 3.24 Der Regelbestand verrottet wie Code — nur unbemerkt (25.07.)
+
+Ein Vier-Augen-Audit über **alle 88 Regeln** und **25 Wächter** förderte zutage, was Wochen des Anbauens angerichtet hatten: zehn echte Widersprüche, sechs Redundanz-Cluster (das Release-Verfahren steht viermal, die Modell-Regel sechsmal, die Dashboard-Struktur dreimal), mehrere Regeln, die eine Durchsetzung *behaupten*, die nie gebaut wurde, und ein knappes Dutzend Einträge, die einen Zustand von vor zwei Wochen beschreiben. Vier Erkenntnisse, die über dieses Projekt hinausreichen:
+
+**(1) Der Bestand altert wie Code, aber ohne Compiler.** Eine veraltete Funktion fällt beim Bauen auf; eine veraltete Regel schweigt und wird trotzdem befolgt. Kein einziger der 88 Einträge war je Gegenstand einer Durchsicht — es gab nur Anbauten. Ein Regelkorpus braucht periodisches Aufräumen so nötig wie eine Codebasis, und dieselbe Sorgfalt: zusammenführen, verweisen, zurückziehen statt löschen.
+
+**(2) Die gefährlichsten Widersprüche stehen INNERHALB einer Datei.** Die Sitzungsstart-Anweisung sagt in Zeile 104, Arbeit sei an Fable-Agenten zu delegieren, und in Zeile 139, Fable sei ausschließlich fürs Vier-Augen-Prinzip da. Ein Memory meldet „behoben am 24.07." und im nächsten Absatz „Fix in Arbeit". Solche Selbstwidersprüche entstehen, weil man den *Anbau* schreibt und die bestehende Datei nicht mehr liest — und sie sind schlimmer als zwei widersprüchliche Dateien, weil niemand denselben Text zweimal prüft.
+
+**(3) Der lauteste Kanal lehrt den größten Fehler.** Die Erinnerung, die bei *jedem* Nutzer-Prompt eingespielt wird, transportierte zwei ausdrücklich zurückgezogene Regeln (nur eine Arbeits-Karte; die aktuelle Karte automatisch geöffnet) — während der zuständige Wächter längst das Gegenteil erzwang. Ein Fehler in einem Hinweis, der hundertmal am Tag erscheint, richtet mehr an als zehn falsche Zeilen in einem selten gelesenen Dokument. **Je höher die Frequenz eines Kanals, desto strenger muss seine Aktualität geprüft werden** — idealerweise generiert man solche Texte aus derselben Quelle, die der Wächter prüft.
+
+**(4) Halbtote Mechanismen sind gefährlicher als fehlende.** Der Wächter für die Wartezeit-Vorarbeit wird nur von Bash-Aufrufen scharfgeschaltet — die Hauptshell dieses Projekts ist PowerShell. Er *existiert*, also gilt die Regel als abgesichert; er *feuert* aber bei der häufigsten Arbeitsweise nie. Dieselbe Klasse: ein Wächter, der bei jedem Zugende blockiert, erzieht zum Überlesen. **Ein Wächter, der nie auslöst, und einer, der immer auslöst, sind beide kaputt** — die Gesundheit eines Mechanismus ist eine eigene Prüfgröße, nicht seine bloße Existenz.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -316,7 +328,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 18:42 · Quellen-Fingerprint: `cf22cafd6703…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 19:09 · Quellen-Fingerprint: `4c91b20320c5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -329,7 +341,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 4 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Autonomer TASKS.md-Batch: Stand 16.07.2026 22:45 — 151 (Saisonfeld) als WIP gepusht (2055350), Wiederaufnahme an der TASKS-151-WIP-Note; Reihenfolge 151→152→156→123→149→150→121…→153-157 | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs, timestamp-posttool-hook.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -371,7 +383,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The v0.1/poc release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-spec-guard.mjs, timestamp-guard.mjs, timestamp-posttool-hook.mjs | ✔ Mechanismus |
+| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -387,8 +399,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 24 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: cf22cafd6703d46cec626a6ee456c8e245bf55505a073c2509e5e53aa5c882b5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T16:42:03.640Z -->
+<!-- RETRO-FINGERPRINT: 4c91b20320c503fbd7f9bfbe770e1fff2cd62fdf30b2797df22c9d803b99d078 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T17:09:39.641Z -->
 <!-- AUTO-GENERATED:END -->

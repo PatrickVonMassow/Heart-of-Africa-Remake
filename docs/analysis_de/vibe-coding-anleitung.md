@@ -193,6 +193,29 @@ Zwei Regeln, die das Netz ehrlich halten:
   Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
   mein aktueller Stand wirklich oben angekommen ist."
 
+- **Deine Regelsammlung verrottet — nur merkt es niemand.** Regeln wachsen an,
+  werden aber nie durchgesehen. Nach einigen Wochen fand ein Audit über 88 Regeln
+  zehn Widersprüche, sechs Doppelungen und mehrere Regeln, die eine Absicherung
+  *behaupteten*, die nie gebaut wurde. Am schlimmsten: Widersprüche **innerhalb
+  einer Datei** (weil man den Anbau schreibt, ohne den Bestand zu lesen) und
+  falsche Inhalte im Kanal mit der **höchsten Frequenz** — eine Erinnerung, die
+  bei jedem Prompt erscheint, lehrte zwei längst zurückgezogene Regeln.
+  → *Prompt:* „Sieh den ganzen Regelbestand periodisch durch — nicht nur auf
+  Lücken, sondern auf Sauberkeit, Aktualität, Dopplung, Widerspruch,
+  **Wirkungslosigkeit** und Veralterung. Prüfe jede Regel gegen den Code, nicht
+  gegen die Nachbarregel. Und prüfe zuerst die Texte, die am häufigsten
+  eingeblendet werden."
+
+- **Ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst.**
+  Ein Prüfmechanismus kann existieren und trotzdem wirkungslos sein — etwa weil er
+  nur bei einer Shell anspringt, die man kaum benutzt. Dann *gilt* die Regel als
+  abgesichert, ohne es zu sein. Umgekehrt erzieht ein Wächter, der bei jedem
+  Arbeitsschritt blockiert, zum Überlesen.
+  → *Prompt:* „Prüfe deine Schutzmechanismen selbst mit: Hat jeder je ausgelöst?
+  Kann er überhaupt auslösen? Doppelt er einen anderen? Ist seine Meldung
+  umsetzbar? Und in welcher Reihenfolge melden sie sich — die brauchbarste
+  Meldung muss zuerst kommen."
+
 - **Der rote Test klagt den Falschen an.** Ein *grüner* Test kann täuschen — ein
   *roter* aber auch, und der ist gefährlicher, weil er Dringlichkeit erzeugt: An
   einem einzigen Tag klagten drei rote Prüfungen das Programm an, und alle drei
@@ -278,4 +301,4 @@ Zwei Regeln, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: cf22cafd6703d46cec626a6ee456c8e245bf55505a073c2509e5e53aa5c882b5 -->
+<!-- GUIDE-FINGERPRINT: 4c91b20320c503fbd7f9bfbe770e1fff2cd62fdf30b2797df22c9d803b99d078 -->

@@ -85,8 +85,10 @@ console.log(
   'festgelegt (18.07.2026) und darf NIE ohne ausdrückliche Freigabe geändert werden — ' +
   'keine neuen Sektionen, keine Features entfernen, keine Infos in fremde Sektionen. ' +
   'Genau VIER Sektionen in dieser Reihenfolge, jeder Eintrag eine ein-/ausklappbare ' +
-  'Karte (nur die aktuelle-Arbeit-Karte offen): ' +
-  '(1) »Woran ich gerade arbeite« — eine Karte, eingeklappt Titel + Startzeit + ' +
+  'Karte — ALLE eingeklappt, NIE ein `open`-Attribut (Nutzer-Mandat 23.07.2026; ' +
+  'das Skript im Board merkt sich, was der LESER geöffnet hat): ' +
+  '(1) »Woran ich gerade arbeite« — EINE KARTE JE PARALLEL BEARBEITETEM PUNKT ' +
+  '(Nutzer-Entscheidung 22.07.2026), eingeklappt Titel + Startzeit + ' +
   'voraussichtliche Endzeit, ausgeklappt Status/Details; KEIN »gerade fertig«, ' +
   '»als nächstes«, »diese Nacht fertig«. Die Karte muss IMMER zeigen, was du ' +
   'GERADE tust — auch Wartezeit-Vorarbeit (welche Folge-Punkte du gerade ' +

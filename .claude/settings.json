@@ -132,6 +132,15 @@
         ]
       },
       {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/prep-arm-hook.mjs"
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {
