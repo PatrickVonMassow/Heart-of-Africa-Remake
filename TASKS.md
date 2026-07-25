@@ -11312,6 +11312,36 @@ the remaining open points in their numeric order.
   player-text, voice-markup-in-every-journal-text, 1890-valid-names,
   English-no-germanisms, commit-messages-no-point-number, new-tasks-append-and-
   defer, tasks-spec-final-state-only — several are pure-checkable.
+  THE SAME CONVERSION IS OWED FOR THE BEGINNER GUIDE'S OWN ADVICE (user 25.07.2026:
+  "haben wir alle Tipps umgesetzt?"). docs/analysis_de/vibe-coding-anleitung.md hands
+  out prompts that ORDER a mechanism; every one of them must therefore exist here, or
+  its absence must be a recorded decision. Already built: progress-board currency
+  (dashboard chain), large-tier-before-release (closing-guard), picture-verified render
+  changes (render-verify-guard), no silent stop (batch-progress-guard), never block on
+  the user (defer-for-user), arrival proven not reported (push-arrival-guard), periodic
+  rule-corpus review (rule-review-guard), guide brevity (guide-brevity-guard). STILL
+  UNBUILT, in the order the guide implies:
+  (a) EVERY FEATURE HAS A TEST ON THE RIGHT LAYER — a check that fires when product
+  code changed with no corresponding test added on either layer.
+  (b) FOUR-EYES WHEN A MECHANISM IS ADDED OR CHANGED — the guide's own prompt; a
+  Stop check that a new/changed *-guard/*-core carries a recorded secondary-model
+  review before it goes live. Note the ordering trap: the reviewing model must not
+  be the authoring one, so the check records WHICH model reviewed.
+  (c) GUARD HEALTH — has each guard ever fired, can it fire at all, does it duplicate
+  another, is its message actionable? Two live examples of the failure: prep-guard
+  armed only on Bash while the project's shell is PowerShell, and scripts/
+  pre-push-gate.mjs exists while core.hooksPath is unset, so it can never run (that
+  one belongs to point 302, not here).
+  (d) ONE AUTHORITATIVE PLACE PER FACT — doc/code drift caught by checking prose
+  against the CODE that owns the fact (src/config/qualityDoc.test.ts is the pattern
+  to generalise; it currently covers only the quality presets).
+  (e) RED-TEST TRIAGE — before changing product code on a red check, decide by
+  EXPERIMENT whether the finding accuses the product or the measurement.
+  (f) NO FIXED WALL-CLOCK WAITS in tests — a detector; waiting is on a condition or
+  the app's clock.
+  (g) ONLY MEASURED NUMBERS are communicated (runtimes, performance, cost).
+  Where a mechanism is genuinely impossible (e.g. "does this look right to a human?"),
+  record that verdict explicitly instead of leaving the row silently empty.
   ALSO AUDIT THE GUARDS THEMSELVES, not only the rules: 25 scripts now run on every
   turn end. Which of them have ever fired? Which duplicate another's job? Is the
   Stop chain's ORDER sensible (the most actionable message first — today a
