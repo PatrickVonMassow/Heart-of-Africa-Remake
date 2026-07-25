@@ -12001,6 +12001,22 @@ the remaining open points in their numeric order.
   `enrichments` green on BOTH backends, twice in a row on a quiet machine; a pure
   test pinning that the lunge staging's outcome does not depend on the escape
   window.
+  DIAGNOSIS (read-only prep 25.07, main session — it points at the CHECK, as point
+  292 did): in `crocDrama` the entire parent-parking block is gated
+  `else if (out.gripped && MODE.kind !== 'lunge')`, so in the LUNGE case the parent
+  is neither moved away NOR pinned by `forceOutcome` (set only for `rescue`). The
+  lunge case therefore rests on an IMPLICIT assumption — that the staged parent
+  happens to stand too far off to intervene — instead of enforcing it, while every
+  other case pins its outcome explicitly (the point-177 lesson, applied to kill,
+  drive-off and rescue but never to lunge). Anything that gives the parent slightly
+  more opportunity (the point-311 escape window is the obvious candidate, a slower
+  or loaded backend just as much) flips the result into a rescue, and the check
+  reads that as a product failure. LIKELY FIX: park the parent FAR in the lunge
+  case exactly as the rescue case parks it near (same unit-vector maths, opposite
+  intent), and/or pin `forceOutcome = 'taken'` for the lunge staging — then the
+  case tests what it claims (the grip) rather than an ambient distance. Confirm
+  with the isolated quiet-machine repeat FIRST: if that repeat is green, the
+  finding was load, and only the implicit assumption needs hardening.
 
 ## Closing (only after all points)
 
