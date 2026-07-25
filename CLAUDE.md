@@ -1711,8 +1711,24 @@ verify suite that proves it.
     step 1). True water refraction remains OPEN. Verifiable:
     `scripts/verify/settings.mjs` toggles TRAA at runtime, asserts a
     non-black frame without console errors on the WebGL 2 path (with
-    screenshot 69), and gates the rebuild leak on a flat renderer texture
-    count across repeated toggle cycles; `src/ui/DebugMenu.test.tsx`
+    screenshot 69), and gates the rebuild leak on the renderer's texture
+    count RETURNING to its starting value across repeated toggle cycles.
+    That count is measured at a SETTLED state (point 334): a rebuild frees
+    the old post chain at commit while the new one allocates its render
+    targets only on the next RENDERED frame, and a headless page nothing
+    forces to paint drops to zero rAF ticks for seconds — read in that
+    window the count sits in a DIP with the whole post chain missing (33
+    instead of 47 in the bird's-eye view), which the old one-sided
+    baseline-vs-end comparison reported as a "+14 leak" on WebGPU while
+    WebGL 2, whose lane never quite reaches a frameless window, stayed
+    green. The gate therefore forces a frame and polls until the reading
+    repeats, is two-sided (a FALLING count fails as an untrustworthy
+    measurement instead of passing silently), and keeps a live-texture
+    registry so a real leak names its survivors by kind/size/format rather
+    than reporting two bare numbers; the verdict and breakdown rules are
+    the pure module `scripts/verify/textureLeak.mjs`, pinned by
+    `scripts/verify/textureLeak.test.mjs` in the Vitest layer.
+    `src/ui/DebugMenu.test.tsx`
     asserts that the graphics-level dropdown drives TRAA via the preset —
     TRAA on in medium/high, off in low (the individual TRAA checkbox was
     removed from the debug menu with the point-276 declutter; the

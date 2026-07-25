@@ -13,6 +13,7 @@
 // rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { leakVerdict } from './textureLeak.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -425,23 +426,92 @@ check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
 // Repeated toggling must not leak the pipeline: every rebuild disposes the
 // full node chain (scene MRT, GTAO, bloom, TRAA history/RTT). The regression
 // was a GPU-memory leak per toggle that blacked out the device after a few
-// switches on real hardware. Gate on the renderer's live texture count —
-// it must stay flat across cycles, not grow per toggle.
+// switches on real hardware. Gate on the renderer's live texture count — it
+// must RETURN to where it started across cycles, not grow per toggle.
+//
+// MEASURED AT A STEADY STATE (point 334). A rebuild frees the old post chain at
+// commit but the new one allocates its render targets only on the next RENDERED
+// frame — and a headless page that nothing forces to paint falls to zero rAF
+// ticks for seconds (measured: 36 frames per 600 ms while screenshots flow, 0-2
+// once they stop, and the WebGPU lane reaches 0 where the WebGL 2 lane never
+// quite does — the whole reason this gate failed on one backend only). Read in
+// that window the count sits in a DIP with the entire post chain missing (33
+// instead of 47 in the bird's-eye view: 12 render targets, 14 textures). Reading
+// the DIP as the baseline and the settled value at the end is exactly the "+14
+// leaked" the product was accused of. So force a frame and poll until the
+// reading stops moving, and keep a live-texture registry so a real leak can
+// NAME its survivors instead of being two bare numbers.
 const texCount = () => page.evaluate(() => window.__renderer.info.memory.textures)
+// A screenshot is the reliable way to make a throttled headless page render;
+// an 8x8 clip keeps it cheap. rAF alone cannot be awaited here — it is the very
+// thing that stalls.
+const forceFrame = () => page.screenshot({ clip: { x: 0, y: 0, width: 8, height: 8 } })
+/** Force frames until the texture count repeats, i.e. the rebuilt pipeline has
+ *  finished allocating. Reports whether it actually settled. */
+const settledReading = async (tries = 12) => {
+  let prev = await texCount()
+  for (let i = 0; i < tries; i++) {
+    await forceFrame()
+    await page.waitForTimeout(120)
+    const cur = await texCount()
+    if (cur === prev) return { count: cur, settled: true, polls: i + 1 }
+    prev = cur
+  }
+  return { count: prev, settled: false, polls: tries }
+}
+// three's own bookkeeping (Info.createTexture/destroyTexture) carries the
+// texture object, so wrapping it yields a live registry — the only way to say
+// WHICH resources survived, since the counter alone cannot.
+await page.evaluate(() => {
+  const info = window.__renderer.info
+  const live = new Map()
+  const origCreate = info.createTexture.bind(info)
+  const origDestroy = info.destroyTexture.bind(info)
+  info.createTexture = function (t) {
+    const img = t.image ?? {}
+    live.set(t, {
+      cls: t.constructor?.name ?? 'Texture',
+      w: img.width ?? t.width ?? 0,
+      h: img.height ?? t.height ?? 0,
+      depth: img.depth ?? 1,
+      format: t.format,
+      type: t.type,
+      isRT: t.isRenderTargetTexture === true,
+      isDepth: t.isDepthTexture === true,
+      name: t.name || '',
+    })
+    return origCreate(t)
+  }
+  info.destroyTexture = function (t) {
+    live.delete(t)
+    return origDestroy(t)
+  }
+  window.__texRegistry = () => [...live.values()]
+})
+const liveTextures = () => page.evaluate(() => window.__texRegistry())
 const toggleTraa = async (on) => {
   await page.evaluate((v) => window.__ui.getState().setTraaEnabled(v), on)
   await page.waitForTimeout(600)
+  await forceFrame() // let the rebuilt pipeline actually build its targets
 }
 await toggleTraa(true)
 await toggleTraa(false)
-const texAfterFirstCycle = await texCount()
+const firstCycle = await settledReading()
+const liveBefore = await liveTextures()
 for (let i = 0; i < 5; i++) {
   await toggleTraa(true)
   await toggleTraa(false)
 }
-const texAfterStress = await texCount()
-check('TRAA toggle stress: no render-target leak across rebuilds',
-  texAfterStress <= texAfterFirstCycle + 2, `${texAfterFirstCycle} -> ${texAfterStress}`)
+const afterStress = await settledReading()
+const liveAfter = await liveTextures()
+check('TRAA toggle stress: the texture count settles for measurement',
+  firstCycle.settled && afterStress.settled,
+  `baseline ${firstCycle.count} (reads ${firstCycle.polls}, tracked ${liveBefore.length}), ` +
+  `end ${afterStress.count} (reads ${afterStress.polls}, tracked ${liveAfter.length})`)
+const leak = leakVerdict({
+  before: firstCycle.count, after: afterStress.count, cycles: 5, tolerance: 2, liveBefore, liveAfter,
+})
+check('TRAA toggle stress: no render-target leak across rebuilds', leak.ok, leak.detail)
 const stressMean = await meanLuma(await page.screenshot())
 check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean ${stressMean.toFixed(1)}`)
 check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
