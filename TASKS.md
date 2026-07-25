@@ -12818,6 +12818,30 @@ the remaining open points in their numeric order.
   A BY-PRODUCT worth noting in the commit: pursue-and-evade with stamina is reusable — a
   goat bolting from someone, a dog in a port — so keep it a helper rather than burying it
   in the children.
+  BUILT UNDER FOUR EYES (user 25.07.2026), all three stages: the PLAN is reviewed by the
+  second model before any code is written, the IMPLEMENTATION and the TESTS are reviewed
+  after. The test review is explicitly ADVERSARIAL ABOUT COVERAGE — its question is not
+  "are these tests right" but "which state combination has no test at all", because the
+  risk here is rare interactions rather than wrong arithmetic. Several interacting
+  continuous quantities (reserve, curve, two thresholds, pressure distance, immunity
+  window) plus a role that moves between figures is precisely the shape in which rare
+  states hide.
+  THE EDGE CASES THE REVIEW MUST CONFIRM ARE COVERED, at minimum: a child caught WHILE
+  recovering; a catch landing exactly on the immunity boundary; two catches resolving in
+  the same frame; the group shrinking to two, and to ONE — the transhumant villages of
+  point 142 thin seasonally, so the player count genuinely changes with the calendar and
+  a lone child must fall back to ordinary idling rather than chase itself; a runner
+  cornered between huts with the chaser closing; the player standing in the path or
+  walking through the game; a chase running while the season, the rain or the day
+  changes underneath it; and the scene being left mid-chase.
+  ARM AN INVARIANT, do not rely on tests alone. The dev assert channel (point 207(i),
+  `devAssert`) turns every session — including the user's own play — into a detector for
+  exactly the rare cases tests miss. Assert continuously: exactly ONE chaser exists in a
+  playing group, no child stands inside a collider or outside the walkable radius, the
+  reserve stays within its bounds, no child holds the chaser role past the resolve cap,
+  and no child is stationary below the floor pace while a chase is running. A violation
+  reports itself in the console with the state that produced it, so a debug report names
+  the situation instead of describing a feeling.
   VERIFIABLE: pure — the reserve drains only at sprint pace and refills below it, never
   leaves its bounds, and the pace never drops below the floor while a chase runs; the
   speed cap is MONOTONE in the reserve and CONTINUOUS — full sprint at full, the floor at
