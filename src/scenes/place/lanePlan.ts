@@ -79,19 +79,6 @@ export function bendAround(
   return pts
 }
 
-/** Distance from a point to the nearest lane centreline of a set. */
-export function distToLanes(
-  lanes: Array<{ points: Array<[number, number]>; width: number }>,
-  x: number,
-  z: number,
-): number {
-  let best = Infinity
-  for (const lane of lanes) {
-    const d = closestOnPolyline(lane.points, x, z).dist
-    if (d < best) best = d
-  }
-  return best
-}
 
 /**
  * An organically winding polyline from `from` to `to`: intermediate points
