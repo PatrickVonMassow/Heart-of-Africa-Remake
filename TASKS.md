@@ -12145,17 +12145,32 @@ the remaining open points in their numeric order.
   obeys the §17.2 discovery gate). Suppress the landmark's own label by that identity,
   NOT by a distance heuristic: a proximity rule would silently hide a genuinely
   neighbouring landmark, and the two records already share the id `giza`.
+  (3) KNOWN FROM THE START, BOTH HALVES (user 25.07.2026: "die Pyramiden bei Kairo
+  sollen außerdem von Anfang an als entdeckt gelten"). Today the two halves disagree:
+  `visitedPlaces` is seeded from KNOWN_FROM_START_PLACES (src/world/geo.ts:290 — every
+  port plus every monument), so the MAP POINT is known; `landmarksSeen` starts EMPTY
+  (src/state/store.ts:436), so the CULTURAL LANDMARK is not. Seed the Giza landmark as
+  seen at game start, and migrate a legacy save the way point 288 migrated the
+  known-from-start places. Everyone in 1890 knew the pyramids stood there; only their
+  surroundings were to be explored.
+  FOLLOWS FROM THAT, and is intended: Giza pays NO discovery bounty for itself (§10 /
+  point 288 — a known-from-start place never does), and because the first-sighting
+  journal entry is gated on `landmarksSeen` (store.ts:788), that vignette does NOT fire
+  for Giza. Its text stays in both language files, unused for now, rather than being
+  deleted — the §4.4 flavour set stays complete.
   KEEP INTACT: the §4.4 count of eight built cultural landmarks and Giza's membership
-  in it, its first-sighting journal entry with its kind-flavoured text in BOTH
-  languages, and the §10 bounty rule (a known-from-start place earns no bounty for
-  itself — point 288).
+  in it; the other seven landmarks stay discovery-gated with their sighting entries and
+  bounties untouched.
   VERIFIABLE: pure — the two records resolve to the SAME coordinate, and a sweep
   asserts no OTHER cultural landmark shares an id with a map point (so the rule is
   general, not a Giza special case); pure — the label-suppression predicate hides the
-  landmark label exactly when a map point shares its id and never otherwise;
-  `scripts/verify/enrichments.mjs` — at the Giza plateau exactly ONE label element
-  names the pyramids (currently two), with a screenshot, and the sighting still
-  reveals the landmark and journals it; the existing Giza suites
+  landmark label exactly when a map point shares its id and never otherwise; pure
+  (`src/state/store.economy.test.ts` / `store.saveload.test.ts`) — a fresh game has
+  Giza in `landmarksSeen`, sighting it credits no bounty and writes no journal entry,
+  a legacy save without it migrates to include it, and an ordinary landmark still
+  discovers, journals and bounties; `scripts/verify/enrichments.mjs` — at the Giza
+  plateau exactly ONE label element names the pyramids (currently two), named from the
+  first frame without any approach, with a screenshot; the existing Giza suites
   (src/scenes/place/gizaSite.test.ts, settlementEntry, landmarks) stay green.
 
 - [ ] 339. F6 BECOMES A COMPLETE BUG REPORT: SCREENSHOT + STATE + DESCRIPTION IN ONE ZIP
