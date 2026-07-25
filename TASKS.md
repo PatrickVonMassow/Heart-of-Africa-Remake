@@ -11627,6 +11627,21 @@ the remaining open points in their numeric order.
   single-frame snap) while the point-128 "stands on its own ground" clearance still
   holds; screenshot of the flare; both backends.
 
+- [ ] 329. DECIDE THE FATE OF THE TWO SURVIVING STRAY BRANCHES (25.07.2026 branch
+  cleanup: 133 fully-merged branches and 26 orphaned worktrees were removed; two
+  carry unmerged work whose value must be judged rather than deleted or blindly
+  merged). (a) `feat/276-wildlife-lod` (23.07, 539 lines: off-screen wildlife
+  behaviour throttling plus a terrain.ts rework, with pure tests) — a PERFORMANCE
+  lever that point 310 (the S25 low-preset pass) may want; check whether it still
+  applies after the point-276/278 merges, re-run its tests, and either finish it as
+  part of 310 or record why it is dropped. (b) `feat/278-dressing-growth` (24.07,
+  275 lines: an ALTERNATIVE fix for the wildlife duplication that main solved
+  differently in d9ee271, plus enrichments checks and pure tests) — diff its test
+  coverage against what main has and salvage any check main lacks; then drop the
+  branch. VERIFIABLE: for each branch a written verdict (merged / salvaged-in-part
+  / dropped, with the reason), the branch deleted afterwards, and the regression
+  green on whatever landed.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
