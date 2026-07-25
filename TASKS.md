@@ -12196,6 +12196,18 @@ the remaining open points in their numeric order.
   green-test-wrong-picture rule). The check must assert the PNG carries real scene
   content — decoded pixels with meaningful variance, not a uniform field — and it must
   run on BOTH backends, because their present/readback paths differ.
+  THE HUD IS NOT IN THAT PICTURE, AND MUST STILL BE IN THE REPORT. Every floating
+  label and every HUD control is DOM, not canvas — the map/region labels are drei
+  `Html` overlays (src/scenes/travel/TravelScene.tsx:1778/1853, RegionBorders.tsx:67)
+  and the status bar, inventory and buttons are ordinary React. A canvas readback
+  therefore shows the 3-D scene ALONE, and would have missed the doubled Giza label of
+  point 338 entirely — the exact defect that prompted this feature. Rasterising the DOM
+  is not worth a dependency, so capture the overlay as DATA instead: alongside the PNG,
+  record every visible label and HUD element with its text and its on-screen rectangle.
+  That is what makes a duplicated, overlapping or off-screen label diagnosable — two
+  entries with the same text and overlapping boxes say it outright. The description file
+  must state plainly that the PNG is the scene without the overlay, so nobody reads the
+  absence of a label in the image as evidence.
   ZIP — NO NEW RUNTIME DEPENDENCY (CLAUDE.md §3). A STORE-only (uncompressed) zip
   writer is ~100 lines of pure code — local file headers, a central directory, CRC32 —
   and a bug-report archive of a PNG and two small text files gains nothing from
@@ -12210,7 +12222,10 @@ the remaining open points in their numeric order.
   F6 as the state-dump popup and must state the final behaviour instead.
   VERIFIABLE: pure — the zip writer produces an archive a real unzip accepts (byte
   layout, CRC32 over known input, several members, an empty member, a UTF-8 filename),
-  and the report assembly names its three members from one stem; component —
+  and the report assembly names its members from one stem; pure — the overlay snapshot
+  lists a visible label with its text and rectangle, omits a hidden one, and two labels
+  sharing a text at overlapping rectangles are both present (the point-338 witness);
+  component —
   `src/ui/StateDump.test.tsx` extended: hidden by default, F6 opens with the textarea
   focused, the typed description reaches the assembled report, Esc closes without
   focusing a control, both languages; live — `scripts/verify/settings.mjs` (or its own
