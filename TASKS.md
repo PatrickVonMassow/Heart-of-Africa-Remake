@@ -11488,7 +11488,7 @@ the remaining open points in their numeric order.
   along the coast and gets out alive (enrichments, both backends); the §11.2/redSea
   suite stays green.
 
-- [ ] 317. ENTER-HINT POSITION: SLIGHTLY BELOW SCREEN CENTRE (user 25.07.2026 with
+- [x] 317. ENTER-HINT POSITION: SLIGHTLY BELOW SCREEN CENTRE (user 25.07.2026 with
   screenshot markup). The "Space to enter <name>" hint currently sits at the bottom
   above the inventory bar; the user wants it a little BELOW the screen centre —
   close enough to the action to be seen, with enough clearance to the centre that
@@ -11612,7 +11612,7 @@ the remaining open points in their numeric order.
   (drown or rescue) in enrichments; the existing "no animal stands in water" checks
   stay green; both backends.
 
-- [ ] 325. MOUSE WHEEL OVER THE DEBUG MENU MUST NOT ZOOM (user 25.07.2026). While
+- [x] 325. MOUSE WHEEL OVER THE DEBUG MENU MUST NOT ZOOM (user 25.07.2026). While
   the pointer is over the debug panel the wheel scrolls the panel only — the
   bird's-eye zoom must not react (today scrolling the long panel changes the view).
   Scope the zoom handler to the canvas / stop propagation on the panel, and apply
