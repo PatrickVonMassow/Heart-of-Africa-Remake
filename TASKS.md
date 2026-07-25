@@ -12983,6 +12983,50 @@ the remaining open points in their numeric order.
   than in its dry month, and the difference is large enough that a person would call it
   overcast; the existing dry-month picture is unchanged.
 
+- [ ] 355. BLIND PARALLEL WORK AS THE GENERAL FOUR-EYES MECHANISM (user 25.07.2026).
+  Establish what point 351 tries in one place as the project's standard way of running
+  the four-eyes principle, and write it into the German analysis documents.
+  THE METHOD: for a GENERATIVE stage, both models work from the same inputs to their own
+  complete result, neither seeing the other's until both are done; the two results are
+  then merged into a union with duplicates removed BY MEANING, keeping both wherever it
+  is unclear that one subsumes the other; an item only one model produced is marked
+  rather than buried, and none is dropped for being unusual.
+  THE REASON, and it belongs in the documents because it is what makes the method worth
+  its cost: a reviewer handed a finished list CHECKS THAT LIST. It anchors on what it is
+  shown and produces far less than it would have from a blank page — so review is the
+  wrong instrument whenever the risk is the item nobody thought of.
+  THE SCOPE LIMIT IS PART OF THE RULE, or it will be applied where it cannot work.
+  Blind-parallel fits DIVERGENT stages — what could go wrong, which scenarios to test,
+  which designs are possible, where a system might break. It does NOT fit CONVERGENT
+  ones: "is this diff correct", "does this implementation match its spec", "is this
+  measurement sound" all judge a specific artefact, which cannot be produced twice
+  independently. Those keep the ordinary review — with one borrowed refinement: the
+  reviewer reads the ARTEFACT before the author's rationale, so it is not anchored by
+  the justification either.
+  COST AND WHEN IT APPLIES: the generative stage runs twice, so roughly double for that
+  stage. It therefore applies where four-eyes already applies by the criticality triage
+  (point 298), not everywhere.
+  ONE AUTHORITATIVE PLACE, and this point must not repeat the mistake its own
+  retrospective records — the model rule once stood in six places and retracting it cost
+  more than establishing it had. The NORMATIVE text goes in CLAUDE.md §6 beside the
+  existing four-eyes definition (which currently reads "one model plans and/or builds,
+  the other reviews" and needs to become the two-mode rule); everything else REFERS to
+  it:
+  - `docs/analysis_de/vibe-coding-anleitung.md`: extend the EXISTING four-eyes tip
+    rather than adding a second one, in the reader's register, and carry the cost marker
+    convention already used there (this is a roughly 2x tip for the affected stage).
+    Respect the document's word budget — make room by tightening, not by raising it.
+  - `docs/analysis_de/retrospektive-zusammenarbeit.md`: record the LESSON (anchoring,
+    and why divergent and convergent stages need different instruments) in the register
+    of the surrounding entries.
+  - The working memory that carries the four-eyes rule is updated to point at the
+    normative text instead of restating it.
+  VERIFIABLE: the rule's normative wording exists exactly ONCE across CLAUDE.md and the
+  docs (a grep for the defining sentence finds one hit, the others being references);
+  the guide stays within its word budget; the retrospective-currency guard is satisfied
+  after the edit; `npm run test:unit` and the docs suite stay green. No code changes, so
+  no browser regression.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
