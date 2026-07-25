@@ -376,6 +376,13 @@ export interface BalanceConfig {
      *  one-off orphaning. No adult in range → the young stays parentless until
      *  one roams near. Calibratable/debug-editable. */
     adoptionRadius: number
+    /** Escape run (design.md §19.8, point 311): how long (seconds) a calf freed
+     *  by its parent's sacrifice runs clear of the predator before it becomes
+     *  adoptable again. Without the window the point-262 adoption claimed the
+     *  calf the instant the parent fell, so it walked back to its new parent
+     *  past the feeding predator instead of escaping. A hard deadline — the
+     *  adoption resumes the moment it expires. Calibratable/debug-editable. */
+    escapeSeconds: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -648,6 +655,12 @@ export const balance: BalanceConfig = {
     // so a nearby herd-mate — not only the dead parent's immediate neighbour —
     // can adopt, yet local enough that the young joins a genuinely close adult.
     adoptionRadius: 20,
+    // Calibratable (point 311): the freed calf's escape leg. Sized so the flight
+    // actually carries it clear of the kill — the prey flee runs at up to
+    // FLEE_SPEED 5 units/s and eases off with distance, so ~12 s covers the
+    // 14-unit flee radius with room to spare — and well above the ~5 s struggle
+    // window, so the escape is never cut short by the drama it follows.
+    escapeSeconds: 12,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

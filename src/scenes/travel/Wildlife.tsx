@@ -76,6 +76,7 @@ import {
   REGION_PREDATORS,
   parentAttackOutcome,
   findAdopter,
+  tickEscapeRun,
   isPredatorSpecies,
   PREDATOR_PREY,
   REGION_PREY,
@@ -285,6 +286,12 @@ interface Animal {
    *  it clears at 0 (or when no elephant is left) so a parent can never be
    *  stuck chasing a target that cannot trample it. */
   grief?: number
+  /** Seconds left of a freed calf's ESCAPE run (design.md §19.8, point 311):
+   *  set when a parent's sacrifice frees this young, counted down every frame
+   *  and cleared at zero. While it runs the point-262 adoption keeps off, so
+   *  the calf actually flees the predator instead of being re-parented in the
+   *  same frame and walking back past it. A hard deadline (invariant I4). */
+  escape?: number
   /** The vigil at a calf's carcass (design.md §19.8, point 121): set when a
    *  predator finished the calf and this parent was alive but too far away to
    *  charge. It walks to the kill site, stands over the carcass, keeps the
@@ -2210,6 +2217,11 @@ function Herds() {
                 calf.caught = undefined // freed — it rises and flees on its own
                 calf.parent = undefined
                 a.child = undefined
+                // The escape run (point 311): the §19.8 ending owns the calf
+                // until it is clear, so the point-262 adoption may not claim it
+                // this frame — a re-parented calf walks back to its new parent
+                // past the feeding predator instead of fleeing.
+                calf.escape = balance.family.escapeSeconds
               }
               if (calf.caughtBy === 'crocodile') {
                 // The sacrifice at the waterline (point 130): the crocodile
@@ -2290,6 +2302,7 @@ function Herds() {
             } else {
               calf.parent = undefined // freed — it keeps fleeing on its own
               a.child = undefined
+              calf.escape = balance.family.escapeSeconds // the escape run owns it (point 311)
               takeAnimal(a, { stain: true })
               LION_STATE.victim = a // the hunt closes out feeding on the parent
             }
@@ -2594,14 +2607,26 @@ function Herds() {
     // young's OWN single-species herd, and findAdopter caps it to live,
     // non-predator, childless adults — so re-linking never dangles a parent
     // reference, clobbers another calf's parent, or links a predator/self/dead.
+    // ORDERING (point 311): a §19.8 ending already running on a young resolves
+    // BEFORE the adoption may claim it — `findAdopter` refuses a CAUGHT calf
+    // (an adopted-mid-struggle calf handed a passing herd-mate the parent role
+    // and sent it charging to its death for a calf it had just met) and one
+    // still running its escape after its parent's sacrifice (without which the
+    // freed calf was re-parented in the same frame and walked back past the
+    // kill instead of fleeing). The escape window is a hard deadline counted
+    // down here for EVERY species (predator cubs included, so the field can
+    // never linger unticked), and the adoption resumes the moment it expires:
+    // point 262's guarantee is deferred, not dropped.
     {
       const ADOPTION_RADIUS = balance.family.adoptionRadius
       for (const sp of SPECIES) {
         // Predators never adopt (a lion cub whose lioness died stays orphaned);
         // the pool is thus homogeneous and non-predator, so findAdopter's
         // same-species/predator gates hold by construction.
-        if (isPredatorSpecies(sp)) continue
+        const predatorHerd = isPredatorSpecies(sp)
         for (const a of herds[sp]) {
+          if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+          if (predatorHerd) continue
           if (a.dead || a.young !== true) continue
           if (a.parent && !a.parent.dead) continue // still has a living parent
           const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS)

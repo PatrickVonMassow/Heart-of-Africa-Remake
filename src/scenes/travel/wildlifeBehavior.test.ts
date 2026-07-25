@@ -96,6 +96,9 @@ import {
   parentAttackOutcome,
   parentDefends,
   findAdopter,
+  adoptionHeld,
+  inEscapeRun,
+  tickEscapeRun,
   isPredatorSpecies,
   type AdoptionAdult,
   PREDATOR_PREY,
@@ -3243,5 +3246,178 @@ describe('findAdopter (design.md §19.8, point 262 — an orphan is taken in by 
     const cub = { species: 'lion', x: 0, z: 0 }
     const lionesses = [{ species: 'lion', x: 2, z: 0 }, { species: 'lion', x: 3, z: 0 }]
     expect(findAdopter(cub, lionesses, 30)).toBeNull()
+  })
+})
+
+describe('the freed calf runs its escape before it is adopted (design.md §19.8, point 311)', () => {
+  // The regression: the point-262 adoption runs every frame, so it claimed a
+  // calf the instant its parent's SACRIFICE freed it — the calf was re-parented
+  // in the same frame and walked back to its adoptive parent past the feeding
+  // predator instead of fleeing, and the §19.8 sacrifice ending never read as
+  // an escape. The two rules below mirror the live pair in Wildlife.tsx (the
+  // sacrifice resolution and the per-frame adoption pass) so the ORDER between
+  // them is what these tests pin.
+  interface Beast extends AdoptionAdult {
+    x: number
+    z: number
+    species: string
+    young?: boolean
+    dead?: boolean
+    caught?: number
+    parent?: Beast
+    child?: Beast
+    escape?: number
+  }
+  const WINDOW = 12 // balance.family.escapeSeconds' shape; the value itself is calibratable
+  const RADIUS = 20 // balance.family.adoptionRadius
+
+  const family = () => {
+    const parent: Beast = { species: 'zebra', x: 0, z: 0 }
+    const calf: Beast = { species: 'zebra', x: 1, z: 0, young: true, caught: 5, parent }
+    parent.child = calf
+    const herdMate: Beast = { species: 'zebra', x: 4, z: 0 } // eligible adopter, well in range
+    return { parent, calf, herdMate, herd: [parent, calf, herdMate] }
+  }
+
+  /** The live sacrifice resolution: the hunter takes the charging parent, the
+   *  calf is freed and starts its escape run (`escape` set only here). `null`
+   *  replays the pre-311 code, which freed the calf with no escape window. */
+  const sacrifice = (parent: Beast, calf: Beast, escapeSeconds: number | null = WINDOW) => {
+    calf.caught = undefined
+    calf.parent = undefined
+    parent.child = undefined
+    if (escapeSeconds !== null) calf.escape = escapeSeconds
+    parent.dead = true
+  }
+
+  /** The live per-frame adoption pass (Wildlife.tsx): tick every escape run
+   *  first (hard deadline), then adopt each parentless juvenile. */
+  const adoptionFrame = (herd: Beast[], dt: number) => {
+    for (const a of herd) {
+      if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+      if (a.dead || a.young !== true) continue
+      if (a.parent && !a.parent.dead) continue
+      const adopter = findAdopter(a, herd, RADIUS)
+      if (adopter) {
+        a.parent = adopter
+        adopter.child = a
+      }
+    }
+  }
+
+  it('a CAUGHT calf is not adopted mid-struggle — the ending resolves first', () => {
+    // The other half of the same ordering bug: a calf orphaned before (or as)
+    // a predator seizes it was adopted while it struggled, and the fresh
+    // "parent" charged in — rewriting an ending that was already resolving
+    // (it died in the calf's place, or drove the predator off and the calf
+    // never died at all).
+    const { parent, calf, herdMate, herd } = family()
+    parent.dead = true // orphaned by any cause…
+    parent.child = undefined
+    calf.parent = undefined
+    calf.caught = 5 // …and seized: the struggle owns it now
+    expect(adoptionHeld(calf)).toBe(true)
+    for (let i = 0; i < 20; i++) {
+      adoptionFrame(herd, 0.25)
+      expect(calf.parent).toBeUndefined()
+    }
+    // The catch resolves (freed here, killed in the other branch) and the
+    // adoption follows on the very next frame.
+    calf.caught = undefined
+    adoptionFrame(herd, 0.25)
+    expect(calf.parent).toBe(herdMate)
+  })
+
+  it('adoptionHeld covers both running endings and nothing else', () => {
+    expect(adoptionHeld({})).toBe(false) // a plain orphan is adoptable
+    expect(adoptionHeld({ caught: 5 })).toBe(true)
+    expect(adoptionHeld({ caught: 0.01 })).toBe(true) // still gripped
+    expect(adoptionHeld({ escape: 3 })).toBe(true)
+    expect(adoptionHeld({ escape: 0 })).toBe(false) // the escape is over
+    expect(adoptionHeld({ caught: 5, escape: 3 })).toBe(true)
+  })
+
+  it('a sacrifice-freed calf is NOT adopted while its escape runs', () => {
+    const { parent, calf, herd } = family()
+    sacrifice(parent, calf)
+    // Frame after frame through the whole window: the calf stays parentless, so
+    // the render loop keeps it in the fleeing branch instead of the follow one.
+    for (let t = 0; t < WINDOW - 0.5; t += 0.25) {
+      adoptionFrame(herd, 0.25)
+      expect(calf.parent).toBeUndefined()
+      expect(inEscapeRun(calf)).toBe(true)
+    }
+  })
+
+  it('WITHOUT the escape window the adoption steals the ending on the first frame (the point-311 witness)', () => {
+    const { parent, calf, herdMate, herd } = family()
+    sacrifice(parent, calf, null) // pre-311 behaviour: freed, no escape run
+    adoptionFrame(herd, 0.25)
+    expect(calf.parent).toBe(herdMate) // re-parented the same frame — no escape
+  })
+
+  it('once the escape completes the calf IS adopted (point 262 deferred, not dropped)', () => {
+    const { parent, calf, herdMate, herd } = family()
+    sacrifice(parent, calf)
+    for (let i = 0; i < Math.ceil(WINDOW / 0.25) + 1; i++) adoptionFrame(herd, 0.25)
+    expect(calf.escape).toBeUndefined()
+    expect(calf.parent).toBe(herdMate)
+    // The parent↔child link is whole again, so every §19.8 drama can recur.
+    expect(herdMate.child).toBe(calf)
+  })
+
+  it('the window boundary is exact: a tick of exactly the time left ENDS it', () => {
+    expect(tickEscapeRun(undefined, 0.5)).toBeUndefined() // no run → nothing to tick
+    expect(tickEscapeRun(2, 0.5)).toBeCloseTo(1.5, 10)
+    expect(tickEscapeRun(2, 1.999)).toBeCloseTo(0.001, 10) // a sliver left: still running
+    expect(inEscapeRun({ escape: 0.001 })).toBe(true)
+    expect(tickEscapeRun(2, 2)).toBeUndefined() // exactly the remainder closes it
+    expect(tickEscapeRun(2, 5)).toBeUndefined() // an overshooting frame closes it too
+    expect(inEscapeRun({ escape: 0 })).toBe(false) // zero is over, not running
+    expect(inEscapeRun({})).toBe(false)
+    // …and the gate follows the predicate exactly, on both sides of the edge.
+    const adult: AdoptionAdult = { species: 'zebra', x: 1, z: 0 }
+    expect(findAdopter({ species: 'zebra', x: 0, z: 0, escape: 0.001 }, [adult], RADIUS)).toBeNull()
+    expect(findAdopter({ species: 'zebra', x: 0, z: 0, escape: 0 }, [adult], RADIUS)).toBe(adult)
+    expect(findAdopter({ species: 'zebra', x: 0, z: 0 }, [adult], RADIUS)).toBe(adult)
+  })
+
+  it('the escape always resolves — invariant I4 — from any window and frame time', () => {
+    for (const w of [0.1, 1, 12, 60]) {
+      for (const dt of [1 / 240, 1 / 60, 0.25, 1, 3]) {
+        let e: number | undefined = w
+        const frames = Math.ceil(w / dt) + 1
+        for (let i = 0; i < frames; i++) e = tickEscapeRun(e, dt)
+        expect(e).toBeUndefined() // never pinned, whatever the frame times
+      }
+    }
+  })
+
+  it('no other §19.8 ending is deferred: an orphan of any OTHER cause is adopted at once', () => {
+    // Trample grief, drowning, the crocodile, a streamed-out parent: none of
+    // them frees a calf mid-hunt, so none sets an escape run — the point-262
+    // adoption still fires on the very first frame.
+    const { parent, calf, herdMate, herd } = family()
+    calf.caught = undefined
+    parent.dead = true // died on its own (no sacrifice, no freeing)
+    parent.child = undefined
+    calf.parent = undefined
+    adoptionFrame(herd, 0.25)
+    expect(calf.parent).toBe(herdMate)
+  })
+
+  it('the too-late ending is untouched: a dead calf is never adopted, escape or not', () => {
+    const { parent, calf, herd } = family()
+    sacrifice(parent, calf)
+    calf.dead = true // taken alongside the parent (the too-late branch)
+    for (let i = 0; i < Math.ceil(WINDOW / 0.25) + 4; i++) adoptionFrame(herd, 0.25)
+    expect(calf.parent).toBeUndefined()
+    expect(calf.escape).toBeUndefined() // the window still ran down (no dangling state)
+  })
+
+  it('the shipped escape window outlasts the struggle it follows', () => {
+    // The calf is freed at the END of its ~5 s struggle, and the flight then has
+    // to carry it clear of the kill — so the window is sized well above it.
+    expect(balance.family.escapeSeconds).toBeGreaterThan(5)
   })
 })
