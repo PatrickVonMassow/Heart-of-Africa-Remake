@@ -66,76 +66,6 @@ const probeSilhouetteFooting = async (page, check, label) => {
   )
 }
 
-/**
- * Point 335: is there a FOREIGN flat band lying across the horizon?
- *
- * The reported Giza picture had a long grey/silver strip along the horizon line
- * with the desert's own dunes and ridge showing above AND below it — the
- * captured panorama band's far field, baked from unbounded water sheets that
- * had no streamed terrain behind them. Measured on the RENDERED frame the
- * point-181 way, with no assumed tone and no assumed row:
- *
- * The signature is a SANDWICH down a column — ground-warm rows, a run of rows
- * that are NOT ground-warm, ground-warm rows again. Crossing a real terrain
- * silhouette can never produce it (a column goes sky → ground once and stays
- * ground). The warmth reference is read from the viewer's OWN near ground in
- * the same frame, so the check asserts no colour of its own; and a foreign band
- * is FLAT, so only sandwiches starting on the same row count. Returns the
- * fraction of the frame's columns carrying such a flat foreign band.
- */
-const foreignHorizonBand = async (pngBuffer) => {
-  const { data, info } = await sharp(pngBuffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const W = info.width
-  const H = info.height
-  const C = info.channels
-  const warmthAt = (x, y) => {
-    const i = (y * W + x) * C
-    return (data[i] - data[i + 2]) / Math.max(data[i], 1)
-  }
-  // Reference: the near ground under the viewer's feet — unambiguously the
-  // site's own ground, in this very frame.
-  const refs = []
-  for (let x = 0; x < W; x += 4) {
-    let s = 0
-    let n = 0
-    for (let y = Math.round(H * 0.86); y < Math.round(H * 0.92); y++) {
-      s += warmthAt(x, y)
-      n++
-    }
-    refs.push(s / n)
-  }
-  refs.sort((a, b) => a - b)
-  const groundWarmth = refs[Math.floor(refs.length / 2)]
-  const warmCut = groundWarmth * 0.45
-  const top = Math.round(H * 0.3)
-  const bot = Math.round(H * 0.7)
-  const MIN_RUN = 8 // px — below this an edge or a silhouette, not a band
-  const hits = []
-  for (let x = 0; x < W; x++) {
-    const warm = []
-    for (let y = top; y < bot; y++) warm.push(warmthAt(x, y) >= warmCut)
-    let best = null
-    let y = 0
-    while (y < warm.length) {
-      if (warm[y]) {
-        y++
-        continue
-      }
-      const start = y
-      while (y < warm.length && !warm[y]) y++
-      const len = y - start
-      const sandwiched = warm.slice(0, start).some(Boolean) && warm.slice(y).some(Boolean)
-      if (sandwiched && len >= MIN_RUN && (!best || len > best.len)) best = { start: start + top, len }
-    }
-    if (best) hits.push(best)
-  }
-  if (!hits.length) return { fraction: 0, row: null, groundWarmth: +groundWarmth.toFixed(3) }
-  const tops = hits.map((h) => h.start).sort((a, b) => a - b)
-  const median = tops[Math.floor(tops.length / 2)]
-  const flat = hits.filter((h) => Math.abs(h.start - median) <= 3)
-  return { fraction: +(flat.length / W).toFixed(3), row: median, groundWarmth: +groundWarmth.toFixed(3) }
-}
-
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 const errors = []
@@ -901,11 +831,8 @@ for (const [placeId, shot] of [
 
   // Point 335: no FOREIGN flat band across the horizon. The reported picture
   // showed a long grey/silver strip along the horizon line, with the desert's
-  // own dunes above and below it — the captured band's far field, baked from
-  // water sheets that reached past the streamed terrain window. The monument is
-  // a late third place kind, so first pin that it takes the band path at all;
-  // then sweep the horizon and measure the rendered frame (no assumed tone, no
-  // assumed row — the helper reads the viewer's own ground for its reference).
+  // own dunes and ridge visible above AND below it. The monument is a late
+  // third place kind, so first pin that it takes the band path at all.
   {
     const bandActive = await page.evaluate(() => window.__placePanoramaActive ?? false)
     check(
@@ -913,51 +840,95 @@ for (const [placeId, shot] of [
       bandActive === true,
       `band active ${bandActive}`,
     )
-    const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
-    const posts = [
-      ['south rim', 0, radius * 0.75],
-      ['east rim', radius * 0.7, 0],
-    ]
-    const worst = { fraction: 0, where: 'none', row: null }
-    let shot = 0
-    for (const [label, px, pz] of posts) {
-      for (let k = 0; k < 8; k++) {
-        const yaw = (k * Math.PI) / 4
-        await page.evaluate(
-          ([x, z, y]) => {
-            const p = window.__placePlayer
-            p.x = x
-            p.z = z
-            p.yaw = y
-            p.pitch = 0
-          },
-          [px, pz, yaw],
-        )
-        await page.waitForTimeout(350)
-        const buf = await page.screenshot()
-        const band = await foreignHorizonBand(buf)
-        if (band.fraction > worst.fraction) {
-          worst.fraction = band.fraction
-          worst.where = `${label} yaw ${((yaw * 180) / Math.PI).toFixed(0)}°`
-          worst.row = band.row
+
+    // The gate, measured per PIXEL ROW on the artefact that carries the defect.
+    //
+    // What made the strip foreign was a HOLE: the capture reached 900 wu while
+    // the travel scene streams terrain to ~144, and the sea plane / river
+    // ribbons / lake sheets have no such bound — so a column of the band ran
+    // terrain, then NOTHING (the far field past the window), then a lone water
+    // sheet floating at the top. Drawn over the geometry backdrop that hole let
+    // the backdrop's relief through above and below the sheet, which is exactly
+    // the reported picture. A column of real surroundings can never do that:
+    // ground is contiguous from the horizon down, so every opaque run is ONE
+    // run. Counting columns whose opaque rows are split by a transparent gap
+    // therefore isolates the defect with no assumed tone, row or distance.
+    //
+    // (The frame-level reading — a flat non-ground strip sandwiched between
+    // ground — cannot be the gate: east of Giza the world really does put the
+    // Red Sea and the trimmed Arabian shelf on the horizon, and that reads the
+    // same way while being the surroundings the band is meant to show.)
+    const bandGaps = await page.evaluate(async () => {
+      if (!window.__panoCaptureForDump) return null
+      const url = await window.__panoCaptureForDump()
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = url
+      })
+      const c = document.createElement('canvas')
+      c.width = img.width
+      c.height = img.height
+      const ctx = c.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+      const d = ctx.getImageData(0, 0, c.width, c.height).data
+      const OPAQUE = 40
+      let split = 0
+      let worst = 0
+      for (let x = 0; x < c.width; x++) {
+        let first = -1
+        let last = -1
+        for (let y = 0; y < c.height; y++) {
+          if (d[(y * c.width + x) * 4 + 3] > OPAQUE) {
+            if (first < 0) first = y
+            last = y
+          }
         }
-        // Human-viewable evidence from two standpoints on the site.
-        if (k === 2 && shot < 2) {
-          shot++
-          await sharp(buf).toFile(`${OUT}140-giza-horizon-${shot}.png`)
-          console.log(`shot 140-giza-horizon-${shot}.png`)
+        if (first < 0) continue
+        let clear = 0
+        for (let y = first; y <= last; y++) if (d[(y * c.width + x) * 4 + 3] <= OPAQUE) clear++
+        if (clear > 0) {
+          split++
+          if (clear > worst) worst = clear
         }
       }
-    }
-    // Measured: the reported (broken) band covered 0.18-0.23 of the columns as
-    // one flat run; with the capture bounded to the committed terrain the worst
-    // sweep direction stays under 0.07 (near water the band legitimately shows
-    // the Nile at the horizon, which is not sandwiched by a foreign strip).
+      return { width: c.width, splitColumns: split, worstGapRows: worst }
+    })
+    // Measured on this very state: with the capture reaching 900 wu the band
+    // split 231/3072 of Giza's columns (and 168/3072 of Cairo's — the defect was
+    // never Giza-only, just most visible on an open plateau), gaps up to 11 rows;
+    // bounded to the committed ring it splits none, and a settlement's worst is
+    // 3 columns of one-row silhouette antialiasing.
     check(
-      'no foreign flat band lies across the Giza horizon (point 335)',
-      worst.fraction < 0.12,
-      `worst ${worst.fraction} of columns at ${worst.where}${worst.row == null ? '' : `, row ${worst.row}`}`,
+      'the Giza band holds no floating strip over a hole in the surroundings (point 335)',
+      bandGaps !== null && bandGaps.splitColumns / bandGaps.width < 0.02,
+      bandGaps === null ? 'no capture to read' : `${bandGaps.splitColumns}/${bandGaps.width} columns split, worst gap ${bandGaps.worstGapRows} rows`,
     )
+
+    // Human-viewable evidence from two standpoints on the site.
+    const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+    const posts = [
+      ['south rim', 0, radius * 0.75, Math.PI / 2],
+      ['east rim', radius * 0.7, 0, Math.PI],
+    ]
+    let shot = 0
+    for (const [, px, pz, yaw] of posts) {
+      await page.evaluate(
+        ([x, z, y]) => {
+          const p = window.__placePlayer
+          p.x = x
+          p.z = z
+          p.yaw = y
+          p.pitch = 0
+        },
+        [px, pz, yaw],
+      )
+      await page.waitForTimeout(600)
+      shot++
+      await page.screenshot({ path: `${OUT}140-giza-horizon-${shot}.png` })
+      console.log(`shot 140-giza-horizon-${shot}.png`)
+    }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
