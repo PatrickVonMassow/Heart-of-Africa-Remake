@@ -11700,9 +11700,18 @@ the remaining open points in their numeric order.
   a player/operator actually reaches?) and the TESTS for validity (would each test
   FAIL if the feature were reverted? does it assert the real signal or a proxy?).
   Use model diversity: a different model than the author reviews. (D) GREEN PROOF —
-  the full LARGE regression on a QUIET machine, both backends, every suite green;
-  build, lint and audit clean; the fast gate green. Any red is either fixed or
-  recorded as a known, justified exception with the user's ruling. (E) COHERENCE —
+  a FULL CLOSING RUN, not merely a regression (user 25.07.2026: "the closing
+  contains a full regression anyway"): all eleven steps of `scripts/closing-guard-core.mjs`
+  (`CLOSING_STEPS`), driven with `node scripts/closing-guard.mjs --status` and
+  `--step <id> --evidence "<proof>"` per step — the LARGE regression on a QUIET
+  machine on BOTH backends being one of them, plus lint/audit, the dead-code,
+  stale-doc, stale-comment and .md audits, the research-doc implementation
+  sections, the graphics-detail-level doc, the §7.1 acceptance confirmation, the
+  open-items list and the simplifications list. CLOSING FREEZE applies (CLAUDE.md
+  §9): no parallel agent work may land while it runs — the in-flight bug agents
+  must be merged or parked FIRST, and the closing then runs on the frozen main.
+  Any red is either fixed or recorded as a known, justified exception with the
+  user's ruling. (E) COHERENCE —
   does everything still fit together (user 25.07.2026)? Cross-check, for the whole
   current state: design.md and CLAUDE.md §7.1 against what the code actually does
   (every feature merged since v0.2 must be described where the docs describe its
