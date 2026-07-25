@@ -11134,15 +11134,22 @@ the remaining open points in their numeric order.
   is already inside the footprint — however he got there — may always move freely to the
   outside. This is the general invariant and it covers every future teleport nobody has
   thought of yet, including a save written by an older build.
-  (2) A JUMP LANDS OUTSIDE. `debugJumpTo` (and any other deliberate teleport to a place)
-  sets him just OUTSIDE the footprint but INSIDE the enter radius, facing the place, so
-  the intended next action — press Space — is immediately available. Jumping to a
-  non-place target (a mountain, the graveyard, the tomb) is unchanged.
+  (2) A JUMP TO AN ENTERABLE PLACE ENTERS IT (user 25.07.2026). Jumping to a settlement
+  or the Giza monument site puts the traveller straight INSIDE, in the first-person
+  view — which is what a jump to a place is for, and what the jump effectively did
+  before entry became key-only (landing on the centre triggered the automatic entry).
+  It goes through the ORDINARY entry path, so everything an entry normally does still
+  happens — discovery, the port checkpoint, the orientation markers. A debug jump is
+  meant to reach the real state, not a special one. Jumping to a target that cannot be
+  entered — a mountain, a waterfall, a lake, the graveyard, the tomb, a natural site —
+  is a bird's-eye jump exactly as today. The bird's-eye position is set as well, so
+  LEAVING the place afterwards puts the traveller where he would have been.
   VERIFIABLE additionally: pure — a step from inside the footprint toward the outside is
-  NOT blocked while a step from outside toward the inside is; the jump-to resolver
-  returns a point outside the collision radius, inside the enter radius, for every place
-  in the roster; live — jumping to a village leaves the traveller free to walk away AND
-  able to enter with Space. ANCHORS: the bird's-eye collision
+  NOT blocked while a step from outside toward the inside is (the one-way rule, swept
+  over the place roster); the jump target resolver classifies every entry in the §21.3
+  picker as enterable or not. Live — jumping to a village lands in the first-person view
+  inside it, leaving it puts the traveller outside the footprint and free to walk away,
+  and jumping to a mountain still lands in the bird's-eye view. ANCHORS: the bird's-eye collision
   (`src/systems/movement.ts` / the travel-scene collider set that already handles trees/animals),
   `src/scenes/travel/settlementEntry.ts` (enter radius + the collision-radius relation), the
   world/place roster (positions + radii). VERIFIABLE: pure tests that the settlement collision
