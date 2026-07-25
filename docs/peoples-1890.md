@@ -262,9 +262,11 @@ Design: The Global Invention of the Kanga, 1876–1886", *Textile History* 48(1)
 [T&F](https://www.tandfonline.com/doi/abs/10.1080/00404969.2017.1294815);
 [Kanga](https://en.wikipedia.org/wiki/Kanga_(African_garment))).
 
-**So the Swahili village (6.5S 38.7E) can dress women in kanga in 1890 without
+**So the Swahili village can dress women in kanga in 1890 without
 anachronism** — as a *fashionable novelty* 4–14 years old, not an ancient
-tradition. Caveat: the **printed proverb/text**, the thing everyone associates
+tradition. (The village stood at 6.5S 38.7E when this was written and now
+stands at **2.4S 40.6E**, Lamu — see §7.1; the kanga argument is a coastal
+one and holds at either point.) Caveat: the **printed proverb/text**, the thing everyone associates
 with the kanga, arrives at the *end* of that decade — keep slogans minimal or
 absent.
 
@@ -583,8 +585,12 @@ mark the site of a town lately containing 20,000 inhabitants**", with "**lions
 commonly seen at the town well during the hot weather**" (Burton, *First
 Footsteps in East Africa*, 1856 — PERIOD, multiply corroborated;
 [Wikisource](https://en.wikisource.org/wiki/First_Footsteps_in_East_Africa/Chapter_10))
-— but Berbera is at **10.43N 45.01E**, ~550 km north of the game's Somali point.
-It would need a coastal port to use.
+— but Berbera is at **10.43N 45.01E**, and the game's Somali point stood
+~550 km south of it when this was written (5.5N). The village has since moved
+north to **9.0N 45.0E** on the Haud (§7.1), so the gap is now ~160 km — still
+Burton's coastal town rather than the interior village, so this remains not
+directly transferable. It would need a coastal port to use; the game has one,
+Berbera itself, as a port city.
 
 ### 4.0.3 Maasai transhumance, if a normal year is ever modelled
 
@@ -893,8 +899,9 @@ infected and appear to have no role in rinderpest transmission and
 maintenance."** ([FAO](https://www.fao.org/4/x2720e/X2720E02.htm)) — MODERN,
 AUTHORITATIVE. Consequence, independently stated: "communities such as the Maasai
 were hit hard while the **Somali people and Gabra were almost untouched as they
-relied on camels**." **The game's Somali point (5.5N 45.0E) sits in exactly the
-camel-dependent interior** to which this applies.
+relied on camels**." **The game's Somali point (now 9.0N 45.0E, the Haud — it
+was 5.5N when this was written, see §7.1) sits in exactly the camel-dependent
+interior** to which this applies; the move north only strengthens the fit.
 
 **★ But the Tuareg take an INDIRECT hit worth having:** "Across the sahel,
 rinderpest **exterminated pack oxen needed to deliver grain to Saharan oases**."
@@ -1136,7 +1143,18 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
   cobra's hood"*) and says **nothing about weather**. Do not turn it into a
   winter coat.
 
-#### Swahili (−6.5, 38.7): nothing seasonal — but something WEEKLY
+#### Swahili (−2.4, 40.6 — Lamu; MOVED 16.07 from −6.5, 38.7): nothing seasonal — but something WEEKLY
+
+> **STATUS — the village was moved, and this section records why.** The old
+> point sat 0.69° from Zanzibar while the next-closest village↔port pair in
+> the world is 4.16° away, a factor of six; and that spot is **Bagamoyo**,
+> which in 1890 is not a village at all but German East Africa's capital and
+> the caravan terminus. The village now stands at **2.4S 40.6E — Lamu**, one
+> of the oldest and most characteristic Swahili towns, 4.2° clear of Zanzibar,
+> on land, in region East, in the same east-rift climate zone and clear of the
+> §4.2 river band. Nothing below changes: the New (1873) dress evidence and
+> Burton's season names are coastal-Swahili evidence and apply at Lamu as at
+> Bagamoyo.
 
 - **§2.3 UPGRADE: THIN → PERIOD.** §2.3 said the kanzu's dating "rests entirely
   on tertiary sources — no period source found". There is one. **Charles New,
@@ -1169,7 +1187,22 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
   chills are advice to **European sailors**, not a description of Swahili
   practice — the easiest misreading in that chapter.
 
-#### Somali (5.5, 45.0): the one real seasonal dress change — and it may be at the wrong latitude
+#### Somali (9.0, 45.0 — the Haud; MOVED 16.07 from 5.5, 45.0): the one real seasonal dress change — and the point was moved to where it applies
+
+> **STATUS — the recommendation below was acted on.** The village stood at
+> 5.5N/349 m, the *Guban* half of Swayne's own contrast, so the karif muffle
+> he documents could not honestly apply to it. It now stands at **9.0N 45.0E,
+> 964 m — the Haud**, the high interior Swayne names, which is also the more
+> canonical Somali pastoral heartland. The karif tobe-over-the-head is
+> therefore SHOWN in the game (design.md §19.15) rather than held as a gap.
+> The move exposed a real model bug on the way: 9.0N/45.0E classified as
+> `congo-north`, because the east-rift rule stopped at lat < 6 and nothing
+> covered the Horn — the moved village would silently have been given the
+> Congo's unimodal June–September rains. There is now a `horn` climate zone
+> running Swayne's PERIOD four seasons (jilal Jan–Mar driest with great heat,
+> gu Apr–Jun the main rains, haga Jul–Sep hot and dry with the karif, dayr
+> Oct–Dec the lesser rains), arid throughout and far drier than the rift
+> beside it. The reasoning that led there is kept in full below.
 
 - **The best single find of the pass.** Swayne (1895, fieldwork **1885–93** — the
   game's exact decade and region), PERIOD, gives the tobe **and its states**:
@@ -1193,14 +1226,16 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
   *"In cold weather the head is muffled up in it"*, (b) his explicit location of
   the cold in haga via the karif, (c) both from one source, one people, the game's
   own years.
-- ⚠️ **GEOGRAPHY CAVEAT — the game's point may be in the wrong place for it.**
-  Swayne puts that cold *"on the Haud and other parts of the high interior"*
-  (~8–9°N, 1000 m+), and his own contrast is that the same wind is *"hot in
-  Guban"*. **The game's Somali village is at 5.5°N, 45.0°E — south of the Haud and
-  low.** So the muffle is defensible **for the Haud and not clearly defensible at
-  this coordinate**. Honest options: move the point north into the Haud/Ogo, or
-  hold the muffle as GAP-at-this-latitude and use the tobe's other three states,
-  which are location-free.
+- ✅ **GEOGRAPHY CAVEAT — RESOLVED by moving the point.** Swayne puts that cold
+  *"on the Haud and other parts of the high interior"* (~8–9°N, 1000 m+), and his
+  own contrast is that the same wind is *"hot in Guban"*. The game's Somali
+  village stood at 5.5°N, 45.0°E — south of the Haud and low, i.e. in the Guban
+  half of that sentence — so the muffle was defensible **for the Haud and not at
+  that coordinate**. Of the two honest options (move the point north into the
+  Haud/Ogo, or hold the muffle as GAP-at-this-latitude and use the tobe's three
+  location-free states), the FIRST was taken on 16.07: the village is now at
+  **9.0°N, 45.0°E, 964 m — on the Haud**, so Swayne's muffle applies to it
+  directly and is what the game shows.
 - Also PERIOD: some tobes *"dipped in red clay… of a bright burnt-sienna colour"*;
   the elite **khaili**; *"In no tribe that I have seen do the Somáli women cover
   the face"*; married women's hair in *"a chignon, enclosed in a dark blue bag"*.
@@ -1319,7 +1354,7 @@ not land on the body. It lands on the **hut**, the **sleeping place** and the
 | --- | --- |
 | **Maasai** | **Nothing on the figure — the hides go on the HUT** (Thomson, PERIOD, twice). Compatible with the ochred-leather ruling. Bonus, now PERIOD: the camp moves **up to the highlands in the DRY season**. |
 | **Swahili** | **Nothing seasonal — the *joho* goes on for great occasions and FRIDAYS** (New, PERIOD). A weekly rhythm the calendar can already compute. |
-| **Somali** | **The one real seasonal dress change: in the karif (Jul–Sep) the tobe is muffled over the head** (Swayne, PERIOD, exact people and years). ⚠️ But that cold is on the **Haud**, not at the game's low 5.5°N point — move the point north or hold it as GAP-at-this-latitude. The other three tobe states are location-free. |
+| **Somali** | **The one real seasonal dress change: in the karif (Jul–Sep) the tobe is muffled over the head** (Swayne, PERIOD, exact people and years). ✅ That cold is on the **Haud**, and the village was moved there (9.0N 45.0E, 964 m) so the finding applies to it; the game shows the muffle. The other three tobe states are location-free. |
 | **Sidama** | **Nothing — GAP.** No period source describes Hawassa dress; the one that seems to (Borelli) means the Omo basin. What CAN be shown: **sleeping outdoors normally, indoors in cold or wet** (Parkyns), and the day-cloth as night-blanket. **Never an Amhara shamma — in 1891 that is the invader's dress.** |
 | **Baganda** | **Nothing — and the record rules out the obvious guess** (the second barkcloth is priesthood). Only the **work belt**. |
 
