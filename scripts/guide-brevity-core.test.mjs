@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { LIMITS, auditGuide, parseEntries, sliceSection, formatViolations } from './guide-brevity-core.mjs'
+import {
+  LIMITS,
+  auditGuide,
+  parseEntries,
+  sliceSection,
+  strayLines,
+  formatViolations,
+} from './guide-brevity-core.mjs'
 
 // Vitest rewrites import.meta.url, so resolve from the repo root it runs in.
 const GUIDE = resolve(process.cwd(), 'docs/analysis_de/vibe-coding-anleitung.md')
@@ -13,7 +20,15 @@ const entry = (title, riskLines, withPrompt = true) =>
     ...(withPrompt ? ['  → *Prompt:* „Etabliere einen Mechanismus, der das verhindert."'] : []),
   ].join('\n')
 
-const doc = (...entries) => `# Titel\n\n## Die häufigsten Fallstricke\n\n${entries.join('\n\n')}\n`
+// A test document is padded with compliant filler entries so it clears the
+// minEntries sanity check — otherwise every fixture would trip the structural
+// guard and drown the property under test. Tests that target that check pass
+// their own lax limits instead.
+const filler = Array.from({ length: LIMITS.minEntries }, (_, i) =>
+  `- **Füller ${i}** Ein Risiko.\n  → *Prompt:* „Etabliere einen Mechanismus."`,
+)
+const rawDoc = (...entries) => `# Titel\n\n## Die häufigsten Fallstricke\n\n${entries.join('\n\n')}\n`
+const doc = (...entries) => rawDoc(...entries, ...filler)
 
 describe('auditGuide — budgets', () => {
   it('passes a compact entry', () => {
@@ -70,9 +85,85 @@ describe('auditGuide — project-specific markers', () => {
     expect(auditGuide(d).ok).toBe(true)
   })
 
+  it('allows a bare directory convention but flags a real repository path', () => {
+    const generic = doc('- **Titel** Leg Notizen unter docs/ ab und halte src/ sauber.\n  → *Prompt:* „Tu es."')
+    expect(auditGuide(generic).violations.filter((v) => v.kind === 'project-specific')).toHaveLength(0)
+    const real = doc('- **Titel** Das steht in scripts/verify/flow.mjs.\n  → *Prompt:* „Tu es."')
+    expect(auditGuide(real).violations.some((v) => v.kind === 'project-specific')).toBe(true)
+  })
+
+  it('does not police the German idiom about the elephant in the room', () => {
+    const d = doc('- **Titel** Sprich den Elefanten im Raum an.\n  → *Prompt:* „Tu es."')
+    expect(auditGuide(d).violations.filter((v) => v.kind === 'project-specific')).toHaveLength(0)
+  })
+
   it('reports each marker once per line, not once per match', () => {
     const d = doc('- **Titel** Am 01.01.2020 und am 02.02.2021.\n  → *Prompt:* „Tu es."')
     expect(auditGuide(d).violations.filter((v) => v.kind === 'project-specific').length).toBe(1)
+  })
+})
+
+// The failure mode this guard exists to avoid is being silently toothless: if
+// the section is renamed or the entry format changes, every per-entry check
+// would inspect an empty list and report success.
+describe('auditGuide — structural sanity', () => {
+  const lax = { ...LIMITS, minEntries: 2 }
+
+  it('flags a renamed pitfall section instead of passing vacuously', () => {
+    const gutted = doc(entry('A', 2, false), entry('B', 2, false)).replace(
+      '## Die häufigsten Fallstricke',
+      '## Themen',
+    )
+    const { ok, violations } = auditGuide(gutted, lax)
+    expect(ok).toBe(false)
+    expect(violations.map((v) => v.kind)).toContain('structure')
+  })
+
+  it('flags a section with too few recognised entries', () => {
+    const { violations } = auditGuide(rawDoc(entry('Nur einer', 2)), lax)
+    expect(violations.map((v) => v.kind)).toContain('structure')
+  })
+
+  it('flags prose smuggled between the bullets', () => {
+    const d = doc(entry('A', 2), 'Eine lange Geschichte ohne Bullet.', entry('B', 2))
+    const { violations } = auditGuide(d, lax)
+    expect(violations.map((v) => v.kind)).toContain('stray-prose')
+  })
+
+  it('flags a bullet written without its bold title (it would escape every check)', () => {
+    const { violations } = auditGuide(doc(entry('A', 2), '- Ohne Fettdruck, also kein Eintrag.', entry('B', 2)), lax)
+    expect(violations.map((v) => v.kind)).toContain('stray-prose')
+  })
+
+  it('treats blank lines and the section rule as formatting, not stray prose', () => {
+    expect(strayLines(sliceSection(`# T\n\n## Fallstricke\n\n- **A** x\n  → *Prompt:* „y"\n\n---\n`, /Fallstrick/i))).toEqual([])
+  })
+
+  it('audits CRLF exactly like LF', () => {
+    const d = doc(entry('A', 2), entry('B', 2))
+    expect(auditGuide(d.replace(/\n/g, '\r\n'), lax)).toEqual(auditGuide(d, lax))
+  })
+
+  it('does not throw on an empty or nullish document', () => {
+    expect(auditGuide('').ok).toBe(false) // no section → structure violation
+    expect(() => auditGuide(null)).not.toThrow()
+  })
+})
+
+describe('auditGuide — budget boundaries', () => {
+  it('allows a risk exactly at the limit and rejects one line more', () => {
+    expect(auditGuide(doc(entry('Grenze', LIMITS.maxRiskLines))).violations
+      .filter((v) => v.kind === 'risk-too-long')).toHaveLength(0)
+    expect(auditGuide(doc(entry('Drüber', LIMITS.maxRiskLines + 1))).violations
+      .filter((v) => v.kind === 'risk-too-long')).toHaveLength(1)
+  })
+
+  it('leaves the fingerprint comment out of BOTH budgets', () => {
+    const d = doc(entry('A', 2))
+    const withFp = `${d}<!-- GUIDE-FINGERPRINT: ${'a'.repeat(64)} -->\n`
+    const tight = { ...LIMITS, maxLines: d.split('\n').length, minEntries: 1 }
+    expect(auditGuide(d, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
+    expect(auditGuide(withFp, tight).violations.filter((v) => v.kind === 'length')).toHaveLength(0)
   })
 })
 
@@ -88,7 +179,7 @@ describe('parsing helpers', () => {
   })
 
   it('groups indented continuation lines into their entry and drops trailing blanks', () => {
-    const s = sliceSection(doc('- **A** x\n  y', '- **B** z\n  → *Prompt:* „q"'), /Fallstrick/i)
+    const s = sliceSection(rawDoc('- **A** x\n  y', '- **B** z\n  → *Prompt:* „q"'), /Fallstrick/i)
     const entries = parseEntries(s)
     expect(entries.map((e) => e.title)).toEqual(['A', 'B'])
     expect(entries[0].lines).toEqual(['- **A** x', '  y'])

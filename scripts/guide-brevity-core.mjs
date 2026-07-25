@@ -17,12 +17,19 @@
 
 export const LIMITS = {
   maxLines: 345,
-  maxWords: 2700,
+  // Deliberately a little loose (~5 % headroom): a budget with almost no room
+  // blocks a clarifying half-sentence, and a guard that fires on legitimate
+  // edits teaches people to raise the number instead of to cut. It must bite on
+  // a growing case study, not on an honest rewording.
+  maxWords: 2850,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
   // The risk half alone: name it, do not narrate it.
   maxRiskLines: 4,
+  // Below this the pitfall section has plainly been renamed or restructured,
+  // and the per-entry checks would silently inspect nothing.
+  minEntries: 10,
 }
 
 // Markers of project-specific content. Each one belongs in the retrospective
@@ -30,13 +37,20 @@ export const LIMITS = {
 export const PROJECT_MARKERS = [
   { re: /\b\d{1,2}\.\d{1,2}\.\d{4}\b/, hint: 'konkretes Datum' },
   { re: /\b(?:Punkt|point)\s+\d+\b/i, hint: 'Punkt-Nummer aus der Aufgabenliste' },
-  { re: /(?:^|[\s("'`])(?:src|scripts|docs|verification|public|node_modules)\//, hint: 'Pfad aus diesem Repository' },
+  {
+    // A SECOND segment is required: `src/` and `docs/` alone are universal
+    // conventions a tool-neutral guide may name; `scripts/verify/x.mjs` is not.
+    re: /(?:^|[\s("'`])(?:src|scripts|docs|verification|public|local|\.claude)\/\w/,
+    hint: 'Pfad aus diesem Repository',
+  },
   {
     re: /\b(?:WebGPU|WebGL|three\.js|Playwright|Vitest|oxlint|Kokoro|R3F|TSL|jsdom)\b/i,
     hint: 'Technologie dieses Projekts (die Anleitung bleibt werkzeug-neutral)',
   },
   {
-    re: /\b(?:Krokodil|Elefant|Savanne|Kanu|Dorfältest|Häfen|Karawane)\w*/i,
+    // Compound forms only — bare "Elefant" also lives in the German idiom about
+    // the elephant in the room, and a guard must not police figures of speech.
+    re: /\b(?:Krokodil|Elefantenherde|Elefantenbulle|Savanne|Kanu|Dorfältest|Karawane|Giraffe|Löwenjagd)\w*/i,
     hint: 'Spielinhalt dieses Projekts',
   },
   { re: /\bin diesem Projekt\b/i, hint: 'Anekdoten-Einleitung' },
@@ -91,6 +105,32 @@ export function parseEntries(sectionLines) {
   return entries
 }
 
+/**
+ * Content lines inside the pitfall section that belong to no entry — a war
+ * story pasted between the bullets, or a bullet written without its bold title.
+ * Without this the per-entry budgets are trivially bypassed: parseEntries
+ * simply drops such lines, so they would face only the whole-document budget.
+ * Blank lines and the `---` section rule are formatting, not content.
+ */
+export function strayLines(sectionLines) {
+  const stray = []
+  let inEntry = false
+  for (const { line, text } of sectionLines) {
+    if (/^-\s+\*\*/.test(text)) {
+      inEntry = true
+      continue
+    }
+    if (text.trim() === '' || /^-{3,}$/.test(text.trim())) continue
+    if (/^\s/.test(text)) {
+      if (!inEntry) stray.push({ line, text })
+      continue
+    }
+    inEntry = false
+    stray.push({ line, text })
+  }
+  return stray
+}
+
 const ACTION_RE = /→\s*\*(?:Prompt|Mechanismus)\s*:\*/
 
 /**
@@ -104,13 +144,14 @@ export function auditGuide(text, limits = LIMITS) {
   const violations = []
   const push = (kind, line, detail) => violations.push({ kind, line, detail })
 
-  const lines = src.split('\n')
-  // The fingerprint comment is bookkeeping, not content.
+  // CRLF must audit identically to LF, and the fingerprint comment is
+  // bookkeeping rather than content — excluded from BOTH budgets, not just one.
+  const lines = src.replace(/\r\n/g, '\n').split('\n')
   const body = lines.filter((l) => !/^<!--/.test(l.trim()))
   const words = body.join(' ').split(/\s+/).filter(Boolean).length
 
-  if (lines.length > limits.maxLines) {
-    push('length', lines.length, `${lines.length} Zeilen > Budget ${limits.maxLines}`)
+  if (body.length > limits.maxLines) {
+    push('length', body.length, `${body.length} Zeilen > Budget ${limits.maxLines}`)
   }
   if (words > limits.maxWords) {
     push('length', 1, `${words} Wörter > Budget ${limits.maxWords}`)
@@ -130,7 +171,28 @@ export function auditGuide(text, limits = LIMITS) {
     }
   })
 
-  for (const entry of parseEntries(sliceSection(src, /Fallstrick/i))) {
+  // Structural sanity FIRST. Renaming the pitfall heading or dropping the
+  // `- **Titel**` form would make every per-entry check inspect an empty list
+  // and report a clean bill of health — the "guard that never fires" failure
+  // this project has hit before. So a missing or gutted section is itself a
+  // violation, and prose smuggled between the bullets is reported too.
+  const section = sliceSection(src, /Fallstrick/i)
+  const entries = parseEntries(section)
+  if (!section.length) {
+    push('structure', 1, 'Keine Fallstrick-Sektion gefunden — die Eintrags-Prüfungen liefen ins Leere')
+  } else if (entries.length < limits.minEntries) {
+    push(
+      'structure',
+      section[0].line,
+      `nur ${entries.length} Fallstrick-Einträge erkannt (< ${limits.minEntries}) — Format geändert? ` +
+        'Die Eintrags-Budgets prüfen sonst nichts',
+    )
+  }
+  for (const { line, text: l } of strayLines(section)) {
+    push('stray-prose', line, `„${l.trim().slice(0, 60)}…" gehört zu keinem Fallstrick-Eintrag`)
+  }
+
+  for (const entry of entries) {
     if (entry.lines.length > limits.maxEntryLines) {
       push(
         'entry-too-long',
