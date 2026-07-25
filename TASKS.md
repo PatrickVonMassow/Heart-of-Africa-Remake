@@ -10977,27 +10977,26 @@ the remaining open points in their numeric order.
   the memory `use-1890-valid-names`; the point-205 plausibility audit enforces it. Fast
   gate green (2867 tests). Committed to main.
 
-- [x] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
-  24.07.2026 during the 276 verify; PRE-EXISTING on main, independent of 276/273).
-  design.md §19.1 / §7.1 pt.20: a nearby animal's own call rises and AUDIBLY FADES with
-  distance. Currently it does not fade back: in `scripts/verify/settings.mjs` the
-  "animal call fades once the player moves away" check fails deterministically —
-  after the injected elephant is removed, `window.__ambience.animalProx().elephant`
-  decays only from ~0.87 to ~0.83 over the 1600 ms window (expected < 0.1). So the
-  proximity call effectively stays up after the source is gone. BEHAVIOUR: the per-animal
-  proximity level must decay to near-silence within a short, perceptible window once no
-  such animal is near (the rise already works — near/prox climb correctly). INVESTIGATE
-  whether the decay time-constant is simply too slow (a real product regression — some
-  merged point likely slowed or froze it; note `prox` and `gone` are nearly identical, so
-  the value barely moves) OR the proximity is not recomputed at all after the herd list
-  changes. Fix the behaviour so the call fades, and if the check's 1600 ms window is
-  genuinely too short for an intended gentle fade, widen it — but the default must reach
-  clear silence in a natural time. ANCHORS: `src/systems/ambience.ts` (`animalProx`, the
-  per-source proximity decay), `scripts/verify/settings.mjs` (the check). VERIFIABLE: a
-  pure test of the proximity decay in `src/systems/ambience.test.ts` (rises near, decays
-  to ~0 within the window after the source leaves), and the settings.mjs check green on
-  BOTH backends. QA-finder-class regression (points 200/285). No player-visible text.
-
+- [x] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES —
+  RESOLVED 25.07.2026 AS A STALE CHECK, NOT A PRODUCT BUG. The reported symptom was
+  real (the settings.mjs check "the animal call fades once the player moves away"
+  failed deterministically, the level staying at ~0.9), but the cause sat in the
+  CHECK: it injected the elephant with the marker tag chunk='inject' and removed it
+  again by filtering on that tag — while keepStreamedAnimal (point 282) RE-HOMES any
+  animal whose chunk tag is not a live chunk into the chunk under its feet,
+  overwriting the marker within one frame. The filter therefore removed nothing, the
+  elephant stayed ~4.5 m from the traveller, and its call correctly stayed up; the
+  value froze at exactly the injected level because the report hysteresis swallows a
+  slowly roaming elephant's drift. FIX: inject UNTAGGED (the convention every other
+  injected animal follows — untagged animals are never re-homed) and remove BY OBJECT
+  IDENTITY; the check now also asserts the AUDIBLE layer, not only the reported
+  number, and names the re-home trap in a comment so the assumption cannot rot again.
+  The audio path was never broken, so no honest pure test could fail beforehand — the
+  four new tests in src/systems/ambience.test.ts were proven to have teeth by MUTATION
+  instead (making setAmbienceAnimals skip zero updates fails exactly those four).
+  Verified: settings 37 pass / 0 fail on WebGL 2 AND on WebGPU. LESSON (feeds point
+  294): a red check can indict the product for its own stale assumption — the reverted
+  degraded-session "fix" accepted that indictment and patched innocent audio code.
 - [x] 293. EXTEND THE IN-GAME BENCHMARK TO GUIDE FURTHER LOW-LEVEL REDUCTION (user
   24.07.2026). The user runs the F8 / `?bench` benchmark (point 277) on a SLOW PC to find
   what MORE can be cut at the LOW graphics level (point 276) to gain performance. Extend
