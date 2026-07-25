@@ -97,6 +97,235 @@ export function parseKlaerungPoints(html) {
   return points
 }
 
+// ═══ Point-313 full-consistency audit (user 25.07.2026, four-eyes Opus+Fable) ═══
+// The 25.07 morning audit found real gaps none of invariants 1-9 caught: newly
+// ticked points with no Erledigt card (262/273/293/305), an OPEN point with an
+// Erledigt card (306), a queue card whose meta was no duration, cp1252
+// double-encoding damage across the file, and structure drift. auditDashboard()
+// is the pure check set; evaluate() blocks on it as invariant (8b), and the
+// wrapper refuses to record --synced while it fails.
+
+/** The four binding sections, in the user's mandated order (18.07.2026). */
+export const SECTION_TITLES = ['Woran ich gerade arbeite', 'Von dir zu klären', 'Warteschlange', 'Erledigt']
+
+// cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
+// its own code point). The detector uses it REVERSED.
+const CP1252_HIGH = {
+  0x80: 0x20ac, 0x82: 0x201a, 0x83: 0x0192, 0x84: 0x201e, 0x85: 0x2026, 0x86: 0x2020,
+  0x87: 0x2021, 0x88: 0x02c6, 0x89: 0x2030, 0x8a: 0x0160, 0x8b: 0x2039, 0x8c: 0x0152,
+  0x8e: 0x017d, 0x91: 0x2018, 0x92: 0x2019, 0x93: 0x201c, 0x94: 0x201d, 0x95: 0x2022,
+  0x96: 0x2013, 0x97: 0x2014, 0x98: 0x02dc, 0x99: 0x2122, 0x9a: 0x0161, 0x9b: 0x203a,
+  0x9c: 0x0153, 0x9e: 0x017e, 0x9f: 0x0178,
+}
+const CP1252_REVERSE = (() => {
+  const rev = new Map()
+  for (let b = 0; b < 0x100; b++) rev.set(String.fromCharCode(b), b)
+  for (const [b, cp] of Object.entries(CP1252_HIGH)) rev.set(String.fromCharCode(cp), Number(b))
+  return rev
+})()
+
+/**
+ * Structural mojibake detector (Opus plan-review change 1): instead of a
+ * substring blocklist, map each char back to its cp1252 byte and flag any spot
+ * where a VALID UTF-8 multibyte sequence emerges — that shape only arises when
+ * UTF-8 bytes were mis-read as cp1252 (the 24.07 umlaut damage: "Ã¼", "â€"",
+ * "âˆ'", "Ï€", the mis-decoded BOM "ï»¿" …). Legitimate content („…", ü, —, ·,
+ * →, ✓, emoji, a real U+FEFF BOM) never forms one: a single cp1252-mappable
+ * char is never a LEAD followed by CONTINUATION-range chars.
+ */
+export function looksDoubleEncoded(text) {
+  const s = typeof text === 'string' ? text : ''
+  const found = []
+  for (let i = 0; i < s.length; i++) {
+    const lead = CP1252_REVERSE.get(s[i])
+    if (lead === undefined || lead < 0xc2 || lead > 0xf4) continue
+    const need = lead >= 0xf0 ? 3 : lead >= 0xe0 ? 2 : 1
+    let ok = true
+    for (let k = 1; k <= need; k++) {
+      const cont = CP1252_REVERSE.get(s[i + k])
+      if (cont === undefined || cont < 0x80 || cont > 0xbf) {
+        ok = false
+        break
+      }
+    }
+    if (!ok) continue
+    found.push(s.slice(i, i + need + 1))
+    i += need
+  }
+  return [...new Set(found)]
+}
+
+/** Slice the board into its <h2>-anchored sections: titles in document order
+ *  plus each section's html (the last runs to EOF, footer included). */
+export function sliceSections(html) {
+  const order = []
+  const sections = {}
+  if (typeof html !== 'string') return { order, sections }
+  const marks = []
+  for (const m of html.matchAll(/<h2>([^<]*)<\/h2>/g)) marks.push({ title: m[1].trim(), at: m.index })
+  for (let i = 0; i < marks.length; i++) {
+    order.push(marks[i].title)
+    sections[marks[i].title] = html.slice(marks[i].at, i + 1 < marks.length ? marks[i + 1].at : undefined)
+  }
+  return { order, sections }
+}
+
+/**
+ * Parse one section's cards → [{open, meta, body, points}]. Point numbers come
+ * from `.num` spans holding a PURE number (a "203A" sub-delivery `.num` is no
+ * point) plus a leading `.t` number incl. the compound forms of the real board
+ * ("287+288 —", "232·233·234 —", "71/72 —", "313: …") — Opus plan-review
+ * hardening 6.
+ */
+export function parseCards(sectionHtml) {
+  const cards = []
+  if (typeof sectionHtml !== 'string') return cards
+  // Split a compound point field into its numbers ("232·233·234", "92+94",
+  // "71/72"); a sub-delivery marker ("203A", "CI", "✓") yields none. Bounded by
+  // MAX_POINT so a date or a count in a title cannot pose as a point number.
+  const MAX_POINT = 999
+  const numbers = (raw) =>
+    String(raw)
+      .split(/[+·/\s]+/)
+      .filter((n) => /^\d+$/.test(n) && Number(n) <= MAX_POINT)
+      .map(Number)
+  for (const part of sectionHtml.split(/<details/).slice(1)) {
+    const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    const meta = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? null
+    // The body slice must survive a container child, so take everything after
+    // the body div's opening tag (the card ends at the next <details anyway).
+    const body = ((part.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const points = new Set()
+    for (const m of summary.matchAll(/class="num">\s*([^<]*?)\s*</g)) for (const n of numbers(m[1])) points.add(n)
+    // Leading title number(s), separated from the text by a dash or colon —
+    // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
+    const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
+    if (t) for (const n of numbers(t)) points.add(n)
+    cards.push({ meta, body, points: [...points] })
+  }
+  return cards
+}
+
+/**
+ * The point-313 audit → violations [{code, msg}]; empty = consistent. `doneSeen`
+ * is the baseline of done points already reviewed (persisted by the wrapper on
+ * each CLEAN --synced); a non-array baseline skips the new-tick checks — the
+ * wrapper seeds it on the first clean pass, so pre-guard history is
+ * grandfathered exactly once.
+ */
+export function auditDashboard(html, input = {}) {
+  const v = []
+  if (typeof html !== 'string' || !html) return v
+  // Totality: every list comes from JSON/parsers and may be anything.
+  const { doneSeen = null } = input ?? {}
+  const open = Array.isArray(input?.open) ? input.open : []
+  const done = Array.isArray(input?.done) ? input.done : []
+  const { order, sections } = sliceSections(html)
+
+  // STRUCTURE — exactly the four binding sections, in order.
+  if (order.length !== SECTION_TITLES.length || SECTION_TITLES.some((t, i) => order[i] !== t)) {
+    v.push({
+      code: 'structure',
+      msg: `section headers are [${order.join(' | ') || '<none>'}] — the binding structure is [${SECTION_TITLES.join(' | ')}]`,
+    })
+  }
+
+  // NO AUTO-OPEN — user mandate 23.07.2026 (dashboard-no-auto-open): no card
+  // carries `open`; the localStorage script restores what the READER opened,
+  // and a hardcoded attribute overrides that choice on every refresh.
+  if (/<details[^>]*\sopen[\s>]/.test(html)) {
+    v.push({
+      code: 'auto-open',
+      msg: 'a <details> carries the `open` attribute — all cards start closed (user mandate 23.07.2026)',
+    })
+  }
+
+  const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '')
+  const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '')
+  const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '')
+  const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '')
+
+  // EMPTY BODY — a card must explain itself when expanded.
+  const empty = [nowCards, vdzkCards, queueCards, erledigtCards].flat().filter((c) => !c.body).length
+  if (empty) v.push({ code: 'empty-body', msg: `${empty} card(s) have an empty body` })
+
+  // DUPLICATE NUMBER within one OPEN section (Erledigt is exempt — several
+  // delivery cards for one point are legitimate history, e.g. point 206).
+  for (const [name, cards] of [
+    [SECTION_TITLES[0], nowCards],
+    [SECTION_TITLES[1], vdzkCards],
+    [SECTION_TITLES[2], queueCards],
+  ]) {
+    const seen = new Set()
+    const dup = new Set()
+    for (const c of cards) for (const n of c.points) (seen.has(n) ? dup : seen).add(n)
+    if (dup.size) {
+      v.push({ code: 'dup-in-section', msg: `point(s) ${[...dup].join(', ')} appear on more than one card in "${name}"` })
+    }
+  }
+
+  // QUEUE META — every Warteschlange card names its estimated duration.
+  const badQueue = queueCards.filter((c) => !c.meta || !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta))
+  if (badQueue.length) {
+    v.push({
+      code: 'queue-meta',
+      msg: `${badQueue.length} Warteschlange card(s) lack a "~<n> h" duration meta (point(s) ${badQueue.flatMap((c) => c.points).join(', ') || '<none parseable>'})`,
+    })
+  }
+
+  // NOW META — the now-card names its start time.
+  if (nowCards.length && nowCards.some((c) => !c.meta || !/\d{1,2}:\d{2}/.test(c.meta))) {
+    v.push({ code: 'now-meta', msg: 'a now-card meta lacks a HH:MM time' })
+  }
+
+  // NEWLY TICKED points need an Erledigt card, with a time meta (only vs the
+  // doneSeen baseline — pre-guard history is grandfathered).
+  if (Array.isArray(doneSeen)) {
+    const seen = new Set(doneSeen.filter((n) => Number.isInteger(n)))
+    const erledigtPoints = new Set(erledigtCards.flatMap((c) => c.points))
+    const missing = done.filter((n) => !seen.has(n) && !erledigtPoints.has(n))
+    if (missing.length) {
+      v.push({ code: 'erledigt-missing', msg: `newly ticked point(s) ${missing.join(', ')} have NO Erledigt card` })
+    }
+    const newNoTime = erledigtCards.filter(
+      (c) => c.points.some((n) => !seen.has(n) && done.includes(n)) && (!c.meta || !/\d{1,2}:\d{2}/.test(c.meta)),
+    )
+    if (newNoTime.length) {
+      v.push({ code: 'erledigt-meta', msg: 'an Erledigt card for a newly ticked point lacks a time meta (start – end)' })
+    }
+  }
+
+  // NO OPEN POINT IN ERLEDIGT (the 25.07 "open 306 under Erledigt" case).
+  const erlSet = new Set(erledigtCards.flatMap((c) => c.points))
+  const openInErl = open.filter((n) => erlSet.has(n))
+  if (openInErl.length) {
+    v.push({ code: 'open-in-erledigt', msg: `OPEN point(s) ${openInErl.join(', ')} have an Erledigt card` })
+  }
+
+  // ENCODING HEALTH — the 24.07 cp1252 double-encoding class.
+  const moji = looksDoubleEncoded(html)
+  if (moji.length) {
+    v.push({
+      code: 'mojibake',
+      msg:
+        `double-encoded sequence(s) found: ${moji.slice(0, 6).join(' ')}${moji.length > 6 ? ` … (+${moji.length - 6})` : ''} — repair the encoding. ` +
+        'If a card DELIBERATELY quotes mojibake (a card about this very bug class), rephrase it ' +
+        'without the literal sequence — quoting damaged bytes on the board is itself damage.',
+    })
+  }
+
+  // FOOTER CURRENCY — the "N offene Punkte" figure must match TASKS.md.
+  const foot = html.match(/(\d+)\s+offene Punkte/)
+  if (foot && open.length && Number(foot[1]) !== open.length) {
+    v.push({ code: 'footer-stale', msg: `the footer claims ${foot[1]} open points, TASKS.md has ${open.length}` })
+  }
+
+  return v
+}
+
 const block = (reason) => ({ decision: 'block', reason })
 const ALLOW = { decision: 'allow' }
 
@@ -279,6 +508,23 @@ export function evaluate(input) {
         'confirmed. Verify the now-card still shows the live sub-state (fresh "Status (Stand HH:MM)" ' +
         'line) — refresh + republish + --synced if not — then run node scripts/focus.mjs confirm.',
     )
+  }
+
+  // (8b) FULL-CONSISTENCY AUDIT (point 313) — evaluated BEFORE the publish
+  // check (fix first, publish once). A logged waiver covers exactly ONE file
+  // hash: any further edit re-arms the audit.
+  const violations = auditDashboard(html, { open, done, doneSeen: marker.doneSeen })
+  if (violations.length) {
+    const waived = marker.auditWaived && repoHash && marker.auditWaived.repoHash === repoHash
+    if (!waived) {
+      const shown = violations.slice(0, 5).map((x) => `[${x.code}] ${x.msg}`)
+      const more = violations.length > 5 ? ` — and ${violations.length - 5} more` : ''
+      return block(
+        `DASHBOARD CONSISTENCY AUDIT FAILED: ${shown.join('; ')}${more}. Fix the board, republish ` +
+          '(dashboard-publish.mjs + Artifact), then re-run --synced (it refuses to attest while the ' +
+          'audit fails). Emergency only: node scripts/dashboard-guard.mjs --waive-audit "<reason>".',
+      )
+    }
   }
 
   // (9) PUBLISHED — "I updated the file" must not masquerade as "it is live".

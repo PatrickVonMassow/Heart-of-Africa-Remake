@@ -9,14 +9,22 @@
 //   (1) registered   (2) fresh vs HEAD          (3) no ticked point in the queue
 //   (4) every open point visible                (5) focus declared (focus.mjs)
 //   (6) now-card title point == declared focus  (7) reconcile after a user prompt
-//   (8) re-affirm after ~30 min of work         (9) repo file == published content
+//   (8) re-affirm after ~30 min of work         (8b) full-consistency audit (313)
+//   (9) repo file == published content
 //
 // The companion flow after every dashboard edit:
 //   node scripts/dashboard-publish.mjs          # sync repo copy → scratchpad copy
 //   <publish the scratchpad file via the Artifact tool (same artifact url)>
 //   node scripts/dashboard-guard.mjs --synced <dashboard.html path>
-// --synced records the reviewed HEAD and, when the now-card matches the declared
-// focus, also counts as the focus confirmation (clears a pending pivot check).
+// --synced VALIDATES FIRST (point 313): while auditDashboard() reports
+// violations it records NOTHING and exits 1 — the board cannot be attested
+// inconsistent. On a clean pass it records the reviewed HEAD, refreshes the
+// integrity snapshots, advances the doneSeen baseline (newly ticked points must
+// have shown their Erledigt card to get here), and — when the now-card matches
+// the declared focus — doubles as the focus confirmation. Emergency bypass for
+// a genuinely unfixable finding: --waive-audit "<reason>" waives exactly the
+// CURRENT file hash (any further edit re-arms the audit); the waiver is logged
+// in dashboard-state.json.
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -32,7 +40,14 @@ import {
   removeFile,
   sha256File,
 } from './dashboard-state.mjs'
-import { parseTasks, parseNowCardPoint, evaluate } from './dashboard-guard-core.mjs'
+import {
+  parseTasks,
+  parseNowCardPoint,
+  auditDashboard,
+  parseCards,
+  sliceSections,
+  evaluate,
+} from './dashboard-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 
@@ -47,6 +62,27 @@ function head() {
   }
 }
 
+// --waive-audit "<reason>": emergency bypass for the consistency audit, bound
+// to exactly the CURRENT registered file's hash (point 313 escape hatch — the
+// only alternative used to be pausing the whole batch).
+if (process.argv[2] === '--waive-audit') {
+  const reason = process.argv[3]
+  const marker = readJson(STATE_PATH)
+  // Falls back to the default board path so the hatch also works BEFORE the
+  // first registration (a fresh clone with a violation would otherwise have no
+  // way out but pausing the whole batch).
+  const rel = (marker && marker.dashboardPath) || '.batch-dashboard.html'
+  const file = resolve(REPO_ROOT, process.argv[4] || rel)
+  if (!reason || !existsSync(file)) {
+    console.error('usage: node scripts/dashboard-guard.mjs --waive-audit "<reason>" [dashboard.html]')
+    process.exit(1)
+  }
+  const waiver = { repoHash: sha256File(file), reason, at: Date.now() }
+  mergeState({ auditWaived: waiver })
+  console.log(`audit waived for the CURRENT file hash only (${String(waiver.repoHash).slice(0, 12)}…): ${reason}`)
+  process.exit(0)
+}
+
 // --synced <path>: record that the dashboard at <path> was reviewed at this HEAD.
 if (process.argv[2] === '--synced') {
   const p = process.argv[3]
@@ -54,7 +90,34 @@ if (process.argv[2] === '--synced') {
     console.error(`dashboard-guard --synced: file not found: ${p}`)
     process.exit(1)
   }
-  mergeState({ dashboardPath: p, head: head(), syncedAt: Date.now() })
+
+  // VALIDATE FIRST (point 313): a board that fails the consistency audit can
+  // not be attested — nothing is written, the violations are the work list.
+  const { open, done } = parseTasks(readFileSync(TASKS, 'utf8'))
+  const priorState = readJson(STATE_PATH) ?? {}
+  const violations = auditDashboard(readFileSync(p, 'utf8'), { open, done, doneSeen: priorState.doneSeen ?? null })
+  const waived = priorState.auditWaived && priorState.auditWaived.repoHash === sha256File(p)
+  if (violations.length && !waived) {
+    console.error(`dashboard-guard --synced REFUSED — ${violations.length} consistency violation(s):`)
+    for (const x of violations) console.error(`  [${x.code}] ${x.msg}`)
+    console.error('Fix the board, republish, then re-run --synced. Emergency only: --waive-audit "<reason>".')
+    process.exit(1)
+  }
+
+  // Advance the doneSeen baseline — but a WAIVED pass must not absorb an
+  // erledigt-missing finding forever: it only advances over points that
+  // actually have a card (plus everything already seen). A clean pass has no
+  // such finding, so it advances over the full done set. The waiver itself is
+  // consumed here: reverting to previously waived bytes must not revive it.
+  const prevSeen = Array.isArray(priorState.doneSeen) ? priorState.doneSeen : null
+  const carded = new Set(
+    parseCards(sliceSections(readFileSync(p, 'utf8')).sections['Erledigt'] ?? '').flatMap((c) => c.points),
+  )
+  const doneSeen =
+    violations.length && prevSeen
+      ? [...new Set([...prevSeen, ...done.filter((n) => carded.has(n))])]
+      : done
+  mergeState({ dashboardPath: p, head: head(), syncedAt: Date.now(), doneSeen, auditWaived: undefined })
   console.log(`dashboard registered at HEAD ${head().slice(0, 7)}: ${p}`)
 
   // Record the card/spec drift baselines for the integrity guard (check C):
