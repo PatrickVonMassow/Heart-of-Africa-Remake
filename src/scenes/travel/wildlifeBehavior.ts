@@ -2039,6 +2039,20 @@ export function inEscapeRun(juvenile: { escape?: number }): boolean {
   return juvenile.escape !== undefined && juvenile.escape > 0
 }
 
+/** Is a §19.8 ending currently running on this young, so the point-262 adoption
+ *  must wait (point 311)? Two states hold it off, both of them one ending in
+ *  progress:
+ *   - CAUGHT: a predator has the calf. Adopting it mid-struggle hands a passing
+ *     herd-mate the parent role in the middle of someone else's drama — the new
+ *     "parent" charges in for a calf it met a heartbeat ago, and its death (or
+ *     its drive-off) rewrites an ending that was already resolving.
+ *   - ESCAPING: the parent's sacrifice just freed it and it is running clear.
+ *  Both are hard-bounded (the caught countdown, the escape deadline), so the
+ *  hold always lifts and the adoption follows — deferred, never dropped. */
+export function adoptionHeld(juvenile: { caught?: number; escape?: number }): boolean {
+  return juvenile.caught !== undefined || inEscapeRun(juvenile)
+}
+
 /** Orphan adoption (design.md §19.8, point 262): the nearest ELIGIBLE adult
  *  that can take in `juvenile`, or `null` when none is within `radius`. Eligible
  *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
@@ -2051,16 +2065,17 @@ export function inEscapeRun(juvenile: { escape?: number }): boolean {
  *  (the pure test); the live caller enforces them by passing a homogeneous,
  *  non-predator herd.
  *
- *  A young still running its ESCAPE (point 311) is not adoptable at all — the
- *  §19.8 ending owns it until its window closes; afterwards the ordinary
- *  adoption picks it up, so point 262's guarantee is deferred, never dropped. */
+ *  A young inside a running §19.8 ending — CAUGHT by a predator, or escaping
+ *  after its parent's sacrifice (point 311) — is not adoptable at all: the
+ *  ending owns it until it resolves. Afterwards the ordinary adoption picks it
+ *  up, so point 262's guarantee is deferred, never dropped. */
 export function findAdopter<A extends AdoptionAdult>(
-  juvenile: { species?: string; x: number; z: number; escape?: number },
+  juvenile: { species?: string; x: number; z: number; caught?: number; escape?: number },
   adults: readonly A[],
   radius: number,
   opts: { isPredator?: (species: string) => boolean; killer?: A | null } = {},
 ): A | null {
-  if (inEscapeRun(juvenile)) return null // the escape leg runs first (point 311)
+  if (adoptionHeld(juvenile)) return null // the §19.8 ending resolves first (point 311)
   const isPredator = opts.isPredator ?? isPredatorSpecies
   const killer = opts.killer ?? null
   const r2 = radius * radius

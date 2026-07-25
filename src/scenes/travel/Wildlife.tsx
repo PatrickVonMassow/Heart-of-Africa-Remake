@@ -2607,13 +2607,16 @@ function Herds() {
     // young's OWN single-species herd, and findAdopter caps it to live,
     // non-predator, childless adults — so re-linking never dangles a parent
     // reference, clobbers another calf's parent, or links a predator/self/dead.
-    // ORDERING (point 311): a calf just freed by its parent's SACRIFICE first
-    // runs its §19.8 escape — `findAdopter` refuses it while `escape` runs, so
-    // it flees the predator instead of being claimed in the same frame and
-    // walking back to its new parent past the kill. The window is a hard
-    // deadline counted down here for EVERY species (predator cubs included, so
-    // the field can never linger unticked), and the adoption resumes the moment
-    // it expires: point 262's guarantee is deferred, not dropped.
+    // ORDERING (point 311): a §19.8 ending already running on a young resolves
+    // BEFORE the adoption may claim it — `findAdopter` refuses a CAUGHT calf
+    // (an adopted-mid-struggle calf handed a passing herd-mate the parent role
+    // and sent it charging to its death for a calf it had just met) and one
+    // still running its escape after its parent's sacrifice (without which the
+    // freed calf was re-parented in the same frame and walked back past the
+    // kill instead of fleeing). The escape window is a hard deadline counted
+    // down here for EVERY species (predator cubs included, so the field can
+    // never linger unticked), and the adoption resumes the moment it expires:
+    // point 262's guarantee is deferred, not dropped.
     {
       const ADOPTION_RADIUS = balance.family.adoptionRadius
       for (const sp of SPECIES) {

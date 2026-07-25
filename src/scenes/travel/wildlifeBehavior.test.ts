@@ -96,6 +96,7 @@ import {
   parentAttackOutcome,
   parentDefends,
   findAdopter,
+  adoptionHeld,
   inEscapeRun,
   tickEscapeRun,
   isPredatorSpecies,
@@ -3303,6 +3304,38 @@ describe('the freed calf runs its escape before it is adopted (design.md §19.8,
       }
     }
   }
+
+  it('a CAUGHT calf is not adopted mid-struggle — the ending resolves first', () => {
+    // The other half of the same ordering bug: a calf orphaned before (or as)
+    // a predator seizes it was adopted while it struggled, and the fresh
+    // "parent" charged in — rewriting an ending that was already resolving
+    // (it died in the calf's place, or drove the predator off and the calf
+    // never died at all).
+    const { parent, calf, herdMate, herd } = family()
+    parent.dead = true // orphaned by any cause…
+    parent.child = undefined
+    calf.parent = undefined
+    calf.caught = 5 // …and seized: the struggle owns it now
+    expect(adoptionHeld(calf)).toBe(true)
+    for (let i = 0; i < 20; i++) {
+      adoptionFrame(herd, 0.25)
+      expect(calf.parent).toBeUndefined()
+    }
+    // The catch resolves (freed here, killed in the other branch) and the
+    // adoption follows on the very next frame.
+    calf.caught = undefined
+    adoptionFrame(herd, 0.25)
+    expect(calf.parent).toBe(herdMate)
+  })
+
+  it('adoptionHeld covers both running endings and nothing else', () => {
+    expect(adoptionHeld({})).toBe(false) // a plain orphan is adoptable
+    expect(adoptionHeld({ caught: 5 })).toBe(true)
+    expect(adoptionHeld({ caught: 0.01 })).toBe(true) // still gripped
+    expect(adoptionHeld({ escape: 3 })).toBe(true)
+    expect(adoptionHeld({ escape: 0 })).toBe(false) // the escape is over
+    expect(adoptionHeld({ caught: 5, escape: 3 })).toBe(true)
+  })
 
   it('a sacrifice-freed calf is NOT adopted while its escape runs', () => {
     const { parent, calf, herd } = family()
