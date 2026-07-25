@@ -11380,7 +11380,7 @@ the remaining open points in their numeric order.
   starts, swims and lands; the §19.5 setback and I4 deadline invariants stay green;
   both backends.
 
-- [ ] 313. FULL DASHBOARD-CONSISTENCY ENFORCEMENT (user 25.07.2026; four-eyes Opus +
+- [x] 313. FULL DASHBOARD-CONSISTENCY ENFORCEMENT (user 25.07.2026; four-eyes Opus +
   Fable on BOTH the plan and the implementation). The 25.07 morning audit found real
   gaps no guard caught: ticked points with NO Erledigt card (262/273/293/305), an
   OPEN point with an Erledigt card (306), a queue card whose meta was not a duration
@@ -11391,23 +11391,37 @@ the remaining open points in their numeric order.
   every NEWLY ticked point (vs the `doneSeen` baseline recorded in
   dashboard-state.json at each clean --synced; first run grandfathers history) must
   have an Erledigt card; (b) NO OPEN POINT IN ERLEDIGT — open ∩ Erledigt blocks (the
-  306 case), parsing both `.num` spans and leading `.t` numbers incl. the "287+288 —"
-  double form; (c) QUEUE META FORMAT — every Warteschlange card carries a `~<n> h`
+  306 case); point numbers come from pure-number `.num` spans AND leading `.t`
+  numbers, with the board's compound forms ("287+288 —", "232·233·234", "92+94",
+  "71/72", "313:") split into single points, a sub-delivery marker ("203A", "CI")
+  read as none, and a bound (<= 999) so a date or year in a title cannot pose as a
+  point; (c) QUEUE META FORMAT — every Warteschlange card carries a `~<n> h`
   duration in its meta (extra tokens like "· Feature" allowed); (d) TIME PRESENT —
-  the now-card meta and every Erledigt card meta contain at least one HH:MM; (e)
-  ENCODING HEALTH — the file contains none of the mojibake signatures (Ã, â€, Â·,
-  â–, âœ, â†, ï¿½ as substrings) — the umlaut-damage class; (f) STRUCTURE — exactly
-  the four section headers in the binding order with nothing between/after them but
-  cards + footer, only the now-section card carries `open`, every card has a
-  non-empty body, and no point number repeats within one section. All checks pure
-  and swept in dashboard-guard-core.test.mjs (violation AND pass cases each,
-  incl. the real 25.07 regression witnesses); the wrapper refuses to record --synced
-  while the audit fails, so the dashboard cannot be attested inconsistent.
+  the now-card meta, and the meta of every Erledigt card for a NEWLY ticked point,
+  contain at least one HH:MM (historical cards keep their older forms); (e)
+  ENCODING HEALTH — a STRUCTURAL double-encoding detector (map each char back
+  through cp1252 and flag where a valid UTF-8 multibyte sequence emerges), which
+  catches the whole umlaut-damage class incl. "−", "≈", "π" and a mis-decoded BOM
+  while passing legitimate German text, "„…"", "·", "→", "✓", emoji and a real BOM;
+  (f) STRUCTURE — exactly the four section headers in the binding order, NO card
+  carries the `open` attribute (user mandate 23.07.2026 — the localStorage script
+  owns the open state), every card has a non-empty body, and no point number
+  repeats within one OPEN section (Erledigt is exempt: several delivery cards per
+  point are legitimate history); (g) FOOTER CURRENCY — the footer's "N offene
+  Punkte" matches TASKS.md. All checks pure and swept in
+  dashboard-guard-core.test.mjs (violation AND pass cases each, incl. the real
+  25.07 regression witnesses); wired as invariant (8b) BEFORE the publish-parity
+  check (fix first, publish once). The wrapper VALIDATES BEFORE IT WRITES: on a
+  violation `--synced` records nothing and exits 1, so the board cannot be attested
+  inconsistent; a clean pass advances the `doneSeen` baseline (first pass
+  grandfathers pre-guard history once). Escape hatch `--waive-audit "<reason>"`
+  covers exactly the CURRENT file hash, works before the first registration, is
+  consumed by the next attestation, and a waived pass advances the baseline only
+  over points that really have a card — so a waiver can never bury a missing card.
   VERIFIABLE: the Vitest sweep; a live --synced on the current board passes; each
-  witness case (a-f) reproduced red against the pre-audit board content in tests.
-  PROCESS RECORD: plan reviewed by Opus before build, implementation adversarially
-  reviewed by Opus after build, findings fixed — both reviews' verdicts noted in the
-  commit/point tick.
+  witness case reproduced red in tests. PROCESS RECORD: plan reviewed by Opus
+  before build, implementation adversarially reviewed by Opus after build, findings
+  fixed — both verdicts noted in the commit.
 
 - [ ] 314. DRIFTING PALE PATCHES ON WATER (user 25.07.2026, screenshot: bird's-eye at
   a river mouth near the ocean — two elongated pale/greenish patches ON the water
