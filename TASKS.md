@@ -10977,27 +10977,26 @@ the remaining open points in their numeric order.
   the memory `use-1890-valid-names`; the point-205 plausibility audit enforces it. Fast
   gate green (2867 tests). Committed to main.
 
-- [ ] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES (found
-  24.07.2026 during the 276 verify; PRE-EXISTING on main, independent of 276/273).
-  design.md §19.1 / §7.1 pt.20: a nearby animal's own call rises and AUDIBLY FADES with
-  distance. Currently it does not fade back: in `scripts/verify/settings.mjs` the
-  "animal call fades once the player moves away" check fails deterministically —
-  after the injected elephant is removed, `window.__ambience.animalProx().elephant`
-  decays only from ~0.87 to ~0.83 over the 1600 ms window (expected < 0.1). So the
-  proximity call effectively stays up after the source is gone. BEHAVIOUR: the per-animal
-  proximity level must decay to near-silence within a short, perceptible window once no
-  such animal is near (the rise already works — near/prox climb correctly). INVESTIGATE
-  whether the decay time-constant is simply too slow (a real product regression — some
-  merged point likely slowed or froze it; note `prox` and `gone` are nearly identical, so
-  the value barely moves) OR the proximity is not recomputed at all after the herd list
-  changes. Fix the behaviour so the call fades, and if the check's 1600 ms window is
-  genuinely too short for an intended gentle fade, widen it — but the default must reach
-  clear silence in a natural time. ANCHORS: `src/systems/ambience.ts` (`animalProx`, the
-  per-source proximity decay), `scripts/verify/settings.mjs` (the check). VERIFIABLE: a
-  pure test of the proximity decay in `src/systems/ambience.test.ts` (rises near, decays
-  to ~0 within the window after the source leaves), and the settings.mjs check green on
-  BOTH backends. QA-finder-class regression (points 200/285). No player-visible text.
-
+- [x] 292. THE PROXIMITY ANIMAL CALL DOES NOT FADE WHEN THE ANIMAL LEAVES —
+  RESOLVED 25.07.2026 AS A STALE CHECK, NOT A PRODUCT BUG. The reported symptom was
+  real (the settings.mjs check "the animal call fades once the player moves away"
+  failed deterministically, the level staying at ~0.9), but the cause sat in the
+  CHECK: it injected the elephant with the marker tag chunk='inject' and removed it
+  again by filtering on that tag — while keepStreamedAnimal (point 282) RE-HOMES any
+  animal whose chunk tag is not a live chunk into the chunk under its feet,
+  overwriting the marker within one frame. The filter therefore removed nothing, the
+  elephant stayed ~4.5 m from the traveller, and its call correctly stayed up; the
+  value froze at exactly the injected level because the report hysteresis swallows a
+  slowly roaming elephant's drift. FIX: inject UNTAGGED (the convention every other
+  injected animal follows — untagged animals are never re-homed) and remove BY OBJECT
+  IDENTITY; the check now also asserts the AUDIBLE layer, not only the reported
+  number, and names the re-home trap in a comment so the assumption cannot rot again.
+  The audio path was never broken, so no honest pure test could fail beforehand — the
+  four new tests in src/systems/ambience.test.ts were proven to have teeth by MUTATION
+  instead (making setAmbienceAnimals skip zero updates fails exactly those four).
+  Verified: settings 37 pass / 0 fail on WebGL 2 AND on WebGPU. LESSON (feeds point
+  294): a red check can indict the product for its own stale assumption — the reverted
+  degraded-session "fix" accepted that indictment and patched innocent audio code.
 - [x] 293. EXTEND THE IN-GAME BENCHMARK TO GUIDE FURTHER LOW-LEVEL REDUCTION (user
   24.07.2026). The user runs the F8 / `?bench` benchmark (point 277) on a SLOW PC to find
   what MORE can be cut at the LOW graphics level (point 276) to gain performance. Extend
@@ -11320,9 +11319,22 @@ the remaining open points in their numeric order.
   unnamed system ("(unnamed) MeshStandardNodeMaterial", constant 425,118 tris / 180
   meshes in EVERY phase — 78 % of the desert frame); dpr is the strongest lever
   overall (baseline GPU 18.55→8.39 ms driving at dpr 1) and LOW already caps it at 1.
-  Deliver: (a) NAME the unnamed breakdown systems (scene-graph group naming, so the F8
-  report attributes every system; the 425k one is suspected to be the river/lake water
-  geometry — verify first), (b) a LOW flora/dressing DENSITY lever (calibratable
+  SALVAGED IDEA (25.07, from the retired `feat/276-wildlife-lod` branch — see point
+  329): throttling the BEHAVIOUR updates of off-screen animals cuts the driving
+  frame cost. The branch itself was retired unmerged (219 commits behind main, its
+  three files moved on 16/9/1 commits since), but the lever is sound and belongs
+  here: update animals outside the rendered frame at a reduced rate (projected via
+  the shared `isOnScreen`, never an assumed radius — the point-172 rule), keeping
+  every §19 drama deadline in sim time so no drama stalls. Judge it on the CPU
+  series of the F8 report, where the S25 shows 7.6-8.7 ms at LOW.
+  DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
+  water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
+  lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
+  material={riverMat}>` / lake map), so `groupKey` in src/systems/benchmark.ts falls
+  back to the material name `MeshStandardNodeMaterial`; the courses are global and
+  biome-independent, which explains the constant count in every phase. Deliver:
+  (a) NAME those groups (and any other unnamed one) so the F8 report attributes
+  every system, (b) a LOW flora/dressing DENSITY lever (calibratable
   instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
   dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
   identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
@@ -11530,7 +11542,11 @@ the remaining open points in their numeric order.
 - [ ] 320. SPRINGS AS REAL 3D BUBBLING WATER (user 25.07.2026: the springs still
   read as a mere symbol — animated now, but flat; they should LOOK like a spring
   with water bubbling three-dimensionally). Rework the §11.3 spring depiction at
-  travel scale into a small 3D water feature: a low dome/upwelling mesh whose
+  travel scale into a small 3D water feature. ANCHOR (25.07, main session): the
+  current spring is built in `src/scenes/travel/Rivers.tsx` as a stack of FLAT discs
+  — circle meshes rotated `-Math.PI / 2` (the pool, a damp-ground ring and the
+  animated ripple), which is exactly why it reads as a symbol however it animates.
+  Replace that stack with: a low dome/upwelling mesh whose
   surface visibly bubbles (TSL displacement/normal animation — renderer-agnostic,
   both backends), a bright welling centre with concentric ripple rings, a small
   wet pool/outflow meeting the terrain (no floating disc, no billboard), sized to
@@ -11643,18 +11659,194 @@ the remaining open points in their numeric order.
 
 - [ ] 329. DECIDE THE FATE OF THE TWO SURVIVING STRAY BRANCHES (25.07.2026 branch
   cleanup: 133 fully-merged branches and 26 orphaned worktrees were removed; two
-  carry unmerged work whose value must be judged rather than deleted or blindly
-  merged). (a) `feat/276-wildlife-lod` (23.07, 539 lines: off-screen wildlife
-  behaviour throttling plus a terrain.ts rework, with pure tests) — a PERFORMANCE
-  lever that point 310 (the S25 low-preset pass) may want; check whether it still
-  applies after the point-276/278 merges, re-run its tests, and either finish it as
-  part of 310 or record why it is dropped. (b) `feat/278-dressing-growth` (24.07,
-  275 lines: an ALTERNATIVE fix for the wildlife duplication that main solved
-  differently in d9ee271, plus enrichments checks and pure tests) — diff its test
-  coverage against what main has and salvage any check main lacks; then drop the
-  branch. VERIFIABLE: for each branch a written verdict (merged / salvaged-in-part
-  / dropped, with the reason), the branch deleted afterwards, and the regression
-  green on whatever landed.
+  carried unmerged work whose value had to be judged rather than deleted or blindly
+  merged).
+  (a) `feat/276-wildlife-lod` — VERDICT 25.07: RETIRED UNMERGED, idea salvaged into
+  point 310. Reason (user-reported, then measured): the branch stood 219 commits
+  behind main; its three files had moved on 16 (Wildlife.tsx), 9
+  (wildlifeBehavior.ts) and 1 (terrain.ts) commits since — merging a 539-line
+  rework across that gap would fight every wildlife fix of the last two days for a
+  lever that is easier to rebuild than to reconcile. The LEVER (throttling
+  off-screen animal behaviour updates) is now an explicit sub-task of point 310,
+  where it is implemented fresh against current code and priced on the S25 report.
+  (b) `feat/278-dressing-growth` (24.07, 275 lines: an ALTERNATIVE fix for the
+  wildlife duplication that main solved differently in d9ee271, plus enrichments
+  checks and pure tests) — STILL OPEN: diff its test coverage against what main has
+  and salvage any check main lacks; then drop the branch.
+  VERIFIABLE: a written verdict per branch (done for (a)), the branch deleted
+  locally AND on GitHub afterwards, and the regression green on whatever landed.
+
+- [ ] 330. FULL POST-DEGRADATION ASSURANCE PASS — nothing new starts until this is
+  100 % green (user 25.07.2026, after three separate leftovers were found by chance:
+  the board's broken umlauts, the board's inconsistency, and a whole night's work
+  sitting unpushed on a feature branch). The user's verdict on the cleanup so far:
+  incomplete. Do ALL of the following, in this order, and report each with evidence:
+  (A) COMPLETENESS — prove that every piece of work exists on GitHub `origin/main`:
+  no local commit ahead of origin (`git rev-list --count origin/main..HEAD` == 0 on
+  every checkout), no stash, no untracked-but-wanted file, no remote branch holding
+  work that main lacks, and the working tree clean; the deployed page builds from
+  that same commit. (B) RESIDUE HUNT — sweep for further traces of the degraded
+  session beyond the three already found: re-run the mojibake detector over EVERY
+  text file in the repo (not just the board), diff main against the pre-degradation
+  commit fd85464 file-by-file and justify every remaining difference, check for
+  orphaned/never-referenced files added that evening, stale `.claude` state, and any
+  test whose assertions cannot fail (the `expect(true)` class) anywhere in the
+  suite. (C) FEATURE AUDIT SINCE v0.2 — for EVERY feature merged after the v0.2 tag
+  (bafd9b2, 24.07 21:15): 262 orphan adoption, 273 walkable Giza site, 293 benchmark
+  low-preset profiling, 305 LOW sun-shadows-off, 306 closing-completeness guard, 308
+  dashboard-sync guard, 309 model tripwire, 313 dashboard consistency audit — judge
+  the IMPLEMENTATION for plausibility (does it do what its spec claims, at the state
+  a player/operator actually reaches?) and the TESTS for validity (would each test
+  FAIL if the feature were reverted? does it assert the real signal or a proxy?).
+  Use model diversity: a different model than the author reviews. (D) GREEN PROOF —
+  a FULL CLOSING RUN, not merely a regression (user 25.07.2026: "the closing
+  contains a full regression anyway"): all eleven steps of `scripts/closing-guard-core.mjs`
+  (`CLOSING_STEPS`), driven with `node scripts/closing-guard.mjs --status` and
+  `--step <id> --evidence "<proof>"` per step — the LARGE regression on a QUIET
+  machine on BOTH backends being one of them, plus lint/audit, the dead-code,
+  stale-doc, stale-comment and .md audits, the research-doc implementation
+  sections, the graphics-detail-level doc, the §7.1 acceptance confirmation, the
+  open-items list and the simplifications list. CLOSING FREEZE applies (CLAUDE.md
+  §9): no parallel agent work may land while it runs — the in-flight bug agents
+  must be merged or parked FIRST, and the closing then runs on the frozen main.
+  Any red is either fixed or recorded as a known, justified exception with the
+  user's ruling. (E) COHERENCE —
+  does everything still fit together (user 25.07.2026)? Cross-check, for the whole
+  current state: design.md and CLAUDE.md §7.1 against what the code actually does
+  (every feature merged since v0.2 must be described where the docs describe its
+  system, and no doc may still pin behaviour the code has left behind); the
+  implementations against their tests (every §7.1 "Verifiable" clause names a test
+  that exists and still asserts that clause); the research docs' implementation
+  sections (peoples-1890 §8, climate-1890 §9, graphics-detail-levels) against the
+  code they mirror; the dashboard against TASKS.md (already guarded — confirm the
+  guard covers what the 25.07 audit found by hand); and the memory corpus against
+  the rules actually in force. VERIFIABLE: a written report per section with the
+  commands run and their output; the tick happens only when (D) is genuinely green
+  and (E) reports no unexplained mismatch.
+
+  PROGRESS 25.07 (main session): (A) done — 0 local commits ahead of origin/main,
+  clean tree, no work-bearing remote branch left (13 fully-merged ones deleted on
+  GitHub), the two remaining stashes identified as deliberately parked older work
+  (a dead-session perf-bench edit 23.07, a picture-rejected coast attempt 22.07 —
+  both pre-degradation, left untouched). (B) partly done — a repo-wide sweep of
+  2305 text files found NO double-encoded text outside this guard's own source
+  (a self-reference: the detector flagged the damaged sequences quoted in its own
+  comment; rewritten so it no longer quotes them), and NO assertion-free test: the
+  five candidates the sweep flagged all assert through helper functions
+  (`fired()`, `foliageOf()`, `expectRise()`), i.e. scanner false positives. Still
+  open in (B): the file-by-file diff against fd85464 and the orphaned-file check.
+  (B) COMPLETED 25.07: the file-by-file diff against fd85464 (excluding the
+  screenshots) shows 16 differences, every one of them accounted for as today's own
+  work — the model tripwire, the dashboard audit, the guard wirings, the two
+  analysis docs, the queued points and the deliberately kept closing-state; nothing
+  unexplained remains. The orphan scan over all 61 scripts found exactly one never
+  imported file, `scripts/check-deployed-benchmark.mjs`, which is a deliberate
+  manual tool (documented "Usage:" header, point 277) and not debris. A
+  model-diverse review of the two guard commits merged this morning
+  (closing-guard fixes + dashboard-sync wiring) additionally verified: the reverted
+  Haiku files are byte-identical to the pre-degradation state, the three stub files
+  are absent, no merge artefacts remain, and the retained closing-state cannot
+  pre-satisfy the tag gate (it is keyed to a different commit; `--status` reports
+  0/11 at HEAD). That review's own findings are queued as point 331.
+
+- [ ] 331. CLOSING-GUARD HARDENING FROM THE 25.07 REVIEW (findings of the
+  model-diverse review that cleared the merged guard commits; all low severity, none
+  blocking, hence one small bundled point). (a) The option-swallowing quantifier in
+  `isVersionTagCommand` (scripts/closing-guard-core.mjs) is exponentially ambiguous
+  over runs of dash-tokens — measured 736 ms on a synthetic 34-flag input, doubling
+  per two flags; unreachable by real git usage (a real subcommand fails the star in
+  O(1), a 20-flag `git log` measured 0 ms) but a PreToolUse HANG is not covered by
+  the wrapper's fail-open, which only catches throws. Fix: drop the redundant
+  `-[cC]` alternative, bound the star (e.g. `{0,10}`), restrict the swallowed
+  argument to `[^-\s]\S*`; add a timing assertion to the test sweep. (b) A `-C
+  <path>` whose PATH ends in a tag name now false-positives (`git -C /build/poc push
+  origin main` blocks) — exclude the `-C`/`--git-dir`/`--work-tree` argument from the
+  segment before the version/poc matching. (c) Real release acts still MISSED
+  (pre-existing, not introduced): `git push origin +v0.3` (force refspec) and `git
+  push origin :v0.3` (tag delete) — add `+` and `:` to the version/poc prefix class;
+  keep the remaining FN-6…FN-12 items recorded as future hardening. (d) DOC DRIFT:
+  three places still say the guard is a PreToolUse(**Bash**) hook although PowerShell
+  — the primary shell here — is matched too (scripts/closing-guard-core.mjs:11,
+  scripts/closing-guard.mjs:5, CLAUDE.md §9); and the `isVersionTagCommand` JSDoc
+  "Matches:" list never gained `gh release create` or the quoted forms. (e) No test
+  covers the wrapper's `tool_name === 'PowerShell'` branch — add one. VERIFIABLE:
+  the existing 30-case sweep stays green and gains cases for (a)-(c) and (e); the
+  documented contract matches the code.
+
+- [ ] 332. FIX THE DOCUMENTATION DRIFT THE 25.07 COHERENCE AUDIT FOUND (all of it
+  predates the degraded session — see the root cause in point 333). Correct, with
+  the CODE as the source of truth: (a) "the TEN port cities are known from the
+  start" is now ELEVEN — point 273 made Giza a known-from-start monument
+  (`KNOWN_FROM_START_PLACES` in src/world/geo.ts filters `kind === 'port' ||
+  'monument'`); fix design.md §3.2, §10 and §17.2 (the §17.2 exemption list
+  enumerates the ten by name and must gain Giza — design.md currently contradicts
+  ITSELF against its own §4.4 line) and CLAUDE.md §7.1 points 3 and 25. (b) LOW has
+  NO sun shadows since point 305 (`QUALITY_PRESETS.low.sunShadows = false`), but
+  design.md §2.7 still says "low-resolution sun shadows", §21 and §21.3 name only
+  the shadow RESOLUTION ladder, and CLAUDE.md §7.1 pt 20's "what LOW turns off"
+  sentence omits it. (c) Point 262's orphan adoption is absent from CLAUDE.md §7.1
+  pt 12's "Calves and family life" bullet (design.md has it) — add it with its
+  `wildlifeBehavior.test.ts` verifiable. (d) Point 293's low-preset profiling pass
+  is absent from §7.1 pt 20's benchmark-report description (design.md §21.1 has
+  it). (e) The debug jump-to "Monuments" group (point 273) is missing from the
+  category lists in CLAUDE.md §7.1 pt 20 and design.md §21.3. (f) Cosmetic:
+  CLAUDE.md §7.1 pt 12 names `panoramaVicinityRadius`/`panoramaVicinityMinAnimals`,
+  the real fields are `balance.panoramaWildlife.vicinityRadius`/`.vicinityMinAnimals`;
+  the §7.1 pt 20 lever list omits `waterCalm` and `wildlifeDensity`. (g) CLAUDE.md
+  §7.1 pt 15 claims polish.mjs gates Giza's "sparse Thomas-Cook-era ambient walkers"
+  — no such assertion exists: either add it or drop the clause. (h) Process
+  surfaces: record the point-309 model allowlist in CLAUDE.md §6, and name the Stop
+  chain guards in §7.2 (six guards now gate a turn end; §7.2 mentions none).
+  VERIFIABLE: each corrected claim matches the code it describes; no doc states a
+  count or behaviour the code contradicts.
+
+- [ ] 333. WHY THE DOCS DRIFT — AND A MECHANISM AGAINST IT (root-cause analysis
+  25.07.2026, user question "where does all this drift come from — were there
+  problems before the degraded session too?"). ANSWER: yes, and it has nothing to do
+  with that session. Measured on the four features merged after v0.2: 262 touched
+  design.md (+2 lines) and NOT CLAUDE.md; 273 touched both (+17/+2) but only ADDED
+  its new paragraphs and left the five older places that state the now-false "ten
+  ports"; 293 touched design.md and the detail-level doc but not CLAUDE.md §7.1; 305
+  touched ONLY docs/graphics-detail-levels.md — the one doc with a SYNC TEST
+  (src/config/qualityDoc.test.ts) — and left design.md §2.7/§21/§21.3 stating the
+  opposite. The pattern is exact: a doc gets updated where a MECHANISM demands it or
+  where the author is already writing; a fact that lives REDUNDANTLY in several
+  places drifts in all the copies nobody was editing. The deeper cause is the
+  redundancy itself — "the ten port cities" is asserted in five places, LOW's shadow
+  behaviour in four. BUILD: (a) a pure DOC-FACT guard that pins the small set of
+  facts stated redundantly across design.md/CLAUDE.md against the CODE that owns
+  them (known-from-start count from `KNOWN_FROM_START_PLACES`, per-level quality
+  values from `QUALITY_PRESETS`, the debug jump-to category list from the menu's own
+  groups, the balance-value names the docs cite) — it fails when a doc's number
+  disagrees with the code's, like qualityDoc.test.ts already does for one doc; (b) a
+  merge-time check that a feature commit touching a §7.1-covered system also touched
+  the doc section that covers it, or says why not; (c) reduce the redundancy where
+  possible — one authoritative statement per fact, referenced elsewhere (the
+  §7.1-references-design.md convention already exists; apply it to the drifted
+  facts). METHOD: model-diverse (a second model reviews the fact inventory for
+  completeness — an incomplete inventory is the failure mode). VERIFIABLE: the guard
+  fails on each of point 332's real drifts when they are re-introduced, and passes
+  on the corrected docs; the fact inventory is listed in the guard's header.
+  SCOPE WIDENED (user 25.07.2026: "establish mechanisms that make such
+  inconsistencies and redundancies impossible in future"): the point delivers a
+  STANDING regime, not a one-off sweep. (d) SINGLE SOURCE OF TRUTH as the primary
+  cure: for every fact the audit found duplicated, ONE place states it and the
+  others reference that place — CLAUDE.md §7.1 already follows this convention
+  toward design.md (§7.1 cites sections instead of repeating content, per the
+  claude-71-reference-not-duplicate rule) and it is simply not applied to counts,
+  defaults and enumerations; extend it there, and where a doc must restate a value
+  for readability, mark it as derived and cover it by (a). (e) A DUPLICATION
+  DETECTOR that fails when a NEW redundant statement of a covered fact appears
+  (a count/keybinding/default that the inventory owns showing up in a second
+  place), so the redundancy cannot creep back after (c) removed it. (f) The
+  merge-time check of (b) becomes part of the standing gate, not a review step:
+  a commit that changes a fact-owning constant must touch the doc that owns the
+  fact, or state why not. (g) The regime is documented in CLAUDE.md §4 (docs
+  conventions) so a future contributor — human or model — finds the rule where the
+  documents themselves are described. ACCEPTANCE for the whole point: re-running
+  the 25.07 coherence audit against the finished state reports no drift and no
+  new duplication, and each mechanism fails on a deliberately re-introduced
+  violation.
 
 ## Closing (only after all points)
 

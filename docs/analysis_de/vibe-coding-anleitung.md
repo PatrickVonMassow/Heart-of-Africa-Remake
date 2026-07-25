@@ -185,6 +185,15 @@ Zwei Regeln, die das Netz ehrlich halten:
   Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
   mein aktueller Stand wirklich oben angekommen ist."
 
+- **„Aufgeräumt" ohne Beweisliste.** Nach einem Zwischenfall räumt man dort auf, wo
+  man den Schaden vermutet — und übersieht den Rest. Der Nutzer findet ihn dann
+  zufällig, was mehr Vertrauen kostet als der Zwischenfall selbst.
+  → *Prompt:* „Nach jedem Zwischenfall: räum nicht nur auf, sondern arbeite eine
+  Liste ab und belege jeden Punkt — liegt alles am Zielort? Gibt es Reste (Kodierung,
+  Waisen-Dateien, Tests ohne echte Prüfung)? Ist jedes zuletzt gebaute Feature samt
+  Tests plausibel? Passen Dokumente und Code noch zusammen? Und am Ende: läuft alles
+  grün?"
+
 - **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft am Ende
   gegen dieselbe Vorstellung, aus der der Fehler stammt — deshalb übersieht man
   ausgerechnet die Stelle, an der die Wirklichkeit anders aussieht als gedacht.

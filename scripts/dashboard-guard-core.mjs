@@ -128,10 +128,16 @@ const CP1252_REVERSE = (() => {
  * Structural mojibake detector (Opus plan-review change 1): instead of a
  * substring blocklist, map each char back to its cp1252 byte and flag any spot
  * where a VALID UTF-8 multibyte sequence emerges — that shape only arises when
- * UTF-8 bytes were mis-read as cp1252 (the 24.07 umlaut damage: "Ã¼", "â€"",
- * "âˆ'", "Ï€", the mis-decoded BOM "ï»¿" …). Legitimate content („…", ü, —, ·,
- * →, ✓, emoji, a real U+FEFF BOM) never forms one: a single cp1252-mappable
- * char is never a LEAD followed by CONTINUATION-range chars.
+ * UTF-8 bytes were mis-read as cp1252 (the 24.07 damage hit umlauts, dashes,
+ * quotes, the minus and pi signs and even the BOM). Legitimate content
+ * (German text, typographic quotes, em dashes, middots, arrows, check marks,
+ * emoji, a real U+FEFF BOM) never forms one: a single cp1252-mappable char is
+ * never a LEAD followed by CONTINUATION-range chars.
+ *
+ * NOTE — no damaged sequence is written literally in this file: quoting one
+ * would make the detector flag its own source (found in the 25.07 assurance
+ * sweep). The test file builds its fixtures programmatically for the same
+ * reason.
  */
 export function looksDoubleEncoded(text) {
   const s = typeof text === 'string' ? text : ''

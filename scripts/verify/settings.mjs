@@ -334,19 +334,33 @@ const aniSound = await page.evaluate(async () => {
   await sleep(1200)
   const baseline = window.__ambience.layerTarget('aniElephant')
   // Inject one right beside the player and let the proximity report settle.
-  herds.elephant.push({ x: p.x + 4, z: p.z + 2, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: 'inject', herd: 999 })
+  // UNTAGGED (`chunk: undefined`) like every other verification-injected animal:
+  // a SYNTHETIC chunk tag does not survive a frame — the streaming re-homes an
+  // animal whose tag is not a live chunk into the live chunk under its feet
+  // (keepStreamedAnimal, point 282), overwriting the tag. An untagged animal is
+  // never re-homed and never chunk-culled, so the harness alone owns its life.
+  const injected = { x: p.x + 4, z: p.z + 2, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: undefined, herd: 999 }
+  herds.elephant.push(injected)
   await sleep(1600)
   const near = window.__ambience.layerTarget('aniElephant')
   const prox = window.__ambience.animalProx().elephant
-  // Remove it again; the call fades back toward silence.
-  herds.elephant = herds.elephant.filter((a) => a.chunk !== 'inject')
+  // Remove it again BY IDENTITY; the call fades back toward silence. (A
+  // `chunk !== 'inject'` filter matched nothing once the re-home landed, so the
+  // elephant stayed beside the player and its call — correctly — stayed up: the
+  // false red of point 292, where `gone` read exactly `prox`.)
+  herds.elephant = herds.elephant.filter((a) => a !== injected)
+  const left = herds.elephant.filter((a) => !a.dead).length // reported, not asserted: a fresh herd may stream in
   await sleep(1600)
   const gone = window.__ambience.animalProx().elephant
-  return { started, baseline, near, prox, gone }
+  const layerGone = window.__ambience.layerTarget('aniElephant')
+  return { started, baseline, near, prox, left, gone, layerGone }
 })
 check('ambience engine starts on demand', aniSound.started === true, '')
 check('a nearby animal raises its proximity call', aniSound.prox > 0.5 && aniSound.near > aniSound.baseline + 0.02, JSON.stringify(aniSound))
-check('the animal call fades once the player moves away', aniSound.gone < 0.1, JSON.stringify(aniSound))
+// Both halves of the fade: the reported proximity falls AND the audible layer
+// target follows it down (the ramp reaches silence, not only the report).
+check('the animal call fades once the player moves away',
+  aniSound.gone < 0.1 && aniSound.layerGone < 0.02, JSON.stringify(aniSound))
 
 // --- Point 153: coastal surf fade + per-source birdsong slider ---------------
 // Read the layer TARGETS synchronously (no await) so the 700 ms ambience
