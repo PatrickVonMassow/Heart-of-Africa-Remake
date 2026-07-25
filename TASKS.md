@@ -12564,6 +12564,35 @@ the remaining open points in their numeric order.
   the quality level stepped to low — the effect is judged on the image, never on the
   flag; no console errors; the build step is reproducible from a clean checkout.
 
+- [ ] 347. THE STARTING QUALITY LEVEL FROM THE URL (user 25.07.2026; design.md §21.1
+  states the target). `?quality=low|medium|high` on any deployment URL — the GH-Pages
+  root, `/poc/`, a `/vX.Y/` folder — opens the session at that level, so a link handed
+  to someone whose hardware is known already fits it. Case-insensitive; an unknown,
+  empty or missing value leaves the ordinary default (`medium`) standing without any
+  player-visible complaint.
+  FOLLOW THE EXISTING IDIOM, do not invent a second one: a PURE parse function beside
+  `benchmarkFromUrl` (`src/systems/startBenchmark.ts`) taking the raw `location.search`
+  and returning a `DetailLevel | null`, with the call site applying it.
+  APPLY IT BEFORE THE FIRST FRAME, not after mount. `detailLevel` is NOT persisted
+  today (no localStorage in `src/state/ui.ts`), so this is purely the initial value —
+  but setting it from an effect after the first render would draw a frame at medium and
+  then rebuild the whole post chain and shadow maps, a visible hitch on exactly the
+  weak hardware the low link is meant for. Seed the store's initial state from the URL.
+  DELIBERATELY UNCHANGED: the touch preset (§17.5) still applies its own subset-of-low
+  flags when the touch layer arms, even if the URL asked for high. That is the existing
+  rule — the preset is tied to the touch layer, not to a guess about the device — and a
+  URL parameter is not a reason to break it. Do not "fix" this.
+  NO TOAST. F9 announces a CHANGE; a URL-set level is the session's starting default
+  and announces nothing.
+  VERIFIABLE: pure — the parser sweeps the three level names, mixed case, an unknown
+  value, an empty search, a search carrying other parameters (`?bench=short&quality=low`
+  in either order), and a repeated parameter, returning null wherever the value is not
+  a level. Component/live — a page loaded with `?quality=low` has the low preset in
+  effect on its FIRST rendered frame (assert through an effective selector, e.g. sun
+  shadows off, not the raw field), `?quality=high` likewise, and no console errors.
+  DOCS: design.md §21.1 already states it; name the parameter in the README's play
+  links if that file lists them, so the shareable form is discoverable.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
