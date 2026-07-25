@@ -11773,7 +11773,7 @@ the remaining open points in their numeric order.
   the existing 30-case sweep stays green and gains cases for (a)-(c) and (e); the
   documented contract matches the code.
 
-- [ ] 332. FIX THE DOCUMENTATION DRIFT THE 25.07 COHERENCE AUDIT FOUND (all of it
+- [x] 332. FIX THE DOCUMENTATION DRIFT THE 25.07 COHERENCE AUDIT FOUND (all of it
   predates the degraded session — see the root cause in point 333). Correct, with
   the CODE as the source of truth: (a) "the TEN port cities are known from the
   start" is now ELEVEN — point 273 made Giza a known-from-start monument
