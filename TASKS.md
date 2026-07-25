@@ -12739,33 +12739,58 @@ the remaining open points in their numeric order.
   rendered height by more than the transition's per-frame step — the pop is what the
   check is for.
 
-- [ ] 351. CHILDREN SHOULD PLAY AROUND THE WELL, NOT BOUNCE OFF IT (user 25.07.2026,
-  deployed build: the village children run beside the well and rebound from it again and
-  again). They are ordinary walkers whose target lies past a collider, so the collision
-  resolution does the only thing it can — slide and stop — and the result reads as
-  repeatedly bumping into the well rather than as play.
-  TARGET: children given a PLAY behaviour that uses the well as its centre instead of
-  treating it as an obstacle in the way — circling it at a radius clear of its collider,
-  changing direction now and then, breaking off and rejoining.
-  THE CIRCLE MUST BE WIDE (user 25.07.2026, second look): the ring they run today is
-  tight, and a tight ring reads as trudging around an obstacle rather than as a game of
-  chase. Make the play radius CALIBRATABLE (`balance.villageLife.playRadius`,
-  debug-editable) and default it clearly wider than the well's own collider — as wide as
-  the free ground around the well allows, bounded by the surrounding colliders and the
-  settlement edge so the chase never runs into a hut. Vary it a little per child and per
-  bout so the group does not orbit on one rail. The §19.10 village life is
-  the point of these figures; a walker pathing rule that merely avoids the well would
-  remove the bumping without producing play, and is not what this asks for.
-  KEEP: the ordinary walkers (adults on errands) unchanged, and the point-155 guarantees
-  intact — an errand target still needs a clear standing circle and an escape direction,
-  and a physically pinned walker is still nudged free after its window. Playing children
-  must not become a way to stand inside a collider.
-  VERIFIABLE: pure — the play path stays outside the well's collider radius at every
-  sampled step and returns to its centre over time (it orbits rather than drifting away);
-  a child's position never enters any collider. Live (`scripts/verify/polish.mjs`, BOTH
-  backends): over a sampled interval a playing child's positions distribute AROUND the
-  well (its bearing from the well changes monotonically for a stretch) rather than
-  clustering against one side, and no child is pinned; screenshot.
+- [ ] 351. THE VILLAGE CHILDREN PLAY A GAME OF TAG (user 25.07.2026). They run wild
+  through the settlement, around the huts and past the fire; one of them is IT and
+  chases the others; on a catch the roles swap and the chase turns around. That is what
+  the §19.10 village life is for — figures that are visibly doing something, not
+  following a path.
+  A PATH IS NOT A GAME, and this is the whole design point: any fixed route — a ring
+  around the well, an orbit at a set radius, a tour of waypoints — is periodic, and the
+  eye recognises it within two passes. A chase is not periodic because its target
+  REACTS. Do not implement this as a path with a moving centre.
+  THE BEHAVIOUR. Each child in the play group is either the chaser or a runner. The
+  chaser steers toward the nearest catchable runner; runners steer away from the chaser,
+  preferring open ground. Speeds are calibratable and close together, with the runner a
+  little quicker than the chaser (`balance.villageLife.*`, debug-editable) so a catch
+  takes real time to happen. On a catch — within a small calibratable distance — the
+  caught child becomes the chaser.
+  USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve
+  obstacles by sliding along a collider and stopping — which is exactly what reads as
+  bumping into things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, already
+  used by every fleeing animal) probes around the heading and CONTINUES the run past an
+  obstacle. A chase wants that one. It is the reason this behaviour is small rather than
+  large: the steering already exists and is pure-tested.
+  FOUR FAILURE MODES THE BUILD MUST CLOSE, each of them a lesson this project has
+  already paid for elsewhere:
+  (1) INSTANT RE-TAG. Without a guard the two children swap the role every frame and
+  stand jittering together. The new chaser owes the freshly-tagged child a short
+  calibratable immunity, and turns away before resuming. This is the same hysteresis
+  that keeps the animals' dodge and guard states from flapping.
+  (2) STICKING ON GEOMETRY. A chase that pins on a hut corner is worse than the bumping
+  it replaces; the deflected step plus a nudge on a stall keeps them running.
+  (3) LEAVING THE PLAY AREA. Children stay inside the walkable settlement, out of the
+  fire ring, and never inside a collider — playing must not become a way to stand where
+  a walker may not.
+  (4) A CHASE THAT NEVER ENDS. If the chaser fails to catch anyone within a calibratable
+  window, the game resolves: a new chaser is drawn or the group breaks off and returns
+  to its ordinary idling for a while before starting again. This is the §19.8 house
+  rule — every started drama resolves — applied to the village.
+  KEEP UNCHANGED: the adults' errands, and the point-155 guarantees (an errand target
+  needs a clear standing circle and an escape direction; a pinned walker is nudged free
+  after its window).
+  A BY-PRODUCT worth noting in the commit: a pursue-and-evade between inhabitants is
+  reusable — a goat bolting from someone, a dog in a port — so keep it a helper rather
+  than burying it in the children.
+  VERIFIABLE: pure — the role swap grants immunity for its window and cannot re-tag
+  inside it (boundary-exact); the chaser's target choice is the nearest catchable runner
+  and never the immune one; the runner's preferred heading leads away from the chaser
+  and into open ground; the unresolved-chase window ends the game deterministically; a
+  child's step never enters a collider or leaves the walkable radius. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): over a sampled interval the
+  children's paths are NOT periodic — their headings cover a wide spread rather than
+  circling, the pairwise distance between chaser and nearest runner rises and falls
+  repeatedly, and the identity of the chaser changes at least once; no child is pinned
+  against geometry and none stands still for the whole interval.
 
 - [ ] 352. THE SETTLEMENT EDGE PAINTED ON THE GROUND (user 25.07.2026; design.md §2.6
   states the target). In the first-person view the boundary is invisible until crossing
