@@ -182,6 +182,10 @@ Der Dashboard-Konsistenz-Guard wurde erstmals konsequent nach dem Zweitmodell-Pr
 
 Nach der Degradation hielt ich das Aufräumen für erledigt — der Nutzer fand danach *zufällig* drei weitere Rückstände: kaputte Umlaute im Board, ein inkonsistentes Board und eine ganze Nachtschicht Arbeit, die nur lokal lag. Sein Urteil („ziemlich unvollständig") traf zu, und die Ursache ist lehrreich: Ich hatte aufgeräumt, *wo ich Schaden vermutete*, statt systematisch **alle Orte zu prüfen, an denen Schaden liegen kann**. Erst der erzwungene Durchlauf mit expliziten Abschnitten — Vollständigkeit (liegt wirklich alles am Zielort?), Rückstände (Kodierung über *alle* 2305 Textdateien, Datei-für-Datei-Diff gegen den letzten gesunden Stand, Waisensuche, Attrappen-Tests), Plausibilität jedes seit dem letzten Tag gebauten Features samt seiner Tests, Kohärenz der Dokumente, und am Ende der grüne Regressionsbeweis — machte die Abdeckung überhaupt beurteilbar. Zwei Nebenbefunde bestätigen den Wert der Systematik: Der Kodierungs-Detektor schlug ausgerechnet auf seine *eigene* Quelldatei an (deren Kommentar die Schadensmuster zitierte), und ein 219 Commits zurückliegender Zweig, den ich zum Bewerten aufgehoben hatte, erwies sich als unmergebar — beides hätte ich ohne die Checkliste nicht angesehen. Übertragbar: **Nach einem Zwischenfall ist „aufgeräumt" eine Behauptung, die eine Beweisliste braucht** — sonst findet der Nutzer die Reste, und das kostet mehr Vertrauen als der Zwischenfall selbst.
 
+### 3.21 Dokumenten-Drift: ein Fakt an fünf Stellen veraltet an vier davon (25.07.)
+
+Ein Kohärenz-Audit fand acht Stellen, an denen die Dokumente etwas anderes behaupten als der Code tut; eine Forensik über die gesamte Projekthistorie fand elf weitere, die älteste vom **ersten Projekttag**. Das Muster ist exakt messbar. Von den vier Features nach dem v0.2-Tag aktualisierte eines *nur* das eine Dokument, für das ein Sync-Test existiert — und ließ drei ungeschützte Stellen falsch stehen; ein anderes beschrieb seine Neuerung korrekt, ließ aber die fünf älteren Stellen unberührt, die dasselbe Faktum nun falsch angeben (design.md widerspricht dadurch sich selbst). **Die Ursache ist nicht Nachlässigkeit, sondern Redundanz plus fehlender Mechanismus:** Wer schreibt, aktualisiert die Stelle, an der er gerade ist; jede Kopie desselben Fakts anderswo veraltet unbemerkt. Zwei Verschärfungen kamen aus der Forensik: Ein **Dokumenten-Audit ohne Code-Abgleich macht die Drift schlimmer** — ein solcher Lauf schrieb eine knappe richtige Zeile in eine ausführliche falsche um; und **Dokumente werden gegen die Arbeitsauftrags-Spezifikation geschrieben statt gegen den ausgelieferten Code** — ein in der Doku zitierter Bezeichner existierte in keinem einzigen Commit. Konsequenz nach §3.16: ein einziger verbindlicher Ort je Faktum (die übrigen verweisen darauf), eine Prüfung, die die verbleibenden Angaben gegen den *besitzenden Code* hält, und ein Detektor gegen neu entstehende Dopplungen; die Aufzählungslisten (Debug-Werte, Umschalter, Sprungziele, Dorf-Koordinaten) stehen dabei ganz vorn — sie allein hätten sechs der elf Alt-Drifts gefunden. Übertragbar: **Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man.**
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -294,7 +298,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 09:34 · Quellen-Fingerprint: `02d1f84015fd…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 10:12 · Quellen-Fingerprint: `02d1f84015fd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -368,5 +372,5 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 25 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
 <!-- RETRO-FINGERPRINT: 02d1f84015fd25797c431b3918f500387c2697594850cfd240642e9bbfc4ff6a -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T07:34:01.219Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T08:12:22.160Z -->
 <!-- AUTO-GENERATED:END -->

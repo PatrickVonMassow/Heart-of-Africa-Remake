@@ -185,6 +185,16 @@ Zwei Regeln, die das Netz ehrlich halten:
   Ausliefern): belege den **Zielzustand**, nicht die Erfolgsmeldung — zeig mir, dass
   mein aktueller Stand wirklich oben angekommen ist."
 
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** „Zehn Häfen",
+  Vorgabewerte, Tastenbelegungen, Aufzählungen: Wer ein Feature baut, aktualisiert
+  die Stelle, an der er gerade schreibt; alle anderen Kopien rotten unbemerkt.
+  Nachträgliche Doku-Audits *ohne* Code-Abgleich machen es schlimmer, weil sie
+  falsche Aussagen ausformulieren statt sie zu prüfen.
+  → *Prompt:* „Jeder Fakt bekommt genau **einen** verbindlichen Ort; alle anderen
+  Stellen verweisen darauf statt ihn zu wiederholen. Wo sich eine Wiederholung nicht
+  vermeiden lässt, schreib mir einen Test, der sie gegen den Code prüft, dem der
+  Fakt gehört. Und prüfe Doku immer gegen den **Code**, nie gegen die Nachbarprosa."
+
 - **„Aufgeräumt" ohne Beweisliste.** Nach einem Zwischenfall räumt man dort auf, wo
   man den Schaden vermutet — und übersieht den Rest. Der Nutzer findet ihn dann
   zufällig, was mehr Vertrauen kostet als der Zwischenfall selbst.

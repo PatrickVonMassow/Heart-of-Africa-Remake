@@ -11799,6 +11799,39 @@ the remaining open points in their numeric order.
   chain guards in §7.2 (six guards now gate a turn end; §7.2 mentions none).
   VERIFIABLE: each corrected claim matches the code it describes; no doc states a
   count or behaviour the code contradicts.
+  OLDER DRIFTS FOUND 25.07 (the same pattern, reaching back to the project's first
+  two commits — fix these together with (a)-(h), most consequential first):
+  (i) design.md §21.2's "tunable values" enumeration is the BINDING contract of
+  CLAUDE.md §2 (every estimated value adjustable in the debug menu) and is missing
+  ~22 of the ~52 fields the menu actually exposes — birdsong/footstep/ambient
+  volumes, the surf radii, the river width factor, all five crocodile values, the
+  water-crossing pair, walker-unstuck, hunt walk-off overtime, vigil delay, drown
+  seconds, wet flow/ground, dig radius, goodwill-for-hint, health and the strafe
+  factor; §21.2 was only ever extended when a family/calf value was added.
+  (j) docs/peoples-1890.md still warns that the Somali village sits at 5.5°N and the
+  Swahili at −6.5/38.7 — both were MOVED on 16.07 (now 9.0/45.0 and −2.4/40.6) and
+  the doc's own recommendation was acted on, so the research record contradicts the
+  world it describes (the worst kind: later accuracy work reads it as fact).
+  (k) CLAUDE.md §7.1 pt 25 says "all SEVEN travel-map cultural landmarks … Giza is
+  the eighth but mounts as Cairo's skyline" while the code publishes EIGHT incl.
+  Giza and the enrichments check asserts eight — and the same criterion says "the
+  eight built cultural landmarks" three lines earlier. Note the mechanism: this
+  false wording was AUTHORED by a docs-only audit commit (17.07) that rewrote a
+  correct-but-terse line into an elaborate wrong one — a doc audit without a code
+  check can make drift worse.
+  (l) design.md §21.3 claims random events are "on by default" (they are off —
+  §14.3 of the same document says so) and promises "one button per kind" where the
+  code has always had a dropdown (day-one drift, 06.07).
+  (m) CLAUDE.md §4 lists `src/places/` in the project structure — that directory
+  has never existed in any commit; the real one is `src/scenes/place/`.
+  (n) The touch-preset lever list (design.md §17.5, CLAUDE.md §7.1 pt 30) names
+  three levers and "each re-enablable in the debug menu"; `activateTouch` applies
+  FOUR (campfire shadows joined) and the per-setting checkboxes were removed.
+  (o) design.md §21.3's toggle list omits the shipped `flatGround` and
+  `foliageCollapse` checkboxes; §21.2 still calls the ambience "one control" where
+  five audio controls exist. (p) A stale CODE COMMENT in src/ui/DebugMenu.tsx says
+  the language selector defaults to German; English has been the default since
+  07.07.
 
 - [ ] 333. WHY THE DOCS DRIFT — AND A MECHANISM AGAINST IT (root-cause analysis
   25.07.2026, user question "where does all this drift come from — were there
@@ -11847,6 +11880,28 @@ the remaining open points in their numeric order.
   the 25.07 coherence audit against the finished state reports no drift and no
   new duplication, and each mechanism fails on a deliberately re-introduced
   violation.
+  GUARD INVENTORY (from the 25.07 forensic sweep — build these checks in this
+  order, best value first; the ENUMERATION checks alone would have caught 6 of the
+  11 older drifts): (1) design.md §21.2's tunable list vs the debug menu's own
+  number fields; (2) design.md §21.3's toggle/tool list vs the menu's checkboxes
+  and selects; (3) the jump-to category list (design.md §21.3 + CLAUDE.md §7.1
+  pt 20) vs the menu's groups; (4) the touch-preset lever list (design.md §17.5 +
+  §7.1 pt 30) vs `activateTouch`; (5) docs/peoples-1890.md's village coordinates vs
+  `VILLAGE_HEARTLANDS`; (6) the known-from-start set (five doc sites) vs
+  `KNOWN_FROM_START_PLACES`; (7) the F-key roster vs the HUD's key handling.
+  Then the COUNTS, each owned by one code constant: ports/peoples/rivers,
+  waterfalls/lakes, cultural landmarks/natural sites, village plans, ice massifs,
+  seasonal-dress peoples, benchmark configs, quality levels. Then the DEFAULTS the
+  docs quote (walk speed, strafe factor, ambience volume, starting money, start
+  date and the 1890-1895 window, ivory range, shadow-map sizes, level default and
+  cycle order, the F3 loadout numbers, the thunder delay band).
+  TWO FURTHER ROOT CAUSES the sweep exposed, to be addressed by the regime:
+  (i) a DOC AUDIT WITHOUT A CODE CHECK can make drift WORSE — a 17.07 docs-only
+  audit rewrote a terse correct line into an elaborate false one; every doc audit
+  must therefore verify against the CODE, never against neighbouring prose;
+  (ii) docs get written against the TASKS SPEC rather than the shipped code — the
+  cited `panoramaVicinityRadius` never existed in any commit, it came from a spec
+  draft; a doc's symbol citations must be checked against the code that shipped.
 
 ## Closing (only after all points)
 
