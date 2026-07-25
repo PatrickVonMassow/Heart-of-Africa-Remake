@@ -11380,6 +11380,35 @@ the remaining open points in their numeric order.
   starts, swims and lands; the §19.5 setback and I4 deadline invariants stay green;
   both backends.
 
+- [ ] 313. FULL DASHBOARD-CONSISTENCY ENFORCEMENT (user 25.07.2026; four-eyes Opus +
+  Fable on BOTH the plan and the implementation). The 25.07 morning audit found real
+  gaps no guard caught: ticked points with NO Erledigt card (262/273/293/305), an
+  OPEN point with an Erledigt card (306), a queue card whose meta was not a duration
+  ("23:11 · regression-failed"), cp1252 mojibake across the file, stray blank lines
+  and stale card bodies. Extend the PURE core (dashboard-guard-core.mjs + its Vitest
+  sweep) with an `auditDashboard` invariant set, wired as further evaluate() blocks
+  and enforced at --synced time like the existing nine: (a) ERLEDIGT COMPLETENESS —
+  every NEWLY ticked point (vs the `doneSeen` baseline recorded in
+  dashboard-state.json at each clean --synced; first run grandfathers history) must
+  have an Erledigt card; (b) NO OPEN POINT IN ERLEDIGT — open ∩ Erledigt blocks (the
+  306 case), parsing both `.num` spans and leading `.t` numbers incl. the "287+288 —"
+  double form; (c) QUEUE META FORMAT — every Warteschlange card carries a `~<n> h`
+  duration in its meta (extra tokens like "· Feature" allowed); (d) TIME PRESENT —
+  the now-card meta and every Erledigt card meta contain at least one HH:MM; (e)
+  ENCODING HEALTH — the file contains none of the mojibake signatures (Ã, â€, Â·,
+  â–, âœ, â†, ï¿½ as substrings) — the umlaut-damage class; (f) STRUCTURE — exactly
+  the four section headers in the binding order with nothing between/after them but
+  cards + footer, only the now-section card carries `open`, every card has a
+  non-empty body, and no point number repeats within one section. All checks pure
+  and swept in dashboard-guard-core.test.mjs (violation AND pass cases each,
+  incl. the real 25.07 regression witnesses); the wrapper refuses to record --synced
+  while the audit fails, so the dashboard cannot be attested inconsistent.
+  VERIFIABLE: the Vitest sweep; a live --synced on the current board passes; each
+  witness case (a-f) reproduced red against the pre-audit board content in tests.
+  PROCESS RECORD: plan reviewed by Opus before build, implementation adversarially
+  reviewed by Opus after build, findings fixed — both reviews' verdicts noted in the
+  commit/point tick.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
