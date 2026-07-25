@@ -12836,6 +12836,41 @@ the remaining open points in their numeric order.
   in the open yard, while in dry weather the two crops match — judged on the image, not
   on the uniform.
 
+- [ ] 354. RAIN FALLS FROM A BRIGHT BLUE SKY IN THE SETTLEMENT (user 25.07.2026,
+  deployed build: the Zulu village on 03.01.1890 — high summer rains — with clear rain
+  streaks against an almost cloudless blue dome). Under rain the sky must read heavy.
+  THE MECHANISM EXISTS AND IS WIRED, which is what makes this worth a careful look
+  rather than a quick tint: `PlaceScene.tsx` computes `skyOvercastParams(wet, strength)`
+  each frame and calls `setSkyOvercast(grayMix, cloudBoost)`, and the parameters are
+  substantial at that date — `grayMix = 0.75 × wetness × weatherStrength`, with the same
+  wetness that is visibly producing the rain streaks. So the numbers say overcast while
+  the picture says blue. DIAGNOSE WHERE THE VALUE IS LOST before changing any constant:
+  candidates are the uniform not reaching the PLACE dome's material instance (the travel
+  dome and the settlement dome are separate mounts), `balance.season.weatherStrength`
+  sitting low, the gray being mixed under a base colour that dominates it, or the cloud
+  deck not thickening at all — the screenshot shows essentially no cloud despite a
+  `cloudBoost` of the same magnitude. Name the actual cause in the commit.
+  THE TEST DID NOT CATCH IT, AND THAT IS THE SECOND HALF OF THIS POINT. The settlement
+  season checks in `scripts/verify/polish.mjs` assert on the VALUES behind
+  `__placeSeason()` — "the rains gray the settlement dome and thicken its cloud deck"
+  compares numbers, not pixels. They are green while the player sees a blue sky. This is
+  the exact failure the project already recorded once for the seasons (point 147: three
+  rounds of uniform-level checks passed while the player saw nothing), and the remedy is
+  the one that worked there — MEASURE THE PICTURE. Replace or supplement those
+  assertions with a pixel comparison of the same sky region in a dry month and in a wet
+  month at the SAME settlement, the way the travel ground already proves its season
+  (screenshots 115/116). A parameter assertion may stay as a supporting check; it may not
+  be the evidence.
+  KEEP: the dry-season sky unchanged, the §19.13 thunderstorm flash and the harmattan
+  dust dome (their own axis, not the wet gray) untouched, and the rain streaks as they
+  are — the streaks are not the complaint.
+  VERIFIABLE: pure — `skyOvercastParams` keeps its curve (already tested); a new test
+  pins whatever wiring turns out to be broken, so it cannot silently return. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshots): a crop of the SKY above the
+  horizon at one settlement is measurably darker and less saturated in its wet month
+  than in its dry month, and the difference is large enough that a person would call it
+  overcast; the existing dry-month picture is unchanged.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
