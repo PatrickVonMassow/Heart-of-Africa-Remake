@@ -12713,6 +12713,53 @@ the remaining open points in their numeric order.
   eaves of a hut in a village AND in a port sees the roof from below as a solid
   surface, with no sky wedge and no view into the interior; no console errors.
 
+- [ ] 350. THE KNEELING VILLAGER IS A SQUASHED VILLAGER (user 25.07.2026, deployed
+  build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
+  ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
+  kneeling with a NON-UNIFORM vertical squash — `scale={[scale, scale * (kneel ? 0.75 :
+  1), scale]}` (line ~60) on top of a shortened body cone (`bodyH = kneel ? 0.55 : 1.0`).
+  The squash applies to the WHOLE figure, the head included, so the head reads as a
+  flattened ellipsoid: kneeling shortens the legs, it does not compress the skull. And
+  the alternation the user sees is `TaskWalker` (line ~496) swapping the standing and
+  kneeling groups by VISIBILITY when it starts and ends its work at the well — an
+  instant pop between two different-looking figures.
+  TARGET: a kneeling pose built from PROPORTIONS, not from a vertical scale. The lower
+  body folds (a shorter, wider base) and the whole figure sits lower, while the head and
+  every other part keep their true shape — the group's scale stays UNIFORM. And the
+  transition reads as a movement rather than a swap: the figure lowers into the pose and
+  rises out of it over a short, calibratable time, so no frame shows one figure replaced
+  by another. Every user of `kneel` gets it — the cook, the fire tender and the errand
+  walker at the well.
+  VERIFIABLE: pure (`src/render/figures.test.ts` or a test beside it) — the kneeling
+  build applies no non-uniform scale (x, y and z factors equal) and its head radius
+  matches the standing figure's, while the pose is genuinely lower (a bounded overall
+  height reduction); the standing build is unchanged. Live
+  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): across the frames in which a
+  task walker starts and finishes its work, no single frame changes the figure's
+  rendered height by more than the transition's per-frame step — the pop is what the
+  check is for.
+
+- [ ] 351. CHILDREN SHOULD PLAY AROUND THE WELL, NOT BOUNCE OFF IT (user 25.07.2026,
+  deployed build: the village children run beside the well and rebound from it again and
+  again). They are ordinary walkers whose target lies past a collider, so the collision
+  resolution does the only thing it can — slide and stop — and the result reads as
+  repeatedly bumping into the well rather than as play.
+  TARGET: children given a PLAY behaviour that uses the well as its centre instead of
+  treating it as an obstacle in the way — circling it at a radius clear of its collider,
+  changing direction now and then, breaking off and rejoining. The §19.10 village life is
+  the point of these figures; a walker pathing rule that merely avoids the well would
+  remove the bumping without producing play, and is not what this asks for.
+  KEEP: the ordinary walkers (adults on errands) unchanged, and the point-155 guarantees
+  intact — an errand target still needs a clear standing circle and an escape direction,
+  and a physically pinned walker is still nudged free after its window. Playing children
+  must not become a way to stand inside a collider.
+  VERIFIABLE: pure — the play path stays outside the well's collider radius at every
+  sampled step and returns to its centre over time (it orbits rather than drifting away);
+  a child's position never enters any collider. Live (`scripts/verify/polish.mjs`, BOTH
+  backends): over a sampled interval a playing child's positions distribute AROUND the
+  well (its bearing from the well changes monotonically for a stretch) rather than
+  clustering against one side, and no child is pinned; screenshot.
+
 ## Closing (only after all points)
 
 NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
