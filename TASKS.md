@@ -11924,6 +11924,23 @@ the remaining open points in their numeric order.
   repeated runs; a pure test for whatever disposal rule was wrong; the picture
   unchanged on both backends (a dispose fix must not blank the post chain — that
   exact regression is what 5e107e4 had to repair).
+  ANCHORS (read-only prep 25.07, main session): the pipeline is built in ONE
+  `useMemo` in src/render/Effects.tsx, which collects every pass into a local
+  `disposables` array and frees them in its cleanup — `scenePass` (samples 0 with
+  TRAA, 4 without), the GTAO pass plus its internal noise texture, the TRAA node
+  plus TWO hand-freed extras (`beautyNode.renderTarget` with its quad material,
+  and the previous-depth texture in both its initial and swapped-out form), and
+  the bloom node. Suspects for the +14 textures, in the order worth measuring:
+  (1) the MRT targets of the REPLACED `scenePass` — the samples value changes
+  with the toggle, so every flip builds a differently-sampled target set;
+  (2) the module-level `velocity` node, deliberately shared and never disposed —
+  check whether its per-pipeline resources are; (3) `RenderPipeline.dispose()`
+  itself, which per the code comment frees only its own quad material, so
+  anything it allocates per output node would accumulate; (4) the WebGPU
+  backend's own texture cache possibly holding entries the three.js objects have
+  already released — that would make the count an OVER-REPORT, i.e. a CHECK bug.
+  Decide (4) FIRST: it is the point-292 lesson (a red check indicting innocent
+  code), and it is the cheapest of the four to settle.
 
 - [ ] 335. GREY BAND ACROSS THE HORIZON AT THE GIZA SITE (user 25.07.2026 with a
   screenshot from the DEPLOYED build, standing on the Giza monument site looking
