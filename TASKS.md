@@ -2917,6 +2917,122 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 (the picture rule) and its evidence
   section, plus a tip in the beginner's guide if a lever generalises.
 
+- [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
+  (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
+  never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
+  in `src/scenes/travel/wildlifeBehavior.ts`, point 192) and the crocodile ambush
+  (§19.16, `crocodileTargetWeight` and the hunt core). Join them into the one scene
+  §19.8 is missing — a family in open water.
+  A CROSSING TAKES THE FAMILY. When a parent with a living calf starts a crossing,
+  the calf enters with it and swims at its flank (the existing leash, at the wade
+  speed both already use); the pair is one crossing, not two. A calf alone never
+  starts one.
+  THE AMBUSH FIRES MID-CHANNEL. The crocodile's target weighting, today biased to
+  drinkers and juveniles AT the bank, gains the swimming calf as its strongest
+  case — a calibratable weight beside the existing ones (§21.2, debug-editable).
+  THE REVERSAL IS THE PICTURE. On the seizure the parent turns round — against the
+  direction the rest of the herd is taking — and swims back. Its heading reversal
+  goes through the ordinary capped turn rate (§19.5: no body ever whips round), and
+  the rest of the herd does NOT turn: it completes the crossing and walks up the far
+  bank. That contrast is what the scene is for; a verification that cannot see it is
+  not passing.
+  THE ENDINGS ARE THE EXISTING ONES, not new: the return is a RESCUE, so it takes
+  the rescue burst braked by `seasonFlowFactor` (`wadeSpeed`) and rolls the SAME
+  §19.8 defence matrix used at the waterline — drive-off, taken-in-the-calf's-place,
+  or too late. NO vigil exists here (the water takes the body, §19.8); a too-late
+  parent makes the NEAREST bank and rejoins its herd. Every branch resolves on a
+  bank — reuse the crossing deadline so nothing is left swimming (§19.5).
+  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (crossing, crocodile weighting,
+  defence resolution, `wadeSpeed`), `src/scenes/travel/Wildlife.tsx` ~2373–2500
+  (the water-drama frame code and its `seasonFlowFactor` calls) and ~3855 (the
+  crossing swim speed), `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`
+  for the debug label.
+  VERIFIABLE: pure (`wildlifeBehavior.test.ts`) — a parent's crossing takes its calf
+  and only its calf; the mid-channel weight beats the bank cases; the reversal
+  respects the turn cap; each defence outcome reaches a terminal state and a
+  too-late parent ends on a bank, never in the channel; no branch can leave the
+  water-drama state set past the deadline. Live (`scripts/verify/wildlife.mjs`, ONE
+  backend — this is behaviour, not shading; the reversal is judged on the recorded
+  positions plus one screenshot): a seeded crossing produces a herd that finishes
+  while one animal reverses.
+  DOCS: design.md §19.8 + §21.2 already state it; add the balance value's comment
+  and the acceptance-evidence line under §12.
+
+- [ ] 363. THE STRAGGLER — a lame calf the herd leaves behind (user 26.07.2026;
+  design.md §19.8 states the target). Every §19 drama is fast: a charge, a seizure,
+  a plunge. This one is slow, and nothing is scripted to kill — it is the only
+  scene in the game whose tension is WAITING.
+  THE LAMENESS. With a calibratable chance (§21.2, debug-editable) a calf that
+  SURVIVES a hunt — the parent drove the predator off (points 124/125/145c), or the
+  chase simply broke off — is left lame: a calibratable speed penalty for a
+  calibratable healing window. Keep the chance low; a drive-off that always cost
+  something would turn the successful defence into a second sacrifice.
+  THE HERD DRAWS AWAY. A lame calf cannot hold the group pace, and its parent does
+  not leave it (the §19.8 constant, already implemented for the mire vigil of point
+  123 — reuse that stay-behind, do not write a second one). The herd keeps its
+  ordinary roaming; the pair simply falls behind and stands alone in the open.
+  NO PREDATOR IS SENT. Do not spawn or steer one. The existing juvenile hunt bias
+  now has an easier target because the pair is isolated and slow; that is the whole
+  mechanism. If a hunt does find them the ORDINARY grammar runs (shield, charge,
+  roll) — the parent does not surrender, because nothing has died.
+  IT ALWAYS RESOLVES (the point-118 lesson): on the healing window the limp ends and
+  the pair rejoins the herd; a streamed-away herd is the adoption/regroup case that
+  already exists. A lame calf must never be left permanently detached.
+  ANCHORS: `src/scenes/travel/wildlifeBehavior.ts` (the hunt outcome/drive-off
+  resolution, the mire stay-behind, the leash and group pacing), `Wildlife.tsx` for
+  the per-frame speed, `src/config/balance.ts` `waterDrama`'s neighbourhood (add the
+  values beside the family-drama block), `src/i18n/{de,en}.ts` labels.
+  VERIFIABLE: pure — the lameness fires only after a SURVIVED hunt and only on its
+  chance; the penalty applies to the calf and the parent's stay-behind mirrors it;
+  the pair falls measurably behind a roaming herd; the window heals and the pair
+  rejoins; no state leaves a calf detached past the window. Live
+  (`scripts/verify/wildlife.mjs`, ONE backend): with the chance forced to 1 a
+  post-hunt pair is measurably behind the herd's centroid and later back with it.
+  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
+  acceptance-evidence line under §12.
+
+- [ ] 364. THE FLOOD SWELLS THE DRAMA CURRENT — and can take a calf at the crest
+  (user 26.07.2026; design.md §19.8 states the target). This point fixes a real
+  inconsistency first and adds a drama second; both land together.
+  THE BUG. `seasonFlowFactor(CURRENT_WEATHER.wetness, dryFlowFactor, wetFlowFactor)`
+  (Wildlife.tsx ~2373/2466/2485/3855) keys the drama current on LOCAL wetness alone.
+  The game's own flood model is deliberately REMOTE-fed (design.md §19.9, points
+  138/139): the Nile crests at Cairo in October where it never rains, and the
+  Okavango peaks in July inside Botswana's dry season. So today the water dramas run
+  at their dry-season gentlest exactly when the modelled river is at its most
+  dangerous. THE FIX: the effective factor is the HIGHER of the wetness-fed factor
+  and a flood-fed one — `nileFloodAt`/`okavangoFloodAt` (`src/systems/season.ts`)
+  scaled by a calibratable balance value (§21.2, debug-editable) — so the crest
+  swells the current, shortens the self-rescue and brakes the rescue burst through
+  the paths that already read the factor. Wire it in ONE place (a helper beside
+  `seasonFlowFactor`) so no call site can be forgotten.
+  THE DRAMA. At a swollen crest a crossing (point 362) can lose the calf to the
+  CURRENT rather than to a crocodile: it is carried downstream past its parent's
+  reach, and the parent turns downstream after it — a rescue on the same rolls and
+  the same brake, which the point-122 drowning window may end for BOTH. This is the
+  existing drowning drama reached by a new road, not a new death: reuse
+  `drownSeconds`/`drownFlowThreshold` unchanged.
+  WHAT MUST NOT CHANGE: the flood stays VERTICAL (§19.9) — no ground becomes water,
+  no §4.2 village clearance moves, the ribbon keeps its width. Only the force
+  changes. A test must pin that.
+  SEQUENCING: 362 lands first (this point's drama rides its crossing); the flow-factor
+  fix is independent and may land even if 362 slips.
+  ANCHORS: `src/systems/season.ts` (`nileFloodAt`, `okavangoFloodAt`),
+  `src/scenes/travel/wildlifeBehavior.ts` (`seasonFlowFactor`, `wadeSpeed`, the
+  drowning core ~1745), `Wildlife.tsx` at the four call sites above,
+  `src/config/balance.ts` `waterDrama`, `src/i18n/{de,en}.ts`.
+  VERIFIABLE: pure — at Cairo in October (wetness 0) the effective factor is
+  significantly above the dry floor and near the wet case, while a rainless
+  non-flood day stays at the floor; the Okavango does the same in July; the factor
+  is never LOWER than today's wetness-fed value anywhere (a pure sweep over the
+  year × both systems); the drowning window and threshold are untouched; the flood
+  changes no water mask, ribbon width or clearance (assert against the existing
+  world sweep). Live (`scripts/verify/wildlife.mjs`, ONE backend): at the October
+  crest a seeded crossing is visibly carried downstream and its rescue is slower
+  than the same seed in the dry season.
+  DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
+  acceptance-evidence line under §12.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
