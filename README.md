@@ -1,4 +1,4 @@
-<img width="1456" height="720" alt="Grok 2c" src="https://github.com/user-attachments/assets/ee4992d7-3a55-4726-9dc5-9d9d2ae28dfa" />
+<img width="1168" height="784" alt="Grok 2" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
 
 # The Heart of Africa — Modern Remake
 
