@@ -55,6 +55,7 @@ import {
 const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
@@ -98,7 +99,7 @@ if (process.argv[2] === '--synced') {
 
   // VALIDATE FIRST (point 313): a board that fails the consistency audit can
   // not be attested — nothing is written, the violations are the work list.
-  const { open, done } = parseTasks(readFileSync(TASKS, 'utf8'))
+  const { open, done } = parseTasks(readTasksAll(TASKS))
   const priorState = readJson(STATE_PATH) ?? {}
   const violations = auditDashboard(readFileSync(p, 'utf8'), { open, done, doneSeen: priorState.doneSeen ?? null })
   const waived = priorState.auditWaived && priorState.auditWaived.repoHash === sha256File(p)
@@ -139,7 +140,7 @@ if (process.argv[2] === '--synced') {
   // later spec change with an unchanged card then flags at turn end until the
   // next reviewed --synced refreshes these snapshots.
   try {
-    const snaps = specSnapshots(readFileSync(TASKS, 'utf8'), readFileSync(p, 'utf8'))
+    const snaps = specSnapshots(readTasksAll(TASKS), readFileSync(p, 'utf8'))
     mergeState({ integritySnapshots: snaps })
     console.log(`integrity snapshots recorded for ${Object.keys(snaps).length} queue card(s)`)
   } catch (e) {
@@ -197,7 +198,7 @@ try {
 
   const result = evaluate({
     paused: existsSync(PAUSE),
-    ...parseTasks(readFileSync(TASKS, 'utf8')),
+    ...parseTasks(readTasksAll(TASKS)),
     marker,
     markerFileExists,
     head: head(),

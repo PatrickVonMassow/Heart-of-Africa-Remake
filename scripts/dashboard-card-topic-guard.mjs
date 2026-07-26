@@ -8,6 +8,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { evaluate } from './dashboard-card-topic-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const DASHBOARD = fileURLToPath(new URL('../.batch-dashboard.html', import.meta.url))
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
@@ -28,7 +29,7 @@ try {
 
   const result = evaluate({
     dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
-    tasksText: readFileSync(TASKS, 'utf8'),
+    tasksText: readTasksAll(TASKS),
   })
   if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
   process.exit(0)

@@ -15,13 +15,20 @@
 // fail-open; guide-brevity-core.test.mjs pins this logic AND audits the real
 // document on every unit-test run, so the regression itself is the enforcement.
 
+// The budget caps NARRATIVE growth — a pitfall swelling into a case study — not
+// the NUMBER of transferable tips: the guide's whole value is how many usable
+// prompts it carries. So it is raised only by the measured size of genuinely new
+// tips, each still bound by the per-entry budgets below, and never to make room
+// for a longer telling of something already there. Raised on 26.07.2026 by the
+// two tips on scoping the most expensive check and on splitting the task list
+// from its archive (+18 lines, +163 words).
 export const LIMITS = {
-  maxLines: 345,
+  maxLines: 363,
   // Deliberately a little loose (~5 % headroom): a budget with almost no room
   // blocks a clarifying half-sentence, and a guard that fires on legitimate
   // edits teaches people to raise the number instead of to cut. It must bite on
   // a growing case study, not on an honest rewording.
-  maxWords: 2850,
+  maxWords: 3013,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

@@ -49,6 +49,29 @@ export function isRenderPath(path) {
  * render-file edit) — or null. Only exit-0 runs count: a crashed/failed suite
  * proves nothing about the picture.
  */
+/**
+ * Can a change to this path render DIFFERENTLY on the two backends? Only such a
+ * change needs the expensive dual-backend picture, and picture inspection is the
+ * costliest thing this project does (user 26.07.2026).
+ *
+ * The exemption is deliberately NARROW: everything in the render set stays
+ * dual-backend except the DOM. The HUD, the dialogs, the map and journal
+ * overlays under src/ui/ are HTML — the browser draws them identically whichever
+ * renderer holds the canvas, so a second run inspects the same pixels twice. A
+ * change there still owes ONE passing run: it can break the picture, just not
+ * per backend.
+ *
+ * Everything else stays dual, including the pure geometry/behaviour modules
+ * under src/scenes/. That is not caution for its own sake — the flora jitter of
+ * point 175 (a per-instance attribute racing its re-upload) and the texture-count
+ * dip of point 334 both appeared on ONE backend from code that looks
+ * backend-neutral. A cleverer rule would have missed them.
+ */
+export function isBackendSensitivePath(path) {
+  if (!isRenderPath(path)) return false
+  return !String(path).replace(/\\/g, '/').startsWith('src/ui/')
+}
+
 export function coveringRun(runs, backend, since) {
   if (!Array.isArray(runs)) return null
   let best = null
@@ -138,7 +161,15 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
-  const missing = BACKENDS.filter((b) => !coveringRun(runs, b, since))
+  // Two backends only where the two backends can DIFFER; otherwise one passing
+  // run is the whole proof, and the second is a picture inspection bought for
+  // nothing (user 26.07.2026).
+  const dual = changedRenderPaths.some(isBackendSensitivePath)
+  const missing = dual
+    ? BACKENDS.filter((b) => !coveringRun(runs, b, since))
+    : BACKENDS.some((b) => coveringRun(runs, b, since))
+      ? []
+      : [BACKENDS[0]]
   if (missing.length === 0) return { decision: 'allow', clear: true }
 
   const shown =
@@ -156,8 +187,12 @@ export function evaluate(input) {
       missing.join(' or ') +
       ' is recorded since the last render-file edit. Standing rule (enforced — the point-210 ' +
       'coast fix read "done" on WebGL2 while the WebGPU picture was still stepped): every ' +
-      'GUI/rendering/shader fix is judged by the rendered PICTURE on BOTH backends before it ' +
-      `counts as done. Run: ${cmds} (pick the suite whose screenshots show the changed view — ` +
+      'GUI/rendering/shader fix is judged by the rendered PICTURE before it counts as done — ' +
+      (dual
+        ? 'and on BOTH backends, because this change can render differently on each. '
+        : 'here ONE backend suffices: the change is DOM-only, and the browser draws the HUD ' +
+          'identically whichever renderer holds the canvas. ') +
+      `Run: ${cmds} (pick the suite whose screenshots show the changed view — ` +
       'passing runs are recorded automatically by the suite itself), then INSPECT the frames of ' +
       'both backends. ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +

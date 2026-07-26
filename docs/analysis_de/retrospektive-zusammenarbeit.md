@@ -224,6 +224,22 @@ Zäh war die Fehlannahme, weil die Erfahrung sie zu bestätigen schien: Das Woch
 
 **Lehre:** Bevor man etwas beziffert, muss der Nenner feststehen — pro Arbeit oder pro Zeit. Beides „Kosten" zu nennen führt zu falschen Entscheidungen; hier zu einer Drosselung, die nichts sparte und nur langsamer machte.
 
+### 3.28 Die teuerste Prüfung war die unschärfste
+
+Die Bildprüfung auf beiden Render-Backends ist die aufwendigste Kontrolle dieses Projekts — zwei Browserläufe, zwei Bildbegutachtungen. Ihr Wächter verlangte sie für ein grob gezogenes Feld: alles unter den Szenen-, Render- und HUD-Bäumen. Damit forderte er zwei Backends auch dort, wo die beiden gar nicht verschieden zeichnen *können*: Die Bedienoberfläche ist HTML, und der Browser malt sie identisch, gleich welcher Renderer die Zeichenfläche hält.
+
+Die Schwierigkeit lag in der Grenzziehung, nicht in der Idee. Mein erster Zuschnitt war zu klug — er hätte auch reine Logikmodule ausgenommen und damit ausgerechnet die zwei Fälle verfehlt, die auf EINEM Backend auftraten, obwohl der Code backend-neutral aussieht: ein Vegetations-Zittern durch eine Wettlaufsituation beim Hochladen, und eine Messung, die nur auf dem einen Pfad in ein Bild ohne gezeichneten Rahmen fiel. Die Ausnahme wurde deshalb auf das reduziert, was **nachweislich** nicht divergieren kann.
+
+**Lehre:** Eine teure Prüfung rechtfertigt sich nicht dadurch, dass sie wichtig ist, sondern dadurch, dass sie dort greift, wo das Risiko sitzt. Und beim Verengen eines Sicherheitsnetzes gilt die konservative Grenze: Nimm nur aus, was **beweisbar** nichts beiträgt — nicht, was plausibel nichts beiträgt.
+
+### 3.29 Der Arbeitsauftrag wuchs, bis er sich selbst im Weg stand
+
+Die Aufgabenliste war auf 13.000 Zeilen gewachsen, 10.000 davon längst erledigte Punkte. Jeder Zug, der sie zu Rate zog, schleppte diese Geschichte mit. Die Datei war nie falsch — sie war zu drei Vierteln Archiv, das wie Arbeitsvorrat gelesen wurde.
+
+Die Trennung ist banal, hätte ohne Mechanismus aber nicht gehalten: Ein einziger vergessener Haken, und die Datei wächst wieder zu. Die eigentliche Sorgfalt lag woanders — wer nur wissen will, was noch zu tun ist, braucht die eine Hälfte; wer einen Punkt als **geschlossen** erkennen muss, braucht beide. Ein Prüfer, der das übersieht, meldet keinen Fehler; er hört auf, jemals etwas zu finden.
+
+**Lehre:** Ein Dokument, das mit jedem Vorgang wächst und bei jedem Vorgang gelesen wird, trägt eine eingebaute Kostenkurve. Trenne früh zwischen dem, was bearbeitet wird, und dem, was nur nachschlagbar sein muss — und prüfe beim Trennen, welcher Leser welche Hälfte braucht.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -244,6 +260,7 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `ci-status-guard` | rote CI wird bemerkt | stille CI-Fehler |
 | `push-arrival-guard` | kein Turn-Ende, solange Commits in keiner Remote-Ref liegen | 3.18 |
 | `commit-scope-guard` | kein Fremdkörper im Commit (Wurzeldateien, fremde Verzeichnisse, große Binärdateien) | private Datei im Repo |
+| `tasks-archive-guard` | Arbeitsauftrag bleibt geteilt: offen in TASKS.md, erledigt im Archiv | 13.000-Zeilen-Datei je Zug |
 | `guide-brevity-guard` | Anleitung bleibt kurz und projekt-neutral | 3.26 |
 | `rule-review-guard` | periodische Durchsicht des ganzen Regelbestands | 3.25 |
 | `guard-health-guard` | kein Durchsetzer im Baum, den nichts aufruft | 3.25 (4) |
@@ -306,7 +323,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 26.07.2026, 10:48 · Quellen-Fingerprint: `9583e7520885…`
+Zuletzt aktualisiert: Sonntag, 26.07.2026, 12:05 · Quellen-Fingerprint: `71a6f0cf2a07…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -342,7 +359,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Before building, triage difficulty × criticality; for HIGH/critical work bring in a second, different model (Fable) to review plan + result — proactively, not only for audits or when stuck | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | Standing licence to use Fable 5 and adjust effort for suitable pending tasks; Opus 4.8 on High stays the default | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 4 | hoch | tasks-spec-guard.mjs | ✔ Mechanismus |
+| EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | 2026-07-14: a second Claude instance ran the hoa batch in parallel (SessionStart hook auto-resume) — caused edit clobbering and test runs against half-finished states; needs a lock before autonomous resume | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | 24.07.2026 — TWO claude batch sessions ran in the SAME working dir at once (OS autostart duplicated a live session); how to detect + the safe posture | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -359,9 +376,9 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
-| TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
+| TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
+| TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
+| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -369,7 +386,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
-| Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
+| Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Wildlife/atmosphere verify suites produce ROTATING false failures under parallel agent load — judge a red only on a quiet machine | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -377,8 +394,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 29 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 30 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 8 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 9583e75208856193ac5652016156fd3f64ae78ae7a8416b76ece68901cd19c1f -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-26T08:48:27.022Z -->
+<!-- RETRO-FINGERPRINT: 71a6f0cf2a07c1e0f94006b09bdad1ed7f0c2d812ff46af8daf9b78bf75f2bb8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-26T10:05:20.887Z -->
 <!-- AUTO-GENERATED:END -->

@@ -299,6 +299,24 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   danach das fertige Ergebnis gegenprüfen lässt — gegen die echten Daten, nicht gegen
   die Beschreibung, und bevor zusammengeführt wird." *(Kosten ≈ 2x)*
 
+- **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter
+  Lauf auf einer anderen Plattform, ein zweites Modell: Solche Kontrollen kosten
+  ein Vielfaches der übrigen. Wird eine davon pauschal für ganze Verzeichnisse
+  gefordert, zahlst du sie auch für Änderungen, bei denen sie nichts beweisen kann.
+  → *Prompt:* „Verlange die teuerste Prüfung nur für Änderungen, die dort wirklich
+  abweichen können. Nimm dabei nur aus, was **beweisbar** nichts beitragen kann —
+  nicht, was plausibel nichts beiträgt —, und schreib die Grenze samt Begründung
+  in den prüfenden Code, nicht in eine Regel daneben."
+
+- **Die Aufgabenliste wächst und wird trotzdem jedes Mal ganz gelesen.** Was
+  erledigt ist, bleibt darin stehen; nach ein paar Wochen ist der größte Teil der
+  Datei Geschichte, die bei jedem Vorgang mitgelesen wird.
+  → *Prompt:* „Halte in der Aufgabenliste nur die OFFENEN Aufgaben. Eine erledigte
+  wandert wortgleich und mit ihrer Nummer in ein Archiv, und ein Mechanismus
+  erzwingt das. Prüfe beim Trennen, welcher Leser welche Hälfte braucht: Wer nur
+  wissen will, was zu tun ist, liest die offene; wer erkennen muss, dass etwas
+  **abgeschlossen** ist, braucht beide."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten

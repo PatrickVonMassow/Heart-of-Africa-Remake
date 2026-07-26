@@ -183,7 +183,12 @@ old→new coverage map live in `scripts/verify/README.md`.
   (durability — nothing stays only local, nothing is lost if a session dies;
   a failed push is reported, never skipped silently). Merge to `main` ONLY when
   the point is COMPLETE and verified — tests green on both layers AND, for a
-  render/GUI change, the rendered picture checked on BOTH backends. On merge,
+  render/GUI change, the rendered picture checked: on BOTH backends where the
+  change can render differently on each, and on ONE where it cannot — a DOM-only
+  change under `src/ui/` draws identically whichever renderer holds the canvas,
+  so the second inspection buys nothing (user 26.07.2026; the classification is
+  `isBackendSensitivePath` in `scripts/render-verify-core.mjs`, and the guard
+  demands accordingly). On merge,
   resolve any conflict CAREFULLY so nothing breaks, and RE-TEST (re-run the
   relevant regression) whenever a conflict touched real code. `main` therefore
   always reflects finished, verified work — it is the deployed branch (the
@@ -200,6 +205,15 @@ old→new coverage map live in `scripts/verify/README.md`.
     after) the merge — never on the branch. This keeps the working-tree TASKS.md
     the guards/dashboard/resume-hook read consistent with the dashboard on every
     branch, and avoids TASKS.md merge conflicts on every point.
+  - **The work order is split (user 26.07.2026).** `TASKS.md` carries the OPEN
+    points plus its framing sections; a point that is ticked MOVES, verbatim and
+    with its number, into `docs/tasks-archive.md`. The reason is cost: three
+    quarters of the file were finished work that every turn carried along.
+    Consumers that only ask "what is still to do" read `TASKS.md`; the ones that
+    must recognise a point as CLOSED read both through `scripts/tasks-source.mjs`
+    (`readTasksAll`). The split is enforced by `tasks-archive-guard` — a tick left
+    in place, an open point stranded in the archive, or a point present in both
+    files blocks the turn end.
   - After EVERY merge to `main` — conflict or not — run the fast gate
     (`npm run test:unit` + build + lint) before moving on; two points that
     auto-merge cleanly can still break together. On a conflict that touched real
@@ -1801,9 +1815,13 @@ After completion and after every major system:
   `dashboard-integrity-guard` (the progress board is published, concise,
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
-  idle stop), `render-verify-guard` (no GUI/render change finished without
-  the both-backend picture check), `queue-order-guard` and `tasks-spec-guard`
-  (the queue order and the final-state-only spec rule), `ci-status-guard` (a
+  idle stop), `render-verify-guard` (no GUI/render change finished without the
+  picture check — on both backends where they can differ, on one where they
+  cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
+  (the queue order, the final-state-only spec rule, and the open/archived split
+  of the work order), `commit-scope-guard` (a PRE-COMMIT hook via the versioned
+  `scripts/git-hooks/`: no stray file, foreign directory or large binary rides
+  along in a commit), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective document stays current), followed
   by `dashboard-sync`. Separately, a PreToolUse(Bash/PowerShell) hook runs

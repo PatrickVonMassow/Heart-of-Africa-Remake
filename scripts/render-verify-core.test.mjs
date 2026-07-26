@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest'
 import {
   BACKENDS,
   isRenderPath,
+  isBackendSensitivePath,
   coveringRun,
   suggestSuite,
   baselineFor,
@@ -236,5 +237,64 @@ describe('evaluate — totality and fail-open posture', () => {
   it('accepts any recorded passing runs when no edit time is known (NaN → since 0)', () => {
     const r = evaluate(renderChange({ latestChangeAt: NaN, runs: [run('webgpu', 5), run('webgl', 5)] }))
     expect(r.decision).toBe('allow')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The DOM exemption (user 26.07.2026): the HUD renders identically under either
+// backend, so a change there owes ONE picture, not two. Everything else in the
+// render set stays dual — the witnesses are point 175 and point 334, which both
+// appeared on a single backend from code that looks backend-neutral.
+describe('isBackendSensitivePath — where two pictures are actually needed', () => {
+  it('exempts the DOM overlays but still counts them as render paths', () => {
+    for (const p of ['src/ui/Hud.tsx', 'src/ui/Dialogs.tsx', 'src/ui/MapOverlay.tsx']) {
+      expect(isRenderPath(p)).toBe(true)
+      expect(isBackendSensitivePath(p)).toBe(false)
+    }
+  })
+
+  it('keeps everything that draws into the canvas dual-backend', () => {
+    for (const p of [
+      'src/render/materials.ts',
+      'src/render/water.tsl.ts',
+      'src/App.tsx',
+      'src/scenes/travel/waterSurface.ts',
+      'src/scenes/place/PlaceScene.tsx',
+      'scripts/verify/polish.mjs',
+    ]) {
+      expect(isBackendSensitivePath(p)).toBe(true)
+    }
+  })
+
+  it('says no to paths outside the render set entirely', () => {
+    for (const p of ['src/state/store.ts', 'TASKS.md', '', null]) {
+      expect(isBackendSensitivePath(p)).toBe(false)
+    }
+  })
+
+  it('a HUD-only change is cleared by ONE passing run, either backend', () => {
+    const base = {
+      head: 'head123',
+      clearedHead: 'old1234',
+      changedRenderPaths: ['src/ui/Hud.tsx'],
+      latestChangeAt: 1000,
+    }
+    for (const backend of ['webgpu', 'webgl']) {
+      const r = evaluate({ ...base, runs: [run(backend, 2000)] })
+      expect(r.decision).toBe('allow')
+    }
+    expect(evaluate({ ...base, runs: [] }).decision).toBe('block')
+  })
+
+  it('a canvas change is NOT cleared by one run — the point-210 rule is intact', () => {
+    const r = evaluate({
+      head: 'head123',
+      clearedHead: 'old1234',
+      changedRenderPaths: ['src/ui/Hud.tsx', 'src/render/materials.ts'],
+      latestChangeAt: 1000,
+      runs: [run('webgl', 2000)],
+    })
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/WEBGPU/)
   })
 })
