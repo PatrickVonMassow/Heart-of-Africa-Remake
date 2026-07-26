@@ -1,193 +1,53 @@
 # TASKS — sequential feature batch
 
-Working file for the current batch. Exactly one point is in progress at a time.
-Each point: implement → adapt docs (incl. README/CLAUDE.md/design.md) → add
-acceptance tests → run the SCOPED regression (below) → commit atomically (only
-if fully green) → tick it here → clear context and re-enter from this file.
+The OPEN work order. A ticked point moves, verbatim and with its number, into
+`docs/tasks-archive.md`; `tasks-archive-guard` blocks a tick left behind here.
+States are `[ ]` open and `[x]` done — nothing in between.
 
-Scoped regression (user mandate 2026-07-14, replacing full-per-point): build +
-lint + audit + the whole Vitest layer run for EVERY point; of the browser
-suites, only those the diff touches (mapping below). The FULL regression still
-runs: when a point touches a scene core (TravelScene/Wildlife/PlaceScene, the
-renderer/post pipeline, store.ts core), at every ~4th point as a collective
-gate, before every Closing, and whenever a flake retry failed twice. Flake
-policy: if exactly one suite fails on a check from the documented flake list
-(movement 0.00 m, bathe probability, TTS timing, calf-sacrifice behaviour
-window, frame-starved screenshot probes, spawn body-spacing settle window),
-rerun THAT suite standalone
-once — green counts as green (noted in the tick); red twice means a real
-investigation. WATCHDOG: if this process ever lets a bug slip through that the
-full-per-point regression would have caught, REPORT it to the user immediately
-— the policy is then reconsidered.
+**Where the rules live.** The build, the test tiers, the branch/merge workflow
+and the closing cycle are in CLAUDE.md (§5, §6, §7.2, §9) and are NOT repeated
+here. The WORKING ORDER lives in the dashboard's Warteschlange — one place, and
+`queue-order-guard` holds it. Do not write ordering prose into this file: the
+overrides that used to stand here described points long since finished, and a
+second place for the same fact is the drift this project keeps paying for.
 
-On failure after correction attempts: STOP, report, and do not build further on a
-broken base. Tests are never weakened; a red run is fixed in the production code.
-
-This file and every new entry are written in English. Commit messages do not
-reference the TASKS point number.
-
-Point states (user mandate 2026-07-14): `[ ]` not started · `[*]` in
-progress · `[~]` implemented, regression/commit still pending · `[x]` done —
-ticked ONLY after the scoped regression is green AND the commit is pushed.
-
-Tracking (user mandate 2026-07-14): a point being worked on is marked `[*]`;
-on completion its result note ends with a tracking line
-`(track: <start> -> <finish>, <minutes> min, ~<tokens>, <model+settings>)`.
-Times are Berlin local; non-work waits (external blocks) are called out;
-token figures are order-of-magnitude estimates (not measurable in-session),
-always marked ~ and split into INPUT and OUTPUT tokens (user mandate
-2026-07-14). Split heuristic while no exact counters exist: ~85 % input
-(tool results, file reads, context) / ~15 % output (code, prose) of the
-estimated total — refined per point when its shape clearly deviates. Model/settings name the model ID, effort level and thinking switch (source:
-the user-level ~/.claude/settings.json — model claude-fable-5[1m], effort
-high — plus the visible thinking state) and the session settings (autonomous
-batch in the VS Code extension, permissions defaultMode dontAsk).
+This file and every entry in it are written in English. Commit messages never
+reference the point number.
 
 ## Regression command
 
 ```sh
-npm test          # full regression: build → lint → vitest → browser suites → preview
-npm test -- flow  # a single browser suite (dev server managed for you)
+npm run test:unit   # fast layer (jsdom) — always
+npm run test:small  # + the everyday browser gate
+npm test            # LARGE: build → lint → vitest → every suite → preview
 ```
 
-`npm test` runs `scripts/verify/run-all.mjs`: it type-checks and builds
-(`tsc -b` + `vite build`), lints (oxlint, zero warnings/errors), type-checks and
-runs the fast **Vitest** layer (jsdom — pure logic, store transitions, HTML-HUD
-components), then starts the Vite dev server (:5173) and runs the 13 browser
-**Playwright** suites (`docs`, `world`, `i18n`, `flow`, `health`, `events`,
-`collision`, `handwriting`, `polish`, `gamepad`, `voice`, `settings`,
-`enrichments`) against it, and finally builds and runs the production-preview
-smoke test (`preview.mjs`, :4173). It exits non-zero if any stage fails or logs a
-browser console error. Prerequisites: `npm install` (Playwright + Chromium), a
-free :5173/:4173. Individual browser suites can also be run directly with
-`node scripts/verify/<name>.mjs` against a running dev server.
+Per point: build + lint + audit + the whole Vitest layer, plus the browser
+suites the diff touches. The LARGE run is mandatory when a point touches a scene
+core (TravelScene/Wildlife/PlaceScene, the renderer/post pipeline, store.ts),
+before every closing, and whenever a flake retry failed twice.
 
-Diff → browser-suite mapping (scoped runs): `src/i18n/` → i18n; store/systems
-logic → Vitest only (flow if the core loop is touched); `src/scenes/place/` →
-collision, polish, settings; `src/scenes/travel/` → enrichments, events,
-health; `src/render/` → settings, enrichments, polish; `src/ui/` → i18n,
-enrichments, settings, flow (dialogs); journal/TTS → voice, handwriting;
-`src/world/` → world, enrichments; `scripts/verify/X.mjs` → X itself; `*.md`
-→ docs. When unsure, include the suite.
+Diff → browser-suite mapping: `src/i18n/` → i18n · store/systems logic → Vitest
+only (flow if the core loop is touched) · `src/scenes/place/` → collision,
+polish, settings · `src/scenes/travel/` → enrichments, events, health ·
+`src/render/` → settings, enrichments, polish · `src/ui/` → i18n, enrichments,
+settings, flow · journal/TTS → voice, handwriting · `src/world/` → world,
+enrichments · `scripts/verify/X.mjs` → X itself · `*.md` → docs. When unsure,
+include the suite.
+
+Flake policy: if exactly ONE suite fails on a check from the documented flake
+list, rerun that suite standalone once — green counts as green and is noted in
+the tick; red twice is a real investigation. WATCHDOG: if this scoping ever lets
+a bug through that a full run would have caught, report it to the user at once
+and the policy is reconsidered.
 
 **Every point adds a test on the appropriate layer** — Vitest for anything
-assertable without a browser, Playwright (`scripts/verify/*.mjs`) only for the
-scene/RAF/geometry/CSS/audio/screenshot cases (`scripts/verify/README.md` holds
-the map).
+assertable without a browser, a browser suite only for the
+scene/RAF/geometry/CSS/audio/screenshot cases (`scripts/verify/README.md`).
 
-Work order (user override, 2026-07-14): after point 83, the open points are
-worked in THIS order — 88, 90, 87, 86, 91, 85, 84, 89. The numbering stays
-as-is; only the sequence changes.
-
-Work order (user override, 2026-07-16): after point 120 (seasons), the points
-that BUILD ON it are pulled forward and done next, before the rest of the
-batch — 122 and 123 (the two family dramas keyed on the wet/dry season), with
-136 (wider, smoother rivers) placed BEFORE 122 because 122 and 130 both write
-against the river's geometry. So: 120 → 136 → 122 → 123 → the remaining open
-points in their numeric order. The numbering stays as-is; only the sequence
-changes.
-
-Work order (user override, 2026-07-16, later): 137 (seasonal dress by educated
-guess) goes NEXT, ahead of 136 — the user asked for it "als nächstes
-eingereiht" while 136 had only just started (nothing of 136 is committed, so
-nothing is half-built). So the order is now: 137 → 136 → 122 → 123 → the
-remaining open points in their numeric order.
-
-Work order (user override, 2026-07-17): point 135 (the stochastic wildlife
-checks) is PULLED FORWARD to directly after 123, BEFORE 149 — the roaming
-flakes (drinker counts, guard approach, trample metric, vicinity seeding)
-were failing one full suite run in two and taxing every point with retries,
-and 149's weather verification should run on a stabilised suite. So: 123 →
-135 → 149 → 150 → the rest as previously ordered.
-
-Work order (user override, 2026-07-16, ninth): 149 (a SECOND full weatherWork order (user override, 2026-07-16, ninth): 149 (a SECOND full weather
-verification, like 147) and 150 (a SECOND interim Closing run) go AFTER 123, on
-the user's instruction — the whole system is re-swept and re-cleaned once more
-after the family dramas and the river rebuild, before the batch tail. So the
-tail reads: … -> 123 -> 149 -> 150 -> the remaining numeric points. 149 before
-150 (a Closing follows a green verification).
-
-Work order (user override, 2026-07-16, eighth): 147 (verify the whole weather
-system — correct AND visible) goes directly after 144, on the user's
-instruction: by then every weather point that changes the PICTURE has landed
-(120, 137, 143, 144), so it is the sweep over what exists. Then 148, an INTERIM
-CLOSING run, pulled forward because the season was the batch's largest rebuild
-and the Closing steps would otherwise wait behind a dozen more points. Order:
-137 -> 143 -> 144 -> 147 -> 148 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136 ->
-122 -> 123 -> rest.
-
-Work order (user override, 2026-07-16, seventh): 146 (revenge) depends on 125's
-shared outcome helper and its (prey, predator) matrix, so it is built directly
-AFTER 125 rather than at the end — it extends that helper to a third outcome and
-would otherwise be written twice. 125 keeps its place in the numeric tail.
-
-Work order (user override, 2026-07-19, twelfth): after the 173 quality push the
-user reported the jumping/floating trees (175), which was fixed and WebGPU-confirmed
-by him. He then moved the two deferred debt points 177 (staging determinism) and
-176 (drink-catchment cap) AHEAD of the closing check and the v0.2 tag ("Verschiebe
-die Punkte 177 und 176 hinter den aktuellen — also noch vor dem Abschluss-Check und
-dem 0.2er-Tag"). So the tail now runs 173 → 175 → 177 → 176 → closing → 174 (v0.2)
-→ 163 → 166 → 170. (177 before 176: a deterministic staging harness stabilises the
-ground that 176's live drought re-verification and the closing regression stand on.)
-
-Work order (user override, 2026-07-18, eleventh): the user inserted a post-162
-quality push (173: closing run + thorough code analysis + many new tests +
-small/large regression tiers) and then a demo tag (174: v0.2 at /v0.2/) DIRECTLY
-after 162 — and, by his explicit choice, 163/166/170 run AFTER the v0.2 tag. So
-the tail runs 165 → 169 → 157 → 162 → 173 → 174 (v0.2) → 163 → 166 → 170.
-
-Work order (user override, 2026-07-18, tenth): the user moved 165 (animals pop
-in view — the same streaming-pop class as 171/164) up to run right after 172. So
-the tail runs 167 → 171 → 172 → 165 → 169 → 157 → 162 → 163 → 166 → 170.
-
-Work order (user override, 2026-07-18, ninth): after 164's zoom-2 test passed
-while the bug persisted in-game, the user made "test at in-game-achievable zoom"
-a standing rule and ordered a retroactive audit of ALL feature tests for
-practice-remote testing — filed as 172, to run right after 171. So the tail runs
-167 → 171 → 172 → 169 → 157 → 162 → 163 → 165 → 166 → 170.
-
-Work order (user override, 2026-07-18, eighth): point 164's fix did not hold —
-the plants still fly in — so the user filed 171 (only change flora outside the
-view) to run DIRECTLY AFTER the current task 167. So the remaining tail runs
-167 → 171 → 169 → 157 → 162 → 163 → 165 → 166 → 170.
-
-Work order (user override, 2026-07-18, seventh): the user pulled three points
-to the front of the remaining tail — 164 (plants jump while driving), then 167
-(rain snaps at the zone border), then 169 (more juveniles), right after the
-point in progress when asked (155). So the tail runs 155 → 164 → 167 → 169 →
-157 → 162 → 163 → 165 → 166 → 170. The other points keep their relative order.
-
-Work order (user override, 2026-07-16, sixth): 145 (three more parental
-sacrifices) goes at the END of the batch, on the user's explicit instruction —
-and its (a) depends on 144 (the burnt-land state) anyway, so the order is
-already forced. 125's new (a2) rides with 125 where it sits; it is an extension
-of that point, not a point of its own.
-
-Work order (user override, 2026-07-16, fifth): 144 (the plants' cover and
-condition follow the season) goes after 143. Together they are the answer to the
-user's repeated, correct report that the months show "nur Änderungen am Regen
-und der Helligkeit": 143 gives the settlement its missing rain and flora, and
-144 replaces a colour tint that MEASURABLY cannot carry the season on its own
-(the terrain multiplies it by the albedo texture) with a change of cover and
-silhouette. Order: 137 -> 143 -> 144 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136
--> 122 -> 123 -> rest.
-
-Work order (user override, 2026-07-16, fourth): 143 (inside a settlement it
-never rains and the ground never bleaches) is a DEFECT in the shipped point
-120g, found by the user stepping through the months, so it goes ahead of the
-138-142 additions: finish what 120 claimed before adding more season. Order:
-137 -> 143 -> 138 -> 139 -> 140 -> 141 -> 142 -> 136 -> 122 -> 123 -> rest.
-
-Work order (user override, 2026-07-16, third): points 138-142 are the season
-findings that were RESEARCHED but never built (the user asked what else had
-been held back; the honest answer was that only the dress was held back for
-thin evidence — the rest was cut for scope, and one, the Okavango, is
-documented as wrong). They queue directly BEHIND the current point 137, in the
-order I proposed and the user accepted: the two physically safest and most
-visible first, then the harmattan, then the ice/hail, then the big one. So the
-full order is now: 137 → 138 (Nile flood) → 139 (Okavango inversion) → 140
-(harmattan) → 141 (glaciers + hail) → 142 (seasonal work) → 136 → 122 → 123 →
-the remaining open points in their numeric order.
+On failure after correction attempts: STOP, report, and do not build further on
+a broken base. Tests are never weakened; a red run is fixed in the production
+code.
 
 ## Checklist
 
@@ -2999,25 +2859,9 @@ the remaining open points in their numeric order.
 
 ## Closing (only after all points)
 
-NOTE ON ORDERING (17.07.2026): new TASKS points are appended BEFORE this
-section, never after it — this section must stay the LAST thing in the file.
-(It had drifted into the middle because points 162-170 were appended past it;
-moved back to the end here.)
+New points are appended BEFORE this section — it stays last in the file.
 
-USER-REQUESTED CLOSING RUN (17.07.2026 23:37): the last full closing is long
-ago and cruft has accreted (tonight alone: probe scripts, many new features,
-several docs edits, dashboard churn). Do a FULL closing cycle right AFTER the
-current step (point 129) and BEFORE resuming the feature queue (168/145c/...).
-Going forward, a standalone closing run may also be taken as its own task now
-and then. The cycle:
-1. Full regression over the whole state (build, lint, npm audit, unit layer,
-   ALL browser suites green — not just the changed ones).
-2. Thorough dead-code / stale-doc / stale-comment cleanup — as separate commits,
-   not mixed with feature commits. (Watch: leftover _probe.mjs scripts, unused
-   exports after the 129 collidable-set trim, the deadtree entry's now-dead
-   references, any TODO/OPEN that is resolved.)
-3. Full regression again.
-4. Analyse every .md file for cruft that accreted through the iterative
-   additions: compact or restructure sections that have grown rambling or
-   redundant, improving structure where it helps. The referenced section
-   numbers must be preserved.
+The closing cycle itself is CLAUDE.md §9: the machine-readable checklist in
+scripts/closing-guard-core.mjs is the authority, and the PreToolUse guard denies a
+version tag until every step is recorded with evidence. A standalone closing run may
+also be taken as its own task now and then.
