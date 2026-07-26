@@ -314,18 +314,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Viel Delegation ist ein
-   Vervielfacher — aber erst, wenn Isolierung und Exklusivität stehen; sonst
-   vervielfacht sie das Chaos. Das Werkzeug dafür sind **Feature-Branches** mit je
-   einer **eigenen Arbeitskopie** (Git-Worktree), und die Bedingung fürs echte
-   Parallelisieren ist, dass die Stränge sich **nicht dieselben Dateien** teilen.
-   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch von `main` und führe
-   > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
-   > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
-   > Arbeitskopie (Git-Worktree) und teile sie so auf, dass sie **nicht dieselben Dateien**
-   > anfassen. Isolierung und Exklusivität **vor** Redundanz."
+3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Delegation vervielfacht
+   — aber erst mit Isolierung und Exklusivität, sonst vervielfacht sie das Chaos.
+   Werkzeug: **Feature-Branches** mit je eigener **Arbeitskopie**, Bedingung: die
+   Stränge teilen sich **keine Dateien**. Die Grenze setzt nicht dein Kontingent,
+   sondern der **Haupt-Agent**: Bei ihm endet jeder Strang, und je mehr Fremdstoff
+   sein Kontext aufnimmt, desto schlechter urteilt er. So viele Stränge, wie du sauber
+   trennen kannst — einen weniger, sobald das Zusammenführen Nacharbeit erzeugt (2–3).
+   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
+   > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
+   > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen."
 
-   *(Aufschlag ≈ 10–25 %, geschätzt — fast nur Nacharbeit bei geteilten Dateien)*
+   *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
 ---
 
