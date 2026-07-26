@@ -2,7 +2,7 @@
 
 This document describes the target state of a modern indie remake. It is based on the game mechanics of the original (see "The Heart of Africa — Complete Game Mechanics"); this document adopts those systems and fixes the decisions made for the remake.
 
-The original is *The Heart of Africa* (Ozark Softscape / Electronic Arts, 1985), the follow-up to the same team's far better-known *The Seven Cities of Gold* (1984) — it carries that game's loop (land on an unmapped continent, explore inland, trade and negotiate with the peoples who live there) from the Americas to Africa. The lineage is named here and in the README because it is how most people will recognise this project at all.
+The original is *The Heart of Africa* (Ozark Softscape / Electronic Arts, 1985), the follow-up to the same team's far better-known *The Seven Cities of Gold* (1984) — it carries that game's loop (explore an unmapped continent on foot, uncovering the map as you go, and trade and negotiate with the peoples who live there) from the Americas to Africa. The lineage is named here and in the README because it is how most people will recognise this project at all.
 
 Contents: §1 Technical framework · §2 Perspectives and camera · §3 World model and map · §4 Settlements · §5 Time and calendar · §6 Resources and conditions · §7 Equipment · §8 Valuables and the value matrix · §9 Building types · §10 Trade and economy · §11 Terrain and movement · §12 Audience with the chief · §13 Language and hint system · §14 Random events · §15 Chronicle/journal · §16 Presentation of events · §17 User interface · §18 Victory/defeat, saving · §19 Atmosphere and immersion · §20 Core gameplay loop · §21 Debug menu
 
