@@ -308,6 +308,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   nicht, was plausibel nichts beiträgt —, und schreib die Grenze samt Begründung
   in den prüfenden Code, nicht in eine Regel daneben."
 
+- **Das Regeldokument wird bei jedem Start geladen — und wächst trotzdem.** Jede
+  einzelne Ergänzung ist berechtigt; die Summe macht das Dokument zu einem Posten,
+  den du bei jeder Sitzung bezahlst.
+  → *Prompt:* „Gib den Dokumenten, die bei jedem Start oder jedem Vorgang gelesen
+  werden, eine **gemessene Obergrenze** mit genau zwei Auswegen: Detail in eine
+  Nachbardatei auslagern, oder die Grenze anheben und die Begründung danebenschreiben.
+  Beim Auslagern wird **verschoben, nicht umformuliert** — und danach jeder Leser der
+  alten Stelle nachgezogen; der gefährlichste ist der, der nicht scheitert, sondern
+  nur nichts mehr findet."
+
 - **Die Aufgabenliste wächst und wird trotzdem jedes Mal ganz gelesen.** Was
   erledigt ist, bleibt darin stehen; nach ein paar Wochen ist der größte Teil der
   Datei Geschichte, die bei jedem Vorgang mitgelesen wird.

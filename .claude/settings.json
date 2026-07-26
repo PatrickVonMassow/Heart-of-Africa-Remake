@@ -71,6 +71,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/doc-budget-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-conciseness-guard.mjs"
           },
           {

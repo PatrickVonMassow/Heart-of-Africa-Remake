@@ -241,6 +241,14 @@ Die Trennung ist banal, hätte ohne Mechanismus aber nicht gehalten: Ein einzige
 
 **Lehre:** Ein Dokument, das mit jedem Vorgang wächst und bei jedem Vorgang gelesen wird, trägt eine eingebaute Kostenkurve. Trenne früh zwischen dem, was bearbeitet wird, und dem, was nur nachschlagbar sein muss — und prüfe beim Trennen, welcher Leser welche Hälfte braucht.
 
+### 3.30 Dieselbe Kurve beim Regeldokument — und was das Aufräumen selbst kostete
+
+Das bindende Projektdokument wird bei **jedem Sitzungsstart** geladen und war auf 17.700 Wörter angewachsen. Vier Fünftel davon waren die Nachweisketten der Abnahmekriterien: welcher Test, welche Datei, welcher Screenshot — gebraucht beim Closing und beim Taggen, gelesen aber bei jedem Start. Sie sind jetzt eine Nachbardatei unter denselben Nummern; das Dokument halbierte sich. Entscheidend war die Methode: **verschoben, nicht umgeschrieben.** Wortlaut umzuformulieren hätte bedeutet, 32 Kriterien neu zu formulieren und dabei genau die Zusicherungen zu verlieren, um die es geht. Ein erster, maschineller Schnitt trennte an der Zeile statt am Satz und riss Sätze entzwei — der zweite schnitt am Wort und ließ jeden Satz ganz.
+
+Teuer war nicht das Kürzen, sondern das **Nachziehen**: Ein Prüfer las weiter nur die halbierte Datei und meldete stillschweigend falsche Zahlen; eine Wiederbelebungs-Notbremse suchte nach einem Haken, den es dort nicht mehr geben kann; eine Flackerliste, ein Regressions-Takt und eine ganze Problemklasse verloren beim Kürzen ihren einzigen Ort. Gefunden hat das nicht der Autor, sondern das **zweite Modell** — jeder dieser Befunde war eine Lücke zwischen dem, was der Umbauende im Kopf hatte, und dem, was die Dateien tatsächlich sagten.
+
+**Lehren:** Beim Verkleinern eines Dokuments ist **Verschieben sicherer als Neuschreiben**, und der Schnitt gehört an die Satzgrenze. Danach ist die eigentliche Arbeit, **jeden Leser** des alten Ortes zu finden — der gefährlichste ist der, der nicht scheitert, sondern nur nichts mehr findet. Und weil das Wachstum nie eine Entscheidung war, sondern die Summe ehrlicher Einzelzugaben, bekamen die ständig gelesenen Dokumente **gemessene Obergrenzen** mit genau zwei zulässigen Auswegen: auslagern oder die Grenze mit schriftlicher Begründung anheben.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -324,7 +332,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 26.07.2026, 12:47 · Quellen-Fingerprint: `8a4253865dd2…`
+Zuletzt aktualisiert: Sonntag, 26.07.2026, 12:55 · Quellen-Fingerprint: `fa6d62af1109…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -393,10 +401,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 30 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 31 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 8a4253865dd27e440358087d3af920e6f148eeefb1380ec1693ea48c7ee7fd64 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-26T10:47:00.079Z -->
+<!-- RETRO-FINGERPRINT: fa6d62af1109bbbebd3df5f4c7eca41984f69b45a9a444ebcd1c6f41e687f07a -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-26T10:55:17.788Z -->
 <!-- AUTO-GENERATED:END -->
