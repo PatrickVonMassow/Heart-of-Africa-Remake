@@ -98,7 +98,10 @@ console.log(
   'die geschätzte Task-Dauer (»~2 h«; das ~ genügt, kein »geschätzt« davor; nach ' +
   'jedem Vorarbeit-Schritt an einem Task dessen Schätzung aktualisieren), ' +
   'KEINE Hinweise wie »neu«/»hochgezogen«. ' +
-  '(4) »Erledigt« — eingeklappt Titel + Startzeit + Endzeit. ' +
+  '(4) »Erledigt« — eingeklappt Titel + Startzeit + Endzeit. Diese Sektion ist ' +
+  'ZUSÄTZLICH als GANZES einklappbar (Nutzer 26.07.2026): ihre Überschrift steckt in ' +
+  '<details class="sect"><summary><h2>Erledigt</h2></summary>…</details> und ist ' +
+  'standardmäßig ZU — sie ist das Archiv und der längste Teil des Boards. ' +
   'Keine weiteren Sektionen (kein »Zeiten & Aufwand«, »Zuletzt passiert«, »gemeldete ' +
   'Bugs«). Was schon im eingeklappten Header steht, NICHT zusätzlich in den ausgeklappten ' +
   'Details wiederholen (z. B. Start/Endzeit der aktuellen-Arbeit-Karte nur im Header). ' +

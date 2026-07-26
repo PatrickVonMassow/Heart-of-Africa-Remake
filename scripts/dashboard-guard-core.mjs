@@ -125,6 +125,11 @@ export function parseKlaerungPoints(html) {
 /** The four binding sections, in the user's mandated order (18.07.2026). */
 export const SECTION_TITLES = ['Woran ich gerade arbeite', 'Von dir zu klären', 'Warteschlange', 'Erledigt']
 
+/** Sections whose whole body collapses behind their heading (user 26.07.2026).
+ *  Erledigt is the archive: it dwarfs the board and is the least-read part, so
+ *  its heading is the toggle and it starts CLOSED like every card. */
+export const COLLAPSIBLE_SECTIONS = ['Erledigt']
+
 // cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
 // its own code point). The detector uses it REVERSED.
 const CP1252_HIGH = {
@@ -214,6 +219,13 @@ export function parseCards(sectionHtml) {
       .map(Number)
   for (const part of sectionHtml.split(/<details/).slice(1)) {
     const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    // A collapsible SECTION wrapper is not a card: its summary holds the <h2>
+    // heading. Without this it would enter the PRECEDING section's card list as
+    // a card with no point, no body and no duration meta — the slice ends AT
+    // the <h2>, so the wrapper's opening tag falls just before the boundary and
+    // its summary is cut open mid-tag. Hence both tests: an intact wrapper is
+    // recognised by the heading, a cut one by the missing `</summary>`.
+    if (/<h2[\s>]/.test(summary) || !part.includes('</summary>')) continue
     const meta = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? null
     // The body slice must survive a container child, so take everything after
     // the body div's opening tag (the card ends at the next <details anyway).
@@ -264,6 +276,20 @@ export function auditDashboard(html, input = {}) {
       code: 'auto-open',
       msg: 'a <details> carries the `open` attribute — all cards start closed (user mandate 23.07.2026)',
     })
+  }
+
+  // COLLAPSIBLE SECTION — user 26.07.2026: Erledigt collapses behind its own
+  // heading and starts closed. The `open` ban above already covers "closed", so
+  // this rule only pins that the wrapper still EXISTS: a republish that dropped
+  // it would silently unfold the longest part of the board again.
+  for (const title of COLLAPSIBLE_SECTIONS) {
+    const wrapped = new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*</summary>`).test(html)
+    if (!wrapped && html.includes(`<h2>${title}</h2>`)) {
+      v.push({
+        code: 'section-not-collapsible',
+        msg: `the "${title}" heading is not wrapped in <details><summary><h2>…</h2></summary> — that section collapses behind its heading (user 26.07.2026)`,
+      })
+    }
   }
 
   const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '')

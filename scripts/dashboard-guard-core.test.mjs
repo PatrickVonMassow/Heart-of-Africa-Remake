@@ -78,8 +78,10 @@ ${now}
 ${k}
 <h2>Warteschlange</h2>
 ${q}
-<h2>Erledigt</h2>
+<details class="sect">
+<summary><h2>Erledigt</h2></summary>
 ${d}
+</details>
 </main>`
 }
 
@@ -604,6 +606,27 @@ describe('auditDashboard — the 25.07 witnesses', () => {
   })
   it('but Erledigt may hold several delivery cards for one point (the real point-206 case)', () => {
     expect(codes(boardHtml({ done: [206, 206, 209] }))).not.toContain('dup-in-section')
+  })
+
+  it('requires the Erledigt heading to stay wrapped in its collapsible section', () => {
+    // The board as published: wrapped, no `open` → clean.
+    expect(codes(boardHtml())).not.toContain('section-not-collapsible')
+    // A republish that unwrapped it (plain heading again) blocks.
+    const unwrapped = boardHtml()
+      .replace('<details class="sect">\n<summary><h2>Erledigt</h2></summary>', '<h2>Erledigt</h2>')
+      .replace(/<\/details>\n<\/main>/, '</main>')
+    expect(codes(unwrapped)).toContain('section-not-collapsible')
+    // And it must still start CLOSED — the standing no-auto-open mandate covers
+    // the wrapper like any card.
+    expect(codes(boardHtml().replace('<details class="sect">', '<details class="sect" open>'))).toContain('auto-open')
+  })
+  it('never counts the section wrapper as a card of the preceding section', () => {
+    // The wrapper's opening tag falls just before the <h2> the slice ends at,
+    // so a naive split would hand Warteschlange a point-less, body-less card.
+    const html = boardHtml()
+    expect(codes(html)).not.toContain('queue-meta')
+    expect(codes(html)).not.toContain('empty-body')
+    expect(parseCards(sliceSections(html).sections['Warteschlange']).length).toBe(2) // 211, 204 — not the wrapper
   })
 
   it('flags a missing section, a wrong order and an empty card body', () => {
