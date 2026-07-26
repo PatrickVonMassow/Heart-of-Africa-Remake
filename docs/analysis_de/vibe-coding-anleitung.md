@@ -117,7 +117,9 @@ selbstbewusst Attrappen.
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
-   > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten." *(Kosten ≈ 2x)*
+   > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten."
+
+   *(Kosten ≈ 2x)*
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
@@ -146,7 +148,9 @@ umgangen wird. Bewährt haben sich **abgestufte Umfänge**:
 > *Prompt:* „Richte drei Test-Stufen ein — schnell (Unit, immer), klein (Unit + Kern-
 > Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
 > passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus, der die große
-> Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert." *(Kosten ≈ 1,5x)*
+> Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert."
+
+*(Kosten ≈ 1,5x)*
 
 Zwei Mechanismen, die das Netz ehrlich halten:
 
@@ -167,9 +171,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
   gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft
   wurde, die ein Nutzer wirklich erreicht — nicht an einem Hilfswert und nicht in einem
-  Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich und lässt sich nicht
-  mechanisieren: Sieh dir den Screenshot an und frag dich, ob das für einen Menschen
-  richtig aussieht.)*
+  Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich:
+  Sieh dir den Screenshot an und frag dich, ob das für einen Menschen richtig aussieht.)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das
   unbeobachtete Y.
@@ -320,8 +323,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
    > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
    > Arbeitskopie (Git-Worktree) und teile sie so auf, dass sie **nicht dieselben Dateien**
-   > anfassen. Isolierung und Exklusivität **vor** Redundanz." *(Aufschlag ≈ 10–25 %,
-   > geschätzt — fast nur Nacharbeit, wenn zwei Stränge denselben Code berühren)*
+   > anfassen. Isolierung und Exklusivität **vor** Redundanz."
+
+   *(Aufschlag ≈ 10–25 %, geschätzt — fast nur Nacharbeit bei geteilten Dateien)*
 
 ---
 
