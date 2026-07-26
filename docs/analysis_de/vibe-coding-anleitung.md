@@ -315,15 +315,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > Änderungen vor, setz sie nicht ungefragt um."
 
 3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Delegation vervielfacht
-   — aber erst mit Isolierung und Exklusivität, sonst vervielfacht sie das Chaos.
-   Werkzeug: **Feature-Branches** mit je eigener **Arbeitskopie**, Bedingung: die
-   Stränge teilen sich **keine Dateien**. Die Grenze setzt nicht dein Kontingent,
-   sondern der **Haupt-Agent**: Bei ihm endet jeder Strang, und je mehr Fremdstoff
-   sein Kontext aufnimmt, desto schlechter urteilt er. So viele Stränge, wie du sauber
-   trennen kannst — einen weniger, sobald das Zusammenführen Nacharbeit erzeugt (2–3).
+   — aber erst mit Isolierung und Exklusivität, sonst vervielfacht sie das Chaos. Die
+   Grenze setzt nicht dein Kontingent, sondern der **Haupt-Agent**: Bei ihm endet jeder
+   Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
+   Drei ist ein guter Start, kein Optimum — die Zahl korrigiert die Erfahrung.
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
    > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
-   > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen."
+   > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen, und
+   > arbeite an höchstens **drei** gleichzeitig. Reduziere die Zahl, sobald das
+   > Zusammenführen Nacharbeit erzeugt oder du Bekanntes nachlesen musst."
 
    *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
