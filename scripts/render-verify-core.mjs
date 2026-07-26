@@ -31,6 +31,13 @@ const NON_RENDER_VERIFY = new Set(['run-all.mjs', 'docs.mjs', 'ttsCache.mjs', 'f
 export function isRenderPath(path) {
   if (typeof path !== 'string' || path === '') return false
   const p = path.replace(/\\/g, '/')
+  // A Vitest file is never a render path, wherever it lives: it runs in jsdom,
+  // opens no browser and cannot move a pixel. The rule was first written for
+  // the files beside the browser suites (below); the guard then demanded a
+  // picture for a jsdom test added under src/ui/, which is the same pointless
+  // errand one folder over — and an errand-sending guard is one you learn to
+  // wave through.
+  if (/\.test\.(ts|tsx|mjs|js)$/.test(p)) return false
   if (p.startsWith('src/render/') || p.startsWith('src/scenes/') || p.startsWith('src/ui/')) return true
   if (p === 'src/App.tsx') return true // renderer setup / scene switch
   if (p.includes('.tsl.')) return true // TSL shader modules wherever they live

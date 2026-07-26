@@ -298,3 +298,27 @@ describe('isBackendSensitivePath — where two pictures are actually needed', ()
     expect(r.reason).toMatch(/WEBGPU/)
   })
 })
+
+// Regression witness (26.07.2026): a Vitest file added under src/ui/ demanded a
+// browser picture, because the rule that exempts them was written only for the
+// files beside the browser suites. A jsdom test cannot move a pixel wherever it
+// lives.
+describe('isRenderPath — Vitest files are never render paths', () => {
+  it('exempts them under the render trees too, not only beside the suites', () => {
+    for (const p of [
+      'src/ui/domOnly.test.ts',
+      'src/ui/Hud.test.tsx',
+      'src/render/fauna.test.ts',
+      'src/scenes/place/layout.test.ts',
+      'scripts/verify/tiers.test.mjs',
+    ]) {
+      expect(isRenderPath(p)).toBe(false)
+      expect(isBackendSensitivePath(p)).toBe(false)
+    }
+  })
+
+  it('still catches the production files beside them', () => {
+    expect(isRenderPath('src/ui/Hud.tsx')).toBe(true)
+    expect(isRenderPath('src/render/fauna.ts')).toBe(true)
+  })
+})
