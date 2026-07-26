@@ -109,6 +109,13 @@ export function finderBeforeOpenFix(queueOrder, tasksOpenSet) {
     const n = Number(v)
     return open.has(n) && !FINDER_POINTS.has(n) && n !== RELEASE_TAG_POINT
   }
+  // The rule orders the work BEFORE the release only (user 26.07.2026: bugs,
+  // then features, then the hardening tickets, then the tag). Cards queued
+  // AFTER the release tag are post-release work and order themselves freely —
+  // reading them as fixes that a finder had jumped ahead of would block the
+  // turn for correctly deferred work.
+  const tagAt = queueOrder.findIndex((v) => Number(v) === RELEASE_TAG_POINT)
+  if (tagAt !== -1) queueOrder = queueOrder.slice(0, tagAt + 1)
   const offenders = []
   for (let i = 0; i < queueOrder.length; i++) {
     const n = Number(queueOrder[i])
