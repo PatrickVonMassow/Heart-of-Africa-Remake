@@ -10,6 +10,16 @@
 // Three things can go wrong, and each has a distinct repair, so each gets its
 // own finding rather than one vague complaint.
 
+/**
+ * Numbers that legitimately exist in neither file: a point folded into another
+ * during specification, so its spec lives inside the surviving one. Recorded
+ * here rather than inferred, so a REAL loss cannot hide behind "probably folded".
+ */
+export const KNOWN_GAPS = new Set([
+  301, // folded during specification
+  324, // folded into 312 (the water rule) on 25.07.2026
+])
+
 /** Point numbers with their tick state: [{ n, done }]. */
 export function parsePoints(text) {
   const out = []
@@ -62,6 +72,61 @@ export function evaluateTasksArchive({ tasksText = '', archiveText = '' } = {}) 
       points: dupes,
       detail: 'point number in BOTH files — the block was copied, not moved',
     })
+  }
+
+  // A number twice inside ONE file. The cross-file check above misses it, and a
+  // second block under the same number means the guards that look a point up
+  // find whichever comes first (four-eyes review, 26.07.2026).
+  const within = []
+  for (const list of [tasks, archive]) {
+    const seen = new Set()
+    for (const p of list) {
+      if (seen.has(p.n)) within.push(p.n)
+      seen.add(p.n)
+    }
+  }
+  if (within.length) {
+    findings.push({
+      rule: 'duplicate-within-file',
+      points: [...new Set(within)],
+      detail: 'the same number appears twice in one file',
+    })
+  }
+
+  // A point that is in NEITHER file. Moving blocks by hand can drop one, and
+  // nothing else would ever notice: the number simply stops existing. Known
+  // gaps are points folded into another during specification.
+  const all = new Set([...tasks, ...archive].map((p) => p.n))
+  if (all.size) {
+    const max = Math.max(...all)
+    const missing = []
+    for (let n = 1; n <= max; n++) if (!all.has(n) && !KNOWN_GAPS.has(n)) missing.push(n)
+    if (missing.length) {
+      findings.push({
+        rule: 'point-vanished',
+        points: missing,
+        detail: 'number exists in neither file — a block was lost, or folded without being recorded here',
+      })
+    }
+  }
+
+  // A line that WANTS to be a point but does not parse (a missing space, a
+  // lower-case marker). Both parsers skip it, so the point silently disappears
+  // from every check rather than failing loudly.
+  for (const [label, text] of [
+    ['TASKS.md', tasksText],
+    ['the archive', archiveText],
+  ]) {
+    const bad = [...String(text ?? '').matchAll(/^- \[[^\]]*\]\s*\d+\./gm)]
+      .map((m) => m[0])
+      .filter((s) => !/^- \[( |x)\] \d+\.$/.test(s))
+    if (bad.length) {
+      findings.push({
+        rule: 'malformed-point-line',
+        points: bad.map((s) => s.trim()),
+        detail: `unparseable point heading in ${label} — it counts nowhere`,
+      })
+    }
   }
 
   return { block: findings.length > 0, findings }

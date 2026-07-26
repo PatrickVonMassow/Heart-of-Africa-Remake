@@ -72,6 +72,17 @@ export function isBackendSensitivePath(path) {
   return !String(path).replace(/\\/g, '/').startsWith('src/ui/')
 }
 
+// The exemption's premise — that src/ui/ holds no 3-D code — is not asserted
+// here but pinned by src/ui/domOnly.test.ts, which fails the moment a file
+// there imports three.js. A path rule alone would have aged silently.
+//
+// KNOWN LIMIT (four-eyes review, 26.07.2026): a few HUD elements render
+// backend-CONDITIONAL text — the WebGL2 fallback notice, the debug backend row,
+// the benchmark's headline series. Their pixels do not differ per backend, but
+// their CONTENT does, and a single run may satisfy this gate on the backend
+// whose branch the change does not exercise. When a diff touches such a branch,
+// run the backend it describes; the guard cannot tell branches apart.
+
 export function coveringRun(runs, backend, since) {
   if (!Array.isArray(runs)) return null
   let best = null

@@ -24,8 +24,9 @@ npm test            # LARGE: build → lint → vitest → every suite → previ
 
 Per point: build + lint + audit + the whole Vitest layer, plus the browser
 suites the diff touches. The LARGE run is mandatory when a point touches a scene
-core (TravelScene/Wildlife/PlaceScene, the renderer/post pipeline, store.ts),
-before every closing, and whenever a flake retry failed twice.
+core (TravelScene/Wildlife/PlaceScene, the renderer/post pipeline, store.ts), at
+every ~4th point as a collective gate, before every closing, and whenever a
+flake retry failed twice.
 
 Diff → browser-suite mapping: `src/i18n/` → i18n · store/systems logic → Vitest
 only (flow if the core loop is touched) · `src/scenes/place/` → collision,
@@ -35,11 +36,13 @@ settings, flow · journal/TTS → voice, handwriting · `src/world/` → world,
 enrichments · `scripts/verify/X.mjs` → X itself · `*.md` → docs. When unsure,
 include the suite.
 
-Flake policy: if exactly ONE suite fails on a check from the documented flake
-list, rerun that suite standalone once — green counts as green and is noted in
-the tick; red twice is a real investigation. WATCHDOG: if this scoping ever lets
-a bug through that a full run would have caught, report it to the user at once
-and the policy is reconsidered.
+Flake policy: if exactly ONE suite fails on a check from the flake list below,
+rerun that suite standalone once — green counts as green and is noted in the
+tick; red twice is a real investigation. The list (this is its only home): the
+movement 0.00 m read, the bathe probability, TTS timing, the calf-sacrifice
+behaviour window, frame-starved screenshot probes, and the spawn body-spacing
+settle window. WATCHDOG: if this scoping ever lets a bug through that a full run
+would have caught, report it to the user at once and the policy is reconsidered.
 
 **Every point adds a test on the appropriate layer** — Vitest for anything
 assertable without a browser, a browser suite only for the

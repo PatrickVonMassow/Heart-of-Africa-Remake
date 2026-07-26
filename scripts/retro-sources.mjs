@@ -10,6 +10,7 @@
 // git error seen by only one side would fabricate a fingerprint mismatch —
 // the guard wrapper's fail-open catches the throw and allows the stop.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readTasksAll } from './tasks-source.mjs'
 import { execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { basename, resolve } from 'node:path'
@@ -97,8 +98,13 @@ export function collectSources({
     windowsHide: true,
   })
   const reverts = revertCommits(log)
+  // The FULL point universe, open and archived: the process/meta points this
+  // inventories are mostly FINISHED, and reading only the open file made the
+  // digest report "8 process points, 8 of them open" where it had been "14, 7
+  // open" — the done dimension silently collapsed to zero (found by the
+  // four-eyes review, 26.07.2026; exactly the failure tasks-source.mjs warns of).
   const processPoints = existsSync(tasksPath)
-    ? processTaskPoints(readFileSync(tasksPath, 'utf8'))
+    ? processTaskPoints(readTasksAll(tasksPath, resolve(repoRoot, 'docs/tasks-archive.md')))
     : []
   return { memories, guards, reverts, processPoints }
 }

@@ -67,8 +67,14 @@ const openPointCount = () => {
     if (m && !/\bDEFERRED\b/.test(l)) n++
   }
   // Format sanity: checkboxes exist but none parse → treat as unknown, NOT as
-  // "complete" (never silently stop with work left on a reformat).
-  if (n === 0 && sawCheckbox && !/- \[x\] \d+\./.test(readFileSync(join(REPO, 'TASKS.md'), 'utf8'))) return -1
+  // "complete" (never silently stop with work left on a reformat). The escape
+  // hatch reads the ARCHIVE (docs/tasks-archive.md), because since the split of
+  // 26.07.2026 a ticked point leaves TASKS.md at once: looking for `- [x]` here
+  // could never succeed again, so every all-DEFERRED file would raise a false
+  // format alarm (four-eyes review).
+  const archive = join(REPO, 'docs', 'tasks-archive.md')
+  const ticksExist = existsSync(archive) && /- \[x\] \d+\./.test(readFileSync(archive, 'utf8'))
+  if (n === 0 && sawCheckbox && !ticksExist) return -1
   return n
 }
 

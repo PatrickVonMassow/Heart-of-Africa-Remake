@@ -112,6 +112,7 @@ Der wichtigste Nutzer-Impuls: Ein Großteil der Punkte stammte aus seinen Screen
 - **Kommunikationsregeln:** Deutsch dreimal angemahnt — beim dritten Mal war der Chat deutsch, aber die Todo-Einträge englisch. Eine Kommunikationsregel gilt für **alle** sichtbaren Ausgaben.
 - **Stille Verschlechterung:** Eine „Optimierung" hatte die Sprachausgabe spürbar verschlechtert. Ein Tradeoff-Umbau an etwas Funktionierendem ist eine **Nutzer-Entscheidung**; „das war mal besser" zuerst gegen die Historie prüfen.
 - **Doku-Drift:** Design- und Build-Dokument ziehen im **selben Commit** mit; Referenzen statt Duplikate, weil Duplikate driften.
+- **Deploy- und Mess-Hygiene:** Halbfertiges wurde direkt auf den Hauptzweig geschoben und war damit in der Live-Demo sichtbar → Feature-Zweige, Hauptzweig = ausgelieferter Stand. Und ein Startdialog ruinierte die erste Messung auf der Nutzer-Hardware. **Lehre:** Das Urteil des Nutzers gilt immer dem deployten Stand, und ein Messlauf muss frei von Bedienoberfläche sein, die ihn stört.
 
 ### 3.11 Nachweise sind zustandsgebunden
 
@@ -323,7 +324,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 26.07.2026, 12:05 · Quellen-Fingerprint: `71a6f0cf2a07…`
+Zuletzt aktualisiert: Sonntag, 26.07.2026, 12:47 · Quellen-Fingerprint: `8a4253865dd2…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -394,8 +395,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 30 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 8 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 30 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 71a6f0cf2a07c1e0f94006b09bdad1ed7f0c2d812ff46af8daf9b78bf75f2bb8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-26T10:05:20.887Z -->
+<!-- RETRO-FINGERPRINT: 8a4253865dd27e440358087d3af920e6f148eeefb1380ec1693ea48c7ee7fd64 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-26T10:47:00.079Z -->
 <!-- AUTO-GENERATED:END -->
