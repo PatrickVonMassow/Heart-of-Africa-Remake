@@ -226,6 +226,16 @@ Der Mechanismus dahinter ist banal und deshalb hartnäckig: **Wer eine Lehre auf
 
 Die Konsequenz war, die Kürze **messbar** zu machen statt sie zu wollen: ein Gesamtbudget (Zeilen und Wörter), ein Budget pro Fallstrick, die Forderung, dass jeder Fallstrick in einem umsetzbaren Prompt endet, und ein Detektor für die Marker, an denen Projekterfahrung erkennbar ist — Datumsangaben, Punktnummern, Repository-Pfade, der eigene Technologie-Stack, Spielinhalte, Anekdoten-Einleitungen. Der Prüfer läuft doppelt: als Stop-Hook für die schnelle Rückmeldung und als Unit-Test, damit die gewöhnliche Regression selbst das Tor ist. Wichtig war dabei die Formulierung der Fehlermeldung: Sie nennt ausdrücklich die Retrospektive als Zielort und fordert, **hinüberzukürzen statt das Budget zu erhöhen** — ein Budget ohne diesen Satz wird beim ersten Anstoßen einfach hochgesetzt. Die allgemeine Lehre: **Wo zwei Dokumente sich einen Themenbereich teilen, braucht die Grenze zwischen ihnen einen Wächter** — die Rollenbeschreibung im Vorwort hält sie nicht.
 
+### 3.26 Verbrauch pro Zeit ist nicht Verbrauch pro Arbeit (26.07.)
+
+Ich hatte dem Nutzer erklärt, parallele Stränge vervielfachten den Token-Verbrauch, weil jeder Agent seinen eigenen Kontext neu füllen müsse — und daraufhin den Agenten-Pool von drei auf zwei verkleinert, um Kontingent zu sparen. In der Einsteiger-Anleitung stand derselbe Satz als Kostenmarker: *(Kosten ≈ Zahl der Stränge)*. Der Nutzer widersprach mit einer einzigen Frage: Für einen neuen Punkt wird der Kontext ohnehin geleert — wieso macht es dann einen Unterschied, ob derselbe Agent frisch ansetzt oder ein neuer? Er hat recht. Ein Punkt kostet **eine** Kontextfüllung, gleich in welchem Prozess sie stattfindet. Parallelität vervielfacht die **Rate** des Verbrauchs und den **Durchsatz** gemeinsam; pro fertigem Punkt bleibt es ungefähr gleich.
+
+Was die Fehlannahme so zäh machte, war ihre scheinbare Bestätigung durch die Erfahrung: Das Wochenkontingent war am Vorabend tatsächlich vorzeitig erschöpft — bei drei Strängen. Nur belegte das die Rate, nicht die Kosten. Drei Stränge erreichen die Wand nach einem Drittel der Zeit **und liefern dabei dreimal so viel**. Ein Symptom kann also die eine von zwei Größen bestätigen und dabei die Verwechslung zementieren; „es fühlte sich teuer an" war ein Aussage über Zeit, formuliert als Aussage über Kosten. Dazu kam ein Verstoß gegen die eigene Regel, nur Gemessenes als gemessen auszugeben: Der Marker in der Anleitung stand ohne Kennzeichnung da, als sei er erhoben worden.
+
+Der echte Aufschlag der Parallelisierung ist ein anderer und deutlich kleiner: Nacharbeit, wenn zwei Stränge denselben Code berühren (einer muss nachziehen und **erneut verifizieren** — und Verifikation, nicht Erzeugung, ist hier der teure Teil), plus die Aufsicht. Die eigentliche Grenze ist ohnehin keine Kostenfrage, sondern der **Haupt-Agent**: Bei ihm endet jeder Strang — zusammenführen, prüfen, urteilen —, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter wird sein Urteil. Genau das fehlte in der Anleitung; sie gab dem Leser eine Zahl, aber kein Kriterium, wie viele Stränge gut für ihn sind. Jetzt steht dort die Faustregel: so viele, wie sich sauber trennen lassen, und einer weniger, sobald das Zusammenführen Nacharbeit erzeugt.
+
+Die Lehre reicht über Token hinaus: **Bevor man etwas beziffert, muss der Nenner feststehen — pro Arbeit oder pro Zeit.** Beides „Kosten" zu nennen ist kein Ungenauigkeitsproblem, sondern führt zu falschen Entscheidungen; hier zu einer Drosselung, die nichts sparte und nur langsamer machte. Und: Eine Kennzahl, die ein Verhalten schlecht aussehen lässt, gehört doppelt geprüft, bevor sie in ein Dokument wandert, das andere anleitet.
+
 ---
 
 ## 4. Die Guards als Immunsystem des Projekts
@@ -342,7 +352,7 @@ Die wichtigste Übertragung in einem Satz: *Was zweimal schiefging, bekommt eine
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 25.07.2026, 20:13 · Quellen-Fingerprint: `cebf47c99133…`
+Zuletzt aktualisiert: Samstag, 25.07.2026, 20:46 · Quellen-Fingerprint: `cebf47c99133…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -416,5 +426,5 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 28 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
 <!-- RETRO-FINGERPRINT: cebf47c99133e00820557d65ec4ac85b23c8bb9443ffc4489c951a4feee1425c -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-25T18:13:45.403Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-25T18:46:52.877Z -->
 <!-- AUTO-GENERATED:END -->
