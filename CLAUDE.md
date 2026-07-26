@@ -345,7 +345,7 @@ changes with it in the same commit.
    pulls him in. Entering focuses the controls without an extra click per
    `design.md` §17.5 (HUD buttons blurred; mouse-look engages on entry from
    the SPACE keypress, with the click as fallback).
-   Nachweise: docs/acceptance-evidence.md §2.
+   Evidence: docs/acceptance-evidence.md §2.
 
 3. **World model.** The fixed, authentic ~1890 geography of `design.md`
    §3.1/§3.2 — researched against the real end-of-19th-century state —
@@ -372,7 +372,7 @@ changes with it in the same commit.
    at build time by its field radius — Khartoum at the widened confluence
    and the Sudd were the reported cases (`src/world/world.test.ts` sweeps
    all of them; screenshots 126/127).
-   Nachweise: docs/acceptance-evidence.md §3.
+   Evidence: docs/acceptance-evidence.md §3.
 
 4. **Movement and time.** The character moves in the bird's-eye view; date
    and provisions advance with the journey (calendar display, start 1890) —
@@ -392,7 +392,7 @@ changes with it in the same commit.
    from the same `placedFloraAt` placement the renderer draws, so an
    unrendered/suppressed plant can never leave a phantom collider,
    point 129).
-   Nachweise: docs/acceptance-evidence.md §4.
+   Evidence: docs/acceptance-evidence.md §4.
 
 5. **Port city.** At least Cairo as the enterable starting port with trade
    (buying equipment, provisions and gifts for `$`). Entering triggers the
@@ -400,14 +400,14 @@ changes with it in the same commit.
    sufficient). Buy AND sell dialogs (shop buy-back, bazaar buy/sell,
    ferry) use the same aligned price-table layout and buy gear back for the
    local currency per §9.
-   Nachweise: docs/acceptance-evidence.md §5.
+   Evidence: docs/acceptance-evidence.md §5.
 
 6. **Village and cultural contact.** At least one enterable village with a
    chief's hut; a culturally correct gift is the condition for a hint —
    not mere observation (`design.md` §12). The village trading post
    barters the baseline goods for gifts and buys gear back for gifts —
    money has no value there (§9).
-   Nachweise: docs/acceptance-evidence.md §6.
+   Evidence: docs/acceptance-evidence.md §6.
 
 7. **Language/direction system.** The full system of `design.md` §13 is
    implemented: the regional direction systems and glossary names of
@@ -415,14 +415,25 @@ changes with it in the same commit.
    region reveres, §8); hints combine landmark, direction word and
    coordinate (§13.1); a raw hint deciphers retroactively in either order
    (§13.2).
-   Nachweise: docs/acceptance-evidence.md §7.
+   OPEN (`design.md` §13.4): this criterion pins what is BUILT, not the
+   target state. Understanding the inhabitants is to become a central
+   mechanic — learned by observing and testing rather than handed over by
+   an elder, with one invented-but-researched language per region (a
+   Chants-of-Sennaar-like direction; e.g. a West African drum-signal
+   tongue). The mechanic is undecided and needs its own research pass
+   first, so §13.2's glossary and §13.3's delivery are placeholders under
+   review. Do not build on them — and do not PROTECT them either: until
+   the new mechanic is settled, disturbing this system is not a reason to
+   compromise a change elsewhere. Once it IS settled and built, it becomes
+   load-bearing like any other system.
+   Evidence: docs/acceptance-evidence.md §7.
 
 8. **Chronicle/journal.** A journal exists, grows automatically on events
    and stores hints (`design.md` §15); plain text suffices here (the
    animated handwriting is pt. 29). First village visits are journaled
    through that people's own ~1890 vignette (§16), never a shared
    boilerplate.
-   Nachweise: docs/acceptance-evidence.md §8.
+   Evidence: docs/acceptance-evidence.md §8.
 
 9. **Status bar.** Date, funds, provisions, gifts and current region are
    displayed per `design.md` §17.1 — no hand-item slot, no permanent
@@ -433,13 +444,13 @@ changes with it in the same commit.
    DD.MM.YYYY; the inventory item currently in use glows, and the health
    bar with its affliction badges sits inside the bar's right end per
    §17.1 (never covered by the journal).
-   Nachweise: docs/acceptance-evidence.md §9.
+   Evidence: docs/acceptance-evidence.md §9.
 
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;
     digging it up with the shovel at the site triggers the victory state.
     The site is triangulated from several hints via the knowing-people
     cascade of `design.md` §13.3.
-   Nachweise: docs/acceptance-evidence.md §10.
+   Evidence: docs/acceptance-evidence.md §10.
 
 11. **Game graphics.** The visual presentation must be appealing and
     elaborate at AAA level and replace the POC's former schematic look.
@@ -454,13 +465,20 @@ changes with it in the same commit.
     climate and landscape dressing of §19.9, the "Graphics and atmosphere"
     section (§2.4), and the elephant-graveyard dressing of §4.4 (readable
     at a glance).
-   Nachweise: docs/acceptance-evidence.md §12.
+   SUPERSEDED AS A TARGET (user 25.07.2026, design.md §19.5): water is for
+   crossing, not for lingering — a FLIGHT is never restricted by river or lake at
+   all, and the §19.5 revision states it. What the evidence section pins is what
+   is BUILT today, per the §7.1 convention.
+   OPEN: tree-climbing-to-flee (§9 open item), and the one seasonal-dress reading
+   the research allows but the figures cannot yet show — a wrap worn DIFFERENTLY
+   in the cold rather than in greater number (§19.13).
+   Evidence: docs/acceptance-evidence.md §12.
 
 13. **Real geodata.** The real-geodata terrain rendering of `design.md`
     §3.3 is implemented (DEM relief, ~1890 vector coasts/rivers/lakes
     without raster steps, biome-based PBR splatting, domain-warped
     meandering biome borders).
-   Nachweise: docs/acceptance-evidence.md §13.
+   Evidence: docs/acceptance-evidence.md §13.
 
 14. **Lighting and post-processing pipeline.** The pipeline of `design.md`
     §2.7 is implemented (IBL, physically grounded sky consistent with the
@@ -468,7 +486,7 @@ changes with it in the same commit.
     filmic tone mapping with color grading and a subtle vignette, and the
     water feature set: wave field, depth-dependent absorption over real
     bathymetry, shore/crest foam).
-   Nachweise: docs/acceptance-evidence.md §14.
+   Evidence: docs/acceptance-evidence.md §14.
 
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,
@@ -484,7 +502,7 @@ changes with it in the same commit.
     buildings front their lane with the door side, while every village
     follows its people's period-accurate ~1890 organising principle
     (design.md §4.5: ring/street/compound/scatter/ksar/riverstrip/coastrow).
-   Nachweise: docs/acceptance-evidence.md §15.
+   Evidence: docs/acceptance-evidence.md §15.
 
 16. **Collision inside settlements.** The collision rules of `design.md`
     §2.6 are implemented (impenetrable buildings and solid objects,
@@ -502,7 +520,7 @@ changes with it in the same commit.
     pinned past a calibratable window (`balance.walkerUnstuckSeconds`,
     debug-editable) is teleport-nudged to free ground — inhabitants only, a
     small invisible correction, never the player.
-   Nachweise: docs/acceptance-evidence.md §16.
+   Evidence: docs/acceptance-evidence.md §16.
 
 17. **Localization.** The game is fully playable in English as well as
     German per `design.md` §17.7 (all player-visible text from the
@@ -510,7 +528,7 @@ changes with it in the same commit.
     language-neutral journal storage re-rendered on switch, localized
     proper names; another language must require only a new language
     file).
-   Nachweise: docs/acceptance-evidence.md §17.
+   Evidence: docs/acceptance-evidence.md §17.
 
 18. **Lint and dependency hygiene.** The codebase is free of linter
     findings and known vulnerabilities: `npm run lint` (oxlint) reports
@@ -537,7 +555,7 @@ changes with it in the same commit.
     door works with the journal open), and the panel ends above the camp/map/journal toggles
     per §17.4. German read-aloud stays an open item until a German-capable
     voice exists.
-   Nachweise: docs/acceptance-evidence.md §19.
+   Evidence: docs/acceptance-evidence.md §19.
 
 20. **Comfort and audio settings.** The control/audio calibration holds:
     mouse-look sensitivity defaults to 0.0011 rad/px, walk speed inside
@@ -670,7 +688,7 @@ changes with it in the same commit.
     burst (`balance.family.rescueBurst`, §19.8 pt. 12 — the field's
     write-through pinned in `src/ui/DebugMenu.test.tsx`). Modal windows and full-screen
     overlays always render above the in-scene floating labels (§17.4).
-   Nachweise: docs/acceptance-evidence.md §20.
+   Evidence: docs/acceptance-evidence.md §20.
 
 21. **Water realism.** The visual water realism of `design.md` §11.3 is
     implemented (rivers in carved beds rendering as one continuous,
@@ -698,7 +716,7 @@ changes with it in the same commit.
     `currentWaterfallRadius`), covering real distance so it advances time
     and provisions (and ticks health/deadline) — never free movement.
     Being swept over falls is gameplay via pt. 23 (waterfall-sweep event).
-   Nachweise: docs/acceptance-evidence.md §21.
+   Evidence: docs/acceptance-evidence.md §21.
 
 22. **Health and afflictions.** The health system of `design.md` §6 is
     implemented: a health pool drained by starvation and the afflictions
@@ -713,7 +731,7 @@ changes with it in the same commit.
     at poor condition (§19.6); health/afflictions travel with the
     checkpoint; all drains/thresholds are balance values adjustable in the
     debug menu, which also toggles afflictions for testing.
-   Nachweise: docs/acceptance-evidence.md §22.
+   Evidence: docs/acceptance-evidence.md §22.
 
 23. **Random events.** `design.md` §14 is implemented as a hidden per-day
     roll while travelling, modulated by terrain and state: the event kinds
@@ -732,7 +750,7 @@ changes with it in the same commit.
     preset the whole random-event system defaults to OFF (§14.3); the
     debug menu toggles it on and triggers each kind directly (§21.3), and
     the §14.4 first-time danger warnings stay active either way.
-   Nachweise: docs/acceptance-evidence.md §23.
+   Evidence: docs/acceptance-evidence.md §23.
 
 24. **Deadline and successor.** The multi-year deadline of `design.md`
     §5/§18 is implemented (balance value, ~5 years) with staged journal
@@ -741,7 +759,14 @@ changes with it in the same commit.
     no successor), and the §18 successor flow on death (pt. 22): resume at
     the last checkpoint, day penalty, silently inherited warning stage,
     takeover entry.
-   Nachweise: docs/acceptance-evidence.md §24.
+   TEMPORARY (`design.md` §5.1, user 16.07.2026): the deadline is
+   SUSPENDED in the shipped config (`balance.deadline.enabled` false) —
+   the expedition never ends on time; instead the calendar STOPS at
+   31.12.1895, the end of the game's window, at every day-advancing path.
+   The mechanism stays implemented and tested (the tests enable the flag),
+   so lifting the suspension is a one-value revert. Do not delete the
+   deadline code, and do not "fix" the tests by dropping the flag.
+   Evidence: docs/acceptance-evidence.md §24.
 
 25. **Trade economy.** `design.md` §8/§9/§10 is implemented:
     shovel-recovered treasure caches (one per region plus a statue site,
@@ -765,7 +790,7 @@ changes with it in the same commit.
     reactions of the §8 matrix; and the baseline goods in every settlement
     with money in ports and gifts in villages (§9). All new texts exist in
     both languages with voice markup.
-   Nachweise: docs/acceptance-evidence.md §25.
+   Evidence: docs/acceptance-evidence.md §25.
 
 26. **Standing with the natives.** The reputation system of `design.md`
     §12 is implemented: hostility and expulsion on a rejected gift with
@@ -779,7 +804,7 @@ changes with it in the same commit.
     possession-based (§6.1/§7): merely carrying a rifle blocks no audience
     and scares no villager. All new texts exist in both languages with
     voice markup.
-   Nachweise: docs/acceptance-evidence.md §26.
+   Evidence: docs/acceptance-evidence.md §26.
 
 27. **Camps (item caches).** The camps of `design.md` §6.3 are
     implemented: free camps pitched (or reopened nearby) with C in the
@@ -790,7 +815,7 @@ changes with it in the same commit.
     entry on return; village caches gated by "Honored Friend", persistent,
     and irretrievably destroyed by a robbery in the region. All new texts
     exist in both languages with voice markup.
-   Nachweise: docs/acceptance-evidence.md §27.
+   Evidence: docs/acceptance-evidence.md §27.
 
 28. **Full saving and loading.** The port-snapshot saving and tabular load
     overview of `design.md` §18 are implemented — one snapshot per port
@@ -799,7 +824,14 @@ changes with it in the same commit.
     health state, manual saving omitted. A legacy single-slot checkpoint
     migrates as one table row; the successor (pt. 24) resumes from the
     latest snapshot. All menu texts exist in both languages.
-   Nachweise: docs/acceptance-evidence.md §28.
+   TEMPORARY (user decision 24.07.2026): the LOAD side is SUSPENDED for the
+   PoC — the startup "a saved game was found — load it?" prompt is disabled
+   (`SAVE_LOAD_ENABLED = false` in `src/ui/Hud.tsx`), so every launch begins a
+   fresh expedition with no popup. Saving still runs (the snapshots and the
+   successor flow are untouched and tested), and re-enabling is the one-value
+   flip. `scripts/verify/flow.mjs` asserts the inverse of the old behaviour:
+   with a checkpoint seeded, NO start overlay appears and the game runs.
+   Evidence: docs/acceptance-evidence.md §28.
 
 29. **Animated handwriting.** The animated handwriting of `design.md`
     §16.3 is implemented (stroke-by-stroke reveal behind the pen hand,
@@ -808,7 +840,7 @@ changes with it in the same commit.
     the remains report takes over, pt. 22 — and silent writing under
     do-not-disturb, §16.2), and the journal keeps the newest content in
     view per §15.4.
-   Nachweise: docs/acceptance-evidence.md §29.
+   Evidence: docs/acceptance-evidence.md §29.
 
 30. **Gamepad and position query.** The gamepad controls of `design.md`
     §17.5 hold (left stick merged with WASD, right stick first-person
@@ -818,7 +850,7 @@ changes with it in the same commit.
     (§17.1/§3.2) reports the current coordinates and region as a localized
     toast on P — the way to read coordinates, which are never shown
     permanently.
-   Nachweise: docs/acceptance-evidence.md §30.
+   Evidence: docs/acceptance-evidence.md §30.
 
 31. **Settlement orientation and panorama wildlife.** The gift-unlocked
     building orientation of `design.md` §17.3 holds (pulsing markers on
@@ -851,7 +883,7 @@ changes with it in the same commit.
     the world arc ÷ its enlargement `scale`), so the leg cadence stays consistent
     with the rendered body's slow horizon crawl instead of flailing at the raw
     world-arc rate.
-   Nachweise: docs/acceptance-evidence.md §31.
+   Evidence: docs/acceptance-evidence.md §31.
 
 32. **Render pipeline upgrades.** TRAA, screen-space reflections and true
     water refraction (`design.md` §2.7) were rebuilt in small
@@ -872,7 +904,7 @@ changes with it in the same commit.
     water or gloss, no in-game situation makes SSR read, so by user
     decision it was REMOVED again (the pipeline reads exactly as after
     step 1). True water refraction remains OPEN.
-   Nachweise: docs/acceptance-evidence.md §32.
+   Evidence: docs/acceptance-evidence.md §32.
 
 ### 7.2 Self-Verification (mandatory)
 

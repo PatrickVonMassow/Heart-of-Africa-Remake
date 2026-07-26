@@ -1,10 +1,10 @@
-# Abnahme-Nachweise (CLAUDE.md §7.1)
+# Acceptance evidence (CLAUDE.md §7.1)
 
-Zu jedem Abnahmekriterium die vollstaendige Nachweiskette: welche Pruefung, welche
-Datei, welcher Screenshot. Ausgelagert aus CLAUDE.md, weil diese Datei bei JEDEM
-Sitzungsstart geladen wird und die Ketten dort den groessten Teil des Umfangs
-ausmachten, waehrend man sie beim Closing und beim Taggen braucht. Der Wortlaut ist
-unveraendert verschoben; Nummerierung und Bedingungen bleiben wie in §7.1.
+For each acceptance criterion the full chain of proof: which check, which file, which
+screenshot. Moved out of CLAUDE.md because that file is loaded at EVERY session start
+and these chains were the larger part of it, while they are needed at a closing and at
+a tag. The wording is moved verbatim; numbering and conditions are as they stood in
+§7.1. A criterion and its evidence section change in the SAME commit.
 
 ---
 
@@ -117,18 +117,6 @@ money.
 Verifiable: `src/state/store.hints.test.ts` covers all five
 regions, the retroactive deciphering (either order) and the gift lore;
 `src/i18n/i18n.test.ts` the in-world words in the language files.
-OPEN (`design.md` §13.4): this criterion pins what is BUILT, not the
-target state. Understanding the inhabitants is to become a central
-mechanic — learned by observing and testing rather than handed over by
-an elder, with one invented-but-researched language per region (a
-Chants-of-Sennaar-like direction; e.g. a West African drum-signal
-tongue). The mechanic is undecided and needs its own research pass
-first, so §13.2's glossary and §13.3's delivery are placeholders under
-review. Do not build on them — and do not PROTECT them either: until
-the new mechanic is settled, disturbing this system is not a reason to
-compromise a change elsewhere. Once it IS settled and built, it becomes
-load-bearing like any other system.
-
 ## 8. Chronicle/journal.
 
 Verifiable: `src/i18n/villages.test.ts` asserts one
@@ -883,14 +871,6 @@ asserts the staged warnings (exactly once each), the expiry defeat
 without successor, and the death-to-successor flow including the day
 penalty and takeover entry; `src/ui/Hud.test.tsx` the recalled-defeat
 overlay without a successor button.
-TEMPORARY (`design.md` §5.1, user 16.07.2026): the deadline is
-SUSPENDED in the shipped config (`balance.deadline.enabled` false) —
-the expedition never ends on time; instead the calendar STOPS at
-31.12.1895, the end of the game's window, at every day-advancing path.
-The mechanism stays implemented and tested (the tests enable the flag),
-so lifting the suspension is a one-value revert. Do not delete the
-deadline code, and do not "fix" the tests by dropping the flag.
-
 ## 25. Trade economy.
 
 Verifiable:
@@ -955,14 +935,6 @@ Verifiable:
 visit, resuming an older visit restores that state, the successor
 using the latest snapshot, and the legacy migration;
 `src/ui/Hud.test.tsx` the table columns incl. the health state.
-TEMPORARY (user decision 24.07.2026): the LOAD side is SUSPENDED for the
-PoC — the startup "a saved game was found — load it?" prompt is disabled
-(`SAVE_LOAD_ENABLED = false` in `src/ui/Hud.tsx`), so every launch begins a
-fresh expedition with no popup. Saving still runs (the snapshots and the
-successor flow are untouched and tested), and re-enabling is the one-value
-flip. `scripts/verify/flow.mjs` asserts the inverse of the old behaviour:
-with a checkpoint seeded, NO start overlay appears and the game runs.
-
 ## 29. Animated handwriting.
 
 Verifiable: `scripts/verify/handwriting.mjs` asserts
@@ -1072,5 +1044,4 @@ etc., pt. 20 / point 276): the level drives the post chain — SSAO on only
 at high, TRAA + bloom off only on low — combined with the internal flags
 without ever clobbering them; `settings.mjs` gates the F9 cycle and the
 effective flips.
-
 

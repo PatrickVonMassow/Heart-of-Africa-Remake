@@ -25,10 +25,15 @@ function uiFiles(dir = UI_DIR, out: string[] = []): string[] {
 }
 
 // Imports that would make a file's output depend on the renderer backend.
+// Static AND dynamic forms: this project lazy-loads heavy modules on purpose
+// (the speech stack, the benchmark runner), so `await import('three/webgpu')`
+// is the shape a future 3-D import here would most likely take.
 const FORBIDDEN = [
   /from\s+['"]three(\/|['"])/,
   /from\s+['"]@react-three\//,
   /from\s+['"][^'"]*\.tsl['"]/,
+  /import\s*\(\s*['"]three(\/|['"])/,
+  /import\s*\(\s*['"]@react-three\//,
 ]
 
 describe('src/ui stays DOM-only', () => {

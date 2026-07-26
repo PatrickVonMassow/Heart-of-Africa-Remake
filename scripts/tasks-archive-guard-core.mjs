@@ -117,7 +117,12 @@ export function evaluateTasksArchive({ tasksText = '', archiveText = '' } = {}) 
     ['TASKS.md', tasksText],
     ['the archive', archiveText],
   ]) {
-    const bad = [...String(text ?? '').matchAll(/^- \[[^\]]*\]\s*\d+\./gm)]
+    // The candidate pattern is deliberately LOOSE — a missing space after the
+    // dash, a bullet written with `*`, an upper-case or empty marker. The strict
+    // form is what must survive; anything that merely resembles it and does not
+    // parse counts nowhere, and the newest appended point is where such a
+    // malformation lands (four-eyes review, second round).
+    const bad = [...String(text ?? '').matchAll(/^[-*] ?\[[^\]]{0,3}\]\s*\d+\./gm)]
       .map((m) => m[0])
       .filter((s) => !/^- \[( |x)\] \d+\.$/.test(s))
     if (bad.length) {

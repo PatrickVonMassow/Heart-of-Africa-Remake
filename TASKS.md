@@ -52,6 +52,13 @@ On failure after correction attempts: STOP, report, and do not build further on
 a broken base. Tests are never weakened; a red run is fixed in the production
 code.
 
+**Where doc updates go (user 26.07.2026):** a criterion in CLAUDE.md §7.1 states
+WHAT must hold; its chain of proof lives in `docs/acceptance-evidence.md` under the
+same number. A point that adds or changes a verifiable behaviour updates the criterion
+AND its evidence section in the same commit; a point that only adds a test touches the
+evidence section alone. Older specs below still say "CLAUDE.md §7.1" for both halves —
+read that as "the criterion and its evidence section".
+
 ## Checklist
 
 - [ ] 174. Tag the demo build `v0.3` and publish it at
