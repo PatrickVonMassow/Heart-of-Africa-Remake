@@ -193,6 +193,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Performance und Kosten werden nur **gemessen** kommuniziert — Performance auf der
   **Ziel-Hardware**, nicht auf der Build-Maschine."
 
+- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt nicht an den
+  Stunden, sondern an der Größe jedes Kontexts: lange Sitzungen, die jede Aufgabe im
+  selben Fenster mitschleppen, und Helfer, die ihren Auftrag in großen Dokumenten erst
+  *suchen* müssen.
+  → *Prompt:* „Lies die Verbrauchsanzeige und nenne mir die **gemessenen** Treiber. Schicke
+  jedem Helfer seinen Auftrag als fertigen Kurzbrief mit, statt ihn in den Projektdokumenten
+  suchen zu lassen, und fang für jede neue Aufgabe einen **frischen Kontext** an."
+  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel: Die Nacharbeit an
+  einer schwachen Lieferung kostet mehr als die Ersparnis.)*
+
 - **Der Assistent bleibt still stehen / schläft ein.** Bei langen, autonomen Läufen endet
   der Fortschritt unbemerkt.
   → *Prompt:* „Wenn du eine Daueraufgabe autonom abarbeitest, sei die **letzte Aktion
@@ -370,4 +380,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: cebf47c99133e00820557d65ec4ac85b23c8bb9443ffc4489c951a4feee1425c -->
+<!-- GUIDE-FINGERPRINT: 1a95eb357bdc3cd42fe437c510e220590b002526d7401e028d709256a3fd44e8 -->

@@ -2868,7 +2868,7 @@ read that as "the criterion and its evidence section".
   DOCS: design.md §19.10 beside the existing village vignettes.
 
 - [ ] 361. CHEAPER PICTURE VERIFICATION — WITHOUT LOSING WHAT IT CATCHES (user
-  26.07.2026; TOP of the queue). The rendered-picture check is the most expensive
+  26.07.2026). The rendered-picture check is the most expensive
   control in this project, and it dominates the cost of the work that is left: 42
   of the 67 open points touch the canvas, so they need the full check, and the
   scoping of 26.07. (DOM changes need one backend, Vitest files none) helped the
@@ -3032,6 +3032,65 @@ read that as "the criterion and its evidence section".
   than the same seed in the dry season.
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
+
+- [ ] 365. THE PRICE OF A POINT — cut the MEASURED token cost of the working
+  process (user 26.07.2026; TOP of the queue). The weekly quota was exhausted a
+  second time on 26.07.2026. Claude Code's usage panel named the drivers for the
+  preceding 24 h: 100 % of the usage came from SUBAGENT-HEAVY sessions, 100 % from
+  sessions running 8+ HOURS, and 94 % at >150k CONTEXT ("longer sessions are more
+  expensive even when cached"). Measured document sizes: CLAUDE.md ~16k tokens,
+  design.md ~46k, TASKS.md (open points only) ~59k, docs/tasks-archive.md ~187k.
+  WHAT IS NOT THE TARGET: parallelism. One point costs ONE context fill whichever
+  process runs it, so the pool size is throughput, not cost — this was settled on
+  26.07.2026 (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.27) and must not
+  be re-derived as a saving. The cost sits in the SIZE of each fill, in the fills
+  that repeat, and in turns spent on nothing.
+  (A) BRIEF INSTEAD OF READING ASSIGNMENT. A delegated agent today orients by
+  reading whole documents — up to ~120k tokens (CLAUDE.md + TASKS.md + design.md)
+  before it sees a line of source, uncached, per agent. Build
+  `scripts/point-brief.mjs <N>`: it reads the point through `readTasksAll`
+  (`scripts/tasks-source.mjs`), resolves the design.md sections the spec references,
+  and prints ONE ready brief. The delegation prompt then carries that brief and
+  instructs the agent NOT to open TASKS.md or design.md wholesale. Record the
+  measured before/after token count for one real point.
+  (B) CONTEXT BOUNDARY PER POINT. 94 % of the usage sat above 150k context because
+  the main session carries point after point in one window. CONSTRAINT: the session
+  cannot clear itself — `/clear` is the user's command. So the mechanism is the
+  existing resume machinery: the batch loop treats a point boundary as a session
+  boundary and lets `batch-resume-hook` re-orient a fresh session (it already
+  re-injects the open points and the batch state). Where a boundary is reached in an
+  ATTENDED session, ask the user for `/clear` rather than carrying on silently.
+  Measure the per-request input size before and after on one point.
+  (C) TASKS.md INTO THE DOC BUDGET. `scripts/doc-budget-core.mjs` budgets CLAUDE.md,
+  design.md and the work order's PREAMBLE — not the ~59k body of open points, which
+  is read whenever a point is looked up. Give the open body a measured ceiling with
+  the same two honest ways out (move it out, or raise the ceiling with a written
+  justification). This is the §3.29/§3.30 cost curve at its third document.
+  (D) NO GUARD BLOCK-LOOPS. A guard that blocks costs a whole turn at full context;
+  the render-verify loop on point 278 cost ~30 such turns for one process mistake.
+  Build `scripts/guard-preflight.mjs`, which runs the relevant pure guard cores in
+  read-only "would this block?" mode BEFORE the action they govern (merge, tick,
+  turn end) and names what would block. Cost: one cheap process run instead of N
+  blocked turns.
+  (E) THE MODEL POLICY STANDS. The usage panel advises "a cheaper model for simpler
+  subagents". REJECTED, and recorded as rejected so it is not revisited as a saving:
+  the 24.07.2026 silent degradation to Haiku 4.5 wrecked three deliveries in 14
+  minutes, and rebuilding them cost more than the tokens saved. The §6 allowlist
+  (Opus 5 worker · Fable 5 four-eyes/fallback · Opus 4.8 last fallback) is unchanged
+  by this point.
+  VERIFIABLE: pure Vitest — `point-brief.mjs` extracts the right point for an open
+  AND an archived number, resolves every design.md section its spec names, fails
+  loudly on an unknown number, and its output stays under a measured ceiling;
+  `doc-budget-core` enforces the new open-body budget (a synthetic over-budget file
+  fails, an under-budget one passes); `guard-preflight` reports a state a guard
+  would block on WITHOUT the guard running, and reports clean on a good state. No
+  browser suite — nothing here renders.
+  DOCS in the same commit: CLAUDE.md §6 (the delegation brief, the context boundary,
+  the rejected cheap-model option) and the measured before/after figures beside the
+  levers. The analysis documents already carry this problem class
+  (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.31 and the beginner's
+  guide's quota pitfall, both written 26.07.2026); extend them only if the
+  implementation changes the conclusion.
 
 ## Closing (only after all points)
 

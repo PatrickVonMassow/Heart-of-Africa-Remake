@@ -249,6 +249,16 @@ Teuer war nicht das Kürzen, sondern das **Nachziehen**: Ein Prüfer las weiter 
 
 **Lehren:** Beim Verkleinern eines Dokuments ist **Verschieben sicherer als Neuschreiben**, und der Schnitt gehört an die Satzgrenze. Danach ist die eigentliche Arbeit, **jeden Leser** des alten Ortes zu finden — der gefährlichste ist der, der nicht scheitert, sondern nur nichts mehr findet. Und weil das Wachstum nie eine Entscheidung war, sondern die Summe ehrlicher Einzelzugaben, bekamen die ständig gelesenen Dokumente **gemessene Obergrenzen** mit genau zwei zulässigen Auswegen: auslagern oder die Grenze mit schriftlicher Begründung anheben.
 
+### 3.31 Die Rechnung stimmte, ihre Voraussetzung nicht — gemessene Verbrauchstreiber
+
+In §3.27 war geklärt, dass Parallelität pro fertigem Punkt nichts kostet; das Argument stützte sich darauf, dass der Kontext für einen neuen Punkt ohnehin geleert wird. Als das Wochenkontingent ein zweites Mal vorzeitig erschöpft war, nannte die Verbrauchsanzeige für die letzten 24 Stunden drei Kennzahlen: alles aus subagenten-lastigen Sitzungen, alles aus Sitzungen jenseits von acht Stunden, und **94 % oberhalb von 150k Kontext**. Der letzte Wert widerlegt nicht die Rechnung, sondern ihre Voraussetzung: Geleert wurde eben nicht. Die Sitzung trug Punkt für Punkt im selben Fenster, und jeder Request zahlte den ganzen Verlauf mit. Erschwerend ist, dass die Sitzung sich nicht selbst leeren *kann* — das ist ein Nutzerbefehl; die Aufräumhandlung war also nie eine Gewohnheit, die man sich vornehmen konnte, sondern eine, die niemandem gehörte.
+
+Der zweite gemessene Posten war die Orientierung. Ein delegierter Agent fand seinen Auftrag, indem er die Dokumente *las* — Regelwerk, Arbeitsauftrag, Designdokument, zusammen bis zu ~120.000 Tokens, ungecacht, je Agent, bevor er die erste Quellzeile sah. Der Auftrag selbst umfasst wenige hundert Wörter und liegt implementierungsreif vor. Das ist kein Delegationsproblem, sondern ein Zustellungsproblem: Wer den Auftrag mitschickt, statt ihn suchen zu lassen, zahlt ihn einmal statt je Leser.
+
+Der dritte Posten war der unauffälligste: blockierende Wächter. Einer, der am Zug-Ende blockiert, kostet einen vollen Zug bei vollem Kontext — der Render-Wächter auf Punkt 278 kostete rund dreißig davon, für einen einzigen Prozessfehler. Das Immunsystem ist richtig; teuer ist nicht die Regel, sondern das Hineinlaufen.
+
+**Lehren:** Eine Kostenrechnung erbt die Annahmen ihres Modells — hier die, dass eine Aufräumhandlung stattfindet; prüfe deshalb die Voraussetzung, nicht nur die Rechnung. Wo etwas Großes wiederholt gelesen wird, ist **Zustellung billiger als Suche**. Und die teuersten Züge sind die, in denen nichts entsteht: Ist die Bedingung eines Wächters vorher prüfbar, gehört sie vorher geprüft.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -310,6 +320,7 @@ Drei Konstruktionsprinzipien haben sich bewährt: **fail-open** (ein Guard-Fehle
 3. **Nebenläufigkeit: Exklusivität vor Redundanz.** Jeder künftige Wiederbeleber wird erst gebaut, nachdem ein atomarer, PID-basierter Owner-Lock existiert.
 4. **Messdisziplin:** ruhige Maschine für Suiten, Ziel-Hardware für Perf, gemessene Zahlen in jeder Kommunikation.
 5. **Nutzer-Artefakte als Verträge:** Struktur einfrieren, pro Klausel ein Prüfer, Änderungen nur als Vorschlag.
+6. **Verbrauch messen, bevor man ihn drosselt — und die Voraussetzung mitprüfen** (§3.31). Die Anzeige nennt die Treiber; die eigene Vermutung nennt sie nicht. Der naheliegendste Hebel bleibt dabei abgelehnt: „billigeres Modell für einfache Aufgaben" hat am 24.07. drei Lieferungen gekostet (§3.17) und damit mehr, als er gespart hätte.
 
 ---
 
@@ -332,7 +343,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 26.07.2026, 13:12 · Quellen-Fingerprint: `fa6d62af1109…`
+Zuletzt aktualisiert: Sonntag, 26.07.2026, 21:45 · Quellen-Fingerprint: `2503f55bd4d5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -343,7 +354,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 4 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 5 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Autonomer TASKS.md-Batch: Stand 16.07.2026 22:45 — 151 (Saisonfeld) als WIP gepusht (2055350), Wiederaufnahme an der TASKS-151-WIP-Note; Reihenfolge 151→152→156→123→149→150→121…→153-157 | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -401,10 +412,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 1 | niedrig | doc-budget-guard.mjs | ✔ Mechanismus |
+| Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 31 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: fa6d62af1109bbbebd3df5f4c7eca41984f69b45a9a444ebcd1c6f41e687f07a -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-26T11:12:53.970Z -->
+<!-- RETRO-FINGERPRINT: 2503f55bd4d5c2d5de4c2dca50d5f3f0cbbfcdc9433729ea76e2200eec90e129 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-26T19:45:35.766Z -->
 <!-- AUTO-GENERATED:END -->
