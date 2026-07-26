@@ -320,7 +320,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
    > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
    > Arbeitskopie (Git-Worktree) und teile sie so auf, dass sie **nicht dieselben Dateien**
-   > anfassen. Isolierung und Exklusivität **vor** Redundanz." *(Kosten ≈ Zahl der Stränge)*
+   > anfassen. Isolierung und Exklusivität **vor** Redundanz." *(Aufschlag ≈ 10–25 %,
+   > geschätzt — fast nur Nacharbeit, wenn zwei Stränge denselben Code berühren)*
 
 ---
 
