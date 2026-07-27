@@ -8,9 +8,18 @@
 //
 // THE BRIEF MUST NOT STARVE ITS READER — a smaller context that costs a rebuild
 // is no saving. Hence two hard failures instead of a silent omission: an unknown
-// point number, and a design.md section the document no longer contains (a
-// renumbering must error, not quietly drop a section). Everything the resolver
-// cannot claim with confidence is NAMED in the brief's notes, never dropped.
+// point number, and a `§` reference that resolves in none of the documents
+// searched (a renumbering must error, not quietly drop a section). Everything the
+// resolver cannot carry is NAMED in the brief's reference map, never dropped.
+//
+// THE BRIEF MUST NOT LIE TO ITS READER EITHER. The work order writes `§` for four
+// different things — a design.md section, a CLAUDE.md section, a section of a
+// research document (`peoples-1890 §8`, `climate §1.1`, `fauna-behaviour-1890
+// §B2.1`), and, sloppily, a work-order POINT number. A resolver that knows only
+// design.md carries design.md §8 where the spec meant peoples-1890 §8, verbatim
+// and without a word — the reader cannot tell. So every reference is resolved
+// against ALL of them, every carried section is LABELLED with the document it
+// came from, and the reference map lists every `§` and where it went.
 //
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
@@ -35,59 +44,106 @@ export const estimateTokens = (text) => Math.ceil(String(text ?? '').length / 4)
  * replaces. Over the ceiling means the spec or its referenced design sections
  * grew past what a brief can carry: split the point or shorten the spec — do not
  * raise the ceiling to make room for a longer telling of the same thing.
+ *
+ * ENFORCED, not advisory: scripts/point-brief.mjs exits non-zero over it (a brief
+ * nobody notices is over budget is how the saving quietly disappears).
  */
 export const BRIEF_TOKEN_CEILING = 24000
 
-/** How far back a `§` reference may look for the document it belongs to. */
-const DOC_LOOKBACK = 220
+/**
+ * How far back a `§` may look for the document it belongs to, per citation style.
+ * The styles differ in how much evidence they carry, so they get different reach:
+ *   - `file`     `docs/peoples-1890.md` — unmistakable, so the generous window;
+ *   - `basename` `peoples-1890`, `acceptance-evidence` — a hyphenated token that
+ *                is never ordinary prose, but weaker: a short window;
+ *   - `stem`     `peoples`, `climate`, `design` — ORDINARY ENGLISH WORDS. Measured
+ *                on the corpus: "peoples §3.1" and "climate §1.1" are real
+ *                citations, while "only the fauna and the §2.5 silhouettes" and
+ *                "sixteen peoples unchanged … the §7 displacement" are not. Only
+ *                strict adjacency (whitespace between the word and the `§`)
+ *                separates them, so that is the rule.
+ */
+export const DOC_WINDOW = { file: 220, basename: 60, stem: 0 }
 
 /**
- * Prose names for documents the work order cites without their filename. Only
- * unambiguous ones: "retrospective §3.12" is the retrospective's section, and
- * without this the resolver would call it a dangling design.md section.
+ * Extra prose names for documents the work order cites by neither filename nor
+ * basename. Only unambiguous ones — a name that also reads as ordinary prose
+ * belongs to the adjacency-only `stem` style, not here.
  */
 export const DOC_ALIASES = [
-  { re: /retrospekti\w*|retrospecti\w*/gi, doc: 'docs/analysis_de/retrospektive-zusammenarbeit.md' },
+  { path: 'docs/analysis_de/retrospektive-zusammenarbeit.md', word: 'retrospekti\\w*', style: 'basename' },
+  { path: 'docs/analysis_de/retrospektive-zusammenarbeit.md', word: 'retrospecti\\w*', style: 'basename' },
 ]
 
-const normalise = (text) => String(text ?? '').replace(/\r\n/g, '\n')
+const normalise = (text) => String(text ?? '').replace(/^﻿/, '').replace(/\r\n/g, '\n')
+
+/**
+ * A `§` reference id: a plain number (`4.2`, `4.0.1`), a lettered one
+ * (`B2.1` — docs/fauna-behaviour-1890.md numbers its second half that way), or a
+ * bare capital naming a whole lettered part (`§B`).
+ *
+ * The trailing lookahead is what keeps the corpus's real prose out: `§s` (in
+ * "the README cites no §s") and "the § numbering" must NOT parse as ids, which
+ * is why the letter form is capital-only and may not be followed by a letter.
+ */
+const SECTION_REF_RE = /§+\s*((?:[A-Z](?:\d+(?:\.\d+)*)?)|(?:\d+(?:\.\d+)*))(?![A-Za-z0-9])/g
+
+/** The named range styles the queue uses: `§19.2-§19.8`, `§19.2–§19.8`. */
+const SECTION_RANGE_RE = /§\s*((?:[A-Z])?\d+(?:\.\d+)*)\s*[-–—]\s*§\s*((?:[A-Z])?\d+(?:\.\d+)*)/g
 
 /**
  * Every point of the work order (open TASKS.md and archived, concatenated by
  * readTasksAll). A point starts at `- [ ] N.` / `- [x] N.` and runs until the
- * next such line or the next `## ` section heading.
+ * next such line or the next `## ` section heading — EXCEPT inside a fenced code
+ * block, where such a line is quoted example text and must not cut the body in
+ * half (a truncated spec is the failure mode this whole module exists to avoid).
+ * `startLine`/`endLine` index into the normalised source so a caller can prove
+ * the body is verbatim.
  */
 export function parseWorkOrderPoints(text) {
   const lines = normalise(text).split('\n')
   const points = []
   let current = null
-  const close = () => {
+  let inFence = false
+  const close = (endLine) => {
     if (current) {
-      while (current.bodyLines.length && current.bodyLines.at(-1).trim() === '') current.bodyLines.pop()
+      current.endLine = endLine
+      while (current.bodyLines.length && current.bodyLines.at(-1).trim() === '') {
+        current.bodyLines.pop()
+        current.endLine--
+      }
       current.body = current.bodyLines.join('\n')
       delete current.bodyLines
       points.push(current)
       current = null
     }
   }
-  for (const line of lines) {
-    const start = /^- \[([ xX])\] (\d+)\.\s?(.*)$/.exec(line)
-    if (start) {
-      close()
-      current = {
-        number: Number(start[2]),
-        done: start[1].toLowerCase() === 'x',
-        bodyLines: [start[3]],
-      }
-      continue
+  lines.forEach((line, i) => {
+    if (/^\s*```/.test(line)) {
+      inFence = !inFence
+      if (current) current.bodyLines.push(line.replace(/^ {2}/, ''))
+      return
     }
-    if (/^#{1,6} /.test(line)) {
-      close()
-      continue
+    if (!inFence) {
+      const start = /^- \[([ xX])\] (\d+)\.\s?(.*)$/.exec(line)
+      if (start) {
+        close(i)
+        current = {
+          number: Number(start[2]),
+          done: start[1].toLowerCase() === 'x',
+          startLine: i,
+          bodyLines: [start[3]],
+        }
+        return
+      }
+      if (/^#{1,6} /.test(line)) {
+        close(i)
+        return
+      }
     }
     if (current) current.bodyLines.push(line.replace(/^ {2}/, ''))
-  }
-  close()
+  })
+  close(lines.length)
   return points
 }
 
@@ -111,59 +167,15 @@ export function pointTitle(point, maxChars = 140) {
   return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trim()}…`
 }
 
-/**
- * The design.md sections a spec references, plus the ones it attributes to
- * ANOTHER document. Attribution is local: a `§` belongs to the nearest `*.md`
- * name within DOC_LOOKBACK characters before it, and to design.md when no
- * document is named nearby (design.md being the design authority — the plain
- * `§4.2` style in this queue always means it).
- *
- * One id is decided ONCE for the whole spec, and an EXPLICIT attribution beats
- * the default wherever it stands: point 365 names the retrospective's `§3.27`
- * beside the file and then again bare, and a per-occurrence rule would have made
- * the bare one a dangling design.md section — a false hard failure.
- *
- * References to another document are not design sections, so they are not
- * resolved; they are reported so the reader knows they exist (never omit silently).
- */
-export function extractDesignSectionRefs(spec) {
-  const text = normalise(spec)
-  const docs = []
-  for (const m of text.matchAll(/[A-Za-z0-9_./-]*[A-Za-z0-9_-]\.md\b/g)) {
-    docs.push({ at: m.index, name: m[0] })
-  }
-  for (const alias of DOC_ALIASES) {
-    for (const m of text.matchAll(alias.re)) docs.push({ at: m.index, name: alias.doc })
-  }
-  docs.sort((a, b) => a.at - b.at)
-  const seen = new Map() // id -> { explicitDesign, foreignDoc }
-  for (const m of text.matchAll(/§+\s*(\d+(?:\.\d+)*)/g)) {
-    const id = m[1].replace(/\.$/, '')
-    let owner = null
-    for (const d of docs) {
-      if (d.at < m.index && m.index - d.at <= DOC_LOOKBACK) owner = d
-    }
-    const entry = seen.get(id) ?? { explicitDesign: false, foreignDoc: null }
-    if (owner) {
-      if (/(^|\/)design\.md$/i.test(owner.name)) entry.explicitDesign = true
-      else entry.foreignDoc = entry.foreignDoc ?? owner.name
-    }
-    seen.set(id, entry)
-  }
-  const design = []
-  const foreign = []
-  for (const [id, entry] of seen) {
-    if (entry.foreignDoc && !entry.explicitDesign) foreign.push(`${entry.foreignDoc} §${id}`)
-    else design.push(id)
-  }
-  design.sort(compareSectionIds)
-  return { design, foreign }
-}
-
-/** Numeric section order: 4.2 before 4.10, 4 before 4.1. */
+/** Numeric section order: 4.2 before 4.10, 4 before 4.1; letters sort first. */
 export function compareSectionIds(a, b) {
-  const pa = a.split('.').map(Number)
-  const pb = b.split('.').map(Number)
+  const split = (s) => {
+    const m = /^([A-Z]?)(.*)$/.exec(String(s))
+    return [m[1], m[2] ? m[2].split('.').map(Number) : []]
+  }
+  const [la, pa] = split(a)
+  const [lb, pb] = split(b)
+  if (la !== lb) return la < lb ? -1 : 1
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const d = (pa[i] ?? -1) - (pb[i] ?? -1)
     if (d) return d
@@ -171,36 +183,22 @@ export function compareSectionIds(a, b) {
   return 0
 }
 
-/** Other work-order points a spec names ("per point 288", "pt. 30", "points 175/177"). */
-export function extractPointRefs(spec, selfNumber = null) {
-  const text = normalise(spec)
-  const found = []
-  const add = (n) => {
-    const v = Number(n)
-    if (Number.isFinite(v) && v > 0 && v !== Number(selfNumber) && !found.includes(v)) found.push(v)
-  }
-  for (const m of text.matchAll(/\bpoints?\s+(\d+(?:\s*[/,]\s*\d+)*)/gi)) {
-    for (const n of m[1].split(/[/,]/)) add(n.trim())
-  }
-  for (const m of text.matchAll(/\bpts?\.\s*(\d+(?:\s*[/,]\s*\d+)*)/gi)) {
-    for (const n of m[1].split(/[/,]/)) add(n.trim())
-  }
-  return found.sort((a, b) => a - b)
-}
-
 /**
- * design.md by section id. A section's text runs from its heading to the next
- * heading of the SAME OR HIGHER level, so `### 19.8` stops at `### 19.16` while
- * `## 19` spans its subsections. For a top-level section only the intro before
- * the first subsection is kept, plus an index of the subsection titles: pulling
- * a whole chapter (§19 is ~400 lines) would defeat the brief, and the reader is
- * told it may read a NAMED subsection on demand.
+ * Sections of a markdown document by id. A section's text runs from its heading
+ * to the next heading of the SAME OR HIGHER level, so `### 19.8` stops at
+ * `### 19.16` while `## 19` spans its subsections. For a top-level section only
+ * the intro before the first subsection is kept, plus an index of the subsection
+ * titles: pulling a whole chapter (§19 is ~400 lines) would defeat the brief, and
+ * the reader is told it may read a NAMED subsection on demand.
+ *
+ * Heading levels 1–6 are all indexed. The research documents use `## B1.` and
+ * `### B2.1`, and design.md's own `##`/`###`/`####` are a subset of that.
  */
 export function parseDesignSections(designText) {
   const lines = normalise(designText).split('\n')
   const heads = []
   lines.forEach((line, i) => {
-    const m = /^(#{2,4})\s+(\d+(?:\.\d+)*)\.?\s+(.*)$/.exec(line)
+    const m = /^(#{1,6})\s+((?:[A-Z]?\d+(?:\.\d+)*))\.?\s+(.*)$/.exec(line)
     if (m) heads.push({ level: m[1].length, id: m[2], title: m[3].trim(), line: i })
   })
   const sections = new Map()
@@ -219,53 +217,196 @@ export function parseDesignSections(designText) {
     const bodyEnd = children.length
       ? heads.slice(idx + 1).find((c) => c.line < end && c.level === h.level + 1).line
       : end
-    sections.set(h.id, {
-      id: h.id,
-      title: h.title,
-      heading: lines[h.line],
-      children,
-      text: lines.slice(h.line, bodyEnd).join('\n').trimEnd(),
-    })
+    // A duplicate id would silently shadow the earlier section, so the FIRST
+    // heading wins and the collision is visible to a caller that looks for it.
+    if (!sections.has(h.id)) {
+      sections.set(h.id, {
+        id: h.id,
+        title: h.title,
+        heading: lines[h.line],
+        children,
+        text: lines.slice(h.line, bodyEnd).join('\n').trimEnd(),
+      })
+    }
   })
   return sections
 }
 
-/** Resolve section ids; a missing one is a hard failure, never an omission. */
-export function resolveDesignSections(designText, ids) {
-  const sections = parseDesignSections(designText)
-  const missing = ids.filter((id) => !sections.has(id))
-  if (missing.length) {
-    throw new BriefError(
-      `design.md no longer contains section(s) ${missing.map((m) => `§${m}`).join(', ')} — the spec ` +
-        'references them (a renumbering?). Fix the reference in the work order or restore the ' +
-        'section; the brief must not silently omit a section its reader was promised.',
-    )
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** The citation styles a document answers to, derived from its path. */
+export function aliasesFor(path) {
+  const file = String(path).replace(/\\/g, '/')
+  const base = file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/i, '')
+  const out = [
+    // The full path or the bare filename, always with the .md suffix.
+    { style: 'file', re: new RegExp(`(?<![\\w/.-])(?:[\\w./-]*/)?${escapeRe(base)}\\.md\\b`, 'gi') },
+  ]
+  // `peoples-1890`, `acceptance-evidence` — a hyphenated token, never prose.
+  if (base.includes('-')) {
+    out.push({ style: 'basename', re: new RegExp(`(?<![\\w/.-])${escapeRe(base)}(?![\\w-])`, 'gi') })
   }
-  return ids.map((id) => sections.get(id))
+  // `peoples`, `climate`, `design` — an ordinary word; adjacency-only (DOC_WINDOW).
+  const stem = base.replace(/-1890$/, '')
+  if (stem !== base || !base.includes('-')) {
+    out.push({ style: 'stem', re: new RegExp(`(?<![\\w/.-])${escapeRe(stem)}(?![\\w-])`, 'gi') })
+  }
+  return out
 }
 
 /**
- * Sort `§`-ids the resolver could not attribute to another document into what
- * they REALLY are, because the work order writes three things the same way:
- *   - a design.md section          → carried verbatim,
- *   - a CLAUDE.md section (`§7.1`, `§7.2` — acceptance and self-verification are
- *     cited constantly without naming the file) → named, read on demand,
- *   - a work-order POINT (`§264 combat`, `§219 ring marker` — a sloppy but real
- *     habit) → resolved as a cross-referenced point.
- * Only what is none of the three is dangling, and that is the hard failure.
+ * The documents a `§` may belong to, prepared once. `design` and `claude` are
+ * named separately because they carry special roles: design.md is the default
+ * owner of an unattributed `§` (the plain `§4.2` style in this queue always means
+ * it) and the only document whose sections the brief carries verbatim; CLAUDE.md
+ * is in every agent's context already, so its sections are named, not carried.
  */
-export function classifySectionRefs({ ids, designText, claudeText = '', tasksText = '' }) {
-  const design = parseDesignSections(designText)
-  const claude = parseDesignSections(claudeText)
-  const points = new Set(parseWorkOrderPoints(tasksText).map((p) => p.number))
-  const out = { designIds: [], claudeIds: [], pointNumbers: [], missing: [] }
-  for (const id of ids) {
-    if (design.has(id)) out.designIds.push(id)
-    else if (claude.has(id)) out.claudeIds.push(id)
-    else if (/^\d+$/.test(id) && points.has(Number(id))) out.pointNumbers.push(Number(id))
-    else out.missing.push(id)
+export function buildDocRegistry({ designText = '', claudeText = '', docs = [] } = {}) {
+  const make = (path, text) => ({
+    path,
+    sections: parseDesignSections(text),
+    aliases: [
+      ...aliasesFor(path),
+      ...DOC_ALIASES.filter((a) => a.path === path).map((a) => ({
+        style: a.style,
+        re: new RegExp(`(?<![\\w/.-])${a.word}(?![\\w-])`, 'gi'),
+      })),
+    ],
+  })
+  const design = make('design.md', designText)
+  const claude = make('CLAUDE.md', claudeText)
+  const others = docs
+    .filter((d) => d && d.path && d.path !== 'design.md' && d.path !== 'CLAUDE.md')
+    .map((d) => make(d.path, d.text ?? ''))
+  return { design, claude, others, list: [design, claude, ...others] }
+}
+
+/** Does `doc` contain `id`, either as a section or as a lettered PART (`§B`)? */
+function holds(doc, id) {
+  if (doc.sections.has(id)) return { kind: 'section', section: doc.sections.get(id) }
+  if (/^[A-Z]$/.test(id)) {
+    const part = [...doc.sections.keys()].filter((k) => k.startsWith(id))
+    if (part.length) return { kind: 'part', members: part }
   }
-  return out
+  return null
+}
+
+/** Every document mention in `text`, with the style that decides its reach. */
+function docMentions(text, registry) {
+  const out = []
+  for (const doc of registry.list) {
+    for (const alias of doc.aliases) {
+      for (const m of text.matchAll(alias.re)) {
+        out.push({ at: m.index, end: m.index + m[0].length, doc, style: alias.style })
+      }
+    }
+  }
+  return out.sort((a, b) => a.at - b.at)
+}
+
+/**
+ * Resolve every `§` occurrence in a spec to the document it means.
+ *
+ * The order below is deliberate, and EXISTENCE decides before attribution does —
+ * a document named earlier only orders the candidates, it never forces a section
+ * the document does not have:
+ *   1. the nearest document named within its style's window, if it has the id;
+ *   2. the last document named at ANY distance, if it has the id — point 142
+ *      names `docs/peoples-1890.md` once at the top and then cites §4.0.1, §4.9,
+ *      §4.0.5 hundreds of characters below, which no fixed window can reach;
+ *   3. design.md, the documented default for a bare `§`;
+ *   4. CLAUDE.md (§7.1/§7.2 are cited constantly without naming the file);
+ *   5. exactly one other document the spec named that has it;
+ *   6. a work-order POINT number (`§264 combat` — sloppy, but a real habit);
+ *   7. nothing — the hard failure, which names every document searched.
+ */
+export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } = {}) {
+  const text = normalise(spec)
+  const mentions = docMentions(text, registry)
+  const namedDocs = [...new Set(mentions.map((m) => m.doc))]
+  const refs = []
+  const seen = new Map()
+
+  const nearOwner = (at) => {
+    let best = null
+    for (const m of mentions) {
+      if (m.end > at) break
+      const gap = at - m.end
+      if (m.style === 'stem' ? /^\s*$/.test(text.slice(m.end, at)) : gap <= DOC_WINDOW[m.style]) {
+        if (!best || m.at >= best.at) best = m
+      }
+    }
+    return best?.doc ?? null
+  }
+  const stickyOwner = (at) => {
+    let best = null
+    for (const m of mentions) {
+      if (m.end > at) break
+      if (m.style !== 'stem' && (!best || m.at >= best.at)) best = m
+    }
+    return best?.doc ?? null
+  }
+
+  for (const m of text.matchAll(SECTION_REF_RE)) {
+    const id = m[1]
+    const at = m.index
+    const candidates = [
+      ['named-nearby', nearOwner(at)],
+      ['named-earlier', stickyOwner(at)],
+      ['design-default', registry.design],
+      ['claude', registry.claude],
+      ...namedDocs.map((d) => ['named-in-spec', d]),
+    ]
+    let hit = null
+    for (const [how, doc] of candidates) {
+      if (!doc) continue
+      const found = holds(doc, id)
+      if (found) {
+        hit = { how, doc, found }
+        break
+      }
+    }
+    if (!hit && /^\d+$/.test(id) && pointNumbers.has(Number(id))) {
+      hit = { how: 'work-order-point', doc: null, found: null }
+    }
+    const key = `${hit?.doc?.path ?? hit?.how ?? 'dangling'}|${id}`
+    if (seen.has(key)) {
+      seen.get(key).occurrences.push(at)
+      continue
+    }
+    const ref = {
+      id,
+      at,
+      occurrences: [at],
+      how: hit ? hit.how : 'dangling',
+      docPath: hit?.doc?.path ?? null,
+      kind: hit?.found?.kind ?? (hit ? 'point' : null),
+      section: hit?.found?.section ?? null,
+      members: hit?.found?.members ?? null,
+    }
+    seen.set(key, ref)
+    refs.push(ref)
+  }
+
+  const ranges = [...text.matchAll(SECTION_RANGE_RE)].map((m) => `§${m[1]}–§${m[2]}`)
+  return { refs, ranges, namedDocs: namedDocs.map((d) => d.path) }
+}
+
+/** Other work-order points a spec names ("per point 288", "pt. 30", "points 175/177"). */
+export function extractPointRefs(spec, selfNumber = null) {
+  const text = normalise(spec)
+  const found = []
+  const add = (n) => {
+    const v = Number(n)
+    if (Number.isFinite(v) && v > 0 && v !== Number(selfNumber) && !found.includes(v)) found.push(v)
+  }
+  for (const m of text.matchAll(/\bpoints?\s+(\d+(?:\s*[/,]\s*\d+)*)/gi)) {
+    for (const n of m[1].split(/[/,]/)) add(n.trim())
+  }
+  for (const m of text.matchAll(/\bpts?\.?\s+(\d+(?:\s*[/,]\s*\d+)*)/gi)) {
+    for (const n of m[1].split(/[/,]/)) add(n.trim())
+  }
+  return found.sort((a, b) => a - b)
 }
 
 const HEADER = [
@@ -273,18 +414,21 @@ const HEADER = [
   '- This brief IS your spec. Do NOT read TASKS.md or docs/tasks-archive.md or design.md',
   '  WHOLESALE: measured, that is ~59k + ~46k tokens per agent, uncached, and avoiding it is',
   '  the entire purpose of this brief.',
-  '- You MAY read any NAMED file, and any NAMED design.md section, on demand. The ban is on',
-  '  wholesale reads, not on targeted lookups — read the source files the spec names.',
+  '- You MAY read any NAMED file, and any NAMED section, on demand. The ban is on wholesale',
+  '  reads, not on targeted lookups — read the source files and sections the spec names.',
+  '- Every carried section below is LABELLED with the document it came from, and the',
+  '  REFERENCE MAP lists every § the spec uses and where it was resolved. If a resolution',
+  '  looks wrong for what the spec means, trust the spec and read that section yourself.',
   '- If this brief proves INSUFFICIENT, or contradicts the code you find: ESCALATE (stop and',
   '  report what is missing) rather than guess. A guessed spec costs a rebuild, which is more',
   '  expensive than the question.',
 ]
 
 /** Assemble the brief text from already-resolved parts (pure, no lookups). */
-export function assembleBrief({ point, sections = [], referenced = [], notes = [] }) {
+export function assembleBrief({ point, sections = [], referenced = [], notes = [], referenceMap = [] }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
-    'Assembled by scripts/point-brief.mjs from the work order and design.md.',
+    'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
     '',
     ...HEADER,
     '',
@@ -293,8 +437,9 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
     '',
   ]
   if (sections.length) {
-    out.push('--- DESIGN SECTIONS THE SPEC REFERENCES (design.md, verbatim) ---')
+    out.push('--- SECTIONS THE SPEC REFERENCES (verbatim) ---')
     for (const s of sections) {
+      out.push(`[from ${s.docPath} §${s.id}]`)
       out.push(s.text)
       if (s.children.length) {
         out.push(
@@ -316,6 +461,13 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
     }
     out.push('')
   }
+  if (referenceMap.length) {
+    out.push(
+      '--- REFERENCE MAP (every § in the spec, and where it was resolved) ---',
+      ...referenceMap.map((l) => `- ${l}`),
+      '',
+    )
+  }
   if (notes.length) {
     out.push('--- NOTES ---', ...notes.map((n) => `- ${n}`), '')
   }
@@ -323,10 +475,10 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
 }
 
 /**
- * The whole job: point number → brief text. Throws BriefError on an unknown
- * point number and on a dangling design.md section.
+ * The whole job: point number → brief text. Throws BriefError on an unknown point
+ * number and on a `§` that resolves in none of the documents searched.
  */
-export function buildBrief({ tasksText, designText, claudeText = '', number }) {
+export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry }) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
   if (!point) {
@@ -337,74 +489,87 @@ export function buildBrief({ tasksText, designText, claudeText = '', number }) {
         'Check the number — a brief for a point that does not exist would send its reader off blind.',
     )
   }
-  const { design: candidates, foreign } = extractDesignSectionRefs(point.body)
+  const reg = registry ?? buildDocRegistry({ designText, claudeText, docs })
+  const pointNumbers = new Set(all.map((p) => p.number))
+  const { refs, ranges } = resolveSectionRefs(point.body, reg, { pointNumbers })
 
-  // A CLAUDE.md-attributed `§` that CLAUDE.md does NOT contain was mis-attributed
-  // by proximity (a bare `§288 combat` standing near a CLAUDE.md mention). Send it
-  // back through the classifier — but as a NOTE if it resolves to nothing, never as
-  // a hard failure: only a reference we believe means design.md may block a brief.
-  const claudeSections = parseDesignSections(claudeText)
-  const foreignNotes = []
-  const reclassify = []
-  for (const f of foreign) {
-    const m = /^(.*) §(\d+(?:\.\d+)*)$/.exec(f)
-    if (m && /(^|\/)CLAUDE\.md$/i.test(m[1]) && !claudeSections.has(m[2])) reclassify.push(m[2])
-    else foreignNotes.push(f)
+  const dangling = refs.filter((r) => r.how === 'dangling')
+  if (dangling.length) {
+    const searched = reg.list.map((d) => d.path).join(', ')
+    throw new BriefError(
+      `the spec of point ${point.number} references ${dangling.map((r) => `§${r.id}`).join(', ')}, ` +
+        `which exists in none of the documents searched (${searched}) and is no work-order point ` +
+        'number either. A renumbering, a typo, or a document this resolver does not know: fix the ' +
+        'reference in the work order, or add the document — the brief must not silently omit a ' +
+        'section its reader was promised.',
+    )
   }
 
-  const sorted = classifySectionRefs({ ids: candidates, designText, claudeText, tasksText })
-  const extra = classifySectionRefs({ ids: reclassify, designText, claudeText, tasksText })
-  sorted.designIds = [...new Set([...sorted.designIds, ...extra.designIds])].sort(compareSectionIds)
-  sorted.claudeIds = [...new Set([...sorted.claudeIds, ...extra.claudeIds])]
-  sorted.pointNumbers = [...new Set([...sorted.pointNumbers, ...extra.pointNumbers])]
-  for (const id of extra.missing) foreignNotes.push(`§${id} (unresolved — no such section or point)`)
-  if (sorted.missing.length) {
-    // Reuse the strict resolver so the failure text has exactly one wording.
-    resolveDesignSections(designText, sorted.missing)
+  // Only design.md's sections are CARRIED verbatim: it is the design authority the
+  // spec's wording depends on. Everything else is NAMED with its heading, because
+  // CLAUDE.md is already in the agent's context and a research document is
+  // background to be read targetedly — carrying those would put the brief over its
+  // ceiling for exactly the points that reference them most.
+  const carried = refs
+    .filter((r) => r.docPath === 'design.md' && r.kind === 'section')
+    .sort((a, b) => compareSectionIds(a.id, b.id))
+    .map((r) => ({ ...r.section, docPath: r.docPath }))
+
+  const describe = (r) => {
+    if (r.how === 'work-order-point') {
+      return `§${r.id} → WORK-ORDER POINT ${r.id} (not a section; listed under the cross-referenced points)`
+    }
+    const where = r.docPath === 'design.md' ? 'carried above' : 'read on demand'
+    if (r.kind === 'part') {
+      return `§${r.id} → ${r.docPath}, the whole §${r.id} part (${r.members.join(', ')}) — ${where}`
+    }
+    const title = r.section?.title ? ` "${r.section.title}"` : ''
+    return `§${r.id} → ${r.docPath} §${r.id}${title} — ${where} [${r.how}]`
   }
-  const sections = resolveDesignSections(designText, sorted.designIds)
-  const refs = [...new Set([...extractPointRefs(point.body, point.number), ...sorted.pointNumbers])]
+  const referenceMap = refs
+    .slice()
+    .sort((a, b) => a.at - b.at)
+    .map(describe)
+
+  const pointRefIds = refs.filter((r) => r.how === 'work-order-point').map((r) => Number(r.id))
+  const crossRefs = [...new Set([...extractPointRefs(point.body, point.number), ...pointRefIds])]
     .filter((n) => n !== point.number)
     .sort((a, b) => a - b)
-  const referenced = refs.map((n) => {
+  const referenced = crossRefs.map((n) => {
     const p = all.find((q) => q.number === n)
-    return p
-      ? { number: n, found: true, done: p.done, title: pointTitle(p) }
-      : { number: n, found: false }
+    return p ? { number: n, found: true, done: p.done, title: pointTitle(p) } : { number: n, found: false }
   })
+
   const notes = []
-  if (foreignNotes.length) {
+  const otherDocs = [...new Set(refs.filter((r) => r.docPath && r.docPath !== 'design.md').map((r) => r.docPath))]
+  if (otherDocs.length) {
     notes.push(
-      `the spec also names section(s) of OTHER documents: ${foreignNotes.join(', ')} — not carried ` +
-        'here; read that named section on demand if the point turns on it.',
+      `the spec's § also point at ${otherDocs.join(', ')} — those sections are NAMED in the ` +
+        'reference map, not carried; read the named section in that file if the point turns on it.',
     )
   }
-  if (sorted.claudeIds.length) {
+  if (ranges.length) {
     notes.push(
-      `the spec cites CLAUDE.md ${sorted.claudeIds.map((i) => `§${i}`).join(', ')} (no design.md section ` +
-        'of that number exists) — CLAUDE.md is in your context already; read that section there.',
+      `the spec names the RANGE(S) ${ranges.join(', ')} — only the endpoints are resolved above; ` +
+        'the sections BETWEEN them are part of the reference and must be read on demand.',
     )
   }
-  if (sorted.pointNumbers.length) {
-    notes.push(
-      `the spec writes §${sorted.pointNumbers.join(', §')} where a WORK-ORDER POINT number is meant — ` +
-        'listed under the cross-referenced points above.',
-    )
-  }
-  if (!sorted.designIds.length) notes.push('the spec names no design.md section.')
+  if (!carried.length) notes.push('no design.md section is carried — the spec names none that resolves there.')
   notes.push(
     'This brief is generated. If the work order changed since, re-run: node scripts/point-brief.mjs ' +
       `${point.number}`,
   )
-  const brief = assembleBrief({ point, sections, referenced, notes })
+
+  const brief = assembleBrief({ point, sections: carried, referenced, notes, referenceMap })
   return {
     brief,
     point,
-    sections,
+    refs,
+    sections: carried,
     referenced,
-    designRefs: sorted.designIds,
-    claudeRefs: sorted.claudeIds,
-    foreignRefs: foreignNotes,
+    designRefs: carried.map((s) => s.id),
+    claudeRefs: refs.filter((r) => r.docPath === 'CLAUDE.md').map((r) => r.id),
+    otherDocRefs: refs.filter((r) => r.docPath && r.docPath !== 'design.md' && r.docPath !== 'CLAUDE.md'),
     tokens: estimateTokens(brief),
   }
 }

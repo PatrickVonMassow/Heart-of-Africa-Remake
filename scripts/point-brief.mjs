@@ -8,15 +8,13 @@
 //
 // Unlike the guards here this script FAILS LOUDLY (exit 1) rather than
 // fail-open: a silently thinned brief would send its reader off blind, and a
-// rebuild costs far more than the failed run.
+// rebuild costs far more than the failed run. Over the token ceiling is a
+// failure too — a brief nobody notices is over budget is how the saving quietly
+// disappears.
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { readTasksAll, TASKS_PATH } from './tasks-source.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 import { BriefError, buildBrief, BRIEF_TOKEN_CEILING } from './point-brief-core.mjs'
-
-const REPO_ROOT = resolve(TASKS_PATH, '..')
-const DESIGN_PATH = resolve(REPO_ROOT, 'design.md')
-const CLAUDE_PATH = resolve(REPO_ROOT, 'CLAUDE.md')
+import { CLAUDE_PATH, DESIGN_PATH, readDocCorpus } from './doc-corpus.mjs'
 
 const args = process.argv.slice(2)
 const number = args.find((a) => /^\d+$/.test(a))
@@ -36,6 +34,7 @@ try {
     // without naming the file); the brief never carries its text — the harness
     // injects CLAUDE.md into every context anyway.
     claudeText: existsSync(CLAUDE_PATH) ? readFileSync(CLAUDE_PATH, 'utf8') : '',
+    docs: readDocCorpus(),
     number,
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
@@ -48,16 +47,21 @@ try {
   }
   if (tokens > BRIEF_TOKEN_CEILING) {
     console.error(
-      '[point-brief] WARNING: over the ceiling — the spec or its design sections have outgrown ' +
-        'what a brief can carry. Split the point or shorten the spec.',
+      '[point-brief] OVER THE CEILING — the spec or its design sections have outgrown what a brief ' +
+        'can carry. Split the point or shorten the spec; do not raise the ceiling. The brief above ' +
+        'is complete and usable, but it is no longer the saving it claims to be.',
     )
+    process.exitCode = 2
   }
-  process.exit(0)
 } catch (e) {
   if (e instanceof BriefError) {
     console.error(`point-brief: ${e.message}`)
-    process.exit(1)
+  } else {
+    console.error(`point-brief failed: ${e && e.stack ? e.stack : e}`)
   }
-  console.error(`point-brief failed: ${e && e.stack ? e.stack : e}`)
-  process.exit(1)
+  process.exitCode = 1
 }
+// No process.exit() here on purpose: the brief can be 80 KB and process.exit()
+// discards whatever of an ASYNCHRONOUS stdout write is still queued (pipes are
+// async on macOS; only Windows and Linux make them synchronous). Letting the
+// event loop drain flushes it on every platform.
