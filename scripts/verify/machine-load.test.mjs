@@ -5,7 +5,7 @@
 // while a red does not.
 import { describe, it, expect } from 'vitest'
 import {
-  DEFERRED_EXIT, ELEVATED_CPU, HEAVY_CPU, LEVEL, ON_LOAD, STRAY_KIND, TIMING_SENSITIVE_SUITES,
+  DEFERRED_EXIT, ELEVATED_CPU, HEAVY_CPU, LEVEL, MAX_LISTED_STRAYS, ON_LOAD, STRAY_KIND, TIMING_SENSITIVE_SUITES,
   annotateResult, annotateStageFailure, classifyLoad, classifyProcess, cpuBusyFraction, decideRun,
   formatLoadReport, isTimingSensitive, killAdvice, onLoadMode, ownTree, parsePsOutput,
   parseWindowsProcessJson, strayProcesses,
@@ -94,6 +94,55 @@ describe('strayProcesses', () => {
     ]
     const strays = strayProcesses({ processes, pid: 99, repoMarker: 'Developing\\hoa' })
     expect(strays.map((s) => [s.pid, s.fromThisRepo])).toEqual([[1, true], [2, false]])
+  })
+})
+
+describe('strayProcesses — one line per leftover TREE', () => {
+  it('folds a cmd.exe → node → child chain of the same kind into its root', () => {
+    const processes = [
+      { pid: 10, ppid: 1, name: 'cmd.exe', cmd: 'cmd.exe /d /s /c node scripts/verify/run-all.mjs enrichments' },
+      { pid: 11, ppid: 10, name: 'node.exe', cmd: 'node scripts/verify/run-all.mjs enrichments' },
+      { pid: 12, ppid: 11, name: 'node.exe', cmd: 'node scripts/verify/enrichments.mjs' },
+    ]
+    expect(strayProcesses({ processes, pid: 99 }).map((s) => s.pid)).toEqual([10])
+  })
+
+  it('folds a browser\'s five helper processes into one', () => {
+    const base = 'chrome-headless-shell.exe --headless'
+    const processes = [
+      { pid: 20, ppid: 1, name: 'chrome-headless-shell.exe', cmd: base },
+      ...[21, 22, 23, 24].map((pid) => ({ pid, ppid: 20, name: 'chrome-headless-shell.exe', cmd: `${base} --type=renderer` })),
+    ]
+    expect(strayProcesses({ processes, pid: 99 })).toHaveLength(1)
+  })
+
+  it('lifts "from this checkout" up to the wrapper, which carries no path of its own', () => {
+    const processes = [
+      { pid: 30, ppid: 1, name: 'cmd.exe', cmd: 'cmd.exe /d /s /c "npm run dev -- --port 63336"' },
+      { pid: 31, ppid: 30, name: 'node.exe', cmd: 'node C:\\dev\\hoa\\node_modules\\vite\\bin\\vite.js --port 63336' },
+    ]
+    const strays = strayProcesses({ processes, pid: 99, repoMarker: 'C:\\dev\\hoa' })
+    expect(strays).toHaveLength(1)
+    expect(strays[0].pid).toBe(30)
+    expect(strays[0].fromThisRepo).toBe(true)
+  })
+
+  it('folds ACROSS an uninteresting process — one dev server was counted as two', () => {
+    const processes = [
+      { pid: 50, ppid: 1, name: 'cmd.exe', cmd: 'cmd.exe /d /s /c "npm run dev -- --port 63336"' },
+      { pid: 51, ppid: 50, name: 'node.exe', cmd: 'node C:\\hoa\\node_modules\\npm\\bin\\npm-cli.js run dev' }, // not classified
+      { pid: 52, ppid: 51, name: 'node.exe', cmd: 'node C:\\hoa\\node_modules\\vite\\bin\\vite.js --port 63336' },
+    ]
+    expect(strayProcesses({ processes, pid: 99 }).map((s) => s.pid)).toEqual([50])
+  })
+
+  it('keeps two INDEPENDENT runs apart — folding must not hide the second one', () => {
+    const processes = [
+      { pid: 40, ppid: 1, name: 'node', cmd: 'node scripts/verify/run-all.mjs' },
+      { pid: 41, ppid: 1, name: 'node', cmd: 'node scripts/verify/run-all.mjs' },
+      { pid: 42, ppid: 40, name: 'node', cmd: 'node node_modules/.bin/vitest run' }, // different kind: stays
+    ]
+    expect(strayProcesses({ processes, pid: 99 }).map((s) => s.pid).sort()).toEqual([40, 41, 42])
   })
 })
 
@@ -277,6 +326,20 @@ describe('formatLoadReport', () => {
     expect(out).toMatch(/FROM THIS CHECKOUT/)
     expect(out).toMatch(/taskkill|kill 4242/)
     expect(out).toMatch(/--on-load=defer/)
+  })
+
+  it('lists ours first and caps the tail instead of printing a process dump', () => {
+    const strays = Array.from({ length: MAX_LISTED_STRAYS + 3 }, (_, i) => ({
+      pid: 100 + i, kind: STRAY_KIND.browser, cmd: 'x'.repeat(300), fromThisRepo: i === MAX_LISTED_STRAYS + 2,
+    }))
+    const load = classifyLoad({ cpuBusyFraction: 0.1, cpuCount: 8, strays })
+    const out = formatLoadReport({ load, decision: decideRun({ suites: ['polish'], level: load.level }) })
+    const listed = out.filter((l) => l.includes('leftover pid'))
+    expect(listed).toHaveLength(MAX_LISTED_STRAYS)
+    expect(listed[0]).toMatch(/FROM THIS CHECKOUT/) // ours is never the one cut off
+    expect(listed[0]).toMatch(/…$/) // the 300-char command line is truncated, not dumped
+    expect(listed[0].length).toBeLessThan(220)
+    expect(out.join('\n')).toMatch(/… and 3 more/)
   })
 
   it('is deterministic — the same input prints the same lines', () => {

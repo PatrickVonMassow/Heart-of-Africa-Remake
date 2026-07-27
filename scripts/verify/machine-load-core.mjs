@@ -169,21 +169,58 @@ export function ownTree({ processes = [], pid }) {
 export function strayProcesses({ processes = [], pid, repoMarker = '' } = {}) {
   const own = ownTree({ processes, pid })
   const marker = String(repoMarker).toLowerCase().replace(/\\/g, '/')
-  const out = []
+  const found = []
   for (const p of processes) {
     if (own.has(Number(p.pid))) continue
     const kind = classifyProcess(p)
     if (!kind) continue
     const cmd = String(p.cmd ?? '').toLowerCase().replace(/\\/g, '/')
-    out.push({
+    found.push({
       pid: Number(p.pid),
+      ppid: Number(p.ppid ?? 0),
       kind,
       name: String(p.name ?? ''),
       cmd: String(p.cmd ?? '').slice(0, 200),
       fromThisRepo: marker.length > 0 && cmd.includes(marker),
     })
   }
-  return out
+  // One line per stray TREE, not per process. A browser is five processes, and a
+  // Windows run is `cmd.exe /c node …` above the node — reported raw, a single
+  // leftover run reads as eight, which turns the report into noise and the
+  // counts into fiction. A child of the same kind is folded into its root, and
+  // the root inherits "from this checkout" from any child, because the outer
+  // `cmd.exe` wrapper carries no path while the node beneath it does.
+  const strayByPid = new Map(found.map((s) => [s.pid, s]))
+  const allByPid = new Map(processes.map((p) => [Number(p.pid), p]))
+  /** The nearest ancestor that is a stray of the SAME kind, or null. The walk
+   *  crosses uninteresting processes in between (`cmd.exe` → `npm` → `vite`),
+   *  which is how one leftover dev server stopped being counted as two. */
+  const sameKindAncestor = (s) => {
+    let cur = allByPid.get(s.ppid)
+    const seen = new Set([s.pid])
+    for (let depth = 0; cur && depth < 16 && !seen.has(Number(cur.pid)); depth++) {
+      seen.add(Number(cur.pid))
+      const asStray = strayByPid.get(Number(cur.pid))
+      if (asStray && asStray.kind === s.kind) return asStray
+      cur = allByPid.get(Number(cur.ppid))
+    }
+    return null
+  }
+  const roots = []
+  for (const s of found) {
+    let root = s
+    const seen = new Set([s.pid])
+    for (let up = sameKindAncestor(root); up && !seen.has(up.pid); up = sameKindAncestor(root)) {
+      seen.add(up.pid)
+      root = up
+    }
+    if (root === s) roots.push(s)
+    else if (s.fromThisRepo) {
+      root.fromThisRepo = true
+      if (marker && !root.cmd.toLowerCase().replace(/\\/g, '/').includes(marker)) root.cmd = s.cmd
+    }
+  }
+  return roots
 }
 
 /**
@@ -353,6 +390,9 @@ export function decideRun({ suites = [], level = LEVEL.unknown, mode = ON_LOAD.f
   }
 }
 
+/** How many leftovers the pre-run report names before it summarises the tail. */
+export const MAX_LISTED_STRAYS = 6
+
 /** The pre-run report: what the probe saw, and what follows from it. */
 export function formatLoadReport({ load, decision, mode = ON_LOAD.flag }) {
   const head = {
@@ -363,9 +403,14 @@ export function formatLoadReport({ load, decision, mode = ON_LOAD.flag }) {
   }[load.level]
   const lines = [`# quiet-machine check (point 296): ${head}`]
   for (const r of load.reasons ?? []) lines.push(`      ${r}`)
-  for (const s of load.strays ?? []) {
-    lines.push(`      leftover pid ${s.pid}: ${strayLabel(s.kind)}${s.fromThisRepo ? ' — FROM THIS CHECKOUT' : ''}  ${s.cmd}`)
+  // Ours first, then the rest, and capped: the report is read at a glance, and
+  // the leftovers a reader can act on are the ones from this checkout.
+  const all = [...(load.strays ?? [])].sort((a, b) => Number(b.fromThisRepo) - Number(a.fromThisRepo))
+  for (const s of all.slice(0, MAX_LISTED_STRAYS)) {
+    const cmd = s.cmd.length > 110 ? `${s.cmd.slice(0, 109)}…` : s.cmd
+    lines.push(`      leftover pid ${s.pid}: ${strayLabel(s.kind)}${s.fromThisRepo ? ' — FROM THIS CHECKOUT' : ''}  ${cmd}`)
   }
+  if (all.length > MAX_LISTED_STRAYS) lines.push(`      … and ${all.length - MAX_LISTED_STRAYS} more`)
   const ours = (load.strays ?? []).filter((s) => s.fromThisRepo)
   if (ours.length) {
     lines.push(
