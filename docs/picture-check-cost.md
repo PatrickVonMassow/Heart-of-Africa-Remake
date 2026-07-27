@@ -72,6 +72,13 @@ a removed check; they are excluded from the totals above and are the reason the
 the *invisible season* of [§4](#4-the-historical-corpus) was accepted on — see
 that row.)
 
+**DO NOT DELETE THEM.** "Stale as suite output" and "worthless" are different
+things: these four are the accepted-state frames for row 5 of the replay corpus,
+so a later phase needs them to show that a cheaper method still catches what the
+current one caught. Tidying them away would quietly remove the evidence the
+whole exercise is measured against. Whoever prunes `verification/` prunes around
+the corpus rows.
+
 Aggregate over all 97 files on disk: **79,171,897 bytes (75.5 MiB), 157,153
 visual tokens**, mean 816,205 bytes per frame.
 
