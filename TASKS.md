@@ -3138,6 +3138,68 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
   rule, already stated for flora, extended to animals) and its evidence section.
 
+- [ ] 379. ABU SIMBEL JOINS THE CULTURAL LANDMARKS (user 27.07.2026). The world carries
+  eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
+  Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
+  and they belong: in 1890 they stood — cleared of sand by Belzoni in 1817 and a fixed
+  point of every Nile journey — at the Nubian reach the traveller passes on the way
+  south, in their ORIGINAL place beside the river (the 1960s relocation is far outside
+  this game's window, so the site sits at the historical coordinates, not the modern
+  ones).
+  BUILD IT AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
+  `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
+  water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
+  a localized name in BOTH language files, a first-sighting journal entry in the §10
+  kind-flavoured shape (both languages, §15 voice markup, once per landmark), the
+  discovery bounty, and the debug-menu jump-to entry in its alphabetical place.
+  THE FRAMING IS THE §4.4 ONE: an African achievement seen by a traveller, not a
+  curiosity. Four colossal seated figures cut from the cliff face, a smaller temple
+  beside them, the river below — the entry says what the traveller SEES and what it
+  meant, in the register the other seven use.
+  RESEARCH BEFORE PLACING: confirm the coordinates and the 1890 state against
+  `docs/peoples-1890.md` (it already mentions the site) and the sources that document
+  the other landmarks; if the research contradicts anything here, the research wins and
+  the point is corrected rather than forced.
+  VERIFIABLE: the existing landmark sweeps in `src/world/world.test.ts` cover it
+  automatically once it is in the data (clearance, no overlap, the label rules); add the
+  i18n completeness case both languages already have, and the first-sighting entry test
+  beside the other landmarks'. One bird's-eye screenshot at in-game zoom showing the
+  site labelled where it belongs on the Nile.
+  DOCS in the same commit: `design.md` §4.4 (the landmark list is design content — this
+  is a genuine addition and pays its measured words), CLAUDE.md §7.1 pt 25 where the
+  eight are enumerated, and the evidence section.
+
+- [ ] 380. THE SURROUNDINGS SHOW THE NEIGHBOUR THAT IS REALLY THERE (user 27.07.2026,
+  reported from the deployed build). Standing at the Giza monument site the traveller
+  does NOT see Cairo on the horizon, while standing in Cairo he does see the pyramids —
+  and in 1890 the two are barely fifteen kilometres apart, in flat desert, in plain
+  view of each other. The asymmetry is the report; the rule it breaks is §2.5, which
+  promises the surroundings panorama of the real map landscape.
+  DIAGNOSE BEFORE BUILDING, because the two directions probably have DIFFERENT causes:
+  the backdrop band (`src/scenes/place/backdrop.ts`) is built from `sampleTerrain`
+  alone — relief, no settlements and no monuments — so it cannot be what shows the
+  pyramids from Cairo; that view is far more likely Cairo's own local dressing. Confirm
+  which mechanism draws each side before deciding where the fix belongs. A fix in the
+  wrong one produces a pyramid that hangs in the sky, which is exactly the class points
+  92/94/181 already paid for.
+  THE TARGET: a settlement or monument that is genuinely within sight distance reads on
+  the horizon from the other, at the right BEARING and the right apparent size, sitting
+  on the ground the backdrop draws (`panoramaStandY`/`discHorizonY`, the point-181
+  footing rule) — never floating, never a black sliver. Sight distance is a
+  calibratable balance value, debug-editable, and the rule is symmetric by construction
+  rather than by two hand-written cases.
+  SCOPE HONESTLY: if the research shows the general case (every neighbouring place
+  within sight) costs far more than the Giza↔Cairo pair the user reported, say so with
+  the measured reason and deliver the general mechanism only if it is affordable —
+  a hard-coded pair is NOT an acceptable substitute, because the next pair reopens it.
+  VERIFIABLE: pure Vitest on the bearing/size/footing computation for a neighbour at a
+  given distance (present within sight, absent beyond it, correct bearing on both
+  sides — the symmetry pinned as a property, not as two examples); plus one Playwright
+  frame from each side, judged by PROJECTING the neighbour into the picture per §7.2,
+  never by an assumed radius.
+  DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
+  and CLAUDE.md §7.1 pt 31 with its evidence section.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
