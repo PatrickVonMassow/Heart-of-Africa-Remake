@@ -3643,6 +3643,12 @@ describe("a juvenile's bond to its parent RESOLVES, never hangs (design.md §19.
     while (calf.parent === parent) familyFrame(herd, 0.5)
     expect(calf.parent).toBeUndefined() // roams on as an ordinary juvenile
     expect(parent.child).toBeUndefined()
+    // From the NEXT frame on it is an ordinary candidate again, so a pair that
+    // merely drifted apart re-forms — with a fresh window, not a stale clock.
+    familyFrame(herd, 0.5)
+    expect(calf.parent).toBe(parent)
+    expect(parent.child).toBe(calf)
+    expect(calf.separated).toBeUndefined()
   })
 
   it('with no eligible adult the resolved calf ends PARENTLESS, never bonded to a ghost', () => {

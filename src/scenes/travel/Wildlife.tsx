@@ -2641,7 +2641,12 @@ function Herds() {
     // short flight resets it) and freezes inside a running §19.8 ending, whose
     // own deadline resolves first. The just-released parent is barred from that
     // frame's adoption, so the calf is not handed back to the very adult it
-    // spent the whole window failing to reach.
+    // spent the whole window failing to reach — from the NEXT frame on it is an
+    // ordinary candidate again, so a pair that merely drifted apart re-forms.
+    // Predator cubs stay out of BOTH passes (as before): they can never be
+    // adopted, so releasing a cub from a living lioness — one long hunt away
+    // from its side — would end that pairing for good. Their phantom case is
+    // already covered by the cull severing the pair above.
     {
       const ADOPTION_RADIUS = balance.family.adoptionRadius
       const FOLLOW_RADIUS = balance.family.followRadius
