@@ -3043,7 +3043,10 @@ read that as "the criterion and its evidence section".
   THE WEEK VIEW REFINES WHERE THE COST SITS, and it is the figure that decides the
   order of work: over 7 days the same three characteristics read 99 % / 96 % / 87 %,
   but the per-type shares — general-purpose 25 %, claude 3 %, workflow-subagent 2 % —
-  put ALL subagents at ~30 % of the usage, which leaves ~70 % with the MAIN session.
+  put the LISTED subagents at ≤ ~30 % of the usage, which leaves ~70 % with the MAIN
+  session. (Treat the 30 % as a lower-bound-style estimate: the panel neither states
+  that it lists every agent type nor that the shares denominate total usage. The
+  direction — the main session dominates — is what carries the ordering, not the digit.)
   (The panel calls the first three "independent characteristics of your usage, not a
   breakdown"; the per-type shares are the only additive numbers, and both views are
   local-session approximations.) So "subagent-heavy" describes the SESSIONS, not where
@@ -3056,51 +3059,144 @@ read that as "the criterion and its evidence section".
   be re-derived as a saving. The cost sits in the SIZE of each fill, in the fills
   that repeat, and in turns spent on nothing.
   (A) BRIEF INSTEAD OF READING ASSIGNMENT. A delegated agent today orients by
-  reading whole documents — up to ~120k tokens (CLAUDE.md + TASKS.md + design.md)
-  before it sees a line of source, uncached, per agent. Build
-  `scripts/point-brief.mjs <N>`: it reads the point through `readTasksAll`
+  reading whole documents before it sees a line of source, uncached, per agent.
+  ~105k of that is addressable (TASKS.md ~59k + design.md ~46k); CLAUDE.md's ~16k is
+  NOT — the harness injects it into every subagent context, so no brief can save it.
+  Build `scripts/point-brief.mjs <N>`: it reads the point through `readTasksAll`
   (`scripts/tasks-source.mjs`), resolves the design.md sections the spec references,
   and prints ONE ready brief. The delegation prompt then carries that brief and
   instructs the agent NOT to open TASKS.md or design.md wholesale. Record the
   measured before/after token count for one real point.
-  (B) CONTEXT BOUNDARY PER POINT. 94 % of the usage sat above 150k context because
-  the main session carries point after point in one window. CONSTRAINT: the session
-  cannot clear itself — `/clear` is the user's command. So the mechanism is the
-  existing resume machinery: the batch loop treats a point boundary as a session
-  boundary and lets `batch-resume-hook` re-orient a fresh session (it already
-  re-injects the open points and the batch state). Where a boundary is reached in an
-  ATTENDED session, ask the user for `/clear` rather than carrying on silently.
-  Measure the per-request input size before and after on one point.
-  (C) TASKS.md INTO THE DOC BUDGET. `scripts/doc-budget-core.mjs` budgets CLAUDE.md,
-  design.md and the work order's PREAMBLE — not the ~59k body of open points, which
-  is read whenever a point is looked up. Give the open body a measured ceiling with
-  the same two honest ways out (move it out, or raise the ceiling with a written
-  justification). This is the §3.29/§3.30 cost curve at its third document.
+  THE BRIEF MUST NOT STARVE ITS READER — a smaller context that costs a rebuild is no
+  saving. So: a DANGLING reference fails the brief LOUDLY (a design.md section the
+  spec names but the document no longer has, e.g. after a renumbering, must error, not
+  be silently omitted); cross-point references inside a spec ("per point 288 …", common
+  in this queue) are resolved into the brief as well; the agent is told it MAY read a
+  NAMED section on demand — the ban is on wholesale reads, not on targeted lookups —
+  and it must ESCALATE rather than guess when the brief proves insufficient.
+  (B) CONTEXT BOUNDARY PER POINT — ATTENDED SESSIONS, AND CONDITIONAL. 87–94 % of the
+  usage sat above 150k context because the main session carries point after point in
+  one window. CONSTRAINT: the session cannot clear itself — `/clear` is the user's
+  command, exposed by no tool. SCOPE: at a point boundary in an ATTENDED session, ask
+  the user for `/clear` rather than carrying on silently; `batch-resume-hook` already
+  re-injects the open points and the batch state on the SessionStart that follows, so
+  a cleared session re-orients itself.
+  CONDITIONAL, not per point: a fresh session re-pays CLAUDE.md, the system prompt and
+  the re-orientation uncached, so recycling a 60k context can cost MORE than carrying
+  it. Trigger the ask above a MEASURED context size (the >150k figure above is the
+  candidate threshold — measure it, do not assume it).
+  THE AUTONOMOUS VARIANT IS NOT PART OF THIS POINT and must not be built into it: an
+  unattended batch session that ends at a boundary has nothing to start its successor
+  (`HoA-Batch-Autostart` is verifiably Disabled — containment after the e9407cae
+  double-session incident), and `batch-progress-guard` BLOCKS the turn end precisely
+  to stop a batch session from ending while open points remain. Closing that gap means
+  either re-enabling the launcher (reversing a containment decision) or letting a live
+  session spawn its successor (guaranteeing two live sessions for a window — the
+  incident class itself). Both are the USER's call; a card in the dashboard's "Von dir
+  zu klären" holds the question, and neither is implemented without an explicit go.
+  (C) THE OPEN WORK-ORDER BODY STAYS UNBUDGETED — recorded here so it is not proposed
+  again. `scripts/doc-budget-core.mjs` deliberately budgets CLAUDE.md, design.md and
+  the work order's PREAMBLE only, on its own written rationale: the POINTS are
+  legitimate growth, and a whole-file ceiling would punish appending work. That
+  rationale still holds, and the escape valves a budget needs do not exist for this
+  half — an OPEN point cannot move to the archive (`tasks-archive-guard` blocks it) and
+  thinning a spec collides with the implementation-ready-final-state mandate, so the
+  only ever-available way out would be raising the ceiling, which is the failure the
+  budget mechanism itself warns against. (A) removes the reason anyway: once the brief
+  is the lookup path, the body's size no longer enters a context. The acceptance test
+  is therefore behavioural, not numeric — see VERIFIABLE.
   (D) NO GUARD BLOCK-LOOPS. A guard that blocks costs a whole turn at full context;
   the render-verify loop on point 278 cost ~30 such turns for one process mistake.
   Build `scripts/guard-preflight.mjs`, which runs the relevant pure guard cores in
   read-only "would this block?" mode BEFORE the action they govern (merge, tick,
   turn end) and names what would block. Cost: one cheap process run instead of N
-  blocked turns.
+  blocked turns. THE DRIFT RISK IS THE INPUT GATHERING, NOT THE CORES: the cores are
+  pure and importable, but each wrapper does its own I/O (git state, session id,
+  dashboard state). The preflight must therefore call each wrapper's gather step and
+  the core's decide step — never a reimplementation of the gathering, which would
+  drift and return a false "clean". Each wrapper exports its gather step for that
+  purpose. The preflight is ADVISORY: state can change between it and the action, so
+  the guard itself stays the authority.
   (E) THE MODEL POLICY STANDS. The usage panel advises "a cheaper model for simpler
-  subagents". REJECTED, and recorded as rejected so it is not revisited as a saving:
-  the 24.07.2026 silent degradation to Haiku 4.5 wrecked three deliveries in 14
-  minutes, and rebuilding them cost more than the tokens saved. The §6 allowlist
-  (Opus 5 worker · Fable 5 four-eyes/fallback · Opus 4.8 last fallback) is unchanged
-  by this point.
-  VERIFIABLE: pure Vitest — `point-brief.mjs` extracts the right point for an open
-  AND an archived number, resolves every design.md section its spec names, fails
-  loudly on an unknown number, and its output stays under a measured ceiling;
-  `doc-budget-core` enforces the new open-body budget (a synthetic over-budget file
-  fails, an under-budget one passes); `guard-preflight` reports a state a guard
-  would block on WITHOUT the guard running, and reports clean on a good state. No
-  browser suite — nothing here renders.
-  DOCS in the same commit: CLAUDE.md §6 (the delegation brief, the context boundary,
-  the rejected cheap-model option) and the measured before/after figures beside the
-  levers. The analysis documents already carry this problem class
-  (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.31 and the beginner's
-  guide's quota pitfall, both written 26.07.2026); extend them only if the
-  implementation changes the conclusion.
+  subagents". REJECTED — recorded so it is not revisited as a saving. The ground is
+  the DECISION of 25.07.2026 (CLAUDE.md §6: Opus 5 worker · Fable 5 four-eyes/fallback
+  · Opus 4.8 last fallback), which this point leaves untouched. Note for anyone
+  re-reading the history: the 24.07.2026 Haiku wreck is evidence for the allowlist's
+  ENFORCEMENT (a weak model must never hold the worker role unnoticed), not a refutation
+  of the panel's proposal, which is about deliberately configuring read-only helpers.
+  The allowlist stands on the decision, not on that incident.
+  VERIFIABLE: pure Vitest — `point-brief.mjs` extracts the right point for an open AND
+  an archived number, resolves every design.md section its spec names, resolves a
+  cross-point reference, FAILS LOUDLY on an unknown point number and on a design.md
+  section the document no longer contains, and its output stays under a measured
+  ceiling; `guard-preflight` reports a state a guard would block on WITHOUT the guard
+  running, reports clean on a good state, and shares its input gathering with the
+  wrapper (a test that pins gather-step reuse, so a reimplementation fails). No browser
+  suite — nothing here renders.
+  MEASURE BOTH SIDES, NOT ONLY TOKENS. Every figure above is a cost figure, and the
+  premise underneath them — "a brief-fed, freshly cleared context delivers as well as a
+  carried one" — is exactly the kind of unexamined assumption §3.27 was about. So the
+  first three points delivered under the brief record their REWORK as well: how often
+  an agent had to escalate for missing context, and whether anything had to be rebuilt.
+  A saving that raises the rebuild rate is not a saving.
+  DOCS in the same commit: CLAUDE.md §6 (the delegation brief, the attended context
+  boundary, the rejected cheap-model option) and the measured before/after figures
+  beside the levers. The analysis documents already carry this problem class
+  (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.31 and the beginner's guide's
+  quota pitfall, both written 26.07.2026); extend them only if the implementation
+  changes the conclusion. The guide's parenthetical on the cheaper model is rewritten
+  to the actual lesson — a weak model must never hold the worker role unnoticed —
+  rather than citing the incident as a refutation.
+  FOUR EYES: done 27.07.2026 (Fable 5 reviewed the Opus 5 spec, verdict
+  GREEN-WITH-CONDITIONS); the conditions are folded into the text above. The
+  IMPLEMENTATION is reviewed the same way before it merges.
+
+- [ ] 366. THE BOARD IS CURRENT BEFORE THE WORK STARTS, NOT AFTER IT ENDS (user
+  27.07.2026). The user watches the published board to see what is happening RIGHT
+  NOW, and today it can lag a long turn: on 27.07.2026 the "Woran ich gerade arbeite"
+  card still read "Pausiert — Wochenkontingent erschöpft" while a review agent and a
+  branch cleanup were already running, and the user had to say so twice.
+  WHY THE EXISTING MECHANISM DOES NOT COVER THIS: every board enforcer in
+  `.claude/settings.json` is a STOP hook — `dashboard-guard`,
+  `dashboard-integrity-guard`, `dashboard-conciseness-guard`,
+  `dashboard-card-topic-guard` and the focus review all fire when the turn ENDS. They
+  guarantee the board is honest by the time the turn is over; they say nothing about
+  the hour in between, which is exactly the window the user reads. The gap is
+  structural, not a lapse of discipline — so it gets a mechanism, per the project's
+  own "enforce, don't remind" principle.
+  THE MECHANISM: a PreToolUse gate (`scripts/board-first-guard.mjs`, pure core in
+  `scripts/board-first-core.mjs`) that DENIES the FIRST state-changing tool call of a
+  turn while the board does not yet describe the work that is starting. State-changing
+  means Edit/Write/NotebookEdit, an Agent launch, and a Bash/PowerShell call that
+  mutates (git commit/merge/push, rm, npm run …); the decision core classifies it.
+  THE CONDITION, and it must be mechanically checkable: `UserPromptSubmit` already runs
+  a hook chain, so it stamps `turnStartedAt` into the dashboard state; the gate then
+  requires (i) a `focus set|confirm` recorded AFTER that stamp and (ii) the published
+  hash equal to the repo file's hash (the invariant `dashboard-publish` already
+  maintains). Both are already-recorded facts — the gate reads state, it does not judge
+  prose.
+  THE ESCAPE PATH IS PART OF THE DESIGN, not an afterthought: a gate that can trap the
+  session is worse than the staleness it fixes (point 365 (D) prices a block-loop at
+  ~30 turns). So the gate NEVER denies the tools needed to satisfy it — reads of any
+  kind, `scripts/focus.mjs`, `scripts/dashboard-publish.mjs`, `dashboard-guard
+  --synced`, an edit of the dashboard file itself — and it is fail-OPEN like every
+  other guard here: an internal error allows the call. It also denies at most once per
+  turn: after the first denial it records that it fired, so a session that ignores it
+  cannot be locked out of working entirely — the Stop chain still catches the end state.
+  ANCHORS: `.claude/settings.json` (the hook registration — a protected path, so this
+  point is attended-only), `scripts/dashboard-state.mjs` (where the stamps live),
+  `scripts/focus.mjs`, `scripts/dashboard-guard.mjs`, and the existing pure-core +
+  fail-open pattern of any `scripts/*-core.mjs`.
+  VERIFIABLE: pure Vitest on the core — a mutating call before any focus stamp DENIES;
+  the same call after a focus stamp newer than `turnStartedAt` ALLOWS; a read-only call
+  always allows; each escape-path command allows even in the denying state; a second
+  mutating call in the same turn allows after the gate has fired once; an unparseable
+  or missing state file ALLOWS (fail-open). Plus a `guard-health` entry so the new
+  enforcer cannot sit in the tree uninvoked.
+  FOUR EYES: a guard is high-criticality (model-diverse-by-criticality), so the second
+  model reviews plan AND result before it goes live.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain list gains its first
+  PreToolUse board gate) and the retrospective's guard table.
 
 ## Closing (only after all points)
 
