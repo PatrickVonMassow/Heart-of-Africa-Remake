@@ -178,7 +178,8 @@ let changedFilesCache = null
 function changedFiles() {
   if (changedFilesCache) return changedFilesCache
   const root = join(HERE, '..', '..')
-  const base = spawnSync('git', ['merge-base', 'HEAD', 'main'], { cwd: root, encoding: 'utf8' })
+  let base = spawnSync('git', ['merge-base', 'HEAD', 'main'], { cwd: root, encoding: 'utf8' })
+  if (base.status !== 0) base = spawnSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' })
   if (base.status !== 0) return (changedFilesCache = [])
   const diff = spawnSync('git', ['diff', '--name-only', base.stdout.trim(), '--'], { cwd: root, encoding: 'utf8' })
   changedFilesCache = diff.status === 0 ? diff.stdout.split('\n').map((l) => l.trim()).filter(Boolean) : []
@@ -197,6 +198,13 @@ function classifyAgainstBaselineRuns() {
   for (const { suite, failed } of redSuites) {
     if (!DEV_SUITES.includes(suite)) {
       console.log(`SKIP  ${suite} — no baseline lane for it (it is not one of the dev suites).`)
+      continue
+    }
+    if (failed.length === 0) {
+      // A crash or a wall-timeout kill left no check names. Classifying would
+      // mean running the suite again from scratch on BOTH sides — expensive and
+      // pointless while the crash itself is the finding.
+      console.log(`SKIP  ${suite} — it produced no check names (crash or timeout kill); read its output first.`)
       continue
     }
     const args = [join(HERE, 'baseline-classify.mjs'), suite]

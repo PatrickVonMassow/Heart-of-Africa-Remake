@@ -87,7 +87,7 @@ export function consoleErrorChecks(output) {
   const seen = new Set()
   const out = []
   for (const t of texts) {
-    const name = `console error: ${normaliseErrorText(t)}`
+    const name = `${CONSOLE_PREFIX} ${normaliseErrorText(t)}`
     const key = checkKey(name)
     if (seen.has(key)) continue
     seen.add(key)
@@ -109,6 +109,25 @@ export function normaliseErrorText(text) {
 /** The comparison identity of a check label (see parseCheckLines). */
 export function checkKey(name) {
   return String(name).replace(/\s+/g, ' ').trim().toLowerCase().replace(/\d+(?:[.,]\d+)?/g, '#')
+}
+
+/** The prefix a console pseudo-check carries — the one thing that survives when
+ *  a check travels between processes as a bare NAME (run-all hands the failing
+ *  names to the classifier wrapper on its command line). */
+const CONSOLE_PREFIX = 'console error:'
+
+/** A check rebuilt from its NAME alone, keeping its kind. Used wherever a name
+ *  crosses a process boundary — without it a console pseudo-check would come
+ *  back as an ordinary check and lose its "absent means it did not happen" rule. */
+export function checkFromName(name) {
+  const label = String(name ?? '').trim()
+  return {
+    status: 'FAIL',
+    name: label,
+    key: checkKey(label),
+    detail: '',
+    kind: label.toLowerCase().startsWith(CONSOLE_PREFIX) ? 'console' : 'check',
+  }
 }
 
 /** The failing checks of one output (console errors included as pseudo-checks),
@@ -150,10 +169,10 @@ const byKey = (list) => new Map(list.map((c) => [c.key, c]))
  *                     caused it — that is what the baseline comparison decides.
  *   load-signature  — both runs failed, but at DISJOINT checks. The load
  *                     fingerprint; not evidence of a defect.
- *   unknown         — a run failed without a parseable FAIL line (a crash, a
- *                     wall-timeout kill, a console-error-only red). Nothing can
- *                     be concluded from names that do not exist, so say so
- *                     rather than guess.
+ *   unknown         — a run failed without a parseable FAIL line: a crash or a
+ *                     wall-timeout kill (a console-error-only red HAS names —
+ *                     see consoleErrorChecks). Nothing can be concluded from
+ *                     names that do not exist, so say so rather than guess.
  *
  * `firstFailed`/`secondFailed` are the raw suite outputs (strings) or already
  * parsed check lists; `secondRan`/`secondOk` describe the retry when no output
@@ -175,13 +194,14 @@ export function repeatSignature({ first, second, secondRan = true, secondOk = fa
     }
   }
   if (a.length === 0 || b.length === 0) {
-    const which = a.length === 0 && b.length === 0 ? 'neither run' : a.length === 0 ? 'run 1' : 'run 2'
+    const both = a.length === 0 && b.length === 0
+    const which = both ? 'neither run' : a.length === 0 ? 'run 1' : 'run 2'
     return {
       verdict: 'unknown',
       stable: [],
       onlyFirst: a,
       onlySecond: b,
-      headline: `${which} printed a FAIL line — a crash, a wall-timeout or a console-error-only red; read the output`,
+      headline: `${which} printed ${both ? 'a' : 'no'} FAIL line at all — a crash or a wall-timeout kill; read the output`,
     }
   }
   const mapB = byKey(b)
@@ -244,7 +264,7 @@ function words(text) {
  * "no changed-file list", and a false is not innocence.
  */
 export function changeRelatedness({ checks, changedFiles }) {
-  const list = (checks ?? []).map((c) => (typeof c === 'string' ? { name: c, key: checkKey(c) } : c))
+  const list = (checks ?? []).map((c) => (typeof c === 'string' ? checkFromName(c) : c))
   if (!changedFiles || changedFiles.length === 0) {
     return list.map((c) => ({ check: c.name, key: c.key, related: null, tokens: [] }))
   }
@@ -278,7 +298,7 @@ export function changeRelatedness({ checks, changedFiles }) {
  * its ABSENCE on a baseline that ran at all means the error did not occur there.
  */
 export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselineChecks, baselineFlaky = [] }) {
-  const failedNow = (currentFailed ?? []).map((c) => (typeof c === 'string' ? { name: c, key: checkKey(c), kind: 'check' } : c))
+  const failedNow = (currentFailed ?? []).map((c) => (typeof c === 'string' ? checkFromName(c) : c))
   const keys = (list) => new Set((list ?? []).map((c) => (typeof c === 'string' ? checkKey(c) : c.key)))
   const baseFailKeys = keys(baselineFailed)
   const baseSeenKeys = keys(baselineChecks)

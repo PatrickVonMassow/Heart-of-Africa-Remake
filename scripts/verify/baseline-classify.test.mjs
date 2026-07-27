@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   allChecks,
   changeRelatedness,
+  checkFromName,
   checkKey,
   classifyAgainstBaseline,
   consoleErrorChecks,
@@ -17,6 +18,7 @@ import {
   parseCheckLines,
   repeatSignature,
 } from './baseline-classify-core.mjs'
+import { parseWrapperArgs } from './baseline-classify.mjs'
 
 // The live 27.07.2026 case: enrichments failed twice at DIFFERENT checks.
 const RUN_1 = [
@@ -106,7 +108,10 @@ describe('the repeat signature of two runs', () => {
   it('refuses a verdict when a run printed no FAIL line at all (crash, timeout kill)', () => {
     const crash = repeatSignature({ first: RUN_1, second: 'Error: page.evaluate: Target closed' })
     expect(crash.verdict).toBe('unknown')
-    expect(crash.headline).toMatch(/run 2/)
+    // The headline must say which run went silent, and say it the right way
+    // round — it is the sentence a human reads when nothing else is readable.
+    expect(crash.headline).toBe('run 2 printed no FAIL line at all — a crash or a wall-timeout kill; read the output')
+    expect(repeatSignature({ first: 'boom', second: 'boom' }).headline).toMatch(/^neither run printed a FAIL line at all/)
     expect(repeatSignature({ first: RUN_1, second: '', secondRan: false }).verdict).toBe('unknown')
   })
 })
@@ -151,6 +156,27 @@ describe('console errors as pseudo-checks (world and i18n print no FAIL line)', 
 
   it('can be switched off for a caller that only wants the printed checks', () => {
     expect(failedChecks(OUT, { includeConsoleErrors: false })).toEqual([])
+  })
+
+  it('keeps its kind when the check travels as a bare NAME between processes', () => {
+    // run-all hands the failing checks to the classifier wrapper on the command
+    // line; without the kind, the "absent on baseline means it did not happen"
+    // rule would silently stop applying to the console-gated suites.
+    const name = consoleErrorChecks(OUT)[1].name
+    expect(checkFromName(name)).toMatchObject({ kind: 'console', key: checkKey(name) })
+    expect(checkFromName('the map opens').kind).toBe('check')
+    // A name carrying an em dash keeps it — it is a name, not a printed line.
+    expect(checkFromName('a check — with a dash').name).toBe('a check — with a dash')
+  })
+
+  it('classifies a console error handed over as a bare name as a real regression', () => {
+    const baseline = 'PASS  the map draws'
+    const classified = classifyAgainstBaseline({
+      currentFailed: [consoleErrorChecks(OUT)[1].name],
+      baselineFailed: failedChecks(baseline),
+      baselineChecks: allChecks(baseline),
+    })
+    expect(classified[0].verdict).toBe('real-regression')
   })
 })
 
@@ -226,6 +252,23 @@ describe('classifying against the baseline', () => {
       baselineChecks: ['the ground edge is dark'],
     })
     expect(classified[0].verdict).toBe('pre-existing')
+  })
+})
+
+describe('the wrapper CLI', () => {
+  it('reads the suite, the flags and their values, with the safe defaults', () => {
+    const a = parseWrapperArgs(['enrichments', '--ref', 'HEAD~1', '--runs', '3', '--failed', 'a herd gathers', '--strict'])
+    expect(a).toMatchObject({ suite: 'enrichments', ref: 'HEAD~1', runs: 3, strict: true, keep: false })
+    expect(a.failed).toEqual(['a herd gathers'])
+    // Two baseline passes by default — one is as flake-prone as the run being triaged.
+    expect(parseWrapperArgs(['polish'])).toMatchObject({ suite: 'polish', ref: null, runs: 2, strict: false })
+  })
+
+  it('never takes a flag value for the suite name, and takes repeated --failed', () => {
+    const a = parseWrapperArgs(['--ref', 'main', 'world', '--failed', 'one', '--failed', 'two'])
+    expect(a.suite).toBe('world')
+    expect(a.failed).toEqual(['one', 'two'])
+    expect(parseWrapperArgs(['--runs', '0', 'world']).runs).toBe(1)
   })
 })
 

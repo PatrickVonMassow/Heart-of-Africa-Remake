@@ -15,15 +15,15 @@
 //                       as the run being triaged, and BOTH wrong readings hurt)
 //   --failed "<check>"  the check(s) red now (repeatable); default: run the
 //                       suite in THIS tree first and take its failures
-//   --current-out <f>   a file holding the failing run's output (what run-all
-//                       passes, so the suite is not run a third time)
+//   --current-out <f>   a file holding the failing run's output, as an
+//                       alternative to naming each check with --failed
 //   --keep              keep the baseline worktree even on success (it is reused
 //                       anyway; this only skips the retention prune)
 //   --strict            exit 1 when a REAL REGRESSION was found (default: 0 —
 //                       this is a triage aid, the suite result stays the gate)
 //
 // Cost discipline (the point's DESIGN care): this is never part of a normal
-// run. run-all calls it only for a suite that failed TWICE and only with
+// run. run-all calls it only for a suite that stayed RED and only with
 // --baseline / VERIFY_BASELINE=1, and the baseline checkout is a REUSED git
 // worktree under the git-ignored local/verify-baseline/, sharing the repo's
 // node_modules through Node's ancestor resolution (no second install).
@@ -39,6 +39,7 @@ import { killTree, launchServer } from './_server.mjs'
 import { DEV_SUITES, SERVERLESS_SUITES, selectBackend } from './tiers.mjs'
 import {
   allChecks,
+  checkFromName,
   classifyAgainstBaseline,
   failedChecks,
   foldBaselineRuns,
@@ -114,12 +115,21 @@ function prepareBaselineTree(sha) {
     return { dir, base, mainRoot }
   }
   git(['worktree', 'prune'], mainRoot)
-  if (existsSync(dir)) rmSync(dir, { recursive: true, force: true })
+  if (existsSync(dir)) {
+    // Present but not a checkout: either a leftover, or ANOTHER run checking out
+    // this very sha right now. Deleting it could pull the rug from under that
+    // run, so say what to do rather than destroy somebody else's tree.
+    throw new Error(`${dir} exists but is not a checkout — another classification may be preparing it; retry, or remove it by hand`)
+  }
   const res = spawnSync('git', ['worktree', 'add', '--detach', dir, sha], { cwd: mainRoot, encoding: 'utf8' })
   if (res.status !== 0) throw new Error(`git worktree add failed: ${(res.stderr ?? '').trim()}`)
   console.log(`# baseline checkout ${dir}`)
   return { dir, base, mainRoot }
 }
+
+/** A checkout younger than this is left alone even when it is over the
+ *  retention count — a parallel classification may be serving from it. */
+const PRUNE_MIN_AGE_MS = 2 * 60 * 60 * 1000
 
 /** Keep only the newest KEEP_BASELINES checkouts; a full tree each. */
 function pruneOldBaselines({ base, mainRoot, keepDir }) {
@@ -131,7 +141,7 @@ function pruneOldBaselines({ base, mainRoot, keepDir }) {
   }
   entries.sort((a, b) => b.t - a.t)
   for (const e of entries.slice(KEEP_BASELINES)) {
-    if (e.dir === keepDir) continue
+    if (e.dir === keepDir || Date.now() - e.t < PRUNE_MIN_AGE_MS) continue
     spawnSync('git', ['worktree', 'remove', '--force', e.dir], { cwd: mainRoot, encoding: 'utf8' })
     if (existsSync(e.dir)) rmSync(e.dir, { recursive: true, force: true })
   }
@@ -182,7 +192,7 @@ async function main() {
 
   // What is red NOW: handed in by run-all (its captured output or the names), or
   // measured here by running the suite in THIS tree.
-  let currentFailed = opts.failed.map((name) => ({ name, key: null, kind: 'check' }))
+  let currentFailed = opts.failed.map(checkFromName)
   if (opts.currentOut && existsSync(opts.currentOut)) currentFailed = failedChecks(readFileSync(opts.currentOut, 'utf8'))
   if (currentFailed.length === 0) {
     let server
@@ -204,8 +214,6 @@ async function main() {
     console.log('baseline-classify: nothing is failing in this tree — nothing to classify.')
     process.exit(0)
   }
-  // Re-key the names handed in as bare strings.
-  currentFailed = currentFailed.map((c) => (c.key ? c : failedChecks(`FAIL  ${c.name}`)[0] ?? c))
 
   const outputs = []
   let server
@@ -238,8 +246,8 @@ async function main() {
         baselineFlaky: folded.flaky,
       })
     : []
-  const suiteFileChanged = Boolean(git(['diff', '--name-only', baseline.sha, 'HEAD', '--', `scripts/verify/${opts.suite}.mjs`]))
-  const infraChanged = (git(['diff', '--name-only', baseline.sha, 'HEAD', '--', ...INFRA_PATHS]) ?? '').split('\n').filter(Boolean)
+  const suiteFileChanged = Boolean(git(['diff', '--name-only', baseline.sha, '--', `scripts/verify/${opts.suite}.mjs`]))
+  const infraChanged = (git(['diff', '--name-only', baseline.sha, '--', ...INFRA_PATHS]) ?? '').split('\n').filter(Boolean)
   for (const line of formatBaselineReport({
     suite: opts.suite,
     ref: `${baseline.sha.slice(0, 12)} (${baseline.ref})`,
