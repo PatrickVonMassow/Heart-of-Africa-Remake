@@ -3235,6 +3235,43 @@ read that as "the criterion and its evidence section".
   written justification), CLAUDE.md §4 if a moved block changes where a thing lives, and
   the retrospective only if the run produces a NEW lesson rather than confirming §3.30.
 
+- [ ] 368. THE ANALYSIS DOCUMENTS HOLD EVERY LESSON ONCE, AND NO SUPERSEDED ONE (user
+  27.07.2026, after point 318). Audit `docs/analysis_de/` — the retrospective and the
+  beginner's guide — on three axes, and deliver the result as a table before changing
+  anything: (1) COMPLETE — is every lesson the recent work produced actually written
+  down? (2) NON-REDUNDANT — is any lesson told twice, in two sections or across the two
+  documents, where one place would do? (3) CURRENT — does any older lesson CONTRADICT a
+  newer one or stand superseded by it? A superseded lesson is not deleted silently: it
+  is rewritten to state the current rule, with the correction visible where the history
+  matters (that is what §3.27 → §3.31 already models — the newer section attacked the
+  older one's PREMISE and said so, instead of quietly replacing it).
+  THE LESSONS THIS SESSION PRODUCED, to check against the documents (the audit looks for
+  more; this list is the known minimum):
+  · An agent told to work "read-only" still CHECKED OUT a branch in the shared working
+    tree, and the main session then did the same to its own running test suite. The
+    lesson is not "be careful" — isolation is a property of the ENVIRONMENT (a worktree
+    per running job), never of an instruction in a prompt.
+  · A live check that hard-codes ONE language's wording fails on correct behaviour: the
+    English suite was asserted against a German placeholder. Assert against the source of
+    truth (the language files), never a literal string.
+  · The work order writes `§` for FOUR different documents. A tool that guesses can feed
+    an agent a silently WRONG section — the loud failure is the harmless case, the silent
+    substitution is the dangerous one.
+  · Broadening a catch turned fail-open-ONCE into fail-open-FOREVER (a gather error
+    re-baselined a pending render gate). When refactoring an error path, preserve WHICH
+    error is allowed to write state.
+  METHOD, and it is the settled one (§3.30): move or rewrite, do not re-tell; cut at the
+  sentence; and after any move find every reader of the old place. The guide additionally
+  obeys `guide-brevity-core.mjs` — a new tip raises the budget by its MEASURED size, a
+  longer telling of something already there does not.
+  VERIFIABLE: `node scripts/retro-refresh.mjs` runs clean and the guide audit passes;
+  every problem class in the retrospective's table has its prose paragraph and vice
+  versa; no two paragraphs state the same rule as their own conclusion; the audit table
+  is delivered in the commit message or beside the diff so the judgement is reviewable.
+  FOUR EYES: the second model reads the finished documents for a lesson that is now
+  stated twice or that contradicts another — this is a coherence question, and coherence
+  is exactly what an author cannot see in their own text.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
