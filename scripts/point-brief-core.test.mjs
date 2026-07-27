@@ -18,6 +18,7 @@ import {
   BriefError,
   BRIEF_TOKEN_CEILING,
   DOC_WINDOW,
+  acceptanceCriteriaFrom,
   aliasesFor,
   assembleBrief,
   buildBrief,
@@ -90,6 +91,12 @@ const CLAUDE = [
   '### 7.1 Acceptance Criteria',
   'The criteria.',
   '',
+  '1. **Build/start.** It builds.',
+  '22. **Health and afflictions.** The health system is implemented.',
+  '',
+  '### 7.2 Self-Verification',
+  'The procedure.',
+  '',
   '## 8. Outside This Run',
   'Not in scope.',
 ].join('\n')
@@ -124,6 +131,11 @@ const DOCS = [
   { path: 'docs/peoples-1890.md', text: PEOPLES },
   { path: 'docs/fauna-behaviour-1890.md', text: FAUNA },
 ]
+
+/** A work order that also holds a point 22 — the §22 / criterion-22 collision. */
+const ALL_WITH_22 = `${ALL}\n\n- [x] 22. AN ARCHIVED POINT about the ocean at full zoom-out.`
+
+const args = { tasksText: ALL, designText: DESIGN, claudeText: CLAUDE, docs: DOCS }
 
 const REGISTRY = buildDocRegistry({ designText: DESIGN, claudeText: CLAUDE, docs: DOCS })
 const resolveIn = (spec, opts) => resolveSectionRefs(spec, REGISTRY, opts).refs
@@ -330,6 +342,78 @@ describe('resolveSectionRefs — which document a § belongs to', () => {
   })
 })
 
+describe('the ambiguity the cascade cannot resolve (fix 1)', () => {
+  it('keeps every OTHER candidate that holds the same id', () => {
+    // design.md §8 and CLAUDE.md §8 both exist; peoples-1890 §8 too, and it is
+    // named in the spec. The winner is a cascade decision, so the losers must
+    // survive it — otherwise the map states a guess as a fact.
+    const [ref] = resolveIn('peoples-1890 §8 is the record')
+    expect(ref.docPath).toBe('docs/peoples-1890.md')
+    expect(ref.alsoIn.map((a) => a.docPath).sort()).toEqual(['CLAUDE.md', 'design.md'])
+  })
+
+  it('leaves alsoIn empty when the winner is the ONLY document holding the id', () => {
+    expect(resolveIn('§4.2 applies')[0].alsoIn).toEqual([])
+  })
+
+  it('does NOT count a document the spec never named and that is no default', () => {
+    // fauna-behaviour-1890 has §B2.1 but is unnamed here, so it is no candidate
+    // and no alternative reading — listing it would be noise, not honesty.
+    const [ref] = resolveIn('peoples-1890 §3.1 is the finding')
+    expect(ref.alsoIn).toEqual([])
+  })
+
+  it('flags BOTH sides when ONE id wins for TWO documents inside one spec', () => {
+    const refs = resolveIn('the research docs (peoples-1890 §8) and the rule in CLAUDE.md §8')
+    const peoples = refs.find((r) => r.docPath === 'docs/peoples-1890.md')
+    const claude = refs.find((r) => r.docPath === 'CLAUDE.md')
+    expect(peoples.alsoIn.map((a) => a.docPath)).toContain('CLAUDE.md')
+    expect(claude.alsoIn.map((a) => a.docPath)).toContain('docs/peoples-1890.md')
+  })
+
+  it('prints the loser, with its TITLE, on the map line', () => {
+    const tasks = ALL.replace('design.md §4.2 and, later, §19.8', 'peoples-1890 §8')
+    const { brief } = buildBrief({ ...args, tasksText: tasks, number: 400 })
+    expect(brief).toMatch(/§8 → docs\/peoples-1890\.md §8 .*AMBIGUOUS: .*design\.md "Valuables"/)
+    expect(brief).toMatch(/ALSO have a §8/)
+  })
+})
+
+describe('a bare §N that may be a CLAUDE.md §7.1 criterion (fix 2)', () => {
+  it('reads the criteria out of §7.1 — list items, which no heading parser sees', () => {
+    const criteria = acceptanceCriteriaFrom(parseDesignSections(CLAUDE))
+    expect(criteria.get(22)).toBe('Health and afflictions')
+    expect(criteria.get(1)).toBe('Build/start')
+    expect(criteria.has(400)).toBe(false)
+  })
+
+  const with22 = ALL_WITH_22.replace('design.md §4.2 and, later, §19.8', '§22 the poor-condition vultures')
+
+  it('names BOTH readings on the map line of a work-order-point resolution', () => {
+    const { brief } = buildBrief({ ...args, tasksText: with22, number: 400 })
+    expect(brief).toMatch(/§22 → WORK-ORDER POINT 22/)
+    expect(brief).toMatch(/ACCEPTANCE CRITERION 22 "Health and afflictions"/)
+  })
+
+  it('warns on the CROSS-REFERENCE line too — that is where the claim is asserted', () => {
+    const { brief } = buildBrief({ ...args, tasksText: with22, number: 400 })
+    expect(brief).toMatch(
+      /point 22 \[done\]: AN ARCHIVED POINT[\s\S]*?acceptance criterion 22 "Health and afflictions" — not this point\./,
+    )
+  })
+
+  it('says nothing about a number §7.1 does not carry', () => {
+    const { brief } = buildBrief({ ...args, number: 400 })
+    expect(brief).toContain('point 288 [done]:')
+    expect(brief).not.toMatch(/criterion 288/)
+  })
+
+  it('falls back to the documented 1..32 range when CLAUDE.md cannot be read', () => {
+    const { brief } = buildBrief({ ...args, tasksText: with22, claudeText: '', number: 400 })
+    expect(brief).toMatch(/ACCEPTANCE CRITERION 22/)
+  })
+})
+
 describe('aliasesFor', () => {
   it('derives the filename, the hyphenated basename and the prose stem', () => {
     expect(aliasesFor('docs/peoples-1890.md').map((a) => a.style)).toEqual(['file', 'basename', 'stem'])
@@ -389,8 +473,6 @@ describe('extractPointRefs', () => {
 })
 
 describe('buildBrief', () => {
-  const args = { tasksText: ALL, designText: DESIGN, claudeText: CLAUDE, docs: DOCS }
-
   it('builds the brief for an OPEN point with its design sections and cross-references', () => {
     const { brief, designRefs, referenced } = buildBrief({ ...args, number: 400 })
     expect(designRefs).toEqual(['4.2', '19.8'])
@@ -626,6 +708,80 @@ describe('faithfulness over the WHOLE work order', () => {
     // The check must actually have had something to check — a corpus scan that
     // silently matched nothing would pass while proving nothing.
     expect(checked).toBeGreaterThan(10)
+  })
+
+  const briefOf = (n) => {
+    const b = built.find((x) => x.point.number === n)
+    expect(b, `point ${n} must be in the corpus for this check to mean anything`).toBeTruthy()
+    return b.result.brief
+  }
+  const mapLines = (n, prefix) => briefOf(n).split('\n').filter((l) => l.startsWith(prefix))
+
+  it('names the OTHER document holding the id — the real point-265 §4.4 collision', () => {
+    // design.md §4.4 "Landmarks" and docs/fauna-behaviour-1890.md §4.4 "Vultures
+    // and the dying animal". The spec means the former (it says so: "folklore
+    // landmark"); the cascade hands two of the three occurrences to the latter.
+    // Existence cannot settle it, so BOTH lines must name the alternative.
+    const design = mapLines(265, '- §4.4 → design.md')
+    const fauna = mapLines(265, '- §4.4 → docs/fauna-behaviour-1890.md')
+    expect(design).toHaveLength(1)
+    expect(fauna).toHaveLength(1)
+    expect(design[0]).toMatch(/AMBIGUOUS: docs\/fauna-behaviour-1890\.md "Vultures and the dying animal" ALSO has a §4\.4/)
+    expect(fauna[0]).toMatch(/AMBIGUOUS: design\.md "Landmarks" ALSO has a §4\.4/)
+  })
+
+  it('de-silences the point-160 residual — its §8/§9 also live in the research docs', () => {
+    for (const [id, doc] of [['8', 'docs/peoples-1890.md'], ['9', 'docs/climate-1890.md']]) {
+      const line = mapLines(160, `- §${id} → design.md`)
+      expect(line, `point 160 resolves §${id} to design.md`).toHaveLength(1)
+      expect(line[0]).toContain('AMBIGUOUS:')
+      expect(line[0]).toContain(doc)
+    }
+  })
+
+  it('names the §7.1 criterion behind a bare §22 — the real point-265 case', () => {
+    const brief = briefOf(265)
+    expect(brief).toMatch(
+      /§22 → WORK-ORDER POINT 22 .*AMBIGUOUS: may instead mean CLAUDE\.md §7\.1 ACCEPTANCE CRITERION 22 "Health and afflictions"/,
+    )
+    // The cross-reference list is where the wrong point is actually asserted.
+    expect(brief).toMatch(
+      /point 22 \[done\]:[\s\S]*?\n {2}AMBIGUOUS: .*acceptance criterion 22 "Health and afflictions" — not this point\./,
+    )
+  })
+
+  it('flags EVERY corpus reference whose id another candidate document also holds', () => {
+    const missing = []
+    let flagged = 0
+    for (const { point, result } of built) {
+      for (const r of result.refs) {
+        if (!r.alsoIn?.length) continue
+        flagged++
+        const line = result.brief.split('\n').find((l) => l.startsWith(`- §${r.id} → ${r.docPath} `))
+        if (!line || !line.includes('AMBIGUOUS:')) missing.push(`${point.number}: §${r.id} unflagged`)
+      }
+    }
+    expect(missing).toEqual([])
+    // Teeth: a corpus scan that matched nothing would pass while proving nothing.
+    expect(flagged).toBeGreaterThan(20)
+  })
+
+  it('flags EVERY corpus §N that could be a §7.1 acceptance criterion instead', () => {
+    const criteria = acceptanceCriteriaFrom(registry.claude.sections)
+    expect(criteria.size).toBeGreaterThan(30)
+    const missing = []
+    let flagged = 0
+    for (const { point, result } of built) {
+      for (const r of result.refs) {
+        if (r.how !== 'work-order-point' || !criteria.has(Number(r.id))) continue
+        flagged++
+        if (!result.brief.includes(`§${r.id} → WORK-ORDER POINT ${r.id}`)) continue
+        const line = result.brief.split('\n').find((l) => l.startsWith(`- §${r.id} → WORK-ORDER POINT`))
+        if (!line.includes(`ACCEPTANCE CRITERION ${r.id}`)) missing.push(`${point.number}: §${r.id} unflagged`)
+      }
+    }
+    expect(missing).toEqual([])
+    expect(flagged).toBeGreaterThan(0)
   })
 
   it('resolves references into the research documents at all (H2)', () => {

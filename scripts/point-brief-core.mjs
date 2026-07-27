@@ -21,6 +21,14 @@
 // against ALL of them, every carried section is LABELLED with the document it
 // came from, and the reference map lists every `§` and where it went.
 //
+// AND WHERE IT CANNOT KNOW, IT SAYS SO. Two ambiguities are structural, not
+// fixable by a better cascade: the same `§N` heading id living in two documents
+// (design.md §4.4 "Landmarks" and fauna-behaviour-1890 §4.4 "Vultures and the
+// dying animal" — existence cannot decide between them), and a bare `§N` that may
+// be a CLAUDE.md §7.1 acceptance criterion, which is a LIST ITEM no resolver can
+// reach. Both are printed with the alternative NAMED on the map line, because a
+// confident wrong identification is the one failure this tool cannot afford.
+//
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
 
@@ -298,10 +306,38 @@ export function buildDocRegistry({ designText = '', claudeText = '', docs = [] }
   })
   const design = make('design.md', designText)
   const claude = make('CLAUDE.md', claudeText)
+  claude.criteria = acceptanceCriteriaFrom(claude.sections)
   const others = docs
     .filter((d) => d && d.path && d.path !== 'design.md' && d.path !== 'CLAUDE.md')
     .map((d) => make(d.path, d.text ?? ''))
   return { design, claude, others, list: [design, claude, ...others] }
+}
+
+/**
+ * Highest acceptance-criterion number to assume when CLAUDE.md cannot be parsed.
+ * §7.1 numbers 1..32 today; the parsed list below is preferred whenever it works.
+ */
+export const ACCEPTANCE_CRITERION_FALLBACK_MAX = 32
+
+/**
+ * CLAUDE.md §7.1's acceptance criteria, by number → short title.
+ *
+ * They are LIST ITEMS (`22. **Health and afflictions.** …`), not headings, so a
+ * section resolver can never reach them — yet the work order cites them as a bare
+ * `§22` / `pt. 22` constantly, and such a reference then falls through to the
+ * WORK-ORDER POINT of that number. Point 265's "the §19.6/§22 poor-condition
+ * vultures" means criterion 22 (health) and got archived point 22 ("the ocean
+ * still renders incorrectly") — right shape, wrong document. Naming both is the
+ * only honest answer.
+ */
+export function acceptanceCriteriaFrom(sections) {
+  const out = new Map()
+  const s = sections?.get?.('7.1')
+  if (!s) return out
+  for (const m of s.text.matchAll(/^(\d+)\.\s+\*\*(.+?)\*\*/gm)) {
+    out.set(Number(m[1]), m[2].trim().replace(/\.$/, ''))
+  }
+  return out
 }
 
 /** Does `doc` contain `id`, either as a section or as a lettered PART (`§B`)? */
@@ -344,6 +380,12 @@ function docMentions(text, registry) {
  *   6. a work-order POINT number (`§264 combat` — sloppy, but a real habit);
  *   7. the notation itself, if the reference stands alone in backticks;
  *   8. nothing — the hard failure, which names every document searched.
+ *
+ * The cascade always produces ONE winner, and that is exactly the danger: where
+ * several candidates hold the id, the order is a guess dressed as a fact. So the
+ * losers are kept on the ref (`alsoIn`) and printed on the map line. Only real
+ * CANDIDATES count — a document the spec never named and that is neither default
+ * is not an alternative reading, and listing it would be noise.
  */
 export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } = {}) {
   const text = normalise(spec)
@@ -389,14 +431,18 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
       ['claude', registry.claude],
       ...namedDocs.map((d) => ['named-in-spec', d]),
     ]
+    // Walk the WHOLE cascade, not just up to the first hit: the winner is still
+    // the first, but the rest are the alternative readings the map must name.
     let hit = null
+    const alsoIn = []
+    const tried = new Set()
     for (const [how, doc] of candidates) {
-      if (!doc) continue
+      if (!doc || tried.has(doc)) continue
+      tried.add(doc)
       const found = holds(doc, id)
-      if (found) {
-        hit = { how, doc, found }
-        break
-      }
+      if (!found) continue
+      if (!hit) hit = { how, doc, found }
+      else alsoIn.push({ docPath: doc.path, kind: found.kind, title: found.section?.title ?? null })
     }
     if (!hit && /^\d+$/.test(id) && pointNumbers.has(Number(id))) {
       hit = { how: 'work-order-point', doc: null, found: null }
@@ -404,7 +450,11 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
     if (!hit && isNotation(at)) hit = { how: 'notation', doc: null, found: null }
     const key = `${hit?.doc?.path ?? hit?.how ?? 'dangling'}|${id}`
     if (seen.has(key)) {
-      seen.get(key).occurrences.push(at)
+      const prev = seen.get(key)
+      prev.occurrences.push(at)
+      // Later occurrences may see a different candidate set (a document named in
+      // between), so the alternatives are unioned rather than taken from the first.
+      for (const a of alsoIn) if (!prev.alsoIn.some((b) => b.docPath === a.docPath)) prev.alsoIn.push(a)
       continue
     }
     const ref = {
@@ -416,10 +466,16 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
       kind: hit?.found?.kind ?? (hit ? 'point' : null),
       section: hit?.found?.section ?? null,
       members: hit?.found?.members ?? null,
+      alsoIn,
     }
     seen.set(key, ref)
     refs.push(ref)
   }
+
+  // The other direction — one id with TWO winners inside one spec (point 160's §8
+  // → peoples-1890 in one sentence and design.md in the next) — needs no extra
+  // pass: `namedDocs` is spec-wide, so whatever wins anywhere was a candidate
+  // everywhere, and each ref already carries the other as an alternative.
 
   const ranges = [...text.matchAll(SECTION_RANGE_RE)].map((m) => `§${m[1]}–§${m[2]}`)
   return { refs, ranges, namedDocs: namedDocs.map((d) => d.path) }
@@ -491,6 +547,12 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
           ? `point ${r.number} [${r.done ? 'done' : 'open'}]: ${r.title}`
           : `point ${r.number}: NOT FOUND in the work order — the spec names it; treat as suspect.`,
       )
+      if (r.criterion !== undefined && r.criterion !== null) {
+        out.push(
+          `  AMBIGUOUS: "§${r.number}" / "pt. ${r.number}" may instead mean CLAUDE.md §7.1 acceptance ` +
+            `criterion ${r.number}${r.criterion ? ` "${r.criterion}"` : ''} — not this point.`,
+        )
+      }
     }
     out.push('')
   }
@@ -548,20 +610,51 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     .sort((a, b) => compareSectionIds(a.id, b.id))
     .map((r) => ({ ...r.section, docPath: r.docPath }))
 
+  const criteria = reg.claude?.criteria ?? new Map()
+  /** The §7.1 criterion of that number — its title, or '' when only the number is known. */
+  const criterionTitle = (n) => {
+    if (criteria.size) return criteria.has(n) ? (criteria.get(n) ?? '') : null
+    return n >= 1 && n <= ACCEPTANCE_CRITERION_FALLBACK_MAX ? '' : null
+  }
+  const criterionNote = (n) => {
+    const title = criterionTitle(n)
+    if (title === null) return ''
+    return (
+      ` | AMBIGUOUS: may instead mean CLAUDE.md §7.1 ACCEPTANCE CRITERION ${n}${title ? ` "${title}"` : ''}, ` +
+      `which the corpus also writes "§${n}" / "pt. ${n}". The criteria are list items, not headings, so no ` +
+      'resolver can tell them apart — decide from what the sentence is about.'
+    )
+  }
+  const alsoNote = (r) => {
+    if (!r.alsoIn?.length) return ''
+    const each = r.alsoIn.map((a) =>
+      a.kind === 'part'
+        ? `${a.docPath} (a whole §${r.id} part)`
+        : `${a.docPath}${a.title ? ` "${a.title}"` : ''}`,
+    )
+    return (
+      ` | AMBIGUOUS: ${each.join(', ')} ALSO ${each.length > 1 ? 'have' : 'has'} a §${r.id}. Existence ` +
+      'cannot decide this one; if the spec meant one of those, read the section there and treat this ' +
+      'resolution as wrong.'
+    )
+  }
   const describe = (r) => {
     if (r.how === 'notation') {
       return `§${r.id} → the NOTATION itself, quoted in backticks — the spec talks about the form of a ` +
         'reference here, it does not make one'
     }
     if (r.how === 'work-order-point') {
-      return `§${r.id} → WORK-ORDER POINT ${r.id} (not a section; listed under the cross-referenced points)`
+      return (
+        `§${r.id} → WORK-ORDER POINT ${r.id} (not a section; listed under the cross-referenced points)` +
+        criterionNote(Number(r.id))
+      )
     }
     const where = r.docPath === 'design.md' ? 'carried above' : 'read on demand'
     if (r.kind === 'part') {
-      return `§${r.id} → ${r.docPath}, the whole §${r.id} part (${r.members.join(', ')}) — ${where}`
+      return `§${r.id} → ${r.docPath}, the whole §${r.id} part (${r.members.join(', ')}) — ${where}${alsoNote(r)}`
     }
     const title = r.section?.title ? ` "${r.section.title}"` : ''
-    return `§${r.id} → ${r.docPath} §${r.id}${title} — ${where} [${r.how}]`
+    return `§${r.id} → ${r.docPath} §${r.id}${title} — ${where} [${r.how}]${alsoNote(r)}`
   }
   const referenceMap = refs
     .slice()
@@ -574,7 +667,11 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     .sort((a, b) => a - b)
   const referenced = crossRefs.map((n) => {
     const p = all.find((q) => q.number === n)
-    return p ? { number: n, found: true, done: p.done, title: pointTitle(p) } : { number: n, found: false }
+    // A number that is ALSO a §7.1 acceptance criterion carries the warning here
+    // too: this list is where the wrong identification actually gets asserted.
+    const criterion = criterionTitle(n)
+    const base = p ? { number: n, found: true, done: p.done, title: pointTitle(p) } : { number: n, found: false }
+    return criterion === null ? base : { ...base, criterion }
   })
 
   const notes = []
