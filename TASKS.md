@@ -1159,23 +1159,6 @@ read that as "the criterion and its evidence section".
   panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
   leg pivots). No player-visible text.
 
-- [ ] 302. NEVER PUSH A STATE THAT FAILS CI — a pre-push fast-gate mechanism (user
-  24.07.2026: recurring pipeline-failure emails). The user gets GitHub failure emails when
-  a push lands a state CI rejects (a new npm-audit CVE, a lint/build/test regression); it
-  "works again afterwards" only because I fix + re-push, but the failed run already emailed.
-  ASSURE via a MECHANISM that a failing state never reaches main: a git PRE-PUSH hook (or an
-  equivalent enforced guard) that runs the fast gate — `npm run build && npm run lint &&
-  node scripts/audit-check.mjs && npm run test:unit` — before a push to main and BLOCKS it
-  on any red, so CI only ever sees green. Keep it proportionate: a docs/dashboard-only push
-  (no `src/`/`scripts/` change) may run a lighter subset (lint + audit-check), but
-  audit-check ALWAYS runs (new CVEs are the usual surprise). ANCHORS: `.git/hooks/pre-push`
-  or `scripts/pre-push-gate(-core).mjs` wired via git config / husky, docs (CLAUDE.md §6 —
-  "fast gate before every main push, enforced"). VERIFIABLE: a pure test of the gate
-  decision (red on any gate fail, green on all pass, doc-only fast-path) and a synthetic
-  failing state blocked from pushing. This is a must-work guard → build under the point-298
-  criticality rule (Fable plan-review before, safety-review after, merge only when green).
-  Until built, RUN the fast gate locally before every main push. No player-visible text.
-
 - [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that

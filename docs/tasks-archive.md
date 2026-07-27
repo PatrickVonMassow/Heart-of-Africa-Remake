@@ -10677,3 +10677,34 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   passing Vitest core test and its wiring; a short report of what was left
   unenforced and why; and the guard-health verdict per script. No player-visible
   text changes.
+
+- [x] 302. NEVER PUSH A STATE THAT FAILS CI — a pre-push fast-gate mechanism (user
+  24.07.2026: recurring pipeline-failure emails). The user gets GitHub failure emails when
+  a push lands a state CI rejects (a new npm-audit CVE, a lint/build/test regression); it
+  "works again afterwards" only because I fix + re-push, but the failed run already emailed.
+  ASSURE via a MECHANISM that a failing state never reaches main: a git PRE-PUSH hook (or an
+  equivalent enforced guard) that runs the fast gate — `npm run build && npm run lint &&
+  node scripts/audit-check.mjs && npm run test:unit` — before a push to main and BLOCKS it
+  on any red, so CI only ever sees green. Keep it proportionate: a docs/dashboard-only push
+  (no `src/`/`scripts/` change) may run a lighter subset (lint + audit-check), but
+  audit-check ALWAYS runs (new CVEs are the usual surprise). ANCHORS: `.git/hooks/pre-push`
+  or `scripts/pre-push-gate(-core).mjs` wired via git config / husky, docs (CLAUDE.md §6 —
+  "fast gate before every main push, enforced"). VERIFIABLE: a pure test of the gate
+  decision (red on any gate fail, green on all pass, doc-only fast-path) and a synthetic
+  failing state blocked from pushing. This is a must-work guard → build under the point-298
+  criticality rule (Fable plan-review before, safety-review after, merge only when green).
+  Until built, RUN the fast gate locally before every main push. No player-visible text.
+  DELIVERED 27.07.2026, and the four-eyes review is part of the record: the second
+  model (Fable 5) reviewed the built gate, returned MERGE-WITH-FIXES over eight
+  findings, and re-reviewed the repairs to MERGE. Two residuals are recorded here so
+  they are not rediscovered as surprises:
+  (R1) THE GATE MEASURES THE WORKING TREE, not the commit being pushed. A broken
+  commit with an uncommitted fix beside it still passes. The verdict now PRINTS that
+  it measured the tree, and names a dirty tree or a HEAD that is not the pushed
+  commit — reported rather than closed, because pinning the state (a stash, or a
+  temporary checkout of the pushed sha on every push) costs more per push than this
+  repository wants to pay. Revisit if a push ever lands red for exactly this reason.
+  (R2) `changedFiles` in the wrapper has no test, because testing it needs an
+  injected git runner. After the new-ref fix every failure mode of it collapses to an
+  empty list, which widens the plan to the FULL gate on main — a defect there can
+  only over-gate, never under-gate. Test debt, not a hole.
