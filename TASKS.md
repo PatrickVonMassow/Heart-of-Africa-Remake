@@ -3339,6 +3339,50 @@ read that as "the criterion and its evidence section".
   beside the body rather than hopping, and a predator staged during that window still
   makes it run.
 
+- [ ] 370. EVERY LESSON GETS A MECHANISM DECISION, AND THE DECISION IS ENFORCED (user
+  27.07.2026). A lesson written into the retrospective is not thereby obeyed — the
+  project's own core thesis says so (§1: enforcement beats memory), and today's session
+  proved it twice by repeating a mistake that was already written down. So a change to
+  the analysis documents must carry a DECISION about its mechanism, and that decision
+  must itself be enforced rather than remembered.
+  THE DECISION HAS EXACTLY THREE LEGITIMATE OUTCOMES, per lesson:
+  (1) an EXISTING enforcer is extended or adjusted to cover it — the PREFERRED outcome;
+  (2) a NEW enforcer, only where no existing one fits;
+  (3) DELIBERATELY NONE, with a written reason — the honest outcome for a lesson no
+  machine can check ("does this look right to a human?"), and it must be stated, not
+  left blank.
+  DO NOT ACCRETE. The guard chain already runs at every turn end and the retrospective
+  itself names guard sprawl as an open risk. So the decision explicitly asks, in this
+  order: does an existing enforcer already cover this? can one be widened instead of a
+  sibling added? does this lesson make an OLDER rule redundant, so the corpus shrinks
+  rather than grows? A new guard is the last resort, never the reflex, and a decision
+  that consolidates two rules into one counts as the best possible answer.
+  THE MECHANISM — extend `retro-currency-guard`, do not add a guard beside it. It already
+  parses the retrospective and knows when the sources moved, so it is the natural host.
+  It gains a LEDGER check against a machine-readable map (`docs/analysis_de/
+  lesson-mechanisms.md` with a parseable table, or a JSON beside it — pick one and say
+  why): every prose subsection of the retrospective has a ledger entry naming its
+  outcome (1), (2) or (3) with the enforcer's name or the written reason. A subsection
+  with no entry BLOCKS the turn end, which is exactly the moment the decision is cheap.
+  BACKFILL IS THE REAL WORK, and it is the point's most valuable output: every existing
+  lesson gets its entry. Expect the backfill to reveal lessons with NO enforcement at
+  all — those findings are reported as a list rather than silently marked (3), and the
+  worst of them become their own queued points.
+  FOUR EYES, both modes (user's explicit instruction): the second model reviews the
+  MECHANISM DESIGN before it is built (a gate that blocks every turn is high-criticality)
+  and the finished ledger afterwards, reading for entries that claim an enforcer which
+  does not actually cover the lesson — the failure mode a self-audit cannot see. The
+  existing `guard-health-guard` already fails on an enforcer nothing invokes; the review
+  must check the INVERSE, a claim without teeth.
+  VERIFIABLE: pure Vitest on the extended core — a retrospective subsection without a
+  ledger entry blocks; one with each of the three outcomes passes; an entry naming a
+  guard script that does not exist FAILS (a claim must point at something real); a
+  malformed ledger fails OPEN like every other guard here, so a parse bug cannot trap the
+  session. Plus one live check that the guard actually fires on a synthetic new
+  subsection.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain description gains the ledger
+  duty) and the retrospective's guard table.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
