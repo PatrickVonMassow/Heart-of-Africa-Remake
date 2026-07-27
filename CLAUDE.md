@@ -985,16 +985,15 @@ After completion and after every major system:
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop), `render-verify-guard` (no GUI/render change finished without the
-  picture check — on both backends where they can differ, on one where they
+  picture check — both backends where they can differ, one where they
   cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
   preamble; its budgets and the two honest ways out live in
   `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
-  (PRE-COMMIT/PRE-PUSH hooks in the versioned `scripts/git-hooks/`, wired by
-  `npm install`: no stray file rides along in a commit, and no push to main
-  lands a state CI would reject), `ci-status-guard` (a
+  (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
+  along, no push lands a state CI would reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective document stays current), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
