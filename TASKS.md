@@ -3383,6 +3383,30 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain description gains the ledger
   duty) and the retrospective's guard table.
 
+- [ ] 372. ONE COMMAND FOR THE BOARD, NOT SIX (user 27.07.2026, arising from the 24/7
+  plan). Keeping the board current costs SIX tool calls every time — edit, publish,
+  Artifact, `--synced`, focus, prep — and it happens several times per point. At the
+  measured rate that ritual is a large share of the main session's requests, and every
+  request is billed at the whole context. It is also the reason the board sometimes lags:
+  a six-step ritual gets postponed, a one-step one does not.
+  BUILD `scripts/board.mjs`: one command that takes the card change, applies it,
+  rotates the Erledigt overflow (`board-archive-rotate`), publishes to the scratchpad,
+  runs the consistency audit, and prints the ONE thing the caller still has to do by
+  hand — the Artifact publish, which is tool-bound and cannot be scripted. Subcommands
+  for what actually happens: `now <point> <status>`, `queue <point>`, `done <point>`,
+  `vdzk-remove <title>`, `status <point> <text>`. Each stamps the status time itself, so
+  the date the guard demands can never be forgotten.
+  MEASURE IT: count the tool calls a board update takes before and after on one real
+  point, and record both numbers in the point. A saving claimed without the count is
+  exactly what this project does not accept.
+  WHAT MUST NOT CHANGE: the four sections, their order, the card shapes, the
+  no-`open` rule and the reader's remembered folds. The command is a faster way to
+  obey the structure, never a new structure.
+  VERIFIABLE: pure Vitest on the card-editing core (each subcommand produces the exact
+  markup the guard accepts; a malformed request fails loudly rather than writing a
+  broken board); the existing dashboard audit passes on every generated board; and the
+  before/after tool-call count is recorded.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
