@@ -22,6 +22,7 @@ import { addAfterEffect, addEffect } from '@react-three/fiber'
 import { balance } from '../config/balance'
 import { QUALITY_PRESETS } from '../config/quality'
 import { getStrings } from '../i18n'
+import { describeBackend } from '../render/backendInfo'
 import { getRenderContext } from '../render/renderContext'
 import { getTerrainRefine, resetTerrainRefine, setTerrainRefine } from '../scenes/travel/terrainLod'
 import { useGame } from '../state/store'
@@ -302,30 +303,6 @@ function applyLowPreset(defaultPixelRatio: number): void {
   ctx?.gl.setPixelRatio(low.dprCap ?? defaultPixelRatio)
 }
 
-/** Renderer backend and adapter string for the report environment. */
-function describeBackend(gl: unknown): { backend: string; adapter: string } {
-  const backend = (gl as { backend?: { isWebGPUBackend?: boolean } }).backend
-  const isWebGpu = backend?.isWebGPUBackend === true
-  const info = backend as unknown as {
-    // three keeps no adapter handle, but the device carries its info
-    // (GPUDevice.adapterInfo) — that is the GPU's name in the report.
-    device?: { adapterInfo?: { vendor?: string; architecture?: string; device?: string; description?: string } }
-    gl?: WebGL2RenderingContext
-  } | null
-  let adapter = 'unknown'
-  if (isWebGpu && info?.device?.adapterInfo) {
-    const a = info.device.adapterInfo
-    adapter = [a.vendor, a.architecture, a.device, a.description].filter(Boolean).join(' ').trim() || 'unknown'
-  } else if (info?.gl) {
-    try {
-      const dbg = info.gl.getExtension('WEBGL_debug_renderer_info')
-      adapter = dbg ? String(info.gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : String(info.gl.getParameter(info.gl.RENDERER))
-    } catch {
-      // Some drivers refuse the unmasked string — the backend name is enough.
-    }
-  }
-  return { backend: isWebGpu ? 'webgpu' : 'webgl2', adapter }
-}
 
 /**
  * Run the whole sweep. Resolves once the report is in the UI store (or the run
