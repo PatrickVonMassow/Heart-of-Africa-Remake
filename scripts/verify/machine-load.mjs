@@ -21,8 +21,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isMainModule } from '../is-main.mjs'
 import {
-  LEVEL, classifyLoad, cpuBusyFraction, decideRun, formatLoadReport, onLoadMode, parsePsOutput,
-  parseWindowsProcessJson, strayProcesses,
+  LEVEL, classifyLoad, cpuBusyFraction, decideRun, forcedLevel, formatLoadReport, onLoadMode,
+  parsePsOutput, parseWindowsProcessJson, strayProcesses,
 } from './machine-load-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -119,6 +119,15 @@ export async function probeMachine({ sampleMs = SAMPLE_MS, pid = process.pid } =
  */
 export async function readMachine(options = {}) {
   try {
+    const forced = forcedLevel(process.env.VERIFY_LOAD_FORCE)
+    if (forced) {
+      return {
+        level: forced,
+        reasons: [`VERIFY_LOAD_FORCE=${forced} — the machine was NOT measured; this is the wiring self-test`],
+        strays: [],
+        probe: null,
+      }
+    }
     const probe = await probeMachine(options)
     return { ...classifyLoad(probe), probe }
   } catch {

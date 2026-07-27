@@ -63,6 +63,18 @@ export const HEAVY_LOADAVG = 1.0
 /** What to do when the machine is not quiet. Default `flag` never blocks. */
 export const ON_LOAD = { flag: 'flag', defer: 'defer', off: 'off' }
 
+/**
+ * The self-test hook (`VERIFY_LOAD_FORCE=loaded`): pretend the machine is in a
+ * given state, so the defer/flag wiring can be proven on demand instead of only
+ * when the machine happens to be busy — the same idea as
+ * `VOICE_STALL_SELFTEST` / `STARTUP_STALL_SELFTEST`. Anything else reads as null
+ * (no forcing), so a stray value can never quietly fake a quiet machine.
+ */
+export function forcedLevel(raw) {
+  const v = String(raw ?? '').trim().toLowerCase()
+  return Object.hasOwn(LEVEL, v) ? LEVEL[v] : null
+}
+
 /** Read the mode from a CLI flag (`--on-load=defer`) or VERIFY_ON_LOAD; junk reads as the default. */
 export function onLoadMode({ flags = [], env = '' } = {}) {
   const fromFlag = (flags.find((f) => String(f).startsWith('--on-load=')) ?? '').split('=')[1]
@@ -459,6 +471,10 @@ export function annotateResult({ level = LEVEL.unknown, redSuites = [], green = 
   }
   const timing = redSuites.filter(isTimingSensitive)
   const other = redSuites.filter((s) => !isTimingSensitive(s))
+  // A failure with no red SUITE is a deterministic stage — a broken build, a
+  // lint finding. Load does not cause those, and labelling them "not
+  // authoritative" would teach the reader to skip the label where it matters.
+  if (timing.length === 0 && other.length === 0) return []
   lines.push(`# UNDER LOAD — NOT AUTHORITATIVE: this red was taken on ${state}.`)
   if (timing.length) {
     lines.push(

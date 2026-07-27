@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFERRED_EXIT, ELEVATED_CPU, HEAVY_CPU, LEVEL, MAX_LISTED_STRAYS, ON_LOAD, STRAY_KIND, TIMING_SENSITIVE_SUITES,
   annotateResult, annotateStageFailure, classifyLoad, classifyProcess, cpuBusyFraction, decideRun,
-  formatLoadReport, isTimingSensitive, killAdvice, onLoadMode, ownTree, parsePsOutput,
+  forcedLevel, formatLoadReport, isTimingSensitive, killAdvice, onLoadMode, ownTree, parsePsOutput,
   parseWindowsProcessJson, strayProcesses,
 } from './machine-load-core.mjs'
 import { DEV_SUITES } from './tiers.mjs'
@@ -250,6 +250,16 @@ describe('onLoadMode', () => {
   })
 })
 
+describe('forcedLevel — the wiring self-test hook', () => {
+  it('accepts the four levels and refuses everything else', () => {
+    expect(forcedLevel('loaded')).toBe(LEVEL.loaded)
+    expect(forcedLevel(' QUIET ')).toBe(LEVEL.quiet)
+    expect(forcedLevel('1')).toBe(null)
+    expect(forcedLevel('')).toBe(null)
+    expect(forcedLevel(undefined)).toBe(null)
+  })
+})
+
 describe('annotateResult — the asymmetry', () => {
   it('says nothing at all on a quiet machine', () => {
     expect(annotateResult({ level: LEVEL.quiet, redSuites: ['polish'] })).toEqual([])
@@ -266,6 +276,10 @@ describe('annotateResult — the asymmetry', () => {
     expect(lines).toMatch(/NOT AUTHORITATIVE/)
     expect(lines).toMatch(/npm test -- enrichments polish/)
     expect(lines).toMatch(/QUIET machine/)
+  })
+
+  it('says nothing about a failure with no red suite — a broken build is not the load\'s doing', () => {
+    expect(annotateResult({ level: LEVEL.loaded, redSuites: [], green: false })).toEqual([])
   })
 
   it('separates a red that is not a timing verdict instead of excusing it', () => {
