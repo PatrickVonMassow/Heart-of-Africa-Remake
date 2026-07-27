@@ -2186,7 +2186,12 @@ function Herds() {
           { // ground-follow (point 203(A)): a mover carries its own standing height
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
+            // The charge follows the calf into the shallows where a crocodile has
+            // hauled it (point 383): over water it rides the sheet chest-deep,
+            // like a crossing swimmer, instead of keeping its bank height.
+            if (gft.type === 'water')
+              a.y = sheetAnchorY(waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height), gft.height, 0.32)
+            else if (gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
           }
           if (d < PARENT_SACRIFICE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146): ONE
@@ -2857,7 +2862,17 @@ function Herds() {
             a.trampleTo || a.vigil || a.crossing !== undefined || a.caught !== undefined
           )
             continue
-          if (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined)) continue
+          // A parent CHARGING a predator that holds its calf is such a drama
+          // mover too (point 383): a crocodile hauls its catch into the river, so
+          // the charge now genuinely reaches the water — and a setback mid-charge
+          // would break the §19.8 rescue/sacrifice at the waterline that §19.16
+          // builds on. This list and the collision push's `inDrama` mirror each
+          // other; the push already exempted a child-caught parent.
+          if (
+            a.child && !a.child.dead &&
+            (a.child.inWater !== undefined || a.child.mired !== undefined || a.child.caught !== undefined)
+          )
+            continue
           const ll = worldToLatLon(a.x, a.z)
           const terSample = sampleTerrain(ll.lat, ll.lon, seed)
           const ter = terSample.type
