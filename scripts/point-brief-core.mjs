@@ -338,7 +338,26 @@ export function buildBrief({ tasksText, designText, claudeText = '', number }) {
     )
   }
   const { design: candidates, foreign } = extractDesignSectionRefs(point.body)
+
+  // A CLAUDE.md-attributed `§` that CLAUDE.md does NOT contain was mis-attributed
+  // by proximity (a bare `§288 combat` standing near a CLAUDE.md mention). Send it
+  // back through the classifier — but as a NOTE if it resolves to nothing, never as
+  // a hard failure: only a reference we believe means design.md may block a brief.
+  const claudeSections = parseDesignSections(claudeText)
+  const foreignNotes = []
+  const reclassify = []
+  for (const f of foreign) {
+    const m = /^(.*) §(\d+(?:\.\d+)*)$/.exec(f)
+    if (m && /(^|\/)CLAUDE\.md$/i.test(m[1]) && !claudeSections.has(m[2])) reclassify.push(m[2])
+    else foreignNotes.push(f)
+  }
+
   const sorted = classifySectionRefs({ ids: candidates, designText, claudeText, tasksText })
+  const extra = classifySectionRefs({ ids: reclassify, designText, claudeText, tasksText })
+  sorted.designIds = [...new Set([...sorted.designIds, ...extra.designIds])].sort(compareSectionIds)
+  sorted.claudeIds = [...new Set([...sorted.claudeIds, ...extra.claudeIds])]
+  sorted.pointNumbers = [...new Set([...sorted.pointNumbers, ...extra.pointNumbers])]
+  for (const id of extra.missing) foreignNotes.push(`§${id} (unresolved — no such section or point)`)
   if (sorted.missing.length) {
     // Reuse the strict resolver so the failure text has exactly one wording.
     resolveDesignSections(designText, sorted.missing)
@@ -354,10 +373,10 @@ export function buildBrief({ tasksText, designText, claudeText = '', number }) {
       : { number: n, found: false }
   })
   const notes = []
-  if (foreign.length) {
+  if (foreignNotes.length) {
     notes.push(
-      `the spec also names section(s) of OTHER documents: ${foreign.join(', ')} — not carried here; ` +
-        'read that named section on demand if the point turns on it.',
+      `the spec also names section(s) of OTHER documents: ${foreignNotes.join(', ')} — not carried ` +
+        'here; read that named section on demand if the point turns on it.',
     )
   }
   if (sorted.claudeIds.length) {
@@ -385,7 +404,7 @@ export function buildBrief({ tasksText, designText, claudeText = '', number }) {
     referenced,
     designRefs: sorted.designIds,
     claudeRefs: sorted.claudeIds,
-    foreignRefs: foreign,
+    foreignRefs: foreignNotes,
     tokens: estimateTokens(brief),
   }
 }
