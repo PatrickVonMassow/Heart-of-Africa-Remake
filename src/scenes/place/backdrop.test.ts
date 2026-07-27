@@ -9,6 +9,8 @@ import * as THREE from 'three/webgpu'
 import {
   backdropBase,
   backdropHeightAt,
+  backdropRingRadius,
+  backdropSurfaceY,
   backdropTaper,
   discHorizonY,
   panoramaStandY,
@@ -19,7 +21,7 @@ import {
   BACKDROP_SEGS,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
-import { placeById } from '../../world/geo'
+import { PLACES, placeById } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { setupGeodata } from '../../test/geodata'
 
@@ -142,6 +144,123 @@ describe('backdrop heightfield (design.md §2.5)', () => {
     }
   })
 
+  it('closes the horizon for every disc radius, camera height and relief profile (point 381)', () => {
+    // The reported tear: past the ground disc there was NO ground at all — the
+    // disc's own rim was the last thing drawn, and above it the captured band's
+    // low rows and the sky behind them.
+    //
+    // The condition, stated without any site: a point outside the disc is drawn
+    // ground only while it sits at or above the eye's grazing line over the disc
+    // edge. That line is SHALLOWEST for the camera standing at the OPPOSITE rim
+    // (the sight ray then leaves the disc a whole diameter away), so the worst
+    // case over every reachable standpoint is the line from there — and it is
+    // the one the surface must clear.
+    const RELIEFS = [
+      ['flat desert', () => 0],
+      ['sunken plain (the reported Giza case)', () => -8],
+      ['deep sea', () => -40],
+      ['plateau over a valley', (r: number) => (r < 120 ? -12 : 4)],
+      ['ridge', (r: number) => Math.sin(r / 40) * 30],
+      ['mountain range', (r: number) => Math.max(-20, r * 0.5 - 60)],
+    ] as const
+    const openings: string[] = []
+    for (const discRadius of [28, 40, 48, 60, 74, 96]) {
+      const r0 = discRadius - BACKDROP_DISC_OVERLAP
+      const discEdge = discRadius
+      for (const eye of [1.2, 1.5, 1.9]) {
+        for (const [label, relief] of RELIEFS) {
+          for (let i = 0; i <= 200; i++) {
+            const r = discEdge + (i / 200) * (BACKDROP_OUTER - discEdge)
+            const y = backdropSurfaceY(r, r0, relief(r))
+            // Worst reachable standpoint: the opposite rim, looking across.
+            const line = discHorizonY(r, 0, -discEdge, 0, eye, discEdge)
+            if (y < line) openings.push(`${label} disc=${discRadius} eye=${eye} r=${r.toFixed(1)} y=${y.toFixed(2)} < line=${line.toFixed(2)}`)
+          }
+        }
+      }
+    }
+    expect(openings).toEqual([])
+  })
+
+  it('never lets the first visible band row sit above the disc edge (point 381)', () => {
+    // The other half of the seam: the rim must stay UNDER the ground disc, and
+    // the first row that emerges past its edge must not stand proud of the
+    // plane the player walks on — a lit top with an unlit face is what an open
+    // rim looks like from inside.
+    for (const discRadius of [28, 42, 62, 74]) {
+      const r0 = discRadius - BACKDROP_DISC_OVERLAP
+      for (const relief of [-30, -5, 0, 3, 40]) {
+        // Hidden under the disc: strictly below its plane all the way to the edge.
+        for (let i = 0; i < 10; i++) {
+          const r = r0 + (i / 10) * BACKDROP_DISC_OVERLAP
+          expect(backdropSurfaceY(r, r0, relief)).toBeLessThan(0)
+        }
+        // At the edge itself: exactly flush, whatever the surroundings do.
+        expect(backdropSurfaceY(discRadius, r0, relief)).toBeGreaterThanOrEqual(0)
+        expect(backdropSurfaceY(discRadius, r0, Math.min(relief, 0))).toBeCloseTo(0, 10)
+      }
+    }
+  })
+
+  it('pins a mesh ring on the ground-disc edge so the join is not interpolated (point 381)', () => {
+    for (const r0 of [40, 54, 72]) {
+      const edge = r0 + BACKDROP_DISC_OVERLAP
+      expect(backdropRingRadius(0, r0)).toBe(r0)
+      expect(backdropRingRadius(1, r0)).toBe(edge)
+      expect(backdropRingRadius(BACKDROP_RINGS - 1, r0)).toBeCloseTo(BACKDROP_OUTER, 6)
+      // Strictly increasing, so the annulus never folds back on itself.
+      for (let ri = 1; ri < BACKDROP_RINGS; ri++) {
+        expect(backdropRingRadius(ri, r0)).toBeGreaterThan(backdropRingRadius(ri - 1, r0))
+      }
+      // The drawn surface at the edge ring IS the disc plane — not the third of
+      // a unit below it that the unpinned ladder interpolated into the join.
+      expect(backdropSurfaceY(backdropRingRadius(1, r0), r0, -20)).toBeCloseTo(0, 10)
+    }
+  })
+
+  it('clamps the fall at the disc plane while leaving the rise untouched (point 381)', () => {
+    const r0 = 72
+    for (let i = 0; i <= 40; i++) {
+      const r = r0 + BACKDROP_DISC_OVERLAP + (i / 40) * (BACKDROP_OUTER - r0)
+      // A surround BELOW the place centre reads as its plane, never as a pit.
+      expect(backdropSurfaceY(r, r0, -25)).toBe(backdropSurfaceY(r, r0, 0))
+      // A surround ABOVE it keeps its relief, still under the looming cap.
+      expect(backdropSurfaceY(r, r0, 12)).toBeGreaterThan(backdropSurfaceY(r, r0, 0))
+      expect(backdropSurfaceY(r, r0, 4000)).toBeCloseTo(r * BACKDROP_MAX_SLOPE * backdropTaper(r, r0), 6)
+    }
+  })
+
+  it('closes the horizon at every real place on the map (point 381)', () => {
+    // The same rule against the REAL terrain, all round every enterable place:
+    // before the fix the sight line escaped in 48/320 azimuths from Giza's
+    // centre and in 3–241/320 from the far rim at EVERY one of them.
+    const EYE = 1.5
+    for (const place of PLACES) {
+      const radius = place.kind === 'port' ? 30 + (place.size ?? 1) * 6 : place.kind === 'monument' ? 60 : 28
+      const r0 = radius + 12
+      const discEdge = r0 + BACKDROP_DISC_OVERLAP
+      const centerH = sampleTerrain(place.lat, place.lon, SEED).height
+      let open = 0
+      for (let si = 0; si < 64; si++) {
+        const a = (si / 64) * Math.PI * 2
+        let closed = false
+        for (let i = 0; i <= 24; i++) {
+          const r = discEdge * Math.pow(BACKDROP_OUTER / discEdge, i / 24)
+          const x = Math.cos(a) * r
+          const z = Math.sin(a) * r
+          const y = backdropHeightAt(x, z, place.lat, place.lon, SEED, centerH, r0)
+          // Worst reachable standpoint again: the rim opposite this azimuth.
+          if (y >= discHorizonY(x, z, -Math.cos(a) * discEdge, -Math.sin(a) * discEdge, EYE, discEdge)) {
+            closed = true
+            break
+          }
+        }
+        if (!closed) open++
+      }
+      expect({ place: place.id, open }).toEqual({ place: place.id, open: 0 })
+    }
+  })
+
   it('holds the raised sampling resolution (no stepped ridge silhouette)', () => {
     // User-reported hard polygon facets at Cairo: the visible steps were the
     // silhouette of the coarse 24×160 heightfield. Floors, not exact values —
@@ -235,9 +354,11 @@ describe('panorama-wildlife standing height (design.md §2.5, point 181)', () =>
       if (OLD_ANCHOR > y) floated++
       if (OLD_ANCHOR < y) buried++
     }
-    // Cairo's sunken delta plain must exercise the ground-line branch, its
-    // dunes the relief branch — both paths are real, not vacuous.
-    expect(onLine).toBeGreaterThan(0)
+    // Point 181's max() is KEPT as the safety net, but since point 381 closed
+    // the seam it no longer has to fire: the drawn surface itself clears the
+    // sight line all round, so every silhouette stands on relief. A ground-line
+    // anchor reappearing here would mean the horizon has torn open again.
+    expect(onLine).toBe(0)
     expect(onRelief).toBeGreaterThan(0)
     expect(floated).toBeGreaterThan(0)
     expect(buried).toBeGreaterThan(0)

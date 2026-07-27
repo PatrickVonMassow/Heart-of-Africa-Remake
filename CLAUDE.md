@@ -907,12 +907,13 @@ changes with it in the same commit.
     The footing is the higher of the backdrop relief at the silhouette's own
     spot and the settlement's visible ground line — the sight line over the
     walkable ground disc's edge from the live camera (`panoramaStandY` /
-    `discHorizonY`, point 181). The former hard EYE_HEIGHT anchor (the
-    captured band's horizon at infinity) put NOTHING under the feet: past the
-    disc edge the plain drops out of sight and the band shows through the gap,
-    so the animals hung in the sky over the band's content (reported on
-    WebGPU in Cairo, over a pyramid flank) — and where relief rose they were
-    buried inside it. The silhouettes WALK rather than glide (point 255): built
+    `discHorizonY`, point 181). The former EYE_HEIGHT anchor put NOTHING
+    under the feet and, where relief rose, buried them. The gap it worked
+    around is CLOSED (point 381): outside the disc the backdrop may rise but
+    never sink below the ground plane, and a ring is pinned on the disc edge,
+    so at any place the walkable ground meets the panorama with no edge, no
+    unlit face and no hole.
+    The silhouettes WALK rather than glide (point 255): built
     with pivoted legs, they swing them on the shared distance-driven gait phase
     (`gaitPhase`/`legSwingAngle`) fed by the arc they drift along their ring, so
     a faster one steps faster and a stalled one stands still — a wall-clock bob
