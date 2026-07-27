@@ -262,6 +262,28 @@ old→new coverage map live in `scripts/verify/README.md`.
   the picture-verification on BOTH backends, the serial
   merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
+- **Delegation brief instead of a reading assignment (point 365).** A delegated
+  agent receives its point as a BRIEF: `node scripts/point-brief.mjs <N>` prints
+  the spec verbatim, the design.md sections it cites, one identifying line per
+  cross-referenced point, and a REFERENCE MAP naming where every `§` resolved.
+  Measured, that is ~1.8k tokens median against ~108k for reading TASKS.md and
+  design.md whole — and it does not grow with the queue, because the parsing
+  happens in a subprocess rather than in a context. The prompt carries the brief
+  and forbids wholesale reads; a NAMED section may be read on demand, and an
+  insufficient brief is ESCALATED, not guessed around. The brief FAILS LOUDLY on
+  a reference that resolves nowhere, and where one section number exists in two
+  documents it prints BOTH — no resolver can decide that, so the reader is told
+  instead of being handed a plausible wrong answer. Every brief carries the
+  revision it was cut from; regenerate rather than reuse an old one.
+- **Context boundary at a point boundary (attended sessions).** 87–94 % of the
+  measured token spend sat above 150k context because one session carried point
+  after point. The session cannot clear itself — `/clear` is the user's command —
+  so at a point boundary in an ATTENDED session ASK for it above a measured
+  context size; `batch-resume-hook` re-orients the fresh session. The autonomous
+  variant is a USER decision (it needs either the disabled autostart back or a
+  session spawning its successor, both of which reopen the double-session class)
+  and is not implemented without an explicit go. The usage panel's "cheaper model
+  for simpler subagents" stays REJECTED; the §6 allowlist is unchanged.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
@@ -975,6 +997,10 @@ After completion and after every major system:
   is recorded. Every one is fail-OPEN — an internal error allows the stop, so
   a guard bug can never trap the session — and each decision core is pure and
   Vitest-covered.
+- **Ask the guards BEFORE the action, not at the turn end (point 365).** Before an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
+  --session <id>` reports read-only whether one would block — advisory, the guard
+  itself stays the authority. A blocked turn produces nothing, and one such loop
+  has already cost ~30 turns; asking first is a cheap process run.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 
