@@ -10914,3 +10914,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: CLAUDE.md §7.2's guard list (the file is at its measured
   ceiling — pay for the entry by trimming, not by raising) and the beginner's guide,
   whose prompt 5 already asks for exactly this and can then cite it as built.
+
+- [x] 375. A VERIFICATION FRAME MUST SHOW WHAT ITS NAME CLAIMS (27.07.2026, found
+  while measuring the picture check under point 361). Two runs of the `world` suite on
+  IDENTICAL code photographed different places: `12-worldmodel-lake-victoria` captured a
+  settled lake view in one run and a mid-travel landscape in the other, and BOTH runs
+  exited 0. The reviewer is then handed a frame that does not show its subject, and no
+  assertion notices — the picture check's own evidence is unreliable in a way no test
+  reports.
+  FIX IT AT THE SHUTTER: before a frame is written, its subject is asserted to be IN the
+  rendered picture, projected through `__camera.onScreen`/`ndc` exactly as the §7.2 rule
+  already demands of every in-view claim — never through an assumed radius. A frame whose
+  subject is absent FAILS the suite, naming the frame and what was found instead; it is
+  never written as if it were the evidence.
+  SCOPE: the named-subject frames of `scripts/verify/*` (a place, a landmark, a
+  settlement). A frame that deliberately photographs a general view declares that, so the
+  requirement is explicit rather than inferred from a filename.
+  VERIFIABLE: pure Vitest on the subject check (present → pass, absent → a loud failure
+  naming the frame), plus one live suite run proving a deliberately mis-aimed frame is
+  refused rather than saved.
+  DOCS in the same commit: CLAUDE.md §7.2 beside the projection rule, and
+  `scripts/verify/README.md`.

@@ -2982,27 +2982,6 @@ read that as "the criterion and its evidence section".
   against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
   when the mechanism runs.
 
-- [ ] 375. A VERIFICATION FRAME MUST SHOW WHAT ITS NAME CLAIMS (27.07.2026, found
-  while measuring the picture check under point 361). Two runs of the `world` suite on
-  IDENTICAL code photographed different places: `12-worldmodel-lake-victoria` captured a
-  settled lake view in one run and a mid-travel landscape in the other, and BOTH runs
-  exited 0. The reviewer is then handed a frame that does not show its subject, and no
-  assertion notices — the picture check's own evidence is unreliable in a way no test
-  reports.
-  FIX IT AT THE SHUTTER: before a frame is written, its subject is asserted to be IN the
-  rendered picture, projected through `__camera.onScreen`/`ndc` exactly as the §7.2 rule
-  already demands of every in-view claim — never through an assumed radius. A frame whose
-  subject is absent FAILS the suite, naming the frame and what was found instead; it is
-  never written as if it were the evidence.
-  SCOPE: the named-subject frames of `scripts/verify/*` (a place, a landmark, a
-  settlement). A frame that deliberately photographs a general view declares that, so the
-  requirement is explicit rather than inferred from a filename.
-  VERIFIABLE: pure Vitest on the subject check (present → pass, absent → a loud failure
-  naming the frame), plus one live suite run proving a deliberately mis-aimed frame is
-  refused rather than saved.
-  DOCS in the same commit: CLAUDE.md §7.2 beside the projection rule, and
-  `scripts/verify/README.md`.
-
 - [ ] 378. THE ANIMAL'S COLLISION SITS BESIDE THE ANIMAL (user 27.07.2026, reported on
   the deployed build with a screenshot: in the bird's-eye view the traveller walks
   STRAIGHT THROUGH the drawn body, and is blocked on empty ground NEXT TO it). The
@@ -3322,6 +3301,36 @@ read that as "the criterion and its evidence section".
   existing CPU/process paths unchanged), and one live reading taken while something is
   deliberately using the GPU, recorded with its figure.
   DOCS in the same commit: `scripts/verify/README.md` beside the quiet-machine section.
+
+- [ ] 387. FOUR CHECKS IN THE POLISH SUITE ARE RED ON MAIN (27.07.2026, established with
+  the baseline lane of point 294 — two runs against the merge-base, all four labelled
+  PRE-EXISTING). The suite therefore cannot exit 0, and because `render-verify-guard`
+  counts only a PASSING run, every backend-sensitive change that picks `polish` has to be
+  cleared by hand. A red that everyone routes around is worse than a missing check: it
+  trains the habit of overriding the gate.
+  THE FOUR, each to be judged on its own — a stale assumption, a threshold on its edge
+  and a real defect look identical from the outside, and this project has mistaken each
+  for the others:
+  · the rains dim the settlement sun and sky light — expected behaviour that does not
+    exist yet; work-order point 385 is where it is built, so this check is asserting a
+    FUTURE state. Decide: does the check wait for 385 (marked as such, not silently
+    passing), or is it wrong about what today promises?
+  · the leave capture bakes the surrounding terrain into the band (point 227).
+  · the band is compass-true: a probe placed due west shows west, not east.
+  · fire shadows ON: the ground behind a ring stone is measurably darker than beside it
+    (design.md §19.10) — reported at 1.6 against a threshold of 2, the same
+    sitting-on-its-own-edge shape as point 382's eye-knob check.
+  FOR EACH: say whether the PRODUCT is wrong, the CHECK asserts something never
+  promised, or the THRESHOLD decides on noise — and fix accordingly. Loosening an
+  assertion to reach green is refused; a check that waits for unbuilt work is marked as
+  waiting, with the point number it waits for, so the suite can exit 0 honestly.
+  MEASURE BEFORE JUDGING A THRESHOLD: run the staging several times on a quiet machine
+  (`node scripts/verify/machine-load.mjs` confirms) and record the spread beside the
+  criterion, exactly as point 382 requires for the crocodile's eyes.
+  VERIFIABLE: `polish` exits 0 twice in a row on a quiet machine on BOTH backends, with
+  every surviving check unchanged in what it demands; each of the four resolved with its
+  reason recorded in the commit.
+  DOCS in the same commit: `scripts/verify/README.md` where the suite is described.
 
 ## Closing (only after all points)
 
