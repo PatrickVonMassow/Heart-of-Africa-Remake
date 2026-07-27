@@ -157,7 +157,8 @@ if (isMain) {
     console.log(
       `boundary recorded: point ${point} is closed and the launcher is armed. End this session now — ` +
         'the OS task starts a fresh one within its interval and batch-resume-hook re-orients it. Do NOT ' +
-        'start the next point in this context.',
+        'start the next point in this context, and do NOT end while a delegated agent is still in ' +
+        'flight (its work would be thrown away — let the pool drain first).',
     )
   }
 }

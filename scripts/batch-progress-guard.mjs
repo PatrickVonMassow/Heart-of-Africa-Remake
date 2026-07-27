@@ -167,10 +167,11 @@ try {
       `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
       `stops; that must not recur. The legitimate ways to end this turn: (a) every point is done; ` +
       `(b) the user asked you to stop — then create .claude/batch-paused and stop; (c) you have just ` +
-      `MERGED AND TICKED a point and are at a POINT BOUNDARY — then END THE SESSION instead of pulling ` +
-      `the next point into this context (the context is the batch's dominant cost): run ` +
-      `\`node scripts/batch-boundary.mjs <the closed point>\`, and when it confirms, stop. The OS launcher ` +
-      `starts a fresh session and batch-resume-hook re-orients it from TASKS.md. If you are blocked on a ` +
+      `MERGED AND TICKED a point, and NO delegated agent is still in flight — that is a POINT BOUNDARY, so ` +
+      `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +
+      `dominant cost): run \`node scripts/batch-boundary.mjs <the closed point>\`, and when it confirms, ` +
+      `stop. The OS launcher starts a fresh session and batch-resume-hook re-orients it from TASKS.md. ` +
+      `Let a running agent pool DRAIN first — ending mid-flight throws its work away. If you are blocked on a ` +
       `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
       `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.`,
   )

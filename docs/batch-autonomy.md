@@ -35,7 +35,10 @@ outside the agent's control.
    `pending-spawn` lock is won BEFORE spawning; losing the race means no spawn).
    Guards: skips while paused, while the batch is complete, and while the owner is
    alive; a debounce marker avoids double-spawns; it finds the newest bundled
-   `claude.exe` dynamically (survives app updates).
+   `claude.exe` dynamically (survives app updates). It also THROWS when imported
+   rather than run — the whole file executes at module load, so a bare `import()`
+   of it (a syntax check, a tooling scan) used to be indistinguishable from
+   running it, and once launched a session inside a git worktree.
 
 ## Failure-mode table
 
@@ -107,7 +110,9 @@ what changed is that ending became a legal way to finish a turn.
 
 How it works:
 
-1. The session merges the point, ticks it on `main`, and runs
+1. The session merges the point, ticks it on `main`, lets any delegated agent pool
+   DRAIN (a subagent lives inside the session — ending mid-flight throws its
+   unfinished work away, and only its pushed commits survive), and then runs
    `node scripts/batch-boundary.mjs <point>`. That command REFUSES unless the work
    order confirms the point closed and the scheduled task is armed, so the session
    finds out at the boundary rather than at a blocked turn end. On success it
