@@ -10,6 +10,7 @@ import {
   GATE_COMMANDS,
   LIGHT_GATE,
   PROTECTED_REF,
+  UNAVAILABLE,
   decide,
   formatVerdict,
   gatePlan,
@@ -126,11 +127,11 @@ describe('gatePlanForPush', () => {
 describe('decide', () => {
   it('blocks on any red and names every failed step', () => {
     const v = decide([{ step: 'build', ok: true }, { step: 'lint', ok: false }])
-    expect(v).toEqual({ blocked: true, failed: ['lint'] })
+    expect(v).toEqual({ blocked: true, failed: ['lint'], unavailable: [] })
   })
 
   it('passes an all-green run', () => {
-    expect(decide(FULL_GATE.map((step) => ({ step, ok: true })))).toEqual({ blocked: false, failed: [] })
+    expect(decide(FULL_GATE.map((step) => ({ step, ok: true })))).toEqual({ blocked: false, failed: [], unavailable: [] })
   })
 
   it('does not block on an empty or malformed result list — the wrapper fails open', () => {
@@ -165,7 +166,7 @@ describe('runGate — a synthetic failing state stops the push', () => {
       return step !== 'lint'
     })
     expect(ran).toEqual(['build', 'lint'])
-    expect(decide(results)).toEqual({ blocked: true, failed: ['lint'] })
+    expect(decide(results)).toEqual({ blocked: true, failed: ['lint'], unavailable: [] })
   })
 
   it('runs every step when they all pass', () => {
@@ -180,6 +181,26 @@ describe('runGate — a synthetic failing state stops the push', () => {
     expect(decide(runGate(['lint'], () => 0)).blocked).toBe(true)
     expect(decide(runGate(['lint'], () => undefined)).blocked).toBe(true)
     expect(decide(runGate(['lint'], () => ({}))).blocked).toBe(true)
+  })
+
+  it('fails SOFT on a step that could not run at all, and keeps going', () => {
+    // The house rule: fail-soft on an environment transient, fail-loud on a
+    // product defect. An unreachable registry must not make the repository
+    // unpushable (second-model finding).
+    const ran = []
+    const results = runGate(FULL_GATE, (step) => {
+      ran.push(step)
+      return step === 'audit' ? UNAVAILABLE : true
+    })
+    expect(ran).toEqual(FULL_GATE)
+    const v = decide(results)
+    expect(v.blocked).toBe(false)
+    expect(v.unavailable).toEqual(['audit'])
+  })
+
+  it('says in the green line what was NOT checked, so a gap is never silent', () => {
+    const msg = formatVerdict({ blocked: false, failed: [], unavailable: ['audit'] }, { reason: 'x' })
+    expect(msg).toMatch(/audit could not run and was NOT checked/)
   })
 
   it('hands the runner the command the core owns, not one the caller invents', () => {

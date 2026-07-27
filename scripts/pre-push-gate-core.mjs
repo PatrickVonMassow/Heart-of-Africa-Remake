@@ -13,6 +13,13 @@
 /** The full gate: exactly what CI runs on a push. */
 export const FULL_GATE = ['build', 'lint', 'audit', 'unit']
 
+/**
+ * A step's runner may report this instead of true/false: the check could not
+ * RUN (no network for the dependency audit), which is an environment fact and
+ * not a statement about the code. Fail-soft on it — the house rule — but say so.
+ */
+export const UNAVAILABLE = 'unavailable'
+
 /** The light gate. audit ALWAYS runs — a new CVE is the usual surprise. */
 export const LIGHT_GATE = ['lint', 'audit']
 
@@ -101,23 +108,34 @@ export function parsePushInput(text) {
 export function runGate(steps, run) {
   const results = []
   for (const step of Array.isArray(steps) ? steps : []) {
-    const ok = run(step, GATE_COMMANDS[step]) === true
+    const outcome = run(step, GATE_COMMANDS[step])
+    // Three outcomes, not two: a step can also be UNAVAILABLE — it could not
+    // run at all (an unreachable registry for the audit). That says nothing
+    // about the code, so it neither passes nor blocks; it is reported and the
+    // run continues. Anything else that is not literally `true` is a failure.
+    if (outcome === UNAVAILABLE) {
+      results.push({ step, ok: true, unavailable: true })
+      continue
+    }
+    const ok = outcome === true
     results.push({ step, ok })
     if (!ok) break
   }
   return results
 }
 
-/** Whether the results block the push, and what failed. */
+/** Whether the results block the push, what failed, and what could not run. */
 export function decide(results) {
   const list = Array.isArray(results) ? results : []
   const failed = list.filter((r) => r && r.ok === false).map((r) => r.step)
-  return { blocked: failed.length > 0, failed }
+  const unavailable = list.filter((r) => r && r.unavailable).map((r) => r.step)
+  return { blocked: failed.length > 0, failed, unavailable }
 }
 
 /** The message the developer sees — it must say what to run, not only what broke. */
-export function formatVerdict({ blocked, failed }, { reason } = {}) {
-  if (!blocked) return `pre-push gate: green (${reason ?? 'gate passed'})`
+export function formatVerdict({ blocked, failed, unavailable = [] }, { reason } = {}) {
+  const note = unavailable.length ? ` — ${unavailable.join(', ')} could not run and was NOT checked` : ''
+  if (!blocked) return `pre-push gate: green (${reason ?? 'gate passed'})${note}`
   // The bypass is documented in the hook's own comment and NOT advertised here:
   // most pushes in this repository are made by autonomous agents, and a failure
   // message that names its escape hatch invites the escape.

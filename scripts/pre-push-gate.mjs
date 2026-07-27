@@ -13,6 +13,7 @@ import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   PROTECTED_REF,
+  UNAVAILABLE,
   decide,
   formatVerdict,
   gatePlanForPush,
@@ -105,8 +106,11 @@ try {
   if (warning) console.log(warning)
 
   console.log(`pre-push gate: ${plan.steps.join(' → ')} (${plan.reason})`)
-  const results = runGate(plan.steps, (_step, [cmd, ...args]) => {
+  const results = runGate(plan.steps, (step, [cmd, ...args]) => {
     const run = spawnSync(cmd, args, { cwd: REPO_ROOT, stdio: 'inherit', shell: process.platform === 'win32' })
+    // audit-check exits 3 when the audit could not RUN (offline, registry
+    // down). That is an environment fact, not a finding: fail soft, say so.
+    if (step === 'audit' && run.status === 3) return UNAVAILABLE
     return run.status === 0
   })
 

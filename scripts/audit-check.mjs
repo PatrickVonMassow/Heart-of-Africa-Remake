@@ -26,8 +26,13 @@ try {
   try {
     json = JSON.parse(e.stdout)
   } catch {
-    console.error('audit-check: could not run/parse `npm audit --json`')
-    process.exit(1)
+    // The audit could not RUN — an unreachable registry, an offline machine —
+    // which says nothing about the dependency tree. Exit code 3 marks that
+    // apart from a real finding (1) so a caller can fail SOFT on it: CI, which
+    // has a network, still treats any non-zero as failure, while the pre-push
+    // gate declines to make the repository unpushable over a transient.
+    console.error('audit-check: could not run/parse `npm audit --json` — the audit did not run (environment)')
+    process.exit(3)
   }
 }
 
