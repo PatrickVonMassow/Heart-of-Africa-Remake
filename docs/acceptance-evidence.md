@@ -582,7 +582,9 @@ Verifiable (`scripts/verify/settings.mjs`,
   the haul always terminates (I4) and resumes when a debug-edited
   river width moves the water out from under a feeding pair. The rule
   is armed in-game as the `croc-feeds-in-water` assert, so any suite
-  catches a regression.
+  catches a regression. Live in `scripts/verify/enrichments.mjs`: a
+  staged feed whose terrain is read back under BOTH bodies through
+  struggle, kill and sink, with screenshot 383.
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item);
 and the one seasonal-dress reading the research allows but the
 figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather
