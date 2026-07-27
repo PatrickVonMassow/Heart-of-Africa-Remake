@@ -11066,3 +11066,204 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   backends, judged by the picture, plus the existing crocodile-drama checks unchanged.
   DOCS in the same commit: design.md §19.16 if the drag-and-feed rule is not yet written
   there explicitly, CLAUDE.md §7.1 pt 12 and its evidence section.
+
+- [x] 365. THE PRICE OF A POINT — cut the MEASURED token cost of the working
+  process (user 26.07.2026; TOP of the queue). The weekly quota was exhausted a
+  second time on 26.07.2026. Claude Code's usage panel named the drivers for the
+  preceding 24 h: 100 % of the usage came from SUBAGENT-HEAVY sessions, 100 % from
+  sessions running 8+ HOURS, and 94 % at >150k CONTEXT ("longer sessions are more
+  expensive even when cached"). Measured document sizes: CLAUDE.md ~16k tokens,
+  design.md ~46k, TASKS.md (open points only) ~59k, docs/tasks-archive.md ~187k.
+  THE WEEK VIEW REFINES WHERE THE COST SITS, and it is the figure that decides the
+  order of work: over 7 days the same three characteristics read 99 % / 96 % / 87 %,
+  but the per-type shares — general-purpose 25 %, claude 3 %, workflow-subagent 2 % —
+  put the LISTED subagents at ≤ ~30 % of the usage, which leaves ~70 % with the MAIN
+  session. (Treat the 30 % as a lower-bound-style estimate: the panel neither states
+  that it lists every agent type nor that the shares denominate total usage. The
+  direction — the main session dominates — is what carries the ordering, not the digit.)
+  (The panel calls the first three "independent characteristics of your usage, not a
+  breakdown"; the per-type shares are the only additive numbers, and both views are
+  local-session approximations.) So "subagent-heavy" describes the SESSIONS, not where
+  the tokens went: (B) is the biggest single lever, and (A) is not an agent-only fix —
+  the main session looks points up in the same whole documents and must use the brief
+  as well.
+  WHAT IS NOT THE TARGET: parallelism. One point costs ONE context fill whichever
+  process runs it, so the pool size is throughput, not cost — this was settled on
+  26.07.2026 (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.27) and must not
+  be re-derived as a saving. The cost sits in the SIZE of each fill, in the fills
+  that repeat, and in turns spent on nothing.
+  (A) BRIEF INSTEAD OF READING ASSIGNMENT. A delegated agent today orients by
+  reading whole documents before it sees a line of source, uncached, per agent.
+  ~105k of that is addressable (TASKS.md ~59k + design.md ~46k); CLAUDE.md's ~16k is
+  NOT — the harness injects it into every subagent context, so no brief can save it.
+  Build `scripts/point-brief.mjs <N>`: it reads the point through `readTasksAll`
+  (`scripts/tasks-source.mjs`), resolves the design.md sections the spec references,
+  and prints ONE ready brief. The delegation prompt then carries that brief and
+  instructs the agent NOT to open TASKS.md or design.md wholesale. Record the
+  measured before/after token count for one real point.
+  THE BRIEF MUST NOT STARVE ITS READER — a smaller context that costs a rebuild is no
+  saving. So: a DANGLING reference fails the brief LOUDLY (a design.md section the
+  spec names but the document no longer has, e.g. after a renumbering, must error, not
+  be silently omitted); cross-point references inside a spec ("per point 288 …", common
+  in this queue) are resolved into the brief as well; the agent is told it MAY read a
+  NAMED section on demand — the ban is on wholesale reads, not on targeted lookups —
+  and it must ESCALATE rather than guess when the brief proves insufficient.
+  (B) CONTEXT BOUNDARY PER POINT — ATTENDED SESSIONS, AND CONDITIONAL. 87–94 % of the
+  usage sat above 150k context because the main session carries point after point in
+  one window. CONSTRAINT: the session cannot clear itself — `/clear` is the user's
+  command, exposed by no tool. SCOPE: at a point boundary in an ATTENDED session, ask
+  the user for `/clear` rather than carrying on silently; `batch-resume-hook` already
+  re-injects the open points and the batch state on the SessionStart that follows, so
+  a cleared session re-orients itself.
+  CONDITIONAL, not per point: a fresh session re-pays CLAUDE.md, the system prompt and
+  the re-orientation uncached, so recycling a 60k context can cost MORE than carrying
+  it. Trigger the ask above a MEASURED context size (the >150k figure above is the
+  candidate threshold — measure it, do not assume it).
+  THE AUTONOMOUS VARIANT IS NOT PART OF THIS POINT and must not be built into it: an
+  unattended batch session that ends at a boundary has nothing to start its successor
+  (`HoA-Batch-Autostart` is verifiably Disabled — containment after the e9407cae
+  double-session incident), and `batch-progress-guard` BLOCKS the turn end precisely
+  to stop a batch session from ending while open points remain. Closing that gap means
+  either re-enabling the launcher (reversing a containment decision) or letting a live
+  session spawn its successor (guaranteeing two live sessions for a window — the
+  incident class itself). Both are the USER's call; a card in the dashboard's "Von dir
+  zu klären" holds the question, and neither is implemented without an explicit go.
+  (C) THE OPEN WORK-ORDER BODY STAYS UNBUDGETED — recorded here so it is not proposed
+  again. `scripts/doc-budget-core.mjs` deliberately budgets CLAUDE.md, design.md and
+  the work order's PREAMBLE only, on its own written rationale: the POINTS are
+  legitimate growth, and a whole-file ceiling would punish appending work. That
+  rationale still holds, and the escape valves a budget needs do not exist for this
+  half — an OPEN point cannot move to the archive (`tasks-archive-guard` blocks it) and
+  thinning a spec collides with the implementation-ready-final-state mandate, so the
+  only ever-available way out would be raising the ceiling, which is the failure the
+  budget mechanism itself warns against. (A) removes the reason anyway: once the brief
+  is the lookup path, the body's size no longer enters a context. The acceptance test
+  is therefore behavioural, not numeric — see VERIFIABLE.
+  (D) NO GUARD BLOCK-LOOPS. A guard that blocks costs a whole turn at full context;
+  the render-verify loop on point 278 cost ~30 such turns for one process mistake.
+  Build `scripts/guard-preflight.mjs`, which runs the relevant pure guard cores in
+  read-only "would this block?" mode BEFORE the action they govern (merge, tick,
+  turn end) and names what would block. Cost: one cheap process run instead of N
+  blocked turns. THE DRIFT RISK IS THE INPUT GATHERING, NOT THE CORES: the cores are
+  pure and importable, but each wrapper does its own I/O (git state, session id,
+  dashboard state). The preflight must therefore call each wrapper's gather step and
+  the core's decide step — never a reimplementation of the gathering, which would
+  drift and return a false "clean". Each wrapper exports its gather step for that
+  purpose. The preflight is ADVISORY: state can change between it and the action, so
+  the guard itself stays the authority.
+  (E) THE MODEL POLICY STANDS. The usage panel advises "a cheaper model for simpler
+  subagents". REJECTED — recorded so it is not revisited as a saving. The ground is
+  the DECISION of 25.07.2026 (CLAUDE.md §6: Opus 5 worker · Fable 5 four-eyes/fallback
+  · Opus 4.8 last fallback), which this point leaves untouched. Note for anyone
+  re-reading the history: the 24.07.2026 Haiku wreck is evidence for the allowlist's
+  ENFORCEMENT (a weak model must never hold the worker role unnoticed), not a refutation
+  of the panel's proposal, which is about deliberately configuring read-only helpers.
+  The allowlist stands on the decision, not on that incident.
+  VERIFIABLE: pure Vitest — `point-brief.mjs` extracts the right point for an open AND
+  an archived number, resolves every design.md section its spec names, resolves a
+  cross-point reference, FAILS LOUDLY on an unknown point number and on a design.md
+  section the document no longer contains, and its output stays under a measured
+  ceiling; `guard-preflight` reports a state a guard would block on WITHOUT the guard
+  running, reports clean on a good state, and shares its input gathering with the
+  wrapper (a test that pins gather-step reuse, so a reimplementation fails). No browser
+  suite — nothing here renders.
+  MEASURE BOTH SIDES, NOT ONLY TOKENS. Every figure above is a cost figure, and the
+  premise underneath them — "a brief-fed, freshly cleared context delivers as well as a
+  carried one" — is exactly the kind of unexamined assumption §3.27 was about. So the
+  first three points delivered under the brief record their REWORK as well: how often
+  an agent had to escalate for missing context, and whether anything had to be rebuilt.
+  A saving that raises the rebuild rate is not a saving.
+  DOCS in the same commit: CLAUDE.md §6 (the delegation brief, the attended context
+  boundary, the rejected cheap-model option) and the measured before/after figures
+  beside the levers. The analysis documents already carry this problem class
+  (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.31 and the beginner's guide's
+  quota pitfall, both written 26.07.2026); extend them only if the implementation
+  changes the conclusion. The guide's parenthetical on the cheaper model is rewritten
+  to the actual lesson — a weak model must never hold the worker role unnoticed —
+  rather than citing the incident as a refutation.
+  FOUR EYES: done 27.07.2026 (Fable 5 reviewed the Opus 5 spec, verdict
+  GREEN-WITH-CONDITIONS); the conditions are folded into the text above. The
+  IMPLEMENTATION is reviewed the same way before it merges — the first such review
+  returned MERGE-WITH-FIXES with two serious defects, which is why the bar below exists.
+  HARDENING — THIS TOOLING BECOMES THE BASE PROCESS FOR PULLING WORK, so a quiet defect
+  in it corrupts every task that follows (user 27.07.2026: spend more effort here rather
+  than risk that). The unit tests are not enough; the following gates are part of the
+  point and it does not merge without them.
+  (H1) FAITHFULNESS OVER THE WHOLE CORPUS, not a sample. For EVERY point, open and
+  archived: the brief carries the spec text VERBATIM (a diff against `readTasksAll`'s
+  body, so no truncation or paraphrase can creep in); every `§` reference in that spec is
+  either carried with content from the document the spec actually NAMED, or named in the
+  notes; and NO section is carried from a document the spec never named. The silent wrong
+  substitution — not the loud failure — is the defect class that must be impossible.
+  (H2) THE `§` CORPUS IS FOUR DOCUMENTS WIDE, not three: design.md, CLAUDE.md, a
+  work-order point, AND the research documents (`docs/*-1890.md`, cited in prose as
+  "peoples-1890 §8", "climate §1.1"). Resolve all four, including a LETTERED section
+  (`§B`). A reference that resolves nowhere fails loudly and names the documents it
+  searched — never "a renumbering?" when the section never was in that document.
+  (H3) THE GUARD CHAIN IS PROVEN BY BEHAVIOUR, not by inspection. A test spawns each
+  refactored wrapper AS A HOOK (child process, hook JSON on stdin) and asserts the same
+  decision, message and exit code as before the refactor, for both a blocking and a
+  clean state. `isMainModule` is the single point of failure for the whole Stop chain;
+  reading it is not evidence, running it is.
+  (H4) ERROR PATHS PRESERVE WHICH ERROR WRITES STATE. The render-verify re-baseline may
+  fire ONLY on the specific baseline-resolution failure it was written for; every other
+  gather error allows the stop WITHOUT touching state. Pin it with a test per error
+  source, because the regression here is invisible — it converts fail-open-once into
+  fail-open-forever, silently clearing an unverified render gate.
+  (H5) A BLIND SECOND SET OF TEST SCENARIOS (§355's divergent mode): the second model
+  designs, independently and without seeing the first, its own complete list of ways the
+  brief could mislead a reader; the union is implemented. A review of a finished list
+  checks the list — it does not produce what is missing from it.
+  (H6) DOGFOOD IT BEFORE TRUSTING IT: the next three delegated points are briefed with
+  the tool, and each agent is asked whether the brief was sufficient. Their answers are
+  recorded with the point. A tool that reads correctly but omits what a builder needs
+  fails this and must be widened.
+  EVIDENCE SO FAR (27.07.2026), and every answer changed something:
+  · point 366 (1.1k tokens): sufficient in shape, but the brief stated an intended state
+    IN THE PRESENT TENSE — "the prompt hook already stamps the turn start" — and it did
+    not. The builder caught it; a weaker reader would have shipped a gate that can never
+    fire, green on every test. Also missing: the stand-down convention every guard has
+    (without it the gate denies every subagent's first edit), the near-full doc budget,
+    and the existing PreToolUse guard as the template. → retrospective §3.35, and the
+    standing HOUSE FACTS block now in every brief.
+  · point 361 (1.3k tokens): "unusually well-scoped", and one instruction was
+    load-bearing (do not run the regression on a shared machine). Gaps: it did not say
+    `verification/` is TRACKED — the agent deleted 96 tracked files and restored them —
+    it presumed every named bug has a fix (two of eight do not), and it named a
+    documentation source without naming where. → the same HOUSE FACTS block.
+  · points 367/368: briefed, and briefed differently — the agent GENERATES the brief
+    itself (`node scripts/point-brief.mjs <N>`) instead of receiving it pasted. Measured
+    reason: 367's brief is 11.9k tokens because it carries §19 verbatim, and pasting it
+    would charge the main session that amount a second time. Answers pending.
+  H6 SATISFIED, and far past the three it asked for: 27.07.2026 ran FIFTEEN briefed
+  delegations (294, 296, 307, 337, 339, 361, 369, 370, 373, 375, 376, 377, 381, 383, 386).
+  Every agent was asked whether the brief sufficed and every one answered. The verdict is
+  the same shape throughout: the brief carried the SPEC well enough to build from — no
+  agent had to re-read the work order or the design document — and what it left out was
+  never the point's content but the HOUSE knowledge around it. The recurring gaps, each
+  reported by more than one agent:
+  · ANCHORS TOO THIN. Two points named one file while the work sat in another (369's
+    scene wiring in `Wildlife.tsx`, 383's whole placement chain). Both agents said the
+    delegating prompt's pointer, not the brief, saved the search.
+  · THE LIVE DOC-BUDGET HEADROOM. Four agents needed to know how many words were free
+    before writing a sentence; "near its limit" was true and useless where the real
+    figure was 3 words. A brief that prints the current headroom per budgeted document
+    would have saved a turn each time.
+  · WHERE A CITED SECTION'S COMPANION LIVES. §7.1's evidence chains moved to
+    `docs/acceptance-evidence.md` and §21.2's catalogue to `docs/design-reference.md`;
+    a reader following the reference map alone writes into the wrong file.
+  · THE REGISTRATION SURFACE OF A NEW MECHANISM — `.claude/settings.json`, the preflight
+    registry AND its test, `guard-health` blocking on an unwired guard, a new browser
+    suite needing `tiers.mjs` and the README together, and the fixed-wait ratchet that
+    fails the unit layer on a literal `waitForTimeout`.
+  · ONE PLATFORM FACT that bit twice in one day: `execSync` goes through cmd.exe, where a
+    bare `^` in a git revision is eaten — it had already bitten `render-verify-guard`.
+  THE REWORK THE POINT ASKED TO MEASURE: none of the fifteen was rebuilt for want of
+  context. Two escalated a spec ambiguity rather than guessing (370 on what counts as a
+  backfilled outcome, 386 on a self-contradicting verifiable clause) — which is the
+  behaviour the brief demands and cheaper than either alternative. Three findings came
+  from agents reading BEYOND their brief (the stale present-tense assertion, the tracked
+  `verification/` directory, the missing drag leg), so the brief did not blinker them.
+  CONCLUSION: the mechanism holds; what it still under-serves is measurable state (budget
+  headroom, where a companion document sits) rather than prose. Those are cheap to add
+  and are the next improvement to the generator, not a reason to widen the brief.
