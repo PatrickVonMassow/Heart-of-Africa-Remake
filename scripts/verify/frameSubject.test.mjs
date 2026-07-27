@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
   UNITS_PER_DEGREE,
@@ -190,6 +190,25 @@ describe('findRawFrames', () => {
     expect(findRawFrames(null)).toBe(0)
     expect(formatRawFrameFindings([])).toBe('')
     expect(formatRawFrameFindings([{ file: 'a.mjs', count: 2 }])).toContain('a.mjs: 2')
+  })
+})
+
+// THE GATE: no verify script may write a frame that declared no subject. Runs in
+// the ordinary unit layer, so every regression run enforces it without any hook
+// wiring — the same shape as the fixed-wait ratchet next door.
+describe('the real verify suites', () => {
+  const dir = resolve(process.cwd(), 'scripts/verify')
+  // The shutter performs the write, and the core states the pattern it looks
+  // for — scanning either would count the mechanism as a violation of itself.
+  const SELF = new Set(['frameSubject.mjs', 'frameSubject-core.mjs'])
+
+  it('declare a subject for every frame they write', () => {
+    const findings = []
+    for (const f of readdirSync(dir).filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs') && !SELF.has(f))) {
+      const count = findRawFrames(readFileSync(resolve(dir, f), 'utf8'))
+      if (count) findings.push({ file: f, count })
+    }
+    expect(findings, `\n${formatRawFrameFindings(findings)}\n`).toEqual([])
   })
 })
 

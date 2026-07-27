@@ -1,6 +1,7 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -68,6 +69,10 @@ const probeSilhouetteFooting = async (page, check, label) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Point 375: every frame below states the subject it must show — the settlement
+// it stands in, the building it is aimed at, the overlay it documents — and the
+// shutter proves that subject is in the picture before the file is written.
+const frame = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -124,9 +129,7 @@ await page.evaluate(() => {
     p.pitch = 0.02
   })
   await page.waitForTimeout(700)
-  const skyBuf = await page.screenshot()
-  await sharp(skyBuf).toFile(`${OUT}100-cairo-giza-skyline.png`)
-  console.log('shot 100-cairo-giza-skyline.png')
+  const skyBuf = await frame('100-cairo-giza-skyline', { place: 'cairo', label: 'the Giza skyline over Cairo' })
 
   // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
   // BAND at this distant skyline scale, so it was removed (kept only at the
@@ -171,8 +174,7 @@ await page.evaluate(() => {
     gizaExcl.skyline === 'giza-pyramids' && gizaExcl.spanCount >= 1 && gizaExcl.sils >= 3 && gizaExcl.violating === 0,
     JSON.stringify(gizaExcl),
   )
-  await page.screenshot({ path: `${OUT}105-cairo-panorama-giza-clear.png` })
-  console.log('shot 105-cairo-panorama-giza-clear.png')
+  await frame('105-cairo-panorama-giza-clear', { place: 'cairo', label: 'the Cairo panorama with the Giza skyline' })
 }
 
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
@@ -276,8 +278,7 @@ const plan = await page.evaluate(() => {
   const labels = [...document.querySelectorAll('.plan-building-label')].map((n) => n.textContent)
   return { present: !!el, labels, canvas: !!document.querySelector('.map-overlay canvas') }
 })
-await page.screenshot({ path: `${OUT}98-place-plan.png` })
-console.log('shot 98-place-plan.png')
+await frame('98-place-plan', { element: '.map-place-plan', label: 'the town plan' })
 check('inside a settlement the map shows the town plan', plan.present && !plan.canvas, JSON.stringify({ canvas: plan.canvas }))
 check('the plan names the functional buildings', plan.labels.length >= 2, `labels [${plan.labels.join(', ')}]`)
 await page.evaluate(() => window.__ui.getState().toggleMap())
@@ -298,8 +299,7 @@ check('the gift unlocks the building markers', after >= 1, `${after} markers`)
 check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
-await page.screenshot({ path: `${OUT}93-orientation-highlight.png` })
-console.log('shot 93-orientation-highlight.png')
+await frame('93-orientation-highlight', { element: '.building-highlight', label: 'the unlocked building marker' })
 
 // Persistence: leaving and re-entering keeps the orientation.
 await page.evaluate(() => {
@@ -349,8 +349,7 @@ await page.evaluate(() => {
   p.yaw = 0
 })
 await page.waitForTimeout(600)
-await page.screenshot({ path: `${OUT}96-capetown-table-mountain.png` })
-console.log('shot 96-capetown-table-mountain.png')
+await frame('96-capetown-table-mountain', { place: 'capetown', label: 'Cape Town under Table Mountain' })
 
 // Timbuktu: the Djinguereber mosque stands inside the town fabric, with a
 // collider (an oriented box like every rectangular building).
@@ -385,8 +384,7 @@ if (mosque) {
     p.yaw = Math.atan2(m.x - p.x, m.z - p.z) + Math.PI
   }, mosque)
   await page.waitForTimeout(600)
-  await page.screenshot({ path: `${OUT}97-timbuktu-djinguereber.png` })
-  console.log('shot 97-timbuktu-djinguereber.png')
+  await frame('97-timbuktu-djinguereber', { local: { x: mosque.x, z: mosque.z, y: 4 }, label: 'the Djinguereber mosque' })
 }
 
 // --- The season inside a settlement (design.md §19.13, point 120g) ------------
@@ -407,14 +405,12 @@ if (mosque) {
   // Poll until the dome-gray lerp settles (point 200), not a fixed wall wait.
   await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
   const dry = await read()
-  await page.screenshot({ path: `${OUT}110-village-season-dry.png` })
-  console.log('shot 110-village-season-dry.png')
+  await frame('110-village-season-dry', { place: 'maasai-village', label: 'the settlement in the dry season' })
 
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
   await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
   const wet = await read()
-  await page.screenshot({ path: `${OUT}111-village-season-wet.png` })
-  console.log('shot 111-village-season-wet.png')
+  await frame('111-village-season-wet', { place: 'maasai-village', label: 'the settlement in the wet season' })
 
   check(
     'the dry-season settlement stands under the clear preset sky',
@@ -450,8 +446,7 @@ if (mosque) {
     wet.tint > 0.75 && dry.tint < 0.25,
     `tint wet ${wet.tint.toFixed(2)} -> dry ${dry.tint.toFixed(2)}`,
   )
-  await page.screenshot({ path: `${OUT}114-village-rain.png` })
-  console.log('shot 114-village-rain.png')
+  await frame('114-village-rain', { place: 'maasai-village', label: 'the rain inside the settlement' })
   // Leave no forced weather behind for the checks below.
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 
@@ -591,8 +586,7 @@ if (mosque) {
   )
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0; p.pitch = 0.02 })
   await page.waitForTimeout(700)
-  await page.screenshot({ path: `${OUT}99-travel-panorama.png` })
-  console.log('shot 99-travel-panorama.png')
+  await frame('99-travel-panorama', { place: 'nubian-village', label: 'the surroundings panorama' })
 
   // Magenta-pillar orientation proof: the probe stood due west of the
   // capture point, so its colour must show looking WEST and not EAST.
@@ -654,9 +648,9 @@ if (mosque) {
   await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 15000 }).catch(() => {})
   await probeSilhouetteFooting(page, check, 'cairo (capture active, Giza skyline)')
   // Human-viewable evidence: aim at a silhouette and shoot it against the band.
-  await page.evaluate(() => {
+  const aimedAt = await page.evaluate(() => {
     const it = Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible)[0]
-    if (!it) return
+    if (!it) return null
     const p = window.__placePlayer
     const r = (window.__placeLayout?.radius ?? 40) * 0.9
     const d = Math.hypot(it.x, it.z) || 1
@@ -664,10 +658,15 @@ if (mosque) {
     p.z = (it.z / d) * r
     p.pitch = 0
     p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
+    return { x: it.x, z: it.z, y: it.y }
   })
   await page.waitForTimeout(800)
-  await page.screenshot({ path: `${OUT}136-cairo-silhouette-footing.png` })
-  console.log('shot 136-cairo-silhouette-footing.png')
+  // The silhouette itself is the subject — it stands far past the walkable disc,
+  // so its own reported height is what has to be projected, not the ground.
+  await frame(
+    '136-cairo-silhouette-footing',
+    aimedAt ? { local: aimedAt, label: 'the panorama silhouette on its ground line' } : { place: 'cairo', label: 'the Cairo panorama (no silhouette to aim at)' },
+  )
   await page.evaluate(() => {
     const p = window.__placePlayer
     p.x = 0
@@ -699,8 +698,7 @@ for (const [placeId, shot] of [
     paths: window.__placeLayout.paths.length,
     dwellings: window.__placeLayout.dwellings.length,
   }))
-  await page.screenshot({ path: `${OUT}${shot}` })
-  console.log(`shot ${shot}`)
+  await frame(shot.replace(/\.png$/, ''), { element: '.map-place-plan', label: `the ${placeId} town plan` })
   check(`${placeId}: the town plan draws the plan fabric`, fabric.plan && fabric.dwellings >= 6, JSON.stringify(fabric))
   await page.evaluate(() => window.__ui.getState().toggleMap())
   await page.waitForTimeout(200)
@@ -724,8 +722,9 @@ for (const [placeId, shot] of [
   await page.waitForTimeout(2500) // travel scene settles, landmark chunk streams in
   const giza = await page.evaluate(() => window.__culturalLandmarks)
   check('the Giza field (with the Sphinx) is mounted at travel scale', !!giza?.ids?.includes('giza'), JSON.stringify(giza))
-  await page.screenshot({ path: `${OUT}103-giza-sphinx-travel.png` })
-  console.log('shot 103-giza-sphinx-travel.png')
+  // Giza's own position (the marker jumped to in the block below), not the
+  // standpoint: the frame claims the field, so the field must be in the picture.
+  await frame('103-giza-sphinx-travel', { world: { lat: 29.7726, lon: 30.7554 }, label: 'the Giza field with the Sphinx' })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
 
@@ -787,9 +786,7 @@ for (const [placeId, shot] of [
     p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
   })
   await page.waitForTimeout(1000)
-  const siteBuf = await page.screenshot()
-  await sharp(siteBuf).toFile(`${OUT}139-giza-walkable-site.png`)
-  console.log('shot 139-giza-walkable-site.png')
+  const siteBuf = await frame('139-giza-walkable-site', { place: 'giza', label: 'the walkable Giza plateau' })
 
   // Point 273: the plateau must read as warm DESERT SAND, not a pale, cool,
   // wavy parchment. Sample the near foreground (the bottom-centre strip, always
@@ -926,8 +923,7 @@ for (const [placeId, shot] of [
       )
       await page.waitForTimeout(600)
       shot++
-      await page.screenshot({ path: `${OUT}141-giza-horizon-${shot}.png` })
-      console.log(`shot 141-giza-horizon-${shot}.png`)
+      await frame(`141-giza-horizon-${shot}`, { place: 'giza', label: 'the Giza horizon from the site rim' })
     }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
@@ -964,15 +960,13 @@ for (const [placeId, shot] of [
   // month, against the fifteen that never dress. The pure mapping is covered in
   // src/systems/dress.test.ts; this is the live half.
   const somaliKarif = await dressAt('somali-village', 8) // August — the karif on the Haud
-  await page.screenshot({ path: `${OUT}113-somali-karif-tobe.png` })
-  console.log('shot 113-somali-karif-tobe.png')
+  await frame('113-somali-karif-tobe', { place: 'somali-village', label: 'the Somali karif dress' })
   const somaliJilal = await dressAt('somali-village', 2) // February — jilal, dry and HOT
   const hausaHarmattan = await dressAt('hausa-village', 1) // January — the harmattan
   const hausaWet = await dressAt('hausa-village', 8) // August — the rains
 
   const zuluWinter = await dressAt('zulu-village', 7) // July — austral winter
-  await page.screenshot({ path: `${OUT}112-zulu-winter-cloaks.png` })
-  console.log('shot 112-zulu-winter-cloaks.png')
+  await frame('112-zulu-winter-cloaks', { place: 'zulu-village', label: 'the Zulu winter cloaks' })
   const zuluSummer = await dressAt('zulu-village', 1) // January — austral summer
   const maasaiWinter = await dressAt('maasai-village', 7) // the equator has no winter
   const sanWinter = await dressAt('san-village', 7) // Passarge's -5C Kalahari mornings
@@ -1088,8 +1082,7 @@ for (const [placeId, shot] of [
     return { sheltered: s.fireSheltered, rain: s.rain, rainFactor: s.fireRainFactor }
   }
   const bembaFire = await fireInRain('bemba-village') // a cook-shelter people
-  await page.screenshot({ path: `${OUT}135-fire-cook-shelter-rain.png` })
-  console.log('shot 135-fire-cook-shelter-rain.png')
+  await frame('135-fire-cook-shelter-rain', { place: 'bemba-village', label: 'the cook shelter over the fire' })
   const maasaiFire = await fireInRain('maasai-village') // a dome-dweller, no canopy
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
   check(
@@ -1187,8 +1180,7 @@ for (const [placeId, shot] of [
   await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(true))
   await page.waitForTimeout(1500) // cube map + TRAA settle
   const contrastOn = await fireContrasts()
-  await page.screenshot({ path: `${OUT}138-fire-shadows-on.png` })
-  console.log('shot 138-fire-shadows-on.png')
+  await frame('138-fire-shadows-on', { local: { x: -3.5, z: 2.5, y: 0.5 }, label: 'the fire pit and its stone ring' })
   await page.evaluate(() => {
     window.__ui.getState().setFireShadowsEnabled(false)
     window.__ui.getState().setSeasonWetnessOverride(null)
