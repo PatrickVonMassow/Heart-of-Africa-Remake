@@ -3237,7 +3237,13 @@ read that as "the criterion and its evidence section".
   ceiling, so no guard complains, but the user reads it as verbose and every point that
   cites a section pays for the bulk around it. It is also the SOLE SOURCE OF TRUTH for
   the target state, which makes a careless cut the most expensive possible edit here.
-  MEASURE FIRST, then cut. Deliver a table of the 21 top-level sections by word count,
+  THE MEASUREMENT IS DONE (27.07.2026) and it makes the task small: §19 Atmosphere alone
+  carries 11.881 words — 39 % of the document — with §2 Perspectives (12 %) and §21 Debug
+  Menu (11 %) making two thirds between the three. Inside §19 the two RESEARCH RECORDS
+  stand out as pure reference read on demand (§19.15 peoples 1.112 words, §19.14 climate
+  778), as does §19.8 Family life (3.484) and §19.13 Seasons (1.973) for narrative weight.
+  Start there; the remaining eighteen sections together are noise by comparison.
+  Deliver a table of the 21 top-level sections by word count,
   and classify each block as: (a) REFERENCE read on demand rather than at the start —
   the candidate to MOVE to a neighbour document under the SAME numbers, exactly as the
   acceptance-evidence split did on 26.07.2026; (b) DUPLICATION of what CLAUDE.md, the
