@@ -2106,7 +2106,7 @@ read that as "the criterion and its evidence section".
   flame shrinks.
   (b) THE VILLAGERS WALK THROUGH IT. The fire needs a collider — the user's own
   suggestion, and the right one: the hearth plus a calibratable clearance radius
-  ( value, debug-editable) joins the settlement's collider set, so inhabitants
+  (a `balance` value, debug-editable) joins the settlement's collider set, so inhabitants
   path AROUND it and the player cannot stand in the flames either. The §2.6 rule that no
   walker may be trapped applies: adding an obstacle in the middle of a yard must not
   strand anyone, so the errand-target validation runs against the widened set.
