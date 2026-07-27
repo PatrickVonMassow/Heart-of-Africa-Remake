@@ -36,7 +36,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } fr
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { killTree, launchServer } from './_server.mjs'
-import { DEV_SUITES, selectBackend } from './tiers.mjs'
+import { DEV_SUITES, SERVERLESS_SUITES, selectBackend } from './tiers.mjs'
 import {
   allChecks,
   classifyAgainstBaseline,
@@ -48,10 +48,6 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
-
-/** Suites that need no dev server (pure Node checks) — they read their OWN
- *  tree, so the baseline runs the BASELINE copy of the script. */
-const NO_SERVER_SUITES = ['docs']
 
 /** Files whose drift between the baseline and HEAD can bend the comparison:
  *  the baseline checkout runs against the CURRENT node_modules and the current
@@ -178,7 +174,10 @@ async function main() {
   }
   console.log(`# baseline ${baseline.sha.slice(0, 12)} (${baseline.ref}) — suite ${opts.suite}, backend ${backend}, ${opts.runs} run(s)`)
 
-  const needsServer = !NO_SERVER_SUITES.includes(opts.suite)
+  // A serverless (pure Node) suite reads its OWN tree, so the baseline runs the
+  // BASELINE copy of the script; everything else runs the CURRENT check against
+  // a baseline dev server.
+  const needsServer = !SERVERLESS_SUITES.includes(opts.suite)
   const tree = prepareBaselineTree(baseline.sha)
 
   // What is red NOW: handed in by run-all (its captured output or the names), or

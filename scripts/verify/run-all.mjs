@@ -14,7 +14,8 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
+import { changeRelatedness, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import { DEV_SUITES, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -44,7 +45,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const VERIFY_GL = selectBackend(process.env.VERIFY_GL)
 
 const args = process.argv.slice(2)
-const { tier, filter, fullRun, isLargeEquivalent } = parseArgs(args)
+const { tier, filter, fullRun, isLargeEquivalent, baseline } = parseArgs(args)
+const wantBaseline = baseline || process.env.VERIFY_BASELINE === '1'
 
 // point 204(b): a bare LARGE run (`npm test` / `npm run test:large`) covers BOTH
 // renderer backends in one command — it re-invokes itself once per planned pass.
@@ -104,7 +106,7 @@ function runSuite(name, baseUrl) {
   })
   if (res.error && res.error.code === 'ETIMEDOUT') {
     console.log(`FAIL  ${name.padEnd(12)} — KILLED after ${Math.round(SUITE_TIMEOUT_MS / 60000)} min wall timeout (hung, not slow — raise VERIFY_SUITE_TIMEOUT_MS if this was a genuine slow-green run)`)
-    return false
+    return { ok: false, out: '' }
   }
   const out = (res.stdout ?? '') + (res.stderr ?? '')
   const pass = (out.match(/^PASS/gm) ?? []).length
@@ -121,7 +123,7 @@ function runSuite(name, baseUrl) {
       for (const line of out.split('\n').filter((l) => l.trim()).slice(-12)) console.log('      | ' + line)
     }
   }
-  return ok
+  return { ok, out }
 }
 
 // Auto-retry a failed BROWSER suite once (point 200 — general flake resilience).
@@ -133,17 +135,73 @@ function runSuite(name, baseUrl) {
 // genuine INTERMITTENT bug (one that flaked, like the buried-drinker) is surfaced
 // rather than masked. The root-cause fix stays the point-200 sim-clock/condition
 // polling; this only stops one transient from failing the whole regression.
+//
+// A double failure is TRIAGED, not asserted (point 294). "Failed twice" used to
+// print "a real failure, not a flake", which is not what two failures prove: on
+// 27.07.2026 `enrichments` failed two staging checks, then a completely
+// different one on the retry, on a loaded machine — the signature of load, and
+// none of the three checks had anything to do with the change. So the verdict is
+// read from the failing check NAMES (baseline-classify-core.mjs): the SAME check
+// twice is a candidate real failure, disjoint sets are load. Whether the check
+// even touches the diff is printed beside it as a weak second signal.
 const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
+/** Suites that failed twice, kept for the opt-in baseline classification below. */
+const doubleFailures = []
 function runSuiteWithRetry(name, baseUrl) {
-  if (!RETRY_ENABLED) return runSuite(name, baseUrl) // strict mode (closing's flake-free gate)
-  if (runSuite(name, baseUrl)) return true
+  const first = runSuite(name, baseUrl)
+  if (first.ok) return true
+  if (!RETRY_ENABLED) {
+    // Strict mode (the closing's flake-free gate): no retry, so no repeat
+    // signature exists — say that rather than imply one.
+    doubleFailures.push({ suite: name, failed: failedChecks(first.out) })
+    return false
+  }
   console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
-  if (runSuite(name, baseUrl)) {
+  const second = runSuite(name, baseUrl)
+  if (second.ok) {
     console.log(`⚠ PASSED ON RETRY  ${name} — it flaked once; INVESTIGATE if it recurs (could be a real intermittent)`)
     return true
   }
-  console.log(`FAIL (twice)  ${name} — a real failure, not a flake`)
+  const signature = repeatSignature({ first: first.out, second: second.out })
+  const interesting = signature.stable.length ? signature.stable : [...signature.onlyFirst, ...signature.onlySecond]
+  const relatedness = changeRelatedness({ checks: interesting, changedFiles: changedFiles() })
+  for (const line of formatRepeatReport({ suite: name, signature, relatedness })) console.log(line)
+  doubleFailures.push({ suite: name, failed: interesting, verdict: signature.verdict })
   return false
+}
+
+// The files this branch changed against its merge-base — the weak relatedness
+// signal's input. Read once, failure-tolerant: no git, no answer, and the report
+// then says nothing rather than something wrong.
+let changedFilesCache = null
+function changedFiles() {
+  if (changedFilesCache) return changedFilesCache
+  const root = join(HERE, '..', '..')
+  const base = spawnSync('git', ['merge-base', 'HEAD', 'main'], { cwd: root, encoding: 'utf8' })
+  if (base.status !== 0) return (changedFilesCache = [])
+  const diff = spawnSync('git', ['diff', '--name-only', base.stdout.trim(), '--'], { cwd: root, encoding: 'utf8' })
+  changedFilesCache = diff.status === 0 ? diff.stdout.split('\n').map((l) => l.trim()).filter(Boolean) : []
+  return changedFilesCache
+}
+
+/**
+ * OPT-IN baseline classification (point 294): for each suite that failed twice,
+ * re-run it against the pre-change baseline and label each red REAL REGRESSION
+ * vs PRE-EXISTING. Off by default — it is a second (and third) browser run on a
+ * second checkout. Enable with `npm test -- --baseline` or VERIFY_BASELINE=1.
+ */
+function classifyAgainstBaselineRuns() {
+  if (doubleFailures.length === 0) return
+  console.log(`\n===== baseline classification (point 294) — ${doubleFailures.length} suite(s) that failed twice =====`)
+  for (const { suite, failed } of doubleFailures) {
+    if (!DEV_SUITES.includes(suite)) {
+      console.log(`SKIP  ${suite} — no baseline lane for it (it is not one of the dev suites).`)
+      continue
+    }
+    const args = [join(HERE, 'baseline-classify.mjs'), suite]
+    for (const c of failed) args.push('--failed', c.name)
+    spawnSync(process.execPath, args, { cwd: join(HERE, '..', '..'), stdio: 'inherit' })
+  }
 }
 
 // Cross-browser functional smoke (point 213): a SHORT check on Firefox + WebKit
@@ -243,7 +301,10 @@ try {
   // WebGPU lane would be redundant.
   const wantCross = (fullRun || filter.includes('crossbrowser')) && VERIFY_GL !== 'webgpu'
   if (devPick.length > 0 || wantCross) {
-    const server = await launchServer('npm run dev', 'dev', join(HERE, '..', '..'))
+    // A pure-Node pick (`npm test -- docs`) starts no vite server at all.
+    const server = needsDevServer(devPick) || wantCross
+      ? await launchServer('npm run dev', 'dev', join(HERE, '..', '..'))
+      : { child: null, base: undefined }
     dev = server.child
     for (const s of devPick) results.push(runSuiteWithRetry(s, server.base))
     if (wantCross) {
@@ -275,6 +336,14 @@ if (!skipPreflight && ((fullRun && tier !== 'small') || filter.includes('preview
       killTree(preview)
     }
   }
+}
+
+if (wantBaseline) classifyAgainstBaselineRuns()
+else if (doubleFailures.length > 0) {
+  console.log(`
+# ${doubleFailures.length} suite(s) failed twice — to label each red REAL REGRESSION vs PRE-EXISTING,`)
+  console.log(`# re-run with --baseline (or VERIFY_BASELINE=1), or classify one suite directly:`)
+  console.log(`#   node scripts/verify/baseline-classify.mjs ${doubleFailures[0].suite}`)
 }
 
 const failed = results.filter((r) => !r).length
