@@ -2906,6 +2906,123 @@ const guard = await page.evaluate(async () => {
 })
 check('a parent moves to guard its calf from a predator', guard.found && guard.after < guard.before - 0.05, JSON.stringify(guard))
 
+// --- Point 369: an orphaned juvenile mourns before it plays again ------------
+// A calf whose parent has just DIED used to go straight back to gambolling, and
+// the picture said nothing had happened. Three staged scenes, all on the
+// synthetic family (point 135) so nothing depends on the natural spawn pool:
+// the bereaved calf keeps to the body and does not hop for a whole play cycle;
+// the window survives an adoption and then RELEASES it back into play; and a
+// predator staged mid-window still makes it run — fear outranks grief.
+const mourn369 = await page.evaluate(async () => {
+  const B = window.__balance
+  const L = window.__lionHunt.state
+  const prevWindow = B.family.mourningSeconds
+  const prevRadius = B.family.adoptionRadius
+  const at = () => window.__game.getState().pos
+  // The play cycle the demeanour must visibly SKIP: one bout plus the fixed
+  // 12 s idle gap (GAMBOL_IDLE_SECONDS in the scene).
+  const CYCLE = B.family.gambolBoutSeconds + 12
+
+  // --- 1) The bereaved calf keeps to the body and does not play -------------
+  L.mode = 'idle'; L.timer = 999 // no stray hunt while the demeanour is watched
+  B.family.adoptionRadius = 0.001 // nobody takes it in: it keeps to the body itself
+  B.family.mourningSeconds = CYCLE * 3 // debug-editable; long enough to watch a whole cycle
+  const p0 = at()
+  // Staged well outside PLAYER_SHY_RADIUS (6): a calf inside it bolts from the
+  // traveller — correctly — and would never reach the demeanour at all.
+  const fam = window.__makeTestFamily(p0.x + 26, p0.z + 6)
+  const { parent, calf } = fam
+  await window.__sleepSim(0.4)
+  const bodyX = parent.x, bodyZ = parent.z
+  parent.dead = true // THE TRIGGER IS DEATH: the calf watches its parent fall
+  await window.__pollSim(4, () => calf.mourn !== undefined)
+  const armed = calf.mourn > 0 && !!calf.mournAt
+  const anchored = armed && Math.hypot(calf.mournAt.x - bodyX, calf.mournAt.z - bodyZ) < 0.01
+  const cutLoose = calf.parent === undefined // holds no body that is gone (point 341)
+  let hopped = false
+  await window.__pollSim(CYCLE + 4, () => {
+    if (calf.hop !== undefined) hopped = true
+    return hopped
+  })
+  const subdued = !hopped && calf.mourn !== undefined
+  // …and it kept to the body rather than roaming off with the herd.
+  const besideBody = Math.hypot(calf.x - bodyX, calf.z - bodyZ) < 12
+  fam.dispose()
+
+  // --- 2) Adoption runs on its own clock, and the window RELEASES the calf --
+  B.family.adoptionRadius = prevRadius
+  const p1 = at()
+  const fam2 = window.__makeTestFamily(p1.x + 26, p1.z - 8)
+  const calf2 = fam2.calf
+  const adopter = { x: fam2.parent.x + 3, z: fam2.parent.z, y: 0.2, rot: 0, scale: 1, phase: 0.11, chunk: fam2.parent.chunk }
+  window.__wildlife.herdsRef.current.zebra.push(adopter)
+  await window.__sleepSim(0.4)
+  fam2.parent.dead = true
+  await window.__pollSim(4, () => calf2.mourn !== undefined && !!calf2.parent)
+  const adoptedWhileMourning = !!calf2.parent && calf2.parent !== fam2.parent && calf2.mourn > 0
+  let hopped2 = false
+  await window.__pollSim(CYCLE + 4, () => {
+    if (calf2.hop !== undefined) hopped2 = true
+    return hopped2
+  })
+  const followsSubdued = !hopped2 && !!calf2.parent
+  // The EXIT path: run the window out and the calf plays again.
+  calf2.mourn = 0.05
+  await window.__pollSim(CYCLE + 8, () => calf2.hop !== undefined)
+  const playsAgain = calf2.mourn === undefined && calf2.mournAt === undefined && calf2.hop !== undefined
+  fam2.dispose()
+  window.__wildlife.herdsRef.current.zebra = window.__wildlife.herdsRef.current.zebra.filter((a) => a !== adopter)
+
+  // --- 3) FEAR STILL WINS: a predator staged mid-window makes it run --------
+  B.family.adoptionRadius = 0.001 // keep it at the body, so only fear can move it off
+  const p2 = at()
+  const fam3 = window.__makeTestFamily(p2.x + 26, p2.z + 20)
+  const calf3 = fam3.calf
+  await window.__sleepSim(0.4)
+  fam3.parent.dead = true
+  await window.__pollSim(4, () => calf3.mourn !== undefined)
+  const mourningWhenHunted = calf3.mourn !== undefined
+  const lx = calf3.x + 5, lz = calf3.z // pinned well beyond CALF_CATCH_DIST: it flees, it is not seized
+  const distToPredator = () => Math.hypot(calf3.x - lx, calf3.z - lz)
+  const fleeBefore = distToPredator()
+  // Re-pin the hunt EVERY frame (the guard check's discipline): a victimless or
+  // stale chase aborts on its own, and the flight branch would then skip.
+  await new Promise((resolve) => {
+    const s0 = window.__wildlife.simTime()
+    const t0 = Date.now()
+    const tick = () => {
+      L.mode = 'chase'; L.lx = lx; L.lz = lz; L.px = calf3.x; L.pz = calf3.z; L.victim = calf3
+      if (window.__wildlife.simTime() - s0 < 5 && Date.now() - t0 < 60000) requestAnimationFrame(tick)
+      else resolve()
+    }
+    requestAnimationFrame(tick)
+  })
+  const fleeAfter = distToPredator()
+  const stillMourningWhileFleeing = calf3.mourn !== undefined // the clock never paused
+  L.mode = 'idle'; L.timer = 60; L.victim = null
+  fam3.dispose()
+
+  B.family.mourningSeconds = prevWindow
+  B.family.adoptionRadius = prevRadius
+  return {
+    armed, anchored, cutLoose, subdued, besideBody,
+    adoptedWhileMourning, followsSubdued, playsAgain,
+    mourningWhenHunted, stillMourningWhileFleeing,
+    fleeBefore: +fleeBefore.toFixed(2), fleeAfter: +fleeAfter.toFixed(2),
+  }
+})
+check('a parent that dies leaves its calf mourning at the spot it fell (point 369)',
+  mourn369.armed && mourn369.anchored && mourn369.cutLoose, JSON.stringify(mourn369))
+check('the bereaved calf stays subdued beside the body instead of hopping (point 369)',
+  mourn369.subdued && mourn369.besideBody, JSON.stringify(mourn369))
+check('adoption changes WHO it follows, not its demeanour — it follows subdued (point 369)',
+  mourn369.adoptedWhileMourning && mourn369.followsSubdued, JSON.stringify(mourn369))
+check('the window always releases the calf back into play (point 369)',
+  mourn369.playsAgain, JSON.stringify(mourn369))
+check('a predator staged during the window still makes the calf RUN (point 369)',
+  mourn369.mourningWhenHunted && mourn369.stillMourningWhileFleeing &&
+    mourn369.fleeAfter > mourn369.fleeBefore + 0.5, JSON.stringify(mourn369))
+
 // --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
 // The lion now approaches from a random direction (chase no longer always runs
 // the same way), and the prey weaves left/right to shake it.
@@ -4696,6 +4813,19 @@ const crocDrama = async (mode, attempt = 0) =>
     herds.zebra.push(calf)
     const pf = window.__balance.parentDefense.predatorFlight
     const prevPf = pf.crocodile
+    // NO THIRD PARENT (27.07.2026). The staged calf stands at the bank ALONE for
+    // up to 30 sim seconds while the drink phase is swept — and a parentless
+    // juvenile is exactly what the point-262 adoption looks for: any childless
+    // zebra adult that has roamed within balance.family.adoptionRadius (20) takes
+    // it in, and THAT adult then charges the crocodile when the grip lands. Its
+    // sacrifice frees the calf, so the lunge case read calf ALIVE, staged parent
+    // alive, crocodile retreated — the drive-off picture, from an animal the
+    // staging never placed. The scenario pins WHICH parent resolves it (the one
+    // it parks and links), so it must pin that there is only one: no adoption for
+    // the length of the drama. Same class as the 25.07. lunge-distance and
+    // outcome pins — the staging is made deterministic, no assertion is relaxed.
+    const prevAdoption = window.__balance.family.adoptionRadius
+    window.__balance.family.adoptionRadius = 0.001
     if (MODE.kind === 'rescue') pf.crocodile = 100 // force the drive-off band
     if (MODE.kind === 'sacrifice' || MODE.kind === 'toolate') pf.crocodile = 0 // force taken
     // Park the scripted lion hunt for the staged scenario (point 194): the two
@@ -4707,7 +4837,7 @@ const crocDrama = async (mode, attempt = 0) =>
     lion.timer = 9999
     lion.victim = null
     lion.victimHunt = false
-    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false }
+    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false, foreignParent: false }
     // Sweep the drink phase so the bank window comes around quickly, watching
     // the croc for motion and teleports until it grips.
     let lastX = croc.x
@@ -4735,6 +4865,11 @@ const crocDrama = async (mode, attempt = 0) =>
       lastX = croc.x; lastZ = croc.z; lastSimT = nowSim
       if (calf.caught !== undefined && calf.caughtBy === 'crocodile') {
         out.gripped = true
+        // Did the adoption pin hold? Any OTHER animal holding this calf as its
+        // child would charge the crocodile itself and resolve the drama the
+        // staging means to resolve — reported, so a future occurrence names its
+        // cause instead of leaving an inexplicable "the calf survived the grip".
+        out.foreignParent = herds.zebra.some((z) => z !== parent && z.child === calf)
         // Now the parent enters the drama: linked and pushed only here, so
         // the pre-grip stand was never disturbed by the follow drive.
         parent.child = calf
@@ -4820,6 +4955,7 @@ const crocDrama = async (mode, attempt = 0) =>
         out.lionTouched = lion.victim === calf || lion.victim === parent
         window.__balance.parentDefense.forceOutcome = undefined
         pf.crocodile = prevPf
+        window.__balance.family.adoptionRadius = prevAdoption
         herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
         herds.crocodile = naturals
         out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
@@ -4847,6 +4983,7 @@ const crocDrama = async (mode, attempt = 0) =>
     out.lionTouched = lion.victim === calf || lion.victim === parent
     window.__balance.parentDefense.forceOutcome = undefined // clear the forced rescue outcome
     pf.crocodile = prevPf
+    window.__balance.family.adoptionRadius = prevAdoption // the herds adopt again
     herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
     herds.crocodile = naturals // the staged croc retires, the naturals return
     out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }

@@ -105,7 +105,11 @@ export const DOC_BUDGETS = [
     // HTML. Without that last sentence a missing label in the image reads
     // as evidence of a bug that is not there. Not a longer telling of
     // something already here: the old bullet described a different feature.
-    maxWords: 27940,
+    // RAISED by 43 measured words for point 369: an orphaned juvenile mourns
+    // before it plays again, and the trigger is DEATH rather than distance —
+    // a genuinely new §19.8 decision, which is what this mechanism prices in.
+    // The margin left over is unchanged, so the next sentence pays its own way.
+    maxWords: 27983,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]

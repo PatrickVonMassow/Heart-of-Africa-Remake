@@ -447,6 +447,7 @@ export const de: Strings = {
     calfAdoptionRadius: 'Adoptionsradius für Waisen',
     calfEscapeSeconds: 'Fluchtdauer des befreiten Jungtiers (s)',
     calfReunionSeconds: 'Trennungsfenster des Jungtiers (s)',
+    calfMourningSeconds: 'Trauerfenster des Waisenjungtiers (s)',
     benchmarkStart: 'Render-Benchmark starten',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     crocDriveOffRest: 'Krokodil: Ruhe nach Vertreiben (s)',

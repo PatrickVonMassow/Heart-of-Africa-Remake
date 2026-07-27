@@ -392,6 +392,14 @@ export interface BalanceConfig {
      *  leash edge never trips it. Zero switches the window off.
      *  Calibratable/debug-editable. */
     reunionSeconds: number
+    /** Orphan mourning window (design.md §19.8/§21.2, point 369): how long
+     *  (seconds) a juvenile whose parent DIED in front of it stays subdued —
+     *  keeping to the spot its parent fell and NOT gambolling — before it plays
+     *  again. Only a death opens the window: a bond that merely resolved
+     *  administratively (point 341 — the parent was streamed out, or the pair
+     *  drifted apart) is not mourned. Fear outranks it: every danger response
+     *  takes the frame. Calibratable/debug-editable. */
+    mourningSeconds: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -688,6 +696,13 @@ export const balance: BalanceConfig = {
     // once per cycle, never approaches it, while a calf that genuinely cannot
     // reach its parent is re-homed inside a minute of play.
     reunionSeconds: 45,
+    // Calibratable (point 369): the orphan's subdued window. Sized above one
+    // whole play cycle (an 8 s bout plus the 12 s idle gap) so the calf visibly
+    // SKIPS a gambol it would otherwise have played — the picture the point
+    // exists for — and in the register of the other §19.8 vigils (the elephants
+    // hold 30 s at the bones). It outlives the body itself (a carcass dissolves
+    // in ~9 s), so the later part of the watch is held at the spot it fell.
+    mourningSeconds: 30,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
