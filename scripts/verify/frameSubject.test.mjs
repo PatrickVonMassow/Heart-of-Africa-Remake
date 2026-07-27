@@ -14,6 +14,7 @@ import {
   findRawFrames,
   formatRawFrameFindings,
 } from './frameSubject-core.mjs'
+import { probeFrameSubject } from './frameSubject.mjs'
 
 const lakeVictoria = () => normaliseDeclaration('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
 
@@ -175,6 +176,78 @@ describe('the failure message', () => {
     expect(describeSubject(normaliseDeclaration('9', { element: '.map-place-plan' }))).toContain('.map-place-plan')
     expect(formatFramePass(lakeVictoria(), { ndc: { x: 0.1, y: 0.2 } })).toContain('shot 12-worldmodel-lake-victoria')
     expect(formatFramePass(normaliseDeclaration('9', { general: 'the whole savanna is the subject' }), {})).toContain('general view')
+  })
+})
+
+// The in-page probe itself, run in jsdom. Only the element branch is reachable
+// without a three.js camera, and that is the branch that has to judge a selector
+// matching SEVERAL elements — the `.building-highlight` case of point 375, where
+// a settlement carries one marker per important building.
+describe('probeFrameSubject on an element subject', () => {
+  const box = (el, x, y, w = 60, h = 70) => {
+    el.getBoundingClientRect = () => ({ x, y, width: w, height: h, left: x, top: y, right: x + w, bottom: y + h })
+    return el
+  }
+  const mount = (...els) => {
+    document.body.innerHTML = ''
+    for (const el of els) document.body.appendChild(el)
+  }
+  const marker = () => {
+    const el = document.createElement('div')
+    el.className = 'building-highlight'
+    return el
+  }
+  const probe = (selector = '.building-highlight') =>
+    probeFrameSubject({ ...normaliseDeclaration('93-orientation-highlight', { element: selector }), report: true })
+
+  it('passes when ANY match is on screen, not only the first in DOM order', () => {
+    // The chief's marker sits far off the right edge, the market's is in view.
+    // The picture shows the subject, so the frame is evidence.
+    mount(box(marker(), 19586, -5270), box(marker(), 700, 300))
+    const p = probe()
+    expect(p.ok).toBe(true)
+    expect(p.matches).toBe(2)
+    expect(p.rect.x).toBe(700) // the reader is pointed at the VISIBLE one
+  })
+
+  it('FAILS when every match is outside the viewport — the measured frame-93 case', () => {
+    mount(box(marker(), 19586, -5270), box(marker(), 1837, -332))
+    const p = probe()
+    expect(p.ok).toBe(false)
+    expect(p.matches).toBe(2)
+    expect(p.reason).toMatch(/lies outside the viewport/)
+  })
+
+  it('FAILS a match that is rendered nowhere, and says so differently', () => {
+    const hidden = box(marker(), 100, 100)
+    hidden.style.display = 'none'
+    mount(hidden)
+    const p = probe()
+    expect(p.ok).toBe(false)
+    expect(p.reason).toMatch(/hidden/)
+  })
+
+  it('FAILS — not passes — when the selector matches nothing at all', () => {
+    mount()
+    const p = probe()
+    expect(p.ok).toBe(false)
+    expect(p.available).toBe(false)
+    expect(p.matches).toBe(0)
+    expect(p.reason).toMatch(/no element matches/)
+  })
+
+  it('refuses a degenerate zero-size match — an empty wrapper is not a picture', () => {
+    mount(box(marker(), 700, 300, 0, 0))
+    expect(probe().ok).toBe(false)
+  })
+
+  it('reports the match count in the failure text, so a reader need not open the page', () => {
+    mount(box(marker(), 19586, -5270), box(marker(), 1837, -332))
+    const d = normaliseDeclaration('93-orientation-highlight', { element: '.building-highlight' })
+    const p = probeFrameSubject({ ...d, report: true })
+    const message = formatFrameFailure(d, p, judgeFrameSubject(d, p))
+    expect(message).toContain('2 element(s) matched .building-highlight')
+    expect(message).toContain('93-orientation-highlight')
   })
 })
 

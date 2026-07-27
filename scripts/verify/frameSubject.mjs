@@ -63,21 +63,41 @@ export function probeFrameSubject(d) {
     return done()
   }
   if (d.kind === 'element') {
-    const el = document.querySelector(d.element)
-    if (!el) {
+    // EVERY match, not just the first. A selector like `.building-highlight`
+    // names a KIND of thing (one marker per important building) and the picture
+    // shows the subject when ANY of them is on screen; judging `querySelector`'s
+    // first match would decide the frame by DOM order and could refuse a picture
+    // the player plainly sees. It is not a softer test — a match still has to be
+    // visible in the viewport — only a correctly aimed one.
+    const all = [].slice.call(document.querySelectorAll(d.element))
+    probe.matches = all.length
+    probe.viewport = { w: window.innerWidth, h: window.innerHeight }
+    if (!all.length) {
       probe.available = false
       probe.reason = 'no element matches ' + d.element
       return done()
     }
-    const r = el.getBoundingClientRect()
-    const cs = getComputedStyle(el)
-    probe.rect = { x: r.x, y: r.y, w: r.width, h: r.height }
-    probe.viewport = { w: window.innerWidth, h: window.innerHeight }
-    const shown = cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity || '1') > 0.01
-    const inView = r.width > 1 && r.height > 1 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight
-    probe.visible = shown && inView
-    probe.ok = probe.visible
-    if (!probe.ok) probe.reason = shown ? d.element + ' lies outside the viewport' : d.element + ' is hidden (display/visibility/opacity)'
+    let anyShown = false
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i]
+      const r = el.getBoundingClientRect()
+      const cs = getComputedStyle(el)
+      const shown = cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity || '1') > 0.01
+      const inView = r.width > 1 && r.height > 1 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight
+      if (shown) anyShown = true
+      // Report the match the reader should look at: the visible one if there is
+      // one, else the first (the failure text then names where it sat).
+      if (!probe.rect || (shown && inView)) probe.rect = { x: r.x, y: r.y, w: r.width, h: r.height }
+      if (shown && inView) {
+        probe.visible = true
+        probe.ok = true
+        return done()
+      }
+    }
+    probe.visible = false
+    probe.reason = anyShown
+      ? d.element + ' lies outside the viewport'
+      : d.element + ' is hidden (display/visibility/opacity)'
     return done()
   }
   if (d.kind === 'world') {

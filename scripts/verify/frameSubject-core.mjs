@@ -195,7 +195,11 @@ const fmt = (n) => (isNum(n) ? n.toFixed(2) : '?')
 export function describeFinding(d, probe) {
   const bits = []
   if (probe?.ndc) bits.push(`projected to ndc (${fmt(probe.ndc.x)}, ${fmt(probe.ndc.y)}, ${fmt(probe.ndc.z)})`)
+  // How many elements the selector matched, so the reader can tell "the only
+  // one was off screen" from "none of the four was" without opening the page.
+  if (d.kind === 'element' && isNum(probe?.matches)) bits.push(`${probe.matches} element(s) matched ${d.element}`)
   if (probe?.rect) bits.push(`box ${Math.round(probe.rect.w)}x${Math.round(probe.rect.h)} at (${Math.round(probe.rect.x)}, ${Math.round(probe.rect.y)})`)
+  if (d.kind === 'element' && probe?.viewport) bits.push(`viewport ${probe.viewport.w}x${probe.viewport.h}`)
   if (probe?.mode) bits.push(`scene ${probe.mode}${probe.placeId ? ` (${probe.placeId})` : ''}`)
   if (probe?.player && d.kind === 'world') {
     const dx = probe.player.x - d.point.x
