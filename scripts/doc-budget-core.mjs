@@ -44,7 +44,11 @@ export const DOC_BUDGETS = [
   {
     path: 'design.md',
     maxLines: 850,
-    maxWords: 27700,
+    maxWords: 27743,
+    // RAISED by 43 measured words for point 369: an orphaned juvenile mourns
+    // before it plays again, and the trigger is DEATH rather than distance —
+    // a genuinely new §19.8 decision, which is what this mechanism prices in.
+    // The margin left over is unchanged, so the next sentence pays its own way.
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the

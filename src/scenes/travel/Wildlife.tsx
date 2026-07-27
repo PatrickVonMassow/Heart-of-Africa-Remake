@@ -80,6 +80,10 @@ import {
   severFamilyLinks,
   tickFamilySeparation,
   tickEscapeRun,
+  orphanMourns,
+  tickMourning,
+  calfMayPlay,
+  juvenileAnchor,
   isPredatorSpecies,
   PREDATOR_PREY,
   REGION_PREY,
@@ -309,6 +313,21 @@ interface Animal {
    *  until balance.vigil.seconds or until the carcass is gone; then the field
    *  clears and the parent simply rejoins the herd. */
   vigil?: { x: number; z: number; carcass: Animal; time: number }
+  /** The orphan's mourning window (design.md §19.8, point 369): seconds left in
+   *  which a juvenile whose parent DIED keeps to the body and does NOT gambol —
+   *  the same standing-by-a-body watch the §19.8 vigil holds, applied to a
+   *  juvenile at its parent. Counted down every frame and cleared at zero, so
+   *  the demeanour always resolves back to play (invariant I4). Only a DEATH
+   *  arms it: a bond that merely resolved administratively (point 341) leaves
+   *  nothing to grieve. Fear outranks it — the flight, hunt and seizure branches
+   *  all sit ABOVE the family follow, so a grieving calf never stands still for
+   *  a predator, and the field is deliberately kept out of `dramaStateOf` so the
+   *  player-shy bolt keeps firing too. */
+  mourn?: number
+  /** Where its parent fell (point 369): the watch's anchor, held as a POINT and
+   *  never a reference — the carcass is removed long before the window ends, and
+   *  nothing may survive holding a body that is gone (point 341). */
+  mournAt?: { x: number; z: number }
   /** Closest lion-to-calf approach seen by this guarding parent (point 191):
    *  feeds guardEngagement's release-on-recede, so a PASSING hunt is guarded
    *  only while it closes in — never leapfrog-followed to the kill. */
@@ -458,6 +477,21 @@ function dramaStateOf(a: Animal, isHunted: boolean): DramaState {
     isLionVictim: a === LION_STATE.victim,
     isHunted,
   }
+}
+
+/** Open the orphan's mourning window (design.md §19.8, point 369): a juvenile
+ *  whose parent has just DIED keeps to the spot it fell for
+ *  balance.family.mourningSeconds and does not gambol, then plays again. Two
+ *  callers, and between them they cover every death: the SACRIFICE, which frees
+ *  the calf and cuts the bond a few lines BEFORE the parent dies (so the sweep
+ *  below could never see it), and the orphan sweep in the family pass, which
+ *  catches every other cause — the hunt, the crocodile, the trample, a drowning.
+ *  Deliberately NOT armed on an administrative ending (a streamed-out parent, the
+ *  point-341 separation): the calf watched nothing happen. */
+const mournOrphan = (young: Animal | null | undefined, body: { x: number; z: number }) => {
+  if (!young || young.dead || young.young !== true) return
+  young.mourn = balance.family.mourningSeconds
+  young.mournAt = { x: body.x, z: body.z }
 }
 
 /** Pointer to the herds of the mounted <Herds>, so <LionHunt> can pick a nearby
@@ -2237,6 +2271,11 @@ function Herds() {
                 // this frame — a re-parented calf walks back to its new parent
                 // past the feeding predator instead of fleeing.
                 calf.escape = balance.family.escapeSeconds
+                // …and it grieves what it just watched (point 369): the parent
+                // dies below, so the sweep in the family pass — which reads a
+                // DEAD parent through a link this branch has already cut — can
+                // never see this ending. Armed here, at the death itself.
+                mournOrphan(calf, a)
               }
               if (calf.caughtBy === 'crocodile') {
                 // The sacrifice at the waterline (point 130): the crocodile
@@ -2318,6 +2357,7 @@ function Herds() {
               calf.parent = undefined // freed — it keeps fleeing on its own
               a.child = undefined
               calf.escape = balance.family.escapeSeconds // the escape run owns it (point 311)
+              mournOrphan(calf, a) // …and grieves the shield that fell for it (point 369)
               takeAnimal(a, { stain: true })
               LION_STATE.victim = a // the hunt closes out feeding on the parent
             }
@@ -2658,6 +2698,15 @@ function Herds() {
         const predatorHerd = isPredatorSpecies(sp)
         for (const a of herds[sp]) {
           if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+          // The orphan's mourning window (point 369) runs on its OWN clock: it
+          // is counted down here for EVERY animal — predator cubs included, so
+          // the field can never linger unticked — and neither the adoption below
+          // nor a danger response pauses it. At zero the watch is packed away
+          // and the young plays again (invariant I4: it always resolves).
+          if (a.mourn !== undefined) {
+            a.mourn = tickMourning(a.mourn, dt)
+            if (a.mourn === undefined) a.mournAt = undefined
+          }
           if (predatorHerd) continue
           if (a.dead || a.young !== true) continue
           let released: Animal | null = null
@@ -2676,6 +2725,19 @@ function Herds() {
             severFamilyLinks(a)
           } else {
             a.separated = undefined // no living parent to be separated from
+            // The orphan's mourning window (design.md §19.8, point 369): a
+            // parent that DIED in the world — by any cause that leaves the link
+            // standing (the hunt, the crocodile, the trample, a drowning) — is
+            // grieved before the calf plays again. The two sacrifice sites cut
+            // the bond themselves and arm it at the death instead, so nothing is
+            // counted twice. Severing here is the point-341 rule applied to a
+            // body: no juvenile keeps a parent that is gone, and the adoption
+            // below then picks it up as an ordinary orphan — subdued, but
+            // following its new parent.
+            if (orphanMourns(a.parent)) {
+              mournOrphan(a, a.parent as Animal)
+              severFamilyLinks(a)
+            }
           }
           const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS, { exclude: released })
           if (adopter) {
@@ -3860,6 +3922,26 @@ function Herds() {
         // flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
+          // Where this juvenile keeps (design.md §19.8, points 341/369): its
+          // LIVING parent — the adoptive one once the point-262 adoption found
+          // it — or, for an orphan still inside its mourning window, the spot
+          // its parent fell. `null` for an ordinary parentless juvenile, which
+          // roams with the herd exactly as before. Read ONCE, above the chain,
+          // so the follow branch and the mourner's watch are one behaviour.
+          const keep = a.young === true ? juvenileAnchor(a) : null
+          // FEAR OUTRANKS GRIEF (point 369). An orphan standing WATCH at the body
+          // yields the whole frame to a danger response — a hunt running nearby,
+          // or an elephant inside the dart ring — and falls back to the ordinary
+          // prey behaviour it had as a parentless juvenile: it flees. Only the
+          // watch yields; a calf with a LIVING parent keeps the family's own hold
+          // exactly as before (the herd around it is its shield). Without this a
+          // 30-second window could have held a calf beside a carcass while a
+          // predator walked in — a worse picture than a cheerful one.
+          const atBody = keep !== null && keep === a.mournAt
+          const fearYields =
+            atBody &&
+            (lionActive ||
+              elephantPos.some(([ex, ez]) => Math.hypot(ex - a.x, ez - a.z) < PREY_PANIC_RADIUS * PREY_PANIC_EXIT))
           if ((a.caught !== undefined && a.caught > 0) || a.fireTrapped !== undefined) {
             // Caught by a predator (resolved in the full-list pre-pass above)
             // — or by the grass-fire line (point 145a), same thrash:
@@ -4100,9 +4182,16 @@ function Herds() {
             }
             pitch = 0
             familyHeld = true
-          } else if (a.young && a.parent && !a.parent.dead) {
-            const toX = a.parent.x - a.x
-            const toZ = a.parent.z - a.z
+          } else if (a.young && keep && !fearYields) {
+            // Follow, play and nurse around whatever this young keeps to — the
+            // living parent, or the body of the one that just died (point 369).
+            // The mourner reaches this branch DELIBERATELY: every danger response
+            // sits ABOVE it (seized, hunted, crossing, in the water) and the
+            // player-shy bolt below owns the frame before the watch does, so a
+            // grieving calf never stands still for a predator. What grief changes
+            // here is only the demeanour: the gambol gate stays shut.
+            const toX = keep.x - a.x
+            const toZ = keep.z - a.z
             const d = Math.hypot(toX, toZ)
             // Player shyness (design.md §19): ANY juvenile — even of a stout
             // species whose adults stand their ground — bolts from the nearby
@@ -4182,8 +4271,13 @@ function Herds() {
               // inside it — so play and follow never alternate per frame.
               if (a.playLock && d < GAMBOL_RANGE * 0.6) a.playLock = undefined
               if (!a.playLock && d > GAMBOL_RANGE) a.playLock = true
-              const canPlay =
-                !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
+              // Grief silences the play (point 369): for the whole mourning
+              // window the calf does not break into a gambol bout — the picture
+              // that used to say nothing had happened.
+              const canPlay = calfMayPlay(
+                !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp),
+                a,
+              )
               const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
               // The drying waterhole (design.md §19.8, point 123): a bout that
               // ENDS at a lake bank whose season has dried to mud may stick the
@@ -4259,7 +4353,9 @@ function Herds() {
               } else {
                 a.hop = undefined
                 a.boutDetour = undefined
-                pitch = -0.22 // nurse: head up toward the parent's flank
+                // At a living parent it nurses; at the spot its parent fell it
+                // holds the §19.8 vigil's lowered head instead (point 369).
+                pitch = keep === a.mournAt ? -0.15 : -0.22
               }
             }
             familyHeld = true
