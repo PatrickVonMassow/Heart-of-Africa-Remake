@@ -3165,6 +3165,23 @@ read that as "the criterion and its evidence section".
   the tool, and each agent is asked whether the brief was sufficient. Their answers are
   recorded with the point. A tool that reads correctly but omits what a builder needs
   fails this and must be widened.
+  EVIDENCE SO FAR (27.07.2026), and every answer changed something:
+  · point 366 (1.1k tokens): sufficient in shape, but the brief stated an intended state
+    IN THE PRESENT TENSE — "the prompt hook already stamps the turn start" — and it did
+    not. The builder caught it; a weaker reader would have shipped a gate that can never
+    fire, green on every test. Also missing: the stand-down convention every guard has
+    (without it the gate denies every subagent's first edit), the near-full doc budget,
+    and the existing PreToolUse guard as the template. → retrospective §3.35, and the
+    standing HOUSE FACTS block now in every brief.
+  · point 361 (1.3k tokens): "unusually well-scoped", and one instruction was
+    load-bearing (do not run the regression on a shared machine). Gaps: it did not say
+    `verification/` is TRACKED — the agent deleted 96 tracked files and restored them —
+    it presumed every named bug has a fix (two of eight do not), and it named a
+    documentation source without naming where. → the same HOUSE FACTS block.
+  · points 367/368: briefed, and briefed differently — the agent GENERATES the brief
+    itself (`node scripts/point-brief.mjs <N>`) instead of receiving it pasted. Measured
+    reason: 367's brief is 11.9k tokens because it carries §19 verbatim, and pasting it
+    would charge the main session that amount a second time. Answers pending.
 
 - [ ] 367. SHORTEN design.md WITHOUT LOSING A DECISION (user 27.07.2026). The design
   document has grown to 994 lines / ~30.5k words (~46k tokens) — under its 1100-line
