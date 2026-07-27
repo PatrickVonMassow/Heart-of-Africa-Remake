@@ -10269,3 +10269,22 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   in the horizon strip (pixel row analysis like the point-181 footing check, not a
   guessed constant); screenshots from several standpoints on BOTH backends; the
   point-227 settlement checks stay green.
+
+- [x] 318. KIND-AWARE "UNKNOWN" LABELS INSTEAD OF A BARE "?" (user 25.07.2026). An
+  undiscovered place currently labels as "?" on the travel map and in the enter
+  hint; the user wants a meaningful placeholder like "unknown village". Replace the
+  bare "?" with LOCALIZED, kind-aware placeholders from the language files (§17.7):
+  e.g. en "Unknown village" / de "Unbekanntes Dorf" for settlements, and the
+  analogous kind terms for the other discovery-gated map points (mountain,
+  waterfall, lake, cultural landmark, natural site — "Unknown mountain"/
+  "Unbekannter Berg", …). Ports are known from the start and never show a
+  placeholder (§17.2/point 288 unchanged); discovery behaviour itself is unchanged
+  — only the placeholder TEXT. Update design.md §17.2/§3.2 and the CLAUDE.md §7.1
+  acceptance wording (points 2 and 3 currently pin the literal "?") IN THE SAME
+  commit, plus every test that asserts the literal "?" (settlementEntry pure tests,
+  the flow.mjs live check, the enrichments `.map-label` assertions). VERIFIABLE:
+  the updated pure tests pin the localized placeholder per kind in BOTH languages
+  (i18n.test.ts covers the new keys); flow.mjs live-checks an undiscovered village
+  hinting "Space to enter Unknown village" while Cairo names itself; enrichments
+  asserts an undiscovered `.map-label` reads the placeholder, a discovered one its
+  name; both backends.
