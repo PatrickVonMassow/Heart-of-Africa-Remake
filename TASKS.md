@@ -3303,6 +3303,42 @@ read that as "the criterion and its evidence section".
   stated twice or that contradicts another — this is a coherence question, and coherence
   is exactly what an author cannot see in their own text.
 
+- [ ] 369. AN ORPHANED JUVENILE DOES NOT PLAY YET (user 27.07.2026). A calf whose
+  parent has just died in front of it goes straight back to gambolling, and it reads
+  wrong — the picture says nothing happened. It needs a SUBDUED window first.
+  THE TRIGGER IS DEATH, NOT DISTANCE. The bond can end two ways: the parent DIES in the
+  world (§19.8), or the pair is separated and the bond resolves administratively (point
+  341 — the parent was streamed out and the calf never saw anything). Only the first
+  case mourns; a calf that simply lost track of its parent has nothing to grieve, and
+  giving it a mourning pose would be a lie about what the player watched.
+  WHAT CHANGES. For a calibratable `balance.family.mourningSeconds` (debug-editable) the
+  juvenile does not run the play/gambol behaviour: it stays near the body and moves
+  subdued, then returns to normal. Reuse the existing vigil rather than inventing a
+  second one — the elephant mourning at the graveyard and the §19.8 death watch already
+  model standing-by-a-body; this is that behaviour applied to a juvenile at its parent.
+  FEAR STILL WINS. Flight, the crocodile grab and every danger response override the
+  subdued state immediately — a grieving calf must never stand still for a predator.
+  That ordering is the one hard rule here; a mournful calf that gets itself eaten is a
+  worse picture than a cheerful one.
+  ADOPTION RUNS ON ITS OWN CLOCK. Being adopted (point 341 / §19.8 `findAdopter`) changes
+  WHO the juvenile follows, not its demeanour: the window keeps running, so a calf can
+  follow its new parent subdued and only later play again. The two mechanics must not
+  cancel each other.
+  SEQUENCING: after point 341, which is where the bond's endings are being sorted out —
+  this point adds the demeanour on one of those endings and would otherwise collide.
+  ANCHORS: the play/gambol selector for young animals and the death-watch/mourning
+  behaviour in `src/scenes/travel/wildlifeBehavior.ts`; `balance.family` in
+  `src/config/balance.ts`; the family section of `src/ui/DebugMenu.tsx`.
+  DOCS in the same commit: design.md §19.8 gains one sentence — an orphan mourns before
+  it plays, and fear overrides it.
+  VERIFIABLE: pure — with a parent that died this instant the play selector is false for
+  the whole window and true after it; a danger stimulus during the window produces
+  flight, not standing; a bond ended by SEPARATION (point 341) never enters the window;
+  adoption during the window leaves the window running. Live
+  (`scripts/verify/enrichments.mjs`): a staged parent death leaves the calf subdued
+  beside the body rather than hopping, and a predator staged during that window still
+  makes it run.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
