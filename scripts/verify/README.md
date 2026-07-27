@@ -97,6 +97,16 @@ the dev hook `__asyncPipelinesOff` and asserts the gate goes red — measured 40
 (WebGL 2) and 8.4 s unpainted (WebGPU), with the attributed block at 0.3-0.4 s
 in both — exactly the number that must NOT be the one gated.
 
+Its measurement window closes on the picture, never on a clock. A fixed tail is
+a wall-clock guess of the very quantity being measured: on a slower machine it
+ends mid-stall and under-reports the standstill the gate exists to catch. So the
+window closes on `pictureSettled` (`liveness.mjs`) — a trailing stretch in which
+the tick train never gapped and frames kept being painted, required to reach
+BOTH edges of that stretch so the quiet tail of a freeze that just ended cannot
+pass for a live picture. The predicate is pure and unit-tested
+(`liveness.test.mjs`), including the case that it survives being stringified
+into the page, which is how the suite runs it where the sample trains live.
+
 The same run found that the suite's "neutral" first-gesture key had stopped
 being neutral: F8 starts the in-game render benchmark (point 277), which swept
 ten graphics configs inside the measurement. A verification's filler inputs need

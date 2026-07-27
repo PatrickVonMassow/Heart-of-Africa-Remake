@@ -27,7 +27,7 @@
 //
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
-import { attributeBlocks, maxGap } from './liveness.mjs'
+import { attributeBlocks, maxGap, pictureSettled, SETTLE_DEFAULTS } from './liveness.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -97,32 +97,22 @@ const warm = SELFTEST
 
 // Close the measured window on the PICTURE'S OWN signal, never on a wall clock
 // (CLAUDE.md §7.2). The window has to contain the whole standstill and a piece
-// of the live picture after it, and only the probe knows when that has happened:
-// a stretch of SETTLE_MS in which no tick gap exceeded QUIET_GAP_MS and frames
-// kept being painted. This is strictly stronger than the fixed tail it replaces
-// — a stall beginning as the last pipeline lands simply postpones the stretch,
-// and with the fix disabled (self-test) the same condition waits out however
-// long the blocking path actually takes on this machine instead of truncating
-// it at a guess.
-const SETTLE_MS = 1500
-const QUIET_GAP_MS = 250
-const MIN_SETTLED_FRAMES = 10
+// of the live picture after it, and only the probe knows when that has happened.
+// `pictureSettled` is the predicate (pure and unit-tested in liveness.test.mjs);
+// it is stringified into the page because the trains live there. Strictly
+// stronger than the fixed tail it replaces — a stall beginning as the last
+// pipeline lands postpones the close instead of falling outside the window, and
+// with the fix disabled (self-test) it waits out however long the blocking path
+// really takes on this machine instead of truncating it at a guess.
 const settled = await page
   .waitForFunction(
-    ({ settleMs, quietGapMs, minFrames }) => {
+    ({ src, opts }) => {
       const S = window.__startupProbe
       if (!S) return false
-      const now = performance.now()
-      const since = now - settleMs
-      const ticks = S.ticks.filter((t) => t >= since)
-      const frames = S.raf.filter((t) => t >= since)
-      if (ticks.length < 2 || frames.length < minFrames) return false
-      for (let i = 1; i < ticks.length; i++) if (ticks[i] - ticks[i - 1] > quietGapMs) return false
-      // The stretch must reach both edges of the window, else a stall that
-      // ended a moment ago would read as quiet.
-      return ticks[0] - since < quietGapMs && now - ticks[ticks.length - 1] < quietGapMs
+      const settledFn = new Function('return ' + src)()
+      return settledFn(S.ticks, S.raf, performance.now(), opts)
     },
-    { settleMs: SETTLE_MS, quietGapMs: QUIET_GAP_MS, minFrames: MIN_SETTLED_FRAMES },
+    { src: pictureSettled.toString(), opts: SETTLE_DEFAULTS },
     { timeout: 180000, polling: 250 },
   )
   .then(() => true)
