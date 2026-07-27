@@ -3197,8 +3197,44 @@ read that as "the criterion and its evidence section".
   sides — the symmetry pinned as a property, not as two examples); plus one Playwright
   frame from each side, judged by PROJECTING the neighbour into the picture per §7.2,
   never by an assumed radius.
+  ORDER: point 381 (the torn seam at that very site) is FIXED FIRST — adding a
+  neighbour to a horizon that is itself broken would build on sand.
   DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
   and CLAUDE.md §7.1 pt 31 with its evidence section.
+
+- [ ] 381. THE HORIZON AT THE GIZA SITE IS TORN OPEN (user 27.07.2026, reported twice
+  with screenshots from the deployed build, standing at "North · The Pyramids of Giza").
+  Just left of centre the ground ends in a HARD STRAIGHT EDGE and gives way to black:
+  a pale slab with a visible thickness sits in front of a dark, speckled wedge, and a
+  thin grey sliver runs off to the right before the brown relief resumes. Nothing about
+  that reads as landscape — §2.5 promises the surroundings panorama of the real map
+  landscape, and here the seam between the walkable ground and that panorama stands
+  open.
+  THE SUSPECT SEAM, to be confirmed rather than assumed: `src/scenes/place/backdrop.ts`
+  builds the band from `sampleTerrain` with a capped slope
+  (`BACKDROP_MAX_SLOPE`), an inner rim that tucks BELOW the settlement ground disc
+  (`BACKDROP_DISC_OVERLAP` and the rim-tuck constant beside it), and a double-sided
+  material. A straight edge with a lit top and an unlit face is what an OPEN rim looks
+  like from inside: the disc ends, the band's inner rim does not reach under it, and
+  the camera sees the band's back face and the void behind it. Point 181 fixed the
+  neighbouring symptom (silhouettes standing in the sky over that same gap) — the gap
+  itself was never closed, only worked around.
+  IT IS NOT A GIZA SPECIAL CASE UNTIL PROVEN ONE: the site is a monument disc rather
+  than a settlement, and its ground radius, relief and camera height differ. Determine
+  whether the seam opens at every place under some condition (a small disc, a flat
+  surround, a particular camera height) or only here, and fix the CONDITION — a
+  per-site constant would leave the next site open.
+  THE TARGET: from eye height, at any place, the walkable ground meets the panorama
+  without a visible edge, an unlit face or a hole; the band's inner rim stays under the
+  disc across the full ring, whatever the disc's radius and the surrounding relief.
+  VERIFIABLE: pure Vitest on the rim geometry — for a sweep of disc radii, camera
+  heights and relief profiles (including the flat desert of this report), the band's
+  inner rim sits below the disc rim across every segment, with a margin, and the first
+  visible band row is never higher than the disc edge; plus one Playwright frame at
+  eye height at the Giza site on BOTH backends, judged by the picture, showing an
+  unbroken horizon. The reported view is the acceptance case: same place, same heading.
+  DOCS in the same commit: CLAUDE.md §7.1 pt 31 (the panorama footing rule already
+  written there) and its evidence section.
 
 ## Closing (only after all points)
 
