@@ -145,15 +145,16 @@ function runSuite(name, baseUrl) {
 // twice is a candidate real failure, disjoint sets are load. Whether the check
 // even touches the diff is printed beside it as a weak second signal.
 const RETRY_ENABLED = process.env.VERIFY_NO_RETRY !== '1'
-/** Suites that failed twice, kept for the opt-in baseline classification below. */
-const doubleFailures = []
+/** Suites that stayed red, kept for the opt-in baseline classification below.
+ *  `runs` is 1 in strict mode (no retry, so there is no repeat signature). */
+const redSuites = []
 function runSuiteWithRetry(name, baseUrl) {
   const first = runSuite(name, baseUrl)
   if (first.ok) return true
   if (!RETRY_ENABLED) {
     // Strict mode (the closing's flake-free gate): no retry, so no repeat
     // signature exists — say that rather than imply one.
-    doubleFailures.push({ suite: name, failed: failedChecks(first.out) })
+    redSuites.push({ suite: name, failed: failedChecks(first.out), runs: 1 })
     return false
   }
   console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
@@ -166,7 +167,7 @@ function runSuiteWithRetry(name, baseUrl) {
   const interesting = signature.stable.length ? signature.stable : [...signature.onlyFirst, ...signature.onlySecond]
   const relatedness = changeRelatedness({ checks: interesting, changedFiles: changedFiles() })
   for (const line of formatRepeatReport({ suite: name, signature, relatedness })) console.log(line)
-  doubleFailures.push({ suite: name, failed: interesting, verdict: signature.verdict })
+  redSuites.push({ suite: name, failed: interesting, runs: 2, verdict: signature.verdict })
   return false
 }
 
@@ -185,15 +186,15 @@ function changedFiles() {
 }
 
 /**
- * OPT-IN baseline classification (point 294): for each suite that failed twice,
+ * OPT-IN baseline classification (point 294): for each suite that stayed red,
  * re-run it against the pre-change baseline and label each red REAL REGRESSION
  * vs PRE-EXISTING. Off by default — it is a second (and third) browser run on a
  * second checkout. Enable with `npm test -- --baseline` or VERIFY_BASELINE=1.
  */
 function classifyAgainstBaselineRuns() {
-  if (doubleFailures.length === 0) return
-  console.log(`\n===== baseline classification (point 294) — ${doubleFailures.length} suite(s) that failed twice =====`)
-  for (const { suite, failed } of doubleFailures) {
+  if (redSuites.length === 0) return
+  console.log(`\n===== baseline classification (point 294) — ${redSuites.length} red suite(s) =====`)
+  for (const { suite, failed } of redSuites) {
     if (!DEV_SUITES.includes(suite)) {
       console.log(`SKIP  ${suite} — no baseline lane for it (it is not one of the dev suites).`)
       continue
@@ -339,11 +340,10 @@ if (!skipPreflight && ((fullRun && tier !== 'small') || filter.includes('preview
 }
 
 if (wantBaseline) classifyAgainstBaselineRuns()
-else if (doubleFailures.length > 0) {
-  console.log(`
-# ${doubleFailures.length} suite(s) failed twice — to label each red REAL REGRESSION vs PRE-EXISTING,`)
+else if (redSuites.length > 0) {
+  console.log(`\n# ${redSuites.length} suite(s) stayed red — to label each red REAL REGRESSION vs PRE-EXISTING,`)
   console.log(`# re-run with --baseline (or VERIFY_BASELINE=1), or classify one suite directly:`)
-  console.log(`#   node scripts/verify/baseline-classify.mjs ${doubleFailures[0].suite}`)
+  console.log(`#   node scripts/verify/baseline-classify.mjs ${redSuites[0].suite}`)
 }
 
 const failed = results.filter((r) => !r).length
