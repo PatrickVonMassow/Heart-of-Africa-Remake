@@ -512,6 +512,21 @@ const HEADER = [
   '- If this brief proves INSUFFICIENT, or contradicts the code you find: ESCALATE (stop and',
   '  report what is missing) rather than guess. A guessed spec costs a rebuild, which is more',
   '  expensive than the question.',
+  '',
+  'HOUSE FACTS NO POINT STATES — each of these cost a real agent real work today (27.07.2026),',
+  'which is why they are delivered rather than remembered:',
+  '- `docs/` and the `verification/` screenshots are TRACKED in git. Neither is scratch space;',
+  '  deleting from them deletes repository content.',
+  '- `scripts/retro-refresh.mjs` must NEVER run from a git WORKTREE: it derives its source',
+  '  directory from the checkout path, finds nothing, and rewrote a document as empty while',
+  '  exiting 0. It throws now — but doc refreshes belong to the main session in the main tree.',
+  '- Every guard here STANDS DOWN for a session that does not own the batch lock and for a',
+  '  paused batch (`heldByOtherLiveOwner`, `.claude/batch-paused`). A new guard that omits it',
+  '  will fire on subagents and on a paused run.',
+  '- CLAUDE.md, design.md and the work order preamble carry MEASURED ceilings',
+  '  (`scripts/doc-budget-core.mjs`), and CLAUDE.md sits near its limit. Measure before you',
+  '  add a paragraph; raising a ceiling needs a written justification in the same commit.',
+  '- Never `git checkout <file>` on a file holding uncommitted work — it discards it.',
 ]
 
 /**
