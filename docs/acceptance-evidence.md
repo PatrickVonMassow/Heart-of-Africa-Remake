@@ -538,7 +538,7 @@ Verifiable (`scripts/verify/settings.mjs`,
   karif, two of the six gated by rank — while the other sixteen stay
   bare however cold their ground gets, the cold being a class
   experience where it is felt at all; the per-people garment mapping
-  lives in `design.md` §19.15. The
+  lives in `docs/design-reference.md` §19.15. The
   per-people mapping, the three drivers, the rank gate and the two
   named traps (the San's cold Kalahari IS dressed on Passarge's
   evidence; the Pedi highveld crosses the threshold and is NOT, the
