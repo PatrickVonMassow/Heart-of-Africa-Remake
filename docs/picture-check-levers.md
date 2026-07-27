@@ -378,7 +378,41 @@ diff frames yet?" from a belief into a command.
   backend is primary. They belong to point 207 (ii) and to the routing question,
   not here.
 
-### 4.5 What this hands to the next reader
+### 4.5 The convergent review, and what it corrected
+
+Per point 355 the replay result is convergent: the second model read §3's numbers
+with no access to §3.4 or §4, and stated its own conclusions before seeing the
+author's. It reached the same verdicts on the diff-gated family and on the
+general routing map — and independently reached §3.1b's guard hole and the
+observation that the archived frames function as decoration rather than as
+baselines. Three of its objections stand and are folded in here rather than
+argued with:
+
+- **The signal figure is soft.** The 0.75 % / 1.73 % that the bar rests on are
+  diffs between two single committed captures, so they contain one sample of
+  capture noise each. The direction holds — the horizon-strip bug had to have a
+  frame *invented* for it, so the existing frames provably did not show it — but
+  the percentages are not clean measurements of a defect's visual footprint.
+- **The season before/after comparison crosses frame sets.** The 91.60 % is
+  measured on `108`/`109`; the 71.30 % on the differently framed `115`/`116`.
+  The conclusion that matters needs only the pre-fix row (a buggy state passes a
+  "did the picture change?" gate), so it survives; the after-number must not be
+  leaned on.
+- **n = 2, on a machine that was demonstrably loaded** — the 1 FPS badge is the
+  proof. "Diff-gating fails on this capture path" is established by the exit-0
+  frames of two different places alone. **"≈ 10 % is the intrinsic noise floor"
+  is NOT established**, and this document should not be read as claiming it. The
+  settling measurement is ten or more repeats on a quiet machine, and the same
+  repeats with capture pinned, to separate state-noise from pixel-noise.
+
+One genuine disagreement, recorded unresolved: the second model leaves
+**downscaling standing** ("nothing in the evidence touches it"), where §3.4
+rejects it as a replacement. Both readings agree on the fact — the lever is
+**untested**, because the two fine-detail rows have no runnable case. The
+difference is only what an untested lever counts as, and this point's own rule
+decides that: a case that cannot be run is not a pass.
+
+### 4.6 What this hands to the next reader
 
 The one thing that would unlock the whole rejected family is **deterministic
 capture** (A9 / B-E). §3.2 gives it a measurable acceptance bar: two consecutive
