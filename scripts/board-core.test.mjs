@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { auditDashboard, parseNowCardPoints, parseQueuePoints } from './dashboard-guard-core.mjs'
+import { auditDashboard, parseNowCardPoints, parseQueuePoints, parseTasks } from './dashboard-guard-core.mjs'
 import {
   addHours,
   berlinStamp,
@@ -13,6 +13,7 @@ import {
   hoursLabel,
   nowCard,
   promoteToNow,
+  refreshFooter,
   removeVdzk,
   setCardStatus,
   toDone,
@@ -289,6 +290,46 @@ describe('every move keeps the real board auditable', () => {
       const added = [...after].filter((c) => !baseline.has(c) && !rotated[name]?.has(c))
       expect(added, `board.mjs ${name} introduced ${added.join(', ')}`).toEqual([])
     }
+  })
+})
+
+describe('refreshFooter — the count the repository already knows', () => {
+  const foot = (inner) => `<main>x</main>\n<footer>${inner}</footer>\n`
+  const live = '27.07.2026, 10:45 (Europe/Berlin) · 74 offene Punkte · Tags v0.2/poc unverändert · lädt sich alle 30 s selbst neu.'
+  const at = new Date('2026-07-27T14:32:00Z') // 16:32 Berlin
+
+  it('derives the count from the work order rather than from the old line', () => {
+    const out = refreshFooter(foot(`Stand: ${live}`), { openCount: 73, now: at })
+    expect(out).toContain('Stand: 27.07.2026, 16:32 (Europe/Berlin) · 73 offene Punkte')
+    expect(out).not.toContain('74 offene Punkte')
+  })
+
+  it('keeps the statement segments, which are not counts', () => {
+    const out = refreshFooter(foot(`Stand: ${live}`), { openCount: 73, now: at })
+    expect(out).toContain('Tags v0.2/poc unverändert')
+    expect(out).toContain('lädt sich alle 30 s selbst neu.')
+  })
+
+  it('writes the German singular rather than "1 offene Punkte"', () => {
+    expect(refreshFooter(foot(`Stand: ${live}`), { openCount: 1, now: at })).toContain('1 offener Punkt ·')
+  })
+
+  it('replaces a footer that does not match the expected shape', () => {
+    const out = refreshFooter(foot('irgendwas'), { openCount: 5, now: at })
+    expect(out).toContain('Stand: 27.07.2026, 16:32 (Europe/Berlin) · 5 offene Punkte · irgendwas')
+  })
+
+  it('fails loudly on a board without a footer and on a nonsense count', () => {
+    expect(() => refreshFooter('<main>x</main>', { openCount: 3 })).toThrow(/no footer/)
+    expect(() => refreshFooter(foot(`Stand: ${live}`), { openCount: -1 })).toThrow(/open-point count/)
+    expect(() => refreshFooter(foot(`Stand: ${live}`), { openCount: '73' })).toThrow(/open-point count/)
+  })
+
+  it('leaves the live board free of the audit stale-footer finding', () => {
+    const html = readFileSync(resolve(REPO_ROOT, '.batch-dashboard.html'), 'utf8')
+    const { open } = parseTasks(readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8'))
+    const codes = auditDashboard(refreshFooter(html, { openCount: open.length }), { open, done: [] }).map((v) => v.code)
+    expect(codes).not.toContain('footer-stale')
   })
 })
 

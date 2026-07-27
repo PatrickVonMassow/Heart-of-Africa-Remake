@@ -11,6 +11,45 @@ export function berlinStamp(now = new Date()) {
   }).format(now)
 }
 
+/** Berlin date and wall clock — "27.07.2026, 16:32", the footer's own notation. */
+export function berlinDateStamp(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('de-DE', {
+    timeZone: 'Europe/Berlin',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).formatToParts(now)
+  const at = (type) => parts.find((p) => p.type === type)?.value
+  return `${at('day')}.${at('month')}.${at('year')}, ${at('hour')}:${at('minute')}`
+}
+
+/** What the footer says when the board carries no statement of its own. */
+const FOOTER_TAIL = 'lädt sich alle 30 s selbst neu.'
+
+/**
+ * Rewrite the footer's date and open-point count, keeping every other segment
+ * the board states for itself (the tag line). The count is not a statement but
+ * a fact the repository holds, and leaving it to the hand made every tick
+ * produce a stale board that the audit then refused — the figure is derived
+ * here instead, from the same parse the audit compares against.
+ */
+export function refreshFooter(html, { openCount, now = new Date() } = {}) {
+  const m = String(html ?? '').match(/<footer>([\s\S]*?)<\/footer>/)
+  if (!m) throw new Error('board: no footer to refresh')
+  if (!Number.isInteger(openCount) || openCount < 0) {
+    throw new Error(`board: not an open-point count: ${openCount}`)
+  }
+  const kept = m[1]
+    .split('·')
+    .map((s) => s.trim())
+    .filter((s) => s && !/^Stand:/.test(s) && !/^\d+\s+offene[rn]?\s+Punkte?$/.test(s))
+  const count = openCount === 1 ? '1 offener Punkt' : `${openCount} offene Punkte`
+  const segments = [`Stand: ${berlinDateStamp(now)} (Europe/Berlin)`, count, ...(kept.length ? kept : [FOOTER_TAIL])]
+  return html.replace(m[0], `<footer>${segments.join(' · ')}</footer>`)
+}
+
 /** The queue card for `point`, or null. Exported so the caller can check first. */
 export function queueCard(html, point) {
   const re = new RegExp(`<details>\\s*<summary><span class="num">${point}</span>[\\s\\S]*?</details>\\s*`)
