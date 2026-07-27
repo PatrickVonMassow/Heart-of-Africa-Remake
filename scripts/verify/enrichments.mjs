@@ -5257,7 +5257,17 @@ await page.evaluate(async () => {
   window.__crocFeedStage = { croc, prey, naturals, out, terrainAt }
   return out
 })
-await page.screenshot({ path: `${OUT}383-crocodile-feeds-in-water.png` })
+// The subject is the staged pair itself: the shutter projects the crocodile's
+// own position, so a frame taken while the camera sits elsewhere is refused
+// rather than filed as evidence (point 375).
+const crocFeedAt = await page.evaluate(() => {
+  const c = window.__crocFeedStage?.croc
+  return c ? { x: c.x, z: c.z } : null
+})
+await shot('383-crocodile-feeds-in-water', {
+  world: crocFeedAt ?? { x: 0, z: 0 },
+  label: 'the crocodile feeding in the water with its catch',
+})
 const crocFeedsInWater = await page.evaluate(async () => {
   const st = window.__crocFeedStage
   if (!st) return { staged: false, noStage: true }
