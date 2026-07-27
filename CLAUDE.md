@@ -992,9 +992,15 @@ After completion and after every major system:
   along in a commit), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective document stays current), followed
-  by `dashboard-sync`. Separately, a PreToolUse(Bash/PowerShell) hook runs
-  `closing-guard` (§9), which denies a version tag until every closing step
-  is recorded. Every one is fail-OPEN — an internal error allows the stop, so
+  by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
+  which denies a version tag until every closing step is recorded, and
+  `board-first-guard`, the first board gate that fires BEFORE the work rather
+  than at the turn end: the Stop chain leaves the board free to lag the whole
+  hour the user is reading it, so the FIRST state-changing call of a turn is
+  denied while no `focus set|confirm` postdates the turn stamp or the board is
+  unpublished. It never blocks a read, its own remedy commands or an edit of
+  the board file, and it denies at most ONCE per turn.
+  Every one is fail-OPEN — an internal error allows the stop, so
   a guard bug can never trap the session — and each decision core is pure and
   Vitest-covered.
 - **Ask the guards BEFORE the action, not at the turn end (point 365).** Before an action a guard governs, `node scripts/guard-preflight.mjs --for <action>

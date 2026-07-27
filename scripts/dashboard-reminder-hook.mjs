@@ -33,7 +33,14 @@ try {
 // Arm the pivot check for THIS session (fail-soft: the reminder text below is
 // still the payload if any of this goes wrong).
 try {
-  if (!standDown) writeJsonAtomic(PENDING_PATH, { sessionId: sid, at: Date.now() })
+  if (!standDown) {
+    writeJsonAtomic(PENDING_PATH, { sessionId: sid, at: Date.now() })
+    // Stamp the turn boundary the BOARD-FIRST PreToolUse gate measures against
+    // (board-first-core.mjs): a focus stamp older than this means the board does
+    // not yet describe the work about to start. No stamp at all leaves the gate
+    // inactive, so this hook is what arms it.
+    mergeState({ turnStartedAt: Date.now() })
+  }
   // Keep the current session's scratchpad target on record so a plain
   // `node scripts/dashboard-publish.mjs` works even without the env variable.
   if (process.env.CLAUDE_SCRATCHPAD_DIR) {
