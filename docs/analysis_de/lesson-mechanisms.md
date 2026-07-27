@@ -39,8 +39,8 @@ Fehlalarme produzieren (zwischen `render-verify-guard` und „Grüner Test, fals
 Bild" gibt es keine gemeinsame Zeichenkette), und Fehlalarme erziehen dazu, den
 Durchsetzer zu umgehen (§3.32). Die Deckung bleibt daher **prüfungsgetragen** —
 sie gehört in die periodische Regel-Durchsicht (`scripts/rule-review-guard.mjs`)
-und in die geschuldete Vier-Augen-Pflicht für Mechanismen
-(`docs/rule-corpus-audit.md`, D-b). Dieser Vorbehalt steht hier, weil die falsche
+und in die Vier-Augen-Pflicht für Mechanismen, die seit dem 27.07.2026 selbst
+erzwungen ist (`scripts/mechanism-review-guard.mjs`, 3.13/3.19). Dieser Vorbehalt steht hier, weil die falsche
 Sicherheit nicht aus der Grenze entsteht, sondern aus dem Verschweigen der Grenze.
 
 ## Lücken werden gemeldet, nicht stillschweigend zu einer „3"
@@ -67,13 +67,13 @@ sind maschinell auszählbar (`ledgerGaps`) und stehen unten noch einmal als List
 | 3.10 | Kleinere, aber lehrreiche Klassen | 3 | Sammelabschnitt aus sechs Kleinklassen. Die durchgesetzten Teile liegen bei ihren eigenen Lektionen (Deploy-Hygiene → `scripts/pre-push-gate.mjs`, Doku-Drift → 3.21, Token-Budget → 3.31). Eigenständig bleiben hier gemessene-statt-geschätzte Zahlen, Kommunikationsregeln und stille Verschlechterung — alle drei prüfen ein Urteil, keinen Zustand. |
 | 3.11 | Nachweise sind zustandsgebunden | 1 | `scripts/render-verify-state.mjs`, `scripts/render-verify-guard.mjs` — der Nachweis war schon HEAD-gebunden; die Lektion schärfte den **Umgang** damit (gegen den Zielzustand laufen lassen), nicht den Mechanismus. |
 | 3.12 | Ein Test kodiert eine veränderliche Vorgabe fest | 3 | Bewusst keiner: Ob eine Schwelle gegen den ausgelieferten Default oder gegen einen alten kalibriert wurde, steht in keiner Datei — es ist die Herkunft einer Zahl. Prüfbar ist nur das Vorgehen (Baseline auf dem Vor-Änderungs-Stand), und das ist eine Handlung, kein Zustand. |
-| 3.13 | Modell-Diversität nach Kritikalität | 3 | `LÜCKE:` Kein Durchsetzer. `docs/rule-corpus-audit.md` A29 hält fest, dass die Regel eine Stop-Hook-Prüfung **behauptet**, die nie existierte; D-b beschreibt den Bau (Attestierung am Mechanismus-Datei + Name des prüfenden Modells, das autorierende Modell abgelehnt). Als eigener Arbeitspunkt geführt — gemeinsam mit 3.19, denn beide brauchen **denselben** Durchsetzer, nicht zwei. |
+| 3.13 | Modell-Diversität nach Kritikalität | 2 | `scripts/mechanism-review-core.mjs`, `scripts/mechanism-review-guard.mjs`, `scripts/mechanism-review.mjs` — der Bau, den `docs/rule-corpus-audit.md` D-b beschreibt: Ein neuer oder geänderter Durchsetzer (Guard, Gate, Git-Hook, Kern daneben) beendet den Zug erst, wenn eine Gegenprüfung erfasst ist — welches Modell, welches Ergebnis, welcher Stand. Das autorierende Modell wird abgelehnt statt gewarnt. **Ein** Durchsetzer für 3.13 und 3.19. |
 | 3.14 | Fast-Gate ≠ Release-Gate | 1 | `scripts/closing-guard.mjs`, `scripts/pre-push-gate.mjs` — der bestehende Closing-Gate deckt die Auslieferungsseite ab; die Lektion begründet, warum er nicht durch das schnelle Gate ersetzbar ist. |
 | 3.15 | Vollständigkeit eines Prozesses braucht ein Gate | 2 | `scripts/closing-guard-core.mjs`, `scripts/closing-guard.mjs` — kein Versions-Tag, solange ein Closing-Schritt unbelegt ist. |
 | 3.16 | Mechanismus ZUERST — das übergeordnete Prinzip | 2 | `scripts/retro-core.mjs` (`evaluateLedger`) + `scripts/retro-currency-guard.mjs` + dieses Register. Die Meta-Regel war bis zum 27.07.2026 selbst nur eine Regel; sie ist jetzt je Lektion eine erfasste, geprüfte Entscheidung. |
 | 3.17 | Stille Modell-Degradation — der Arbeiter selbst kann das Problem sein | 2 | `scripts/model-guard-core.mjs`, `scripts/model-guard.mjs` — die Identität des ausführenden Modells als überwachte Laufzeit-Invariante, gelesen aus den Commit-Trailern. |
 | 3.18 | „Erfolgreich" ist nicht „angekommen" | 2 | `scripts/push-arrival-core.mjs`, `scripts/push-arrival-guard.mjs` — kein Zug-Ende, solange Commits in keiner Remote-Ref liegen. |
-| 3.19 | Vier Augen finden, was ein Modell nicht sehen kann | 3 | `LÜCKE:` Kein Durchsetzer. Identisch zu 3.13 in der Sache: Der Vier-Augen-Zwang für neue/geänderte Mechanismen ist von der Einsteiger-Anleitung angeordnet, wurde als gebaut *behauptet* und existiert nicht (`docs/rule-corpus-audit.md` A29/D-b). **Ein** Durchsetzer schließt beide Zeilen — der Bestand wächst dabei um eins, nicht um zwei. |
+| 3.19 | Vier Augen finden, was ein Modell nicht sehen kann | 2 | Derselbe Durchsetzer wie 3.13 (`scripts/mechanism-review-guard.mjs`) — der Bestand wuchs um eins, nicht um zwei. Ein `do-not-merge`-Ergebnis blockiert so laut wie ein fehlender Eintrag; was vor der einmaligen Basislinie liegt, ist bestandsgeschützt, wie bei `scripts/model-guard.mjs`. Die Prüfung fand am eigenen Bau prompt fünf Befunde, darunter einen still umgehbaren Pfad. |
 | 3.20 | Aufräumen ist eine Prüfaufgabe, keine Fleißaufgabe | 3 | `LÜCKE:` Kein Durchsetzer für den **Zwischenfall**-Fall. Die Form existiert und ist erzwungen — `scripts/closing-guard-core.mjs` führt eine belegpflichtige Schrittliste —, aber nur für eine Auslieferung; nach der Modell-Degradation und dem Doppel-Session-Vorfall lief das Aufräumen aus dem Gedächtnis (`docs/rule-corpus-audit.md` D-k). Die billige Fassung ist eine zweite Schrittliste im selben Guard. |
 | 3.21 | Ein Fakt an fünf Stellen veraltet an vier davon | 1 | `src/config/qualityDoc.test.ts` ist das Muster (Prosa gegen den Code geprüft, der den Fakt besitzt); `scripts/retro-currency-guard.mjs` hält dieses Dokumentenpaar aktuell. Verallgemeinert ist es nicht: `docs/rule-corpus-audit.md` D-d hält vier lebende Drifts dieser Klasse fest, alle im Memory-Korpus, den kein Test erreicht. |
 | 3.22 | Der rote Test, der den Unschuldigen anklagt | 3 | Bewusst keiner: „Belastet der Befund das Produkt oder die Messung?" ist eine Entscheidung **vor** dem Code-Edit; keine Prüfung kann sie beobachten (`docs/rule-corpus-audit.md` D-e führt sie ausdrücklich als nicht mechanisierbar). |
@@ -102,24 +102,18 @@ sind maschinell auszählbar (`ledgerGaps`) und stehen unten noch einmal als List
 
 Aus der Rückerfassung, nicht stillschweigend als „bewusst keine" abgelegt:
 
-1. **3.13 + 3.19 — Vier Augen bei Mechanismen.** Der wertvollste offene Posten:
-   von der Einsteiger-Anleitung angeordnet, als gebaut *behauptet*
-   (`docs/rule-corpus-audit.md` A29), nie existiert. **Beide Lektionen schließt
-   derselbe eine Durchsetzer** — sie sind hier absichtlich als ein Posten
-   geführt, damit der Bestand um eins wächst statt um zwei. Als eigener
-   Arbeitspunkt geführt.
-2. **3.20 — Beweisliste nach einem Zwischenfall.** Die Form ist gebaut und
+1. **3.20 — Beweisliste nach einem Zwischenfall.** Die Form ist gebaut und
    erzwungen, aber nur für die Auslieferung (`scripts/closing-guard-core.mjs`).
    Die billige Fassung ist eine zweite Schrittliste im **selben** Guard — kein
    neuer Guard.
-3. **3.35 — Präsens-Zusicherungen im Auftrag.** Ungebaut
+2. **3.35 — Präsens-Zusicherungen im Auftrag.** Ungebaut
    (`docs/rule-corpus-audit.md` D-i). Der Kurzbrief prüft Verweise, nicht
    Behauptungen — und eine falsche Tatsachenbehauptung führt zu einer Lieferung,
    die genau nichts tut.
-4. **3.8 — lastabhängige Zeitschranken.** Ungebaut
+3. **3.8 — lastabhängige Zeitschranken.** Ungebaut
    (`docs/rule-corpus-audit.md` D-h). Nur die Urteilshälfte dieser Lektion ist
    bewusst mechanismusfrei.
-5. **3.39 — Commit je Schritt.** Die Sicherung ist erzwungen, die
+4. **3.39 — Commit je Schritt.** Die Sicherung ist erzwungen, die
    **Schrittweite** nicht: Sie lebt in handgeschriebenen Prompts. Am 27.07.2026
    war genau diese Zeile der Unterschied zwischen einem Agenten, der alles
    verlor, und einem, der nichts verlor — der billigste denkbare Ort dafür ist

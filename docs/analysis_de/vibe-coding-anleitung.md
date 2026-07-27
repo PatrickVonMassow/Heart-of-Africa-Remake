@@ -118,6 +118,11 @@ selbstbewusst Attrappen.
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
    > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten."
 
+   Auch diese Regel braucht ihren eigenen Mechanismus, sonst fällt sie genau dann
+   aus, wenn es eng wird: Ohne festgehaltenen Prüf-Eintrag — wer geprüft hat, mit
+   welchem Ergebnis, welcher Stand — darf der Zug nicht enden. Ein „passt schon"
+   des Autors selbst zählt dabei nicht als Gegenprüfung.
+
    *(Kosten ≈ 2x)*
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
