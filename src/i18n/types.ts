@@ -383,6 +383,7 @@ export interface Strings {
     calfAdoptionRadius: string
     calfEscapeSeconds: string
     calfReunionSeconds: string
+    calfMourningSeconds: string
     benchmarkStart: string
     crocGripSeconds: string
     crocDriveOffRest: string

@@ -101,6 +101,11 @@ import {
   tickEscapeRun,
   severFamilyLinks,
   tickFamilySeparation,
+  orphanMourns,
+  tickMourning,
+  isMourning,
+  calfMayPlay,
+  juvenileAnchor,
   isPredatorSpecies,
   type AdoptionAdult,
   PREDATOR_PREY,
@@ -3689,5 +3694,229 @@ describe("a juvenile's bond to its parent RESOLVES, never hangs (design.md §19.
     // window must sit clear above it or ordinary play would end healthy bonds.
     expect(balance.family.reunionSeconds).toBeGreaterThan(balance.family.gambolBoutSeconds + 12)
     expect(balance.family.reunionSeconds).toBeGreaterThan(balance.family.escapeSeconds)
+  })
+})
+
+describe('the orphan mourns before it plays again (design.md §19.8, point 369)', () => {
+  interface Beast {
+    species: string
+    x: number
+    z: number
+    young?: boolean
+    dead?: boolean
+    caught?: number
+    escape?: number
+    parent?: Beast
+    child?: Beast
+    separated?: number
+    mourn?: number
+    mournAt?: { x: number; z: number }
+  }
+  const FOLLOW = 8.1 // balance.family.followRadius' shape
+  const WINDOW = 45 // balance.family.reunionSeconds' shape
+  const RADIUS = 20 // balance.family.adoptionRadius
+  const MOURN = 30 // balance.family.mourningSeconds' shape; the value stays calibratable
+
+  const pair = (parentX = 0, calfX = 1) => {
+    const parent: Beast = { species: 'zebra', x: parentX, z: 0 }
+    const calf: Beast = { species: 'zebra', x: calfX, z: 0, young: true, parent }
+    parent.child = calf
+    return { parent, calf }
+  }
+
+  /** The live family pass (Wildlife.tsx) with the mourning window in it: tick
+   *  the countdown for every animal (a hard deadline that always resolves), open
+   *  it on a parent that DIED — severing the bond, so nothing survives holding a
+   *  body that is gone (point 341) — then run the ordinary point-262 adoption. */
+  const familyFrame = (herd: Beast[], dt: number, mourning = MOURN) => {
+    for (const a of herd) {
+      if (a.mourn !== undefined) {
+        a.mourn = tickMourning(a.mourn, dt)
+        if (a.mourn === undefined) a.mournAt = undefined // the watch is over — play again
+      }
+      if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+      if (a.dead || a.young !== true) continue
+      let released: Beast | null = null
+      if (a.parent && !a.parent.dead) {
+        const sep = tickFamilySeparation(
+          a.separated,
+          Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
+          FOLLOW,
+          dt,
+          WINDOW,
+          adoptionHeld(a),
+        )
+        a.separated = sep.separated
+        if (!sep.resolve) continue
+        released = a.parent
+        severFamilyLinks(a) // an administrative ending: nothing to grieve
+      } else {
+        a.separated = undefined
+        if (orphanMourns(a.parent)) {
+          const body = a.parent as Beast
+          a.mourn = mourning
+          a.mournAt = { x: body.x, z: body.z }
+          severFamilyLinks(a)
+        }
+      }
+      const adopter = findAdopter(a, herd, RADIUS, { exclude: released })
+      if (adopter) {
+        a.parent = adopter
+        adopter.child = a
+      }
+    }
+  }
+
+  it('THE TRIGGER IS DEATH: only a parent that died opens the window', () => {
+    expect(orphanMourns({ dead: true })).toBe(true)
+    expect(orphanMourns({})).toBe(false) // alive and well
+    expect(orphanMourns({ dead: false })).toBe(false)
+    expect(orphanMourns(undefined)).toBe(false) // the bond was already cut
+    expect(orphanMourns(null)).toBe(false)
+  })
+
+  it('a parent that dies leaves its calf mourning AT THE SPOT it fell', () => {
+    const { parent, calf } = pair(4, 5)
+    const herd = [parent, calf]
+    familyFrame(herd, 1 / 60)
+    expect(calf.mourn).toBeUndefined() // nothing has happened yet
+    parent.dead = true
+    familyFrame(herd, 1 / 60)
+    expect(calf.mourn).toBeCloseTo(MOURN, 5) // armed this frame — the tick starts next
+    expect(calf.mournAt).toEqual({ x: 4, z: 0 })
+    expect(calf.parent).toBeUndefined() // no calf holds a body that is gone
+    // The anchor is a POINT: moving or removing the carcass cannot drag the watch.
+    parent.x = 999
+    expect(juvenileAnchor(calf)).toEqual({ x: 4, z: 0 })
+  })
+
+  it('a bond ended by SEPARATION is never mourned — the calf saw nothing happen', () => {
+    const { parent, calf } = pair(0, 0)
+    calf.x = 15 // out of reach of a LIVING parent: the point-341 resolve
+    const herd = [parent, calf]
+    while (calf.parent === parent) familyFrame(herd, 0.5)
+    expect(calf.mourn).toBeUndefined()
+    expect(calf.mournAt).toBeUndefined()
+    expect(calfMayPlay(true, calf)).toBe(true) // it plays on, as it should
+  })
+
+  it('a parent STREAMED OUT is never mourned either (point 341 cuts the bond, nobody died)', () => {
+    const { parent, calf } = pair(0, 1)
+    severFamilyLinks(parent) // the cull's spelling: removed, not dead
+    const herd = [calf]
+    familyFrame(herd, 1 / 60)
+    expect(calf.mourn).toBeUndefined()
+  })
+
+  it('the play selector is FALSE for the whole window and TRUE after it', () => {
+    const { parent, calf } = pair(0, 1)
+    const herd = [parent, calf]
+    parent.dead = true
+    familyFrame(herd, 1 / 60)
+    const dt = 1 / 60
+    for (let elapsed = 0; elapsed < MOURN - dt; elapsed += dt) {
+      expect(isMourning(calf)).toBe(true)
+      expect(calfMayPlay(true, calf)).toBe(false) // grief silences the gambol
+      familyFrame(herd, dt)
+    }
+    // …and the EXIT path: the window runs out and the calf plays again.
+    while (calf.mourn !== undefined) familyFrame(herd, dt)
+    expect(isMourning(calf)).toBe(false)
+    expect(calfMayPlay(true, calf)).toBe(true)
+    expect(calf.mournAt).toBeUndefined() // the watch is packed away with it
+  })
+
+  it('ADOPTION runs on its own clock: it changes WHO the calf follows, not its demeanour', () => {
+    const { parent, calf } = pair(0, 1)
+    const adopter: Beast = { species: 'zebra', x: 3, z: 0 }
+    const herd = [parent, calf, adopter]
+    parent.dead = true
+    familyFrame(herd, 1 / 60)
+    expect(calf.parent).toBe(adopter) // taken in at once (point 262)
+    expect(adopter.child).toBe(calf)
+    expect(isMourning(calf)).toBe(true) // …and STILL mourning: the two never cancel
+    // It follows its new parent, subdued — the anchor is the living adult again,
+    // while the play gate stays shut for the rest of the window.
+    expect(juvenileAnchor(calf)).toBe(adopter)
+    expect(calfMayPlay(true, calf)).toBe(false)
+    for (let t = 0; t < MOURN + 5; t += 0.5) familyFrame(herd, 0.5)
+    expect(isMourning(calf)).toBe(false)
+    expect(calf.parent).toBe(adopter) // and the adoption outlives the grief
+    expect(calfMayPlay(true, calf)).toBe(true)
+  })
+
+  it('a SECOND bereavement mourns again (the adoptive parent is grieved like the first)', () => {
+    const { parent, calf } = pair(0, 1)
+    const adopter: Beast = { species: 'zebra', x: 3, z: 0 }
+    const herd = [parent, calf, adopter]
+    parent.dead = true
+    familyFrame(herd, 0.5) // the first bereavement: mourned and adopted
+    while (calf.mourn !== undefined) familyFrame(herd, 0.5)
+    expect(calf.parent).toBe(adopter)
+    adopter.dead = true
+    familyFrame(herd, 0.5)
+    expect(isMourning(calf)).toBe(true)
+    expect(calf.mournAt).toEqual({ x: 3, z: 0 })
+  })
+
+  it('FEAR STILL WINS: a mourning calf inside the shy ring flees the traveller', () => {
+    // The mourning window deliberately does NOT enter the drama state fed to the
+    // arbitration (point 252), so every danger response outranks it — a grieving
+    // calf must never stand still for a predator.
+    const calf: Beast = { species: 'zebra', x: 0, z: 0, young: true, mourn: MOURN, mournAt: { x: 0, z: 0 } }
+    expect(isMourning(calf)).toBe(true)
+    const pick = resolveFleeTarget(
+      0,
+      0,
+      {
+        species: 'zebra',
+        isJuvenile: true,
+        preyWeapon: balance.parentDefense.preyWeapon,
+        drama: {}, // what dramaStateOf builds for a merely mourning calf
+        drinking: false,
+        stagedBankVictim: false,
+      },
+      [],
+      [[0, -4]],
+      3.2,
+      6,
+    )
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('player')
+    // And the seized/hunted states still own their frame, mourning or not.
+    expect(adoptionHeld({ caught: 3 })).toBe(true)
+  })
+
+  it('the window ALWAYS resolves — invariant I4 — from any length and frame time', () => {
+    for (const w of [0.5, 5, 30, 120]) {
+      for (const dt of [1 / 240, 1 / 60, 0.25, 1, 7]) {
+        let m: number | undefined = w
+        let frames = 0
+        while (m !== undefined && frames < Math.ceil(w / dt) + 2) {
+          m = tickMourning(m, dt)
+          frames++
+        }
+        expect(m).toBeUndefined()
+      }
+    }
+    // Exact boundary: a tick of exactly the remaining time ENDS the window.
+    expect(tickMourning(2, 2)).toBeUndefined()
+    expect(tickMourning(2, 1.999)).toBeCloseTo(0.001, 6)
+    expect(tickMourning(undefined, 1)).toBeUndefined()
+  })
+
+  it('the anchor falls back to the herd once the watch is over', () => {
+    expect(juvenileAnchor({})).toBeNull() // an ordinary parentless juvenile roams
+    expect(juvenileAnchor({ parent: { x: 2, z: 3 }, mourn: 5, mournAt: { x: 9, z: 9 } })).toEqual({ x: 2, z: 3 })
+    expect(juvenileAnchor({ parent: { x: 2, z: 3, dead: true }, mourn: 5, mournAt: { x: 9, z: 9 } }))
+      .toEqual({ x: 9, z: 9 }) // a dead parent is no anchor — the spot it fell is
+    expect(juvenileAnchor({ parent: { x: 2, z: 3, dead: true } })).toBeNull()
+  })
+
+  it('the shipped window outlasts a whole play cycle', () => {
+    // GAMBOL_IDLE_SECONDS is 12 s in the scene, so one cycle is bout + 12 s: the
+    // window must sit above it or the calf would gambol straight through its
+    // grief and the picture would say nothing had happened.
+    expect(balance.family.mourningSeconds).toBeGreaterThan(balance.family.gambolBoutSeconds + 12)
   })
 })

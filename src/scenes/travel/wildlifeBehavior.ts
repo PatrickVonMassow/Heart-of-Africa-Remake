@@ -2130,6 +2130,68 @@ export function tickFamilySeparation(
   return { separated: t, resolve: false }
 }
 
+/**
+ * Does the END of a juvenile's bond open the mourning window (design.md §19.8,
+ * point 369)? THE TRIGGER IS DEATH, NOT DISTANCE. A bond ends two ways: the
+ * parent DIES in the world (mourned), or the bond resolves administratively —
+ * the parent was streamed out from under the calf, or the separation window
+ * released a pair that drifted apart (point 341). Only the first is grieved: a
+ * calf that simply lost track of its parent watched nothing happen, and a
+ * mourning pose there would be a lie about what the PLAYER watched.
+ */
+export function orphanMourns(parent: { dead?: boolean } | null | undefined): boolean {
+  return parent !== null && parent !== undefined && parent.dead === true
+}
+
+/**
+ * Tick the orphan's mourning window (design.md §19.8, point 369): the seconds
+ * left, or `undefined` once it has run out. The escape run's hard-deadline
+ * shape, deliberately shared — the demeanour ALWAYS resolves back to play
+ * (invariant I4), whatever else happens to the calf meanwhile.
+ */
+export function tickMourning(mourn: number | undefined, dt: number): number | undefined {
+  return tickEscapeRun(mourn, dt)
+}
+
+/** Is this juvenile inside its §19.8 mourning window (point 369)? */
+export function isMourning(young: { mourn?: number }): boolean {
+  return young.mourn !== undefined && young.mourn > 0
+}
+
+/**
+ * The play gate (design.md §19.8, point 369): may this juvenile break into a
+ * gambol bout right now? `base` is the ordinary play condition (a playful
+ * species, inside its leash, no hunt running); grief silences it for the whole
+ * window, so an orphan whose parent has just died does not go straight back to
+ * gambolling. DANGER outranks both — a seized or hunted calf takes its flight
+ * branch long before this gate is consulted.
+ */
+export function calfMayPlay(base: boolean, young: { mourn?: number }): boolean {
+  return base && !isMourning(young)
+}
+
+/**
+ * Where a juvenile keeps (design.md §19.8, points 341/369): its LIVING parent —
+ * the ADOPTIVE one once point 262 has found it, so being adopted changes WHO it
+ * follows and not its demeanour, and the two mechanics never cancel each other —
+ * or, for an orphan still inside its mourning window, the spot where its parent
+ * fell. `null` for an ordinary parentless juvenile, which roams with the herd
+ * exactly as before.
+ *
+ * The mourning anchor is a POINT, never a reference to the body: the carcass is
+ * removed long before the window ends, and nothing may survive holding an animal
+ * that is gone (point 341's lesson).
+ */
+export function juvenileAnchor(young: {
+  parent?: { x: number; z: number; dead?: boolean }
+  mourn?: number
+  mournAt?: { x: number; z: number }
+}): { x: number; z: number } | null {
+  if (young.parent && young.parent.dead !== true) return young.parent
+  if (isMourning(young) && young.mournAt) return young.mournAt
+  return null
+}
+
 /** Orphan adoption (design.md §19.8, point 262): the nearest ELIGIBLE adult
  *  that can take in `juvenile`, or `null` when none is within `radius`. Eligible
  *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
