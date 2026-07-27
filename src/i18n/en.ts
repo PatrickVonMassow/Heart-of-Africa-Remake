@@ -237,11 +237,29 @@ export const en: Strings = {
   },
 
   stateDump: {
-    title: 'Game State',
-    download: 'Download',
+    title: 'Bug Report',
+    download: 'State only (JSON)',
+    downloadReport: 'Download report',
     copy: 'Copy',
     copied: 'Game state copied to the clipboard.',
     close: 'Close (F6)',
+    descriptionLabel: 'What went wrong?',
+    descriptionPlaceholder: 'Describe what you saw — what you were doing, and what looked wrong.',
+    contents: 'The archive holds the picture, the full game state and your description. Pass it on unopened.',
+    saved: 'Bug report saved.',
+    report: {
+      heading: 'The Heart of Africa — bug report',
+      description: 'What went wrong',
+      noDescription: '(no description given)',
+      environment: 'Environment',
+      reproduction: 'Reproduction',
+      files: 'Files in this archive',
+      pictureNote: 'the 3-D scene, read back from the canvas. It does NOT contain the HUD or any floating label — those are HTML and never enter the picture.',
+      pictureMissing: '(no screenshot: the capture failed — the state and the overlay list are still complete.)',
+      stateNote: 'the complete game state, balance values and UI state as JSON.',
+      overlayNote: 'every label and HUD element visible at that moment, with its text and its on-screen rectangle — this is where the HUD and the map labels are.',
+      duplicateNote: 'Labels sharing a text at overlapping positions',
+    },
   },
 
   benchmark: {

@@ -3,9 +3,10 @@
 // §18 snapshot fields) plus the balance object and the self-describing header,
 // drop every store action, and be deterministic given a state and a date.
 import { describe, it, expect, beforeEach } from 'vitest'
-import { dumpFilename, dumpGameState, DUMP_APP } from './stateDump'
+import { dumpFilename, dumpGameState, dumpSummary, inGameDate, DUMP_APP } from './stateDump'
 import { useGame, type GameState } from './store'
-import { balance } from '../config/balance'
+import { balance, START_YEAR } from '../config/balance'
+import { regionAt, worldToLatLon } from '../world/geo'
 
 beforeEach(() => {
   localStorage.clear()
@@ -84,6 +85,60 @@ describe('dumpGameState (design.md §21.1, F6)', () => {
       Object.entries(s).filter(([, v]) => typeof v !== 'function'),
     )
     expect(parsed.game).toEqual(JSON.parse(JSON.stringify(dataFields)))
+  })
+})
+
+// What turned a vague report into a reproducible one in the field
+// (user 27.07.2026): seed, position, region, in-game date, pace, graphics
+// level. They must be CAPTURED and they must sit at the TOP, not be hunted
+// for somewhere inside the full store.
+describe('dumpSummary: the reproduction fields (design.md §21.1)', () => {
+  it('carries the seed, position, region, date, travel speed and graphics level', () => {
+    useGame.setState({ pos: { x: 40, z: -120 }, day: 250.5 })
+    const s = useGame.getState()
+    const sum = dumpSummary(s, 'high')
+    const ll = worldToLatLon(s.pos.x, s.pos.z)
+    expect(sum.seed).toBe(4711)
+    expect(sum.pos).toEqual({ x: 40, z: -120 })
+    expect(sum.latLon.lat).toBeCloseTo(ll.lat, 6)
+    expect(sum.region).toBe(regionAt(ll.lat, ll.lon))
+    expect(sum.inGameDate).toBe(inGameDate(250.5))
+    expect(sum.day).toBe(250.5)
+    expect(sum.travelSpeed).toBe(balance.travelSpeed)
+    expect(sum.detailLevel).toBe('high')
+    expect(sum.mode).toBe(s.mode)
+  })
+
+  it('formats the in-game date DD.MM.YYYY from the 1890 start', () => {
+    expect(inGameDate(0)).toBe('01.01.1890')
+    expect(inGameDate(31)).toBe('01.02.1890')
+    expect(inGameDate(365)).toBe('01.01.1891')
+    expect(inGameDate(0, START_YEAR)).toBe('01.01.1890')
+  })
+
+  it('sits ABOVE the bulk in the dump, ahead of game and balance', () => {
+    const json = dumpGameState(useGame.getState(), { detailLevel: 'low' })
+    const keys = Object.keys(JSON.parse(json))
+    expect(keys.indexOf('summary')).toBeLessThan(keys.indexOf('game'))
+    expect(keys.indexOf('summary')).toBeLessThan(keys.indexOf('balance'))
+    expect(JSON.parse(json).summary.detailLevel).toBe('low')
+  })
+
+  it('carries the environment header when one is passed', () => {
+    const env = {
+      build: 'production',
+      commit: 'abc1234',
+      backend: 'webgl2',
+      adapter: 'llvmpipe',
+      language: 'de',
+      quality: 'low',
+      userAgent: 'test',
+      viewport: { width: 800, height: 600 },
+      devicePixelRatio: 1,
+    }
+    const parsed = JSON.parse(dumpGameState(useGame.getState(), { env }))
+    expect(parsed.env).toEqual(env)
+    expect(Object.keys(parsed).indexOf('env')).toBeLessThan(Object.keys(parsed).indexOf('game'))
   })
 })
 
