@@ -4683,7 +4683,15 @@ function Herds() {
           a.mired !== undefined
         const face = thrashing ? yaw : turnToward(a.face ?? yaw, yaw, FACE_TURN * dt)
         a.face = face
-        if (sp !== 'elephant' && !thrashing && yaw !== idleYaw) a.rot = face
+        // A crocodile mid-ambush owns its own facing (points 257/383): the burst,
+        // the haul and the feeding hold all set `a.rot` in the sim, and the feed
+        // pose's death-roll is a RELATIVE overlay on it. Writing the rendered
+        // facing back would feed that overlay in frame after frame — the point-257
+        // accumulation — and since the catch is placed AT the jaws, the wrench
+        // would swing the pair over the shoreline: measured, ~12 % of a feed's
+        // frames had one of the two on land.
+        const crocOwnsFacing = sp === 'crocodile' && a.lunge !== undefined
+        if (sp !== 'elephant' && !thrashing && !crocOwnsFacing && yaw !== idleYaw) a.rot = face
         vpos.set(px, bodyY, pz)
         if (pitch !== 0) {
           euler.set(pitch, face, 0, 'YXZ')
