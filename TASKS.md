@@ -1229,85 +1229,6 @@ read that as "the criterion and its evidence section".
   »feat/224-…«). This guard exemplifies point 307's mechanism-first principle: instead of relying
   on memory, a technical gate enforces rule compliance.
 
-- [ ] 307. FULL AUDIT OF EVERY RULE AND MECHANISM — HEALTH, NOT JUST COVERAGE
-  (user 25.07.2026, widening the original "find the missing mechanisms" scope after
-  a day that exposed how disordered the rule corpus has become). The corpus now
-  spans ~65 memories, 25 guard/hook scripts, CLAUDE.md §2/§4/§6/§7/§9, design.md
-  process sections, the analysis docs and the standing batch instructions — grown
-  by accretion, never once reviewed AS A WHOLE. Evidence that it needs it: today a
-  single rule change had to be applied in SIX places; two memories had to be
-  retired outright; a doc gained a SECOND copy of a rule it already stated (caught
-  only by re-reading); the coherence audit found a memory claiming enforcement by a
-  guard that was never built; and four separate checks accused the product of bugs
-  that were their own stale assumptions.
-  AUDIT EVERY RULE ON SIX AXES, one row per rule in a delivered table:
-  (1) CLEAN — is it stated once, in the right place, unambiguously?
-  (2) CURRENT — does it still match how the project actually works?
-  (3) REDUNDANT — is the same rule stated elsewhere (in another memory, doc or
-  guard message)? Merge to a single authoritative statement, others reference it.
-  (4) CONTRADICTORY — does it conflict with another rule, or with the code?
-  (5) INEFFECTIVE — does its mechanism actually fire? A guard that cannot block,
-  a check whose assertion cannot fail, a memory claiming an enforcement that does
-  not exist (the model-diverse-by-criticality case) all count as ineffective.
-  (6) OBSOLETE — has it been superseded (mark RETIRED with what survives, do not
-  silently delete — a reader who knows the old rule must see it was dropped on
-  purpose; that convention was set today).
-  THEN CONVERT: for every rule that is worth keeping but rests on intention alone,
-  BUILD the enforcing mechanism (pure core + Vitest + fail-open wrapper + wiring,
-  the project guard schema). Prioritise by how often compliance has actually
-  slipped, not by how easy the check is. The unguarded candidates already named:
-  push-after-every-commit, one-atomic-commit-per-point, both-languages-for-every-
-  player-text, voice-markup-in-every-journal-text, 1890-valid-names,
-  English-no-germanisms, commit-messages-no-point-number, new-tasks-append-and-
-  defer, tasks-spec-final-state-only — several are pure-checkable.
-  THE SAME CONVERSION IS OWED FOR THE BEGINNER GUIDE'S OWN ADVICE (user 25.07.2026:
-  "haben wir alle Tipps umgesetzt?"). docs/analysis_de/vibe-coding-anleitung.md hands
-  out prompts that ORDER a mechanism; every one of them must therefore exist here, or
-  its absence must be a recorded decision. Already built: progress-board currency
-  (dashboard chain), large-tier-before-release (closing-guard), picture-verified render
-  changes (render-verify-guard), no silent stop (batch-progress-guard), never block on
-  the user (defer-for-user), arrival proven not reported (push-arrival-guard), periodic
-  rule-corpus review (rule-review-guard), guide brevity (guide-brevity-guard). STILL
-  UNBUILT, in the order the guide implies:
-  (a) EVERY FEATURE HAS A TEST ON THE RIGHT LAYER — a check that fires when product
-  code changed with no corresponding test added on either layer.
-  (b) FOUR-EYES WHEN A MECHANISM IS ADDED OR CHANGED — the guide's own prompt; a
-  Stop check that a new/changed *-guard/*-core carries a recorded secondary-model
-  review before it goes live. Note the ordering trap: the reviewing model must not
-  be the authoring one, so the check records WHICH model reviewed.
-  (c) GUARD HEALTH — has each guard ever fired, can it fire at all, does it duplicate
-  another, is its message actionable? Two live examples of the failure: prep-guard
-  armed only on Bash while the project's shell is PowerShell, and scripts/
-  pre-push-gate.mjs exists while core.hooksPath is unset, so it can never run (that
-  one belongs to point 302, not here).
-  (d) ONE AUTHORITATIVE PLACE PER FACT — doc/code drift caught by checking prose
-  against the CODE that owns the fact (src/config/qualityDoc.test.ts is the pattern
-  to generalise; it currently covers only the quality presets).
-  (e) RED-TEST TRIAGE — before changing product code on a red check, decide by
-  EXPERIMENT whether the finding accuses the product or the measurement.
-  (f) NO FIXED WALL-CLOCK WAITS in tests — a detector; waiting is on a condition or
-  the app's clock.
-  (g) ONLY MEASURED NUMBERS are communicated (runtimes, performance, cost).
-  Where a mechanism is genuinely impossible (e.g. "does this look right to a human?"),
-  record that verdict explicitly instead of leaving the row silently empty.
-  ALSO AUDIT THE GUARDS THEMSELVES, not only the rules: 25 scripts now run on every
-  turn end. Which of them have ever fired? Which duplicate another's job? Is the
-  Stop chain's ORDER sensible (the most actionable message first — today a
-  structure violation was reported as "36 points missing" by an earlier guard)? Is
-  any of them so noisy that it trains the reader to ignore it? A guard that never
-  fires and a guard that always fires are both broken.
-  METHOD — FOUR EYES per the 25.07 model policy: one model scans and proposes,
-  the OTHER reviews the inventory for completeness and each verdict for
-  correctness (an incomplete inventory is the failure mode, and a rule audit that
-  checks rules against neighbouring prose rather than against the CODE makes drift
-  worse — that happened on 17.07 and is recorded in point 333's root causes).
-  VERIFIABLE: the rule×axis table with a verdict and an action per row; every
-  RETIRED rule marked as such with its surviving insight; every merged duplicate
-  leaving exactly one authoritative statement; each newly built guard with a
-  passing Vitest core test and its wiring; a short report of what was left
-  unenforced and why; and the guard-health verdict per script. No player-visible
-  text changes.
-
 - [ ] 309. SERVING-MODEL DEGRADATION: REPAIR + TRIPWIRE (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
   commit trailers) and merged three deliveries that missed their specs; main is RESTORED
@@ -3244,6 +3165,38 @@ read that as "the criterion and its evidence section".
   are recorded with the decision.
   DOCS in the same commit: CLAUDE.md §7.2 (the classification sentence) and the rationale
   beside `isBackendSensitivePath`.
+
+- [ ] 377. THE FOUR-EYES RULE FOR A NEW MECHANISM GETS ITS OWN MECHANISM
+  (27.07.2026, from the rule-corpus audit of point 307). The rule "a new or changed
+  guard is reviewed by the SECOND model before it goes live" is the project's own
+  exemplar for enforcing rather than remembering — and the audit found it was claimed
+  to have a Stop check that never existed. It has been carried by intention alone, and
+  it was skipped in exactly the cases where it mattered: the pre-push gate went live
+  before its review, which then found two defects that defeated its purpose.
+  BUILD IT AS A STOP CHECK, in the shape every other guard here has (a pure,
+  Vitest-covered `*-core.mjs` plus a fail-open wrapper, standing down for a non-owner
+  session and a paused batch): when the turn's commits add or change a
+  `scripts/*-guard*.mjs`, `scripts/*-gate*.mjs`, a `*-core.mjs` beside one, or a git
+  hook under `scripts/git-hooks/`, the turn may not end until a review is RECORDED for
+  that change — which model reviewed, its verdict, and the commit it judged.
+  THE RECORD IS THE HARD PART, so keep it cheap and honest: `node
+  scripts/mechanism-review.mjs --record <sha> --model <name> --verdict <merge|
+  merge-with-fixes|do-not-merge> --evidence "<one line>"`, stored beside the other
+  batch state. The reviewing model must NOT be the authoring one — the record carries
+  both, and a match is refused rather than warned about. A verdict of
+  `do-not-merge` blocks as loudly as a missing record.
+  NOT RETROACTIVE: guards that already exist are grandfathered by a one-off baseline,
+  exactly as `model-guard` handles its own history — the point is the next mechanism,
+  not a review debt for twenty-eight of them.
+  VERIFIABLE: pure Vitest — a changed guard without a record blocks; with a record by a
+  DIFFERENT model it passes; a record by the authoring model is refused; a
+  `do-not-merge` verdict blocks; a turn that changed no mechanism is untouched; the
+  baseline grandfathering holds. Plus the spawned-hook test the Stop chain's other
+  guards have (`scripts/guard-hooks.test.mjs`), because reading a wrapper is not
+  evidence that it fires.
+  DOCS in the same commit: CLAUDE.md §7.2's guard list (the file is at its measured
+  ceiling — pay for the entry by trimming, not by raising) and the beginner's guide,
+  whose prompt 5 already asks for exactly this and can then cite it as built.
 
 ## Closing (only after all points)
 
