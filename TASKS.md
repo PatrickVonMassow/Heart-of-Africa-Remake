@@ -1015,16 +1015,6 @@ read that as "the criterion and its evidence section".
   player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
   (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
 
-- [ ] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
-  retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
-  agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
-  polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
-  of emitting an ambiguous red. Mechanizes the "judge a red only on a quiet machine"
-  heuristic so it does not rely on memory. ANCHORS: `scripts/verify/run-all.mjs` (load probe
-  + flag), a pure load-classification helper. VERIFIABLE: a pure test of the load-detect/flag
-  decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
-  grows.)
-
 - [ ] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
   hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
   hooks run every turn end) and the memory files (contradictory/tempering pairs like
@@ -2106,6 +2096,25 @@ read that as "the criterion and its evidence section".
   already made the fire answer to a place's own COLD, harmattan and karif; RAIN is the
   driver it never got, and rain is the one that contradicts the picture outright — an
   open fire in the open does not burn through a downpour.
+  TWO MORE FAULTS IN THE SAME OBJECT, reported 27.07.2026 with a screenshot of the
+  Mbuti village under rain, and they must be fixed WITH the rain behaviour rather than
+  after it — a shrinking flame that keeps them would only shrink the fault:
+  (a) THE FLAME FLOATS. A fire reduced by the weather still stands ON the ground: its
+  base sits in the hearth, on the fire pit's own surface, at every size the rain rule
+  produces. Whatever scales it must scale it about its base, not its centre — check the
+  full range the rule can reach, including the smallest, because the gap grows as the
+  flame shrinks.
+  (b) THE VILLAGERS WALK THROUGH IT. The fire needs a collider — the user's own
+  suggestion, and the right one: the hearth plus a calibratable clearance radius
+  (a `balance` value, debug-editable) joins the settlement's collider set, so inhabitants
+  path AROUND it and the player cannot stand in the flames either. The §2.6 rule that no
+  walker may be trapped applies: adding an obstacle in the middle of a yard must not
+  strand anyone, so the errand-target validation runs against the widened set.
+  VERIFIABLE for both: pure Vitest — the flame's base stays at hearth height across the
+  whole scale range (the floating case fails before the fix), and the hearth collider is
+  in the set every walker path is validated against, with no walker target left inside
+  it; live, one first-person frame in the rain showing flame on ground, and a walker
+  observed pathing around the hearth rather than through it.
   RESEARCH FIRST, then build — this is a people question, not a graphics question.
   Establish from `docs/peoples-1890.md` (extending it where it is silent) where each
   people's cooking fire actually SAT around 1890: a hearth inside the dwelling, a
@@ -2994,55 +3003,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 beside the projection rule, and
   `scripts/verify/README.md`.
 
-- [ ] 376. THE RENDER SET MUST CONTAIN THE FILE THAT ONCE BROKE THE PICTURE (27.07.2026,
-  found under point 361). `scripts/render-verify-core.mjs` classifies `src/world/redSea.ts`
-  as NOT a render path, yet the point-210 stepped coast — the founding case of the
-  both-backend picture rule — touched that file and nothing else. The guard would not have
-  demanded a picture check for the bug it exists because of.
-  DECIDE BY MEASUREMENT, not by instinct, and record the figure either way: (a) widen the
-  classification to the world-geometry sources that FEED the rendered terrain, or (b) keep
-  the narrow set and add those sources as a named exception list derived from the
-  historical corpus. (a) is safer and costs more checks; (b) is cheaper and covers only
-  what has already burned us once. Measure how many of the last 100 commits each option
-  would newly force into a picture check, and choose on that number.
-  VERIFIABLE: `scripts/render-verify-core.test.mjs` gains the point-210 commit as a case —
-  the classification must demand the picture check for it — and the measured commit counts
-  are recorded with the decision.
-  DOCS in the same commit: CLAUDE.md §7.2 (the classification sentence) and the rationale
-  beside `isBackendSensitivePath`.
-
-- [ ] 377. THE FOUR-EYES RULE FOR A NEW MECHANISM GETS ITS OWN MECHANISM
-  (27.07.2026, from the rule-corpus audit of point 307). The rule "a new or changed
-  guard is reviewed by the SECOND model before it goes live" is the project's own
-  exemplar for enforcing rather than remembering — and the audit found it was claimed
-  to have a Stop check that never existed. It has been carried by intention alone, and
-  it was skipped in exactly the cases where it mattered: the pre-push gate went live
-  before its review, which then found two defects that defeated its purpose.
-  BUILD IT AS A STOP CHECK, in the shape every other guard here has (a pure,
-  Vitest-covered `*-core.mjs` plus a fail-open wrapper, standing down for a non-owner
-  session and a paused batch): when the turn's commits add or change a
-  `scripts/*-guard*.mjs`, `scripts/*-gate*.mjs`, a `*-core.mjs` beside one, or a git
-  hook under `scripts/git-hooks/`, the turn may not end until a review is RECORDED for
-  that change — which model reviewed, its verdict, and the commit it judged.
-  THE RECORD IS THE HARD PART, so keep it cheap and honest: `node
-  scripts/mechanism-review.mjs --record <sha> --model <name> --verdict <merge|
-  merge-with-fixes|do-not-merge> --evidence "<one line>"`, stored beside the other
-  batch state. The reviewing model must NOT be the authoring one — the record carries
-  both, and a match is refused rather than warned about. A verdict of
-  `do-not-merge` blocks as loudly as a missing record.
-  NOT RETROACTIVE: guards that already exist are grandfathered by a one-off baseline,
-  exactly as `model-guard` handles its own history — the point is the next mechanism,
-  not a review debt for twenty-eight of them.
-  VERIFIABLE: pure Vitest — a changed guard without a record blocks; with a record by a
-  DIFFERENT model it passes; a record by the authoring model is refused; a
-  `do-not-merge` verdict blocks; a turn that changed no mechanism is untouched; the
-  baseline grandfathering holds. Plus the spawned-hook test the Stop chain's other
-  guards have (`scripts/guard-hooks.test.mjs`), because reading a wrapper is not
-  evidence that it fires.
-  DOCS in the same commit: CLAUDE.md §7.2's guard list (the file is at its measured
-  ceiling — pay for the entry by trimming, not by raising) and the beginner's guide,
-  whose prompt 5 already asks for exactly this and can then cite it as built.
-
 - [ ] 378. THE ANIMAL'S COLLISION SITS BESIDE THE ANIMAL (user 27.07.2026, reported on
   the deployed build with a screenshot: in the bird's-eye view the traveller walks
   STRAIGHT THROUGH the drawn body, and is blocked on empty ground NEXT TO it). The
@@ -3087,7 +3047,8 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
   rule, already stated for flora, extended to animals) and its evidence section.
 
-- [ ] 379. ABU SIMBEL JOINS THE CULTURAL LANDMARKS (user 27.07.2026). The world carries
+- [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
+  own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
   Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
   and they belong: in 1890 they stood — cleared of sand by Belzoni in 1817 and a fixed
@@ -3095,7 +3056,25 @@ read that as "the criterion and its evidence section".
   south, in their ORIGINAL place beside the river (the 1960s relocation is far outside
   this game's window, so the site sits at the historical coordinates, not the modern
   ones).
-  BUILD IT AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
+  IT IS ENTERABLE, LIKE THE PYRAMIDS (user 27.07.2026): the traveller walks up to it in
+  the bird's-eye view and enters with SPACE, exactly as point 273 made the Giza monument
+  site walkable — the same enter radius, the same discovery gate, the same non-overlap
+  rule against every other place's enter disc, and a first-person site the player can
+  cross. Point 273 is the pattern to follow rather than a second mechanism to invent;
+  read what it built before designing anything.
+  ONE PLACE, ONE LABEL — do not repeat the Giza mistake (user 27.07.2026). Making the
+  pyramids walkable left the site defined TWICE, as a cultural landmark AND as a map
+  point, so the bird's-eye view carries two overlapping names for one thing (that is
+  work-order point 338, still open). Abu Simbel is entered into the world ONCE, in
+  whichever of the two forms carries an enterable site, and it must NOT also stand as a
+  second definition. Point 338 decides which form survives for Giza; this point follows
+  that decision rather than inventing a third arrangement — and if 338 is still open
+  when this is built, it is fixed FIRST, because building a second double label while
+  the first is being removed is the same defect twice.
+  VERIFIABLE for that half: a pure test asserting the site appears EXACTLY ONCE across
+  the landmark and map-point definitions, and one bird's-eye frame at in-game zoom
+  showing a single label.
+  BUILD THE REST AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
   `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
   water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
   a localized name in BOTH language files, a first-sighting journal entry in the §10
@@ -3184,6 +3163,140 @@ read that as "the criterion and its evidence section".
   unbroken horizon. The reported view is the acceptance case: same place, same heading.
   DOCS in the same commit: CLAUDE.md §7.1 pt 31 (the panorama footing rule already
   written there) and its evidence section.
+
+- [ ] 382. THE CROCODILE'S EYE-KNOB CHECK SITS ON ITS OWN THRESHOLD (27.07.2026, found
+  while triaging point 369). The `enrichments` check "a lurking crocodile shows its eye
+  knobs while its body reads as WATER, and a strike does not" (point 274) failed TWICE
+  with the SAME check in one evening — the candidate-real signature, not the load one —
+  at `strikeDiff` 44.2 and 44.6 against a threshold of `> 45`. A check that decides on
+  the second decimal of a colour difference is not measuring the property it claims:
+  the question is whether the lunging body reads as an ANIMAL rather than as water, and
+  that answer must not flip because a frame landed a shade differently.
+  DECIDE WHAT THE CHECK IS REALLY ASKING, then re-express it: measure the separation
+  between the hidden and the striking body against the WATER around them (a ratio or a
+  standard-deviation distance, which is scale-free), rather than an absolute channel
+  delta compared with a hand-set number. Whatever replaces it must still FAIL a body
+  that stays water-coloured through the strike — verify that by feeding it the hidden
+  frame and demanding a red.
+  DO NOT SIMPLY RAISE OR LOWER THE NUMBER. Moving the threshold to make today's run
+  green is the failure mode this project has paid for: the next frame lands on the new
+  edge and the same evening repeats.
+  MEASURE THE SPREAD FIRST: run the check's own staging several times and record the
+  distribution of the value it reads. A threshold is only defensible against a measured
+  spread; if the spread turns out to be wide because the STAGING varies, the staging is
+  what needs pinning (the point-369 triage found exactly that class — a third animal
+  wandering into a staged drama).
+  VERIFIABLE: the reworked check green over repeated runs on a QUIET machine (the
+  point-296 probe confirms the machine before the figure is believed), red on the
+  hidden-body frame, and the measured spread recorded beside the new criterion.
+  DOCS in the same commit: the check's own comment block in `scripts/verify/
+  enrichments.mjs` and, if the criterion changes what §19.16 promises, design.md.
+
+- [ ] 383. THE CROCODILE FEEDS ON DRY LAND WITH ITS CATCH IN THE WATER (user 27.07.2026,
+  reported from the deployed build with a screenshot: the traveller sits in his canoe on
+  the river, and on the sandy bank beside him stands the crocodile — WHOLLY on land, all
+  four legs on sand — while the carcass it is feeding on lies at the waterline with its
+  head submerged). Both halves are wrong, and they are wrong in opposite directions: the
+  ambusher of §19.16 comes OUT of the water and takes its catch BACK into it; it does not
+  stand on a beach to eat, and its prey does not end up in the water while it does not.
+  THE RULE THE PICTURE BREAKS: a crocodile's kill is dragged into the water (§19.16 —
+  the ambush from the water) and the feeding happens with the crocodile IN the water,
+  the carcass at or just under the surface beside it. The arrangement the player saw is
+  the exact inverse, so whatever places the pair after a kill is placing them
+  independently of each other and independently of the shoreline.
+  DIAGNOSE THE PLACEMENT, do not nudge the model: establish whether (a) the crocodile
+  walks out of the water while a feed is running, (b) the carcass is dropped at the
+  strike point while the crocodile retreats to its own resting spot, (c) the water mask
+  the two consult disagrees (the river band widened by the calibratable width factor is
+  a known source of edge disagreement), or (d) the drag-into-water leg does not exist at
+  all for a bank kill. Name which in the commit; each has a different fix and three of
+  them would leave the picture unchanged.
+  TARGET: from the moment the grip holds until the carcass is gone, the crocodile's body
+  centre stays on a water cell, and the carcass stays within its own body length of that
+  body and on a water cell too. A crocodile that ends a feed may return to land as
+  §19.16 allows it to bask — but never while a carcass it is feeding on lies in the
+  water, and never with the two on opposite sides of the shoreline.
+  WATCH THE NEIGHBOURING CASE: the same question for a kill made ON the bank (the
+  drinking-victim drama) — the drag leg is what puts it right, and if that leg is
+  missing this is where it shows.
+  VERIFIABLE: pure Vitest on the placement — for a sweep of strike positions along a
+  bank (including the widened river band), the feeding pair's cells are both water and
+  their separation stays inside a body length, across the whole feed; a regression case
+  built from the reported arrangement (crocodile on land, carcass in water) must FAIL
+  before the fix. Live: one bird's-eye frame at in-game zoom of a staged feed on BOTH
+  backends, judged by the picture, plus the existing crocodile-drama checks unchanged.
+  DOCS in the same commit: design.md §19.16 if the drag-and-feed rule is not yet written
+  there explicitly, CLAUDE.md §7.1 pt 12 and its evidence section.
+
+- [ ] 384. RAIN THAT TOUCHES THE WORLD — WET GROUND, IMPACTS, LIT DROPS (user 27.07.2026,
+  after looking at the settlement rain on the deployed build: "the rain is simply painted
+  over the picture — it has no effect on the optics at all"). Measured against the code,
+  that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
+  quads in an UNLIT `MeshBasicNodeMaterial` of one constant colour (0.66/0.72/0.8), fog
+  off, depth-write off, inside a 15-unit column centred on the eye. The streaks do stand
+  in the world and are occluded by huts — but nothing else in the scene knows it is
+  raining. This point closes that gap with the three cheapest steps, in the order of
+  effect per cost; point 385 carries the two dearer ones.
+  (1) WET SURFACES — the biggest gain for the least work, and it needs no new particle.
+  A single scene-wide wetness value (the place's own `rainAmount`, already computed)
+  drives the existing materials: roughness down, albedo slightly darkened, specular
+  response up, so ground, roofs and walls go dark and glossy and the village fire
+  reflects in the wet earth. Sheltered ground is EXEMPT — work-order point 353 owns that
+  rule; this point must not fight it, so read it first and drive both from one value.
+  (2) THE RAIN REACHES THE GROUND, AND ARRIVES. Today the column is a fixed box around
+  the head and drops recycle at its lower edge — which is why the player sees them stop
+  in mid-air. A drop ends at the GROUND under it (the terrain/settlement height at its
+  own x/z), and its end is an IMPACT: a short-lived, small ring or splash quad at that
+  spot, alpha-fading, instanced like the drops themselves. On water the impact is a
+  ring; on dust it is a puff — one shape parameterised, not two systems.
+  (3) LIT DROPS INSTEAD OF ONE FLAT COLOUR. A streak's brightness follows the sun/sky
+  direction and the view angle, so it reads bright against a dark hut and nearly
+  vanishes against a bright sky, and the drops of one gust no longer look identical.
+  QUALITY LEVELS ARE PART OF THE POINT, not an afterthought (§21 convention): every new
+  lever gets a low/medium/high entry in `QUALITY_PRESETS` (`src/config/quality.ts`) and a
+  row in `docs/graphics-detail-levels.md` — the completeness gate in
+  `src/config/quality.test.ts` fails otherwise. Rain that costs frames on LOW is a
+  regression, so low keeps the plain streaks and the wetness value at most; impacts and
+  lit drops are medium/high.
+  BOTH BACKENDS, ONE PATH: TSL only, no WebGPU-only branch (CLAUDE.md §3) — the
+  reverted TRAA attempt is the precedent for what a second code path costs.
+  VERIFIABLE: pure Vitest on the wetness mapping (dry → today's values, wet → the
+  darkened/glossier set, sheltered ground unchanged) and on the impact placement (a
+  drop's end equals the ground height under it, never the column's lower edge); the
+  quality-preset completeness and doc-sync gates green; live, one first-person frame in
+  the rain on BOTH backends showing wet ground and drops that arrive, judged by the
+  picture, plus the §21 detail levels stepped through without a red.
+  DOCS in the same commit: design.md §19.13 (what rain does to the picture is design
+  content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
+  section.
+
+- [ ] 385. RAIN WITH DEPTH AND WEATHER — LAYERS, STREAK SHAPE, DIMMED SUN (user
+  27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
+  point 379). Point 384 makes the rain touch the world; this makes the rain itself read
+  as weather rather than as particles.
+  (4) DEPTH INSTEAD OF ONE CURTAIN: two or three layers at different distances and
+  speeds, with the streak LENGTH following the drop's velocity relative to the camera
+  and soft, faded ends rather than hard rectangles. That is the classic way volume is
+  suggested without more particles — the count stays where it is or falls.
+  (5) THE WEATHER CHANGES THE LIGHT: while it rains the sun is damped, the haze rises
+  and the view distance shortens, so a downpour looks like one from inside a hut as well
+  as from the open. This is where the rain stops being an overlay: the scene gets darker
+  and flatter, and the fire is suddenly the brightest thing in the village.
+  BOUNDARY: the blue sky under rain is work-order point 354 and stays there — this point
+  changes the LIGHT, not the sky dome, and the two must be built so neither undoes the
+  other. Read 354 before starting; if it is still open when this begins, say in the
+  commit how the two interact.
+  QUALITY LEVELS, as in 384: every lever gets its low/medium/high entry and its doc row;
+  the layered rain and the light damping are medium/high, low keeps one layer and the
+  undimmed sun.
+  BOTH BACKENDS, ONE PATH: TSL only, no backend branch.
+  VERIFIABLE: pure Vitest on the layer/velocity mapping (streak length follows relative
+  speed; a stalled camera does not stretch a drop) and on the light damping (rain 0 →
+  today's sun and haze exactly; rain 1 → the damped set; monotone in between); live, one
+  first-person frame per backend in the open and one from under a roof, judged by the
+  picture, at each detail level.
+  DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
+  §7.1 pt 12 and its evidence section.
 
 ## Closing (only after all points)
 

@@ -29,6 +29,10 @@ import {
 import { evaluateDocBudgets, formatDocBudgetVerdict } from './doc-budget-core.mjs'
 import { findForbiddenCommits } from './model-guard-core.mjs'
 import { evaluate as renderVerifyEvaluate } from './render-verify-core.mjs'
+import {
+  evaluateMechanismReview,
+  formatMechanismReviewVerdict,
+} from './mechanism-review-core.mjs'
 
 import { gatherDashboardInputs } from './dashboard-guard.mjs'
 import { gatherTasksSpecInputs } from './tasks-spec-guard.mjs'
@@ -37,6 +41,7 @@ import { gatherQueueOrderInputs } from './queue-order-guard.mjs'
 import { gatherDocBudgetInputs } from './doc-budget-guard.mjs'
 import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
+import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
 
 import {
   ACTIONS,
@@ -101,6 +106,14 @@ export const GUARDS = [
     id: 'render-verify-guard',
     gather: gatherRenderVerifyInputs,
     decide: renderVerifyEvaluate,
+  },
+  {
+    id: 'mechanism-review-guard',
+    gather: gatherMechanismReviewInputs,
+    decide: (inputs) => {
+      const verdict = evaluateMechanismReview(inputs)
+      return { block: verdict.block, reason: formatMechanismReviewVerdict(verdict) }
+    },
   },
   {
     id: 'queue-order-guard',

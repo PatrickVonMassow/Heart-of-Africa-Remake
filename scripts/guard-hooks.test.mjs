@@ -120,7 +120,11 @@ afterAll(() => {
   }
 })
 
-describe('the harness itself', () => {
+// Spawns EVERY registered guard plus the preflight, so it is the heaviest case
+// in the file and the first to hit the 5 s default when the machine is also
+// running a browser suite — which is the normal state here. A timeout under load
+// is a load verdict, not a defect.
+describe('the harness itself', { timeout: 60_000 }, () => {
   it('runs against an isolated temp repo, never the real one', () => {
     expect(repo.startsWith(tmpdir())).toBe(true)
     expect(resolve(repo)).not.toBe(resolve(process.cwd()))
@@ -441,6 +445,240 @@ describe('render-verify-guard', () => {
       } catch {
         /* Windows lock on a temp dir */
       }
+    }
+  })
+})
+
+// The four-eyes gate on mechanisms (point 377), spawned rather than read. Its
+// whole promise is that it fires on the NEXT guard someone writes, and the rule
+// it enforces was believed enforced for weeks while nothing was wired at all —
+// so "the code looks right" is precisely the evidence that failed here before.
+// The 5 s default is too thin here: a single case spawns a handful of git
+// commands, the record CLI, the preflight and the hook itself, and this machine
+// regularly runs a browser suite alongside the unit layer. A timeout under load
+// is a load verdict, not a defect — and one that rotates teaches people to
+// re-run rather than to read.
+describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 60_000 }, () => {
+  const BASELINE = '.claude/mechanism-review-baseline.json'
+  const LEDGER = '.claude/mechanism-reviews.jsonl'
+  const branch = () => git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim()
+  const head = () => git('rev-parse', 'HEAD').stdout.trim()
+  const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
+  const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
+  const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
+
+  let base = ''
+  let guardSha = ''
+
+  it('BLOCKS a committed guard that no second model has reviewed', () => {
+    write(LEDGER, '')
+    base = head()
+    write('scripts/demo-guard.mjs', '// a brand-new enforcer\n')
+    commit(`add a demo guard\n\n${AUTHOR}`)
+    guardSha = head()
+    baselineAt(base)
+
+    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+    expect(hook.decision.reason).toMatch(/FOUR-EYES GATE ON MECHANISMS/)
+    expect(hook.decision.reason).toContain('scripts/demo-guard.mjs')
+    expect(hook.decision.reason).toContain(guardSha.slice(0, 7))
+  })
+
+  it('ALLOWS once a DIFFERENT model has recorded a review', () => {
+    const r = review([
+      '--record', guardSha,
+      '--model', 'Fable 5',
+      '--verdict', 'merge',
+      '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    baselineAt(base)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('REFUSES to record a self-review instead of warning about it', () => {
+    const r = review([
+      '--record', guardSha,
+      '--model', 'Claude Opus 5',
+      '--verdict', 'merge',
+      '--evidence', 'I have read my own work again and it still looks right',
+    ])
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/SELF-REVIEW is refused/)
+  })
+
+  it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
+    const r = review([
+      '--record', guardSha,
+      '--model', 'Fable 5',
+      '--verdict', 'do-not-merge',
+      '--evidence', 'the fast path waves through the files the unit layer measures',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    baselineAt(base)
+    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+    expect(hook.decision.reason).toMatch(/DO-NOT-MERGE/)
+    expect(hook.decision.reason).toMatch(/the unit layer measures/)
+  })
+
+  it('leaves a turn that changed no mechanism completely alone', () => {
+    const before = head()
+    write('src/ui/Panel.tsx', '// ordinary feature work\n')
+    commit(`a feature change\n\n${AUTHOR}`)
+    baselineAt(before)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('lets ONE record on a DESCENDANT cover the mechanism commits below it', () => {
+    // The promise printed in the block message — "reviewing the branch head is
+    // enough" — resolved through real git ancestry rather than a synthetic list.
+    const from = head()
+    write('scripts/demo2-guard.mjs', '// a second enforcer\n')
+    commit(`add a second demo guard\n\n${AUTHOR}`)
+    write('scripts/demo2-guard.mjs', '// a second enforcer, sharpened\n')
+    commit(`sharpen the second demo guard\n\n${AUTHOR}`)
+    const branchHead = head()
+    baselineAt(from)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+
+    const r = review([
+      '--record', branchHead,
+      '--model', 'Fable 5',
+      '--verdict', 'merge-with-fixes',
+      '--evidence', 'reviewed both commits of the branch at its head',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    baselineAt(from)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('SEES a guard rewritten INSIDE a merge commit, where no side commit shows it', () => {
+    // `git log --name-only` prints no files for a merge by default, so a guard
+    // rewritten while resolving a conflict — the exact case CLAUDE.md §6 warns
+    // the merging session about — was invisible: the turn cleared and the
+    // baseline advanced past it for good. The arrangement isolates that delta:
+    // the guard exists BEFORE the window (grandfathered), both side commits
+    // touch only ordinary files, and the rewrite happens in the merge alone.
+    write(LEDGER, '')
+    write('scripts/demo3-guard.mjs', '// a third enforcer\n')
+    write('conflict.txt', 'common\n')
+    commit(`add a third demo guard\n\n${AUTHOR}`)
+    const from = head()
+    const trunk = branch()
+
+    git('checkout', '-q', '-b', 'side')
+    write('conflict.txt', 'side\n')
+    commit(`ordinary work on the side branch\n\n${AUTHOR}`)
+    git('checkout', '-q', trunk)
+    write('conflict.txt', 'trunk\n')
+    commit(`ordinary work on the trunk\n\n${AUTHOR}`)
+
+    const merge = git('merge', '--no-ff', '--no-commit', 'side')
+    expect(merge.status, 'the fixture needs a real conflict to resolve').not.toBe(0)
+    write('conflict.txt', 'resolved\n')
+    write('scripts/demo3-guard.mjs', '// rewritten while resolving the conflict\n')
+    commit(`merge the side branch\n\n${AUTHOR}`)
+    baselineAt(from)
+
+    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+    expect(hook.decision.reason).toContain('scripts/demo3-guard.mjs')
+    expect(hook.decision.reason).toMatch(/merge the side branch/)
+  })
+
+  it('does NOT block a CLEAN merge of a reviewed mechanism branch', () => {
+    // The companion the case above needs, and the reason `--diff-merges` reads
+    // `cc` rather than `first-parent`: under first-parent a merge lists
+    // everything the branch brought in, so the merge commit itself became a
+    // pending mechanism commit that NO branch-head record can cover — a merge is
+    // not an ancestor of the branch it merges. The gate would have blocked every
+    // landing of every mechanism branch, its own included, and merges carry no
+    // model trailer, so the self-review refusal could not even bite on the record
+    // the trapped session would write.
+    write(LEDGER, '')
+    const from = head()
+    const trunk = branch()
+
+    git('checkout', '-q', '-b', 'clean-side')
+    write('scripts/demo4-guard.mjs', '// a fourth enforcer\n')
+    commit(`add a fourth demo guard\n\n${AUTHOR}`)
+    const sideHead = head()
+    git('checkout', '-q', trunk)
+    write('unrelated.txt', 'the trunk moved on\n')
+    commit(`unrelated trunk work\n\n${AUTHOR}`)
+
+    const r = review([
+      '--record', sideHead,
+      '--model', 'Fable 5',
+      '--verdict', 'merge',
+      '--evidence', 'reviewed the fourth demo guard on its branch before the merge',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    const merge = git('merge', '--no-ff', '-m', `merge the clean side branch\n\n${AUTHOR}`, 'clean-side')
+    expect(merge.status, merge.stderr).toBe(0)
+    baselineAt(from)
+
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('BLOCKS in a FRESH tree on a feature branch, where no baseline exists yet', () => {
+    // The companion to the fork-point bootstrap: a worktree carries no baseline
+    // file, and arming at HEAD would grandfather exactly the mechanism work the
+    // branch was created to add. On Windows this failed silently for a while —
+    // cmd.exe ate the `^` in `main^{commit}`, every ref probe threw, and the
+    // fallback to HEAD reported a clear gate over unreviewed commits.
+    write(LEDGER, '')
+    const trunk = branch()
+    // bootstrapBase forks from `main`; the temp repo's default branch may be
+    // called something else, and force-updating the checked-out branch fails.
+    if (trunk !== 'main') expect(git('branch', '-f', 'main', trunk).status).toBe(0)
+    git('checkout', '-q', '-b', 'feat/fresh-tree')
+    write('scripts/demo5-guard.mjs', '// a fifth enforcer\n')
+    commit(`add a fifth demo guard\n\n${AUTHOR}`)
+    rmSync(resolve(repo, BASELINE), { force: true })
+    try {
+      const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+      expect(hook.decision.reason).toContain('scripts/demo5-guard.mjs')
+    } finally {
+      git('checkout', '-q', trunk)
+    }
+  })
+
+  it('does NOT advance the baseline while it is blocking', () => {
+    // A gate that pins its baseline on a blocked turn clears itself on the next
+    // one — the block would be a single-turn nuisance instead of a gate.
+    write(LEDGER, '')
+    baselineAt(base)
+    const before = readFileSync(resolve(repo, BASELINE), 'utf8')
+    const hook = runHook('mechanism-review-guard.mjs')
+    expect(hook.decision?.decision).toBe('block')
+    expect(readFileSync(resolve(repo, BASELINE), 'utf8')).toBe(before)
+  })
+
+  it('grandfathers what predates the baseline, and arms itself at HEAD', () => {
+    // The unreviewed demo guard is still in history and the ledger is empty —
+    // exactly the state the twenty-odd existing guards are in. Nothing is owed,
+    // and the gate pins the baseline so it audits from here on.
+    write(LEDGER, '')
+    rmSync(resolve(repo, BASELINE), { force: true })
+    const at = head()
+    const hook = runHook('mechanism-review-guard.mjs')
+    expect(hook.status, hook.stderr).toBe(0)
+    expect(hook.stdout.trim()).toBe('')
+    const state = JSON.parse(readFileSync(resolve(repo, BASELINE), 'utf8'))
+    expect(Object.values(state.baselines)).toContain(at)
+  })
+
+  it('stands down silently while the batch is paused', () => {
+    write(LEDGER, '')
+    baselineAt(base) // the unreviewed demo guard is pending again
+    write('.claude/batch-paused', 'test')
+    try {
+      expect(preflight()['mechanism-review-guard'].status).toBe('not-applicable')
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(hook.stdout.trim()).toBe('')
+    } finally {
+      rmSync(resolve(repo, '.claude/batch-paused'), { force: true })
     }
   })
 })

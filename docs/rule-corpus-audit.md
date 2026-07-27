@@ -80,7 +80,7 @@ retired with its surviving insight.
 | A26 | lint-and-cve-clean-always | OK | | keep | |
 | A27 | maximal-delegation | CONTRA | Instructs `model: fable` and "Prefer the cheap Fable model", and claims to be "baked into the batch-resume hook". The hook (`batch-resume-hook.mjs:105/142`) states the **opposite** and correct policy: Opus 5 is the worker, Fable reviews only. A high-frequency rule contradicting the highest-frequency channel. | Correct to Opus 5; keep the pool size and the closing freeze. | |
 | A28 | maximum-qa-process | OK | | keep | |
-| A29 | model-diverse-by-criticality | INEFFECTIVE | Claims enforcement "by point 298's criticality-triage convention + a **Stop-hook guard** that blocks a high-criticality tick without a recorded diverse review". No such guard exists in `scripts/` or in the Stop chain. This is the exemplar the mandate names. | Either build it (see D-b) or state plainly that it rests on intention. | |
+| A29 | model-diverse-by-criticality | RESOLVED | Claims enforcement "by point 298's criticality-triage convention + a **Stop-hook guard** that blocks a high-criticality tick without a recorded diverse review". No such guard existed in `scripts/` or in the Stop chain when this audit was cut. This is the exemplar the mandate names. | BUILT on 27.07.2026: `scripts/mechanism-review-guard.mjs` (see D-b). | |
 | A30 | model-effort-discretion | OBSOLETE | Grants Fable discretion with "Opus 4.8 on High stays the DEFAULT" — withdrawn 25.07.2026 by `fable-sparingly` + `serving-model-watch`. | RETIRE with the surviving insight (never lower the model/effort on load-bearing work to save budget). | |
 | A31 | never-stop-the-batch | STALE | The rule is current; two long mechanism paragraphs are not — the `ScheduleWakeup` re-arm (only meaningful inside a dynamic `/loop`) and the session-only `CronCreate` heartbeat have been superseded by `batch-progress-guard` + the autostart task. 7.9 KB in a per-session corpus. | Compress the mechanism prose to a pointer at `docs/batch-autonomy.md`; keep the behavioural rule verbatim. | |
 | A32 | new-tasks-append-and-defer | OK | | keep | |
@@ -161,7 +161,7 @@ must be a recorded decision (user 25.07.2026).
 | # | Guide prompt | State | Verdict / action | 2nd |
 | --- | --- | --- | --- | --- |
 | D-a | A mechanism that fires when product code changed with **no test** added on either layer | UNBUILT | Buildable as a Stop check over the commit's file list (product paths vs `*.test.*`). Not built here: the honest version needs a per-commit exemption channel (a pure refactor, a doc commit), which is a design decision with a real false-positive cost. Recorded as owed. | |
-| D-b | **Four eyes when a mechanism is added or changed** — the reviewing model recorded by name | UNBUILT | This is the highest-value unbuilt one: it is ordered by the guide, claimed as built by A29, and the corpus already shows what an unreviewed guard costs (C2). Recorded as owed, with the design: attestation keyed on the enforcer file + the reviewing model's name, refusing the authoring model. | |
+| D-b | **Four eyes when a mechanism is added or changed** — the reviewing model recorded by name | BUILT | This was the highest-value unbuilt one: it is ordered by the guide, claimed as built by A29, and the corpus already shows what an unreviewed guard costs (C2). Built on 27.07.2026 to that design: `scripts/mechanism-review-core.mjs` + `scripts/mechanism-review-guard.mjs` + the record CLI `scripts/mechanism-review.mjs`, keyed on the mechanism files a commit touches, refusing the authoring model and grandfathering everything before its baseline. Its OWN four-eyes review returned five findings, one of them a silently passable path — the evidence the row argues for. | ≠ (review found it) |
 | D-c | **Guard health** — can each fire, does it duplicate, is its message actionable | BUILT | `guard-health-core.mjs` + `guard-health-guard.mjs`, wired. The mandate listed this as unbuilt; it shipped since. Its one gap is C1 ("has it ever fired"). | |
 | D-d | **One authoritative place per fact**, prose checked against the code that owns it | PARTIAL | `src/config/qualityDoc.test.ts` is the pattern, covering only the quality presets. This audit found four live drifts of exactly this class (A9 zoom range, A46 F9 key, A44 doc path, A59 default zoom) — all in memories, which no test can reach because they live outside the repo. Generalising the pattern to `docs/` prose is buildable; to the memory corpus it is not. Recorded. | |
 | D-e | **Red-test triage** — decide by experiment whether the finding accuses product or measurement | NOT MECHANISABLE | A judgment call before a code edit; no check can observe it. Recorded as a deliberate non-mechanism, per the guide's own carve-out. | |
@@ -216,11 +216,11 @@ Changed and verified:
 Recorded, with the reason, rather than built:
 
 - **C1** (a guard fire log, which is what would make "has it ever fired?"
-  answerable at all), **D-a**, **D-b**, **D-h**, **D-i**, **D-j**, **D-k**,
+  answerable at all), **D-a**, **D-h**, **D-i**, **D-j**, **D-k**,
   **D-l** — each touches many wrappers or the verify harness while a parallel
-  strand works the same area. They are owed, not refused. **D-b is the one to
-  build first**: it is ordered by the guide, was falsely claimed as built (A29),
-  and C9's tightening is itself a change that should go through it.
+  strand works the same area. They are owed, not refused. **D-b was the one to
+  build first** — ordered by the guide, falsely claimed as built (A29) — and it
+  is now built; C9's tightening is a change that goes through it.
 - **B3** — owed and cheap in principle, blocked by one word of budget head-room
   and an active parallel edit in that exact section.
 - **A11** (commit messages, 0 violations in 200 commits), **A19** (germanisms),

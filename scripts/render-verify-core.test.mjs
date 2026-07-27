@@ -6,9 +6,13 @@
 // fail-open depends on the core being total). The regression that motivated the
 // guard — the point-210 coast fix called done after a WebGL2-only check while
 // the WebGPU picture was still stepped — is pinned explicitly.
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import {
   BACKENDS,
+  NON_RENDER_VERIFY,
   isRenderPath,
   isBackendSensitivePath,
   coveringRun,
@@ -16,6 +20,8 @@ import {
   baselineFor,
   evaluate,
 } from './render-verify-core.mjs'
+
+const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
 
 /** A passing run record as the recorder writes it. */
 function run(backend, at, overrides = {}) {
@@ -61,6 +67,22 @@ describe('isRenderPath', () => {
     expect(isRenderPath('scripts/verify/fixedWaits.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/README.md')).toBe(false)
   })
+  // Regression witnesses (27.07.2026): three commits touching ONLY harness
+  // scripts that draw nothing each demanded a full both-backend picture check.
+  it('never treats the non-drawing harness as a render path', () => {
+    expect(isRenderPath('scripts/verify/machine-load.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/machine-load-core.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/baseline-classify.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/_server.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/tiers.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/liveness.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/textureLeak.mjs')).toBe(false)
+  })
+  // A DENYLIST, so an unknown verify script defaults INTO the set: a suite added
+  // tomorrow is covered from its first commit without touching this file.
+  it('keeps an unrecognised verify script in the render set', () => {
+    expect(isRenderPath('scripts/verify/brandNewSuite.mjs')).toBe(true)
+  })
   // Regression witness: a *.test.mjs beside the suites runs in jsdom and never
   // opens a browser. Treating it as a render path demanded a two-backend
   // browser run for editing a pure text scanner.
@@ -68,6 +90,18 @@ describe('isRenderPath', () => {
     expect(isRenderPath('scripts/verify/fixedWaits.test.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/tiers.test.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/textureLeak.test.mjs')).toBe(false)
+  })
+  // Point 376: world geometry reaches the frame without naming the renderer —
+  // the coast contour, the heightfield, the river courses, the landmark spots.
+  it('matches the world-geometry sources that feed the rendered terrain', () => {
+    expect(isRenderPath('src/world/redSea.ts')).toBe(true)
+    expect(isRenderPath('src/world/terrain.ts')).toBe(true)
+    expect(isRenderPath('src/world/coastVector.ts')).toBe(true)
+    expect(isRenderPath('src/world/hydro.ts')).toBe(true)
+    expect(isRenderPath('src/world/data/landmarks.ts')).toBe(true)
+    expect(isRenderPath('src\\world\\redSea.ts')).toBe(true)
+    // …but a Vitest file beside them still is not one.
+    expect(isRenderPath('src/world/redSea.test.ts')).toBe(false)
   })
   it('ignores logic/store/docs paths (a pure logic change needs no dual picture)', () => {
     expect(isRenderPath('src/state/store.ts')).toBe(false)
@@ -351,5 +385,73 @@ describe('isRenderPath — Vitest files are never render paths', () => {
   it('still catches the production files beside them', () => {
     expect(isRenderPath('src/ui/Hud.tsx')).toBe(true)
     expect(isRenderPath('src/render/fauna.ts')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The founding case, replayed as a commit (point 376). `9284f05` — "Crop the
+// Gulf-of-Suez head cleanly" — is the fix for corpus row 1, the stepped coast
+// that was called done after a WebGL2-only check while WebGPU still showed the
+// steps (docs/picture-check-cost.md §4). Its diff is these two files and
+// nothing else, and the guard as first written classified neither as a render
+// path: it would have waved through the very bug it exists because of.
+describe('the point-210 commit (9284f05) — the bug the guard exists for', () => {
+  const CHANGED = ['src/world/redSea.test.ts', 'src/world/redSea.ts']
+
+  it('is a render change, and a backend-sensitive one', () => {
+    expect(CHANGED.filter(isRenderPath)).toEqual(['src/world/redSea.ts'])
+    expect(CHANGED.some(isBackendSensitivePath)).toBe(true)
+  })
+
+  it('demands the picture on BOTH backends — a WebGL2-only run does not clear it', () => {
+    const commit = {
+      head: 'head9284',
+      clearedHead: 'old01fa8',
+      changedRenderPaths: CHANGED.filter(isRenderPath),
+      latestChangeAt: 1000,
+    }
+    expect(evaluate({ ...commit, runs: [] }).decision).toBe('block')
+    const webglOnly = evaluate({ ...commit, runs: [run('webgl', 2000)] })
+    expect(webglOnly.decision).toBe('block')
+    expect(webglOnly.reason).toMatch(/NOT VERIFIED ON WEBGPU/)
+    expect(webglOnly.reason).toContain('src/world/redSea.ts')
+    expect(evaluate({ ...commit, runs: [run('webgl', 2000), run('webgpu', 2100)] }).decision).toBe(
+      'allow',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The harness denylist is a claim about the FILES, so it is checked against
+// them rather than against itself: a script under scripts/verify/ belongs to
+// the render set exactly when it drives a browser (playwright directly, or the
+// shared _browser/_boot helpers). A new suite is therefore covered by default
+// and a new helper fails here until it is listed — the list can go stale, the
+// directory cannot.
+describe('NON_RENDER_VERIFY matches the actual scripts/verify/ tree', () => {
+  const scripts = readdirSync(VERIFY_DIR)
+    .filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs'))
+    .map((f) => ({ file: f, source: readFileSync(join(VERIFY_DIR, f), 'utf8') }))
+
+  const drivesBrowser = ({ file, source }) =>
+    file === '_browser.mjs' ||
+    file === '_boot.mjs' ||
+    /^import .*from '(playwright|\.\/_browser\.mjs|\.\/_boot\.mjs)'/m.test(source)
+
+  it('finds the suites at all (a mis-resolved directory must not pass silently)', () => {
+    expect(scripts.length).toBeGreaterThan(20)
+    expect(scripts.filter(drivesBrowser).length).toBeGreaterThan(15)
+  })
+
+  it('classifies every verify script by whether it drives a browser', () => {
+    const wrong = scripts
+      .filter((s) => isRenderPath(`scripts/verify/${s.file}`) !== drivesBrowser(s))
+      .map((s) => s.file)
+    expect(wrong).toEqual([])
+  })
+
+  it('lists no script that no longer exists', () => {
+    const present = new Set(scripts.map((s) => s.file))
+    expect([...NON_RENDER_VERIFY].filter((f) => !present.has(f))).toEqual([])
   })
 })

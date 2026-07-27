@@ -243,6 +243,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
       [
         'dashboard-guard',
         'doc-budget-guard',
+        'mechanism-review-guard',
         'model-guard',
         'queue-order-guard',
         'render-verify-guard',

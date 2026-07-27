@@ -1010,9 +1010,11 @@ After completion and after every major system:
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop bar a verified point boundary), `render-verify-guard` (no
-  GUI/render change finished without the picture check — both backends where
-  they can differ, one where they
-  cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
+  render-set change — scene/shader/HUD, `src/world/` geometry, the browser
+  suites — finished without the picture check; both backends where they can
+  differ, one where they cannot), `mechanism-review-guard` (no new or changed
+  guard, gate or git hook without a recorded review by the OTHER model —
+  `scripts/mechanism-review.mjs --record`), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
@@ -1021,17 +1023,16 @@ After completion and after every major system:
   (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
   along, no push lands a state CI would reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
-  `retro-currency-guard` (the retrospective stays current, and each lesson in
-  it carries a mechanism decision — an enforcer widened, a new one, or none
-  with a reason: `docs/analysis_de/lesson-mechanisms.md`), followed
+  `retro-currency-guard` (the retrospective stays current, each lesson in it
+  carrying a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
-  `board-first-guard`, the first board gate that fires BEFORE the work rather
-  than at the turn end: the Stop chain leaves the board free to lag the whole
-  hour the user is reading it, so the FIRST state-changing call of a turn is
-  denied while no `focus set|confirm` postdates the turn stamp or the board is
-  unpublished. It never blocks a read, its own remedy commands or an edit of
-  the board file, and it denies at most ONCE per turn.
+  `board-first-guard`, which fires BEFORE the work rather than at the turn end
+  (the Stop chain leaves the board free to lag the whole hour the user is
+  reading it): the FIRST state-changing call of a turn is denied while no
+  `focus set|confirm` postdates the turn stamp or the board is unpublished —
+  never a read, its own remedy commands or an edit of the board file, and at
+  most ONCE per turn.
   Every one is fail-OPEN — an internal error allows the stop, so
   a guard bug can never trap the session — and each decision core is pure and
   Vitest-covered.

@@ -10855,3 +10855,62 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   suite) presses F6 in a real scene, types a description, triggers the download and
   asserts a non-empty zip whose PNG member decodes to a NON-uniform image, on BOTH
   backends.
+
+- [x] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
+  retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
+  agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
+  polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
+  of emitting an ambiguous red. Mechanizes the "judge a red only on a quiet machine"
+  heuristic so it does not rely on memory. ANCHORS: `scripts/verify/run-all.mjs` (load probe
+  + flag), a pure load-classification helper. VERIFIABLE: a pure test of the load-detect/flag
+  decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
+  grows.)
+
+- [x] 376. THE RENDER SET MUST CONTAIN THE FILE THAT ONCE BROKE THE PICTURE (27.07.2026,
+  found under point 361). `scripts/render-verify-core.mjs` classifies `src/world/redSea.ts`
+  as NOT a render path, yet the point-210 stepped coast — the founding case of the
+  both-backend picture rule — touched that file and nothing else. The guard would not have
+  demanded a picture check for the bug it exists because of.
+  DECIDE BY MEASUREMENT, not by instinct, and record the figure either way: (a) widen the
+  classification to the world-geometry sources that FEED the rendered terrain, or (b) keep
+  the narrow set and add those sources as a named exception list derived from the
+  historical corpus. (a) is safer and costs more checks; (b) is cheaper and covers only
+  what has already burned us once. Measure how many of the last 100 commits each option
+  would newly force into a picture check, and choose on that number.
+  VERIFIABLE: `scripts/render-verify-core.test.mjs` gains the point-210 commit as a case —
+  the classification must demand the picture check for it — and the measured commit counts
+  are recorded with the decision.
+  DOCS in the same commit: CLAUDE.md §7.2 (the classification sentence) and the rationale
+  beside `isBackendSensitivePath`.
+
+- [x] 377. THE FOUR-EYES RULE FOR A NEW MECHANISM GETS ITS OWN MECHANISM
+  (27.07.2026, from the rule-corpus audit of point 307). The rule "a new or changed
+  guard is reviewed by the SECOND model before it goes live" is the project's own
+  exemplar for enforcing rather than remembering — and the audit found it was claimed
+  to have a Stop check that never existed. It has been carried by intention alone, and
+  it was skipped in exactly the cases where it mattered: the pre-push gate went live
+  before its review, which then found two defects that defeated its purpose.
+  BUILD IT AS A STOP CHECK, in the shape every other guard here has (a pure,
+  Vitest-covered `*-core.mjs` plus a fail-open wrapper, standing down for a non-owner
+  session and a paused batch): when the turn's commits add or change a
+  `scripts/*-guard*.mjs`, `scripts/*-gate*.mjs`, a `*-core.mjs` beside one, or a git
+  hook under `scripts/git-hooks/`, the turn may not end until a review is RECORDED for
+  that change — which model reviewed, its verdict, and the commit it judged.
+  THE RECORD IS THE HARD PART, so keep it cheap and honest: `node
+  scripts/mechanism-review.mjs --record <sha> --model <name> --verdict <merge|
+  merge-with-fixes|do-not-merge> --evidence "<one line>"`, stored beside the other
+  batch state. The reviewing model must NOT be the authoring one — the record carries
+  both, and a match is refused rather than warned about. A verdict of
+  `do-not-merge` blocks as loudly as a missing record.
+  NOT RETROACTIVE: guards that already exist are grandfathered by a one-off baseline,
+  exactly as `model-guard` handles its own history — the point is the next mechanism,
+  not a review debt for twenty-eight of them.
+  VERIFIABLE: pure Vitest — a changed guard without a record blocks; with a record by a
+  DIFFERENT model it passes; a record by the authoring model is refused; a
+  `do-not-merge` verdict blocks; a turn that changed no mechanism is untouched; the
+  baseline grandfathering holds. Plus the spawned-hook test the Stop chain's other
+  guards have (`scripts/guard-hooks.test.mjs`), because reading a wrapper is not
+  evidence that it fires.
+  DOCS in the same commit: CLAUDE.md §7.2's guard list (the file is at its measured
+  ceiling — pay for the entry by trimming, not by raising) and the beginner's guide,
+  whose prompt 5 already asks for exactly this and can then cite it as built.

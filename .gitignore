@@ -55,6 +55,10 @@ scripts/.tile-cache
 .claude/batch-lock.json.tmp-*
 .claude/batch-lock.json.reaping
 .claude/timestamp-guard-state.json
+# Per-branch baseline of the mechanism four-eyes gate — local bookkeeping. The
+# ledger it is judged against (.claude/mechanism-reviews.jsonl) IS tracked: a
+# review happens on a branch and the gate bites in the session that merges it.
+.claude/mechanism-review-baseline.json
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/

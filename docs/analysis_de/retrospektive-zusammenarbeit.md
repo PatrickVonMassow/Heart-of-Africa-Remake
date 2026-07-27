@@ -346,6 +346,18 @@ Zwei Details entscheiden, ob so ein Riegel wirkt. Erstens die **Verdrahtung**: E
 
 **Lehre:** Eine Prüfung gehört vor die Handlung, die sie absichern soll. Läuft sie danach, ist sie eine Benachrichtigung — und die Kosten des Fehlers sind bereits entstanden. Dasselbe Muster fand sich am selben Tag in der Einsteiger-Anleitung: Ausgerechnet der Merksatz „jede Regel braucht einen Mechanismus" stand dort zwischen den Aufträgen und war selbst nur ein Merksatz.
 
+### 3.41 Ein Ergebnis, das kein Beweis ist
+
+Am Abend des 27.07.2026 lieferte dieselbe Prüfung **vier** Ergebnisse zu **einer** Frage: zweimal rot an verschiedenen Stellen, einmal rot mit einem ungelösten Merge-Konflikt im Baum, einmal rot mit genau einem echten Fund. Keines der ersten drei war falsch *gemessen* — jedes war unter Bedingungen gemessen worden, unter denen es nichts belegt.
+
+Drei verschiedene Ursachen, ein gemeinsames Muster. **Last:** parallel liefen die volle Unit-Schicht und zwei Agenten; wechselnde Fehlerstellen sind deren Signatur, nicht die eines Defekts. **Ein Zustand, den es nie geben wird:** der Zweig war beim Angleichen an den Hauptzweig in einem Konflikt stehen geblieben, geprüft wurde eine Mischung aus beidem. **Überbleibsel:** ein vergessener Entwicklungsserver aus einem früheren Lauf trieb vier Unit-Tests in ihre Zeitgrenze — er verbrauchte im Leerlauf keine Rechenzeit und wäre jeder Auslastungsmessung entgangen.
+
+Gefährlich daran ist nicht das Rot, sondern die Versuchung: Das erste Rot sah nach einem echten Befund aus, und der Prüfstand nannte es auch so („zweimal gescheitert — ein echter Fehler"). Eine Reparatur an dieser Stelle hätte einen Fehler behoben, den es nicht gab, und den echten, der im vierten Lauf steckte, überdeckt.
+
+Die Antwort ist ein Paar: eine Messung **vor** dem Lauf, die die Maschine beurteilt und ein zeitkritisches Rot als nicht beweiskräftig kennzeichnet, und eine Einordnung **nach** dem Lauf, die dieselbe Prüfung zweimal rot als Verdacht wertet, zwei Läufe mit verschiedenen Ausfällen dagegen als Last. Beide sind **beschriftend, nicht blockierend** — mit einer Asymmetrie, die der Kern der Sache ist: **Ein Grün unter Last zählt weiterhin; ein zeitkritisches Rot nicht.** Last erzeugt falsche Rote, keine falschen Grünen.
+
+**Lehren:** Vor der Interpretation eines Messergebnisses gehört die Frage, ob die Bedingungen es überhaupt zu einem Beweis machen — und diese Frage gehört an die Maschine, nicht ans Gedächtnis. Und: Ein Prüfstand, der eine Aussage über die Art seines Roten trifft, muss sie begründen können; „zweimal gescheitert, also echt" war eine Behauptung ohne Beleg.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -435,7 +447,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 17:34 · Quellen-Fingerprint: `6a8140772131…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 22:08 · Quellen-Fingerprint: `6a33a8d80dda…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -507,8 +519,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 64 Feedback-/Projekt-Memories · 34 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 64 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 6a814077213162b8cd7590f545ce60a28ea294f0273e98dbe4790d9c873f3a03 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T15:34:08.531Z -->
+<!-- RETRO-FINGERPRINT: 6a33a8d80dda49b0c01bec1e5f1d9a986f35a907e282c540b677ce02ffc2cd5c -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T20:08:40.689Z -->
 <!-- AUTO-GENERATED:END -->
