@@ -7,29 +7,45 @@
 // only reads TASKS.md and is fail-OPEN: any internal error → allow, so a guard
 // bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { evaluate } from './tasks-spec-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { isMainModule } from './is-main.mjs'
+import { repoPath } from './repo-paths.mjs'
 
-const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
-const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
+const TASKS = repoPath('TASKS.md')
+const PAUSE = repoPath('.claude/batch-paused')
 
-try {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — the rule is repo truth, not session-local */
+/**
+ * The guard's I/O half, exported so the preflight (point 365 D) can ask "would
+ * this block?" from the SAME gathering the Stop hook uses — a second, drifting
+ * copy of it would report a false "clean".
+ */
+export function gatherTasksSpecInputs({ sessionId = '' } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
+  if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
+  return { applicable: true, inputs: { tasksMd: readFileSync(TASKS, 'utf8') } }
+}
 
-  if (existsSync(PAUSE)) process.exit(0) // user-paused: don't trap a paused session
-  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
-  if (!existsSync(TASKS)) process.exit(0) // no work log — nothing to hold clean
+if (isMainModule(import.meta.url)) {
+  try {
+    let sid = ''
+    try {
+      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) — the rule is repo truth, not session-local */
+    }
 
-  const result = evaluate({ tasksMd: readFileSync(TASKS, 'utf8') })
-  if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
-  process.exit(0)
-} catch (e) {
-  console.error(`tasks-spec-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
+    const gathered = gatherTasksSpecInputs({ sessionId: sid })
+    if (!gathered.applicable) process.exit(0) // paused / non-owner / no work log
+
+    const result = evaluate(gathered.inputs)
+    if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+    process.exit(0)
+  } catch (e) {
+    console.error(`tasks-spec-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
+  }
 }

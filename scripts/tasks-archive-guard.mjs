@@ -10,20 +10,28 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { evaluateTasksArchive, formatTasksArchiveVerdict } from './tasks-archive-guard-core.mjs'
 import { TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
+import { isMainModule } from './is-main.mjs'
 
-try {
+/** The guard's I/O half, shared with the preflight (point 365 D). */
+export function gatherTasksArchiveInputs() {
   const read = (p) => (existsSync(p) ? readFileSync(p, 'utf8') : '')
-  const verdict = evaluateTasksArchive({
-    tasksText: read(TASKS_PATH),
-    archiveText: read(ARCHIVE_PATH),
-  })
-  if (verdict.block) {
-    process.stdout.write(
-      JSON.stringify({ decision: 'block', reason: formatTasksArchiveVerdict(verdict) }),
-    )
+  return {
+    applicable: true,
+    inputs: { tasksText: read(TASKS_PATH), archiveText: read(ARCHIVE_PATH) },
   }
-  process.exit(0)
-} catch (e) {
-  console.error(`tasks-archive-guard error (allowing the stop): ${e && e.message}`)
-  process.exit(0)
+}
+
+if (isMainModule(import.meta.url)) {
+  try {
+    const verdict = evaluateTasksArchive(gatherTasksArchiveInputs().inputs)
+    if (verdict.block) {
+      process.stdout.write(
+        JSON.stringify({ decision: 'block', reason: formatTasksArchiveVerdict(verdict) }),
+      )
+    }
+    process.exit(0)
+  } catch (e) {
+    console.error(`tasks-archive-guard error (allowing the stop): ${e && e.message}`)
+    process.exit(0)
+  }
 }
