@@ -22,6 +22,7 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
+import { AUTO_END, AUTO_START } from './retro-core.mjs'
 
 const SOURCE_SCRIPTS = resolve(process.cwd(), 'scripts')
 const SESSION = 'hook-test-session'
@@ -31,9 +32,10 @@ const node = (args, opts = {}) =>
   spawnSync(process.execPath, args, { encoding: 'utf8', cwd: repo, maxBuffer: 64 * 1024 * 1024, ...opts })
 
 /** `node <repo>/scripts/<name>` with a Stop-hook payload on stdin. */
-function runHook(name, { args = [], session = SESSION } = {}) {
+function runHook(name, { args = [], session = SESSION, env } = {}) {
   const r = node([resolve(repo, 'scripts', name), ...args], {
     input: JSON.stringify({ session_id: session, hook_event_name: 'Stop' }),
+    ...(env ? { env: { ...process.env, ...env } } : {}),
   })
   let decision = null
   try {
@@ -160,6 +162,77 @@ describe('the harness itself', () => {
       'these Stop hooks gate their body on isMainModule but are spawned by no case above — ' +
         'register them with guard-preflight.mjs, or add an explicit spawn test',
     ).toEqual([])
+  })
+})
+
+// The lesson→mechanism ledger, exercised through the SPAWNED guard rather than
+// its core (point 370). Two things only a real run can show: that the ledger
+// verdict survives `collectSources()` THROWING — which it does in every git
+// worktree, where the memory dir is keyed on the checkout path, and which would
+// otherwise swallow the ledger check through the wrapper's outer catch — and
+// that a brand-new lesson subsection really does stop the turn.
+describe('retro-currency-guard: the lesson ledger', () => {
+  const RETRO = 'docs/analysis_de/retrospektive-zusammenarbeit.md'
+  const LEDGER = 'docs/analysis_de/lesson-mechanisms.md'
+  const retro = (extra = '') =>
+    ['# Retro', '', '### 3.1 Eine alte Lehre', 'prose', '', extra, '', AUTO_START, AUTO_END].join('\n')
+  const ledger = (...rows) =>
+    ['| Lektion | Titel | Ergebnis | Durchsetzer / Begründung |', '|---|---|---|---|', ...rows].join('\n')
+  const ROW_31 = '| 3.1 | Eine alte Lehre | 1 | scripts/model-guard.mjs |'
+
+  it('BLOCKS on a brand-new subsection that carries no mechanism decision', () => {
+    write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
+    write(LEDGER, ledger(ROW_31))
+    const hook = runHook('retro-currency-guard.mjs')
+    expect(hook.status).toBe(0)
+    expect(hook.decision?.decision, `stdout was ${JSON.stringify(hook.stdout)}`).toBe('block')
+    expect(hook.decision.reason).toMatch(/§3\.99 .* has NO ledger entry/)
+    // The proof that it does not ride on the currency half: that half errored
+    // out on the missing memory dir and allowed, exactly as in a worktree.
+    expect(hook.stderr).toMatch(/currency check errored/)
+  })
+
+  it('ALLOWS once the decision is recorded', () => {
+    write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
+    write(LEDGER, ledger(ROW_31, '| 3.99 | Eine brandneue Lehre | 2 | scripts/guard-health-guard.mjs |'))
+    const hook = runHook('retro-currency-guard.mjs')
+    expect(hook.status).toBe(0)
+    expect(hook.stdout.trim()).toBe('')
+  })
+
+  it('BLOCKS a decision that claims an enforcer nobody built', () => {
+    write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
+    write(LEDGER, ledger(ROW_31, '| 3.99 | Eine brandneue Lehre | 2 | scripts/imaginary-guard.mjs |'))
+    const hook = runHook('retro-currency-guard.mjs')
+    expect(hook.decision?.decision).toBe('block')
+    expect(hook.decision.reason).toMatch(/imaginary-guard\.mjs.*does not exist/s)
+  })
+
+  // RETRO_LEDGER_PATH exists so a check can point the guard at a ledger of its
+  // own. An override nothing exercises is a claim, not a lever, so it is used
+  // here rather than merely declared.
+  it('honours RETRO_LEDGER_PATH', () => {
+    write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
+    write(LEDGER, ledger(ROW_31)) // incomplete: the default path would BLOCK
+    write('elsewhere/ledger.md', ledger(ROW_31, '| 3.99 | Eine brandneue Lehre | 3 | Bewusst keiner: reine Urteilsfrage. |'))
+    const hook = runHook('retro-currency-guard.mjs', {
+      env: { RETRO_LEDGER_PATH: resolve(repo, 'elsewhere/ledger.md') },
+    })
+    expect(hook.status).toBe(0)
+    expect(hook.stdout.trim()).toBe('')
+  })
+
+  it('stands down silently while the batch is paused', () => {
+    write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
+    write(LEDGER, ledger(ROW_31))
+    write('.claude/batch-paused', '')
+    try {
+      expect(runHook('retro-currency-guard.mjs').stdout.trim()).toBe('')
+    } finally {
+      rmSync(resolve(repo, '.claude/batch-paused'), { force: true })
+      rmSync(resolve(repo, 'docs/analysis_de'), { recursive: true, force: true })
+      rmSync(resolve(repo, 'elsewhere'), { recursive: true, force: true })
+    }
   })
 })
 

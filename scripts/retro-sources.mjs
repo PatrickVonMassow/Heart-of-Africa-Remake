@@ -45,6 +45,12 @@ export const DOC_PATH =
 export const GUIDE_PATH =
   process.env.RETRO_GUIDE_PATH || resolve(REPO_ROOT, 'docs', 'analysis_de', 'vibe-coding-anleitung.md')
 
+/** The lesson→mechanism ledger: one recorded decision per lesson subsection of
+ *  the retrospective (point 370). Overridable so the live check can point the
+ *  guard at a synthetic pair without touching the real documents. */
+export const LEDGER_PATH =
+  process.env.RETRO_LEDGER_PATH || resolve(REPO_ROOT, 'docs', 'analysis_de', 'lesson-mechanisms.md')
+
 /**
  * The project memory dir under ~/.claude/projects/<munged repo path>/memory.
  * The munging mirrors the harness: every ':' '\' '/' becomes '-', the drive
