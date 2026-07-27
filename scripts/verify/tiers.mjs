@@ -14,7 +14,7 @@
 export const DEV_SUITES = [
   'docs', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
   'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
-  'benchmark',
+  'benchmark', 'report',
 ]
 
 /**

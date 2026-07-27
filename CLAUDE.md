@@ -622,9 +622,16 @@ changes with it in the same commit.
     gifts/dollars/provisions, full health, full canteen, no afflictions,
     capacity raised to fit, the extended zoom unlocked, and the travel
     speed set to 25 for fast test traversal (point 154) — F4 canoe
-    toggle — F6 state-dump popup for bug reports: the complete game
-    state incl. balance and UI as pretty JSON in a top-most modal with
-    download/copy; F5 stays the browser's reload (it fires before
+    toggle — F6 the COMPLETE bug report in one keypress: a top-most modal
+    with an autofocused description field and one download handing out
+    picture, state JSON (complete state incl. balance and UI), overlay
+    list and description as ONE zip named from the dump stem, the
+    reproduction summary — seed, position, region, date, travel speed,
+    graphics level — at the TOP of the JSON. The screenshot is read back
+    INSIDE a rendered frame (no `preserveDrawingBuffer` — it would cost
+    every player frame time) and holds the scene ALONE; labels and HUD are
+    DOM and ride along in the overlay list, which the description file
+    states; F5 stays the browser's reload (it fires before
     preventDefault can stop it, hence F6; the lower F-key that Windows Chrome
     binds to Caret-Browsing is likewise left to the browser) and F9 cycles the
     GRAPHICS QUALITY LEVEL — low / medium / high (design.md §2.7/§21, point 276
@@ -665,10 +672,15 @@ changes with it in the same commit.
     preset and the F8 benchmark — asserted in `src/ui/DebugMenu.test.tsx`, and
     the live F9 cycle + effective flips in `scripts/verify/settings.mjs`;
     verifiable via `src/state/stateDump.test.ts` (the serialiser captures
-    every data field, drops the actions, stays deterministic) and
-    `src/ui/StateDump.test.tsx` (hidden by default, F6/Esc toggle without
-    moving focus onto a control, the F6 browser default prevented, F5
-    left untouched) — F8 the in-game render benchmark (point 277), the one
+    every data field, drops the actions, stays deterministic, the summary
+    on top), `src/report/*.test.ts` (the zip an unzip accepts, the
+    assembly, the overlay snapshot incl. the doubled-label witness),
+    `src/ui/StateDump.test.tsx` (hidden by default, F6 opens with the field
+    focused, the typed text reaches the archive, Esc closes leaving focus
+    on no control, both languages, the F6 default prevented, F5 untouched)
+    and `scripts/verify/report.mjs` (a live F6 run on BOTH backends whose
+    PNG member is DECODED and must vary — a blank capture is a valid
+    PNG) — F8 the in-game render benchmark (point 277), the one
     debug tool that SHIPS IN THE DELIVERED BUILD (the levers of point 276
     must be priced on the USER's hardware, not on the headless one), its
     runner LAZILY imported on the keypress so it stays out of the eager
@@ -990,9 +1002,9 @@ After completion and after every major system:
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop bar a verified point boundary), `render-verify-guard` (no
-  GUI/render change finished without the picture check — both backends where
-  they can differ, one where they
-  cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
+  render-set change — scene/shader/HUD, `src/world/` geometry, the browser
+  suites — finished without the picture check; both backends where they can
+  differ, one where they cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's

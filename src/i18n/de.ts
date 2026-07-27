@@ -238,11 +238,29 @@ export const de: Strings = {
   },
 
   stateDump: {
-    title: 'Spielzustand',
-    download: 'Herunterladen',
+    title: 'Fehlerbericht',
+    download: 'Nur Zustand (JSON)',
+    downloadReport: 'Bericht herunterladen',
     copy: 'Kopieren',
     copied: 'Spielzustand in die Zwischenablage kopiert.',
     close: 'Schließen (F6)',
+    descriptionLabel: 'Was ist schiefgelaufen?',
+    descriptionPlaceholder: 'Beschreibe, was du gesehen hast — was du gerade getan hast und was falsch aussah.',
+    contents: 'Das Archiv enthält das Bild, den vollständigen Spielzustand und deine Beschreibung. Du kannst es ungeöffnet weitergeben.',
+    saved: 'Fehlerbericht gespeichert.',
+    report: {
+      heading: 'The Heart of Africa — Fehlerbericht',
+      description: 'Was schiefgelaufen ist',
+      noDescription: '(keine Beschreibung angegeben)',
+      environment: 'Umgebung',
+      reproduction: 'Reproduktion',
+      files: 'Dateien in diesem Archiv',
+      pictureNote: 'die 3-D-Szene, aus dem Canvas zurückgelesen. Sie enthält WEDER die Anzeigeleiste NOCH eine schwebende Beschriftung — die sind HTML und kommen nie ins Bild.',
+      pictureMissing: '(kein Bildschirmfoto: die Aufnahme ist fehlgeschlagen — Zustand und Beschriftungsliste sind trotzdem vollständig.)',
+      stateNote: 'der vollständige Spielzustand, die Balance-Werte und der UI-Zustand als JSON.',
+      overlayNote: 'jede in diesem Moment sichtbare Beschriftung und jedes Anzeigeelement, mit Text und Bildschirmrechteck — hier stehen die Anzeigeleiste und die Kartenbeschriftungen.',
+      duplicateNote: 'Beschriftungen mit gleichem Text an überlappenden Stellen',
+    },
   },
 
   benchmark: {

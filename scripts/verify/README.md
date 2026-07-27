@@ -39,7 +39,7 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 | Tier | Command | Browser suites | Preview |
 |------|---------|----------------|---------|
 | **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 17** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 18** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
@@ -113,6 +113,53 @@ The same run found that the suite's "neutral" first-gesture key had stopped
 being neutral: F8 starts the in-game render benchmark (point 277), which swept
 ten graphics configs inside the measurement. A verification's filler inputs need
 re-checking whenever the game binds a new key.
+
+## Is the machine QUIET? — before the run (point 296)
+
+A timing verdict taken under load is not evidence. On 27.07.2026 that cost three
+invalid runs and one wrong conclusion: `enrichments` was run while a full unit
+run and two agents shared the machine, reported two failures, reported a
+DIFFERENT one on the retry, and was called "a real failure, not a flake" — the
+same suite was green on a quiet machine in exactly those checks. The same day, a
+unit run produced four `Test timed out in 5000ms` failures in tests that pass in
+582 ms alone; the cause was a dev server from an earlier verify run that nobody
+had shut down.
+
+So `run-all.mjs` reads the machine ONCE, before the preflight, through the pure
+module `machine-load-core.mjs` (probe in `machine-load.mjs`, pinned by
+`machine-load.test.mjs`). Two things are read: the CPU busy DELTA over a short
+window, and the process table — for another verify or vitest run, a build, a
+vite dev/preview server, or an automation browser. The run's own process tree is
+excluded; **a sibling is not**, because a second agent under the same session is
+exactly the load worth seeing. Each leftover is reported once per process TREE
+(raw, one dev server counts as two and one headless browser as five), ours first,
+with the `taskkill`/`kill` line that ends it.
+
+| Level | When | Effect on a pick containing `settings, enrichments, polish, startup, voice, benchmark` |
+|---|---|---|
+| `quiet` | CPU below 35 %, nothing of ours running | run; its verdict is evidence |
+| `busy` | CPU ≥ 35 %, or ANY leftover — an idle dev server counts, its damage is invisible to a CPU reading | run + FLAG (default), or defer |
+| `loaded` | CPU ≥ 70 %, or a competing verify/vitest run | run + FLAG (default), or defer |
+| `unknown` | the probe could not read the machine | run; reported as unproven, never as quiet |
+
+The label at the END of the run is asymmetric, and that asymmetry is the content:
+**load produces false REDS, not false greens.** A green under load still counts. A
+red from a timing-sensitive suite under load is `UNDER LOAD — NOT AUTHORITATIVE`
+and prints the command to re-run it alone. A failure with no red suite (a broken
+build, a lint finding) is left unlabelled — load did not cause it, and a label
+printed where it does not belong stops being read.
+
+```
+node scripts/verify/machine-load.mjs         # ask first: exit 0 quiet, 2 not quiet
+node scripts/verify/machine-load.mjs --json  # same, machine-readable
+npm test -- large --on-load=defer            # skip the run instead of flagging it
+VERIFY_ON_LOAD=off npm test                  # switch the check off entirely
+VERIFY_LOAD_FORCE=loaded npm test -- docs    # self-test the wiring on a quiet machine
+```
+
+This is the half that acts BEFORE a run; the section below is the half that reads
+a red AFTER it, and they share their vocabulary (`load signature`, "judge a red
+only on a quiet machine") because they describe one phenomenon from two ends.
 
 ## Triaging a RED run (point 294)
 

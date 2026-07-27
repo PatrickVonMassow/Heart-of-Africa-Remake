@@ -156,16 +156,40 @@ export interface Strings {
     back: string
   }
 
-  /** F6 state-dump popup (design.md §21.1): the full game state for bug reports. */
+  /** F6 bug report (design.md §21.1): picture, state and description in one zip. */
   stateDump: {
     title: string
     /** Save the JSON as a .json file. */
     download: string
+    /** Save picture + state + description as one .zip (the primary action). */
+    downloadReport: string
     /** Copy the JSON to the clipboard. */
     copy: string
     /** Toast confirming the JSON went to the clipboard. */
     copied: string
     close: string
+    /** Label above the free-text field for what went wrong. */
+    descriptionLabel: string
+    /** Placeholder inside that field. */
+    descriptionPlaceholder: string
+    /** One line under the field naming what the archive will contain. */
+    contents: string
+    /** Toast after the archive was handed to the browser. */
+    saved: string
+    /** Section headings and notes of the description file inside the archive. */
+    report: {
+      heading: string
+      description: string
+      noDescription: string
+      environment: string
+      reproduction: string
+      files: string
+      pictureNote: string
+      pictureMissing: string
+      stateNote: string
+      overlayNote: string
+      duplicateNote: string
+    }
   }
 
   /** In-game render benchmark (design.md §21.1, F8). */
