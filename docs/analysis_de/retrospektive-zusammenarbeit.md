@@ -1,6 +1,6 @@
 # Retrospektive der Zusammenarbeit — „The Heart of Africa" (Remake-POC)
 
-Zeitraum: 06.07.–26.07.2026 · Quellen: Git-Historie (alle Branches), die Memory-Dateien, TASKS.md, `docs/`, die Guard-/Hook-Skripte in `scripts/`, `.claude/settings.json` und Stichproben aus den Sitzungs-Transkripten.
+Zeitraum: 06.07.–27.07.2026 · Quellen: Git-Historie (alle Branches), die Memory-Dateien, TASKS.md, `docs/`, die Guard-/Hook-Skripte in `scripts/`, `.claude/settings.json` und Stichproben aus den Sitzungs-Transkripten.
 
 Selbstkritisch gemeint: festgehalten werden die wiederkehrenden Fehlerklassen, ihre Ursachen und die Lehren — knapp, damit sie gelesen werden.
 
@@ -36,6 +36,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 24.07. | **Harter Singleton**; harter timestamp-guard; „ruhige Maschine"; erster Benchmark auf Nutzer-Hardware |
 | 25.07. | Stille Modell-Degradation + Aufräum-Pass; Regel-Audit über den ganzen Bestand; Guard-Gesundheit |
 | 26.07. | Kosten-vs-Rate-Korrektur bei der Parallelität; Commit-Umfangs-Wächter |
+| 27.07. | Gemessene Verbrauchstreiber → Kurzbrief je Auftrag statt Dokumentensuche; Board-Gate **vor** der Arbeit; Vorprüfung der Wächter |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -178,7 +179,9 @@ Nach der Degradation hielt ich das Aufräumen für erledigt; der Nutzer fand dan
 
 Ein Kohärenz-Audit fand acht Stellen, an denen die Dokumente etwas anderes behaupten als der Code tut; eine Forensik fand elf weitere, die älteste vom ersten Projekttag. Die Ursache ist nicht Nachlässigkeit, sondern **Redundanz ohne Mechanismus**: Wer schreibt, aktualisiert die Stelle, an der er gerade ist. Zwei Verschärfungen: Ein Dokumenten-Audit **ohne** Code-Abgleich macht die Drift schlimmer, und Dokumente werden gegen die Spezifikation geschrieben statt gegen den ausgelieferten Code.
 
-**Lehre:** Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man. Ein verbindlicher Ort je Faktum, alle anderen verweisen.
+Dieselbe Wette schließt, wer eine Beschriftung im **Testcode** wörtlich erwartet, statt sie aus der Sprachdatei zu lesen: Eine live laufende Prüfung suchte den deutschen Platzhalter, während ihre Suite auf Englisch lief — sie schlug bei völlig korrektem Verhalten fehl. Eine Prüfzusicherung ist eine Kopie wie jede andere.
+
+**Lehre:** Jede Zahl, die in zwei Dokumenten steht, ist eine Wette darauf, dass beide gleichzeitig gepflegt werden — und diese Wette verliert man. Ein verbindlicher Ort je Faktum, alle anderen verweisen; für Tests heißt das, gegen die Quelle der Wahrheit zu prüfen statt gegen eine abgeschriebene Zeichenkette.
 
 ### 3.22 Der rote Test, der den Unschuldigen anklagt
 
@@ -207,7 +210,7 @@ Ein Audit über alle 88 Regeln und 25 Wächter fand zehn Widersprüche, sechs Re
 1. **Der Bestand altert wie Code, aber ohne Compiler.** Eine veraltete Funktion fällt beim Bauen auf; eine veraltete Regel schweigt und wird trotzdem befolgt. Ein Regelkorpus braucht periodisches Aufräumen — zusammenführen, verweisen, zurückziehen statt löschen.
 2. **Die gefährlichsten Widersprüche stehen INNERHALB einer Datei**, weil man den Anbau schreibt und das Bestehende nicht mehr liest. Niemand prüft denselben Text zweimal.
 3. **Der lauteste Kanal lehrt den größten Fehler.** Die bei *jedem* Prompt eingespielte Erinnerung transportierte zwei zurückgezogene Regeln. Je höher die Frequenz eines Kanals, desto strenger seine Aktualitätsprüfung — idealerweise generiert aus derselben Quelle, die der Wächter prüft.
-4. **Halbtote Mechanismen sind gefährlicher als fehlende.** Ein Wächter, der nur von einer Shell scharfgeschaltet wird, die dieses Projekt kaum benutzt, *existiert* — und feuert nie. **Ein Wächter, der nie auslöst, und einer, der immer auslöst, sind beide kaputt.** Verwandt: Ein negatives Ergebnis muss von „konnte nicht messen" unterscheidbar sein — mein eigener Rundlauf über alle Wächter meldete „alle still" und maß nichts.
+4. **Halbtote Mechanismen sind gefährlicher als fehlende.** Ein Wächter, der nur von einer Shell scharfgeschaltet wird, die dieses Projekt kaum benutzt, *existiert* — und feuert nie. **Ein Wächter, der nie auslöst, und einer, der immer auslöst, sind beide kaputt.** Verwandt: Ein negatives Ergebnis muss von „konnte nicht messen" unterscheidbar sein — mein eigener Rundlauf über alle Wächter meldete „alle still" und maß nichts. Genau das wiederholte sich später: Ein Generator, aus einem Nebenbaum gestartet, fand sein Quellverzeichnis nicht, schrieb die maschinell gepflegte Übersicht dieses Dokuments als **leer** und meldete Erfolg; 65 Zeilen waren weg, bevor ein Blick in den Diff es fing. Die Lehre stand da längst — sie hatte nur keinen Mechanismus. Jetzt bricht der Generator bei leerem Quellverzeichnis ab und nennt die wahrscheinliche Ursache.
 
 ### 3.26 Ein Dokument driftet in die Rolle des Nachbardokuments
 
@@ -265,7 +268,7 @@ Zwei Befunde desselben Tages, die zusammengehören, weil beide die *Platzierung*
 
 Der erste: Sämtliche Board-Wächter hängen am Zug-**Ende**. Sie sichern zu, dass die Anzeige stimmt, sobald ein Zug fertig ist — über die Stunde davor sagen sie nichts. Genau diese Stunde ist aber die, in der der Nutzer hinsieht: Er las „Pausiert", während längst zwei Vorgänge liefen, und musste es zweimal anmahnen. Der Fehler war nicht Nachlässigkeit, sondern eine Zusicherung, die am falschen Ende des Vorgangs sitzt. **Lehre:** Ein Versprechen über den *laufenden* Zustand muss dort durchgesetzt werden, wo der Zustand entsteht, nicht dort, wo er abgeschlossen wird.
 
-Der zweite: Der Wächter über die Auftrags-Formulierung suchte seine Verbotsphrasen als bloße Teilzeichenketten und las deshalb „is **unchanged from**" als Revisionsspur „changed from". Er blockierte einen völlig sauberen Punkt, und zwar wiederholt, bis die Ursache gefunden war. Eine Wortgrenze kostete zwei Zeilen. **Lehre:** Ein Wächter, der bei gewöhnlicher Sprache anschlägt, verliert genau das, wovon er lebt — dass man ihm glaubt. Fehlalarme sind keine Kosmetik; sie erziehen dazu, den Durchsetzer zu umgehen, und damit fällt die ganze Konstruktion in sich zusammen.
+Der zweite: Der Wächter über die Auftrags-Formulierung suchte seine Verbotsphrasen als bloße Teilzeichenketten und las deshalb „is **unchanged from**" als Revisionsspur „changed from". Er blockierte einen völlig sauberen Punkt, und zwar wiederholt, bis die Ursache gefunden war. Eine Wortgrenze kostete zwei Zeilen. Am selben Tag schlug er ein zweites Mal an — auf einem Punkt, dessen **Gegenstand** veraltete Lehren sind; dort half die Wortgrenze nicht mehr, denn eine Phrasenliste kann eine Revisionsspur nicht von einem Text über Revisionen unterscheiden. **Lehre:** Ein Wächter, der bei gewöhnlicher Sprache anschlägt, verliert genau das, wovon er lebt — dass man ihm glaubt. Fehlalarme sind keine Kosmetik; sie erziehen dazu, den Durchsetzer zu umgehen, und damit fällt die ganze Konstruktion in sich zusammen.
 
 ### 3.33 Eine Ersparnis, die Nacharbeit auslöst, ist keine Ersparnis
 
@@ -338,9 +341,12 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `render-verify-guard` | Render-Change nur mit grünem Lauf auf BEIDEN Backends | 3.6 |
 | `model-guard` | kein Weiterarbeiten nach dem Trailer eines nicht freigegebenen Modells | 3.17 |
 | `ci-status-guard` | rote CI wird bemerkt | stille CI-Fehler |
+| `closing-guard` | kein Versions-Tag, solange ein Closing-Schritt unbelegt ist | 3.15 |
 | `push-arrival-guard` | kein Turn-Ende, solange Commits in keiner Remote-Ref liegen | 3.18 |
 | `commit-scope-guard` | kein Fremdkörper im Commit (Wurzeldateien, fremde Verzeichnisse, große Binärdateien) | private Datei im Repo |
 | `tasks-archive-guard` | Arbeitsauftrag bleibt geteilt: offen in TASKS.md, erledigt im Archiv | 13.000-Zeilen-Datei je Zug |
+| `doc-budget-guard` | gemessene Obergrenze für die ständig gelesenen Dokumente | 3.30 |
+| `retro-currency-guard` | dieses Dokument bleibt aktuell zu seinen Quellen | 3.21 |
 | `guide-brevity-guard` | Anleitung bleibt kurz und projekt-neutral | 3.26 |
 | `rule-review-guard` | periodische Durchsicht des ganzen Regelbestands | 3.25 |
 | `guard-health-guard` | kein Durchsetzer im Baum, den nichts aufruft | 3.25 (4) |
@@ -381,7 +387,7 @@ Drei Konstruktionsprinzipien haben sich bewährt: **fail-open** (ein Guard-Fehle
 3. **Nebenläufigkeit: Exklusivität vor Redundanz.** Jeder künftige Wiederbeleber wird erst gebaut, nachdem ein atomarer, PID-basierter Owner-Lock existiert.
 4. **Messdisziplin:** ruhige Maschine für Suiten, Ziel-Hardware für Perf, gemessene Zahlen in jeder Kommunikation.
 5. **Nutzer-Artefakte als Verträge:** Struktur einfrieren, pro Klausel ein Prüfer, Änderungen nur als Vorschlag.
-6. **Verbrauch messen, bevor man ihn drosselt — und die Voraussetzung mitprüfen** (§3.31). Die Anzeige nennt die Treiber; die eigene Vermutung nennt sie nicht. Der naheliegendste Hebel bleibt dabei abgelehnt: „billigeres Modell für einfache Aufgaben" hat am 24.07. drei Lieferungen gekostet (§3.17) und damit mehr, als er gespart hätte.
+6. **Verbrauch messen, bevor man ihn drosselt — und die Voraussetzung mitprüfen** (§3.31). Die Anzeige nennt die Treiber; die eigene Vermutung nennt sie nicht. Der naheliegendste Hebel bleibt dabei abgelehnt: „billigeres Modell für einfache Aufgaben". Die Begründung dafür gehört §3.33 — eine Ersparnis wird gegen die Nacharbeit gerechnet, die sie auslöst. Der Abend des 24.07. belegt etwas anderes (§3.17): dass ein zu schwacher Arbeiter unbemerkt bleibt.
 
 ---
 
