@@ -32,14 +32,14 @@ export function settlementEnterCandidate(
 
 /**
  * The name shown in the "Space to enter <name>" hint (design.md §2.3). An
- * UNDISCOVERED settlement's real name stays hidden — the hint reads "?" to
- * match its §17.2 "?" map label (point 287) — while a discovered place (a
- * known-from-start port, or one already visited) shows its name. The caller
- * passes the SAME discovery flag the .map-label uses (visitedPlaces).
+ * UNDISCOVERED settlement's real name stays hidden — the hint reads the
+ * localized KIND placeholder ("Unknown village") to match its §17.2 map label
+ * (point 318) — while a discovered place (a known-from-start port, or one
+ * already visited) shows its name. The caller passes the SAME discovery flag
+ * the .map-label uses (visitedPlaces) and the same placeholder string.
  */
-export const UNDISCOVERED_PLACE_LABEL = '?'
-export function enterHintName(discovered: boolean, placeName: string): string {
-  return discovered ? placeName : UNDISCOVERED_PLACE_LABEL
+export function enterHintName(discovered: boolean, placeName: string, unknownLabel: string): string {
+  return discovered ? placeName : unknownLabel
 }
 
 /**

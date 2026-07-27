@@ -2,7 +2,9 @@
 // helpers. Entering is movement-based but confirmed with the Space use key —
 // reaching the enter radius never enters on its own, and a water cell blocks it.
 import { describe, it, expect } from 'vitest'
-import { enterHintName, settlementEnterCandidate, settlementToEnter, shouldEnterSettlement, UNDISCOVERED_PLACE_LABEL, type EnterablePlace } from './settlementEntry'
+import { enterHintName, settlementEnterCandidate, settlementToEnter, shouldEnterSettlement, type EnterablePlace } from './settlementEntry'
+import { de } from '../../i18n/de'
+import { en } from '../../i18n/en'
 import { KNOWN_FROM_START_PLACES, PLACES as GEO_PLACES, latLonToWorld, placeById } from '../../world/geo'
 import { balance } from '../../config/balance'
 
@@ -50,17 +52,19 @@ describe('shouldEnterSettlement (design.md §2.3)', () => {
   })
 })
 
-describe('enterHintName — the enter hint hides an undiscovered name (point 287)', () => {
+describe('enterHintName — the enter hint hides an undiscovered name (points 287/318)', () => {
   it('shows the name for a discovered place', () => {
-    expect(enterHintName(true, 'Cairo')).toBe('Cairo')
-    expect(enterHintName(true, 'Maasai Village')).toBe('Maasai Village')
+    expect(enterHintName(true, 'Cairo', en.unknownPlaces.port)).toBe('Cairo')
+    expect(enterHintName(true, 'Maasai Village', en.unknownPlaces.village)).toBe('Maasai Village')
   })
 
-  it('reads "?" for an undiscovered place, matching its §17.2 map label', () => {
-    expect(enterHintName(false, 'Maasai Village')).toBe(UNDISCOVERED_PLACE_LABEL)
-    expect(enterHintName(false, 'Maasai Village')).toBe('?')
+  it('reads the kind placeholder for an undiscovered place, matching its §17.2 map label', () => {
+    expect(enterHintName(false, 'Maasai Village', en.unknownPlaces.village)).toBe('Unknown village')
+    expect(enterHintName(false, 'Kilimanjaro', de.unknownPlaces.mountain)).toBe('Unbekannter Berg')
     // The real name never leaks through the hint while undiscovered.
-    expect(enterHintName(false, 'Maasai Village')).not.toContain('Maasai')
+    expect(enterHintName(false, 'Maasai Village', en.unknownPlaces.village)).not.toContain('Maasai')
+    // …and the placeholder is never the bare "?" it replaced (point 318).
+    expect(enterHintName(false, 'Maasai Village', en.unknownPlaces.village)).not.toBe('?')
   })
 })
 

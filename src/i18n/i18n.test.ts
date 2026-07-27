@@ -206,3 +206,40 @@ describe('cultural and natural landmarks i18n coverage (design.md §4.4)', () =>
     })
   }
 })
+
+describe('undiscovered map points name their KIND, not a bare "?" (point 318)', () => {
+  const KINDS = ['port', 'monument', 'village', 'mountain', 'waterfall', 'lake', 'cultural', 'natural', 'site'] as const
+
+  for (const lang of [en, de]) {
+    describe(lang.lang, () => {
+      it.each(KINDS)('%s has a localized placeholder that is not the old "?"', (kind) => {
+        const label = lang.unknownPlaces[kind]
+        expect(typeof label).toBe('string')
+        expect(label.length).toBeGreaterThan(3)
+        expect(label).not.toBe('?')
+        expect(label).not.toContain('?')
+      })
+
+      it('gives every kind its OWN wording, so the label tells kinds apart', () => {
+        const labels = KINDS.map((k) => lang.unknownPlaces[k])
+        // 'natural' and 'site' may read differently per language, but no two
+        // kinds may collapse into the same string — that would defeat the point.
+        expect(new Set(labels).size).toBe(labels.length)
+      })
+    })
+  }
+
+  it('agrees German adjective endings with each noun gender', () => {
+    // Written out per gender in the language file, never glued together.
+    expect(de.unknownPlaces.village).toBe('Unbekanntes Dorf')
+    expect(de.unknownPlaces.mountain).toBe('Unbekannter Berg')
+    expect(de.unknownPlaces.lake).toBe('Unbekannter See')
+    expect(de.unknownPlaces.site).toBe('Unbekannte Stätte')
+  })
+
+  it('keeps the elephant graveyard placeholder neutral, so the kind is no spoiler', () => {
+    for (const lang of [en, de]) {
+      expect(lang.unknownPlaces.site.toLowerCase()).not.toMatch(/elefant|elephant|friedhof|graveyard/)
+    }
+  })
+})
