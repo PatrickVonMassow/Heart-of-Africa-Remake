@@ -1796,53 +1796,65 @@ check('with no adult in range the orphan simply stays parentless (point 262)',
 // all where none is eligible), and a calf left out of reach of a living parent
 // past balance.family.reunionSeconds has its bond released to the same adoption.
 const bond = await page.evaluate(async () => {
-  window.__game.getState().debugJumpTo(-2.5, 34.0) // Serengeti savanna
+  const STAGE = [-2.5, 34.0] // Serengeti savanna
+  const AWAY = [5.0, 20.0] // far off in another region: the staged pair is left behind
+  const jump = (ll) => window.__game.getState().debugJumpTo(ll[0], ll[1])
+  jump(STAGE)
   await window.__sleepSim(0.5)
   const herds = window.__wildlife.herdsRef.current
   const clear = () => { for (const sp of Object.keys(herds)) herds[sp].length = 0 }
-  const p = window.__game.getState().pos
-  const mk = (dx, dz, over = {}) => ({ x: p.x + dx, z: p.z + dz, y: 0.2, rot: 0, scale: 1, phase: 0, ...over })
+  const at = () => window.__game.getState().pos
+  const mk = (p, dx, dz, over = {}) => ({ x: p.x + dx, z: p.z + dz, y: 0.2, rot: 0, scale: 1, phase: 0, ...over })
   const live = (a) => !!a && a.dead !== true && a.young !== true && herds.zebra.includes(a)
 
   // --- The cull takes the parent: the calf keeps no phantom ---
+  // Driving AWAY is what removes it, exactly as in the report — the despawn ring
+  // is a distance from the player, and the on-screen backstop only holds an
+  // animal inside the rendered frame. `chunk` is what makes the cull judge it at
+  // all (an injected, untagged animal is always kept), so the staged calf and its
+  // herd-mate survive the drive while the tagged parent is streamed out.
   clear()
-  // `chunk` is what makes the streaming cull judge it at all (an untagged
-  // injected animal is always kept); the chunk key is deliberately one that was
-  // never spawned, so distance alone decides — as when the player drives away.
-  const parent = mk(0, 0, { chunk: '999999,999999' })
-  const calf = mk(1, 0, { young: true, scale: 0.55, parent })
+  const p0 = at()
+  const parent = mk(p0, 0, 0, { chunk: '999999,999999' })
+  const calf = mk(p0, 1, 0, { young: true, scale: 0.55, parent })
   parent.child = calf
-  const adopter = mk(3, 0) // a childless zebra adult beside the calf
+  const adopter = mk(p0, 3, 0) // a childless zebra adult beside the calf
   herds.zebra.unshift(parent, calf, adopter)
   await window.__sleepSim(0.3)
-  parent.x = p.x + 600; parent.z = p.z + 600 // far beyond the despawn ring and off screen
+  jump(AWAY)
   await window.__pollSim(6, () => !herds.zebra.includes(parent) && !!calf.parent && calf.parent !== parent)
   const culled = !herds.zebra.includes(parent)
-  const noPhantom = calf.parent !== parent && parent.child !== calf
-  const reAdopted = live(calf.parent) && calf.parent.child === calf
+  const noPhantom = culled && calf.parent !== parent && parent.child !== calf
+  const reAdopted = culled && calf.parent !== parent && live(calf.parent) && calf.parent.child === calf
 
   // --- No eligible adult: the calf roams on parentless, never bonded to a ghost ---
   const prevR = window.__balance.family.adoptionRadius
   window.__balance.family.adoptionRadius = 0.001 // nothing is in reach, not even a streamed-in herd-mate
   clear()
-  const lone = mk(0, 0, { chunk: '999999,999999' })
-  const stray = mk(1, 0, { young: true, scale: 0.55, parent: lone })
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p1 = at()
+  const lone = mk(p1, 0, 0, { chunk: '999999,999999' })
+  const stray = mk(p1, 1, 0, { young: true, scale: 0.55, parent: lone })
   lone.child = stray
   herds.zebra.unshift(lone, stray)
   await window.__sleepSim(0.3)
-  lone.x = p.x + 600; lone.z = p.z + 600
+  jump(AWAY)
   await window.__pollSim(6, () => !herds.zebra.includes(lone) && !stray.parent)
-  const freeRoamer = !herds.zebra.includes(lone) && !stray.parent
+  const freeRoamer = !herds.zebra.includes(lone) && !stray.parent && lone.child !== stray
   window.__balance.family.adoptionRadius = prevR
 
   // --- The separation window: a living parent it cannot reach ---
   const prevW = window.__balance.family.reunionSeconds
   window.__balance.family.reunionSeconds = 1 // debug-editable; shortened so the check stays quick
   clear()
-  const distant = mk(0, 0) // alive and well, but far outside the follow radius
-  const left = mk(40, 0, { young: true, scale: 0.55, parent: distant })
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p2 = at()
+  const distant = mk(p2, 0, 0) // alive and well, but far outside the follow radius
+  const left = mk(p2, 40, 0, { young: true, scale: 0.55, parent: distant })
   distant.child = left
-  herds.zebra.unshift(distant, left, mk(38, 0)) // an eligible adult beside the stray calf
+  herds.zebra.unshift(distant, left, mk(p2, 38, 0)) // an eligible adult beside the stray calf
   await window.__pollSim(8, () => !!left.parent && left.parent !== distant)
   const separated = live(left.parent) && left.parent.child === left && distant.child !== left
   window.__balance.family.reunionSeconds = prevW
