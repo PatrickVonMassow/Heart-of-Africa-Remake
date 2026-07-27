@@ -114,6 +114,37 @@ describe('suggestSuite', () => {
     expect(suggestSuite([run('webgl', 1, { suite: 'unknown' })])).toBe('enrichments')
     expect(suggestSuite(null)).toBe('enrichments')
   })
+
+  // Point 361: the old rule ignored the change and ratcheted — one enrichments
+  // run made the 37-frame, 951-second suite the standing suggestion forever.
+  // Only the DOM-only narrowing survived the historical replay.
+  it('sends a DOM-only change to flow instead of the 37-frame suite', () => {
+    const runs = [run('webgl', 1, { suite: 'enrichments' })]
+    expect(suggestSuite(runs, ['src/ui/Hud.tsx'])).toBe('flow')
+    expect(suggestSuite([], ['src/ui/Hud.tsx', 'src/ui/DebugMenu.tsx'])).toBe('flow')
+  })
+  it('does not narrow when any changed path can render per backend', () => {
+    const runs = [run('webgl', 1, { suite: 'polish' })]
+    expect(suggestSuite(runs, ['src/ui/Hud.tsx', 'src/render/water.ts'])).toBe('polish')
+    expect(suggestSuite(runs, ['src/scenes/travel/TravelScene.tsx'])).toBe('polish')
+    // The general path→suite map was REJECTED by the replay; travel-scene code
+    // must keep the old suggestion, not acquire a new one.
+    expect(suggestSuite([], ['src/scenes/travel/TravelScene.tsx'])).toBe('enrichments')
+  })
+  it('ignores a path list that is empty, absent or not render paths', () => {
+    expect(suggestSuite([], [])).toBe('enrichments')
+    expect(suggestSuite([], null)).toBe('enrichments')
+    expect(suggestSuite([], ['README.md'])).toBe('enrichments')
+    // A jsdom test under src/ui/ is not a render path at all (isRenderPath),
+    // so it must not smuggle a suite suggestion out of this branch.
+    expect(suggestSuite([], ['src/ui/Hud.test.tsx'])).toBe('enrichments')
+  })
+  it('names flow in the block message for a DOM-only change', () => {
+    const r = evaluate(renderChange({ changedRenderPaths: ['src/ui/Hud.tsx'] }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toContain('run-all.mjs flow')
+    expect(r.reason).not.toContain('run-all.mjs enrichments')
+  })
 })
 
 describe('evaluate — non-render changes pass freely', () => {

@@ -234,6 +234,14 @@ quietest frame in the noise table moves 27.81 % — thirty-seven times the
 smallest real defect. The loudest moves 128 grey levels on average, which is
 not noise at all.**
 
+A second, independent probe run (`scripts/picture-stability.mjs world`, the tool
+of [§4.3](#43-implemented-the-capture-stability-probe)) reproduced the finding
+and sharpened it: **8 of 8 frames over the bar again, between 10.90 % and
+80.18 %, but in a different rank order** — `15-worldmodel-victoria-falls` worst
+at 80.18 % where it had been fourth, `12-worldmodel-lake-victoria` down to
+28.60 % from 98.62 %. The instability is not a fixed per-frame pattern that a
+per-frame tolerance could be fitted to. It is different every time.
+
 `12-worldmodel-lake-victoria` explains itself when the two frames are opened:
 one run captured a settled top-down view of the lake at 60 FPS; the other, on a
 loaded machine, captured a wide unsettled landscape at 1 FPS with the camera
