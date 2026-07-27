@@ -2,7 +2,7 @@
 // the markup the board guard accepts — a stamped status — and refuse the cases
 // where silently doing nothing would leave the reader with a stale card.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { auditDashboard, parseNowCardPoints, parseQueuePoints, parseTasks } from './dashboard-guard-core.mjs'
@@ -262,8 +262,18 @@ describe('removeVdzk — an answered question disappears', () => {
 // The fixtures above pin the shape; this pins that the shape is the LIVE one.
 // A card generator that drifts from the board the guard reads would pass every
 // synthetic test and block the next turn instead.
-describe('every move keeps the real board auditable', () => {
-  const html = readFileSync(resolve(REPO_ROOT, '.batch-dashboard.html'), 'utf8')
+//
+// The board is a LOCAL artefact — .gitignore keeps it out of the repository —
+// so it exists on a working machine and never in CI. The sweep therefore skips
+// where there is no board rather than failing the pipeline for a missing file,
+// and the fixtures above (which run everywhere) carry the shape on their own.
+const BOARD_PATH = resolve(REPO_ROOT, '.batch-dashboard.html')
+const hasBoard = existsSync(BOARD_PATH)
+
+describe.skipIf(!hasBoard)('every move keeps the real board auditable', () => {
+  // Read lazily: a skipped suite still RUNS its factory, so an eager read would
+  // throw at collection time on exactly the machine that has no board.
+  const html = hasBoard ? readFileSync(BOARD_PATH, 'utf8') : ''
   const audit = (doc) => new Set(auditDashboard(doc, { open: [], done: [] }).map((v) => v.code))
   const baseline = audit(html)
   const [aNowPoint] = [...parseNowCardPoints(html)]
@@ -325,8 +335,9 @@ describe('refreshFooter — the count the repository already knows', () => {
     expect(() => refreshFooter(foot(`Stand: ${live}`), { openCount: '73' })).toThrow(/open-point count/)
   })
 
-  it('leaves the live board free of the audit stale-footer finding', () => {
-    const html = readFileSync(resolve(REPO_ROOT, '.batch-dashboard.html'), 'utf8')
+  // Same reason as the sweep above: no board on a CI checkout.
+  it.skipIf(!hasBoard)('leaves the live board free of the audit stale-footer finding', () => {
+    const html = readFileSync(BOARD_PATH, 'utf8')
     const { open } = parseTasks(readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8'))
     const codes = auditDashboard(refreshFooter(html, { openCount: open.length }), { open, done: [] }).map((v) => v.code)
     expect(codes).not.toContain('footer-stale')
