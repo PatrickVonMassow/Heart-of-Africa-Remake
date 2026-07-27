@@ -3228,6 +3228,76 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: design.md §19.16 if the drag-and-feed rule is not yet written
   there explicitly, CLAUDE.md §7.1 pt 12 and its evidence section.
 
+- [ ] 384. RAIN THAT TOUCHES THE WORLD — WET GROUND, IMPACTS, LIT DROPS (user 27.07.2026,
+  after looking at the settlement rain on the deployed build: "the rain is simply painted
+  over the picture — it has no effect on the optics at all"). Measured against the code,
+  that reading is nearly right: `src/scenes/place/PlaceRain.tsx` draws 700 instanced
+  quads in an UNLIT `MeshBasicNodeMaterial` of one constant colour (0.66/0.72/0.8), fog
+  off, depth-write off, inside a 15-unit column centred on the eye. The streaks do stand
+  in the world and are occluded by huts — but nothing else in the scene knows it is
+  raining. This point closes that gap with the three cheapest steps, in the order of
+  effect per cost; point 385 carries the two dearer ones.
+  (1) WET SURFACES — the biggest gain for the least work, and it needs no new particle.
+  A single scene-wide wetness value (the place's own `rainAmount`, already computed)
+  drives the existing materials: roughness down, albedo slightly darkened, specular
+  response up, so ground, roofs and walls go dark and glossy and the village fire
+  reflects in the wet earth. Sheltered ground is EXEMPT — work-order point 353 owns that
+  rule; this point must not fight it, so read it first and drive both from one value.
+  (2) THE RAIN REACHES THE GROUND, AND ARRIVES. Today the column is a fixed box around
+  the head and drops recycle at its lower edge — which is why the player sees them stop
+  in mid-air. A drop ends at the GROUND under it (the terrain/settlement height at its
+  own x/z), and its end is an IMPACT: a short-lived, small ring or splash quad at that
+  spot, alpha-fading, instanced like the drops themselves. On water the impact is a
+  ring; on dust it is a puff — one shape parameterised, not two systems.
+  (3) LIT DROPS INSTEAD OF ONE FLAT COLOUR. A streak's brightness follows the sun/sky
+  direction and the view angle, so it reads bright against a dark hut and nearly
+  vanishes against a bright sky, and the drops of one gust no longer look identical.
+  QUALITY LEVELS ARE PART OF THE POINT, not an afterthought (§21 convention): every new
+  lever gets a low/medium/high entry in `QUALITY_PRESETS` (`src/config/quality.ts`) and a
+  row in `docs/graphics-detail-levels.md` — the completeness gate in
+  `src/config/quality.test.ts` fails otherwise. Rain that costs frames on LOW is a
+  regression, so low keeps the plain streaks and the wetness value at most; impacts and
+  lit drops are medium/high.
+  BOTH BACKENDS, ONE PATH: TSL only, no WebGPU-only branch (CLAUDE.md §3) — the
+  reverted TRAA attempt is the precedent for what a second code path costs.
+  VERIFIABLE: pure Vitest on the wetness mapping (dry → today's values, wet → the
+  darkened/glossier set, sheltered ground unchanged) and on the impact placement (a
+  drop's end equals the ground height under it, never the column's lower edge); the
+  quality-preset completeness and doc-sync gates green; live, one first-person frame in
+  the rain on BOTH backends showing wet ground and drops that arrive, judged by the
+  picture, plus the §21 detail levels stepped through without a red.
+  DOCS in the same commit: design.md §19.13 (what rain does to the picture is design
+  content), `docs/graphics-detail-levels.md`, and CLAUDE.md §7.1 pt 12 with its evidence
+  section.
+
+- [ ] 385. RAIN WITH DEPTH AND WEATHER — LAYERS, STREAK SHAPE, DIMMED SUN (user
+  27.07.2026; the second half of the rain work, deliberately LAST in the queue, after
+  point 379). Point 384 makes the rain touch the world; this makes the rain itself read
+  as weather rather than as particles.
+  (4) DEPTH INSTEAD OF ONE CURTAIN: two or three layers at different distances and
+  speeds, with the streak LENGTH following the drop's velocity relative to the camera
+  and soft, faded ends rather than hard rectangles. That is the classic way volume is
+  suggested without more particles — the count stays where it is or falls.
+  (5) THE WEATHER CHANGES THE LIGHT: while it rains the sun is damped, the haze rises
+  and the view distance shortens, so a downpour looks like one from inside a hut as well
+  as from the open. This is where the rain stops being an overlay: the scene gets darker
+  and flatter, and the fire is suddenly the brightest thing in the village.
+  BOUNDARY: the blue sky under rain is work-order point 354 and stays there — this point
+  changes the LIGHT, not the sky dome, and the two must be built so neither undoes the
+  other. Read 354 before starting; if it is still open when this begins, say in the
+  commit how the two interact.
+  QUALITY LEVELS, as in 384: every lever gets its low/medium/high entry and its doc row;
+  the layered rain and the light damping are medium/high, low keeps one layer and the
+  undimmed sun.
+  BOTH BACKENDS, ONE PATH: TSL only, no backend branch.
+  VERIFIABLE: pure Vitest on the layer/velocity mapping (streak length follows relative
+  speed; a stalled camera does not stretch a drop) and on the light damping (rain 0 →
+  today's sun and haze exactly; rain 1 → the damped set; monotone in between); live, one
+  first-person frame per backend in the open and one from under a roof, judged by the
+  picture, at each detail level.
+  DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
+  §7.1 pt 12 and its evidence section.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
