@@ -985,15 +985,15 @@ After completion and after every major system:
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop), `render-verify-guard` (no GUI/render change finished without the
-  picture check — on both backends where they can differ, on one where they
+  picture check — both backends where they can differ, one where they
   cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
   preamble; its budgets and the two honest ways out live in
-  `scripts/doc-budget-core.mjs`), `commit-scope-guard` (a PRE-COMMIT hook via the versioned
-  `scripts/git-hooks/`: no stray file, foreign directory or large binary rides
-  along in a commit), `ci-status-guard` (a
+  `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
+  (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
+  along, no push lands a state CI would reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective document stays current), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
@@ -1011,6 +1011,12 @@ After completion and after every major system:
   --session <id>` reports read-only whether one would block — advisory, the guard
   itself stays the authority. A blocked turn produces nothing, and one such loop
   has already cost ~30 turns; asking first is a cheap process run.
+- **Screenshot diffing is NOT available as a shortcut (point 361).** Every
+  pixel-metric way to cheapen this check was replayed against the bugs the
+  picture caught and REJECTED: two runs of one suite on identical code move
+  11–98 % of a frame, the smallest real defect moved 0.75 %. No golden-image
+  gate until `node scripts/picture-stability.mjs <suite>` reports STABLE;
+  verdicts in `docs/picture-check-levers.md`.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 

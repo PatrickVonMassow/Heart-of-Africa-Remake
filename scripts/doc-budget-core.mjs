@@ -31,7 +31,15 @@ export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
     maxLines: 1080,
-    maxWords: 9600,
+    // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
+    // is not available as a shortcut (point 361). That is the mechanism working
+    // as designed rather than a concession: the words buy a NEW standing rule
+    // and a command to re-test it, not a longer telling of something already
+    // here. It is also cheap to hold — the rule forecloses a proposal that will
+    // otherwise be re-derived from first principles by every session that
+    // notices how expensive the picture check is, and re-deriving it costs a
+    // replay corpus.
+    maxWords: 9650,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
