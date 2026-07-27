@@ -297,6 +297,28 @@ Das ist die teuerste Sorte Fehler in einem Auftrag, weil sie sich nicht wie ein 
 
 **Lehre:** Was im Auftrag im Präsens steht, muss beim Schreiben nachgesehen sein. Was noch gebaut werden muss, gehört in die Zukunftsform oder ausdrücklich unter „das existiert noch nicht" — die zwei Sekunden für ein `grep` sind billiger als eine Lieferung, die ins Leere greift. Und weil das nicht nur für Aufträge gilt: Jede Zusicherung, die ein Dokument über den Code macht, ist entweder nachgesehen oder als Absicht gekennzeichnet.
 
+### 3.36 Isolierung ist eine Eigenschaft der Umgebung, keine Anweisung
+
+Ein Agent, der ausdrücklich **nur lesend** arbeiten sollte, checkte im gemeinsamen Arbeitsbaum einen Zweig aus; die Hauptsitzung tat kurz darauf dasselbe — in einem Baum, in dem gerade ihre eigene Testsuite lief. Beide Male war die Anweisung eindeutig, beide Male wirkungslos. Ein Prompt beschreibt eine Absicht; der Arbeitsbaum ist geteilter Zustand, und wer ihn schreiben *kann*, schreibt ihn irgendwann.
+
+**Lehre:** Isolierung ist eine Eigenschaft der Umgebung, nie des Auftrags. Jeder Vorgang, der laufen darf, bekommt seine eigene Arbeitskopie — dann ist „nur lesend" keine Zusage mehr, sondern eine Eigenschaft dessen, was er überhaupt anfassen kann. Das ist §3.16 eine Ebene tiefer: erzwingen statt erinnern heißt hier, die Möglichkeit zu **entziehen**, statt sie zu verbieten.
+
+### 3.37 Ein Werkzeug, das rät, ersetzt still
+
+Der Arbeitsauftrag benutzt dasselbe Abschnittszeichen für vier verschiedene Dokumente. Der Generator, der einem delegierten Agenten seinen Auftrag zustellt (§3.31), erkannte ein Dokument nur an seiner Dateiendung — ein Verweis in Prosaform fiel deshalb auf das Designdokument zurück, dessen gleichnummerierter Abschnitt wortwörtlich und unkommentiert in den Auftrag wanderte, während die Fehlermeldung eine Umnummerierung dieses Dokuments beschuldigte. Der Agent hätte gegen einen fremden Abschnitt gebaut, ohne dass irgendwo etwas rot geworden wäre.
+
+Ein Werkzeug, das eine Eingabe nicht auflösen kann, hat zwei Ausgänge: laut scheitern oder still etwas Plausibles einsetzen. **Der laute ist der harmlose.** Die Reparatur bestand deshalb nicht in besserem Raten, sondern darin, jede Auflösung sichtbar zu machen: Jeder mitgelieferte Abschnitt trägt sein Herkunftsdokument, eine Referenzkarte nennt jeden Verweis und wohin er aufgelöst wurde, und was nirgends aufgeht, scheitert weiterhin — nun unter Nennung aller durchsuchten Dokumente.
+
+**Lehre:** Eine Notation, die in mehreren Dokumenten dasselbe Zeichen benutzt, ist keine Kennung, sondern eine Vermutung. Wo ein Werkzeug sie auflöst, gehört die Auflösung ins Ergebnis: Ein falscher Treffer, den man sehen kann, ist ein Fehler — einer, den man nicht sehen kann, ist eine Fälschung. (Die Einsteiger-Anleitung warnt vor dieser Klasse seit Wochen; ihr Absatz hier fehlte bis jetzt.)
+
+### 3.38 Fail-open EINMAL ist nicht fail-open FÜR IMMER
+
+Beim Umbau eines Fehlerpfads wurde ein eng gefasster Fang verbreitert: Statt nur des einen erwarteten Fehlers schluckte er jeden Fehlschlag des Vergleichsschritts. Die Verzweigung dahinter setzte die Bildprüfung neu auf — ein vorübergehender Prozessfehler unter Last hätte damit ein offenes, unverifiziertes Render-Gate endgültig für erledigt erklärt. Aus „diesmal lassen wir durch" war „ab jetzt ist nichts mehr offen" geworden, und zwar unsichtbar, weil beide Wege dieselbe Erfolgsmeldung schreiben.
+
+Der Unterschied liegt nicht im Durchlassen, sondern im **Schreiben**. Fail-open (§4) heißt: Ein Wächter hält die Sitzung nicht auf, wenn er selbst kaputt ist. Es heißt nicht, dass er im Fehlerfall Zustand fortschreiben darf. Die Reparatur trennt genau das — das Gate fragt jetzt, ob sein Bezugspunkt noch erreichbar ist, und rückt nur vor, wenn er es nachweislich nicht mehr ist; eine unbeantwortbare Frage zählt als „vorhanden" und lässt das Gate stehen.
+
+**Lehre:** Beim Umbau eines Fehlerpfads gehört die Frage dazu, **welcher** Fehler Zustand schreiben darf — die Menge der gefangenen Fehler ist Teil der Spezifikation, nicht Aufräumarbeit. Und ein Ausfallverhalten wird nach seiner Dauer beurteilt: einmal durchlassen ist eine Nachsicht, dauerhaft durchlassen ist eine Abschaffung.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -330,7 +352,7 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `worktree-reminder` | Delegations-Disziplin | Branch-Kollisionen |
 | `defer-for-user` / `notify` | nie auf den Nutzer blockieren; Signal aufs Handy | Batch fror an Rückfragen fest |
 
-Drei Konstruktionsprinzipien haben sich bewährt: **fail-open** (ein Guard-Fehler blockiert nie die Session — sonst wird das Immunsystem zur Autoimmunkrankheit), **pure, getestete Kerne** (`*-core.mjs` + Vitest) und seit dem 24.07. **ownership-aware** (ein Guard drängt nur den Lock-Owner in Pflichten).
+Drei Konstruktionsprinzipien haben sich bewährt: **fail-open** (ein Guard-Fehler blockiert nie die Session — sonst wird das Immunsystem zur Autoimmunkrankheit; durchlassen heißt dabei nicht, im Fehlerfall Zustand fortzuschreiben, §3.38), **pure, getestete Kerne** (`*-core.mjs` + Vitest) und seit dem 24.07. **ownership-aware** (ein Guard drängt nur den Lock-Owner in Pflichten).
 
 ---
 
