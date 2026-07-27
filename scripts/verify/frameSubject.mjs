@@ -78,12 +78,15 @@ export function probeFrameSubject(d) {
       return done()
     }
     let anyShown = false
+    let anySized = false
     for (let i = 0; i < all.length; i++) {
       const el = all[i]
       const r = el.getBoundingClientRect()
       const cs = getComputedStyle(el)
       const shown = cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity || '1') > 0.01
-      const inView = r.width > 1 && r.height > 1 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight
+      const sized = r.width > 1 && r.height > 1
+      if (shown && sized) anySized = true
+      const inView = sized && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight
       if (shown) anyShown = true
       // Report the match the reader should look at: the visible one if there is
       // one, else the first (the failure text then names where it sat).
@@ -95,9 +98,15 @@ export function probeFrameSubject(d) {
       }
     }
     probe.visible = false
-    probe.reason = anyShown
-      ? d.element + ' lies outside the viewport'
-      : d.element + ' is hidden (display/visibility/opacity)'
+    // Say which of the three ways it failed: nothing rendered at all, rendered
+    // but with no size to see, or drawn somewhere off the frame. "Outside the
+    // viewport" for a 0x0 wrapper would send the next reader after the aim when
+    // the element has nothing to show.
+    probe.reason = !anyShown
+      ? d.element + ' is hidden (display/visibility/opacity)'
+      : !anySized
+        ? d.element + ' has no rendered size (a zero-size box is not a picture)'
+        : d.element + ' lies outside the viewport'
     return done()
   }
   if (d.kind === 'world') {

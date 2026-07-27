@@ -236,9 +236,11 @@ describe('probeFrameSubject on an element subject', () => {
     expect(p.reason).toMatch(/no element matches/)
   })
 
-  it('refuses a degenerate zero-size match — an empty wrapper is not a picture', () => {
+  it('refuses a degenerate zero-size match, and says so rather than blaming the aim', () => {
     mount(box(marker(), 700, 300, 0, 0))
-    expect(probe().ok).toBe(false)
+    const p = probe()
+    expect(p.ok).toBe(false)
+    expect(p.reason).toMatch(/no rendered size/)
   })
 
   it('reports the match count in the failure text, so a reader need not open the page', () => {
