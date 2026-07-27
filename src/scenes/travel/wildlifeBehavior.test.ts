@@ -99,6 +99,8 @@ import {
   adoptionHeld,
   inEscapeRun,
   tickEscapeRun,
+  severFamilyLinks,
+  tickFamilySeparation,
   isPredatorSpecies,
   type AdoptionAdult,
   PREDATOR_PREY,
@@ -3419,5 +3421,267 @@ describe('the freed calf runs its escape before it is adopted (design.md §19.8,
     // The calf is freed at the END of its ~5 s struggle, and the flight then has
     // to carry it clear of the kill — so the window is sized well above it.
     expect(balance.family.escapeSeconds).toBeGreaterThan(5)
+  })
+})
+
+describe("a juvenile's bond to its parent RESOLVES, never hangs (design.md §19.8, point 341)", () => {
+  // The regression: the streaming cull removes an animal by distance from the
+  // player, and it cleared NEITHER `parent` nor `child`. A player who drove a
+  // calf far enough left its parent behind, and because the follow branch only
+  // tests `!parent.dead` — a culled parent is not dead — the calf walked to a
+  // frozen phantom position and nursed at nothing, while the §19.8 orphan
+  // adoption (which waits for a DEAD parent) never fired. Two rules end it: the
+  // cull severs the pair, and a separation window resolves everything else.
+  interface Beast extends AdoptionAdult {
+    x: number
+    z: number
+    species: string
+    young?: boolean
+    dead?: boolean
+    caught?: number
+    escape?: number
+    chunk?: string
+    parent?: Beast
+    child?: Beast
+    separated?: number
+  }
+  const CHUNK = 100
+  const FOLLOW = 8.1 // balance.family.followRadius' shape
+  const WINDOW = 45 // balance.family.reunionSeconds' shape; the value stays calibratable
+  const RADIUS = 20 // balance.family.adoptionRadius
+
+  const pair = (parentX = 0, calfX = 1) => {
+    const parent: Beast = { species: 'zebra', x: parentX, z: 0, chunk: '0,0' }
+    const calf: Beast = { species: 'zebra', x: calfX, z: 0, young: true, chunk: '0,0', parent }
+    parent.child = calf
+    return { parent, calf }
+  }
+
+  /** The live streaming cull (Wildlife.tsx): keep by distance/frame, and sever
+   *  the family links of everything it drops. No live chunks and no frustum keep,
+   *  so distance alone decides — as it does when the player drives away. */
+  const cullFrame = (herd: Beast[], playerX: number, despawnR: number): Beast[] =>
+    herd.filter((a) => {
+      const v = keepStreamedAnimal(a, () => false, CHUNK, playerX, 0, despawnR, () => false)
+      if (!v.keep) severFamilyLinks(a)
+      return v.keep
+    })
+
+  /** The live family pass (Wildlife.tsx): tick the separation of every juvenile
+   *  with a living parent, resolve the bond at the window, then run the ordinary
+   *  point-262 adoption over every parentless young. */
+  const familyFrame = (herd: Beast[], dt: number, window = WINDOW) => {
+    for (const a of herd) {
+      if (a.dead || a.young !== true) continue
+      let released: Beast | null = null
+      if (a.parent && !a.parent.dead) {
+        const sep = tickFamilySeparation(
+          a.separated,
+          Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
+          FOLLOW,
+          dt,
+          window,
+          adoptionHeld(a),
+        )
+        a.separated = sep.separated
+        if (!sep.resolve) continue
+        released = a.parent
+        severFamilyLinks(a)
+      } else {
+        a.separated = undefined
+      }
+      const adopter = findAdopter(a, herd, RADIUS, { exclude: released })
+      if (adopter) {
+        a.parent = adopter
+        adopter.child = a
+      }
+    }
+  }
+
+  it('severFamilyLinks clears BOTH directions', () => {
+    const { parent, calf } = pair()
+    severFamilyLinks(calf)
+    expect(calf.parent).toBeUndefined()
+    expect(parent.child).toBeUndefined()
+    // …and from the parent's side just the same.
+    const b = pair()
+    severFamilyLinks(b.parent)
+    expect(b.parent.child).toBeUndefined()
+    expect(b.calf.parent).toBeUndefined()
+  })
+
+  it('severFamilyLinks leaves a FOREIGN back-reference alone', () => {
+    // A calf already re-parented elsewhere: cutting its former parent must not
+    // clear the link it now holds to its new one.
+    const { parent, calf } = pair()
+    const newParent: Beast = { species: 'zebra', x: 30, z: 0 }
+    calf.parent = newParent
+    newParent.child = calf
+    severFamilyLinks(parent) // parent.child still points at the calf
+    expect(parent.child).toBeUndefined()
+    expect(calf.parent).toBe(newParent) // not cut
+    expect(newParent.child).toBe(calf)
+    expect(severFamilyLinks({})).toBeUndefined() // an unlinked animal is a no-op
+  })
+
+  it('the CULL clears the pair: a survivor never references a removed animal', () => {
+    const { parent, calf } = pair(0, 1)
+    // The player drives off: the parent is now beyond the despawn ring, the calf
+    // (which the player followed) is not.
+    parent.x = 500
+    const left = cullFrame([parent, calf], 1, 110)
+    expect(left).toEqual([calf]) // the parent was streamed out
+    expect(calf.parent).toBeUndefined() // …and left NO phantom behind
+  })
+
+  it('a calf whose parent is culled is adopted in the very same frame', () => {
+    const { parent, calf } = pair(0, 1)
+    const herdMate: Beast = { species: 'zebra', x: 5, z: 0, chunk: '0,0' }
+    parent.x = 500 // out of the ring
+    const left = cullFrame([parent, calf, herdMate], 1, 110)
+    familyFrame(left, 1 / 60)
+    expect(calf.parent).toBe(herdMate)
+    expect(herdMate.child).toBe(calf)
+    expect(calf.separated).toBeUndefined() // in reach of its new parent
+  })
+
+  it('a culled CALF leaves its parent shielding nothing', () => {
+    const { parent, calf } = pair(0, 1)
+    calf.x = 500
+    const left = cullFrame([parent, calf], 1, 110)
+    expect(left).toEqual([parent])
+    expect(parent.child).toBeUndefined()
+  })
+
+  it('the separation clock runs ONLY while the calf is out of reach', () => {
+    // Inside the follow radius nothing accumulates, however long it stands there.
+    let s: number | undefined
+    for (let i = 0; i < 1000; i++) {
+      const r = tickFamilySeparation(s, FOLLOW, FOLLOW, 1 / 60, WINDOW)
+      s = r.separated
+      expect(r.resolve).toBe(false)
+      expect(s).toBeUndefined()
+    }
+    // Out of reach it accumulates…
+    s = tickFamilySeparation(undefined, FOLLOW + 0.01, FOLLOW, 2, WINDOW).separated
+    expect(s).toBeCloseTo(2, 10)
+    s = tickFamilySeparation(s, 40, FOLLOW, 3, WINDOW).separated
+    expect(s).toBeCloseTo(5, 10)
+    // …and coming back inside RESETS it (a gambol at the leash edge, a short
+    // flight): the next excursion starts from zero, so it can never add up.
+    const back = tickFamilySeparation(s, FOLLOW - 0.5, FOLLOW, 1 / 60, WINDOW)
+    expect(back.resolve).toBe(false)
+    expect(back.separated).toBeUndefined()
+  })
+
+  it('the window boundary is exact: a tick landing on it resolves, a sliver short does not', () => {
+    const short = tickFamilySeparation(WINDOW - 1, 40, FOLLOW, 0.999, WINDOW)
+    expect(short.resolve).toBe(false)
+    expect(short.separated).toBeCloseTo(WINDOW - 0.001, 10)
+    const exact = tickFamilySeparation(WINDOW - 1, 40, FOLLOW, 1, WINDOW)
+    expect(exact.resolve).toBe(true)
+    expect(exact.separated).toBeUndefined() // the clock is cleared with the bond
+    const over = tickFamilySeparation(WINDOW - 1, 40, FOLLOW, 5, WINDOW)
+    expect(over.resolve).toBe(true) // an overshooting frame resolves too
+  })
+
+  it('a running §19.8 ending FREEZES the clock — that drama resolves first', () => {
+    // Caught by a predator, or escaping after the parent's sacrifice: the pair
+    // belongs to that ending, whose own deadline is hard (point 311).
+    const held = tickFamilySeparation(WINDOW - 0.5, 40, FOLLOW, 5, WINDOW, true)
+    expect(held.resolve).toBe(false)
+    expect(held.separated).toBeCloseTo(WINDOW - 0.5, 10) // frozen, not reset
+    // The moment the ending lifts, the window resolves as usual.
+    expect(tickFamilySeparation(WINDOW - 0.5, 40, FOLLOW, 5, WINDOW, false).resolve).toBe(true)
+  })
+
+  it('a window of zero switches the separation OFF (a debug edit must not sever every bond)', () => {
+    const off = tickFamilySeparation(3, 40, FOLLOW, 1, 0)
+    expect(off.resolve).toBe(false)
+    expect(off.separated).toBeUndefined()
+    expect(tickFamilySeparation(3, 40, FOLLOW, 1, -5).resolve).toBe(false)
+  })
+
+  it('the separation ALWAYS resolves — invariant I4 — from any window and frame time', () => {
+    for (const w of [0.5, 5, 45, 120]) {
+      for (const dt of [1 / 240, 1 / 60, 0.25, 1, 3]) {
+        let s: number | undefined
+        let resolved = false
+        const frames = Math.ceil(w / dt) + 1
+        for (let i = 0; i < frames && !resolved; i++) {
+          const r = tickFamilySeparation(s, 999, FOLLOW, dt, w)
+          s = r.separated
+          resolved = r.resolve
+        }
+        expect(resolved).toBe(true)
+      }
+    }
+  })
+
+  it('an out-of-reach calf keeps its parent until the window is out, then is adopted', () => {
+    const { parent, calf } = pair(0, 0)
+    calf.x = 15 // out of reach (> FOLLOW), but well inside the adoption radius
+    const herdMate: Beast = { species: 'zebra', x: 18, z: 0 }
+    const herd = [parent, calf, herdMate]
+    for (let t = 0; t < WINDOW - 1; t += 0.5) {
+      familyFrame(herd, 0.5)
+      expect(calf.parent).toBe(parent) // the bond holds while the window runs
+    }
+    while (calf.parent === parent) familyFrame(herd, 0.5)
+    expect(calf.parent).toBe(herdMate) // resolved → a LIVING parent nearby
+    expect(herdMate.child).toBe(calf)
+    expect(parent.child).toBeUndefined() // the old bond is cut on both sides
+  })
+
+  it('the released parent is not handed the same calf straight back', () => {
+    // It is the nearest eligible adult the instant its link is cleared, so
+    // without the exclusion the resolve would be a no-op and the walk toward a
+    // parent it cannot reach would simply start over.
+    const { parent, calf } = pair(0, 0)
+    calf.x = 15
+    const herd = [parent, calf]
+    while (calf.parent === parent) familyFrame(herd, 0.5)
+    expect(calf.parent).toBeUndefined() // roams on as an ordinary juvenile
+    expect(parent.child).toBeUndefined()
+  })
+
+  it('with no eligible adult the resolved calf ends PARENTLESS, never bonded to a ghost', () => {
+    const { parent, calf } = pair(0, 0)
+    calf.x = 40 // far out of reach; nothing else of its kind anywhere near
+    const predator: Beast = { species: 'lion', x: 41, z: 0 } // never an adopter
+    const otherKind: Beast = { species: 'wildebeest', x: 41, z: 1 }
+    const herd = [parent, calf, predator, otherKind]
+    for (let t = 0; t <= WINDOW + 5; t += 0.5) familyFrame(herd, 0.5)
+    expect(calf.parent).toBeUndefined()
+    expect(calf.separated).toBeUndefined() // no clock left running either
+    expect(parent.child).toBeUndefined()
+  })
+
+  it('a healthy pair at play never trips the window', () => {
+    // The scene's play cycle: a bout of balance.family.gambolBoutSeconds out at
+    // the gambol range, then the follow leg back inside the leash. The calf drops
+    // into reach once per cycle, which resets the clock — so the window never
+    // fires however long the pair grazes together.
+    const { parent, calf } = pair(0, 0)
+    const herd = [parent, calf]
+    const dt = 1 / 30
+    for (let cycle = 0; cycle < 20; cycle++) {
+      for (let t = 0; t < balance.family.gambolBoutSeconds; t += dt) {
+        calf.x = balance.family.gambolRange // out at the leash edge
+        familyFrame(herd, dt)
+      }
+      for (let t = 0; t < 12; t += dt) {
+        calf.x = 1 // followed back in and nursing (the idle gap)
+        familyFrame(herd, dt)
+      }
+      expect(calf.parent).toBe(parent)
+    }
+  })
+
+  it('the shipped window outlasts a whole play cycle', () => {
+    // GAMBOL_IDLE_SECONDS is 12 s in the scene, so one cycle is bout + 12 s; the
+    // window must sit clear above it or ordinary play would end healthy bonds.
+    expect(balance.family.reunionSeconds).toBeGreaterThan(balance.family.gambolBoutSeconds + 12)
+    expect(balance.family.reunionSeconds).toBeGreaterThan(balance.family.escapeSeconds)
   })
 })

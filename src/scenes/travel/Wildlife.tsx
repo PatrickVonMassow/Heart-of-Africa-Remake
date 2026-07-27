@@ -76,6 +76,9 @@ import {
   REGION_PREDATORS,
   parentAttackOutcome,
   findAdopter,
+  adoptionHeld,
+  severFamilyLinks,
+  tickFamilySeparation,
   tickEscapeRun,
   isPredatorSpecies,
   PREDATOR_PREY,
@@ -221,6 +224,12 @@ interface Animal {
   parent?: Animal
   /** The parent's calf/foal, guarded against predators (design.md §19). */
   child?: Animal
+  /** Seconds this juvenile has been OUT OF REACH of its parent (design.md §19.8,
+   *  point 341): accumulated while it stands farther away than the follow radius,
+   *  reset the moment it is back inside. At balance.family.reunionSeconds the bond
+   *  RESOLVES — links cleared, the young handed to the orphan adoption — so a walk
+   *  toward a parent it can never reach always has an ending. */
+  separated?: number
   /** Shore animals that also wade in and bathe, not just drink (design.md §19). */
   bathe?: boolean
   /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
@@ -2058,6 +2067,12 @@ function Herds() {
           if (a.origin === undefined) a.origin = a.chunk // birth chunk, pre-re-home
           a.chunk = v.rehomeTo
         }
+        // A removed animal leaves NO family link behind (point 341): this cull is
+        // where the §19.8 phantom was born — a calf kept its streamed-out parent
+        // (not dead, so the follow branch and the orphan adoption both accepted
+        // it) and walked to a frozen position to nurse at nothing. Severing both
+        // sides hands it to the adoption pass below in this very frame.
+        if (!v.keep) severFamilyLinks(a)
         return v.keep
       })
     }
@@ -2617,8 +2632,20 @@ function Herds() {
     // down here for EVERY species (predator cubs included, so the field can
     // never linger unticked), and the adoption resumes the moment it expires:
     // point 262's guarantee is deferred, not dropped.
+    // SEPARATION (point 341): the bond gets the same hard deadline. A juvenile
+    // out of reach of its LIVING parent — farther than the follow radius — for
+    // longer than balance.family.reunionSeconds has the bond RESOLVED here:
+    // both links cleared and the young handed straight to the adoption below, so
+    // a walk toward a parent it can never reach always ends. The clock runs only
+    // while the calf is genuinely out of reach (a gambol at the leash edge or a
+    // short flight resets it) and freezes inside a running §19.8 ending, whose
+    // own deadline resolves first. The just-released parent is barred from that
+    // frame's adoption, so the calf is not handed back to the very adult it
+    // spent the whole window failing to reach.
     {
       const ADOPTION_RADIUS = balance.family.adoptionRadius
+      const FOLLOW_RADIUS = balance.family.followRadius
+      const REUNION_SECONDS = balance.family.reunionSeconds
       for (const sp of SPECIES) {
         // Predators never adopt (a lion cub whose lioness died stays orphaned);
         // the pool is thus homogeneous and non-predator, so findAdopter's
@@ -2628,8 +2655,24 @@ function Herds() {
           if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
           if (predatorHerd) continue
           if (a.dead || a.young !== true) continue
-          if (a.parent && !a.parent.dead) continue // still has a living parent
-          const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS)
+          let released: Animal | null = null
+          if (a.parent && !a.parent.dead) {
+            const sep = tickFamilySeparation(
+              a.separated,
+              Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
+              FOLLOW_RADIUS,
+              dt,
+              REUNION_SECONDS,
+              adoptionHeld(a),
+            )
+            a.separated = sep.separated
+            if (!sep.resolve) continue // still has a living parent within reach of reuniting
+            released = a.parent
+            severFamilyLinks(a)
+          } else {
+            a.separated = undefined // no living parent to be separated from
+          }
+          const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS, { exclude: released })
           if (adopter) {
             a.parent = adopter
             adopter.child = a
@@ -4620,6 +4663,7 @@ function Herds() {
         const farOffScreen = Math.hypot(a.x - pos.x, a.z - pos.z) > despawnR
         if (consumed || farOffScreen) {
           a.gone = true // releases a scavenger flight bound to this carcass
+          severFamilyLinks(a) // no survivor holds a removed animal (point 341)
           list.splice(i, 1)
         }
       }

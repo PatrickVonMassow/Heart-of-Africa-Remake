@@ -382,6 +382,7 @@ export interface Strings {
     juvenileDrinkCrocBias: string
     calfAdoptionRadius: string
     calfEscapeSeconds: string
+    calfReunionSeconds: string
     benchmarkStart: string
     crocGripSeconds: string
     crocDriveOffRest: string
