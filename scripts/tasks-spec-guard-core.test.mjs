@@ -50,6 +50,13 @@ describe('findTrailMarker', () => {
     expect(findTrailMarker('the menu, originally\n  planned as buttons, is a dropdown')).toBe('originally planned')
   })
 
+  it('requires a word boundary, so an innocent word ENDING in a phrase is not a trail', () => {
+    // "is unchanged from" read as "changed from" and blocked a clean point (27.07.2026)
+    expect(findTrailMarker('the same village in dry weather is unchanged from today')).toBeNull()
+    // the real trail in the same sentence shape must still be caught
+    expect(findTrailMarker('the radius changed from 12 m to 30 m')).toBe('changed from')
+  })
+
   it('does not flag clean final-state spec language', () => {
     expect(findTrailMarker(CLEAN_POINT)).toBeNull()
     // legitimate baseline-vs-target framing must stay allowed
