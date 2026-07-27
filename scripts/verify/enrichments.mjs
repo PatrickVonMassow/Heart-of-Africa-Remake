@@ -272,21 +272,29 @@ await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
-// --- Point 12: map points show "?" until discovered --------------------------
-// Every place/landmark label is rendered; an undiscovered one shows a muted "?",
+// --- Point 12: map points name their KIND until discovered -------------------
+// Every place/landmark label is rendered; an undiscovered one shows a muted,
+// kind-aware placeholder (point 318 — "Unbekanntes Dorf", "Unbekannter Berg"),
 // a visited place (Cairo) shows its real name, and sighting a landmark reveals it.
-const labelsBefore = await page.evaluate(() => {
+const labelsBefore = await page.evaluate(async () => {
+  // Language-agnostic on purpose: this suite runs in ENGLISH, flow.mjs in German,
+  // so the placeholder is matched against the language FILES rather than one
+  // hard-coded wording (point 318 — a German-only regex failed here first).
+  const [{ en }, { de }] = await Promise.all([import('/src/i18n/en.ts'), import('/src/i18n/de.ts')])
+  const placeholders = new Set([...Object.values(en.unknownPlaces), ...Object.values(de.unknownPlaces)])
   const labels = [...document.querySelectorAll('.map-label')]
   return {
-    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && l.textContent.trim() === '?').length,
+    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && placeholders.has(l.textContent.trim())).length,
+    bareQuestionMarks: labels.filter((l) => l.textContent.trim() === '?').length,
     cairoNamed: labels.some((l) => !l.classList.contains('undiscovered') && /Kair|Cairo/.test(l.textContent)),
     kiliHidden: !labels.some((l) => /Kilim/.test(l.textContent)),
     seen: window.__game.getState().landmarksSeen.includes('kilimanjaro'),
   }
 })
-check('undiscovered map points show a "?" label', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('undiscovered map points name their kind', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('no map label is a bare "?" any more (point 318)', labelsBefore.bareQuestionMarks === 0, JSON.stringify(labelsBefore))
 check('a visited place (Cairo) shows its real name', labelsBefore.cairoNamed, JSON.stringify(labelsBefore))
-check('an unsighted landmark (Kilimanjaro) is hidden behind "?"', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
+check('an unsighted landmark (Kilimanjaro) is hidden behind its kind label', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
 await page.evaluate(() =>
   window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'kilimanjaro'] }),
 )

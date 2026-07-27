@@ -124,6 +124,11 @@ export const en: Strings = {
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
+  unknownPlaces: {
+    port: 'Unknown port', monument: 'Unknown monument', village: 'Unknown village',
+    mountain: 'Unknown mountain', waterfall: 'Unknown waterfall', lake: 'Unknown lake',
+    cultural: 'Unknown ruins', natural: 'Unknown landmark', site: 'Unknown site',
+  },
   equipment: {
     shovel: 'Shovel', rope: 'Rope', machete: 'Machete', rifle: 'Rifle',
     medicine: 'Medicine', canteen: 'Canteen', canoe: 'Canoe',

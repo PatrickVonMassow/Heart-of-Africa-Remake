@@ -31,7 +31,7 @@ import {
   effectiveFloraCastShadow,
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { PLACES, latLonToWorld, worldToLatLon, type PlaceDef } from '../../world/geo'
+import { PLACES, latLonToWorld, placeById, worldToLatLon, type PlaceDef } from '../../world/geo'
 import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
@@ -1775,7 +1775,9 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
       {place.kind === 'port' ? <PortMarker /> : place.kind === 'monument' ? <MonumentMarker /> : <VillageMarker />}
       {!enterHintShown && (
         <Html center position={[0, 2.9, 0]} distanceFactor={60}>
-          <div className={`map-label${discovered ? '' : ' undiscovered'}`}>{discovered ? t.places[place.id] : '?'}</div>
+          <div className={`map-label${discovered ? '' : ' undiscovered'}`}>
+            {discovered ? t.places[place.id] : t.unknownPlaces[place.kind]}
+          </div>
         </Html>
       )}
     </group>
@@ -1792,6 +1794,7 @@ function LandmarkLabels() {
   const items = useMemo(() => {
     const lakes = LAKES.map((l) => ({
       key: l.id,
+      kind: 'lake' as const,
       name: t.landmarks[l.id],
       lat: l.center[1],
       lon: l.center[0],
@@ -1800,6 +1803,7 @@ function LandmarkLabels() {
     }))
     const mountains = MOUNTAINS.map((m) => ({
       key: m.id,
+      kind: 'mountain' as const,
       name: t.landmarks[m.id],
       lat: m.lat,
       lon: m.lon,
@@ -1808,6 +1812,7 @@ function LandmarkLabels() {
     }))
     const falls = WATERFALLS.map((w) => ({
       key: w.id,
+      kind: 'waterfall' as const,
       name: t.landmarks[w.id],
       lat: w.lat,
       lon: w.lon,
@@ -1817,6 +1822,8 @@ function LandmarkLabels() {
     const g = ELEPHANT_GRAVEYARD
     const graveyard = {
       key: g.id,
+      // Neutral on purpose: naming the kind would spoil what is found here.
+      kind: 'site' as const,
       name: t.landmarks[g.id],
       lat: g.lat,
       lon: g.lon,
@@ -1825,6 +1832,7 @@ function LandmarkLabels() {
     }
     const cultural = CULTURAL_LANDMARKS.map((c) => ({
       key: c.id,
+      kind: 'cultural' as const,
       name: t.landmarks[c.id],
       lat: c.lat,
       lon: c.lon,
@@ -1835,6 +1843,7 @@ function LandmarkLabels() {
     // water features (water-label styling like the lakes).
     const natural = NATURAL_SITES.map((n) => ({
       key: n.id,
+      kind: 'natural' as const,
       name: t.landmarks[n.id],
       lat: n.lat,
       lon: n.lon,
@@ -1851,7 +1860,7 @@ function LandmarkLabels() {
         return (
           <Html key={it.key} center position={[p.x, it.y, p.z]} distanceFactor={60}>
             <div className={`map-label landmark${it.water ? ' water-label' : ''}${discovered ? '' : ' undiscovered'}`}>
-              {discovered ? it.name : '?'}
+              {discovered ? it.name : t.unknownPlaces[it.kind]}
             </div>
           </Html>
         )
@@ -2814,10 +2823,16 @@ export function TravelScene() {
     )
     // The enter hint takes precedence over the camp prompt when both are in range.
     // An UNDISCOVERED settlement's name stays hidden (point 287): the hint reads
-    // "?" to match its §17.2 "?" map label, using the SAME discovery flag
-    // (visitedPlaces) the map-label gate reads.
+    // its localized KIND placeholder to match its §17.2 map label (point 318),
+    // using the SAME discovery flag (visitedPlaces) the map-label gate reads.
     const prompt = enterId
-      ? strings.prompts.enterPlace(enterHintName(s.visitedPlaces.includes(enterId), strings.places[enterId]))
+      ? strings.prompts.enterPlace(
+          enterHintName(
+            s.visitedPlaces.includes(enterId),
+            strings.places[enterId],
+            strings.unknownPlaces[placeById(enterId).kind],
+          ),
+        )
       : nearCamp
         ? strings.prompts.openCamp
         : null
