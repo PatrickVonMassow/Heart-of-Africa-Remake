@@ -194,6 +194,8 @@ describe('the gate is wired, not merely present', () => {
     const hook = read('scripts/git-hooks/pre-push')
     expect(hook).toMatch(/^#!\/bin\/sh/)
     expect(hook).toContain('scripts/pre-push-gate.mjs')
+    // A worktree on a branch that predates the gate must stay pushable.
+    expect(hook).toContain('[ -f scripts/pre-push-gate.mjs ] || exit 0')
   })
 
   it('wires core.hooksPath from npm install rather than from memory', () => {
